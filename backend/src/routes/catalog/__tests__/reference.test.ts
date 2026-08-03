@@ -90,6 +90,20 @@ describe("GET /api/reference", () => {
     }
   });
 
+  // #1507/carried #1508 AC: a 2014 Paladin/Ranger has no Spellcasting feature
+  // until level 2 (PHB'14 p. 84/92), so level1SpellPicks must be null — never
+  // `{ spells: n > 0, maxSpellLevel: 0 }`, the incoherent shape #1508 flagged.
+  it("serves level1SpellPicks: null for a 2014 Paladin/Ranger (no Spellcasting until level 2)", async () => {
+    const response = await supertest
+      .agent(app)
+      .set("Cookie", COOKIE)
+      .get("/api/reference?edition=EDITION_2014");
+    const byName = (name: string) => response.body.classes.find((c: { name: string }) => c.name === name);
+
+    expect(byName("Paladin").level1SpellPicks).toBeNull();
+    expect(byName("Ranger").level1SpellPicks).toBeNull();
+  });
+
   // #1161: each class carries its PHB'24 primary ability/abilities so the
   // creation ability panel can flag recommended rows without re-encoding the rules.
   it("ships primaryAbility per class", async () => {
@@ -608,11 +622,15 @@ describe("GET /api/reference", () => {
   // on purpose (the describe block above); `startingEquipment` is excluded
   // because #1535 makes IT genuinely edition-divergent content too (a real
   // PHB'24 package, not the pre-#1535 2014 copy) via the same exact
-  // (classId, edition) resolution as subclasses, not a fallback. This latch
-  // guards every OTHER class field against a future "for symmetry" filter,
-  // same shape as this file's itemRarities latch (edition-invariant, not
-  // edition-resolved).
-  it("classes (apart from subclassGateLevel/subclasses/startingEquipment) and races are identical between editions (#1308/#1535)", async () => {
+  // (classId, edition) resolution as subclasses, not a fallback. `level1SpellPicks`
+  // is excluded because #1507 threads `edition` into preparedSpellCountAt/
+  // maxSpellLevelForClass — genuinely null for a 2014 Paladin/Ranger (no
+  // Spellcasting feature until level 2) where it is non-null for 2024, and a
+  // 2014 Bard/Sorcerer/Ranger spell count reads the SRD 5.1 Spells Known table
+  // instead of the SRD 5.2 Prepared Spells one. This latch guards every OTHER
+  // class field against a future "for symmetry" filter, same shape as this
+  // file's itemRarities latch (edition-invariant, not edition-resolved).
+  it("classes (apart from subclassGateLevel/subclasses/startingEquipment/level1SpellPicks) and races are identical between editions (#1308/#1535/#1507)", async () => {
     const res2014 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2014");
     const res2024 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2024");
 
@@ -621,6 +639,7 @@ describe("GET /api/reference", () => {
       delete rest.subclassGateLevel;
       delete rest.subclasses;
       delete rest.startingEquipment;
+      delete rest.level1SpellPicks;
       return rest;
     };
     expect(res2014.body.classes.map(stripEditionDivergentFields)).toEqual(

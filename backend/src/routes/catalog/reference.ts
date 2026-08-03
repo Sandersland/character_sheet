@@ -155,8 +155,10 @@ referenceRouter.get("/reference", async (req, res) => {
     startingEquipment: startingEquipmentByClassId.get(c.id) ?? null,
     // #1161/#1529: PHB'24 primary ability/abilities, off the catalog column; [] for a homebrew class.
     primaryAbility: primaryAbilities(c.primaryAbilities),
-    // #1131: level-1 creation pick counts from the SRD 5.2 tables (null for a
-    // non-caster) so the creation picker never re-encodes the rules.
+    // #1131: level-1 creation pick counts (per requesting edition, #1507) — null
+    // for a non-caster (or a 2014 Paladin/Ranger, which has no Spellcasting
+    // feature until level 2, #1508's carried AC) — so the creation picker never
+    // re-encodes the rules.
     //
     // maxSpellLevel (#1377) moves the highest-learnable-level rule off the client,
     // which hardcoded 1. Every seeded class that reaches this branch resolves to 1
@@ -164,12 +166,18 @@ referenceRouter.get("/reference", async (req, res) => {
     // call creationPickError makes: that one passes the chosen subclass, this one
     // can't (no subclass is chosen yet at this point in the ceremony). The two
     // agree at level 1; do not assume they are joined.
+    //
+    // No ability-score-driven 2014 caps read here (`null, {}` below): the 2014
+    // Cleric/Druid/Wizard/Paladin formula needs a real ability score this
+    // endpoint has none of (no character exists yet) — the actual 2014 creation
+    // count/list validation is #1510's job; this is a mechanical thread-through
+    // so the build compiles with 2024 output byte-identical.
     level1SpellPicks:
-      preparedSpellCountAt(c.name, 1) != null
+      preparedSpellCountAt(c.name, 1, null, {}, edition) != null
         ? {
             cantrips: cantripsKnownAtLevel(c.name, 1),
-            spells: preparedSpellCountAt(c.name, 1)!,
-            maxSpellLevel: maxSpellLevelForClass(c.name, 1),
+            spells: preparedSpellCountAt(c.name, 1, null, {}, edition)!,
+            maxSpellLevel: maxSpellLevelForClass(c.name, 1, null, edition),
           }
         : null,
     // 5e multiclass ability prerequisite (PHB'14 p. 163): the option thresholds plus

@@ -986,13 +986,19 @@ function buildSpellcastingOp(
   const profBonus = proficiencyBonusForLevel(level);
   const className = row.classEntries[0]?.name ?? "";
   const abilityScores = row.abilityScores as Record<string, number>;
-  const derived = deriveSpellcasting(className, level, abilityScores, profBonus);
+  const edition = editionOf(row);
+  // `subclass` stays undefined here, matching this call's pre-existing behavior
+  // (mechanical edition thread-through only, #1507 — not a scope change).
+  const derived = deriveSpellcasting(className, level, abilityScores, profBonus, undefined, edition);
   // Single-class uses the XP-derived level (per-class column can be stale) so the
   // enforced cap matches the serialized limit; multiclass uses per-entry levels.
   const limitEntries = row.classEntries.length === 1
     ? [{ name: className, level, subclass: row.classEntries[0]?.subclass ?? null }]
     : row.classEntries.map((e) => ({ name: e.name, level: e.level, subclass: e.subclass }));
-  const preparedSpellLimit = derivePreparedSpellLimit(limitEntries);
+  // Deliberate-coupling latch (#1507 D2/D3): resolves through the same
+  // derivePreparedSpellLimit as buildSpellcastingView's clamp-on-read and
+  // reconcilePreparedSpells — never a second inline copy of the cap.
+  const preparedSpellLimit = derivePreparedSpellLimit(limitEntries, abilityScores, edition);
 
   const { slotTotals, arcanaTotals } = computeSlotTables(row.spellcasting, derived);
 

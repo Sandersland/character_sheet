@@ -228,7 +228,7 @@ export function buildSpellcastingView(
   if (view === undefined) return undefined;
   // Clamp-on-read (#1127): trim any over-cap prepared spells to the derived limit
   // (the reconciler is the write-side; this is the non-destructive read fallback).
-  const limit = derivePreparedSpellLimit(preparedLimitEntries(row, primaryClass, level));
+  const limit = derivePreparedSpellLimit(preparedLimitEntries(row, primaryClass, level), abilityScores, editionOf(row));
   const raw = (view as { spells?: unknown }).spells;
   const clamped = clampPreparedToLimit(Array.isArray(raw) ? (raw as SpellEntry[]) : [], limit).spells;
   // #1381: `abilityScores` here is the same raw row.abilityScores that
@@ -308,6 +308,7 @@ function buildSingleClassSpellcastingView(
     abilityScores,
     proficiencyBonus,
     primaryClass?.subclass ?? undefined,
+    editionOf(row),
   );
   const granted = deriveGrantedSpells(primaryClass?.subclassRef, level, editionOf(row));
   const itemSpells = deriveItemSpellsFor(row); // #528: surfaced for any holder, caster or not.
@@ -333,6 +334,7 @@ function buildMulticlassSpellcastingView(
     row.classEntries.map((e) => ({ name: e.name, level: e.level, subclass: e.subclass })),
     abilityScores,
     proficiencyBonus,
+    editionOf(row),
   );
 
   // Subclass-granted spells across every class entry (each gated by its own level).
