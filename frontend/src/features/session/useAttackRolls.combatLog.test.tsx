@@ -9,7 +9,7 @@ import { renderHook } from "@testing-library/react";
 import { RollProvider } from "@/features/dice/RollContext";
 import { useAttackRolls } from "@/features/session/useAttackRolls";
 import type { AttackTallyRow } from "@/lib/attackTallySummary";
-import type { AttackEntry } from "@/lib/attackMath";
+import type { AttackEntry, DamageRider } from "@/lib/attackMath";
 import type { RollResult } from "@/lib/dice";
 
 vi.mock("@/api/client", () => ({ logRoll: vi.fn().mockResolvedValue(undefined) }));
@@ -31,6 +31,15 @@ const longsword: AttackEntry = {
 };
 
 const dagger: AttackEntry = { ...longsword, id: "dagger", name: "Dagger", logSource: "Dagger" };
+
+const FIRE_RIDER: DamageRider = {
+  id: "inv-1:rider:0",
+  spec: { count: 2, faces: 6, modifier: 0 },
+  damageType: "fire",
+  label: "+2d6 fire",
+  rollLabel: "Longsword fire damage",
+  logSource: "Longsword",
+};
 
 // die value drives whether a d20 roll comes back nat20/nat1/neither; damage
 // rolls (faces !== 20) always report `die` as their kept value.
@@ -192,5 +201,26 @@ describe("useAttackRolls — #1235 combat-log fields on the attack event", () =>
     const first = logRollSafe.mock.calls[0][5].swingId;
     const second = logRollSafe.mock.calls[1][5].swingId;
     expect(first).not.toBe(second);
+  });
+
+  it("shares the parent entry's swingId onto its rider's damage roll (#1354)", () => {
+    const { result, logRollSafe } = setup(rollReturning(10));
+    result.current.viewFor(longsword).onAttack();
+    result.current.viewFor(longsword).onDamageRider(FIRE_RIDER);
+
+    const attackExtra = logRollSafe.mock.calls[0][5];
+    const riderExtra = logRollSafe.mock.calls[1][5];
+    expect(riderExtra.swingId).toBe(attackExtra.swingId);
+  });
+
+  it("a second swing's rider carries the second swing's fresh swingId, not the first's (#1354)", () => {
+    const { result, logRollSafe } = setup(rollReturning(10));
+    result.current.viewFor(longsword).onAttack();
+    result.current.viewFor(longsword).onAttack();
+    result.current.viewFor(longsword).onDamageRider(FIRE_RIDER);
+
+    const secondAttackExtra = logRollSafe.mock.calls[1][5];
+    const riderExtra = logRollSafe.mock.calls[2][5];
+    expect(riderExtra.swingId).toBe(secondAttackExtra.swingId);
   });
 });
