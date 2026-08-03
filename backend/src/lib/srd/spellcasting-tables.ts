@@ -705,7 +705,13 @@ export function deriveSpellcasting(
 export function levelUpSpellPicks(className: string, level: number, subclass?: string | null): number {
   // #1131: a fresh level-1 entry (creation or multiclass-add) picks its full
   // prepared count — including re-prepare classes, which offer no picks after.
-  if (level <= 1) return preparedSpellCountAt(className, 1, subclass, {}, "EDITION_2024") ?? 0;
+  // #1513: Wizard is the exception — a level-1 pick fills the spellbook (6),
+  // not the prepared count (4); WIZARD_LEVEL1_SPELLBOOK_SIZE is the one place
+  // that number lives, shared with level1SpellPicksFor.
+  if (level <= 1) {
+    if (className.toLowerCase() === "wizard") return WIZARD_LEVEL1_SPELLBOOK_SIZE;
+    return preparedSpellCountAt(className, 1, subclass, {}, "EDITION_2024") ?? 0;
+  }
   if (className.toLowerCase() === "wizard") return 2;
   if (swapCadenceFor(className, subclass, "EDITION_2024") !== "onLevelUp") return 0;
   const now = preparedSpellCountAt(className, level, subclass, {}, "EDITION_2024") ?? 0;
@@ -816,8 +822,9 @@ export function maxSpellLevelForClass(
 //     long rest (derivePreparedSpellLimit). There is nothing to pick at
 //     creation, so 0 is the faithful count, not a placeholder or a guess.
 //   - "spellbook" (Wizard): a personal list distinct in SIZE from what's
-//     prepared daily — this is the SCRIBED count; the still-wrong prepared
-//     count is #1513, out of scope here.
+//     prepared daily — served by WIZARD_LEVEL1_SPELLBOOK_SIZE below (#1513),
+//     not this table, since the same split also has to reach EDITION_2024
+//     (this table is 2014-only).
 // Paladin/Ranger are absent entirely: SRD 5.1 grants no Spellcasting feature
 // at level 1 at all (spellcastingStartLevel gates them out below; this table
 // is never consulted for them).
@@ -828,13 +835,23 @@ const LEVEL1_CREATION_SPELLS_2014: Readonly<Record<string, number>> = {
   sorcerer: 2,
   // known — SRD 5.1: "At 1st level, you know two 1st-level spells of your choice from the warlock spell list."
   warlock: 2,
-  // spellbook — SRD 5.1: "...a spellbook containing six 1st-level wizard spells of your choice."
-  wizard: 6,
   // prepared-from-full-list — SRD 5.1: prepares WIS mod + level from the whole class list; no known list exists.
   cleric: 0,
   // prepared-from-full-list — SRD 5.1: prepares WIS mod + level from the whole class list; no known list exists.
   druid: 0,
 };
+
+// Wizard's level-1 SPELLBOOK size — distinct from its PREPARED count
+// (preparedSpellCountAt / PREPARED_SPELLS_BY_CLASS.wizard[0] === 4), which
+// #1513 fixes a conflation of. Both editions agree on six, so this constant
+// carries no `edition` parameter and is the ONE place the number 6 lives —
+// level1SpellPicksFor's `spells`/`spellbookSize` fields and
+// levelUpSpellPicks's level<=1 branch both read it, never a second copy.
+// SRD 5.1, Wizard, "Your Spellbook": "At 1st level, you have a spellbook
+// containing six 1st-level wizard spells of your choice." SRD 5.2, Wizard
+// level 1, Spellcasting: the spellbook starts with six level-1 wizard spells;
+// the Prepared Spells column (4 at level 1) is a separate, smaller number.
+const WIZARD_LEVEL1_SPELLBOOK_SIZE = 6;
 
 /**
  * The level-1 CREATION-time spell picks a class offers, per edition — folds in
@@ -855,24 +872,39 @@ const LEVEL1_CREATION_SPELLS_2014: Readonly<Record<string, number>> = {
  * same discipline for the zero case.
  *
  * SRD 5.2: reuses preparedSpellCountAt's fixed table directly (no separate
- * 2024 table to keep in sync). SRD 5.1: the fixed table above; cantrips are
+ * 2024 table to keep in sync) — EXCEPT Wizard, whose creation pick is its
+ * spellbook size, not its prepared count (#1513, WIZARD_LEVEL1_SPELLBOOK_SIZE).
+ * SRD 5.1: the fixed table above (Wizard excepted the same way); cantrips are
  * verified byte-identical between both editions (cantripsKnownAtLevel takes no
  * `edition`), so one call serves both branches.
+ *
+ * `spellbookSize` (#1513) is present, and equal to `spells`, ONLY for Wizard —
+ * it marks that this class's creation-pick count is the spellbook size, not
+ * the prepared cap, so a consumer can never mistake one for the other. Every
+ * other class omits the key; the prepared cap itself is never served here —
+ * callers read it from preparedSpellCountAt / derivePreparedSpellLimit.
  */
 export function level1SpellPicksFor(
   className: string,
   subclass: string | null | undefined,
   edition: RulesEdition,
-): { cantrips: number; spells: number; maxSpellLevel: number } | null {
+): { cantrips: number; spells: number; maxSpellLevel: number; spellbookSize?: number } | null {
   if (spellcastingStartLevel(className, subclass, edition) > 1) return null;
 
-  const spells =
-    edition === "EDITION_2014"
+  const isWizard = className.toLowerCase() === "wizard";
+  const spells = isWizard
+    ? WIZARD_LEVEL1_SPELLBOOK_SIZE
+    : edition === "EDITION_2014"
       ? (LEVEL1_CREATION_SPELLS_2014[className.toLowerCase()] ?? null)
       : preparedSpellCountAt(className, 1, subclass, {}, edition);
   if (spells == null) return null; // non-caster
 
   const cantrips = cantripsKnownAtLevel(className, 1, subclass);
   const maxSpellLevel = spells === 0 ? 0 : maxSpellLevelForClass(className, 1, subclass, edition);
-  return { cantrips, spells, maxSpellLevel };
+  return {
+    cantrips,
+    spells,
+    maxSpellLevel,
+    ...(isWizard ? { spellbookSize: WIZARD_LEVEL1_SPELLBOOK_SIZE } : {}),
+  };
 }
