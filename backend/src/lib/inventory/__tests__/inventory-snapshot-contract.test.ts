@@ -11,14 +11,35 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 import {
   ACTIVATED_DURATIONS,
   ACTIVATION_TYPES,
+  ARMOR_CATEGORIES,
+  ATTUNEMENT_PREREQ_KINDS,
+  CAPABILITY_KINDS,
+  EQUIP_SLOTS,
   inventorySnapshotSchema,
+  ITEM_CATEGORIES,
   ITEM_RARITY_KEYS,
   ITEM_RESOURCE_KINDS,
   ITEM_RESOURCE_PERIODS,
   snapshotCapabilitySchema,
+  WEAPON_CLASSES,
+  WEAPON_RANGES,
 } from "@character-sheet/contracts";
+import {
+  ArmorCategory,
+  CapabilityKind,
+  EquipSlot,
+  ItemCategory,
+  WeaponClass,
+  WeaponRange,
+} from "@/generated/prisma/client.js";
 import { ITEM_RARITIES } from "@/lib/srd/item-rarity.js";
-import type { ActivatedDurationKind, ActivationType, ItemResourceKind, ItemResourcePeriod } from "@character-sheet/shared-types";
+import type {
+  ActivatedDurationKind,
+  ActivationType,
+  AttunementPrereqKind,
+  ItemResourceKind,
+  ItemResourcePeriod,
+} from "@character-sheet/shared-types";
 
 const PASSIVE = { key: "cap-1", kind: "passiveBonus", target: "ac", op: "add", value: 1 };
 
@@ -186,5 +207,25 @@ describe("the tuples #1647 moved stay in step with their unions", () => {
   // ITEM_RARITIES is a rules table, not a union — latch against its keys.
   it("ITEM_RARITY_KEYS covers exactly the rarity tiers the rules table defines", () => {
     expect([...ITEM_RARITY_KEYS].sort()).toEqual(ITEM_RARITIES.map((r) => r.key).sort());
+  });
+
+  // These six were HAND-TRANSCRIBED from schema.prisma's enum blocks — the one
+  // step in this change with no compiler behind it, and transcription is what
+  // went wrong twice while it was being designed. A tuple that silently loses a
+  // member makes inventorySnapshotSchema reject a legitimate value, surfacing as
+  // a parse failure in #1648's writer with nothing failing at the definition
+  // site. Compared against the GENERATED enum objects, which Prisma rebuilds
+  // from the schema, so drift cannot survive a migration unnoticed.
+  it("Prisma-transcribed tuples cover exactly their generated enums", () => {
+    expect([...EQUIP_SLOTS].sort()).toEqual(Object.values(EquipSlot).sort());
+    expect([...ITEM_CATEGORIES].sort()).toEqual(Object.values(ItemCategory).sort());
+    expect([...ARMOR_CATEGORIES].sort()).toEqual(Object.values(ArmorCategory).sort());
+    expect([...WEAPON_CLASSES].sort()).toEqual(Object.values(WeaponClass).sort());
+    expect([...WEAPON_RANGES].sort()).toEqual(Object.values(WeaponRange).sort());
+    expect([...CAPABILITY_KINDS].sort()).toEqual(Object.values(CapabilityKind).sort());
+  });
+
+  it("ATTUNEMENT_PREREQ_KINDS stays in step with its shared union", () => {
+    expectTypeOf<(typeof ATTUNEMENT_PREREQ_KINDS)[number]>().toEqualTypeOf<AttunementPrereqKind>();
   });
 });

@@ -1,7 +1,8 @@
 // The six 5e magic-item rarity tiers (DMG p. 135) in ascending order, each with
 // its standard buy value in gp (midpoint of the DMG range). Artifacts are
-// priceless (null). This is the single source of truth for rarity rules data —
-// the frontend resolves display labels from these keys, never rendering them raw.
+// priceless (null). This is the single source of truth for the rarity gp VALUES;
+// the key domain itself moved to contracts (#1647). The frontend resolves
+// display labels from those keys, never rendering them raw.
 
 // The key domain moved to @character-sheet/contracts (#1647): inventorySnapshotSchema
 // validates against it and that package is a leaf zone, so the tuple can't live

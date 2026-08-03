@@ -90,6 +90,9 @@ export const inventorySnapshotSchema = z.strictObject({
   slot: z.enum(EQUIP_SLOTS).nullish(),
 
   rarity: z.enum(ITEM_RARITY_KEYS).nullish(),
+  // .optional() and NOT .nullish() like its neighbours: the column is
+  // Boolean @default(false) and never null, so null would be a lie. Omission is
+  // the only valid absence.
   requiresAttunement: z.boolean().optional(),
   // null kind = attunable by anyone, distinct from requiresAttunement false.
   attunementPrereqKind: z.enum(ATTUNEMENT_PREREQ_KINDS).nullish(),
