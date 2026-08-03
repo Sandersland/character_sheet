@@ -328,6 +328,25 @@ describe("useSpellPicker — spell attacks carry swingId (#1360)", () => {
     expect(retryDamage.swingId).toBe(attackId);
     expect(retryDamage.verdict).toBe("hit");
   });
+
+  it("a nat-1 attack then cast shares the swingId and carries verdict='miss' on the damage event", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0); // d20 → 1 (nat1)
+    const opts = makeOpts([attackSpell]);
+    const { result } = render(opts);
+
+    act(() => result.current.handleAttackRoll(attackSpell));
+    const attackEvent = mockLogRoll.mock.calls.map((c) => c[2]).find((e) => e.kind === "attack")!;
+    expect(attackEvent).toMatchObject({ nat20: false, nat1: true, crit: false, verdict: "miss" });
+
+    await act(async () => {
+      await result.current.handleCast(attackSpell);
+    });
+
+    const damageEvent = mockLogRoll.mock.calls.map((c) => c[2]).find((e) => e.kind === "damage")!;
+    expect(damageEvent.swingId).toBe(attackEvent.swingId);
+    expect(damageEvent.verdict).toBe("miss");
+    expect(damageEvent.crit).toBe(false);
+  });
 });
 
 // #1164: durable post-cast feedback — the result well, the log-symmetry fix

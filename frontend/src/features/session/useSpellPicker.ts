@@ -257,12 +257,13 @@ export function useSpellPicker(opts: UseSpellPickerOptions): UseSpellPicker {
     // swing's id and verdict so the two events group as one swing (#1360). A
     // save/no-attack cast has no ref entry, so it logs exactly as before.
     // Rolling damage is an implicit hit call (same rule useAttackRolls.handleDamage
-    // documents) unless the attack roll was already a crit. NOT consumed here —
-    // a rejected mutateAsync leaves handleCast's catch branch offering a retry
-    // (same row, no re-roll), so the entry must survive until handleCast's
-    // success path actually commits the cast (a failed-then-retried cast logs
-    // TWO damage events sharing one swingId, correctly — both belong to the
-    // one attack, same as a damage rider).
+    // documents) UNLESS the attack die already decided miss/crit — a nat-1
+    // attack still carries verdict "miss" onto its damage event, not "hit".
+    // NOT consumed here — a rejected mutateAsync leaves handleCast's catch
+    // branch offering a retry (same row, no re-roll), so the entry must
+    // survive until handleCast's success path actually commits the cast (a
+    // failed-then-retried cast logs TWO damage events sharing one swingId,
+    // correctly — both belong to the one attack, same as a damage rider).
     const attack = spellAttackRef.current[spell.id];
     logRollSafe(
       "damage",
@@ -270,7 +271,13 @@ export function useSpellPicker(opts: UseSpellPickerOptions): UseSpellPicker {
       result,
       castSpec,
       spell.damageType ?? undefined,
-      attack ? { swingId: attack.swingId, verdict: attack.nat20 ? "crit" : "hit", crit: attack.nat20 } : undefined,
+      attack
+        ? {
+            swingId: attack.swingId,
+            verdict: attack.nat1 ? "miss" : attack.nat20 ? "crit" : "hit",
+            crit: attack.nat20,
+          }
+        : undefined,
     );
     return { total: result.total, keptDice: result.dice.filter((d) => !d.dropped).map((d) => d.value) };
   }

@@ -239,4 +239,24 @@ describe("InlineSpellAttackSection — swingId groups attack + damage (#1360)", 
     expect(retryDamage.swingId).toBe(attackId);
     expect(retryDamage.verdict).toBe("hit");
   });
+
+  it("a nat-1 attack then cast shares the swingId and carries verdict='miss' on the damage event", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(Math, "random").mockReturnValue(0); // d20 → 1 (nat1)
+    renderSection(makeCharacter([fireBolt]));
+    const updated = makeCharacter([fireBolt]);
+    mockCast.mockResolvedValue(updated);
+
+    await user.click(screen.getByRole("button", { name: /^Attack/ }));
+    await user.click(screen.getByRole("button", { name: "Cast" }));
+    await waitFor(() => expect(cachedCharacter("char-1")).toEqual(updated));
+
+    const calls = vi.mocked(logRoll).mock.calls.map((c) => c[2]);
+    const attackEvent = calls.find((e) => e.kind === "attack")!;
+    const damageEvent = calls.find((e) => e.kind === "damage")!;
+    expect(attackEvent).toMatchObject({ nat20: false, nat1: true, crit: false, verdict: "miss" });
+    expect(damageEvent.swingId).toBe(attackEvent.swingId);
+    expect(damageEvent.verdict).toBe("miss");
+    expect(damageEvent.crit).toBe(false);
+  });
 });

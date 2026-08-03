@@ -26,7 +26,7 @@ type RollLogKind = "attack" | "damage";
 /**
  * The #1235 combat-log decomposition fields — optional so every non-weapon
  * caller (spells, tally-resolve maneuvers) can keep calling logRollSafe with
- * just the original five args. Only useAttackRolls populates this today.
+ * just the original five args.
  */
 interface RollLogExtra {
   swingId?: string;

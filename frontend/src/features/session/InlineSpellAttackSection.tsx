@@ -108,15 +108,18 @@ export default function InlineSpellAttackSection({
   function rollDamage(spell: Spell): number {
     const base = computeCastSpec(spell, 0);
     if (!base) return 0;
-    const crit = isNaturalTwenty(lastAttack[spell.id]);
-    const spec = crit ? { ...base, crit: true } : base;
+    const nat20 = isNaturalTwenty(lastAttack[spell.id]);
+    const nat1 = isNaturalOne(lastAttack[spell.id]);
+    const spec = nat20 ? { ...base, crit: true } : base;
     const result = roll(spec, `${spell.name} — damage`);
     // Shares the attack's swingId (#1360) — rolling damage is an implicit hit
-    // call (same rule useAttackRolls.handleDamage documents) unless it's a crit.
+    // call (same rule useAttackRolls.handleDamage documents) UNLESS the attack
+    // die already decided miss/crit — a nat-1 attack still carries verdict
+    // "miss" onto the damage event, not "hit".
     logRollSafe("damage", spell.name, result, spec, spell.damageType ?? undefined, {
       swingId: swingIdRef.current[spell.id],
-      verdict: crit ? "crit" : "hit",
-      crit,
+      verdict: nat1 ? "miss" : nat20 ? "crit" : "hit",
+      crit: nat20,
     });
     setLastDamage((prev) => ({ ...prev, [spell.id]: result }));
     return result.total;
