@@ -42,6 +42,13 @@ function serializeItem(row: ItemWithDetails) {
 // as its own endpoint rather than folded into GET /api/reference since the
 // consumer is the character sheet, not the creation form (see reference.ts).
 itemsRouter.get("/items", async (_req, res) => {
-  const items = await prisma.item.findMany({ orderBy: { name: "asc" }, include: itemInclude });
+  // GLOBAL only (#1645): this is the shared catalog, served to every client
+  // regardless of campaign. Once #1646 merges DM-authored rows into Item, an
+  // unpinned read would hand one campaign's homebrew to everyone.
+  const items = await prisma.item.findMany({
+    where: { scopeKey: "global" },
+    orderBy: { name: "asc" },
+    include: itemInclude,
+  });
   res.json(items.map(serializeItem));
 });

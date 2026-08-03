@@ -911,6 +911,7 @@ describe("POST /:id/events/:batchId/revert — inventory undo", () => {
       data: {
         name: INV_CATALOG_ITEM_NAME,
         category: "gear",
+        scopeKey: "global",
         weight: 1,
         cost: { cp: 0, sp: 0, gp: 1, pp: 0 },
         description: "A bundled catalog torch.",

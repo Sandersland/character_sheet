@@ -61,6 +61,7 @@ const TEST_ITEM = {
   category: "weapon" as const,
   weight: 2,
   cost: { cp: 0, sp: 1, gp: 0, pp: 0 },
+  scopeKey: "global",
 };
 const TEST_WEAPON_DETAIL = {
   damageDiceCount: 1,
@@ -81,7 +82,7 @@ describe("applyInventoryOperations", () => {
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
     const item = await prisma.item.upsert({
-      where: { name: TEST_ITEM.name },
+      where: { scopeKey_name: { scopeKey: "global", name: TEST_ITEM.name } },
       create: { ...TEST_ITEM, weaponDetail: { create: TEST_WEAPON_DETAIL } },
       update: {
         ...TEST_ITEM,

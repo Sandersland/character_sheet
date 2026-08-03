@@ -447,8 +447,14 @@ async function seedItems(prisma: PrismaClient) {
   for (const item of ITEMS) {
     const { name, category, weight, cost, description, toolCategory } = item;
     const row = await prisma.item.upsert({
-      where: { name },
-      create: { name, category, weight, cost, description, toolCategory: orNull(toolCategory), ...itemDetailCreateFields(item) },
+      // Names are unique per scope, not globally (#1645), so the seed has to
+      // say WHICH scope it owns — otherwise a DM's campaign row of the same
+      // name would be a candidate for the catalog's upsert.
+      where: { scopeKey_name: { scopeKey: "global", name } },
+      // scope/scopeKey are create-only: an existing row's scope is not the
+      // seed's to change, and writing them on update would let a reseed
+      // silently re-scope a row #1646 had moved.
+      create: { name, category, weight, cost, description, toolCategory: orNull(toolCategory), scope: "GLOBAL", scopeKey: "global", ...itemDetailCreateFields(item) },
       update: { name, category, weight, cost, description, toolCategory: orNull(toolCategory), ...itemDetailUpsertFields(item) },
     });
     itemIdsByName.set(row.name, row.id);

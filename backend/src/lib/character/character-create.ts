@@ -118,7 +118,10 @@ async function resolveFixedItems(
 
   const names = [...new Set(expanded.map((r) => r.catalogName))];
   const items = await prisma.item.findMany({
-    where: { name: { in: names } },
+    // Pinned to the GLOBAL catalog (#1645), same rule as validateOpenPick.
+    // itemByName below collapses this on name, so an unpinned read would let a
+    // campaign row OVERWRITE the catalog one and grant the wrong item entirely.
+    where: { scopeKey: "global", name: { in: names } },
     include: catalogItemDetailInclude,
   });
   const itemByName = new Map(items.map((i) => [i.name, i]));
@@ -606,7 +609,11 @@ async function validateOpenPick(
   creationToolProfs: CreationToolProf[],
 ): Promise<PhaseResult<{ ref: FixedRef }>> {
   const catalogItem = await prisma.item.findUnique({
-    where: { name: chosenName },
+    // Pinned to the GLOBAL catalog (#1645). Starting equipment resolves seeded
+    // content, so a campaign-scoped row must never satisfy an open pick — once
+    // #1646 merges DM-authored items into this table, an unpinned lookup would
+    // let a homebrew row shadow the catalog name the package meant.
+    where: { scopeKey_name: { scopeKey: "global", name: chosenName } },
     include: { weaponDetail: true },
   });
   const error = openPickFilterError(catalogItem, pick, chosenName, creationToolProfs);
