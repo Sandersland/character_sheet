@@ -15,35 +15,51 @@ interface GrantSubclassRow {
   edition: SeedEdition | null;
 }
 
+// Candidate for a SHARED (untagged) grant: the shared NULL row, else a SOLE
+// tagged candidate (The Archfey/The Great Old One, EDITION_2014-only since
+// #1233) — only that edition's characters can hold the subclass, so the
+// shared grant is unambiguous. Multiple tagged candidates resolve to nothing
+// here and fall through to throwUnresolvedGrantSubclass's ambiguity error.
+// Split out of resolveGrantSubclass purely to keep each function's cyclomatic
+// count ≤ 4: prisma/seed/** carries no coverage instrumentation
+// (vitest.config.ts scopes coverage.include to src/**), so a function here
+// floors at the uncovered CRAP formula CC^2+CC against the CI health gate —
+// the same reasoning editionLabel and its seed-subclasses.ts siblings carry.
+function sharedGrantCandidate(candidates: GrantSubclassRow[]): GrantSubclassRow | undefined {
+  const shared = candidates.find((c) => c.edition === null);
+  if (shared) return shared;
+  return candidates.length === 1 ? candidates[0] : undefined;
+}
+
+// The unresolved-grant throw, isolated for the same complexity reasoning as
+// sharedGrantCandidate above: a shared grant over a name forked into MULTIPLE
+// tagged rows is ambiguous (which fork was meant?) and a hard seed error
+// rather than a guess; anything else unresolved is an unknown subclass.
+function throwUnresolvedGrantSubclass(candidates: GrantSubclassRow[], g: SubclassGrantedSpellSeed): never {
+  if (candidates.length > 1) {
+    throw new Error(
+      `Seed error: shared (untagged) grant "${g.spellName}" targets subclass "${g.subclassName}" (${g.className}), ` +
+        `which exists only as per-edition forks — tag the grant row with an edition (or one per edition) instead`,
+    );
+  }
+  throw new Error(`Seed error: unknown subclass "${g.subclassName}" for ${g.className}`);
+}
+
 // Resolve the Subclass row a grant attaches to, from every (classId, name)
 // candidate — the key stays (classId, name) so #1408's slug rekey is a pure
 // lookup-key swap. This replaced the deterministic-but-arbitrary
 // findFirst + orderBy latch that predated the grant's own edition axis:
 //  - a TAGGED grant resolves exactly like a character of that edition would
 //    (resolveEditionRow: exact-edition row, else the shared NULL row);
-//  - a SHARED grant belongs on the shared NULL row; a sole tagged candidate
-//    (The Archfey/The Great Old One, EDITION_2014-only since #1233) also
-//    admits it, since only that edition's characters can hold the subclass;
-//  - a shared grant over a name forked into MULTIPLE tagged rows is ambiguous
-//    (which fork was meant?) and a hard seed error rather than a guess.
+//  - a SHARED grant resolves through sharedGrantCandidate above.
 function resolveGrantSubclass(
   candidates: GrantSubclassRow[],
   g: SubclassGrantedSpellSeed,
 ): GrantSubclassRow {
-  const edition = g.edition ?? null;
-  const resolved = edition
-    ? resolveEditionRow(candidates, edition)
-    : candidates.find((c) => c.edition === null) ?? (candidates.length === 1 ? candidates[0] : undefined);
-  if (!resolved) {
-    if (candidates.length > 1) {
-      throw new Error(
-        `Seed error: shared (untagged) grant "${g.spellName}" targets subclass "${g.subclassName}" (${g.className}), ` +
-          `which exists only as per-edition forks — tag the grant row with an edition (or one per edition) instead`,
-      );
-    }
-    throw new Error(`Seed error: unknown subclass "${g.subclassName}" for ${g.className}`);
-  }
-  return resolved;
+  const resolved = g.edition
+    ? resolveEditionRow(candidates, g.edition)
+    : sharedGrantCandidate(candidates);
+  return resolved ?? throwUnresolvedGrantSubclass(candidates, g);
 }
 
 // Resolve one granted-spell seed row's subclass + catalog spell to ids and
