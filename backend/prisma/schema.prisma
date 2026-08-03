@@ -1630,6 +1630,12 @@ model InventoryItem {
   // lives in the snapshot. Mutable state stays a column: ~17 call sites update
   // it with atomic update/updateMany, and a blob would make each a
   // read-modify-write.
+  //
+  // NON-NULL IFF the snapshot's `consumable.maxUses` is non-null. The rest
+  // sweep selects charged rows by `usesRemaining: { not: null }` and refills
+  // each to its snapshot maxUses, so a row that breaks this equivalence has its
+  // usesRemaining silently reset to null on the next long rest. Write the two
+  // together or not at all.
   usesRemaining         Int?
 
   capabilityUses InventoryCapabilityUse[]

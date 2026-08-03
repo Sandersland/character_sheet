@@ -557,8 +557,17 @@ async function spendItemSpellResource(
     // WHERE re-evaluates against the committed row under its write lock, so
     // racers serialize and an overdraw loses (count 0 → whole tx rolls back)
     // instead of pushing `used` past maxCharges.
+    // Scoped by inventoryItemId as well as the key: the unique constraint is
+    // (inventoryItemId, capabilityKey), so the key alone does not identify a
+    // row. Keys are per-acquisition UUIDs and a collision is not reachable
+    // today, but this is the overdraw guard — resting it on an unstated
+    // assumption is what makes such a guard quietly stop guarding.
     const spent = await ctx.tx.inventoryCapabilityUse.updateMany({
-      where: { capabilityKey: meta.poolCapabilityId, used: { lte: meta.usesTotal - chargeCost } },
+      where: {
+        inventoryItemId: meta.inventoryItemId,
+        capabilityKey: meta.poolCapabilityId,
+        used: { lte: meta.usesTotal - chargeCost },
+      },
       data: { used: { increment: chargeCost } },
     });
     if (spent.count === 0) {
@@ -568,7 +577,7 @@ async function spendItemSpellResource(
     }
     // Re-read for the event data: under a race the pre-tx snapshot is stale.
     const fresh = await ctx.tx.inventoryCapabilityUse.findFirstOrThrow({
-      where: { capabilityKey: meta.poolCapabilityId },
+      where: { inventoryItemId: meta.inventoryItemId, capabilityKey: meta.poolCapabilityId },
       select: { used: true },
     });
     poolUsedAfter = fresh.used;
@@ -577,7 +586,7 @@ async function spendItemSpellResource(
   } else if (meta.usesTotal !== Infinity) {
     await mirrorCapabilityUsedIncrement(ctx.tx, meta.capabilityId, 1);
     const updated = await ctx.tx.inventoryCapabilityUse.findFirstOrThrow({
-      where: { capabilityKey: meta.capabilityId },
+      where: { inventoryItemId: meta.inventoryItemId, capabilityKey: meta.capabilityId },
       select: { used: true },
     });
     capabilityUsedBefore = { capabilityId: meta.capabilityId, used: updated.used - 1 };

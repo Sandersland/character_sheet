@@ -9,6 +9,14 @@
 // race a read-modify-write. capabilityKey is a capability's stable snapshot
 // key (`capabilities[].key` in buildInventorySnapshot's output) — an opaque
 // string, not tied to any live row's id.
+//
+// These filter on capabilityKey ALONE while the unique constraint is
+// (inventoryItemId, capabilityKey): keys are per-acquisition UUIDs, so a key
+// identifies one row in practice, and the rest sweep's batch form is
+// deliberately cross-item. That is a deliberate trade, not an oversight — but
+// it means a caller that already knows its inventoryItemId should scope by it
+// rather than call these, which is why the spellcasting overdraw guard does
+// its own updateMany instead.
 import type { Prisma } from "@/generated/prisma/client.js";
 
 export async function mirrorCapabilityUsedSet(
