@@ -10,6 +10,7 @@ import {
   InvalidInventoryOperationError,
   revertInventoryEvent,
 } from "@/lib/inventory/inventory.js";
+import { mirrorCapabilityUsedSet, mirrorUsesRemaining } from "@/lib/inventory/inventory-capability-use.js";
 
 // Runtime-checkable set of every valid CharacterEventCategory, derived from the
 // Prisma-generated enum so it can never drift from the schema.
@@ -135,6 +136,7 @@ async function restoreConsumableCharges(
       where: { inventoryItemId: c.inventoryItemId },
       data: { usesRemaining: c.usesRemaining },
     });
+    await mirrorUsesRemaining(tx, c.inventoryItemId, c.usesRemaining);
   }
 }
 
@@ -153,6 +155,7 @@ async function restoreChargePools(
       where: { id: p.capabilityId },
       data: { used: p.used },
     });
+    await mirrorCapabilityUsedSet(tx, p.capabilityId, p.used);
   }
 }
 
@@ -228,6 +231,7 @@ async function revertSpellcastingEvent(ctx: RevertContext): Promise<void> {
       where: { id: capabilityUsed.capabilityId },
       data: { used: capabilityUsed.used },
     });
+    await mirrorCapabilityUsedSet(tx, capabilityUsed.capabilityId, capabilityUsed.used);
   }
 }
 

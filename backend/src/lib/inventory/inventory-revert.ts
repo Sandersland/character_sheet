@@ -12,6 +12,7 @@ import {
 import type { DeletedInventoryItemSnapshot } from "./inventory-snapshot.js";
 import { buildInventorySnapshot } from "./inventory-snapshot-build.js";
 import type { ArmorDetailFields, ConsumableDetailFields, WeaponDetailFields } from "./detail-snapshot.js";
+import { mirrorCapabilityUsedSet } from "./inventory-capability-use.js";
 
 // Undo / revert.
 //
@@ -190,6 +191,10 @@ async function restoreScalars(
   if (before.equippedSlot !== undefined) updateData.equippedSlot = before.equippedSlot;
   if (before.attuned !== undefined) updateData.attuned = before.attuned;
   if (before.activatedUsesSpent !== undefined) updateData.activatedUsesSpent = before.activatedUsesSpent;
+  // Promoted out of InventoryConsumableDetail (#1648) — restored in the SAME
+  // InventoryItem update as the other scalars above, mirroring the value the
+  // detail-row restore below writes.
+  if (before.usesRemaining !== undefined) updateData.usesRemaining = before.usesRemaining;
   if (Object.keys(updateData).length > 0) {
     await tx.inventoryItem.update({ where: { id: entityId }, data: updateData });
   }
@@ -207,6 +212,7 @@ async function restoreScalars(
       where: { id: before.capabilityUsed.capabilityId },
       data: { used: before.capabilityUsed.used },
     });
+    await mirrorCapabilityUsedSet(tx, before.capabilityUsed.capabilityId, before.capabilityUsed.used);
   }
 }
 

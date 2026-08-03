@@ -4,7 +4,7 @@
 // creation/mutation call sites (this file grows a describe block per task).
 import { randomUUID } from "node:crypto";
 
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { inventorySnapshotSchema } from "@character-sheet/contracts";
 import { Prisma } from "@/generated/prisma/client.js";
@@ -13,6 +13,9 @@ import { ensureTestOwner } from "@/test-support/owner.js";
 import { applyInventoryOperations, revertInventoryEvent } from "@/lib/inventory/inventory.js";
 import { awardCampaignItem, revokeCampaignItem } from "@/lib/campaign/campaign-item-award.js";
 import { createCharacter } from "@/lib/character/character-create.js";
+import { applyHitPointOperations } from "@/lib/combat/hitpoints.js";
+import { applySpellcastingOperations } from "@/lib/spellcasting/spellcasting.js";
+import { revertBatch } from "@/lib/activity/activity.js";
 import { buildInventorySnapshot, type SnapshotSourceRow } from "../inventory-snapshot-build.js";
 
 const ROW_WITH_EVERYTHING: SnapshotSourceRow = {
@@ -391,5 +394,307 @@ describe("dual-write the four creation paths (#1648)", () => {
         where: { characterId: { in: characterIds }, snapshot: { equals: Prisma.DbNull } },
       }),
     ).toBe(0);
+  });
+});
+
+// ── Task 5: dual-write the mutable state ────────────────────────────────────
+//
+// Only usesRemaining and capability `used` need mirroring (#1648's "what the
+// issue gets wrong" #2) — activatedUsesSpent is already an InventoryItem
+// column, unmoved by this issue, so item-recharge.ts needs no change despite
+// being in the issue's file list. One scenario per write family the AC names:
+// a rest sweep, a consumable use, an item spell cast, an activation, and an
+// undo. Fixtures here are raw Prisma creates (not the app-layer paths Task 4
+// covers), so each seeds its own InventoryCapabilityUse row to establish the
+// pre-mutation baseline the mirror write is checked against.
+
+const MUTABLE_SPELL = {
+  name: "Dual-Write Mutable Spell",
+  level: 1,
+  school: "evocation" as const,
+  castingTime: "1 action",
+  range: "30 ft",
+  duration: "Instantaneous",
+  description: "Test spell.",
+  concentration: false,
+  effectKind: "damage",
+  effectDiceCount: 1,
+  effectDiceFaces: 6,
+  damageType: "force",
+  classes: ["wizard"],
+};
+
+async function capabilityUse(capabilityId: string) {
+  return prisma.inventoryCapabilityUse.findFirstOrThrow({ where: { capabilityKey: capabilityId } });
+}
+
+describe("dual-write mutable inventory state (#1648)", () => {
+  let spellId: string;
+  const characterIds: string[] = [];
+
+  beforeAll(async () => {
+    await ensureTestOwner(OWNER_ID);
+    const spell = await prisma.spell.upsert({ where: { name: MUTABLE_SPELL.name }, create: MUTABLE_SPELL, update: MUTABLE_SPELL });
+    spellId = spell.id;
+  });
+
+  afterAll(async () => {
+    await prisma.character.deleteMany({ where: { id: { in: characterIds } } });
+    await prisma.spell.deleteMany({ where: { name: MUTABLE_SPELL.name } });
+  });
+
+  it("a long rest mirrors a charge-pool recharge, an item-spell reset, and a consumable recharge", async () => {
+    const characterId = await makeCharacter();
+    characterIds.push(characterId);
+
+    const wand = await prisma.inventoryItem.create({
+      data: {
+        characterId,
+        name: "Dual-Write Wand",
+        category: "gear",
+        quantity: 1,
+        requiresAttunement: true,
+        attuned: true,
+        capabilities: {
+          create: [
+            { kind: "charges", maxCharges: 7, rechargeTrigger: "dawn", rechargeBonus: 2, used: 4 },
+            { kind: "castSpell", spellId, spellName: "Test Spell", spellLevel: 1, castLevel: 1, castResource: "perRestShort", castUses: 2, used: 2 },
+          ],
+        },
+      },
+      include: { capabilities: true },
+    });
+    const poolCap = wand.capabilities.find((c) => c.kind === "charges")!;
+    const castCap = wand.capabilities.find((c) => c.kind === "castSpell")!;
+    await prisma.inventoryCapabilityUse.createMany({
+      data: [
+        { inventoryItemId: wand.id, capabilityKey: poolCap.id, used: 4 },
+        { inventoryItemId: wand.id, capabilityKey: castCap.id, used: 2 },
+      ],
+    });
+    const potion = await prisma.inventoryItem.create({
+      data: {
+        characterId,
+        name: "Dual-Write Potion",
+        category: "consumable",
+        quantity: 1,
+        usesRemaining: 1,
+        consumableDetail: { create: { maxUses: 3, usesRemaining: 1 } },
+      },
+    });
+
+    await applyHitPointOperations(characterId, [{ type: "longRest" }]);
+
+    // rechargeOneChargePool: dawn triggers on a long rest; no rechargeDice, so
+    // the regain is the flat rechargeBonus (2) — nextUsed = max(0, 4-2).
+    const poolAfter = await prisma.inventoryCapability.findUniqueOrThrow({ where: { id: poolCap.id } });
+    expect(poolAfter.used).toBe(2);
+    expect((await capabilityUse(poolCap.id)).used).toBe(2);
+
+    // resetItemSpellUsesOnRest: perRestShort recharges on short OR long.
+    const castAfter = await prisma.inventoryCapability.findUniqueOrThrow({ where: { id: castCap.id } });
+    expect(castAfter.used).toBe(0);
+    expect((await capabilityUse(castCap.id)).used).toBe(0);
+
+    const consumableDetail = await prisma.inventoryConsumableDetail.findUniqueOrThrow({ where: { inventoryItemId: potion.id } });
+    expect(consumableDetail.usesRemaining).toBe(3);
+    const potionRow = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: potion.id } });
+    expect(potionRow.usesRemaining).toBe(3);
+  });
+
+  it("a consumable use mirrors usesRemaining onto InventoryItem", async () => {
+    const characterId = await makeCharacter();
+    characterIds.push(characterId);
+    const item = await prisma.inventoryItem.create({
+      data: {
+        characterId,
+        name: "Dual-Write Elixir",
+        category: "consumable",
+        quantity: 1,
+        usesRemaining: 2,
+        consumableDetail: { create: { maxUses: 3, usesRemaining: 2 } },
+      },
+    });
+
+    await applyInventoryOperations(characterId, [{ type: "use", inventoryItemId: item.id }]);
+
+    const detail = await prisma.inventoryConsumableDetail.findUniqueOrThrow({ where: { inventoryItemId: item.id } });
+    expect(detail.usesRemaining).toBe(1);
+    const row = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: item.id } });
+    expect(row.usesRemaining).toBe(1);
+  });
+
+  it("an item-spell cast (per-capability counter) mirrors `used` onto InventoryCapabilityUse", async () => {
+    const characterId = await makeCharacter();
+    characterIds.push(characterId);
+    const item = await prisma.inventoryItem.create({
+      data: {
+        characterId,
+        name: "Dual-Write Ring",
+        category: "gear",
+        quantity: 1,
+        requiresAttunement: true,
+        attuned: true,
+        capabilities: {
+          create: [
+            { kind: "castSpell", spellId, spellName: "Test Spell", spellLevel: 1, castLevel: 1, castResource: "perRestShort", castUses: 2 },
+          ],
+        },
+      },
+      include: { capabilities: true },
+    });
+    const castCap = item.capabilities[0];
+    await prisma.inventoryCapabilityUse.create({ data: { inventoryItemId: item.id, capabilityKey: castCap.id, used: 0 } });
+    const entryId = `item:${item.id}:${spellId}:${castCap.id}`;
+
+    await applySpellcastingOperations(characterId, [{ type: "castItemSpell", entryId, roll: 9 }], OWNER_ID);
+
+    const capAfter = await prisma.inventoryCapability.findUniqueOrThrow({ where: { id: castCap.id } });
+    expect(capAfter.used).toBe(1);
+    expect((await capabilityUse(castCap.id)).used).toBe(1);
+  });
+
+  it("an item-spell cast (shared charges pool) mirrors `used` onto InventoryCapabilityUse", async () => {
+    const characterId = await makeCharacter();
+    characterIds.push(characterId);
+    const item = await prisma.inventoryItem.create({
+      data: {
+        characterId,
+        name: "Dual-Write Charged Wand",
+        category: "gear",
+        quantity: 1,
+        requiresAttunement: true,
+        attuned: true,
+        capabilities: {
+          create: [
+            { kind: "charges", maxCharges: 7, rechargeTrigger: "dawn" },
+            { kind: "castSpell", spellId, spellName: "Test Spell", spellLevel: 1, castLevel: 1, castResource: "charges", chargeCost: 3 },
+          ],
+        },
+      },
+      include: { capabilities: true },
+    });
+    const poolCap = item.capabilities.find((c) => c.kind === "charges")!;
+    const castCap = item.capabilities.find((c) => c.kind === "castSpell")!;
+    await prisma.inventoryCapabilityUse.createMany({
+      data: [
+        { inventoryItemId: item.id, capabilityKey: poolCap.id, used: 0 },
+        { inventoryItemId: item.id, capabilityKey: castCap.id, used: 0 },
+      ],
+    });
+    const entryId = `item:${item.id}:${spellId}:${castCap.id}`;
+
+    await applySpellcastingOperations(characterId, [{ type: "castItemSpell", entryId, roll: 9 }], OWNER_ID);
+
+    const poolAfter = await prisma.inventoryCapability.findUniqueOrThrow({ where: { id: poolCap.id } });
+    expect(poolAfter.used).toBe(3);
+    expect((await capabilityUse(poolCap.id)).used).toBe(3);
+  });
+
+  it("a charges-costed activation mirrors the pool's `used` onto InventoryCapabilityUse", async () => {
+    const characterId = await makeCharacter();
+    characterIds.push(characterId);
+    const item = await prisma.inventoryItem.create({
+      data: {
+        characterId,
+        name: "Dual-Write Activation Wand",
+        category: "gear",
+        quantity: 1,
+        requiresAttunement: true,
+        attuned: true,
+        capabilities: {
+          create: [
+            { kind: "charges", maxCharges: 7, rechargeTrigger: "dawn" },
+            {
+              kind: "activatedEffect",
+              activation: "commandWord",
+              target: "ac",
+              op: "add",
+              value: 1,
+              activatedDuration: "whileActive",
+              resourceKind: "charges",
+              chargeCost: 2,
+            },
+          ],
+        },
+      },
+      include: { capabilities: true },
+    });
+    const poolCap = item.capabilities.find((c) => c.kind === "charges")!;
+    await prisma.inventoryCapabilityUse.create({ data: { inventoryItemId: item.id, capabilityKey: poolCap.id, used: 0 } });
+
+    await applyInventoryOperations(characterId, [{ type: "activate", inventoryItemId: item.id }]);
+
+    const poolAfter = await prisma.inventoryCapability.findUniqueOrThrow({ where: { id: poolCap.id } });
+    expect(poolAfter.used).toBe(2);
+    expect((await capabilityUse(poolCap.id)).used).toBe(2);
+  });
+
+  it("undo restores usesRemaining's mirror alongside the InventoryConsumableDetail column", async () => {
+    const characterId = await makeCharacter();
+    characterIds.push(characterId);
+    const item = await prisma.inventoryItem.create({
+      data: {
+        characterId,
+        name: "Dual-Write Undo Elixir",
+        category: "consumable",
+        quantity: 1,
+        usesRemaining: 2,
+        consumableDetail: { create: { maxUses: 3, usesRemaining: 2 } },
+      },
+    });
+    await applyInventoryOperations(characterId, [{ type: "use", inventoryItemId: item.id }]);
+    const useEvent = await prisma.characterEvent.findFirstOrThrow({ where: { characterId, type: "consumed" } });
+
+    await prisma.$transaction((tx) => revertInventoryEvent(tx, characterId, useEvent));
+
+    const detail = await prisma.inventoryConsumableDetail.findUniqueOrThrow({ where: { inventoryItemId: item.id } });
+    expect(detail.usesRemaining).toBe(2);
+    const row = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: item.id } });
+    expect(row.usesRemaining).toBe(2);
+  });
+
+  it("undo of a charges-costed activation restores the pool's `used` mirror too", async () => {
+    const characterId = await makeCharacter();
+    characterIds.push(characterId);
+    const item = await prisma.inventoryItem.create({
+      data: {
+        characterId,
+        name: "Dual-Write Undo Activation Wand",
+        category: "gear",
+        quantity: 1,
+        requiresAttunement: true,
+        attuned: true,
+        capabilities: {
+          create: [
+            { kind: "charges", maxCharges: 7, rechargeTrigger: "dawn" },
+            {
+              kind: "activatedEffect",
+              activation: "commandWord",
+              target: "ac",
+              op: "add",
+              value: 1,
+              activatedDuration: "whileActive",
+              resourceKind: "charges",
+              chargeCost: 2,
+            },
+          ],
+        },
+      },
+      include: { capabilities: true },
+    });
+    const poolCap = item.capabilities.find((c) => c.kind === "charges")!;
+    await prisma.inventoryCapabilityUse.create({ data: { inventoryItemId: item.id, capabilityKey: poolCap.id, used: 0 } });
+
+    await applyInventoryOperations(characterId, [{ type: "activate", inventoryItemId: item.id }]);
+    expect((await capabilityUse(poolCap.id)).used).toBe(2);
+    const activateEvent = await prisma.characterEvent.findFirstOrThrow({ where: { characterId, type: "activated" } });
+
+    const undone = await revertBatch(prisma, characterId, activateEvent.batchId!);
+    expect(undone.ok).toBe(true);
+
+    const poolAfter = await prisma.inventoryCapability.findUniqueOrThrow({ where: { id: poolCap.id } });
+    expect(poolAfter.used).toBe(0);
+    expect((await capabilityUse(poolCap.id)).used).toBe(0);
   });
 });

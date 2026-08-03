@@ -13,6 +13,7 @@ import {
   type DeletedInventoryItemSnapshot,
   snapshotInventoryItemForUndo,
 } from "./inventory-snapshot.js";
+import { mirrorUsesRemaining } from "./inventory-capability-use.js";
 
 // A consumable auto-applies its effect only when it heals (#121). Non-heal
 // effects are rolled + recorded but never applied server-side.
@@ -111,6 +112,7 @@ async function persistUseDecrement(
       where: { inventoryItemId: item.id },
       data: { usesRemaining: remainingUses ?? 0 },
     });
+    await mirrorUsesRemaining(tx, item.id, remainingUses ?? 0);
   } else if (remainingQty === 0) {
     await tx.inventoryItem.delete({ where: { id: item.id } });
   } else {

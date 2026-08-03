@@ -28,6 +28,7 @@ import { sorceryPointCostForSlot, FONT_OF_MAGIC_MAX_SLOT_LEVEL } from "@/lib/cla
 import { readEffectSpec } from "@/lib/combat/effects.js";
 import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/experience.js";
 import { logEvent } from "@/lib/activity/events.js";
+import { mirrorCapabilityUsedIncrement } from "@/lib/inventory/inventory-capability-use.js";
 import { normalizeSpellcastingMutable } from "./spell-state.js";
 import { deriveGrantedSpells, deriveItemSpells, type GrantedSpellSource } from "./granted-spells.js";
 import type { ItemSpellSourceItem } from "./granted-spells.js";
@@ -548,6 +549,7 @@ async function spendItemSpellResource(
         `${entry.name} needs ${chargeCost} charge${chargeCost === 1 ? "" : "s"} — ${meta.itemName} has too few remaining`,
       );
     }
+    await mirrorCapabilityUsedIncrement(ctx.tx, meta.poolCapabilityId, chargeCost);
     // Re-read for the event data: under a race the pre-tx snapshot is stale.
     const fresh = await ctx.tx.inventoryCapability.findUniqueOrThrow({
       where: { id: meta.poolCapabilityId },
@@ -562,6 +564,7 @@ async function spendItemSpellResource(
       data: { used: { increment: 1 } },
       select: { used: true },
     });
+    await mirrorCapabilityUsedIncrement(ctx.tx, meta.capabilityId, 1);
     capabilityUsedBefore = { capabilityId: meta.capabilityId, used: updated.used - 1 };
     capabilityUsedAfter = { capabilityId: meta.capabilityId, used: updated.used };
   }
