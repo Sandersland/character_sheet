@@ -8,6 +8,7 @@ import {
   applyResourceTransactions,
   createCharacter,
   deleteCharacter,
+  deleteCharacterPortrait,
   fetchActivity,
   fetchCharacter,
   fetchCharacters,
@@ -15,6 +16,7 @@ import {
   rollInitiativeTransaction,
   updateCampaignPreferences,
   updateCharacter,
+  uploadCharacterPortrait,
 } from "@/api/characters";
 import type { CreateCharacterInput, HitPointOperation } from "@/types/character";
 
@@ -409,6 +411,79 @@ describe("revertBatch", () => {
     await expect(revertBatch("1", "batch-1")).rejects.toThrow(
       "Only the most recent batch can be reverted"
     );
+  });
+});
+
+describe("uploadCharacterPortrait", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("POSTs multipart form data with the file under the `portrait` field", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ id: "1" }) });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const file = new File(["png-bytes"], "hero.png", { type: "image/png" });
+    const result = await uploadCharacterPortrait("1", file);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/characters/1/portrait"),
+      expect.objectContaining({ method: "POST" })
+    );
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(init.body).toBeInstanceOf(FormData);
+    expect((init.body as FormData).get("portrait")).toBe(file);
+    expect(result.id).toBe("1");
+  });
+
+  it("sets NO Content-Type header — the browser must add the multipart boundary itself", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ id: "1" }) });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await uploadCharacterPortrait("1", new File(["x"], "x.png", { type: "image/png" }));
+
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(init.headers).toBeUndefined();
+  });
+
+  it("surfaces the server's { error } message on a non-ok response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: async () => ({ error: "Uploaded file is not a decodable image" }),
+      })
+    );
+
+    await expect(
+      uploadCharacterPortrait("1", new File(["x"], "x.png", { type: "image/png" }))
+    ).rejects.toThrow("Uploaded file is not a decodable image");
+  });
+});
+
+describe("deleteCharacterPortrait", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("sends a DELETE and returns the updated character", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ id: "1" }) });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await deleteCharacterPortrait("1");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/characters/1/portrait"),
+      expect.objectContaining({ method: "DELETE" })
+    );
+    expect(result.id).toBe("1");
+  });
+
+  it("throws on a non-ok response", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500 }));
+
+    await expect(deleteCharacterPortrait("1")).rejects.toThrow();
   });
 });
 
