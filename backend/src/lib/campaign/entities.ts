@@ -47,7 +47,9 @@ export async function findViewableEntity(
 ) {
   const entity = await db.campaignEntity.findUnique({
     where: { id: entityId },
-    select: { id: true, campaignId: true, visibility: true },
+    // portraitKey rides along so the entity portrait GET is one round-trip
+    // (#1657); other callers ignore the extra scalar.
+    select: { id: true, campaignId: true, visibility: true, portraitKey: true },
   });
   if (!entity || entity.campaignId !== campaignId) return null;
   return isOwner || entity.visibility !== "HIDDEN" ? entity : null;

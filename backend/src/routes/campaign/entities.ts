@@ -407,7 +407,7 @@ entitiesRouter.get("/campaigns/:id/entities/:entityId/portrait", async (req, res
   const entity = await findViewableEntity(prisma, req.params.entityId, req.params.id, role === "OWNER");
   if (!entity) throw new NotFoundError("Entity not found");
 
-  await sendStoredPortrait(res, await storedEntityPortraitKey(entity.id));
+  await sendStoredPortrait(res, entity.portraitKey);
 });
 
 // Idempotent: removing an absent portrait is a no-op 200 — the response is
