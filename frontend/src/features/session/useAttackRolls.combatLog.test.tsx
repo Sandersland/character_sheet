@@ -32,7 +32,7 @@ const longsword: AttackEntry = {
 
 const dagger: AttackEntry = { ...longsword, id: "dagger", name: "Dagger", logSource: "Dagger" };
 
-const FIRE_RIDER: DamageRider = {
+const fireRider: DamageRider = {
   id: "inv-1:rider:0",
   spec: { count: 2, faces: 6, modifier: 0 },
   damageType: "fire",
@@ -206,7 +206,7 @@ describe("useAttackRolls — #1235 combat-log fields on the attack event", () =>
   it("shares the parent entry's swingId onto its rider's damage roll (#1354)", () => {
     const { result, logRollSafe } = setup(rollReturning(10));
     result.current.viewFor(longsword).onAttack();
-    result.current.viewFor(longsword).onDamageRider(FIRE_RIDER);
+    result.current.viewFor(longsword).onDamageRider(fireRider);
 
     const attackExtra = logRollSafe.mock.calls[0][5];
     const riderExtra = logRollSafe.mock.calls[1][5];
@@ -217,7 +217,7 @@ describe("useAttackRolls — #1235 combat-log fields on the attack event", () =>
     const { result, logRollSafe } = setup(rollReturning(10));
     result.current.viewFor(longsword).onAttack();
     result.current.viewFor(longsword).onAttack();
-    result.current.viewFor(longsword).onDamageRider(FIRE_RIDER);
+    result.current.viewFor(longsword).onDamageRider(fireRider);
 
     const secondAttackExtra = logRollSafe.mock.calls[1][5];
     const riderExtra = logRollSafe.mock.calls[2][5];
