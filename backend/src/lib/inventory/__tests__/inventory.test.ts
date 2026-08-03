@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { Prisma, type CharacterEventType } from "@/generated/prisma/client.js";
@@ -790,6 +792,63 @@ describe("applyInventoryOperations", () => {
       // …and the row is back (full sell deleted it).
       const restored = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: created.id } });
       expect(restored.quantity).toBe(2);
+    });
+
+    // A pre-#1646 audit blob names the provenance FK `campaignItemId`. The log is
+    // append-only so those blobs are never rewritten; ids were preserved by the
+    // merge migration, so the legacy key still resolves and undo must honour it.
+    it("recreates a pre-merge awarded item from a legacy campaignItemId snapshot", async () => {
+      const campaign = await prisma.campaign.create({
+        data: { name: "Legacy Snapshot Campaign", ownerId: OWNER_ID, inviteCode: randomUUID() },
+      });
+      const campaignItem = await prisma.item.create({
+        data: {
+          name: "Legacy Snapshot Blade",
+          category: "gear",
+          scope: "CAMPAIGN",
+          scopeKey: `campaign:${campaign.id}`,
+          campaignId: campaign.id,
+        },
+      });
+
+      const legacySnapshot = {
+        id: "00000000-0000-0000-0000-000000000001",
+        itemId: null,
+        campaignItemId: campaignItem.id,
+        name: "Legacy Snapshot Blade",
+        category: "gear",
+        weight: null,
+        cost: null,
+        description: null,
+        quantity: 1,
+        equippedSlot: null,
+        slot: null,
+        rarity: null,
+        attuned: false,
+        requiresAttunement: false,
+        attunementPrereqKind: null,
+        attunementPrereqValue: null,
+        notes: null,
+        position: 0,
+        weaponDetail: null,
+        armorDetail: null,
+        consumableDetail: null,
+        capabilities: [],
+      };
+
+      await prisma.$transaction((tx) =>
+        revertInventoryEvent(tx, characterAId, {
+          entityId: legacySnapshot.id,
+          before: { name: legacySnapshot.name, quantity: 1, category: "gear" },
+          data: { deletedItem: legacySnapshot },
+        }),
+      );
+
+      const restored = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: legacySnapshot.id } });
+      expect(restored.itemId).toBe(campaignItem.id);
+
+      await prisma.inventoryItem.delete({ where: { id: legacySnapshot.id } });
+      await prisma.campaign.delete({ where: { id: campaign.id } });
     });
   });
 });

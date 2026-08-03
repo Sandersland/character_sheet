@@ -1,12 +1,13 @@
 import type { ArmorCategory, WeaponClass, WeaponRange } from "@/generated/prisma/client.js";
 
-// Every *Detail table (Item, CampaignItem, InventoryItem tiers — see
-// schema.prisma) carries this exact mechanical column shape. This module is
-// the one field-copy builder shared by every "snapshot one detail row into
-// another" call site: the catalog-acquire path and campaign-award path build
-// a nested Prisma create block (snapshotDetailCreate); the undo-delete
-// restore path (snapshotInventoryItemForUndo in inventory.ts) uses the flat
-// per-detail builders directly, unwrapped.
+// Every *Detail table (Item and InventoryItem tiers — see schema.prisma;
+// CAMPAIGN-scoped Item rows share Item's own tables since #1646) carries this
+// exact mechanical column shape. This module is the one field-copy builder
+// shared by every "snapshot one detail row into another" call site: the
+// catalog-acquire path and campaign-award path build a nested Prisma create
+// block (snapshotDetailCreate); the undo-delete restore path
+// (snapshotInventoryItemForUndo in inventory.ts) uses the flat per-detail
+// builders directly, unwrapped.
 
 export interface WeaponDetailFields {
   damageDiceCount: number;
