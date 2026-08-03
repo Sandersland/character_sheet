@@ -24,8 +24,24 @@ function isPrismaRecordNotFound(err: unknown): boolean {
   );
 }
 
+// Prisma's unique-constraint violation. Like P2025 it carries no `.status`, so
+// without this a duplicate would 500 — and its message embeds the absolute
+// server path and the failing query text, which is why the message is replaced
+// rather than passed through (#1646 surfaced this on campaign item names).
+//
+// Matched on the code alone: Prisma 7's driver adapter leaves `meta.target`
+// undefined and buries the violated columns under
+// meta.driverAdapterError.cause.constraint.fields, quoted inconsistently — a
+// meta.target check compiles, reads correctly, and silently never matches.
+function isPrismaUniqueViolation(err: unknown): boolean {
+  return Boolean(
+    err && typeof err === "object" && (err as { code?: unknown }).code === "P2002",
+  );
+}
+
 function statusFromError(err: unknown): number {
   if (isPrismaRecordNotFound(err)) return 404;
+  if (isPrismaUniqueViolation(err)) return 409;
   if (err && typeof err === "object") {
     const candidate = (err as { status?: unknown; statusCode?: unknown }).status ??
       (err as { statusCode?: unknown }).statusCode;
@@ -49,9 +65,11 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
   // clean "Not found" to the client instead.
   const message = isPrismaRecordNotFound(err)
     ? "Not found"
-    : err instanceof Error
-      ? err.message
-      : String(err);
+    : isPrismaUniqueViolation(err)
+      ? "That already exists"
+      : err instanceof Error
+        ? err.message
+        : String(err);
   const isProd = process.env.NODE_ENV === "production";
 
   // Log every unexpected (500) error with its stack, server-side only. Prefer
