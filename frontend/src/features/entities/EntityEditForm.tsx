@@ -1,4 +1,5 @@
 import Card from "@/components/ui/Card";
+import EntityPortraitField from "@/features/entities/EntityPortraitField";
 import { ENTITY_TYPE_OPTIONS } from "@/lib/mentions";
 import type { EntityType } from "@/types/character";
 
@@ -15,19 +16,28 @@ interface EntityForm {
   setAliases: (v: string) => void;
   notes: string;
   setNotes: (v: string) => void;
-  portraitUrl: string;
-  setPortraitUrl: (v: string) => void;
+}
+
+// Immediate-mode portrait wiring (#1617): the entity id exists, so selections
+// upload straight away. Provided only for the campaign OWNER — portrait
+// writes are owner-only, so non-owners get no control at all.
+interface PortraitControlProps {
+  imageUrl: string | null;
+  onSelect: (file: File) => void;
+  onRemove: () => void;
 }
 
 // The article's inline edit state (#842) — swaps in for the header + lead.
 export default function EntityEditForm({
   form,
   busy,
+  portrait,
   onSave,
   onCancel,
 }: {
   form: EntityForm;
   busy: boolean;
+  portrait?: PortraitControlProps;
   onSave: () => void;
   onCancel: () => void;
 }) {
@@ -73,19 +83,14 @@ export default function EntityEditForm({
             onChange={(e) => form.setAliases(e.target.value)}
           />
         </div>
-        <div>
-          <label className={labelCls} htmlFor="entity-portrait-url">
-            Portrait URL
-          </label>
-          <input
-            id="entity-portrait-url"
-            type="url"
-            placeholder="https://…"
-            className={inputCls}
-            value={form.portraitUrl}
-            onChange={(e) => form.setPortraitUrl(e.target.value)}
+        {portrait && (
+          <EntityPortraitField
+            imageUrl={portrait.imageUrl}
+            pending={busy}
+            onSelect={portrait.onSelect}
+            onRemove={portrait.onRemove}
           />
-        </div>
+        )}
         <div>
           <label className={labelCls} htmlFor="entity-notes">
             Notes

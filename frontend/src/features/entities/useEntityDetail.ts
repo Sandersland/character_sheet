@@ -3,12 +3,14 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 import {
   deleteEntity,
+  deleteEntityPortrait,
   fetchCampaign,
   fetchCampaignItemByEntity,
   fetchEntities,
   fetchEntityBacklinks,
   fetchEntityConnections,
   updateEntity,
+  uploadEntityPortrait,
 } from "@/api/client";
 import { primeCampaignEntities, useCampaignEntities } from "@/hooks/useCampaignEntities";
 import { errorMessage } from "@/lib/errorMessage";
@@ -102,7 +104,6 @@ interface EntityFormValues {
   name: string;
   aliases: string;
   notes: string;
-  portraitUrl: string;
 }
 
 function buildEntityPatch(form: EntityFormValues) {
@@ -114,7 +115,6 @@ function buildEntityPatch(form: EntityFormValues) {
       .map((a) => a.trim())
       .filter(Boolean),
     notes: form.notes.trim() === "" ? null : form.notes.trim(),
-    portraitUrl: form.portraitUrl.trim() === "" ? null : form.portraitUrl.trim(),
   };
 }
 
@@ -157,14 +157,12 @@ function useEntityForm() {
   const [name, setName] = useState("");
   const [aliases, setAliases] = useState("");
   const [notes, setNotes] = useState("");
-  const [portraitUrl, setPortraitUrl] = useState("");
   // Stable so the load effect can depend on it without re-running per render.
   const fill = useCallback((found: CampaignEntity) => {
     setType(found.type);
     setName(found.name);
     setAliases(found.aliases.join(", "));
     setNotes(found.notes ?? "");
-    setPortraitUrl(found.portraitUrl ?? "");
   }, []);
   return {
     type,
@@ -175,8 +173,6 @@ function useEntityForm() {
     setAliases,
     notes,
     setNotes,
-    portraitUrl,
-    setPortraitUrl,
     fill,
   };
 }
@@ -226,7 +222,33 @@ function useEntityMutations(ctx: {
     });
   }
 
-  return { busy, error, handleSave, handleDelete, handleToggleVisibility };
+  // Portrait writes (#1617) ride the same apply path as PATCH so the pane,
+  // rail, and shared entity cache pick up the fresh ?v= URL together.
+  function handleUploadPortrait(file: File) {
+    const { campaignId, entityId } = ctx;
+    if (!campaignId || !entityId) return;
+    void runMutation(setBusy, setError, "Failed to upload the portrait.", async () => {
+      ctx.apply(campaignId, entityId, await uploadEntityPortrait(campaignId, entityId, file));
+    });
+  }
+
+  function handleRemovePortrait() {
+    const { campaignId, entityId } = ctx;
+    if (!campaignId || !entityId) return;
+    void runMutation(setBusy, setError, "Failed to remove the portrait.", async () => {
+      ctx.apply(campaignId, entityId, await deleteEntityPortrait(campaignId, entityId));
+    });
+  }
+
+  return {
+    busy,
+    error,
+    handleSave,
+    handleDelete,
+    handleToggleVisibility,
+    handleUploadPortrait,
+    handleRemovePortrait,
+  };
 }
 
 // Loads an entity (with derived stats), its role/item/backlinks/connections, and
@@ -312,5 +334,7 @@ export function useEntityDetail(campaignId?: string, entityId?: string) {
     handleSave: mutations.handleSave,
     handleDelete: mutations.handleDelete,
     handleToggleVisibility: mutations.handleToggleVisibility,
+    handleUploadPortrait: mutations.handleUploadPortrait,
+    handleRemovePortrait: mutations.handleRemovePortrait,
   };
 }

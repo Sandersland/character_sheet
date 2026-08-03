@@ -190,7 +190,7 @@ describe("CodexLedger hover preview (#843)", () => {
   });
 
   it("shows a portrait thumbnail when set and the monogram when null (#844)", () => {
-    const url = "https://example.com/goblin.png";
+    const url = "/api/campaigns/camp-1/entities/ent-npc/portrait?v=uuid-1";
     renderLedger([{ ...GOBLIN, portraitUrl: url }, GATE]);
     const withPortrait = screen.getByRole("link", { name: /Goblin Chief/ });
     expect(withPortrait.querySelector("img")).toHaveAttribute("src", url);

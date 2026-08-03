@@ -14,10 +14,8 @@ import {
   updateCharacterSchema,
 } from "@/lib/character/character-schemas.js";
 import { assertCharacterAccess } from "@/lib/auth/access.js";
-import {
-  deletePortraitBlobBestEffort,
-  storedPortraitKey,
-} from "@/lib/character/character-portrait.js";
+import { storedPortraitKey } from "@/lib/character/character-portrait.js";
+import { deletePortraitBlobBestEffort } from "@/lib/storage/portrait-blob.js";
 
 export const charactersRouter = Router();
 

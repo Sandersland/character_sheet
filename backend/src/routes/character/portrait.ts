@@ -3,16 +3,13 @@ import { randomUUID } from "node:crypto";
 import { Router } from "express";
 
 import { assertCharacterAccess } from "@/lib/auth/access.js";
-import { NotFoundError } from "@/lib/auth/errors.js";
 import { characterInclude } from "@/lib/character/character-include.js";
-import {
-  deletePortraitBlobBestEffort,
-  storedPortraitKey,
-} from "@/lib/character/character-portrait.js";
+import { storedPortraitKey } from "@/lib/character/character-portrait.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
 import { prisma } from "@/lib/core/prisma.js";
-import { BlobNotFoundError, createBlobStore, type BlobObject } from "@/lib/storage/index.js";
-import { PORTRAIT_FIELD, portraitMultipart, sendPortrait } from "@/lib/storage/portrait-http.js";
+import { createBlobStore } from "@/lib/storage/index.js";
+import { deletePortraitBlobBestEffort } from "@/lib/storage/portrait-blob.js";
+import { PORTRAIT_FIELD, portraitMultipart, sendStoredPortrait } from "@/lib/storage/portrait-http.js";
 import { PORTRAIT_CONTENT_TYPE, reencodePortrait } from "@/lib/storage/portrait-image.js";
 
 /**
@@ -65,20 +62,7 @@ portraitRouter.post<{ id: string }>(
 
 portraitRouter.get<{ id: string }>("/", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "view");
-
-  const portraitKey = await storedPortraitKey(req.params.id);
-  if (!portraitKey) throw new NotFoundError("Portrait not found");
-
-  let blob: BlobObject;
-  try {
-    blob = await createBlobStore().get(portraitKey);
-  } catch (error) {
-    // A stored key whose blob is gone (e.g. wiped fs dir) reads as no
-    // portrait, not a server fault.
-    if (error instanceof BlobNotFoundError) throw new NotFoundError("Portrait not found");
-    throw error;
-  }
-  sendPortrait(res, blob);
+  await sendStoredPortrait(res, await storedPortraitKey(req.params.id));
 });
 
 // Idempotent: deleting an absent portrait is a no-op 200 — the response is

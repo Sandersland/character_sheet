@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
-import { createEntity } from "@/api/client";
-import { primeCampaignEntities, useCampaignEntities } from "@/hooks/useCampaignEntities";
+import EntityPortraitField from "@/features/entities/EntityPortraitField";
+import { useEntityCreate } from "@/features/entities/useEntityCreate";
 import { ENTITY_TYPE_OPTIONS } from "@/lib/mentions";
 import type { EntityType } from "@/types/character";
 
@@ -18,15 +18,19 @@ const labelCls = "block text-xs font-semibold text-parchment-700";
 // Shared codex create panel (#840): hosted inline in the desktop rail and in the
 // mobile bottom sheet. Escape dismisses; the host returns focus to its toggle.
 export default function EntityCreateForm({ campaignId, isOwner, onClose }: EntityCreateFormProps) {
-  const { entities } = useCampaignEntities(campaignId);
-  const [busy, setBusy] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
   const [type, setType] = useState<EntityType>("NPC");
   const [name, setName] = useState("");
   const [aliases, setAliases] = useState("");
-  const [portraitUrl, setPortraitUrl] = useState("");
   const [notes, setNotes] = useState("");
   const [startHidden, setStartHidden] = useState(false);
+  // Deferred portrait staging + create/upload sequencing (#1617) live in the
+  // hook; the portrait control renders only for the owner — portrait writes
+  // are a campaign-OWNER act.
+  const { busy, formError, portraitFile, setPortraitFile, createdEntity, submit } = useEntityCreate(
+    campaignId,
+    isOwner,
+    onClose,
+  );
 
   // Escape dismisses the open create panel (document-level, same pattern as DropdownMenu).
   useEffect(() => {
@@ -37,31 +41,9 @@ export default function EntityCreateForm({ campaignId, isOwner, onClose }: Entit
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
 
-  async function handleCreate() {
-    if (name.trim() === "") return;
-    setBusy(true);
-    setFormError(null);
-    try {
-      const created = await createEntity(campaignId, {
-        type,
-        name: name.trim(),
-        aliases: aliases
-          .split(",")
-          .map((a) => a.trim())
-          .filter(Boolean),
-        notes: notes.trim() === "" ? undefined : notes.trim(),
-        ...(portraitUrl.trim() === "" ? {} : { portraitUrl: portraitUrl.trim() }),
-        // Only the owner may seed visibility; the backend gates it anyway.
-        ...(isOwner && startHidden ? { visibility: "HIDDEN" as const } : {}),
-      });
-      // Prime the shared cache so the list and journal @-chips update at once.
-      primeCampaignEntities(campaignId, [...entities, created]);
-      onClose();
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Failed to create entity.");
-    } finally {
-      setBusy(false);
-    }
+  function handleCreate() {
+    if (!createdEntity && name.trim() === "") return;
+    void submit({ type, name, aliases, notes, startHidden });
   }
 
   return (
@@ -110,19 +92,14 @@ export default function EntityCreateForm({ campaignId, isOwner, onClose }: Entit
           onChange={(e) => setAliases(e.target.value)}
         />
       </div>
-      <div>
-        <label className={labelCls} htmlFor="codex-entity-portrait-url">
-          Portrait URL
-        </label>
-        <input
-          id="codex-entity-portrait-url"
-          type="url"
-          placeholder="https://…"
-          className={inputCls}
-          value={portraitUrl}
-          onChange={(e) => setPortraitUrl(e.target.value)}
+      {isOwner && (
+        <EntityPortraitField
+          file={portraitFile}
+          pending={busy}
+          onSelect={setPortraitFile}
+          onRemove={() => setPortraitFile(null)}
         />
-      </div>
+      )}
       <div>
         <label className={labelCls} htmlFor="codex-entity-notes">
           Notes
@@ -155,11 +132,11 @@ export default function EntityCreateForm({ campaignId, isOwner, onClose }: Entit
         </button>
         <button
           type="button"
-          disabled={busy || name.trim() === ""}
+          disabled={busy || (!createdEntity && name.trim() === "")}
           onClick={handleCreate}
           className="rounded-control bg-garnet-600 px-3 py-1.5 text-xs font-semibold text-parchment-50 hover:bg-garnet-700 disabled:opacity-40"
         >
-          {busy ? "Creating…" : "Create entity"}
+          {busy ? "Creating…" : createdEntity ? "Retry upload" : "Create entity"}
         </button>
       </div>
     </div>
