@@ -122,8 +122,11 @@ On Railway, run the same steps against the environment by name — the database 
 
 ```bash
 railway link --project character_sheet --environment staging --service Postgres-6QpG
-railway connect                                  # interactive psql
-railway run -- sh -c 'echo "$DATABASE_PUBLIC_URL"'   # for the Prisma CLI
+railway connect        # interactive psql
+
+# The Prisma CLI, against that environment — the URL is injected into the
+# subprocess, so it is never typed, echoed, or left in shell history.
+railway run -- sh -c 'cd backend && DATABASE_URL="$DATABASE_PUBLIC_URL" npx prisma migrate status'
 ```
 
 **Use `DATABASE_PUBLIC_URL`, never `DATABASE_URL`** — the service's own is `*.railway.internal` and is unreachable from a laptop. `railway run` injects it into a subprocess, which is how to reach the DB from a script without ever printing the credential:
