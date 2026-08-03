@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { ARMOR_CATEGORIES, WEAPON_CLASSES } from "@character-sheet/contracts";
+
 import { Prisma } from "@/generated/prisma/client.js";
 import {
   ADVANTAGE_ON,
@@ -25,8 +27,6 @@ import type { CampaignItemHolder } from "./campaign-item-award.js";
 const CATEGORIES = ["weapon", "armor", "consumable", "gear"] as const;
 // The 8 worn EquipSlot values gear may declare; MAIN_HAND/OFF_HAND/BODY are derived from detail data, never authored.
 const WORN_SLOTS = ["HEAD", "NECK", "CLOAK", "HANDS", "WRISTS", "BELT", "FEET", "RING"] as const;
-const ARMOR_CATEGORIES = ["light", "medium", "heavy", "shield"] as const;
-const WEAPON_CLASSES = ["simple", "martial"] as const;
 // fallow-ignore-next-line code-duplication -- validation literal list mirrors the catalog enum values by design
 const WEAPON_RANGES = ["melee", "ranged"] as const;
 

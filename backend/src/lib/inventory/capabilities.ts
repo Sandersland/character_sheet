@@ -3,6 +3,8 @@
 // kind-discriminated Capability. All five kinds are materialized: passiveBonus,
 // castSpell (#528), grant (#529), activatedEffect (#543), charges (#555).
 
+import { PROFICIENCY_KINDS } from "@character-sheet/contracts";
+
 import { casterFractionFor } from "@/lib/srd/srd.js";
 import type {
   ActivatedDurationKind,
@@ -27,10 +29,7 @@ import type {
 
 // The capability vocabulary is the wire contract and lives in shared-types
 // (#1273); re-exported so the ~8 backend modules importing it from here keep
-// resolving it unchanged. The as-const tuples below stay backend-side because
-// they feed the route zod schemas — capability-wire-contract.test.ts latches each
-// tuple to its shared union, which is what the deleted `(typeof X)[number]`
-// definitions used to guarantee for free.
+// resolving it unchanged.
 export type {
   ActivatedDurationKind,
   ActivationType,
@@ -51,49 +50,28 @@ export type {
   SerializedCapability,
 };
 
-// The passiveBonus target enum, as a value tuple so the route's zod schema and
-// the frontend option list share one source of truth with the shared union.
-export const CAPABILITY_TARGETS = [
-  "ac",
-  "attack",
-  "damage",
-  "save",
-  "skill",
-  "abilityScore",
-  "spellAttack",
-  "spellDc",
-  "initiative",
-  "speed",
-  "maxHp",
-] as const;
-
-export const CAPABILITY_OPS = ["add", "setTo"] as const;
-
-export const ATTUNEMENT_PREREQ_KINDS = ["class", "spellcaster", "species", "alignment"] as const;
-
-// castSpell resource + stat-mode enums (#528), value tuples so the route schema
-// and the frontend option lists share one source of truth with the shared unions.
-export const CAST_RESOURCES = ["perRestShort", "perRestLong", "perDayDawn", "perDayDusk", "atWill", "charges"] as const;
-
-export const CAST_STAT_MODES = ["fixed", "wielder"] as const;
-
-// Recharge triggers for a charges pool (#555) — the ItemResourcePeriod values,
-// as a tuple so the route schema and frontend option list share one source.
-export const CHARGE_TRIGGERS = ["short", "long", "dawn", "dusk"] as const;
-
-// grant kind (#529). "sense"/"movement" are reserved: valid enum values the DM
-// can't yet author and no derivation consumes them.
-export const GRANT_TYPES = ["resistance", "immunity", "conditionImmunity", "advantage", "proficiency"] as const;
-
-export const ADVANTAGE_ON = ["save", "check", "initiative", "attack"] as const;
-
-// What grantValue names: a damage type, a condition, a skill/ability/save key,
-// or a weapon/tool/language name. Disambiguates the flat grantValue column.
-export const GRANT_VALUE_KINDS = ["damageType", "condition", "skill", "ability", "save", "weapon", "tool", "language"] as const;
-
-// Proficiency grants name one of these categories via grantValueKind; exported
-// so capability-wire-contract.test.ts can latch it to the shared ProficiencyKind.
-export const PROFICIENCY_KINDS = ["skill", "save", "weapon", "tool", "language"] as const;
+// The capability vocabulary moved to @character-sheet/contracts (#1647): the
+// snapshot schema validates against it and that package is a leaf zone, so a
+// tuple it uses cannot live here. Re-exported so the backend modules importing
+// it from this module keep resolving unchanged, and so
+// capability-wire-contract.test.ts still latches each tuple to its shared union.
+// (CAPABILITY_KINDS has no importer through this module — it's new, not moved
+// — so it isn't re-exported here; consumers reach it via contracts directly.)
+export {
+  ADVANTAGE_ON,
+  ATTUNEMENT_PREREQ_KINDS,
+  CAPABILITY_OPS,
+  CAPABILITY_TARGETS,
+  CAST_RESOURCES,
+  CAST_STAT_MODES,
+  CHARGE_TRIGGERS,
+  GRANT_TYPES,
+  GRANT_VALUE_KINDS,
+} from "@character-sheet/contracts";
+// PROFICIENCY_KINDS is imported above (not just re-exported) because
+// collectProficiencyGrant below needs a local binding — `export { X } from`
+// alone doesn't introduce one.
+export { PROFICIENCY_KINDS };
 
 // The column-read form of a dice-valued bonus: valueDamageType is a nullable
 // column, so this stays nullable where the wire CapabilityDice is not —
