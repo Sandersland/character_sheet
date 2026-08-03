@@ -603,6 +603,28 @@ describe("roll kinds log under the `roll` category", () => {
     expect(attack!.data).not.toHaveProperty("outcome");
   });
 
+  // #1359: the dropped d20 face of an advantage/disadvantage roll survives
+  // parseRollInput -> logRollEvent all the way to the persisted event data.
+  it("persists droppedFaces on an advantage roll; a normal roll's event has no droppedFaces key", async () => {
+    const sessionId = await activeSession();
+    await agent(cookieOwner).post(rollUrl(sessionId)).send({
+      kind: "attack", source: "Longsword", total: 20, faces: [15], droppedFaces: [5], rollMode: "advantage",
+    });
+    await agent(cookieOwner).post(rollUrl(sessionId)).send({
+      kind: "attack", source: "Dagger", total: 12, faces: [7],
+    });
+
+    const events = await prisma.characterEvent.findMany({
+      where: { characterId: CHAR_OWNER, type: "attackRoll" },
+      orderBy: { createdAt: "asc" },
+    });
+    expect(events).toHaveLength(2);
+    expect(events[0].data).toMatchObject({ faces: [15], droppedFaces: [5] });
+    // Unset optional fields persist as JSON null (like `faces`/`swingId`/etc.),
+    // never as an omitted key — see logRollEvent's `rollData` object.
+    expect((events[1].data as { droppedFaces?: unknown }).droppedFaces).toBeNull();
+  });
+
   it("rejects an invalid kind, rollMode, or dc with 400", async () => {
     const sessionId = await activeSession();
     const badKind = await agent(cookieOwner).post(rollUrl(sessionId)).send({ kind: "perception", source: "x", total: 1 });

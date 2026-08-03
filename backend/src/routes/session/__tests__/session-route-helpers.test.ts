@@ -133,6 +133,40 @@ describe("parseRollInput", () => {
     expect(res.statusCode).toBeUndefined();
   });
 
+  // #1359: droppedFaces gets the exact same treatment faces does (reuses
+  // areValidFaces) — the non-kept d20 face of an advantage/disadvantage roll.
+  it("carries a valid droppedFaces through", () => {
+    const res = mockRes();
+    const roll = parseRollInput(
+      reqWith({ ...valid, faces: [15], droppedFaces: [5] }),
+      res as unknown as Response,
+    );
+    expect(res.statusCode).toBeUndefined();
+    expect(roll?.droppedFaces).toEqual([5]);
+  });
+
+  it("accepts an undefined droppedFaces (optional)", () => {
+    const res = mockRes();
+    expect(parseRollInput(reqWith({ ...valid }), res as unknown as Response)?.droppedFaces).toBeUndefined();
+    expect(res.statusCode).toBeUndefined();
+  });
+
+  it("400s when droppedFaces contains a non-positive or non-integer value", () => {
+    const res = mockRes();
+    expect(
+      parseRollInput(reqWith({ ...valid, droppedFaces: [6, 0] }), res as unknown as Response),
+    ).toBeNull();
+    expect(res.body).toEqual({ error: "droppedFaces must be an array of positive integers" });
+  });
+
+  it("400s when droppedFaces contains a non-integer string value", () => {
+    const res = mockRes();
+    expect(
+      parseRollInput(reqWith({ ...valid, droppedFaces: ["x"] }), res as unknown as Response),
+    ).toBeNull();
+    expect(res.body).toEqual({ error: "droppedFaces must be an array of positive integers" });
+  });
+
   it("400s on a non-finite dc", () => {
     const res = mockRes();
     expect(parseRollInput(reqWith({ ...valid, dc: Infinity }), res as unknown as Response)).toBeNull();

@@ -167,9 +167,23 @@ function summaryFallbackRow(e: CharacterEvent, round: number | undefined): FeedR
   return { id: e.id, round, tone: "default", segments: [{ text: e.summary }] };
 }
 
+// The leading "1d20 (...)" token for an attack roll. Plain "1d20 (12)" when
+// there's no dropped die (normal roll, or a pre-#1359 event that never
+// carried droppedFaces); "1d20 (5, 9 — lower kept)" when there is one, "lower"
+// vs "higher" decided by comparing the two recorded face VALUES — never
+// re-derived from `rollMode`, which is a separate field absent on old events.
+function attackDieToken(data: RollEventData): string | null {
+  if (!data.faces || data.faces.length === 0) return null;
+  const keptLabel = data.nat20 ? "nat 20" : `${data.faces[0]}`;
+  const dropped = data.droppedFaces?.[0];
+  if (dropped === undefined) return `1d20 (${keptLabel})`;
+  const keptWord = data.faces[0] < dropped ? "lower kept" : "higher kept";
+  return `1d20 (${keptLabel}, ${dropped} — ${keptWord})`;
+}
+
 function buildAttackDrillRow(e: CharacterEvent): DrillInRow {
   const data = (e.data ?? {}) as RollEventData;
-  const dieToken = data.faces && data.faces.length > 0 ? `1d20 (${data.nat20 ? "nat 20" : data.faces[0]})` : null;
+  const dieToken = attackDieToken(data);
   const parts = [dieToken, ...labeledAddends(data.attackComponents, ATTACK_ADDEND_LABELS)].filter(
     (p): p is string => p !== null,
   );

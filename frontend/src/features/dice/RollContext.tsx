@@ -73,6 +73,8 @@ interface RollLogInput extends RollLog {
   total: number;
   /** Raw kept die faces (non-dropped) for the Session Log breakdown. */
   faces?: number[];
+  /** The non-kept d20 face(s) of an advantage/disadvantage roll (#1359). */
+  droppedFaces?: number[];
   specLabel?: string;
   rollMode?: RollMode;
 }
@@ -166,10 +168,14 @@ export function RollProvider({ children, characterId, sessionId, onRollLogged, r
   const logResult = useCallback(
     (spec: RollSpec, log: RollLog | undefined, result: RollResult) => {
       if (!log) return;
+      // Non-empty only: an empty droppedFaces on every normal roll would be
+      // pure noise on the wire and in the persisted event log.
+      const droppedFaces = result.dice.filter((d) => d.dropped).map((d) => d.value);
       logSessionRoll({
         ...log,
         total: result.total,
         faces: result.dice.filter((d) => !d.dropped).map((d) => d.value),
+        ...(droppedFaces.length > 0 ? { droppedFaces } : {}),
         specLabel: formatRollSpec(spec),
         rollMode: spec.mode,
       });

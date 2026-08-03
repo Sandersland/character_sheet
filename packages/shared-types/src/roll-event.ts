@@ -71,6 +71,11 @@ export interface RollEventData {
   damageType?: string;
   /** Raw kept die faces (non-dropped), e.g. [12] for 1d20 or [3, 5] for 2d6. */
   faces?: number[];
+  /**
+   * The non-kept d20 face(s) of an advantage/disadvantage roll — absent for a
+   * normal roll and for pre-existing events logged before this field existed.
+   */
+  droppedFaces?: number[];
   /** Ability key for check/save/initiative rolls — source carries the display text. */
   ability?: string;
   /** Skill key for check rolls. */

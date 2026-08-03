@@ -452,6 +452,8 @@ interface LogRollParams {
   damageType?: string;
   /** Raw kept die faces (non-dropped), e.g. [12] for 1d20 or [3, 5] for 2d6. */
   faces?: number[];
+  /** Non-kept d20 face(s) of an advantage/disadvantage roll (#1359). */
+  droppedFaces?: number[];
   /** Ability key for check/save/initiative rolls (already a display-resolved source). */
   ability?: string;
   /** Skill key for check rolls. */
@@ -482,6 +484,16 @@ function buildRollSummary(params: LogRollParams): string {
   return `${source}: ${total}${dcSuffix}${specLabel ? ` (${specLabel})` : ""}`;
 }
 
+// Optional wire field -> persisted JSON value: undefined becomes null (a JSON
+// column can't hold undefined), so every unset LogRollParams field still
+// stores as an explicit null rather than an omitted key. Shared by every
+// rollData field below (#1359) so logRollEvent's own branch count doesn't
+// grow by one per optional field — the backend CI health step ratchets that
+// ceiling (#1235).
+function nullish<T>(value: T | undefined): T | null {
+  return value ?? null;
+}
+
 /**
  * Logs a single roll (attack / damage / check / save / initiative) from the
  * session UI. The caller must be an active participant of an active session.
@@ -495,14 +507,13 @@ export async function logRollEvent(
   await assertActiveParticipant(sessionId, characterId);
 
   const {
-    kind, source, total, specLabel, damageType, faces, ability, skill, dc, rollMode,
+    kind, source, total, specLabel, damageType, faces, droppedFaces, ability, skill, dc, rollMode,
     swingId, verdict, nat20, nat1, crit, modeSources, attackComponents, damageComponents,
   } = params;
   const batchId = randomUUID();
 
-  // Hoisted out of the transaction call so the `??` chain (one per optional
-  // wire field) doesn't count toward $transaction's callback's cyclomatic
-  // complexity — the backend CI health step ratchets that ceiling (#1235).
+  // Hoisted out of the transaction call so building this object doesn't count
+  // toward $transaction's callback's cyclomatic complexity (#1235).
   // target/outcome are NEVER written here — see LogRollParams' comment
   // (#1235 reserves them on the wire type for a future target/outcome
   // feature; the engine has no enemy/target model to populate them from).
@@ -510,21 +521,22 @@ export async function logRollEvent(
     kind,
     source,
     total,
-    specLabel: specLabel ?? null,
-    damageType: damageType ?? null,
-    faces: faces ?? null,
-    ability: ability ?? null,
-    skill: skill ?? null,
-    dc: dc ?? null,
-    rollMode: rollMode ?? null,
-    swingId: swingId ?? null,
-    verdict: verdict ?? null,
-    nat20: nat20 ?? null,
-    nat1: nat1 ?? null,
-    crit: crit ?? null,
-    modeSources: modeSources ?? null,
-    attackComponents: attackComponents ?? null,
-    damageComponents: damageComponents ?? null,
+    specLabel: nullish(specLabel),
+    damageType: nullish(damageType),
+    faces: nullish(faces),
+    droppedFaces: nullish(droppedFaces),
+    ability: nullish(ability),
+    skill: nullish(skill),
+    dc: nullish(dc),
+    rollMode: nullish(rollMode),
+    swingId: nullish(swingId),
+    verdict: nullish(verdict),
+    nat20: nullish(nat20),
+    nat1: nullish(nat1),
+    crit: nullish(crit),
+    modeSources: nullish(modeSources),
+    attackComponents: nullish(attackComponents),
+    damageComponents: nullish(damageComponents),
   };
 
   return prisma.$transaction(async (tx) => {
