@@ -2,7 +2,10 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { deleteCharacter } from "@/api/client";
+import { getQueryClient } from "@/api/queryClient";
+import { characterKeys } from "@/api/queryKeys";
 import Modal from "@/components/ui/Modal";
+import type { CharacterSummary } from "@/types/character";
 
 interface DeleteCharacterModalProps {
   characterId: string;
@@ -30,6 +33,16 @@ export default function DeleteCharacterModal({
     setError(null);
     try {
       await deleteCharacter(characterId);
+      // Write the list cache exactly rather than invalidating (#1660): the
+      // navigation lands inside createQueryClient's 30s staleTime, so the list
+      // page would otherwise serve the cached array with the ghost row and
+      // never refetch. The detail entry is removed outright — nothing should
+      // read a deleted character back.
+      const queryClient = getQueryClient();
+      queryClient.setQueryData<CharacterSummary[]>(characterKeys.list(), (prev) =>
+        prev?.filter((character) => character.id !== characterId),
+      );
+      queryClient.removeQueries({ queryKey: characterKeys.detail(characterId) });
       navigate("/", { replace: true });
     } catch {
       setError("Something went wrong. Please try again.");
