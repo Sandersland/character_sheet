@@ -25,6 +25,18 @@ export function creationSpellCounts(selectedClass: ClassOption | undefined): Cre
   return selectedClass?.level1SpellPicks ?? null;
 }
 
+/**
+ * The leveled-spell pick cap for creation (#1513): `spellbookSize` when served
+ * (the Wizard split — its creation pick count is a spellbook size, not its
+ * prepared cap), else `spells`. Mirrors the server gate's own precedence
+ * (`creationSpellCountError` reads the same `level1SpellPicksFor` object) so
+ * the cap can never be read two ways — the number itself is served, never
+ * derived here.
+ */
+export function creationLeveledPickCap(counts: CreationSpellCounts): number {
+  return counts.spellbookSize ?? counts.spells;
+}
+
 /** Toggle an id in a selection list; refuses to add past `cap` (deselect always allowed). */
 export function toggleCreationPick(current: string[], id: string, cap: number): string[] {
   if (current.includes(id)) return current.filter((x) => x !== id);
@@ -44,6 +56,7 @@ export function creationSpellsMissing(
   if (!counts) return [];
   const missing: string[] = [];
   if (cantripIds.length !== counts.cantrips) missing.push(`Cantrips: choose ${counts.cantrips}`);
-  if (spellIds.length !== counts.spells) missing.push(`Spells: choose ${counts.spells}`);
+  const spellsCap = creationLeveledPickCap(counts);
+  if (spellIds.length !== spellsCap) missing.push(`Spells: choose ${spellsCap}`);
   return missing;
 }

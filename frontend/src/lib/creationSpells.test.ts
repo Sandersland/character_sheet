@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import {
+  creationLeveledPickCap,
   creationSpellCounts,
   creationSpellsMissing,
   splitCreationCatalog,
@@ -60,5 +61,23 @@ describe("creationSpellsMissing — completeness labels", () => {
   });
   it("is empty for a non-caster (null counts) regardless of stray picks", () => {
     expect(creationSpellsMissing(null, ["x"], ["y"])).toEqual([]);
+  });
+  // #1513: a Wizard's served `spells` already carries the spellbook figure (6),
+  // but the label goes through creationLeveledPickCap so the cap can never be
+  // read two ways if spellbookSize and spells ever diverge.
+  it("names the Wizard's spellbook count via creationLeveledPickCap, not spells directly", () => {
+    expect(
+      creationSpellsMissing({ cantrips: 3, spells: 6, maxSpellLevel: 1, spellbookSize: 6 }, ["c1", "c2", "c3"], []),
+    ).toEqual(["Spells: choose 6"]);
+  });
+});
+
+describe("creationLeveledPickCap — the leveled-spell pick cap (#1513)", () => {
+  it("is spellbookSize when present (the Wizard split)", () => {
+    expect(creationLeveledPickCap({ cantrips: 3, spells: 6, maxSpellLevel: 1, spellbookSize: 6 })).toBe(6);
+  });
+  it("falls back to spells for every other class (no spellbookSize)", () => {
+    expect(creationLeveledPickCap({ cantrips: 2, spells: 2, maxSpellLevel: 1 })).toBe(2);
+    expect(creationLeveledPickCap({ cantrips: 0, spells: 2, maxSpellLevel: 1 })).toBe(2);
   });
 });

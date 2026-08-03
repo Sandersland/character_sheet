@@ -138,4 +138,26 @@ describe("CreationSpellsStep", () => {
     await act(async () => { resolve(CATALOG); });
     vi.useRealTimers();
   });
+
+  // #1513: the Wizard's Spells group relabels to "Spellbook" and carries the
+  // split-explaining note when counts.spellbookSize is served. Every other
+  // caster (this file's default `counts` has no spellbookSize) is unaffected —
+  // the existing tests above pin that byte-identical "Spells" behavior.
+  describe("Wizard spellbook (#1513)", () => {
+    const WIZARD_COUNTS = { cantrips: 3, spells: 6, maxSpellLevel: 1, spellbookSize: 6 };
+
+    it("labels the leveled group Spellbook, shows the split note, and caps at spellbookSize", async () => {
+      renderStep({ className: "wizard", counts: WIZARD_COUNTS });
+      expect(await screen.findByText("Cantrips 0/3 · Spellbook 0/6")).toBeInTheDocument();
+      expect(
+        screen.getByText(/All 6 spells you choose are scribed into your spellbook/),
+      ).toBeInTheDocument();
+    });
+
+    it("does not show the spellbook note or relabel for a non-wizard caster", async () => {
+      renderStep();
+      await screen.findByText("Cantrips 0/2 · Spells 0/2");
+      expect(screen.queryByText(/scribed into your spellbook/)).not.toBeInTheDocument();
+    });
+  });
 });
