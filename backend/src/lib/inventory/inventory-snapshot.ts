@@ -119,7 +119,11 @@ export function snapshotItemDetail(item: CatalogItemWithDetails) {
 export interface DeletedInventoryItemSnapshot {
   id: string;
   itemId: string | null;
-  campaignItemId: string | null;
+  // LEGACY, read-only (#1646): the pre-merge name for the same provenance FK.
+  // Audit blobs are append-only, so pre-merge snapshots still carry this key
+  // instead of itemId; resolveSnapshotRefs falls back to it on undo. No writer
+  // sets it any more — snapshotInventoryItemForUndo below only writes itemId.
+  campaignItemId?: string | null;
   name: string;
   category: ItemCategory;
   weight: number | null;
@@ -149,7 +153,6 @@ export function snapshotInventoryItemForUndo(item: InventoryItemWithDetails): De
   return {
     id: item.id,
     itemId: item.itemId,
-    campaignItemId: item.campaignItemId,
     name: item.name,
     category: item.category,
     weight: item.weight,

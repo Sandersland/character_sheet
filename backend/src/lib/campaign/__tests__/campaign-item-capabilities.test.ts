@@ -42,9 +42,11 @@ describe("capability snapshot on award (#545)", () => {
     });
     characterId = character.id;
 
-    const item = await prisma.campaignItem.create({
+    const item = await prisma.item.create({
       data: {
         campaignId,
+        scope: "CAMPAIGN",
+        scopeKey: `campaign:${campaignId}`,
         name: "Cloak of Elvenkind",
         category: "gear",
         requiresAttunement: true,
@@ -70,7 +72,7 @@ describe("capability snapshot on award (#545)", () => {
     await awardCampaignItem({ campaignId, campaignItemId, characterId, quantity: 1 });
 
     const row = await prisma.inventoryItem.findFirstOrThrow({
-      where: { characterId, campaignItemId },
+      where: { characterId, itemId: campaignItemId },
       include: inventoryItemDetailInclude,
     });
 
@@ -88,9 +90,11 @@ describe("capability snapshot on award (#545)", () => {
   });
 
   it("snapshots the charges pool columns; the awarded pool starts full (used = 0) (#555)", async () => {
-    const wand = await prisma.campaignItem.create({
+    const wand = await prisma.item.create({
       data: {
         campaignId,
+        scope: "CAMPAIGN",
+        scopeKey: `campaign:${campaignId}`,
         name: "Wand of Magic Missiles",
         category: "gear",
         capabilities: {
@@ -122,7 +126,7 @@ describe("capability snapshot on award (#545)", () => {
     await awardCampaignItem({ campaignId, campaignItemId: wand.id, characterId, quantity: 1 });
 
     const row = await prisma.inventoryItem.findFirstOrThrow({
-      where: { characterId, campaignItemId: wand.id },
+      where: { characterId, itemId: wand.id },
       include: inventoryItemDetailInclude,
     });
     const pool = row.capabilities.find((c) => c.kind === "charges")!;
@@ -138,16 +142,16 @@ describe("capability snapshot on award (#545)", () => {
     expect(cast).toMatchObject({ castResource: "charges", chargeCost: 1 });
   });
 
-  it("keeps the snapshot after the source CampaignItem is deleted (provenance FK SetNull)", async () => {
+  it("keeps the snapshot after the source Item is deleted (provenance FK SetNull)", async () => {
     await awardCampaignItem({ campaignId, campaignItemId, characterId, quantity: 1 });
-    await prisma.campaignItem.delete({ where: { id: campaignItemId } });
+    await prisma.item.delete({ where: { id: campaignItemId } });
 
     const row = await prisma.inventoryItem.findFirstOrThrow({
       where: { characterId },
       include: inventoryItemDetailInclude,
     });
     // Provenance FK nulled by SetNull, but the snapshotted capabilities survive.
-    expect(row.campaignItemId).toBeNull();
+    expect(row.itemId).toBeNull();
     expect(row.capabilities).toHaveLength(2);
     expect(row.requiresAttunement).toBe(true);
     expect(row.attunementPrereqValue).toBe("Elf");

@@ -203,7 +203,7 @@ export function chargeTriggerRechargesOn(trigger: ChargeTrigger, rest: "short" |
   return rest === "long";
 }
 
-// The flat columns shared by CampaignItemCapability and InventoryCapability.
+// The flat columns shared by ItemCapability and InventoryCapability.
 export interface CapabilityColumns {
   kind: string;
   description?: string | null;
@@ -349,7 +349,7 @@ const CAPABILITY_READERS: Record<string, ((row: CapabilityColumns) => Capability
   activatedEffect: readActivatedEffectRow,
 };
 
-// Adapter over the flat capability columns — one CampaignItemCapability row per
+// Adapter over the flat capability columns — one ItemCapability row per
 // capability, with no per-kind DB tables (the dispatch table above is code, not
 // schema). A malformed
 // passiveBonus (missing target/op) or grant (missing grantType) reads as opaque

@@ -43,13 +43,13 @@ model Character {
   // onDelete: Cascade — deleting a user removes their characters. "Only the
   // owner may read/write" is enforced (#101) via requireAuth (app.ts) +
   // assertCharacterAccess (lib/auth/access.ts), the single sharing seam (#116).
-  ownerId     String
-  owner       User    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId String
+  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
   // Optional shared-campaign link (#246). SetNull so deleting a campaign leaves
   // the character intact (just unassigned).
-  campaignId  String?
-  campaign    Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  campaignId String?
+  campaign   Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
 
   // Authoritative rules edition for this sheet (#1281/#1285), read only through
   // editionOf. Persisted for the same reason as ownerId — it isn't a function of
@@ -76,17 +76,17 @@ model Character {
   // Level-gated choices (e.g. Student of War) live in resources Json instead.
   toolProficiencies        Json
 
-  currency     Json
-  spellcasting Json?
+  currency      Json
+  spellcasting  Json?
   // Mutable resource state: { used: Record<key,count>, maneuversKnown: ManeuverEntry[] }.
   // Only `used` counts and known lists persist; totals/die-size/recharge are
   // derived at read time by deriveResources() in src/lib/srd.ts.
-  resources    Json?
+  resources     Json?
   // Mutable conditions state: { active: ConditionEntry[], exhaustion: number }.
   // `active` holds the standard 5e status conditions (prone, poisoned, etc.) by
   // boolean presence; `exhaustion` is a single 0–6 level (special case). The
   // canonical condition rules data lives in src/lib/srd.ts (CONDITIONS).
-  conditions   Json?
+  conditions    Json?
   // Mutable active-effects state: { buffs: ActiveBuff[] }. Cast-granted stat
   // modifiers (e.g. a concentration buff spell), each tagged with the casting
   // entry id so they clear when that concentration ends. Normalized on read;
@@ -120,12 +120,12 @@ model Character {
 // AuthSession tables (#100).
 
 model User {
-  id       String  @id @default(uuid())
+  id          String  @id @default(uuid())
   // Nullable + unique: an emailless bootstrap user can exist (single-player
   // today); OAuth/credential users added in #100 will carry an email.
-  email    String? @unique
-  name     String?
-  imageUrl String?
+  email       String? @unique
+  name        String?
+  imageUrl    String?
   // Account-synced player preferences (#1178: theme, dice-roll style,
   // auto-roll concentration) — typed JSON (see UserPreferences) so new keys
   // need no migration. NULL means "never stored" (distinct from a stored
@@ -152,38 +152,36 @@ model User {
 // state, access is gated by CampaignMembership via assertCampaignMembership.
 
 model Campaign {
-  id         String   @id @default(uuid())
-  name       String
+  id           String       @id @default(uuid())
+  name         String
   // The DM's default for characters created into this campaign (#1285). Never
   // authoritative for an existing sheet — Character.rulesEdition is, and joining
   // a campaign never converts it.
   rulesEdition RulesEdition @default(EDITION_2024)
-  ownerId    String
-  owner      User     @relation("CampaignOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId      String
+  owner        User         @relation("CampaignOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   // Opaque random join code (same crypto as session tokens). Unique so /join
   // resolves a campaign by code.
-  inviteCode String   @unique
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  inviteCode   String       @unique
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 
-  members    CampaignMembership[]
-  characters Character[]
+  members              CampaignMembership[]
+  characters           Character[]
   // Shared campaign wiki: NPCs/locations/factions/etc. tagged in notes (#248).
-  entities   CampaignEntity[]
+  entities             CampaignEntity[]
   // DM-authored campaign items, each auto-linked to an ITEM entity (#380).
-  items      CampaignItem[]
-  // CAMPAIGN-scoped Item rows (#1645). Named apart from `items` only because
-  // CampaignItem still holds that name; #1646 merges those rows in here, drops
-  // that model, and this becomes the sole campaign-item relation.
-  scopedItems Item[]
+  // CAMPAIGN-scoped Item rows (#1645/#1646) — the sole campaign-item relation
+  // since the CampaignItem model was merged into Item and dropped.
+  items                Item[]
   // Non-destructive "revealed to be" identity links between entities (#387).
-  entityMerges CampaignEntityMerge[]
-  sessions   Session[]
+  entityMerges         CampaignEntityMerge[]
+  sessions             Session[]
   // Per-character play preferences scoped to this campaign (#537).
   characterPreferences CampaignCharacterPreference[]
   // Named parts/arcs the journal groups sessions under (#863). Campaign-level
   // (one shared story spine), DM-curated.
-  arcs       CampaignArc[]
+  arcs                 CampaignArc[]
 }
 
 // A named part/arc of a campaign's story (#863): the journal page groups
@@ -202,7 +200,7 @@ model CampaignArc {
   position   Int
   createdAt  DateTime @default(now())
 
-  sessions   Session[]
+  sessions Session[]
 
   @@index([campaignId, position])
 }
@@ -280,8 +278,8 @@ model CampaignEntity {
   itemLink      CampaignItemLink?
   // Identity-merge back-relations (#387): the (single) merge where this entity
   // is the old identity, and the merges where it is the surviving true identity.
-  mergedInto    CampaignEntityMerge?  @relation("MergedIdentity")
-  survivorOf    CampaignEntityMerge[] @relation("SurvivorIdentity")
+  mergedInto    CampaignEntityMerge?   @relation("MergedIdentity")
+  survivorOf    CampaignEntityMerge[]  @relation("SurvivorIdentity")
 
   @@index([campaignId, type])
 }
@@ -340,177 +338,7 @@ model CampaignEntityMerge {
   @@index([survivorEntityId])
 }
 
-// --- DM-authored campaign items (#380) --------------------------------------
-// A DM-authored magic item / loot entry that lives in a campaign (NOT on any
-// character sheet). Mirrors the catalog Item shape — per-category mechanical
-// fields live on the optional 1:1 *Detail tables below, not as nullable
-// columns — plus DM-only fields (rarity, attunement, isUnique, dmNotes). On
-// create it auto-registers a HIDDEN ITEM CampaignEntity via CampaignItemLink
-// (same pattern as CampaignCharacterLink), so it is @-mentionable and gets
-// reveal/hide + backlinks for free from the #248/#379 machinery. dmNotes is
-// DM-private and is scrubbed from every player-facing payload in routes/items.ts.
-model CampaignItem {
-  id                 String       @id @default(uuid())
-  campaignId         String
-  campaign           Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  name               String
-  description        String?
-  category           ItemCategory
-  rarity             ItemRarity?
-  // Paper-doll slot for wearable gear (#565); same meaning as Item.slot.
-  slot               EquipSlot?
-  requiresAttunement Boolean      @default(false)
-  // Attunement prerequisite (#545) — null kind = attunable by anyone. Snapshotted
-  // onto InventoryItem on award so the check runs against the frozen copy.
-  attunementPrereqKind  AttunementPrereqKind?
-  attunementPrereqValue String?
-  isUnique           Boolean      @default(false)
-  weight             Float?
-  cost               Json? // {cp,sp,gp,pp} — same shape as Item.cost
-  // DM-private prep notes — never serialized into a player-facing response.
-  dmNotes            String?
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
-
-  weaponDetail     CampaignItemWeaponDetail?
-  armorDetail      CampaignItemArmorDetail?
-  consumableDetail CampaignItemConsumableDetail?
-  capabilities     CampaignItemCapability[]
-  link             CampaignItemLink?
-  // Awarded snapshots on player sheets (#381) — holder derivation reads these.
-  awards           InventoryItem[]           @relation("CampaignItemAwards")
-
-  @@index([campaignId])
-}
-
-// Same shape as ItemWeaponDetail, owned by CampaignItem.
-model CampaignItemWeaponDetail {
-  id             String       @id @default(uuid())
-  campaignItemId String       @unique
-  campaignItem   CampaignItem @relation(fields: [campaignItemId], references: [id], onDelete: Cascade)
-
-  damageDiceCount Int
-  damageDiceFaces Int
-  damageModifier  Int    @default(0)
-  damageType      String
-
-  versatileDiceCount Int?
-  versatileDiceFaces Int?
-
-  finesse     Boolean @default(false)
-  light       Boolean @default(false)
-  heavy       Boolean @default(false)
-  twoHanded   Boolean @default(false)
-  reach       Boolean @default(false)
-  thrown      Boolean @default(false)
-  ammunition  Boolean @default(false)
-  rangeNormal Int?
-  rangeLong   Int?
-
-  weaponClass WeaponClass?
-  weaponRange WeaponRange?
-}
-
-// Same shape as ItemArmorDetail, owned by CampaignItem.
-model CampaignItemArmorDetail {
-  id             String       @id @default(uuid())
-  campaignItemId String       @unique
-  campaignItem   CampaignItem @relation(fields: [campaignItemId], references: [id], onDelete: Cascade)
-
-  armorCategory       ArmorCategory
-  baseArmorClass      Int
-  dexModifierApplies  Boolean       @default(false)
-  dexModifierMax      Int?
-  stealthDisadvantage Boolean       @default(false)
-  strengthRequirement Int?
-}
-
-// Same shape as ItemConsumableDetail, owned by CampaignItem.
-model CampaignItemConsumableDetail {
-  id             String       @id @default(uuid())
-  campaignItemId String       @unique
-  campaignItem   CampaignItem @relation(fields: [campaignItemId], references: [id], onDelete: Cascade)
-
-  effectDiceCount   Int?
-  effectDiceFaces   Int?
-  effectModifier    Int?
-  effectDescription String?
-
-  // Limited-use charges (#121). null = stackable; non-null = charged.
-  maxUses       Int?
-  usesRemaining Int?
-}
-
-// Typed 1:N capability side-table (#545). Kind-discriminated with flat columns;
-// readCapability in lib/inventory/capabilities.ts is the adapter. Only passiveBonus is
-// read today. Snapshotted to InventoryCapability on award (same column set).
-model CampaignItemCapability {
-  id             String       @id @default(uuid())
-  campaignItemId String
-  campaignItem   CampaignItem @relation(fields: [campaignItemId], references: [id], onDelete: Cascade)
-
-  kind        CapabilityKind
-  description String?
-
-  // passiveBonus payload
-  target    CapabilityTarget?
-  op        CapabilityOp?
-  value     Int?
-  // Specific skill/ability/save key when target is skill|abilityScore|save.
-  targetKey String?
-  condition String?
-
-  // Dice-valued bonus (round-trips now; consumed in the damage roll at #526C).
-  valueDiceCount  Int?
-  valueDiceFaces  Int?
-  valueDamageType String?
-
-  // castSpell payload (#528): the item grants a spell cast from the item itself.
-  spellId           String? // catalog Spell.id provenance
-  spellName         String? // snapshot for display without a catalog join
-  spellLevel        Int?
-  castLevel         Int? // slot level the item casts the spell at
-  castResource      CapabilityCastResource?
-  castUses          Int? // uses per recharge period (null = 1)
-  castConcentration Boolean?
-  dcMode            CapabilityCastStatMode?
-  dcValue           Int?
-  attackMode        CapabilityCastStatMode?
-  attackValue       Int?
-
-  // activatedEffect payload (#543). The inline while-active self-buff reuses the
-  // target/op/value columns above; these add the activation + recharge model.
-  activation      ActivationType?
-  activatedDuration ActivatedDuration?
-  resourceKind    ItemResourceKind?
-  resourcePeriod  ItemResourcePeriod?
-  resourceCharges Int?
-  // Free-text wall-clock duration ("10 minutes") surfaced as reminder text.
-  durationText    String?
-
-  // grant payload (#529): resistance/immunity/conditionImmunity/advantage/proficiency.
-  grantType       String?
-  grantOn         String?
-  grantValueKind  String?
-  grantValue      String?
-  cantBeSurprised Boolean @default(false)
-
-  // charges payload (#555): the item's shared charge pool — at most ONE charges
-  // row per item (authoring-enforced). All-null recharge dice = full refill on
-  // the trigger; dawn/dusk approximate to a long rest (see ItemResourcePeriod).
-  maxCharges        Int?
-  rechargeDiceCount Int?
-  rechargeDiceFaces Int?
-  rechargeBonus     Int?
-  rechargeTrigger   ItemResourcePeriod?
-  // Cost (in pool charges) paid by a castSpell/activatedEffect capability whose
-  // resource is `charges` (null = 1). Lives on the SPENDING capability's row.
-  chargeCost        Int?
-
-  @@index([campaignItemId])
-}
-
-// Links a CampaignItem to its auto-created ITEM entity (1:1 both ways), same
+// Links a CAMPAIGN-scoped Item to its auto-created ITEM entity (1:1 both ways), same
 // pattern as CampaignCharacterLink. DELETE cleanup rule (routes/items.ts):
 // deleting the item deletes BOTH this link (cascade) AND the fronting entity
 // (explicit, in the same transaction) — the entity has no life without its item.
@@ -518,8 +346,10 @@ model CampaignItemLink {
   id               String         @id @default(uuid())
   campaignEntityId String         @unique
   campaignEntity   CampaignEntity @relation(fields: [campaignEntityId], references: [id], onDelete: Cascade)
-  campaignItemId   String         @unique
-  campaignItem     CampaignItem   @relation(fields: [campaignItemId], references: [id], onDelete: Cascade)
+  // Points at a CAMPAIGN-scoped Item since #1646 merged the two definition
+  // tables; the name still describes what it links, so the model keeps it.
+  itemId           String         @unique
+  item             Item           @relation(fields: [itemId], references: [id], onDelete: Cascade)
 }
 
 // --- Campaign-scoped character preferences (#537) ---------------------------
@@ -529,9 +359,9 @@ model CampaignItemLink {
 // campaigns. Owner-only writes via assertCharacterAccess; both FKs cascade so a
 // deleted campaign or character removes its preference rows.
 model CampaignCharacterPreference {
-  id         String   @id @default(uuid())
-  campaignId String
-  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  id          String    @id @default(uuid())
+  campaignId  String
+  campaign    Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   characterId String
   character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
 
@@ -604,23 +434,23 @@ model Race {
 }
 
 model CharacterClass {
-  id               String   @id @default(uuid())
-  name             String   @unique
-  hitDie           String // e.g. "d8"
-  savingThrows     String[] // ability names, e.g. ["strength", "constitution"]
-  skillChoiceCount Int
-  skillChoices     String[] // eligible skill names to choose from
-  isSpellcaster    Boolean  @default(false)
+  id                String   @id @default(uuid())
+  name              String   @unique
+  hitDie            String // e.g. "d8"
+  savingThrows      String[] // ability names, e.g. ["strength", "constitution"]
+  skillChoiceCount  Int
+  skillChoices      String[] // eligible skill names to choose from
+  isSpellcaster     Boolean  @default(false)
   // The 2014 (PHB'14) level at which this class first grants a subclass choice
   // — Cleric/Sorcerer/Warlock = 1, Wizard/Druid = 2, most others = 3. SRD 5.2
   // (2024) ignores this column outright: subclassGateLevel hardcodes 3 for
   // every class under EDITION_2024, so one row serves both editions (#1308).
-  subclassLevel    Int      @default(3)
+  subclassLevel     Int      @default(3)
   // Tool proficiency grants — fixed tools the class always grants.
-  toolProficiencies  String[] @default([])
+  toolProficiencies String[] @default([])
   // Tool proficiency choices — player picks toolChoiceCount from this list.
-  toolChoices        String[] @default([])
-  toolChoiceCount    Int      @default(0)
+  toolChoices       String[] @default([])
+  toolChoiceCount   Int      @default(0)
 
   // ---- #1529: the last class-table content still keyed by class NAME in
   // ---- lib/srd/ Record<string,...> literals, moved onto this row so
@@ -636,24 +466,24 @@ model CharacterClass {
   // the `subclassLevel`/`subclassGateLevel` shape: one rule function reading
   // this column with `edition` as its last parameter, never a second column
   // and never `=== "EDITION_…"`.
-  armorProficiencies  String[] @default([])
-  weaponProficiencies String[] @default([])
+  armorProficiencies      String[] @default([])
+  weaponProficiencies     String[] @default([])
   // ASI/feat slot levels BEYOND the edition-invariant base schedule
   // (4/8/12/16/19, BASE_ASI_LEVELS) — Fighter [6,14], Rogue [10], [] for
   // every other class. CLAUDE.md lists ASI levels among the rules where
   // 2014 and 2024 agree, so this is one column, no edition fork.
-  extraAsiLevels      Int[]    @default([])
+  extraAsiLevels          Int[]    @default([])
   // The character level at which this class grants a Fighting Style feat pick
   // (Fighter 1, Paladin/Ranger 2 — agrees in both editions); NULL = this class
   // never grants one. What differs by edition is feat-vs-menu (SRD 5.2 p. 47,
   // #1137's concern), not this level, so no edition fork here either.
-  fightingStyleFeatLevel Int?
+  fightingStyleFeatLevel  Int?
   // 5e multiclass ability-score prerequisite (PHB'14 p. 163): an array of AND-
   // option-groups, OR'd together — e.g. Fighter's `[{strength:13},
   // {dexterity:13}]` (the only OR class), Paladin's `[{strength:13,
   // charisma:13}]` (a single AND group). Json (not String[]) because only it
   // can express the OR-of-AND shape; edition-invariant per CLAUDE.md.
-  multiclassPrerequisites Json   @default("[]")
+  multiclassPrerequisites Json     @default("[]")
   // PHB'24 class-table "Primary Ability" column — the ability(ies) the
   // creation ability panel recommends (#1161). NOT a 2014/2024 agreement:
   // PHB'14 has no such table column (Quick Build suggestions instead), so
@@ -661,11 +491,11 @@ model CharacterClass {
   // content pretending to be shared.
   primaryAbilities        String[] @default([])
 
-  entries    CharacterClassEntry[]
-  subclasses Subclass[]
+  entries                   CharacterClassEntry[]
+  subclasses                Subclass[]
   // Back-relation only — not a column, appears on no payload unless included
   // (#1522/#1523's ClassFeature foundation).
-  features   ClassFeature[]
+  features                  ClassFeature[]
   // Back-relation only — not a column, appears on no payload unless included
   // (#1519/#1533's StartingEquipmentPackage foundation).
   startingEquipmentPackages StartingEquipmentPackage[]
@@ -746,13 +576,13 @@ model SubclassGrantedSpell {
 // relation here). classId is required (every feature belongs to a class);
 // subclassId is NULL for a base-class feature (the majority of rows).
 model ClassFeature {
-  id         String          @id @default(uuid())
-  classId    String
-  class      CharacterClass  @relation(fields: [classId], references: [id], onDelete: Cascade)
-  subclassId String?
-  subclass   Subclass?       @relation(fields: [subclassId], references: [id], onDelete: Cascade)
-  name       String
-  level      Int             // absolute character level (#1522's settled Q1 — copy 2014 subclass-grant levels verbatim)
+  id          String         @id @default(uuid())
+  classId     String
+  class       CharacterClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subclassId  String?
+  subclass    Subclass?      @relation(fields: [subclassId], references: [id], onDelete: Cascade)
+  name        String
+  level       Int // absolute character level (#1522's settled Q1 — copy 2014 subclass-grant levels verbatim)
   description String
 
   // Non-nullable, unlike Subclass/Feat/GrantedAbility/Background/Action's
@@ -779,15 +609,15 @@ model ClassFeature {
   // total (#1224).
   resourceKey      String?
   resourceLabel    String?
-  resourceRecharge String?  // RechargeOn
-  resourceTotals   Json?    // [{ minLevel, total }] — ASCENDING by minLevel, last-match-wins
-  resourceDieTiers Json?    // [{ minLevel, die }]   — ASCENDING by minLevel, last-match-wins
+  resourceRecharge String? // RechargeOn
+  resourceTotals   Json? // [{ minLevel, total }] — ASCENDING by minLevel, last-match-wins
+  resourceDieTiers Json? // [{ minLevel, die }]   — ASCENDING by minLevel, last-match-wins
 
   // Activation block — replaces this feature's DERIVED_ACTIONS row. No gate
   // columns: grantClass IS classId, grantSubclassSlugs IS subclassId,
   // grantLevel IS level — one row, one gate.
-  activationCost    String?  // ActionCost: action | bonusAction | reaction | free | special
-  resolverKind      String?  // ResolutionKind — served on the wire, retiring the frontend mirror
+  activationCost    String? // ActionCost: action | bonusAction | reaction | free | special
+  resolverKind      String? // ResolutionKind — served on the wire, retiring the frontend mirror
   requiresUnarmored Boolean  @default(false)
   regrants          String[] @default([])
 
@@ -831,7 +661,7 @@ model ClassFeature {
   // VALUE vocabulary is defined by whichever of #1530/#1120 populates it
   // first — this issue invents none. Recorded as a comment on #900.
   derivedStat      String?
-  derivedStatTiers Json?   // [{ minLevel, value }] — ASCENDING by minLevel, last-match-wins
+  derivedStatTiers Json? // [{ minLevel, value }] — ASCENDING by minLevel, last-match-wins
 
   // A closed-form save DC a subclass announces from the abilities named here
   // (#1546): 8 + proficiency bonus + the higher of these abilities' modifiers
@@ -892,11 +722,11 @@ model ClassFeature {
 // same Prisma-DSL-has-no-@@check gap as the gold-dice-jointly-null check
 // above) rather than trusting every future write path to honour it.
 model StartingEquipmentPackage {
-  id         String          @id @default(uuid())
-  classId    String?
-  class      CharacterClass? @relation(fields: [classId], references: [id], onDelete: Cascade)
+  id           String          @id @default(uuid())
+  classId      String?
+  class        CharacterClass? @relation(fields: [classId], references: [id], onDelete: Cascade)
   backgroundId String?
-  background   Background?   @relation(fields: [backgroundId], references: [id], onDelete: Cascade)
+  background   Background?     @relation(fields: [backgroundId], references: [id], onDelete: Cascade)
   // Mirror of CharacterClass.name / Background.name (whichever FK is set),
   // carried ONLY so staleCatalogRowsWhere/startingEquipmentStaleWhere can
   // partition this family's prune by (identity, edition) — that helper filters
@@ -908,8 +738,8 @@ model StartingEquipmentPackage {
   // see seed-starting-equipment.ts's pruneStaleClassPackages/
   // pruneStaleBackgroundPackages — so a `notIn: []` empty-partition trap on
   // one family can never delete the other's rows.
-  name    String
-  edition RulesEdition
+  name         String
+  edition      RulesEdition
 
   // Nullable (#1564 commit 3): PHB'24 has no roll-for-gold rule at all — NULL
   // states that truthfully ("this package has no dice alternative"), where
@@ -944,8 +774,8 @@ model StartingEquipmentGroup {
   // positionally (collectGroupRefs), and rows come back in arbitrary order
   // without an explicit orderBy — assigned by array index at seed time from a
   // nested literal, so it's deterministic by construction (#1545's lesson).
-  position Int
-  label    String
+  position  Int
+  label     String
 
   options StartingEquipmentOption[]
 
@@ -974,38 +804,38 @@ model StartingEquipmentOption {
 }
 
 model StartingEquipmentItem {
-  id       String                  @id @default(uuid())
-  optionId String
-  option   StartingEquipmentOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
-  position Int
+  id          String                  @id @default(uuid())
+  optionId    String
+  option      StartingEquipmentOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  position    Int
   // NAME reference, deliberately not a FK to Item: resolveFixedItems looks a
   // ref up against Pack FIRST and falls through to Item, so an Item FK would
   // make "Dungeoneer's Pack" unexpressible. The seed validator checks
   // ITEMS ∪ PACKS instead (assertSeedContentValid).
   catalogName String
-  quantity    Int    @default(1)
+  quantity    Int                     @default(1)
 
   @@unique([optionId, position])
 }
 
 model StartingEquipmentOpenPick {
-  id       String                  @id @default(uuid())
-  optionId String
-  option   StartingEquipmentOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
-  position Int
-  label    String
+  id                String                  @id @default(uuid())
+  optionId          String
+  option            StartingEquipmentOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  position          Int
+  label             String
   // Named after ItemWeaponDetail's columns, which openPickFilterError
   // compares against — NOT after the wire field. The wire's OpenPickFilter
   // (renamed from WeaponPoolFilter, #1564 — it filters more than weapons now)
   // calls the second one `range`; mapStartingEquipmentPackage's mapOpenPick
   // (backend lib/inventory/starting-equipment-package.ts, #1534) is the mapper
   // that renames it. If you rename either side, rename the mapper in the same diff.
-  weaponClass WeaponClass? // null = any
-  weaponRange WeaponRange? // null = any
+  weaponClass       WeaponClass? // null = any
+  weaponRange       WeaponRange? // null = any
   // Non-weapon filter axis (#1564): "musical instrument" / "artisan tool"
   // pool, e.g. the Bard's "musical instrument of your choice". Mirrors
   // Item.toolCategory, which openPickFilterError compares against.
-  toolCategory ToolCategory? // null = not tool-filtered
+  toolCategory      ToolCategory? // null = not tool-filtered
   // True when this pick isn't a free choice at all but must match ONE OF the
   // character's own creation tool choices (creationToolProfs) — Monk's
   // "Artisan's Tools or Musical Instrument chosen for the tool proficiency
@@ -1013,8 +843,8 @@ model StartingEquipmentOpenPick {
   // proficiency in it, which the book does not permit. Also serves the
   // Soldier background's "Gaming Set (same as above)" (#1565) — same
   // mechanism, no second one built for it.
-  boundToToolChoice Boolean @default(false)
-  quantity    Int          @default(1)
+  boundToToolChoice Boolean                 @default(false)
+  quantity          Int                     @default(1)
 
   @@unique([optionId, position])
 }
@@ -1036,7 +866,7 @@ model Background {
   // place the fallback ordering lives.
   edition            RulesEdition?
 
-  selections CharacterBackground[]
+  selections                CharacterBackground[]
   // Back-relation only — not a column, appears on no payload unless included
   // (#1565's StartingEquipmentPackage reuse, see that model's own comment).
   startingEquipmentPackages StartingEquipmentPackage[]
@@ -1301,26 +1131,26 @@ enum SpellSchool {
 // Adding a new action = append a row to seed.ts + add the effect fn in
 // actions.ts. No migration needed for new actions; only new columns need one.
 model Action {
-  id          String     @id @default(uuid())
-  key         String               // stable machine key, e.g. "rage" | "dodge"
-  name        String               // display label
+  id          String @id @default(uuid())
+  key         String // stable machine key, e.g. "rage" | "dodge"
+  name        String // display label
   description String
 
   // Which economy slot this action consumes on the character's turn.
-  cost        ActionCost
+  cost ActionCost
 
   // Gating — universal actions are available to everyone; class/subclass/level
   // actions are gated by the character's class entry.
-  universal   Boolean    @default(false)
-  grantClass  String?    // lowercase class name, e.g. "fighter"
-  grantSubclass String?  // lowercase subclass name (optional, for subclass-only abilities)
-  grantLevel  Int?       // minimum character level for this action to appear
+  universal     Boolean @default(false)
+  grantClass    String? // lowercase class name, e.g. "fighter"
+  grantSubclass String? // lowercase subclass name (optional, for subclass-only abilities)
+  grantLevel    Int? // minimum character level for this action to appear
 
   // Optional scalar resource-spend hint — used by deriveActions to determine
   // `enabled` (e.g. Rage costs 1 "rage"; Flurry costs 2 "ki"). No program,
   // just two columns that let deriveActions check remaining > amount.
   resourceKey    String? // matches DerivedResource.key, e.g. "rage"
-  resourceAmount Int?    // units required; null means no resource check needed
+  resourceAmount Int? // units required; null means no resource check needed
 
   // NULL = valid in both editions (#1306) — still true for every class row.
   // Every `universal: true` row is now forked (#1430): each `description` is a
@@ -1360,15 +1190,15 @@ model GrantedAbility {
   // placement routes the session UI: attackRoll | damageRoll | reaction | effect
   // | attackOption. actionSlot is the economy slot consumed (bonusAction/reaction),
   // null when none. selfTempHp = Rally (die + Cha mod as self temp HP).
-  placement   String?
-  actionSlot  String?
-  selfTempHp  Boolean @default(false)
+  placement  String?
+  actionSlot String?
+  selfTempHp Boolean @default(false)
 
   // Embedded AbilityCost (F2) — focus/superiority-die pool spend. kind "none" = free.
   costKind    String? // "none" | "pool"
   costPoolKey String? // e.g. "focus"
-  costBase    Int?    // base pool cost
-  costPerStep Int?    // additional units per scaling step
+  costBase    Int? // base pool cost
+  costPerStep Int? // additional units per scaling step
 
   // Embedded EffectSpec (F1) — same flat columns as Spell. saveAbility doubles
   // as the ability's DC save ability.
@@ -1386,8 +1216,8 @@ model GrantedAbility {
 
   // Passive-modifier (buff) effect: applies a flat modifier to a skill/stat
   // target while the granting concentration holds. null = not a buff.
-  buffTarget         String?
-  buffModifier       Int?
+  buffTarget   String?
+  buffModifier Int?
 
   // NULL = valid in both editions; a diverging maneuver / shadow art / channel
   // divinity / subclass-choice option forks into one row per edition sharing
@@ -1422,10 +1252,10 @@ model Feat {
   description       String
   prerequisite      String?
   category          FeatCategory  @default(general)
-  levelPrerequisite Int?          // General ⇒ 4, Epic Boon ⇒ 19 (PHB'24)
+  levelPrerequisite Int? // General ⇒ 4, Epic Boon ⇒ 19 (PHB'24)
   repeatable        Boolean       @default(false)
   abilityOptions    String[]      @default([]) // abilities the player may raise by abilityIncrease
-  abilityIncrease   Int           @default(0)  // usually 1 for half-feats
+  abilityIncrease   Int           @default(0) // usually 1 for half-feats
   improvements      Json          @default("[]") // FeatImprovement[]: { target, amount, perLevel? }
   // NULL = valid in both editions; a diverging feat (e.g. Alert) forks into one
   // row per edition sharing this name (#1306). The migration's unique index on
@@ -1448,31 +1278,31 @@ model Feat {
 // spells are flat (school/level/effect/scaling) rather than category-
 // polymorphic like items, so no detail table split is needed.
 model Spell {
-  id          String      @id @default(uuid())
-  name        String      @unique
-  level       Int         // 0 = cantrip
-  school      SpellSchool
-  castingTime String
-  range       String
-  duration    String
-  description String
-  concentration Boolean   @default(false)
-  ritual      Boolean     @default(false)
-  classes     String[]    // lowercase class names the spell appears on, e.g. ["wizard","sorcerer"]
+  id            String      @id @default(uuid())
+  name          String      @unique
+  level         Int // 0 = cantrip
+  school        SpellSchool
+  castingTime   String
+  range         String
+  duration      String
+  description   String
+  concentration Boolean     @default(false)
+  ritual        Boolean     @default(false)
+  classes       String[] // lowercase class names the spell appears on, e.g. ["wizard","sorcerer"]
 
   // Spell components for spellbook display + future component checks.
   // { verbal: bool, somatic: bool, material: bool, materialDescription?: string }
-  components  Json?
+  components Json?
 
   // Structured effect data for auto-rolling at cast time (RollSpec-shaped,
   // mirrors ItemWeaponDetail / ItemConsumableDetail). null = utility spell.
-  effectKind         String?  // "damage" | "heal" | "buff" — null means utility (no roll)
+  effectKind         String? // "damage" | "heal" | "buff" — null means utility (no roll)
   effectDiceCount    Int?
   effectDiceFaces    Int?
-  effectModifier     Int?     // flat bonus added after dice (e.g. +3 in "3d4+3")
-  damageType         String?  // "fire" / "radiant" / etc. — for damage spells
-  attackType         String?  // "attack" | "save" | null
-  saveAbility        String?  // ability the target saves with, e.g. "dexterity"
+  effectModifier     Int? // flat bonus added after dice (e.g. +3 in "3d4+3")
+  damageType         String? // "fire" / "radiant" / etc. — for damage spells
+  attackType         String? // "attack" | "save" | null
+  saveAbility        String? // ability the target saves with, e.g. "dexterity"
   // Passive-modifier (buff) effect (#363) while active. `buffModifier` is the
   // ABSOLUTE value the AC target reads, never a delta over the base: "ac" is a
   // flat +N add (Shield of Faith 2), "acUnarmoredBase" is the full unarmored base
@@ -1488,10 +1318,10 @@ model Spell {
   // spell has no upcast scaling — Fireball adds 1d6 per upcast level).
   upcastDicePerLevel Int?
   // Cantrip damage scales with character level (5/11/17 thresholds) per 5e rules.
-  cantripScaling     Boolean  @default(false)
+  cantripScaling     Boolean @default(false)
 
   // Subclasses that grant this spell for free (#898).
-  grantedBy          SubclassGrantedSpell[]
+  grantedBy SubclassGrantedSpell[]
 }
 
 // Baseline equipment catalog, same role as Race/CharacterClass above: seeded
@@ -1502,8 +1332,8 @@ model Spell {
 // an effect roll) live on the optional *Detail tables below rather than as
 // nullable columns here — see those models' comments for why.
 model Item {
-  id          String       @id @default(uuid())
-  scope       ItemScope    @default(GLOBAL)
+  id           String        @id @default(uuid())
+  scope        ItemScope     @default(GLOBAL)
   // Non-null uniqueness discriminator: "global" or "campaign:<campaignId>".
   // The rule is "a name is unique among GLOBAL rows only", and this is its only
   // expressible form here — @@unique([campaignId, name]) is SILENTLY wrong
@@ -1511,18 +1341,18 @@ model Item {
   // 'Longsword' would both insert), and Prisma 7.8 rejects `nullsNotDistinct`.
   // Redundant with scope/campaignId by construction; item-scope.integration
   // .test.ts asserts the agreement. Extends to "user:<id>" unchanged.
-  scopeKey    String
-  campaignId  String?
-  campaign    Campaign?    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  name        String
-  category    ItemCategory
-  weight      Float?
-  cost        Json? // {cp,sp,gp,pp} — sell/buy default, player can override
-  description String?
+  scopeKey     String
+  campaignId   String?
+  campaign     Campaign?     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  name         String
+  category     ItemCategory
+  weight       Float?
+  cost         Json? // {cp,sp,gp,pp} — sell/buy default, player can override
+  description  String?
   // Paper-doll slot for gear (#565). null = bag-only (not wearable). Weapons
   // and body armor derive their slot from detail data, so this is only set for
   // wearable gear (rings, cloaks, amulets, boots, etc.).
-  slot        EquipSlot?
+  slot         EquipSlot?
   // Tool-proficiency category (#1564) — set ONLY for the small set of Item
   // rows that ARE tools (the ten musical instruments, Herbalism Kit,
   // Thieves' Tools); null for everything else. Lets a StartingEquipmentOpenPick
@@ -1556,16 +1386,17 @@ model Item {
 
   inventoryItems InventoryItem[]
   packContents   PackContent[]
+  // Back-relation to the fronting ITEM CampaignEntity link (#380, re-parented
+  // from CampaignItem by #1646). Only ever set on a CAMPAIGN-scoped row.
+  link           CampaignItemLink?
 
   @@unique([scopeKey, name])
   @@index([campaignId])
 }
 
-// Typed 1:N capability side-table, re-parented from CampaignItemCapability
-// (#1645). The column set is identical ON PURPOSE — #1646 copies rows across
-// with a straight INSERT … SELECT, and any divergence silently drops data, so
-// item-capability-parity.integration.test.ts compares the two directly. Do not
-// reorder, rename or "tidy" these; fix them in CampaignItemCapability first.
+// Typed 1:N capability side-table. Was CampaignItemCapability's column set
+// verbatim before #1646 merged the two definition tables and copied every
+// CAMPAIGN row across with a straight INSERT … SELECT keyed on it.
 model ItemCapability {
   id     String @id @default(uuid())
   itemId String
@@ -1602,13 +1433,13 @@ model ItemCapability {
 
   // activatedEffect payload (#543). The inline while-active self-buff reuses the
   // target/op/value columns above; these add the activation + recharge model.
-  activation      ActivationType?
+  activation        ActivationType?
   activatedDuration ActivatedDuration?
-  resourceKind    ItemResourceKind?
-  resourcePeriod  ItemResourcePeriod?
-  resourceCharges Int?
+  resourceKind      ItemResourceKind?
+  resourcePeriod    ItemResourcePeriod?
+  resourceCharges   Int?
   // Free-text wall-clock duration ("10 minutes") surfaced as reminder text.
-  durationText    String?
+  durationText      String?
 
   // grant payload (#529): resistance/immunity/conditionImmunity/advantage/proficiency.
   grantType       String?
@@ -1742,46 +1573,43 @@ model PackContent {
 // row's own copy, free to diverge — e.g. a "Club +1" bumping its own
 // InventoryWeaponDetail.damageModifier independent of the catalog Club.
 model InventoryItem {
-  id          String       @id @default(uuid())
-  characterId String
-  character   Character    @relation(fields: [characterId], references: [id], onDelete: Cascade)
-  itemId      String?
-  item        Item?        @relation(fields: [itemId], references: [id], onDelete: SetNull)
-  // Provenance of a DM-awarded campaign item (#381) — mirrors the itemId
-  // provenance pattern above. Null for player-acquired rows; SetNull so
-  // deleting the CampaignItem leaves the awarded snapshot intact.
-  campaignItemId String?
-  campaignItem   CampaignItem? @relation("CampaignItemAwards", fields: [campaignItemId], references: [id], onDelete: SetNull)
-  name        String
-  category    ItemCategory
-  weight      Float?
-  cost        Json?
-  description String?
-  quantity    Int          @default(1)
+  id                    String                @id @default(uuid())
+  characterId           String
+  character             Character             @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  // Provenance of the source Item, catalog or DM-awarded alike (#381/#1646) —
+  // SetNull so deleting the source Item leaves the awarded snapshot intact.
+  itemId                String?
+  item                  Item?                 @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  name                  String
+  category              ItemCategory
+  weight                Float?
+  cost                  Json?
+  description           String?
+  quantity              Int                   @default(1)
   // Paper-doll placement (#565). The SINGLE source of truth for "is this equipped":
   // the wire `equipped` field is DERIVED as (equippedSlot != null) in
   // serializeCharacter — there is no persisted `equipped` boolean. A two-handed
   // weapon occupies MAIN_HAND and locks OFF_HAND (never a second row).
-  equippedSlot EquipSlot?
+  equippedSlot          EquipSlot?
   // Snapshot of the source Item/CampaignItem.slot for wearable gear (#565).
-  slot        EquipSlot?
+  slot                  EquipSlot?
   // Snapshot of the source CampaignItem.rarity for the Worn view (#565) — carried
   // alongside requiresAttunement below; display-only, no derivation reads it.
-  rarity      ItemRarity?
+  rarity                ItemRarity?
   // Attunement state (#545) — persisted boolean; the 3-item cap is DERIVED
   // (counted), never stored. attune/unattune go through …/inventory/transactions.
-  attuned     Boolean      @default(false)
+  attuned               Boolean               @default(false)
   // Snapshot of the source CampaignItem's attunement metadata (#545). requiresAttunement
   // is captured at award time because the frozen copy outlives the mutable/deletable source;
   // prereqKind null = attunable by anyone (distinct from requiresAttunement false = not attunable).
   requiresAttunement    Boolean               @default(false)
   attunementPrereqKind  AttunementPrereqKind?
   attunementPrereqValue String?
-  notes       String?
-  position    Int          @default(0)
+  notes                 String?
+  position              Int                   @default(0)
   // Uses spent on an activatedEffect capability since its last recharge (#543).
   // Reset by the matching rest; the seeded self-buff tracks the "active" state.
-  activatedUsesSpent Int    @default(0)
+  activatedUsesSpent    Int                   @default(0)
 
   weaponDetail     InventoryWeaponDetail?
   armorDetail      InventoryArmorDetail?
@@ -1823,12 +1651,12 @@ model InventoryCapability {
   attackValue       Int?
 
   // activatedEffect payload (#543) — snapshot twin of CampaignItemCapability.
-  activation      ActivationType?
+  activation        ActivationType?
   activatedDuration ActivatedDuration?
-  resourceKind    ItemResourceKind?
-  resourcePeriod  ItemResourcePeriod?
-  resourceCharges Int?
-  durationText    String?
+  resourceKind      ItemResourceKind?
+  resourcePeriod    ItemResourcePeriod?
+  resourceCharges   Int?
+  durationText      String?
 
   // grant payload (#529): resistance/immunity/conditionImmunity/advantage/proficiency.
   grantType       String?
@@ -1849,7 +1677,7 @@ model InventoryCapability {
 
   // Runtime use counter — inventory-only (not an authored field). Reset on the
   // matching rest by the HP rest handlers; never copied on award.
-  used              Int     @default(0)
+  used Int @default(0)
 
   @@index([inventoryItemId])
 }
@@ -1941,14 +1769,14 @@ enum CharacterEventCategory {
   experience
   currency
   spellcasting
-  class        // subclass selection and future multiclass ops
-  resources    // superiority dice, ki, rage, maneuvers, etc.
-  advancement  // ability score improvements and feats
-  session      // session lifecycle: started / ended
-  combat       // combat lifecycle: started / ended / round advanced
-  conditions   // status conditions (prone, poisoned, etc.) + exhaustion level
-  effects      // active cast-granted stat modifiers (buffs)
-  roll         // dice rolls logged from the session UI (attack/damage/check/save/initiative)
+  class // subclass selection and future multiclass ops
+  resources // superiority dice, ki, rage, maneuvers, etc.
+  advancement // ability score improvements and feats
+  session // session lifecycle: started / ended
+  combat // combat lifecycle: started / ended / round advanced
+  conditions // status conditions (prone, poisoned, etc.) + exhaustion level
+  effects // active cast-granted stat modifiers (buffs)
+  roll // dice rolls logged from the session UI (attack/damage/check/save/initiative)
   // future: journal
 }
 
@@ -2108,29 +1936,29 @@ model CharacterEvent {
 // At most one `active` session per campaign, and at most one `active` solo session
 // per character (campaignId null, #1080) — both enforced in lib, not a DB partial-unique.
 model Session {
-  id          String        @id @default(uuid())
+  id           String        @id @default(uuid())
   // Null for a character-scoped solo session (#1080).
-  campaignId  String?
-  campaign    Campaign?     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  status      SessionStatus @default(active)
-  startedAt   DateTime      @default(now())
-  endedAt     DateTime?
+  campaignId   String?
+  campaign     Campaign?     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  status       SessionStatus @default(active)
+  startedAt    DateTime      @default(now())
+  endedAt      DateTime?
   // Optional human-readable name for the session, e.g. "Session 4 — The Sunless Citadel".
-  title       String?
+  title        String?
   // Optional arc/part this session belongs to in the journal (#863). SetNull so
   // deleting an arc leaves the session intact and merely un-arced.
-  arcId       String?
-  arc         CampaignArc?  @relation(fields: [arcId], references: [id], onDelete: SetNull)
+  arcId        String?
+  arc          CampaignArc?  @relation(fields: [arcId], references: [id], onDelete: SetNull)
   // Campaign recap aggregate computed at session-end (#245). Null while active.
-  summary     Json?
+  summary      Json?
   // Combat round state (#1030) — a deliberate DERIVE-DON'T-PERSIST EXCEPTION:
   // the round is shared mutable state every participant's client must observe
   // identically, which is impossible to derive per-client. This is now the
   // authoritative read model; combatStarted/combatEnded/combatRoundAdvanced
   // CharacterEvent rows remain the audit trail, not the source of truth.
-  combatActive Boolean  @default(false)
-  round        Int      @default(0)
-  updatedAt    DateTime @updatedAt
+  combatActive Boolean       @default(false)
+  round        Int           @default(0)
+  updatedAt    DateTime      @updatedAt
 
   events         CharacterEvent[]
   journalEntries JournalEntry[]
@@ -2208,7 +2036,7 @@ model CharacterEventField {
   id       String         @id @default(uuid())
   eventId  String
   event    CharacterEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  path     String         // e.g. "hitPoints.max", "currency.gp", "quantity"
+  path     String // e.g. "hitPoints.max", "currency.gp", "quantity"
   oldValue Json?
   newValue Json?
 }

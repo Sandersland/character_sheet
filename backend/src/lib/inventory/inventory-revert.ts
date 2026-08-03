@@ -51,24 +51,19 @@ async function reverseCurrencyDelta(
   await setCharacterCurrency(tx, characterId, currencyDebit(current, currencyDelta));
 }
 
-// Re-links a deleted row's provenance FKs on recreate: itemId (catalog) and
-// campaignItemId (#381) survive only when their referent still exists (else
-// null — the snapshot is self-contained / SetNull).
+// Re-links a deleted row's provenance FK on recreate: it survives only when the
+// referent still exists (else null — the snapshot is self-contained / SetNull).
+// `campaignItemId` is the pre-#1646 name for the same FK and still appears in
+// audit blobs written before the merge; ids were preserved, so it resolves
+// against Item unchanged.
 async function resolveSnapshotRefs(
   tx: Prisma.TransactionClient,
   deletedItem: DeletedInventoryItemSnapshot,
-): Promise<{ itemId: string | null; campaignItemId: string | null }> {
-  let itemId = deletedItem.itemId;
-  if (itemId) {
-    const catalogItem = await tx.item.findUnique({ where: { id: itemId }, select: { id: true } });
-    if (!catalogItem) itemId = null;
-  }
-  let campaignItemId = deletedItem.campaignItemId ?? null;
-  if (campaignItemId) {
-    const campaignItem = await tx.campaignItem.findUnique({ where: { id: campaignItemId }, select: { id: true } });
-    if (!campaignItem) campaignItemId = null;
-  }
-  return { itemId, campaignItemId };
+): Promise<{ itemId: string | null }> {
+  const candidate = deletedItem.itemId ?? deletedItem.campaignItemId ?? null;
+  if (!candidate) return { itemId: null };
+  const existing = await tx.item.findUnique({ where: { id: candidate }, select: { id: true } });
+  return { itemId: existing ? candidate : null };
 }
 
 // The nested detail-block create payload for a recreated row (weapon/armor/
@@ -93,13 +88,12 @@ async function recreateDeletedItem(
   entityId: string,
   deletedItem: DeletedInventoryItemSnapshot,
 ) {
-  const { itemId, campaignItemId } = await resolveSnapshotRefs(tx, deletedItem);
+  const { itemId } = await resolveSnapshotRefs(tx, deletedItem);
   await tx.inventoryItem.create({
     data: {
       id: entityId,
       characterId,
       itemId,
-      campaignItemId,
       name: deletedItem.name,
       category: deletedItem.category,
       weight: deletedItem.weight ?? undefined,

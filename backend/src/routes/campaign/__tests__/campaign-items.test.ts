@@ -63,7 +63,7 @@ describe("campaign items (#380)", () => {
     expect(entity?.type).toBe("ITEM");
     expect(entity?.visibility).toBe("HIDDEN");
     expect(entity?.name).toBe("Flametongue");
-    const link = await prisma.campaignItemLink.findUnique({ where: { campaignItemId: res.body.id } });
+    const link = await prisma.campaignItemLink.findUnique({ where: { itemId: res.body.id } });
     expect(link?.campaignEntityId).toBe(res.body.entity.id);
   });
 
@@ -209,7 +209,7 @@ describe("campaign items (#380)", () => {
     expect(ok.status).toBe(204);
 
     // The documented cleanup rule: deleting the item removes its fronting entity.
-    expect(await prisma.campaignItem.findUnique({ where: { id: itemId } })).toBeNull();
+    expect(await prisma.item.findUnique({ where: { id: itemId } })).toBeNull();
     expect(await prisma.campaignEntity.findUnique({ where: { id: entityId } })).toBeNull();
   });
 
@@ -255,7 +255,7 @@ describe("campaign items (#380)", () => {
       durationText: "10 minutes",
     });
 
-    const persisted = await prisma.campaignItemCapability.findMany({ where: { campaignItemId: res.body.id } });
+    const persisted = await prisma.itemCapability.findMany({ where: { itemId: res.body.id } });
     expect(persisted).toHaveLength(1);
     expect(persisted[0].activation).toBe("bonus");
   });
@@ -280,7 +280,7 @@ describe("campaign items (#380)", () => {
     expect(res.body.capabilities[0]).toMatchObject({ kind: "passiveBonus", target: "skill", value: 2, targetKey: "stealth" });
 
     // The old activatedEffect row is gone — replace, not merge.
-    const persisted = await prisma.campaignItemCapability.findMany({ where: { campaignItemId: itemId } });
+    const persisted = await prisma.itemCapability.findMany({ where: { itemId: itemId } });
     expect(persisted).toHaveLength(1);
     expect(persisted[0].kind).toBe("passiveBonus");
   });
@@ -318,8 +318,8 @@ describe("campaign items (#380)", () => {
     });
     expect(res.body.capabilities[1]).toMatchObject({ kind: "castSpell", resource: "charges", chargeCost: 1 });
 
-    const persisted = await prisma.campaignItemCapability.findMany({
-      where: { campaignItemId: res.body.id },
+    const persisted = await prisma.itemCapability.findMany({
+      where: { itemId: res.body.id },
       orderBy: { kind: "asc" },
     });
     const pool = persisted.find((c) => c.kind === "charges")!;
@@ -421,7 +421,7 @@ describe("campaign items (#380)", () => {
     expect(res.status).toBe(201);
     expect(res.body.slot).toBeUndefined();
 
-    const persisted = await prisma.campaignItem.findUnique({ where: { id: res.body.id } });
+    const persisted = await prisma.item.findUnique({ where: { id: res.body.id } });
     expect(persisted?.slot).toBeNull();
   });
 
@@ -468,7 +468,7 @@ describe("campaign items (#380)", () => {
       .send({ slot: "NECK" });
     expect(res.status).toBe(400);
     expect(JSON.stringify(res.body)).toContain("slot");
-    const after = await prisma.campaignItem.findUnique({ where: { id: itemId } });
+    const after = await prisma.item.findUnique({ where: { id: itemId } });
     expect(after?.slot).toBeNull();
   });
 
@@ -487,7 +487,7 @@ describe("campaign items (#380)", () => {
     expect(patched.status).toBe(200);
     expect(patched.body.slot).toBeUndefined();
 
-    const persisted = await prisma.campaignItem.findUnique({ where: { id: itemId } });
+    const persisted = await prisma.item.findUnique({ where: { id: itemId } });
     expect(persisted?.slot).toBeNull();
   });
 
@@ -499,10 +499,13 @@ describe("campaign items (#380)", () => {
       value: 0,
       dice: { count: 1, faces: 6 },
     };
+    // Distinct name from the file's `weaponItem` fixture: since #1646 campaign
+    // items share Item's @@unique([scopeKey, name]), so two items named
+    // "Flametongue" in this same campaign would collide.
     const created = await supertest(app)
       .post(`/api/campaigns/${campaignId}/items`)
       .set("Cookie", cookieOwner)
-      .send({ name: "Flametongue", category: "weapon", capabilities: [] });
+      .send({ name: "Frostbrand", category: "weapon", capabilities: [] });
     const itemId = created.body.id as string;
 
     const res = await supertest(app)
@@ -512,7 +515,7 @@ describe("campaign items (#380)", () => {
     expect(res.status).toBe(200);
     expect(res.body.capabilities[0]).toMatchObject({ kind: "passiveBonus", target: "damage" });
 
-    const persisted = await prisma.campaignItemCapability.findMany({ where: { campaignItemId: itemId } });
+    const persisted = await prisma.itemCapability.findMany({ where: { itemId: itemId } });
     expect(persisted[0].valueDiceCount).toBe(1);
     expect(persisted[0].valueDiceFaces).toBe(6);
   });
@@ -653,7 +656,7 @@ describe("campaign items (#380)", () => {
       const patched = await patchItem(itemId, { capabilities: [] });
       expect(patched.status).toBe(200);
       expect(patched.body.capabilities).toBeUndefined();
-      expect(await prisma.campaignItemCapability.count({ where: { campaignItemId: itemId } })).toBe(0);
+      expect(await prisma.itemCapability.count({ where: { itemId: itemId } })).toBe(0);
     });
 
     it("PATCH without a name does NOT touch the linked entity (name-sync negative)", async () => {
@@ -687,7 +690,7 @@ describe("campaign items (#380)", () => {
       expect(patched.body.category).toBe("gear");
       expect(patched.body.weapon).toMatchObject({ damageDiceCount: 1, damageDiceFaces: 8 });
 
-      const detail = await prisma.campaignItemWeaponDetail.findUnique({ where: { campaignItemId: itemId } });
+      const detail = await prisma.itemWeaponDetail.findUnique({ where: { itemId: itemId } });
       expect(detail).not.toBeNull();
     });
   });
@@ -722,8 +725,8 @@ describe("campaign items (#380)", () => {
         cantBeSurprised: true,
       });
 
-      const persisted = await prisma.campaignItemCapability.findMany({
-        where: { campaignItemId: res.body.id },
+      const persisted = await prisma.itemCapability.findMany({
+        where: { itemId: res.body.id },
         orderBy: { grantType: "asc" },
       });
       expect(persisted).toHaveLength(2);
@@ -787,7 +790,7 @@ describe("campaign items (#380)", () => {
         attackMode: "fixed",
       });
 
-      const persisted = await prisma.campaignItemCapability.findMany({ where: { campaignItemId: res.body.id } });
+      const persisted = await prisma.itemCapability.findMany({ where: { itemId: res.body.id } });
       expect(persisted).toHaveLength(1);
       expect(persisted[0]).toMatchObject({
         kind: "castSpell",

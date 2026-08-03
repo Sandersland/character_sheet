@@ -95,7 +95,7 @@ describe("campaign item award/revoke (#381)", () => {
 
     // Snapshot + detail landed on the sheet with provenance FK.
     const row = await prisma.inventoryItem.findFirst({
-      where: { characterId: CHAR, campaignItemId: id },
+      where: { characterId: CHAR, itemId: id },
       include: { weaponDetail: true },
     });
     expect(row?.name).toBe("Flametongue");
@@ -120,6 +120,28 @@ describe("campaign item award/revoke (#381)", () => {
     expect(await prisma.inventoryItem.findFirst({ where: { id: row!.id } })).toBeNull();
   });
 
+  // Since #1646, dmNotes lives on Item alongside seeded catalog rows — nothing
+  // about the TABLE keeps it private any more, so this pins the includeDmNotes
+  // flag as the sole guard on the two payloads a DM-list test wouldn't cover.
+  // Stringify-and-search is deliberately blunt: it catches the field at ANY
+  // nesting depth, including inside an inventory snapshot, which a keyed
+  // assertion on the top-level object would miss.
+  it("never carries dmNotes on the award response or the character sheet", async () => {
+    const { id } = await createItem({ ...weaponItem, name: "Secret Sword", dmNotes: "only the DM should see this" });
+
+    const awardResponse = await agent(cookieOwner)
+      .post(`/api/campaigns/${campaignId}/items/${id}/award`)
+      .send({ characterId: CHAR, quantity: 1 });
+    expect(awardResponse.status).toBe(200);
+    expect(JSON.stringify(awardResponse.body)).not.toContain("dmNotes");
+
+    const sheet = await agent(cookiePlayer).get(`/api/characters/${CHAR}`);
+    expect(sheet.status).toBe(200);
+    expect(JSON.stringify(sheet.body)).not.toContain("dmNotes");
+
+    await prisma.inventoryItem.deleteMany({ where: { itemId: id } });
+  });
+
   it("PL-1: awarding a slotted gear item snapshots slot onto the InventoryItem", async () => {
     const { id } = await createItem({ name: "Amulet of Health", category: "gear", slot: "NECK" });
     await agent(cookieOwner)
@@ -127,10 +149,10 @@ describe("campaign item award/revoke (#381)", () => {
       .send({ characterId: CHAR });
 
     const row = await prisma.inventoryItem.findFirstOrThrow({
-      where: { characterId: CHAR, campaignItemId: id },
+      where: { characterId: CHAR, itemId: id },
     });
     expect(row.slot).toBe("NECK");
-    await prisma.inventoryItem.deleteMany({ where: { campaignItemId: id } });
+    await prisma.inventoryItem.deleteMany({ where: { itemId: id } });
   });
 
   it("revokes a player-modified (renamed + equipped) snapshot, undoably", async () => {
@@ -141,7 +163,7 @@ describe("campaign item award/revoke (#381)", () => {
       .send({ characterId: CHAR });
 
     const row = await prisma.inventoryItem.findFirstOrThrow({
-      where: { characterId: CHAR, campaignItemId: id },
+      where: { characterId: CHAR, itemId: id },
     });
     // Player renames + equips the snapshot.
     await agent(cookiePlayer)
@@ -169,7 +191,7 @@ describe("campaign item award/revoke (#381)", () => {
     expect(restored?.name).toBe("My Sword");
     // The provenance FK must survive undo, or the row falls out of holder /
     // unique-guard queries (create/cleanup asymmetry).
-    expect(restored?.campaignItemId).toBe(id);
+    expect(restored?.itemId).toBe(id);
 
     // Holders + Codex card still see the restored row.
     const list = await agent(cookieOwner).get(`/api/campaigns/${campaignId}/items`);
@@ -190,7 +212,7 @@ describe("campaign item award/revoke (#381)", () => {
     expect(reRevoke.status).toBe(200);
 
     // Cleanup for the next tests.
-    await prisma.inventoryItem.deleteMany({ where: { campaignItemId: id } });
+    await prisma.inventoryItem.deleteMany({ where: { itemId: id } });
   });
 
   it("404s revoke when the character does not hold the item", async () => {
@@ -222,7 +244,7 @@ describe("campaign item award/revoke (#381)", () => {
       .post(`/api/campaigns/${campaignId}/items/${id}/award`)
       .send({ characterId: CHAR });
     expect(retry.status).toBe(200);
-    await prisma.inventoryItem.deleteMany({ where: { campaignItemId: id } });
+    await prisma.inventoryItem.deleteMany({ where: { itemId: id } });
   });
 
   it("editing the item after award changes future awards only; existing rows untouched", async () => {
@@ -236,26 +258,26 @@ describe("campaign item award/revoke (#381)", () => {
       .send({ name: "Renamed" });
 
     const existing = await prisma.inventoryItem.findFirstOrThrow({
-      where: { characterId: CHAR, campaignItemId: id },
+      where: { characterId: CHAR, itemId: id },
     });
     expect(existing.name).toBe("Original");
-    await prisma.inventoryItem.deleteMany({ where: { campaignItemId: id } });
+    await prisma.inventoryItem.deleteMany({ where: { itemId: id } });
   });
 
-  it("deleting the item leaves awarded rows intact with campaignItemId = NULL (SetNull)", async () => {
+  it("deleting the item leaves awarded rows intact with itemId = NULL (SetNull)", async () => {
     const { id } = await createItem({ ...weaponItem, name: "Doomed" });
     await agent(cookieOwner)
       .post(`/api/campaigns/${campaignId}/items/${id}/award`)
       .send({ characterId: CHAR });
     const row = await prisma.inventoryItem.findFirstOrThrow({
-      where: { characterId: CHAR, campaignItemId: id },
+      where: { characterId: CHAR, itemId: id },
     });
 
     await agent(cookieOwner).delete(`/api/campaigns/${campaignId}/items/${id}`);
 
     const after = await prisma.inventoryItem.findUnique({ where: { id: row.id } });
     expect(after).not.toBeNull();
-    expect(after?.campaignItemId).toBeNull();
+    expect(after?.itemId).toBeNull();
     expect(after?.name).toBe("Doomed");
     await prisma.inventoryItem.deleteMany({ where: { id: row.id } });
   });
@@ -272,7 +294,7 @@ describe("campaign item award/revoke (#381)", () => {
       .post(`/api/campaigns/${campaignId}/items/${id}/award`)
       .send({ characterId: OUTSIDER_CHAR });
     expect(outside.status).toBe(400);
-    await prisma.inventoryItem.deleteMany({ where: { campaignItemId: id } });
+    await prisma.inventoryItem.deleteMany({ where: { itemId: id } });
   });
 
   it("surfaces holders in the owner list and the revealed by-entity Codex card", async () => {
@@ -291,7 +313,7 @@ describe("campaign item award/revoke (#381)", () => {
     );
     expect(card.status).toBe(200);
     expect(card.body.holders).toEqual([{ characterId: CHAR, characterName: "Bruenor", quantity: 3 }]);
-    await prisma.inventoryItem.deleteMany({ where: { campaignItemId: id } });
+    await prisma.inventoryItem.deleteMany({ where: { itemId: id } });
   });
 
   // ── Session-threaded loot (#382) ──────────────────────────────────────────────
@@ -330,7 +352,7 @@ describe("campaign item award/revoke (#381)", () => {
     );
     expect(participant.summary.loot).toEqual([{ name: "Session Blade", qty: 2 }]);
 
-    await prisma.inventoryItem.deleteMany({ where: { campaignItemId: id } });
+    await prisma.inventoryItem.deleteMany({ where: { itemId: id } });
   });
 
   it("auto-threads to the campaign's active session when no sessionId is passed", async () => {
@@ -353,7 +375,7 @@ describe("campaign item award/revoke (#381)", () => {
 
     // Undo during the session removes both the inventory row and the log entry.
     const row = await prisma.inventoryItem.findFirstOrThrow({
-      where: { characterId: CHAR, campaignItemId: id },
+      where: { characterId: CHAR, itemId: id },
     });
     const revert = await agent(cookiePlayer).post(
       `/api/characters/${CHAR}/events/${loot.batchId}/revert`,
@@ -369,7 +391,7 @@ describe("campaign item award/revoke (#381)", () => {
     expect(stillActive).toBeUndefined();
 
     await agent(cookieOwner).post(`/api/campaigns/${campaignId}/sessions/${sessionId}/end`);
-    await prisma.inventoryItem.deleteMany({ where: { campaignItemId: id } });
+    await prisma.inventoryItem.deleteMany({ where: { itemId: id } });
   });
 
   it("rejects an award whose sessionId belongs to a different campaign", async () => {
@@ -388,7 +410,7 @@ describe("campaign item award/revoke (#381)", () => {
     expect(res.body.error).toContain("does not belong");
     // The award was rejected — nothing landed on the sheet.
     expect(
-      await prisma.inventoryItem.findFirst({ where: { characterId: CHAR, campaignItemId: id } }),
+      await prisma.inventoryItem.findFirst({ where: { characterId: CHAR, itemId: id } }),
     ).toBeNull();
 
     await prisma.campaign.delete({ where: { id: foreignCampaign.id } });
