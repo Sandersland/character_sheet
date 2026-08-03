@@ -66,6 +66,16 @@ describe("CreationSpellsStep", () => {
     expect(fetchMock).toHaveBeenCalledWith({ className: "warlock", maxLevel: 1 });
   });
 
+  // #1510: a 2014 Cleric/Druid serves maxSpellLevel: 0 (cantrips-only — see
+  // level1SpellPicksFor's comment). `0` must survive to the request unchanged,
+  // not get floored to 1 — the cantrips-only fetch seam #1377 built on the wire
+  // (fetchSpells' `!== undefined` check, spells.test.ts's `?maxLevel=0` pin).
+  it("passes maxSpellLevel: 0 through to the fetch for a cantrips-only class", async () => {
+    renderStep({ className: "cleric", counts: { cantrips: 3, spells: 0, maxSpellLevel: 0 } });
+    await screen.findByRole("button", { name: "Open Eldritch Blast" });
+    expect(fetchMock).toHaveBeenCalledWith({ className: "cleric", maxLevel: 0 });
+  });
+
   // Each render keeps exactly one group alive, which is how the level-0 split can
   // be observed without the picker's <section>s carrying accessible names.
   it("routes level-0 rows to the Cantrips group only", async () => {

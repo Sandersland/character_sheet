@@ -10,11 +10,10 @@ import {
 } from "@/lib/inventory/inventory.js";
 import {
   ALIGNMENTS,
-  cantripsKnownAtLevel,
   deriveCreatedCharacter,
   isKnownTool,
+  level1SpellPicksFor,
   maxSpellLevelForClass,
-  preparedSpellCountAt,
 } from "@/lib/srd/srd.js";
 import { ABILITY_CAP } from "@/lib/leveling/advancement.js";
 import {
@@ -82,10 +81,11 @@ type ResolvedSelections = {
   subclassName: string | null;
   skillProficiencies: string[];
   creationToolProfs: CreationToolProf[];
-  // #1507: threaded through to resolveCreationSpells' preparedSpellCountAt/
-  // maxSpellLevelForClass calls. Recomputed here (not re-derived from
-  // input.rulesEdition ?? DEFAULT_RULES_EDITION a second time) since
-  // resolveSelections already resolved it for the creation-time subclass gate.
+  // #1507/#1510: threaded through to creationSpellCountError's level1SpellPicksFor
+  // call and resolveCreationSpells' maxSpellLevelForClass ceiling. Recomputed
+  // here (not re-derived from input.rulesEdition ?? DEFAULT_RULES_EDITION a
+  // second time) since resolveSelections already resolved it for the
+  // creation-time subclass gate.
   edition: RulesEdition;
 };
 
@@ -891,30 +891,31 @@ type CreationSpells = NonNullable<CreateCharacterBody["spells"]>;
 
 // Precondition + count checks for creation picks: the class must cast at level 1,
 // the two lists must match the level-1 counts (per edition), and no id may repeat.
+// #1510 D4: both counts come from level1SpellPicksFor — the SAME function
+// reference.ts serves, so a served count and an enforced count can never
+// disagree by construction (no separate abilityScores-driven read here: a
+// 2014 Cleric/Druid's creation picks are 0 regardless of Wisdom — see that
+// function's comment for why).
 function creationSpellCountError(
   spells: CreationSpells,
   className: string,
   classDisplay: string,
   subclass: string | null,
-  abilityScores: Record<string, number>,
   edition: RulesEdition,
 ): Fail | null {
-  // #1508 carried AC: this is `null` (not 0) for a 2014 Paladin/Ranger at level
-  // 1 — spellcastingStartLevel gates them out via preparedSpellCountAt, so the
-  // "does not cast spells at level 1" 400 below is the correct, intentional
-  // response rather than a silently-accepted 2 picks. The 2014 creation NUMBERS
-  // themselves (this function's count/list validation once a class does cast)
-  // are #1510's job — this thread-through only fixes the level-1 non-caster gate.
-  const spellCount = preparedSpellCountAt(className, 1, subclass, abilityScores, edition);
-  if (spellCount == null) {
+  // #1508 carried AC, #1510: `null` for a 2014 Paladin/Ranger (no Spellcasting
+  // until level 2) or any non-caster — the "does not cast spells at level 1"
+  // 400 below is the correct, intentional response rather than a silently
+  // accepted pick count.
+  const picks = level1SpellPicksFor(className, subclass, edition);
+  if (picks == null) {
     return { ok: false, status: 400, error: `${classDisplay} does not cast spells at level 1` };
   }
-  const cantripCount = cantripsKnownAtLevel(className, 1, subclass);
-  if (spells.cantripIds.length !== cantripCount) {
-    return { ok: false, status: 400, error: `Expected ${cantripCount} cantrip(s), got ${spells.cantripIds.length}` };
+  if (spells.cantripIds.length !== picks.cantrips) {
+    return { ok: false, status: 400, error: `Expected ${picks.cantrips} cantrip(s), got ${spells.cantripIds.length}` };
   }
-  if (spells.spellIds.length !== spellCount) {
-    return { ok: false, status: 400, error: `Expected ${spellCount} level-1 spell(s), got ${spells.spellIds.length}` };
+  if (spells.spellIds.length !== picks.spells) {
+    return { ok: false, status: 400, error: `Expected ${picks.spells} level-1 spell(s), got ${spells.spellIds.length}` };
   }
   const allIds = [...spells.cantripIds, ...spells.spellIds];
   if (new Set(allIds).size !== allIds.length) {
@@ -927,12 +928,11 @@ function creationSpellCountError(
 // prepared spells become prepared SpellEntry snapshots; every count/list/level is
 // validated against the class's per-edition tables via one catalog read.
 // Omitting `spells` yields a null book (back-compat); a non-caster sending
-// `spells` is a 400. `abilityScores` is the background-adjusted effective score
-// set (#1507: needed for the 2014 Cleric/Druid/Wizard/Paladin ability-mod formula).
+// `spells` is a 400. #1510: no ability scores needed here — level1SpellPicksFor
+// is a fixed table per edition, not the ability-mod-driven ongoing prepared cap.
 async function resolveCreationSpells(
   input: CreateCharacterBody,
   selections: ResolvedSelections,
-  abilityScores: Record<string, number>,
 ): Promise<PhaseResult<{ spellEntries: SpellEntry[] | null }>> {
   const { spells } = input;
   if (!spells) return { ok: true, spellEntries: null };
@@ -941,7 +941,7 @@ async function resolveCreationSpells(
   const className = classDisplay.toLowerCase();
   const subclass = selections.subclassName;
   const { edition } = selections;
-  const countError = creationSpellCountError(spells, className, classDisplay, subclass, abilityScores, edition);
+  const countError = creationSpellCountError(spells, className, classDisplay, subclass, edition);
   if (countError) return countError;
 
   const allIds = [...spells.cantripIds, ...spells.spellIds];
@@ -1086,7 +1086,7 @@ export async function createCharacter(
   );
   if (!equipment.ok) return equipment;
 
-  const spells = await resolveCreationSpells(input, selections, grants.effectiveScores);
+  const spells = await resolveCreationSpells(input, selections);
   if (!spells.ok) return spells;
 
   const { id } = await persistCreatedCharacter(input, ownerId, selections, equipment, spells.spellEntries, grants);

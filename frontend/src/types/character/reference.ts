@@ -68,9 +68,14 @@ export interface ClassOption {
   toolChoices: string[];
   /** Number of tool choices the player may make. */
   toolChoiceCount: number;
-  /** #1131: level-1 creation pick counts (SRD 5.2); null for a non-caster.
-   *  `maxSpellLevel` (#1377) is the highest level the class can learn at level 1,
-   *  served so the picker sends it as `?maxLevel=` rather than a hardcoded 1. */
+  /** #1131/#1510: level-1 creation pick counts, resolved server-side for the
+   *  requested edition (SRD 5.2 or SRD 5.1 per `?edition=`); null for a
+   *  non-caster (or a class with no Spellcasting feature yet under this
+   *  edition, e.g. a 2014 Paladin/Ranger). `spells: 0` is a real, edition-legal
+   *  answer (a 2014 Cleric/Druid prepares from the full class list — there is
+   *  no creation-time list to pick from). `maxSpellLevel` (#1377) is the
+   *  highest level a creation pick may be, served so the picker sends it as
+   *  `?maxLevel=` rather than a hardcoded 1; it is 0 for a cantrips-only step. */
   level1SpellPicks: { cantrips: number; spells: number; maxSpellLevel: number } | null;
   /** #1161: PHB'24 primary ability/abilities the creation panel recommends; [] for homebrew. */
   primaryAbility: AbilityName[];

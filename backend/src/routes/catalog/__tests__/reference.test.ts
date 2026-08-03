@@ -90,16 +90,28 @@ describe("GET /api/reference", () => {
     }
   });
 
-  // #1507/carried #1508 AC: a 2014 Paladin/Ranger has no Spellcasting feature
-  // until level 2 (PHB'14 p. 84/92), so level1SpellPicks must be null — never
-  // `{ spells: n > 0, maxSpellLevel: 0 }`, the incoherent shape #1508 flagged.
-  it("serves level1SpellPicks: null for a 2014 Paladin/Ranger (no Spellcasting until level 2)", async () => {
+  // #1507/carried #1508 AC + #1510: a 2014 Paladin/Ranger has no Spellcasting
+  // feature until level 2 (PHB'14 p. 84/92), so level1SpellPicks must be null
+  // — never `{ spells: n > 0, maxSpellLevel: 0 }`, the incoherent shape #1508
+  // flagged. The rest of this pins level1SpellPicksFor's fixed SRD 5.1 table
+  // (#1510) via the live route, alongside the pure unit test in
+  // lib/srd/__tests__/level1-spell-picks.test.ts.
+  it("serves level1SpellPicks per the SRD 5.1 table (#1510), null for a 2014 Paladin/Ranger", async () => {
     const response = await supertest
       .agent(app)
       .set("Cookie", COOKIE)
       .get("/api/reference?edition=EDITION_2014");
     const byName = (name: string) => response.body.classes.find((c: { name: string }) => c.name === name);
 
+    expect(byName("Bard").level1SpellPicks).toEqual({ cantrips: 2, spells: 4, maxSpellLevel: 1 });
+    expect(byName("Sorcerer").level1SpellPicks).toEqual({ cantrips: 4, spells: 2, maxSpellLevel: 1 });
+    expect(byName("Warlock").level1SpellPicks).toEqual({ cantrips: 2, spells: 2, maxSpellLevel: 1 });
+    expect(byName("Wizard").level1SpellPicks).toEqual({ cantrips: 3, spells: 6, maxSpellLevel: 1 });
+    // Cleric/Druid: no creation-time list exists in SRD 5.1 (prepared from the
+    // full class list, capped by WIS mod + level on the sheet) — 0 spells,
+    // cantrips only, and maxSpellLevel 0 alongside it (#1510's micro-decision).
+    expect(byName("Cleric").level1SpellPicks).toEqual({ cantrips: 3, spells: 0, maxSpellLevel: 0 });
+    expect(byName("Druid").level1SpellPicks).toEqual({ cantrips: 2, spells: 0, maxSpellLevel: 0 });
     expect(byName("Paladin").level1SpellPicks).toBeNull();
     expect(byName("Ranger").level1SpellPicks).toBeNull();
   });
