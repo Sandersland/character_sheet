@@ -62,13 +62,20 @@ export async function reencodePortrait(input: Buffer, declaredContentType: strin
       `Unsupported image format${format ? ` "${format}"` : ""} — upload JPEG, PNG, WebP, GIF, or AVIF`,
     );
   }
-  if (!acceptedMimes.includes(declaredContentType.toLowerCase())) {
+  // Compare the bare media type: a declared Content-Type may legally carry
+  // parameters ("image/jpeg; charset=utf-8") that would spuriously fail an
+  // exact-string whitelist match.
+  const declaredType = declaredContentType.split(";")[0].trim().toLowerCase();
+  if (!acceptedMimes.includes(declaredType)) {
     throw new PortraitImageError(
       `Declared Content-Type "${declaredContentType}" does not match the uploaded ${format} image`,
     );
   }
 
   try {
+    // .webp() without {animated: true} keeps only a GIF's first frame —
+    // deliberate: portraits are static, and de-animating shrinks both the
+    // stored bytes and the decode surface.
     return await sharp(input)
       .rotate()
       .resize(PORTRAIT_EDGE_PX, PORTRAIT_EDGE_PX, { fit: "inside", withoutEnlargement: true })

@@ -61,6 +61,10 @@ export function sendPortrait(res: Response, blob: BlobObject): void {
   res.setHeader("Content-Type", blob.contentType);
   res.setHeader("Content-Length", String(blob.size));
   res.setHeader("Cache-Control", PORTRAIT_CACHE_CONTROL);
+  // pipe() never destroys its SOURCE when the destination goes away — a
+  // client dropping mid-transfer would otherwise leak the blob stream (and,
+  // under the s3 driver, its pooled HTTPS connection).
+  res.on("close", () => blob.body.destroy());
   // Headers are already sent once piping starts, so the terminal errorHandler
   // can't emit JSON — destroy the response and let the client see a truncated
   // transfer instead of a hung request.

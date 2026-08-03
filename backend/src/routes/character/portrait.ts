@@ -57,7 +57,7 @@ portraitRouter.post<{ id: string }>(
       data: { portraitKey: key },
       include: characterInclude,
     });
-    if (previousKey !== key) await deletePortraitBlobBestEffort(previousKey);
+    await deletePortraitBlobBestEffort(previousKey);
 
     res.json(serializeCharacter(updated));
   },

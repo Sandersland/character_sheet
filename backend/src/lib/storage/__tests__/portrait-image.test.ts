@@ -50,6 +50,16 @@ describe("reencodePortrait", () => {
     expect(smallOut.height).toBe(60);
   });
 
+  it("accepts a declared type carrying MIME parameters when the bytes match", async () => {
+    const jpeg = await sharp({ create: { width: 8, height: 8, channels: 3, background: "#000" } })
+      .jpeg()
+      .toBuffer();
+
+    await expect(
+      reencodePortrait(jpeg, "image/jpeg; charset=utf-8"),
+    ).resolves.toBeInstanceOf(Buffer);
+  });
+
   it("rejects a declared type that does not match the bytes", async () => {
     const png = await sharp({ create: { width: 8, height: 8, channels: 3, background: "#000" } })
       .png()
