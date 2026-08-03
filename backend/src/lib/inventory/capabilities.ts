@@ -364,6 +364,11 @@ export function readCapability(row: CapabilityColumns): Capability {
 // once so the two "copy one capability row's columns into a new row" sites
 // (capabilityColumnFields below) can't drift apart on which columns count as
 // "the capability" vs. runtime state.
+//
+// The `satisfies` below rejects a key that is NOT on CapabilityColumns, but
+// nothing catches one that is MISSING: a column added to the capability tables
+// and not added here is silently dropped from every copy, surfacing later as a
+// schema parse failure far from the cause. Add the column in both places.
 const CAPABILITY_COLUMN_KEYS = [
   "kind", "description", "target", "op", "value", "targetKey", "condition",
   "valueDiceCount", "valueDiceFaces", "valueDamageType",
