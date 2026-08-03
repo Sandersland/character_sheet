@@ -165,7 +165,7 @@ describe("cantripsKnownAtLevel — SRD 5.2 cantrip columns (data only, #1131 wir
   });
 });
 
-describe("swapCadenceFor — SRD 5.2 spell-swap cadence", () => {
+describe("swapCadenceFor — per-edition spell-swap cadence", () => {
   it("onLevelUp for Bard/Sorcerer/Warlock + EK/AT", () => {
     for (const cls of ["bard", "sorcerer", "warlock"]) expect(swapCadenceFor(cls, null, "EDITION_2024")).toBe("onLevelUp");
     expect(swapCadenceFor("fighter", "Eldritch Knight", "EDITION_2024")).toBe("onLevelUp");
