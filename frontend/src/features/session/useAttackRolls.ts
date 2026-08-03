@@ -144,6 +144,10 @@ export function useAttackRolls({
       formName: entry.name,
       source,
       attack,
+      // Carried onto the tally row so rollDamageFor (useTallyResolve) can
+      // correlate its damage event with this attack even without reaching
+      // swingIdRef (#1354).
+      swingId,
     });
   }
 
@@ -180,7 +184,11 @@ export function useAttackRolls({
       : false;
     const spec = parentCrit ? critDamageSpec(rider.spec) : rider.spec;
     const result = roll(spec, rider.rollLabel);
-    logRollSafe("damage", rider.logSource, result, spec, rider.damageType);
+    logRollSafe("damage", rider.logSource, result, spec, rider.damageType, {
+      // Shares the parent swing's id (#1235/#1354) — the rider is another
+      // roll event on the same swing, not a new one.
+      swingId: parentEntryId ? swingIdRef.current[parentEntryId] : undefined,
+    });
     setRiderTotals((prev) => ({ ...prev, [rider.id]: result.total }));
     if (currentRow) addTallyDamageRider(currentRow.id, result.total);
   }

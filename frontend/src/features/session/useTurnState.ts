@@ -49,6 +49,8 @@ export interface RecordedAttack {
   attack: TallyAttackRoll;
   /** Which economy slot recorded it (#813). Defaults to `action` when omitted. */
   source?: TallyRowSource;
+  /** Correlates this row's roll events as one swing (#1235). */
+  swingId?: string;
 }
 
 let rowIdSeq = 0;
@@ -502,6 +504,10 @@ function tallyRowFor(recorded: RecordedAttack, fallbackSource: TallyRowSource): 
     formName: recorded.formName,
     attack: recorded.attack,
     ...(verdict ? { verdict } : {}),
+    // Carries the attack-time swingId (#1235/#1354) so a later rollDamageFor
+    // on this row — which has no access to useAttackRolls' swingIdRef — can
+    // still correlate its damage event with the attack event.
+    ...(recorded.swingId ? { swingId: recorded.swingId } : {}),
   };
 }
 
