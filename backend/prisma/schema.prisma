@@ -1621,11 +1621,36 @@ model InventoryItem {
   // Uses spent on an activatedEffect capability since its last recharge (#543).
   // Reset by the matching rest; the seeded self-buff tracks the "active" state.
   activatedUsesSpent    Int                   @default(0)
+  // The frozen half of this row as one document (#1648, epic #1644), validated
+  // by inventorySnapshotSchema. NULLABLE only until #1649 flips the readers and
+  // backfills are proven — a null here means a write path that forgot it, which
+  // is what inventory-snapshot-dual-write.test.ts exists to catch.
+  snapshot              Json?
+  // Promoted out of InventoryConsumableDetail, whose maxUses twin is frozen and
+  // lives in the snapshot. Mutable state stays a column: ~17 call sites update
+  // it with atomic update/updateMany, and a blob would make each a
+  // read-modify-write.
+  usesRemaining         Int?
 
   weaponDetail     InventoryWeaponDetail?
   armorDetail      InventoryArmorDetail?
   consumableDetail InventoryConsumableDetail?
   capabilities     InventoryCapability[]
+  capabilityUses   InventoryCapabilityUse[]
+}
+
+// The one mutable field of InventoryCapability (#1648). Keyed by the capability's
+// `key` in the snapshot rather than a row id, because #1649 deletes the row it
+// would otherwise point at.
+model InventoryCapabilityUse {
+  id              String        @id @default(uuid())
+  inventoryItemId String
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  capabilityKey   String
+  used            Int           @default(0)
+
+  @@unique([inventoryItemId, capabilityKey])
+  @@index([inventoryItemId])
 }
 
 // Snapshot twin of CampaignItemCapability, owned by InventoryItem (#545). Same

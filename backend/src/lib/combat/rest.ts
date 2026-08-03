@@ -29,6 +29,11 @@ import {
   readCapability,
   type CapabilityColumns,
 } from "@/lib/inventory/capabilities.js";
+import {
+  mirrorCapabilityUsedResetMany,
+  mirrorCapabilityUsedSet,
+  mirrorUsesRemaining,
+} from "@/lib/inventory/inventory-capability-use.js";
 import { InvalidHitPointOperationError, hitDieHeal, type HitDice } from "./hp-core.js";
 import type { HpOpContext, HpOpResult } from "./hp-context.js";
 
@@ -72,6 +77,7 @@ async function resetItemSpellUsesOnRest(
   }
   if (ids.length > 0) {
     await ctx.tx.inventoryCapability.updateMany({ where: { id: { in: ids } }, data: { used: 0 } });
+    await mirrorCapabilityUsedResetMany(ctx.tx, ids);
   }
   return restored;
 }
@@ -117,6 +123,7 @@ async function rechargeOneChargePool(
   const nextUsed = Math.max(0, used - regained);
   if (nextUsed === used) return null;
   await tx.inventoryCapability.update({ where: { id: col.id }, data: { used: nextUsed } });
+  await mirrorCapabilityUsedSet(tx, col.id, nextUsed);
   return {
     before: { capabilityId: col.id, itemName, used },
     after: { capabilityId: col.id, itemName, used: nextUsed },
@@ -460,6 +467,7 @@ async function rechargeConsumables(
         where: { inventoryItemId: c.inventoryItemId },
         data: { usesRemaining: c.maxUses },
       });
+      await mirrorUsesRemaining(tx, c.inventoryItemId, c.maxUses);
       consumablesRecharged += 1;
     }
   }

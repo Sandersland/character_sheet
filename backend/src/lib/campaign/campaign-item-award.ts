@@ -1,9 +1,12 @@
 import { randomUUID } from "node:crypto";
 
 import { Prisma } from "@/generated/prisma/client.js";
-import { snapshotDetailCreate } from "@/lib/inventory/detail-snapshot.js";
+import { capabilityColumnFields } from "@/lib/inventory/capabilities.js";
+import { consumableDetailFields, snapshotDetailCreate } from "@/lib/inventory/detail-snapshot.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { snapshotInventoryItemForUndo, inventoryItemDetailInclude } from "@/lib/inventory/inventory.js";
+import { asCurrency } from "@/lib/inventory/inventory-currency.js";
+import { buildInventorySnapshot } from "@/lib/inventory/inventory-snapshot-build.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { getActiveSessionId } from "@/lib/session/sessions.js";
 
@@ -43,66 +46,29 @@ function toJsonInput(value: Prisma.JsonValue | null): Prisma.InputJsonValue | Pr
   return value === null ? Prisma.JsonNull : (value as Prisma.InputJsonValue);
 }
 
+// Typed capability rows snapshotted 1:1 onto the awarded item (#545) — a
+// straight column copy via capabilityColumnFields (`used` NOT copied: an
+// awarded pool/per-capability counter starts full, remaining = max − 0).
+// Each gets an explicit id (#1648) rather than the column default, generated
+// client-side so the SAME id can key both this InventoryCapability row and
+// its InventoryCapabilityUse mirror, and feed buildInventorySnapshot's
+// capabilities[].key, all from one create() call.
+function snapshotCampaignItemCapabilityCreates(item: CampaignItemWithDetails) {
+  return item.capabilities.map((c) => ({ id: randomUUID(), ...capabilityColumnFields(c) }));
+}
+
 // Builds the InventoryItem nested detail-create block from a CAMPAIGN-scoped
 // Item's already-included detail rows — the Item*Detail tables share the
 // exact shape of the Inventory*Detail tables, so this is a straight field copy.
-function snapshotCampaignItemDetail(item: CampaignItemWithDetails) {
+// The snapshot is self-contained, so a later edit/revoke of the source leaves
+// these intact.
+function snapshotCampaignItemDetail(
+  item: CampaignItemWithDetails,
+  capabilityCreates: ReturnType<typeof snapshotCampaignItemCapabilityCreates>,
+) {
   return {
     ...snapshotDetailCreate(item),
-    // Typed capability rows snapshotted 1:1 onto the awarded item (#545) — a
-    // straight column copy, same as the detail tables above. The snapshot is
-    // self-contained, so a later edit/revoke of the source leaves these intact.
-    capabilities:
-      item.capabilities.length > 0
-        ? {
-            create: item.capabilities.map((c) => ({
-              kind: c.kind,
-              description: c.description,
-              target: c.target,
-              op: c.op,
-              value: c.value,
-              targetKey: c.targetKey,
-              condition: c.condition,
-              valueDiceCount: c.valueDiceCount,
-              valueDiceFaces: c.valueDiceFaces,
-              valueDamageType: c.valueDamageType,
-              // castSpell columns (#528) — provenance spellId + authored config.
-              // `used` is NOT copied (runtime state resets to 0 on the new item).
-              spellId: c.spellId,
-              spellName: c.spellName,
-              spellLevel: c.spellLevel,
-              castLevel: c.castLevel,
-              castResource: c.castResource,
-              castUses: c.castUses,
-              castConcentration: c.castConcentration,
-              dcMode: c.dcMode,
-              dcValue: c.dcValue,
-              attackMode: c.attackMode,
-              attackValue: c.attackValue,
-              // activatedEffect columns (#543).
-              activation: c.activation,
-              activatedDuration: c.activatedDuration,
-              resourceKind: c.resourceKind,
-              resourcePeriod: c.resourcePeriod,
-              resourceCharges: c.resourceCharges,
-              durationText: c.durationText,
-              // grant columns (#529).
-              grantType: c.grantType,
-              grantOn: c.grantOn,
-              grantValueKind: c.grantValueKind,
-              grantValue: c.grantValue,
-              cantBeSurprised: c.cantBeSurprised,
-              // charges pool columns (#555). `used` stays uncopied — an awarded
-              // pool starts full (remaining = maxCharges − 0).
-              maxCharges: c.maxCharges,
-              rechargeDiceCount: c.rechargeDiceCount,
-              rechargeDiceFaces: c.rechargeDiceFaces,
-              rechargeBonus: c.rechargeBonus,
-              rechargeTrigger: c.rechargeTrigger,
-              chargeCost: c.chargeCost,
-            })),
-          }
-        : undefined,
+    capabilities: capabilityCreates.length > 0 ? { create: capabilityCreates } : undefined,
   };
 }
 
@@ -189,6 +155,12 @@ export async function awardCampaignItem(params: {
     }
 
     const position = await tx.inventoryItem.count({ where: { characterId: character.id } });
+    // Ids generated up front (#1648) so the same create() call can nest both
+    // `capabilities` and their `capabilityUses` mirror rows, and so
+    // buildInventorySnapshot's capabilities[].key matches the row id that
+    // actually lands — no follow-up read-then-update round trip.
+    const capabilityCreates = snapshotCampaignItemCapabilityCreates(item);
+    const capabilityUseCreates = capabilityCreates.map((c) => ({ capabilityKey: c.id, used: 0 }));
     const created = await tx.inventoryItem.create({
       data: {
         characterId: character.id,
@@ -208,7 +180,30 @@ export async function awardCampaignItem(params: {
         attunementPrereqKind: item.attunementPrereqKind,
         attunementPrereqValue: item.attunementPrereqValue,
         position,
-        ...snapshotCampaignItemDetail(item),
+        // Promoted out of InventoryConsumableDetail (#1648) — same freshCopy
+        // rule as the nested consumableDetail create below (a charged
+        // consumable is awarded full).
+        usesRemaining: item.consumableDetail
+          ? consumableDetailFields(item.consumableDetail, { freshCopy: true }).usesRemaining
+          : null,
+        snapshot: buildInventorySnapshot({
+          name: item.name,
+          category: item.category,
+          weight: item.weight,
+          cost: asCurrency(item.cost),
+          description: item.description,
+          slot: item.slot,
+          rarity: item.rarity,
+          requiresAttunement: item.requiresAttunement,
+          attunementPrereqKind: item.attunementPrereqKind,
+          attunementPrereqValue: item.attunementPrereqValue,
+          weaponDetail: item.weaponDetail,
+          armorDetail: item.armorDetail,
+          consumableDetail: item.consumableDetail,
+          capabilities: capabilityCreates,
+        }) as unknown as Prisma.InputJsonValue,
+        capabilityUses: capabilityUseCreates.length > 0 ? { create: capabilityUseCreates } : undefined,
+        ...snapshotCampaignItemDetail(item, capabilityCreates),
       },
     });
 

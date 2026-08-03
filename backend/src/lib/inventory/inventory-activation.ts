@@ -14,6 +14,7 @@ import {
 } from "@/lib/combat/active-effects.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { InvalidInventoryOperationError } from "./inventory-currency.js";
+import { mirrorCapabilityUsedIncrement } from "./inventory-capability-use.js";
 import {
   type ActivateOperation,
   type DeactivateOperation,
@@ -105,6 +106,7 @@ async function spendActivationCharges(
       `${item.name} needs ${chargeCost} charge${chargeCost === 1 ? "" : "s"} — too few remaining`,
     );
   }
+  await mirrorCapabilityUsedIncrement(tx, pool.row.id, chargeCost);
   // Re-read for the event snapshot: under a race the pre-read `pool.row.used` is stale.
   const fresh = await tx.inventoryCapability.findUniqueOrThrow({
     where: { id: pool.row.id },

@@ -1,5 +1,5 @@
 import { Prisma, type EquipSlot, type ItemRarity } from "@/generated/prisma/client.js";
-import { type AttunementPrereqKind } from "./capabilities.js";
+import { capabilityColumnFields, type AttunementPrereqKind } from "./capabilities.js";
 import {
   armorDetailFields,
   consumableDetailFields,
@@ -15,6 +15,7 @@ import type {
 } from "./item-detail-inputs.js";
 import { type Currency, asCurrency, toJsonInput } from "./inventory-currency.js";
 import type { InventoryItemWithDetails, CatalogItemWithDetails } from "./inventory-types.js";
+import { buildInventorySnapshot } from "./inventory-snapshot-build.js";
 
 // Damage-roll fields of a weapon detail block, defaulted the same way as
 // their sibling groups below (see normalizeWeaponDetail).
@@ -168,49 +169,9 @@ export function snapshotInventoryItemForUndo(item: InventoryItemWithDetails): De
     attunementPrereqValue: item.attunementPrereqValue,
     notes: item.notes,
     position: item.position,
-    // fallow-ignore-next-line code-duplication -- snapshot mirrors the persisted capability shape field-for-field on purpose
-    capabilities: item.capabilities.map((c) => ({
-      kind: c.kind,
-      description: c.description,
-      target: c.target,
-      op: c.op,
-      value: c.value,
-      targetKey: c.targetKey,
-      condition: c.condition,
-      valueDiceCount: c.valueDiceCount,
-      valueDiceFaces: c.valueDiceFaces,
-      valueDamageType: c.valueDamageType,
-      spellId: c.spellId,
-      spellName: c.spellName,
-      spellLevel: c.spellLevel,
-      castLevel: c.castLevel,
-      castResource: c.castResource,
-      castUses: c.castUses,
-      castConcentration: c.castConcentration,
-      dcMode: c.dcMode,
-      dcValue: c.dcValue,
-      attackMode: c.attackMode,
-      attackValue: c.attackValue,
-      activation: c.activation,
-      activatedDuration: c.activatedDuration,
-      resourceKind: c.resourceKind,
-      resourcePeriod: c.resourcePeriod,
-      resourceCharges: c.resourceCharges,
-      durationText: c.durationText,
-      grantType: c.grantType,
-      grantOn: c.grantOn,
-      grantValueKind: c.grantValueKind,
-      grantValue: c.grantValue,
-      cantBeSurprised: c.cantBeSurprised,
-      maxCharges: c.maxCharges,
-      rechargeDiceCount: c.rechargeDiceCount,
-      rechargeDiceFaces: c.rechargeDiceFaces,
-      rechargeBonus: c.rechargeBonus,
-      rechargeTrigger: c.rechargeTrigger,
-      chargeCost: c.chargeCost,
-      // Runtime counter: undo-of-delete restores the row verbatim, spend state included.
-      used: c.used,
-    })),
+    // used included (unlike snapshotCampaignItemCapabilityCreates's award
+    // path): undo-of-delete restores the row verbatim, spend state included.
+    capabilities: item.capabilities.map((c) => ({ ...capabilityColumnFields(c), used: c.used })),
     weaponDetail: item.weaponDetail ? weaponDetailFields(item.weaponDetail) : null,
     armorDetail: item.armorDetail ? armorDetailFields(item.armorDetail) : null,
     consumableDetail: item.consumableDetail ? consumableDetailFields(item.consumableDetail) : null,
@@ -227,6 +188,7 @@ export function buildInventoryCreateFromCatalog(
   item: CatalogItemWithDetails,
   opts: { quantity: number; position: number }
 ) {
+  const detail = snapshotItemDetail(item);
   return {
     itemId: item.id,
     name: item.name,
@@ -239,7 +201,33 @@ export function buildInventoryCreateFromCatalog(
     equippedSlot: null as EquipSlot | null,
     slot: item.slot,
     position: opts.position,
-    ...snapshotItemDetail(item),
+    // Promoted out of InventoryConsumableDetail (#1648) — same freshCopy value
+    // the nested consumableDetail create below carries.
+    usesRemaining: detail.consumableDetail?.create.usesRemaining ?? null,
+    // catalogItemDetailInclude doesn't fetch capabilities (starting gear is
+    // catalog-only content, never a capability-bearing DM award), so this is
+    // always built with capabilities: []. rarity/requiresAttunement/
+    // attunementPrereqKind/Value are NOT snapshotted from the catalog item
+    // here (pre-existing behaviour, unchanged by #1648): this create doesn't
+    // set those columns either, so the snapshot must agree with what the row
+    // actually persists, not with the catalog's values.
+    snapshot: buildInventorySnapshot({
+      name: item.name,
+      category: item.category,
+      weight: item.weight ?? null,
+      cost: asCurrency(item.cost),
+      description: item.description ?? null,
+      slot: item.slot,
+      rarity: null,
+      requiresAttunement: false,
+      attunementPrereqKind: null,
+      attunementPrereqValue: null,
+      weaponDetail: detail.weaponDetail?.create ?? null,
+      armorDetail: detail.armorDetail?.create ?? null,
+      consumableDetail: detail.consumableDetail?.create ?? null,
+      capabilities: [],
+    }) as unknown as Prisma.InputJsonValue,
+    ...detail,
   };
 }
 
