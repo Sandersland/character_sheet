@@ -119,3 +119,93 @@ describe("applySpellcastingOpInTx (#885 seam)", () => {
     ).rejects.toThrowError(new InvalidSpellcastingOperationError("Character not found: does-not-exist"));
   });
 });
+
+// #1507 D7: a 2014 Bard is a "known" caster (SRD 5.1) — a learned spell is
+// castable immediately, no separate preparation step. A 2024 Bard is
+// "prepared" (SRD 5.2) — the born-`prepared: false` behavior every other
+// learnSpell case in this file already exercises.
+describe("applySpellcastingOpInTx — learnSpell born-prepared (#1507 D7)", () => {
+  const created: string[] = [];
+  const BARD_CATALOG_NAME = "Spellcasting In-Tx Bard";
+  const BARD_SPELL_NAME = "Spellcasting In-Tx Vicious Mockery";
+  let bardClassId: string;
+  let bardSpellId: string;
+
+  beforeAll(async () => {
+    await ensureTestOwner(OWNER_ID);
+    const cls = await prisma.characterClass.upsert({
+      where: { name: BARD_CATALOG_NAME },
+      create: {
+        name: BARD_CATALOG_NAME,
+        hitDie: "d8",
+        savingThrows: ["dexterity", "charisma"],
+        skillChoiceCount: 3,
+        skillChoices: ["performance", "persuasion", "deception"],
+        isSpellcaster: true,
+      },
+      update: {},
+    });
+    bardClassId = cls.id;
+    const spell = await prisma.spell.upsert({
+      where: { name: BARD_SPELL_NAME },
+      create: {
+        name: BARD_SPELL_NAME,
+        level: 1,
+        school: "enchantment" as const,
+        castingTime: "1 action",
+        range: "60 ft",
+        duration: "Instantaneous",
+        description: "1d4 psychic damage.",
+        classes: ["bard"],
+      },
+      update: {},
+    });
+    bardSpellId = spell.id;
+  });
+
+  afterEach(async () => {
+    if (created.length) await prisma.character.deleteMany({ where: { id: { in: created.splice(0) } } });
+  });
+
+  afterAll(async () => {
+    await prisma.spell.deleteMany({ where: { name: BARD_SPELL_NAME } });
+    await prisma.characterClass.deleteMany({ where: { name: BARD_CATALOG_NAME } });
+  });
+
+  async function bardFixture(rulesEdition: "EDITION_2014" | "EDITION_2024") {
+    const character = await prisma.character.create({
+      data: {
+        ...BASE_CHAR,
+        name: `Spellcasting In-Tx Bard Fixture (${rulesEdition})`,
+        rulesEdition,
+        ownerId: OWNER_ID,
+        experiencePoints: 6500, // level 5
+        abilityScores: { strength: 8, dexterity: 12, constitution: 12, intelligence: 10, wisdom: 10, charisma: 16 },
+        spellcasting: Prisma.JsonNull,
+        classEntries: { create: { name: "bard", classId: bardClassId, level: 5, position: 0 } },
+      },
+    });
+    created.push(character.id);
+    return character.id;
+  }
+
+  it("a 2014 bard's learnSpell yields prepared: true", async () => {
+    const id = await bardFixture("EDITION_2014");
+    await prisma.$transaction((tx) =>
+      applySpellcastingOpInTx(tx, id, { type: "learnSpell", spellId: bardSpellId }, BATCH, null, OWNER_ID),
+    );
+    const row = await prisma.character.findUniqueOrThrow({ where: { id } });
+    const spells = (row.spellcasting as { spells: { spellId?: string; prepared: boolean }[] }).spells;
+    expect(spells.find((s) => s.spellId === bardSpellId)?.prepared).toBe(true);
+  });
+
+  it("a 2024 bard's learnSpell yields prepared: false", async () => {
+    const id = await bardFixture("EDITION_2024");
+    await prisma.$transaction((tx) =>
+      applySpellcastingOpInTx(tx, id, { type: "learnSpell", spellId: bardSpellId }, BATCH, null, OWNER_ID),
+    );
+    const row = await prisma.character.findUniqueOrThrow({ where: { id } });
+    const spells = (row.spellcasting as { spells: { spellId?: string; prepared: boolean }[] }).spells;
+    expect(spells.find((s) => s.spellId === bardSpellId)?.prepared).toBe(false);
+  });
+});

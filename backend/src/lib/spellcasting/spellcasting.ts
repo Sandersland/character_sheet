@@ -38,7 +38,7 @@ import type {
   SpellComponents,
   SpellcastingMutableState,
 } from "./spell-state.js";
-import { deriveSpellcasting, derivePreparedSpellLimit } from "@/lib/srd/srd.js";
+import { deriveSpellcasting, derivePreparedSpellLimit, casterModelForEntries } from "@/lib/srd/srd.js";
 import { deriveResources } from "@/lib/classes/class-features.js";
 import { FEATURE_ROWS_CLASS_FEATURES, FEATURE_ROWS_SUBCLASS_FEATURES, featureRowsOf } from "@/lib/classes/feature-rows-select.js";
 import { editionOf } from "@/lib/rules/edition.js";
@@ -101,8 +101,16 @@ interface SpellOpContext {
   // wielder-mode item spell's DC/attack (#528). Null for a non-caster.
   wielderSpellSaveDC: number | null;
   wielderSpellAttackBonus: number | null;
-  // Derived prepared-spell cap (#883). Null for known/pact/third casters.
+  // Derived prepared-spell cap (#883, edition-forked #1507): null only when no
+  // class entry is a caster at its level — every SRD 5.2 caster and every SRD
+  // 5.1 caster (known or prepared) resolves to a real number via
+  // derivePreparedSpellLimit; Pact Magic is the one caster this cap never
+  // governs, but it still resolves non-null through Warlock's shared array.
   preparedSpellLimit: number | null;
+  // Known vs prepared (#1507 D5/D7): "known" for a 2014 Bard/Sorcerer/Warlock/
+  // Ranger/EK/AT, "prepared" for everything else, null for a non-caster.
+  // Drives applyLearnSpellOp's D7 born-prepared rule below.
+  casterModel: "known" | "prepared" | null;
   // Arcane Recovery (#904): the mutable resources state (the once-per-long-rest
   // use counter lives here), whether the character has the pool, and the wizard
   // level driving the ceil(level/2) slot-level cap.
@@ -313,6 +321,12 @@ async function resolveCatalogSpellEntry(
 // scroll-scribing/DM-grant flows. The level-up ceremony's own eligibility gate
 // (class list + spell-level ceiling) lives in `assertPickSpellEligibility`,
 // which validates against the server-built plan step before this op ever runs.
+//
+// #1507 D7: a 2014 "known" caster's chosen spell is castable the moment it's
+// learned — SRD 5.1 has no separate preparation step for Bard/Sorcerer/
+// Warlock/Ranger/EK/AT, so `ctx.casterModel === "known"` births the entry
+// `prepared: true` here (catalog and custom paths alike). Cantrips are
+// unaffected either way — always castable, never toggled.
 async function applyLearnSpellOp(ctx: SpellOpContext, op: LearnSpellOperation): Promise<OpOutcome> {
   const { tx, state } = ctx;
   if (Boolean(op.spellId) === Boolean(op.custom)) {
@@ -323,6 +337,7 @@ async function applyLearnSpellOp(ctx: SpellOpContext, op: LearnSpellOperation): 
   const newEntry = op.spellId
     ? await resolveCatalogSpellEntry(tx, state, op.spellId)
     : customSpellToEntry(op.custom!);
+  if (ctx.casterModel === "known") newEntry.prepared = true;
   state.spells.push(newEntry);
   return {
     eventType: "learnSpell",
@@ -825,6 +840,7 @@ function buildSpellOpContext(
   arcanaTotals: Record<number, number>,
   derived: DerivedSpellcasting,
   preparedSpellLimit: number | null,
+  casterModel: "known" | "prepared" | null,
   arcaneRecovery: { resources: ResourcesMutableState; available: boolean; wizardLevel: number },
 ): SpellOpContext {
   return {
@@ -837,6 +853,7 @@ function buildSpellOpContext(
     wielderSpellSaveDC: derived?.spellSaveDC ?? null,
     wielderSpellAttackBonus: derived?.spellAttackBonus ?? null,
     preparedSpellLimit,
+    casterModel,
     resources: arcaneRecovery.resources,
     arcaneRecoveryAvailable: arcaneRecovery.available,
     wizardLevel: arcaneRecovery.wizardLevel,
@@ -999,6 +1016,9 @@ function buildSpellcastingOp(
   // derivePreparedSpellLimit as buildSpellcastingView's clamp-on-read and
   // reconcilePreparedSpells — never a second inline copy of the cap.
   const preparedSpellLimit = derivePreparedSpellLimit(limitEntries, abilityScores, edition);
+  // D7: the ONE combiner buildSpellcastingView's served wire field also calls —
+  // never a second inline copy (#1507).
+  const casterModel = casterModelForEntries(limitEntries, edition);
 
   const { slotTotals, arcanaTotals } = computeSlotTables(row.spellcasting, derived);
 
@@ -1022,7 +1042,7 @@ function buildSpellcastingOp(
     editionOf(row),
   );
 
-  const ctx = buildSpellOpContext(ids, row, state, slotTotals, arcanaTotals, derived, preparedSpellLimit, arcaneRecovery);
+  const ctx = buildSpellOpContext(ids, row, state, slotTotals, arcanaTotals, derived, preparedSpellLimit, casterModel, arcaneRecovery);
   return { ctx, state, beforeState };
 }
 
