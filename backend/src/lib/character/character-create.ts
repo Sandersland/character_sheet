@@ -11,6 +11,7 @@ import {
 import {
   ALIGNMENTS,
   deriveCreatedCharacter,
+  derivePreparedSpellLimit,
   isKnownTool,
   level1SpellPicksFor,
   maxSpellLevelForClass,
@@ -27,7 +28,7 @@ import {
   EQUIPMENT_PACKAGE_INCLUDE,
 } from "@/lib/inventory/starting-equipment-package.js";
 import { creationSpellEntry } from "@/lib/spellcasting/spellcasting.js";
-import type { SpellEntry } from "@/lib/spellcasting/spell-state.js";
+import { clampPreparedToLimit, type SpellEntry } from "@/lib/spellcasting/spell-state.js";
 import { subclassGateLevel } from "@/lib/leveling/effective-levels.js";
 import { DEFAULT_RULES_EDITION } from "@/lib/rules/edition.js";
 import { crossEditionRejection, resolveEditionRow, withEditionOrShared } from "@/lib/rules/catalog-edition.js";
@@ -977,6 +978,33 @@ function creationSpellcasting(spellEntries: SpellEntry[] | null): Prisma.InputJs
   return { slotsUsed: {}, arcanumUsed: {}, spells: spellEntries, concentratingOn: null } as unknown as Prisma.InputJsonValue;
 }
 
+// #1513 D-A: creation prepares the legal max, not every scribed spell — a
+// Wizard's spellbook (6, level1SpellPicksFor's spellbookSize) can exceed its
+// prepared cap (4 at INT 16), so the first `limit` leveled picks (in pick
+// order) stay prepared:true and the rest are stored prepared:false.
+// clampPreparedToLimit is the SAME "keep the first N" rule
+// buildSpellcastingView's read-side clamp applies (#1127) — reusing it here
+// means the stored blob equals the served view (trimmedCount 0 on every read)
+// instead of an over-cap book permanently relying on the read-side fallback to
+// trim it. Cantrips (level 0) are untouched by the clamp. For every non-Wizard,
+// level-1 picks are already <= the limit, so this is a no-op and the stored
+// blob is byte-identical to before. Split out of persistCreatedCharacter to
+// keep that function's complexity under the repo's health gate.
+function clampCreationSpellEntries(
+  spellEntries: SpellEntry[] | null,
+  primaryClassChoice: PrimaryClassChoice,
+  selections: ResolvedSelections,
+  effectiveScores: Record<string, number>,
+): SpellEntry[] | null {
+  if (!spellEntries) return null;
+  const limit = derivePreparedSpellLimit(
+    [{ name: primaryClassChoice.name, level: 1, subclass: selections.subclassName }],
+    effectiveScores,
+    selections.edition,
+  );
+  return clampPreparedToLimit(spellEntries, limit).spells;
+}
+
 // Phase 3 — ability/HP seeding, spell/proficiency setup (deriveCreatedCharacter)
 // and persistence. Returns just the new id; the route re-fetches + serializes.
 async function persistCreatedCharacter(
@@ -1003,6 +1031,7 @@ async function persistCreatedCharacter(
   );
 
   const resources = creationResources(originEntry);
+  const clampedSpellEntries = clampCreationSpellEntries(spellEntries, primaryClassChoice, selections, effectiveScores);
 
   const created = await prisma.character.create({
     data: {
@@ -1026,7 +1055,7 @@ async function persistCreatedCharacter(
       toolProficiencies: derived.toolProficiencies as unknown as Prisma.InputJsonValue,
       // Override derived currency with starting gold if the gold path was chosen.
       ...(startingCurrency ? { currency: startingCurrency } : {}),
-      spellcasting: creationSpellcasting(spellEntries),
+      spellcasting: creationSpellcasting(clampedSpellEntries),
       raceSelection: { create: { name: input.race, raceId: race.id } },
       backgroundSelection: {
         create: { name: input.background, backgroundId: background?.id ?? null },

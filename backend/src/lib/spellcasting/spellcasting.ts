@@ -265,6 +265,9 @@ function catalogSpellToEntry(catalogSpell: Spell): SpellEntry {
 
 // #1131: a creation-time pick — the same catalog snapshot, but prepared (a fresh
 // caster's chosen cantrips + level-1 spells are all prepared from the start).
+// #1513: a Wizard's spellbook (6) can exceed its prepared cap (4) — that
+// exception is applied AFTER this, by persistCreatedCharacter's write-time
+// clampPreparedToLimit call, not here; every entry is still born prepared:true.
 export function creationSpellEntry(catalogSpell: Spell): SpellEntry {
   return { ...catalogSpellToEntry(catalogSpell), prepared: true };
 }
