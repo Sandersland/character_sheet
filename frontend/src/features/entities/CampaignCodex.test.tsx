@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
@@ -12,6 +12,7 @@ import { axe } from "@/test/axe";
 
 vi.mock("@/api/client", () => ({
   createEntity: vi.fn(),
+  uploadEntityPortrait: vi.fn(),
 }));
 
 vi.mock("@/hooks/useCampaignEntities", () => ({
@@ -22,6 +23,14 @@ vi.mock("@/hooks/useCampaignEntities", () => ({
 vi.mock("@/features/entities/useCodexActivity", () => ({
   useCodexActivity: vi.fn(),
 }));
+
+// jsdom ships neither object-URL static; the staged-portrait preview needs both.
+beforeAll(() => {
+  Object.assign(URL, {
+    createObjectURL: vi.fn(() => "blob:preview-url"),
+    revokeObjectURL: vi.fn(),
+  });
+});
 
 const CAMPAIGN_ID = "camp-1";
 
@@ -424,7 +433,6 @@ describe("CampaignCodex create flow (#367)", () => {
     await user.selectOptions(screen.getByLabelText("Type"), "NPC");
     await user.type(screen.getByLabelText(/name/i), "  Sildar Hallwinter  ");
     await user.type(screen.getByLabelText(/aliases/i), "Sil, the Knight");
-    await user.type(screen.getByLabelText(/portrait url/i), "https://example.com/sildar.png");
     await user.type(screen.getByLabelText(/notes/i), "Rescued near Phandalin.");
     await user.click(screen.getByRole("button", { name: /create entity/i }));
 
@@ -432,7 +440,6 @@ describe("CampaignCodex create flow (#367)", () => {
       type: "NPC",
       name: "Sildar Hallwinter",
       aliases: ["Sil", "the Knight"],
-      portraitUrl: "https://example.com/sildar.png",
       notes: "Rescued near Phandalin.",
     });
     expect(vi.mocked(primeCampaignEntities)).toHaveBeenCalledWith(
@@ -441,6 +448,78 @@ describe("CampaignCodex create flow (#367)", () => {
     );
     // Panel collapses back to the toggle after a successful create.
     expect(screen.queryByRole("button", { name: /create entity/i })).not.toBeInTheDocument();
+  });
+
+  it("shows the portrait picker only to the owner — portrait writes are owner-only (#1617)", async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderCodex("OWNER");
+    await user.click(screen.getByRole("button", { name: /new entry/i }));
+    expect(screen.getByRole("button", { name: /choose image/i })).toBeInTheDocument();
+    unmount();
+
+    renderCodex("PLAYER");
+    await user.click(screen.getByRole("button", { name: /new entry/i }));
+    expect(screen.queryByRole("button", { name: /choose image/i })).not.toBeInTheDocument();
+  });
+
+  it("uploads the staged portrait after create and primes the cache with the upload response (#1617)", async () => {
+    const user = userEvent.setup();
+    const file = new File([new Uint8Array(8)], "sildar.png", { type: "image/png" });
+    const created = entity({ id: "ent-new", name: "Sildar" });
+    const uploaded = {
+      ...created,
+      portraitUrl: `/api/campaigns/${CAMPAIGN_ID}/entities/ent-new/portrait?v=uuid-1`,
+    };
+    vi.mocked(client.createEntity).mockResolvedValue(created);
+    vi.mocked(client.uploadEntityPortrait).mockResolvedValue(uploaded);
+    renderCodex("OWNER");
+
+    await user.click(screen.getByRole("button", { name: /new entry/i }));
+    await user.type(screen.getByLabelText(/name/i), "Sildar");
+    await user.upload(screen.getByLabelText("Portrait"), file);
+    await user.click(screen.getByRole("button", { name: /create entity/i }));
+
+    expect(vi.mocked(client.uploadEntityPortrait)).toHaveBeenCalledWith(
+      CAMPAIGN_ID,
+      "ent-new",
+      file,
+    );
+    expect(vi.mocked(primeCampaignEntities)).toHaveBeenLastCalledWith(
+      CAMPAIGN_ID,
+      expect.arrayContaining([
+        expect.objectContaining({ id: "ent-new", portraitUrl: uploaded.portraitUrl }),
+      ]),
+    );
+    expect(screen.queryByRole("button", { name: /create entity/i })).not.toBeInTheDocument();
+  });
+
+  it("keeps the created entity and offers a retry when the portrait upload fails (#1617)", async () => {
+    const user = userEvent.setup();
+    const file = new File([new Uint8Array(8)], "sildar.png", { type: "image/png" });
+    const created = entity({ id: "ent-new", name: "Sildar" });
+    vi.mocked(client.createEntity).mockResolvedValue(created);
+    vi.mocked(client.uploadEntityPortrait).mockRejectedValue(new Error("boom"));
+    renderCodex("OWNER");
+
+    await user.click(screen.getByRole("button", { name: /new entry/i }));
+    await user.type(screen.getByLabelText(/name/i), "Sildar");
+    await user.upload(screen.getByLabelText("Portrait"), file);
+    await user.click(screen.getByRole("button", { name: /create entity/i }));
+
+    // The create stuck (cache primed) even though the upload failed.
+    expect(vi.mocked(primeCampaignEntities)).toHaveBeenCalledWith(
+      CAMPAIGN_ID,
+      expect.arrayContaining([expect.objectContaining({ id: "ent-new" })]),
+    );
+    expect(await screen.findByText(/portrait upload failed/i)).toBeInTheDocument();
+    expect(vi.mocked(client.createEntity)).toHaveBeenCalledTimes(1);
+
+    // Retry only re-runs the upload — never a second create.
+    vi.mocked(client.uploadEntityPortrait).mockResolvedValue({ ...created, portraitUrl: "x" });
+    await user.click(screen.getByRole("button", { name: /retry upload/i }));
+    expect(vi.mocked(client.createEntity)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(client.uploadEntityPortrait)).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole("button", { name: /retry upload/i })).not.toBeInTheDocument();
   });
 
   it("omits notes when the field is blank", async () => {

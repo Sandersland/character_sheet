@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 
 import { assertCampaignMembership, assertCampaignOwner } from "@/lib/auth/access.js";
@@ -19,9 +19,9 @@ import {
 } from "@/lib/campaign/entities.js";
 import { parseBodyOr400 } from "@/lib/http/parse-body.js";
 import { prisma } from "@/lib/core/prisma.js";
-import { BlobNotFoundError, createBlobStore, type BlobObject } from "@/lib/storage/index.js";
+import { createBlobStore } from "@/lib/storage/index.js";
 import { deletePortraitBlobBestEffort, portraitKeyVersion } from "@/lib/storage/portrait-blob.js";
-import { PORTRAIT_FIELD, portraitMultipart, sendPortrait } from "@/lib/storage/portrait-http.js";
+import { PORTRAIT_FIELD, portraitMultipart, sendStoredPortrait } from "@/lib/storage/portrait-http.js";
 import { PORTRAIT_CONTENT_TYPE, reencodePortrait } from "@/lib/storage/portrait-image.js";
 
 // Campaign entity registry (#248): the shared wiki of NPCs/locations/factions/
@@ -222,40 +222,38 @@ entitiesRouter.post("/campaigns/:id/entities/merges", async (req, res) => {
   res.status(201).json(result.merge);
 });
 
-// POST execute — OWNER only.
-entitiesRouter.post("/campaigns/:id/entities/merges/:mergeId/execute", async (req, res) => {
-  await assertCampaignOwner(
-    prisma,
-    req.user!.id,
-    req.params.id,
-    "edit",
-    "Only the campaign owner may execute a merge",
-  );
-
-  const result = await executeMerge(prisma, req.params.id, req.params.mergeId);
+// OWNER-gated merge-lifecycle step shared by execute and unmerge: assert the
+// role, run the op, unwrap the { ok: false } error shape. Returns the ok
+// result, or undefined when the error response was already written.
+async function runOwnerMergeOp<T extends { ok: true } | { ok: false; status: number; error: string }>(
+  req: Request<{ id: string; mergeId: string }>,
+  res: Response,
+  forbiddenMessage: string,
+  op: (campaignId: string, mergeId: string) => Promise<T>,
+): Promise<Extract<T, { ok: true }> | undefined> {
+  await assertCampaignOwner(prisma, req.user!.id, req.params.id, "edit", forbiddenMessage);
+  const result = await op(req.params.id, req.params.mergeId);
   if (!result.ok) {
     res.status(result.status).json({ error: result.error });
-    return;
+    return undefined;
   }
-  res.json(result.merge);
+  return result as Extract<T, { ok: true }>;
+}
+
+// POST execute — OWNER only.
+entitiesRouter.post("/campaigns/:id/entities/merges/:mergeId/execute", async (req, res) => {
+  const result = await runOwnerMergeOp(req, res, "Only the campaign owner may execute a merge", (cid, mid) =>
+    executeMerge(prisma, cid, mid),
+  );
+  if (result) res.json(result.merge);
 });
 
 // DELETE unmerge — OWNER only.
 entitiesRouter.delete("/campaigns/:id/entities/merges/:mergeId", async (req, res) => {
-  await assertCampaignOwner(
-    prisma,
-    req.user!.id,
-    req.params.id,
-    "edit",
-    "Only the campaign owner may unmerge entities",
+  const result = await runOwnerMergeOp(req, res, "Only the campaign owner may unmerge entities", (cid, mid) =>
+    deleteMerge(prisma, cid, mid),
   );
-
-  const result = await deleteMerge(prisma, req.params.id, req.params.mergeId);
-  if (!result.ok) {
-    res.status(result.status).json({ error: result.error });
-    return;
-  }
-  res.status(204).end();
+  if (result) res.status(204).end();
 });
 
 /**
@@ -339,6 +337,24 @@ async function storedEntityPortraitKey(entityId: string): Promise<string | null>
   return portraitKey;
 }
 
+// Key swap + superseded-blob cleanup + wire response, shared by the portrait
+// POST (fresh key) and DELETE (null). The previous key is read before the
+// swap so the old blob can be best-effort deleted after the write commits —
+// a crash between steps leaves at worst an orphaned blob, never a dangling key.
+async function swapEntityPortraitKey(
+  res: Response,
+  entityId: string,
+  key: string | null,
+): Promise<void> {
+  const previousKey = await storedEntityPortraitKey(entityId);
+  const updated = await prisma.campaignEntity.update({
+    where: { id: entityId },
+    data: { portraitKey: key },
+  });
+  await deletePortraitBlobBestEffort(previousKey);
+  res.json(toWireEntity(updated));
+}
+
 // Owner gate + entity-in-campaign 404 run BEFORE portraitMultipart, so an
 // unauthorized caller never makes the server buffer a multi-megabyte body.
 async function assertOwnedEntityForPortraitWrite(
@@ -377,19 +393,11 @@ entitiesRouter.post(
 
     const entityId = req.params.entityId;
     const webp = await reencodePortrait(req.file.buffer, req.file.mimetype);
+    // A fresh uuid per upload is what versions the wire URL (toWireEntity
+    // reads it back as ?v=), making the immutable cache header safe.
     const key = `portraits/entities/${entityId}/${randomUUID()}.webp`;
     await createBlobStore().put(key, webp, { contentType: PORTRAIT_CONTENT_TYPE });
-
-    // Blob first, then the key swap, then old-blob cleanup — the character
-    // POST's crash ordering: at worst an orphaned blob, never a dangling key.
-    const previousKey = await storedEntityPortraitKey(entityId);
-    const updated = await prisma.campaignEntity.update({
-      where: { id: entityId },
-      data: { portraitKey: key },
-    });
-    await deletePortraitBlobBestEffort(previousKey);
-
-    res.json(toWireEntity(updated));
+    await swapEntityPortraitKey(res, entityId, key);
   },
 );
 
@@ -399,19 +407,7 @@ entitiesRouter.get("/campaigns/:id/entities/:entityId/portrait", async (req, res
   const entity = await findViewableEntity(prisma, req.params.entityId, req.params.id, role === "OWNER");
   if (!entity) throw new NotFoundError("Entity not found");
 
-  const portraitKey = await storedEntityPortraitKey(entity.id);
-  if (!portraitKey) throw new NotFoundError("Portrait not found");
-
-  let blob: BlobObject;
-  try {
-    blob = await createBlobStore().get(portraitKey);
-  } catch (error) {
-    // A stored key whose blob is gone (e.g. wiped fs dir) reads as no
-    // portrait, not a server fault.
-    if (error instanceof BlobNotFoundError) throw new NotFoundError("Portrait not found");
-    throw error;
-  }
-  sendPortrait(res, blob);
+  await sendStoredPortrait(res, await storedEntityPortraitKey(entity.id));
 });
 
 // Idempotent: removing an absent portrait is a no-op 200 — the response is
@@ -424,14 +420,7 @@ entitiesRouter.delete("/campaigns/:id/entities/:entityId/portrait", async (req, 
     "Only the campaign owner may remove entity portraits",
   );
 
-  const previousKey = await storedEntityPortraitKey(req.params.entityId);
-  const updated = await prisma.campaignEntity.update({
-    where: { id: req.params.entityId },
-    data: { portraitKey: null },
-  });
-  await deletePortraitBlobBestEffort(previousKey);
-
-  res.json(toWireEntity(updated));
+  await swapEntityPortraitKey(res, req.params.entityId, null);
 });
 
 /**

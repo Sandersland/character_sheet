@@ -71,7 +71,7 @@ describe("EntityPreviewCard (#843)", () => {
   });
 
   it("shows a portrait thumbnail when set and the monogram when absent (#844)", () => {
-    const url = "https://example.com/goblin.png";
+    const url = "/api/campaigns/camp-1/entities/ent-1/portrait?v=uuid-1";
     const p = preview();
     p.entity = { ...p.entity, portraitUrl: url };
     render(<EntityPreviewCard preview={p} />);

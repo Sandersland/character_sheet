@@ -1,7 +1,9 @@
 import type { RequestHandler, Response } from "express";
 import multer from "multer";
 
-import type { BlobObject } from "./blob-store.js";
+import { NotFoundError } from "@/lib/auth/errors.js";
+import { BlobNotFoundError, type BlobObject } from "./blob-store.js";
+import { createBlobStore } from "./index.js";
 import { PORTRAIT_MAX_UPLOAD_BYTES } from "./portrait-image.js";
 
 // The multipart field name — the cross-plan contract pinned with the upload UI
@@ -55,9 +57,26 @@ export const portraitMultipart: RequestHandler = (req, res, next) => {
   });
 };
 
+/**
+ * Resolves a stored portrait key to its blob and streams it — the GET serve
+ * tail shared by the character (#1615) and entity (#1617) portrait routes.
+ * Callers authorize first; a null key, or a stored key whose blob is gone
+ * (e.g. wiped fs dir), reads as 404, not a server fault.
+ */
+export async function sendStoredPortrait(res: Response, portraitKey: string | null): Promise<void> {
+  if (!portraitKey) throw new NotFoundError("Portrait not found");
+  let blob: BlobObject;
+  try {
+    blob = await createBlobStore().get(portraitKey);
+  } catch (error) {
+    if (error instanceof BlobNotFoundError) throw new NotFoundError("Portrait not found");
+    throw error;
+  }
+  sendPortrait(res, blob);
+}
+
 // Streams a stored portrait blob with the immutable cache contract above.
-// Shared with entity portraits (#1617) alongside portraitMultipart.
-export function sendPortrait(res: Response, blob: BlobObject): void {
+function sendPortrait(res: Response, blob: BlobObject): void {
   res.setHeader("Content-Type", blob.contentType);
   res.setHeader("Content-Length", String(blob.size));
   res.setHeader("Cache-Control", PORTRAIT_CACHE_CONTROL);
