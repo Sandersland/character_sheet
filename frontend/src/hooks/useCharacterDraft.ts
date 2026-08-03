@@ -51,7 +51,9 @@ export interface CharacterDraft {
   toolChoices: string[];
   /** #1131: chosen level-1 cantrip catalog ids (casters only). */
   cantripIds: string[];
-  /** #1131: chosen level-1 prepared-spell catalog ids (casters only). */
+  /** #1131/#1510: chosen level-1 spell catalog ids (casters only) — prepared
+   *  or known per the class's edition model; empty for a 2014 Cleric/Druid,
+   *  which has no creation-time list to choose from. */
   spellIds: string[];
   equipmentDraft: EquipmentDraft | null;
   /** #1565: the background's OWN equipment draft, parallel to equipmentDraft
