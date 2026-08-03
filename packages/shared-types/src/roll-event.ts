@@ -74,6 +74,7 @@ export interface RollEventData {
   /**
    * The non-kept d20 face(s) of an advantage/disadvantage roll — absent for a
    * normal roll and for pre-existing events logged before this field existed.
+   * Currently at most one element; the drill-in display reads only the first.
    */
   droppedFaces?: number[];
   /** Ability key for check/save/initiative rolls — source carries the display text. */

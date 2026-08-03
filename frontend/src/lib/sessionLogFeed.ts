@@ -177,7 +177,8 @@ function attackDieToken(data: RollEventData): string | null {
   const keptLabel = data.nat20 ? "nat 20" : `${data.faces[0]}`;
   const dropped = data.droppedFaces?.[0];
   if (dropped === undefined) return `1d20 (${keptLabel})`;
-  const keptWord = data.faces[0] < dropped ? "lower kept" : "higher kept";
+  const keptWord =
+    data.faces[0] < dropped ? "lower kept" : data.faces[0] > dropped ? "higher kept" : "kept";
   return `1d20 (${keptLabel}, ${dropped} — ${keptWord})`;
 }
 

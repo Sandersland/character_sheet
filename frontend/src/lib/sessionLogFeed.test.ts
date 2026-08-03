@@ -276,6 +276,11 @@ describe("buildFeedItems attack drill-in dropped d20 face (#1359)", () => {
     expect(rows[0].drillIn?.[0].formula).toContain("1d20 (15, 5 — higher kept)");
   });
 
+  it("renders the neutral 'kept' when both dice landed on the same face", () => {
+    const rows = buildFeedItems([attackEvent({ total: 17, faces: [12], droppedFaces: [12] })]).map(rowOf);
+    expect(rows[0].drillIn?.[0].formula).toContain("1d20 (12, 12 — kept)");
+  });
+
   it("keeps the nat-20 special case, showing the dropped face alongside it", () => {
     const rows = buildFeedItems([attackEvent({ total: 25, faces: [20], droppedFaces: [9], nat20: true })]).map(rowOf);
     expect(rows[0].drillIn?.[0].formula).toContain("1d20 (nat 20, 9 — higher kept)");
