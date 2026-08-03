@@ -5,13 +5,11 @@ import { Router } from "express";
 import { assertCharacterAccess } from "@/lib/auth/access.js";
 import { NotFoundError } from "@/lib/auth/errors.js";
 import { characterInclude } from "@/lib/character/character-include.js";
-import {
-  deletePortraitBlobBestEffort,
-  storedPortraitKey,
-} from "@/lib/character/character-portrait.js";
+import { storedPortraitKey } from "@/lib/character/character-portrait.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { BlobNotFoundError, createBlobStore, type BlobObject } from "@/lib/storage/index.js";
+import { deletePortraitBlobBestEffort } from "@/lib/storage/portrait-blob.js";
 import { PORTRAIT_FIELD, portraitMultipart, sendPortrait } from "@/lib/storage/portrait-http.js";
 import { PORTRAIT_CONTENT_TYPE, reencodePortrait } from "@/lib/storage/portrait-image.js";
 

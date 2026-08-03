@@ -18,6 +18,7 @@ import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
 import { normalizeActiveEffectsMutable, type ActiveEffectsMutableState } from "@/lib/combat/active-effects.js";
 import { isOffHandLocked } from "@/lib/inventory/inventory-placement.js";
 import { RULES_EDITION_LABELS, editionOf } from "@/lib/rules/edition.js";
+import { portraitKeyVersion } from "@/lib/storage/portrait-blob.js";
 import type { DiceRider, SaveRider } from "@character-sheet/shared-types";
 import type { CharacterWithRelations } from "./character-include.js";
 import { buildRollModifiers, buildTargetModifiers } from "./serialize/effects.js";
@@ -162,9 +163,7 @@ function buildRiderView(
 // grants nothing — access is enforced by the route, not by URL secrecy.
 function derivePortraitUrl(row: { id: string; portraitKey: string | null }): string | undefined {
   if (!row.portraitKey) return undefined;
-  const filename = row.portraitKey.slice(row.portraitKey.lastIndexOf("/") + 1);
-  const version = filename.replace(/\.[^.]+$/, "");
-  return `/api/characters/${row.id}/portrait?v=${version}`;
+  return `/api/characters/${row.id}/portrait?v=${portraitKeyVersion(row.portraitKey)}`;
 }
 
 export function serializeCharacterSummary(row: {
