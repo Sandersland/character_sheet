@@ -22,6 +22,12 @@ function initials(name: string): string {
  * grids") — portrait placeholder, name as the lead, race/class/level as
  * de-emphasized supporting metadata (principles.md: avoid naked
  * label:value, fold the count into natural language instead).
+ *
+ * The media slot is one fixed 4:5 box in BOTH states so a grid row of mixed
+ * portrait/monogram cards keeps uniform geometry. The img is absolute-fill:
+ * left in flow, its intrinsic height becomes the flex item's min-content
+ * floor and pushes the box past its *preferred* aspect-ratio, which is what
+ * stretched portrait cards taller than their monogram siblings.
  */
 export default function CharacterCard({ character }: CharacterCardProps) {
   return (
@@ -29,12 +35,12 @@ export default function CharacterCard({ character }: CharacterCardProps) {
       to={`/characters/${character.id}`}
       className="group flex flex-col overflow-hidden rounded-card border border-parchment-200 bg-parchment-50 shadow-card transition-shadow hover:shadow-raised focus-visible:shadow-raised"
     >
-      <div className="flex aspect-[4/3] items-center justify-center bg-gradient-to-br from-garnet-100 to-parchment-200">
+      <div className="relative flex aspect-[4/5] items-center justify-center overflow-hidden bg-gradient-to-br from-garnet-100 to-parchment-200">
         {character.portraitUrl ? (
           <img
             src={character.portraitUrl}
             alt={`Portrait of ${character.name}`}
-            className="h-full w-full object-cover"
+            className="absolute inset-0 h-full w-full object-cover"
           />
         ) : (
           <span className="font-display text-3xl font-semibold text-garnet-700">

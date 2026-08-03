@@ -185,6 +185,15 @@ not just differently tuned.
 - `SkillsTable`, `InventoryList`, `SpellsSection`, `JournalSection`,
   `VitalsStrip`, `BackendStatus`, `CharacterCard` — page-specific composed
   components, all consuming the shared tokens above.
+- Portrait slots are **4:5, fixed** (#1618): both `CharacterCard`'s list media
+  box and `IdentityCard`'s portrait region render one `aspect-[4/5]` container
+  in every state — an absolute-fill `object-cover` img when a portrait exists,
+  the garnet-100→parchment-200 monogram/empty gradient otherwise. Absolute
+  fill matters: an in-flow img's intrinsic height is the flex item's
+  min-content floor and pushes a *preferred* aspect-ratio taller, which is
+  what broke mixed portrait/monogram grid rows. Sheet-side portraits render at
+  ≤ w-48 (uploads are ≤512px WebP; wider goes soft). New portrait surfaces
+  should reuse the same ratio + fill pattern.
 - Icons — all resolve through `components/ui/icons.ts`: `lucide-react` for UI
   chrome (kebab, chevron, search, +/−/✕), `react-icons/gi` for D&D flavor
   (abilities, item categories, empty-state heroes). Subpath imports only;
