@@ -804,3 +804,75 @@ export function maxSpellLevelForClass(
   if (!derived) return 0;
   return derived.slotTotals.reduce((max, slot) => Math.max(max, slot.level), 0);
 }
+
+// #1510: SRD 5.1's level-1 CREATION-time spell picks — a fixed table, not the
+// ongoing ability-mod-driven cap preparedSpellCountAt computes. The owner's
+// rationale-correcting comment on #1510 (2026-07-29) records three distinct
+// caster shapes, only some of which have a creation-time list at all:
+//   - "known" (Bard/Sorcerer/Warlock): a fixed personal list, chosen here and
+//     swappable per swapCadenceFor's onLevelUp cadence.
+//   - "prepared from the full class list" (Cleric/Druid): NO personal list
+//     exists in PHB'14 — the WIS-mod cap governs a subset re-prepared every
+//     long rest (derivePreparedSpellLimit). There is nothing to pick at
+//     creation, so 0 is the faithful count, not a placeholder or a guess.
+//   - "spellbook" (Wizard): a personal list distinct in SIZE from what's
+//     prepared daily — this is the SCRIBED count; the still-wrong prepared
+//     count is #1513, out of scope here.
+// Paladin/Ranger are absent entirely: SRD 5.1 grants no Spellcasting feature
+// at level 1 at all (spellcastingStartLevel gates them out below; this table
+// is never consulted for them).
+const LEVEL1_CREATION_SPELLS_2014: Readonly<Record<string, number>> = {
+  // known — SRD 5.1: "You know four 1st-level spells of your choice from the bard spell list."
+  bard: 4,
+  // known — SRD 5.1: "You know two 1st-level spells of your choice from the sorcerer spell list."
+  sorcerer: 2,
+  // known — SRD 5.1: "At 1st level, you know two 1st-level spells of your choice from the warlock spell list."
+  warlock: 2,
+  // spellbook — SRD 5.1: "...a spellbook containing six 1st-level wizard spells of your choice."
+  wizard: 6,
+  // prepared-from-full-list — SRD 5.1: prepares WIS mod + level from the whole class list; no known list exists.
+  cleric: 0,
+  // prepared-from-full-list — SRD 5.1: prepares WIS mod + level from the whole class list; no known list exists.
+  druid: 0,
+};
+
+/**
+ * The level-1 CREATION-time spell picks a class offers, per edition — folds in
+ * #1377's maxSpellLevel so `reference.ts` and `creationSpellCountError` (#1510
+ * D4) resolve the served and enforced counts through this ONE function, never
+ * two inline copies.
+ *
+ * `null` = no Spells step this creation: a non-caster, or below
+ * spellcastingStartLevel (a 2014 Paladin/Ranger, or a level-1 third-caster
+ * subclass in either edition — neither has Spellcasting yet).
+ *
+ * `spells: 0` = a cantrips-only step (2014 Cleric/Druid — see
+ * LEVEL1_CREATION_SPELLS_2014's comment for why 0 is correct, not a
+ * placeholder). `maxSpellLevel` is 0 in that case too (the cantrips-only seam
+ * #1377 built — `spells.test.ts` pins `?maxLevel=0` as legal, not a floor of
+ * 1) — a served `spells: n > 0` alongside `maxSpellLevel: 0` would be the
+ * incoherent shape #1508 already flagged for the null case, so this keeps the
+ * same discipline for the zero case.
+ *
+ * SRD 5.2: reuses preparedSpellCountAt's fixed table directly (no separate
+ * 2024 table to keep in sync). SRD 5.1: the fixed table above; cantrips are
+ * verified byte-identical between both editions (cantripsKnownAtLevel takes no
+ * `edition`), so one call serves both branches.
+ */
+export function level1SpellPicksFor(
+  className: string,
+  subclass: string | null | undefined,
+  edition: RulesEdition,
+): { cantrips: number; spells: number; maxSpellLevel: number } | null {
+  if (spellcastingStartLevel(className, subclass, edition) > 1) return null;
+
+  const cantrips = cantripsKnownAtLevel(className, 1, subclass);
+  const spells =
+    edition === "EDITION_2014"
+      ? (LEVEL1_CREATION_SPELLS_2014[className.toLowerCase()] ?? null)
+      : preparedSpellCountAt(className, 1, subclass, {}, edition);
+  if (spells == null) return null; // non-caster
+
+  const maxSpellLevel = spells === 0 ? 0 : maxSpellLevelForClass(className, 1, subclass, edition);
+  return { cantrips, spells, maxSpellLevel };
+}
