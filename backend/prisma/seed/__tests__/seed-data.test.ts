@@ -335,7 +335,7 @@ describe("SPELLS — creation picker coverage (#1131)", () => {
 
   it("every level-1 caster has more first-level spells than it prepares at level 1", () => {
     for (const cls of ["bard", "cleric", "druid", "sorcerer", "wizard", "warlock", "paladin", "ranger"]) {
-      expect(onList(cls, 1), `${cls} L1 spells`).toBeGreaterThan(preparedSpellCountAt(cls, 1) ?? 0);
+      expect(onList(cls, 1), `${cls} L1 spells`).toBeGreaterThan(preparedSpellCountAt(cls, 1, null, {}, "EDITION_2024") ?? 0);
     }
   });
 });
