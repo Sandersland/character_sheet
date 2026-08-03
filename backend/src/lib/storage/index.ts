@@ -9,9 +9,9 @@ import { createS3BlobStore } from "./s3-blob-store.js";
 // Public surface of the storage domain: consumers import the port type, the
 // normalized errors, and the env-driven factory from here — the drivers stay
 // internal so no call site can couple to one (#1614).
-// fallow-ignore-next-line unused-type -- BlobObject/PutOptions are the port's wire shapes; first consumer is the portrait route (#1615)
+// fallow-ignore-next-line unused-type -- PutOptions completes the port's public surface (BlobStore.put's options shape); in-tree callers pass it inline, so only an out-of-tree driver/consumer would import it
 export type { BlobObject, BlobStore, PutOptions } from "./blob-store.js";
-// fallow-ignore-next-line unused-export -- BlobNotFoundError/BlobKeyError's first consumer is the portrait route's error mapping (#1615)
+// fallow-ignore-next-line unused-export -- BlobKeyError completes the port's error surface (assertValidKey throws it); in-tree routes only ever build valid server-generated keys, so nothing catches it yet
 export { BlobKeyError, BlobNotFoundError, BlobStoreConfigError } from "./blob-store.js";
 
 function readEnv(name: string): string | undefined {
