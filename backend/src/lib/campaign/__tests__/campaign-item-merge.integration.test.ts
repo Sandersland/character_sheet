@@ -14,6 +14,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
+import { inventoryItemFixtureData } from "@/test-support/inventory-snapshot-fixture.js";
 
 const OWNER_ID = "owner-campaign-item-merge";
 const MADE_CAMPAIGNS: string[] = [];
@@ -83,7 +84,7 @@ describe("CampaignItem rows live in Item (#1646)", () => {
       data: { name: "Merge Fixture", ownerId: OWNER_ID, alignment: "True Neutral", ...CHAR_FIELDS },
     });
     const awarded = await prisma.inventoryItem.create({
-      data: { characterId: character.id, itemId: source.id, name: "Doomed Blade", category: "gear", quantity: 1 },
+      data: { ...inventoryItemFixtureData({ characterId: character.id, name: "Doomed Blade", category: "gear" }), itemId: source.id },
     });
 
     await prisma.item.delete({ where: { id: source.id } });
@@ -107,7 +108,7 @@ describe("CampaignItem rows live in Item (#1646)", () => {
       data: { name: "Cascade Fixture", ownerId: OWNER_ID, alignment: "True Neutral", ...CHAR_FIELDS },
     });
     const awarded = await prisma.inventoryItem.create({
-      data: { characterId: character.id, itemId: source.id, name: "Cascade Blade", category: "gear", quantity: 1 },
+      data: { ...inventoryItemFixtureData({ characterId: character.id, name: "Cascade Blade", category: "gear" }), itemId: source.id },
     });
 
     await prisma.campaign.delete({ where: { id: campaign.id } });

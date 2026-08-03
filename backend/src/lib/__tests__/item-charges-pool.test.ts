@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { Prisma } from "@/generated/prisma/client.js";
@@ -10,6 +12,9 @@ import { applySpellcastingOperations } from "@/lib/spellcasting/spellcasting.js"
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import type { SpellEntry } from "@/lib/spellcasting/spell-state.js";
+import type { CapabilityColumns } from "@/lib/inventory/capabilities.js";
+import { readInventorySnapshot } from "@/lib/inventory/inventory-snapshot-read.js";
+import { inventoryItemFixtureData, type InventoryItemFixtureInput } from "@/test-support/inventory-snapshot-fixture.js";
 
 const OWNER_ID = "owner-item-charges-pool";
 
@@ -45,38 +50,62 @@ const BASE_CHAR = {
 };
 
 // Wand of Magic Missiles' pool: 7 charges, regains 1d6+1 daily at dawn.
-const WAND_POOL = {
-  kind: "charges" as const,
+const WAND_POOL: CapabilityColumns = {
+  kind: "charges",
   maxCharges: 7,
   rechargeDiceCount: 1,
   rechargeDiceFaces: 6,
   rechargeBonus: 1,
-  rechargeTrigger: "dawn" as const,
+  rechargeTrigger: "dawn",
 };
 
-function chargesCast(spellId: string, over: Record<string, unknown> = {}) {
+function chargesCast(
+  spellId: string,
+  over: Partial<CapabilityColumns> & { id?: string } = {},
+): CapabilityColumns & { id?: string } {
   return {
-    kind: "castSpell" as const,
+    kind: "castSpell",
     spellId,
     spellName: "Magic Missile",
     spellLevel: 1,
     castLevel: 1,
-    castResource: "charges" as const,
+    castResource: "charges",
     chargeCost: 1,
     castConcentration: false,
-    dcMode: "fixed" as const,
-    attackMode: "fixed" as const,
+    dcMode: "fixed",
+    attackMode: "fixed",
     ...over,
   };
 }
 
-async function poolRow(itemId: string) {
-  return prisma.inventoryCapability.findFirstOrThrow({ where: { inventoryItemId: itemId, kind: "charges" } });
+// The item's charges-pool capability key, read off its snapshot (#1649) —
+// dynamic lookup, not a pre-known id, since a pool never needs to be
+// referenced by an entryId the way a castSpell capability does.
+async function poolCapabilityKey(itemId: string): Promise<string> {
+  const item = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: itemId } });
+  const pool = readInventorySnapshot(item).capabilities.find((c) => c.kind === "charges");
+  if (!pool) throw new Error(`item ${itemId} has no charges pool capability`);
+  return pool.key;
+}
+
+async function poolRow(itemId: string): Promise<{ id: string; used: number }> {
+  const id = await poolCapabilityKey(itemId);
+  const use = await prisma.inventoryCapabilityUse.findFirstOrThrow({ where: { capabilityKey: id } });
+  return { id, used: use.used };
+}
+
+// Test-only backdoor to seed a pool's starting `used` state (simulating prior
+// spend) without going through a real cast/activation.
+async function setPoolUsed(itemId: string, used: number): Promise<void> {
+  const id = await poolCapabilityKey(itemId);
+  await prisma.inventoryCapabilityUse.updateMany({ where: { capabilityKey: id }, data: { used } });
 }
 
 async function entryIdFor(itemId: string, capabilityId: string): Promise<string> {
-  const cap = await prisma.inventoryCapability.findUniqueOrThrow({ where: { id: capabilityId } });
-  return `item:${itemId}:${cap.spellId}:${cap.id}`;
+  const item = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: itemId } });
+  const cap = readInventorySnapshot(item).capabilities.find((c) => c.key === capabilityId);
+  if (!cap || cap.kind !== "castSpell") throw new Error(`capability ${capabilityId} on item ${itemId} is not a castSpell`);
+  return `item:${itemId}:${cap.spellId}:${cap.key}`;
 }
 
 async function serialize(characterId: string) {
@@ -108,33 +137,33 @@ describe("item charges pool (#555)", () => {
     await prisma.spell.deleteMany({ where: { name: SPELL.name } });
   });
 
-  async function makeWand(capabilities: Record<string, unknown>[], itemOver: Record<string, unknown> = {}) {
-    const item = await prisma.inventoryItem.create({
-      data: {
-        character: { connect: { id: characterId } },
+  async function makeWand(
+    capabilities: (CapabilityColumns & { id?: string; used?: number })[],
+    itemOver: Partial<InventoryItemFixtureInput> = {},
+  ) {
+    return prisma.inventoryItem.create({
+      data: inventoryItemFixtureData({
+        characterId,
         name: "Wand of Magic Missiles",
         category: "gear",
-        quantity: 1,
         requiresAttunement: true,
         attuned: true,
         ...itemOver,
-        capabilities: { create: capabilities as Prisma.InventoryCapabilityCreateWithoutInventoryItemInput[] },
-      },
-      include: { capabilities: true },
+        capabilities,
+      }),
     });
-    return item;
   }
 
   it("a charges-costed cast spends the pool (not the capability's own counter)", async () => {
-    const item = await makeWand([WAND_POOL, chargesCast(spellId, { chargeCost: 3 })]);
-    const castCap = item.capabilities.find((c) => c.kind === "castSpell")!;
-    const entryId = await entryIdFor(item.id, castCap.id);
+    const castCapId = randomUUID();
+    const item = await makeWand([WAND_POOL, chargesCast(spellId, { chargeCost: 3, id: castCapId })]);
+    const entryId = await entryIdFor(item.id, castCapId);
 
     await applySpellcastingOperations(characterId, [{ type: "castItemSpell", entryId, roll: 9 }], OWNER_ID);
 
     expect((await poolRow(item.id)).used).toBe(3);
-    const freshCastCap = await prisma.inventoryCapability.findUniqueOrThrow({ where: { id: castCap.id } });
-    expect(freshCastCap.used).toBe(0); // the pool row carries the spend, not the cast row
+    const use = await prisma.inventoryCapabilityUse.findFirstOrThrow({ where: { capabilityKey: castCapId } });
+    expect(use.used).toBe(0); // the pool row carries the spend, not the cast row
 
     const ev = await prisma.characterEvent.findFirstOrThrow({ where: { characterId, type: "castSpell" } });
     const data = ev.data as Record<string, unknown>;
@@ -144,9 +173,9 @@ describe("item charges pool (#555)", () => {
   });
 
   it("undo of a charges-costed cast refunds the pool (#580)", async () => {
-    const item = await makeWand([WAND_POOL, chargesCast(spellId, { chargeCost: 3 })]);
-    const castCap = item.capabilities.find((c) => c.kind === "castSpell")!;
-    const entryId = await entryIdFor(item.id, castCap.id);
+    const castCapId = randomUUID();
+    const item = await makeWand([WAND_POOL, chargesCast(spellId, { chargeCost: 3, id: castCapId })]);
+    const entryId = await entryIdFor(item.id, castCapId);
 
     await applySpellcastingOperations(characterId, [{ type: "castItemSpell", entryId, roll: 9 }], OWNER_ID);
     expect((await poolRow(item.id)).used).toBe(3);
@@ -158,14 +187,15 @@ describe("item charges pool (#555)", () => {
   });
 
   it("blocks a cast whose cost exceeds the remaining charges", async () => {
+    const cheapId = randomUUID();
+    const dearId = randomUUID();
     const item = await makeWand([
       WAND_POOL,
-      chargesCast(spellId, { chargeCost: 3 }),
-      chargesCast(spellId, { spellName: "Magic Missile (5th)", castLevel: 5, chargeCost: 5 }),
+      chargesCast(spellId, { chargeCost: 3, id: cheapId }),
+      chargesCast(spellId, { spellName: "Magic Missile (5th)", castLevel: 5, chargeCost: 5, id: dearId }),
     ]);
-    const [cheap, dear] = item.capabilities.filter((c) => c.kind === "castSpell");
-    const cheapEntry = await entryIdFor(item.id, cheap.id);
-    const dearEntry = await entryIdFor(item.id, dear.id);
+    const cheapEntry = await entryIdFor(item.id, cheapId);
+    const dearEntry = await entryIdFor(item.id, dearId);
 
     // 7 → 4 remaining; the 5-charge cast must be rejected and the pool untouched.
     await applySpellcastingOperations(characterId, [{ type: "castItemSpell", entryId: cheapEntry, roll: 9 }], OWNER_ID);
@@ -269,9 +299,9 @@ describe("item charges pool (#555)", () => {
     // transactions can each snapshot the same `used` and all pass the derived
     // remaining-check. The conditional increment (used <= max - cost) must let
     // exactly two cost-3 casts through a 7-charge pool, never pushing used past 7.
-    const item = await makeWand([WAND_POOL, chargesCast(spellId, { chargeCost: 3 })]);
-    const castCap = item.capabilities.find((c) => c.kind === "castSpell")!;
-    const entryId = await entryIdFor(item.id, castCap.id);
+    const castCapId = randomUUID();
+    const item = await makeWand([WAND_POOL, chargesCast(spellId, { chargeCost: 3, id: castCapId })]);
+    const entryId = await entryIdFor(item.id, castCapId);
 
     const results = await Promise.allSettled(
       Array.from({ length: 3 }, () =>
@@ -286,7 +316,7 @@ describe("item charges pool (#555)", () => {
 
   it("recharges 1d6+1 at dawn on a long rest (bounded, capped at max) and undo re-expends", async () => {
     const item = await makeWand([WAND_POOL, chargesCast(spellId)]);
-    await prisma.inventoryCapability.updateMany({ where: { inventoryItemId: item.id, kind: "charges" }, data: { used: 7 } });
+    await setPoolUsed(item.id, 7);
 
     await applyHitPointOperations(characterId, [{ type: "longRest" }]);
     const used = (await poolRow(item.id)).used;
@@ -309,7 +339,7 @@ describe("item charges pool (#555)", () => {
       { kind: "charges", maxCharges: 3, rechargeTrigger: "long" },
       chargesCast(spellId),
     ]);
-    await prisma.inventoryCapability.updateMany({ where: { inventoryItemId: item.id, kind: "charges" }, data: { used: 3 } });
+    await setPoolUsed(item.id, 3);
     await applyHitPointOperations(characterId, [{ type: "longRest" }]);
     expect((await poolRow(item.id)).used).toBe(0);
   });
@@ -317,10 +347,8 @@ describe("item charges pool (#555)", () => {
   it("a short trigger recharges on a short rest; dawn does not", async () => {
     const shortItem = await makeWand([{ kind: "charges", maxCharges: 3, rechargeTrigger: "short" }, chargesCast(spellId)]);
     const dawnItem = await makeWand([WAND_POOL, chargesCast(spellId)], { name: "Dawn Wand" });
-    await prisma.inventoryCapability.updateMany({
-      where: { inventoryItemId: { in: [shortItem.id, dawnItem.id] }, kind: "charges" },
-      data: { used: 3 },
-    });
+    await setPoolUsed(shortItem.id, 3);
+    await setPoolUsed(dawnItem.id, 3);
 
     await applyHitPointOperations(characterId, [{ type: "shortRest", rolls: [] }]);
     expect((await poolRow(shortItem.id)).used).toBe(0); // refilled (dice-less)
@@ -331,7 +359,7 @@ describe("item charges pool (#555)", () => {
     const item = await makeWand([{ kind: "charges", maxCharges: 3, rechargeTrigger: "long" }, chargesCast(spellId)], {
       attuned: false,
     });
-    await prisma.inventoryCapability.updateMany({ where: { inventoryItemId: item.id, kind: "charges" }, data: { used: 3 } });
+    await setPoolUsed(item.id, 3);
     await applyHitPointOperations(characterId, [{ type: "longRest" }]);
     expect((await poolRow(item.id)).used).toBe(0);
   });
@@ -351,7 +379,7 @@ describe("item charges pool (#555)", () => {
         chargeCost: 2,
       },
     ]);
-    await prisma.inventoryCapability.updateMany({ where: { inventoryItemId: item.id, kind: "charges" }, data: { used: 2 } });
+    await setPoolUsed(item.id, 2);
 
     const sheet = await serialize(characterId);
     const wire = sheet.inventory.find((i) => i.id === item.id)!;
@@ -367,9 +395,9 @@ describe("item charges pool (#555)", () => {
   });
 
   it("unattuning hides the pool-backed spell but leaves the pool state intact", async () => {
-    const item = await makeWand([WAND_POOL, chargesCast(spellId, { chargeCost: 3 })]);
-    const castCap = item.capabilities.find((c) => c.kind === "castSpell")!;
-    const entryId = await entryIdFor(item.id, castCap.id);
+    const castCapId = randomUUID();
+    const item = await makeWand([WAND_POOL, chargesCast(spellId, { chargeCost: 3, id: castCapId })]);
+    const entryId = await entryIdFor(item.id, castCapId);
     await applySpellcastingOperations(characterId, [{ type: "castItemSpell", entryId, roll: 9 }], OWNER_ID);
     expect((await poolRow(item.id)).used).toBe(3);
 

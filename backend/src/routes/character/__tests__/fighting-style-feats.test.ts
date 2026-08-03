@@ -15,6 +15,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
+import { inventoryItemFixtureData } from "@/test-support/inventory-snapshot-fixture.js";
 
 const OWNER_ID = "owner-fs-feats";
 let COOKIE: string;
@@ -88,15 +89,21 @@ beforeEach(async () => {
       currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
       spellcasting: Prisma.JsonNull,
       classEntries: { create: [{ position: 0, name: "Fighter", classId: fighterClassId, level: 5 }] },
-      inventoryItems: {
-        create: [
-          { name: "Longbow", category: "weapon", equippedSlot: "MAIN_HAND",
-            weaponDetail: { create: { damageDiceCount: 1, damageDiceFaces: 8, damageType: "piercing", weaponRange: "ranged", twoHanded: true } } },
-          { name: "Longsword", category: "weapon",
-            weaponDetail: { create: { damageDiceCount: 1, damageDiceFaces: 8, damageType: "slashing", weaponRange: "melee" } } },
-        ],
-      },
     },
+  });
+  // #1649: weapon detail now lives on InventoryItem.snapshot, so these are
+  // created separately rather than nested under character.create.
+  await prisma.inventoryItem.create({
+    data: inventoryItemFixtureData({
+      characterId: FIXTURE_ID, name: "Longbow", category: "weapon", equippedSlot: "MAIN_HAND",
+      weapon: { damageDiceCount: 1, damageDiceFaces: 8, damageType: "piercing", weaponRange: "ranged", twoHanded: true },
+    }),
+  });
+  await prisma.inventoryItem.create({
+    data: inventoryItemFixtureData({
+      characterId: FIXTURE_ID, name: "Longsword", category: "weapon",
+      weapon: { damageDiceCount: 1, damageDiceFaces: 8, damageType: "slashing", weaponRange: "melee" },
+    }),
   });
 });
 

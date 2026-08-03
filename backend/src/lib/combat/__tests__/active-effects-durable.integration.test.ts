@@ -22,18 +22,18 @@ import {
   type ActiveBuff,
 } from "@/lib/combat/active-effects.js";
 import { applyHitPointOperations } from "@/lib/combat/hitpoints.js";
+import { inventoryItemFixtureData } from "@/test-support/inventory-snapshot-fixture.js";
 
 const OWNER_ID = "owner-durable-buffs";
 const FIXTURE_ID = "test-durable-buffs-character-1";
 let COOKIE: string;
 
-const GREATSWORD = {
-  name: "Greatsword",
-  category: "weapon" as const,
-  equippedSlot: "MAIN_HAND" as const,
-  weaponDetail: {
-    create: { damageDiceCount: 2, damageDiceFaces: 6, damageType: "slashing", weaponRange: "melee" as const, twoHanded: true },
-  },
+const GREATSWORD_WEAPON = {
+  damageDiceCount: 2,
+  damageDiceFaces: 6,
+  damageType: "slashing",
+  weaponRange: "melee" as const,
+  twoHanded: true,
 };
 
 async function applyBuff(buff: Omit<ActiveBuff, "id">) {
@@ -73,8 +73,16 @@ describe("durable buffs (#455)", () => {
         skills: [{ name: "athletics", ability: "strength", proficient: false }],
         toolProficiencies: [],
         currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
-        inventoryItems: { create: [GREATSWORD] },
       },
+    });
+    await prisma.inventoryItem.create({
+      data: inventoryItemFixtureData({
+        characterId: FIXTURE_ID,
+        name: "Greatsword",
+        category: "weapon",
+        equippedSlot: "MAIN_HAND",
+        weapon: GREATSWORD_WEAPON,
+      }),
     });
   });
 

@@ -12,6 +12,8 @@
  * update the expectations here, and the strict toEqual is what forces it to.
  */
 
+import { randomUUID } from "node:crypto";
+
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -22,6 +24,8 @@ import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 import { battleMasterResourceRowsData } from "@/test-support/fighter-resource-rows.js";
+import { inventoryItemFixtureData } from "@/test-support/inventory-snapshot-fixture.js";
+import { readInventorySnapshot } from "@/lib/inventory/inventory-snapshot-read.js";
 
 const OWNER_ID = "owner-serialize-char";
 let COOKIE: string;
@@ -440,14 +444,12 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
 
     const created = await prisma.inventoryItem.findFirstOrThrow({
       where: { characterId: "serial-char-e", name: "Ancestral Longsword" },
-      include: { weaponDetail: true },
     });
     // Every optional field the minimal input omitted, pinned to its exact
     // normalizeWeaponDetail default — the source of that function's cyclo 15
-    // (14 `??` fallbacks + 1).
-    expect(created.weaponDetail).toEqual({
-      id: expect.any(String),
-      inventoryItemId: created.id,
+    // (14 `??` fallbacks + 1). Read from the snapshot (#1649) — weaponDetail's
+    // own table is gone.
+    expect(readInventorySnapshot(created).weapon).toEqual({
       damageDiceCount: 1,
       damageDiceFaces: 8,
       damageModifier: 0,
@@ -507,37 +509,48 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
         attunementPrereqValue: "Fighter",
       },
     });
-    await prisma.inventoryCapability.create({
-      data: { inventoryItemId: weapon.id, kind: "passiveBonus", target: "skill", targetKey: "athletics", op: "add", value: 1 },
+    // The acquire op never authors capabilities, so the weapon's own snapshot
+    // (already validated) carries `capabilities: []` — patch one in directly
+    // (#1649: there's no "add a capability" application op, so this test adds
+    // it the way an award/undo path would, keyed the same way).
+    const capId = randomUUID();
+    const currentSnapshot = readInventorySnapshot(weapon);
+    await prisma.inventoryItem.update({
+      where: { id: weapon.id },
+      data: {
+        snapshot: {
+          ...currentSnapshot,
+          capabilities: [{ key: capId, kind: "passiveBonus", target: "skill", targetKey: "athletics", op: "add", value: 1 }],
+        } as unknown as Prisma.InputJsonValue,
+      },
     });
+    await prisma.inventoryCapabilityUse.create({ data: { inventoryItemId: weapon.id, capabilityKey: capId, used: 0 } });
 
     // Bag-only gear item (declares a wearable slot, unequipped) — the opposite
     // branch of every optional field above, plus the `slot` fallback.
     await prisma.inventoryItem.create({
-      data: { characterId: "serial-char-e", name: "Boots of Testing", category: "gear", slot: "FEET", position: 1 },
+      data: inventoryItemFixtureData({ characterId: "serial-char-e", name: "Boots of Testing", category: "gear", slot: "FEET", position: 1 }),
     });
     // Hits serializeInventoryItem's armorDetail branch.
     await prisma.inventoryItem.create({
-      data: {
+      data: inventoryItemFixtureData({
         characterId: "serial-char-e",
         name: "Traveler's Leather",
         category: "armor",
         position: 2,
-        armorDetail: { create: { armorCategory: "light", baseArmorClass: 11, dexModifierApplies: true } },
-      },
+        armor: { armorCategory: "light", baseArmorClass: 11, dexModifierApplies: true },
+      }),
     });
     // Hits serializeInventoryItem's consumableDetail branch.
     await prisma.inventoryItem.create({
-      data: {
+      data: inventoryItemFixtureData({
         characterId: "serial-char-e",
         name: "Potion of Testing",
         category: "consumable",
         quantity: 3,
         position: 3,
-        consumableDetail: {
-          create: { effectDiceCount: 2, effectDiceFaces: 4, effectModifier: 0, effectDescription: "Heals 2d4.", maxUses: 1, usesRemaining: 1 },
-        },
-      },
+        consumable: { effectDiceCount: 2, effectDiceFaces: 4, effectModifier: 0, effectDescription: "Heals 2d4.", maxUses: 1, usesRemaining: 1 },
+      }),
     });
 
     const e = (await getChar("serial-char-e")).body;

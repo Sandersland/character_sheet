@@ -12,6 +12,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
+import { readInventorySnapshot } from "@/lib/inventory/inventory-snapshot-read.js";
 
 const OWNER = "owner-award-owner";
 const PLAYER = "owner-award-player";
@@ -96,11 +97,10 @@ describe("campaign item award/revoke (#381)", () => {
     // Snapshot + detail landed on the sheet with provenance FK.
     const row = await prisma.inventoryItem.findFirst({
       where: { characterId: CHAR, itemId: id },
-      include: { weaponDetail: true },
     });
     expect(row?.name).toBe("Flametongue");
     expect(row?.quantity).toBe(2);
-    expect(row?.weaponDetail?.damageDiceCount).toBe(2);
+    expect(row && readInventorySnapshot(row).weapon?.damageDiceCount).toBe(2);
 
     // Award auto-revealed the fronting entity.
     const entity = await prisma.campaignEntity.findUnique({ where: { id: entityId } });

@@ -12,6 +12,7 @@ import {
   inventoryItemDetailInclude,
   revertInventoryEvent,
 } from "@/lib/inventory/inventory.js";
+import { inventoryItemFixtureData, type InventoryItemFixtureInput } from "@/test-support/inventory-snapshot-fixture.js";
 
 const OWNER_ID = "owner-attunement-lib";
 
@@ -33,16 +34,10 @@ const MINIMAL_CHARACTER = {
 async function makeItem(
   characterId: string,
   name: string,
-  extra: Partial<Prisma.InventoryItemCreateInput> = {},
+  extra: Partial<Omit<InventoryItemFixtureInput, "characterId" | "name" | "category">> = {},
 ): Promise<string> {
   const row = await prisma.inventoryItem.create({
-    data: {
-      character: { connect: { id: characterId } },
-      name,
-      category: "gear",
-      quantity: 1,
-      ...extra,
-    },
+    data: inventoryItemFixtureData({ characterId, name, category: "gear", ...extra }),
   });
   return row.id;
 }

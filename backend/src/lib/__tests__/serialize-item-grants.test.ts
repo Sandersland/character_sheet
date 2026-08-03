@@ -5,6 +5,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
+import { inventoryItemFixtureData } from "@/test-support/inventory-snapshot-fixture.js";
 
 const OWNER_ID = "owner-serialize-grants";
 
@@ -45,21 +46,18 @@ describe("serialize derives item grants (#529)", () => {
     characterId = character.id;
 
     const ring = await prisma.inventoryItem.create({
-      data: {
-        character: { connect: { id: characterId } },
+      data: inventoryItemFixtureData({
+        characterId,
         name: "Ring of Fire Resistance",
         category: "gear",
-        quantity: 1,
         requiresAttunement: true,
-        capabilities: {
-          create: [
-            { kind: "grant", grantType: "resistance", grantValueKind: "damageType", grantValue: "fire" },
-            { kind: "grant", grantType: "proficiency", grantValueKind: "skill", grantValue: "perception" },
-            { kind: "grant", grantType: "advantage", grantOn: "initiative", cantBeSurprised: true },
-            { kind: "grant", grantType: "conditionImmunity", grantValueKind: "condition", grantValue: "poisoned" },
-          ],
-        },
-      },
+        capabilities: [
+          { kind: "grant", grantType: "resistance", grantValueKind: "damageType", grantValue: "fire" },
+          { kind: "grant", grantType: "proficiency", grantValueKind: "skill", grantValue: "perception" },
+          { kind: "grant", grantType: "advantage", grantOn: "initiative", cantBeSurprised: true },
+          { kind: "grant", grantType: "conditionImmunity", grantValueKind: "condition", grantValue: "poisoned" },
+        ],
+      }),
     });
     ringId = ring.id;
   });
@@ -103,16 +101,13 @@ describe("serialize derives item grants (#529)", () => {
 
   it("merges an item weapon proficiency tagged source item while active", async () => {
     await prisma.inventoryItem.create({
-      data: {
-        character: { connect: { id: characterId } },
+      data: inventoryItemFixtureData({
+        characterId,
         name: "Greataxe of Training",
         category: "weapon",
-        quantity: 1,
         equippedSlot: "MAIN_HAND",
-        capabilities: {
-          create: [{ kind: "grant", grantType: "proficiency", grantValueKind: "weapon", grantValue: "Greataxes" }],
-        },
-      },
+        capabilities: [{ kind: "grant", grantType: "proficiency", grantValueKind: "weapon", grantValue: "Greataxes" }],
+      }),
     });
     const view = await serialize(characterId);
     // Rogue lacks Greataxes, so the item grant surfaces with source "item".

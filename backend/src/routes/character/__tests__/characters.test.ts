@@ -8,6 +8,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
+import { inventoryItemFixtureData } from "@/test-support/inventory-snapshot-fixture.js";
 
 const TEST_USER = { id: "test-user-1", email: "fixture-owner@test.local" };
 let COOKIE: string;
@@ -110,30 +111,36 @@ describe("characters routes", () => {
         classEntries: {
           create: [{ name: characterClass.name, classId: characterClass.id, position: 0 }],
         },
-        inventoryItems: {
-          create: [
-            {
-              itemId: item.id,
-              name: item.name,
-              category: item.category,
-              weight: item.weight,
-              cost: TEST_ITEM.cost,
-              quantity: 1,
-              equippedSlot: "MAIN_HAND",
-              position: 0,
-              weaponDetail: { create: TEST_ITEM_WEAPON_DETAIL },
-            },
-            {
-              itemId: null,
-              name: "Homebrew Amulet",
-              category: "gear",
-              description: "A custom magic item with no catalog entry.",
-              quantity: 1,
-              position: 1,
-            },
-          ],
-        },
       },
+    });
+    // #1649: InventoryItem detail now lives on `snapshot`, not the four
+    // Inventory*Detail relations — created separately (rather than nested
+    // under character.create) so inventoryItemFixtureData's snapshot build
+    // can be spread in; itemId is layered on top since the fixture helper
+    // has no catalog-item concept.
+    await prisma.inventoryItem.create({
+      data: {
+        ...inventoryItemFixtureData({
+          characterId: FIXTURE.id,
+          name: item.name,
+          category: item.category,
+          weight: item.weight,
+          cost: TEST_ITEM.cost,
+          equippedSlot: "MAIN_HAND",
+          position: 0,
+          weapon: TEST_ITEM_WEAPON_DETAIL,
+        }),
+        itemId: item.id,
+      },
+    });
+    await prisma.inventoryItem.create({
+      data: inventoryItemFixtureData({
+        characterId: FIXTURE.id,
+        name: "Homebrew Amulet",
+        category: "gear",
+        description: "A custom magic item with no catalog entry.",
+        position: 1,
+      }),
     });
 
     createdCharacterIds = [FIXTURE.id];
@@ -263,27 +270,24 @@ describe("characters routes", () => {
           classEntries: {
             create: classEntries.map((e, i) => ({ name: e.name, level: e.level, position: i })),
           },
-          inventoryItems: equippedArmorCategory
-            ? {
-                create: [
-                  {
-                    name: `${equippedArmorCategory} armor`,
-                    category: "armor",
-                    quantity: 1,
-                    equippedSlot: equippedArmorCategory === "shield" ? "OFF_HAND" : "BODY",
-                    position: 0,
-                    armorDetail: {
-                      create: {
-                        armorCategory: equippedArmorCategory,
-                        baseArmorClass: equippedArmorCategory === "shield" ? 2 : 14,
-                      },
-                    },
-                  },
-                ],
-              }
-            : undefined,
         },
       });
+      if (equippedArmorCategory) {
+        // #1649: armor detail now lives on InventoryItem.snapshot.
+        await prisma.inventoryItem.create({
+          data: inventoryItemFixtureData({
+            characterId: id,
+            name: `${equippedArmorCategory} armor`,
+            category: "armor",
+            equippedSlot: equippedArmorCategory === "shield" ? "OFF_HAND" : "BODY",
+            position: 0,
+            armor: {
+              armorCategory: equippedArmorCategory,
+              baseArmorClass: equippedArmorCategory === "shield" ? 2 : 14,
+            },
+          }),
+        });
+      }
       const response = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${id}`);
       expect(response.status).toBe(200);
       return response.body.speed;
