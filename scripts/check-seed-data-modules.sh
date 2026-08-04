@@ -19,7 +19,13 @@
 # species-data.ts: the species+nested-variant upsert loop plus the per-species
 # stale-variant/stale-species prune), seed-species-traits.ts (#1682 — same
 # split for species-traits-data.ts: the (speciesId, variantId) target
-# resolution plus the find-then-write upsert and per-target stale-trait prune).
+# resolution plus the find-then-write upsert and per-target stale-trait prune),
+# seed-species-granted-spells.ts (#1683 — same split for species-granted-
+# spells-data.ts: the (speciesId, variantId, spellId) target resolution plus
+# the find-then-write upsert and id-scoped stale-grant prune),
+# species-seed-lookup.ts (#1683 — the shared (slug, edition) -> Species row
+# lookup seed-species-traits.ts and seed-species-granted-spells.ts both
+# resolve their targets against; a query helper, not content).
 # validate.ts is NOT listed here on purpose — it's also logic, but it happens
 # to carry none of the three tokens (pure zod validation, no DB access), so it
 # passes the scan as a plain data module would; adding it to the exception
@@ -30,7 +36,7 @@
 # deleting a module or mistyping the glob turns this red, not silently green.
 set -eu
 
-LOGIC_EXCEPTIONS="prisma/seed/guards.ts prisma/seed/prune.ts prisma/seed/rename-spells.ts prisma/seed/seed-class-features.ts prisma/seed/seed-granted-spells.ts prisma/seed/seed-starting-equipment.ts prisma/seed/seed-subclasses.ts prisma/seed/seed-species.ts prisma/seed/seed-species-traits.ts"
+LOGIC_EXCEPTIONS="prisma/seed/guards.ts prisma/seed/prune.ts prisma/seed/rename-spells.ts prisma/seed/seed-class-features.ts prisma/seed/seed-granted-spells.ts prisma/seed/seed-starting-equipment.ts prisma/seed/seed-subclasses.ts prisma/seed/seed-species.ts prisma/seed/seed-species-traits.ts prisma/seed/seed-species-granted-spells.ts prisma/seed/species-seed-lookup.ts"
 
 is_exception() {
   target="$1"

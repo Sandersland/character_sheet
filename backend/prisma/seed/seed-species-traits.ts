@@ -14,6 +14,7 @@
 import type { Prisma, PrismaClient } from "../../src/generated/prisma/client.js";
 import { upsertEditionRow } from "../../src/lib/rules/catalog-edition.js";
 import { SPECIES_TRAITS, type SpeciesTraitSeed } from "./species-traits-data.js";
+import { loadSpeciesByKey } from "./species-seed-lookup.js";
 
 interface SpeciesTarget {
   speciesId: string;
@@ -101,10 +102,7 @@ async function pruneStaleTraits(
 }
 
 export async function seedSpeciesTraits(prisma: PrismaClient): Promise<void> {
-  const speciesRows = await prisma.species.findMany({
-    select: { id: true, slug: true, edition: true, variants: { select: { id: true, slug: true } } },
-  });
-  const speciesByKey = new Map(speciesRows.map((s) => [`${s.slug}::${s.edition}`, s]));
+  const speciesByKey = await loadSpeciesByKey(prisma);
 
   const targets: SpeciesTarget[] = [];
   const seededNamesByTargetKey = new Map<string, string[]>();

@@ -1064,6 +1064,18 @@ model CharacterRace {
   // LEVEL_GATED_RECONCILERS entry follows for the same reason: this state's
   // legal maximum is fixed at creation, never revisited by level.
   abilityBonuses Json @default("[]")
+  // #1683: the Int/Wis/Cha casting-ability choice a 2024 lineage/legacy makes
+  // WHEN GAINED (PHB'24 "choose the ability when you select the lineage") —
+  // snapshotted here, not on SpeciesGrantedSpell, because the row is shared
+  // catalog content and the choice is per-character. Plain string, not the
+  // AbilityName wire type (no Ability enum in this schema, same convention as
+  // SubclassGrantedSpell.castingAbility) — validated against the six lowercase
+  // names at read time (deriveGrantedCastingAbility's own fallback-to-wisdom
+  // guard covers a corrupt value). NULL for a 2014 character (no 2014 subrace
+  // has this choice), a species/variant with no spell grant, or before #1683's
+  // picker runs. Immutable post-creation — same reasoning as abilityBonuses
+  // above, no LEVEL_GATED_RECONCILERS entry.
+  castingAbility String?
 }
 
 model CharacterBackground {
