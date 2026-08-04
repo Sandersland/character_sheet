@@ -69,7 +69,6 @@ describe("SpeciesTrait.improvements (#1682) — 2014 Hill Dwarf", () => {
     const hillDwarf = dwarf.variants.find((v) => v.slug === "hill")!;
 
     const id = await createCharacter({
-      race: "Hill Dwarf",
       rulesEdition: "EDITION_2014",
       speciesId: dwarf.id,
       variantId: hillDwarf.id,
@@ -98,7 +97,7 @@ describe("SpeciesTrait.improvements (#1682) — 2014 Hill Dwarf", () => {
   it("no arithmetic crosses the wire beyond the resolved numbers — speciesTraits carries name+description only", async () => {
     const dwarf = await prisma.species.findFirstOrThrow({ where: { slug: "dwarf", edition: "EDITION_2014" }, include: { variants: true } });
     const hillDwarf = dwarf.variants.find((v) => v.slug === "hill")!;
-    const id = await createCharacter({ race: "Hill Dwarf", rulesEdition: "EDITION_2014", speciesId: dwarf.id, variantId: hillDwarf.id });
+    const id = await createCharacter({ rulesEdition: "EDITION_2014", speciesId: dwarf.id, variantId: hillDwarf.id });
 
     const res = await get(id);
     for (const trait of res.body.speciesTraits) {
@@ -119,7 +118,6 @@ describe("SpeciesTrait.improvements (#1682) — 2014 Mountain Dwarf", () => {
       // buildMergedArmorProficiencies (Fighter is already proficient with
       // light+medium+heavy+shields, which would tag "class" first).
       classes: [{ name: "Wizard" }],
-      race: "Mountain Dwarf",
       rulesEdition: "EDITION_2014",
       speciesId: dwarf.id,
       variantId: mountainDwarf.id,
@@ -162,15 +160,17 @@ describe("SpeciesTrait.improvements (#1682) — level-down scales Dwarven Toughn
   it("Dwarven Toughness's per-level delta is exactly 1 more than a no-species-bonus control's, in both directions", async () => {
     const dwarf = await prisma.species.findFirstOrThrow({ where: { slug: "dwarf", edition: "EDITION_2014" }, include: { variants: true } });
     const hillDwarf = dwarf.variants.find((v) => v.slug === "hill")!;
-    const dwarfId = await createCharacter({ race: "Hill Dwarf", rulesEdition: "EDITION_2014", speciesId: dwarf.id, variantId: hillDwarf.id });
-    // The Hill Dwarf's effective CON is 14 (12 base + 2 species, #1681); give the
-    // legacy-path control the SAME effective CON (no species increase applies
-    // without a speciesId) so the per-level CON-mod contribution cancels and the
+    const dwarfId = await createCharacter({ rulesEdition: "EDITION_2014", speciesId: dwarf.id, variantId: hillDwarf.id });
+    // The Hill Dwarf's effective CON is 14 (12 base + 2 species, #1681). Human
+    // 2014 carries no SpeciesTrait row at all (no maxHp perLevel grant) and a
+    // fixed +1-to-everything increase (#1681) — base CON 13 lands the SAME
+    // effective CON 14, so the per-level CON-mod contribution cancels and the
     // delta-of-deltas isolates Dwarven Toughness alone.
+    const human2014 = await prisma.species.findFirstOrThrow({ where: { slug: "human", edition: "EDITION_2014" } });
     const humanId = await createCharacter({
-      race: "Human",
       rulesEdition: "EDITION_2014",
-      abilityScores: { strength: 12, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 10, charisma: 10 },
+      speciesId: human2014.id,
+      abilityScores: { strength: 12, dexterity: 12, constitution: 13, intelligence: 10, wisdom: 10, charisma: 10 },
     });
 
     const dwarfResult = await levelToTwoAndBack(dwarfId);
@@ -195,7 +195,7 @@ describe("SpeciesTrait.improvements (#1682) — level-down scales Dwarven Toughn
 describe("SpeciesTrait.improvements (#1682) — 2024 species shows edition-specific trait text (transcription-rule fork)", () => {
   it("a 2024 Dwarf's Darkvision/Dwarven Toughness text cites SRD 5.2/PHB'24, not SRD 5.1, even where the mechanic (Dwarven Toughness maxHp) agrees", async () => {
     const dwarf2024 = await prisma.species.findFirstOrThrow({ where: { slug: "dwarf", edition: "EDITION_2024" } });
-    const id = await createCharacter({ race: "Dwarf", rulesEdition: "EDITION_2024", speciesId: dwarf2024.id });
+    const id = await createCharacter({ rulesEdition: "EDITION_2024", speciesId: dwarf2024.id });
 
     const res = await get(id);
     expect(res.status).toBe(200);

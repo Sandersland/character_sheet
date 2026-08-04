@@ -20,44 +20,6 @@ import type {
 } from "../../src/lib/inventory/item-detail-inputs.js";
 import type { SeedEdition } from "./edition.js";
 
-export const RACES = [
-  // Dwarf subraces
-  { name: "Hill Dwarf",     speed: 25 },
-  { name: "Mountain Dwarf", speed: 25 },
-  // Elf subraces
-  { name: "High Elf",       speed: 30 },
-  { name: "Wood Elf",       speed: 35 },
-  { name: "Drow",           speed: 30 },
-  // Halfling subraces
-  { name: "Lightfoot Halfling", speed: 25 },
-  { name: "Stout Halfling",     speed: 25 },
-  // Human (no subrace split)
-  { name: "Human",         speed: 30 },
-  // Dragonborn (no subrace split in PHB)
-  { name: "Dragonborn",    speed: 30 },
-  // Gnome subraces
-  { name: "Forest Gnome",  speed: 25 },
-  { name: "Rock Gnome",    speed: 25 },
-  // Half-races and Tiefling
-  { name: "Half-Elf",      speed: 30 },
-  { name: "Half-Orc",      speed: 30 },
-  { name: "Tiefling",      speed: 30 },
-  // Legacy generic entries — kept for back-compat with characters created
-  // before this list was expanded to named subraces.
-  { name: "Dwarf",         speed: 25 },
-  { name: "Halfling",      speed: 25 },
-  { name: "Gnome",         speed: 25 },
-  // Elf's own bare entry was never needed here pre-#1690: every 2014 Elf
-  // must pick a named subrace (High/Wood/Drow, all listed above), so a bare
-  // "Elf" name never reached this lookup. 2024 Elf (species-data.ts) has NO
-  // lineage variants yet (#1683's scope) — resolveClassAndRace's legacy
-  // `race`-name match (character-create.ts, the #1679 compat window) is a
-  // hard requirement until #1684 prunes it, so a variantless 2024 Elf needs
-  // this row to be creatable at all. Speed 30, matching SRD 5.1 p. 21's base
-  // Elf (Wood Elf's own +5 to 35 lives on ITS own row, unaffected).
-  { name: "Elf",           speed: 30 },
-];
-
 // #1529: armorProficiencies/weaponProficiencies are SRD 5.1/PHB'14 ONLY —
 // relocated verbatim from the deleted CLASS_PROFICIENCY_GRANTS record.
 // At least Bard/Druid/Monk/Rogue/Sorcerer/Wizard differ in SRD 5.2/PHB'24;
@@ -381,7 +343,7 @@ export interface CatalogItem {
 // --- Item catalog -------------------------------------------------------
 // Baseline equipment list (served via GET /api/items, see
 // src/routes/items.ts) covering all four ItemCategory values. Like
-// RACES/CLASSES/BACKGROUNDS above, this seeds the catalog rows that
+// CLASSES/BACKGROUNDS above, this seeds the catalog rows that
 // InventoryItem rows below snapshot from — see schema.prisma's comment on
 // Item/InventoryItem for why a snapshot rather than a live reference.
 export const ITEMS: CatalogItem[] = [

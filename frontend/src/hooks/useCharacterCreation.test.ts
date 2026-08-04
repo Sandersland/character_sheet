@@ -46,7 +46,6 @@ function makeClass(overrides: Partial<ClassOption> = {}): ClassOption {
 }
 
 const reference: ReferenceData = {
-  races: [{ id: "race-1", name: "Elf", speed: 30, toolProficiencies: [] }],
   species: [{
     id: "sp-elf", name: "Elf", slug: "elf", speed: 30, abilityIncreases: [],
     needsCastingAbility: false, chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false, variants: [],
@@ -240,7 +239,7 @@ describe("useCharacterCreation", () => {
     expect(result.current.preview.maxHp).toBe(10); // d8 + con mod 2
   });
 
-  it("has no preview speed or maxHp before race/class are chosen", async () => {
+  it("has no preview speed or maxHp before species/class are chosen", async () => {
     seedDraft({});
     const { result } = await mount();
     expect(result.current.preview.speed).toBeUndefined();
@@ -260,10 +259,6 @@ describe("useCharacterCreation", () => {
       expect.objectContaining({
         name: "Lidda",
         speciesId: "sp-elf",
-        // Legacy race string derived from the chosen species name — kept as a
-        // regression guard on that derivation through the full hook until #1684
-        // removes the compat-window flat-race requirement.
-        race: "Elf",
         background: "Sage",
         classes: [{ name: "Rogue", subclass: null, subclassId: undefined }],
         skillProficiencies: ["perception", "stealth", "acrobatics"],

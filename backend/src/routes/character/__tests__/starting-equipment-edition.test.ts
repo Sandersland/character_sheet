@@ -19,6 +19,7 @@ import supertest from "supertest";
 import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
+import { seededSpeciesAnchor } from "@/test-support/species.js";
 
 const OWNER_ID = "owner-starting-equipment-edition";
 let COOKIE: string;
@@ -83,11 +84,12 @@ async function createPackage(
   });
 }
 
-function baseBody(edition: "EDITION_2014" | "EDITION_2024") {
+async function baseBody(edition: "EDITION_2014" | "EDITION_2024") {
+  const anchor = await seededSpeciesAnchor(edition);
   return {
     name: `Fixture Character ${edition}`,
     alignment: "True Neutral",
-    race: "Human",
+    ...anchor,
     background: "Soldier",
     classes: [{ name: FIXTURE_CLASS.name }],
     abilityScores: {
@@ -127,7 +129,7 @@ describe("character creation resolves StartingEquipmentPackage by (classId, edit
       .agent(app)
       .set("Cookie", COOKIE)
       .post("/api/characters")
-      .send({ ...baseBody("EDITION_2014"), startingEquipment: { mode: "package", selections: [{ optionIndex: 0 }] } });
+      .send({ ...(await baseBody("EDITION_2014")), startingEquipment: { mode: "package", selections: [{ optionIndex: 0 }] } });
 
     expect(response.status).toBe(201);
     createdCharacterIds.push(response.body.id);
@@ -141,7 +143,7 @@ describe("character creation resolves StartingEquipmentPackage by (classId, edit
       .agent(app)
       .set("Cookie", COOKIE)
       .post("/api/characters")
-      .send({ ...baseBody("EDITION_2024"), startingEquipment: { mode: "package", selections: [{ optionIndex: 0 }] } });
+      .send({ ...(await baseBody("EDITION_2024")), startingEquipment: { mode: "package", selections: [{ optionIndex: 0 }] } });
 
     expect(response.status).toBe(201);
     createdCharacterIds.push(response.body.id);
@@ -155,7 +157,7 @@ describe("character creation resolves StartingEquipmentPackage by (classId, edit
       .agent(app)
       .set("Cookie", COOKIE)
       .post("/api/characters")
-      .send({ ...baseBody("EDITION_2014"), startingEquipment: { mode: "gold", gold: 25 } });
+      .send({ ...(await baseBody("EDITION_2014")), startingEquipment: { mode: "gold", gold: 25 } });
     expect(in2014Range.status).toBe(201);
     createdCharacterIds.push(in2014Range.body.id);
 
@@ -163,7 +165,7 @@ describe("character creation resolves StartingEquipmentPackage by (classId, edit
       .agent(app)
       .set("Cookie", COOKIE)
       .post("/api/characters")
-      .send({ ...baseBody("EDITION_2024"), startingEquipment: { mode: "gold", gold: 25 } });
+      .send({ ...(await baseBody("EDITION_2024")), startingEquipment: { mode: "gold", gold: 25 } });
     expect(same2024.status).toBe(400);
   });
 });

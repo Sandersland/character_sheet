@@ -21,7 +21,6 @@ test("resistance: raging Barbarian halves matching damage, full for others", asy
   const id = await createCharacter(page.request, {
     name: uniqueName("Rage Bear"),
     className: "Barbarian",
-    race: "Half-Orc",
     background: "Soldier",
   });
 

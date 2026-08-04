@@ -76,7 +76,6 @@ describe("POST /api/characters — 2024 Human Skillful + Versatile (#1690)", () 
     const tough = await featByName("Tough");
     const res = await post({
       ...baseBody,
-      race: "Human",
       speciesId: human.id,
       speciesSkills: ["stealth"],
       speciesOriginFeatId: tough.id,
@@ -107,7 +106,6 @@ describe("POST /api/characters — 2024 Human Skillful + Versatile (#1690)", () 
     const style = await featByName("Great Weapon Fighting");
     const res = await post({
       ...baseBody,
-      race: "Human",
       speciesId: human.id,
       speciesSkills: ["stealth"],
       speciesOriginFeatId: style.id,
@@ -122,7 +120,6 @@ describe("POST /api/characters — 2024 Human Skillful + Versatile (#1690)", () 
     const savageAttacker = await featByName("Savage Attacker");
     const res = await post({
       ...baseBody,
-      race: "Human",
       speciesId: human.id,
       speciesSkills: ["stealth"],
       speciesOriginFeatId: savageAttacker.id,
@@ -141,7 +138,6 @@ describe("POST /api/characters — 2024 Human Skillful + Versatile (#1690)", () 
       // Sage's own abilityChoices are constitution/intelligence/wisdom — baseBody's
       // strength/dexterity spread is Soldier's own, invalid here.
       backgroundAbilities: { constitution: 2, intelligence: 1 },
-      race: "Human",
       speciesId: human.id,
       speciesSkills: ["stealth"],
       speciesOriginFeatId: magicInitiate.id,
@@ -155,7 +151,6 @@ describe("POST /api/characters — 2024 Human Skillful + Versatile (#1690)", () 
     const tough = await featByName("Tough");
     const res = await post({
       ...baseBody,
-      race: "Human",
       speciesId: human.id,
       speciesSkills: [],
       speciesOriginFeatId: tough.id,
@@ -168,7 +163,6 @@ describe("POST /api/characters — 2024 Human Skillful + Versatile (#1690)", () 
     const human = await human2024();
     const res = await post({
       ...baseBody,
-      race: "Human",
       speciesId: human.id,
       speciesSkills: ["stealth"],
     });
@@ -179,7 +173,6 @@ describe("POST /api/characters — 2024 Human Skillful + Versatile (#1690)", () 
     const human = await human2024();
     const res = await post({
       ...baseBody,
-      race: "Human",
       speciesId: human.id,
       speciesSkills: ["stealth"],
       speciesOriginFeatId: "00000000-0000-0000-0000-000000000000",
@@ -193,7 +186,6 @@ describe("POST /api/characters — 2024 Elf Keen Senses (#1690)", () => {
     const { elf, woodElf } = await elf2024();
     const res = await post({
       ...baseBody,
-      race: "Wood Elf",
       speciesId: elf.id,
       variantId: woodElf.id,
       castingAbility: "wisdom",
@@ -211,7 +203,6 @@ describe("POST /api/characters — 2024 Elf Keen Senses (#1690)", () => {
     const { elf, woodElf } = await elf2024();
     const res = await post({
       ...baseBody,
-      race: "Wood Elf",
       speciesId: elf.id,
       variantId: woodElf.id,
       castingAbility: "wisdom",
@@ -226,7 +217,6 @@ describe("POST /api/characters — 2024 Elf Keen Senses (#1690)", () => {
     const tough = await featByName("Tough");
     const res = await post({
       ...baseBody,
-      race: "Wood Elf",
       speciesId: elf.id,
       variantId: woodElf.id,
       castingAbility: "wisdom",
@@ -250,7 +240,6 @@ describe("POST /api/characters — chooseOriginFeat both-edition pins (#1690)", 
       abilityScores: BASE_SCORES,
       skillProficiencies: ["athletics", "history", "insight", "religion"],
       rulesEdition: "EDITION_2014" as const,
-      race: "Half-Elf",
       speciesId: halfElf.id,
       speciesAbilities: { strength: 1, dexterity: 1 },
       speciesSkills: ["stealth", "perception"],
@@ -264,7 +253,6 @@ describe("POST /api/characters — chooseOriginFeat both-edition pins (#1690)", 
     const tough = await featByName("Tough");
     const res = await post({
       ...baseBody,
-      race: "Dwarf",
       speciesId: dwarf.id,
       speciesOriginFeatId: tough.id,
     });

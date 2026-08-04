@@ -24,13 +24,13 @@ import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
+import { seededSpeciesAnchor } from "@/test-support/species.js";
 
 const OWNER_ID = "owner-origin-feat-edition-1306";
 let COOKIE: string;
 
 const BASE = {
   alignment: "True Neutral",
-  race: "Human",
   background: "Criminal",
   classes: [{ name: "Fighter" }],
   abilityScores: { strength: 10, dexterity: 13, constitution: 14, intelligence: 12, wisdom: 10, charisma: 8 },
@@ -46,7 +46,8 @@ afterEach(async () => {
 });
 
 async function createCriminal(name: string, rulesEdition: "EDITION_2014" | "EDITION_2024") {
-  const res = await supertest(app).post("/api/characters").set("Cookie", COOKIE).send({ ...BASE, name, rulesEdition });
+  const anchor = await seededSpeciesAnchor(rulesEdition);
+  const res = await supertest(app).post("/api/characters").set("Cookie", COOKIE).send({ ...BASE, ...anchor, name, rulesEdition });
   expect(res.status).toBe(201);
   return res.body;
 }

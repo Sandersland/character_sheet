@@ -1,10 +1,9 @@
 import type { CharacterDraft } from "@/hooks/useCharacterDraft";
-import type { BackgroundOption, ClassOption, RaceOption } from "@/types/character";
+import type { BackgroundOption, ClassOption } from "@/types/character";
 
 interface ToolProficiencyChoicesArgs {
   draft: CharacterDraft;
   selectedClass: ClassOption | undefined;
-  selectedRace: RaceOption | undefined;
   selectedBackground: BackgroundOption | undefined;
   update: (patch: Partial<CharacterDraft>) => void;
 }
@@ -17,18 +16,19 @@ export interface ToolProficiencyChoices {
   toggleToolChoice: (name: string) => void;
 }
 
-// Granted = fixed from background/class/race (read-only); choices = player-selectable from class up to the cap.
+// Granted = fixed from background/class (read-only); choices = player-selectable from class up to the cap.
+// No species/race source: the flat Race model never actually seeded a
+// toolProficiencies row (confirmed empty, #1684) and no species-granted
+// tool-proficiency mechanism exists yet either.
 export function useToolProficiencyChoices({
   draft,
   selectedClass,
-  selectedRace,
   selectedBackground,
   update,
 }: ToolProficiencyChoicesArgs): ToolProficiencyChoices {
   const grantedToolProfs = [
     ...(draft.useCustomBackground ? [] : selectedBackground?.toolProficiencies ?? []),
     ...(selectedClass?.toolProficiencies ?? []),
-    ...(selectedRace?.toolProficiencies ?? []),
   ].filter((name, idx, arr) => arr.indexOf(name) === idx);
 
   const toolChoiceOptions = (selectedClass?.toolChoices ?? []).filter(

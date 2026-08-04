@@ -66,7 +66,6 @@ describe("POST /api/characters — Half-Elf Skill Versatility (#1689)", () => {
     const halfElfRow = await halfElf();
     const res = await post({
       ...baseBody,
-      race: "Half-Elf",
       speciesId: halfElfRow.id,
       // Half-Elf's own #1681 ability-increase choice ("+1 to two of your
       // choice") is orthogonal to this slice's skill choice but still
@@ -91,7 +90,6 @@ describe("POST /api/characters — Half-Elf Skill Versatility (#1689)", () => {
     const halfElfRow = await halfElf();
     const res = await post({
       ...baseBody,
-      race: "Half-Elf",
       speciesId: halfElfRow.id,
       speciesSkills: ["stealth"],
     });
@@ -103,7 +101,6 @@ describe("POST /api/characters — Half-Elf Skill Versatility (#1689)", () => {
     const halfElfRow = await halfElf();
     const res = await post({
       ...baseBody,
-      race: "Half-Elf",
       speciesId: halfElfRow.id,
       speciesSkills: ["stealth", "stealth"],
     });
@@ -115,7 +112,6 @@ describe("POST /api/characters — Half-Elf Skill Versatility (#1689)", () => {
     const halfElfRow = await halfElf();
     const res = await post({
       ...baseBody,
-      race: "Half-Elf",
       speciesId: halfElfRow.id,
       speciesSkills: ["stealth", "notARealSkill"],
     });
@@ -127,7 +123,6 @@ describe("POST /api/characters — Half-Elf Skill Versatility (#1689)", () => {
     const halfElfRow = await halfElf();
     const res = await post({
       ...baseBody,
-      race: "Half-Elf",
       speciesId: halfElfRow.id,
       speciesSkills: ["stealth", "athletics"], // athletics is already a Fighter pick
     });
@@ -135,10 +130,11 @@ describe("POST /api/characters — Half-Elf Skill Versatility (#1689)", () => {
     expect(res.body.error).toMatch(/already chosen via class\/background/);
   });
 
-  it("400s when speciesSkills is sent but Half-Elf's own speciesId/variantId weren't selected (no spec to satisfy)", async () => {
+  it("400s when speciesSkills is sent for a species with no matching choice spec (Human has none)", async () => {
+    const human2014 = await prisma.species.findFirstOrThrow({ where: { slug: "human", edition: "EDITION_2014" } });
     const res = await post({
       ...baseBody,
-      race: "Human",
+      speciesId: human2014.id,
       speciesSkills: ["stealth", "perception"],
     });
     expect(res.status).toBe(400);
@@ -152,7 +148,6 @@ describe("POST /api/characters — High Elf Cantrip (#1689)", () => {
 
     const res = await post({
       ...baseBody,
-      race: "High Elf",
       speciesId: elf.id,
       variantId: highElfVariant.id,
       speciesCantripId: spell.id,
@@ -180,7 +175,6 @@ describe("POST /api/characters — High Elf Cantrip (#1689)", () => {
 
     const res = await post({
       ...baseBody,
-      race: "High Elf",
       speciesId: elf.id,
       variantId: highElfVariant.id,
       speciesCantripId: magicMissile.id,
@@ -194,7 +188,6 @@ describe("POST /api/characters — High Elf Cantrip (#1689)", () => {
 
     const res = await post({
       ...baseBody,
-      race: "High Elf",
       speciesId: elf.id,
       variantId: highElfVariant.id,
       speciesCantripId: sacredFlame.id,
@@ -206,7 +199,6 @@ describe("POST /api/characters — High Elf Cantrip (#1689)", () => {
     const { elf, highElfVariant } = await highElf();
     const res = await post({
       ...baseBody,
-      race: "High Elf",
       speciesId: elf.id,
       variantId: highElfVariant.id,
     });
@@ -223,7 +215,6 @@ describe("POST /api/characters — no-spec pins, both directions (#1689)", () =>
     const hillDwarf = dwarf.variants.find((v) => v.slug === "hill")!;
     const res = await post({
       ...baseBody,
-      race: "Hill Dwarf",
       speciesId: dwarf.id,
       variantId: hillDwarf.id,
       speciesSkills: ["stealth", "perception"],
@@ -240,7 +231,6 @@ describe("POST /api/characters — no-spec pins, both directions (#1689)", () =>
     const spell = await fireBolt();
     const res = await post({
       ...baseBody,
-      race: "Hill Dwarf",
       speciesId: dwarf.id,
       variantId: hillDwarf.id,
       speciesCantripId: spell.id,
@@ -248,26 +238,27 @@ describe("POST /api/characters — no-spec pins, both directions (#1689)", () =>
     expect(res.status).toBe(400);
   });
 
-  it("every 2024 species 400s on speciesSkills — the mechanism is edition-neutral but no 2024 content is seeded this slice (#1690's)", async () => {
-    const human2024 = await prisma.species.findFirstOrThrow({ where: { slug: "human", edition: "EDITION_2024" } });
+  // #1690 gave 2024 Human its own chooseSkills trait (Skillful), so this pin
+  // now needs a 2024 species with genuinely NO choice-bearing trait — Dwarf
+  // carries neither Skillful/Versatile (Human) nor Keen Senses (Elf).
+  it("a 2024 species with no choice-bearing trait (Dwarf) 400s on speciesSkills", async () => {
+    const dwarf2024 = await prisma.species.findFirstOrThrow({ where: { slug: "dwarf", edition: "EDITION_2024" } });
     const res = await post({
       ...baseBody,
-      race: "Human",
       rulesEdition: "EDITION_2024",
-      speciesId: human2024.id,
+      speciesId: dwarf2024.id,
       speciesSkills: ["stealth", "perception"],
     });
     expect(res.status).toBe(400);
   });
 
-  it("every 2024 species 400s on speciesCantripId — same pin, other field", async () => {
-    const human2024 = await prisma.species.findFirstOrThrow({ where: { slug: "human", edition: "EDITION_2024" } });
+  it("a 2024 species with no choice-bearing trait (Dwarf) 400s on speciesCantripId — same pin, other field", async () => {
+    const dwarf2024 = await prisma.species.findFirstOrThrow({ where: { slug: "dwarf", edition: "EDITION_2024" } });
     const spell = await fireBolt();
     const res = await post({
       ...baseBody,
-      race: "Human",
       rulesEdition: "EDITION_2024",
-      speciesId: human2024.id,
+      speciesId: dwarf2024.id,
       speciesCantripId: spell.id,
     });
     expect(res.status).toBe(400);

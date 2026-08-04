@@ -136,7 +136,6 @@ export function useCharacterCreation(): CharacterCreation {
   const toolChoices = useToolProficiencyChoices({
     draft,
     selectedClass: selections.class,
-    selectedRace: selections.race,
     selectedBackground: selections.background,
     update,
   });

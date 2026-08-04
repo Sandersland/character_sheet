@@ -1,5 +1,5 @@
 // Pure 5e-rules sanity checks on SPECIES — no database, same role as
-// catalog-data.test.ts (RACES/CLASSES/BACKGROUNDS). Guards the roster-parity
+// catalog-data.test.ts (CLASSES/BACKGROUNDS). Guards the roster-parity
 // invariants the epic names explicitly: neither edition's roster contains the
 // other's exclusives, and the PHB'14 Dwarf 25 ft / PHB'24 Dwarf 30 ft canary.
 import { describe, it, expect } from "vitest";

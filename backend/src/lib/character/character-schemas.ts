@@ -51,14 +51,13 @@ export const createCharacterSchema = z
     // URLs — the create UI stages a file and uploads it via portraitRouter
     // after create; .strict() 400s any client still sending a URL.
     experiencePoints: z.number().int().nonnegative().optional(),
-    race: z.string().min(1),
-    // Species catalog FK (#1679) — additive alongside `race` above during the
-    // compat window (`race` stays required until #1684 prunes the legacy
-    // path). Validated in resolveSpeciesSelection: variant must belong to
-    // this species, species edition must match the character's, and a
-    // variant-bearing species requires speciesId+variantId iff the species has
-    // variant rows. variantId is REJECTED without a speciesId (never implies one).
-    speciesId: z.string().optional(),
+    // Species catalog FK (#1679) — the mechanical anchor since #1684 pruned
+    // the flat `Race` model/legacy `race`-name path. Validated in
+    // resolveSpeciesSelection: variant must belong to this species, species
+    // edition must match the character's, and a variant-bearing species
+    // requires variantId iff the species has variant rows. variantId is
+    // REJECTED without a speciesId (never implies one).
+    speciesId: z.string().min(1),
     variantId: z.string().optional(),
     // 2014 species/subrace ability increases (#1681): the CHOSEN portion only
     // (fixed increases are applied server-side with no request field, same

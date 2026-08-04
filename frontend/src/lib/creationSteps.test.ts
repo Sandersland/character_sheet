@@ -156,7 +156,7 @@ const dwarfSpecies: SpeciesOption = {
 };
 
 function sel(overrides: Partial<CreationSelections> = {}): CreationSelections {
-  return { species: undefined, variant: undefined, race: undefined, class: undefined, background: undefined, ...overrides };
+  return { species: undefined, variant: undefined, class: undefined, background: undefined, ...overrides };
 }
 
 // #1683: a 2024 Elf-shaped species with a spell-granting lineage (Drow) —

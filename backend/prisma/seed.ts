@@ -5,7 +5,7 @@ import { PrismaClient } from "../src/generated/prisma/client.js";
 // Pure catalog seed data (no side effects) — see prisma/seed/*.ts. This file is
 // the upsert entrypoint (it must stay at prisma/seed.ts per prisma.config.ts);
 // every data array below is imported from a per-domain module under seed/.
-import { RACES, CLASSES, BACKGROUNDS, ITEMS, type CatalogItem } from "./seed/catalog-data.js";
+import { CLASSES, BACKGROUNDS, ITEMS, type CatalogItem } from "./seed/catalog-data.js";
 import { ACTIONS } from "./seed/actions.js";
 import { MANEUVERS } from "./seed/maneuvers.js";
 import { SHADOW_ARTS } from "./seed/shadow-arts.js";
@@ -61,12 +61,6 @@ function itemDetailUpsertFields(item: CatalogItem) {
       ? { upsert: { create: item.consumable, update: item.consumable } }
       : undefined,
   };
-}
-
-async function seedRaces(prisma: PrismaClient) {
-  for (const race of RACES) {
-    await prisma.race.upsert({ where: { name: race.name }, create: race, update: race });
-  }
 }
 
 // Returns className → id so subclasses can resolve their parent class.
@@ -450,9 +444,6 @@ async function main() {
     ...CHANNEL_DIVINITIES,
     ...SUBCLASS_CHOICE_OPTIONS,
   ]);
-  await seedRaces(prisma);
-  // #1679: additive, alongside seedRaces above — the flat Race table/seed
-  // keeps serving the legacy creation path until #1684 prunes it.
   await seedSpecies(prisma);
   // #1682: trait content, resolved against the Species/SpeciesVariant rows
   // seedSpecies just wrote — must run after it.

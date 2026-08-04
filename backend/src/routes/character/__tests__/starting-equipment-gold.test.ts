@@ -13,6 +13,7 @@ import supertest from "supertest";
 import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
+import { seededSpeciesId } from "@/test-support/species.js";
 
 const OWNER_ID = "owner-starting-equipment-gold";
 let COOKIE: string;
@@ -27,13 +28,14 @@ const FIXTURE_CLASS = {
 };
 
 let fixtureClassId: string;
+let human2014Id: string;
 const createdCharacterIds: string[] = [];
 
 function baseBody(overrides: Record<string, unknown> = {}) {
   return {
     name: "Fixture Gold Character",
     alignment: "True Neutral",
-    race: "Human",
+    speciesId: human2014Id,
     background: "Soldier",
     classes: [{ name: FIXTURE_CLASS.name }],
     abilityScores: {
@@ -52,6 +54,7 @@ function baseBody(overrides: Record<string, unknown> = {}) {
 
 describe("per-option gold reaches the created character's currency (#1564)", () => {
   beforeAll(async () => {
+    human2014Id = await seededSpeciesId("Human", "EDITION_2014");
     const cls = await prisma.characterClass.upsert({
       where: { name: FIXTURE_CLASS.name },
       create: FIXTURE_CLASS,

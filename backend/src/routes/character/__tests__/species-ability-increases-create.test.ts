@@ -47,7 +47,6 @@ describe("POST /api/characters — 2014 fixed increases bake at creation (#1681)
 
     const res = await post({
       ...baseBody,
-      race: "Hill Dwarf",
       rulesEdition: "EDITION_2014",
       speciesId: dwarf.id,
       variantId: hillDwarf.id,
@@ -85,7 +84,6 @@ describe("POST /api/characters — 2014 fixed increases bake at creation (#1681)
 
     const res = await post({
       ...baseBody,
-      race: "Mountain Dwarf",
       rulesEdition: "EDITION_2014",
       speciesId: dwarf.id,
       variantId: mountainDwarf.id,
@@ -96,13 +94,6 @@ describe("POST /api/characters — 2014 fixed increases bake at creation (#1681)
     // Fixed +2 CON overflow — server-applied, so the error names "species", not
     // the speciesAbilities field the client never submitted here (#1681 review).
     expect(res.body.error).toBe("species: constitution would exceed 20");
-  });
-
-  it("a legacy race-name-only creation (no speciesId) applies no increase, unchanged from before #1681", async () => {
-    const res = await post({ ...baseBody, race: "Hill Dwarf", rulesEdition: "EDITION_2014" });
-    expect(res.status).toBe(201);
-    createdCharacterIds.push(res.body.id);
-    expect(res.body.abilityScores).toEqual(BASE_SCORES);
   });
 });
 
@@ -123,7 +114,6 @@ describe("POST /api/characters — 2014 choose-from-list increases (Half-Elf, #1
     const halfElf = await halfElf2014();
     const res = await post({
       ...baseBody,
-      race: "Half-Elf",
       rulesEdition: "EDITION_2014",
       speciesId: halfElf.id,
       speciesAbilities: { strength: 1, dexterity: 1 },
@@ -154,7 +144,6 @@ describe("POST /api/characters — 2014 choose-from-list increases (Half-Elf, #1
     const halfElf = await halfElf2014();
     const res = await post({
       ...baseBody,
-      race: "Half-Elf",
       rulesEdition: "EDITION_2014",
       speciesId: halfElf.id,
       speciesSkills: SPECIES_SKILLS,
@@ -167,7 +156,6 @@ describe("POST /api/characters — 2014 choose-from-list increases (Half-Elf, #1
     const halfElf = await halfElf2014();
     const res = await post({
       ...baseBody,
-      race: "Half-Elf",
       rulesEdition: "EDITION_2014",
       speciesId: halfElf.id,
       speciesAbilities: { strength: 1 },
@@ -181,7 +169,6 @@ describe("POST /api/characters — 2014 choose-from-list increases (Half-Elf, #1
     const halfElf = await halfElf2014();
     const res = await post({
       ...baseBody,
-      race: "Half-Elf",
       rulesEdition: "EDITION_2014",
       speciesId: halfElf.id,
       speciesAbilities: { charisma: 1, strength: 1 },
@@ -195,7 +182,6 @@ describe("POST /api/characters — 2014 choose-from-list increases (Half-Elf, #1
     const halfElf = await halfElf2014();
     const res = await post({
       ...baseBody,
-      race: "Half-Elf",
       rulesEdition: "EDITION_2014",
       speciesId: halfElf.id,
       speciesAbilities: { strength: 2, dexterity: 1 },
@@ -209,7 +195,6 @@ describe("POST /api/characters — 2014 choose-from-list increases (Half-Elf, #1
     const halfElf = await halfElf2014();
     const res = await post({
       ...baseBody,
-      race: "Half-Elf",
       rulesEdition: "EDITION_2014",
       speciesId: halfElf.id,
       abilityScores: { ...BASE_SCORES, strength: 20 },
@@ -228,7 +213,6 @@ describe("POST /api/characters — 2014 choose-from-list increases (Half-Elf, #1
     const hillDwarf = dwarf.variants.find((v) => v.slug === "hill")!;
     const res = await post({
       ...baseBody,
-      race: "Hill Dwarf",
       rulesEdition: "EDITION_2014",
       speciesId: dwarf.id,
       variantId: hillDwarf.id,
@@ -244,7 +228,6 @@ describe("POST /api/characters — 2024 gets nothing from species, both directio
     const dwarf2024 = await prisma.species.findFirstOrThrow({ where: { slug: "dwarf", edition: "EDITION_2024" } });
     const res = await post({
       ...baseBody,
-      race: "Dwarf",
       rulesEdition: "EDITION_2024",
       speciesId: dwarf2024.id,
       speciesAbilities: { strength: 1 },
@@ -255,7 +238,7 @@ describe("POST /api/characters — 2024 gets nothing from species, both directio
 
   it("a 2024 character's scores gain nothing from species even with one selected", async () => {
     const dwarf2024 = await prisma.species.findFirstOrThrow({ where: { slug: "dwarf", edition: "EDITION_2024" } });
-    const res = await post({ ...baseBody, race: "Dwarf", rulesEdition: "EDITION_2024", speciesId: dwarf2024.id });
+    const res = await post({ ...baseBody, rulesEdition: "EDITION_2024", speciesId: dwarf2024.id });
 
     expect(res.status).toBe(201);
     createdCharacterIds.push(res.body.id);
@@ -293,7 +276,6 @@ describe("POST /api/characters — floating-spread species fixture (#1681 AC3)",
 
     const illegalShape = await post({
       ...baseBody,
-      race: "Human",
       rulesEdition: "EDITION_2014",
       speciesId: fixture.id,
       speciesAbilities: { strength: 3 },
@@ -303,7 +285,6 @@ describe("POST /api/characters — floating-spread species fixture (#1681 AC3)",
 
     const legal = await post({
       ...baseBody,
-      race: "Human",
       rulesEdition: "EDITION_2014",
       speciesId: fixture.id,
       speciesAbilities: { strength: 2, dexterity: 1 },

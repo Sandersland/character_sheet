@@ -115,14 +115,17 @@ export const ARMOR_CATEGORY_ORDER: readonly ArmorProficiencyCategory[] = [
   "light", "medium", "heavy", "shield",
 ];
 
-/** Union of all proficiency grant sources used across weapons, armor, and tools. */
-export type ProficiencySource = "class" | "race" | "feat" | "background" | "subclass" | "item";
+/** Union of all proficiency grant sources used across weapons, armor, and tools.
+ *  No "race" member: species-granted armor/weapon proficiencies arrive
+ *  feat-sourced since the #1682 RACE_PROFICIENCY_GRANTS retirement, and no
+ *  species-granted tool-proficiency mechanism exists (#1684 confirmed the
+ *  flat Race model's own toolProficiencies column was always empty). */
+export type ProficiencySource = "class" | "feat" | "background" | "subclass" | "item";
 
 /** Human-readable labels for every proficiency source. Used by ProficienciesCard
  *  across all three sub-sections so weapons, armor, and tools share one map. */
 export const SOURCE_LABELS: Record<ProficiencySource, string> = {
   class:      "Class",
-  race:       "Race",
   feat:       "Feat",
   background: "Background",
   subclass:   "Battle Master",

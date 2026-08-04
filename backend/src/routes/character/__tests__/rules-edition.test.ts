@@ -5,6 +5,7 @@ import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
+import { seededSpeciesAnchor } from "@/test-support/species.js";
 
 // #1285: the rulesEdition discriminator. Existing rows stamp EDITION_2024
 // because the shipped catalog is uniformly 2024 — stamping 2014 would point a
@@ -14,14 +15,17 @@ let COOKIE: string;
 
 const BASE = {
   alignment: "True Neutral",
-  race: "Hill Dwarf",
   background: "Sage",
   classes: [{ name: "Fighter" }],
   abilityScores: { strength: 15, dexterity: 14, constitution: 14, intelligence: 10, wisdom: 10, charisma: 8 },
 };
 
-function create(body: object) {
-  return supertest(app).post("/api/characters").set("Cookie", COOKIE).send(body);
+// #1684: the species anchor is resolved per the REQUESTED edition (a missing
+// rulesEdition defaults to 2024, same default the create route itself uses) —
+// Dwarf's 2014 row requires a variantId (Hill Dwarf) that its 2024 row doesn't.
+async function create(body: { rulesEdition?: string } & Record<string, unknown>) {
+  const anchor = await seededSpeciesAnchor((body.rulesEdition as "EDITION_2014" | "EDITION_2024") ?? "EDITION_2024");
+  return supertest(app).post("/api/characters").set("Cookie", COOKIE).send({ ...anchor, ...body });
 }
 function get(id: string) {
   return supertest(app).get(`/api/characters/${id}`).set("Cookie", COOKIE);

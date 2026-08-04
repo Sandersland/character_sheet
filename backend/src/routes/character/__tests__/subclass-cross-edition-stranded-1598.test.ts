@@ -27,6 +27,7 @@ import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
+import { seededSpeciesAnchor } from "@/test-support/species.js";
 
 const OWNER_ID = "owner-1598-stranded-subclass";
 let COOKIE: string;
@@ -62,13 +63,14 @@ afterEach(async () => {
 });
 
 async function createCharacter(name: string, className: string, experiencePoints = 900) {
+  const anchor = await seededSpeciesAnchor("EDITION_2024");
   const res = await supertest(app)
     .post("/api/characters")
     .set("Cookie", COOKIE)
     .send({
       name,
       alignment: "True Neutral",
-      race: "Hill Dwarf",
+      ...anchor,
       background: "Sage",
       classes: [{ name: className }],
       abilityScores: BASE_ABILITY_SCORES,

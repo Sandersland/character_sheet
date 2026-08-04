@@ -20,12 +20,12 @@ describe("GET /api/reference", () => {
       .get("/api/reference?edition=EDITION_2024");
 
     expect(response.status).toBe(200);
-    expect(response.body).toHaveProperty("races");
+    expect(response.body).toHaveProperty("species");
     expect(response.body).toHaveProperty("classes");
     expect(response.body).toHaveProperty("backgrounds");
     expect(response.body).toHaveProperty("alignments");
 
-    expect(Array.isArray(response.body.races)).toBe(true);
+    expect(Array.isArray(response.body.species)).toBe(true);
     expect(Array.isArray(response.body.classes)).toBe(true);
     expect(Array.isArray(response.body.backgrounds)).toBe(true);
     expect(response.body.alignments).toEqual(
@@ -701,7 +701,7 @@ describe("GET /api/reference", () => {
   // instead of the SRD 5.2 Prepared Spells one. This latch guards every OTHER
   // class field against a future "for symmetry" filter, same shape as this
   // file's itemRarities latch (edition-invariant, not edition-resolved).
-  it("classes (apart from subclassGateLevel/subclasses/startingEquipment/level1SpellPicks) and races are identical between editions (#1308/#1535/#1507)", async () => {
+  it("classes (apart from subclassGateLevel/subclasses/startingEquipment/level1SpellPicks) are identical between editions (#1308/#1535/#1507)", async () => {
     const res2014 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2014");
     const res2024 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2024");
 
@@ -716,7 +716,8 @@ describe("GET /api/reference", () => {
     expect(res2014.body.classes.map(stripEditionDivergentFields)).toEqual(
       res2024.body.classes.map(stripEditionDivergentFields),
     );
-    expect(res2014.body.races).toEqual(res2024.body.races);
+    // species (unlike classes) is DELIBERATELY edition-divergent (#1684's own
+    // compat-gap fix) — reference-species.test.ts pins the roster differences.
   });
 
   // #1559: proves #1336's edition-scoping and #1559's Subclass tag compose —

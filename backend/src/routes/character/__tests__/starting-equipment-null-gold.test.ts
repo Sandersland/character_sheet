@@ -14,6 +14,7 @@ import supertest from "supertest";
 import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
+import { seededSpeciesId } from "@/test-support/species.js";
 
 const OWNER_ID = "owner-starting-equipment-null-gold";
 let COOKIE: string;
@@ -28,10 +29,12 @@ const FIXTURE_CLASS = {
 };
 
 let fixtureClassId: string;
+let human2014Id: string;
 const createdCharacterIds: string[] = [];
 
 describe("resolveStartingGold rejects a NULL-dice package (#1564)", () => {
   beforeAll(async () => {
+    human2014Id = await seededSpeciesId("Human", "EDITION_2014");
     const cls = await prisma.characterClass.upsert({
       where: { name: FIXTURE_CLASS.name },
       create: FIXTURE_CLASS,
@@ -79,7 +82,7 @@ describe("resolveStartingGold rejects a NULL-dice package (#1564)", () => {
       .send({
         name: "Fixture Null Gold Character",
         alignment: "True Neutral",
-        race: "Human",
+        speciesId: human2014Id,
         background: "Soldier",
         classes: [{ name: FIXTURE_CLASS.name }],
         abilityScores: {
@@ -108,7 +111,7 @@ describe("resolveStartingGold rejects a NULL-dice package (#1564)", () => {
       .send({
         name: "Fixture Null Gold Character (package)",
         alignment: "True Neutral",
-        race: "Human",
+        speciesId: human2014Id,
         background: "Soldier",
         classes: [{ name: FIXTURE_CLASS.name }],
         abilityScores: {

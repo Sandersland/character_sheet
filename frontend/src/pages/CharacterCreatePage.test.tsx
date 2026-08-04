@@ -42,7 +42,6 @@ const SPELL_CATALOG = [
 ];
 
 const referenceFixture: ReferenceData = {
-  races: [{ id: "race-human", name: "Human", speed: 30, toolProficiencies: [] }],
   species: [{
     id: "sp-human", name: "Human", slug: "human", speed: 30, abilityIncreases: [],
     needsCastingAbility: false, chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false, variants: [],
@@ -215,7 +214,6 @@ describe("CharacterCreatePage (#1176 ceremony)", () => {
     expect(mockCreateCharacter).toHaveBeenCalledWith({
       name: "Alric",
       alignment: "Lawful Good",
-      race: "Human",
       speciesId: "sp-human",
       background: "Sage",
       classes: [{ name: "Bard", subclass: null, subclassId: undefined }],

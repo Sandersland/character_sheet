@@ -10,7 +10,6 @@ vi.mock("@/api/client", () => ({
 }));
 
 const REFERENCE: ReferenceData = {
-  races: [],
   species: [],
   classes: [],
   backgrounds: [],

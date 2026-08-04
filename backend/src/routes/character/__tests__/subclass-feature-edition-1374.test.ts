@@ -18,6 +18,7 @@ import { authCookie } from "@/test-support/auth.js";
 import { deriveResources } from "@/lib/classes/class-features.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 import { loadDbFeatureRows } from "@/lib/classes/__tests__/db-feature-rows.fixture.js";
+import { seededSpeciesAnchor } from "@/test-support/species.js";
 
 const OWNER_ID = "owner-1374-subclass-feature-edition";
 let COOKIE: string;
@@ -64,13 +65,14 @@ afterEach(async () => {
 });
 
 async function createCharacter(name: string, className: string, rulesEdition: "EDITION_2014" | "EDITION_2024") {
+  const anchor = await seededSpeciesAnchor(rulesEdition);
   const res = await supertest(app)
     .post("/api/characters")
     .set("Cookie", COOKIE)
     .send({
       name,
       alignment: "True Neutral",
-      race: "Hill Dwarf",
+      ...anchor,
       background: "Sage",
       classes: [{ name: className }],
       abilityScores: BASE_ABILITY_SCORES,

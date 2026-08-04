@@ -20,13 +20,13 @@ import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
+import { seededSpeciesAnchor } from "@/test-support/species.js";
 
 const OWNER_ID = "owner-unarmed-strike-edition";
 let COOKIE: string;
 
 const BASE = {
   alignment: "Lawful Neutral",
-  race: "Hill Dwarf",
   background: "Sage",
   classes: [{ name: "Monk" }],
   abilityScores: { strength: 10, dexterity: 16, constitution: 12, intelligence: 10, wisdom: 14, charisma: 8 },
@@ -42,10 +42,11 @@ async function createMonkAt(
   name: string,
   level: 1 | 17 | 20,
 ): Promise<string> {
+  const anchor = await seededSpeciesAnchor(rulesEdition);
   const res = await supertest(app)
     .post("/api/characters")
     .set("Cookie", COOKIE)
-    .send({ ...BASE, name, rulesEdition });
+    .send({ ...BASE, ...anchor, name, rulesEdition });
   expect(res.status).toBe(201);
   const id = res.body.id as string;
 

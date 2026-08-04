@@ -8,7 +8,7 @@ import { describe, it, expect } from "vitest";
 
 import { toolsByCategory, type ToolCategory } from "@/lib/srd/tools.js";
 
-import { RACES, CLASSES, BACKGROUNDS, ITEMS, type CatalogItem } from "../catalog-data.js";
+import { CLASSES, BACKGROUNDS, ITEMS, type CatalogItem } from "../catalog-data.js";
 
 // The 12 PHB classes. If any is missing the character-creation dropdown is
 // broken (Warlock/Druid have shipped missing before).
@@ -73,23 +73,6 @@ describe("CLASSES catalog", () => {
         `class "${cls.name}" picks ${cls.skillChoiceCount} of ${cls.skillChoices.length} skills`,
       ).toBeLessThanOrEqual(cls.skillChoices.length);
     }
-  });
-});
-
-describe("RACES catalog", () => {
-  it("is non-empty and every race has a positive speed", () => {
-    expect(RACES.length).toBeGreaterThan(0);
-    for (const race of RACES) {
-      expect(typeof race.speed, `race "${race.name}" speed not numeric`).toBe("number");
-      expect(race.speed, `race "${race.name}" has non-positive speed`).toBeGreaterThan(0);
-    }
-  });
-
-  it("has no duplicate race names", () => {
-    // RACES mixes named subraces (Hill Dwarf) with legacy generic entries
-    // (Dwarf) — distinct names, but a future edit could collide one.
-    const names = RACES.map((r) => r.name);
-    expect(new Set(names).size).toBe(names.length);
   });
 });
 

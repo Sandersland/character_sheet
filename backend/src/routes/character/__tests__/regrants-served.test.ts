@@ -19,6 +19,7 @@ import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
+import { seededSpeciesAnchor } from "@/test-support/species.js";
 
 const OWNER_ID = "owner-regrants-served";
 const EDITIONS = ["EDITION_2014", "EDITION_2024"] as const;
@@ -29,7 +30,6 @@ const createdIds: string[] = [];
 
 const BASE = {
   alignment: "Chaotic Neutral",
-  race: "Hill Dwarf",
   background: "Sage",
   abilityScores: { strength: 10, dexterity: 16, constitution: 12, intelligence: 12, wisdom: 10, charisma: 10 },
 };
@@ -41,10 +41,11 @@ async function makeCharacter(
   level: 2 | 3,
   subclass?: string,
 ): Promise<string> {
+  const anchor = await seededSpeciesAnchor(rulesEdition);
   const res = await supertest(app)
     .post("/api/characters")
     .set("Cookie", COOKIE)
-    .send({ ...BASE, classes: [{ name: className }], name, rulesEdition });
+    .send({ ...BASE, ...anchor, classes: [{ name: className }], name, rulesEdition });
   expect(res.status).toBe(201);
   const id = res.body.id as string;
   createdIds.push(id);
