@@ -59,8 +59,11 @@ describe("POST /api/characters — 2014 fixed increases bake at creation (#1681)
     // CON 12 → 14 (species +2), WIS 10 → 11 (variant +1); everything else untouched.
     expect(res.body.abilityScores).toEqual({ ...BASE_SCORES, constitution: 14, wisdom: 11 });
 
-    // CON 14 → +2 mod, Fighter d10 → 12 max HP (base scores' 10 would give 11).
-    expect(res.body.hitPoints.max).toBe(12);
+    // CON 14 → +2 mod, Fighter d10 → 12 base HP, +1 from Hill Dwarf's own
+    // Dwarven Toughness trait (#1682, seeded after this test was written —
+    // the assertion went stale without failing until a full-suite run
+    // caught it, #1689 review) = 13 max.
+    expect(res.body.hitPoints.max).toBe(13);
     // DEX 12 (unaffected by Dwarf's increases) → +1 mod, no other init bonus.
     expect(res.body.initiativeBonus).toBe(1);
 
@@ -110,6 +113,14 @@ describe("POST /api/characters — 2014 choose-from-list increases (Half-Elf, #1
     return prisma.species.findFirstOrThrow({ where: { slug: "half-elf", edition: "EDITION_2014" } });
   }
 
+  // Half-Elf ALSO carries a #1689 skill choice (Skill Versatility) as of this
+  // slice — every request below must satisfy it too, or the skill-choice gate
+  // (which resolves before ability increases, resolveSelections vs. the later
+  // resolveSpeciesGrants phase) 400s before reaching the ability check this
+  // file exists to exercise. Not overlapping with anything: baseBody sends no
+  // skillProficiencies of its own.
+  const SPECIES_SKILLS = ["stealth", "perception"];
+
   it("applies the fixed +2 CHA and the chosen +1/+1 to two distinct non-CHA abilities", async () => {
     const halfElf = await halfElf2014();
     const res = await post({
@@ -118,6 +129,7 @@ describe("POST /api/characters — 2014 choose-from-list increases (Half-Elf, #1
       rulesEdition: "EDITION_2014",
       speciesId: halfElf.id,
       speciesAbilities: { strength: 1, dexterity: 1 },
+      speciesSkills: SPECIES_SKILLS,
     });
 
     expect(res.status).toBe(201);
@@ -142,7 +154,13 @@ describe("POST /api/characters — 2014 choose-from-list increases (Half-Elf, #1
 
   it("400s with a distinct message when speciesAbilities is omitted entirely", async () => {
     const halfElf = await halfElf2014();
-    const res = await post({ ...baseBody, race: "Half-Elf", rulesEdition: "EDITION_2014", speciesId: halfElf.id });
+    const res = await post({
+      ...baseBody,
+      race: "Half-Elf",
+      rulesEdition: "EDITION_2014",
+      speciesId: halfElf.id,
+      speciesSkills: SPECIES_SKILLS,
+    });
     expect(res.status).toBe(400);
     expect(res.body.error).toBe("speciesAbilities required: this species grants a choice of ability increases");
   });
@@ -155,6 +173,7 @@ describe("POST /api/characters — 2014 choose-from-list increases (Half-Elf, #1
       rulesEdition: "EDITION_2014",
       speciesId: halfElf.id,
       speciesAbilities: { strength: 1 },
+      speciesSkills: SPECIES_SKILLS,
     });
     expect(res.status).toBe(400);
     expect(res.body.error).toBe("speciesAbilities: choose exactly 2 distinct abilities (got 1)");
@@ -168,6 +187,7 @@ describe("POST /api/characters — 2014 choose-from-list increases (Half-Elf, #1
       rulesEdition: "EDITION_2014",
       speciesId: halfElf.id,
       speciesAbilities: { charisma: 1, strength: 1 },
+      speciesSkills: SPECIES_SKILLS,
     });
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/^speciesAbilities: charisma not eligible/);
@@ -181,6 +201,7 @@ describe("POST /api/characters — 2014 choose-from-list increases (Half-Elf, #1
       rulesEdition: "EDITION_2014",
       speciesId: halfElf.id,
       speciesAbilities: { strength: 2, dexterity: 1 },
+      speciesSkills: SPECIES_SKILLS,
     });
     expect(res.status).toBe(400);
     expect(res.body.error).toBe("speciesAbilities: each choice must be +1");
@@ -195,6 +216,7 @@ describe("POST /api/characters — 2014 choose-from-list increases (Half-Elf, #1
       speciesId: halfElf.id,
       abilityScores: { ...BASE_SCORES, strength: 20 },
       speciesAbilities: { strength: 1, dexterity: 1 },
+      speciesSkills: SPECIES_SKILLS,
     });
     expect(res.status).toBe(400);
     expect(res.body.error).toBe("speciesAbilities: strength would exceed 20");

@@ -22,10 +22,11 @@
 // cited text (`improvements` omitted). This is not a content gap — extending
 // the vocabulary is out of this slice's scope (not requested by #1682).
 //
-// Choice-bearing traits (Half-Elf Skill Versatility, High Elf Cantrip, 2024
-// Human Skillful/Versatile, Elf Keen Senses) land here as announce-only TEXT
-// ROWS only — #1689/#1690 own their actual choice mechanics (epic review
-// decision 8). No row here may claim a resolved mechanic for one of these.
+// Choice-bearing traits: Half-Elf Skill Versatility and High Elf Cantrip carry
+// a real `choice` spec as of #1689 (speciesTraitChoiceSchema, lib/srd/
+// species-trait-choices.ts). The 2024 pair (Human Skillful/Versatile, Elf Keen
+// Senses) stays announce-only TEXT ROWS — #1690's scope, not this one's (epic
+// review decision 8). No row here may claim a resolved mechanic for those.
 //
 // Level-gated traits (2024 Dragonborn's Draconic Flight at level 5, Aasimar's
 // Radiant Soul/Necrotic Shroud/Celestial Revelation, Goliath's Large Form) are
@@ -36,6 +37,7 @@ import { z } from "zod";
 
 import type { FeatImprovement } from "../../src/lib/classes/resources-state.js";
 import { featImprovementSchema } from "../../src/lib/srd/feats.js";
+import { speciesTraitChoiceSchema, type SpeciesTraitChoice } from "../../src/lib/srd/species-trait-choices.js";
 import type { SeedEdition } from "./edition.js";
 
 export interface SpeciesTraitSeed {
@@ -46,12 +48,16 @@ export interface SpeciesTraitSeed {
   name: string;
   description: string;
   improvements?: FeatImprovement[];
+  /** #1689: the player-choice mechanic this trait grants (Half-Elf's two
+   *  skills, High Elf's cantrip) — omitted for every fixed-only/announce-only
+   *  trait, the vast majority. */
+  choice?: SpeciesTraitChoice;
 }
 
 // Validated at seed time (prisma/seed/validate.ts). Reuses featImprovementSchema
 // (lib/srd/feats.ts) — the SAME zod a taken feat's improvements snapshot and a
 // ClassFeature row's improvements column validate against (#1691) — rather
-// than a third declaration.
+// than a third declaration. `choice` reuses speciesTraitChoiceSchema the same way.
 export const speciesTraitSeedSchema = z
   .object({
     speciesSlug: z.string().min(1),
@@ -60,6 +66,7 @@ export const speciesTraitSeedSchema = z
     name: z.string().min(1),
     description: z.string().min(1),
     improvements: z.array(featImprovementSchema).optional(),
+    choice: speciesTraitChoiceSchema.optional(),
   })
   .strict();
 
@@ -216,8 +223,8 @@ const ELF_2014: SpeciesTraitSeed[] = [
     speciesEdition: "EDITION_2014",
     variantSlug: "high",
     name: "Cantrip",
-    description:
-      "You know one cantrip of your choice from the wizard spell list. Intelligence is your spellcasting ability for it. (SRD 5.1 p. 24) — choice mechanics are #1689's scope, not authored here.",
+    description: "You know one cantrip of your choice from the wizard spell list. Intelligence is your spellcasting ability for it. (SRD 5.1 p. 24)",
+    choice: { chooseCantrip: { list: "wizard", castingAbility: "intelligence" } },
   },
   {
     speciesSlug: "elf",
@@ -362,7 +369,8 @@ const HALF_ELF_2014: SpeciesTraitSeed[] = [
     speciesSlug: "half-elf",
     speciesEdition: "EDITION_2014",
     name: "Skill Versatility",
-    description: "You gain proficiency in two skills of your choice. (SRD 5.1 p. 25) — choice mechanics are #1689's scope, not authored here.",
+    description: "You gain proficiency in two skills of your choice. (SRD 5.1 p. 25)",
+    choice: { chooseSkills: { count: 2 } },
   },
 ];
 

@@ -9,6 +9,8 @@ import CreationReviewStep from "@/features/character-create/CreationReviewStep";
 import CreationSpellsStep from "@/features/character-create/CreationSpellsStep";
 import IdentitySection from "@/features/character-create/IdentitySection";
 import SkillSection from "@/features/character-create/SkillSection";
+import SpeciesCantripSection from "@/features/character-create/SpeciesCantripSection";
+import SpeciesSkillSection from "@/features/character-create/SpeciesSkillSection";
 import StartingEquipmentSection from "@/features/character-create/StartingEquipmentSection";
 import ToolProficiencySection from "@/features/character-create/ToolProficiencySection";
 import { CeremonyCard, CeremonyStage, CeremonyFooter } from "@/features/ceremony/CeremonyShell";
@@ -64,6 +66,9 @@ function SkillsStepBody({ c }: StepBodyProps) {
         selected={c.skills.selected}
         onToggle={c.skills.toggle}
       />
+      {/* #1689: Half-Elf's Skill Versatility — renders only when the server
+          serves a chooseSkills spec for the chosen species+variant. */}
+      <SpeciesSkillSection choice={c.speciesSkillChoice} onToggle={c.speciesSkillChoice.toggle} />
       <ToolProficiencySection
         grantedToolProfs={c.toolChoices.grantedToolProfs}
         toolChoiceOptions={c.toolChoices.toolChoiceOptions}
@@ -77,15 +82,25 @@ function SkillsStepBody({ c }: StepBodyProps) {
 
 function SpellsStepBody({ c }: StepBodyProps) {
   const picks = c.selections.class?.level1SpellPicks;
-  if (!picks) return null;
   return (
-    <CreationSpellsStep
-      className={c.draft.className}
-      counts={picks}
-      cantripIds={c.draft.cantripIds}
-      spellIds={c.draft.spellIds}
-      onChange={c.update}
-    />
+    <>
+      {picks && (
+        <CreationSpellsStep
+          className={c.draft.className}
+          counts={picks}
+          cantripIds={c.draft.cantripIds}
+          spellIds={c.draft.spellIds}
+          onChange={c.update}
+        />
+      )}
+      {/* #1689: High Elf's Cantrip — renders only when the server serves a
+          chooseCantrip spec; independent of the class picks above, so this
+          is the ONLY content on the step for a non-caster High Elf. */}
+      <SpeciesCantripSection
+        choice={c.speciesCantripChoice}
+        onChange={(speciesCantripId) => c.update({ speciesCantripId })}
+      />
+    </>
   );
 }
 

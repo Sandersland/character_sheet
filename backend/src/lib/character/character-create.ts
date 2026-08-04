@@ -16,6 +16,7 @@ import {
   isKnownTool,
   level1SpellPicksFor,
   maxSpellLevelForClass,
+  SKILLS,
 } from "@/lib/srd/srd.js";
 import { ABILITY_CAP } from "@/lib/leveling/advancement.js";
 import {
@@ -45,6 +46,13 @@ import {
   type AbilityIncreaseSpec,
   type ChooseIncrease,
 } from "@/lib/srd/species-ability-increases.js";
+import {
+  isChooseCantrip,
+  isChooseSkills,
+  type ChooseCantrip,
+  type ChooseSkills,
+  type SpeciesTraitChoice,
+} from "@/lib/srd/species-trait-choices.js";
 import type { ClassStartingEquipment, RulesEdition } from "@character-sheet/shared-types";
 import type { CreateCharacterBody } from "./character-schemas.js";
 
@@ -108,6 +116,12 @@ type ResolvedSelections = {
   // persistCreatedCharacter writes the selection + variantName + abilityBonuses
   // onto CharacterRace.
   speciesSelection: SpeciesSelection;
+  // #1689: the confirmed species/variant's own choice-bearing trait specs
+  // (SpeciesTrait.choice) — { null, null } for a legacy `race`-name-only
+  // creation OR a species with no choice-bearing trait (every 2024 species
+  // this slice). resolveSpeciesSkillGrant/resolveSpeciesCantripGrant read
+  // this to validate + apply speciesSkills/speciesCantripId.
+  speciesChoiceSpecs: SpeciesChoiceSpecs;
 };
 
 // #1679: the validated species/variant selection persisted onto
@@ -333,12 +347,99 @@ async function resolveSpeciesSelection(
   };
 }
 
-// Validate player skill selections against the class/background pools.
+// #1689: the confirmed species/variant's own choice-bearing trait specs
+// (SpeciesTrait.choice), split by discriminant — mirrors
+// fetchMergedAbilityIncreases' own "narrow fetch for the confirmed selection
+// only" shape (#1681). At most one of each kind exists in the wave-1 roster;
+// the FIRST match wins if a future row ever seeds two of the same kind, the
+// same priority rule resolveChosenIncreases uses for ability-increase specs.
+type SpeciesChoiceSpecs = {
+  chooseSkills: ChooseSkills | null;
+  chooseCantrip: ChooseCantrip | null;
+};
+
+const NO_SPECIES_CHOICES: SpeciesChoiceSpecs = { chooseSkills: null, chooseCantrip: null };
+
+async function fetchSpeciesChoiceSpecs(speciesId: string, variantId: string | null): Promise<SpeciesChoiceSpecs> {
+  const traits = await prisma.speciesTrait.findMany({
+    where: { speciesId, OR: [{ variantId: null }, ...(variantId ? [{ variantId }] : [])] },
+    select: { choice: true },
+  });
+  const choices = traits
+    .map((t) => t.choice)
+    .filter((c): c is NonNullable<typeof c> => c != null) as unknown as SpeciesTraitChoice[];
+  return {
+    chooseSkills: choices.find(isChooseSkills)?.chooseSkills ?? null,
+    chooseCantrip: choices.find(isChooseCantrip)?.chooseCantrip ?? null,
+  };
+}
+
+// {null, null} for a legacy `race`-name-only creation (no speciesId to look
+// traits up against) — split out of resolveSelections purely to keep that
+// function's own cyclomatic/cognitive complexity under the repo's health gate.
+async function resolveSpeciesChoiceSpecsFor(speciesSelection: SpeciesSelection): Promise<SpeciesChoiceSpecs> {
+  return speciesSelection.speciesId
+    ? fetchSpeciesChoiceSpecs(speciesSelection.speciesId, speciesSelection.variantId)
+    : NO_SPECIES_CHOICES;
+}
+
+// #1689: validates speciesSkills against the trait's own count/from spec AND
+// against the class/background picks already made (the "may not duplicate"
+// rule named explicitly in the issue) — kept as its own function, called from
+// validateSkillChoices below, so the duplicate-with-class/background message
+// stays distinct from that function's own "invalid skill" / "too many"
+// rejections, mirroring validateSpeciesChoose's split from the ability-
+// increase spread checks (#1681).
+function validateSpeciesSkillChoice(
+  speciesSkills: string[] | undefined,
+  spec: ChooseSkills | null,
+  classBackgroundSkills: string[],
+): Fail | { speciesSkills: string[] } {
+  if (!spec) {
+    if (speciesSkills) {
+      return { ok: false, status: 400, error: "speciesSkills not allowed: this species has no skill choice" };
+    }
+    return { speciesSkills: [] };
+  }
+  if (!speciesSkills) {
+    return { ok: false, status: 400, error: "speciesSkills required: this species grants a choice of skill proficiencies" };
+  }
+  const eligible = spec.from ?? SKILLS.map((s) => s.name);
+  const invalid = speciesSkills.filter((s) => !eligible.includes(s));
+  if (invalid.length > 0) {
+    return { ok: false, status: 400, error: `speciesSkills: unknown or ineligible skill(s): ${invalid.join(", ")}` };
+  }
+  if (new Set(speciesSkills).size !== speciesSkills.length) {
+    return { ok: false, status: 400, error: "speciesSkills must be distinct" };
+  }
+  if (speciesSkills.length !== spec.count) {
+    return {
+      ok: false,
+      status: 400,
+      error: `speciesSkills: choose exactly ${spec.count} distinct skill(s) (got ${speciesSkills.length})`,
+    };
+  }
+  const duplicate = speciesSkills.filter((s) => classBackgroundSkills.includes(s));
+  if (duplicate.length > 0) {
+    return {
+      ok: false,
+      status: 400,
+      error: `speciesSkills: ${duplicate.join(", ")} already chosen via class/background — species skills must be distinct from your other picks`,
+    };
+  }
+  return { speciesSkills };
+}
+
+// Validate player skill selections against the class/background pools, then
+// (#1689) the species' own skill choice against ITS spec and against these
+// same picks.
 function validateSkillChoices(
   skillProficiencies: string[],
   characterClass: ResolvedClass,
-  background: ResolvedBackground
-): Fail | null {
+  background: ResolvedBackground,
+  speciesSkillSpec: ChooseSkills | null,
+  requestedSpeciesSkills: string[] | undefined,
+): Fail | { speciesSkills: string[] } {
   const allowedSkills = new Set([
     ...characterClass.skillChoices,
     ...(background?.skillProficiencies ?? []),
@@ -356,7 +457,7 @@ function validateSkillChoices(
       error: `Too many skill proficiencies selected (max ${maxSkillChoices})`,
     };
   }
-  return null;
+  return validateSpeciesSkillChoice(requestedSpeciesSkills, speciesSkillSpec, skillProficiencies);
 }
 
 // Validate the player's tool selections against the class toolChoices pool.
@@ -390,16 +491,18 @@ function validateToolChoices(
 }
 
 // Validate player skill + tool selections against the class/background pools
-// and assemble the creation-fixed tool proficiencies from all fixed sources.
+// (plus, #1689, the species' own skill choice) and assemble the
+// creation-fixed tool proficiencies from all fixed sources.
 function resolveProficiencies(
   input: CreateCharacterBody,
   race: ResolvedRace,
   characterClass: ResolvedClass,
-  background: ResolvedBackground
+  background: ResolvedBackground,
+  speciesSkillSpec: ChooseSkills | null,
 ): PhaseResult<{ skillProficiencies: string[]; creationToolProfs: CreationToolProf[] }> {
   const skillProficiencies = input.skillProficiencies ?? [];
-  const skillError = validateSkillChoices(skillProficiencies, characterClass, background);
-  if (skillError) return skillError;
+  const skillResult = validateSkillChoices(skillProficiencies, characterClass, background, speciesSkillSpec, input.speciesSkills);
+  if ("ok" in skillResult) return skillResult;
 
   // toolChoices in the request are the player's selections from the class
   // toolChoices pool (e.g. 3 instruments for Bard).
@@ -416,7 +519,12 @@ function resolveProficiencies(
     ...playerToolChoices.map((name) => ({ name, source: "class" as const })),
   ];
 
-  return { ok: true, skillProficiencies, creationToolProfs };
+  // #1689: species-chosen skills fold into the SAME persisted proficiency
+  // list class/background picks use (deriveCreatedCharacter's skills[].proficient
+  // is a plain `.includes(name)` membership check) — no separate "source" is
+  // tracked in this array; that provenance lives on CharacterRace.speciesSkills
+  // instead (persistCreatedCharacter), read straight off validated input.
+  return { ok: true, skillProficiencies: [...skillProficiencies, ...skillResult.speciesSkills], creationToolProfs };
 }
 
 // The two request-shape guards that must pass before any DB lookup (bad
@@ -433,6 +541,28 @@ function validateCreationBasics(
     return { ok: false, status: 400, error: "At least one class is required" };
   }
   return { ok: true, primaryClassChoice: input.classes[0] };
+}
+
+// Fetches + validates the race/class catalog anchors alone (both required —
+// mechanical derivation needs an anchor for each). Split out of
+// resolveSelections purely to keep its own cyclomatic/cognitive complexity
+// under the repo's health gate, same reasoning as validateVariantSelection /
+// resolveSpeciesCatalogRow above.
+async function resolveClassAndRace(
+  input: CreateCharacterBody,
+  primaryClassChoice: PrimaryClassChoice,
+): Promise<PhaseResult<{ race: ResolvedRace; characterClass: ResolvedClass }>> {
+  const race = await prisma.race.findUnique({ where: { name: input.race } });
+  const characterClass = await prisma.characterClass.findUnique({
+    where: { name: primaryClassChoice.name },
+  });
+  if (!race) {
+    return { ok: false, status: 400, error: `Unknown race: ${input.race}` };
+  }
+  if (!characterClass) {
+    return { ok: false, status: 400, error: `Unknown class: ${primaryClassChoice.name}` };
+  }
+  return { ok: true, race, characterClass };
 }
 
 // Phase 1 — selection resolution: validate alignment + class count, resolve the
@@ -455,27 +585,19 @@ async function resolveSelections(
   // needs it to pick the right edition-tagged row (#1306).
   const edition: RulesEdition = input.rulesEdition ?? DEFAULT_RULES_EDITION;
 
-  const race = await prisma.race.findUnique({ where: { name: input.race } });
-  const characterClass = await prisma.characterClass.findUnique({
-    where: { name: primaryClassChoice.name },
-  });
+  // The background only grants skill-proficiency choices (no mechanical
+  // fields), so — unlike race/class — it's allowed to be homebrew: an
+  // unresolved name is kept as-is with a null backgroundId rather than
+  // rejected.
+  const classAndRace = await resolveClassAndRace(input, primaryClassChoice);
+  if (!classAndRace.ok) return classAndRace;
+  const { race, characterClass } = classAndRace;
+
   const backgroundCandidates = await prisma.background.findMany({
     where: withEditionOrShared({ name: input.background }, edition),
     include: { originFeat: true },
   });
   const background = resolveEditionRow(backgroundCandidates, edition) ?? null;
-
-  // Mechanical derivation needs a catalog anchor for race + class. The
-  // background only grants skill-proficiency choices (no mechanical
-  // fields), so — unlike race/class — it's allowed to be homebrew: an
-  // unresolved name is kept as-is with a null backgroundId rather than
-  // rejected.
-  if (!race) {
-    return { ok: false, status: 400, error: `Unknown race: ${input.race}` };
-  }
-  if (!characterClass) {
-    return { ok: false, status: 400, error: `Unknown class: ${primaryClassChoice.name}` };
-  }
 
   const subclass = await resolveSubclass(primaryClassChoice, characterClass, edition);
   if (!subclass.ok) return subclass;
@@ -483,7 +605,11 @@ async function resolveSelections(
   const speciesSelection = await resolveSpeciesSelection(input, edition);
   if (!speciesSelection.ok) return speciesSelection;
 
-  const proficiencies = resolveProficiencies(input, race, characterClass, background);
+  // #1689: fetched before proficiencies below — resolveProficiencies needs
+  // chooseSkills to validate speciesSkills.
+  const speciesChoiceSpecs = await resolveSpeciesChoiceSpecsFor(speciesSelection);
+
+  const proficiencies = resolveProficiencies(input, race, characterClass, background, speciesChoiceSpecs.chooseSkills);
   if (!proficiencies.ok) return proficiencies;
 
   return {
@@ -502,6 +628,7 @@ async function resolveSelections(
       variantId: speciesSelection.variantId,
       variantName: speciesSelection.variantName,
     },
+    speciesChoiceSpecs,
   };
 }
 
@@ -1332,6 +1459,38 @@ async function resolveCreationSpells(
   return { ok: true, spellEntries: entries };
 }
 
+// Phase 2c — species-granted cantrip (#1689, High Elf's Cantrip). Reuses the
+// SAME creationPickError the class's own creation picks validate against
+// (kind "cantrip", the spec's own class list, maxLevel unused for that kind)
+// so the two can never diverge on what counts as a legal cantrip pick. Marked
+// source:"species" + the spec's fixed castingAbility (Intelligence for High
+// Elf) — see SpellEntry's own comment for why that marker matters.
+async function resolveSpeciesCantripGrant(
+  input: CreateCharacterBody,
+  spec: ChooseCantrip | null,
+  existingEntries: SpellEntry[],
+): Promise<PhaseResult<{ entry: SpellEntry | null }>> {
+  const { speciesCantripId } = input;
+  if (!spec) {
+    if (speciesCantripId) {
+      return { ok: false, status: 400, error: "speciesCantripId not allowed: this species has no cantrip choice" };
+    }
+    return { ok: true, entry: null };
+  }
+  if (!speciesCantripId) {
+    return { ok: false, status: 400, error: "speciesCantripId required: this species grants a choice of cantrip" };
+  }
+  if (existingEntries.some((e) => e.spellId === speciesCantripId)) {
+    return { ok: false, status: 400, error: "speciesCantripId duplicates a class-picked spell" };
+  }
+  const row = (await prisma.spell.findUnique({ where: { id: speciesCantripId } })) ?? undefined;
+  const classDisplay = spec.list.charAt(0).toUpperCase() + spec.list.slice(1);
+  const error = creationPickError(row, speciesCantripId, "cantrip", spec.list, classDisplay, 0);
+  if (error) return error;
+  const entry: SpellEntry = { ...creationSpellEntry(row!), source: "species", castingAbility: spec.castingAbility };
+  return { ok: true, entry };
+}
+
 // The Origin feat rides resources.advancements as a slot-exempt entry (#1130);
 // undefined when the background grants none (the column is left at its default).
 function creationResources(originEntry: AdvancementEntry | null): Prisma.InputJsonValue | undefined {
@@ -1375,6 +1534,60 @@ function clampCreationSpellEntries(
   return clampPreparedToLimit(spellEntries, limit).spells;
 }
 
+// The species-granted cantrip entry (#1689), if any — provenance-only lookup
+// (the actual grant already lives in spellEntries itself); split out purely
+// to keep persistCreatedCharacter's own complexity under the repo's health gate.
+function speciesCantripEntryOf(spellEntries: SpellEntry[] | null): SpellEntry | null {
+  return spellEntries?.find((e) => e.source === "species") ?? null;
+}
+
+// #1679/#1681/#1689: the raceSelection.create payload — species/variant
+// selection, the #1681 ability-increase provenance snapshot, and the #1689
+// creation-choice provenance snapshot, all siblings on one row. Split out of
+// persistCreatedCharacter purely to keep that function's own
+// cyclomatic/cognitive complexity under the repo's health gate.
+function raceSelectionCreateInput(
+  input: CreateCharacterBody,
+  selections: ResolvedSelections,
+  appliedIncreases: SpeciesGrants["appliedIncreases"],
+  speciesCantripName: string | null,
+) {
+  return {
+    name: input.race,
+    raceId: selections.race.id,
+    // #1679: additive alongside raceId above — null/null/null for a legacy
+    // `race`-name-only creation. abilityBonuses is the #1681 provenance
+    // snapshot of exactly what resolveSpeciesGrants applied (fixed + chosen)
+    // — [] for a 2024 character, a legacy `race`-name creation, or a species
+    // with no increases in its merged spec.
+    speciesId: selections.speciesSelection.speciesId,
+    variantId: selections.speciesSelection.variantId,
+    variantName: selections.speciesSelection.variantName,
+    abilityBonuses: appliedIncreases as unknown as Prisma.InputJsonValue,
+    // #1689: provenance snapshot of the species-granted creation choices,
+    // sibling to abilityBonuses above — [] / null for every species with no
+    // choice-bearing trait.
+    speciesSkills: input.speciesSkills ?? [],
+    speciesCantripName,
+  };
+}
+
+// The three OPTIONAL top-level Character.create fields, each present only
+// under its own condition — extracted so each ternary is its own function's
+// decision point, not another one of persistCreatedCharacter's own (same
+// complexity-gate reasoning as the two helpers above).
+function resourcesField(resources: Prisma.InputJsonValue | undefined): { resources?: Prisma.InputJsonValue } {
+  return resources ? { resources } : {};
+}
+function currencyField(startingCurrency: MaterializedEquipment["startingCurrency"]) {
+  return startingCurrency ? { currency: startingCurrency } : {};
+}
+function inventoryItemsField(inventoryItemCreates: InventoryCreate[]) {
+  return inventoryItemCreates.length > 0
+    ? { inventoryItems: { create: inventoryItemCreates.map(stripInventoryCreateForWrite) } }
+    : {};
+}
+
 // Phase 3 — ability/HP seeding, spell/proficiency setup (deriveCreatedCharacter)
 // and persistence. Returns just the new id; the route re-fetches + serializes.
 async function persistCreatedCharacter(
@@ -1386,7 +1599,7 @@ async function persistCreatedCharacter(
   grants: BackgroundGrants,
   speciesGrants: SpeciesGrants,
 ): Promise<{ id: string }> {
-  const { race, characterClass, background, primaryClassChoice } = selections;
+  const { characterClass, background, primaryClassChoice } = selections;
   const { inventoryItemCreates, startingCurrency } = equipment;
   const { originEntry } = grants;
   // speciesGrants.effectiveScores is grants.effectiveScores with the #1681
@@ -1406,11 +1619,12 @@ async function persistCreatedCharacter(
       skillProficiencies: selections.skillProficiencies,
       toolProficiencies: selections.creationToolProfs,
     },
-    { race, characterClass }
+    { race: selections.race, characterClass }
   );
 
   const resources = creationResources(originEntry);
   const clampedSpellEntries = clampCreationSpellEntries(spellEntries, primaryClassChoice, selections, effectiveScores);
+  const speciesCantripName = speciesCantripEntryOf(spellEntries)?.name ?? null;
 
   const created = await prisma.character.create({
     data: {
@@ -1428,28 +1642,14 @@ async function persistCreatedCharacter(
       experiencePoints: input.experiencePoints ?? 0,
       abilityScores: effectiveScores,
       ...derived,
-      ...(resources ? { resources } : {}),
+      ...resourcesField(resources),
       // toolProficiencies is ToolProficiencyEntry[] from srd/srd.ts; Prisma
       // expects InputJsonValue for Json columns — safe to cast here.
       toolProficiencies: derived.toolProficiencies as unknown as Prisma.InputJsonValue,
       // Override derived currency with starting gold if the gold path was chosen.
-      ...(startingCurrency ? { currency: startingCurrency } : {}),
+      ...currencyField(startingCurrency),
       spellcasting: creationSpellcasting(clampedSpellEntries),
-      raceSelection: {
-        create: {
-          name: input.race,
-          raceId: race.id,
-          // #1679: additive alongside raceId above — null/null/null for a
-          // legacy `race`-name-only creation. abilityBonuses is the #1681
-          // provenance snapshot of exactly what resolveSpeciesGrants applied
-          // (fixed + chosen) — [] for a 2024 character, a legacy `race`-name
-          // creation, or a species with no increases in its merged spec.
-          speciesId: selections.speciesSelection.speciesId,
-          variantId: selections.speciesSelection.variantId,
-          variantName: selections.speciesSelection.variantName,
-          abilityBonuses: appliedIncreases as unknown as Prisma.InputJsonValue,
-        },
-      },
+      raceSelection: { create: raceSelectionCreateInput(input, selections, appliedIncreases, speciesCantripName) },
       backgroundSelection: {
         create: { name: input.background, backgroundId: background?.id ?? null },
       },
@@ -1464,9 +1664,7 @@ async function persistCreatedCharacter(
           },
         ],
       },
-      ...(inventoryItemCreates.length > 0
-        ? { inventoryItems: { create: inventoryItemCreates.map(stripInventoryCreateForWrite) } }
-        : {}),
+      ...inventoryItemsField(inventoryItemCreates),
     },
     select: { id: true },
   });
@@ -1522,6 +1720,15 @@ export async function createCharacter(
   const spells = await resolveCreationSpells(input, selections);
   if (!spells.ok) return spells;
 
-  const { id } = await persistCreatedCharacter(input, ownerId, selections, equipment, spells.spellEntries, grants, speciesGrants);
+  // #1689: the species-granted cantrip (High Elf), resolved independently of
+  // the class's own creation picks above and merged after — a non-caster
+  // species (Human, Hill Dwarf) never reaches this with a spec to satisfy,
+  // and a species WITH a spec still needs it even when the class itself
+  // casts no spells at all (a High Elf Fighter still gets its cantrip).
+  const speciesCantrip = await resolveSpeciesCantripGrant(input, selections.speciesChoiceSpecs.chooseCantrip, spells.spellEntries ?? []);
+  if (!speciesCantrip.ok) return speciesCantrip;
+  const spellEntries = speciesCantrip.entry ? [...(spells.spellEntries ?? []), speciesCantrip.entry] : spells.spellEntries;
+
+  const { id } = await persistCreatedCharacter(input, ownerId, selections, equipment, spellEntries, grants, speciesGrants);
   return { ok: true, id };
 }

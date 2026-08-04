@@ -131,3 +131,21 @@ describe("choice-bearing traits (#1689/#1690's scope) land as announce-only text
     }
   });
 });
+
+describe("#1689: choice-spec vocabulary lands on exactly the two 2014 wave-1 rows", () => {
+  it("Half-Elf's own Skill Versatility row carries chooseSkills: count 2, no `from` restriction (SRD 5.1 places none)", () => {
+    const skillVersatility = SPECIES_TRAITS.find((t) => t.speciesSlug === "half-elf" && t.name === "Skill Versatility");
+    expect(skillVersatility?.choice).toEqual({ chooseSkills: { count: 2 } });
+  });
+
+  it("High Elf's own Cantrip row carries chooseCantrip: the wizard list, Intelligence casting ability (SRD 5.1 p. 24)", () => {
+    const cantrip = SPECIES_TRAITS.find((t) => t.speciesSlug === "elf" && t.variantSlug === "high" && t.name === "Cantrip");
+    expect(cantrip?.choice).toEqual({ chooseCantrip: { list: "wizard", castingAbility: "intelligence" } });
+  });
+
+  it("no other row carries a `choice` — 2024 Human Skillful/Versatile and 2024 Elf Keen Senses stay spec-less this slice (#1690's scope)", () => {
+    const withChoice = SPECIES_TRAITS.filter((t) => t.choice !== undefined);
+    const names = withChoice.map((t) => `${t.speciesSlug}::${t.speciesEdition}::${t.variantSlug ?? "base"}::${t.name}`).sort();
+    expect(names).toEqual(["elf::EDITION_2014::high::Cantrip", "half-elf::EDITION_2014::base::Skill Versatility"].sort());
+  });
+});
