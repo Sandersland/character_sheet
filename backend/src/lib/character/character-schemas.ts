@@ -68,6 +68,14 @@ export const createCharacterSchema = z
     // other direction) and when the merged spec is fixed-only — see
     // resolveSpeciesGrants in character-create.ts.
     speciesAbilities: z.record(z.string(), z.number().int().positive()).optional(),
+    // 2024 lineage/legacy casting-ability choice (#1683): the Int/Wis/Cha
+    // ability a spell-granting lineage (Elf's Drow/High Elf/Wood Elf, Gnome's
+    // Forest/Rock, Tiefling's Abyssal/Chthonic/Infernal) uses, chosen "when
+    // you select the lineage" (PHB'24). Required iff the resolved species+
+    // variant's merged SpeciesGrantedSpell rows are non-empty; 400 otherwise
+    // (submitted with no species, or a species/variant that grants nothing)
+    // — see resolveCastingAbility in character-create.ts.
+    castingAbility: z.enum(["intelligence", "wisdom", "charisma"]).optional(),
     // #1689: the species/variant's OWN creation choices (SpeciesTrait.choice) —
     // distinct from skillProficiencies/spells below, which are the class/
     // background pools. Required iff the resolved species+variant carries a

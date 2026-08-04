@@ -4,13 +4,12 @@
 // species-data.ts/seed-species.ts's own split). DATA MODULE ONLY (#1277 AC 4,
 // scripts/check-seed-data-modules.sh).
 //
-// Scope (issue #1682): the 2014 roster's FULL trait text (SRD 5.1, PHB'14 for
-// subrace-only content) and the 2024 roster's NON-LINEAGE traits (SRD 5.2 /
-// PHB'24) — 2024 lineage/legacy/ancestry traits beyond Dragonborn's Draconic
-// Ancestry (Elf lineages, Gnome lineages, Tiefling legacies, Goliath giant
-// ancestry) are #1683's scope, not this slice's. Dragonborn's Draconic
-// Ancestry is authored in BOTH editions here (epic review decision 7 — the
-// variant rows themselves are seeded in #1679).
+// Scope (issue #1682, extended by #1683): the 2014 roster's FULL trait text
+// (SRD 5.1, PHB'14 for subrace-only content) and the 2024 roster's traits,
+// INCLUDING lineage/legacy/ancestry content (Elf lineages, Gnome lineages,
+// Tiefling legacies, Goliath giant ancestry) since #1683 landed. Dragonborn's
+// Draconic Ancestry is authored in BOTH editions here (epic review decision 7
+// — the variant rows themselves are seeded in #1679).
 //
 // Derived vs announce-only (owner ruling 2026-08-03, including darkvision —
 // visible information, not a derived combat stat): the ONLY targets the
@@ -508,6 +507,54 @@ const ELF_2024_BASE: SpeciesTraitSeed[] = [
   },
 ];
 
+// #1683: Elf Lineages (SRD 5.2 p. 24-25) — each grants a Level 1 benefit plus
+// two more spells at character levels 3 and 5, always-prepared and gated by
+// the SpeciesGrantedSpell rows in species-granted-spells-data.ts. Every
+// lineage's spells share ONE spellcasting ability, chosen from Intelligence,
+// Wisdom, or Charisma when the lineage is picked (#1683's casting-ability
+// picker) — the trait text below is announce-only; the actual grants/ability
+// resolve through deriveGrantedSpells.
+const ELF_LINEAGES_2024: SpeciesTraitSeed[] = [
+  {
+    speciesSlug: "elf",
+    speciesEdition: "EDITION_2024",
+    variantSlug: "drow",
+    name: "Superior Darkvision",
+    description: "Your Darkvision has a range of 120 feet, superseding the base Elf trait's 60 feet. (SRD 5.2 p. 24)",
+  },
+  {
+    speciesSlug: "elf",
+    speciesEdition: "EDITION_2024",
+    variantSlug: "drow",
+    name: "Drow Lineage",
+    description:
+      "You know the Dancing Lights cantrip. At level 3 you gain Faerie Fire, and at level 5 you gain Darkness, both always prepared and castable once per long rest without a spell slot (or with a spell slot you have). Intelligence, Wisdom, or Charisma is your spellcasting ability for these spells (chosen when you select the lineage). (SRD 5.2 p. 24)",
+  },
+  {
+    speciesSlug: "elf",
+    speciesEdition: "EDITION_2024",
+    variantSlug: "high",
+    name: "High Elf Lineage",
+    description:
+      "You know the Prestidigitation cantrip, swappable for a different Wizard cantrip after a long rest (swap not modeled — the cantrip is granted fixed). At level 3 you gain Detect Magic, and at level 5 you gain Misty Step, both always prepared and castable once per long rest without a spell slot (or with a spell slot you have). Intelligence, Wisdom, or Charisma is your spellcasting ability for these spells (chosen when you select the lineage). (SRD 5.2 p. 25)",
+  },
+  {
+    speciesSlug: "elf",
+    speciesEdition: "EDITION_2024",
+    variantSlug: "wood",
+    name: "Fleet of Foot",
+    description: "Your walking speed increases to 35 feet. (SRD 5.2 p. 25)",
+  },
+  {
+    speciesSlug: "elf",
+    speciesEdition: "EDITION_2024",
+    variantSlug: "wood",
+    name: "Wood Elf Lineage",
+    description:
+      "You know the Druidcraft cantrip. At level 3 you gain Longstrider, and at level 5 you gain Pass without Trace, both always prepared and castable once per long rest without a spell slot (or with a spell slot you have). Intelligence, Wisdom, or Charisma is your spellcasting ability for these spells (chosen when you select the lineage). (SRD 5.2 p. 25)",
+  },
+];
+
 const GNOME_2024_BASE: SpeciesTraitSeed[] = [
   darkvision("gnome", "EDITION_2024", "SRD 5.2 p. 30", 60),
   {
@@ -518,12 +565,82 @@ const GNOME_2024_BASE: SpeciesTraitSeed[] = [
   },
 ];
 
+// #1683: Gnomish Lineages (SRD 5.2 p. 30-31) — no leveled spell track (unlike
+// the Elf lineages, both grants land at level 1 only), but the SAME
+// player-chosen Intelligence/Wisdom/Charisma casting-ability trait.
+const GNOME_LINEAGES_2024: SpeciesTraitSeed[] = [
+  {
+    speciesSlug: "gnome",
+    speciesEdition: "EDITION_2024",
+    variantSlug: "forest",
+    name: "Forest Gnome Lineage",
+    description:
+      "You know the Minor Illusion cantrip, and you always have the Speak with Animals spell prepared — castable without a spell slot a number of times equal to your proficiency bonus, regaining all expended uses on a long rest. Intelligence, Wisdom, or Charisma is your spellcasting ability for these spells (chosen when you select the lineage). (SRD 5.2 p. 30)",
+  },
+  {
+    speciesSlug: "gnome",
+    speciesEdition: "EDITION_2024",
+    variantSlug: "rock",
+    name: "Rock Gnome Lineage",
+    description:
+      "You know the Mending and Prestidigitation cantrips. Intelligence, Wisdom, or Charisma is your spellcasting ability for them (chosen when you select the lineage). You can also spend 10 minutes casting Prestidigitation to create a Tiny clockwork device (AC 5, 1 HP) that produces one Prestidigitation effect when activated (up to three such devices at a time — the device-crafting mechanic is announce-only). (SRD 5.2 p. 31)",
+  },
+];
+
+// #1683: the Giant Ancestry table (SRD 5.2 p. 32) — six non-spell benefits,
+// usable a number of times equal to proficiency bonus per long rest. No
+// SpeciesGrantedSpell rows (none of the six casts a spell).
+const GOLIATH_ANCESTRY_2024: SpeciesTraitSeed[] = [
+  {
+    speciesSlug: "goliath",
+    speciesEdition: "EDITION_2024",
+    variantSlug: "cloud",
+    name: "Cloud's Jaunt",
+    description: "As a Bonus Action, you magically teleport up to 30 feet to an unoccupied space you can see, usable a number of times equal to your proficiency bonus, regaining all uses on a long rest. (SRD 5.2 p. 32)",
+  },
+  {
+    speciesSlug: "goliath",
+    speciesEdition: "EDITION_2024",
+    variantSlug: "fire",
+    name: "Fire's Burn",
+    description: "When you hit a target with an attack roll and deal damage to it, you can also deal 1d10 fire damage to that target, usable a number of times equal to your proficiency bonus, regaining all uses on a long rest. (SRD 5.2 p. 32)",
+  },
+  {
+    speciesSlug: "goliath",
+    speciesEdition: "EDITION_2024",
+    variantSlug: "frost",
+    name: "Frost's Chill",
+    description: "When you hit a target with an attack roll and deal damage to it, you can also deal 1d6 cold damage to it and reduce its speed by 10 feet until the start of your next turn, usable a number of times equal to your proficiency bonus, regaining all uses on a long rest. (SRD 5.2 p. 32)",
+  },
+  {
+    speciesSlug: "goliath",
+    speciesEdition: "EDITION_2024",
+    variantSlug: "hill",
+    name: "Hill's Tumble",
+    description: "When you hit a Large or smaller creature with an attack roll and deal damage to it, you can give that target the prone condition, usable a number of times equal to your proficiency bonus, regaining all uses on a long rest. (SRD 5.2 p. 32)",
+  },
+  {
+    speciesSlug: "goliath",
+    speciesEdition: "EDITION_2024",
+    variantSlug: "stone",
+    name: "Stone's Endurance",
+    description: "When you take damage, you can take a Reaction to roll 1d12, add your Constitution modifier, and reduce the damage by that total, usable a number of times equal to your proficiency bonus, regaining all uses on a long rest. (SRD 5.2 p. 32)",
+  },
+  {
+    speciesSlug: "goliath",
+    speciesEdition: "EDITION_2024",
+    variantSlug: "storm",
+    name: "Storm's Thunder",
+    description: "When you take damage from a creature within 60 feet of you, you can take a Reaction to deal 1d8 thunder damage to that creature, usable a number of times equal to your proficiency bonus, regaining all uses on a long rest. (SRD 5.2 p. 32)",
+  },
+];
+
 const GOLIATH_2024_BASE: SpeciesTraitSeed[] = [
   {
     speciesSlug: "goliath",
     speciesEdition: "EDITION_2024",
     name: "Giant Ancestry",
-    description: "You have a magical trait inherited from your giant ancestors, chosen from the Giant Ancestry table. (SRD 5.2 p. 32) — the ancestry choice's mechanics are #1683's scope.",
+    description: "You have a magical trait inherited from your giant ancestors, chosen from the Giant Ancestry table — see the six variant rows below. (SRD 5.2 p. 32)",
   },
   {
     speciesSlug: "goliath",
@@ -598,7 +715,7 @@ const TIEFLING_2024_BASE: SpeciesTraitSeed[] = [
     speciesSlug: "tiefling",
     speciesEdition: "EDITION_2024",
     name: "Fiendish Legacy",
-    description: "You choose a legacy — Abyssal, Chthonic, or Infernal — which grants resistances and spells. (SRD 5.2 p. 47) — the legacy choice's mechanics are #1683's scope.",
+    description: "You choose a legacy — Abyssal, Chthonic, or Infernal — which grants a resistance and spells (see the three variant rows below). (SRD 5.2 p. 47)",
   },
   {
     speciesSlug: "tiefling",
@@ -608,17 +725,53 @@ const TIEFLING_2024_BASE: SpeciesTraitSeed[] = [
   },
 ];
 
+// #1683: Fiendish Legacies (SRD 5.2 p. 47-48) — each grants a damage
+// resistance plus a cantrip/1st-level spell at level 1, a 2nd-level spell at
+// level 3, and a 3rd-level spell at level 5, gated by the SpeciesGrantedSpell
+// rows in species-granted-spells-data.ts. Same player-chosen Int/Wis/Cha
+// casting ability as the Elf/Gnome lineages above.
+const TIEFLING_LEGACIES_2024: SpeciesTraitSeed[] = [
+  {
+    speciesSlug: "tiefling",
+    speciesEdition: "EDITION_2024",
+    variantSlug: "abyssal",
+    name: "Abyssal Legacy",
+    description:
+      "You have resistance to poison damage. You know the Poison Spray cantrip. At level 3 you gain Ray of Sickness, and at level 5 you gain Hold Person, both always prepared and castable once per long rest without a spell slot (or with a spell slot you have). Intelligence, Wisdom, or Charisma is your spellcasting ability for these spells (chosen when you select the legacy). (SRD 5.2 p. 47)",
+  },
+  {
+    speciesSlug: "tiefling",
+    speciesEdition: "EDITION_2024",
+    variantSlug: "chthonic",
+    name: "Chthonic Legacy",
+    description:
+      "You have resistance to necrotic damage. You know the Chill Touch cantrip. At level 3 you gain False Life, and at level 5 you gain Ray of Enfeeblement, both always prepared and castable once per long rest without a spell slot (or with a spell slot you have). Intelligence, Wisdom, or Charisma is your spellcasting ability for these spells (chosen when you select the legacy). (SRD 5.2 p. 47)",
+  },
+  {
+    speciesSlug: "tiefling",
+    speciesEdition: "EDITION_2024",
+    variantSlug: "infernal",
+    name: "Infernal Legacy",
+    description:
+      "You have resistance to fire damage. You know the Fire Bolt cantrip. At level 3 you gain Hellish Rebuke, and at level 5 you gain Darkness, both always prepared and castable once per long rest without a spell slot (or with a spell slot you have). Intelligence, Wisdom, or Charisma is your spellcasting ability for these spells (chosen when you select the legacy). (SRD 5.2 p. 47)",
+  },
+];
+
 const SPECIES_TRAITS_2024: SpeciesTraitSeed[] = [
   ...AASIMAR_2024,
   ...DRAGONBORN_2024_BASE,
   ...DWARF_2024,
   ...ELF_2024_BASE,
+  ...ELF_LINEAGES_2024,
   ...GNOME_2024_BASE,
+  ...GNOME_LINEAGES_2024,
   ...GOLIATH_2024_BASE,
+  ...GOLIATH_ANCESTRY_2024,
   ...HALFLING_2024_BASE,
   ...HUMAN_2024_BASE,
   ...ORC_2024_BASE,
   ...TIEFLING_2024_BASE,
+  ...TIEFLING_LEGACIES_2024,
 ];
 
 export const SPECIES_TRAITS: SpeciesTraitSeed[] = [...SPECIES_TRAITS_2014, ...SPECIES_TRAITS_2024];

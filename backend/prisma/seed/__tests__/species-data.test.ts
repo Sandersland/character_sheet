@@ -140,11 +140,28 @@ describe("2024 roster (PHB'24)", () => {
     expect(dragonborn2014?.variants?.map((v) => v.name).sort()).toEqual(expectedNames);
   });
 
-  it("seeds no 2024 lineage variants beyond Dragonborn this slice (Elf/Gnome/Tiefling/Goliath are #1683)", () => {
-    for (const name of ["Elf", "Gnome", "Tiefling", "Goliath"]) {
-      const species = roster2024.find((s) => s.name === name);
-      expect(species?.variants ?? [], name).toHaveLength(0);
+  it("#1683: seeds the Elf/Gnome/Tiefling lineage-legacy variants and the Goliath Giant Ancestry variants", () => {
+    const variantNames = (name: string) => roster2024.find((s) => s.name === name)?.variants?.map((v) => v.name).sort();
+    expect(variantNames("Elf")).toEqual(["Drow", "High Elf", "Wood Elf"]);
+    expect(variantNames("Gnome")).toEqual(["Forest Gnome", "Rock Gnome"]);
+    expect(variantNames("Tiefling")).toEqual(["Abyssal Legacy", "Chthonic Legacy", "Infernal Legacy"]);
+    expect(variantNames("Goliath")).toEqual(
+      ["Cloud's Jaunt", "Fire's Burn", "Frost's Chill", "Hill's Tumble", "Stone's Endurance", "Storm's Thunder"].sort(),
+    );
+  });
+
+  it("#1683: Wood Elf overrides speed to 35 ft (SRD 5.2 Fleet of Foot); no other new 2024 variant overrides speed", () => {
+    const elf = roster2024.find((s) => s.name === "Elf");
+    const woodElf = elf?.variants?.find((v) => v.name === "Wood Elf");
+    expect(woodElf?.speedOverride).toBe(35);
+    for (const variant of elf?.variants ?? []) {
+      if (variant.name !== "Wood Elf") expect(variant.speedOverride, variant.name).toBeUndefined();
     }
+  });
+
+  it("#1683: Aasimar carries no variants — Celestial Revelation is a level-3 in-play choice, not a creation lineage", () => {
+    const aasimar = roster2024.find((s) => s.name === "Aasimar");
+    expect(aasimar?.variants ?? []).toHaveLength(0);
   });
 });
 

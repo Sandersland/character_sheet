@@ -70,6 +70,7 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
     },
     backgroundAbilities: {},
     speciesAbilities: {},
+    castingAbility: "",
     speciesSkills: [],
     speciesCantripId: "",
     skillProficiencies: [],
@@ -125,6 +126,7 @@ const elfSpecies: SpeciesOption = {
   slug: "elf",
   speed: 30,
   abilityIncreases: [],
+  needsCastingAbility: false,
   chooseSkills: null,
   chooseCantrip: null,
   variants: [],
@@ -137,17 +139,41 @@ const dwarfSpecies: SpeciesOption = {
   slug: "dwarf",
   speed: 25,
   abilityIncreases: [],
+  needsCastingAbility: false,
   chooseSkills: null,
   chooseCantrip: null,
   variants: [
-    { id: "var-hill", name: "Hill Dwarf", slug: "hill", abilityIncreases: [], chooseSkills: null, chooseCantrip: null },
-    { id: "var-mountain", name: "Mountain Dwarf", slug: "mountain", abilityIncreases: [], chooseSkills: null, chooseCantrip: null },
+    {
+      id: "var-hill", name: "Hill Dwarf", slug: "hill", abilityIncreases: [],
+      needsCastingAbility: false, chooseSkills: null, chooseCantrip: null,
+    },
+    {
+      id: "var-mountain", name: "Mountain Dwarf", slug: "mountain", abilityIncreases: [],
+      needsCastingAbility: false, chooseSkills: null, chooseCantrip: null,
+    },
   ],
 };
 
 function sel(overrides: Partial<CreationSelections> = {}): CreationSelections {
   return { species: undefined, variant: undefined, race: undefined, class: undefined, background: undefined, ...overrides };
 }
+
+// #1683: a 2024 Elf-shaped species with a spell-granting lineage (Drow) —
+// the identity step's casting-ability gate fixture.
+const drowLineageElf: SpeciesOption = {
+  id: "sp-elf-2024",
+  name: "Elf",
+  slug: "elf",
+  speed: 30,
+  abilityIncreases: [],
+  needsCastingAbility: false,
+  chooseSkills: null,
+  chooseCantrip: null,
+  variants: [{
+    id: "var-drow", name: "Drow", slug: "drow", abilityIncreases: [],
+    needsCastingAbility: true, chooseSkills: null, chooseCantrip: null,
+  }],
+};
 
 // #1681: Half-Elf-shape species fixture (fixed +2 CHA + choose 2 of 5 at +1) —
 // the one shape that actually gates the abilities step (a fixed-only species
@@ -161,6 +187,7 @@ const halfElfSpecies: SpeciesOption = {
     { ability: "charisma", amount: 2 },
     { choose: { count: 2, amount: 1, from: ["strength", "dexterity", "constitution", "intelligence", "wisdom"] } },
   ],
+  needsCastingAbility: false,
   // #1689: Skill Versatility — used by the "skills" step's own missing-gate tests below.
   chooseSkills: { count: 2 },
   chooseCantrip: null,
@@ -175,6 +202,7 @@ const highElfSpecies: SpeciesOption = {
   slug: "elf",
   speed: 30,
   abilityIncreases: [],
+  needsCastingAbility: false,
   chooseSkills: null,
   chooseCantrip: null,
   variants: [
@@ -183,6 +211,7 @@ const highElfSpecies: SpeciesOption = {
       name: "High Elf",
       slug: "high",
       abilityIncreases: [],
+      needsCastingAbility: false,
       chooseSkills: null,
       chooseCantrip: { list: "wizard", castingAbility: "intelligence" },
     },
@@ -317,6 +346,39 @@ describe("creationStepMissing", () => {
       background: "Sage",
     });
     expect(creationStepMissing("identity", draft, sel({ class: rogue, species: elfSpecies }))).toEqual([]);
+  });
+
+  // #1683: a spell-granting lineage (Drow) blocks Continue without a chosen
+  // casting ability; picking one clears the step. Gated in the IDENTITY step
+  // (not abilities) — the choice is made when the lineage is picked.
+  it("identity blocks a spell-granting variant with no castingAbility, and clears once one is chosen", () => {
+    const draft = makeDraft({
+      name: "A",
+      alignment: "Neutral Good",
+      speciesId: "sp-elf-2024",
+      variantId: "var-drow",
+      className: "Rogue",
+      background: "Sage",
+    });
+    const selection = sel({ class: rogue, species: drowLineageElf, variant: drowLineageElf.variants[0] });
+    expect(creationStepMissing("identity", draft, selection)).toEqual(["Casting ability"]);
+
+    const withChoice = makeDraft({ ...draft, castingAbility: "charisma" });
+    expect(creationStepMissing("identity", withChoice, selection)).toEqual([]);
+  });
+
+  it("identity never gates a non-spell-granting variant on a casting ability", () => {
+    const draft = makeDraft({
+      name: "A",
+      alignment: "Neutral Good",
+      speciesId: "sp-dwarf",
+      variantId: "var-hill",
+      className: "Rogue",
+      background: "Sage",
+    });
+    expect(
+      creationStepMissing("identity", draft, sel({ class: rogue, species: dwarfSpecies, variant: dwarfSpecies.variants[0] })),
+    ).toEqual([]);
   });
 
   it("abilities gates a specced-incomplete background and clears when complete", () => {

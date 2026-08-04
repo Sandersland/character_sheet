@@ -110,15 +110,23 @@ function optionalSpellFields(s: GrantedSpellCatalogSpell): Partial<SpellEntry> {
   return out;
 }
 
-// The spells a subclass grants for free at this character level, resolved live
-// from the loaded catalog rows. Below a grant's gate level it is omitted; a
-// cross-edition row is omitted (admittedGrants); a null source (no subclass,
-// or homebrew without a catalog row) grants nothing. Never persisted —
-// re-derived on every read.
+// The spells a subclass OR species/lineage grants for free at this character
+// level, resolved live from the loaded catalog rows. Below a grant's gate
+// level it is omitted; a cross-edition row is omitted (admittedGrants); a
+// null source (no subclass/species, or homebrew without a catalog row)
+// grants nothing. Never persisted — re-derived on every read, which is what
+// makes level-down free for both sources with no reconciler write.
+//
+// `sourceKind` (#1683) is the ONE parameter that changes between the two
+// callers — it only stamps the derived SpellEntry's `source` literal, never
+// forks the derivation itself: this stays the single shared function serving
+// both `collectGrantedSpells` (subclass, serialize/spellcasting.ts) and the
+// species source built by buildSpeciesGrantedSpellSource below.
 export function deriveGrantedSpells(
   source: GrantedSpellSource | null | undefined,
   level: number,
   edition: RulesEdition,
+  sourceKind: "subclass" | "species" = "subclass",
 ): SpellEntry[] {
   if (!source) return [];
   return admittedGrants(source, edition)
@@ -129,7 +137,7 @@ export function deriveGrantedSpells(
       level: g.spell.level,
       school: g.spell.school,
       prepared: true,
-      source: "subclass" as const,
+      source: sourceKind,
       castingTime: g.spell.castingTime,
       range: g.spell.range,
       duration: g.spell.duration,
@@ -165,9 +173,10 @@ const ABILITY_NAMES = new Set<string>([
   "charisma",
 ]);
 
-// The ability a subclass's granted spells use for save DC / attack bonus, read
-// off the first ADMITTED grant (a cross-edition row must not set the stat for
-// a character it never grants to). The column is a plain `string`, so validate
+// The ability a granted-spell source's spells use for save DC / attack bonus
+// (a subclass, or a 2024 species lineage since #1683), read off the first
+// ADMITTED grant (a cross-edition row must not set the stat for a character it
+// never grants to). The column is a plain `string`, so validate
 // it against the six lowercase ability names — a mis-cased/unknown value falls
 // back to Wisdom rather than silently producing a NaN modifier / wrong save DC.
 export function deriveGrantedCastingAbility(
@@ -176,6 +185,105 @@ export function deriveGrantedCastingAbility(
 ): keyof AbilityScores {
   const raw = source ? admittedGrants(source, edition)[0]?.castingAbility : undefined;
   return (raw && ABILITY_NAMES.has(raw) ? raw : "wisdom") as keyof AbilityScores;
+}
+
+// The SpeciesGrantedSpell rows a species/variant carries, shaped for
+// buildSpeciesGrantedSpellSource below — a structural subset so each of its
+// three call sites (serialize, the spellcasting transaction-op layer, the
+// level reconciler) can build one from its OWN differently-shaped Prisma
+// select/include (mirrors GrantedSpellRow's own role for subclass grants).
+export interface SpeciesGrantedSpellRow {
+  variantId: string | null;
+  gateLevel: number;
+  spell: GrantedSpellCatalogSpell;
+}
+
+// The input buildSpeciesGrantedSpellSource resolves into a GrantedSpellSource
+// — read off a character's CharacterRace + Species/SpeciesVariant selection.
+export interface SpeciesGrantSourceInput {
+  /** The granting species/variant's display name — builds the derived id
+   *  scheme (`granted:<name>:<spell>`), same role as GrantedSpellSource.name. */
+  name: string;
+  /** CharacterRace.castingAbility (#1683) — the player's Int/Wis/Cha choice,
+   *  made once when the lineage/legacy was picked. Null for a species/variant
+   *  with no spell grant, a 2014 character, or before the choice existed. */
+  castingAbility: string | null;
+  /** Species -> SpeciesGrantedSpell back-relation: EVERY grant row FK'd to
+   *  this speciesId, spanning every variant (plain Prisma relation semantics
+   *  — the same gotcha activeTraitRows documents for species.traits). Narrowed
+   *  to species-level (variantId === null) inside this function. */
+  speciesGrantedSpells: SpeciesGrantedSpellRow[];
+  /** SpeciesVariant -> SpeciesGrantedSpell back-relation for the CHOSEN
+   *  variant only — already scoped by Prisma, no further filtering needed. */
+  variantGrantedSpells: SpeciesGrantedSpellRow[];
+}
+
+// Species/lineage-granted spells (#1683) build a second GrantedSpellSource,
+// resolved through the SAME deriveGrantedSpells subclass grants use
+// (sourceKind: "species", never a fork — the one-shared-function
+// non-negotiable). Unlike SubclassGrantedSpell, a SpeciesGrantedSpell row
+// carries no per-row castingAbility (no column on the model) and no per-row
+// edition (species children have no edition column at all, unlike
+// SubclassGrantedSpell's real per-row fork) — every row here is stamped with
+// the SAME character-chosen ability and `edition: null`. `edition: null`
+// means admittedGrants' cross-edition filter is a structural no-op for a
+// species source: the edition gate already happened when the Species/
+// SpeciesVariant row itself was resolved per edition at read time
+// (characterInclude) and at creation (resolveSpeciesSelection) — "parent-
+// edition scoped", not a second filter here.
+export function buildSpeciesGrantedSpellSource(input: SpeciesGrantSourceInput | null): GrantedSpellSource | null {
+  if (!input) return null;
+  const speciesLevel = input.speciesGrantedSpells.filter((g) => g.variantId === null);
+  const rows = [...speciesLevel, ...input.variantGrantedSpells];
+  if (rows.length === 0) return null;
+  const castingAbility =
+    input.castingAbility && ABILITY_NAMES.has(input.castingAbility) ? input.castingAbility : "wisdom";
+  return {
+    name: input.name,
+    grantedSpells: rows.map((r) => ({ gateLevel: r.gateLevel, castingAbility, edition: null, spell: r.spell })),
+  };
+}
+
+// The `CharacterRace.raceSelection` sub-select two callers need when they
+// AREN'T already loading species/variant for another reason (unlike
+// character-include.ts, which loads species/variant WITH traits for the
+// read-serialize path too, #1682) — the level reconciler and the
+// spellcasting transaction-op layer. A plain literal, not `satisfies
+// Prisma.CharacterRaceSelect`: this module stays decoupled from the
+// generated Prisma client (pure over loaded rows, per its own header),
+// structurally compatible when spread into either caller's own
+// `satisfies Prisma...Select` block. Fallow flagged the two identical
+// query-fragment copies this replaces.
+export const RACE_SELECTION_GRANT_SELECT = {
+  castingAbility: true,
+  species: { select: { name: true, grantedSpells: { select: { variantId: true, gateLevel: true, spell: true } } } },
+  variant: { select: { name: true, grantedSpells: { select: { variantId: true, gateLevel: true, spell: true } } } },
+} as const;
+
+/** The shape RACE_SELECTION_GRANT_SELECT resolves to — the input
+ *  speciesGrantedSpellSourceFromRaceSelection below adapts. */
+export interface RaceSelectionGrantRow {
+  castingAbility: string | null;
+  species: { name: string; grantedSpells: SpeciesGrantedSpellRow[] } | null;
+  variant: { name: string; grantedSpells: SpeciesGrantedSpellRow[] } | null;
+}
+
+// The RACE_SELECTION_GRANT_SELECT-shaped adapter into buildSpeciesGrantedSpellSource
+// above — shared by level-reconciliation.ts and the spellcasting transaction-op
+// layer (character-include.ts's read-serialize path uses its own
+// buildSpeciesGrantedSpellSourceFor, serialize/species.ts, since it loads a
+// wider raceSelection shape already). One function, not two copies of the
+// same null-species-guard + field mapping (fallow flagged the prior duplicate).
+export function speciesGrantedSpellSourceFromRaceSelection(
+  raceSelection: RaceSelectionGrantRow | null | undefined,
+): GrantedSpellSource | null {
+  if (!raceSelection?.species) return null;
+  return buildSpeciesGrantedSpellSource({
+    name: raceSelection.variant?.name ?? raceSelection.species.name,
+    castingAbility: raceSelection.castingAbility,
+    speciesGrantedSpells: raceSelection.species.grantedSpells,
+    variantGrantedSpells: raceSelection.variant?.grantedSpells ?? [],
+  });
 }
 
 // The minimal inventory-item shape item-spell derivation needs: an item is a

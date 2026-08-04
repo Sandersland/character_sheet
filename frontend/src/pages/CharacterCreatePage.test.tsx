@@ -43,7 +43,10 @@ const SPELL_CATALOG = [
 
 const referenceFixture: ReferenceData = {
   races: [{ id: "race-human", name: "Human", speed: 30, toolProficiencies: [] }],
-  species: [{ id: "sp-human", name: "Human", slug: "human", speed: 30, abilityIncreases: [], chooseSkills: null, chooseCantrip: null, variants: [] }],
+  species: [{
+    id: "sp-human", name: "Human", slug: "human", speed: 30, abilityIncreases: [],
+    needsCastingAbility: false, chooseSkills: null, chooseCantrip: null, variants: [],
+  }],
   classes: [
     {
       id: "class-bard",

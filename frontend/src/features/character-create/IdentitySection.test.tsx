@@ -38,6 +38,7 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
     },
     backgroundAbilities: {},
     speciesAbilities: {},
+    castingAbility: "",
     speciesSkills: [],
     speciesCantripId: "",
     skillProficiencies: [],
@@ -67,14 +68,46 @@ const reference: ReferenceData = {
       slug: "dwarf",
       speed: 25,
       abilityIncreases: [],
+      needsCastingAbility: false,
       chooseSkills: null,
       chooseCantrip: null,
       variants: [
-        { id: "var-hill", name: "Hill Dwarf", slug: "hill", abilityIncreases: [], chooseSkills: null, chooseCantrip: null },
-        { id: "var-mountain", name: "Mountain Dwarf", slug: "mountain", abilityIncreases: [], chooseSkills: null, chooseCantrip: null },
+        {
+          id: "var-hill", name: "Hill Dwarf", slug: "hill", abilityIncreases: [],
+          needsCastingAbility: false, chooseSkills: null, chooseCantrip: null,
+        },
+        {
+          id: "var-mountain", name: "Mountain Dwarf", slug: "mountain", abilityIncreases: [],
+          needsCastingAbility: false, chooseSkills: null, chooseCantrip: null,
+        },
       ],
     },
-    { id: "sp-human", name: "Human", slug: "human", speed: 30, abilityIncreases: [], chooseSkills: null, chooseCantrip: null, variants: [] },
+    {
+      id: "sp-human", name: "Human", slug: "human", speed: 30, abilityIncreases: [],
+      needsCastingAbility: false, chooseSkills: null, chooseCantrip: null, variants: [],
+    },
+    // #1683: a 2024 Elf-shaped species with a spell-granting lineage (Drow)
+    // and a non-spell-granting one (Wood Elf), for the casting-ability picker.
+    {
+      id: "sp-elf-2024",
+      name: "Elf",
+      slug: "elf",
+      speed: 30,
+      abilityIncreases: [],
+      needsCastingAbility: false,
+      chooseSkills: null,
+      chooseCantrip: null,
+      variants: [
+        {
+          id: "var-drow", name: "Drow", slug: "drow", abilityIncreases: [],
+          needsCastingAbility: true, chooseSkills: null, chooseCantrip: null,
+        },
+        {
+          id: "var-wood", name: "Wood Elf", slug: "wood", abilityIncreases: [],
+          needsCastingAbility: false, chooseSkills: null, chooseCantrip: null,
+        },
+      ],
+    },
   ],
   classes: [],
   backgrounds: [],
@@ -118,21 +151,81 @@ describe("IdentitySection — two-step species/variant picker (#1680)", () => {
     expect(screen.queryByLabelText(/^Variant/)).not.toBeInTheDocument();
   });
 
-  it("picking a species resets any stale variant selection", async () => {
+  it("picking a species resets any stale variant selection (and castingAbility, #1683)", async () => {
     const u = userEvent.setup();
     const update = renderSection(makeDraft({ speciesId: "sp-dwarf", variantId: "var-hill" }));
 
     await u.selectOptions(screen.getByLabelText(/^Species/), "Human");
 
-    expect(update).toHaveBeenCalledWith({ speciesId: "sp-human", variantId: "" });
+    expect(update).toHaveBeenCalledWith({ speciesId: "sp-human", variantId: "", castingAbility: "" });
   });
 
-  it("picking a variant updates variantId alone", async () => {
+  it("picking a variant updates variantId (and resets castingAbility, #1683)", async () => {
     const u = userEvent.setup();
     const update = renderSection(makeDraft({ speciesId: "sp-dwarf" }));
 
     await u.selectOptions(screen.getByLabelText(/^Variant/), "Hill Dwarf");
 
-    expect(update).toHaveBeenCalledWith({ variantId: "var-hill" });
+    expect(update).toHaveBeenCalledWith({ variantId: "var-hill", castingAbility: "" });
+  });
+});
+
+// #1683: the casting-ability picker (Int/Wis/Cha), rendered only for a
+// spell-granting lineage/legacy (SpeciesVariantOption.needsCastingAbility).
+describe("IdentitySection — casting-ability picker (#1683)", () => {
+  it("renders no picker before a species is chosen", () => {
+    renderSection(makeDraft());
+    expect(screen.queryByRole("group", { name: /casting ability/i })).not.toBeInTheDocument();
+  });
+
+  it("renders no picker for a non-spell-granting variant (Wood Elf)", () => {
+    renderSection(makeDraft({ speciesId: "sp-elf-2024", variantId: "var-wood" }));
+    expect(screen.queryByRole("group", { name: /casting ability/i })).not.toBeInTheDocument();
+  });
+
+  it("renders the picker for a spell-granting variant (Drow)", () => {
+    renderSection(makeDraft({ speciesId: "sp-elf-2024", variantId: "var-drow" }));
+    const group = screen.getByRole("group", { name: /casting ability/i });
+    expect(group).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Intelligence" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Wisdom" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Charisma" })).toBeInTheDocument();
+  });
+
+  it("picking an ability updates castingAbility", async () => {
+    const u = userEvent.setup();
+    const update = renderSection(makeDraft({ speciesId: "sp-elf-2024", variantId: "var-drow" }));
+
+    await u.click(screen.getByRole("button", { name: "Charisma" }));
+
+    expect(update).toHaveBeenCalledWith({ castingAbility: "charisma" });
+  });
+
+  it("marks the chosen ability pressed", () => {
+    renderSection(makeDraft({ speciesId: "sp-elf-2024", variantId: "var-drow", castingAbility: "wisdom" }));
+    expect(screen.getByRole("button", { name: "Wisdom" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Charisma" })).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("changing species resets a stale castingAbility choice", async () => {
+    const u = userEvent.setup();
+    const update = renderSection(
+      makeDraft({ speciesId: "sp-elf-2024", variantId: "var-drow", castingAbility: "charisma" }),
+    );
+
+    await u.selectOptions(screen.getByLabelText(/^Species/), "Dwarf");
+
+    expect(update).toHaveBeenCalledWith({ speciesId: "sp-dwarf", variantId: "", castingAbility: "" });
+  });
+
+  it("changing variant resets a stale castingAbility choice", async () => {
+    const u = userEvent.setup();
+    const update = renderSection(
+      makeDraft({ speciesId: "sp-elf-2024", variantId: "var-drow", castingAbility: "charisma" }),
+    );
+
+    await u.selectOptions(screen.getByLabelText(/^Variant/), "Wood Elf");
+
+    expect(update).toHaveBeenCalledWith({ variantId: "var-wood", castingAbility: "" });
   });
 });

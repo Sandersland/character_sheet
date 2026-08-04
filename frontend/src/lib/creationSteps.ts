@@ -6,6 +6,7 @@
 import { ABILITY_ORDER } from "@/lib/abilities";
 import {
   deriveBackgroundBonuses,
+  deriveCastingAbilityChoice,
   deriveSkillChoices,
   deriveSpeciesBonuses,
   deriveSpeciesCantripChoice,
@@ -45,12 +46,15 @@ export function creationSteps(selections: CreationSelections): CreationStepKey[]
 // The identity-field checks share missingRequirements' rule by asking it with
 // no equipment (startingEquipment null) so nothing but identity is flagged.
 function identityMissing(draft: CharacterDraft, selections: CreationSelections): string[] {
+  const castingAbility = deriveCastingAbilityChoice(draft, selections);
   return missingRequirements({
     name: draft.name,
     alignment: draft.alignment,
     speciesChosen: draft.speciesId.length > 0,
     variantRequired: (selections.species?.variants.length ?? 0) > 0,
     variantChosen: draft.variantId.length > 0,
+    castingAbilityRequired: castingAbility.applicable,
+    castingAbilityChosen: castingAbility.complete,
     className: draft.className,
     backgroundName: resolveBackgroundName(draft),
     startingEquipment: null,
@@ -65,12 +69,15 @@ function identityMissing(draft: CharacterDraft, selections: CreationSelections):
 // leaves exactly the equipment detail. If that ordering ever changes, this slice
 // breaks.
 function equipmentMissing(draft: CharacterDraft, selections: CreationSelections): string[] {
+  const castingAbility = deriveCastingAbilityChoice(draft, selections);
   const full = missingRequirements({
     name: draft.name,
     alignment: draft.alignment,
     speciesChosen: draft.speciesId.length > 0,
     variantRequired: (selections.species?.variants.length ?? 0) > 0,
     variantChosen: draft.variantId.length > 0,
+    castingAbilityRequired: castingAbility.applicable,
+    castingAbilityChosen: castingAbility.complete,
     className: draft.className,
     backgroundName: resolveBackgroundName(draft),
     startingEquipment: selections.class?.startingEquipment ?? null,
