@@ -16,6 +16,7 @@ import { inventorySnapshotSchema } from "@character-sheet/contracts";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
+import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 import { applyInventoryOperations, revertInventoryEvent } from "@/lib/inventory/inventory.js";
 import { awardCampaignItem, revokeCampaignItem } from "@/lib/campaign/campaign-item-award.js";
 import { createCharacter } from "@/lib/character/character-create.js";
@@ -431,7 +432,14 @@ describe("mutable inventory state writes only its single home (#1649)", () => {
 
   beforeAll(async () => {
     await ensureTestOwner(OWNER_ID);
-    const spell = await prisma.spell.upsert({ where: { name: MUTABLE_SPELL.name }, create: MUTABLE_SPELL, update: MUTABLE_SPELL });
+    // upsertEditionRow, not .upsert(): Spell's business key is now (name,
+    // edition) (#1710), and this fixture spell is edition-neutral.
+    const spell = await upsertEditionRow(
+      prisma.spell,
+      { name: MUTABLE_SPELL.name, edition: null },
+      { ...MUTABLE_SPELL, edition: null },
+      MUTABLE_SPELL,
+    );
     spellId = spell.id;
   });
 

@@ -3,6 +3,14 @@
 // auto-rolling feature. Structured effect fields (effectKind/effectDiceCount
 // etc.) mirror ItemWeaponDetail / ItemConsumableDetail so the frontend can roll
 // damage/healing at cast time using the same dice.ts engine.
+//
+// Every row below is SRD 5.2 (2024) text (renamed spells, narrowed
+// components) rather than "valid in both editions" — seedSpells defaults an
+// untagged entry's `edition` to EDITION_2024, not to Feat's NULL/shared
+// convention (#1710). A 2014 fork lives in a sibling spells-2014/*.ts file
+// instead of an `edition: "EDITION_2014"` override here.
+import type { SeedEdition } from "./edition.js";
+
 export type SpellSchoolSeed =
   | "abjuration" | "conjuration" | "divination" | "enchantment"
   | "evocation" | "illusion" | "necromancy" | "transmutation";
@@ -40,6 +48,10 @@ export interface CatalogSpell {
   // 13, not 3), the floor for "acFloor" (Barkskin 17).
   buffTarget?: "ac" | "acUnarmoredBase" | "acFloor";
   buffModifier?: number;
+  // Omitted here = EDITION_2024 (this file's own default, see the header
+  // comment) — NOT "shared", unlike Feat/Background/Subclass's `edition?`.
+  // Set explicitly only for a row that genuinely applies to both editions.
+  edition?: SeedEdition;
 }
 
 // SRD 5.2 (2024) renamed the proper-noun spells (#1132). Each entry renames the

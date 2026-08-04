@@ -52,7 +52,7 @@ let fireballDesc: string;
 
 beforeAll(async () => {
   await ensureTestOwner(OWNER_ID);
-  const fb = await prisma.spell.findUniqueOrThrow({ where: { name: "Fireball" } });
+  const fb = await prisma.spell.findFirstOrThrow({ where: { name: "Fireball" } });
   fireballId = fb.id;
   fireballDesc = fb.description;
 });

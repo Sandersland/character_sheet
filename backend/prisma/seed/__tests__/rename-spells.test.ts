@@ -8,11 +8,15 @@ import { applySpellRenames } from "../rename-spells.js";
 
 const CLEANUP = ["Rename Alpha", "Rename Beta", "Rename Gamma"];
 
+// edition: "EDITION_2024" — applySpellRenames is scoped to that edition
+// (#1710); an edition-null row here wouldn't be found by the function under
+// test.
 async function makeSpell(name: string) {
   return prisma.spell.create({
     data: {
       name, level: 1, school: "evocation", castingTime: "1 action", range: "60 ft",
       duration: "Instantaneous", description: `desc ${name}`, classes: ["wizard"],
+      edition: "EDITION_2024",
     },
   });
 }
@@ -25,16 +29,16 @@ describe("applySpellRenames (#1132)", () => {
   it("renames in place, preserving the row id (FK-safe)", async () => {
     const row = await makeSpell("Rename Alpha");
     await applySpellRenames(prisma, [{ from: "Rename Alpha", to: "Rename Beta" }]);
-    const renamed = await prisma.spell.findUnique({ where: { name: "Rename Beta" } });
+    const renamed = await prisma.spell.findFirst({ where: { name: "Rename Beta" } });
     expect(renamed?.id).toBe(row.id);
-    expect(await prisma.spell.findUnique({ where: { name: "Rename Alpha" } })).toBeNull();
+    expect(await prisma.spell.findFirst({ where: { name: "Rename Alpha" } })).toBeNull();
   });
 
   it("is idempotent — a second run (source already gone) is a no-op", async () => {
     const row = await makeSpell("Rename Alpha");
     await applySpellRenames(prisma, [{ from: "Rename Alpha", to: "Rename Beta" }]);
     await applySpellRenames(prisma, [{ from: "Rename Alpha", to: "Rename Beta" }]);
-    const renamed = await prisma.spell.findUnique({ where: { name: "Rename Beta" } });
+    const renamed = await prisma.spell.findFirst({ where: { name: "Rename Beta" } });
     expect(renamed?.id).toBe(row.id);
   });
 

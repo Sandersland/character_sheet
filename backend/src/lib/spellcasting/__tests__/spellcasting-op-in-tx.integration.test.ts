@@ -3,6 +3,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
+import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 import {
   InvalidSpellcastingOperationError,
   applySpellcastingOpInTx,
@@ -59,11 +60,14 @@ describe("applySpellcastingOpInTx (#885 seam)", () => {
       update: {},
     });
     wizardClassId = cls.id;
-    const spell = await prisma.spell.upsert({
-      where: { name: TEST_SPELL.name },
-      create: TEST_SPELL,
-      update: TEST_SPELL,
-    });
+    // upsertEditionRow, not .upsert(): Spell's business key is now (name,
+    // edition) (#1710), and this fixture spell is edition-neutral.
+    const spell = await upsertEditionRow(
+      prisma.spell,
+      { name: TEST_SPELL.name, edition: null },
+      { ...TEST_SPELL, edition: null },
+      TEST_SPELL,
+    );
     catalogSpellId = spell.id;
   });
 
@@ -146,20 +150,24 @@ describe("applySpellcastingOpInTx — learnSpell born-prepared (#1507 D7)", () =
       update: {},
     });
     bardClassId = cls.id;
-    const spell = await prisma.spell.upsert({
-      where: { name: BARD_SPELL_NAME },
-      create: {
-        name: BARD_SPELL_NAME,
-        level: 1,
-        school: "enchantment" as const,
-        castingTime: "1 action",
-        range: "60 ft",
-        duration: "Instantaneous",
-        description: "1d4 psychic damage.",
-        classes: ["bard"],
-      },
-      update: {},
-    });
+    // upsertEditionRow, not .upsert(): Spell's business key is now (name,
+    // edition) (#1710), and this fixture spell is edition-neutral.
+    const bardSpellData = {
+      name: BARD_SPELL_NAME,
+      level: 1,
+      school: "enchantment" as const,
+      castingTime: "1 action",
+      range: "60 ft",
+      duration: "Instantaneous",
+      description: "1d4 psychic damage.",
+      classes: ["bard"],
+    };
+    const spell = await upsertEditionRow(
+      prisma.spell,
+      { name: BARD_SPELL_NAME, edition: null },
+      { ...bardSpellData, edition: null },
+      bardSpellData,
+    );
     bardSpellId = spell.id;
   });
 

@@ -13,6 +13,7 @@ import { CHANNEL_DIVINITIES } from "./seed/channel-divinity.js";
 import { SUBCLASS_CHOICE_OPTIONS } from "./seed/subclass-choices.js";
 import { FEATS } from "./seed/feats.js";
 import { SPELLS, SPELL_RENAMES, type CatalogSpell } from "./seed/spells.js";
+import { SPELLS_2014 } from "./seed/spells-2014/index.js";
 import { applySpellRenames } from "./seed/rename-spells.js";
 import { seedSubclassGrantedSpells } from "./seed/seed-granted-spells.js";
 import { seedClassFeatures } from "./seed/seed-class-features.js";
@@ -368,27 +369,40 @@ function spellSeedData(spell: CatalogSpell) {
   return { ...SPELL_COLUMN_DEFAULTS, ...spell };
 }
 
+// spells.ts entries default to EDITION_2024 (they're SRD 5.2 text, not
+// "valid in both editions" — see spells.ts's header); spells-2014/index.ts's
+// own default already tags every SPELLS_2014 row EDITION_2014, so this is a
+// no-op for those. One function, so seedSpells' upsert loop and its prune
+// below can never drift onto two different defaults (#1710).
+function resolvedSpellEdition(spell: Pick<CatalogSpell, "edition">): SeedEdition {
+  return spell.edition ?? "EDITION_2024";
+}
+
 // Seed spell catalog — apply in-place renames FIRST (so the upsert matches the
-// renamed row, not a stranded twin), upsert by unique name, then drop stale rows
-// (2024-removed spells like Toll the Dead). Learned SpellEntry snapshots are
-// unaffected by a catalog drop (no FK); a one-time resync script refreshes them.
+// renamed row, not a stranded twin), then upsertEditionRow by (name, edition)
+// so a same-name 2014/2024 fork lands as siblings rather than one overwriting
+// the other (#1710), then drop stale rows (2024-removed spells like Toll the
+// Dead, or an edition retag's orphaned twin — see the Feat/Action precedent
+// in catalog-edition.ts). Learned SpellEntry snapshots are unaffected by a
+// catalog drop (no FK); a one-time resync script refreshes them.
 async function seedSpells(prisma: PrismaClient) {
   await applySpellRenames(prisma, SPELL_RENAMES);
-  const seededNames = SPELLS.map((s) => s.name);
-  for (const spell of SPELLS) {
-    const data = spellSeedData(spell);
-    await prisma.spell.upsert({
-      where: { name: spell.name },
-      create: data,
-      update: data,
-    });
+  const allSpells: CatalogSpell[] = [...SPELLS, ...SPELLS_2014];
+  for (const spell of allSpells) {
+    const edition = resolvedSpellEdition(spell);
+    const data = { ...spellSeedData(spell), edition };
+    // upsertEditionRow, not .upsert(): the compound-key shorthand can't
+    // express a null edition, and every spell here resolves to a concrete
+    // one anyway (see resolvedSpellEdition) — used for consistency with
+    // every other editioned catalog seeder.
+    await upsertEditionRow(prisma.spell, { name: spell.name, edition }, data, data);
   }
-  const stale = await prisma.spell.findMany({
-    where: { name: { notIn: seededNames } },
-    select: { name: true },
-  });
-  if (stale.length) console.log(`seedSpells: dropping stale catalog rows: ${stale.map((s) => s.name).join(", ")}`);
-  await prisma.spell.deleteMany({ where: { name: { notIn: seededNames } } });
+  const staleWhere = staleCatalogRowsWhere("name", allSpells.map((s) => ({ identity: s.name, edition: resolvedSpellEdition(s) })));
+  const stale = await prisma.spell.findMany({ where: staleWhere, select: { name: true, edition: true } });
+  if (stale.length) {
+    console.log(`seedSpells: dropping stale catalog rows: ${stale.map((s) => `${s.name} (${s.edition ?? "shared"})`).join(", ")}`);
+  }
+  await prisma.spell.deleteMany({ where: staleWhere });
 }
 
 // Returns itemName → id so packs can resolve their contents.

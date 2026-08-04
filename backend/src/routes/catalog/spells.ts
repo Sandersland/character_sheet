@@ -15,7 +15,9 @@ export const spellsRouter = Router();
  * creation ceremony asks for one class's legal band, while the sheet's picker
  * legitimately wants everything. Server-applied so the eligibility rule — on the
  * class's list, inside the legal level band — has exactly one home (#1377).
- * No `?edition=`: Spell rows are not edition-tagged.
+ * No `?edition=` yet: Spell carries an `edition` column (#1710, foundation
+ * for the 2014 catalog) but this route doesn't filter by it — every row
+ * returns regardless of edition. Wiring `?edition=` in is F2/F3's job.
  */
 spellsRouter.get("/spells", async (req, res) => {
   const classFilter = parseClassFilterOr400(req, res);

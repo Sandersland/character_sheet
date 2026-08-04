@@ -1518,7 +1518,7 @@ model Feat {
 // polymorphic like items, so no detail table split is needed.
 model Spell {
   id            String      @id @default(uuid())
-  name          String      @unique
+  name          String
   level         Int // 0 = cantrip
   school        SpellSchool
   castingTime   String
@@ -1563,6 +1563,20 @@ model Spell {
   grantedBy        SubclassGrantedSpell[]
   // Species/variants that grant this spell for free (#1679's table; no rows yet).
   speciesGrantedBy SpeciesGrantedSpell[]
+
+  // NULL = valid in both editions; a diverging spell forks into one row per
+  // edition sharing this name (#1710, foundation for epic #1517's 2014
+  // catalog). Mirrors Feat's `edition` above: NULLS NOT DISTINCT on the
+  // migration's unique index so two NULL-edition rows sharing a name are
+  // still rejected — see resolveEditionRow, the single place the exact/NULL
+  // fallback ordering is expressed. The existing ~109 seeded rows are SRD 5.2
+  // text and are tagged EDITION_2024, not NULL — they're edition-specific
+  // content (renamed spells, narrowed components), not rules that happen to
+  // agree, so seedSpells defaults an untagged spells.ts entry to 2024 rather
+  // than to the "shared" NULL Feat uses.
+  edition RulesEdition?
+
+  @@unique([name, edition])
 }
 
 // Baseline equipment catalog, same role as Species/CharacterClass above: seeded

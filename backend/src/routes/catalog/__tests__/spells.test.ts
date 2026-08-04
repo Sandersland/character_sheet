@@ -4,6 +4,7 @@ import supertest from "supertest";
 import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
+import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 
 const OWNER_ID = "owner-spells";
 let COOKIE: string;
@@ -50,9 +51,11 @@ const UTILITY_SPELL = {
   cantripScaling: true,
 };
 
+// upsertEditionRow, not .upsert(): Spell's business key is now (name,
+// edition) (#1710), and these fixture spells are edition-neutral.
 async function seedFixtures() {
-  await prisma.spell.upsert({ where: { name: DAMAGE_SPELL.name }, create: DAMAGE_SPELL, update: DAMAGE_SPELL });
-  await prisma.spell.upsert({ where: { name: UTILITY_SPELL.name }, create: UTILITY_SPELL, update: UTILITY_SPELL });
+  await upsertEditionRow(prisma.spell, { name: DAMAGE_SPELL.name, edition: null }, { ...DAMAGE_SPELL, edition: null }, DAMAGE_SPELL);
+  await upsertEditionRow(prisma.spell, { name: UTILITY_SPELL.name, edition: null }, { ...UTILITY_SPELL, edition: null }, UTILITY_SPELL);
 }
 
 function get(path: string) {

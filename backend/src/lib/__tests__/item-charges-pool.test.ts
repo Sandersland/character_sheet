@@ -11,6 +11,7 @@ import { applyInventoryOperations } from "@/lib/inventory/inventory.js";
 import { applySpellcastingOperations } from "@/lib/spellcasting/spellcasting.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
+import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 import type { SpellEntry } from "@/lib/spellcasting/spell-state.js";
 import type { CapabilityColumns } from "@/lib/inventory/capabilities.js";
 import { readInventorySnapshot } from "@/lib/inventory/inventory-snapshot-read.js";
@@ -119,7 +120,9 @@ describe("item charges pool (#555)", () => {
 
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
-    const spell = await prisma.spell.upsert({ where: { name: SPELL.name }, create: SPELL, update: SPELL });
+    // upsertEditionRow, not .upsert(): Spell's business key is now (name,
+    // edition) (#1710), and this fixture spell is edition-neutral.
+    const spell = await upsertEditionRow(prisma.spell, { name: SPELL.name, edition: null }, { ...SPELL, edition: null }, SPELL);
     spellId = spell.id;
     const character = await prisma.character.create({
       data: {
