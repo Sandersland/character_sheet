@@ -1,11 +1,8 @@
-import { abilityModifier } from "@/lib/srd/srd.js";
-
 import type { ClassDefinition } from "./types.js";
 
 // #1226 (mirrors Barbarian's #1223 / Ranger's #1230 pilots): Druid's feature
 // TEXT moved to literal seed data (prisma/seed/druid-features.ts, commits
-// 1-2). This module is NOT deletable — for THREE independent reasons, unlike
-// Ranger's two:
+// 1-2). This module is NOT deletable — for TWO independent reasons:
 //
 // (1) `grantLevel: 2` on both subclasses below (PHB'14 p.66) — the binding
 // reason, identical in shape to Wizard's own module survival (#1234): even a
@@ -31,9 +28,11 @@ import type { ClassDefinition } from "./types.js";
 // Archdruid branch and its "Unlimited uses (Archdruid)" sentence) exactly as
 // it was before this issue.
 //
-// (3) Circle of the Moon's own Moonlight Step resourceFn (2024, below): a
-// Wisdom-modifier formula resourceTotals can't express, mirroring Ranger's
-// Tireless/Nature's Veil (#1230) and Warlock's Dark One's Own Luck residue.
+// Circle of the Moon's own Moonlight Step resourceFn (2024) used to be a
+// THIRD reason — a Wisdom-modifier formula resourceTotals couldn't express,
+// mirroring Ranger's Tireless/Nature's Veil (#1230) and Warlock's Dark One's
+// Own Luck residue — but #1685's `{ abilityMod, min }` tier now expresses it
+// directly on the row (druid-features.ts), so that resourceFn is deleted.
 export const druid: ClassDefinition = {
   resourceFn: (level, _abilityScores, _profBonus, subclassKey, edition) => {
     if (edition === "EDITION_2024") return [];
@@ -52,33 +51,7 @@ export const druid: ClassDefinition = {
   // PHB'14 p.66: Druid Circle (Druid's subclass) is chosen at 2nd level.
   subclasses: {
     "circle of the land": { slug: "druid-circle-of-the-land", grantLevel: 2 },
-    "circle of the moon": {
-      slug: "druid-circle-of-the-moon",
-      grantLevel: 2,
-      // Moonlight Step (SRD 5.2, mirror-sourced — see druid-features.ts's own
-      // header): "a number of times equal to your Wisdom modifier (minimum of
-      // once)", regained on a Long Rest — a formula no `resourceTotals` tier
-      // array can express (reason (3) above). Absent under EDITION_2014
-      // (Moonlight Step doesn't exist in SRD 5.1) and below its own L10 grant.
-      resourceFn: (level, abilityScores, _profBonus, _subclassKey, edition) => {
-        if (edition !== "EDITION_2024" || level < 10) return [];
-        const wisMod = Math.max(1, abilityModifier(abilityScores.wisdom ?? 10));
-        return [
-          {
-            key: "moonlightStep",
-            label: "Moonlight Step",
-            total: wisMod,
-            recharge: "longRest",
-            // #1528 no-second-string rule: this description MUST agree with
-            // the EDITION_2024 Moonlight Step row's own text
-            // (druid-features.ts) — both mention "Bonus Action", "30 feet"
-            // and "Wisdom modifier".
-            description:
-              "As a Bonus Action, you teleport up to 30 feet to an unoccupied space you can see, and you have Advantage on the next attack roll you make before the end of this turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest. You can also regain one expended use by expending a spell slot of level 2 or higher (no action required).",
-          },
-        ];
-      },
-    },
+    "circle of the moon": { slug: "druid-circle-of-the-moon", grantLevel: 2 },
   },
 };
 

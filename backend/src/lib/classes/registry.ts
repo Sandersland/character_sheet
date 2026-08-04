@@ -114,18 +114,20 @@ interface ClassLayer {
 // A resourceFn pool wins over a row-declared pool of the same key (mirrors
 // mergeLayers' base-wins policy) — no production collision exists today
 // (Fighter's rows declare a resourceKey since #1528, Barbarian's since #1223,
-// and Warlock's/Ranger's since #1233/#1230; Fighter's and Barbarian's modules
-// are deleted outright, so neither has a resourceFn left to collide with.
-// Warlock's Fiend subclass and Ranger's own base class are the two LIVE
-// mergePoolSources cases: Warlock's 2024 Dark One's Own Luck pool and
-// Ranger's 2024 Tireless/Nature's Veil pools are each a formula
-// (Charisma/Wisdom modifier) resourceTotals can't express — but every one of
-// those rows deliberately OMITS resourceTotals, so poolFromRow
-// (class-feature-rows.ts) never even produces a same-keyed row pool to
-// collide with; the resourceFn is each pool's ONLY source under 2024), but
-// this keeps a class mid-migration (resourceFn for some pools, rows for
-// others) from silently doubling a pool up if a row and a resourceFn ever
-// named the same key during the transition.
+// Warlock's since #1233, Ranger's since #1230, and Druid's Circle of the Moon
+// since #1226; Fighter's/Barbarian's modules are deleted outright, and
+// Warlock's/Ranger's/Druid's Circle of the Moon's own formula pools (Dark
+// One's Own Luck, Tireless/Nature's Veil, Moonlight Step) moved off their
+// resourceFns onto `{ abilityMod, min }` row tiers by #1685, so none of the
+// three has a resourceFn left to collide with either). This keeps a class
+// mid-migration (resourceFn for some pools, rows for others) from silently
+// doubling a pool up if a row and a resourceFn ever named the same key during
+// a future transition — defense-in-depth, not a live guard today. NOTE: a
+// key that used to arrive via `fromFn` (ordered first) and now arrives via
+// `fromRows` instead changes ARRAY POSITION, not value — #1685 accepted this
+// for Ranger's base layer (Favored Enemy/Tireless/Nature's Veil), pinned by
+// class-features-snapshot.test.ts in the rows' own (level-ascending)
+// authoring order rather than the old fn-first order.
 function mergePoolSources(fromFn: DerivedResource[], fromRows: DerivedResource[]): DerivedResource[] {
   if (fromRows.length === 0) return fromFn;
   const seenKeys = new Set(fromFn.map((p) => p.key));
@@ -135,15 +137,16 @@ function mergePoolSources(fromFn: DerivedResource[], fromRows: DerivedResource[]
 // Row-driven pools are DATA-gated, not class-gated: `poolsFromRows` reads
 // whatever `resourceKey` a class's rows actually populate, which today is
 // Fighter (#1528), Barbarian's Rage (#1223), Wizard's Arcane Recovery/Illusory
-// Self (#1234), Warlock's Magical Cunning/Dark One's Own Luck (2014
-// only)/Hurl Through Hell/Fey Presence/Misty Escape/Dark Delirium/Entropic
-// Ward (#1233), Ranger's Favored Enemy/Tireless (2024 only)/Nature's Veil
-// (2024 only) (#1230), Sorcerer's Innate Sorcery/Sorcerous Restoration/
-// Dragon Wings/Tamed Surge (2024 only)/Tides of Chaos (both editions)
-// (#1232), and Cleric's channelDivinity (#1225, one carrier row per edition —
-// see cleric-features.ts's own RESOURCE POOL header block) — every other
-// class's rows carry no resourceKey, so this is a no-op for them until their
-// own wave-2 retab (#1134) populates theirs. Rogue is the exception that stays
+// Self (#1234), Warlock's Magical Cunning/Dark One's Own Luck/Hurl Through
+// Hell/Fey Presence/Misty Escape/Dark Delirium/Entropic Ward (#1233/#1685),
+// Ranger's Favored Enemy/Tireless (2024 only)/Nature's Veil (2024 only)
+// (#1230/#1685), Sorcerer's Innate Sorcery/Sorcerous Restoration/Dragon
+// Wings/Tamed Surge (2024 only)/Tides of Chaos (both editions) (#1232),
+// Cleric's channelDivinity (#1225, one carrier row per edition — see
+// cleric-features.ts's own RESOURCE POOL header block), and Druid's Circle of
+// the Moon moonlightStep (#1226/#1685, now a row-driven formula pool) — the
+// remaining classes' rows carry no resourceKey, so this is a no-op for them
+// until their own wave-2 retab (#1134) populates theirs. Rogue is the exception that stays
 // a no-op even AFTER its retab (#1231): Sneak Attack's Nd6 is a computed rule
 // function off the class entry's own level, never a persisted pool. No
 // `=== "fighter"` / `=== "barbarian"` / `=== "rogue"` / `=== "warlock"` /
@@ -159,7 +162,7 @@ function deriveBaseLayer(
   edition: RulesEdition,
 ): ClassLayer {
   const fnPools = classDef?.resourceFn ? classDef.resourceFn(level, abilityScores, profBonus, subclassKey, edition) : [];
-  const rowPools = poolsFromRows(featureRows?.classRows ?? [], level, edition);
+  const rowPools = poolsFromRows(featureRows?.classRows ?? [], level, abilityScores, profBonus, edition);
   return {
     pools: mergePoolSources(fnPools, rowPools),
     features: featuresFromRows(featureRows?.classRows ?? [], level, "class", edition),
@@ -225,12 +228,12 @@ function deriveSubclassLayer(
   // subclass, so passing it again would be a silent semantic change under
   // deriveResources' byte-identical-2024-output AC.
   const fnPools = def.resourceFn ? def.resourceFn(level, abilityScores, profBonus, undefined, edition) : [];
-  // Read once — three readers below (rowPools/features/improvements) share
-  // this instead of each repeating its own `featureRows?.subclassRows ?? []`,
-  // which is what pushed this function's cyclomatic score over the ratchet
-  // when #1691's improvements reader landed as a fourth occurrence.
+  // Read once — the readers below (rowPools/features/improvements) share this
+  // instead of each repeating its own `featureRows?.subclassRows ?? []`, which
+  // is what pushed this function's cyclomatic score over the ratchet when
+  // #1691's improvements reader landed as a fourth occurrence.
   const subclassRows = featureRows?.subclassRows ?? [];
-  const rowPools = poolsFromRows(subclassRows, level, edition);
+  const rowPools = poolsFromRows(subclassRows, level, abilityScores, profBonus, edition);
   return {
     active: true,
     def,

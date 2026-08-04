@@ -97,3 +97,66 @@ describe("ClassFeature tier-array schemas reject a descending minLevel order (#1
     expect(result.success).toBe(true);
   });
 });
+
+// #1685/#416 C3: total may be a formula instead of a flat number. Driven
+// through classFeatureSeedSchema.safeParse for the same reason as the suite
+// above — the one surface that actually ships (prisma/seed/validate.ts's
+// assertSeedContentValid runs it at seed time, so a malformed formula fails
+// the seed, never a character's read path).
+describe("resourceTotals' `total` accepts the #1685 formula vocabulary and rejects malformed formulas", () => {
+  it('accepts "proficiencyBonus"', () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceTotals: [{ minLevel: 1, total: "proficiencyBonus" }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts { abilityMod, min }", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceTotals: [{ minLevel: 1, total: { abilityMod: "charisma", min: 1 } }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts { abilityMod } with no min", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceTotals: [{ minLevel: 1, total: { abilityMod: "wisdom" } }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts { levelTimes }", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceTotals: [{ minLevel: 1, total: { levelTimes: 5 } }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects an unrecognized formula string (e.g. a typo\'d "proficiencyBonus")', () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceTotals: [{ minLevel: 1, total: "proficiencyBonu" }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an unrecognized abilityMod name", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceTotals: [{ minLevel: 1, total: { abilityMod: "luck" } }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a non-positive levelTimes", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceTotals: [{ minLevel: 1, total: { levelTimes: 0 } }],
+    });
+    expect(result.success).toBe(false);
+  });
+});

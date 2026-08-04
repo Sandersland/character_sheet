@@ -27,12 +27,14 @@ import { WIZARD_FEATURES } from "../wizard-features.js";
 const BASE_ROWS = WIZARD_FEATURES.filter((r) => r.subclassSlug === null);
 const ILLUSION_ROWS = WIZARD_FEATURES.filter((r) => r.subclassSlug === "wizard-school-of-illusion");
 
+// abilityScores/profBonus are unused — both pools are flat numbers, never a
+// #1685 formula tier.
 function arcaneRecoveryAt(level: number, edition: "EDITION_2014" | "EDITION_2024") {
-  return poolsFromRows(BASE_ROWS, level, edition).find((p) => p.key === "arcaneRecovery");
+  return poolsFromRows(BASE_ROWS, level, {}, 0, edition).find((p) => p.key === "arcaneRecovery");
 }
 
 function illusorySelfAt(level: number, edition: "EDITION_2014" | "EDITION_2024") {
-  return poolsFromRows(ILLUSION_ROWS, level, edition).find((p) => p.key === "illusorySelf");
+  return poolsFromRows(ILLUSION_ROWS, level, {}, 0, edition).find((p) => p.key === "illusorySelf");
 }
 
 describe("Arcane Recovery pool (#1234) — the retired resourceFn's exact outputs, both editions", () => {

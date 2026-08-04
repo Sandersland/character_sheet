@@ -12,13 +12,15 @@
 // isn't in the free SRD — see BEAST_MASTER_RAW's own comment for the
 // two-independent-mirror discipline applied there. Commit 3 moves Favored
 // Enemy's resourceTotals pool onto its EDITION_2024 row (a level-tiered
-// total) and declares — without populating — Tireless's and Nature's Veil's
-// resourceKey (both a Wisdom-modifier FORMULA, not a tier table; their total
-// stays in ranger.ts's small EDITION_2024-gated resourceFn residue,
-// mirroring warlock.ts's Dark One's Own Luck pattern). class-features.ts
-// concatenates RANGER_FEATURES onto the still-derived classes' rows to build
-// CLASS_FEATURES; see its LITERAL_ROW_CLASSES export for the set of classes
-// whose rows tests must not compare against a TS-array "old" side.
+// total). Tireless's and Nature's Veil's rows originally declared
+// resourceKey without populating resourceTotals (a Wisdom-modifier formula,
+// resourceTotals' flat-number tiers couldn't express it) — #1685 widened the
+// vocabulary, so both now carry a `{ abilityMod: "wisdom", min: 1 }` tier and
+// ranger.ts's resourceFn residue that used to supply their total is deleted.
+// class-features.ts concatenates RANGER_FEATURES onto the still-derived
+// classes' rows to build CLASS_FEATURES; see its LITERAL_ROW_CLASSES export
+// for the set of classes whose rows tests must not compare against a
+// TS-array "old" side.
 //
 // DATA MODULE ONLY (#1277 AC 4, scripts/check-seed-data-modules.sh): no
 // direct database calls or async write logic may live in this file. expand()
@@ -37,6 +39,7 @@
 // (ranger-2014-snapshot.test.ts) — this commit only ever ADDS an
 // `edition: "EDITION_2014"`/`"EDITION_2024"` tag alongside new 2024 text; it
 // never edits a 2014 row's own name/level/description.
+import type { ResourceTotalFormula } from "../../src/lib/classes/class-feature-rows.js";
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { SeedEdition } from "./edition.js";
 import type { ClassFeatureSeedRow } from "./class-features.js";
@@ -65,14 +68,12 @@ interface RawRangerFeature {
   // other row leaves this undefined — no other Ranger feature has this axis.
   derivedStat?: string;
   derivedStatTiers?: { minLevel: number; value: number | string }[];
-  // Resource-pool descriptor columns (#1230 commit 3) — see this file's own
-  // header for why only Favored Enemy's (2024) row sets resourceTotals, and
-  // Tireless's/Nature's Veil's (2024) rows set the other three but
-  // deliberately omit it.
+  // Resource-pool descriptor columns (#1230 commit 3, widened #1685) — see
+  // this file's own header for the three rows that set these.
   resourceKey?: string;
   resourceLabel?: string;
   resourceRecharge?: string;
-  resourceTotals?: { minLevel: number; total: number; shortRestRegain?: number }[];
+  resourceTotals?: { minLevel: number; total: ResourceTotalFormula; shortRestRegain?: number }[];
 }
 
 function expand(raw: RawRangerFeature): ClassFeatureSeedRow[] {
@@ -298,22 +299,17 @@ const RANGER_BASE_RAW: RawRangerFeature[] = [
     level: 10,
     edition: "EDITION_2024",
     // SRD 5.2. NEW in 2024 — no 2014 counterpart. C1: uses = WISDOM MODIFIER
-    // (minimum of once), not proficiency bonus — a formula resourceTotals'
-    // tier array can't express (verified: poolFromRow, class-feature-rows.ts,
-    // returns null for a resourceKey with no matching resourceTotals tier —
-    // never ship that half-state without the resourceFn below also
-    // existing). This row declares resourceKey/resourceLabel/
-    // resourceRecharge and deliberately OMITS resourceTotals; ranger.ts's
-    // EDITION_2024-gated resourceFn supplies the total from the character's
-    // Wisdom modifier, mirroring warlock.ts's Dark One's Own Luck pattern.
-    // #1528 no-second-string rule: the resourceFn's pool description below
-    // MUST agree with this row's own text — both mention "Temporary Hit
-    // Points" and "Wisdom modifier" — asserted by ranger-wisdom-pools.test.ts.
+    // (minimum of once), not proficiency bonus. #1685: now a
+    // `{ abilityMod: "wisdom", min: 1 }` formula tier, evaluated by
+    // evaluateResourceTotal (class-feature-rows.ts); ranger.ts's
+    // EDITION_2024-gated resourceFn residue that used to supply this total is
+    // deleted.
     description:
       "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
     resourceKey: "tireless",
     resourceLabel: "Tireless",
     resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 10, total: { abilityMod: "wisdom", min: 1 } }],
   },
   {
     subclassSlug: null,
@@ -341,13 +337,13 @@ const RANGER_BASE_RAW: RawRangerFeature[] = [
     level: 14,
     edition: "EDITION_2024",
     // SRD 5.2. NEW in 2024 — no 2014 counterpart. C1: uses = WISDOM MODIFIER
-    // (minimum of once) — same formula shape as Tireless above, same
-    // deliberate resourceTotals omission, same resourceFn residue.
+    // (minimum of once) — same formula tier shape as Tireless above (#1685).
     description:
       "As a Bonus Action, you magically become Invisible until the end of your next turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
     resourceKey: "naturesVeil",
     resourceLabel: "Nature's Veil",
     resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 14, total: { abilityMod: "wisdom", min: 1 } }],
   },
   {
     subclassSlug: null,

@@ -205,10 +205,10 @@ function isPopulatedBattleMasterPoolRow(row: { className: string; subclassSlug: 
 // #1233: every Warlock pool that moved onto its row — Magical Cunning (base),
 // Dark One's Own Luck/Hurl Through Hell (The Fiend), Fey Presence/Misty
 // Escape/Dark Delirium (The Archfey), Entropic Ward (The Great Old One).
-// Dark One's Own Luck's 2024 row sets resourceKey but deliberately OMITS
-// resourceTotals (a Charisma-modifier formula, still resourceFn-derived) —
-// still "populated" for this check's purposes, since resourceKey itself is
-// non-null.
+// Dark One's Own Luck's 2024 row used to set resourceKey while deliberately
+// OMITTING resourceTotals (a Charisma-modifier formula, then still
+// resourceFn-derived); #1685's `{ abilityMod, min }` tier now populates it
+// on both editions' rows.
 const POPULATED_WARLOCK_ROW_KEYS = new Set([
   "Warlock::null::Magical Cunning",
   "Warlock::warlock-the-fiend::Dark One's Own Luck",
@@ -230,10 +230,10 @@ function isPopulatedWarlockRow(row: { className: string; subclassSlug: string | 
 // key would incorrectly mark the 2014 row "populated" too and fail its
 // expectNullResourceColumns check. Tireless/Nature's Veil have no 2014
 // counterpart at all, so their 2024-only keys need no such asymmetry
-// handling, but stay 4-tuples for consistency. Tireless/Nature's Veil set
-// resourceKey but deliberately OMIT resourceTotals (a Wisdom-modifier
-// formula, still resourceFn-derived) — still "populated" for this check's
-// purposes, same shape as Warlock's Dark One's Own Luck 2024 row.
+// handling, but stay 4-tuples for consistency. Tireless/Nature's Veil used to
+// set resourceKey while deliberately OMITTING resourceTotals (a
+// Wisdom-modifier formula, then still resourceFn-derived); #1685's
+// `{ abilityMod, min }` tier now populates it on both rows.
 const POPULATED_RANGER_ROW_KEYS = new Set([
   "Ranger::null::Favored Enemy::EDITION_2024",
   "Ranger::null::Tireless::EDITION_2024",
@@ -282,10 +282,10 @@ function isPopulatedClericRow(row: RowKey): boolean {
 // #1226: Druid's Wild Shape pool moved onto its EDITION_2024 row only (the
 // EDITION_2014 row's pool stays in lib/classes/druid.ts's resourceFn — see
 // druid-features.ts's own RESOURCE POOL header for the split verdict); Circle
-// of the Moon's Moonlight Step (2024) row also declares resourceKey, but
-// deliberately OMITS resourceTotals (a Wisdom-modifier formula, supplied by
-// druid.ts's subclass resourceFn) — it's still "populated" for this sweep's
-// purposes since resourceKey/resourceLabel/resourceRecharge are non-default.
+// of the Moon's Moonlight Step (2024) row also declares resourceKey — it used
+// to deliberately OMIT resourceTotals (a Wisdom-modifier formula, then
+// supplied by druid.ts's subclass resourceFn), but #1685's
+// `{ abilityMod, min }` tier now populates it directly on the row.
 const POPULATED_DRUID_ROW_KEYS = new Set([
   "Druid::null::Wild Shape::EDITION_2024",
   "Druid::druid-circle-of-the-moon::Moonlight Step::EDITION_2024",
@@ -309,11 +309,10 @@ function isPopulatedPaladinRow(row: RowKey): boolean {
 // What the descriptor predicates below key on. `edition` is part of the key
 // because a class can populate a descriptor column on ONE edition's row and
 // not the other's, under the same (class, subclass, name): Ranger's Favored
-// Enemy exists in both editions and carries a pool only in 2024 (#1230), and
-// Warlock's Dark One's Own Luck already omits resourceTotals on its 2024 row
-// alone. A 3-tuple key cannot express either, and would assert the wrong thing
-// on the row it can't distinguish. Predicates that are edition-invariant
-// simply ignore the field.
+// Enemy exists in both editions and carries a pool only in 2024 (#1230). A
+// 3-tuple key cannot express that, and would assert the wrong thing on the
+// row it can't distinguish. Predicates that are edition-invariant simply
+// ignore the field.
 type RowKey = { className: string; subclassSlug: string | null; name: string; edition: string };
 
 // #1546 Part B: the ability list Combat Superiority's maneuverSaveDC is
@@ -541,15 +540,16 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
   // PLUS #1546's Combat Superiority ×2 (its superiority-dice pool) PLUS
   // #1223's Rage x2 (Barbarian's base-class pool, both editions) PLUS #1234's
   // Arcane Recovery x2 (Wizard's base-class pool) and Illusory Self x2 (School
-  // of Illusion's subclass pool) PLUS #1233's eight Warlock rows that set
-  // resourceTotals (Magical Cunning x1, Dark One's Own Luck 2014-only x1 — its
-  // 2024 row deliberately OMITS resourceTotals, a Charisma-modifier formula —
-  // Hurl Through Hell x2, Fey Presence x1, Misty Escape x1, Dark Delirium x1,
-  // Entropic Ward x1) PLUS #1230's ONE Ranger row (Favored Enemy's 2024 row
-  // only), #1232's six Sorcerer rows (Innate Sorcery x1, Sorcerous Restoration
-  // x1, Tides of Chaos x2 — one per edition — Dragon Wings x1, Tamed Surge x1)
-  // and #1225's two Cleric Channel Divinity carrier rows (Turn Undead
-  // 2014-only x1, Channel Divinity 2024-only x1);
+  // of Illusion's subclass pool) PLUS #1233/#1685's nine Warlock rows that set
+  // resourceTotals (Magical Cunning x1, Dark One's Own Luck x2 — both editions,
+  // 2024's now a `{ abilityMod, min }` formula tier — Hurl Through Hell x2, Fey
+  // Presence x1, Misty Escape x1, Dark Delirium x1, Entropic Ward x1) PLUS
+  // #1230/#1685's THREE Ranger rows (Favored Enemy's 2024 row, plus
+  // Tireless/Nature's Veil's own 2024 formula tiers), #1232's six Sorcerer
+  // rows (Innate Sorcery x1, Sorcerous Restoration x1, Tides of Chaos x2 — one
+  // per edition — Dragon Wings x1, Tamed Surge x1) and #1225's two Cleric
+  // Channel Divinity carrier rows (Turn Undead 2014-only x1, Channel Divinity
+  // 2024-only x1);
   // derivedStatTiers excludes #1530's twelve populated Extra
   // Attack rows PLUS #1546's Combat Superiority/Student of War x2 editions each
   // (DERIVED_STAT_ROW_KEYS x2 editions each, computed below); resourceDieTiers
@@ -562,14 +562,15 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
     // the components, 22 + 1 + 6 + 2 + 1 + 2 = 34. Picking any one branch's
     // number would silently exempt the other classes' rows from the sweep —
     // the wave-A near-miss this file's aggregator comment already records, in
-    // its other half. Druid contributes +1, not +2: Moonlight Step declares
-    // resourceKey but deliberately omits resourceTotals, so it is "populated"
-    // for the aggregator above and NOT counted here.
-    // 6 Fighter + 2 Combat Superiority + 2 Rage + 4 Wizard + 8 Warlock
-    // + 1 Ranger + 6 Sorcerer + 2 Cleric + 1 Druid + 2 Paladin (#1229's own
+    // its other half. #1685 then migrated the four remaining formula pools
+    // onto their rows (Dark One's Own Luck's 2024 row, Tireless, Nature's
+    // Veil, Moonlight Step), raising Warlock 8 -> 9, Ranger 1 -> 3, Druid
+    // 1 -> 2: 34 + 1 + 2 + 1 = 38.
+    // 6 Fighter + 2 Combat Superiority + 2 Rage + 4 Wizard + 9 Warlock
+    // + 3 Ranger + 6 Sorcerer + 2 Cleric + 2 Druid + 2 Paladin (#1229's own
     // Channel Divinity carrier rows, one per edition — see
     // isPopulatedPaladinRow).
-    const populatedResourceTotalsCount = 34;
+    const populatedResourceTotalsCount = 38;
     const populatedResourceDieTiersCount = 2;
     const populatedDerivedStatTiersCount = DERIVED_STAT_ROW_KEYS.size * 2;
     for (const column of ["resourceTotals", "resourceDieTiers", "derivedStatTiers"] as const) {

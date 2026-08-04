@@ -17,8 +17,10 @@ const BASE_ROWS = SORCERER_FEATURES.filter((r) => r.subclassSlug === null);
 const DRACONIC_ROWS = SORCERER_FEATURES.filter((r) => r.subclassSlug === "sorcerer-draconic-bloodline");
 const WILD_ROWS = SORCERER_FEATURES.filter((r) => r.subclassSlug === "sorcerer-wild-magic");
 
+// abilityScores/profBonus are unused here — every Sorcerer resourceTotals
+// tier is a flat number, never a #1685 formula — so `{}`/`0` are inert.
 function poolAt(rows: typeof SORCERER_FEATURES, key: string, level: number, edition: "EDITION_2014" | "EDITION_2024") {
-  return poolsFromRows(rows, level, edition).find((p) => p.key === key);
+  return poolsFromRows(rows, level, {}, 0, edition).find((p) => p.key === key);
 }
 
 describe("Innate Sorcery (base class, #1232): 2024 only, L1, 2/long rest — the first pool a 2024 Sorcerer has", () => {
@@ -116,7 +118,7 @@ describe("cross-edition absence at level 20 (#1232 §1.3 proof): innateSorcery/s
 describe("sorceryPoints stays in resourceFn, never on a row (#1232 §1.1)", () => {
   it("poolsFromRows over the base rows never contains a sorceryPoints key, in either edition", () => {
     for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {
-      expect(poolsFromRows(BASE_ROWS, 20, edition).some((p) => p.key === "sorceryPoints")).toBe(false);
+      expect(poolsFromRows(BASE_ROWS, 20, {}, 0, edition).some((p) => p.key === "sorceryPoints")).toBe(false);
     }
   });
 

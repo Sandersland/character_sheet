@@ -23,8 +23,10 @@ import { BARBARIAN_FEATURES } from "../barbarian-features.js";
 // loads (characterInclude; subclassId: null).
 const BASE_ROWS = BARBARIAN_FEATURES.filter((r) => r.subclassSlug === null);
 
+// abilityScores/profBonus are unused — Rage's tier is a flat number, never a
+// #1685 formula.
 function ragePoolAt(level: number, edition: "EDITION_2014" | "EDITION_2024") {
-  const pools = poolsFromRows(BASE_ROWS, level, edition);
+  const pools = poolsFromRows(BASE_ROWS, level, {}, 0, edition);
   return pools.find((p) => p.key === "rage");
 }
 
