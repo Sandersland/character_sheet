@@ -167,6 +167,11 @@ describe("deriveWeaponAttackComponents — names the governing ability (#1361)",
   it("non-finesse melee weapon names strength", () => {
     expect(deriveWeaponAttackComponents(longsword, scores, 3, martialGrant).ability).toBe("strength");
   });
+
+  it("finesse weapon on a STR === DEX character names strength (deterministic tiebreak)", () => {
+    const tied = { strength: 14, dexterity: 14 };
+    expect(deriveWeaponAttackComponents(rapier, tied, 3, martialGrant).ability).toBe("strength");
+  });
 });
 
 // deriveWeaponDamage already exposed `abilityModifier` (#732); this issue
@@ -209,5 +214,9 @@ describe("deriveWeaponDamage — names the governing ability (#1361)", () => {
 
   it("ranged weapon names dexterity", () => {
     expect(deriveWeaponDamage(longbow, false, scores).ability).toBe("dexterity");
+  });
+
+  it("non-finesse melee weapon names strength", () => {
+    expect(deriveWeaponDamage(longsword, false, scores).ability).toBe("strength");
   });
 });
