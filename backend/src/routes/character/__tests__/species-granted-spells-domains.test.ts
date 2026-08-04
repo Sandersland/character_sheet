@@ -167,3 +167,30 @@ describe("Drow lineage spell track — spellcasting transaction ops (#1683)", ()
     expect((stored?.spells ?? []).some((s) => s.source === "species")).toBe(false);
   });
 });
+
+// #1683 AC: "Lineage traits render in the species sheet section (#1682's
+// component) with SRD 5.2/PHB'24 citations" — proven off the same real
+// seeded Drow rows, through the SAME character.speciesTraits wire field
+// species-trait-improvements-1682.test.ts already proves for 2014 Dwarf.
+describe("Drow lineage traits in the species sheet section (#1683 AC)", () => {
+  it("carries Superior Darkvision and Drow Lineage, both cited SRD 5.2, alongside the base Elf traits", async () => {
+    await createDrowFighter(XP_LVL_1);
+    const res = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${CHAR_ID}`);
+    expect(res.status).toBe(200);
+
+    const traits = res.body.speciesTraits as { name: string; description: string }[];
+    const names = traits.map((t) => t.name);
+    // Base Elf traits (Darkvision, Fey Ancestry, Keen Senses, Trance) plus the
+    // Drow-only pair — proves species-level + variant-level traits merge
+    // (activeTraitRows) exactly as the 2014 Hill Dwarf suite already proves.
+    expect(names).toEqual(expect.arrayContaining(["Darkvision", "Fey Ancestry", "Trance", "Superior Darkvision", "Drow Lineage"]));
+
+    const superiorDarkvision = traits.find((t) => t.name === "Superior Darkvision")!;
+    expect(superiorDarkvision.description).toContain("SRD 5.2");
+    expect(superiorDarkvision.description).toContain("120 feet");
+
+    const drowLineage = traits.find((t) => t.name === "Drow Lineage")!;
+    expect(drowLineage.description).toContain("SRD 5.2");
+    expect(drowLineage.description).toContain("Dancing Lights");
+  });
+});
