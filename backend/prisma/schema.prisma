@@ -518,6 +518,17 @@ model SpeciesTrait {
   // FeatImprovement[] vocabulary (Feat.improvements, srd/feats.ts) reused
   // verbatim so #1682's derivation layer needs no new shape, only a new source.
   improvements Json @default("[]")
+  // #1689: the player-CHOICE vocabulary a fixed FeatImprovement can't express
+  // ("choose two skills", "choose a cantrip") — speciesTraitChoiceSchema
+  // (lib/srd/species-trait-choices.ts). NULL for every announce-only or
+  // fixed-only trait (the vast majority); set on exactly the ONE trait row
+  // that carries the choice (Half-Elf's own Skill Versatility row, High Elf's
+  // own Cantrip row) so the choice stays tied to its citation + description —
+  // the same "identity lives on the trait row" shape #1682 established,
+  // rather than a second spec column on Species/SpeciesVariant. A single
+  // object, not an array like `improvements`: one trait row is always exactly
+  // one mechanic, never a bundle of choices.
+  choice Json?
 
   // Postgres does not auto-index FK columns; #1682 resolves traits by species
   // (include: { traits: true }) and by variant, and a species prune cascades on
@@ -1078,6 +1089,18 @@ model CharacterRace {
   // LEVEL_GATED_RECONCILERS entry follows for the same reason: this state's
   // legal maximum is fixed at creation, never revisited by level.
   abilityBonuses Json @default("[]")
+  // #1689: provenance snapshot of the species-granted CREATION CHOICES applied
+  // — sibling of abilityBonuses above, same "audit-only, not the source of
+  // truth" role as variantName. The functional grant lives elsewhere
+  // (speciesSkills fold into the character's normal skillProficiencies;
+  // the cantrip lands in Character.spellcasting.spells, source:"species") —
+  // these two columns exist only so the choice is inspectable without
+  // re-deriving it from the mutable spellcasting blob. [] / null for a
+  // species with no choice-bearing trait, a legacy `race`-name creation, or
+  // every 2024 species this slice (the mechanism is edition-neutral; 2024
+  // content is #1690's).
+  speciesSkills      String[] @default([])
+  speciesCantripName String?
 }
 
 model CharacterBackground {

@@ -68,6 +68,15 @@ export const createCharacterSchema = z
     // other direction) and when the merged spec is fixed-only — see
     // resolveSpeciesGrants in character-create.ts.
     speciesAbilities: z.record(z.string(), z.number().int().positive()).optional(),
+    // #1689: the species/variant's OWN creation choices (SpeciesTrait.choice) —
+    // distinct from skillProficiencies/spells below, which are the class/
+    // background pools. Required iff the resolved species+variant carries a
+    // matching choice-bearing trait; 400 otherwise, including every 2024
+    // species (the mechanism is edition-neutral, but no 2024 trait carries a
+    // `choice` yet — that's #1690's content). See resolveSpeciesChoiceGrants
+    // in character-create.ts.
+    speciesSkills: z.array(z.string()).optional(),
+    speciesCantripId: z.string().optional(),
     background: z.string().min(1),
     classes: z.array(classChoiceSchema).length(1),
     abilityScores: abilityScoresSchema,

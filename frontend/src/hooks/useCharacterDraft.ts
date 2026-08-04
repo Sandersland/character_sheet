@@ -57,6 +57,12 @@ export interface CharacterDraft {
    *  to two of your choice"). Empty for a fixed-only or variantless species,
    *  and for every 2024 species (the spec is always []). */
   speciesAbilities: Partial<Record<AbilityName, number>>;
+  /** #1689: species-granted skill choice (Half-Elf's Skill Versatility) —
+   *  empty for a species with no chooseSkills spec served. */
+  speciesSkills: SkillName[];
+  /** #1689: species-granted cantrip choice (High Elf's Cantrip) — catalog
+   *  spell id, empty string for none chosen / no chooseCantrip spec served. */
+  speciesCantripId: string;
   skillProficiencies: SkillName[];
   /** Tool proficiency names chosen by the player at character creation. */
   toolChoices: string[];
@@ -106,6 +112,8 @@ const EMPTY_DRAFT: CharacterDraft = {
   abilityScores: DEFAULT_ABILITY_SCORES,
   backgroundAbilities: {},
   speciesAbilities: {},
+  speciesSkills: [],
+  speciesCantripId: "",
   skillProficiencies: [],
   toolChoices: [],
   cantripIds: [],

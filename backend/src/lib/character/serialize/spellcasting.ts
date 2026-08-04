@@ -57,6 +57,35 @@ function collectGrantedCastingAbility(entries: CharacterWithRelations["classEntr
   return deriveGrantedCastingAbility(granting?.subclassRef, edition);
 }
 
+// #1689: a species-granted spell (High Elf's Cantrip) carries its OWN fixed
+// casting ability, independent of any subclass grant — preferred over
+// deriveGrantedCastingAbility's subclass-or-Wisdom default whenever the
+// character's ONLY spell source a slotless view renders is a species grant
+// (e.g. a non-caster High Elf Fighter, which has no subclass to derive from
+// and would otherwise default to Wisdom). null when no stored entry carries
+// the marker, so callers fall through to the subclass-derived default.
+function deriveSpeciesCastingAbility(spells: SpellEntry[]): keyof AbilityScores | null {
+  const species = spells.find((s) => s.source === "species" && s.castingAbility);
+  return (species?.castingAbility as keyof AbilityScores) ?? null;
+}
+
+// Whether a character's STORED spells carry a species grant (#1689) at all —
+// split out of buildSingleClassSpellcastingView/buildMulticlassSpellcastingView
+// purely to keep each function's own cyclomatic/cognitive complexity under
+// the repo's health gate (both need only the boolean, not the entries).
+function hasStoredSpeciesGrant(stored: { spells: SpellEntry[] }): boolean {
+  return stored.spells.some((s) => s.source === "species");
+}
+
+// Whether a non-caster class still gets a slotless spellcasting view: a
+// subclass grant, an item grant (#528), or a species grant (#1689, e.g. a
+// High Elf Fighter's racial Cantrip). Split out of
+// buildSingleClassSpellcastingView purely to keep that function's own
+// cyclomatic/cognitive complexity under the repo's health gate.
+function hasAnyNonCasterGrant(granted: SpellEntry[], itemSpells: SpellEntry[], row: CharacterWithRelations): boolean {
+  return granted.length > 0 || itemSpells.length > 0 || hasStoredSpeciesGrant(normalizeSpellcastingMutable(row.spellcasting));
+}
+
 // Clamp-on-read for concentration: surface the stored entry when it's a current
 // spellbook spell OR a Shadow Art (its entryId carries the shadow-art: prefix, a
 // disjoint id space); drop stale entries (e.g. a forgotten spellbook spell).
@@ -110,20 +139,24 @@ function buildCasterSpellcastingView(
   };
 }
 
-// Non-caster class that nonetheless gets a subclass-granted spell (e.g. a
-// Warrior of Shadow monk's Minor Illusion). Slotless view so the grant renders;
-// the casting ability is derived per rule (Wisdom is the default).
-function buildGrantedOnlySpellcastingView(
-  row: CharacterWithRelations,
-  primaryClass: PrimaryClass,
-  abilityScores: Record<string, number>,
-  proficiencyBonus: number,
-  granted: SpellEntry[],
-  itemSpells: SpellEntry[],
-): object {
-  const stored = normalizeSpellcastingMutable(row.spellcasting);
-  // fallow-ignore-next-line code-duplication -- casting-ability + modifier derivation shared with other spellcasting serializers by design
-  const castingAbility = deriveGrantedCastingAbility(primaryClass?.subclassRef, editionOf(row));
+// Non-caster class that nonetheless gets a subclass- or species-granted spell
+// The slotless view body shared by the single-class and multiclass non-caster
+// branches (#1689): a subclass/item/species grant supplies spells but no slots.
+// `fallbackAbility` is the caller's own subclass-derived ability; the species
+// grant's OWN fixed ability wins ONLY when no subclass grant competes for the
+// single top-level DC/attack — the one-ability view can't hold both, so a High
+// Elf Monk keeps its subclass Wisdom while a High Elf Fighter (no subclass
+// grant) gets the cantrip's Intelligence.
+function slotlessGrantedView(params: {
+  granted: SpellEntry[];
+  itemSpells: SpellEntry[];
+  stored: ReturnType<typeof normalizeSpellcastingMutable>;
+  abilityScores: Record<string, number>;
+  proficiencyBonus: number;
+  fallbackAbility: keyof AbilityScores;
+}): object {
+  const { granted, itemSpells, stored, abilityScores, proficiencyBonus, fallbackAbility } = params;
+  const castingAbility = (granted.length === 0 ? deriveSpeciesCastingAbility(stored.spells) : null) ?? fallbackAbility;
   const abilMod = abilityModifier(abilityScores[castingAbility] ?? 10);
   const grantedSpells = [...mergeGrantedSpells(stored.spells, granted), ...itemSpells];
   return {
@@ -137,6 +170,29 @@ function buildGrantedOnlySpellcastingView(
     // ShadowArtsSection handoff banner + concentrating badge can render.
     concentratingOn: resolveConcentration(stored.concentratingOn, grantedSpells),
   };
+}
+
+// (e.g. a Warrior of Shadow monk's Minor Illusion, or a High Elf Fighter's
+// racial Cantrip). Slotless view so the grant renders; the casting ability
+// prefers a stored species grant's OWN fixed ability (#1689) over the
+// subclass-derived default (Wisdom when neither applies).
+function buildGrantedOnlySpellcastingView(
+  row: CharacterWithRelations,
+  primaryClass: PrimaryClass,
+  abilityScores: Record<string, number>,
+  proficiencyBonus: number,
+  granted: SpellEntry[],
+  itemSpells: SpellEntry[],
+): object {
+  const stored = normalizeSpellcastingMutable(row.spellcasting);
+  return slotlessGrantedView({
+    granted,
+    itemSpells,
+    stored,
+    abilityScores,
+    proficiencyBonus,
+    fallbackAbility: deriveGrantedCastingAbility(primaryClass?.subclassRef, editionOf(row)),
+  });
 }
 
 // Fallback only for an already well-formed serialized blob (has `slots`). The
@@ -328,7 +384,12 @@ function buildSingleClassSpellcastingView(
   if (derivedSpell) {
     return buildCasterSpellcastingView(row, derivedSpell, granted, itemSpells);
   }
-  if (granted.length > 0 || itemSpells.length > 0) {
+  // #1689: a species grant (e.g. a High Elf Fighter's racial Cantrip) is
+  // stored, not derived — check it alongside subclass/item grants so a
+  // non-caster class still surfaces its ONE spell instead of falling through
+  // to buildFallbackSpellcastingBlob (which only renders a legacy `slots`-
+  // shaped blob, never the compact stored format).
+  if (hasAnyNonCasterGrant(granted, itemSpells, row)) {
     return buildGrantedOnlySpellcastingView(row, primaryClass, abilityScores, proficiencyBonus, granted, itemSpells);
   }
   return buildFallbackSpellcastingBlob(row);
@@ -354,22 +415,19 @@ function buildMulticlassSpellcastingView(
   const itemSpells = deriveItemSpellsFor(row);
   const stored = normalizeSpellcastingMutable(row.spellcasting);
 
-  // No caster class in the mix, but a subclass or item still grants a spell —
-  // surface a slotless view (ability derived per rule; mirrors the single-class branch).
+  // No caster class in the mix, but a subclass, item, or species (#1689)
+  // grant still supplies a spell — surface a slotless view (ability derived
+  // per rule; mirrors the single-class branch).
   if (multi.classes.length === 0) {
-    if (granted.length === 0 && itemSpells.length === 0) return undefined;
-    const castingAbility = collectGrantedCastingAbility(row.classEntries, level, editionOf(row));
-    const abilMod = abilityModifier(abilityScores[castingAbility] ?? 10);
-    const grantedSpells = [...mergeGrantedSpells(stored.spells, granted), ...itemSpells];
-    return {
-      ability: castingAbility,
-      spellSaveDC: 8 + proficiencyBonus + abilMod,
-      spellAttackBonus: proficiencyBonus + abilMod,
-      slots: [],
-      arcana: [],
-      spells: grantedSpells,
-      concentratingOn: resolveConcentration(stored.concentratingOn, grantedSpells),
-    };
+    if (granted.length === 0 && itemSpells.length === 0 && !hasStoredSpeciesGrant(stored)) return undefined;
+    return slotlessGrantedView({
+      granted,
+      itemSpells,
+      stored,
+      abilityScores,
+      proficiencyBonus,
+      fallbackAbility: collectGrantedCastingAbility(row.classEntries, level, editionOf(row)),
+    });
   }
 
   const primaryCaster = multi.classes[0];

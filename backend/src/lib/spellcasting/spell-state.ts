@@ -48,10 +48,26 @@ export interface SpellEntry {
   buffTarget?: string | null;
   buffModifier?: number | null;
   // Provenance of the entry; "subclass" marks a derived, non-persisted grant,
-  // "item" a spell granted by a held magic item (#528, cast from the item).
-  source?: "subclass" | "item";
+  // "item" a spell granted by a held magic item (#528, cast from the item),
+  // "species" a player-CHOSEN species-granted spell (#1689, e.g. High Elf's
+  // Cantrip). Unlike "subclass"/"item" (both re-derived at read time from a
+  // catalog table, never actually persisted in the happy path — see
+  // reconcileGrantedSpells, lib/leveling/level-reconciliation.ts), a species
+  // grant IS the persisted record: the player chose it at creation and there
+  // is no catalog row to re-derive it from. That reconciler's leak-strip only
+  // ever matches source === "subclass", so a species entry is exempt by
+  // construction, not by a special case in that file.
+  source?: "subclass" | "item" | "species";
   // Item-granted-spell fields (#528), present only when source === "item".
   item?: ItemSpellMeta;
+  // #1689: the FIXED casting ability a species grant specifies (High Elf's
+  // Cantrip: Intelligence, independent of the character's own class ability)
+  // — present only when source === "species". A plain string, not a real
+  // AbilityName union: this module is a leaf (no back-imports, see the file
+  // banner); the value is written by character-create.ts off
+  // ChooseCantrip.castingAbility, itself z.enum(ABILITY_NAMES)-checked at
+  // that seam, so an invalid ability can never reach here.
+  castingAbility?: string;
 }
 
 /**
