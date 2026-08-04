@@ -166,7 +166,9 @@ async function clearBuffsOnEquipInTx(
   if (!row) return;
   const { buffs } = normalizeActiveEffectsMutable(row.activeEffects);
   for (const buff of buffs) {
-    if ((buff.clearOn ?? []).some((t) => triggers.includes(t as ClearOnTrigger))) {
+    // buff.clearOn is persisted, untrusted text; compare it as a plain string
+    // against the known triggers rather than asserting it IS a ClearOnTrigger.
+    if ((buff.clearOn ?? []).some((t) => (triggers as readonly string[]).includes(t))) {
       await clearBuffByKeyInTx(tx, characterId, buff.key, batchId, sessionId, `donned ${item.name}`);
     }
   }

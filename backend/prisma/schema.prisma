@@ -744,8 +744,8 @@ model ClassFeature {
   // Declarative activation-time gates (#1688): a closed vocabulary — armor/
   // shield literals ("noMediumArmor" | "noHeavyArmor" | "noShield" |
   // "noBodyArmor") plus `{ requiresActiveBuff: <buffKey> }`, evaluated by
-  // unmetActivationRequirements (lib/classes/activation-requires.ts) at
-  // activation, server-side, inside applyRowDrivenActionInTx — never
+  // unmetActivationRequirements at activation, server-side, inside
+  // applyRowDrivenActionInTx — never
   // re-derived client-side. Bladesong (#1676) is the first `noMediumArmor`/
   // `noHeavyArmor`/`noShield` consumer; Song of Defense's `requiresActiveBuff`
   // and Elemental Attunement's burst/strike ops are the follow-ons. Validated
@@ -845,13 +845,12 @@ model ClassFeature {
   // this vocabulary is interpreted. Validated seed-time
   // (classFeatureSeedSchema); `target` may equal the buff's own `key` for a
   // marker buff with no numeric effect (Elemental Attunement's shape).
-  // `clearOn` (#1688) is a list of equip-time trigger keys (CLEAR_ON_TRIGGERS,
-  // lib/classes/class-feature-rows.ts) copied onto the instantiated ActiveBuff
-  // and matched against the equip hook's own raised triggers
-  // (equipClearTriggers, lib/inventory/inventory-placement.ts) — the
-  // metadata path Mage Armor's equip-driven true-end (#363) now rides too
-  // (buffTarget "acUnarmoredBase" -> clearOn ["equipBodyArmor"], set at cast
-  // time in lib/spellcasting/ability-cast.ts).
+  // `clearOn` (#1688) is a list of equip-time trigger keys (CLEAR_ON_TRIGGERS)
+  // copied onto the instantiated ActiveBuff and matched against the equip
+  // hook's own raised triggers (equipClearTriggers) — the metadata path Mage
+  // Armor's equip-driven true-end (#363) now rides too (buffTarget
+  // "acUnarmoredBase" -> clearOn ["equipBodyArmor"], set at cast time via
+  // BUFF_TARGET_CLEAR_ON).
   effectBuffs Json?
 
   // NULLS NOT DISTINCT is hand-written in the migration (Prisma's DSL cannot

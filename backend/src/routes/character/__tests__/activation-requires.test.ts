@@ -118,6 +118,27 @@ async function seedRows(): Promise<void> {
       activationRequires: [{ requiresActiveBuff: "testBladesong" }],
     },
   });
+  await prisma.classFeature.create({
+    data: {
+      classId,
+      subclassId: null,
+      name: "Test Body Gate",
+      level: 1,
+      edition: "EDITION_2024",
+      description: "noBodyArmor fixture row (#1688) — the composite any-body-armor gate.",
+      activationCost: "bonusAction",
+      resolverKind: "toggle",
+      resourceKey: "testBodyGate",
+      resourceLabel: "Test Body Gate",
+      resourceRecharge: "longRest",
+      resourceTotals: [{ minLevel: 1, total: 5 }],
+      costKind: "pool",
+      costPoolKey: "testBodyGate",
+      costBase: 1,
+      activationRequires: ["noBodyArmor"],
+      effectBuffs: [{ key: "testBodyGate", target: "testBodyGate", modifier: 0, duration: "while-active" }],
+    },
+  });
 }
 
 function executeAction(characterId: string, actionKey: string) {
@@ -189,6 +210,16 @@ describe("POST /:id/actions/transactions — declarative activation constraints 
     const res = await executeAction(id, "testBladesong");
     expect(res.status).toBe(400);
     expect(res.body.error).toContain("cannot be activated while wielding a shield");
+  });
+
+  it("noBodyArmor: 400s while wearing LIGHT armor — the composite any-body-armor gate blocks every category", async () => {
+    const id = "test-activation-requires-body";
+    await createCharacter(id);
+    // Light armor passes noMediumArmor/noHeavyArmor but must trip noBodyArmor.
+    await equipArmor(id, "light");
+    const res = await executeAction(id, "testBodyGate");
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("cannot be activated while wearing armor");
   });
 
   it("light armor does not block activation", async () => {

@@ -18,6 +18,7 @@ import { resolveBuffSpec, type EffectSpec } from "@/lib/combat/effects.js";
 import { logEvent, type EventType } from "@/lib/activity/events.js";
 import { applyHealInTx, applyDamageInTx, applyTempHpInTx } from "@/lib/combat/hitpoints.js";
 import type { ConcentrationState, SpellcastingMutableState } from "./spell-state.js";
+import type { ClearOnTrigger } from "@/lib/classes/class-feature-rows.js";
 
 /** A cast's effect target: the caster themselves, or a consenting ally's sheet (#462). */
 export type CastTarget = "self" | { characterId: string };
@@ -26,8 +27,8 @@ export type CastTarget = "self" | { characterId: string };
  * Mage Armor's "the spell ends if the target dons armor" (#363) — migrated
  * (#1688) off the equip hook's own hardcoded target check onto the buff's own
  * `clearOn` metadata, the same path every effectBuffs-driven buff's
- * equip-driven true-end now rides (inventory-placement.ts's
- * equipClearTriggers). "acUnarmoredBase" is the only buffTarget any seeded
+ * equip-driven true-end now rides (equipClearTriggers). "acUnarmoredBase" is
+ * the only buffTarget any seeded
  * Spell/GrantedAbility sets that needs one; "equipBodyArmor" fires for EVERY
  * armor category (light included) — the same condition the old hardcoded
  * `slot === "BODY"` check applied regardless of category, so this keeps that
@@ -35,7 +36,7 @@ export type CastTarget = "self" | { characterId: string };
  * true-end is one more entry here, not a second special case in the equip
  * hook.
  */
-const BUFF_TARGET_CLEAR_ON: Partial<Record<string, string[]>> = {
+const BUFF_TARGET_CLEAR_ON: Partial<Record<string, ClearOnTrigger[]>> = {
   acUnarmoredBase: ["equipBodyArmor"],
 };
 
