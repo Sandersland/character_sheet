@@ -33,6 +33,7 @@ import { clampPreparedToLimit, type SpellEntry } from "@/lib/spellcasting/spell-
 import { subclassGateLevel } from "@/lib/leveling/effective-levels.js";
 import { DEFAULT_RULES_EDITION } from "@/lib/rules/edition.js";
 import { crossEditionRejection, resolveEditionRow, withEditionOrShared } from "@/lib/rules/catalog-edition.js";
+import { backgroundGrantsAbilitySpread, backgroundGrantsOriginFeat } from "@/lib/rules/background-grants.js";
 import type { ClassStartingEquipment, RulesEdition } from "@character-sheet/shared-types";
 import type { CreateCharacterBody } from "./character-schemas.js";
 
@@ -412,20 +413,25 @@ function applyBackgroundSpread(
 // Snapshots the background's Origin feat into a slot-exempt AdvancementEntry
 // (#1130). Magic Initiate's granted class is folded into the description snapshot.
 //
+// Origin feats are a PHB'24-only mechanic (#1504) — backgroundGrantsOriginFeat
+// gates a 2014 character out before any resolution runs, so everything below
+// this point only ever executes for EDITION_2024.
+//
 // Background.originFeatId is a single FK, fixed once at seed time to a
 // representative row (the reference-display default — same "no character to
 // resolve against" reasoning as reference.ts's subclassLevel hardcode). A
 // character actually being CREATED has an edition, so re-resolve the feat by
 // NAME against THIS character's edition (#1306) rather than trust whichever
-// row got baked — Alert forks by edition, so a 2014 character creating with a
-// background whose baked FK happens to point at the 2024 row must still land
-// on the 2014 row. No fallback to the baked row on a miss: silently snapshotting
-// the OTHER edition's mechanics into a permanent AdvancementEntry is exactly the
-// contamination this function exists to prevent, so grant nothing rather than
-// grant the wrong thing (unreachable today — every seeded origin feat has a
-// null/shared row every edition can fall back to — but a knowingly-wrong write
-// is still the wrong shape to leave in).
+// row got baked — Alert forks into EDITION_2014/EDITION_2024 rows with no
+// shared fallback, so a wrong-edition baked FK must not leak through. No
+// fallback to the baked row on a miss: silently snapshotting the OTHER
+// edition's mechanics into a permanent AdvancementEntry is exactly the
+// contamination this function exists to prevent — grant nothing rather than
+// grant the wrong thing. Since edition is always EDITION_2024 here, Alert's
+// fork always resolves cleanly in practice; the guard stays for any future
+// feat that forks without a null row.
 async function buildOriginEntry(background: ResolvedBackground, edition: RulesEdition): Promise<AdvancementEntry | null> {
+  if (!backgroundGrantsOriginFeat(edition)) return null;
   if (!background?.originFeat) return null;
   const baked = background.originFeat;
   const candidates = await prisma.feat.findMany({ where: withEditionOrShared({ name: baked.name }, edition) });
@@ -452,6 +458,13 @@ async function buildOriginEntry(background: ResolvedBackground, edition: RulesEd
 // effective scores (baked BEFORE deriveCreatedCharacter so HP/init are correct)
 // and snapshot the Origin feat. A spec-less/custom background rejects any spread
 // but still grants its (absent) feat; omitting the spread applies no bump.
+//
+// The ability spread is a PHB'24-only mechanic (#1572) — a 2014 character
+// submitting one is rejected outright, distinctly from the spec-less-background
+// 400 below, before that background's own abilityChoices are even consulted
+// (Criminal/Sage/etc. carry a real spec under `edition: null`, resolvable for
+// either edition, so the choices-length check alone would let a 2014 character
+// through on any background PHB'24 backgrounds share with 2014).
 async function resolveBackgroundGrants(
   input: CreateCharacterBody,
   background: ResolvedBackground,
@@ -461,6 +474,9 @@ async function resolveBackgroundGrants(
   const choices = background?.abilityChoices ?? [];
 
   if (spread) {
+    if (!backgroundGrantsAbilitySpread(edition)) {
+      return { ok: false, status: 400, error: "backgroundAbilities not allowed: background ability scores are a 2024 rule" };
+    }
     if (choices.length === 0) {
       return { ok: false, status: 400, error: "backgroundAbilities not allowed: this background has no ability spread" };
     }

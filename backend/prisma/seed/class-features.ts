@@ -33,6 +33,8 @@ import { z } from "zod";
 import type { ResourceTotalFormula } from "../../src/lib/classes/class-feature-rows.js";
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { AuthoredFeature, ClassDefinition, SubclassDefinition } from "../../src/lib/classes/types.js";
+import type { FeatImprovement } from "../../src/lib/classes/resources-state.js";
+import { featImprovementSchema } from "../../src/lib/srd/feats.js";
 import type { SeedEdition } from "./edition.js";
 
 import { monk } from "../../src/lib/classes/monk.js";
@@ -72,10 +74,10 @@ import { WIZARD_FEATURES } from "./wizard-features.js";
 // (see each file's own header and #1576). Ranger (#1230) and Bard (#1224) are
 // the THIRD state: each module also stays registered, but for reasons that
 // have nothing to do with the gate — both subclasses' `grantLevel: 3` already
-// equal the fallback. See ranger.ts's own header for the two that apply to it
-// (Hunter's `choices` catalog, #899, owned by #1353; and its EDITION_2024
-// Wisdom-modifier `resourceFn`, #1230 commit 3) and bard.ts's own header for
-// the one that applies to it (Bardic Inspiration's resourceFn — a Cha-modifier
+// equal the fallback. See ranger.ts's own header for the one that applies to
+// it (Hunter's `choices` catalog, #899, owned by #1353 — its EDITION_2024
+// Wisdom-modifier resourceFn was retired to a row by #1685) and bard.ts's own
+// header for the one that applies to it (Bardic Inspiration's resourceFn — a Cha-modifier
 // formula AND a level-tiered recharge, neither expressible as a row). Paladin
 // (#1229) is a FOURTH state, for yet another reason: two of its three resource
 // pools (divineSense, layOnHands) are formula-shaped (a Charisma-modifier
@@ -238,6 +240,10 @@ export interface ClassFeatureSeedRow {
   // why this is read directly rather than matched against derivedStat by
   // name. Only Fighter's Combat Superiority rows set it today.
   saveDcAbilities?: string[];
+  // A passive, always-on grant (#1691) — see ClassFeature.improvements' own
+  // schema.prisma comment. Life Domain's 2014 "Bonus Proficiency" row is the
+  // proving case.
+  improvements?: FeatImprovement[];
 }
 
 // Untagged (feature.edition undefined, #1522's ~256-row default) -> two rows,
@@ -338,7 +344,9 @@ const resourceTotalFormulaSchema = z.union([
   z.literal("proficiencyBonus"),
   z.object({
     abilityMod: z.enum(["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"]),
-    min: z.number().int().optional(),
+    // A floor for the modifier, never a source of negative totals — 0 stays
+    // valid (floor at zero), negatives are rejected at seed (#1685 review).
+    min: z.number().int().nonnegative().optional(),
   }),
   z.object({ levelTimes: z.number().int().positive() }),
 ]);
@@ -377,4 +385,8 @@ export const classFeatureSeedSchema = z.object({
   resourceDieTiers: resourceDieTiersSchema.nullable().optional(),
   derivedStatTiers: derivedStatTiersSchema.nullable().optional(),
   saveDcAbilities: z.array(z.string().min(1)).optional(),
+  // Reuses featImprovementSchema (lib/srd/feats.ts) — the SAME zod a taken
+  // feat's improvements snapshot validates against (#1691) — rather than a
+  // second declaration.
+  improvements: z.array(featImprovementSchema).nullable().optional(),
 });

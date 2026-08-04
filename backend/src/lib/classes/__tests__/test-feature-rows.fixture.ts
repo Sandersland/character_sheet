@@ -50,8 +50,8 @@
 // undefined fallback is 3, so deleting any would silently move that class's
 // 2014 subclass gate (#1576). `ranger.ts` and `bard.ts` survive for a DIFFERENT
 // reason still — each own header names it: Ranger's Hunter `choices` catalog
-// (#899/#1353) and its EDITION_2024 Wisdom-modifier resourceFn; Bard's
-// Cha-modifier/level-tiered-recharge resourceFn (#1224) — both subclasses'
+// (#899/#1353 — its EDITION_2024 Wisdom-modifier resourceFn was retired to a
+// row by #1685); Bard's Cha-modifier/level-tiered-recharge resourceFn (#1224) — both subclasses'
 // `grantLevel: 3` already equal the fallback, so unlike the first five that
 // isn't why either module stays. None of them still exports a base-class
 // `features` array, which is what matters here.

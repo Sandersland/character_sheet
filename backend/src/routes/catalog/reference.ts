@@ -18,6 +18,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { subclassGateLevel } from "@/lib/leveling/effective-levels.js";
 import { requireEditionOr400 } from "@/lib/http/parse-edition-param.js";
 import { resolveEditionCatalog, withEditionOrShared } from "@/lib/rules/catalog-edition.js";
+import { backgroundGrantsAbilitySpread, backgroundGrantsOriginFeat } from "@/lib/rules/background-grants.js";
 
 export const referenceRouter = Router();
 
@@ -87,8 +88,12 @@ referenceRouter.get("/reference", async (req, res) => {
   // resolveEditionCatalog here makes this preview agree with what a character
   // actually gets — buildOriginEntry re-resolves the same way against the
   // CREATING character's edition, so the two can no longer disagree (they did:
-  // a 2014 Criminal saw 2024 Alert text). The FK survives only as a name source
-  // until #1348 replaces it with originFeatName.
+  // a 2014 Criminal saw 2024 Alert text; #1504 later found the correct 2014
+  // answer isn't "the 2014 text" but "no Origin feat at all" — the name-lookup
+  // below still runs so `originFeatByName` stays populated for 2024, but the
+  // backgroundGrantsOriginFeat gate at the projection (below) is what actually
+  // decides whether a 2014 background serves it). The FK survives only as a
+  // name source until #1348 replaces it with originFeatName.
   //
   // Scope latch (#1336): backgrounds and each class's subclasses (below) are now
   // resolved per the requesting edition, same mechanism as originFeatRows and
@@ -188,10 +193,17 @@ referenceRouter.get("/reference", async (req, res) => {
     name: b.name,
     skillProficiencies: b.skillProficiencies,
     toolProficiencies: b.toolProficiencies,
-    // PHB'24 ability spread + Origin feat; empty/null for spec-less legacy rows (#1130).
-    abilityChoices: b.abilityChoices,
-    // Resolved for the requested edition — see the originFeatByName comment above.
-    originFeat: b.originFeat ? (originFeatByName.get(b.originFeat.name) ?? null) : null,
+    // PHB'24 ability spread; empty for a spec-less legacy row (#1130) AND for
+    // every background under EDITION_2014 (#1572) — the spread is a PHB'24-only
+    // mechanic, so this must agree with resolveBackgroundGrants's 2014 rejection.
+    abilityChoices: backgroundGrantsAbilitySpread(edition) ? b.abilityChoices : [],
+    // Resolved for the requested edition — see the originFeatByName comment
+    // above. `null` for EVERY background under EDITION_2014 (#1504): Origin
+    // feats are a PHB'24-only mechanic, so this must agree with
+    // buildOriginEntry's 2014 no-grant, not just resolve to the 2014 catalog row.
+    originFeat: backgroundGrantsOriginFeat(edition) && b.originFeat
+      ? (originFeatByName.get(b.originFeat.name) ?? null)
+      : null,
     // #1565: null for a background with no seeded package under this edition
     // (see startingEquipmentByBackgroundId's comment) — never a placeholder
     // empty-groups package, so the picker can tell "no equipment choices"

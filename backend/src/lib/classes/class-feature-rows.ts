@@ -9,6 +9,7 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 
 import { abilityModifier } from "@/lib/srd/math.js";
 
+import type { FeatImprovement } from "./resources-state.js";
 import type { DerivedFeature, DerivedResource, RechargeOn } from "./types.js";
 
 /** The six abilities a `{ abilityMod }` formula tier (below) may name. */
@@ -59,6 +60,8 @@ export function evaluateResourceTotal(total: ResourceTotalFormula, ctx: Resource
   if (typeof total === "number") return total;
   if (total === "proficiencyBonus") return ctx.profBonus;
   if ("abilityMod" in total) {
+    // A missing score reads as 10 (modifier 0), matching resourceFn caller
+    // behavior; poolsFromRows always passes the full scores in practice.
     const mod = abilityModifier(ctx.abilityScores[total.abilityMod] ?? 10);
     return total.min !== undefined ? Math.max(total.min, mod) : mod;
   }
@@ -163,6 +166,11 @@ export interface ClassFeatureRow extends ResourceColumns, ActivationColumns {
   // nullable String column can't name two fields. Empty/absent means "no
   // such axis" for every row but the one Battle Master row that sets it.
   saveDcAbilities?: string[] | null;
+  // A passive, always-on grant (#1691) — the SAME FeatImprovement vocabulary a
+  // taken feat's own `improvements` snapshot uses (resources-state.ts),
+  // reused rather than forked (see ClassFeature.improvements' own
+  // schema.prisma comment). Read by improvementsFromRows below.
+  improvements?: FeatImprovement[] | null;
 }
 
 /**
@@ -216,6 +224,27 @@ export function featuresFromRows(
   return rows
     .filter((row) => row.edition === edition && row.level <= level)
     .map((row) => ({ name: row.name, level: row.level, description: row.description, source, edition: row.edition }));
+}
+
+/**
+ * Flat FeatImprovement[] from a class/subclass's active rows (#1691) — the
+ * ClassFeature twin of a taken feat's own `improvements` snapshot. Filters by
+ * edition + grant level exactly like featuresFromRows/poolsFromRows above, so
+ * a row's improvements apply only once its OWN gate is met — the proving case
+ * is Life Domain's 2014-only "Bonus Proficiency" row (heavy armor), which has
+ * no EDITION_2024 successor and so is correctly absent from a 2024 read.
+ * #1682's SpeciesTrait layer reads the same vocabulary off a different row
+ * family through the same deriveImprovementBonuses/deriveImprovementProficiencies
+ * evaluator (lib/srd/feats.ts) this feeds.
+ */
+export function improvementsFromRows(
+  rows: readonly ClassFeatureRow[],
+  level: number,
+  edition: RulesEdition,
+): FeatImprovement[] {
+  return rows
+    .filter((row) => row.edition === edition && row.level <= level)
+    .flatMap((row) => row.improvements ?? []);
 }
 
 // Last tier whose minLevel <= level (ascending, last-match-wins, #1522). Tiers

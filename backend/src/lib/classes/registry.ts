@@ -9,12 +9,13 @@ import { editionOf } from "@/lib/rules/edition.js";
 import { deriveAnnouncedSaveDC } from "@/lib/srd/srd.js";
 
 import { bard } from "./bard.js";
-import { derivedStatFromRows, featuresFromRows, poolsFromRows, type ClassFeatureRow, type ClassFeatureRowsCarrier } from "./class-feature-rows.js";
+import { derivedStatFromRows, featuresFromRows, improvementsFromRows, poolsFromRows, type ClassFeatureRow, type ClassFeatureRowsCarrier } from "./class-feature-rows.js";
 import { cleric } from "./cleric.js";
 import { druid } from "./druid.js";
 import { monk } from "./monk.js";
 import { paladin } from "./paladin.js";
 import { ranger } from "./ranger.js";
+import type { FeatImprovement } from "./resources-state.js";
 import { sorcerer } from "./sorcerer.js";
 import { SUBCLASS_IDENTITY, type SubclassIdentity, type SubclassSlug } from "./subclass-slug.js";
 import type { ClassDefinition, ClassExtras, DerivedClassInfo, DerivedFeature, DerivedResource, DerivedSubclassChoice, SubclassDefinition } from "./types.js";
@@ -106,6 +107,8 @@ export function resolveClassDie(source: string, info: DerivedClassInfo): number 
 interface ClassLayer {
   pools: DerivedResource[];
   features: DerivedFeature[];
+  // Row-driven passive grants (#1691) — see improvementsFromRows' own header.
+  improvements: FeatImprovement[];
 }
 
 // A resourceFn pool wins over a row-declared pool of the same key (mirrors
@@ -138,11 +141,12 @@ function mergePoolSources(fromFn: DerivedResource[], fromRows: DerivedResource[]
 // Hell/Fey Presence/Misty Escape/Dark Delirium/Entropic Ward (#1233/#1685),
 // Ranger's Favored Enemy/Tireless (2024 only)/Nature's Veil (2024 only)
 // (#1230/#1685), Sorcerer's Innate Sorcery/Sorcerous Restoration/Dragon
-// Wings/Tamed Surge (2024 only)/Tides of Chaos (both editions) (#1232), and
+// Wings/Tamed Surge (2024 only)/Tides of Chaos (both editions) (#1232),
 // Cleric's channelDivinity (#1225, one carrier row per edition — see
-// cleric-features.ts's own RESOURCE POOL header block) — every other class's
-// rows carry no resourceKey, so this is a no-op for them until their own
-// wave-2 retab (#1134) populates theirs. Rogue is the exception that stays
+// cleric-features.ts's own RESOURCE POOL header block), and Druid's Circle of
+// the Moon moonlightStep (#1226/#1685, now a row-driven formula pool) — the
+// remaining classes' rows carry no resourceKey, so this is a no-op for them
+// until their own wave-2 retab (#1134) populates theirs. Rogue is the exception that stays
 // a no-op even AFTER its retab (#1231): Sneak Attack's Nd6 is a computed rule
 // function off the class entry's own level, never a persisted pool. No
 // `=== "fighter"` / `=== "barbarian"` / `=== "rogue"` / `=== "warlock"` /
@@ -162,6 +166,7 @@ function deriveBaseLayer(
   return {
     pools: mergePoolSources(fnPools, rowPools),
     features: featuresFromRows(featureRows?.classRows ?? [], level, "class", edition),
+    improvements: improvementsFromRows(featureRows?.classRows ?? [], level, edition),
   };
 }
 
@@ -214,7 +219,7 @@ function deriveSubclassLayer(
 ): SubclassLayer {
   const def = SUBCLASSES[subclassKey];
   if (!isSubclassActive(def, level, edition, featureRows?.subclassLevel)) {
-    return { active: false, def, pools: [], features: [] };
+    return { active: false, def, pools: [], features: [], improvements: [] };
   }
   // subclassKey is `undefined` here, not this function's own `subclassKey`
   // param (#1499) — ResourceFn's subclassKey exists so the BASE layer can
@@ -223,23 +228,36 @@ function deriveSubclassLayer(
   // subclass, so passing it again would be a silent semantic change under
   // deriveResources' byte-identical-2024-output AC.
   const fnPools = def.resourceFn ? def.resourceFn(level, abilityScores, profBonus, undefined, edition) : [];
-  const rowPools = poolsFromRows(featureRows?.subclassRows ?? [], level, abilityScores, profBonus, edition);
+  // Read once — the readers below (rowPools/features/improvements) share this
+  // instead of each repeating its own `featureRows?.subclassRows ?? []`, which
+  // is what pushed this function's cyclomatic score over the ratchet when
+  // #1691's improvements reader landed as a fourth occurrence.
+  const subclassRows = featureRows?.subclassRows ?? [];
+  const rowPools = poolsFromRows(subclassRows, level, abilityScores, profBonus, edition);
   return {
     active: true,
     def,
     pools: mergePoolSources(fnPools, rowPools),
-    features: featuresFromRows(featureRows?.subclassRows ?? [], level, "subclass", edition),
+    features: featuresFromRows(subclassRows, level, "subclass", edition),
+    improvements: improvementsFromRows(subclassRows, level, edition),
   };
 }
 
-// Base-wins on pool-key collision; features are sorted by level.
-function mergeLayers(base: ClassLayer, sub: ClassLayer): { resources: DerivedResource[]; features: DerivedFeature[] } {
+// Base-wins on pool-key collision; features are sorted by level. improvements
+// simply concatenate (#1691) — no key to collide on, and
+// deriveImprovementProficiencies' Set-based dedup (lib/srd/feats.ts) already
+// tolerates a repeated grant with no help needed here.
+function mergeLayers(
+  base: ClassLayer,
+  sub: ClassLayer,
+): { resources: DerivedResource[]; features: DerivedFeature[]; improvements: FeatImprovement[] } {
   const seenPoolKeys = new Set(base.pools.map((p) => p.key));
   const resources = [...base.pools, ...sub.pools.filter((p) => !seenPoolKeys.has(p.key))];
   const features = [...base.features, ...sub.features].sort(
     (a, b) => a.level - b.level || a.name.localeCompare(b.name),
   );
-  return { resources, features };
+  const improvements = [...base.improvements, ...sub.improvements];
+  return { resources, features, improvements };
 }
 
 // Subclass-specific bespoke choice-cap fields (ClassExtras — maneuverChoiceCount/
@@ -356,7 +374,7 @@ export function deriveResources(
     featureRows,
     edition,
   );
-  const { resources, features } = mergeLayers(base, sub);
+  const { resources, features, improvements } = mergeLayers(base, sub);
 
   // #1524: with an absent featureRows carrier (every narrow-select caller —
   // e.g. RESOURCES_SELECT's applyResourceOpInTx, which learnSubclassChoice
@@ -380,6 +398,10 @@ export function deriveResources(
   const result: DerivedClassInfo = { resources, features };
   if (extras) Object.assign(result, extras);
   if (subclassChoices) result.subclassChoices = subclassChoices;
+  // Same row set as `features` above (improvementsFromRows/featuresFromRows
+  // share one filter), so improvements is never non-empty while features is
+  // empty — no separate null-check branch needed.
+  if (improvements.length > 0) result.improvements = improvements;
 
   return result;
 }
@@ -664,6 +686,30 @@ function collectEntryScopedFeatures<E extends EntryScopedClassEntry>(
   return features.sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
 }
 
+// Entry-scoped ClassFeature.improvements layer (#1691) — each entry's active
+// row-driven grants at that entry's OWN effective level, concatenated across
+// entries. Mirrors collectEntryScopedFeatures's per-entry loop exactly (same
+// deriveEntryInfo call, so the SAME level/edition/subclass-active gate
+// features already went through); no name-based dedup like features' own
+// `seenNames` — a repeated proficiency grant collapses at
+// deriveImprovementProficiencies' Set instead (lib/srd/feats.ts), which is
+// where applyFeatLayer consumes this list.
+function collectEntryScopedImprovements<E extends EntryScopedClassEntry>(
+  classEntries: E[],
+  totalLevel: number,
+  abilityScores: Record<string, number>,
+  profBonus: number,
+  getFeatureRows: GetFeatureRows<E> | undefined,
+  edition: RulesEdition,
+): FeatImprovement[] {
+  const improvements: FeatImprovement[] = [];
+  for (const entry of classEntries) {
+    const info = deriveEntryInfo(entry, classEntries.length, totalLevel, abilityScores, profBonus, getFeatureRows, edition);
+    improvements.push(...(info?.improvements ?? []));
+  }
+  return improvements;
+}
+
 /**
  * Entry-scoped resource caps + pools + features for multiclass level-up
  * (#1177 caps, #1071 pools, #1206 features + extras): the EXTRAS_FIELDS
@@ -703,12 +749,14 @@ export function deriveEntryScopedResources<E extends EntryScopedClassEntry>(
 
   const pools = collectEntryScopedPools(classEntries, totalLevel, abilityScores, profBonus, getFeatureRows, edition);
   const features = collectEntryScopedFeatures(classEntries, totalLevel, abilityScores, profBonus, getFeatureRows, edition);
+  const improvements = collectEntryScopedImprovements(classEntries, totalLevel, abilityScores, profBonus, getFeatureRows, edition);
 
   if (derived) {
     derived.resources = pools;
     derived.features = features;
-  } else if (pools.length > 0 || features.length > 0) {
-    derived = { resources: pools, features };
+    if (improvements.length > 0) derived.improvements = improvements;
+  } else if (pools.length > 0 || features.length > 0 || improvements.length > 0) {
+    derived = { resources: pools, features, ...(improvements.length > 0 ? { improvements } : {}) };
   }
 
   return { derived };
