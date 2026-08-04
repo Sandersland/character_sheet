@@ -32,6 +32,8 @@ import { z } from "zod";
 
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { AuthoredFeature, ClassDefinition, SubclassDefinition } from "../../src/lib/classes/types.js";
+import type { FeatImprovement } from "../../src/lib/classes/resources-state.js";
+import { featImprovementSchema } from "../../src/lib/srd/feats.js";
 import type { SeedEdition } from "./edition.js";
 
 import { monk } from "../../src/lib/classes/monk.js";
@@ -233,6 +235,10 @@ export interface ClassFeatureSeedRow {
   // why this is read directly rather than matched against derivedStat by
   // name. Only Fighter's Combat Superiority rows set it today.
   saveDcAbilities?: string[];
+  // A passive, always-on grant (#1691) — see ClassFeature.improvements' own
+  // schema.prisma comment. Life Domain's 2014 "Bonus Proficiency" row is the
+  // proving case.
+  improvements?: FeatImprovement[];
 }
 
 // Untagged (feature.edition undefined, #1522's ~256-row default) -> two rows,
@@ -355,4 +361,8 @@ export const classFeatureSeedSchema = z.object({
   resourceDieTiers: resourceDieTiersSchema.nullable().optional(),
   derivedStatTiers: derivedStatTiersSchema.nullable().optional(),
   saveDcAbilities: z.array(z.string().min(1)).optional(),
+  // Reuses featImprovementSchema (lib/srd/feats.ts) — the SAME zod a taken
+  // feat's improvements snapshot validates against (#1691) — rather than a
+  // second declaration.
+  improvements: z.array(featImprovementSchema).nullable().optional(),
 });

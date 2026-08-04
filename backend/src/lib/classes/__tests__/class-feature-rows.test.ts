@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { derivedStatFromRows, featuresFromRows, type ClassFeatureRow } from "@/lib/classes/class-feature-rows.js";
+import { derivedStatFromRows, featuresFromRows, improvementsFromRows, type ClassFeatureRow } from "@/lib/classes/class-feature-rows.js";
 
 function row(overrides: Partial<ClassFeatureRow> = {}): ClassFeatureRow {
   return { name: "Test Feature", level: 1, description: "test description", edition: "EDITION_2014", ...overrides };
@@ -96,6 +96,43 @@ describe("derivedStatFromRows (#1530) — same edition/level truth table as feat
 
   it("an empty row list returns undefined (the caller supplies the floor, not this function)", () => {
     expect(derivedStatFromRows([], 20, "EDITION_2024", "attacksPerAction")).toBeUndefined();
+  });
+});
+
+describe("improvementsFromRows (#1691) — same edition/level truth table as featuresFromRows, flattened across rows", () => {
+  it("a row tagged for the matching edition, at or below the character's level, contributes its improvements", () => {
+    const rows = [row({ level: 3, improvements: [{ target: "armorProficiency", amount: 1, key: "heavy" }] })];
+    expect(improvementsFromRows(rows, 2, "EDITION_2014")).toEqual([]);
+    expect(improvementsFromRows(rows, 3, "EDITION_2014")).toEqual([{ target: "armorProficiency", amount: 1, key: "heavy" }]);
+  });
+
+  it("a row tagged for the OTHER edition is excluded — never falls back", () => {
+    const rows = [row({ edition: "EDITION_2014", improvements: [{ target: "initiative", amount: 1 }] })];
+    expect(improvementsFromRows(rows, 20, "EDITION_2024")).toEqual([]);
+  });
+
+  it("a row with no improvements contributes nothing, even when active", () => {
+    const rows = [row({ edition: "EDITION_2014", level: 1 })];
+    expect(improvementsFromRows(rows, 20, "EDITION_2014")).toEqual([]);
+  });
+
+  it("flattens improvements across every qualifying row (a numeric target + a keyed proficiency target both reach the caller)", () => {
+    const rows = [
+      row({ name: "A", level: 1, edition: "EDITION_2014", improvements: [{ target: "skillProficiency", amount: 1, key: "athletics" }] }),
+      row({ name: "B", level: 3, edition: "EDITION_2014", improvements: [{ target: "armorClass", amount: 1 }] }),
+    ];
+    expect(improvementsFromRows(rows, 3, "EDITION_2014")).toEqual([
+      { target: "skillProficiency", amount: 1, key: "athletics" },
+      { target: "armorClass", amount: 1 },
+    ]);
+    // Below B's level, only A's grant is active.
+    expect(improvementsFromRows(rows, 2, "EDITION_2014")).toEqual([
+      { target: "skillProficiency", amount: 1, key: "athletics" },
+    ]);
+  });
+
+  it("an empty row list produces an empty improvements list (the no-carrier default every narrow-select caller falls back to)", () => {
+    expect(improvementsFromRows([], 20, "EDITION_2024")).toEqual([]);
   });
 });
 

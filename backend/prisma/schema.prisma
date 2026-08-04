@@ -699,6 +699,19 @@ model ClassFeature {
   // Superiority.
   saveDcAbilities String[] @default([])
 
+  // A passive, always-on grant — proficiency or a flat numeric bonus — the
+  // row's prose promises but no other descriptor column can express (#1691;
+  // the proving case is Life Domain's 2014 "Bonus Proficiency" row, which
+  // said "you gain heavy armor proficiency" and granted nothing). Validated
+  // seed-time against the SAME FeatImprovement vocabulary/zod schema a taken
+  // feat's `improvements` snapshot uses (lib/srd/feats.ts's
+  // featImprovementSchema/FEAT_IMPROVEMENT_TARGETS) — reused, not forked, so
+  // a target added for feats is usable here with no second declaration.
+  // #1682's SpeciesTrait.improvements is the sibling of this column, reusing
+  // the same read-time evaluator (deriveImprovementBonuses/
+  // deriveImprovementProficiencies).
+  improvements Json?
+
   // NULLS NOT DISTINCT is hand-written in the migration (Prisma's DSL cannot
   // express it) — subclassId is nullable and base-class features are the
   // majority of rows, so without it two identical (fighter, NULL, "Second

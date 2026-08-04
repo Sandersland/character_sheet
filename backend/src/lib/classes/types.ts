@@ -3,6 +3,7 @@
 
 import type { RulesEdition } from "@character-sheet/shared-types";
 
+import type { FeatImprovement } from "./resources-state.js";
 import type { SubclassSlug } from "./subclass-slug.js";
 
 export type RechargeOn = "shortRest" | "longRest" | "short-or-long" | "none";
@@ -171,6 +172,17 @@ export interface DerivedClassInfo extends ClassExtras {
    * step. See SubclassChoice for the declaration shape.
    */
   subclassChoices?: DerivedSubclassChoice[];
+  /**
+   * Flat FeatImprovement[] from every active class/subclass ClassFeature row
+   * (#1691) — the row-driven twin of a taken feat's own `improvements`
+   * snapshot. Optional (like subclassChoices above) rather than defaulting to
+   * `[]` so the majority of DerivedClassInfo literals across the test suite
+   * (none of which author a row-level grant) don't need editing for this
+   * field. Consumed by applyFeatLayer (serialize/classes.ts), which merges it
+   * with advancement-sourced improvements through the SAME
+   * deriveImprovementBonuses/deriveImprovementProficiencies evaluator.
+   */
+  improvements?: FeatImprovement[];
 }
 
 /**
