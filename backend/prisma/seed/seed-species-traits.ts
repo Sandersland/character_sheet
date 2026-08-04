@@ -11,7 +11,7 @@
 // reuses upsertEditionRow (lib/rules/catalog-edition.ts) generically: that
 // helper only needs findFirst/create/update, it isn't edition-specific despite
 // its name/JSDoc being framed around Feat/Subclass's nullable-edition case.
-import type { PrismaClient } from "../../src/generated/prisma/client.js";
+import type { Prisma, PrismaClient } from "../../src/generated/prisma/client.js";
 import { upsertEditionRow } from "../../src/lib/rules/catalog-edition.js";
 import { SPECIES_TRAITS, type SpeciesTraitSeed } from "./species-traits-data.js";
 
@@ -46,18 +46,24 @@ function resolveTarget(
 }
 
 async function upsertTrait(prisma: PrismaClient, trait: SpeciesTraitSeed, target: SpeciesTarget): Promise<void> {
+  // Prisma types a Json column as opaque InputJsonValue — cast once here,
+  // mirroring seedClassFeatures' identical `improvements` write (seed-class-
+  // features.ts) and character-create.ts's `toolProficiencies as unknown as
+  // Prisma.InputJsonValue` precedent; validated at SEED time
+  // (speciesTraitSeedSchema), not re-validated on write.
+  const improvements = (trait.improvements ?? []) as unknown as Prisma.InputJsonValue;
   const data = {
     speciesId: target.speciesId,
     variantId: target.variantId,
     name: trait.name,
     description: trait.description,
-    improvements: trait.improvements ?? [],
+    improvements,
   };
   await upsertEditionRow(
     prisma.speciesTrait,
     { speciesId: target.speciesId, variantId: target.variantId, name: trait.name },
     data,
-    { description: trait.description, improvements: trait.improvements ?? [] },
+    { description: trait.description, improvements },
   );
 }
 
