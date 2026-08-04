@@ -975,13 +975,9 @@ async function resolveSpeciesGrants(
 ): Promise<PhaseResult<SpeciesGrants>> {
   const submitted = input.speciesAbilities;
 
-  if (!speciesSelection.speciesId) {
-    if (submitted) {
-      return { ok: false, status: 400, error: "speciesAbilities not allowed: no species selected" };
-    }
-    return { ok: true, effectiveScores: baseScores, appliedIncreases: [] };
-  }
-
+  // speciesId is required by the create schema (the species-only path, #1684),
+  // so the selection always resolves one here — there is no "no species"
+  // fallback to guard.
   const editionError = speciesAbilitiesEditionGuard(submitted, edition);
   if (editionError) return editionError;
   if (!speciesGrantsAbilityIncreases(edition)) {
