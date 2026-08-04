@@ -182,20 +182,27 @@ export function applyAdvancementClamp(
 
 // Improvement modifier layer: sum structured improvements from the kept
 // advancements (origin feats + slot-bounded entries) TOGETHER WITH active
-// ClassFeature row grants (#1691) through the ONE deriveImprovementBonuses/
-// deriveImprovementProficiencies evaluator — the merge point that makes a
-// proficiency granted by both a feat and a feature row collapse to one Set
-// entry (no separate dedup: see deriveImprovementProficiencies' own header).
+// ClassFeature row grants (#1691) AND active SpeciesTrait row grants (#1682,
+// serialize/species.ts's buildSpeciesTraitsView) through the ONE
+// deriveImprovementBonuses/deriveImprovementProficiencies evaluator — the
+// merge point that makes a proficiency granted by any of the three sources
+// collapse to one Set entry (no separate dedup: see
+// deriveImprovementProficiencies' own header). RACE_PROFICIENCY_GRANTS
+// (retired #1682) used to be a fourth, name-keyed source outside this merge;
+// a species trait's weapon/armor grant now surfaces with source: "feat" in
+// the wire proficiency arrays, the SAME bucket a ClassFeature row grant
+// already uses (#1691 precedent) — not a new "species" bucket.
 // Because clampedAdvancements already excludes over-cap feats and
-// classFeatureImprovements is already level/edition-gated at collection time
-// (buildResourcesView, via deriveEntryScopedResources), level-down behavior
-// for both sources is automatic — no separate reversal code needed.
-// perLevel bonuses (e.g. Tough) scale with hitDiceTotal (applied level) for
-// EITHER source — no production ClassFeature row uses perLevel today, so this
-// is inert there, not a live divergence.
+// classFeatureImprovements/speciesTraitImprovements are already gated at
+// collection time (buildResourcesView via deriveEntryScopedResources;
+// buildSpeciesTraitsView via the character's own species/variant selection),
+// level-down behavior for every source is automatic — no separate reversal
+// code needed. perLevel bonuses (e.g. Tough, Dwarven Toughness) scale with
+// hitDiceTotal (applied level) for EVERY source.
 export function applyFeatLayer(
   clampedAdvancements: AdvancementEntry[],
   classFeatureImprovements: FeatImprovement[],
+  speciesTraitImprovements: FeatImprovement[],
   hitDiceTotal: number,
   maxHp: number,
 ): {
@@ -206,6 +213,7 @@ export function applyFeatLayer(
   const improvements = [
     ...clampedAdvancements.flatMap((entry) => entry.improvements ?? []),
     ...classFeatureImprovements,
+    ...speciesTraitImprovements,
   ];
   const featBonuses = deriveImprovementBonuses(improvements, hitDiceTotal);
   const effectiveMaxHp = maxHp + featBonuses.maxHp;

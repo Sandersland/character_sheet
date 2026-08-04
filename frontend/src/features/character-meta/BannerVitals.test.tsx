@@ -97,6 +97,7 @@ const mockCharacter: Character = {
   advancementSlots: { total: 1, used: 0 },
   fightingStyleSlots: { total: 0, used: 0 },
   journal: [],
+  speciesTraits: [],
 };
 
 // BannerVitals (and its nested ArmorClassBreakdown) reads useCurrentCharacter(),

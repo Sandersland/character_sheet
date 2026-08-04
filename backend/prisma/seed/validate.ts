@@ -28,6 +28,7 @@ import {
 import { ITEMS } from "./catalog-data.js";
 import { PACKS } from "./packs.js";
 import { SPECIES, speciesSeedSchema } from "./species-data.js";
+import { SPECIES_TRAITS, speciesTraitSeedSchema } from "./species-traits-data.js";
 
 interface SeedFamily {
   schema: z.ZodTypeAny;
@@ -50,6 +51,10 @@ const SEED_FAMILIES: Record<string, SeedFamily> = {
   // SPECIES row embeds its own variants), so no separate SPECIES_VARIANTS
   // family is needed.
   SPECIES: { schema: speciesSeedSchema, rows: SPECIES },
+  // #1682 — trait content; cross-referenced against SPECIES below (a
+  // speciesSlug/variantSlug typo is a broken FK resolution at seed time
+  // otherwise, not a zod-catchable shape error).
+  SPECIES_TRAITS: { schema: speciesTraitSeedSchema, rows: SPECIES_TRAITS },
 };
 
 export interface SeedValidationSummary {
@@ -106,6 +111,58 @@ export function assertCatalogNamesResolve(
       throw new Error(`Seed content invalid — ${familyName} references unknown catalogName "${name}"`);
     }
   }
+}
+
+// A variantSlug (when given) must name a real variant of its species. Split
+// out of assertSpeciesTraitsResolve to keep every seed validator under the
+// seed-file cyclomatic budget (CC <= 4): they run uncovered in globalSetup, so
+// CRAP is complexity-driven and CC 5+ crosses the ceiling (#1682/#1679).
+function assertTraitVariantKnown(
+  species: (typeof SPECIES)[number],
+  trait: (typeof SPECIES_TRAITS)[number],
+  index: number,
+): void {
+  if (!trait.variantSlug) return;
+  const known = (species.variants ?? []).some((v) => v.slug === trait.variantSlug);
+  if (!known) {
+    throw new Error(
+      `Seed content invalid — SPECIES_TRAITS[${index}] references unknown variant "${trait.variantSlug}" under species "${trait.speciesSlug}" (${trait.speciesEdition})`,
+    );
+  }
+}
+
+// One SPECIES_TRAITS row: its species must resolve, its variant (if any) must
+// resolve, and its (species, edition, variant, name) key must be unique.
+function assertSpeciesTraitRowResolves(
+  trait: (typeof SPECIES_TRAITS)[number],
+  index: number,
+  speciesByKey: Map<string, (typeof SPECIES)[number]>,
+  seen: Set<string>,
+): void {
+  const species = speciesByKey.get(`${trait.speciesSlug}::${trait.speciesEdition}`);
+  if (!species) {
+    throw new Error(
+      `Seed content invalid — SPECIES_TRAITS[${index}] references unknown species "${trait.speciesSlug}" (${trait.speciesEdition})`,
+    );
+  }
+  assertTraitVariantKnown(species, trait, index);
+  const key = `${trait.speciesSlug}::${trait.speciesEdition}::${trait.variantSlug ?? "null"}::${trait.name}`;
+  if (seen.has(key)) {
+    throw new Error(`Seed error: duplicate species trait "${trait.name}" for target "${key}"`);
+  }
+  seen.add(key);
+}
+
+// Every (speciesSlug, speciesEdition) a SPECIES_TRAITS row names must resolve
+// against SPECIES, and a variantSlug (when given) against that species' own
+// variants — the #1682 twin of assertCatalogNamesResolve above, catching a
+// typo'd slug before seedSpeciesTraits' DB-backed resolveTarget throws a much
+// less specific runtime error mid-seed. Also rejects two rows sharing the
+// same (speciesSlug, speciesEdition, variantSlug, name).
+function assertSpeciesTraitsResolve(speciesRows: typeof SPECIES, traitRows: typeof SPECIES_TRAITS): void {
+  const speciesByKey = new Map(speciesRows.map((s) => [`${s.slug}::${s.edition}`, s]));
+  const seen = new Set<string>();
+  traitRows.forEach((trait, index) => assertSpeciesTraitRowResolves(trait, index, speciesByKey, seen));
 }
 
 /**
@@ -177,6 +234,8 @@ export function assertSeedContentValid(): SeedValidationSummary {
       rowsByVariantSlug.set(variant.slug, variantIndex);
     });
   });
+
+  assertSpeciesTraitsResolve(SPECIES, SPECIES_TRAITS);
 
   return { familiesChecked: Object.keys(SEED_FAMILIES).length, rowsChecked };
 }
