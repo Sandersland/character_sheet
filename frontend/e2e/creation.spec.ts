@@ -236,7 +236,9 @@ test("creation: a 2014 warlock must choose its patron at creation", async ({ pag
   // Abilities step — the PHB'24 background ability spread is not offered
   // under 2014 (#1572, a PHB'24-only mechanic): no +2/+1 radios render for
   // Sage here, unlike the 2024 warlock test above, and Continue is not
-  // blocked by it.
+  // blocked by it. Assert their absence so a reintroduced spread fails the
+  // test rather than passing on a step that simply goes unclicked.
+  await expect(page.getByRole("radio", { name: /^\+[12] to / })).toHaveCount(0);
   await continueStep(page);
 
   // Skills & Tools step.
