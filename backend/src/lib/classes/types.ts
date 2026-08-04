@@ -3,6 +3,7 @@
 
 import type { RulesEdition } from "@character-sheet/shared-types";
 
+import type { ActionCost } from "./actions.js";
 import type { EffectBuffRow } from "./class-feature-rows.js";
 import type { FeatImprovement } from "./resources-state.js";
 import type { SubclassSlug } from "./subclass-slug.js";
@@ -129,9 +130,9 @@ export interface AuthoredFeature {
    * the one class still on this TS-authoring path, the only — consumer.
    */
   resourceKey?: string;
-  activationCost?: string;
-  resolverKind?: string;
-  costKind?: string;
+  activationCost?: ActionCost;
+  resolverKind?: "toggle";
+  costKind?: "pool" | "none";
   costPoolKey?: string;
   costBase?: number;
   effectBuffs?: EffectBuffRow[];

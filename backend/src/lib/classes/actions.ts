@@ -1086,6 +1086,13 @@ export function toggleRowOps(row: ClassFeatureRow, ctx: ResourceTotalContext, is
   if (isEnd) {
     return buffs.map((b) => ({ type: "clearBuff", key: b.key, reason: `${row.name} ended` }));
   }
+  // Activation with no buff to apply would still spend the pool below — a
+  // silent drain. That only happens for a misauthored row (null/empty
+  // effectBuffs) or one whose every buff is gated above ctx.level; fail loud
+  // rather than charge the resource for nothing (#1686 review).
+  if (buffs.length === 0) {
+    throw new Error(`Toggle row "${row.name}" has no active effectBuffs at level ${ctx.level}`);
+  }
   const ops: ActionOp[] = buffs.map((b) => ({
     type: "applyBuff",
     buff: {

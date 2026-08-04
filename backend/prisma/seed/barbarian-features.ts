@@ -58,6 +58,7 @@
 // proof #1686 exists for — see toggleActionsFromRow/toggleRowOps
 // (lib/classes/actions.ts) for the generic engine this data drives.
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
+import type { ActionCost } from "../../src/lib/classes/actions.js";
 import type { EffectBuffRow } from "../../src/lib/classes/class-feature-rows.js";
 import type { SeedEdition } from "./edition.js";
 import type { ClassFeatureSeedRow } from "./class-features.js";
@@ -94,9 +95,9 @@ interface RawBarbarianFeature {
   resourceTotals?: { minLevel: number; total: number; shortRestRegain?: number }[];
   // Rage's activation block (#1686) — see this file's own header for why
   // only Rage's two rows below ever set these.
-  activationCost?: string;
-  resolverKind?: string;
-  costKind?: string;
+  activationCost?: ActionCost;
+  resolverKind?: "toggle";
+  costKind?: "pool" | "none";
   costPoolKey?: string;
   costBase?: number;
   effectBuffs?: EffectBuffRow[];

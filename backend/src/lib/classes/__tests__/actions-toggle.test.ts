@@ -112,6 +112,15 @@ describe("toggleRowOps (#1686) — the generic activate/end effect handler", () 
     expect(ops.some((o) => o.type === "spendResource")).toBe(false);
   });
 
+  it("throws on activation when a pool-cost row has no active buffs — never silently drains the pool (#1686 review)", () => {
+    // A misauthored/misgated toggle (null effectBuffs, or all entries gated
+    // above ctx.level) would otherwise push spendResource with no applyBuff.
+    const emptyRow: ClassFeatureRow = { ...TOGGLE_ROW, effectBuffs: [] };
+    expect(() => toggleRowOps(emptyRow, ctx, false)).toThrow(/no active effectBuffs at level/);
+    // End is still safe — clearing an empty buff list is a no-op, not a spend.
+    expect(toggleRowOps(emptyRow, ctx, true)).toEqual([]);
+  });
+
   it("carries resistDamageTypes/rollEffects through to the applyBuff op (Rage needs both)", () => {
     const row: ClassFeatureRow = {
       ...TOGGLE_ROW,

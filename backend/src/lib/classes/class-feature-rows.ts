@@ -77,7 +77,10 @@ export function evaluateResourceTotal(total: ResourceTotalFormula, ctx: Resource
  * poolFromRow's own tierAt call), never a sum of every tier crossed. Below
  * every tier's minLevel (or an empty array) resolves to 0, not undefined —
  * a buff always applies SOME modifier once its own entry-level minLevel gate
- * (EffectBuffRow.minLevel) has already admitted it.
+ * (EffectBuffRow.minLevel) has already admitted it. Corollary: a tier array
+ * whose first tier's minLevel exceeds ctx.level reads 0; if that isn't the
+ * intent, gate the whole entry with EffectBuffRow.minLevel rather than relying
+ * on the tier floor (#1686 review).
  */
 export function evaluateBuffModifier(modifier: BuffModifierFormula, ctx: ResourceTotalContext): number {
   if (!Array.isArray(modifier)) return evaluateResourceTotal(modifier, ctx);
