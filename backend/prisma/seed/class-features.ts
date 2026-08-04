@@ -30,11 +30,12 @@
 // green rather than adding a bespoke exception whose file also holds data).
 import { z } from "zod";
 
-import type { ResourceTotalFormula } from "../../src/lib/classes/class-feature-rows.js";
+import type { BuffModifierFormula, EffectBuffRow, ResourceTotalFormula } from "../../src/lib/classes/class-feature-rows.js";
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { AuthoredFeature, ClassDefinition, SubclassDefinition } from "../../src/lib/classes/types.js";
 import type { FeatImprovement } from "../../src/lib/classes/resources-state.js";
 import { featImprovementSchema } from "../../src/lib/srd/feats.js";
+import { SKILL_KEYS } from "../../src/lib/srd/alignments.js";
 import type { SeedEdition } from "./edition.js";
 
 import { monk } from "../../src/lib/classes/monk.js";
@@ -244,6 +245,11 @@ export interface ClassFeatureSeedRow {
   // schema.prisma comment. Life Domain's 2014 "Bonus Proficiency" row is the
   // proving case.
   improvements?: FeatImprovement[];
+  // The row-declared while-active buff list a "toggle" resolverKind
+  // activates (#1686) — see ClassFeature.effectBuffs' own schema.prisma
+  // comment for the shape/evaluator. `EffectBuffRow` is a type-only import,
+  // same reasoning as `ResourceTotalFormula` above.
+  effectBuffs?: EffectBuffRow[];
 }
 
 // Untagged (feature.edition undefined, #1522's ~256-row default) -> two rows,
@@ -370,6 +376,68 @@ const derivedStatTiersSchema = z
   .array(z.object({ minLevel: z.number().int().positive(), value: z.union([z.number(), z.string()]) }))
   .refine(isAscendingByMinLevel, ASCENDING_TIER_MESSAGE);
 
+// #1686: effectBuffs' `modifier` — evaluateBuffModifier's own vocabulary
+// (class-feature-rows.ts): resourceTotalFormulaSchema's formula shapes, OR a
+// tier array (ASCENDING minLevel, last-match-wins, same invariant as
+// resourceTotals/derivedStatTiers) — Rage's +2/+3/+4 damage bonus is the
+// forcing case. `value` (not `total`) mirrors derivedStatTiersSchema's own
+// naming, since this scales a MODIFIER, not a pool total.
+const buffModifierTiersSchema = z
+  .array(z.object({ minLevel: z.number().int().positive(), value: z.number() }))
+  .refine(isAscendingByMinLevel, ASCENDING_TIER_MESSAGE);
+const buffModifierFormulaSchema: z.ZodType<BuffModifierFormula> = z.union([resourceTotalFormulaSchema, buffModifierTiersSchema]);
+
+// The state-driven roll grants (#486) a buff may carry — mirrors RollEffect
+// (lib/srd/roll-effects.ts); this validator only ever needs the
+// advantage/disadvantage form (AdvantageRollEffect) since no seeded content
+// authors a flat roll modifier yet.
+const rollEffectSchema = z.object({
+  mode: z.enum(["advantage", "disadvantage"]),
+  kind: z.enum(["attack", "check", "save", "initiative"]),
+  ability: z.string().min(1).optional(),
+});
+
+// Every `target` a row-declared buff may name (#1686): the 18 skill keys plus
+// the handful of derived-stat keys serializeCharacter's buildTargetModifiers
+// actually sums (meleeDamage/attackRoll/ac/acFloor/acUnarmoredBase/speed —
+// character-serialize.ts's serialize/{combat,inventory,proficiencies}.ts) —
+// widen this list in the SAME diff that adds a new buffTargets[...] consumer,
+// never speculatively. A marker buff (`target === key`, e.g. Elemental
+// Attunement) is admitted by the object-level `.refine` below instead of
+// living in this list, since it names no real stat.
+const KNOWN_BUFF_TARGETS: readonly string[] = [
+  ...SKILL_KEYS,
+  "meleeDamage",
+  "attackRoll",
+  "ac",
+  "acFloor",
+  "acUnarmoredBase",
+  "speed",
+];
+
+// One row-declared while-active buff (#1686) — EffectBuffRow's own seed-time
+// mirror. `.refine` admits target === key (the marker-buff form, modifier: 0,
+// Elemental Attunement's shape) as an alternative to KNOWN_BUFF_TARGETS
+// membership, so a state-tracking-only toggle isn't rejected as "unknown".
+const effectBuffSchema = z
+  .object({
+    key: z.string().min(1),
+    target: z.string().min(1),
+    modifier: buffModifierFormulaSchema,
+    duration: z.enum(["concentration", "while-active", "until-rest"]),
+    minLevel: z.number().int().positive().optional(),
+    // #1688 owns this trigger's vocabulary — authored here, unvalidated
+    // beyond "non-empty string", until that issue defines the enum.
+    clearOn: z.string().min(1).optional(),
+    endReminder: z.string().min(1).optional(),
+    resistDamageTypes: z.array(z.string().min(1)).optional(),
+    rollEffects: z.array(rollEffectSchema).optional(),
+  })
+  .refine((buff) => buff.target === buff.key || KNOWN_BUFF_TARGETS.includes(buff.target), {
+    message: "effectBuffs target must be a known skill/stat key, or equal the buff's own `key` (a marker buff)",
+  });
+const effectBuffsSchema = z.array(effectBuffSchema);
+
 // Validated at seed time (prisma/seed/validate.ts). Only the identity fields
 // this migration actually populates are required; the descriptor fields are
 // declared (using the tier schemas above) so a future population pass is
@@ -389,4 +457,5 @@ export const classFeatureSeedSchema = z.object({
   // feat's improvements snapshot validates against (#1691) — rather than a
   // second declaration.
   improvements: z.array(featImprovementSchema).nullable().optional(),
+  effectBuffs: effectBuffsSchema.nullable().optional(),
 });

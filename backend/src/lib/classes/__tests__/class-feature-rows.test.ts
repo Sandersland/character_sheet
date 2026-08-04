@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { derivedStatFromRows, evaluateResourceTotal, featuresFromRows, improvementsFromRows, poolsFromRows, type ClassFeatureRow } from "@/lib/classes/class-feature-rows.js";
+import { derivedStatFromRows, evaluateBuffModifier, evaluateResourceTotal, featuresFromRows, improvementsFromRows, poolsFromRows, type ClassFeatureRow } from "@/lib/classes/class-feature-rows.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 
 function row(overrides: Partial<ClassFeatureRow> = {}): ClassFeatureRow {
@@ -184,6 +184,45 @@ describe("improvementsFromRows (#1691) — same edition/level truth table as fea
 
   it("an empty row list produces an empty improvements list (the no-carrier default every narrow-select caller falls back to)", () => {
     expect(improvementsFromRows([], 20, "EDITION_2024")).toEqual([]);
+  });
+});
+
+describe("evaluateBuffModifier (#1686) — evaluateResourceTotal's formula vocabulary PLUS a tier array", () => {
+  const ctx = { level: 6, abilityScores: { wisdom: 16, charisma: 8 }, profBonus: 3 };
+
+  it("a plain number passes through unchanged, same as evaluateResourceTotal", () => {
+    expect(evaluateBuffModifier(2, ctx)).toBe(2);
+  });
+
+  it('"proficiencyBonus" reads ctx.profBonus, same as evaluateResourceTotal', () => {
+    expect(evaluateBuffModifier("proficiencyBonus", { ...ctx, profBonus: 5 })).toBe(5);
+  });
+
+  it("{ abilityMod, min } floors at min, same as evaluateResourceTotal", () => {
+    expect(evaluateBuffModifier({ abilityMod: "charisma", min: 1 }, ctx)).toBe(1);
+  });
+
+  // Rage's own shape: +2 at L1, +3 at L9, +4 at L16 (rageMeleeDamageBonus).
+  const RAGE_TIERS = [
+    { minLevel: 1, value: 2 },
+    { minLevel: 9, value: 3 },
+    { minLevel: 16, value: 4 },
+  ];
+
+  it("a tier array resolves the LAST tier whose minLevel <= level — never a sum", () => {
+    expect(evaluateBuffModifier(RAGE_TIERS, { ...ctx, level: 1 })).toBe(2);
+    expect(evaluateBuffModifier(RAGE_TIERS, { ...ctx, level: 8 })).toBe(2);
+    expect(evaluateBuffModifier(RAGE_TIERS, { ...ctx, level: 9 })).toBe(3);
+    expect(evaluateBuffModifier(RAGE_TIERS, { ...ctx, level: 15 })).toBe(3);
+  });
+
+  it("a L16 character gets exactly the top tier (+4), not the sum of every tier crossed (2+3+4=9)", () => {
+    expect(evaluateBuffModifier(RAGE_TIERS, { ...ctx, level: 16 })).toBe(4);
+    expect(evaluateBuffModifier(RAGE_TIERS, { ...ctx, level: 20 })).toBe(4);
+  });
+
+  it("a tier array below its first minLevel resolves to 0 (no tier reached)", () => {
+    expect(evaluateBuffModifier([{ minLevel: 5, value: 3 }], { ...ctx, level: 1 })).toBe(0);
   });
 });
 

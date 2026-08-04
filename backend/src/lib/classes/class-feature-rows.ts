@@ -8,6 +8,7 @@
 import type { RulesEdition } from "@character-sheet/shared-types";
 
 import { abilityModifier } from "@/lib/srd/math.js";
+import type { RollEffect } from "@/lib/srd/roll-effects.js";
 
 import type { FeatImprovement } from "./resources-state.js";
 import type { DerivedFeature, DerivedResource, RechargeOn } from "./types.js";
@@ -68,9 +69,77 @@ export function evaluateResourceTotal(total: ResourceTotalFormula, ctx: Resource
   return total.levelTimes * ctx.level;
 }
 
+/**
+ * Resolves a row-declared buff's `modifier` (#1686) — a plain
+ * ResourceTotalFormula reuses evaluateResourceTotal unchanged (Bladesong's
+ * `+INT (min 1)` AC shape); a tier array resolves the last tier whose
+ * minLevel <= ctx.level (ASCENDING, last-match-wins — same invariant as
+ * poolFromRow's own tierAt call), never a sum of every tier crossed. Below
+ * every tier's minLevel (or an empty array) resolves to 0, not undefined —
+ * a buff always applies SOME modifier once its own entry-level minLevel gate
+ * (EffectBuffRow.minLevel) has already admitted it.
+ */
+export function evaluateBuffModifier(modifier: BuffModifierFormula, ctx: ResourceTotalContext): number {
+  if (!Array.isArray(modifier)) return evaluateResourceTotal(modifier, ctx);
+  return tierAt(modifier, ctx.level)?.value ?? 0;
+}
+
 export interface ResourceDieTier {
   minLevel: number;
   die: string;
+}
+
+/** One tier of a row-declared buff's `modifier` — ASCENDING by minLevel, last-match-wins (#1686), same invariant as ResourceTotalTier/DerivedStatTier. `value` (not `total`) mirrors DerivedStatTier's own naming, since this scales a MODIFIER, not a pool total — Rage's +2/+3/+4 damage bonus is the shape. */
+export interface BuffModifierTier {
+  minLevel: number;
+  value: number;
+}
+
+/**
+ * A row-declared while-active buff's `modifier` (#1686): either #1685's
+ * ResourceTotalFormula (a flat number, "proficiencyBonus", an ability
+ * modifier, or level x N) or a tier array — evaluateBuffModifier below is the
+ * one place this vocabulary is interpreted, reusing evaluateResourceTotal for
+ * the non-tiered half rather than a second copy of that formula's cases.
+ */
+export type BuffModifierFormula = ResourceTotalFormula | BuffModifierTier[];
+
+// Duration values re-declared here (not imported from lib/combat/active-effects.ts)
+// to keep this file's module graph clear of that file's own Prisma import —
+// class-feature-rows.test.ts's no-Prisma-import assertion only checks THIS
+// file's own import text, but the intent (a pure leaf, see ClassFeatureRow's
+// own header) would still break; ActiveBuff.duration must stay assignable
+// from this literal union, pinned by class-feature-effect-buffs.test.ts.
+export type EffectBuffDuration = "concentration" | "while-active" | "until-rest";
+
+/**
+ * One row-declared while-active buff (#1686) — a ClassFeature/GrantedAbility
+ * row's `effectBuffs` entry, instantiated as an ActiveBuff op by the generic
+ * "toggle" resolver (lib/classes/actions.ts). `target` may equal this entry's
+ * own `key` for a marker buff with no numeric effect (`modifier: 0`) — state
+ * tracking only, e.g. Elemental Attunement's shape; the seed target validator
+ * (classFeatureSeedSchema) admits that form rather than rejecting it as an
+ * unknown target. `minLevel` gates whether this WHOLE ENTRY applies at the
+ * character's current level (Song of Victory's L14 extra entry riding the
+ * same L2 toggle) — distinct from a tiered `modifier`'s own minLevel axis,
+ * which scales the value WITHIN one always-present entry (Rage's damage
+ * bonus); a row can use either axis or both without them colliding. `clearOn`
+ * is authored but has no reader yet (#1688). `endReminder` is display text
+ * only — DURABLE_BUFF_END_CONDITIONS (frontend/src/lib/turnHooks.ts) is where
+ * an actual auto-end PREDICATE lives, keyed by `key`, which is why a migrated
+ * buff's `key` must stay byte-stable with that table's own entries (Rage:
+ * "rage").
+ */
+export interface EffectBuffRow {
+  key: string;
+  target: string;
+  modifier: BuffModifierFormula;
+  duration: EffectBuffDuration;
+  minLevel?: number;
+  clearOn?: string;
+  endReminder?: string;
+  resistDamageTypes?: string[];
+  rollEffects?: RollEffect[];
 }
 
 /**
@@ -171,6 +240,9 @@ export interface ClassFeatureRow extends ResourceColumns, ActivationColumns {
   // reused rather than forked (see ClassFeature.improvements' own
   // schema.prisma comment). Read by improvementsFromRows below.
   improvements?: FeatImprovement[] | null;
+  // The row-declared while-active buff list a "toggle" resolverKind
+  // activates (#1686) — see EffectBuffRow's own comment for the shape.
+  effectBuffs?: EffectBuffRow[] | null;
 }
 
 /**
@@ -245,6 +317,36 @@ export function improvementsFromRows(
   return rows
     .filter((row) => row.edition === edition && row.level <= level)
     .flatMap((row) => row.improvements ?? []);
+}
+
+/** An EffectBuffRow with its formula/tier `modifier` evaluated to a number — ready for appendActiveBuffInTx (#1686). */
+export interface ResolvedEffectBuff {
+  key: string;
+  target: string;
+  modifier: number;
+  duration: EffectBuffDuration;
+  resistDamageTypes?: string[];
+  rollEffects?: RollEffect[];
+}
+
+/**
+ * One row's own `effectBuffs`, filtered to entries whose per-entry `minLevel`
+ * (an availability gate on the WHOLE ENTRY — Song of Victory's L14 extra
+ * entry riding the same L2 toggle) is reached at `ctx.level`, with each entry's
+ * formula/tier `modifier` evaluated to a number (#1686) — the "toggle"
+ * resolver's one read of a row's buff list (lib/classes/actions.ts).
+ */
+export function effectBuffsFromRow(row: ClassFeatureRow, ctx: ResourceTotalContext): ResolvedEffectBuff[] {
+  return (row.effectBuffs ?? [])
+    .filter((buff) => buff.minLevel === undefined || ctx.level >= buff.minLevel)
+    .map((buff) => ({
+      key: buff.key,
+      target: buff.target,
+      modifier: evaluateBuffModifier(buff.modifier, ctx),
+      duration: buff.duration,
+      ...(buff.resistDamageTypes ? { resistDamageTypes: buff.resistDamageTypes } : {}),
+      ...(buff.rollEffects ? { rollEffects: buff.rollEffects } : {}),
+    }));
 }
 
 // Last tier whose minLevel <= level (ascending, last-match-wins, #1522). Tiers

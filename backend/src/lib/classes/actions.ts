@@ -47,7 +47,7 @@ import { readAbilityCost, type AbilityCost } from "@/lib/spellcasting/ability-co
 import { readEffectSpec, resolveEffectSpec, type EffectSpec } from "@/lib/combat/effects.js";
 import { effectiveEntryLevel } from "@/lib/leveling/effective-levels.js";
 import { resolveSubclassSlug, type SubclassSlug, type SubclassIdentityInput } from "./subclass-slug.js";
-import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "./class-feature-rows.js";
+import { effectBuffsFromRow, type ClassFeatureRow, type ClassFeatureRowsCarrier, type ResourceTotalContext } from "./class-feature-rows.js";
 
 export type ActionCost = "action" | "bonusAction" | "reaction" | "free" | "special";
 
@@ -790,7 +790,10 @@ type HealOp = { type: "heal"; amount: number };
 type TempHpOp = { type: "tempHp"; amount: number };
 type ApplyBuffOp = { type: "applyBuff"; buff: Omit<ActiveBuff, "id"> };
 type ClearBuffOp = { type: "clearBuff"; key: string; reason: string };
-type ActionOp = SpendResourceOp | AdjustQuantityOp | HealOp | TempHpOp | ApplyBuffOp | ClearBuffOp;
+// Exported so toggleRowOps below (the #1686 generic toggle handler) and the
+// routes/character/actions.ts dispatcher share this exact union instead of a
+// second, structurally-equal copy.
+export type ActionOp = SpendResourceOp | AdjustQuantityOp | HealOp | TempHpOp | ApplyBuffOp | ClearBuffOp;
 
 type EffectFn = (ctx: ActionContext) => ActionOp[];
 
@@ -1020,6 +1023,105 @@ function actionFromRow(
   return buildRowAction(row, level, enabled, disabledReason);
 }
 
+// The synthesized "end" action key for a toggle row's own activate key
+// (#1686) — "rage" -> "endRage", matching the pre-migration DERIVED_ACTIONS
+// endRage key byte-for-byte, which is load-bearing:
+// DURABLE_BUFF_END_CONDITIONS (frontend/src/lib/turnHooks.ts) hardcodes
+// "endRage" as the auto-end action it invokes, keyed by the "rage" buff —
+// this function must keep producing that exact string for Rage forever, not
+// merely today.
+export function endActionKey(activateKey: string): string {
+  return `end${activateKey.charAt(0).toUpperCase()}${activateKey.slice(1)}`;
+}
+
+/**
+ * A "toggle" row's own AvailableAction PAIR (#1686) — synthesizes an activate
+ * entry (key = row.resourceKey, the same "click key = identity" convention
+ * buildRowAction uses) and an end entry (key = endActionKey(activateKey))
+ * from ONE row, replacing a hand-authored DERIVED_ACTIONS pair (Rage/endRage).
+ * Enablement checks the row's own ABILITY COST (costPoolKey/costBase — "cost
+ * columns already exist"), not resourceKey/resourceAmount: resourceKey is
+ * this row's IDENTITY here, not necessarily the pool it draws from (Elemental
+ * Attunement's identity is "elementalAttunement" but its cost draws from the
+ * shared "focus" pool; they coincide only when a feature spends its OWN
+ * dedicated pool, Rage's case, where costPoolKey === resourceKey === "rage").
+ * The end action is always enabled — same as the retired endRage
+ * DERIVED_ACTIONS row (no server-tracked "is this active" gate); clearing an
+ * inactive buff is already a safe no-op (clearBuffByKeyInTx).
+ */
+function toggleActionsFromRow(
+  row: ClassFeatureRow,
+  level: number,
+  edition: RulesEdition,
+  poolMap: Map<string, number>,
+  unarmoredUnshielded: boolean,
+): AvailableAction[] {
+  if (row.edition !== edition || row.level > level || !row.activationCost || !row.resourceKey) return [];
+  const cost = readAbilityCost(row);
+  const record: EnablementInput = {
+    resourceKey: cost.kind === "pool" ? cost.key : undefined,
+    resourceAmount: cost.kind === "pool" ? cost.base : undefined,
+    requiresUnarmored: row.requiresUnarmored ?? false,
+  };
+  const { enabled, disabledReason } = resolveEnablement(record, poolMap, unarmoredUnshielded);
+  const activateKey = row.resourceKey;
+  return [
+    {
+      key: activateKey,
+      name: row.name,
+      cost: row.activationCost as ActionCost,
+      enabled,
+      ...(disabledReason ? { disabledReason } : {}),
+      resolverKind: "toggle",
+    },
+    {
+      key: endActionKey(activateKey),
+      name: `End ${row.name}`,
+      cost: row.activationCost as ActionCost,
+      enabled: true,
+      resolverKind: "toggle",
+    },
+  ];
+}
+
+/**
+ * The generic "toggle" effect handler (#1686): instantiates a row's
+ * `effectBuffs` as ActiveBuff ops on activation, or clears them by key on
+ * end — the row-driven counterpart to a hand-authored ACTION_EFFECT_FN pair
+ * (Rage's retired `rage`/`endRage` functions). `ctx.level` is the granting
+ * class entry's OWN effective level (mirrors the retired
+ * computeRageDamageBonus's barbarian-level lookup, never the character's
+ * total level) — the same level effectBuffsFromRow uses for both a buff
+ * entry's own `minLevel` gate and a tiered `modifier`'s evaluation.
+ * Activation also pays the row's own ability cost (costPoolKey/costBase —
+ * "cost columns already exist") via a spendResource op, omitting `amount`
+ * when it's 1 to match every existing hand-authored spend's byte shape
+ * (`{ type: "spendResource", key: "rage" }`, no `amount` field).
+ */
+export function toggleRowOps(row: ClassFeatureRow, ctx: ResourceTotalContext, isEnd: boolean): ActionOp[] {
+  const buffs = effectBuffsFromRow(row, ctx);
+  if (isEnd) {
+    return buffs.map((b) => ({ type: "clearBuff", key: b.key, reason: `${row.name} ended` }));
+  }
+  const ops: ActionOp[] = buffs.map((b) => ({
+    type: "applyBuff",
+    buff: {
+      key: b.key,
+      target: b.target,
+      modifier: b.modifier,
+      source: row.name,
+      duration: b.duration,
+      ...(b.resistDamageTypes ? { resistDamageTypes: b.resistDamageTypes } : {}),
+      ...(b.rollEffects ? { rollEffects: b.rollEffects } : {}),
+    },
+  }));
+  const cost = readAbilityCost(row);
+  if (cost.kind === "pool") {
+    ops.push({ type: "spendResource", key: cost.key, ...(cost.base !== 1 ? { amount: cost.base } : {}) });
+  }
+  return ops;
+}
+
 /**
  * A dynamic subtitle for a row-driven heal (e.g. "Regain 1d10 + 3 HP") built
  * from the row's own effect columns rather than a second hand-authored
@@ -1050,6 +1152,14 @@ function actionsFromRows(
 ): AvailableAction[] {
   const actions: AvailableAction[] = [];
   for (const row of rows) {
+    // A "toggle" row synthesizes an activate/end PAIR (#1686), never a single
+    // actionFromRow entry — branched before that gate so a toggle row's
+    // resourceKey/activationCost never falls through to the cast-core/spend
+    // path below.
+    if (row.resolverKind === "toggle") {
+      actions.push(...toggleActionsFromRow(row, level, edition, poolMap, unarmoredUnshielded));
+      continue;
+    }
     const action = actionFromRow(row, level, edition, poolMap, unarmoredUnshielded);
     if (action) actions.push(action);
   }
