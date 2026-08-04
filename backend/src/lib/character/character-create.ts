@@ -90,6 +90,19 @@ type ResolvedSelections = {
   // second time) since resolveSelections already resolved it for the
   // creation-time subclass gate.
   edition: RulesEdition;
+  // #1679: the validated species/variant selection — [null, null, null] for a
+  // legacy `race`-name-only creation (the compat-window default). Increases
+  // are NOT applied this slice (#1681); persistCreatedCharacter only writes
+  // the selection + variantName snapshot onto CharacterRace.
+  speciesSelection: SpeciesSelection;
+};
+
+// #1679: the validated species/variant selection persisted onto
+// CharacterRace, sibling to subclassId/subclassName above.
+type SpeciesSelection = {
+  speciesId: string | null;
+  variantId: string | null;
+  variantName: string | null;
 };
 
 type MaterializedEquipment = {
@@ -215,6 +228,98 @@ async function resolveSubclass(
   return { ok: true, subclassId: null, subclassName: null };
 }
 
+// Validates the variant half of a #1679 species selection: a variant-bearing
+// species requires variantId, a variantless species rejects one, and a
+// supplied variantId must resolve to a variant belonging to THIS species.
+// Split out of resolveSpeciesSelection purely to keep each function's own
+// cyclomatic/cognitive complexity under the repo's health gate — same
+// reasoning as validateSkillChoices/validateToolChoices splitting out of
+// resolveProficiencies above.
+function validateVariantSelection(
+  species: { name: string; variants: { id: string; name: string }[] },
+  variantId: string | undefined,
+): PhaseResult<{ variant: { id: string; name: string } | null }> {
+  const hasVariants = species.variants.length > 0;
+  if (hasVariants && !variantId) {
+    return {
+      ok: false,
+      status: 400,
+      error: `Species "${species.name}" requires a variantId (it has ${species.variants.length} variant option(s))`,
+    };
+  }
+  if (!hasVariants && variantId) {
+    return { ok: false, status: 400, error: `Species "${species.name}" has no variants — variantId must be omitted` };
+  }
+  if (!variantId) return { ok: true, variant: null };
+
+  const variant = species.variants.find((v) => v.id === variantId);
+  if (!variant) {
+    return {
+      ok: false,
+      status: 400,
+      error: `Variant id ${variantId} does not belong to species "${species.name}"`,
+    };
+  }
+  return { ok: true, variant };
+}
+
+type SpeciesCatalogRow = { id: string; name: string; variants: { id: string; name: string }[] };
+
+// Fetches + validates the species catalog anchor alone (existence + edition
+// match) — split out of resolveSpeciesSelection purely to keep each
+// function's own cyclomatic/cognitive complexity under the repo's health
+// gate, same reasoning as validateVariantSelection above.
+async function resolveSpeciesCatalogRow(
+  speciesId: string,
+  edition: RulesEdition,
+): Promise<PhaseResult<{ species: SpeciesCatalogRow }>> {
+  const species = await prisma.species.findUnique({
+    where: { id: speciesId },
+    // Only id+name are read from variants here (existence + belongs-to checks);
+    // Dragonborn alone pulls 10 rows each carrying abilityIncreases JSON.
+    include: { variants: { select: { id: true, name: true } } },
+  });
+  if (!species) {
+    return { ok: false, status: 400, error: `Unknown species id: ${speciesId}` };
+  }
+  const mismatch = crossEditionRejection(species, `Species "${species.name}"`, edition);
+  if (mismatch) return { ok: false, status: 400, error: mismatch };
+  return { ok: true, species };
+}
+
+// Resolves + validates the #1679 species/variant selection. `edition` is the
+// same `resolveSelections`-computed local every other creation-time catalog
+// lookup uses (the Character row doesn't exist yet, so there's no column to
+// read via editionOf). Four rejection cases, matching the issue's AC: unknown
+// species id and cross-edition species (resolveSpeciesCatalogRow above), a
+// variant-bearing species missing its variantId, and a variantless species
+// (or a cross-species variant) given one anyway (validateVariantSelection).
+async function resolveSpeciesSelection(
+  input: CreateCharacterBody,
+  edition: RulesEdition,
+): Promise<PhaseResult<SpeciesSelection>> {
+  if (!input.speciesId) {
+    if (input.variantId) {
+      return { ok: false, status: 400, error: "variantId requires speciesId" };
+    }
+    return { ok: true, speciesId: null, variantId: null, variantName: null };
+  }
+
+  const catalogResult = await resolveSpeciesCatalogRow(input.speciesId, edition);
+  if (!catalogResult.ok) return catalogResult;
+  const { species } = catalogResult;
+
+  const variantResult = validateVariantSelection(species, input.variantId);
+  if (!variantResult.ok) return variantResult;
+
+  return {
+    ok: true,
+    speciesId: species.id,
+    variantId: variantResult.variant?.id ?? null,
+    variantName: variantResult.variant?.name ?? null,
+  };
+}
+
 // Validate player skill selections against the class/background pools.
 function validateSkillChoices(
   skillProficiencies: string[],
@@ -301,19 +406,30 @@ function resolveProficiencies(
   return { ok: true, skillProficiencies, creationToolProfs };
 }
 
-// Phase 1 — selection resolution: validate alignment + class count, resolve the
-// race/class/background catalog anchors, and validate subclass + proficiencies.
-async function resolveSelections(
-  input: CreateCharacterBody
-): Promise<PhaseResult<ResolvedSelections>> {
+// The two request-shape guards that must pass before any DB lookup (bad
+// alignment / empty classes). Split out of resolveSelections purely to keep
+// its own cyclomatic/cognitive complexity under the repo's health gate — same
+// reasoning as validateVariantSelection/resolveSpeciesCatalogRow above.
+function validateCreationBasics(
+  input: CreateCharacterBody,
+): PhaseResult<{ primaryClassChoice: PrimaryClassChoice }> {
   if (!ALIGNMENTS.includes(input.alignment)) {
     return { ok: false, status: 400, error: `Unknown alignment: ${input.alignment}` };
   }
   if (!input.classes.length) {
     return { ok: false, status: 400, error: "At least one class is required" };
   }
+  return { ok: true, primaryClassChoice: input.classes[0] };
+}
 
-  const primaryClassChoice = input.classes[0];
+// Phase 1 — selection resolution: validate alignment + class count, resolve the
+// race/class/background catalog anchors, and validate subclass + proficiencies.
+async function resolveSelections(
+  input: CreateCharacterBody
+): Promise<PhaseResult<ResolvedSelections>> {
+  const basics = validateCreationBasics(input);
+  if (!basics.ok) return basics;
+  const { primaryClassChoice } = basics;
 
   // Sequential rather than Promise.all: the pg driver adapter's pool can
   // warn/queue when the same PrismaClient fires concurrent queries, and
@@ -351,6 +467,9 @@ async function resolveSelections(
   const subclass = await resolveSubclass(primaryClassChoice, characterClass, edition);
   if (!subclass.ok) return subclass;
 
+  const speciesSelection = await resolveSpeciesSelection(input, edition);
+  if (!speciesSelection.ok) return speciesSelection;
+
   const proficiencies = resolveProficiencies(input, race, characterClass, background);
   if (!proficiencies.ok) return proficiencies;
 
@@ -365,6 +484,11 @@ async function resolveSelections(
     skillProficiencies: proficiencies.skillProficiencies,
     creationToolProfs: proficiencies.creationToolProfs,
     edition,
+    speciesSelection: {
+      speciesId: speciesSelection.speciesId,
+      variantId: speciesSelection.variantId,
+      variantName: speciesSelection.variantName,
+    },
   };
 }
 
@@ -1073,7 +1197,19 @@ async function persistCreatedCharacter(
       // Override derived currency with starting gold if the gold path was chosen.
       ...(startingCurrency ? { currency: startingCurrency } : {}),
       spellcasting: creationSpellcasting(clampedSpellEntries),
-      raceSelection: { create: { name: input.race, raceId: race.id } },
+      raceSelection: {
+        create: {
+          name: input.race,
+          raceId: race.id,
+          // #1679: additive alongside raceId above — null/null/null for a
+          // legacy `race`-name-only creation. abilityBonuses stays [] this
+          // slice (increases aren't applied until #1681); it's the
+          // provenance snapshot of what WOULD be applied, not a default.
+          speciesId: selections.speciesSelection.speciesId,
+          variantId: selections.speciesSelection.variantId,
+          variantName: selections.speciesSelection.variantName,
+        },
+      },
       backgroundSelection: {
         create: { name: input.background, backgroundId: background?.id ?? null },
       },

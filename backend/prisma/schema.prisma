@@ -433,6 +433,118 @@ model Race {
   selections CharacterRace[]
 }
 
+// --- Species catalog (#1679, epic #1518) ------------------------------------
+// Parent+variant catalog for the two-step species→variant creation choice
+// (2014 race→subrace, 2024 species→lineage/legacy/ancestry) — built ALONGSIDE
+// Race above, not replacing it: the flat model/seed and CharacterRace.raceId
+// keep serving the legacy creation path until #1684 prunes them (epic review
+// decision 10 — this migration is purely additive, no character wipe here).
+// `edition` is NOT NULL, unlike Subclass/Feat/Background's nullable `edition`:
+// no species is edition-neutral — rosters, ability increases, and trait text
+// all fork per edition (the ACTIONS/#1430 transcription rule), so a 2014 and
+// a 2024 Dwarf are two rows sharing a name, never one shared row. Children
+// (SpeciesVariant/SpeciesTrait/SpeciesGrantedSpell) carry NO edition column of
+// their own — they inherit it through speciesId, so a cross-edition check is
+// always a parent-edition comparison (see character-create.ts's
+// resolveSpeciesSelection).
+model Species {
+  id      String       @id @default(uuid())
+  name    String
+  slug    String
+  speed   Int
+  edition RulesEdition
+  // AbilityIncreaseSpec[] — fixed | choose | floating (abilityIncreasesSchema,
+  // lib/srd/species-ability-increases.ts). [] for every EDITION_2024 row: 2024
+  // ability increases come from backgrounds only (#1572), never species (epic
+  // body, pinned by a negative test both directions). NOT applied to a
+  // character in this slice — only the SELECTION is persisted; #1681 (slice 3)
+  // reads this column and bakes the increases into effective scores.
+  abilityIncreases Json @default("[]")
+
+  variants      SpeciesVariant[]
+  traits        SpeciesTrait[]
+  grantedSpells SpeciesGrantedSpell[]
+  selections    CharacterRace[]
+
+  @@unique([name, edition])
+  @@unique([slug, edition])
+}
+
+// A species' second creation step: 2014 subrace, 2024 lineage/legacy/ancestry,
+// or — in BOTH editions — Dragonborn's Draconic Ancestry (epic review decision
+// 7: PHB'14 calls it a trait rather than a subrace, but the schema has exactly
+// one place for a species-level creation choice, and this is it). No `edition`
+// column — inherits the parent Species row's edition.
+model SpeciesVariant {
+  id        String  @id @default(uuid())
+  speciesId String
+  species   Species @relation(fields: [speciesId], references: [id], onDelete: Cascade)
+  name      String
+  slug      String
+  // NULL = use the parent Species.speed (the common case). Set only when the
+  // book states a different value for this variant (PHB'14 Wood Elf 35 ft;
+  // no 2024 variant seeded this slice overrides speed).
+  speedOverride Int?
+  // Same AbilityIncreaseSpec[] shape as Species.abilityIncreases, additive to
+  // the parent's at creation (PHB'14 Hill Dwarf +1 WIS on top of Dwarf's own
+  // +2 CON — the create phase merges both levels, #1681). [] for every 2024
+  // row and for every Dragonborn ancestry variant in either edition (draconic
+  // ancestry grants a damage type + resistance, never an ability increase).
+  abilityIncreases Json @default("[]")
+
+  traits        SpeciesTrait[]
+  grantedSpells SpeciesGrantedSpell[]
+  selections    CharacterRace[]
+
+  @@unique([speciesId, name])
+  @@unique([speciesId, slug])
+}
+
+// Species trait content — table only in this slice; every row's actual prose
+// and mechanics are authored in #1682 (slice 4), including the Dragonborn
+// ancestry variants' breath weapon + resistance. speciesId is required (every
+// trait belongs to a species); variantId is NULL for a species-level trait
+// (the majority — Dwarven Resilience) and set for a variant-only one (Hill
+// Dwarf's Dwarven Toughness) — same base-required/child-optional shape as
+// ClassFeature's classId/subclassId.
+model SpeciesTrait {
+  id          String          @id @default(uuid())
+  speciesId   String
+  species     Species         @relation(fields: [speciesId], references: [id], onDelete: Cascade)
+  variantId   String?
+  variant     SpeciesVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  name        String
+  description String
+  // FeatImprovement[] vocabulary (Feat.improvements, srd/feats.ts) reused
+  // verbatim so #1682's derivation layer needs no new shape, only a new source.
+  improvements Json @default("[]")
+
+  // Postgres does not auto-index FK columns; #1682 resolves traits by species
+  // (include: { traits: true }) and by variant, and a species prune cascades on
+  // speciesId — index both so neither becomes a full table scan (#1679 review).
+  @@index([speciesId])
+  @@index([variantId])
+}
+
+// A spell a species/variant grants for free — sibling of SubclassGrantedSpell
+// (2024 lineage spell tracks land in #1683/slice 6), deliberately NOT the same
+// table: a species grant's source is the species/variant, never a subclass.
+// Unlike SubclassGrantedSpell's nullable `edition` (a genuine shared-vs-forked
+// axis), this has no edition column at all — it inherits edition through
+// speciesId, the same as every other Species child. No rows seeded this slice.
+model SpeciesGrantedSpell {
+  id        String          @id @default(uuid())
+  speciesId String
+  species   Species         @relation(fields: [speciesId], references: [id], onDelete: Cascade)
+  variantId String?
+  variant   SpeciesVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  spellId   String
+  spell     Spell           @relation(fields: [spellId], references: [id], onDelete: Cascade)
+  gateLevel Int
+
+  @@index([speciesId])
+}
+
 model CharacterClass {
   id                String   @id @default(uuid())
   name              String   @unique
@@ -910,6 +1022,27 @@ model CharacterRace {
   raceId      String?
   race        Race?     @relation(fields: [raceId], references: [id], onDelete: SetNull)
   name        String
+  // --- Species model (#1679) — additive alongside raceId above; both may be
+  // populated (a species-path creation sets speciesId/variantId and leaves
+  // raceId null, and vice versa for the legacy `race`-name path) until #1684
+  // prunes Race/raceId. speciesId/variantId are nullable: a homebrew or
+  // legacy-`race`-name creation has neither. variantId is set only for a
+  // variant-bearing species — character-create.ts's resolveSpeciesSelection
+  // requires one whenever the chosen species has variant rows.
+  speciesId   String?
+  species     Species?        @relation(fields: [speciesId], references: [id], onDelete: SetNull)
+  variantId   String?
+  variant     SpeciesVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  // Drifting display snapshot of the chosen variant's name — same "defaults
+  // from the catalog, free to diverge" shape as `name` above. NULL when no
+  // variant was chosen (variantless species, homebrew, or the legacy `race`
+  // path).
+  variantName String?
+  // Provenance snapshot of the ability increases actually APPLIED (owner-
+  // approved 2026-08-03) — always [] in this slice, since increases aren't
+  // applied until #1681; makes the eventual bake auditable, unlike the
+  // background ability spread (#1130), which has no equivalent record.
+  abilityBonuses Json @default("[]")
 }
 
 model CharacterBackground {
@@ -1346,6 +1479,8 @@ model Spell {
 
   // Subclasses that grant this spell for free (#898).
   grantedBy SubclassGrantedSpell[]
+  // Species/variants that grant this spell for free (#1679's table; no rows yet).
+  speciesGrantedBy SpeciesGrantedSpell[]
 }
 
 // Baseline equipment catalog, same role as Race/CharacterClass above: seeded
