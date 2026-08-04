@@ -79,10 +79,10 @@ export const createCharacterSchema = z
     // #1689: the species/variant's OWN creation choices (SpeciesTrait.choice) —
     // distinct from skillProficiencies/spells below, which are the class/
     // background pools. Required iff the resolved species+variant carries a
-    // matching choice-bearing trait; 400 otherwise, including every 2024
-    // species (the mechanism is edition-neutral, but no 2024 trait carries a
-    // `choice` yet — that's #1690's content). See resolveSpeciesChoiceGrants
-    // in character-create.ts.
+    // matching choice-bearing trait; 400 otherwise — a 2014 species without
+    // one, or a 2024 species other than the Human/Elf choice traits #1690 added
+    // (the mechanism is edition-neutral). See resolveSpeciesChoiceGrants in
+    // character-create.ts.
     speciesSkills: z.array(z.string()).optional(),
     speciesCantripId: z.string().optional(),
     // #1690: the species-granted Origin feat pick (2024 Human's Versatile) —
