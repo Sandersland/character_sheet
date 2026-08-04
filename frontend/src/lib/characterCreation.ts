@@ -8,7 +8,6 @@ import type {
   ClassOption,
   CreateCharacterInput,
   OriginFeatOption,
-  RaceOption,
   ReferenceData,
   SkillName,
   SpeciesCantripChoiceOption,
@@ -19,15 +18,10 @@ import type {
 } from "@/types/character";
 
 export interface CreationSelections {
-  /** #1680: the two-step picker's own selection. */
+  /** #1680: the two-step picker's own selection — the sole species/variant
+   *  source of truth since #1684 pruned the flat `Race` catalog. */
   species: SpeciesOption | undefined;
   variant: SpeciesVariantOption | undefined;
-  /** Legacy flat-catalog row sharing the chosen species/variant's NAME, if one
-   *  exists — kept only as useToolProficiencyChoices' (currently dormant)
-   *  race-granted-tool-proficiency source, never the picker's own source of
-   *  truth. Absent whenever no flat `Race` row shares that name (e.g. a 2024
-   *  species the flat legacy list never carried). */
-  race: RaceOption | undefined;
   class: ClassOption | undefined;
   background: BackgroundOption | undefined;
 }
@@ -308,7 +302,6 @@ export function resolveSelections(
   return {
     species,
     variant,
-    race: reference?.races.find((r) => r.name === (variant?.name ?? species?.name)),
     class: reference?.classes.find((c) => c.name === draft.className),
     background: reference?.backgrounds.find((b) => b.name === draft.background),
   };
@@ -448,12 +441,11 @@ export function buildCreatePayload(
   return {
     name: draft.name.trim(),
     alignment: draft.alignment,
-    // POST /api/characters still requires `race` as a display-name string
-    // (#1679's compat window, pruned in #1684) — resolved from the chosen
-    // species/variant's own name so it always echoes what the two-step
-    // picker (#1680) shows, rather than a second, separately-picked value.
-    race: selections.variant?.name ?? selections.species?.name ?? "",
-    speciesId: draft.speciesId || undefined,
+    // #1684: speciesId is the sole mechanical anchor (the flat `race` field
+    // and its legacy create path are gone) — always set by submit time, the
+    // same "gated by CreationCeremony's step validity" guarantee `rulesEdition`
+    // below relies on.
+    speciesId: draft.speciesId,
     variantId: draft.variantId || undefined,
     // Only send a completed CHOICE; a fixed-only species (or none) sends
     // undefined — the backend applies fixed increases unconditionally with no

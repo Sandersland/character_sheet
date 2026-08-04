@@ -215,7 +215,6 @@ describe("CharacterCreatePage (#1176 ceremony)", () => {
     expect(mockCreateCharacter).toHaveBeenCalledWith({
       name: "Alric",
       alignment: "Lawful Good",
-      race: "Human",
       speciesId: "sp-human",
       background: "Sage",
       classes: [{ name: "Bard", subclass: null, subclassId: undefined }],

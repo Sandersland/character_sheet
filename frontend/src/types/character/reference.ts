@@ -275,7 +275,7 @@ export interface ReferenceData {
 }
 
 /** Body for `POST /api/characters`. The backend derives AC/HP/saves/skills
- * from `race`/`classes[0]`/`abilityScores` via `deriveCreatedCharacter` —
+ * from `speciesId`/`classes[0]`/`abilityScores` via `deriveCreatedCharacter` —
  * rather than the client computing and sending them. */
 // One selection per equipment choice group when mode:"package".
 export interface PackageSelection {
@@ -291,12 +291,10 @@ export interface CreateCharacterInput {
   name: string;
   alignment: string;
   experiencePoints?: number;
-  race: string;
-  /** #1679/#1680: the two-step picker's real selection — ids, like
-   *  `subclassId`. `race` above stays required alongside these (the display
-   *  name POST /api/characters still needs until #1684 prunes the legacy path);
-   *  the frontend no longer presents a race picker. */
-  speciesId?: string;
+  /** #1679/#1680/#1684: the two-step picker's real selection — ids, like
+   *  `subclassId`. The sole mechanical anchor since the flat `race` field and
+   *  its legacy create path were pruned. */
+  speciesId: string;
   variantId?: string;
   /** 2014 species/subrace ability increases (#1681): the CHOSEN portion only
    *  (fixed increases apply server-side with no request field). Sent only

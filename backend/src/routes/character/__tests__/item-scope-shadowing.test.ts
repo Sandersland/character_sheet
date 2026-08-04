@@ -20,6 +20,7 @@ import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
+import { seededSpeciesId } from "@/test-support/species.js";
 
 const OWNER_ID = "owner-item-scope-shadowing";
 // A real seeded catalog item, so the shadow is over content that genuinely
@@ -40,13 +41,14 @@ let fixtureClassId: string;
 let campaignId: string;
 let globalDaggerId: string;
 let campaignDaggerId: string;
+let human2014Id: string;
 const createdCharacterIds: string[] = [];
 
 function baseBody() {
   return {
     name: "Fixture Shadowing Character",
     alignment: "True Neutral",
-    race: "Human",
+    speciesId: human2014Id,
     background: "Soldier",
     classes: [{ name: FIXTURE_CLASS.name }],
     abilityScores: {
@@ -65,6 +67,7 @@ function baseBody() {
 beforeAll(async () => {
   await ensureTestOwner(OWNER_ID);
   COOKIE = await authCookie(OWNER_ID);
+  human2014Id = await seededSpeciesId("Human", "EDITION_2014");
 
   const cls = await prisma.characterClass.upsert({
     where: { name: FIXTURE_CLASS.name },

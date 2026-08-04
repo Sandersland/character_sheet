@@ -5,6 +5,7 @@ import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
+import { seededSpeciesAnchor } from "@/test-support/species.js";
 
 // Unique fixture ids for this file (parallel-safe on the shared dev DB).
 const OWNER_A = "owner-campaigns-a"; // creator
@@ -210,7 +211,7 @@ describe("campaigns (#246)", () => {
       .send({
         name: "test-campaigns-char-edition-mismatch",
         alignment: "True Neutral",
-        race: "Hill Dwarf",
+        ...(await seededSpeciesAnchor("EDITION_2014")),
         background: "Sage",
         classes: [{ name: "Fighter" }],
         abilityScores: {
@@ -269,7 +270,7 @@ describe("campaigns (#246)", () => {
       .send({
         name: "test-campaigns-char-edition-pin",
         alignment: "True Neutral",
-        race: "Hill Dwarf",
+        ...(await seededSpeciesAnchor("EDITION_2014")),
         background: "Sage",
         classes: [{ name: "Fighter" }],
         abilityScores: {
@@ -324,7 +325,7 @@ describe("campaigns (#246)", () => {
       .send({
         name: "test-campaigns-char-campaign-edition-pin",
         alignment: "True Neutral",
-        race: "Hill Dwarf",
+        ...(await seededSpeciesAnchor("EDITION_2014")),
         background: "Sage",
         classes: [{ name: "Fighter" }],
         abilityScores: {

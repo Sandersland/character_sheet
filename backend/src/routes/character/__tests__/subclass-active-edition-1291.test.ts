@@ -16,6 +16,7 @@ import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
+import { seededSpeciesAnchor } from "@/test-support/species.js";
 
 const OWNER_ID = "owner-1291-subclass-active";
 let COOKIE: string;
@@ -49,13 +50,14 @@ afterEach(async () => {
 });
 
 async function createCharacter(name: string, rulesEdition: "EDITION_2014" | "EDITION_2024") {
+  const anchor = await seededSpeciesAnchor(rulesEdition);
   const res = await supertest(app)
     .post("/api/characters")
     .set("Cookie", COOKIE)
     .send({
       name,
       alignment: "True Neutral",
-      race: "Hill Dwarf",
+      ...anchor,
       background: "Sage",
       classes: [{ name: "Cleric" }],
       abilityScores: BASE_ABILITY_SCORES,

@@ -13,6 +13,7 @@ import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
+import { seededSpeciesAnchor } from "@/test-support/species.js";
 
 const OWNER_ID = "owner-1308-subclass-gate";
 let COOKIE: string;
@@ -66,13 +67,14 @@ afterEach(async () => {
 });
 
 async function createCharacter(name: string, className: string, rulesEdition: "EDITION_2014" | "EDITION_2024") {
+  const anchor = await seededSpeciesAnchor(rulesEdition);
   const res = await supertest(app)
     .post("/api/characters")
     .set("Cookie", COOKIE)
     .send({
       name,
       alignment: "True Neutral",
-      race: "Hill Dwarf",
+      ...anchor,
       background: "Sage",
       classes: [{ name: className }],
       abilityScores: BASE_ABILITY_SCORES,
@@ -190,13 +192,14 @@ describe("2014 subclass gate — seeded Cleric (gate 1) and Wizard (gate 2), #13
 // CREATION.
 describe("character creation subclass gate (#1308)", () => {
   it("rejects a Life Domain subclassId at creation for a 2024 Cleric (gate 3, not creation)", async () => {
+    const anchor = await seededSpeciesAnchor("EDITION_2024");
     const res = await supertest(app)
       .post("/api/characters")
       .set("Cookie", COOKIE)
       .send({
         name: "1308 Gate Create Cleric 2024",
         alignment: "True Neutral",
-        race: "Hill Dwarf",
+        ...anchor,
         background: "Sage",
         classes: [{ name: "Cleric", subclassId: lifeDomainId }],
         abilityScores: BASE_ABILITY_SCORES,
@@ -207,13 +210,14 @@ describe("character creation subclass gate (#1308)", () => {
   });
 
   it("accepts a Life Domain subclassId at creation for a 2014 Cleric (gate 1 = creation)", async () => {
+    const anchor = await seededSpeciesAnchor("EDITION_2014");
     const res = await supertest(app)
       .post("/api/characters")
       .set("Cookie", COOKIE)
       .send({
         name: "1308 Gate Create Cleric 2014",
         alignment: "True Neutral",
-        race: "Hill Dwarf",
+        ...anchor,
         background: "Sage",
         classes: [{ name: "Cleric", subclassId: lifeDomainId }],
         abilityScores: BASE_ABILITY_SCORES,

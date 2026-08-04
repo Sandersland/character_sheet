@@ -137,6 +137,51 @@ describe("attune / unattune operations (#545)", () => {
     expect((await prisma.inventoryItem.findUniqueOrThrow({ where: { id: itemId } })).attuned).toBe(false);
   });
 
+  // #1684: the species prereq now resolves through raceSelection.species/
+  // variant (catalog-linked), not the free-drifting raceSelection.name string
+  // — proven against a REAL speciesId/variantId anchor, not the fixture's own
+  // homebrew `raceSelection: { create: { name: "Elf" } }` (no FK).
+  it("resolves a species prerequisite against a real speciesId/variantId-anchored character (variant name wins)", async () => {
+    const dwarf = await prisma.species.findFirstOrThrow({
+      where: { slug: "dwarf", edition: "EDITION_2014" },
+      include: { variants: true },
+    });
+    const hillDwarf = dwarf.variants.find((v) => v.slug === "hill")!;
+    const speciesCharacter = await prisma.character.create({
+      data: {
+        ...MINIMAL_CHARACTER,
+        name: "Species Attune Fixture",
+        ownerId: OWNER_ID,
+        rulesEdition: "EDITION_2014",
+        spellcasting: Prisma.JsonNull,
+        classEntries: { create: { name: "Fighter", level: 1, position: 0 } },
+        raceSelection: {
+          create: { name: hillDwarf.name, speciesId: dwarf.id, variantId: hillDwarf.id, variantName: hillDwarf.name },
+        },
+      },
+    });
+
+    const itemId = await makeItem(speciesCharacter.id, "Axe of the Dwarvish Lords", {
+      attunementPrereqKind: "species",
+      attunementPrereqValue: "Hill Dwarf",
+    });
+    await applyInventoryOperations(speciesCharacter.id, [{ type: "attune", inventoryItemId: itemId }]);
+    expect((await prisma.inventoryItem.findUniqueOrThrow({ where: { id: itemId } })).attuned).toBe(true);
+
+    // The parent species' own name ("Dwarf") does NOT satisfy a prerequisite
+    // pinned to the more specific variant name — proves the match resolves
+    // the VARIANT relation, not just "some species field or other".
+    const wrongItemId = await makeItem(speciesCharacter.id, "Axe of Generic Dwarves", {
+      attunementPrereqKind: "species",
+      attunementPrereqValue: "Dwarf",
+    });
+    await expect(
+      applyInventoryOperations(speciesCharacter.id, [{ type: "attune", inventoryItemId: wrongItemId }]),
+    ).rejects.toThrow(/requires attunement by a Dwarf/);
+
+    await prisma.character.deleteMany({ where: { id: speciesCharacter.id } });
+  });
+
   it("allows attune when a spellcaster prerequisite is met (Wizard)", async () => {
     const itemId = await makeItem(characterId, "Staff of Power", {
       attunementPrereqKind: "spellcaster",

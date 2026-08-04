@@ -69,7 +69,6 @@ type Ok<T> = { ok: true } & T;
 type PhaseResult<T> = Fail | Ok<T>;
 
 type PrimaryClassChoice = CreateCharacterBody["classes"][number];
-type ResolvedRace = NonNullable<Awaited<ReturnType<typeof prisma.race.findUnique>>>;
 type ResolvedClass = NonNullable<Awaited<ReturnType<typeof prisma.characterClass.findUnique>>>;
 type ResolvedBackground = Prisma.BackgroundGetPayload<{ include: { originFeat: true } }> | null;
 
@@ -87,7 +86,7 @@ const MAGIC_INITIATE_CLASS_BY_BACKGROUND: Record<string, string> = {
   Acolyte: "Cleric",
   Sage: "Wizard",
 };
-type CreationToolProf = { name: string; source: "background" | "class" | "race" };
+type CreationToolProf = { name: string; source: "background" | "class" };
 type PackageEquipment = Extract<
   NonNullable<CreateCharacterBody["startingEquipment"]>,
   { mode: "package" }
@@ -97,7 +96,6 @@ type InventoryCreate = ReturnType<typeof buildInventoryCreateFromCatalog>;
 
 type ResolvedSelections = {
   primaryClassChoice: PrimaryClassChoice;
-  race: ResolvedRace;
   characterClass: ResolvedClass;
   background: ResolvedBackground;
   subclassId: string | null;
@@ -110,27 +108,32 @@ type ResolvedSelections = {
   // second time) since resolveSelections already resolved it for the
   // creation-time subclass gate.
   edition: RulesEdition;
-  // #1679: the validated species/variant selection — [null, null, null] for a
-  // legacy `race`-name-only creation (the compat-window default). #1681's
+  // #1679/#1684: the validated species/variant selection — the sole
+  // mechanical anchor since the flat Race model was pruned. #1681's
   // resolveSpeciesGrants resolves this into a SpeciesGrants (ability increases
   // baked into effective scores + the applied-increases provenance snapshot);
   // persistCreatedCharacter writes the selection + variantName + abilityBonuses
   // onto CharacterRace.
   speciesSelection: SpeciesSelection;
   // #1689: the confirmed species/variant's own choice-bearing trait specs
-  // (SpeciesTrait.choice) — { null, null } for a legacy `race`-name-only
-  // creation OR a species with no choice-bearing trait (every 2024 species
-  // this slice). resolveSpeciesSkillGrant/resolveSpeciesCantripGrant read
-  // this to validate + apply speciesSkills/speciesCantripId.
+  // (SpeciesTrait.choice) — { null, null } for a species with no
+  // choice-bearing trait (every 2024 species this slice).
+  // resolveSpeciesSkillGrant/resolveSpeciesCantripGrant read this to
+  // validate + apply speciesSkills/speciesCantripId.
   speciesChoiceSpecs: SpeciesChoiceSpecs;
 };
 
-// #1679: the validated species/variant selection persisted onto
-// CharacterRace, sibling to subclassId/subclassName above.
+// #1679/#1684: the validated species/variant selection persisted onto
+// CharacterRace, sibling to subclassId/subclassName above — the sole
+// mechanical anchor (speed + display name) since the flat Race model's prune.
 type SpeciesSelection = {
-  speciesId: string | null;
+  speciesId: string;
+  speciesName: string;
   variantId: string | null;
   variantName: string | null;
+  // Variant speedOverride wins, else the parent species' own speed —
+  // deriveCreatedCharacter's replacement for the pruned Race.speed anchor.
+  speed: number;
 };
 
 type MaterializedEquipment = {
@@ -264,9 +267,9 @@ async function resolveSubclass(
 // reasoning as validateSkillChoices/validateToolChoices splitting out of
 // resolveProficiencies above.
 function validateVariantSelection(
-  species: { name: string; variants: { id: string; name: string }[] },
+  species: { name: string; variants: { id: string; name: string; speedOverride: number | null }[] },
   variantId: string | undefined,
-): PhaseResult<{ variant: { id: string; name: string } | null }> {
+): PhaseResult<{ variant: { id: string; name: string; speedOverride: number | null } | null }> {
   const hasVariants = species.variants.length > 0;
   if (hasVariants && !variantId) {
     return {
@@ -291,7 +294,12 @@ function validateVariantSelection(
   return { ok: true, variant };
 }
 
-type SpeciesCatalogRow = { id: string; name: string; variants: { id: string; name: string }[] };
+type SpeciesCatalogRow = {
+  id: string;
+  name: string;
+  speed: number;
+  variants: { id: string; name: string; speedOverride: number | null }[];
+};
 
 // Fetches + validates the species catalog anchor alone (existence + edition
 // match) — split out of resolveSpeciesSelection purely to keep each
@@ -303,9 +311,10 @@ async function resolveSpeciesCatalogRow(
 ): Promise<PhaseResult<{ species: SpeciesCatalogRow }>> {
   const species = await prisma.species.findUnique({
     where: { id: speciesId },
-    // Only id+name are read from variants here (existence + belongs-to checks);
-    // Dragonborn alone pulls 10 rows each carrying abilityIncreases JSON.
-    include: { variants: { select: { id: true, name: true } } },
+    // id+name+speedOverride are read from variants here (existence/belongs-to
+    // checks and the #1684 speed anchor); Dragonborn alone pulls 10 rows each
+    // carrying abilityIncreases JSON, so this stays a narrow select.
+    include: { variants: { select: { id: true, name: true, speedOverride: true } } },
   });
   if (!species) {
     return { ok: false, status: 400, error: `Unknown species id: ${speciesId}` };
@@ -315,36 +324,33 @@ async function resolveSpeciesCatalogRow(
   return { ok: true, species };
 }
 
-// Resolves + validates the #1679 species/variant selection. `edition` is the
-// same `resolveSelections`-computed local every other creation-time catalog
-// lookup uses (the Character row doesn't exist yet, so there's no column to
-// read via editionOf). Four rejection cases, matching the issue's AC: unknown
-// species id and cross-edition species (resolveSpeciesCatalogRow above), a
-// variant-bearing species missing its variantId, and a variantless species
-// (or a cross-species variant) given one anyway (validateVariantSelection).
+// Resolves + validates the #1679/#1684 species/variant selection — the sole
+// mechanical anchor (speciesId is required by the zod schema). `edition` is
+// the same `resolveSelections`-computed local every other creation-time
+// catalog lookup uses (the Character row doesn't exist yet, so there's no
+// column to read via editionOf). Three rejection cases, matching the issue's
+// AC: unknown species id and cross-edition species (resolveSpeciesCatalogRow
+// above), a variant-bearing species missing its variantId, and a variantless
+// species (or a cross-species variant) given one anyway (validateVariantSelection).
 async function resolveSpeciesSelection(
   input: CreateCharacterBody,
   edition: RulesEdition,
 ): Promise<PhaseResult<SpeciesSelection>> {
-  if (!input.speciesId) {
-    if (input.variantId) {
-      return { ok: false, status: 400, error: "variantId requires speciesId" };
-    }
-    return { ok: true, speciesId: null, variantId: null, variantName: null };
-  }
-
   const catalogResult = await resolveSpeciesCatalogRow(input.speciesId, edition);
   if (!catalogResult.ok) return catalogResult;
   const { species } = catalogResult;
 
   const variantResult = validateVariantSelection(species, input.variantId);
   if (!variantResult.ok) return variantResult;
+  const { variant } = variantResult;
 
   return {
     ok: true,
     speciesId: species.id,
-    variantId: variantResult.variant?.id ?? null,
-    variantName: variantResult.variant?.name ?? null,
+    speciesName: species.name,
+    variantId: variant?.id ?? null,
+    variantName: variant?.name ?? null,
+    speed: variant?.speedOverride ?? species.speed,
   };
 }
 
@@ -363,22 +369,17 @@ async function speciesGrantsSpells(speciesId: string, variantId: string | null):
 
 // Phase 1.7 — the #1683 casting-ability choice: required iff the resolved
 // species+variant grants at least one spell (speciesGrantsSpells above),
-// rejected otherwise (no species selected, or a species/variant that grants
-// nothing — Dragonborn's ancestry, Goliath's Giant Ancestry, every 2014
-// species this wave). Immutable post-creation like every other species
-// selection field (no race transaction endpoint) — written straight through
-// to CharacterRace.castingAbility with no further validation here: the zod
+// rejected otherwise (a species/variant that grants nothing — Dragonborn's
+// ancestry, Goliath's Giant Ancestry, every 2014 species this wave).
+// Immutable post-creation like every other species selection field (no
+// species transaction endpoint) — written straight through to
+// CharacterRace.castingAbility with no further validation here: the zod
 // schema already restricts it to the three ability names.
 async function resolveCastingAbility(
   input: CreateCharacterBody,
   speciesSelection: SpeciesSelection,
 ): Promise<PhaseResult<{ castingAbility: string | null }>> {
   const submitted = input.castingAbility;
-  if (!speciesSelection.speciesId) {
-    if (submitted) return { ok: false, status: 400, error: "castingAbility not allowed: no species selected" };
-    return { ok: true, castingAbility: null };
-  }
-
   const grantsSpells = await speciesGrantsSpells(speciesSelection.speciesId, speciesSelection.variantId);
   if (!grantsSpells) {
     if (submitted) return { ok: false, status: 400, error: "castingAbility not allowed: this species/variant grants no spells" };
@@ -407,8 +408,6 @@ type SpeciesChoiceSpecs = {
   chooseOriginFeat: boolean;
 };
 
-const NO_SPECIES_CHOICES: SpeciesChoiceSpecs = { chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false };
-
 async function fetchSpeciesChoiceSpecs(speciesId: string, variantId: string | null): Promise<SpeciesChoiceSpecs> {
   const traits = await prisma.speciesTrait.findMany({
     where: { speciesId, OR: [{ variantId: null }, ...(variantId ? [{ variantId }] : [])] },
@@ -422,15 +421,6 @@ async function fetchSpeciesChoiceSpecs(speciesId: string, variantId: string | nu
     chooseCantrip: choices.find(isChooseCantrip)?.chooseCantrip ?? null,
     chooseOriginFeat: choices.some(isChooseOriginFeat),
   };
-}
-
-// {null, null} for a legacy `race`-name-only creation (no speciesId to look
-// traits up against) — split out of resolveSelections purely to keep that
-// function's own cyclomatic/cognitive complexity under the repo's health gate.
-async function resolveSpeciesChoiceSpecsFor(speciesSelection: SpeciesSelection): Promise<SpeciesChoiceSpecs> {
-  return speciesSelection.speciesId
-    ? fetchSpeciesChoiceSpecs(speciesSelection.speciesId, speciesSelection.variantId)
-    : NO_SPECIES_CHOICES;
 }
 
 // #1689: validates speciesSkills against the trait's own count/from spec AND
@@ -511,7 +501,7 @@ function validateSkillChoices(
 }
 
 // Validate the player's tool selections against the class toolChoices pool.
-// Fixed grants come from background/class/race and are applied server-side.
+// Fixed grants come from background/class and are applied server-side.
 function validateToolChoices(
   playerToolChoices: string[],
   characterClass: ResolvedClass
@@ -545,7 +535,6 @@ function validateToolChoices(
 // creation-fixed tool proficiencies from all fixed sources.
 function resolveProficiencies(
   input: CreateCharacterBody,
-  race: ResolvedRace,
   characterClass: ResolvedClass,
   background: ResolvedBackground,
   speciesSkillSpec: ChooseSkills | null,
@@ -560,12 +549,14 @@ function resolveProficiencies(
   const toolError = validateToolChoices(playerToolChoices, characterClass);
   if (toolError) return toolError;
 
-  // Assemble creation-fixed tool proficiencies from all three fixed sources.
-  // toolChoices (player picks) count as a "class" source.
+  // Assemble creation-fixed tool proficiencies from the two fixed sources —
+  // no species/race source exists: the flat Race model never seeded a
+  // toolProficiencies row (confirmed empty, #1684) and no species-granted
+  // tool-proficiency mechanism exists yet either. toolChoices (player picks)
+  // count as a "class" source.
   const creationToolProfs: CreationToolProf[] = [
     ...(background?.toolProficiencies ?? []).map((name) => ({ name, source: "background" as const })),
     ...(characterClass.toolProficiencies ?? []).map((name) => ({ name, source: "class" as const })),
-    ...(race.toolProficiencies ?? []).map((name) => ({ name, source: "race" as const })),
     ...playerToolChoices.map((name) => ({ name, source: "class" as const })),
   ];
 
@@ -593,30 +584,25 @@ function validateCreationBasics(
   return { ok: true, primaryClassChoice: input.classes[0] };
 }
 
-// Fetches + validates the race/class catalog anchors alone (both required —
-// mechanical derivation needs an anchor for each). Split out of
-// resolveSelections purely to keep its own cyclomatic/cognitive complexity
-// under the repo's health gate, same reasoning as validateVariantSelection /
+// Fetches + validates the class catalog anchor alone (species is resolved
+// separately by resolveSpeciesSelection). Split out of resolveSelections
+// purely to keep its own cyclomatic/cognitive complexity under the repo's
+// health gate, same reasoning as validateVariantSelection /
 // resolveSpeciesCatalogRow above.
-async function resolveClassAndRace(
-  input: CreateCharacterBody,
+async function resolveCharacterClass(
   primaryClassChoice: PrimaryClassChoice,
-): Promise<PhaseResult<{ race: ResolvedRace; characterClass: ResolvedClass }>> {
-  const race = await prisma.race.findUnique({ where: { name: input.race } });
+): Promise<PhaseResult<{ characterClass: ResolvedClass }>> {
   const characterClass = await prisma.characterClass.findUnique({
     where: { name: primaryClassChoice.name },
   });
-  if (!race) {
-    return { ok: false, status: 400, error: `Unknown race: ${input.race}` };
-  }
   if (!characterClass) {
     return { ok: false, status: 400, error: `Unknown class: ${primaryClassChoice.name}` };
   }
-  return { ok: true, race, characterClass };
+  return { ok: true, characterClass };
 }
 
 // Phase 1 — selection resolution: validate alignment + class count, resolve the
-// race/class/background catalog anchors, and validate subclass + proficiencies.
+// species/class/background catalog anchors, and validate subclass + proficiencies.
 async function resolveSelections(
   input: CreateCharacterBody
 ): Promise<PhaseResult<ResolvedSelections>> {
@@ -636,12 +622,12 @@ async function resolveSelections(
   const edition: RulesEdition = input.rulesEdition ?? DEFAULT_RULES_EDITION;
 
   // The background only grants skill-proficiency choices (no mechanical
-  // fields), so — unlike race/class — it's allowed to be homebrew: an
+  // fields), so — unlike class/species — it's allowed to be homebrew: an
   // unresolved name is kept as-is with a null backgroundId rather than
   // rejected.
-  const classAndRace = await resolveClassAndRace(input, primaryClassChoice);
-  if (!classAndRace.ok) return classAndRace;
-  const { race, characterClass } = classAndRace;
+  const classResult = await resolveCharacterClass(primaryClassChoice);
+  if (!classResult.ok) return classResult;
+  const { characterClass } = classResult;
 
   const backgroundCandidates = await prisma.background.findMany({
     where: withEditionOrShared({ name: input.background }, edition),
@@ -657,15 +643,14 @@ async function resolveSelections(
 
   // #1689: fetched before proficiencies below — resolveProficiencies needs
   // chooseSkills to validate speciesSkills.
-  const speciesChoiceSpecs = await resolveSpeciesChoiceSpecsFor(speciesSelection);
+  const speciesChoiceSpecs = await fetchSpeciesChoiceSpecs(speciesSelection.speciesId, speciesSelection.variantId);
 
-  const proficiencies = resolveProficiencies(input, race, characterClass, background, speciesChoiceSpecs.chooseSkills);
+  const proficiencies = resolveProficiencies(input, characterClass, background, speciesChoiceSpecs.chooseSkills);
   if (!proficiencies.ok) return proficiencies;
 
   return {
     ok: true,
     primaryClassChoice,
-    race,
     characterClass,
     background,
     subclassId: subclass.subclassId,
@@ -675,8 +660,10 @@ async function resolveSelections(
     edition,
     speciesSelection: {
       speciesId: speciesSelection.speciesId,
+      speciesName: speciesSelection.speciesName,
       variantId: speciesSelection.variantId,
       variantName: speciesSelection.variantName,
+      speed: speciesSelection.speed,
     },
     speciesChoiceSpecs,
   };
@@ -971,8 +958,8 @@ async function fetchMergedAbilityIncreases(
 // specs (#1679), validate the chosen portion against `speciesAbilities`, and fold
 // BOTH fixed and chosen increases into effective scores — baked BEFORE
 // deriveCreatedCharacter, same "no reversible delta" shape as the background
-// spread (#1130), and for the same reason: race is immutable post-creation (no
-// race transaction endpoint), so there is nothing for a delta to ever reverse.
+// spread (#1130), and for the same reason: species is immutable post-creation
+// (no species transaction endpoint), so there is nothing for a delta to ever reverse.
 // No LEVEL_GATED_RECONCILERS entry follows from the same fact — the legal
 // maximum this state can reach never changes with level, only at creation.
 //
@@ -1687,7 +1674,7 @@ function speciesCantripEntryOf(spellEntries: SpellEntry[] | null): SpellEntry | 
   return spellEntries?.find((e) => e.source === "species") ?? null;
 }
 
-// #1679/#1681/#1689: the raceSelection.create payload — species/variant
+// #1679/#1681/#1684/#1689: the raceSelection.create payload — species/variant
 // selection, the #1681 ability-increase provenance snapshot, and the #1689
 // creation-choice provenance snapshot, all siblings on one row. Split out of
 // persistCreatedCharacter purely to keep that function's own
@@ -1700,21 +1687,22 @@ function raceSelectionCreateInput(
   speciesOriginFeatName: string | null,
   castingAbility: string | null,
 ) {
+  const { speciesSelection } = selections;
   return {
-    name: input.race,
-    raceId: selections.race.id,
-    // #1679: additive alongside raceId above — null/null/null for a legacy
-    // `race`-name-only creation. abilityBonuses is the #1681 provenance
-    // snapshot of exactly what resolveSpeciesGrants applied (fixed + chosen)
-    // — [] for a 2024 character, a legacy `race`-name creation, or a species
-    // with no increases in its merged spec.
-    speciesId: selections.speciesSelection.speciesId,
-    variantId: selections.speciesSelection.variantId,
-    variantName: selections.speciesSelection.variantName,
+    // #1684: the display-name snapshot defaults from the resolved variant
+    // (more specific) or the species itself — the flat Race model's own
+    // `name` no longer exists as a separate input.
+    name: speciesSelection.variantName ?? speciesSelection.speciesName,
+    speciesId: speciesSelection.speciesId,
+    variantId: speciesSelection.variantId,
+    variantName: speciesSelection.variantName,
+    // abilityBonuses is the #1681 provenance snapshot of exactly what
+    // resolveSpeciesGrants applied (fixed + chosen) — [] for a 2024
+    // character or a species with no increases in its merged spec.
     abilityBonuses: appliedIncreases as unknown as Prisma.InputJsonValue,
     // #1683: the 2024 lineage/legacy casting-ability choice, resolved by
-    // resolveCastingAbility — null for a 2014 character, a legacy
-    // `race`-name creation, or a species/variant that grants no spells.
+    // resolveCastingAbility — null for a 2014 character or a species/variant
+    // that grants no spells.
     castingAbility,
     // #1689: provenance snapshot of the species-granted creation choices,
     // sibling to abilityBonuses above — [] / null for every species with no
@@ -1778,7 +1766,7 @@ async function persistCreatedCharacter(
       skillProficiencies: selections.skillProficiencies,
       toolProficiencies: selections.creationToolProfs,
     },
-    { race: selections.race, characterClass }
+    { species: { speed: selections.speciesSelection.speed }, characterClass }
   );
 
   const resources = creationResources([originEntry, speciesOriginFeatEntry]);

@@ -9,10 +9,17 @@ import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 import { inventoryItemFixtureData } from "@/test-support/inventory-snapshot-fixture.js";
+import { seededSpeciesId } from "@/test-support/species.js";
 
 const TEST_USER = { id: "test-user-1", email: "fixture-owner@test.local" };
 let COOKIE: string;
 const TEST_RACE = { name: "Test Race", speed: 30 };
+// #1684: the flat Race model is gone — speciesId is the creation-route
+// anchor. Shares TEST_RACE's own display name so `expect(...).race` pins
+// below stay unchanged; edition-invariant (EDITION_2024), no variants, no
+// #1690 choice trait, so every createBody below needs no further fields.
+const TEST_SPECIES = { name: TEST_RACE.name, slug: "zzz-fixture-characters-test", speed: TEST_RACE.speed, edition: "EDITION_2024" as const };
+let testSpeciesId: string;
 const TEST_CLASS = {
   name: "Test Class",
   hitDie: "d10",
@@ -76,11 +83,12 @@ describe("characters routes", () => {
     COOKIE = await authCookie(TEST_USER.id);
     // Sequential rather than Promise.all — see the matching comment in
     // charactersRouter's POST handler.
-    const race = await prisma.race.upsert({
-      where: { name: TEST_RACE.name },
-      create: TEST_RACE,
-      update: TEST_RACE,
+    const species = await prisma.species.upsert({
+      where: { slug_edition: { slug: TEST_SPECIES.slug, edition: TEST_SPECIES.edition } },
+      create: TEST_SPECIES,
+      update: TEST_SPECIES,
     });
+    testSpeciesId = species.id;
     const characterClass = await prisma.characterClass.upsert({
       where: { name: TEST_CLASS.name },
       create: TEST_CLASS,
@@ -106,7 +114,7 @@ describe("characters routes", () => {
         ...FIXTURE,
         owner: { connect: { id: TEST_USER.id } },
         spellcasting: Prisma.JsonNull,
-        raceSelection: { create: { name: race.name, raceId: race.id } },
+        raceSelection: { create: { name: species.name, speciesId: species.id } },
         backgroundSelection: { create: { name: background.name, backgroundId: background.id } },
         classEntries: {
           create: [{ name: characterClass.name, classId: characterClass.id, position: 0 }],
@@ -154,7 +162,7 @@ describe("characters routes", () => {
   // churn ids — but a later file on this worker inherits the same database, so
   // they must not linger as selectable catalog options once the suite is done.
   afterAll(async () => {
-    await prisma.race.deleteMany({ where: { name: TEST_RACE.name } });
+    await prisma.species.deleteMany({ where: { slug: TEST_SPECIES.slug } });
     await prisma.characterClass.deleteMany({ where: { name: TEST_CLASS.name } });
     await prisma.background.deleteMany({ where: { name: TEST_BACKGROUND.name } });
     await prisma.item.deleteMany({ where: { name: TEST_ITEM.name } });
@@ -430,10 +438,13 @@ describe("characters routes", () => {
   });
 
   describe("POST /api/characters", () => {
-    const createBody = {
+    // A function, not a const: speciesId isn't known until the outer
+    // beforeEach's upsert runs, so each call reads the CURRENT testSpeciesId
+    // rather than one captured at describe-body evaluation time.
+    const createBody = () => ({
       name: "New Hero",
       alignment: "Lawful Good",
-      race: TEST_RACE.name,
+      speciesId: testSpeciesId,
       background: TEST_BACKGROUND.name,
       classes: [{ name: TEST_CLASS.name }],
       abilityScores: {
@@ -445,12 +456,12 @@ describe("characters routes", () => {
         charisma: 8,
       },
       skillProficiencies: ["athletics", "perception"],
-    };
+    });
 
     it("creates a character and derives mechanical fields from the catalog", async () => {
       const response = await supertest.agent(app).set("Cookie", COOKIE)
         .post("/api/characters")
-        .send(createBody);
+        .send(createBody());
 
       expect(response.status).toBe(201);
       createdCharacterIds.push(response.body.id);
@@ -489,7 +500,7 @@ describe("characters routes", () => {
     it("persists the race/background/class as cascade-deleted selection rows", async () => {
       const response = await supertest.agent(app).set("Cookie", COOKIE)
         .post("/api/characters")
-        .send(createBody);
+        .send(createBody());
 
       expect(response.status).toBe(201);
       const id = response.body.id;
@@ -514,7 +525,7 @@ describe("characters routes", () => {
     it("rejects portraitUrl in the create payload with 400 (#1616)", async () => {
       const response = await supertest.agent(app).set("Cookie", COOKIE)
         .post("/api/characters")
-        .send({ ...createBody, portraitUrl: "https://example.com/p.jpg" });
+        .send({ ...createBody(), portraitUrl: "https://example.com/p.jpg" });
 
       expect(response.status).toBe(400);
     });
@@ -522,17 +533,17 @@ describe("characters routes", () => {
     it("allows a homebrew background with no catalog match", async () => {
       const response = await supertest.agent(app).set("Cookie", COOKIE)
         .post("/api/characters")
-        .send({ ...createBody, background: "Wandering Storyteller" });
+        .send({ ...createBody(), background: "Wandering Storyteller" });
 
       expect(response.status).toBe(201);
       createdCharacterIds.push(response.body.id);
       expect(response.body.background).toBe("Wandering Storyteller");
     });
 
-    it("rejects an unresolvable race with 400", async () => {
+    it("rejects an unresolvable speciesId with 400", async () => {
       const response = await supertest.agent(app).set("Cookie", COOKIE)
         .post("/api/characters")
-        .send({ ...createBody, race: "Not A Real Race" });
+        .send({ ...createBody(), speciesId: "not-a-real-species-id" });
 
       expect(response.status).toBe(400);
     });
@@ -540,7 +551,7 @@ describe("characters routes", () => {
     it("rejects an unresolvable class with 400", async () => {
       const response = await supertest.agent(app).set("Cookie", COOKIE)
         .post("/api/characters")
-        .send({ ...createBody, classes: [{ name: "Not A Real Class" }] });
+        .send({ ...createBody(), classes: [{ name: "Not A Real Class" }] });
 
       expect(response.status).toBe(400);
     });
@@ -548,13 +559,13 @@ describe("characters routes", () => {
     it("rejects an unknown alignment with 400", async () => {
       const response = await supertest.agent(app).set("Cookie", COOKIE)
         .post("/api/characters")
-        .send({ ...createBody, alignment: "Mostly Good" });
+        .send({ ...createBody(), alignment: "Mostly Good" });
 
       expect(response.status).toBe(400);
     });
 
     it("rejects a missing required field with 400", async () => {
-      const { name, ...withoutName } = createBody;
+      const { name, ...withoutName } = createBody();
       void name;
 
       const response = await supertest.agent(app).set("Cookie", COOKIE)
@@ -567,26 +578,30 @@ describe("characters routes", () => {
     it("rejects a derived/mechanical field via .strict() with 400", async () => {
       const response = await supertest.agent(app).set("Cookie", COOKIE)
         .post("/api/characters")
-        .send({ ...createBody, armorClass: 99 });
+        .send({ ...createBody(), armorClass: 99 });
 
       expect(response.status).toBe(400);
     });
 
     // ── 2024 background ability spread + Origin feat (#1130) ──────────────
     // Uses the seeded Criminal background (abilityChoices dex/con/int, Origin
-    // feat Alert) with the seeded Human race + Fighter class.
+    // feat Alert) with a species anchor + Fighter class. Halfling: 2024 Human
+    // carries its own #1690 choice trait (Skillful/Versatile, would 400 every
+    // body below for an unrelated reason) and 2024 Dwarf carries its own
+    // Dwarven Toughness (+1 maxHp/level, would corrupt this block's own
+    // exact-HP assertions) — Halfling has neither in EDITION_2024.
     describe("background ability spread + Origin feat (#1130)", () => {
       const criminalBody = {
         name: "Sneak",
         alignment: "True Neutral",
-        race: "Human",
         background: "Criminal",
         classes: [{ name: "Fighter" }],
         abilityScores: { strength: 10, dexterity: 13, constitution: 14, intelligence: 12, wisdom: 10, charisma: 8 },
       };
 
       async function post(body: object) {
-        return supertest.agent(app).set("Cookie", COOKIE).post("/api/characters").send(body);
+        const speciesId = await seededSpeciesId("Halfling", "EDITION_2024");
+        return supertest.agent(app).set("Cookie", COOKIE).post("/api/characters").send({ speciesId, ...body });
       }
 
       it("applies the +2/+1 spread, grants the origin feat, and consumes no slot", async () => {
@@ -681,25 +696,41 @@ describe("characters routes", () => {
       const criminal2014Body = {
         name: "Sneak (2014)",
         alignment: "True Neutral",
-        race: "Human",
         background: "Criminal",
         classes: [{ name: "Fighter" }],
         rulesEdition: "EDITION_2014" as const,
         abilityScores: { strength: 10, dexterity: 13, constitution: 14, intelligence: 12, wisdom: 10, charisma: 8 },
       };
 
+      // Lightfoot Halfling (species DEX+2, variant CHA+1, #1681 fixed increases)
+      // — CON stays untouched by either bump, so the HP assertion below still
+      // isolates "no BACKGROUND spread baked in" cleanly. Every 2014 species
+      // grants SOMETHING (#1681, unlike the pruned legacy no-speciesId path),
+      // so "ability scores exactly as submitted" is no longer provable —
+      // this asserts the submitted scores plus exactly the species bump instead.
       async function post(body: object) {
-        return supertest.agent(app).set("Cookie", COOKIE).post("/api/characters").send(body);
+        const halfling = await prisma.species.findFirstOrThrow({
+          where: { slug: "halfling", edition: "EDITION_2014" },
+          include: { variants: true },
+        });
+        const lightfoot = halfling.variants.find((v) => v.slug === "lightfoot")!;
+        return supertest.agent(app).set("Cookie", COOKIE).post("/api/characters")
+          .send({ speciesId: halfling.id, variantId: lightfoot.id, ...body });
       }
 
-      it("grants no origin feat and leaves ability scores exactly as submitted", async () => {
+      it("grants no origin feat and no BACKGROUND ability spread (species' own fixed increase still applies, #1681)", async () => {
         const res = await post(criminal2014Body);
         expect(res.status).toBe(201);
         createdCharacterIds.push(res.body.id);
 
         expect(res.body.advancements).toHaveLength(0);
-        expect(res.body.abilityScores).toEqual(criminal2014Body.abilityScores);
-        // No spread baked in: CON 14 → +2 mod, Fighter d10 → 12 max HP (not the
+        expect(res.body.abilityScores).toEqual({
+          ...criminal2014Body.abilityScores,
+          dexterity: 15, // 13 + species DEX+2
+          charisma: 9, // 8 + Lightfoot CHA+1
+        });
+        // No BACKGROUND spread baked in: CON stays exactly 14 (untouched by
+        // Halfling's own increases) → +2 mod, Fighter d10 → 12 max HP (not the
         // 13 a CON-touching 2024 spread would produce, per the sibling test above).
         expect(res.body.hitPoints.max).toBe(12);
       });
@@ -724,10 +755,13 @@ describe("characters routes", () => {
       // is ONE group of two lettered options instead, so every body here
       // pins rulesEdition explicitly rather than relying on
       // DEFAULT_RULES_EDITION (2024).
-      const wizardBody = {
+      // A function, not a const — speciesId is resolved via an async DB
+      // lookup (Human 2014 has no #1690 choice trait, matching this block's
+      // "no player choices" bodies), unavailable at describe-body evaluation time.
+      const wizardBody = async () => ({
         name: "Merlin",
         alignment: "Neutral Good",
-        race: "Human",
+        speciesId: await seededSpeciesId("Human", "EDITION_2014"),
         background: "Sage",
         classes: [{ name: "Wizard" }],
         abilityScores: {
@@ -749,12 +783,12 @@ describe("characters routes", () => {
             { optionIndex: 0 },
           ],
         },
-      };
+      });
 
       it("creates inventory rows from a package selection (no open picks)", async () => {
         const response = await supertest.agent(app).set("Cookie", COOKIE)
           .post("/api/characters")
-          .send(wizardBody);
+          .send(await wizardBody());
 
         expect(response.status).toBe(201);
         createdCharacterIds.push(response.body.id);
@@ -786,7 +820,7 @@ describe("characters routes", () => {
           .send({
             name: "Sir Gawain",
             alignment: "Lawful Good",
-            race: "Human",
+            speciesId: await seededSpeciesId("Human", "EDITION_2014"),
             background: "Soldier",
             classes: [{ name: "Fighter" }],
             abilityScores: {
@@ -857,7 +891,7 @@ describe("characters routes", () => {
           .send({
             name: "Hrothgar",
             alignment: "Chaotic Good",
-            race: "Human",
+            speciesId: await seededSpeciesId("Human", "EDITION_2014"),
             background: "Soldier",
             classes: [{ name: "Fighter" }],
             abilityScores: {
@@ -908,7 +942,7 @@ describe("characters routes", () => {
         const response = await supertest.agent(app).set("Cookie", COOKIE)
           .post("/api/characters")
           .send({
-            ...wizardBody,
+            ...(await wizardBody()),
             startingEquipment: {
               mode: "package",
               // Wizard has groups.length === 4; optionIndex 99 is out of range
@@ -928,7 +962,7 @@ describe("characters routes", () => {
         const response = await supertest.agent(app).set("Cookie", COOKIE)
           .post("/api/characters")
           .send({
-            ...wizardBody,
+            ...(await wizardBody()),
             startingEquipment: {
               mode: "package",
               // Wizard has 4 groups; only 2 provided
@@ -945,7 +979,7 @@ describe("characters routes", () => {
           .send({
             name: "Bad Fighter",
             alignment: "Chaotic Evil",
-            race: "Human",
+            speciesId: await seededSpeciesId("Human", "EDITION_2014"),
             background: "Soldier",
             classes: [{ name: "Fighter" }],
             abilityScores: {
@@ -978,7 +1012,7 @@ describe("characters routes", () => {
           .send({
             name: "Sneaky Fighter",
             alignment: "Chaotic Neutral",
-            race: "Human",
+            speciesId: await seededSpeciesId("Human", "EDITION_2014"),
             background: "Soldier",
             classes: [{ name: "Fighter" }],
             abilityScores: {
@@ -1012,7 +1046,7 @@ describe("characters routes", () => {
         const response = await supertest.agent(app).set("Cookie", COOKIE)
           .post("/api/characters")
           .send({
-            ...createBody,
+            ...createBody(),
             startingEquipment: { mode: "package", selections: [] },
           });
 
@@ -1027,7 +1061,7 @@ describe("characters routes", () => {
         const response = await supertest.agent(app).set("Cookie", COOKIE)
           .post("/api/characters")
           .send({
-            ...createBody,
+            ...createBody(),
             startingEquipment: { mode: "gold", gold: 999999 },
           });
 
@@ -1041,10 +1075,11 @@ describe("characters routes", () => {
       // 2014-only: EDITION_2024's Wizard package has no roll-for-gold rule at
       // all (gold: null, #1564/#1535) — pin the edition rather than relying
       // on DEFAULT_RULES_EDITION (2024).
-      const baseBody = {
+      // A function, not a const — same reasoning as wizardBody above.
+      const baseBody = async () => ({
         name: "Wealthy Adventurer",
         alignment: "True Neutral",
-        race: "Human",
+        speciesId: await seededSpeciesId("Human", "EDITION_2014"),
         background: "Sage",
         classes: [{ name: "Wizard" }],
         abilityScores: {
@@ -1057,13 +1092,13 @@ describe("characters routes", () => {
         },
         skillProficiencies: ["arcana", "history"],
         rulesEdition: "EDITION_2014" as const,
-      };
+      });
 
       it("sets currency.gp and leaves inventory empty", async () => {
         // Wizard gold: 4d4×10 → min 40, max 160
         const response = await supertest.agent(app).set("Cookie", COOKIE)
           .post("/api/characters")
-          .send({ ...baseBody, startingEquipment: { mode: "gold", gold: 100 } });
+          .send({ ...(await baseBody()), startingEquipment: { mode: "gold", gold: 100 } });
 
         expect(response.status).toBe(201);
         createdCharacterIds.push(response.body.id);
@@ -1076,7 +1111,7 @@ describe("characters routes", () => {
         // Wizard min = 4×10 = 40
         const response = await supertest.agent(app).set("Cookie", COOKIE)
           .post("/api/characters")
-          .send({ ...baseBody, startingEquipment: { mode: "gold", gold: 0 } });
+          .send({ ...(await baseBody()), startingEquipment: { mode: "gold", gold: 0 } });
 
         expect(response.status).toBe(400);
       });
@@ -1085,7 +1120,7 @@ describe("characters routes", () => {
         // Wizard max = 4×4×10 = 160
         const response = await supertest.agent(app).set("Cookie", COOKIE)
           .post("/api/characters")
-          .send({ ...baseBody, startingEquipment: { mode: "gold", gold: 999 } });
+          .send({ ...(await baseBody()), startingEquipment: { mode: "gold", gold: 999 } });
 
         expect(response.status).toBe(400);
       });
@@ -1094,7 +1129,7 @@ describe("characters routes", () => {
     it("omitting startingEquipment creates an empty-inventory character (regression)", async () => {
       const response = await supertest.agent(app).set("Cookie", COOKIE)
         .post("/api/characters")
-        .send(createBody); // createBody has no startingEquipment
+        .send(createBody()); // createBody has no startingEquipment
 
       expect(response.status).toBe(201);
       createdCharacterIds.push(response.body.id);
@@ -1104,10 +1139,13 @@ describe("characters routes", () => {
   });
 
   describe("character ownership (#99)", () => {
-    const createBody = {
+    // A function, not a const — see the sibling createBody in "POST
+    // /api/characters" above for why (testSpeciesId isn't known yet at
+    // describe-body evaluation time).
+    const createBody = () => ({
       name: "Owned Hero",
       alignment: "Lawful Good",
-      race: TEST_RACE.name,
+      speciesId: testSpeciesId,
       background: TEST_BACKGROUND.name,
       classes: [{ name: TEST_CLASS.name }],
       abilityScores: {
@@ -1119,12 +1157,12 @@ describe("characters routes", () => {
         charisma: 8,
       },
       skillProficiencies: ["athletics", "perception"],
-    };
+    });
 
     it("POST stamps ownerId with the authenticated user (#101)", async () => {
       const response = await supertest.agent(app).set("Cookie", COOKIE)
         .post("/api/characters")
-        .send(createBody);
+        .send(createBody());
 
       expect(response.status).toBe(201);
       createdCharacterIds.push(response.body.id);

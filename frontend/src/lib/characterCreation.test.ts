@@ -58,9 +58,6 @@ const CRIMINAL_PACKAGE: ClassStartingEquipment = {
   gold: null,
 };
 
-// #1680: a flat Race row sharing the species' name — kept only to exercise
-// resolveSelections' compat `race` lookup (useToolProficiencyChoices' dormant
-// race-granted-tool-profs source), never the picker's own source of truth.
 const reference: ReferenceData = {
   races: [{ id: "race-1", name: "Elf", speed: 30, toolProficiencies: [] }],
   species: [{
@@ -144,12 +141,9 @@ describe("resolveSelections", () => {
     const resolved = resolveSelections(reference, draft);
     expect(resolved.class?.name).toBe("Rogue");
     expect(resolved.species?.name).toBe("Elf");
-    // #1680: the legacy `race` compat lookup resolves by the species' NAME.
-    expect(resolved.race?.name).toBe("Elf");
     expect(resolveSelections(null, draft)).toEqual({
       species: undefined,
       variant: undefined,
-      race: undefined,
       class: undefined,
       background: undefined,
     });
@@ -532,7 +526,7 @@ describe("derivePreview", () => {
     expect(preview.maxHp).toBe(10);
   });
 
-  it("leaves speed and maxHp undefined without race/class", () => {
+  it("leaves speed and maxHp undefined without species/class", () => {
     const draft = makeDraft({});
     const preview = derivePreview(draft, resolveSelections(reference, draft));
     expect(preview.speed).toBeUndefined();
@@ -713,11 +707,15 @@ describe("buildCreatePayload", () => {
     expect(buildCreatePayload(unset, sel2, deriveSkillChoices(unset, sel2), []).speciesOriginFeatId).toBeUndefined();
   });
 
-  it("omits speciesId/variantId when the draft's own empty-string default is untouched (`|| undefined` normalization)", () => {
+  // speciesId is the required mechanical anchor (#1684) — sent as-is, with no
+  // `|| undefined` normalization (CreationCeremony's step validity gates
+  // submission before an empty draft value could ever reach here). variantId
+  // stays optional and IS normalized, mirroring subclassId's own "" → undefined shape.
+  it("omits variantId when the draft's own empty-string default is untouched (`|| undefined` normalization)", () => {
     const draft = makeDraft({ name: "X", className: "Rogue" });
     const selections = resolveSelections(speciesReference, draft);
     const payload = buildCreatePayload(draft, selections, deriveSkillChoices(draft, selections), []);
-    expect(payload.speciesId).toBeUndefined();
+    expect(payload.speciesId).toBe("");
     expect(payload.variantId).toBeUndefined();
   });
 
@@ -743,9 +741,10 @@ describe("buildCreatePayload", () => {
     expect(payload.backgroundStartingEquipment).toBeUndefined();
   });
 
-  // #1680: the two-step picker's real selection rides speciesId/variantId
-  // (ids, like subclassId); `race` is resolved compat text, not a second pick.
-  it("sends speciesId/variantId and derives the legacy race string from the chosen name", () => {
+  // #1680/#1684: the two-step picker's real selection rides speciesId/variantId
+  // (ids, like subclassId) — the sole mechanical anchor since the flat `race`
+  // field was pruned.
+  it("sends speciesId/variantId", () => {
     const variantReference: ReferenceData = {
       ...reference,
       species: [
@@ -778,20 +777,17 @@ describe("buildCreatePayload", () => {
     const payload = buildCreatePayload(draft, selections, skills, []);
     expect(payload.speciesId).toBe("sp-dwarf");
     expect(payload.variantId).toBe("var-hill");
-    expect(payload.race).toBe("Hill Dwarf");
   });
 
-  // A variantless species' payload race falls back to the species' own name,
-  // and variantId is omitted (never an empty string) — mirrors subclassId's
-  // "" → undefined shape.
-  it("omits variantId and uses the species name for a variantless species", () => {
+  // variantId is omitted (never an empty string) for a variantless species —
+  // mirrors subclassId's "" → undefined shape.
+  it("omits variantId for a variantless species", () => {
     const draft = makeDraft({ name: "Alric", className: "Rogue", background: "Sage", speciesId: "sp-elf" });
     const selections = resolveSelections(reference, draft);
     const skills = deriveSkillChoices(draft, selections);
     const payload = buildCreatePayload(draft, selections, skills, []);
     expect(payload.speciesId).toBe("sp-elf");
     expect(payload.variantId).toBeUndefined();
-    expect(payload.race).toBe("Elf");
   });
 
   it("passes through non-empty tool choices", () => {
@@ -835,7 +831,6 @@ describe("creation spells (#1131)", () => {
   const casterSelections = {
     species: undefined,
     variant: undefined,
-    race: undefined,
     class: caster,
     background: undefined,
   };

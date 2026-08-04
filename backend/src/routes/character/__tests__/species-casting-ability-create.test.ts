@@ -53,7 +53,6 @@ describe("POST /api/characters — 2024 lineage casting-ability choice (#1683)",
     const { elf, drowVariant } = await drow();
     const res = await post({
       ...baseBody,
-      race: "Drow",
       speciesId: elf.id,
       variantId: drowVariant.id,
       castingAbility: "charisma",
@@ -75,7 +74,6 @@ describe("POST /api/characters — 2024 lineage casting-ability choice (#1683)",
     // provably castingAbility's OWN rejection, not an earlier one.
     const res = await post({
       ...baseBody,
-      race: "Drow",
       speciesId: elf.id,
       variantId: drowVariant.id,
       speciesSkills: ["survival"],
@@ -88,7 +86,6 @@ describe("POST /api/characters — 2024 lineage casting-ability choice (#1683)",
     const { elf, drowVariant } = await drow();
     const res = await post({
       ...baseBody,
-      race: "Drow",
       speciesId: elf.id,
       variantId: drowVariant.id,
       castingAbility: "strength",
@@ -97,10 +94,8 @@ describe("POST /api/characters — 2024 lineage casting-ability choice (#1683)",
     expect(res.status).toBe(400);
   });
 
-  // Goliath (Cloud's Jaunt etc.) has no flat legacy counterpart yet (the
-  // compat-window gap #1684 removes, out of scope here) — a 2024 Dragonborn
-  // dragon-type variant proves the same "grants no spells" rejection using a
-  // species WITH a flat row (Dragonborn ancestry never grants a spell either).
+  // A 2024 Dragonborn dragon-type variant proves the "grants no spells"
+  // rejection (Dragonborn ancestry never grants a spell).
   it("400s a submitted castingAbility for a species/variant that grants no spells (Dragonborn ancestry)", async () => {
     const dragonborn = await prisma.species.findFirstOrThrow({
       where: { slug: "dragonborn", edition: "EDITION_2024" },
@@ -109,21 +104,12 @@ describe("POST /api/characters — 2024 lineage casting-ability choice (#1683)",
     const redVariant = dragonborn.variants.find((v) => v.slug === "red")!;
     const res = await post({
       ...baseBody,
-      // The flat legacy Race table has no per-color split ("Dragonborn" only,
-      // catalog-data.ts) — the compat-window `race` field targets that row.
-      race: "Dragonborn",
       speciesId: dragonborn.id,
       variantId: redVariant.id,
       castingAbility: "wisdom",
     });
     expect(res.status).toBe(400);
     expect(res.body.error).toBe("castingAbility not allowed: this species/variant grants no spells");
-  });
-
-  it("400s a submitted castingAbility when no species was selected", async () => {
-    const res = await post({ ...baseBody, race: "Human", castingAbility: "wisdom" });
-    expect(res.status).toBe(400);
-    expect(res.body.error).toBe("castingAbility not allowed: no species selected");
   });
 
   it("a species-level (variantless) grant would require castingAbility too — verified via High Elf, a variant-level grant", async () => {
@@ -134,7 +120,6 @@ describe("POST /api/characters — 2024 lineage casting-ability choice (#1683)",
     const highElf = elf.variants.find((v) => v.slug === "high")!;
     const res = await post({
       ...baseBody,
-      race: "High Elf",
       speciesId: elf.id,
       variantId: highElf.id,
       castingAbility: "intelligence",
@@ -153,7 +138,6 @@ describe("POST /api/characters — 2024 lineage casting-ability choice (#1683)",
     const res = await post({
       ...baseBody,
       rulesEdition: "EDITION_2014",
-      race: "Human",
       speciesId: human2014.id,
     });
     expect(res.status).toBe(201);

@@ -5,6 +5,7 @@ import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
+import { seededSpeciesAnchor } from "@/test-support/species.js";
 
 // #1131: the creation spell/cantrip picker. A level-1 caster (Warlock: 2 cantrips
 // + 2 prepared spells per SRD 5.2) finishes with a prepared spellbook; a
@@ -14,13 +15,15 @@ let COOKIE: string;
 
 const BASE = {
   alignment: "True Neutral",
-  race: "Hill Dwarf",
   background: "Sage",
   abilityScores: { strength: 8, dexterity: 14, constitution: 14, intelligence: 10, wisdom: 10, charisma: 16 },
 };
 
-function create(body: object) {
-  return supertest(app).post("/api/characters").set("Cookie", COOKIE).send(body);
+// #1684: the species anchor is resolved per the REQUESTED edition (a missing
+// rulesEdition defaults to 2024, same default the create route itself uses).
+async function create(body: { rulesEdition?: string } & Record<string, unknown>) {
+  const anchor = await seededSpeciesAnchor((body.rulesEdition as "EDITION_2014" | "EDITION_2024") ?? "EDITION_2024");
+  return supertest(app).post("/api/characters").set("Cookie", COOKIE).send({ ...anchor, ...body });
 }
 
 async function warlockPicks() {

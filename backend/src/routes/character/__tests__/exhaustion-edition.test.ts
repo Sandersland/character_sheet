@@ -13,6 +13,7 @@ import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
+import { seededSpeciesAnchor } from "@/test-support/species.js";
 
 const OWNER_ID = "owner-exhaustion-edition";
 let COOKIE: string;
@@ -21,17 +22,17 @@ let COOKIE: string;
 // matches the fixture already used by rules-edition.test.ts / rules-edition-seam.test.ts.
 const BASE = {
   alignment: "True Neutral",
-  race: "Hill Dwarf",
   background: "Sage",
   classes: [{ name: "Fighter" }],
   abilityScores: { strength: 15, dexterity: 14, constitution: 14, intelligence: 10, wisdom: 10, charisma: 8 },
 };
 
-async function createAt(rulesEdition: "EDITION_2014" | "EDITION_2024", name: string, race?: string) {
+async function createAt(rulesEdition: "EDITION_2014" | "EDITION_2024", name: string, speciesName?: string) {
+  const anchor = await seededSpeciesAnchor(rulesEdition, speciesName);
   const res = await supertest(app)
     .post("/api/characters")
     .set("Cookie", COOKIE)
-    .send({ ...BASE, ...(race ? { race } : {}), name, rulesEdition });
+    .send({ ...BASE, ...anchor, name, rulesEdition });
   expect(res.status).toBe(201);
   return res.body.id as string;
 }
@@ -84,7 +85,11 @@ describe("exhaustion forks on rulesEdition (#1307)", () => {
       "Disadvantage on attack rolls, ability checks, saving throws, and initiative; Speed halved.",
     );
 
-    expect(char2024.speed).toBe(10); // 25 − 15 (−5 ft×level)
+    // #1684: 2024 Dwarf is 30 ft (PHB'24 p. 22), NOT 2014's 25 ft — the two
+    // editions' Dwarf rows genuinely differ, unlike the pre-#1684 legacy
+    // `race`-name path, which resolved "Hill Dwarf" by name regardless of
+    // the character's own rulesEdition.
+    expect(char2024.speed).toBe(15); // 30 − 15 (−5 ft×level)
     expect(char2024.rollModifiers).toEqual(
       expect.arrayContaining([
         { mode: "flat", modifier: -6, kind: "attack", source: "Exhaustion" },

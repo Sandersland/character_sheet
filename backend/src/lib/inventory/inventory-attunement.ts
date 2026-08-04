@@ -35,14 +35,26 @@ export async function applyAttune(
       where: { id: characterId },
       select: {
         alignment: true,
-        raceSelection: { select: { name: true } },
+        // #1684: species/variant relations, not raceSelection.name — the flat
+        // Race model is gone, and CharacterRace.name is a drifting DISPLAY
+        // snapshot (schema.prisma's own "free to drift independently" comment
+        // on the selections-model pattern); a mechanical prerequisite check
+        // should resolve against the catalog-linked identity instead. variant
+        // (more specific, e.g. "Hill Dwarf") wins over species ("Dwarf");
+        // raceSelection.name is the last fallback for a homebrew/no-species-FK
+        // character (raw-inserted fixtures with no speciesId).
+        raceSelection: { select: { name: true, species: { select: { name: true } }, variant: { select: { name: true } } } },
         classEntries: { select: { name: true, subclass: true } },
       },
     });
     const prereq = { kind: item.attunementPrereqKind, value: item.attunementPrereqValue };
     const subject = {
       classEntries: character?.classEntries ?? [],
-      raceName: character?.raceSelection?.name ?? null,
+      raceName:
+        character?.raceSelection?.variant?.name
+        ?? character?.raceSelection?.species?.name
+        ?? character?.raceSelection?.name
+        ?? null,
       alignment: character?.alignment ?? null,
     };
     if (!meetsAttunementPrereq(prereq, subject)) {

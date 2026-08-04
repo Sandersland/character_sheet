@@ -200,14 +200,14 @@ export type QuiveringPalmResult = SetQuiveringPalmResult | TriggerQuiveringPalmR
 
 /**
  * One merged tool proficiency entry on the character wire type.
- * Creation-fixed profs (background/class/race) and level-gated subclass
+ * Creation-fixed profs (background/class) and level-gated subclass
  * profs (Student of War) are merged by serializeCharacter before sending.
  */
 export interface ToolProficiency {
   name: string;
   category: "artisan" | "gamingSet" | "musicalInstrument" | "other";
   /** Where this proficiency came from ("item" = a magic item grant, #529). */
-  source: "background" | "class" | "race" | "subclass" | "item";
+  source: "background" | "class" | "subclass" | "item";
 }
 
 /** Armor category that a character is proficient with. */

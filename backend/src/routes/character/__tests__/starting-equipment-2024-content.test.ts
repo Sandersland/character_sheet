@@ -12,6 +12,7 @@ import supertest from "supertest";
 
 import { app } from "@/test-support/app-server.js";
 import { authCookie } from "@/test-support/auth.js";
+import { seededSpeciesAnchor } from "@/test-support/species.js";
 
 const OWNER_ID = "owner-starting-equipment-2024-content";
 let COOKIE: string;
@@ -26,11 +27,12 @@ afterAll(async () => {
   await prisma.character.deleteMany({ where: { id: { in: createdCharacterIds } } });
 });
 
-function baseBody(overrides: Record<string, unknown>) {
+async function baseBody(overrides: { rulesEdition: "EDITION_2014" | "EDITION_2024" } & Record<string, unknown>) {
+  const anchor = await seededSpeciesAnchor(overrides.rulesEdition);
   return {
     name: "Fixture",
     alignment: "True Neutral",
-    race: "Human",
+    ...anchor,
     background: "Soldier",
     abilityScores: {
       strength: 10,
@@ -52,7 +54,7 @@ describe("real EDITION_2024 Barbarian package vs. real EDITION_2014 (#1535)", ()
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send(
-        baseBody({
+        await baseBody({
           name: "2024 Barbarian",
           classes: [{ name: "Barbarian" }],
           rulesEdition: "EDITION_2024",
@@ -80,7 +82,7 @@ describe("real EDITION_2024 Barbarian package vs. real EDITION_2014 (#1535)", ()
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send(
-        baseBody({
+        await baseBody({
           name: "2014 Barbarian",
           classes: [{ name: "Barbarian" }],
           rulesEdition: "EDITION_2014",
@@ -120,7 +122,7 @@ describe("real EDITION_2024 Bard package: the musical-instrument open pick (#153
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send(
-        baseBody({
+        await baseBody({
           name: "2024 Bard OK",
           classes: [{ name: "Bard" }],
           rulesEdition: "EDITION_2024",
@@ -137,7 +139,7 @@ describe("real EDITION_2024 Bard package: the musical-instrument open pick (#153
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send(
-        baseBody({
+        await baseBody({
           name: "2024 Bard Rejected",
           classes: [{ name: "Bard" }],
           rulesEdition: "EDITION_2024",
@@ -157,7 +159,7 @@ describe("real EDITION_2024 Monk package: the tool-bound open pick (#1535)", () 
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send(
-        baseBody({
+        await baseBody({
           name: "2024 Monk OK",
           classes: [{ name: "Monk" }],
           rulesEdition: "EDITION_2024",
@@ -175,7 +177,7 @@ describe("real EDITION_2024 Monk package: the tool-bound open pick (#1535)", () 
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send(
-        baseBody({
+        await baseBody({
           name: "2024 Monk Rejected",
           classes: [{ name: "Monk" }],
           rulesEdition: "EDITION_2024",

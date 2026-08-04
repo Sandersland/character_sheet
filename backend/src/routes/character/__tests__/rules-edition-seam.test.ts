@@ -6,6 +6,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
+import { seededSpeciesAnchor } from "@/test-support/species.js";
 
 /**
  * The #1285 acceptance test: one rule (`subclassGateLevel`) resolved through the
@@ -31,7 +32,6 @@ let subclassId: string;
 
 const BASE = {
   alignment: "True Neutral",
-  race: "Hill Dwarf",
   background: "Sage",
   classes: [{ name: CLASS_NAME }],
   abilityScores: { strength: 10, dexterity: 12, constitution: 14, intelligence: 15, wisdom: 10, charisma: 8 },
@@ -40,10 +40,11 @@ const BASE = {
 /** Creates a character on the fixture class, then sets it to level 2 with the
  *  subclass already chosen — the state where the two editions disagree. */
 async function makeCharacterAt2(rulesEdition: "EDITION_2014" | "EDITION_2024", name: string) {
+  const anchor = await seededSpeciesAnchor(rulesEdition);
   const res = await supertest(app)
     .post("/api/characters")
     .set("Cookie", COOKIE)
-    .send({ ...BASE, name, rulesEdition });
+    .send({ ...BASE, ...anchor, name, rulesEdition });
   expect(res.status).toBe(201);
   const id = res.body.id as string;
 

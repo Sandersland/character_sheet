@@ -23,6 +23,7 @@ import { applyHitPointOperations } from "@/lib/combat/hitpoints.js";
 import { applySpellcastingOperations } from "@/lib/spellcasting/spellcasting.js";
 import { revertBatch } from "@/lib/activity/activity.js";
 import { inventoryItemFixtureData } from "@/test-support/inventory-snapshot-fixture.js";
+import { seededSpeciesId } from "@/test-support/species.js";
 import { buildInventorySnapshot, type SnapshotSourceRow } from "../inventory-snapshot-build.js";
 
 const ROW_WITH_EVERYTHING: SnapshotSourceRow = {
@@ -355,11 +356,12 @@ describe("the four creation paths write a snapshot (#1649)", () => {
   });
 
   it("character creation's nested inventoryItems create writes a snapshot on every starting-gear row", async () => {
+    const speciesId = await seededSpeciesId("Human", "EDITION_2014");
     const result = await createCharacter(
       {
         name: "Snapshot-Write Wizard",
         alignment: "Neutral Good",
-        race: "Human",
+        speciesId,
         background: "Sage",
         classes: [{ name: "Wizard" }],
         abilityScores: { strength: 10, dexterity: 10, constitution: 10, intelligence: 15, wisdom: 10, charisma: 10 },

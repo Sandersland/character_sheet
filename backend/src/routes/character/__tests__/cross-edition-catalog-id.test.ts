@@ -22,6 +22,7 @@ import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 import { resolveLevelUpContext } from "@/lib/leveling/level-up-transaction.js";
 import { InvalidLevelUpError } from "@/lib/leveling/level-up-submission.js";
 import { battleMasterResourceRowsData } from "@/test-support/fighter-resource-rows.js";
+import { seededSpeciesAnchor } from "@/test-support/species.js";
 
 const OWNER_ID = "owner-cross-edition-catalog-id";
 let COOKIE: string;
@@ -78,12 +79,13 @@ describe("Chunk 1 — Feat / advancement.takeFeat (lib/leveling/advancement.ts:3
 
   // Level 4 (XP 2700) → one ASI slot (advancement.test.ts:20 convention).
   async function createCharacter(rulesEdition: "EDITION_2014" | "EDITION_2024", name: string) {
+    const anchor = await seededSpeciesAnchor(rulesEdition);
     const res = await agent()
       .post("/api/characters")
       .send({
         name,
         alignment: "True Neutral",
-        race: "Hill Dwarf",
+        ...anchor,
         background: "Sage",
         classes: [{ name: "Fighter" }],
         abilityScores: { strength: 15, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 10, charisma: 8 },
@@ -182,12 +184,13 @@ describe("Chunk 2 — Subclass / class.setSubclass (lib/classes/class.ts:83)", (
 
   // Level 3+ (XP 900, hitDice.total 3) so subclassGateLevel passes for both editions.
   async function createCharacter(rulesEdition: "EDITION_2014" | "EDITION_2024", name: string) {
+    const anchor = await seededSpeciesAnchor(rulesEdition);
     const res = await agent()
       .post("/api/characters")
       .send({
         name,
         alignment: "True Neutral",
-        race: "Hill Dwarf",
+        ...anchor,
         background: "Sage",
         classes: [{ name: CLASS_NAME }],
         abilityScores: { strength: 15, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 10, charisma: 8 },
@@ -290,12 +293,13 @@ describe("Chunk 3 — Subclass / character-create.resolveSubclass (lib/character
   });
 
   async function createWithSubclass(rulesEdition: "EDITION_2014" | "EDITION_2024", name: string, subclassId: string) {
+    const anchor = await seededSpeciesAnchor(rulesEdition);
     return agent()
       .post("/api/characters")
       .send({
         name,
         alignment: "True Neutral",
-        race: "Hill Dwarf",
+        ...anchor,
         background: "Sage",
         classes: [{ name: CLASS_NAME, subclassId }],
         abilityScores: { strength: 10, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 15, charisma: 8 },
@@ -556,12 +560,13 @@ describe("Chunk 5 — Subclass / level-up plan preview ?subclassId= (#1414)", ()
     name: string,
     opts: { xp: number; entryLevel: number; hitDiceTotal: number } = { xp: 900, entryLevel: 2, hitDiceTotal: 2 },
   ) {
+    const anchor = await seededSpeciesAnchor(rulesEdition);
     const res = await agent()
       .post("/api/characters")
       .send({
         name,
         alignment: "True Neutral",
-        race: "Hill Dwarf",
+        ...anchor,
         background: "Sage",
         classes: [{ name: CLASS_NAME }],
         abilityScores: { strength: 15, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 10, charisma: 8 },

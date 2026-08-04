@@ -32,6 +32,7 @@ import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
 import { applyInventoryOperations } from "@/lib/inventory/inventory.js";
 import { inventoryItemFixtureData } from "@/test-support/inventory-snapshot-fixture.js";
+import { seededSpeciesAnchor } from "@/test-support/species.js";
 
 const OWNER_ID = "owner-actions-bladesinger";
 let COOKIE: string;
@@ -128,10 +129,11 @@ async function createWizard(
   xp: number,
   abilityScores: typeof ABILITY_SCORES_INT_FLOOR = ABILITY_SCORES_INT_FLOOR,
 ): Promise<string> {
+  const anchor = await seededSpeciesAnchor(rulesEdition);
   const res = await agent().post("/api/characters").send({
     name,
     alignment: "True Neutral",
-    race: "Hill Dwarf",
+    ...anchor,
     background: "Sage",
     classes: [{ name: "Wizard" }],
     abilityScores,

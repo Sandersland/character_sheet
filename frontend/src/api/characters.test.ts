@@ -178,7 +178,7 @@ describe("createCharacter", () => {
   const input: CreateCharacterInput = {
     name: "New Hero",
     alignment: "Lawful Good",
-    race: "Human",
+    speciesId: "species-human",
     background: "Soldier",
     classes: [{ name: "Fighter" }],
     abilityScores: {
