@@ -47,9 +47,10 @@ export interface SpellEntry {
   // for effectKind "buff"; snapshotted from the catalog at learn time.
   buffTarget?: string | null;
   buffModifier?: number | null;
-  // Provenance of the entry; "subclass" marks a derived, non-persisted grant,
-  // "item" a spell granted by a held magic item (#528, cast from the item).
-  source?: "subclass" | "item";
+  // Provenance of the entry; "subclass" and "species" (#1683) both mark a
+  // derived, non-persisted grant (deriveGrantedSpells' sourceKind), "item" a
+  // spell granted by a held magic item (#528, cast from the item).
+  source?: "subclass" | "species" | "item";
   // Item-granted-spell fields (#528), present only when source === "item".
   item?: ItemSpellMeta;
 }

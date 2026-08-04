@@ -92,6 +92,13 @@ describe("deriveSpellRow", () => {
     expect(d.isGranted).toBe(true);
   });
 
+  // #1683: species/lineage-granted spells (e.g. a Drow's Dancing Lights) are
+  // the same always-prepared/no-Remove shape as a subclass grant.
+  it("marks species-granted spells as granted", () => {
+    const d = deriveSpellRow({ ...cantrip, source: "species" }, []);
+    expect(d.isGranted).toBe(true);
+  });
+
   it("falls back to neutral tone for an unknown school", () => {
     const d = deriveSpellRow({ ...leveled, school: "mystery" as Spell["school"] }, [3]);
     expect(d.schoolTone).toBe("neutral");
@@ -105,6 +112,10 @@ describe("runeState", () => {
 
   it("locks a subclass-granted spell", () => {
     expect(runeState({ ...leveled, source: "subclass" })).toBe("locked");
+  });
+
+  it("locks a species-granted spell (#1683)", () => {
+    expect(runeState({ ...leveled, source: "species" })).toBe("locked");
   });
 
   it("locks an item-granted spell", () => {

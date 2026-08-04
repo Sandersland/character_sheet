@@ -53,7 +53,11 @@ import { FEATURE_ROWS_ENTRY_SELECT, featureRowsOf } from "@/lib/classes/feature-
 import { reverseAdvancementEffects } from "./advancement.js";
 import { normalizeHitPoints } from "@/lib/combat/hitpoints.js";
 import { clampPreparedToLimit, normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
-import { deriveGrantedSpells } from "@/lib/spellcasting/granted-spells.js";
+import {
+  deriveGrantedSpells,
+  speciesGrantedSpellSourceFromRaceSelection,
+  RACE_SELECTION_GRANT_SELECT,
+} from "@/lib/spellcasting/granted-spells.js";
 
 export interface ReconcileContext {
   tx: Prisma.TransactionClient;
@@ -118,11 +122,12 @@ async function reconcileSubclass(ctx: ReconcileContext): Promise<void> {
   }
 }
 
-// Defense-in-depth: subclass-granted spells are pure-derived at read time and
-// never persisted in the happy path, so this only fires if a source:"subclass"
-// entry ever leaks into the stored spells[]. It strips any leaked grant no longer
-// valid at the new level (re-derived on read anyway). Runs AFTER reconcileSubclass
-// so a cleared subclass yields an empty valid set. Reuses the spellcasting undo
+// Defense-in-depth: subclass- AND species-granted spells (#1683) are
+// pure-derived at read time and never persisted in the happy path, so this
+// only fires if a source:"subclass"/"species" entry ever leaks into the
+// stored spells[]. It strips any leaked grant no longer valid at the new
+// level (re-derived on read anyway). Runs AFTER reconcileSubclass so a
+// cleared subclass yields an empty valid set. Reuses the spellcasting undo
 // branch in activity.ts (restores before.spellcasting) — no new EventType.
 
 async function reconcileGrantedSpells(ctx: ReconcileContext): Promise<void> {
@@ -142,22 +147,33 @@ async function reconcileGrantedSpells(ctx: ReconcileContext): Promise<void> {
           subclassRef: { include: { grantedSpells: { orderBy: { gateLevel: "asc" }, include: { spell: true } } } },
         },
       },
+      // Species/lineage-granted spells (#1683) — same source-agnostic
+      // deriveGrantedSpells, fed through the shared RACE_SELECTION_GRANT_SELECT
+      // + speciesGrantedSpellSourceFromRaceSelection (granted-spells.ts),
+      // which the spellcasting transaction-op layer also uses — one query
+      // fragment + one adapter, not two copies.
+      raceSelection: { select: RACE_SELECTION_GRANT_SELECT },
     },
   });
   if (!row) return;
 
   const state = normalizeSpellcastingMutable(row.spellcasting);
-  if (!state.spells.some((s) => s.source === "subclass")) return; // normal case
+  if (!state.spells.some((s) => s.source === "subclass" || s.source === "species")) return; // normal case
 
-  // Grants across every class entry, symmetric with the serialize read side —
-  // ctx.edition, the same authority the clamp-on-read resolves via editionOf.
-  const validIds = new Set(
-    row.classEntries
-      .flatMap((e) => deriveGrantedSpells(e.subclassRef, effectiveEntryLevel(e.level, row.classEntries.length, newDerivedLevel), edition))
-      .map((s) => s.id),
-  );
+  const speciesSource = speciesGrantedSpellSourceFromRaceSelection(row.raceSelection);
 
-  const kept = state.spells.filter((s) => s.source !== "subclass" || validIds.has(s.id));
+  // Grants across every class entry PLUS the species source, symmetric with
+  // the serialize read side — ctx.edition, the same authority the
+  // clamp-on-read resolves via editionOf. Species grants use the XP-derived
+  // level directly (no per-class effective-level split — a species pick
+  // isn't scoped to any one class entry).
+  const validIds = new Set([
+    ...row.classEntries.flatMap((e) => deriveGrantedSpells(e.subclassRef, effectiveEntryLevel(e.level, row.classEntries.length, newDerivedLevel), edition)).map((s) => s.id),
+    ...deriveGrantedSpells(speciesSource, newDerivedLevel, edition, "species").map((s) => s.id),
+  ]);
+
+  const isGranted = (s: { source?: string }) => s.source === "subclass" || s.source === "species";
+  const kept = state.spells.filter((s) => !isGranted(s) || validIds.has(s.id));
   if (kept.length === state.spells.length) return; // all leaked grants still valid
 
   const before = {
@@ -174,7 +190,7 @@ async function reconcileGrantedSpells(ctx: ReconcileContext): Promise<void> {
   // Drop concentration if it pointed at a stripped grant (leave Shadow Arts and
   // still-kept spells untouched).
   const removedIds = new Set(
-    state.spells.filter((s) => s.source === "subclass" && !validIds.has(s.id)).map((s) => s.id),
+    state.spells.filter((s) => isGranted(s) && !validIds.has(s.id)).map((s) => s.id),
   );
   if (state.concentratingOn && removedIds.has(state.concentratingOn.entryId)) {
     state.concentratingOn = null;
@@ -207,7 +223,7 @@ async function reconcileGrantedSpells(ctx: ReconcileContext): Promise<void> {
     characterId,
     category: "spellcasting",
     type: "forgetSpell",
-    summary: `${removedCount} subclass-granted spell${removedCount > 1 ? "s" : ""} removed — no longer granted at this level`,
+    summary: `${removedCount} granted spell${removedCount > 1 ? "s" : ""} removed — no longer granted at this level`,
     before,
     after,
     data: { removedCount },

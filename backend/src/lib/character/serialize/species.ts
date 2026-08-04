@@ -8,6 +8,7 @@
 // rows.ts's improvementsFromRows JSDoc anticipates exactly this reuse).
 import type { FeatImprovement } from "@/lib/classes/resources-state.js";
 import type { CharacterWithRelations } from "@/lib/character/character-include.js";
+import { buildSpeciesGrantedSpellSource, type GrantedSpellSource } from "@/lib/spellcasting/granted-spells.js";
 
 /** The species-granted sheet section's own row shape (#1682) — cited text only. */
 export interface SpeciesTraitView {
@@ -75,4 +76,25 @@ export function buildSpeciesTraitsView(row: CharacterWithRelations): {
     traits: active.map((t) => ({ name: t.name, description: t.description })),
     improvements: active.flatMap((t) => t.improvements ?? []),
   };
+}
+
+/**
+ * The species/lineage GrantedSpellSource for THIS character (#1683) — the
+ * `characterInclude`-shaped adapter feeding buildSpeciesGrantedSpellSource
+ * (granted-spells.ts), which stays the one shared function subclass grants
+ * also resolve through (sourceKind "species"). `raceSelection.species` is the
+ * back-relation, unfiltered by variant (same activeTraitRows gotcha); the
+ * function itself narrows to species-level + the picked variant.
+ * `raceSelection.castingAbility` is the #1683 creation-time snapshot — read
+ * straight off the row (a scalar column, needs no include).
+ */
+export function buildSpeciesGrantedSpellSourceFor(row: CharacterWithRelations): GrantedSpellSource | null {
+  const { species, variant, castingAbility } = row.raceSelection ?? {};
+  if (!species) return null;
+  return buildSpeciesGrantedSpellSource({
+    name: variant?.name ?? species.name,
+    castingAbility: castingAbility ?? null,
+    speciesGrantedSpells: species.grantedSpells,
+    variantGrantedSpells: variant?.grantedSpells ?? [],
+  });
 }

@@ -10,16 +10,18 @@ import { resolveInventoryItem, type InventoryItemWithDetails } from "@/lib/inven
 // inventory.ts to reuse — every inventory-transaction op returns the full
 // serialized character, same shape as this file's own endpoints.
 export const characterInclude = {
-  // #1682: species/variant relations, each with their OWN trait rows —
-  // buildSpeciesTraitsView (serialize/species.ts) reads raceSelection.
-  // species/variant here to derive the active trait set. Both resolve to
-  // null for a legacy `race`-name-only creation (speciesId/variantId null,
-  // #1679's additive migration) — buildSpeciesTraitsView handles that as
-  // "no species picked yet", never a crash.
+  // #1682/#1683: species/variant relations, each with their OWN trait AND
+  // granted-spell rows — buildSpeciesTraitsView (serialize/species.ts) reads
+  // .traits, buildSpeciesGrantedSpellSourceFor (same file) reads
+  // .grantedSpells + castingAbility (a scalar column on raceSelection itself,
+  // no include needed). Both species/variant resolve to null for a legacy
+  // `race`-name-only creation (speciesId/variantId null, #1679's additive
+  // migration) — both builders handle that as "no species picked yet", never
+  // a crash.
   raceSelection: {
     include: {
-      species: { include: { traits: true } },
-      variant: { include: { traits: true } },
+      species: { include: { traits: true, grantedSpells: { orderBy: { gateLevel: "asc" }, include: { spell: true } } } },
+      variant: { include: { traits: true, grantedSpells: { orderBy: { gateLevel: "asc" }, include: { spell: true } } } },
     },
   },
   backgroundSelection: true,

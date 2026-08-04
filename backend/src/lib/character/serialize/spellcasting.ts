@@ -17,6 +17,7 @@ import { readEffectSpec, resolveEffectSpec, type EffectRoll } from "@/lib/combat
 import { SHADOW_ART_CONCENTRATION_PREFIX } from "@/lib/classes/shadow-arts.js";
 import { effectiveEntryLevel } from "@/lib/leveling/effective-levels.js";
 import { editionOf } from "@/lib/rules/edition.js";
+import { buildSpeciesGrantedSpellSourceFor } from "./species.js";
 import type { RulesEdition } from "@character-sheet/shared-types";
 import type { CharacterWithRelations } from "@/lib/character/character-include.js";
 import type { PrimaryClass } from "./classes.js";
@@ -33,6 +34,16 @@ function mergeGrantedSpells(stored: SpellEntry[], granted: SpellEntry[]): SpellE
 // level (multiclass here → per-entry; single-sourced via effectiveEntryLevel).
 function collectGrantedSpells(entries: CharacterWithRelations["classEntries"], derivedLevel: number, edition: RulesEdition): SpellEntry[] {
   return entries.flatMap((e) => deriveGrantedSpells(e.subclassRef, effectiveEntryLevel(e.level, entries.length, derivedLevel), edition));
+}
+
+// Species/lineage-granted spells (#1683): a SECOND GrantedSpellSource,
+// independent of class entries (a species pick has no "level" of its own —
+// it gates on the character's overall XP-derived level, the SAME `level`
+// every view builder below already threads through). Resolved through the
+// SAME deriveGrantedSpells subclass grants use (sourceKind: "species") — the
+// one-shared-function non-negotiable, not a second derivation path.
+function deriveSpeciesGrantedSpells(row: CharacterWithRelations, level: number, edition: RulesEdition): SpellEntry[] {
+  return deriveGrantedSpells(buildSpeciesGrantedSpellSourceFor(row), level, edition, "species");
 }
 
 // Item-granted spells (#528) for a holder's active items. Appended after learned
@@ -55,6 +66,24 @@ function deriveItemSpellsFor(row: CharacterWithRelations): SpellEntry[] {
 function collectGrantedCastingAbility(entries: CharacterWithRelations["classEntries"], derivedLevel: number, edition: RulesEdition): keyof AbilityScores {
   const granting = entries.find((e) => deriveGrantedSpells(e.subclassRef, effectiveEntryLevel(e.level, entries.length, derivedLevel), edition).length > 0);
   return deriveGrantedCastingAbility(granting?.subclassRef, edition);
+}
+
+// The ability a "granted-only" (no real caster class) view uses for its one
+// save DC / attack bonus (#1683): subclass wins whenever it grants ANYTHING
+// at this level (subclassGranted.length check, not deriveGrantedCastingAbility's
+// own gate-blind admittedGrants lookup), species otherwise — Wisdom is the
+// ultimate default either function falls back to. A character with grants
+// from BOTH sources at once is a real but rare edge case (e.g. a Drow Warrior
+// of Shadow monk); this repo's existing DC/attack-bonus model is already one
+// scalar per view, so it picks a winner rather than modeling two.
+function resolveGrantedCastingAbility(
+  subclassGranted: SpellEntry[],
+  subclassSource: Parameters<typeof deriveGrantedCastingAbility>[0],
+  speciesSource: Parameters<typeof deriveGrantedCastingAbility>[0],
+  edition: RulesEdition,
+): keyof AbilityScores {
+  if (subclassGranted.length > 0) return deriveGrantedCastingAbility(subclassSource, edition);
+  return deriveGrantedCastingAbility(speciesSource, edition);
 }
 
 // Clamp-on-read for concentration: surface the stored entry when it's a current
@@ -110,20 +139,20 @@ function buildCasterSpellcastingView(
   };
 }
 
-// Non-caster class that nonetheless gets a subclass-granted spell (e.g. a
-// Warrior of Shadow monk's Minor Illusion). Slotless view so the grant renders;
-// the casting ability is derived per rule (Wisdom is the default).
+// Non-caster class that nonetheless gets a subclass- or species-granted spell
+// (e.g. a Warrior of Shadow monk's Minor Illusion, or a Fighter with a Drow
+// lineage). Slotless view so the grant renders; `castingAbility` is resolved
+// by the caller (resolveGrantedCastingAbility below) — subclass wins when it
+// grants anything at this level, species otherwise, Wisdom the ultimate default.
 function buildGrantedOnlySpellcastingView(
   row: CharacterWithRelations,
-  primaryClass: PrimaryClass,
   abilityScores: Record<string, number>,
   proficiencyBonus: number,
   granted: SpellEntry[],
   itemSpells: SpellEntry[],
+  castingAbility: keyof AbilityScores,
 ): object {
   const stored = normalizeSpellcastingMutable(row.spellcasting);
-  // fallow-ignore-next-line code-duplication -- casting-ability + modifier derivation shared with other spellcasting serializers by design
-  const castingAbility = deriveGrantedCastingAbility(primaryClass?.subclassRef, editionOf(row));
   const abilMod = abilityModifier(abilityScores[castingAbility] ?? 10);
   const grantedSpells = [...mergeGrantedSpells(stored.spells, granted), ...itemSpells];
   return {
@@ -304,6 +333,48 @@ function buildSpellcastingViewBase(
   return buildSingleClassSpellcastingView(row, primaryClass, level, abilityScores, proficiencyBonus);
 }
 
+// Subclass + species grants for the single-class view (#1683), split out of
+// buildSingleClassSpellcastingView purely to keep that function's own
+// cyclomatic complexity under the repo's health gate. Species/lineage grants
+// ride alongside subclass grants everywhere — a caster's own class ability
+// governs effect rolls uniformly either way (buildCasterSpellcastingView),
+// same precedent as a subclass grant riding a caster class today; only the
+// granted-only (no real caster) branch needs to pick WHICH source's ability
+// to use (resolveGrantedCastingAbility, called from
+// buildSingleClassGrantedOnlyView below).
+function collectSingleClassGranted(
+  row: CharacterWithRelations,
+  primaryClass: PrimaryClass,
+  level: number,
+  edition: RulesEdition,
+): { subclassGranted: SpellEntry[]; granted: SpellEntry[] } {
+  const subclassGranted = deriveGrantedSpells(primaryClass?.subclassRef, level, edition);
+  const speciesGranted = deriveSpeciesGrantedSpells(row, level, edition);
+  return { subclassGranted, granted: [...subclassGranted, ...speciesGranted] };
+}
+
+// The granted-only branch's ability resolution + delegate call, split out of
+// buildSingleClassSpellcastingView for the same complexity-budget reason as
+// collectSingleClassGranted above.
+function buildSingleClassGrantedOnlyView(
+  row: CharacterWithRelations,
+  primaryClass: PrimaryClass,
+  abilityScores: Record<string, number>,
+  proficiencyBonus: number,
+  subclassGranted: SpellEntry[],
+  granted: SpellEntry[],
+  itemSpells: SpellEntry[],
+  edition: RulesEdition,
+): object {
+  const castingAbility = resolveGrantedCastingAbility(
+    subclassGranted,
+    primaryClass?.subclassRef,
+    buildSpeciesGrantedSpellSourceFor(row),
+    edition,
+  );
+  return buildGrantedOnlySpellcastingView(row, abilityScores, proficiencyBonus, granted, itemSpells, castingAbility);
+}
+
 // Single-class spellcasting view: caster stats + slots, or a slotless
 // granted-only view, or the legacy blob fallback. Uses the XP-derived level
 // (the per-class column can be stale).
@@ -322,14 +393,15 @@ function buildSingleClassSpellcastingView(
     primaryClass?.subclass ?? undefined,
     editionOf(row),
   );
-  const granted = deriveGrantedSpells(primaryClass?.subclassRef, level, editionOf(row));
+  const edition = editionOf(row);
+  const { subclassGranted, granted } = collectSingleClassGranted(row, primaryClass, level, edition);
   const itemSpells = deriveItemSpellsFor(row); // #528: surfaced for any holder, caster or not.
 
   if (derivedSpell) {
     return buildCasterSpellcastingView(row, derivedSpell, granted, itemSpells);
   }
   if (granted.length > 0 || itemSpells.length > 0) {
-    return buildGrantedOnlySpellcastingView(row, primaryClass, abilityScores, proficiencyBonus, granted, itemSpells);
+    return buildSingleClassGrantedOnlyView(row, primaryClass, abilityScores, proficiencyBonus, subclassGranted, granted, itemSpells, edition);
   }
   return buildFallbackSpellcastingBlob(row);
 }
@@ -350,26 +422,25 @@ function buildMulticlassSpellcastingView(
   );
 
   // Subclass-granted spells across every class entry (each gated by its own level).
-  const granted = collectGrantedSpells(row.classEntries, level, editionOf(row));
+  const edition = editionOf(row);
+  const subclassGranted = collectGrantedSpells(row.classEntries, level, edition);
+  // #1683: species/lineage grants (independent of any class entry, same
+  // reasoning as buildSingleClassSpellcastingView's own comment above).
+  const speciesGranted = deriveSpeciesGrantedSpells(row, level, edition);
+  const granted = [...subclassGranted, ...speciesGranted];
   const itemSpells = deriveItemSpellsFor(row);
   const stored = normalizeSpellcastingMutable(row.spellcasting);
 
-  // No caster class in the mix, but a subclass or item still grants a spell —
-  // surface a slotless view (ability derived per rule; mirrors the single-class branch).
+  // No caster class in the mix, but a subclass/species or item still grants a
+  // spell — surface a slotless view. Same shape buildGrantedOnlySpellcastingView
+  // builds for the single-class case; reused here rather than duplicated
+  // (fallow flagged the prior byte-identical copy).
   if (multi.classes.length === 0) {
     if (granted.length === 0 && itemSpells.length === 0) return undefined;
-    const castingAbility = collectGrantedCastingAbility(row.classEntries, level, editionOf(row));
-    const abilMod = abilityModifier(abilityScores[castingAbility] ?? 10);
-    const grantedSpells = [...mergeGrantedSpells(stored.spells, granted), ...itemSpells];
-    return {
-      ability: castingAbility,
-      spellSaveDC: 8 + proficiencyBonus + abilMod,
-      spellAttackBonus: proficiencyBonus + abilMod,
-      slots: [],
-      arcana: [],
-      spells: grantedSpells,
-      concentratingOn: resolveConcentration(stored.concentratingOn, grantedSpells),
-    };
+    const castingAbility = subclassGranted.length > 0
+      ? collectGrantedCastingAbility(row.classEntries, level, edition)
+      : deriveGrantedCastingAbility(buildSpeciesGrantedSpellSourceFor(row), edition);
+    return buildGrantedOnlySpellcastingView(row, abilityScores, proficiencyBonus, granted, itemSpells, castingAbility);
   }
 
   const primaryCaster = multi.classes[0];
