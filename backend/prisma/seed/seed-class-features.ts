@@ -54,6 +54,9 @@ const DESCRIPTOR_RESET = {
   derivedStat: null,
   derivedStatTiers: Prisma.DbNull,
   saveDcAbilities: [] as string[],
+  // #1691 — same Prisma.DbNull sentinel as the other two Json? descriptor
+  // columns above, for the same reason (see this block's own header).
+  improvements: Prisma.DbNull,
 };
 
 function partitionKey(classId: string, subclassId: string | null): string {

@@ -262,7 +262,7 @@ export function serializeCharacter(rawRow: CharacterRow) {
     abilityScoresMap,
     progress.proficiencyBonus,
   );
-  const { resources, maneuverSaveDC } = buildResourcesView(
+  const { resources, maneuverSaveDC, classFeatureImprovements } = buildResourcesView(
     row,
     progress.level,
     abilityScoresMap,
@@ -270,11 +270,13 @@ export function serializeCharacter(rawRow: CharacterRow) {
   );
 
   // 3. Advancement clamp → effective scores/HP/initiative, then the feat layer
-  //    summed over the kept advancements (origin feats + slot-bounded entries).
+  //    summed over the kept advancements (origin feats + slot-bounded entries)
+  //    TOGETHER WITH active ClassFeature row grants (#1691's classFeatureImprovements).
   const { effectiveScores, hitPoints, effectiveInitBonus, clampedAdvancements, advSlotTotal, usedSlots, fightingStyleSlotTotal, usedFightingStyleSlots } =
     applyAdvancementClamp(row, progress.level, normalizedHitPoints);
   const { featBonuses, effectiveMaxHp, featProficiencies } = applyFeatLayer(
     clampedAdvancements,
+    classFeatureImprovements,
     hitDice.total,
     hitPoints.max,
   );

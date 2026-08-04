@@ -8,7 +8,7 @@ import {
   applyAdvancementOperations,
   InvalidAdvancementOperationError,
 } from "@/lib/leveling/advancement.js";
-import { FEAT_IMPROVEMENT_TARGETS } from "@/lib/srd/srd.js";
+import { featImprovementSchema } from "@/lib/srd/srd.js";
 import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
 
 export const advancementRouter = Router({ mergeParams: true });
@@ -22,26 +22,6 @@ export const takeAsiOpSchema = z.object({
   type: z.literal("takeAsi"),
   increases: z.array(increaseSchema).min(1).max(2),
 });
-
-const featImprovementSchema = z
-  .object({
-    target: z.enum(FEAT_IMPROVEMENT_TARGETS),
-    amount: z.number().int(),
-    perLevel: z.boolean().optional(),
-    key: z.string().optional(),
-  })
-  .refine(
-    (imp) => {
-      const keyedTargets: string[] = [
-        "skillProficiency",
-        "savingThrowProficiency",
-        "armorProficiency",
-        "weaponProficiency",
-      ];
-      return keyedTargets.includes(imp.target) ? !!imp.key : true;
-    },
-    { message: "FeatImprovement: 'key' is required for proficiency targets (skill, savingThrow, armor, weapon)" },
-  );
 
 export const takeFeatOpSchema = z
   .object({
