@@ -822,6 +822,23 @@ model ClassFeature {
   // deriveImprovementProficiencies).
   improvements Json?
 
+  // A row-declared list of while-active buffs a "toggle" resolverKind
+  // activates (#1686): [{ key, target, modifier, duration, minLevel?,
+  // clearOn?, endReminder?, resistDamageTypes?, rollEffects? }]. Distinct from
+  // buffTarget/buffModifier above (#900 C2b's single flat modifier, applied by
+  // a cast) — this column carries a LIST, each entry independently
+  // level-gated (minLevel) and able to carry resistance/roll-effect grants a
+  // single flat modifier can't express (Rage needs both). `modifier` is
+  // #1685's ResourceTotalFormula OR a tier array (ASCENDING minLevel,
+  // last-match-wins, same invariant as resourceTotals/derivedStatTiers) —
+  // evaluateBuffModifier (lib/classes/class-feature-rows.ts) is the one place
+  // this vocabulary is interpreted. Validated seed-time
+  // (classFeatureSeedSchema); `target` may equal the buff's own `key` for a
+  // marker buff with no numeric effect (Elemental Attunement's shape).
+  // `clearOn` is authored here but has no reader yet — its trigger vocabulary
+  // is #1688's.
+  effectBuffs Json?
+
   // NULLS NOT DISTINCT is hand-written in the migration (Prisma's DSL cannot
   // express it) — subclassId is nullable and base-class features are the
   // majority of rows, so without it two identical (fighter, NULL, "Second
@@ -1380,6 +1397,12 @@ model GrantedAbility {
   // target while the granting concentration holds. null = not a buff.
   buffTarget   String?
   buffModifier Int?
+
+  // The row-declared while-active buff list (#1686) — see ClassFeature.effectBuffs'
+  // own comment for the shape/evaluator. No maneuver/GrantedAbility row
+  // populates this yet; added here so a future "toggle" GrantedAbility (e.g. a
+  // Battle Master maneuver with a while-active rider) needs no second migration.
+  effectBuffs Json?
 
   // NULL = valid in both editions; a diverging maneuver / shadow art / channel
   // divinity / subclass-choice option forks into one row per edition sharing

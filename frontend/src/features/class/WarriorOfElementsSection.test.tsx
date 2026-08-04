@@ -32,31 +32,41 @@ function makeCharacter(over?: {
 
 // WarriorOfElementsSection reads useCurrentCharacter(), so every render seeds
 // the cache and mounts CurrentCharacterProvider via renderWithCharacter.
-function render(character: Character, onOperations: (ops: WarriorOfElementsOperation[]) => void) {
+// onToggleAttunement (#1686) is the separate prop the Attunement toggle now
+// fires — a plain executeAction op, not a WarriorOfElementsOperation.
+function render(
+  character: Character,
+  onOperations: (ops: WarriorOfElementsOperation[]) => void,
+  onToggleAttunement: (activate: boolean) => void = vi.fn(),
+) {
   return renderWithCharacter(
-    <WarriorOfElementsSection busy={false} onOperations={onOperations} />,
+    <WarriorOfElementsSection busy={false} onOperations={onOperations} onToggleAttunement={onToggleAttunement} />,
     character,
   );
 }
 
 describe("WarriorOfElementsSection", () => {
-  it("toggles Elemental Attunement on (active: true) when not attuned", async () => {
+  it("fires onToggleAttunement(true) when not attuned — not onOperations, #1686", async () => {
     const user = userEvent.setup();
     const onOperations = vi.fn<(ops: WarriorOfElementsOperation[]) => void>();
-    render(makeCharacter(), onOperations);
+    const onToggleAttunement = vi.fn<(activate: boolean) => void>();
+    render(makeCharacter(), onOperations, onToggleAttunement);
 
     await user.click(screen.getByRole("button", { name: "Attune" }));
-    expect(onOperations).toHaveBeenCalledWith([{ type: "toggleElementalAttunement", active: true }]);
+    expect(onToggleAttunement).toHaveBeenCalledWith(true);
+    expect(onOperations).not.toHaveBeenCalled();
   });
 
-  it("ends Attunement (active: false) when already attuned", async () => {
+  it("fires onToggleAttunement(false) when already attuned — not onOperations, #1686", async () => {
     const user = userEvent.setup();
     const onOperations = vi.fn<(ops: WarriorOfElementsOperation[]) => void>();
-    render(makeCharacter({ attuned: true }), onOperations);
+    const onToggleAttunement = vi.fn<(activate: boolean) => void>();
+    render(makeCharacter({ attuned: true }), onOperations, onToggleAttunement);
 
     expect(screen.getByRole("status")).toHaveTextContent(/Attunement active/i);
     await user.click(screen.getByRole("button", { name: "End" }));
-    expect(onOperations).toHaveBeenCalledWith([{ type: "toggleElementalAttunement", active: false }]);
+    expect(onToggleAttunement).toHaveBeenCalledWith(false);
+    expect(onOperations).not.toHaveBeenCalled();
   });
 
   it("casts Elemental Burst with the chosen damage type and a positive roll", async () => {

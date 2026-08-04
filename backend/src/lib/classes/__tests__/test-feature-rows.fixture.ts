@@ -298,6 +298,31 @@ export const BATTLE_MASTER_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_
 // keeps the pre-existing 99-at-L20 "unlimited" encoding with no
 // shortRestRegain; 2024 caps at 6 from L17 (no L20 tier) with
 // shortRestRegain: 1 on every tier (SRD 5.2 p.20).
+// Rage's activation + buff block (#1686) — mirrors barbarian-features.ts's
+// own rageBuff()/RAGE_DAMAGE_TIERS; this fixture has no direct import path to
+// that prisma/seed/ module (backend/tsconfig.json's `rootDir: "src"` TS6059
+// boundary, this file's own header), so the shape is duplicated here exactly
+// like every other descriptor column below already is.
+function rageBuffFixture(): ClassFeatureRow["effectBuffs"] {
+  return [
+    {
+      key: "rage",
+      target: "meleeDamage",
+      modifier: [
+        { minLevel: 1, value: 2 },
+        { minLevel: 9, value: 3 },
+        { minLevel: 16, value: 4 },
+      ],
+      duration: "while-active",
+      resistDamageTypes: ["bludgeoning", "piercing", "slashing"],
+      rollEffects: [
+        { mode: "advantage", kind: "check", ability: "strength" },
+        { mode: "advantage", kind: "save", ability: "strength" },
+      ],
+    },
+  ];
+}
+
 export const BARBARIAN_BASE_ROWS: ClassFeatureRow[] = [
   {
     name: "Rage",
@@ -316,6 +341,12 @@ export const BARBARIAN_BASE_ROWS: ClassFeatureRow[] = [
       { minLevel: 17, total: 6 },
       { minLevel: 20, total: 99 },
     ],
+    activationCost: "bonusAction",
+    resolverKind: "toggle",
+    costKind: "pool",
+    costPoolKey: "rage",
+    costBase: 1,
+    effectBuffs: rageBuffFixture(),
   },
   {
     name: "Rage",
@@ -333,6 +364,12 @@ export const BARBARIAN_BASE_ROWS: ClassFeatureRow[] = [
       { minLevel: 12, total: 5, shortRestRegain: 1 },
       { minLevel: 17, total: 6, shortRestRegain: 1 },
     ],
+    activationCost: "bonusAction",
+    resolverKind: "toggle",
+    costKind: "pool",
+    costPoolKey: "rage",
+    costBase: 1,
+    effectBuffs: rageBuffFixture(),
   },
 ];
 

@@ -179,6 +179,16 @@ function isPopulatedBarbarianRow(row: { className: string; subclassSlug: string 
   return row.className === "Barbarian" && row.subclassSlug === null && row.name === "Rage";
 }
 
+// #1686: Elemental Attunement's toggle block (activationCost/resolverKind/
+// resourceKey/costKind/costPoolKey/costBase/effectBuffs) — the first Monk
+// row (still on the TS-authoring path, monk.ts) to populate a descriptor
+// column. Elemental Burst/Elemental Strike stay text-only rows; their real
+// ops live in warrior-of-elements.ts's own endpoint (save-DC damage, not a
+// buff), same as before this migration.
+function isPopulatedMonkRow(row: { className: string; subclassSlug: string | null; name: string }): boolean {
+  return row.className === "Monk" && row.subclassSlug === "monk-warrior-of-the-elements" && row.name === "Elemental Attunement";
+}
+
 // #1234: Arcane Recovery's resource pool (base Wizard, both editions — 2
 // rows) — the third class to populate a resource descriptor column. No
 // activation/cost/effect columns (Arcane Recovery has no DERIVED_ACTIONS
@@ -355,6 +365,7 @@ const POPULATED_ROW_PREDICATES: ((row: RowKey) => boolean)[] = [
   isPopulatedFighterRow,
   isPopulatedBattleMasterPoolRow,
   isPopulatedBarbarianRow,
+  isPopulatedMonkRow,
   isPopulatedWarlockRow,
   isPopulatedWizardRow,
   isPopulatedIllusorySelfRow,
@@ -668,9 +679,11 @@ describe("ClassFeature migration — Fighter's #1528 pilot rows are populated ex
 
 // #1223: precise pin for Rage's two populated rows, mirroring the Fighter
 // pilot-row proofs above — proves the write landed exactly as authored, not
-// just "something is non-null".
-describe("ClassFeature migration — Barbarian's #1223 Rage rows are populated exactly as authored", () => {
-  it("resourceKey/recharge/totals only — no activation/cost columns (Rage's activation stays in classes/actions.ts's DERIVED_ACTIONS)", async () => {
+// just "something is non-null". #1686 extends this pin to Rage's own
+// activation/cost/effectBuffs columns, now that its DERIVED_ACTIONS pair and
+// ACTION_EFFECT_FN closure are retired in favor of a row-driven "toggle".
+describe("ClassFeature migration — Barbarian's #1223/#1686 Rage rows are populated exactly as authored", () => {
+  it("resourceKey/recharge/totals AND activation/cost/effectBuffs — Rage is fully row-driven now", async () => {
     const rows = await prisma.classFeature.findMany({
       where: { name: "Rage", class: { name: "Barbarian" }, subclassId: null },
       orderBy: { edition: "asc" },
@@ -699,9 +712,30 @@ describe("ClassFeature migration — Barbarian's #1223 Rage rows are populated e
       { minLevel: 17, total: 6, shortRestRegain: 1 },
     ]);
 
+    const rageBuff = [
+      {
+        key: "rage",
+        target: "meleeDamage",
+        modifier: [
+          { minLevel: 1, value: 2 },
+          { minLevel: 9, value: 3 },
+          { minLevel: 16, value: 4 },
+        ],
+        duration: "while-active",
+        resistDamageTypes: ["bludgeoning", "piercing", "slashing"],
+        rollEffects: [
+          { mode: "advantage", kind: "check", ability: "strength" },
+          { mode: "advantage", kind: "save", ability: "strength" },
+        ],
+      },
+    ];
     for (const row of rows) {
-      expect(row.activationCost, row.edition).toBeNull();
-      expect(row.costKind, row.edition).toBeNull();
+      expect(row.activationCost, row.edition).toBe("bonusAction");
+      expect(row.resolverKind, row.edition).toBe("toggle");
+      expect(row.costKind, row.edition).toBe("pool");
+      expect(row.costPoolKey, row.edition).toBe("rage");
+      expect(row.costBase, row.edition).toBe(1);
+      expect(row.effectBuffs, row.edition).toEqual(rageBuff);
     }
   });
 });

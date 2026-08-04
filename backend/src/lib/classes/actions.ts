@@ -47,7 +47,7 @@ import { readAbilityCost, type AbilityCost } from "@/lib/spellcasting/ability-co
 import { readEffectSpec, resolveEffectSpec, type EffectSpec } from "@/lib/combat/effects.js";
 import { effectiveEntryLevel } from "@/lib/leveling/effective-levels.js";
 import { resolveSubclassSlug, type SubclassSlug, type SubclassIdentityInput } from "./subclass-slug.js";
-import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "./class-feature-rows.js";
+import { effectBuffsFromRow, type ClassFeatureRow, type ClassFeatureRowsCarrier, type ResourceTotalContext } from "./class-feature-rows.js";
 
 export type ActionCost = "action" | "bonusAction" | "reaction" | "free" | "special";
 
@@ -57,10 +57,10 @@ export class UnknownActionError extends Error {
   status = 400;
 }
 
-/** Rage's melee-damage bonus by barbarian level (+2 / +3 / +4). */
-export function rageMeleeDamageBonus(barbarianLevel: number): number {
-  return barbarianLevel >= 16 ? 4 : barbarianLevel >= 9 ? 3 : 2;
-}
+// rageMeleeDamageBonus retired (#1686) — the +2/+3/+4 progression now lives
+// as a tiered `modifier` on Rage's own effectBuffs entry
+// (barbarian-features.ts), evaluated by evaluateBuffModifier
+// (class-feature-rows.ts) instead of a hardcoded closure here.
 
 /** One class/level gate: this class grants the row from this class level up. */
 interface ActionClassGate {
@@ -207,8 +207,10 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // Only class-specific (non-universal) actions go in availableActions.
 
   // Barbarian
-  { key: "rage", name: "Rage", cost: "bonusAction", grantClass: "barbarian", grantLevel: 1, resourceKey: "rage", resourceAmount: 1 },
-  { key: "endRage", name: "End Rage", cost: "bonusAction", grantClass: "barbarian", grantLevel: 1 },
+  // Rage/endRage retired from this table (#1686) — row-driven now
+  // (barbarian-features.ts's Rage rows, resolverKind "toggle"), synthesized
+  // by toggleActionsFromRow instead of a hand-authored pair here — mirrors
+  // Second Wind/Action Surge's own #1528 retirement.
   { key: "recklessAttack", name: "Reckless Attack", cost: "free", grantClass: "barbarian", grantLevel: 2 },
 
   // Bard
@@ -403,22 +405,14 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   },
 
   // Warrior of the Elements (PHB'24 p.90 — not in SRD 5.2, which ships only
-  // Warrior of the Open Hand for monk) two Focus-spending session actions
-  // (#1315, migrated off a pair of DerivedClassInfo availability booleans) —
-  // the real ops live in warrior-of-elements.ts's own endpoint, so neither row
-  // gets an ACTION_EFFECT_FN entry. Elemental Attunement is explicitly "no
-  // action"; Elemental Burst is a Magic action.
-  {
-    key: "elementalAttunement",
-    name: "Elemental Attunement",
-    cost: "free",
-    grantClass: "monk",
-    grantSubclassSlugs: ["monk-warrior-of-the-elements"],
-    grantLevel: 3,
-    resourceKey: "focus",
-    resourceAmount: 1,
-    reminder: "No action, start of your turn: spend 1 focus to imbue yourself with elemental energy for 10 minutes (or until incapacitated). Unarmed Strike reach +10 ft; once per hit, deal Acid/Cold/Fire/Lightning/Thunder damage instead of the normal type, forcing a Strength save (focus DC) to move the target up to 10 ft on a failure.",
-  },
+  // Warrior of the Open Hand for monk). Elemental Attunement retired from
+  // this table (#1686) — row-driven now (monk.ts's AuthoredFeature entry,
+  // resolverKind "toggle"), synthesizing its own "elementalAttunement"/
+  // "endElementalAttunement" pair via toggleActionsFromRow; the buff/spend
+  // ops route through the generic toggle dispatcher
+  // (routes/character/actions.ts), NOT warrior-of-elements.ts's own endpoint
+  // any more. Elemental Burst stays here and in that endpoint — it's a
+  // save-DC damage op, not a buff.
   {
     key: "elementalBurst",
     name: "Elemental Burst",
@@ -764,17 +758,24 @@ function resolveEnablement(
 //    range server-side rather than recomputing (same pattern as castSpell.roll).
 //  - A roll made server-side with no client input (e.g. Heightened Focus's
 //    temp-HP roll) is precomputed by the route before dispatch and passed in
-//    via its own ctx field, same shape as `rageDamageBonus` below.
+//    via its own ctx field, same shape as `heightenedFocusTempHp` below.
 //  - Use ONLY existing op types (spendResource, adjustQuantity, heal, tempHp,
 //    applyBuff, clearBuff).
+//
+// A while-active BUFF-GRANTING feature (Rage was the last one here) does NOT
+// belong in this table any more (#1686): author it as a ClassFeature/
+// GrantedAbility row with resolverKind "toggle" + an `effectBuffs` list
+// instead (toggleActionsFromRow/toggleRowOps below) — Rage's own migration
+// (barbarian-features.ts) is the worked example, including the level-tiered
+// modifier and resistDamageTypes/rollEffects passthrough this table's
+// closures used to hand-roll. This table stays for actions with NO buff to
+// grant (spend/heal/tempHp/no-op).
 
 interface ActionContext {
   /** Arbitrary dice roll total supplied by the client (e.g. potion healing). */
   roll?: number;
   /** ID of the inventory item to consume (e.g. healing potion). */
   inventoryItemId?: string;
-  /** Level-derived Rage melee-damage bonus, computed by the route from barbarian level. */
-  rageDamageBonus?: number;
   /**
    * Heightened Focus (monk L10, PHB'24 p.98/SRD 5.2, #1244): temp HP for
    * Patient Defense's Focus variant, rolled server-side (two Martial Arts die
@@ -790,7 +791,10 @@ type HealOp = { type: "heal"; amount: number };
 type TempHpOp = { type: "tempHp"; amount: number };
 type ApplyBuffOp = { type: "applyBuff"; buff: Omit<ActiveBuff, "id"> };
 type ClearBuffOp = { type: "clearBuff"; key: string; reason: string };
-type ActionOp = SpendResourceOp | AdjustQuantityOp | HealOp | TempHpOp | ApplyBuffOp | ClearBuffOp;
+// Exported so toggleRowOps below (the #1686 generic toggle handler) and the
+// routes/character/actions.ts dispatcher share this exact union instead of a
+// second, structurally-equal copy.
+export type ActionOp = SpendResourceOp | AdjustQuantityOp | HealOp | TempHpOp | ApplyBuffOp | ClearBuffOp;
 
 type EffectFn = (ctx: ActionContext) => ActionOp[];
 
@@ -822,28 +826,10 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
   },
 
   // Barbarian
-  // Rage applies a durable while-active meleeDamage buff (auto-ends via the
-  // session turn-hook / long rest / 0 HP) and spends a rage use.
-  rage: (ctx) => [
-    {
-      type: "applyBuff",
-      buff: {
-        key: "rage",
-        target: "meleeDamage",
-        modifier: ctx.rageDamageBonus ?? 2,
-        source: "Rage",
-        duration: "while-active",
-        resistDamageTypes: ["bludgeoning", "piercing", "slashing"],
-        rollEffects: [
-          { mode: "advantage", kind: "check", ability: "strength" },
-          { mode: "advantage", kind: "save", ability: "strength" },
-        ],
-      },
-    },
-    { type: "spendResource", key: "rage" },
-  ],
-  // Manual end (bonus action) — the same clear the turn-hook fires automatically.
-  endRage: () => [{ type: "clearBuff", key: "rage", reason: "Rage ended" }],
+  // Rage/endRage retired from this table (#1686) — row-driven now
+  // (barbarian-features.ts's Rage rows carry resolverKind "toggle" + a
+  // tiered effectBuffs entry), dispatched through toggleRowOps
+  // (routes/character/actions.ts) instead of a hand-authored closure here.
   recklessAttack: () => [], // ephemeral — advantage/disadvantage is tracked by the table
 
   // Bard
@@ -1020,6 +1006,112 @@ function actionFromRow(
   return buildRowAction(row, level, enabled, disabledReason);
 }
 
+// The synthesized "end" action key for a toggle row's own activate key
+// (#1686) — "rage" -> "endRage", matching the pre-migration DERIVED_ACTIONS
+// endRage key byte-for-byte, which is load-bearing:
+// DURABLE_BUFF_END_CONDITIONS (frontend/src/lib/turnHooks.ts) hardcodes
+// "endRage" as the auto-end action it invokes, keyed by the "rage" buff —
+// this function must keep producing that exact string for Rage forever, not
+// merely today.
+export function endActionKey(activateKey: string): string {
+  return `end${activateKey.charAt(0).toUpperCase()}${activateKey.slice(1)}`;
+}
+
+/**
+ * A "toggle" row's own AvailableAction PAIR (#1686) — synthesizes an activate
+ * entry (key = row.resourceKey, the same "click key = identity" convention
+ * buildRowAction uses) and an end entry (key = endActionKey(activateKey))
+ * from ONE row, replacing a hand-authored DERIVED_ACTIONS pair (Rage/endRage).
+ * Enablement checks the row's own ABILITY COST (costPoolKey/costBase — "cost
+ * columns already exist"), not resourceKey/resourceAmount: resourceKey is
+ * this row's IDENTITY here, not necessarily the pool it draws from (Elemental
+ * Attunement's identity is "elementalAttunement" but its cost draws from the
+ * shared "focus" pool; they coincide only when a feature spends its OWN
+ * dedicated pool, Rage's case, where costPoolKey === resourceKey === "rage").
+ * The end action is always enabled — same as the retired endRage
+ * DERIVED_ACTIONS row (no server-tracked "is this active" gate); clearing an
+ * inactive buff is already a safe no-op (clearBuffByKeyInTx).
+ */
+function toggleActionsFromRow(
+  row: ClassFeatureRow,
+  level: number,
+  edition: RulesEdition,
+  poolMap: Map<string, number>,
+  unarmoredUnshielded: boolean,
+): AvailableAction[] {
+  if (row.edition !== edition || row.level > level || !row.activationCost || !row.resourceKey) return [];
+  const cost = readAbilityCost(row);
+  const record: EnablementInput = {
+    resourceKey: cost.kind === "pool" ? cost.key : undefined,
+    resourceAmount: cost.kind === "pool" ? cost.base : undefined,
+    requiresUnarmored: row.requiresUnarmored ?? false,
+  };
+  const { enabled, disabledReason } = resolveEnablement(record, poolMap, unarmoredUnshielded);
+  const activateKey = row.resourceKey;
+  return [
+    {
+      key: activateKey,
+      name: row.name,
+      cost: row.activationCost as ActionCost,
+      enabled,
+      ...(disabledReason ? { disabledReason } : {}),
+      resolverKind: "toggle",
+    },
+    {
+      key: endActionKey(activateKey),
+      name: `End ${row.name}`,
+      cost: row.activationCost as ActionCost,
+      enabled: true,
+      resolverKind: "toggle",
+    },
+  ];
+}
+
+/**
+ * The generic "toggle" effect handler (#1686): instantiates a row's
+ * `effectBuffs` as ActiveBuff ops on activation, or clears them by key on
+ * end — the row-driven counterpart to a hand-authored ACTION_EFFECT_FN pair
+ * (Rage's retired `rage`/`endRage` functions). `ctx.level` is the granting
+ * class entry's OWN effective level (mirrors the retired
+ * computeRageDamageBonus's barbarian-level lookup, never the character's
+ * total level) — the same level effectBuffsFromRow uses for both a buff
+ * entry's own `minLevel` gate and a tiered `modifier`'s evaluation.
+ * Activation also pays the row's own ability cost (costPoolKey/costBase —
+ * "cost columns already exist") via a spendResource op, omitting `amount`
+ * when it's 1 to match every existing hand-authored spend's byte shape
+ * (`{ type: "spendResource", key: "rage" }`, no `amount` field).
+ */
+export function toggleRowOps(row: ClassFeatureRow, ctx: ResourceTotalContext, isEnd: boolean): ActionOp[] {
+  const buffs = effectBuffsFromRow(row, ctx);
+  if (isEnd) {
+    return buffs.map((b) => ({ type: "clearBuff", key: b.key, reason: `${row.name} ended` }));
+  }
+  // Activation with no buff to apply would still spend the pool below — a
+  // silent drain. That only happens for a misauthored row (null/empty
+  // effectBuffs) or one whose every buff is gated above ctx.level; fail loud
+  // rather than charge the resource for nothing (#1686 review).
+  if (buffs.length === 0) {
+    throw new Error(`Toggle row "${row.name}" has no active effectBuffs at level ${ctx.level}`);
+  }
+  const ops: ActionOp[] = buffs.map((b) => ({
+    type: "applyBuff",
+    buff: {
+      key: b.key,
+      target: b.target,
+      modifier: b.modifier,
+      source: row.name,
+      duration: b.duration,
+      ...(b.resistDamageTypes ? { resistDamageTypes: b.resistDamageTypes } : {}),
+      ...(b.rollEffects ? { rollEffects: b.rollEffects } : {}),
+    },
+  }));
+  const cost = readAbilityCost(row);
+  if (cost.kind === "pool") {
+    ops.push({ type: "spendResource", key: cost.key, ...(cost.base !== 1 ? { amount: cost.base } : {}) });
+  }
+  return ops;
+}
+
 /**
  * A dynamic subtitle for a row-driven heal (e.g. "Regain 1d10 + 3 HP") built
  * from the row's own effect columns rather than a second hand-authored
@@ -1050,6 +1142,14 @@ function actionsFromRows(
 ): AvailableAction[] {
   const actions: AvailableAction[] = [];
   for (const row of rows) {
+    // A "toggle" row synthesizes an activate/end PAIR (#1686), never a single
+    // actionFromRow entry — branched before that gate so a toggle row's
+    // resourceKey/activationCost never falls through to the cast-core/spend
+    // path below.
+    if (row.resolverKind === "toggle") {
+      actions.push(...toggleActionsFromRow(row, level, edition, poolMap, unarmoredUnshielded));
+      continue;
+    }
     const action = actionFromRow(row, level, edition, poolMap, unarmoredUnshielded);
     if (action) actions.push(action);
   }

@@ -57,6 +57,9 @@ const DESCRIPTOR_RESET = {
   // #1691 — same Prisma.DbNull sentinel as the other two Json? descriptor
   // columns above, for the same reason (see this block's own header).
   improvements: Prisma.DbNull,
+  // #1686 — same Prisma.DbNull sentinel, same reason: "populated nowhere" for
+  // a row that authors no `effectBuffs` list.
+  effectBuffs: Prisma.DbNull,
 };
 
 function partitionKey(classId: string, subclassId: string | null): string {
