@@ -77,10 +77,11 @@ describe("SpeciesTrait.improvements (#1682) — 2014 Hill Dwarf", () => {
 
     const res = await get(id);
     expect(res.status).toBe(200);
-    // Level-1 Fighter d10 + CON 12 (mod +1) = 11 base; Dwarven Toughness adds
-    // +1/level, so 12 at level 1 (the level-delta proof lives in block 3).
+    // Level-1 Fighter d10 + CON 14 (12 base + 2 species, #1681) → mod +2 = 12
+    // base; Dwarven Toughness adds +1/level, so 13 at level 1 (the level-delta
+    // proof lives in block 3).
     expect(res.body.hitDice.total).toBe(1);
-    expect(res.body.hitPoints.max).toBe(12);
+    expect(res.body.hitPoints.max).toBe(13);
 
     const weapons = weaponNames(res.body);
     expect(weapons).toEqual(expect.arrayContaining(["Battleaxes", "Handaxes", "Light Hammers", "Warhammers"]));
@@ -162,7 +163,15 @@ describe("SpeciesTrait.improvements (#1682) — level-down scales Dwarven Toughn
     const dwarf = await prisma.species.findFirstOrThrow({ where: { slug: "dwarf", edition: "EDITION_2014" }, include: { variants: true } });
     const hillDwarf = dwarf.variants.find((v) => v.slug === "hill")!;
     const dwarfId = await createCharacter({ race: "Hill Dwarf", rulesEdition: "EDITION_2014", speciesId: dwarf.id, variantId: hillDwarf.id });
-    const humanId = await createCharacter({ race: "Human", rulesEdition: "EDITION_2014" }); // no speciesId — legacy path, no species trait bonus
+    // The Hill Dwarf's effective CON is 14 (12 base + 2 species, #1681); give the
+    // legacy-path control the SAME effective CON (no species increase applies
+    // without a speciesId) so the per-level CON-mod contribution cancels and the
+    // delta-of-deltas isolates Dwarven Toughness alone.
+    const humanId = await createCharacter({
+      race: "Human",
+      rulesEdition: "EDITION_2014",
+      abilityScores: { strength: 12, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 10, charisma: 10 },
+    });
 
     const dwarfResult = await levelToTwoAndBack(dwarfId);
     const humanResult = await levelToTwoAndBack(humanId);
