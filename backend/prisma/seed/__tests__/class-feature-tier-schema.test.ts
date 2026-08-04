@@ -160,3 +160,149 @@ describe("resourceTotals' `total` accepts the #1685 formula vocabulary and rejec
     expect(result.success).toBe(false);
   });
 });
+
+// #1686: effectBuffs is a NEW nullable/optional list on ClassFeature — a
+// "toggle" resolverKind row's while-active buff descriptors. Driven through
+// classFeatureSeedSchema.safeParse for the same reason as every suite above:
+// prisma/seed/validate.ts's assertSeedContentValid is the one surface that
+// actually ships.
+describe("effectBuffs (#1686) — the toggle-resolver buff-list vocabulary", () => {
+  it("accepts a minimal buff (flat number modifier, a known target)", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      effectBuffs: [{ key: "rage", target: "meleeDamage", modifier: 2, duration: "while-active" }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects an unknown target that isn't the buff's own key", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      effectBuffs: [{ key: "rage", target: "notARealTarget", modifier: 2, duration: "while-active" }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("admits the marker-buff form — target equal to the buff's own key — even though it names no known stat (Elemental Attunement's shape)", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      effectBuffs: [{ key: "elementalAttunement", target: "elementalAttunement", modifier: 0, duration: "while-active" }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts a skill-name target (any of the 18 skill keys)", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      effectBuffs: [{ key: "guidance", target: "athletics", modifier: 1, duration: "concentration" }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects an unrecognized duration", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      effectBuffs: [{ key: "rage", target: "meleeDamage", modifier: 2, duration: "forever" }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts a tiered modifier — ascending minLevel, last-match-wins — mirroring resourceTotals' own tier invariant", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      effectBuffs: [
+        {
+          key: "rage",
+          target: "meleeDamage",
+          modifier: [
+            { minLevel: 1, value: 2 },
+            { minLevel: 9, value: 3 },
+            { minLevel: 16, value: 4 },
+          ],
+          duration: "while-active",
+        },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a DESCENDING tiered modifier — the same ordering rule every other tier column enforces", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      effectBuffs: [
+        {
+          key: "rage",
+          target: "meleeDamage",
+          modifier: [
+            { minLevel: 16, value: 4 },
+            { minLevel: 1, value: 2 },
+          ],
+          duration: "while-active",
+        },
+      ],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts resistDamageTypes and rollEffects (Rage needs both)", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      effectBuffs: [
+        {
+          key: "rage",
+          target: "meleeDamage",
+          modifier: 2,
+          duration: "while-active",
+          resistDamageTypes: ["bludgeoning", "piercing", "slashing"],
+          rollEffects: [
+            { mode: "advantage", kind: "check", ability: "strength" },
+            { mode: "advantage", kind: "save", ability: "strength" },
+          ],
+        },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects an unrecognized rollEffects mode", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      effectBuffs: [
+        {
+          key: "rage",
+          target: "meleeDamage",
+          modifier: 2,
+          duration: "while-active",
+          rollEffects: [{ mode: "sneaky", kind: "check", ability: "strength" }],
+        },
+      ],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts an entry-level minLevel gate plus an endReminder/clearOn", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      effectBuffs: [
+        {
+          key: "bladesong",
+          target: "ac",
+          modifier: { abilityMod: "intelligence", min: 1 },
+          duration: "concentration",
+          minLevel: 14,
+          clearOn: "concentrationEnds",
+          endReminder: "Bladesong ends if you attack with a weapon other than a light one, or cast a spell other than an Illusion or Transmutation spell.",
+        },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a buff missing a required field (no `key`)", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      effectBuffs: [{ target: "meleeDamage", modifier: 2, duration: "while-active" }],
+    });
+    expect(result.success).toBe(false);
+  });
+});

@@ -31,7 +31,7 @@ import { z } from "zod";
 import { assertCharacterAccess } from "@/lib/auth/access.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
-import { ACTION_EFFECT_FN, castSpecFromRow, rageMeleeDamageBonus, UnknownActionError } from "@/lib/classes/actions.js";
+import { ACTION_EFFECT_FN, castSpecFromRow, endActionKey, toggleRowOps, UnknownActionError } from "@/lib/classes/actions.js";
 import { castAbilityInTx } from "@/lib/spellcasting/ability-cast.js";
 import { ABILITY_SLOT_SUBJECT, type PayCostContext } from "@/lib/spellcasting/ability-cost.js";
 import { castAbilityWithSlotInTx } from "@/lib/spellcasting/spellcasting.js";
@@ -48,10 +48,10 @@ import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js"
 import { getActiveSessionId } from "@/lib/session/sessions.js";
 import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
-import { levelForExperience } from "@/lib/leveling/experience.js";
+import { levelForExperience, proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 import { effectiveEntryLevel } from "@/lib/leveling/effective-levels.js";
 import { FEATURE_ROWS_ENTRY_SELECT, featureRowsOf } from "@/lib/classes/feature-rows-select.js";
-import type { ClassFeatureRow } from "@/lib/classes/class-feature-rows.js";
+import type { ClassFeatureRow, ResourceTotalContext } from "@/lib/classes/class-feature-rows.js";
 
 export const actionsRouter = Router({ mergeParams: true });
 
@@ -71,6 +71,9 @@ const actionTransactionsSchema = z.object({
 const ROW_ACTION_SELECT = {
   experiencePoints: true,
   rulesEdition: true,
+  // Read for the #1686 generic toggle handler's evaluateBuffModifier context
+  // ({ abilityMod } formula tiers) — every other row-driven branch ignores it.
+  abilityScores: true,
   classEntries: {
     orderBy: { position: "asc" as const },
     select: { name: true, subclass: true, level: true, ...FEATURE_ROWS_ENTRY_SELECT },
@@ -83,10 +86,18 @@ type RowActionCharacter = Prisma.CharacterGetPayload<{ select: typeof ROW_ACTION
 // the level any `modifierSource: "classLevel"` effect on that row scales by
 // (Second Wind is `1d10 + your Fighter level`). The pairing is what keeps the
 // dispatcher from reaching for the XP-derived character total, which is a
-// different number the moment the character multiclasses.
+// different number the moment the character multiclasses. `actionKey` is the
+// key THIS entry answers to — the row's own `resourceKey` for every
+// non-toggle row and a toggle row's activate half, or `endActionKey(...)` for
+// a toggle row's synthesized end half (#1686) — so a single `.find` by
+// actionKey (below) resolves either half without a second lookup path.
+// `isToggleEnd` tells the dispatcher which of a toggle row's two op lists to
+// run.
 interface EligibleRowAction {
   row: ClassFeatureRow;
   entryLevel: number;
+  actionKey: string;
+  isToggleEnd: boolean;
 }
 
 // Every row-driven action row available to this character right now — each
@@ -94,7 +105,10 @@ interface EligibleRowAction {
 // (`activationCost` set), the right edition, and reached (row.level <=
 // that entry's own effective level). Mirrors deriveEntryScopedActions'
 // per-entry gate exactly, so the wire's `availableActions[]` and this
-// dispatcher's legality check can never drift.
+// dispatcher's legality check can never drift. A "toggle" row (#1686)
+// contributes TWO entries (activate + end), mirroring
+// toggleActionsFromRow's own pair — so this list and the served
+// availableActions[] can never disagree on which keys are legal either.
 function eligibleRowActions(character: RowActionCharacter): EligibleRowAction[] {
   const totalLevel = levelForExperience(character.experiencePoints);
   const edition = editionOf(character);
@@ -103,7 +117,14 @@ function eligibleRowActions(character: RowActionCharacter): EligibleRowAction[] 
     const effLevel = effectiveEntryLevel(entry.level, character.classEntries.length, totalLevel);
     const { classRows, subclassRows } = featureRowsOf(entry);
     for (const row of [...classRows, ...subclassRows]) {
-      if (row.activationCost && row.edition === edition && row.level <= effLevel) rows.push({ row, entryLevel: effLevel });
+      if (!row.activationCost || row.edition !== edition || row.level > effLevel) continue;
+      if (row.resolverKind === "toggle") {
+        if (!row.resourceKey) continue;
+        rows.push({ row, entryLevel: effLevel, actionKey: row.resourceKey, isToggleEnd: false });
+        rows.push({ row, entryLevel: effLevel, actionKey: endActionKey(row.resourceKey), isToggleEnd: true });
+      } else if (row.resourceKey) {
+        rows.push({ row, entryLevel: effLevel, actionKey: row.resourceKey, isToggleEnd: false });
+      }
     }
   }
   return rows;
@@ -124,7 +145,6 @@ async function applyActionOpInTx(
   op: ExecuteActionOperation,
   batchId: string,
   sessionId: string | null,
-  rageDamageBonus: number,
   heightenedFocusTempHp: number,
 ): Promise<ExecuteActionResult> {
   const effectFn = ACTION_EFFECT_FN[op.actionKey];
@@ -132,7 +152,7 @@ async function applyActionOpInTx(
     return applyRowDrivenActionInTx(tx, characterId, op, batchId, sessionId);
   }
 
-  const ctx = { roll: op.roll, inventoryItemId: op.inventoryItemId, rageDamageBonus, heightenedFocusTempHp };
+  const ctx = { roll: op.roll, inventoryItemId: op.inventoryItemId, heightenedFocusTempHp };
   const ops = effectFn(ctx);
   for (const effect of ops) {
     await applyActionEffectInTx(tx, characterId, effect, batchId, sessionId);
@@ -142,7 +162,9 @@ async function applyActionOpInTx(
 
 /**
  * Row-driven dispatch (#1528) — the retired `ACTION_CAST_FN`/DERIVED_ACTIONS
- * counterpart for a ClassFeature row. A row with no `effectKind` (Action
+ * counterpart for a ClassFeature row. A "toggle" row (#1686) instantiates its
+ * `effectBuffs` as buff ops (activate) or clears them (end) via the generic
+ * `toggleRowOps` handler. A non-toggle row with no `effectKind` (Action
  * Surge — a pure counter) just spends its pool; a row WITH one (Second Wind)
  * routes through `castAbilityInTx`, but unlike the retired table, THIS
  * function rolls the effect itself — `castManeuver` (maneuvers.ts) is the
@@ -163,14 +185,28 @@ async function applyRowDrivenActionInTx(
   const character = await tx.character.findUnique({ where: { id: characterId }, select: ROW_ACTION_SELECT });
   if (!character) throw new Error(`Character not found: ${characterId}`);
 
-  const eligible = eligibleRowActions(character).find((e) => e.row.resourceKey === op.actionKey);
-  // `resourceKey` is what the find matched on, so a hit always has one — the
-  // separate binding is only to carry that through to the narrowed type.
-  const resourceKey = eligible?.row.resourceKey;
-  if (!eligible || !resourceKey) {
+  const eligible = eligibleRowActions(character).find((e) => e.actionKey === op.actionKey);
+  if (!eligible) {
     throw new UnknownActionError(`Unknown action key: ${op.actionKey}`);
   }
-  const { row, entryLevel } = eligible;
+  const { row, entryLevel, isToggleEnd } = eligible;
+
+  if (row.resolverKind === "toggle") {
+    const ctx: ResourceTotalContext = {
+      level: entryLevel,
+      abilityScores: character.abilityScores as Record<string, number>,
+      profBonus: proficiencyBonusForLevel(levelForExperience(character.experiencePoints)),
+    };
+    for (const effect of toggleRowOps(row, ctx, isToggleEnd)) {
+      await applyActionEffectInTx(tx, characterId, effect, batchId, sessionId);
+    }
+    return {};
+  }
+
+  // Every non-toggle row-driven action carries its own resourceKey (the
+  // eligibleRowActions gate above requires it), so this is always defined —
+  // the separate binding just narrows the type for the spend below.
+  const resourceKey = row.resourceKey as string;
 
   if (!row.effectKind) {
     // A pure counter (Action Surge) — the extra-action grant is client-side.
@@ -282,9 +318,10 @@ async function applyActionEffectInTx(
  */
 async function assertKnownActionKeys(operations: ExecuteActionOperation[], characterId: string): Promise<void> {
   const character = await prisma.character.findUnique({ where: { id: characterId }, select: ROW_ACTION_SELECT });
-  const rowKeys = new Set(
-    (character ? eligibleRowActions(character) : []).map((e) => e.row.resourceKey).filter((k): k is string => k !== undefined && k !== null),
-  );
+  // `actionKey` (not `row.resourceKey`) so a toggle row's synthesized end key
+  // (#1686, e.g. "endRage") is recognized too — eligibleRowActions already
+  // produces both halves of a toggle row's pair under this field.
+  const rowKeys = new Set((character ? eligibleRowActions(character) : []).map((e) => e.actionKey));
   for (const op of operations) {
     if (!ACTION_EFFECT_FN[op.actionKey] && !rowKeys.has(op.actionKey)) {
       throw new UnknownActionError(`Unknown action key: ${op.actionKey}`);
@@ -292,27 +329,19 @@ async function assertKnownActionKeys(operations: ExecuteActionOperation[], chara
   }
 }
 
-/**
- * Level-derived Rage melee bonus, resolved before the transaction so the rage
- * effect fn stays pure (no DB). Only hits the DB when a rage op is present.
- */
-async function computeRageDamageBonus(operations: ExecuteActionOperation[], characterId: string): Promise<number> {
-  if (!operations.some((op) => op.actionKey === "rage")) return 0;
-  const classRow = await prisma.character.findUnique({
-    where: { id: characterId },
-    select: { classEntries: { select: { name: true, level: true } } },
-  });
-  const barbarianLevel = classRow?.classEntries.find((e) => e.name.toLowerCase() === "barbarian")?.level ?? 0;
-  return rageMeleeDamageBonus(barbarianLevel);
-}
+// computeRageDamageBonus retired (#1686) — Rage's melee-damage bonus is now
+// evaluated by toggleRowOps off the row's own tiered effectBuffs modifier,
+// using the granting entry's OWN effective level (eligibleRowActions'
+// entryLevel, resolved inside applyRowDrivenActionInTx's toggle branch), so
+// no separate pre-transaction DB read is needed for it any more.
 
 /**
  * Heightened Focus (monk L10, PHB'24 p.98/SRD 5.2, #1244): Patient Defense's
  * Focus variant additionally grants temp HP = two Martial Arts die rolls,
- * rolled server-side (no client input) — mirrors computeRageDamageBonus:
- * only hits the DB when a patientDefenseFocus op is present, and only rolls
- * when the monk is actually L10+ (0 below that, so the effect fn omits the
- * tempHp op entirely rather than granting a zero amount).
+ * rolled server-side (no client input) — only hits the DB when a
+ * patientDefenseFocus op is present, and only rolls when the monk is
+ * actually L10+ (0 below that, so the effect fn omits the tempHp op
+ * entirely rather than granting a zero amount).
  */
 async function computeHeightenedFocusTempHp(operations: ExecuteActionOperation[], characterId: string): Promise<number> {
   if (!operations.some((op) => op.actionKey === "patientDefenseFocus")) return 0;
@@ -350,7 +379,6 @@ actionsRouter.post<{ id: string }>(
     // clean 500 — no message-string sniffing, no hand-rolled 500 here.
     await assertKnownActionKeys(operations, characterId);
 
-    const rageDamageBonus = await computeRageDamageBonus(operations, characterId);
     const heightenedFocusTempHp = await computeHeightenedFocusTempHp(operations, characterId);
     const batchId = randomUUID();
     const sessionId = await getActiveSessionId(characterId);
@@ -364,7 +392,7 @@ actionsRouter.post<{ id: string }>(
     const results: ExecuteActionResult[] = [];
     await prisma.$transaction(async (tx) => {
       for (const op of operations) {
-        results.push(await applyActionOpInTx(tx, characterId, op, batchId, sessionId, rageDamageBonus, heightenedFocusTempHp));
+        results.push(await applyActionOpInTx(tx, characterId, op, batchId, sessionId, heightenedFocusTempHp));
       }
     });
 

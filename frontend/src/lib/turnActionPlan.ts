@@ -70,7 +70,14 @@ export function planActionClick(
     case "loadout-picker":
       return { consumeSlot: false, openResolution: true, send: "none" };
 
+    // A row-served "toggle" (#1686, e.g. Rage/End Rage) shares simple-confirm's
+    // exact send shape — kept as its own case (not folded into
+    // "simple-confirm") because it's the value resolverFromRow actually
+    // receives off the wire, and a shared case keeps this switch's
+    // exhaustiveness check honest about which kinds a future toggle row can
+    // reach here through.
     case "simple-confirm":
+    case "toggle":
       return {
         consumeSlot: true,
         openResolution: false,

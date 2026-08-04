@@ -27,7 +27,6 @@ import type {
   RestoreResourceOperation,
   RollInitiativeOperation,
   SpendResourceOperation,
-  ToggleAttunementResult,
   WarriorOfElementsResult,
 } from "@character-sheet/shared-types";
 
@@ -50,9 +49,9 @@ describe("class-resource wire contract", () => {
     >();
   });
 
-  it("keeps the elements result a three-member union, not an optional bag", () => {
+  it("keeps the elements result a two-member union, not an optional bag (#1686: the toggle result retired — it's a plain ExecuteActionResult now, not a WarriorOfElementsResult)", () => {
     expectTypeOf<WarriorOfElementsResult>().toEqualTypeOf<
-      ToggleAttunementResult | ElementalBurstResult | ElementalStrikeResult
+      ElementalBurstResult | ElementalStrikeResult
     >();
   });
 });

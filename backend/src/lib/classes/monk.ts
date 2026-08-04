@@ -300,6 +300,32 @@ const WARRIOR_OF_THE_ELEMENTS_FEATURES: AuthoredFeature[] = [
     source: "subclass",
     description:
       "At the start of your turn, you can expend 1 Focus Point (no action) to imbue yourself with elemental energy for 10 minutes (or until you're Incapacitated). While attuned: your Unarmed Strike reach increases by 10 ft; and once per Unarmed Strike hit you can deal Acid, Cold, Fire, Lightning, or Thunder damage instead of the normal type — when you do, you can force the target to make a Strength saving throw (your focus save DC), moving it up to 10 ft in a direction of your choice on a failure.",
+    // #1686: the TOGGLE half only — activating/ending the buff that gates
+    // attunementActive() (warrior-of-elements.ts). Elemental Burst/Elemental
+    // Strike's own damage-and-save mechanics stay in that file's dedicated
+    // route (they're save-DC damage ops, not buffs). `resourceKey` here is
+    // this toggle's own IDENTITY (activate key "elementalAttunement" / end
+    // key "endElementalAttunement") — it has no resourceTotals of its own
+    // because the ACTUAL spend is 1 use of the SHARED "focus" pool
+    // (costPoolKey), not a dedicated per-feature pool (contrast Rage, whose
+    // resourceKey names a pool it also declares — barbarian-features.ts).
+    // The marker-buff form (modifier: 0, target === key) is state-tracking
+    // only: attunementActive() reads the buff's PRESENCE, never its
+    // modifier value.
+    resourceKey: "elementalAttunement",
+    activationCost: "free",
+    resolverKind: "toggle",
+    costKind: "pool",
+    costPoolKey: "focus",
+    costBase: 1,
+    effectBuffs: [
+      {
+        key: "elementalAttunement",
+        target: "elementalAttunement",
+        modifier: 0,
+        duration: "while-active",
+      },
+    ],
   },
   {
     name: "Elemental Burst",

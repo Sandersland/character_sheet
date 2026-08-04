@@ -26,7 +26,6 @@ export type {
   RestoreResourceOperation,
   RollInitiativeOperation,
   SpendResourceOperation,
-  ToggleElementalAttunementOperation,
   WarriorOfElementsOperation,
   WarriorOfElementsResult,
 } from "@character-sheet/shared-types";

@@ -2,6 +2,10 @@
 // the skills table). SKILLS is the canonical mapping implicit in
 // prisma/seed.ts's per-character skill arrays; it is internal to lib/srd and
 // consumed by character-derive.ts, not re-exported for general use.
+// SKILL_KEYS (below) is the one deliberate exception — a flat name-only
+// projection reused by the effectBuffs `target` seed validator
+// (prisma/seed/class-features.ts, #1686), which needs the 18 skill keys
+// without importing the (ability-mapping-carrying) SkillDefinition shape.
 
 export const ALIGNMENTS: readonly string[] = [
   "Lawful Good",
@@ -40,3 +44,5 @@ export const SKILLS: readonly SkillDefinition[] = [
   { name: "stealth", ability: "dexterity" },
   { name: "survival", ability: "wisdom" },
 ];
+
+export const SKILL_KEYS: readonly string[] = SKILLS.map((s) => s.name);

@@ -14,11 +14,13 @@ import { SERVER_EFFECT_KEYS, resolverFor, ACTION_RESOLVERS } from "./actionResol
 // actionSurge are row-driven now (#1528) — dispatched via
 // routes/character/actions.ts's row-driven path, not this table, so they're
 // deliberately absent here too (parity would otherwise falsely fail).
+// rage/endRage joined that same row-driven set (#1686, a "toggle"
+// resolverKind row) — also deliberately absent.
 const BACKEND_ACTION_EFFECT_KEYS = new Set([
   "attack", "castSpell", "dodge", "dash", "disengage", "help", "hide",
   "search", "ready", "grapple", "opportunityAttack", "castSpellReaction",
   "useObject",
-  "rage", "endRage", "recklessAttack",
+  "recklessAttack",
   "bardicInspiration",
   "channelDivinity",
   "wildShape",

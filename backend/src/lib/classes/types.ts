@@ -3,6 +3,8 @@
 
 import type { RulesEdition } from "@character-sheet/shared-types";
 
+import type { ActionCost } from "./actions.js";
+import type { EffectBuffRow } from "./class-feature-rows.js";
 import type { FeatImprovement } from "./resources-state.js";
 import type { SubclassSlug } from "./subclass-slug.js";
 
@@ -112,6 +114,28 @@ export interface AuthoredFeature {
    */
   derivedStat?: string;
   derivedStatTiers?: { minLevel: number; value: number | string }[];
+  /**
+   * ClassFeature's activation/resource-identity/cost/effectBuffs columns
+   * (#1686) — a "toggle" resolverKind row's own descriptor block, threaded
+   * straight through expandFeatureRow the same way derivedStat/
+   * derivedStatTiers already are (this file never interprets any of them).
+   * `resourceKey` here is the toggle's own IDENTITY (both the activate
+   * action's `key` and the seed for its synthesized "end" key,
+   * endActionKey) — NOT necessarily a resourceTotals-backed pool: Elemental
+   * Attunement sets `resourceKey: "elementalAttunement"` with no
+   * resourceTotals of its own (its cost is paid from the SHARED "focus"
+   * pool via costPoolKey instead — see toggleActionsFromRow's own comment
+   * for why the two axes are independent). Elemental Attunement's own
+   * AuthoredFeature entry (monk.ts) is the first — and, while Monk remains
+   * the one class still on this TS-authoring path, the only — consumer.
+   */
+  resourceKey?: string;
+  activationCost?: ActionCost;
+  resolverKind?: "toggle";
+  costKind?: "pool" | "none";
+  costPoolKey?: string;
+  costBase?: number;
+  effectBuffs?: EffectBuffRow[];
 }
 
 /**

@@ -1,9 +1,14 @@
 /**
  * Warrior of the Elements route tests (#1247). A level-17 Warrior of the
  * Elements (Wis 16, prof +6) has focus DC 17 and a d12 Martial Arts die.
- * Elemental Attunement toggles a 10-min while-active buff (spends 1 Focus);
  * Elemental Burst spends 2 Focus and rolls 3× the Martial Arts die vs a Dex
  * save; Elemental Strikes require an active attunement and force a Str save.
+ *
+ * Elemental Attunement's own toggle moved OFF this endpoint (#1686) onto the
+ * generic row-driven "toggle" mechanism (POST .../actions/transactions,
+ * executeAction "elementalAttunement"/"endElementalAttunement") — its own
+ * coverage lives in this file's "Elemental Attunement toggle" describe block
+ * below, exercised through that endpoint instead of `url`.
  */
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -41,6 +46,13 @@ function agent() {
   return supertest.agent(app).set("Cookie", COOKIE);
 }
 const url = `/api/characters/${FIXTURE_ID}/abilities/warrior-of-elements/transactions`;
+// Elemental Attunement's own toggle (#1686) — the generic row-driven actions
+// endpoint, not the bespoke `url` above.
+function toggleAttunement(actionKey: "elementalAttunement" | "endElementalAttunement") {
+  return agent()
+    .post(`/api/characters/${FIXTURE_ID}/actions/transactions`)
+    .send({ operations: [{ type: "executeAction", actionKey }] });
+}
 
 // #1524: production always sets both classId/subclassId (routes/character/
 // class.ts, level-up.ts), and characterInclude's ClassFeature relations key
@@ -79,7 +91,18 @@ async function resolveClassAndSubclass(subclass: string | undefined): Promise<{ 
     await prisma.classFeature.deleteMany({ where: { classId: cls.id, subclassId: sub.id } });
     await prisma.classFeature.createMany({
       data: [
-        { classId: cls.id, subclassId: sub.id, name: "Elemental Attunement", level: 3, edition: "EDITION_2024", description: "At the start of your turn, you can expend 1 Focus Point (no action) to imbue yourself with elemental energy for 10 minutes (or until you're Incapacitated). While attuned: your Unarmed Strike reach increases by 10 ft; and once per Unarmed Strike hit you can deal Acid, Cold, Fire, Lightning, or Thunder damage instead of the normal type — when you do, you can force the target to make a Strength saving throw (your focus save DC), moving it up to 10 ft in a direction of your choice on a failure." },
+        {
+          classId: cls.id, subclassId: sub.id, name: "Elemental Attunement", level: 3, edition: "EDITION_2024",
+          description: "At the start of your turn, you can expend 1 Focus Point (no action) to imbue yourself with elemental energy for 10 minutes (or until you're Incapacitated). While attuned: your Unarmed Strike reach increases by 10 ft; and once per Unarmed Strike hit you can deal Acid, Cold, Fire, Lightning, or Thunder damage instead of the normal type — when you do, you can force the target to make a Strength saving throw (your focus save DC), moving it up to 10 ft in a direction of your choice on a failure.",
+          // #1686: the toggle half — mirrors monk.ts's real AuthoredFeature entry.
+          activationCost: "free",
+          resolverKind: "toggle",
+          resourceKey: "elementalAttunement",
+          costKind: "pool",
+          costPoolKey: "focus",
+          costBase: 1,
+          effectBuffs: [{ key: "elementalAttunement", target: "elementalAttunement", modifier: 0, duration: "while-active" }],
+        },
         { classId: cls.id, subclassId: sub.id, name: "Manipulate Elements", level: 3, edition: "EDITION_2024", description: "You know the Elementalism cantrip. Wisdom is your spellcasting ability for it." },
         { classId: cls.id, subclassId: sub.id, name: "Elemental Burst", level: 6, edition: "EDITION_2024", description: "As a Magic action, you can expend 2 Focus Points to create a 20-foot-radius sphere of elemental energy centered on a point within 120 ft. Choose Acid, Cold, Fire, Lightning, or Thunder. Each creature in the sphere makes a Dexterity saving throw (your focus save DC), taking damage equal to three rolls of your Martial Arts die of the chosen type on a failure, or half as much on a success." },
         { classId: cls.id, subclassId: sub.id, name: "Stride of the Elements", level: 11, edition: "EDITION_2024", description: "While your Elemental Attunement is active, you have a Fly Speed and a Swim Speed each equal to your Speed." },
@@ -163,13 +186,14 @@ describe("POST /api/characters/:id/abilities/warrior-of-elements/transactions", 
     expect(actionKeys).toContain("elementalBurst");
   });
 
+  // #1686: Elemental Attunement's own toggle is row-driven now — the generic
+  // actions endpoint (toggleAttunement helper), not `url`.
   it("Elemental Attunement toggles a 10-min while-active buff, spending 1 Focus", async () => {
     await createMonk(17, "Warrior of the Elements");
-    const res = await agent().post(url).send({ operations: [{ type: "toggleElementalAttunement", active: true }] });
+    const res = await toggleAttunement("elementalAttunement");
     expect(res.status).toBe(200);
-    expect(res.body.results[0].active).toBe(true);
 
-    const focus = res.body.character.resources.pools.find((p: { key: string }) => p.key === "focus");
+    const focus = res.body.resources.pools.find((p: { key: string }) => p.key === "focus");
     expect(focus.remaining).toBe(16); // 17 total − 1 spent
 
     const buffs = await activeBuffs();
@@ -178,18 +202,20 @@ describe("POST /api/characters/:id/abilities/warrior-of-elements/transactions", 
     expect(buff.duration).toBe("while-active");
 
     // Toggling off clears the buff (no Focus refund).
-    const off = await agent().post(url).send({ operations: [{ type: "toggleElementalAttunement", active: false }] });
+    const off = await toggleAttunement("endElementalAttunement");
     expect(off.status).toBe(200);
-    expect(off.body.results[0].active).toBe(false);
     expect((await activeBuffs()).some((b) => b.key === ELEMENTAL_ATTUNEMENT_BUFF_KEY)).toBe(false);
   });
 
-  // #1275 byte-identity oracle: captured on the per-feature URL before the move to
-  // the shared ability endpoint, so a green run afterwards is evidence the audit
-  // trail is unchanged.
+  // #1275/#1686 byte-identity oracle: originally captured on the per-feature
+  // URL, then re-pinned here against the generic actions endpoint — a green
+  // run is evidence the buff/spend shape is unchanged. The THIRD
+  // "toggleElementalAttunement" summary event the old bespoke closure logged
+  // is intentionally gone (#1686): the generic toggle handler logs only the
+  // primitive ops (buffApplied, spendResource), same as Rage's own migration.
   it("pins the audit trail of one Elemental Attunement toggle", async () => {
     await createMonk(17, "Warrior of the Elements");
-    const res = await agent().post(url).send({ operations: [{ type: "toggleElementalAttunement", active: true }] });
+    const res = await toggleAttunement("elementalAttunement");
     expect(res.status).toBe(200);
 
     const noResourcesUsed = {
@@ -217,23 +243,22 @@ describe("POST /api/characters/:id/abilities/warrior-of-elements/transactions", 
         after: { resources: { ...noResourcesUsed.resources, used: { focus: 1 } } },
         data: { key: "focus", amount: 1, remaining: 16, roll: null },
       },
-      {
-        category: "resources",
-        type: "toggleElementalAttunement",
-        summary: "Elemental Attunement — imbued with elemental energy for 10 minutes (or until Incapacitated).",
-        before: null,
-        after: null,
-        data: { active: true },
-      },
     ]);
   });
 
-  it("cannot activate Elemental Attunement twice", async () => {
+  // #1686: the generic toggle engine has no "already active" guard (same as
+  // Rage) — re-activating simply re-applies the buff (dedup-by-key replaces,
+  // never stacks, appendActiveBuffInTx's existing contract) and spends
+  // another Focus. This intentionally REPLACES the retired bespoke
+  // function's 400 rejection.
+  it("activating Elemental Attunement twice re-applies the buff and spends Focus again (no guard, matches Rage)", async () => {
     await createMonk(17, "Warrior of the Elements");
-    await agent().post(url).send({ operations: [{ type: "toggleElementalAttunement", active: true }] });
-    const res = await agent().post(url).send({ operations: [{ type: "toggleElementalAttunement", active: true }] });
-    expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/already active/i);
+    await toggleAttunement("elementalAttunement");
+    const res = await toggleAttunement("elementalAttunement");
+    expect(res.status).toBe(200);
+    expect((await activeBuffs()).filter((b) => b.key === ELEMENTAL_ATTUNEMENT_BUFF_KEY)).toHaveLength(1);
+    const focus = res.body.resources.pools.find((p: { key: string }) => p.key === "focus");
+    expect(focus.remaining).toBe(15); // 17 total − 2 activations × 1 Focus
   });
 
   it("Elemental Burst spends 2 Focus and resolves a Dex save vs the focus DC (17)", async () => {
@@ -265,7 +290,7 @@ describe("POST /api/characters/:id/abilities/warrior-of-elements/transactions", 
     expect(blocked.status).toBe(400);
     expect(blocked.body.error).toMatch(/attunement/i);
 
-    await agent().post(url).send({ operations: [{ type: "toggleElementalAttunement", active: true }] });
+    await toggleAttunement("elementalAttunement");
     const res = await agent().post(url).send({ operations: [{ type: "elementalStrike", damageType: "lightning", roll: 8 }] });
     expect(res.status).toBe(200);
     const result = res.body.results[0];
@@ -289,14 +314,21 @@ describe("POST /api/characters/:id/abilities/warrior-of-elements/transactions", 
   // against the XP-derived effective level for single-class characters instead.
   it("gates off the XP-derived level, not a stale classEntries[].level column (single-class pending level-up)", async () => {
     await createMonkStaleLevelColumn(2, 3, "Warrior of the Elements");
-    const res = await agent().post(url).send({ operations: [{ type: "toggleElementalAttunement", active: true }] });
+    const res = await toggleAttunement("elementalAttunement");
     expect(res.status).toBe(200);
   });
 
+  // #1686: the row-driven toggle's "not granted" failure now surfaces
+  // through the SAME generic gate every other row-driven action uses
+  // (assertKnownActionKeys/eligibleRowActions, routes/character/actions.ts)
+  // — a Warrior of the Open Hand's own rows simply never contain
+  // "elementalAttunement", so it 400s as an unknown action key rather than
+  // the retired bespoke function's "Only a Warrior of the Elements monk..."
+  // message.
   it("rejects Elemental Attunement from a non-elements monk", async () => {
     await createMonk(17, "Warrior of the Open Hand");
-    const res = await agent().post(url).send({ operations: [{ type: "toggleElementalAttunement", active: true }] });
+    const res = await toggleAttunement("elementalAttunement");
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/Warrior of the Elements/i);
+    expect(res.body.error).toMatch(/unknown action key/i);
   });
 });
