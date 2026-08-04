@@ -274,7 +274,9 @@ async function resolveSpeciesCatalogRow(
 ): Promise<PhaseResult<{ species: SpeciesCatalogRow }>> {
   const species = await prisma.species.findUnique({
     where: { id: speciesId },
-    include: { variants: true },
+    // Only id+name are read from variants here (existence + belongs-to checks);
+    // Dragonborn alone pulls 10 rows each carrying abilityIncreases JSON.
+    include: { variants: { select: { id: true, name: true } } },
   });
   if (!species) {
     return { ok: false, status: 400, error: `Unknown species id: ${speciesId}` };

@@ -518,6 +518,12 @@ model SpeciesTrait {
   // FeatImprovement[] vocabulary (Feat.improvements, srd/feats.ts) reused
   // verbatim so #1682's derivation layer needs no new shape, only a new source.
   improvements Json @default("[]")
+
+  // Postgres does not auto-index FK columns; #1682 resolves traits by species
+  // (include: { traits: true }) and by variant, and a species prune cascades on
+  // speciesId — index both so neither becomes a full table scan (#1679 review).
+  @@index([speciesId])
+  @@index([variantId])
 }
 
 // A spell a species/variant grants for free — sibling of SubclassGrantedSpell

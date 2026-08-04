@@ -37,34 +37,54 @@ function staleSpeciesWhere(seeded: readonly { slug: string; edition: SeedEdition
   };
 }
 
+type SpeciesVariantSeed = NonNullable<SpeciesSeed["variants"]>[number];
+
+// Split out of seedVariants so that function stays under the seed-file
+// cyclomatic budget (CC <= 4): seed helpers run in globalSetup, uncovered by
+// vitest, so CRAP is driven by complexity alone — the two `??` defaults live
+// here rather than inflating the loop (#1679 review).
+function variantRow(speciesId: string, variant: SpeciesVariantSeed) {
+  return {
+    speciesId,
+    name: variant.name,
+    slug: variant.slug,
+    speedOverride: variant.speedOverride ?? null,
+    abilityIncreases: variant.abilityIncreases ?? [],
+  };
+}
+
+// Drop variants this species no longer seeds (a renamed/retired subrace),
+// scoped to THIS species' rows only, never the whole table.
+async function pruneStaleVariants(
+  prisma: PrismaClient,
+  speciesId: string,
+  species: SpeciesSeed,
+  seededSlugs: string[],
+): Promise<void> {
+  const where = { speciesId, slug: { notIn: seededSlugs } };
+  const stale = await prisma.speciesVariant.findMany({ where, select: { name: true } });
+  if (stale.length) {
+    console.log(`seedSpecies: dropping stale variant rows for ${species.name} (${species.edition}): ${stale.map((v) => v.name).join(", ")}`);
+  }
+  await prisma.speciesVariant.deleteMany({ where });
+}
+
 async function seedVariants(prisma: PrismaClient, speciesId: string, species: SpeciesSeed): Promise<void> {
   const variants = species.variants ?? [];
   for (const variant of variants) {
-    const data = {
-      speciesId,
-      name: variant.name,
-      slug: variant.slug,
-      speedOverride: variant.speedOverride ?? null,
-      abilityIncreases: variant.abilityIncreases ?? [],
-    };
+    const data = variantRow(speciesId, variant);
     await prisma.speciesVariant.upsert({
       where: { speciesId_slug: { speciesId, slug: variant.slug } },
       create: data,
       update: data,
     });
   }
-
-  // Drop variants this species no longer seeds (a renamed/retired subrace) —
-  // scoped to THIS species' rows only, never the whole table.
-  const seededSlugs = variants.map((v) => v.slug);
-  const stale = await prisma.speciesVariant.findMany({
-    where: { speciesId, slug: { notIn: seededSlugs } },
-    select: { id: true, name: true },
-  });
-  if (stale.length) {
-    console.log(`seedSpecies: dropping stale variant rows for ${species.name} (${species.edition}): ${stale.map((v) => v.name).join(", ")}`);
-  }
-  await prisma.speciesVariant.deleteMany({ where: { speciesId, slug: { notIn: seededSlugs } } });
+  await pruneStaleVariants(
+    prisma,
+    speciesId,
+    species,
+    variants.map((v) => v.slug),
+  );
 }
 
 export async function seedSpecies(prisma: PrismaClient): Promise<void> {
