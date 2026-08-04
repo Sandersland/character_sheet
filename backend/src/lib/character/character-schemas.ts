@@ -52,6 +52,14 @@ export const createCharacterSchema = z
     // after create; .strict() 400s any client still sending a URL.
     experiencePoints: z.number().int().nonnegative().optional(),
     race: z.string().min(1),
+    // Species catalog FK (#1679) — additive alongside `race` above during the
+    // compat window (`race` stays required until #1684 prunes the legacy
+    // path). Validated in resolveSpeciesSelection: variant must belong to
+    // this species, species edition must match the character's, and a
+    // variant-bearing species requires speciesId+variantId iff the species has
+    // variant rows. variantId is REJECTED without a speciesId (never implies one).
+    speciesId: z.string().optional(),
+    variantId: z.string().optional(),
     background: z.string().min(1),
     classes: z.array(classChoiceSchema).length(1),
     abilityScores: abilityScoresSchema,
