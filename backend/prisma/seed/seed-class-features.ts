@@ -60,6 +60,9 @@ const DESCRIPTOR_RESET = {
   // #1686 — same Prisma.DbNull sentinel, same reason: "populated nowhere" for
   // a row that authors no `effectBuffs` list.
   effectBuffs: Prisma.DbNull,
+  // #1688 — same Prisma.DbNull sentinel, same reason: "populated nowhere" for
+  // a row that authors no `activationRequires` list.
+  activationRequires: Prisma.DbNull,
 };
 
 function partitionKey(classId: string, subclassId: string | null): string {

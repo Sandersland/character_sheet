@@ -116,6 +116,20 @@ export type BuffModifierFormula = ResourceTotalFormula | BuffModifierTier[];
 export type EffectBuffDuration = "concentration" | "while-active" | "until-rest";
 
 /**
+ * Equip-time trigger keys `EffectBuffRow.clearOn` may name (#1688) — raised
+ * by the equip hook (`equipClearTriggers`, lib/inventory/inventory-placement.ts)
+ * when an item is donned, and matched against an active buff's own `clearOn`
+ * list by that same hook. "equipBodyArmor" fires for EVERY body-armor
+ * category (Mage Armor's RAW shape: "the spell ends if the target dons
+ * armor" — any category, #363); "equip<Category>Armor" fires only for that
+ * one category (Bladesong's shape: medium/heavy only, never light);
+ * "equipShield" fires for a shield placed in OFF_HAND. A row names the
+ * trigger set its own rule actually cares about.
+ */
+export const CLEAR_ON_TRIGGERS = ["equipLightArmor", "equipMediumArmor", "equipHeavyArmor", "equipBodyArmor", "equipShield"] as const;
+export type ClearOnTrigger = (typeof CLEAR_ON_TRIGGERS)[number];
+
+/**
  * One row-declared while-active buff (#1686) — a ClassFeature/GrantedAbility
  * row's `effectBuffs` entry, instantiated as an ActiveBuff op by the generic
  * "toggle" resolver (lib/classes/actions.ts). `target` may equal this entry's
@@ -127,11 +141,12 @@ export type EffectBuffDuration = "concentration" | "while-active" | "until-rest"
  * same L2 toggle) — distinct from a tiered `modifier`'s own minLevel axis,
  * which scales the value WITHIN one always-present entry (Rage's damage
  * bonus); a row can use either axis or both without them colliding. `clearOn`
- * is authored but has no reader yet (#1688). `endReminder` is display text
- * only — DURABLE_BUFF_END_CONDITIONS (frontend/src/lib/turnHooks.ts) is where
- * an actual auto-end PREDICATE lives, keyed by `key`, which is why a migrated
- * buff's `key` must stay byte-stable with that table's own entries (Rage:
- * "rage").
+ * (#1688) is a LIST — Bladesong needs three triggers (medium armor, heavy
+ * armor, OR shield) to end the same entry, which a single string couldn't
+ * express. `endReminder` is display text only — DURABLE_BUFF_END_CONDITIONS
+ * (frontend/src/lib/turnHooks.ts) is where an actual auto-end PREDICATE
+ * lives, keyed by `key`, which is why a migrated buff's `key` must stay
+ * byte-stable with that table's own entries (Rage: "rage").
  */
 export interface EffectBuffRow {
   key: string;
@@ -139,7 +154,7 @@ export interface EffectBuffRow {
   modifier: BuffModifierFormula;
   duration: EffectBuffDuration;
   minLevel?: number;
-  clearOn?: string;
+  clearOn?: ClearOnTrigger[];
   endReminder?: string;
   resistDamageTypes?: string[];
   rollEffects?: RollEffect[];
@@ -172,6 +187,39 @@ export interface ResourceColumns {
 }
 
 /**
+ * Armor/shield literals `ActivationRequirement` may name (#1688) — evaluated
+ * against the character's CURRENTLY EQUIPPED state at activation time (not
+ * derive-time `requiresUnarmored`'s blanket condition, which only ever means
+ * "no armor AND no shield"; this vocabulary lets a row name medium/heavy
+ * specifically, e.g. Bladesong: no medium/heavy armor and no shield, but
+ * light armor is fine).
+ */
+export const ARMOR_ACTIVATION_REQUIREMENTS = ["noMediumArmor", "noHeavyArmor", "noShield", "noBodyArmor"] as const;
+export type ArmorActivationRequirement = (typeof ARMOR_ACTIVATION_REQUIREMENTS)[number];
+
+/**
+ * Gates activation on another buff (named by its `key`) currently being
+ * active (#1688) — Bladesinger's Song of Defense ("usable only while your
+ * Bladesong is active", #1676) is the first consumer; Elemental Attunement's
+ * burst/strike ops (warrior-of-elements.ts's hand-rolled `attunementActive`
+ * check) are the follow-on migration target for a later rung. Enforced for
+ * ANY row-driven activation (applyRowDrivenActionInTx), not only a "toggle"
+ * row's own activate half.
+ */
+export interface RequiresActiveBuffRequirement {
+  requiresActiveBuff: string;
+}
+
+/**
+ * The closed `activationRequires` vocabulary (#1688) — an armor/shield
+ * literal or a `requiresActiveBuff` object, evaluated by
+ * `unmetActivationRequirements` (lib/classes/activation-requires.ts), the ONE
+ * place this vocabulary is interpreted. Validated seed-time
+ * (classFeatureSeedSchema).
+ */
+export type ActivationRequirement = ArmorActivationRequirement | RequiresActiveBuffRequirement;
+
+/**
  * ClassFeature's activation-block columns — replaces a DERIVED_ACTIONS row
  * (#1528). No gate columns here: grantClass/grantSubclassSlugs/grantLevel are
  * the row's own classId/subclassId/level (one row, one gate).
@@ -181,6 +229,7 @@ export interface ActivationColumns {
   resolverKind?: string | null;
   requiresUnarmored?: boolean | null;
   regrants?: string[] | null;
+  activationRequires?: ActivationRequirement[] | null;
 }
 
 /**
@@ -328,6 +377,7 @@ export interface ResolvedEffectBuff {
   target: string;
   modifier: number;
   duration: EffectBuffDuration;
+  clearOn?: ClearOnTrigger[];
   resistDamageTypes?: string[];
   rollEffects?: RollEffect[];
 }
@@ -347,6 +397,7 @@ export function effectBuffsFromRow(row: ClassFeatureRow, ctx: ResourceTotalConte
       target: buff.target,
       modifier: evaluateBuffModifier(buff.modifier, ctx),
       duration: buff.duration,
+      ...(buff.clearOn ? { clearOn: buff.clearOn } : {}),
       ...(buff.resistDamageTypes ? { resistDamageTypes: buff.resistDamageTypes } : {}),
       ...(buff.rollEffects ? { rollEffects: buff.rollEffects } : {}),
     }));

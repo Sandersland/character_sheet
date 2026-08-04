@@ -22,6 +22,23 @@ import type { ConcentrationState, SpellcastingMutableState } from "./spell-state
 /** A cast's effect target: the caster themselves, or a consenting ally's sheet (#462). */
 export type CastTarget = "self" | { characterId: string };
 
+/**
+ * Mage Armor's "the spell ends if the target dons armor" (#363) — migrated
+ * (#1688) off the equip hook's own hardcoded target check onto the buff's own
+ * `clearOn` metadata, the same path every effectBuffs-driven buff's
+ * equip-driven true-end now rides (inventory-placement.ts's
+ * equipClearTriggers). "acUnarmoredBase" is the only buffTarget any seeded
+ * Spell/GrantedAbility sets that needs one; "equipBodyArmor" fires for EVERY
+ * armor category (light included) — the same condition the old hardcoded
+ * `slot === "BODY"` check applied regardless of category, so this keeps that
+ * behavior byte-for-byte. A future buffTarget needing an equip-driven
+ * true-end is one more entry here, not a second special case in the equip
+ * hook.
+ */
+const BUFF_TARGET_CLEAR_ON: Partial<Record<string, string[]>> = {
+  acUnarmoredBase: ["equipBodyArmor"],
+};
+
 // The per-op result the dispatcher logs (before/after snapshots + logEvent).
 export interface OpOutcome {
   eventType: string;
@@ -197,6 +214,7 @@ export async function castAbilityInTx(ctx: CastAbilityContext, input: CastAbilit
         source: input.name,
         sourceEntryId: input.entryId,
         duration: input.concentrates ? "concentration" : "while-active",
+        ...(BUFF_TARGET_CLEAR_ON[buff.target] ? { clearOn: BUFF_TARGET_CLEAR_ON[buff.target] } : {}),
       },
       ctx.batchId,
       ctx.sessionId,
