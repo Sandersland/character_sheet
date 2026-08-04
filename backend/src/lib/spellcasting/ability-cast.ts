@@ -10,7 +10,7 @@
  */
 
 import { Prisma } from "@/generated/prisma/client.js";
-import { payAbilityCostInTx, type AbilityCost, type PayCostContext } from "./ability-cost.js";
+import { payAbilityCostInTx, type AbilityCost, type PayCostContext, type SlotCostSubject } from "./ability-cost.js";
 import { appendActiveBuffInTx, clearBuffsForSourceInTx } from "@/lib/combat/active-effects.js";
 import { assertCampaignMembership } from "@/lib/auth/access.js";
 import { AuthorizationError } from "@/lib/auth/errors.js";
@@ -59,6 +59,9 @@ export interface CastAbilityInput {
   eventType: EventType;
   concentrates: boolean;
   apply?: { target: CastTarget; kind: "heal" | "damage" | "tempHp"; amount: number };
+  // Below-minLevel wording for a `{kind:"slot"}` cost (#1687) — omitted for a
+  // spell cast (payAbilityCostInTx's own "cast a level-N spell" default).
+  costSubject?: SlotCostSubject;
 }
 
 // Byte-load-bearing: reproduces the current castSpell summary exactly.
@@ -165,7 +168,7 @@ async function applyPartyHealInTx(
 
 // The one shared cast sequence. Returns the OpOutcome the dispatcher logs.
 export async function castAbilityInTx(ctx: CastAbilityContext, input: CastAbilityInput): Promise<OpOutcome> {
-  const paid = await payAbilityCostInTx(ctx.cost, input.cost, input.requested);
+  const paid = await payAbilityCostInTx(ctx.cost, input.cost, input.requested, input.costSubject);
   const summary = buildCastSummary(input.name, paid.label, input.effect, input.roll);
   const slotLevel = input.cost.kind === "slot" ? (input.requested ?? input.cost.minLevel) : null;
   const eventData: Record<string, unknown> = {

@@ -726,7 +726,7 @@ const ALL_EVENT_TYPES = [
   "levelUp", "levelDown", "deathSave", "stabilize",
   "xpAward", "xpSet",
   "currencyAdjust",
-  "castSpell", "expendSlot", "restoreSlot",
+  "castSpell", "castAbilitySlot", "expendSlot", "restoreSlot",
   "learnSpell", "forgetSpell", "prepareSpell", "unprepareSpell",
   "concentrationDropped",
   "subclassChosen", "subclassRemoved",

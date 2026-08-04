@@ -42,6 +42,10 @@ export type EventType =
   | "currencyAdjust"
   // spellcasting
   | "castSpell"
+  // A row-driven ability's {kind:"slot"} spend (#1687) — the generic-ability
+  // counterpart to castSpell for the row-driven dispatcher, whose OpOutcome
+  // was previously discarded for every cost kind (routes/character/actions.ts).
+  | "castAbilitySlot"
   | "expendSlot"
   | "restoreSlot"
   | "learnSpell"

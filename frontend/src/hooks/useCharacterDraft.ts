@@ -31,7 +31,13 @@ const EMPTY_ASSIGNMENTS: Record<AbilityName, number | null> = {
 export interface CharacterDraft {
   name: string;
   alignment: string;
-  race: string;
+  /** #1680: catalog species id — the two-step picker's first step, replacing
+   *  the flat `race` name field it superseded. Empty = not yet chosen. */
+  speciesId: string;
+  /** #1680: catalog variant id — the second step, required (non-empty)
+   *  whenever the chosen species has variant rows (mirrors subclassId's
+   *  shape); empty for a variantless species or before a species is picked. */
+  variantId: string;
   className: string;
   subclass: string;
   /** Catalog subclass id — empty string when none selected or class grants subclass post-L1. */
@@ -81,7 +87,8 @@ export interface CharacterDraft {
 const EMPTY_DRAFT: CharacterDraft = {
   name: "",
   alignment: "",
-  race: "",
+  speciesId: "",
+  variantId: "",
   className: "",
   subclass: "",
   subclassId: "",
