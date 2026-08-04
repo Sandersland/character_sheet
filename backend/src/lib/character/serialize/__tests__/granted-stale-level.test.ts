@@ -48,7 +48,7 @@ describe("granted-only path uses XP-derived level for single-class (#1019)", () 
       {},
     );
     shadowId = shadow.id;
-    const minorIllusion = await prisma.spell.findUnique({ where: { name: "Minor Illusion" }, select: { id: true } });
+    const minorIllusion = await prisma.spell.findFirst({ where: { name: "Minor Illusion" }, select: { id: true } });
     if (!minorIllusion) throw new Error("Minor Illusion not seeded — run `prisma db seed` before tests");
     // upsertEditionRow: the widened (subclassId, spellId, edition) shorthand
     // can't express a null edition at runtime (#1625).

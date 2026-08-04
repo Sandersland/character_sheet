@@ -95,7 +95,7 @@ describe("revert-matrix — reverseEvent per-category undo (#615)", () => {
   it("effects: undo of a buff cast restores activeEffects (Mage Armor removed)", async () => {
     await createWizard("rm-effects");
     // Casting Mage Armor applies a durable AC buff → an `effects` buffApplied event.
-    const spell = await prisma.spell.findUniqueOrThrow({ where: { name: "Mage Armor" } });
+    const spell = await prisma.spell.findFirstOrThrow({ where: { name: "Mage Armor" } });
     await applySpellcastingOperations("rm-effects", [{ type: "learnSpell", spellId: spell.id }], OWNER_ID);
     const row = await prisma.character.findUniqueOrThrow({ where: { id: "rm-effects" }, select: { spellcasting: true } });
     const entryId = (row.spellcasting as { spells: { id: string; spellId?: string }[] }).spells.find((s) => s.spellId === spell.id)!.id;

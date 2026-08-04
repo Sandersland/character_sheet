@@ -50,7 +50,7 @@ async function entryIdForSpell(spellId: string): Promise<string> {
 
 // Learn a catalog spell by name and (optionally) cast it at its base level.
 async function learnAndCast(spellName: string, cast = true): Promise<string> {
-  const spell = await prisma.spell.findUniqueOrThrow({ where: { name: spellName } });
+  const spell = await prisma.spell.findFirstOrThrow({ where: { name: spellName } });
   await applySpellcastingOperations(characterId, [{ type: "learnSpell", spellId: spell.id }], OWNER_ID);
   const entryId = await entryIdForSpell(spell.id);
   if (cast) await applySpellcastingOperations(characterId, [{ type: "castSpell", entryId, roll: 0 }], OWNER_ID);
