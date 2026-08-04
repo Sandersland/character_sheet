@@ -33,7 +33,8 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ACTION_EFFECT_FN, castSpecFromRow, rageMeleeDamageBonus, UnknownActionError } from "@/lib/classes/actions.js";
 import { castAbilityInTx } from "@/lib/spellcasting/ability-cast.js";
-import type { PayCostContext } from "@/lib/spellcasting/ability-cost.js";
+import { ABILITY_SLOT_SUBJECT, type PayCostContext } from "@/lib/spellcasting/ability-cost.js";
+import { castAbilityWithSlotInTx } from "@/lib/spellcasting/spellcasting.js";
 import type { SpendResourceOperation } from "@/lib/classes/resources.js";
 import type { AdjustQuantityOperation } from "@/lib/inventory/inventory.js";
 import { applyAdjustQuantity } from "@/lib/inventory/inventory.js";
@@ -145,9 +146,12 @@ async function applyActionOpInTx(
  * Surge — a pure counter) just spends its pool; a row WITH one (Second Wind)
  * routes through `castAbilityInTx`, but unlike the retired table, THIS
  * function rolls the effect itself — `castManeuver` (maneuvers.ts) is the
- * server-authoritative-roll precedent. The OpOutcome is intentionally not
- * logged for the cast-core path — byte-parity keeps only the spend + heal
- * events, same as before #1528.
+ * server-authoritative-roll precedent. A `costKind:"pool"`/`"none"` cast's
+ * OpOutcome is intentionally not logged — byte-parity keeps only the spend +
+ * heal events, same as before #1528. A `costKind:"slot"` cast (#1687) is the
+ * one exception: nothing else logs the slot spend, so `castAbilityWithSlotInTx`
+ * loads real slot/arcanum state, pays through it, persists, AND logs — the
+ * generic-ability counterpart to a spell cast's own load→pay→persist→log.
  */
 async function applyRowDrivenActionInTx(
   tx: Prisma.TransactionClient,
@@ -181,6 +185,22 @@ async function applyRowDrivenActionInTx(
   }
 
   const { spec, roll } = castSpecFromRow(row, entryLevel, rollDie);
+
+  if (spec.cost.kind === "slot") {
+    await castAbilityWithSlotInTx(tx, characterId, batchId, sessionId, {
+      name: spec.name,
+      entryId: op.actionKey,
+      cost: spec.cost,
+      effect: spec.effect,
+      requested: op.slotLevel,
+      roll,
+      eventType: "castAbilitySlot",
+      concentrates: false,
+      apply: spec.apply,
+      costSubject: ABILITY_SLOT_SUBJECT,
+    });
+    return { roll };
+  }
 
   const cRow = await tx.character.findUnique({ where: { id: characterId }, select: { spellcasting: true } });
   if (!cRow) throw new Error(`Character not found: ${characterId}`);

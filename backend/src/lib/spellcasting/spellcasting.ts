@@ -19,7 +19,7 @@ import { randomUUID } from "node:crypto";
 
 
 import { Prisma, type Spell } from "@/generated/prisma/client.js";
-import { castAbilityInTx, type OpOutcome } from "./ability-cast.js";
+import { castAbilityInTx, type CastAbilityInput, type OpOutcome } from "./ability-cast.js";
 import { clearBuffByKeyInTx, clearBuffsForSourceInTx } from "@/lib/combat/active-effects.js";
 import { InvalidSpellcastingOperationError, type AbilityCost, type PayCostContext } from "./ability-cost.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
@@ -892,6 +892,85 @@ async function logSpellcastingEvent(
     batchId: ids.batchId,
     sessionId: ids.sessionId,
   });
+}
+
+// Character columns castAbilityWithSlotInTx needs to derive slot/arcana
+// totals from scratch — a lean subset of SPELLCASTING_SELECT for a caller
+// (the row-driven ability dispatcher, routes/character/actions.ts) with no
+// SpellOpContext of its own.
+const SLOT_PAY_SELECT = {
+  experiencePoints: true,
+  abilityScores: true,
+  rulesEdition: true,
+  spellcasting: true,
+  classEntries: {
+    orderBy: { position: "asc" as const },
+    select: { name: true, subclass: true },
+  },
+} satisfies Prisma.CharacterSelect;
+
+/**
+ * Pays + logs a `{kind:"slot"}` ability cost for a caller with no
+ * SpellOpContext of its own (#1687) — the row-driven ability dispatcher's
+ * counterpart to applySpellcastingOpInTx's own load → pay → persist → log
+ * sequence for a spell cast. Before this, a row-driven cost could only be
+ * "pool" or "none": `costKind:"slot"` on a ClassFeature row typed, but
+ * nothing loaded the slot/arcanum maps `payAbilityCostInTx` requires, and the
+ * cast's OpOutcome was discarded (no event logged), so a spend would have
+ * mutated nothing durable and left no undo trail.
+ *
+ * Mirrors buildSpellcastingOp's own derivation exactly: primary class only,
+ * XP-derived TOTAL level — a pre-existing scope limit shared by both callers
+ * (a spell cast has never combined multiclass slot tables here either), not
+ * something this widens.
+ */
+export async function castAbilityWithSlotInTx(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  batchId: string,
+  sessionId: string | null,
+  input: CastAbilityInput,
+): Promise<OpOutcome> {
+  const row = await tx.character.findUnique({ where: { id: characterId }, select: SLOT_PAY_SELECT });
+  if (!row) {
+    throw new InvalidSpellcastingOperationError(`Character not found: ${characterId}`);
+  }
+
+  const level = levelForExperience(row.experiencePoints);
+  const profBonus = proficiencyBonusForLevel(level);
+  const primary = row.classEntries[0];
+  const derived = deriveSpellcasting(
+    primary?.name ?? "",
+    level,
+    row.abilityScores as Record<string, number>,
+    profBonus,
+    primary?.subclass ?? undefined,
+    editionOf(row),
+  );
+  const { slotTotals, arcanaTotals } = computeSlotTables(row.spellcasting, derived);
+
+  const state = normalizeSpellcastingMutable(row.spellcasting);
+  const before = cloneSpellState(state);
+
+  const costCtx: PayCostContext = {
+    tx,
+    characterId,
+    batchId,
+    sessionId,
+    slotsUsed: state.slotsUsed,
+    arcanumUsed: state.arcanumUsed,
+    slotTotals,
+    arcanaTotals,
+  };
+
+  const outcome = await castAbilityInTx(
+    { tx, characterId, batchId, sessionId, cost: costCtx, concentrationHost: state },
+    input,
+  );
+
+  await persistSpellState(tx, characterId, state);
+  await logSpellcastingEvent(tx, { characterId, batchId, sessionId }, outcome, before, cloneSpellState(state));
+  return outcome;
 }
 
 /**
