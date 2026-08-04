@@ -68,6 +68,7 @@
 // parameter (CLAUDE.md's no-fork-when-they-agree rule) — its signature stays
 // `(level, abilityScores)`.
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
+import type { FeatImprovement } from "../../src/lib/classes/resources-state.js";
 import type { SeedEdition } from "./edition.js";
 import type { ClassFeatureSeedRow } from "./class-features.js";
 
@@ -90,6 +91,10 @@ interface RawBardFeature {
   // Attack), unlike Cleric, whose rows set neither.
   derivedStat?: string;
   derivedStatTiers?: { minLevel: number; value: number | string }[];
+  // A passive, always-on grant (#1691) — see ClassFeature.improvements' own
+  // schema.prisma comment. Only College of Valor's 2014 "Bonus Proficiencies"
+  // row sets this today.
+  improvements?: FeatImprovement[];
 }
 
 function expand(raw: RawBardFeature): ClassFeatureSeedRow[] {
@@ -103,6 +108,7 @@ function expand(raw: RawBardFeature): ClassFeatureSeedRow[] {
     edition,
     derivedStat: raw.derivedStat,
     derivedStatTiers: raw.derivedStatTiers,
+    improvements: raw.improvements,
   }));
 }
 
@@ -416,6 +422,14 @@ const COLLEGE_OF_VALOR_RAW: RawBardFeature[] = [
     level: 3,
     edition: "EDITION_2014",
     description: "You gain proficiency with medium armor, shields, and martial weapons.",
+    // #1691: PHB'14 p.56 grants these outright, no choice involved.
+    // 2014-row-only, matching this row's own edition — the 2024 successor
+    // (Martial Training, below) is its own row and authors its own grant.
+    improvements: [
+      { target: "armorProficiency", amount: 1, key: "medium" },
+      { target: "armorProficiency", amount: 1, key: "shield" },
+      { target: "weaponProficiency", amount: 1, key: "Martial Weapons" },
+    ],
   },
   // Bonus Proficiencies has NO EDITION_2024 row — renamed outright to Martial
   // Training below (a different name AND a scope change: it adds a
