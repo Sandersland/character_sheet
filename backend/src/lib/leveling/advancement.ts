@@ -33,9 +33,10 @@ import {
   type FeatImprovement,
   type ResourcesMutableState,
 } from "@/lib/classes/resources.js";
-import { characterAdvancementSlots, abilityModifier, characterFightingStyleFeatSlots } from "@/lib/srd/srd.js";
+import { characterAdvancementSlots, abilityModifier, characterFightingStyleFeatSlots, deriveFeatBonuses } from "@/lib/srd/srd.js";
 import { featOfferedForAsiSlot, type FeatCategory } from "@/lib/srd/feats.js";
-import { normalizeHitPoints, normalizeHitDice, type HitPoints, type HitDice } from "@/lib/combat/hitpoints.js";
+import { effectiveMaxHitPoints, normalizeHitPoints, normalizeHitDice, type HitPoints, type HitDice } from "@/lib/combat/hitpoints.js";
+import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
 import { editionOf } from "@/lib/rules/edition.js";
 import { crossEditionRejection } from "@/lib/rules/catalog-edition.js";
 import type { RulesEdition } from "@character-sheet/shared-types";
@@ -558,6 +559,9 @@ const ADVANCEMENT_SELECT = {
   initiativeBonus: true,
   experiencePoints: true,
   rulesEdition: true,
+  // conditions (#1321): effectiveMaxHitPoints' exhaustion input for the
+  // shared-tail HP clamp in applyAdvancementOpInTx.
+  conditions: true,
   classEntries: {
     orderBy: { position: "asc" as const },
     // All entries (name + level) — both the fs-slot cap (#1137) and the ASI/feat
@@ -609,6 +613,18 @@ export async function applyAdvancementOpInTx(
 
   const before = snapshotAdvancementState(ctx.scores, ctx.hp, ctx.initBonus, ctx.state);
   const outcome = await dispatchAdvancementOp(ctx, op);
+
+  // #1321: one shared-tail clamp covers takeAsi/takeFeat (which raise max+current
+  // by the same hpDelta — at exhaustion 4+ the effective max grows by LESS) and
+  // removeAdvancement (which lowers max — reverseAdvancementEffects' own clamp
+  // is against the RAW max, superseded here). ctx.state.advancements already
+  // reflects the op's push/splice, so the feat-slot-cap dance below sees the
+  // POST-op advancement list — a just-taken Tough immediately counts.
+  const { kept: inCapForHpClamp } = splitAdvancementsBySlotCap(ctx.state.advancements, ctx.totalSlots, ctx.fightingStyleSlotTotal);
+  const featMaxHpBonusForClamp = deriveFeatBonuses(inCapForHpClamp, ctx.hitDice.total).maxHp;
+  const exhaustionLevel = normalizeConditionsMutable(character.conditions).exhaustion;
+  const newEffMax = effectiveMaxHitPoints(outcome.newHp.max, featMaxHpBonusForClamp, exhaustionLevel, ctx.edition);
+  outcome.newHp = { ...outcome.newHp, current: Math.min(outcome.newHp.current, newEffMax) };
 
   await tx.character.update({
     where: { id: characterId },

@@ -35,7 +35,7 @@ import {
   mirrorUsesRemaining,
 } from "@/lib/inventory/inventory-capability-use.js";
 import { readInventorySnapshot } from "@/lib/inventory/inventory-snapshot-read.js";
-import { InvalidHitPointOperationError, hitDieHeal, type HitDice } from "./hp-core.js";
+import { InvalidHitPointOperationError, effectiveMaxHitPoints, hitDieHeal, type HitDice } from "./hp-core.js";
 import type { HpOpContext, HpOpResult } from "./hp-context.js";
 
 type InventoryItemRow = NonNullable<HpOpContext["row"]["inventoryItems"]>[number];
@@ -499,9 +499,8 @@ function recoverExhaustionOnLongRest(row: HpOpContext["row"]): {
 }
 
 export async function applyLongRestOp(ctx: HpOpContext): Promise<HpOpResult> {
-  const { tx, characterId, row, hp, hd, effMax } = ctx;
+  const { tx, characterId, row, hp, hd, featMaxHpBonus, exhaustionLevel } = ctx;
   const prevCurrent = hp.current;
-  hp.current = effMax;
   hp.temp = 0;
   hp.deathSaves = { successes: 0, failures: 0 };
   // Recover hit dice equal to half your total, rounded up (SRD 5.2 Long Rest), min 1.
@@ -511,11 +510,20 @@ export async function applyLongRestOp(ctx: HpOpContext): Promise<HpOpResult> {
   const spells = resetLongRestSpellcasting(row);
   const resources = resetRestResources(row, "long");
   const afterResourceState = serializeResourcesState(resources.state);
+  // Decision 6 (#1321): recover exhaustion BEFORE recomputing the effective
+  // max, then set current to THAT post-recovery number — reducing exhaustion
+  // first is the only reading under which "regains all lost hit points"
+  // (PHB'14 p. 186) is true of the character who walks away from the rest.
+  // ctx.effMax is the STALE pre-rest value (built before exhaustion dropped)
+  // and must not be used here.
   const exhaustion = recoverExhaustionOnLongRest(row);
+  const postRestExhaustionLevel = exhaustion ? exhaustion.afterConditionsState.exhaustion : exhaustionLevel;
+  const postRestEffMax = effectiveMaxHitPoints(hp.max, featMaxHpBonus, postRestExhaustionLevel, row.rulesEdition);
+  hp.current = postRestEffMax;
   const items = await runItemRestResets(ctx, "long");
   const consumables = await rechargeConsumables(tx, characterId);
 
-  const hpRestored = effMax - prevCurrent;
+  const hpRestored = postRestEffMax - prevCurrent;
   const eventData: Record<string, unknown> = {
     recovered,
     hpRestored,

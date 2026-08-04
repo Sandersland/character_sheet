@@ -240,13 +240,21 @@ async function revertConditionsEvent(ctx: RevertContext): Promise<void> {
   const { tx, characterId, before } = ctx;
   // Restore the full conditions JSON (active list + exhaustion level)
   // from the before snapshot — identical pattern to resources revert.
+  // #1321: a setExhaustion that raised exhaustion to 4+ also carries a
+  // `before.hitPoints` snapshot (the pre-clamp current, decision 4) — restore
+  // it too when present, guarded exactly like restoreHitPointColumns, so
+  // events without it (applyCondition/removeCondition, or a setExhaustion that
+  // never triggered the clamp) are unaffected.
   const beforeConditions = before.conditions as Record<string, unknown> | undefined;
-  if (beforeConditions !== undefined) {
-    await tx.character.update({
-      where: { id: characterId },
-      data: { conditions: beforeConditions as Prisma.InputJsonValue },
-    });
-  }
+  const beforeHitPoints = before.hitPoints as Record<string, unknown> | undefined;
+  const updateData: Record<string, unknown> = {};
+  if (beforeConditions !== undefined) updateData.conditions = beforeConditions;
+  if (beforeHitPoints !== undefined) updateData.hitPoints = beforeHitPoints;
+  if (Object.keys(updateData).length === 0) return;
+  await tx.character.update({
+    where: { id: characterId },
+    data: updateData as Prisma.CharacterUpdateInput,
+  });
 }
 
 async function revertEffectsEvent(ctx: RevertContext): Promise<void> {

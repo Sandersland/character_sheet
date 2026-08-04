@@ -887,3 +887,103 @@ describe("POST /api/characters/:id/experience — Fighting Style feat reconcilia
     expect(res.body.advancements.some((a: { slot?: string }) => a.slot === "fightingStyle")).toBe(false);
   });
 });
+
+// #1321: at exhaustion 4+ (PHB'14 p. 291 tier 4), any write site that lowers
+// hp.max must clamp `current` against the EFFECTIVE (halved) max, not the raw
+// column — both level-down paths below (revertLevelUps in experience-ops.ts
+// and reconcileAdvancements in level-reconciliation.ts) are on the ticket's
+// checklist as clamping against the raw column today.
+describe("POST /api/characters/:id/experience — level-down HP clamps to the exhaustion-halved effective max (#1321)", () => {
+  const XP_L1 = 0, XP_L3 = 900, XP_L4 = 2700, XP_L5 = 6500;
+
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { name: { startsWith: "ExhLevelDown" } } });
+  });
+
+  it("XP drop reverses HP level-ups (no levelUp event, average fallback) and clamps current to the halved max, not the raw one", async () => {
+    // No levelUp CharacterEvent rows exist, so revertLevelUps falls back to
+    // fixedAverageForDie(10)+conMod(0) = 6 HP per reversed level. Con 10 →
+    // conMod 0 keeps the fallback arithmetic simple and exact.
+    await prisma.character.create({
+      data: {
+        ...BASE_CHARACTER,
+        ownerId: OWNER_ID,
+        id: "eld-fallback",
+        name: "ExhLevelDown fallback",
+        rulesEdition: "EDITION_2014",
+        experiencePoints: XP_L5, // level 5 → hitDice.total 5 matches, no pending
+        hitPoints: { current: 60, max: 60, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 5, die: "d10", spent: 0 },
+        conditions: { active: [], exhaustion: 4 },
+        spellcasting: Prisma.JsonNull,
+        classEntries: { create: [{ name: "fighter", position: 0, level: 5 }] },
+      },
+    });
+
+    // Drop from level 5 to level 3 → reverses 2 levels → RAW hp.max: 60 - 2×6
+    // = 48. Effective max at exhaustion 4: floor(48/2) = 24 — serializeCharacter
+    // ALWAYS serves the effective max (that part isn't new), so the response's
+    // `max`/`current` are both 24 either way. What #1321 changes is the
+    // PERSISTED raw current: the OLD (buggy) clamp is Math.min(current, RAW
+    // max) = min(60, 48) = 48; the fix clamps to the EFFECTIVE max (24) instead
+    // — re-read the row directly to prove it, not just the served response.
+    const res = await postXp("eld-fallback", { operations: [{ type: "set", value: XP_L3 }] });
+    expect(res.status).toBe(200);
+    expect(res.body.hitPoints.max).toBe(24);
+    expect(res.body.hitPoints.current).toBe(24);
+
+    const row = await prisma.character.findUniqueOrThrow({ where: { id: "eld-fallback" }, select: { hitPoints: true } });
+    const raw = row.hitPoints as { max: number; current: number };
+    expect(raw.max).toBe(48);
+    expect(raw.current).toBe(24); // NOT 48 — clamped to the effective max
+  });
+
+  it("reconcileAdvancements: removing an over-cap ASI on level-down clamps current to the halved max", async () => {
+    const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    // hpDelta baked into the AdvancementEntry (as applyTakeAsi would have
+    // written it live) — the value is arbitrary but large enough to make the
+    // raw-vs-effective clamp difference unambiguous.
+    const asi = { id: "eld-asi", level: 4, kind: "asi" as const, abilityDeltas: { constitution: 2 }, hpDelta: 20, initDelta: 0 };
+    await prisma.character.create({
+      data: {
+        ...BASE_CHARACTER,
+        ownerId: OWNER_ID,
+        id: "eld-asi-recon",
+        name: "ExhLevelDown asi-recon",
+        rulesEdition: "EDITION_2014",
+        // XP says level 4 (an ASI slot is already available and was taken),
+        // but hitDice.total stays 1 — a "pending level-up" state (the
+        // advancement slot cap resolves off the XP-derived level directly,
+        // not hitDice.total) so revertLevelUps has nothing to reverse when
+        // XP later drops to level 1 (1 is not < hitDice.total 1) — isolating
+        // this test to ONLY reconcileAdvancements's clamp, not revertLevelUps'.
+        experiencePoints: XP_L4,
+        // hp.max already includes the ASI's +20 (applyTakeAsi writes it live) —
+        // 20 base + 20 from the ASI = 40.
+        hitPoints: { current: 40, max: 40, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 1, die: "d10", spent: 0 },
+        conditions: { active: [], exhaustion: 4 },
+        resources: { used: {}, maneuversKnown: [], toolProficienciesKnown: [], choicesKnown: {}, advancements: [asi], fightingStyle: null } as unknown as Prisma.InputJsonValue,
+        spellcasting: Prisma.JsonNull,
+        classEntries: { create: [{ name: "Fighter", position: 0, level: 1, classId: fighter.id }] },
+      },
+    });
+
+    // Drop to level 1 (no ASI slots) → the ASI is reconciled away: RAW hp.max
+    // reverses to 40 - 20 = 20. Effective max at exhaustion 4: floor(20/2)=10 —
+    // serializeCharacter always serves the effective max, so response max/current
+    // are both 10 either way. What #1321 changes is the PERSISTED raw current:
+    // the OLD (buggy) clamp is Math.min(current, RAW max) = min(40, 20) = 20;
+    // re-read the row directly to prove the fix clamps to 10 instead.
+    const res = await postXp("eld-asi-recon", { operations: [{ type: "set", value: XP_L1 }] });
+    expect(res.status).toBe(200);
+    expect(res.body.advancements.some((a: { kind: string }) => a.kind === "asi")).toBe(false);
+    expect(res.body.hitPoints.max).toBe(10);
+    expect(res.body.hitPoints.current).toBe(10);
+
+    const row = await prisma.character.findUniqueOrThrow({ where: { id: "eld-asi-recon" }, select: { hitPoints: true } });
+    const raw = row.hitPoints as { max: number; current: number };
+    expect(raw.max).toBe(20);
+    expect(raw.current).toBe(10); // NOT 20 — clamped to the effective max
+  });
+});

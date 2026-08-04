@@ -91,6 +91,48 @@ describe("revert-matrix — reverseEvent per-category undo (#615)", () => {
     expect(after.conditions).toEqual({ active: [], exhaustion: 0 });
   });
 
+  // #1321: setExhaustion 3→4 (PHB'14 p. 291 tier 4) carries the one-way HP
+  // clamp write in the SAME event's before/after — undo must restore both the
+  // exhaustion level AND the pre-clamp current HP, not just conditions.
+  it("conditions: undo of a setExhaustion that halved the max ALSO restores the pre-clamp current HP", async () => {
+    await prisma.character.create({
+      data: {
+        alignment: "Neutral",
+        initiativeBonus: 0,
+        speed: 30,
+        abilityScores: { strength: 10, dexterity: 14, constitution: 12, intelligence: 16, wisdom: 10, charisma: 10 },
+        savingThrowProficiencies: [],
+        skills: [],
+        toolProficiencies: [],
+        currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
+        ownerId: OWNER_ID,
+        id: "rm-conditions-hp",
+        name: "RevertMatrix rm-conditions-hp",
+        rulesEdition: "EDITION_2014",
+        experiencePoints: 900, // wizard level 3
+        hitPoints: { current: 25, max: 30, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 3, die: "d6", spent: 0 },
+        spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
+        classEntries: { create: [{ name: "wizard", position: 0, level: 3 }] },
+      },
+    });
+
+    const url = `/api/characters/rm-conditions-hp/conditions/transactions`;
+    const applied = await post(url, { operations: [{ type: "setExhaustion", level: 4 }] });
+    expect(applied.status).toBe(200);
+    expect(applied.body.hitPoints.max).toBe(15); // floor(30/2)
+    expect(applied.body.hitPoints.current).toBe(15); // clamped down from 25
+
+    const batchId = await latestBatchId("rm-conditions-hp");
+    const rev = await post(`/api/characters/rm-conditions-hp/events/${batchId}/revert`, {});
+    expect(rev.status).toBe(200);
+
+    const after = await getChar("rm-conditions-hp");
+    expect(after.conditions.exhaustion).toBe(0);
+    expect(after.hitPoints.max).toBe(30);
+    expect(after.hitPoints.current).toBe(25); // pre-clamp current restored, not left at 15
+  });
+
   // ── effects branch (activity.ts) ─────────────────────────────────────────────
   it("effects: undo of a buff cast restores activeEffects (Mage Armor removed)", async () => {
     await createWizard("rm-effects");

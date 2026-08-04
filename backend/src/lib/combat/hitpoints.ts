@@ -11,6 +11,8 @@ export {
   InvalidHitPointOperationError,
   normalizeHitPoints,
   normalizeHitDice,
+  effectiveMaxHitPoints,
+  inCapAdvancementsAt,
   fixedAverageForDie,
   levelUpHpGain,
   hitDieHeal,

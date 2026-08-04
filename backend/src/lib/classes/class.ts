@@ -17,9 +17,18 @@ import { editionOf } from "@/lib/rules/edition.js";
 import { crossEditionRejection } from "@/lib/rules/catalog-edition.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
-import { levelUpHpGain, normalizeHitDice, normalizeHitPoints } from "@/lib/combat/hitpoints.js";
+import {
+  effectiveMaxHitPoints,
+  inCapAdvancementsAt,
+  levelUpHpGain,
+  normalizeHitDice,
+  normalizeHitPoints,
+} from "@/lib/combat/hitpoints.js";
+import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
 import {
   abilityModifier,
+  characterFightingStyleFeatSlots,
+  deriveFeatBonuses,
   hitDieFace,
   multiclassPrerequisitesMet,
   type MulticlassPrerequisiteOption,
@@ -163,9 +172,17 @@ const ADD_CLASS_SELECT = {
   abilityScores: true,
   hitPoints: true,
   hitDice: true,
+  // resources/conditions/rulesEdition (#1321): effectiveMaxHitPoints' inputs —
+  // a multiclass level-up bumps hp.max+current by the SAME gain, which at
+  // exhaustion 4+ can push current above the (proportionally smaller-growing)
+  // effective max. `class.extraAsiLevels`/`fightingStyleFeatLevel` mirror
+  // buildHpOpContext's own select.
+  resources: true,
+  conditions: true,
+  rulesEdition: true,
   classEntries: {
     orderBy: { position: "asc" as const },
-    select: { id: true, name: true, level: true, position: true, classId: true },
+    select: { id: true, name: true, level: true, position: true, classId: true, class: { select: { extraAsiLevels: true, fightingStyleFeatLevel: true } } },
   },
 } satisfies Prisma.CharacterSelect;
 
@@ -241,10 +258,21 @@ async function applyAddClass(ctx: ClassOpContext, op: AddClassOperation): Promis
 
   const beforeHp = normalizeHitPoints(character.hitPoints);
   const beforeHd = normalizeHitDice(character.hitDice);
+  const newMax = beforeHp.max + gain;
+  // #1321: at exhaustion 4+, raising the raw max by `gain` doesn't raise the
+  // effective max by the same amount — clamp current to the recomputed
+  // effective max rather than gain the full `gain` unconditionally (mirrors
+  // bumpHpForLevelUp's own reasoning, hp-ops.ts).
+  const derivedLevel = levelForExperience(character.experiencePoints);
+  const fightingStyleSlotTotal = characterFightingStyleFeatSlots(character.classEntries, derivedLevel);
+  const inCapAdvancements = inCapAdvancementsAt(character.resources, character.classEntries, derivedLevel, fightingStyleSlotTotal);
+  const featMaxHpBonus = deriveFeatBonuses(inCapAdvancements, beforeHd.total + 1).maxHp;
+  const exhaustionLevel = normalizeConditionsMutable(character.conditions).exhaustion;
+  const newEffMax = effectiveMaxHitPoints(newMax, featMaxHpBonus, exhaustionLevel, character.rulesEdition);
   const afterHp = {
     ...beforeHp,
-    max: beforeHp.max + gain,
-    current: beforeHp.current + gain,
+    max: newMax,
+    current: Math.min(beforeHp.current + gain, newEffMax),
   };
   const afterHd = { ...beforeHd, total: beforeHd.total + 1 };
 

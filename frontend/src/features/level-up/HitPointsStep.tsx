@@ -59,6 +59,10 @@ export default function HitPointsStep({ step }: { step: LevelUpStep }) {
   // must agree on the same numbers within a render.
   const meta = readHitPointsMeta(step);
   const { roll, method, gain, handleRoll, chooseAverage, chooseRoll } = useHpRoll(meta);
+  // #1497: `character.hitPoints.max` is already the exhaustion-halved
+  // EFFECTIVE max (#1321) when exhaustion 4+ applies, so `currentMax + gain`
+  // below is not exact — the halving arithmetic depends on the pre-halving
+  // max's parity, which would require re-deriving the rule client-side.
   const currentMax = character.hitPoints.max;
   // Chrome, deliberately client-side: formatModifier/abilityAbbr are display
   // strings over a served number, not mechanics.

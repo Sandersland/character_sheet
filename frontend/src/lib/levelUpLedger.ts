@@ -172,6 +172,9 @@ export function buildLevelUpLedger(
     // `character.level` is the XP-derived level (already the post-up value while a
     // level-up is pending); the applied "before" is one below the target.
     { label: "Level", before: String(plan.target.newLevel - 1), after: String(plan.target.newLevel), variant: "delta" },
+    // #1497: `max` is already the exhaustion-halved EFFECTIVE max (#1321) when
+    // exhaustion 4+ applies, so `max + hpGain(...)` is not exact for that
+    // case — same gap as the Hit Dice row's `// #1075` below.
     draft.hp
       ? {
           label: "Maximum HP",
