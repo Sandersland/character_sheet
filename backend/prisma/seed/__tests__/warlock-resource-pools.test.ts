@@ -15,8 +15,17 @@ const FIEND_ROWS = WARLOCK_FEATURES.filter((r) => r.subclassSlug === "warlock-th
 const ARCHFEY_ROWS = WARLOCK_FEATURES.filter((r) => r.subclassSlug === "warlock-the-archfey");
 const GOO_ROWS = WARLOCK_FEATURES.filter((r) => r.subclassSlug === "warlock-the-great-old-one");
 
-function poolAt(rows: typeof WARLOCK_FEATURES, key: string, level: number, edition: "EDITION_2014" | "EDITION_2024") {
-  return poolsFromRows(rows, level, edition).find((p) => p.key === key);
+// abilityScores/profBonus default to `{}`/`0`; darkOnesOwnLuckPoolAt below
+// overrides abilityScores for the one #1685 formula-shaped pool this file
+// covers.
+function poolAt(
+  rows: typeof WARLOCK_FEATURES,
+  key: string,
+  level: number,
+  edition: "EDITION_2014" | "EDITION_2024",
+  abilityScores: Record<string, number> = {},
+) {
+  return poolsFromRows(rows, level, abilityScores, 0, edition).find((p) => p.key === key);
 }
 
 describe("Magical Cunning (base class, #1233): 2024 only, L2, 1/long rest", () => {

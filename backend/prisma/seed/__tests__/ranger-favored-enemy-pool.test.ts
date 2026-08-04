@@ -16,8 +16,10 @@ import { RANGER_FEATURES } from "../ranger-features.js";
 
 const BASE_ROWS = RANGER_FEATURES.filter((r) => r.subclassSlug === null);
 
-function poolAt(key: string, level: number, edition: "EDITION_2014" | "EDITION_2024") {
-  return poolsFromRows(BASE_ROWS, level, edition).find((p) => p.key === key);
+// abilityScores defaults to `{}`; the wisdom-modifier tests below (Tireless/
+// Nature's Veil, #1685) pass their own.
+function poolAt(key: string, level: number, edition: "EDITION_2014" | "EDITION_2024", abilityScores: Record<string, number> = {}) {
+  return poolsFromRows(BASE_ROWS, level, abilityScores, 0, edition).find((p) => p.key === key);
 }
 
 describe("Favored Enemy (#1230): 2/3/4/5/6 at L1/5/9/13/17, Long Rest recharge, 2024 only", () => {

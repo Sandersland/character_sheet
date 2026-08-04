@@ -30,6 +30,7 @@
 // green rather than adding a bespoke exception whose file also holds data).
 import { z } from "zod";
 
+import type { ResourceTotalFormula } from "../../src/lib/classes/class-feature-rows.js";
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { AuthoredFeature, ClassDefinition, SubclassDefinition } from "../../src/lib/classes/types.js";
 import type { SeedEdition } from "./edition.js";
@@ -203,8 +204,12 @@ export interface ClassFeatureSeedRow {
   // a fifth top-level column — see class-feature-rows.ts's ResourceTotalTier
   // for why (the #1221 partial short-rest top-up had no column to populate
   // when #1523 shipped resourceTotals). Second Wind's 2024 row is the first
-  // to set it.
-  resourceTotals?: { minLevel: number; total: number; shortRestRegain?: number }[];
+  // to set it. `total: ResourceTotalFormula` (#1685) is a type-only import —
+  // this row is later handed straight to a `ClassFeatureRow[]`-typed
+  // parameter in several seed tests, so a structurally-widened local literal
+  // (e.g. `abilityMod: string`) would silently fail that assignment instead
+  // of catching a typo'd ability name at compile time.
+  resourceTotals?: { minLevel: number; total: ResourceTotalFormula; shortRestRegain?: number }[];
   resourceDieTiers?: { minLevel: number; die: string }[];
   activationCost?: string;
   resolverKind?: string;
@@ -321,11 +326,28 @@ const ASCENDING_TIER_MESSAGE = { message: "tier array must be strictly ascending
 // individually would let a caller bypass classFeatureSeedSchema's other
 // fields for no benefit now that at least one is load-bearing — un-exporting
 // keeps ONE validation surface.
+// #1685/#416 C3: a tier's `total` may be a formula instead of a flat number
+// — evaluated at read time by evaluateResourceTotal
+// (src/lib/classes/class-feature-rows.ts), the ONE place this vocabulary is
+// interpreted. Mirrors ResourceTotalFormula there field-for-field; the
+// ability list is the same six-literal enum subclass-granted-spells.ts's
+// castingAbility already uses (no shared runtime const — six strings
+// repeated inline is cheaper than a cross-module coupling for a fixed list).
+const resourceTotalFormulaSchema = z.union([
+  z.number().int().nonnegative(),
+  z.literal("proficiencyBonus"),
+  z.object({
+    abilityMod: z.enum(["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"]),
+    min: z.number().int().optional(),
+  }),
+  z.object({ levelTimes: z.number().int().positive() }),
+]);
+
 const resourceTotalsTierSchema = z
   .array(
     z.object({
       minLevel: z.number().int().positive(),
-      total: z.number().int().nonnegative(),
+      total: resourceTotalFormulaSchema,
       // #1528: Second Wind's 2024 partial short-rest top-up (#1221) — see
       // ClassFeatureSeedRow.resourceTotals' own comment for why this rides
       // the tier object rather than a fifth top-level column.

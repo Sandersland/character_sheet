@@ -7,7 +7,8 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { derivedStatFromRows, featuresFromRows, type ClassFeatureRow } from "@/lib/classes/class-feature-rows.js";
+import { derivedStatFromRows, evaluateResourceTotal, featuresFromRows, poolsFromRows, type ClassFeatureRow } from "@/lib/classes/class-feature-rows.js";
+import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 
 function row(overrides: Partial<ClassFeatureRow> = {}): ClassFeatureRow {
   return { name: "Test Feature", level: 1, description: "test description", edition: "EDITION_2014", ...overrides };
@@ -96,6 +97,56 @@ describe("derivedStatFromRows (#1530) — same edition/level truth table as feat
 
   it("an empty row list returns undefined (the caller supplies the floor, not this function)", () => {
     expect(derivedStatFromRows([], 20, "EDITION_2024", "attacksPerAction")).toBeUndefined();
+  });
+});
+
+describe("evaluateResourceTotal (#1685) — the formula vocabulary poolFromRow reads, also #1686's future evaluator for buff modifiers", () => {
+  const ctx = { level: 6, abilityScores: { wisdom: 16, charisma: 8 }, profBonus: 3 };
+
+  it("a plain number passes through unchanged (pre-existing shape)", () => {
+    expect(evaluateResourceTotal(4, ctx)).toBe(4);
+  });
+
+  it('"proficiencyBonus" reads ctx.profBonus', () => {
+    expect(evaluateResourceTotal("proficiencyBonus", { ...ctx, profBonus: 5 })).toBe(5);
+  });
+
+  it("{ abilityMod } reads the named ability's modifier, unfloored when no min is given", () => {
+    expect(evaluateResourceTotal({ abilityMod: "wisdom" }, ctx)).toBe(3); // Wis 16 -> +3
+  });
+
+  it("{ abilityMod, min } floors a low/negative modifier at min — the Math.max(1, mod) shape every migrated pool uses", () => {
+    expect(evaluateResourceTotal({ abilityMod: "charisma", min: 1 }, ctx)).toBe(1); // Cha 8 -> -1, floored to 1
+    expect(evaluateResourceTotal({ abilityMod: "wisdom", min: 1 }, ctx)).toBe(3); // above min, min is a no-op
+  });
+
+  it("{ levelTimes } multiplies ctx.level — the Lay on Hands (5 x level) shape", () => {
+    expect(evaluateResourceTotal({ levelTimes: 5 }, { ...ctx, level: 7 })).toBe(35);
+  });
+});
+
+describe("poolsFromRows resolves a tier's formula total end to end (#1685)", () => {
+  it('a flat number tier is unaffected by the widening', () => {
+    const rows = [row({ resourceKey: "flat", resourceTotals: [{ minLevel: 1, total: 4 }] })];
+    expect(poolsFromRows(rows, 5, {}, 3, "EDITION_2014")[0].total).toBe(4);
+  });
+
+  it('"proficiencyBonus" scales when profBonus crosses a level boundary (L4 -> L5)', () => {
+    const rows = [row({ resourceKey: "pb", resourceTotals: [{ minLevel: 1, total: "proficiencyBonus" }] })];
+    expect(poolsFromRows(rows, 4, {}, proficiencyBonusForLevel(4), "EDITION_2014")[0].total).toBe(2);
+    expect(poolsFromRows(rows, 5, {}, proficiencyBonusForLevel(5), "EDITION_2014")[0].total).toBe(3);
+  });
+
+  it("{ abilityMod, min } reads the row's own abilityScores/profBonus inputs, floored at min", () => {
+    const rows = [row({ resourceKey: "cha", resourceTotals: [{ minLevel: 1, total: { abilityMod: "charisma", min: 1 } }] })];
+    expect(poolsFromRows(rows, 1, { charisma: 8 }, 2, "EDITION_2014")[0].total).toBe(1);
+    expect(poolsFromRows(rows, 1, { charisma: 20 }, 2, "EDITION_2014")[0].total).toBe(5);
+  });
+
+  it("{ levelTimes } scales with the character's level, not a fixed tier value", () => {
+    const rows = [row({ resourceKey: "loh", resourceTotals: [{ minLevel: 1, total: { levelTimes: 5 } }] })];
+    expect(poolsFromRows(rows, 3, {}, 2, "EDITION_2014")[0].total).toBe(15);
+    expect(poolsFromRows(rows, 7, {}, 2, "EDITION_2014")[0].total).toBe(35);
   });
 });
 

@@ -7,7 +7,24 @@
 // here ever touches the database.
 import type { RulesEdition } from "@character-sheet/shared-types";
 
+import { abilityModifier } from "@/lib/srd/math.js";
+
 import type { DerivedFeature, DerivedResource, RechargeOn } from "./types.js";
+
+/** The six abilities a `{ abilityMod }` formula tier (below) may name. */
+export type ResourceTotalAbility = "strength" | "dexterity" | "constitution" | "intelligence" | "wisdom" | "charisma";
+
+/**
+ * A tier's `total` (#1685/#416's C3 evaluator): either the pre-existing flat
+ * number, or a formula that reads the same inputs every `resourceFn` already
+ * received — `"proficiencyBonus"`, an ability modifier (`min` floors it, the
+ * `Math.max(1, mod)` shape Dark One's Own Luck/Tireless/Nature's Veil/
+ * Moonlight Step all share), or `level x N` (the Lay on Hands *shape* —
+ * Lay on Hands itself stays resourceFn; see paladin.ts's own header for why).
+ * evaluateResourceTotal below is the one place this vocabulary is
+ * interpreted.
+ */
+export type ResourceTotalFormula = number | "proficiencyBonus" | { abilityMod: ResourceTotalAbility; min?: number } | { levelTimes: number };
 
 /**
  * A tiered resource total — ASCENDING by minLevel, last-match-wins (#1522
@@ -20,8 +37,32 @@ import type { DerivedFeature, DerivedResource, RechargeOn } from "./types.js";
  */
 export interface ResourceTotalTier {
   minLevel: number;
-  total: number;
+  total: ResourceTotalFormula;
   shortRestRegain?: number;
+}
+
+/** The per-character inputs a formula `total` may read — identical to `ResourceFn`'s own (level, abilityScores, profBonus), minus `subclassKey`/`edition` (poolFromRow's row is already scoped to both). */
+export interface ResourceTotalContext {
+  level: number;
+  abilityScores: Record<string, number>;
+  profBonus: number;
+}
+
+/**
+ * Resolves one tier's `total` to a number — the ONE evaluator for the
+ * ResourceTotalFormula vocabulary, exported so #1686 (row-declared buff
+ * modifiers) can reuse it unchanged for `buffModifier` instead of growing a
+ * second copy: a new formula case belongs here, once, not at a second call
+ * site.
+ */
+export function evaluateResourceTotal(total: ResourceTotalFormula, ctx: ResourceTotalContext): number {
+  if (typeof total === "number") return total;
+  if (total === "proficiencyBonus") return ctx.profBonus;
+  if ("abilityMod" in total) {
+    const mod = abilityModifier(ctx.abilityScores[total.abilityMod] ?? 10);
+    return total.min !== undefined ? Math.max(total.min, mod) : mod;
+  }
+  return total.levelTimes * ctx.level;
 }
 
 export interface ResourceDieTier {
@@ -195,15 +236,15 @@ function tierAt<T extends { minLevel: number }>(tiers: readonly T[] | null | und
  * `description` IS the feature's `description` (#1528: never a second
  * string) — the row-driven counterpart to a resourceFn pool literal.
  */
-function poolFromRow(row: ClassFeatureRow, level: number): DerivedResource | null {
+function poolFromRow(row: ClassFeatureRow, ctx: ResourceTotalContext): DerivedResource | null {
   if (!row.resourceKey) return null;
-  const totalTier = tierAt(row.resourceTotals, level);
+  const totalTier = tierAt(row.resourceTotals, ctx.level);
   if (!totalTier) return null;
-  const dieTier = tierAt(row.resourceDieTiers, level);
+  const dieTier = tierAt(row.resourceDieTiers, ctx.level);
   return {
     key: row.resourceKey,
     label: row.resourceLabel ?? row.name,
-    total: totalTier.total,
+    total: evaluateResourceTotal(totalTier.total, ctx),
     ...(dieTier ? { die: dieTier.die } : {}),
     recharge: (row.resourceRecharge as RechargeOn | null) ?? "none",
     ...(totalTier.shortRestRegain !== undefined ? { shortRestRegain: totalTier.shortRestRegain } : {}),
@@ -215,14 +256,23 @@ function poolFromRow(row: ClassFeatureRow, level: number): DerivedResource | nul
  * Every resource pool declared across a class/subclass's rows, at one
  * character level — the row-driven counterpart to a resourceFn call
  * (`deriveBaseLayer`/`deriveSubclassLayer`, registry.ts, Fighter-gated #1528).
- * Filters by edition + grant level exactly like featuresFromRows, then drops
- * any row with no resourceKey or whose first tier isn't reached yet.
+ * `abilityScores`/`profBonus` are the same two inputs `resourceFn` always
+ * received, now threaded through for a formula-shaped `total` (#1685) — every
+ * pre-existing flat-number caller is unaffected. Filters by edition + grant
+ * level exactly like featuresFromRows, then drops any row with no resourceKey
+ * or whose first tier isn't reached yet.
  */
-export function poolsFromRows(rows: readonly ClassFeatureRow[], level: number, edition: RulesEdition): DerivedResource[] {
+export function poolsFromRows(
+  rows: readonly ClassFeatureRow[],
+  level: number,
+  abilityScores: Record<string, number>,
+  profBonus: number,
+  edition: RulesEdition,
+): DerivedResource[] {
   const pools: DerivedResource[] = [];
   for (const row of rows) {
     if (row.edition !== edition || row.level > level) continue;
-    const pool = poolFromRow(row, level);
+    const pool = poolFromRow(row, { level, abilityScores, profBonus });
     if (pool) pools.push(pool);
   }
   return pools;

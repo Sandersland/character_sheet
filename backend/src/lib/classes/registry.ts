@@ -156,7 +156,7 @@ function deriveBaseLayer(
   edition: RulesEdition,
 ): ClassLayer {
   const fnPools = classDef?.resourceFn ? classDef.resourceFn(level, abilityScores, profBonus, subclassKey, edition) : [];
-  const rowPools = poolsFromRows(featureRows?.classRows ?? [], level, edition);
+  const rowPools = poolsFromRows(featureRows?.classRows ?? [], level, abilityScores, profBonus, edition);
   return {
     pools: mergePoolSources(fnPools, rowPools),
     features: featuresFromRows(featureRows?.classRows ?? [], level, "class", edition),
@@ -221,7 +221,7 @@ function deriveSubclassLayer(
   // subclass, so passing it again would be a silent semantic change under
   // deriveResources' byte-identical-2024-output AC.
   const fnPools = def.resourceFn ? def.resourceFn(level, abilityScores, profBonus, undefined, edition) : [];
-  const rowPools = poolsFromRows(featureRows?.subclassRows ?? [], level, edition);
+  const rowPools = poolsFromRows(featureRows?.subclassRows ?? [], level, abilityScores, profBonus, edition);
   return {
     active: true,
     def,
