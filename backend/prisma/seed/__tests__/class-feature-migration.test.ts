@@ -179,6 +179,16 @@ function isPopulatedBarbarianRow(row: { className: string; subclassSlug: string 
   return row.className === "Barbarian" && row.subclassSlug === null && row.name === "Rage";
 }
 
+// #1686: Elemental Attunement's toggle block (activationCost/resolverKind/
+// resourceKey/costKind/costPoolKey/costBase/effectBuffs) — the first Monk
+// row (still on the TS-authoring path, monk.ts) to populate a descriptor
+// column. Elemental Burst/Elemental Strike stay text-only rows; their real
+// ops live in warrior-of-elements.ts's own endpoint (save-DC damage, not a
+// buff), same as before this migration.
+function isPopulatedMonkRow(row: { className: string; subclassSlug: string | null; name: string }): boolean {
+  return row.className === "Monk" && row.subclassSlug === "monk-warrior-of-the-elements" && row.name === "Elemental Attunement";
+}
+
 // #1234: Arcane Recovery's resource pool (base Wizard, both editions — 2
 // rows) — the third class to populate a resource descriptor column. No
 // activation/cost/effect columns (Arcane Recovery has no DERIVED_ACTIONS
@@ -355,6 +365,7 @@ const POPULATED_ROW_PREDICATES: ((row: RowKey) => boolean)[] = [
   isPopulatedFighterRow,
   isPopulatedBattleMasterPoolRow,
   isPopulatedBarbarianRow,
+  isPopulatedMonkRow,
   isPopulatedWarlockRow,
   isPopulatedWizardRow,
   isPopulatedIllusorySelfRow,

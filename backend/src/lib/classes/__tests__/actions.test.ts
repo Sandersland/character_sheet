@@ -1048,12 +1048,40 @@ describe("Warrior of Shadow — Shadow Arts / Cloak of Shadows catalog rows (#13
 describe("Warrior of the Elements — Elemental Attunement / Elemental Burst catalog rows (#1315)", () => {
   const ELEMENTS = "Warrior of the Elements";
 
+  // Elemental Attunement is row-driven now (#1686) — a bare `at()` call (no
+  // featureRows carrier) can never see it, since Monk's own module carries no
+  // DERIVED_ACTIONS entry for it any more. Mirrors monk.ts's real
+  // AuthoredFeature entry exactly (the row-driven counterpart of every other
+  // literal-class fixture row in test-feature-rows.fixture.ts).
+  const ELEMENTAL_ATTUNEMENT_ROW: ClassFeatureRow = {
+    name: "Elemental Attunement",
+    level: 3,
+    description: "test",
+    edition: "EDITION_2024",
+    resourceKey: "elementalAttunement",
+    activationCost: "free",
+    resolverKind: "toggle",
+    costKind: "pool",
+    costPoolKey: "focus",
+    costBase: 1,
+    effectBuffs: [{ key: "elementalAttunement", target: "elementalAttunement", modifier: 0, duration: "while-active" }],
+  };
+  const elementsAt = (level: number, pools: ResourcePool[]) =>
+    deriveEntryScopedActions(
+      [{ name: "monk", subclass: ELEMENTS, level }],
+      level,
+      pools,
+      true,
+      "EDITION_2024",
+      () => ({ classRows: [], subclassRows: [ELEMENTAL_ATTUNEMENT_ROW] }),
+    );
+
   it("gets elementalAttunement at L3, not L2, as a no-action (free) toggle", () => {
-    expect(keys(at("monk", ELEMENTS, 2, []))).not.toContain("elementalAttunement");
-    const l3 = at("monk", ELEMENTS, 3, [pool("focus", 1)]);
-    const attune = l3.find((a) => a.key === "elementalAttunement");
+    expect(elementsAt(2, []).some((a) => a.key === "elementalAttunement")).toBe(false);
+    const attune = elementsAt(3, [pool("focus", 1)]).find((a) => a.key === "elementalAttunement");
     expect(attune).toBeDefined();
     expect(attune?.cost).toBe("free");
+    expect(attune?.resolverKind).toBe("toggle");
   });
 
   it("gets elementalBurst at L6, not L5, as a Magic action", () => {
@@ -1064,13 +1092,15 @@ describe("Warrior of the Elements — Elemental Attunement / Elemental Burst cat
     expect(burst?.cost).toBe("action");
   });
 
-  it("elementalAttunement costs 1 focus, elementalBurst costs 2", () => {
-    const noFocus = at("monk", ELEMENTS, 6, [pool("focus", 0)]);
-    expect(noFocus.find((a) => a.key === "elementalAttunement")?.enabled).toBe(false);
-    expect(noFocus.find((a) => a.key === "elementalBurst")?.enabled).toBe(false);
-    const oneFocus = at("monk", ELEMENTS, 6, [pool("focus", 1)]);
-    expect(oneFocus.find((a) => a.key === "elementalAttunement")?.enabled).toBe(true);
-    expect(oneFocus.find((a) => a.key === "elementalBurst")?.enabled).toBe(false);
+  it("elementalAttunement costs 1 focus (row-driven gate)", () => {
+    expect(elementsAt(6, [pool("focus", 0)]).find((a) => a.key === "elementalAttunement")?.enabled).toBe(false);
+    expect(elementsAt(6, [pool("focus", 1)]).find((a) => a.key === "elementalAttunement")?.enabled).toBe(true);
+  });
+
+  it("elementalBurst costs 2 focus (DERIVED_ACTIONS gate)", () => {
+    expect(at("monk", ELEMENTS, 6, [pool("focus", 0)]).find((a) => a.key === "elementalBurst")?.enabled).toBe(false);
+    expect(at("monk", ELEMENTS, 6, [pool("focus", 1)]).find((a) => a.key === "elementalBurst")?.enabled).toBe(false);
+    expect(at("monk", ELEMENTS, 6, [pool("focus", 2)]).find((a) => a.key === "elementalBurst")?.enabled).toBe(true);
   });
 
   it("subclass gate: a non-Elements monk gets neither at any level", () => {
@@ -1176,8 +1206,9 @@ describe("subclass gate resolves via slug — FK preferred, exact name as fallba
   });
 
   it("the other three families still match their registry names exactly", () => {
+    // elementalAttunement is row-driven (#1686) — bare at() can't reach it;
+    // elementalBurst alone still proves the slug match for this subclass.
     const elements = keys(at("monk", "warrior of the elements", 6, [pool("focus", 2)]));
-    expect(elements).toContain("elementalAttunement");
     expect(elements).toContain("elementalBurst");
 
     const openHand = keys(at("monk", "warrior of the open hand", 11, [pool("wholenessOfBody", 1)]));
@@ -1199,9 +1230,12 @@ describe("subclass gate resolves via slug — FK preferred, exact name as fallba
   // maintained table). Still exercises the name-fallback path at runtime: for
   // each slug, resolve its accepted NAME via SUBCLASS_IDENTITY and call
   // through `at()`, so this is the same mechanism the FK path uses, minus the FK.
+  // elementalAttunement is deliberately absent from its subclass's list here —
+  // it's row-driven (#1686) and unreachable through the bare at() this test
+  // uses; elementalBurst alone still proves the slug match.
   const MONK_SUBCLASS_GRANT_KEYS: Record<Extract<SubclassSlug, `monk-${string}`>, string[]> = {
     "monk-warrior-of-shadow": ["shadowStep", "shadowArts", "cloakOfShadows"],
-    "monk-warrior-of-the-elements": ["elementalAttunement", "elementalBurst"],
+    "monk-warrior-of-the-elements": ["elementalBurst"],
     "monk-warrior-of-the-open-hand": ["wholenessOfBody", "fleetStep"],
     "monk-warrior-of-mercy": ["handOfHealing", "handOfHealingFlurry"],
   };

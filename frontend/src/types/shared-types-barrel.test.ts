@@ -29,7 +29,6 @@ import type {
   RestoreResourceOperation,
   RollInitiativeOperation,
   SpendResourceOperation,
-  ToggleElementalAttunementOperation,
   WarriorOfElementsOperation,
   WarriorOfElementsResult,
 } from "@/types/character";
@@ -122,7 +121,6 @@ describe("@/types/character barrel", () => {
     expectTypeOf<RestoreResourceOperation>().toEqualTypeOf<Shared.RestoreResourceOperation>();
     expectTypeOf<RollInitiativeOperation>().toEqualTypeOf<Shared.RollInitiativeOperation>();
     expectTypeOf<SpendResourceOperation>().toEqualTypeOf<Shared.SpendResourceOperation>();
-    expectTypeOf<ToggleElementalAttunementOperation>().toEqualTypeOf<Shared.ToggleElementalAttunementOperation>();
     expectTypeOf<WarriorOfElementsOperation>().toEqualTypeOf<Shared.WarriorOfElementsOperation>();
     expectTypeOf<WarriorOfElementsResult>().toEqualTypeOf<Shared.WarriorOfElementsResult>();
   });

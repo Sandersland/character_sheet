@@ -6,6 +6,12 @@
  * Dexterity save). The Burst damage total is rolled client-side off the
  * character's already-derived Martial Arts die (unarmedStrike.damage.faces);
  * the server decides full vs half from its own save roll.
+ *
+ * The Attunement toggle no longer flows through `onOperations` (#1686) — it's
+ * a row-driven "toggle" now, dispatched as a plain executeAction
+ * "elementalAttunement"/"endElementalAttunement" op via the SEPARATE
+ * `onToggleAttunement` prop (POST /actions/transactions, not this section's
+ * own /elements/transactions endpoint). Only Burst stays on `onOperations`.
  */
 
 import { useState } from "react";
@@ -24,6 +30,7 @@ const DAMAGE_TYPES: ElementalDamageType[] = ["acid", "cold", "fire", "lightning"
 interface Props {
   busy: boolean;
   onOperations: (ops: WarriorOfElementsOperation[]) => void;
+  onToggleAttunement: (activate: boolean) => void;
 }
 
 // Remaining Focus from the character's derived resource pools.
@@ -102,7 +109,7 @@ function BurstRow({
   );
 }
 
-export default function WarriorOfElementsSection({ busy, onOperations }: Props) {
+export default function WarriorOfElementsSection({ busy, onOperations, onToggleAttunement }: Props) {
   const { character } = useCurrentCharacter();
   const focusAvailable = focusRemaining(character);
   const attuned = character.activeEffects.buffs.some((b) => b.key === ELEMENTAL_ATTUNEMENT_BUFF_KEY);
@@ -132,7 +139,7 @@ export default function WarriorOfElementsSection({ busy, onOperations }: Props) 
         <AttunementRow
           attuned={attuned}
           disabled={busy || (!attuned && focusAvailable < ATTUNEMENT_FOCUS_COST)}
-          onToggle={() => onOperations([{ type: "toggleElementalAttunement", active: !attuned }])}
+          onToggle={() => onToggleAttunement(!attuned)}
         />
         {burstAvailable && (
           <BurstRow

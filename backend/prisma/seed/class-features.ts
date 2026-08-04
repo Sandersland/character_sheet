@@ -265,13 +265,22 @@ function expandFeatureRow(raw: RawFeatureRow): ClassFeatureSeedRow[] {
     name: raw.feature.name,
     level: raw.feature.level,
     description: raw.feature.description,
-    // #1530: the only two descriptor columns an AuthoredFeature may set
-    // today. `undefined` passes straight through — writeResolvedRows'
-    // authoredDescriptors (seed-class-features.ts) skips undefined keys, so
-    // the four remaining TS-authored classes' rows keep resolving to
-    // DESCRIPTOR_RESET exactly as before this field existed.
+    // #1530: derivedStat/derivedStatTiers. #1686 widens this to the
+    // activation/cost/effectBuffs block a "toggle" resolverKind row needs
+    // (Elemental Attunement, monk.ts) — every field `undefined` passes
+    // straight through — writeResolvedRows' authoredDescriptors
+    // (seed-class-features.ts) skips undefined keys, so every OTHER
+    // TS-authored row keeps resolving to DESCRIPTOR_RESET exactly as before
+    // either field set existed.
     derivedStat: raw.feature.derivedStat,
     derivedStatTiers: raw.feature.derivedStatTiers,
+    resourceKey: raw.feature.resourceKey,
+    activationCost: raw.feature.activationCost,
+    resolverKind: raw.feature.resolverKind,
+    costKind: raw.feature.costKind,
+    costPoolKey: raw.feature.costPoolKey,
+    costBase: raw.feature.costBase,
+    effectBuffs: raw.feature.effectBuffs,
   };
   const editions: SeedEdition[] = raw.feature.edition ? [raw.feature.edition] : ["EDITION_2014", "EDITION_2024"];
   return editions.map((edition) => ({ ...base, edition }));

@@ -73,7 +73,9 @@ export type EventType =
   | "triggerQuiveringPalm"
   | "dealHandOfHarm"
   | "useHandOfUltimateMercy"
-  | "toggleElementalAttunement"
+  // toggleElementalAttunement retired (#1686) — Elemental Attunement's own
+  // toggle now logs through the generic buffApplied/buffCleared/
+  // spendResource event types (like Rage) instead of its own bespoke one.
   | "castElementalBurst"
   | "elementalStrike"
   | "learnToolProficiency"

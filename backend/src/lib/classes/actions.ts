@@ -405,22 +405,14 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   },
 
   // Warrior of the Elements (PHB'24 p.90 — not in SRD 5.2, which ships only
-  // Warrior of the Open Hand for monk) two Focus-spending session actions
-  // (#1315, migrated off a pair of DerivedClassInfo availability booleans) —
-  // the real ops live in warrior-of-elements.ts's own endpoint, so neither row
-  // gets an ACTION_EFFECT_FN entry. Elemental Attunement is explicitly "no
-  // action"; Elemental Burst is a Magic action.
-  {
-    key: "elementalAttunement",
-    name: "Elemental Attunement",
-    cost: "free",
-    grantClass: "monk",
-    grantSubclassSlugs: ["monk-warrior-of-the-elements"],
-    grantLevel: 3,
-    resourceKey: "focus",
-    resourceAmount: 1,
-    reminder: "No action, start of your turn: spend 1 focus to imbue yourself with elemental energy for 10 minutes (or until incapacitated). Unarmed Strike reach +10 ft; once per hit, deal Acid/Cold/Fire/Lightning/Thunder damage instead of the normal type, forcing a Strength save (focus DC) to move the target up to 10 ft on a failure.",
-  },
+  // Warrior of the Open Hand for monk). Elemental Attunement retired from
+  // this table (#1686) — row-driven now (monk.ts's AuthoredFeature entry,
+  // resolverKind "toggle"), synthesizing its own "elementalAttunement"/
+  // "endElementalAttunement" pair via toggleActionsFromRow; the buff/spend
+  // ops route through the generic toggle dispatcher
+  // (routes/character/actions.ts), NOT warrior-of-elements.ts's own endpoint
+  // any more. Elemental Burst stays here and in that endpoint — it's a
+  // save-DC damage op, not a buff.
   {
     key: "elementalBurst",
     name: "Elemental Burst",
