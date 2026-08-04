@@ -39,8 +39,18 @@ const CLASS_BACKGROUND_SKILLS = ["history", "insight", "athletics", "intimidatio
 async function human2024() {
   return prisma.species.findFirstOrThrow({ where: { slug: "human", edition: "EDITION_2024" } });
 }
+// #1683 landed the Elf lineage variants (Drow/High Elf/Wood Elf) alongside
+// this slice — every 2024 Elf lineage grants a spell (species-granted-spells-
+// data.ts), so a 2024 Elf create always needs BOTH variantId+castingAbility
+// (#1683) AND speciesSkills (Keen Senses, this slice) — Wood Elf here purely
+// to keep the fixture simple, not because the other two behave differently.
 async function elf2024() {
-  return prisma.species.findFirstOrThrow({ where: { slug: "elf", edition: "EDITION_2024" } });
+  const elf = await prisma.species.findFirstOrThrow({
+    where: { slug: "elf", edition: "EDITION_2024" },
+    include: { variants: true },
+  });
+  const woodElf = elf.variants.find((v) => v.slug === "wood")!;
+  return { elf, woodElf };
 }
 async function featByName(name: string) {
   return prisma.feat.findFirstOrThrow({ where: { name } });
@@ -180,11 +190,13 @@ describe("POST /api/characters — 2024 Human Skillful + Versatile (#1690)", () 
 
 describe("POST /api/characters — 2024 Elf Keen Senses (#1690)", () => {
   it("one of Insight/Perception/Survival 201s and serializes proficient", async () => {
-    const elf = await elf2024();
+    const { elf, woodElf } = await elf2024();
     const res = await post({
       ...baseBody,
-      race: "Elf",
+      race: "Wood Elf",
       speciesId: elf.id,
+      variantId: woodElf.id,
+      castingAbility: "wisdom",
       speciesSkills: ["perception"],
     });
     expect(res.status).toBe(201);
@@ -196,11 +208,13 @@ describe("POST /api/characters — 2024 Elf Keen Senses (#1690)", () => {
   });
 
   it("400s with a distinct message for a skill outside Insight/Perception/Survival", async () => {
-    const elf = await elf2024();
+    const { elf, woodElf } = await elf2024();
     const res = await post({
       ...baseBody,
-      race: "Elf",
+      race: "Wood Elf",
       speciesId: elf.id,
+      variantId: woodElf.id,
+      castingAbility: "wisdom",
       speciesSkills: ["stealth"],
     });
     expect(res.status).toBe(400);
@@ -208,12 +222,14 @@ describe("POST /api/characters — 2024 Elf Keen Senses (#1690)", () => {
   });
 
   it("Elf carries no chooseOriginFeat spec — speciesOriginFeatId 400s", async () => {
-    const elf = await elf2024();
+    const { elf, woodElf } = await elf2024();
     const tough = await featByName("Tough");
     const res = await post({
       ...baseBody,
-      race: "Elf",
+      race: "Wood Elf",
       speciesId: elf.id,
+      variantId: woodElf.id,
+      castingAbility: "wisdom",
       speciesSkills: ["perception"],
       speciesOriginFeatId: tough.id,
     });

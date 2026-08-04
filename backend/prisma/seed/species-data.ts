@@ -20,11 +20,13 @@
 // ancestry has never granted an ability score bonus in either edition) and no
 // speedOverride.
 //
-// No 2024 lineage/legacy/ancestry variants beyond Dragonborn are seeded here
-// (Elf/Gnome/Tiefling/Goliath) — those are #1683's scope (slice 6), not this
-// slice's. Every 2024 species row's `abilityIncreases` is `[]`: 2024 ability
-// increases come from backgrounds only (#1572), never species — pinned by a
-// negative test in species-data.test.ts.
+// #1683 (slice 6): the remaining 2024 lineage/legacy/ancestry variants — Elf
+// (Drow/High Elf/Wood Elf), Gnome (Forest/Rock), Tiefling (Abyssal/Chthonic/
+// Infernal), Goliath (the six Giant Ancestry benefits) — via the elfLineage
+// Variants/gnomishLineageVariants/fiendishLegacyVariants/giantAncestryVariants
+// helpers below. Every 2024 species row's `abilityIncreases` is `[]` (species
+// or variant): 2024 ability increases come from backgrounds only (#1572),
+// never species — pinned by a negative test in species-data.test.ts.
 import { z } from "zod";
 
 import { abilityIncreasesSchema, type AbilityIncreaseSpec } from "../../src/lib/srd/species-ability-increases.js";
@@ -210,6 +212,55 @@ const SPECIES_2014: SpeciesSeed[] = [
   },
 ];
 
+// #1683: the 2024 lineage/legacy/ancestry variants — identity rows only (name
+// + slug [+ speedOverride for Wood Elf]), never an abilityIncreases entry (no
+// 2024 species/variant ever grants one, #1572). The spell-granting rows'
+// actual SpeciesGrantedSpell content lives in species-granted-spells-data.ts;
+// their announce-text trait rows (resistances, Fiendish Legacy/Giant Ancestry
+// framing, Superior Darkvision) live in species-traits-data.ts. Aasimar's
+// Celestial Revelation is deliberately NOT here — verified against SRD 5.2 p.
+// 12/PHB'24 p. 16 (2026-08-04 research pass): it's a Bonus Action transformation
+// unlocked at character level 3 and re-chosen every time you use it, not a
+// creation-time lineage pick — see the PR description for the full ruling.
+function elfLineageVariants(): SpeciesVariantSeed[] {
+  return [
+    { name: "Drow", slug: "drow" },
+    { name: "High Elf", slug: "high" },
+    { name: "Wood Elf", slug: "wood", speedOverride: 35 }, // SRD 5.2 p. 24: Fleet of Foot
+  ];
+}
+
+function gnomishLineageVariants(): SpeciesVariantSeed[] {
+  return [
+    { name: "Forest Gnome", slug: "forest" },
+    { name: "Rock Gnome", slug: "rock" },
+  ];
+}
+
+function fiendishLegacyVariants(): SpeciesVariantSeed[] {
+  return [
+    { name: "Abyssal Legacy", slug: "abyssal" },
+    { name: "Chthonic Legacy", slug: "chthonic" },
+    { name: "Infernal Legacy", slug: "infernal" },
+  ];
+}
+
+// SRD 5.2 p. 32's Giant Ancestry table — six benefits, one chosen at creation
+// (re-selectable on a level up per the book, but the app bakes the creation
+// pick like every other species choice, #1681's "no reversible delta" shape).
+// No abilityIncreases (never one in 2024) and no SpeciesGrantedSpell rows
+// (none of the six benefits cast a spell) — pure trait content, #1682-shaped.
+function giantAncestryVariants(): SpeciesVariantSeed[] {
+  return [
+    { name: "Cloud's Jaunt", slug: "cloud" },
+    { name: "Fire's Burn", slug: "fire" },
+    { name: "Frost's Chill", slug: "frost" },
+    { name: "Hill's Tumble", slug: "hill" },
+    { name: "Stone's Endurance", slug: "stone" },
+    { name: "Storm's Thunder", slug: "storm" },
+  ];
+}
+
 // PHB'24/SRD 5.2: no species carries an ability increase (backgrounds do,
 // #1572) — every row below has an empty (default) abilityIncreases. Every
 // speed is 30 ft except Goliath's 35 ft (SRD 5.2's own stated exception).
@@ -223,17 +274,13 @@ const SPECIES_2024: SpeciesSeed[] = [
     variants: dragonAncestryVariants(),
   },
   { name: "Dwarf", slug: "dwarf", speed: 30, edition: "EDITION_2024" }, // canary: 25 ft in 2014, 30 ft here
-  // Elven Lineage (Drow/High Elf/Wood Elf) is #1683's scope, not this slice's.
-  { name: "Elf", slug: "elf", speed: 30, edition: "EDITION_2024" },
-  // Gnomish Lineage (Forest/Rock) is #1683's scope, not this slice's.
-  { name: "Gnome", slug: "gnome", speed: 30, edition: "EDITION_2024" },
-  // Giant Ancestry is #1683's scope, not this slice's.
-  { name: "Goliath", slug: "goliath", speed: 35, edition: "EDITION_2024" },
+  { name: "Elf", slug: "elf", speed: 30, edition: "EDITION_2024", variants: elfLineageVariants() },
+  { name: "Gnome", slug: "gnome", speed: 30, edition: "EDITION_2024", variants: gnomishLineageVariants() },
+  { name: "Goliath", slug: "goliath", speed: 35, edition: "EDITION_2024", variants: giantAncestryVariants() },
   { name: "Halfling", slug: "halfling", speed: 30, edition: "EDITION_2024" },
   { name: "Human", slug: "human", speed: 30, edition: "EDITION_2024" },
   { name: "Orc", slug: "orc", speed: 30, edition: "EDITION_2024" },
-  // Fiendish Legacy (Abyssal/Chthonic/Infernal) is #1683's scope, not this slice's.
-  { name: "Tiefling", slug: "tiefling", speed: 30, edition: "EDITION_2024" },
+  { name: "Tiefling", slug: "tiefling", speed: 30, edition: "EDITION_2024", variants: fiendishLegacyVariants() },
 ];
 
 export const SPECIES: SpeciesSeed[] = [...SPECIES_2014, ...SPECIES_2024];

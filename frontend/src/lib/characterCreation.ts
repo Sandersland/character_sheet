@@ -168,6 +168,37 @@ export function deriveSpeciesBonuses(
   return { applicable, fixed, choice, assignment, complete };
 }
 
+export interface CreationCastingAbilityChoice {
+  /** True when the resolved variant (or species, for a future species-level
+   *  grant) needs the Int/Wis/Cha choice — SpeciesVariantOption/SpeciesOption's
+   *  own served `needsCastingAbility` flag, never re-derived client-side. */
+  applicable: boolean;
+  /** The current draft value, narrowed to the wire enum (or "" = unset). */
+  value: "" | "intelligence" | "wisdom" | "charisma";
+  /** True when there's no choice to make, or a value has been picked. */
+  complete: boolean;
+}
+
+/**
+ * Derives the #1683 casting-ability choice state for the form: whether the
+ * chosen species+variant needs it (server-resolved, via needsCastingAbility)
+ * and whether the draft has answered it. The variant's own flag wins when a
+ * variant is chosen (mirrors deriveSpeciesBonuses' merge precedent); falls
+ * back to the species' own flag for a variantless species (no real PHB'24
+ * row needs this yet — every 2024 grant this wave is variant-scoped).
+ */
+export function deriveCastingAbilityChoice(
+  draft: CharacterDraft,
+  selections: CreationSelections,
+): CreationCastingAbilityChoice {
+  const applicable = selections.variant?.needsCastingAbility ?? selections.species?.needsCastingAbility ?? false;
+  return {
+    applicable,
+    value: draft.castingAbility,
+    complete: !applicable || draft.castingAbility !== "",
+  };
+}
+
 export interface CreationSpeciesSkillChoice {
   /** False renders no panel — driven purely by the served spec (#1572
    *  trick), never a client edition check. */
@@ -381,6 +412,9 @@ function completedSpeciesCantripId(choice: CreationSpeciesCantripChoice): string
 function completedSpeciesOriginFeatId(choice: CreationSpeciesOriginFeatChoice): string | undefined {
   return choice.applicable && choice.complete ? choice.selectedId : undefined;
 }
+function completedCastingAbility(choice: CreationCastingAbilityChoice): "intelligence" | "wisdom" | "charisma" | undefined {
+  return choice.applicable && choice.value ? choice.value : undefined;
+}
 
 // #1131/#1689: a level-1 caster's own creation picks — a species cantrip
 // choice rides the SAME `spells` step but a DIFFERENT request field
@@ -403,6 +437,7 @@ export function buildCreatePayload(
 ): CreateCharacterInput {
   const backgroundBonuses = deriveBackgroundBonuses(draft, selections);
   const speciesBonuses = deriveSpeciesBonuses(draft, selections);
+  const castingAbilityChoice = deriveCastingAbilityChoice(draft, selections);
   const classBackgroundSkills = [...skills.granted, ...skills.selected];
   // #1689: species creation choices, independent of the #1681 ability spread
   // above — a species may carry both (Half-Elf: CHA+2/choose-two AND Skill
@@ -420,7 +455,14 @@ export function buildCreatePayload(
     race: selections.variant?.name ?? selections.species?.name ?? "",
     speciesId: draft.speciesId || undefined,
     variantId: draft.variantId || undefined,
+    // Only send a completed CHOICE; a fixed-only species (or none) sends
+    // undefined — the backend applies fixed increases unconditionally with no
+    // request field and 400s a speciesAbilities it didn't ask for (#1681).
     speciesAbilities: completedSpeciesAbilities(speciesBonuses),
+    // #1683: only send a completed choice; a species/variant that grants no
+    // spell (or an unanswered choice) sends undefined — the backend 400s a
+    // castingAbility it didn't ask for (resolveCastingAbility, character-create.ts).
+    castingAbility: completedCastingAbility(castingAbilityChoice),
     speciesSkills: completedSpeciesSkills(speciesSkillChoice),
     speciesCantripId: completedSpeciesCantripId(speciesCantripChoice),
     speciesOriginFeatId: completedSpeciesOriginFeatId(speciesOriginFeatChoice),

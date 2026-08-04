@@ -29,6 +29,8 @@ import { ITEMS } from "./catalog-data.js";
 import { PACKS } from "./packs.js";
 import { SPECIES, speciesSeedSchema } from "./species-data.js";
 import { SPECIES_TRAITS, speciesTraitSeedSchema } from "./species-traits-data.js";
+import { SPECIES_GRANTED_SPELLS, speciesGrantedSpellSeedSchema } from "./species-granted-spells-data.js";
+import { SPELLS } from "./spells.js";
 
 interface SeedFamily {
   schema: z.ZodTypeAny;
@@ -55,6 +57,10 @@ const SEED_FAMILIES: Record<string, SeedFamily> = {
   // speciesSlug/variantSlug typo is a broken FK resolution at seed time
   // otherwise, not a zod-catchable shape error).
   SPECIES_TRAITS: { schema: speciesTraitSeedSchema, rows: SPECIES_TRAITS },
+  // #1683 — 2024 lineage/legacy spell tracks; cross-referenced against SPECIES
+  // (variant must exist) and SPELLS (spellName must resolve) below, the same
+  // "zod catches shape, assertX catches FK typos" split as SPECIES_TRAITS.
+  SPECIES_GRANTED_SPELLS: { schema: speciesGrantedSpellSeedSchema, rows: SPECIES_GRANTED_SPELLS },
 };
 
 export interface SeedValidationSummary {
@@ -117,18 +123,25 @@ export function assertCatalogNamesResolve(
 // out of assertSpeciesTraitsResolve to keep every seed validator under the
 // seed-file cyclomatic budget (CC <= 4): they run uncovered in globalSetup, so
 // CRAP is complexity-driven and CC 5+ crosses the ceiling (#1682/#1679).
+// Shared variant-slug resolution check for the SpeciesTrait and
+// SpeciesGrantedSpell seed validators (#1682/#1683): variantSlug must name a
+// real variant of its species. `context` identifies the calling row for the
+// error message (e.g. "SPECIES_TRAITS[3]").
+function assertVariantSlugKnown(species: (typeof SPECIES)[number], variantSlug: string, context: string): void {
+  if (!(species.variants ?? []).some((v) => v.slug === variantSlug)) {
+    throw new Error(
+      `Seed content invalid — ${context} references unknown variant "${variantSlug}" under species "${species.slug}" (${species.edition})`,
+    );
+  }
+}
+
 function assertTraitVariantKnown(
   species: (typeof SPECIES)[number],
   trait: (typeof SPECIES_TRAITS)[number],
   index: number,
 ): void {
   if (!trait.variantSlug) return;
-  const known = (species.variants ?? []).some((v) => v.slug === trait.variantSlug);
-  if (!known) {
-    throw new Error(
-      `Seed content invalid — SPECIES_TRAITS[${index}] references unknown variant "${trait.variantSlug}" under species "${trait.speciesSlug}" (${trait.speciesEdition})`,
-    );
-  }
+  assertVariantSlugKnown(species, trait.variantSlug, `SPECIES_TRAITS[${index}]`);
 }
 
 // One SPECIES_TRAITS row: its species must resolve, its variant (if any) must
@@ -163,6 +176,39 @@ function assertSpeciesTraitsResolve(speciesRows: typeof SPECIES, traitRows: type
   const speciesByKey = new Map(speciesRows.map((s) => [`${s.slug}::${s.edition}`, s]));
   const seen = new Set<string>();
   traitRows.forEach((trait, index) => assertSpeciesTraitRowResolves(trait, index, speciesByKey, seen));
+}
+
+// One SPECIES_GRANTED_SPELLS row: its species must resolve, its variant must
+// resolve (every row this slice is variant-level, #1683), and its spellName
+// must name a real SPELLS catalog entry — the #1683 twin of
+// assertSpeciesTraitRowResolves above, catching a typo'd slug/name before
+// seedSpeciesGrantedSpells' DB-backed resolution throws a less specific error.
+function assertSpeciesGrantedSpellRowResolves(
+  grant: (typeof SPECIES_GRANTED_SPELLS)[number],
+  index: number,
+  speciesByKey: Map<string, (typeof SPECIES)[number]>,
+  spellNames: Set<string>,
+): void {
+  const species = speciesByKey.get(`${grant.speciesSlug}::${grant.speciesEdition}`);
+  if (!species) {
+    throw new Error(
+      `Seed content invalid — SPECIES_GRANTED_SPELLS[${index}] references unknown species "${grant.speciesSlug}" (${grant.speciesEdition})`,
+    );
+  }
+  assertVariantSlugKnown(species, grant.variantSlug, `SPECIES_GRANTED_SPELLS[${index}]`);
+  if (!spellNames.has(grant.spellName)) {
+    throw new Error(`Seed content invalid — SPECIES_GRANTED_SPELLS[${index}] references unknown spell "${grant.spellName}"`);
+  }
+}
+
+function assertSpeciesGrantedSpellsResolve(
+  speciesRows: typeof SPECIES,
+  grantRows: typeof SPECIES_GRANTED_SPELLS,
+  spellRows: typeof SPELLS,
+): void {
+  const speciesByKey = new Map(speciesRows.map((s) => [`${s.slug}::${s.edition}`, s]));
+  const spellNames = new Set(spellRows.map((s) => s.name));
+  grantRows.forEach((grant, index) => assertSpeciesGrantedSpellRowResolves(grant, index, speciesByKey, spellNames));
 }
 
 /**
@@ -236,6 +282,7 @@ export function assertSeedContentValid(): SeedValidationSummary {
   });
 
   assertSpeciesTraitsResolve(SPECIES, SPECIES_TRAITS);
+  assertSpeciesGrantedSpellsResolve(SPECIES, SPECIES_GRANTED_SPELLS, SPELLS);
 
   return { familiesChecked: Object.keys(SEED_FAMILIES).length, rowsChecked };
 }

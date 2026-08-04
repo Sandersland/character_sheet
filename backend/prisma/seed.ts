@@ -19,6 +19,7 @@ import { seedClassFeatures } from "./seed/seed-class-features.js";
 import { seedSubclasses } from "./seed/seed-subclasses.js";
 import { seedSpecies } from "./seed/seed-species.js";
 import { seedSpeciesTraits } from "./seed/seed-species-traits.js";
+import { seedSpeciesGrantedSpells } from "./seed/seed-species-granted-spells.js";
 import { seedStartingEquipment } from "./seed/seed-starting-equipment.js";
 import { PACKS } from "./seed/packs.js";
 import { assertUniqueGrantedAbilityNames } from "./seed/guards.js";
@@ -469,6 +470,9 @@ async function main() {
   await seedBackgrounds(prisma);
   await seedSpells(prisma);
   await seedSubclassGrantedSpells(prisma, classIds);
+  // #1683: 2024 lineage/legacy spell tracks — needs Species (seedSpecies,
+  // above) AND the Spell catalog (seedSpells, just above) both seeded.
+  await seedSpeciesGrantedSpells(prisma);
   const itemIdsByName = await seedItems(prisma);
   await seedPacks(prisma, itemIdsByName);
   // No reader yet (#1534) — StartingEquipmentPackage rows are inert until

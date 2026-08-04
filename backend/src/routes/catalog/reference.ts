@@ -41,6 +41,9 @@ referenceRouter.get("/reference", async (req, res) => {
   // resolveEditionCatalog/withEditionOrShared: Species.edition is NOT NULL
   // (no species is edition-neutral), so there is no shared/NULL row to fall
   // back to — the same reasoning as StartingEquipmentPackage's own query above.
+  // grantedSpells (#1683): existence-only (select id) at both levels, purely
+  // to derive needsCastingAbility below — the actual grant rows are never
+  // served here (resolved live at read/creation time, never a catalog preview).
   // #1689: `traits` rides along so chooseSkills/chooseCantrip can be resolved
   // below — species.traits returns EVERY trait FK'd to this speciesId
   // regardless of variantId (plain Prisma relation semantics, same caveat
@@ -52,7 +55,18 @@ referenceRouter.get("/reference", async (req, res) => {
     orderBy: { name: "asc" },
     include: {
       traits: { select: { variantId: true, choice: true } },
-      variants: { orderBy: { name: "asc" }, include: { traits: { select: { choice: true } } } },
+      variants: {
+        orderBy: { name: "asc" },
+        include: {
+          traits: { select: { choice: true } },
+          grantedSpells: { select: { id: true } },
+        },
+      },
+      // Species.grantedSpells is the UNFILTERED back-relation (every grant
+      // FK'd to this speciesId, spanning every variant — the same
+      // activeTraitRows gotcha) — variantId carried so the mapping below can
+      // narrow to species-level (variantId === null) only.
+      grantedSpells: { select: { id: true, variantId: true } },
     },
   });
   // Narrowed to at-most-two-per-key at the DB (withEditionOrShared), then
@@ -251,6 +265,12 @@ referenceRouter.get("/reference", async (req, res) => {
     slug: s.slug,
     speed: s.speed,
     abilityIncreases: s.abilityIncreases as unknown as AbilityIncreaseSpec[],
+    // #1683: whether picking THIS species alone (no variant chosen) grants a
+    // spell — narrowed from the unfiltered back-relation to variantId ===
+    // null, same rule serialize/species.ts's activeTraitRows documents.
+    // Never true this wave (every 2024 grant is variant-scoped), kept
+    // general so a future species-level grant needs no picker rewrite.
+    needsCastingAbility: s.grantedSpells.some((g) => g.variantId === null),
     chooseSkills: chooseSkillsOf(s.traits.filter((t) => t.variantId === null)),
     chooseCantrip: chooseCantripOf(s.traits.filter((t) => t.variantId === null)),
     chooseOriginFeat: chooseOriginFeatOf(s.traits.filter((t) => t.variantId === null)),
@@ -259,6 +279,8 @@ referenceRouter.get("/reference", async (req, res) => {
       name: v.name,
       slug: v.slug,
       abilityIncreases: v.abilityIncreases as unknown as AbilityIncreaseSpec[],
+      // Already scoped to this variant by Prisma (its own back-relation).
+      needsCastingAbility: v.grantedSpells.length > 0,
       chooseSkills: chooseSkillsOf(v.traits),
       chooseCantrip: chooseCantripOf(v.traits),
       chooseOriginFeat: chooseOriginFeatOf(v.traits),

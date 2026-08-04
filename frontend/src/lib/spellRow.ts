@@ -25,7 +25,7 @@ export function deriveSpellRow(spell: Spell, availableSlots: number[]): SpellRow
   const atWill = item ? item.resource === "atWill" : false;
   const chargeCost = item?.resource === "charges" ? item.chargeCost ?? 1 : 1;
   const itemExhausted = Boolean(item) && !atWill && (item?.usesRemaining ?? 0) < chargeCost;
-  const isGranted = spell.source === "subclass" || spell.source === "item";
+  const isGranted = spell.source === "subclass" || spell.source === "species" || spell.source === "item";
   const schoolTone = SCHOOL_TONE[spell.school as keyof typeof SCHOOL_TONE] ?? "neutral";
   const noBudget = (!isCantrip && !item && availableSlots.length === 0) || itemExhausted;
   return { isCantrip, item, atWill, chargeCost, itemExhausted, isGranted, schoolTone, noBudget };
@@ -36,7 +36,7 @@ export function deriveSpellRow(spell: Spell, availableSlots: number[]): SpellRow
 export type RuneState = "locked" | "prepared" | "unprepared";
 
 export function runeState(spell: Spell): RuneState {
-  if (spell.level === 0 || spell.source === "subclass" || spell.source === "item") return "locked";
+  if (spell.level === 0 || spell.source === "subclass" || spell.source === "species" || spell.source === "item") return "locked";
   return spell.prepared ? "prepared" : "unprepared";
 }
 

@@ -87,6 +87,12 @@ export interface SpeciesVariantOption {
   /** Additive to the parent species' own abilityIncreases at creation (Hill
    *  Dwarf's +1 WIS on top of Dwarf's +2 CON) — [] for every 2024 row. */
   abilityIncreases: AbilityIncreaseSpec[];
+  /** #1683: true when picking this variant requires the Int/Wis/Cha
+   *  casting-ability choice (a 2024 lineage/legacy that grants a spell —
+   *  Elf's Drow/High Elf/Wood Elf, Gnome's Forest/Rock, Tiefling's Abyssal/
+   *  Chthonic/Infernal). False for every 2014 row and every non-spell 2024
+   *  variant (Dragonborn ancestry, Goliath's Giant Ancestry). */
+  needsCastingAbility: boolean;
   /** #1689/#1690: null/false for every row but the ones that carry the
    *  matching trait — see the type's own comment. */
   chooseSkills: SpeciesSkillChoiceOption | null;
@@ -107,6 +113,10 @@ export interface SpeciesOption {
   /** [] for every EDITION_2024 row — 2024 ability increases come from
    *  backgrounds only (#1572), never species (#1681). */
   abilityIncreases: AbilityIncreaseSpec[];
+  /** #1683: same signal as SpeciesVariantOption.needsCastingAbility, at the
+   *  species level (a grant with no variant chosen) — always false this
+   *  wave, kept general for a future species-level grant. */
+  needsCastingAbility: boolean;
   /** #1689/#1690: null/false for every row but the ones that carry the
    *  matching trait — see the type's own comment. */
   chooseSkills: SpeciesSkillChoiceOption | null;
@@ -293,6 +303,10 @@ export interface CreateCharacterInput {
    *  when the merged species+variant spec has a choose component AND the
    *  player has completed it — see deriveSpeciesBonuses. */
   speciesAbilities?: Partial<Record<AbilityName, number>>;
+  /** #1683: the 2024 lineage/legacy casting-ability choice (Int/Wis/Cha),
+   *  required iff the chosen species+variant's needsCastingAbility is true —
+   *  see deriveCastingAbilityChoice. */
+  castingAbility?: "intelligence" | "wisdom" | "charisma";
   /** #1689: species-granted creation choices (SpeciesTrait.choice) —
    *  distinct from `skillProficiencies`/`spells` below, which are the
    *  class/background pools. Sent only when the resolved species+variant

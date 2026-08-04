@@ -32,7 +32,13 @@ import { mirrorCapabilityUsedIncrement } from "@/lib/inventory/inventory-capabil
 import { capabilityColumnsFromSnapshot } from "@/lib/inventory/capabilities.js";
 import { readInventorySnapshot } from "@/lib/inventory/inventory-snapshot-read.js";
 import { normalizeSpellcastingMutable } from "./spell-state.js";
-import { deriveGrantedSpells, deriveItemSpells, type GrantedSpellSource } from "./granted-spells.js";
+import {
+  deriveGrantedSpells,
+  deriveItemSpells,
+  speciesGrantedSpellSourceFromRaceSelection,
+  RACE_SELECTION_GRANT_SELECT,
+  type GrantedSpellSource,
+} from "./granted-spells.js";
 import type { ItemSpellSourceItem } from "./granted-spells.js";
 import type {
   SpellEntry,
@@ -353,10 +359,17 @@ async function applyLearnSpellOp(ctx: SpellOpContext, op: LearnSpellOperation): 
 
 async function applyForgetSpellOp(ctx: SpellOpContext, op: ForgetSpellOperation): Promise<OpOutcome> {
   const { state } = ctx;
-  // Subclass-granted spells are derived, not persisted — they cannot be forgotten.
+  // Subclass- AND species/lineage-granted (#1683) spells are derived, not
+  // persisted — they cannot be forgotten. Both share the `granted:` id
+  // prefix (deriveGrantedSpells' id scheme); the source check is
+  // defense-in-depth for the subclass half only — NOT extended to
+  // source === "species", which also matches a #1689 species-CHOICE entry
+  // (High Elf's Cantrip) that IS meant to be forgettable-eligible the same
+  // as any other stored spell (its id is never `granted:`-prefixed, so it
+  // never trips the first branch either).
   const idx = state.spells.findIndex((s) => s.id === op.entryId);
   if (op.entryId.startsWith("granted:") || state.spells[idx]?.source === "subclass") {
-    throw new InvalidSpellcastingOperationError("Cannot forget a subclass-granted spell.");
+    throw new InvalidSpellcastingOperationError("Cannot forget a subclass- or species-lineage-granted spell.");
   }
   if (idx === -1) {
     throw new InvalidSpellcastingOperationError(`Spell entry not found: ${op.entryId}`);
@@ -756,17 +769,22 @@ function computeSlotTables(
   return { slotTotals, arcanaTotals };
 }
 
-// Inject derived subclass-granted (#438) + item-granted (#528) spells into the
-// working state so ops that target them resolve. Disjoint id spaces; stripped
-// again before persist (persistSpellState) — they live only in the read view.
+// Inject derived subclass-granted (#438) + species-granted (#1683) +
+// item-granted (#528) spells into the working state so ops that target them
+// resolve. Disjoint id spaces; stripped again before persist
+// (persistSpellState) — they live only in the read view.
 function injectDerivedSpells(
   state: SpellcastingMutableState,
   subclassRef: GrantedSpellSource | null | undefined,
+  speciesRef: GrantedSpellSource | null | undefined,
   level: number,
   itemSources: ItemSpellSourceItem[],
   edition: RulesEdition,
 ): void {
-  const granted = deriveGrantedSpells(subclassRef, level, edition);
+  const granted = [
+    ...deriveGrantedSpells(subclassRef, level, edition),
+    ...deriveGrantedSpells(speciesRef, level, edition, "species"),
+  ];
   if (granted.length > 0) {
     const names = new Set(state.spells.map((s) => s.name.toLowerCase()));
     for (const g of granted) if (!names.has(g.name.toLowerCase())) state.spells.push(g);
@@ -786,13 +804,21 @@ function cloneSpellState(state: SpellcastingMutableState): { spellcasting: Spell
   };
 }
 
-// Strip derived grants + item spells (re-derived on read) and persist the state.
+// Strip derived grants (subclass + #1683 species/lineage) + item spells
+// (all re-derived on read) and persist the state. A #1689 species-CHOICE
+// entry (source:"species", but never `granted:`-id-prefixed) is deliberately
+// KEPT — it IS the persisted record, not a re-derivable grant; see
+// SpellEntry's own `source` comment (spell-state.ts) for the full split.
 async function persistSpellState(
   tx: Prisma.TransactionClient,
   characterId: string,
   state: SpellcastingMutableState,
 ): Promise<void> {
-  state.spells = state.spells.filter((s) => s.source !== "subclass" && s.source !== "item");
+  state.spells = state.spells.filter((s) => {
+    if (s.source === "item" || s.source === "subclass") return false;
+    if (s.source === "species" && s.id.startsWith("granted:")) return false;
+    return true;
+  });
   await tx.character.update({
     where: { id: characterId },
     data: {
@@ -1046,6 +1072,12 @@ const SPELLCASTING_SELECT = {
       },
     },
   },
+  // Species/lineage-granted spells (#1683) injected into the working view
+  // below alongside subclassRef's, so a species grant (e.g. a Drow's Dancing
+  // Lights) is actually castable/preparable, not just visible on the read
+  // path. Shared RACE_SELECTION_GRANT_SELECT — level-reconciliation.ts uses
+  // the SAME fragment (granted-spells.ts).
+  raceSelection: { select: RACE_SELECTION_GRANT_SELECT },
   // capabilities are reconstructed from `snapshot` + `capabilityUses` in
   // buildSpellcastingOp below (#1649) — the four Inventory* mirror relations
   // are gone.
@@ -1124,9 +1156,17 @@ function buildSpellcastingOp(
   const state = normalizeSpellcastingMutable(row.spellcasting);
   const beforeState = cloneSpellState(state);
 
+  // #1683: the species source is independent of any class entry — resolved
+  // once here from raceSelection (SPELLCASTING_SELECT's shared
+  // RACE_SELECTION_GRANT_SELECT) via the SAME adapter level-reconciliation.ts
+  // uses, not the serialize layer's own (that would invert this module's
+  // dependency direction).
+  const speciesSource = speciesGrantedSpellSourceFromRaceSelection(row.raceSelection);
+
   injectDerivedSpells(
     state,
     row.classEntries[0]?.subclassRef,
+    speciesSource,
     level,
     row.inventoryItems.map((i) => {
       const snapshot = readInventorySnapshot(i);

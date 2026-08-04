@@ -1,8 +1,15 @@
 import Card from "@/components/ui/Card";
 import ImageUploadControl from "@/components/ui/ImageUploadControl";
 import { emptyPackageState } from "@/lib/startingEquipment";
+import { ABILITY_LABELS } from "@/lib/abilities";
 import type { CharacterDraft } from "@/hooks/useCharacterDraft";
 import type { ReferenceData } from "@/types/character";
+
+// #1683: the three abilities a 2024 spell-granting lineage/legacy may use —
+// "choose the ability when you select the lineage" (PHB'24). A fixed
+// sub-list of AbilityName, not the full six-ability set the sheet's other
+// pickers offer.
+const CASTING_ABILITIES = ["intelligence", "wisdom", "charisma"] as const;
 
 interface IdentitySectionProps {
   draft: CharacterDraft;
@@ -82,8 +89,10 @@ export default function IdentitySection({
             value={draft.speciesId}
             onChange={(e) =>
               // Changing species resets the variant — a variant id only ever
-              // means something relative to its own parent species (#1680).
-              update({ speciesId: e.target.value, variantId: "" })
+              // means something relative to its own parent species (#1680) —
+              // and the casting-ability choice, which only ever means
+              // something relative to its own variant/species (#1683).
+              update({ speciesId: e.target.value, variantId: "", castingAbility: "" })
             }
             className="rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1.5 text-sm font-normal normal-case text-parchment-900"
           >
@@ -110,7 +119,12 @@ export default function IdentitySection({
               </span>
               <select
                 value={draft.variantId}
-                onChange={(e) => update({ variantId: e.target.value })}
+                onChange={(e) =>
+                  // Changing variant resets the casting-ability choice — it
+                  // only ever means something relative to the CHOSEN variant
+                  // (#1683: a Wood Elf pick has no such choice at all).
+                  update({ variantId: e.target.value, castingAbility: "" })
+                }
                 className="rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1.5 text-sm font-normal normal-case text-parchment-900"
               >
                 <option value="">Select variant…</option>
@@ -121,6 +135,47 @@ export default function IdentitySection({
                 ))}
               </select>
             </label>
+          );
+        })()}
+
+        {/* Casting-ability picker (#1683) — renders ONLY when the resolved
+            species+variant grants a spell (needsCastingAbility, server-
+            resolved, never re-derived here): 2024 Elf's Drow/High Elf/Wood
+            Elf, Gnome's Forest/Rock, Tiefling's Abyssal/Chthonic/Infernal. The
+            variant's own flag wins when a variant is chosen; falls back to
+            the species' own flag for a variantless grant (none seeded yet). */}
+        {(() => {
+          const selectedSpecies = reference.species.find((s) => s.id === draft.speciesId);
+          const selectedVariant = selectedSpecies?.variants.find((v) => v.id === draft.variantId);
+          const needsCastingAbility = selectedVariant?.needsCastingAbility ?? selectedSpecies?.needsCastingAbility ?? false;
+          if (!needsCastingAbility) return null;
+          return (
+            <div className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600 sm:col-span-2">
+              <span>
+                Casting Ability
+                <RequiredMark />
+              </span>
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Casting ability">
+                {CASTING_ABILITIES.map((ability) => {
+                  const pressed = draft.castingAbility === ability;
+                  return (
+                    <button
+                      key={ability}
+                      type="button"
+                      aria-pressed={pressed}
+                      onClick={() => update({ castingAbility: ability })}
+                      className={`rounded-control border px-3 py-1.5 text-xs font-semibold normal-case transition-colors ${
+                        pressed
+                          ? "border-garnet-surface bg-garnet-surface text-garnet-on-surface"
+                          : "border-parchment-300 text-parchment-700 hover:border-arcane-400"
+                      }`}
+                    >
+                      {ABILITY_LABELS[ability]}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           );
         })()}
 

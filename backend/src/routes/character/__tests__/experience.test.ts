@@ -680,8 +680,11 @@ describe("POST /api/characters/:id/experience — granted spells reconciled on l
     await postXp("test-gs-event", { operations: [{ type: "set", value: XP_LVL_1 }] });
 
     const actRes = await getActivity("test-gs-event");
+    // #1683: the summary text generalized to "granted spell(s)" — the
+    // reconciler now strips a leaked SPECIES grant the same way, not just a
+    // subclass one (reconcileGrantedSpells, level-reconciliation.ts).
     const ev = actRes.body.find(
-      (e: { category: string; summary: string }) => e.category === "spellcasting" && e.summary.includes("subclass-granted"),
+      (e: { category: string; summary: string }) => e.category === "spellcasting" && e.summary.includes("granted spell"),
     );
     expect(ev).toBeDefined();
   });
@@ -731,6 +734,80 @@ describe("POST /api/characters/:id/experience — granted spells reconciled on l
     const stored = row?.spellcasting as { spells: Array<{ source?: string }> } | null;
     expect(stored?.spells).toHaveLength(1);
     expect(stored?.spells[0].source).toBe("subclass");
+  });
+});
+
+// #1683: reconcileGrantedSpells' species-grant twin of the subclass suite
+// above — the SAME defense-in-depth reconciler, over a leaked source:"species"
+// entry, against the real seeded 2024 Elf/Drow rows.
+describe("POST /api/characters/:id/experience — species-granted spells reconciled on level-down (#1683)", () => {
+  let elfSpeciesId: string;
+  let drowVariantId: string;
+
+  beforeAll(async () => {
+    const elf = await prisma.species.findFirstOrThrow({
+      where: { slug: "elf", edition: "EDITION_2024" },
+      select: { id: true, variants: { where: { slug: "drow" }, select: { id: true } } },
+    });
+    elfSpeciesId = elf.id;
+    drowVariantId = elf.variants[0].id;
+  });
+
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { name: { startsWith: "SpeciesGrantedSpell" } } });
+  });
+
+  // Faerie Fire (gate 3) leaked into storage — dropping to level 1 must strip it.
+  const leakedSpellcasting = () => ({
+    slotsUsed: {},
+    spells: [{
+      id: "granted:drow:faerie-fire",
+      name: "Faerie Fire",
+      level: 1, school: "evocation", prepared: true, source: "species",
+      castingTime: "1 action", range: "60 ft", duration: "Concentration, up to 1 minute",
+      description: "Leaked persisted grant.",
+    }],
+  });
+
+  async function createLvl3Drow(id: string) {
+    await ensureTestOwner(OWNER_ID);
+    return prisma.character.create({
+      data: {
+        ...BASE_CHARACTER,
+        ownerId: OWNER_ID,
+        id,
+        name: `SpeciesGrantedSpell ${id}`,
+        rulesEdition: "EDITION_2024",
+        experiencePoints: XP_LVL_3,
+        hitDice: { total: 3, die: "d10", spent: 0 },
+        spellcasting: leakedSpellcasting() as Prisma.InputJsonValue,
+        raceSelection: {
+          create: { name: "Drow", speciesId: elfSpeciesId, variantId: drowVariantId, variantName: "Drow", castingAbility: "charisma" },
+        },
+        classEntries: { create: [{ name: "Fighter", position: 0, level: 3 }] },
+      },
+    });
+  }
+
+  it("strips a leaked persisted species grant when XP drops below its gate level", async () => {
+    await createLvl3Drow("test-species-gs-strip");
+    const res = await postXp("test-species-gs-strip", { operations: [{ type: "set", value: XP_LVL_1 }] });
+    expect(res.status).toBe(200);
+
+    const row = await prisma.character.findUnique({ where: { id: "test-species-gs-strip" }, select: { spellcasting: true } });
+    const stored = row?.spellcasting as { spells: unknown[] } | null;
+    expect(stored?.spells).toHaveLength(0);
+  });
+
+  it("emits a spellcasting event for the stripped species grant", async () => {
+    await createLvl3Drow("test-species-gs-event");
+    await postXp("test-species-gs-event", { operations: [{ type: "set", value: XP_LVL_1 }] });
+
+    const actRes = await getActivity("test-species-gs-event");
+    const ev = actRes.body.find(
+      (e: { category: string; summary: string }) => e.category === "spellcasting" && e.summary.includes("granted spell"),
+    );
+    expect(ev).toBeDefined();
   });
 });
 

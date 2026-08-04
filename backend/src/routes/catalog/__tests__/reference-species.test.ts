@@ -90,6 +90,39 @@ describe("GET /api/reference — species (#1679)", () => {
     expect(dragonborn2014.variants).toHaveLength(10);
     expect(dragonborn2024.variants).toHaveLength(10);
   });
+
+  // #1683: the frontend picker needs a served signal for "this variant needs
+  // a casting-ability choice" — never re-derived client-side (CLAUDE.md: the
+  // frontend never originates a rule).
+  describe("needsCastingAbility (#1683)", () => {
+    it("is true for a 2024 Elf lineage variant that grants a spell (Drow)", async () => {
+      const res = await getReference("EDITION_2024");
+      const elf = res.body.species.find((s: { name: string }) => s.name === "Elf");
+      const drow = elf.variants.find((v: { name: string }) => v.name === "Drow");
+      expect(drow.needsCastingAbility).toBe(true);
+    });
+
+    it("is false for a 2024 Dragonborn ancestry variant (grants no spell)", async () => {
+      const res = await getReference("EDITION_2024");
+      const dragonborn = res.body.species.find((s: { name: string }) => s.name === "Dragonborn");
+      expect(dragonborn.variants.every((v: { needsCastingAbility: boolean }) => v.needsCastingAbility === false)).toBe(true);
+    });
+
+    it("is false at the species level for every 2024 species this wave (every grant is variant-scoped)", async () => {
+      const res = await getReference("EDITION_2024");
+      for (const species of res.body.species as { needsCastingAbility: boolean }[]) {
+        expect(species.needsCastingAbility).toBe(false);
+      }
+    });
+
+    it("is false for every 2014 species/variant (no 2014 row grants a spell)", async () => {
+      const res = await getReference("EDITION_2014");
+      for (const species of res.body.species as { needsCastingAbility: boolean; variants: { needsCastingAbility: boolean }[] }[]) {
+        expect(species.needsCastingAbility).toBe(false);
+        for (const variant of species.variants) expect(variant.needsCastingAbility).toBe(false);
+      }
+    });
+  });
 });
 
 describe("GET /api/reference — species creation-choice specs (#1689)", () => {
