@@ -43,7 +43,8 @@ import { applySpendResourceInTx } from "@/lib/classes/resources.js";
 import { deriveMartialArtsDie } from "@/lib/srd/srd.js";
 import { editionOf } from "@/lib/rules/edition.js";
 import { rollDie } from "@/lib/core/dice.js";
-import { appendActiveBuffInTx, clearBuffByKeyInTx } from "@/lib/combat/active-effects.js";
+import { appendActiveBuffInTx, clearBuffByKeyInTx, normalizeActiveEffectsMutable } from "@/lib/combat/active-effects.js";
+import { currentArmorStateInTx, unmetActivationRequirements, ActivationRequirementError } from "@/lib/classes/activation-requires.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
 import { getActiveSessionId } from "@/lib/session/sessions.js";
 import { characterInclude } from "@/lib/character/character-include.js";
@@ -74,6 +75,12 @@ const ROW_ACTION_SELECT = {
   // Read for the #1686 generic toggle handler's evaluateBuffModifier context
   // ({ abilityMod } formula tiers) — every other row-driven branch ignores it.
   abilityScores: true,
+  // Read for #1688's `requiresActiveBuff` gate — the set of currently active
+  // buff keys an activationRequires entry may name. Cheap (one JSON column);
+  // fetched unconditionally rather than only when a row sets
+  // activationRequires, since the row isn't known until after this same
+  // query resolves.
+  activeEffects: true,
   classEntries: {
     orderBy: { position: "asc" as const },
     select: { name: true, subclass: true, level: true, ...FEATURE_ROWS_ENTRY_SELECT },
@@ -160,6 +167,37 @@ async function applyActionOpInTx(
   return {};
 }
 
+// A row's own `activationRequires` is non-empty — the guard
+// assertActivationRequirementsMet uses to skip both the buff/armor reads and
+// the evaluation entirely for the common case (a row that authors none).
+function hasActivationRequires(row: ClassFeatureRow): boolean {
+  return Boolean(row.activationRequires && row.activationRequires.length > 0);
+}
+
+/**
+ * #1688: the row's own declarative activation constraints. Never checked on
+ * a toggle row's END half — ending is always legal, mirrors
+ * toggleActionsFromRow's own "end always enabled" rule (lib/classes/actions.ts).
+ * Split out of applyRowDrivenActionInTx to keep that function's own
+ * branching budget low (fallow's cyclomatic/CRAP gate) — this is otherwise
+ * inlined logic with no reuse.
+ */
+async function assertActivationRequirementsMet(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  character: RowActionCharacter,
+  row: ClassFeatureRow,
+  isToggleEnd: boolean,
+): Promise<void> {
+  if (isToggleEnd || !hasActivationRequires(row)) return;
+  const activeBuffKeys = new Set(normalizeActiveEffectsMutable(character.activeEffects).buffs.map((b) => b.key));
+  const armor = await currentArmorStateInTx(tx, characterId);
+  const reasons = unmetActivationRequirements(row.activationRequires, { armor, activeBuffKeys });
+  if (reasons.length > 0) {
+    throw new ActivationRequirementError(`${row.name} ${reasons.join("; ")}`);
+  }
+}
+
 /**
  * Row-driven dispatch (#1528) — the retired `ACTION_CAST_FN`/DERIVED_ACTIONS
  * counterpart for a ClassFeature row. A "toggle" row (#1686) instantiates its
@@ -190,6 +228,8 @@ async function applyRowDrivenActionInTx(
     throw new UnknownActionError(`Unknown action key: ${op.actionKey}`);
   }
   const { row, entryLevel, isToggleEnd } = eligible;
+
+  await assertActivationRequirementsMet(tx, characterId, character, row, isToggleEnd);
 
   if (row.resolverKind === "toggle") {
     const ctx: ResourceTotalContext = {

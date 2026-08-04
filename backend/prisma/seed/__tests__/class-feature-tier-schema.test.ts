@@ -280,7 +280,7 @@ describe("effectBuffs (#1686) — the toggle-resolver buff-list vocabulary", () 
     expect(result.success).toBe(false);
   });
 
-  it("accepts an entry-level minLevel gate plus an endReminder/clearOn", () => {
+  it("accepts an entry-level minLevel gate plus an endReminder/clearOn (#1688's equip-trigger vocabulary, a list)", () => {
     const result = classFeatureSeedSchema.safeParse({
       ...baseRow,
       effectBuffs: [
@@ -290,12 +290,22 @@ describe("effectBuffs (#1686) — the toggle-resolver buff-list vocabulary", () 
           modifier: { abilityMod: "intelligence", min: 1 },
           duration: "concentration",
           minLevel: 14,
-          clearOn: "concentrationEnds",
+          clearOn: ["equipMediumArmor", "equipHeavyArmor", "equipShield"],
           endReminder: "Bladesong ends if you attack with a weapon other than a light one, or cast a spell other than an Illusion or Transmutation spell.",
         },
       ],
     });
     expect(result.success).toBe(true);
+  });
+
+  it("rejects a clearOn entry outside the closed CLEAR_ON_TRIGGERS vocabulary", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      effectBuffs: [
+        { key: "bladesong", target: "ac", modifier: 1, duration: "while-active", clearOn: ["concentrationEnds"] },
+      ],
+    });
+    expect(result.success).toBe(false);
   });
 
   it("rejects a buff missing a required field (no `key`)", () => {
@@ -304,5 +314,64 @@ describe("effectBuffs (#1686) — the toggle-resolver buff-list vocabulary", () 
       effectBuffs: [{ target: "meleeDamage", modifier: 2, duration: "while-active" }],
     });
     expect(result.success).toBe(false);
+  });
+});
+
+// #1688: activationRequires' closed vocabulary — an armor/shield literal or a
+// `requiresActiveBuff` object. Driven through classFeatureSeedSchema.safeParse
+// for the same reason as effectBuffs above: the production validation path
+// (prisma/seed/validate.ts) is what this pins, not an un-exported schema.
+describe("activationRequires (#1688) — the declarative activation-constraint vocabulary", () => {
+  it("accepts every armor/shield literal", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      activationRequires: ["noMediumArmor", "noHeavyArmor", "noShield", "noBodyArmor"],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts a requiresActiveBuff object naming another buff's key", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      activationRequires: [{ requiresActiveBuff: "bladesong" }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts a mix of armor literals and requiresActiveBuff in one list", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      activationRequires: ["noMediumArmor", "noShield", { requiresActiveBuff: "bladesong" }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects an unrecognized literal outside the closed vocabulary", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      activationRequires: ["noRobe"],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a requiresActiveBuff object with an empty key", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      activationRequires: [{ requiresActiveBuff: "" }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a requiresActiveBuff object carrying an unknown extra field (strict)", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      activationRequires: [{ requiresActiveBuff: "bladesong", extra: true }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("null/absent activationRequires is valid (the common case)", () => {
+    expect(classFeatureSeedSchema.safeParse({ ...baseRow, activationRequires: null }).success).toBe(true);
+    expect(classFeatureSeedSchema.safeParse({ ...baseRow }).success).toBe(true);
   });
 });

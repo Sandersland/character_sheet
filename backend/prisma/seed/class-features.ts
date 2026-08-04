@@ -30,7 +30,14 @@
 // green rather than adding a bespoke exception whose file also holds data).
 import { z } from "zod";
 
-import type { BuffModifierFormula, EffectBuffRow, ResourceTotalFormula } from "../../src/lib/classes/class-feature-rows.js";
+import {
+  ARMOR_ACTIVATION_REQUIREMENTS,
+  CLEAR_ON_TRIGGERS,
+  type ActivationRequirement,
+  type BuffModifierFormula,
+  type EffectBuffRow,
+  type ResourceTotalFormula,
+} from "../../src/lib/classes/class-feature-rows.js";
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { AuthoredFeature, ClassDefinition, SubclassDefinition } from "../../src/lib/classes/types.js";
 import type { FeatImprovement } from "../../src/lib/classes/resources-state.js";
@@ -218,6 +225,10 @@ export interface ClassFeatureSeedRow {
   resolverKind?: string;
   requiresUnarmored?: boolean;
   regrants?: string[];
+  // Declarative activation-time gates (#1688) — see ClassFeature.activationRequires'
+  // own schema.prisma comment for the vocabulary/evaluator. `ActivationRequirement`
+  // is a type-only import, same reasoning as `ResourceTotalFormula` above.
+  activationRequires?: ActivationRequirement[];
   costKind?: string;
   costPoolKey?: string;
   costBase?: number;
@@ -267,11 +278,11 @@ function expandFeatureRow(raw: RawFeatureRow): ClassFeatureSeedRow[] {
     description: raw.feature.description,
     // #1530: derivedStat/derivedStatTiers. #1686 widens this to the
     // activation/cost/effectBuffs block a "toggle" resolverKind row needs
-    // (Elemental Attunement, monk.ts) — every field `undefined` passes
-    // straight through — writeResolvedRows' authoredDescriptors
-    // (seed-class-features.ts) skips undefined keys, so every OTHER
-    // TS-authored row keeps resolving to DESCRIPTOR_RESET exactly as before
-    // either field set existed.
+    // (Elemental Attunement, monk.ts); #1688 adds activationRequires —
+    // every field `undefined` passes straight through — writeResolvedRows'
+    // authoredDescriptors (seed-class-features.ts) skips undefined keys, so
+    // every OTHER TS-authored row keeps resolving to DESCRIPTOR_RESET exactly
+    // as before either field set existed.
     derivedStat: raw.feature.derivedStat,
     derivedStatTiers: raw.feature.derivedStatTiers,
     resourceKey: raw.feature.resourceKey,
@@ -281,6 +292,7 @@ function expandFeatureRow(raw: RawFeatureRow): ClassFeatureSeedRow[] {
     costPoolKey: raw.feature.costPoolKey,
     costBase: raw.feature.costBase,
     effectBuffs: raw.feature.effectBuffs,
+    activationRequires: raw.feature.activationRequires,
   };
   const editions: SeedEdition[] = raw.feature.edition ? [raw.feature.edition] : ["EDITION_2014", "EDITION_2024"];
   return editions.map((edition) => ({ ...base, edition }));
@@ -435,9 +447,10 @@ const effectBuffSchema = z
     modifier: buffModifierFormulaSchema,
     duration: z.enum(["concentration", "while-active", "until-rest"]),
     minLevel: z.number().int().positive().optional(),
-    // #1688 owns this trigger's vocabulary — authored here, unvalidated
-    // beyond "non-empty string", until that issue defines the enum.
-    clearOn: z.string().min(1).optional(),
+    // The closed CLEAR_ON_TRIGGERS vocabulary (#1688) — a list, not a single
+    // trigger, since one buff can need several (Bladesong: medium armor, OR
+    // heavy armor, OR a shield).
+    clearOn: z.array(z.enum(CLEAR_ON_TRIGGERS)).optional(),
     endReminder: z.string().min(1).optional(),
     resistDamageTypes: z.array(z.string().min(1)).optional(),
     rollEffects: z.array(rollEffectSchema).optional(),
@@ -446,6 +459,18 @@ const effectBuffSchema = z
     message: "effectBuffs target must be a known skill/stat key, or equal the buff's own `key` (a marker buff)",
   });
 const effectBuffsSchema = z.array(effectBuffSchema);
+
+// The closed `activationRequires` vocabulary (#1688): an armor/shield literal
+// or a `requiresActiveBuff` object naming another buff's key. No cross-row
+// check that the named key actually resolves to a real effectBuffs entry
+// elsewhere in the seed — requiresActiveBuff can legitimately name a DIFFERENT
+// row's buff (Song of Defense names Bladesong's own key), which this file has
+// no cross-row pass to verify against.
+const activationRequirementSchema = z.union([
+  z.enum(ARMOR_ACTIVATION_REQUIREMENTS),
+  z.object({ requiresActiveBuff: z.string().min(1) }).strict(),
+]);
+const activationRequiresSchema = z.array(activationRequirementSchema);
 
 // Validated at seed time (prisma/seed/validate.ts). Only the identity fields
 // this migration actually populates are required; the descriptor fields are
@@ -467,4 +492,5 @@ export const classFeatureSeedSchema = z.object({
   // second declaration.
   improvements: z.array(featImprovementSchema).nullable().optional(),
   effectBuffs: effectBuffsSchema.nullable().optional(),
+  activationRequires: activationRequiresSchema.nullable().optional(),
 });

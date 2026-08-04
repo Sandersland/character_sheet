@@ -741,6 +741,16 @@ model ClassFeature {
   resolverKind      String? // ResolutionKind — served on the wire, retiring the frontend mirror
   requiresUnarmored Boolean  @default(false)
   regrants          String[] @default([])
+  // Declarative activation-time gates (#1688): a closed vocabulary — armor/
+  // shield literals ("noMediumArmor" | "noHeavyArmor" | "noShield" |
+  // "noBodyArmor") plus `{ requiresActiveBuff: <buffKey> }`, evaluated by
+  // unmetActivationRequirements at activation, server-side, inside
+  // applyRowDrivenActionInTx — never
+  // re-derived client-side. Bladesong (#1676) is the first `noMediumArmor`/
+  // `noHeavyArmor`/`noShield` consumer; Song of Defense's `requiresActiveBuff`
+  // and Elemental Attunement's burst/strike ops are the follow-ons. Validated
+  // seed-time (classFeatureSeedSchema).
+  activationRequires Json?
 
   // Cost block — GrantedAbility's columns verbatim (AbilityCostColumns is
   // exactly these four, all optional) so readAbilityCost reads them unchanged.
@@ -835,8 +845,12 @@ model ClassFeature {
   // this vocabulary is interpreted. Validated seed-time
   // (classFeatureSeedSchema); `target` may equal the buff's own `key` for a
   // marker buff with no numeric effect (Elemental Attunement's shape).
-  // `clearOn` is authored here but has no reader yet — its trigger vocabulary
-  // is #1688's.
+  // `clearOn` (#1688) is a list of equip-time trigger keys (CLEAR_ON_TRIGGERS)
+  // copied onto the instantiated ActiveBuff and matched against the equip
+  // hook's own raised triggers (equipClearTriggers) — the metadata path Mage
+  // Armor's equip-driven true-end (#363) now rides too (buffTarget
+  // "acUnarmoredBase" -> clearOn ["equipBodyArmor"], set at cast time via
+  // BUFF_TARGET_CLEAR_ON).
   effectBuffs Json?
 
   // NULLS NOT DISTINCT is hand-written in the migration (Prisma's DSL cannot
@@ -1403,6 +1417,13 @@ model GrantedAbility {
   // populates this yet; added here so a future "toggle" GrantedAbility (e.g. a
   // Battle Master maneuver with a while-active rider) needs no second migration.
   effectBuffs Json?
+
+  // Declarative activation-time gates (#1688) — see ClassFeature.activationRequires'
+  // own comment for the vocabulary/evaluator. No maneuver row populates this
+  // yet (no maneuver has an armor/shield or requiresActiveBuff constraint);
+  // added here for schema symmetry so a future GrantedAbility with one needs
+  // no second migration.
+  activationRequires Json?
 
   // NULL = valid in both editions; a diverging maneuver / shadow art / channel
   // divinity / subclass-choice option forks into one row per edition sharing
