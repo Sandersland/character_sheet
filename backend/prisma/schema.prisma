@@ -456,9 +456,9 @@ model Species {
   // AbilityIncreaseSpec[] — fixed | choose | floating (abilityIncreasesSchema,
   // lib/srd/species-ability-increases.ts). [] for every EDITION_2024 row: 2024
   // ability increases come from backgrounds only (#1572), never species (epic
-  // body, pinned by a negative test both directions). NOT applied to a
-  // character in this slice — only the SELECTION is persisted; #1681 (slice 3)
-  // reads this column and bakes the increases into effective scores.
+  // body, pinned by a negative test both directions). Read and baked into
+  // effective scores at creation by resolveSpeciesGrants (character-create.ts,
+  // #1681); the applied result is snapshotted onto CharacterRace.abilityBonuses.
   abilityIncreases Json @default("[]")
 
   variants      SpeciesVariant[]
@@ -1037,9 +1037,15 @@ model CharacterRace {
   // path).
   variantName String?
   // Provenance snapshot of the ability increases actually APPLIED (owner-
-  // approved 2026-08-03) — always [] in this slice, since increases aren't
-  // applied until #1681; makes the eventual bake auditable, unlike the
-  // background ability spread (#1130), which has no equivalent record.
+  // approved 2026-08-03), written by resolveSpeciesGrants (character-create.ts,
+  // #1681) — [] for a 2024 character, a legacy `race`-name creation, or a
+  // species with no increases in its merged spec. Makes the bake auditable,
+  // unlike the background ability spread (#1130), which has no equivalent
+  // record. The scores themselves stay baked with no reversible delta — race
+  // is immutable post-creation (no race transaction endpoint, `race` absent
+  // from PATCH), so there is nothing for a delta to ever reverse, and no
+  // LEVEL_GATED_RECONCILERS entry follows for the same reason: this state's
+  // legal maximum is fixed at creation, never revisited by level.
   abilityBonuses Json @default("[]")
 }
 

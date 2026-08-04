@@ -19,6 +19,7 @@ import { subclassGateLevel } from "@/lib/leveling/effective-levels.js";
 import { requireEditionOr400 } from "@/lib/http/parse-edition-param.js";
 import { resolveEditionCatalog, withEditionOrShared } from "@/lib/rules/catalog-edition.js";
 import { backgroundGrantsAbilitySpread, backgroundGrantsOriginFeat } from "@/lib/rules/background-grants.js";
+import type { AbilityIncreaseSpec } from "@/lib/srd/species-ability-increases.js";
 
 export const referenceRouter = Router();
 
@@ -201,20 +202,24 @@ referenceRouter.get("/reference", async (req, res) => {
   }));
 
   // #1679: variants nested inside each species, exactly like
-  // classes[].subclasses above — abilityIncreases/speedOverride are NOT
-  // served yet (increases aren't applied until #1681, and no client needs
-  // the override before the picker lands in #1680); this slice's payload is
-  // identity only (id/name/slug/speed/variants), enough for a two-step picker
-  // to render.
+  // classes[].subclasses above. abilityIncreases rides along as of #1681 (cast
+  // through the AbilityIncreaseSpec[] shape — a wire mirror only, the frontend
+  // ceremony never originates the rule, only renders this server-resolved
+  // spec) so the creation ceremony can preview + request the choice; the raw
+  // JSON column is [] for every EDITION_2024 row, matching resolveSpeciesGrants'
+  // edition gate. speedOverride is NOT served yet — no client needs it before
+  // the variant-speed picker lands (#1680/#1682).
   const speciesWithVariants = rawSpecies.map((s) => ({
     id: s.id,
     name: s.name,
     slug: s.slug,
     speed: s.speed,
+    abilityIncreases: s.abilityIncreases as unknown as AbilityIncreaseSpec[],
     variants: s.variants.map((v) => ({
       id: v.id,
       name: v.name,
       slug: v.slug,
+      abilityIncreases: v.abilityIncreases as unknown as AbilityIncreaseSpec[],
     })),
   }));
 

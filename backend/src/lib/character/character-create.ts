@@ -33,7 +33,18 @@ import { clampPreparedToLimit, type SpellEntry } from "@/lib/spellcasting/spell-
 import { subclassGateLevel } from "@/lib/leveling/effective-levels.js";
 import { DEFAULT_RULES_EDITION } from "@/lib/rules/edition.js";
 import { crossEditionRejection, resolveEditionRow, withEditionOrShared } from "@/lib/rules/catalog-edition.js";
-import { backgroundGrantsAbilitySpread, backgroundGrantsOriginFeat } from "@/lib/rules/background-grants.js";
+import {
+  applyAbilitySpread,
+  backgroundGrantsAbilitySpread,
+  backgroundGrantsOriginFeat,
+  floatingSpreadShapeValid,
+  speciesGrantsAbilityIncreases,
+} from "@/lib/rules/background-grants.js";
+import {
+  ABILITY_NAMES,
+  type AbilityIncreaseSpec,
+  type ChooseIncrease,
+} from "@/lib/srd/species-ability-increases.js";
 import type { ClassStartingEquipment, RulesEdition } from "@character-sheet/shared-types";
 import type { CreateCharacterBody } from "./character-schemas.js";
 
@@ -91,9 +102,11 @@ type ResolvedSelections = {
   // creation-time subclass gate.
   edition: RulesEdition;
   // #1679: the validated species/variant selection — [null, null, null] for a
-  // legacy `race`-name-only creation (the compat-window default). Increases
-  // are NOT applied this slice (#1681); persistCreatedCharacter only writes
-  // the selection + variantName snapshot onto CharacterRace.
+  // legacy `race`-name-only creation (the compat-window default). #1681's
+  // resolveSpeciesGrants resolves this into a SpeciesGrants (ability increases
+  // baked into effective scores + the applied-increases provenance snapshot);
+  // persistCreatedCharacter writes the selection + variantName + abilityBonuses
+  // onto CharacterRace.
   speciesSelection: SpeciesSelection;
 };
 
@@ -492,17 +505,26 @@ async function resolveSelections(
   };
 }
 
-// A legal PHB'24 spread is +2/+1 (two abilities) or +1/+1/+1 (three) — always
-// summing to 3.
-function backgroundSpreadShapeValid(amounts: number[]): boolean {
-  const sorted = [...amounts].sort((a, b) => a - b);
-  const isTwoOne = sorted.length === 2 && sorted[0] === 1 && sorted[1] === 2;
-  const isOneOneOne = sorted.length === 3 && sorted.every((a) => a === 1);
-  return isTwoOne || isOneOneOne;
+// Shared per-ability 20-cap check (SRD 5.2/5.1's one ABILITY_CAP): every
+// ability-spread validator below — background's, and #1681's species
+// choose/floating/fixed — ends with this same "would exceed 20" rejection, so
+// it lives once rather than four near-identical copies (fallow's duplication
+// gate flagged the original three-copy spread).
+function abilityCapOverflowError(
+  entries: [string, number][],
+  base: Record<string, number>,
+  fieldName: string,
+): Fail | null {
+  const over = entries.find(([ability, amount]) => (base[ability] ?? 10) + amount > ABILITY_CAP);
+  if (!over) return null;
+  return { ok: false, status: 400, error: `${fieldName}: ${over[0]} would exceed ${ABILITY_CAP}` };
 }
 
 // Validates the spread: every bump is one of the background's three abilities,
 // the shape is legal, and no resulting score tops the 20 cap (SRD 5.2).
+// floatingSpreadShapeValid is the #1681-extracted shared shape check — species'
+// own floating-spread validator (validateSpeciesFloating below) calls the SAME
+// function, not a copy.
 function validateBackgroundSpread(
   spread: Record<string, number>,
   choices: string[],
@@ -513,25 +535,10 @@ function validateBackgroundSpread(
   if (invalid.length > 0) {
     return { ok: false, status: 400, error: `backgroundAbilities: ${invalid.join(", ")} not in this background's choices (${choices.join(", ")})` };
   }
-  if (!backgroundSpreadShapeValid(entries.map(([, amount]) => amount))) {
+  if (!floatingSpreadShapeValid(entries.map(([, amount]) => amount))) {
     return { ok: false, status: 400, error: "backgroundAbilities must be +2/+1 (two abilities) or +1/+1/+1 (three abilities)" };
   }
-  const over = entries.find(([ability, amount]) => (base[ability] ?? 10) + amount > ABILITY_CAP);
-  if (over) {
-    return { ok: false, status: 400, error: `backgroundAbilities: ${over[0]} would exceed ${ABILITY_CAP}` };
-  }
-  return null;
-}
-
-function applyBackgroundSpread(
-  base: Record<string, number>,
-  spread: Record<string, number> | undefined,
-): Record<string, number> {
-  const scores = { ...base };
-  for (const [ability, amount] of Object.entries(spread ?? {})) {
-    scores[ability] = (scores[ability] ?? 10) + amount;
-  }
-  return scores;
+  return abilityCapOverflowError(entries, base, "backgroundAbilities");
 }
 
 // Snapshots the background's Origin feat into a slot-exempt AdvancementEntry
@@ -610,8 +617,223 @@ async function resolveBackgroundGrants(
 
   return {
     ok: true,
-    effectiveScores: applyBackgroundSpread(input.abilityScores, spread),
+    effectiveScores: applyAbilitySpread(input.abilityScores, spread),
     originEntry: await buildOriginEntry(background, edition),
+  };
+}
+
+// Species grants resolved from the request: the ability increases already
+// folded into effective scores (baked before deriveCreatedCharacter, same
+// #1130 shape as BackgroundGrants) and the exact {ability, amount}[] applied —
+// the CharacterRace.abilityBonuses provenance snapshot the background spread
+// has no equivalent of.
+type SpeciesGrants = {
+  effectiveScores: Record<string, number>;
+  appliedIncreases: { ability: string; amount: number }[];
+};
+
+// Splits a merged Species+SpeciesVariant abilityIncreases spec array into its
+// three forms by discriminant key. `fixed` entries are summed per ability
+// (Human's six separate +1s land in one record); `choose`/`floating` are kept
+// as the raw sub-specs since resolveSpeciesGrants validates each against the
+// request's `speciesAbilities` before applying.
+function splitAbilityIncreaseSpecs(specs: AbilityIncreaseSpec[]): {
+  fixedSpread: Record<string, number>;
+  chooseSpecs: ChooseIncrease[];
+  floatingSpecs: number[];
+} {
+  const fixedSpread: Record<string, number> = {};
+  const chooseSpecs: ChooseIncrease[] = [];
+  const floatingSpecs: number[] = [];
+  for (const spec of specs) {
+    if ("ability" in spec) {
+      fixedSpread[spec.ability] = (fixedSpread[spec.ability] ?? 0) + spec.amount;
+    } else if ("choose" in spec) {
+      chooseSpecs.push(spec.choose);
+    } else {
+      floatingSpecs.push(spec.floating);
+    }
+  }
+  return { fixedSpread, chooseSpecs, floatingSpecs };
+}
+
+// Validates the CHOSEN portion of a choose-from-list spec (Half-Elf's "+1 to
+// two of your choice") — composes the same membership + per-ability-cap checks
+// resolveHalfFeatBump (advancement.ts) applies to a half-feat's ability bump,
+// generalized from one pick to `count` distinct picks. A Record's keys are
+// already distinct, so "count distinct abilities" reduces to "exactly `count`
+// entries" once membership is confirmed.
+function validateSpeciesChoose(
+  spec: ChooseIncrease,
+  submitted: Record<string, number>,
+  fixedAbilities: Set<string>,
+  base: Record<string, number>,
+): Fail | { chosen: Record<string, number> } {
+  const eligible: string[] = spec.from ?? [...ABILITY_NAMES];
+  const entries = Object.entries(submitted);
+
+  const invalid = entries.filter(([ability]) => !eligible.includes(ability) || fixedAbilities.has(ability));
+  if (invalid.length > 0) {
+    return {
+      ok: false,
+      status: 400,
+      error: `speciesAbilities: ${invalid.map(([a]) => a).join(", ")} not eligible (options: ${eligible.join(", ")})`,
+    };
+  }
+  const wrongAmount = entries.find(([, amount]) => amount !== spec.amount);
+  if (wrongAmount) {
+    return { ok: false, status: 400, error: `speciesAbilities: each choice must be +${spec.amount}` };
+  }
+  if (entries.length !== spec.count) {
+    return {
+      ok: false,
+      status: 400,
+      error: `speciesAbilities: choose exactly ${spec.count} distinct abilities (got ${entries.length})`,
+    };
+  }
+  return abilityCapOverflowError(entries, base, "speciesAbilities") ?? { chosen: Object.fromEntries(entries) };
+}
+
+// Validates a floating-spread spec (the Astral Elf shape, seeded only as a
+// #1679 test fixture this wave — no real PHB'14 roster row uses it) via the
+// SAME floatingSpreadShapeValid the background spread validates with (#1681
+// AC: proven by symbol, not by a second copy of the shape rule).
+function validateSpeciesFloating(
+  submitted: Record<string, number>,
+  fixedAbilities: Set<string>,
+  base: Record<string, number>,
+): Fail | { chosen: Record<string, number> } {
+  const entries = Object.entries(submitted);
+  const invalid = entries.filter(([ability]) => fixedAbilities.has(ability));
+  if (invalid.length > 0) {
+    return {
+      ok: false,
+      status: 400,
+      error: `speciesAbilities: ${invalid.map(([a]) => a).join(", ")} already fixed by this species`,
+    };
+  }
+  if (!floatingSpreadShapeValid(entries.map(([, amount]) => amount))) {
+    return { ok: false, status: 400, error: "speciesAbilities must be +2/+1 (two abilities) or +1/+1/+1 (three abilities)" };
+  }
+  return abilityCapOverflowError(entries, base, "speciesAbilities") ?? { chosen: Object.fromEntries(entries) };
+}
+
+// Resolves the CHOSEN portion of a merged spec (everything beyond the fixed
+// increases, which apply unconditionally with no player input). `chooseSpecs`
+// and `floatingSpecs` never both carry entries in the current roster + fixture
+// (Half-Elf: fixed + choose; the Astral Elf fixture: floating alone) — choose
+// wins if a future row ever seeds both, since Half-Elf-shaped content is the
+// only real PHB'14 case; revisit this priority if that changes.
+function resolveChosenIncreases(
+  chooseSpecs: ChooseIncrease[],
+  floatingSpecs: number[],
+  submitted: Record<string, number> | undefined,
+  fixedAbilities: Set<string>,
+  base: Record<string, number>,
+): Fail | { chosen: Record<string, number> } {
+  const needsChoice = chooseSpecs.length > 0 || floatingSpecs.length > 0;
+  if (!needsChoice) {
+    if (submitted) {
+      return { ok: false, status: 400, error: "speciesAbilities not allowed: this species has no ability choice" };
+    }
+    return { chosen: {} };
+  }
+  if (!submitted) {
+    return { ok: false, status: 400, error: "speciesAbilities required: this species grants a choice of ability increases" };
+  }
+  if (chooseSpecs.length > 0) {
+    return validateSpeciesChoose(chooseSpecs[0], submitted, fixedAbilities, base);
+  }
+  return validateSpeciesFloating(submitted, fixedAbilities, base);
+}
+
+// Rejects a submitted speciesAbilities under the wrong edition — split out of
+// resolveSpeciesGrants purely to keep its own cyclomatic/cognitive complexity
+// under the repo's health gate, same reasoning as validateVariantSelection /
+// resolveSpeciesCatalogRow above.
+function speciesAbilitiesEditionGuard(
+  submitted: Record<string, number> | undefined,
+  edition: RulesEdition,
+): Fail | null {
+  if (submitted && !speciesGrantsAbilityIncreases(edition)) {
+    return { ok: false, status: 400, error: "speciesAbilities not allowed: species ability increases are a 2014 rule" };
+  }
+  return null;
+}
+
+// Narrow fetch (abilityIncreases only) for the CONFIRMED species/variant —
+// resolveSpeciesCatalogRow's own species.findUnique (in resolveSpeciesSelection)
+// deliberately avoids this column for every candidate variant (its comment:
+// Dragonborn alone carries 10 variant rows). This is the one place that
+// column is read, and only once the edition gate has confirmed it's needed.
+async function fetchMergedAbilityIncreases(
+  speciesId: string,
+  variantId: string | null,
+): Promise<AbilityIncreaseSpec[]> {
+  const species = await prisma.species.findUniqueOrThrow({
+    where: { id: speciesId },
+    select: { abilityIncreases: true },
+  });
+  const variant = variantId
+    ? await prisma.speciesVariant.findUniqueOrThrow({
+        where: { id: variantId },
+        select: { abilityIncreases: true },
+      })
+    : null;
+  return [
+    ...(species.abilityIncreases as unknown as AbilityIncreaseSpec[]),
+    ...((variant?.abilityIncreases as unknown as AbilityIncreaseSpec[]) ?? []),
+  ];
+}
+
+// Phase 1.6 — species grants (#1681): merge the species + variant abilityIncreases
+// specs (#1679), validate the chosen portion against `speciesAbilities`, and fold
+// BOTH fixed and chosen increases into effective scores — baked BEFORE
+// deriveCreatedCharacter, same "no reversible delta" shape as the background
+// spread (#1130), and for the same reason: race is immutable post-creation (no
+// race transaction endpoint), so there is nothing for a delta to ever reverse.
+// No LEVEL_GATED_RECONCILERS entry follows from the same fact — the legal
+// maximum this state can reach never changes with level, only at creation.
+//
+// Ability increases are a PHB'14-only mechanic (#1572's mirror image) —
+// speciesGrantsAbilityIncreases gates a 2024 character out before the catalog
+// spec is even fetched, so a 2024 species row's (always empty) spec is never
+// the reason 2024 gets nothing; the edition gate is.
+async function resolveSpeciesGrants(
+  input: CreateCharacterBody,
+  speciesSelection: SpeciesSelection,
+  edition: RulesEdition,
+  baseScores: Record<string, number>,
+): Promise<PhaseResult<SpeciesGrants>> {
+  const submitted = input.speciesAbilities;
+
+  if (!speciesSelection.speciesId) {
+    if (submitted) {
+      return { ok: false, status: 400, error: "speciesAbilities not allowed: no species selected" };
+    }
+    return { ok: true, effectiveScores: baseScores, appliedIncreases: [] };
+  }
+
+  const editionError = speciesAbilitiesEditionGuard(submitted, edition);
+  if (editionError) return editionError;
+  if (!speciesGrantsAbilityIncreases(edition)) {
+    return { ok: true, effectiveScores: baseScores, appliedIncreases: [] };
+  }
+
+  const specs = await fetchMergedAbilityIncreases(speciesSelection.speciesId, speciesSelection.variantId);
+  const { fixedSpread, chooseSpecs, floatingSpecs } = splitAbilityIncreaseSpecs(specs);
+
+  const fixedCapError = abilityCapOverflowError(Object.entries(fixedSpread), baseScores, "speciesAbilities");
+  if (fixedCapError) return fixedCapError;
+
+  const chosenResult = resolveChosenIncreases(chooseSpecs, floatingSpecs, submitted, new Set(Object.keys(fixedSpread)), baseScores);
+  if ("ok" in chosenResult) return chosenResult;
+
+  const fullSpread = { ...fixedSpread, ...chosenResult.chosen };
+  return {
+    ok: true,
+    effectiveScores: applyAbilitySpread(baseScores, fullSpread),
+    appliedIncreases: Object.entries(fullSpread).map(([ability, amount]) => ({ ability, amount })),
   };
 }
 
@@ -1155,13 +1377,22 @@ async function persistCreatedCharacter(
   equipment: MaterializedEquipment,
   spellEntries: SpellEntry[] | null,
   grants: BackgroundGrants,
+  speciesGrants: SpeciesGrants,
 ): Promise<{ id: string }> {
   const { race, characterClass, background, primaryClassChoice } = selections;
   const { inventoryItemCreates, startingCurrency } = equipment;
-  const { effectiveScores, originEntry } = grants;
+  const { originEntry } = grants;
+  // speciesGrants.effectiveScores is grants.effectiveScores with the #1681
+  // species/variant increases folded on TOP (resolveSpeciesGrants took
+  // grants.effectiveScores as its base) — the one effectiveScores this
+  // function persists, so a 2024 character (species contributes nothing)
+  // and a 2014 character (background contributes nothing) both bake from
+  // the same final value with no separate code path.
+  const { effectiveScores, appliedIncreases } = speciesGrants;
 
-  // Background ability spread is baked into effectiveScores BEFORE derivation so
-  // level-1 HP/initiative reflect it for free — no reversible delta record (#1130).
+  // Background ability spread + species/variant ability increases are both
+  // baked into effectiveScores BEFORE derivation so level-1 HP/initiative
+  // reflect them for free — no reversible delta record (#1130, #1681).
   const derived = deriveCreatedCharacter(
     {
       abilityScores: effectiveScores,
@@ -1202,12 +1433,14 @@ async function persistCreatedCharacter(
           name: input.race,
           raceId: race.id,
           // #1679: additive alongside raceId above — null/null/null for a
-          // legacy `race`-name-only creation. abilityBonuses stays [] this
-          // slice (increases aren't applied until #1681); it's the
-          // provenance snapshot of what WOULD be applied, not a default.
+          // legacy `race`-name-only creation. abilityBonuses is the #1681
+          // provenance snapshot of exactly what resolveSpeciesGrants applied
+          // (fixed + chosen) — [] for a 2024 character, a legacy `race`-name
+          // creation, or a species with no increases in its merged spec.
           speciesId: selections.speciesSelection.speciesId,
           variantId: selections.speciesSelection.variantId,
           variantName: selections.speciesSelection.variantName,
+          abilityBonuses: appliedIncreases as unknown as Prisma.InputJsonValue,
         },
       },
       backgroundSelection: {
@@ -1250,6 +1483,17 @@ export async function createCharacter(
   const grants = await resolveBackgroundGrants(input, selections.background, input.rulesEdition ?? DEFAULT_RULES_EDITION);
   if (!grants.ok) return grants;
 
+  // Species increases bake on TOP of the background spread (grants.effectiveScores)
+  // rather than input.abilityScores directly — the two never both contribute in
+  // practice (opposite-edition mechanics, speciesGrantsAbilityIncreases vs
+  // backgroundGrantsAbilitySpread), but composing this way means a hypothetical
+  // future homebrew edition mixing both still bakes correctly with no special case.
+  // selections.edition (not a third DEFAULT_RULES_EDITION re-derivation): already
+  // the resolved value resolveSelections computed, safe to reuse directly since
+  // this call sits after that resolution, unlike resolveBackgroundGrants above.
+  const speciesGrants = await resolveSpeciesGrants(input, selections.speciesSelection, selections.edition, grants.effectiveScores);
+  if (!speciesGrants.ok) return speciesGrants;
+
   const equipment = await materializeStartingEquipment(
     input,
     selections.characterClass.id,
@@ -1271,6 +1515,6 @@ export async function createCharacter(
   const spells = await resolveCreationSpells(input, selections);
   if (!spells.ok) return spells;
 
-  const { id } = await persistCreatedCharacter(input, ownerId, selections, equipment, spells.spellEntries, grants);
+  const { id } = await persistCreatedCharacter(input, ownerId, selections, equipment, spells.spellEntries, grants, speciesGrants);
   return { ok: true, id };
 }
