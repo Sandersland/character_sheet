@@ -43,7 +43,7 @@ const SPELL_CATALOG = [
 
 const referenceFixture: ReferenceData = {
   races: [{ id: "race-human", name: "Human", speed: 30, toolProficiencies: [] }],
-  species: [],
+  species: [{ id: "sp-human", name: "Human", slug: "human", speed: 30, abilityIncreases: [], variants: [] }],
   classes: [
     {
       id: "class-bard",
@@ -168,7 +168,9 @@ async function fillIdentity(
 ) {
   await u.type(await screen.findByLabelText(/name/i), "Alric");
   await u.selectOptions(screen.getByLabelText(/alignment/i), "Lawful Good");
-  await u.selectOptions(screen.getByLabelText(/race/i), "Human");
+  // Human has no variants under this fixture — the two-step picker (#1680)
+  // renders no second panel, so selecting it alone completes the identity gate.
+  await u.selectOptions(screen.getByLabelText(/species/i), "Human");
   await u.selectOptions(screen.getByLabelText(/class/i), className);
   await u.selectOptions(screen.getByLabelText("Background"), background);
 }
@@ -211,6 +213,7 @@ describe("CharacterCreatePage (#1176 ceremony)", () => {
       name: "Alric",
       alignment: "Lawful Good",
       race: "Human",
+      speciesId: "sp-human",
       background: "Sage",
       classes: [{ name: "Bard", subclass: null, subclassId: undefined }],
       abilityScores: {

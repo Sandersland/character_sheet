@@ -42,7 +42,8 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
   return {
     name: "",
     alignment: "",
-    race: "",
+    speciesId: "",
+    variantId: "",
     className: "",
     subclass: "",
     subclassId: "",
@@ -113,8 +114,26 @@ const specBackground = {
   startingEquipment: null,
 };
 
+// Variantless (2014 Human-shaped) species fixture — the identity step's
+// generic "a species is chosen" tests use this so they don't also have to
+// carry a variant pick.
+const elfSpecies: SpeciesOption = { id: "sp-elf", name: "Elf", slug: "elf", speed: 30, abilityIncreases: [], variants: [] };
+// Variant-bearing (2014 Dwarf-shaped) species fixture for the #1680
+// variant-required gate.
+const dwarfSpecies: SpeciesOption = {
+  id: "sp-dwarf",
+  name: "Dwarf",
+  slug: "dwarf",
+  speed: 25,
+  abilityIncreases: [],
+  variants: [
+    { id: "var-hill", name: "Hill Dwarf", slug: "hill", abilityIncreases: [] },
+    { id: "var-mountain", name: "Mountain Dwarf", slug: "mountain", abilityIncreases: [] },
+  ],
+};
+
 function sel(overrides: Partial<CreationSelections> = {}): CreationSelections {
-  return { race: undefined, class: undefined, background: undefined, species: undefined, speciesVariant: undefined, ...overrides };
+  return { species: undefined, variant: undefined, race: undefined, class: undefined, background: undefined, ...overrides };
 }
 
 // #1681: Half-Elf-shape species fixture (fixed +2 CHA + choose 2 of 5 at +1) —
@@ -186,7 +205,7 @@ describe("creationStepMissing", () => {
     expect(creationStepMissing("identity", makeDraft(), sel())).toEqual([
       "Name",
       "Alignment",
-      "Race",
+      "Species",
       "Class",
       "Background",
     ]);
@@ -196,12 +215,46 @@ describe("creationStepMissing", () => {
     const draft = makeDraft({
       name: "A",
       alignment: "Neutral Good",
-      race: "Elf",
+      speciesId: "sp-elf",
       className: "Rogue",
       useCustomBackground: true,
       customBackground: "   ",
     });
-    expect(creationStepMissing("identity", draft, sel({ class: rogue }))).toEqual(["Background"]);
+    expect(creationStepMissing("identity", draft, sel({ class: rogue, species: elfSpecies }))).toEqual(["Background"]);
+  });
+
+  // #1680: a variant-bearing species (2014 Dwarf) cannot Continue without a
+  // variant chosen; picking one clears the step.
+  it("identity blocks a variant-bearing species with no variant, and clears once one is chosen", () => {
+    const draft = makeDraft({
+      name: "A",
+      alignment: "Neutral Good",
+      speciesId: "sp-dwarf",
+      className: "Rogue",
+      background: "Sage",
+    });
+    expect(creationStepMissing("identity", draft, sel({ class: rogue, species: dwarfSpecies }))).toEqual(["Variant"]);
+
+    const withVariant = makeDraft({ ...draft, variantId: "var-hill" });
+    expect(
+      creationStepMissing(
+        "identity",
+        withVariant,
+        sel({ class: rogue, species: dwarfSpecies, variant: dwarfSpecies.variants[0] }),
+      ),
+    ).toEqual([]);
+  });
+
+  // A variantless species (2014 Human-shaped) never asks for a variant.
+  it("identity never gates a variantless species on a variant", () => {
+    const draft = makeDraft({
+      name: "A",
+      alignment: "Neutral Good",
+      speciesId: "sp-elf",
+      className: "Rogue",
+      background: "Sage",
+    });
+    expect(creationStepMissing("identity", draft, sel({ class: rogue, species: elfSpecies }))).toEqual([]);
   });
 
   it("abilities gates a specced-incomplete background and clears when complete", () => {
@@ -218,12 +271,12 @@ describe("creationStepMissing", () => {
   });
 
   it("abilities gates a choose-bearing species and clears when complete (#1681)", () => {
-    const incomplete = makeDraft({ race: "Half-Elf" });
+    const incomplete = makeDraft({ speciesId: "sp-half-elf" });
     expect(creationStepMissing("abilities", incomplete, sel({ species: halfElfSpecies }))).toEqual([
       "Species ability scores",
     ]);
 
-    const complete = makeDraft({ race: "Half-Elf", speciesAbilities: { strength: 1, dexterity: 1 } });
+    const complete = makeDraft({ speciesId: "sp-half-elf", speciesAbilities: { strength: 1, dexterity: 1 } });
     expect(creationStepMissing("abilities", complete, sel({ species: halfElfSpecies }))).toEqual([]);
 
     // A fixed-only (or unmatched) species never gates abilities.
@@ -350,17 +403,17 @@ describe("aggregate matches creationMissing", () => {
 
 describe("creationMissing", () => {
   it("lists all unmet requirements for an empty draft", () => {
-    expect(creationMissing(makeDraft(), sel())).toEqual(["Name", "Alignment", "Race", "Class", "Background"]);
+    expect(creationMissing(makeDraft(), sel())).toEqual(["Name", "Alignment", "Species", "Class", "Background"]);
   });
 
   it("is empty for a complete draft with a spec-less background", () => {
-    const draft = makeDraft({ name: "Lidda", alignment: "Neutral Good", race: "Elf", className: "Rogue", background: "Sage" });
-    expect(creationMissing(draft, sel({ class: rogue }))).toEqual([]);
+    const draft = makeDraft({ name: "Lidda", alignment: "Neutral Good", speciesId: "sp-elf", className: "Rogue", background: "Sage" });
+    expect(creationMissing(draft, sel({ class: rogue, species: elfSpecies }))).toEqual([]);
   });
 
   it("blocks save until a specced background's spread is complete (#1130)", () => {
-    const draft = makeDraft({ name: "Lidda", alignment: "Neutral Good", race: "Elf", className: "Rogue", background: "Criminal" });
-    const selections = sel({ class: rogue, background: specBackground });
+    const draft = makeDraft({ name: "Lidda", alignment: "Neutral Good", speciesId: "sp-elf", className: "Rogue", background: "Criminal" });
+    const selections = sel({ class: rogue, background: specBackground, species: elfSpecies });
     expect(creationMissing(draft, selections)).toContain("Background ability scores");
 
     const assigned = makeDraft({ ...draft, backgroundAbilities: { dexterity: 2, constitution: 1 } });
@@ -368,9 +421,9 @@ describe("creationMissing", () => {
   });
 
   it("blocks an incomplete caster's spell picks and passes a complete one (#1131)", () => {
-    const caster = { name: "Mo", alignment: "Neutral Good", race: "Elf", className: "Wizard", background: "Sage" };
+    const caster = { name: "Mo", alignment: "Neutral Good", speciesId: "sp-elf", className: "Wizard", background: "Sage" };
     const incomplete = makeDraft({ ...caster, cantripIds: ["c1"], spellIds: [] });
-    expect(creationMissing(incomplete, sel({ class: wizard }))).toEqual(["Cantrips: choose 3", "Spells: choose 6"]);
+    expect(creationMissing(incomplete, sel({ class: wizard, species: elfSpecies }))).toEqual(["Cantrips: choose 3", "Spells: choose 6"]);
 
     // #1513: a complete Wizard book needs 6 leveled picks, not 4.
     const complete = makeDraft({
@@ -378,11 +431,11 @@ describe("creationMissing", () => {
       cantripIds: ["c1", "c2", "c3"],
       spellIds: ["s1", "s2", "s3", "s4", "s5", "s6"],
     });
-    expect(creationMissing(complete, sel({ class: wizard }))).toEqual([]);
+    expect(creationMissing(complete, sel({ class: wizard, species: elfSpecies }))).toEqual([]);
   });
 
   it("never blocks a non-caster on spells (#1131)", () => {
-    const draft = makeDraft({ name: "F", alignment: "Neutral Good", race: "Elf", className: "Rogue", background: "Sage" });
-    expect(creationMissing(draft, sel({ class: rogue }))).toEqual([]);
+    const draft = makeDraft({ name: "F", alignment: "Neutral Good", speciesId: "sp-elf", className: "Rogue", background: "Sage" });
+    expect(creationMissing(draft, sel({ class: rogue, species: elfSpecies }))).toEqual([]);
   });
 });

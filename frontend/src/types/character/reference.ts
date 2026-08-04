@@ -46,8 +46,10 @@ export type AbilityIncreaseSpec =
   | { choose: { count: number; amount: number; from?: AbilityName[] } }
   | { floating: number };
 
-/** A species' second creation step (2014 subrace / 2024 lineage), served nested
- *  inside SpeciesOption.variants — [] renders no variant step (#1679/#1680). */
+/** A species' second creation step — 2014 subrace, 2024 lineage/legacy/
+ *  ancestry (#1679/#1680), served nested inside SpeciesOption.variants: an
+ *  empty variants array renders no variant step. Carries its own
+ *  abilityIncreases (#1681), additive to the parent species'. */
 export interface SpeciesVariantOption {
   id: string;
   name: string;
@@ -57,8 +59,11 @@ export interface SpeciesVariantOption {
   abilityIncreases: AbilityIncreaseSpec[];
 }
 
-/** Species option (from GET /api/reference, #1679) — nested per edition
- *  alongside the legacy flat `races` list above during the #1684 compat window. */
+/** Species option (#1679/#1680), served nested per edition (server-filtered
+ *  by `?edition=`, never a client edition check — the #1572 trick) with its
+ *  variants nested inside, exactly like ClassOption.subclasses. An empty
+ *  `variants` array is the signal the two-step picker renders one step, not
+ *  two — e.g. 2014 Human vs. 2014 Dwarf (Hill/Mountain). */
 export interface SpeciesOption {
   id: string;
   name: string;
@@ -201,8 +206,9 @@ export interface EditionsResponse {
 
 export interface ReferenceData {
   races: RaceOption[];
-  /** #1679: species nested per edition, alongside the legacy flat `races`
-   *  above (superseded per-edition here, pruned outright in #1684). */
+  /** Species catalog for the two-step species→variant picker (#1679/#1680),
+   *  served alongside the flat `races` list above during its compat window
+   *  (per-edition here supersedes the flat list; both pruned in #1684). */
   species: SpeciesOption[];
   classes: ClassOption[];
   backgrounds: BackgroundOption[];
@@ -236,11 +242,10 @@ export interface CreateCharacterInput {
   alignment: string;
   experiencePoints?: number;
   race: string;
-  /** #1679: species catalog FK, sent alongside the legacy `race` name above
-   *  during the #1684 compat window — name-matched from `race` by
-   *  resolveSelections (characterCreation.ts) until #1680's two-step picker
-   *  sets it directly. Undefined for a legacy/homebrew race name with no
-   *  catalog match. */
+  /** #1679/#1680: the two-step picker's real selection — ids, like
+   *  `subclassId`. `race` above stays required alongside these (the display
+   *  name POST /api/characters still needs until #1684 prunes the legacy path);
+   *  the frontend no longer presents a race picker. */
   speciesId?: string;
   variantId?: string;
   /** 2014 species/subrace ability increases (#1681): the CHOSEN portion only

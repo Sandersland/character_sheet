@@ -34,7 +34,14 @@ export interface AbilityCostColumns {
 }
 
 // Adapter over the flat cost columns — mirrors readEffectSpec in effects.ts.
+// costKind "slot" (#1687) reuses costBase as AbilityCost's minLevel — the same
+// column pool already carries, no dedicated costMinSlotLevel column: a slot
+// cost and a pool cost never coexist on one row, so one Int? column can name
+// either "minimum slot level" or "base pool spend" depending on costKind.
 export function readAbilityCost(row: AbilityCostColumns): AbilityCost {
+  if (row.costKind === "slot") {
+    return { kind: "slot", minLevel: row.costBase ?? 1 };
+  }
   if (row.costKind === "pool" && row.costPoolKey) {
     return {
       kind: "pool",
@@ -62,16 +69,32 @@ export interface PaidCost {
   effectiveStep: number;
 }
 
+// The verb/noun pair paySlotCost's below-minLevel error interpolates — lets a
+// generic ability (#1687) read as "use a level-N ability" instead of the
+// spell-cast wording "cast a level-N spell", without a second copy of the
+// error or a per-caller message string threaded all the way through.
+export interface SlotCostSubject {
+  verb: string;
+  noun: string;
+}
+
+const SPELL_SLOT_SUBJECT: SlotCostSubject = { verb: "cast", noun: "spell" };
+
+// The generic-ability wording (#1687) — row-driven abilities (castAbilityWithSlotInTx)
+// pass this so their below-minLevel error never says "spell".
+export const ABILITY_SLOT_SUBJECT: SlotCostSubject = { verb: "use", noun: "ability" };
+
 export async function payAbilityCostInTx(
   ctx: PayCostContext,
   cost: AbilityCost,
   requested?: number,
+  subject: SlotCostSubject = SPELL_SLOT_SUBJECT,
 ): Promise<PaidCost> {
   switch (cost.kind) {
     case "none":
       return { label: "", effectiveStep: 0 };
     case "slot":
-      return paySlotCost(ctx, cost, requested);
+      return paySlotCost(ctx, cost, requested, subject);
     case "pool":
       return payPoolCost(ctx, cost, requested);
   }
@@ -122,13 +145,14 @@ function spendArcanum(state: SlotPayState, slotLevel: number): string {
 function paySlotCost(
   ctx: PayCostContext,
   cost: Extract<AbilityCost, { kind: "slot" }>,
-  requested?: number,
+  requested: number | undefined,
+  subject: SlotCostSubject,
 ): PaidCost {
   const state = requireSlotPayState(ctx);
   const slotLevel = requested ?? cost.minLevel;
   if (slotLevel < cost.minLevel) {
     throw new InvalidSpellcastingOperationError(
-      `Cannot cast a level-${cost.minLevel} spell in a level-${slotLevel} slot`
+      `Cannot ${subject.verb} a level-${cost.minLevel} ${subject.noun} in a level-${slotLevel} slot`
     );
   }
 

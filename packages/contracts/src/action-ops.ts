@@ -25,6 +25,13 @@ export const executeActionOpSchema = z.object({
   roll: z.number().int().positive().optional(),
   /** Inventory item to consume (for "drink potion" / Use Object). */
   inventoryItemId: z.string().optional(),
+  /**
+   * Chosen spell-slot level for a row-driven `{costKind:"slot"}` ability
+   * (#1687) — the executeAction counterpart to castSpell's `slotLevel`.
+   * Omitted, the payer defaults to the ability's own minimum level
+   * (paySlotCost, ability-cost.ts).
+   */
+  slotLevel: z.number().int().positive().optional(),
 });
 export type ExecuteActionOperation = z.infer<typeof executeActionOpSchema>;
 

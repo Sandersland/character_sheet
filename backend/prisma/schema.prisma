@@ -1355,11 +1355,12 @@ model GrantedAbility {
   actionSlot String?
   selfTempHp Boolean @default(false)
 
-  // Embedded AbilityCost (F2) — focus/superiority-die pool spend. kind "none" = free.
-  costKind    String? // "none" | "pool"
-  costPoolKey String? // e.g. "focus"
-  costBase    Int? // base pool cost
-  costPerStep Int? // additional units per scaling step
+  // Embedded AbilityCost (F2/F3) — focus/superiority-die pool spend, or a
+  // spell-slot spend. kind "none" = free.
+  costKind    String? // "none" | "pool" | "slot"
+  costPoolKey String? // e.g. "focus" — "pool" only
+  costBase    Int? // "pool": base pool cost. "slot" (#1687): minimum slot level (AbilityCost's minLevel) — reused rather than a dedicated costMinSlotLevel column since a row is never both kinds at once.
+  costPerStep Int? // additional units per scaling step — "pool" only
 
   // Embedded EffectSpec (F1) — same flat columns as Spell. saveAbility doubles
   // as the ability's DC save ability.
@@ -1872,6 +1873,7 @@ enum CharacterEventType {
   currencyAdjust
   // spellcasting
   castSpell
+  castAbilitySlot // row-driven {kind:"slot"} ability spend (#1687)
   expendSlot
   restoreSlot
   learnSpell

@@ -9,7 +9,8 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
   return {
     name: "",
     alignment: "",
-    race: "",
+    speciesId: "",
+    variantId: "",
     className: "",
     subclass: "",
     subclassId: "",

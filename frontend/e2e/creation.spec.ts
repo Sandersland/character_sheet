@@ -59,7 +59,7 @@ test("creation: guided ceremony lands on the sheet with the chosen class", async
   // start; ^Class also keeps it from matching the Subclass field.
   await page.getByLabel(/^Name/).fill(name);
   await page.getByLabel(/^Alignment/).selectOption({ label: "True Neutral" });
-  await page.getByLabel(/^Race/).selectOption({ label: "Human" });
+  await page.getByLabel(/^Species/).selectOption({ label: "Human" });
   await page.getByLabel(/^Class/).selectOption({ label: "Fighter" });
   await page.getByLabel("Background").selectOption({ label: "Soldier" });
   await continueStep(page);
@@ -116,7 +116,7 @@ test("creation: a Noble's background gaming-set pick is satisfiable from a grant
 
   await page.getByLabel(/^Name/).fill(name);
   await page.getByLabel(/^Alignment/).selectOption({ label: "True Neutral" });
-  await page.getByLabel(/^Race/).selectOption({ label: "Human" });
+  await page.getByLabel(/^Species/).selectOption({ label: "Human" });
   await page.getByLabel(/^Class/).selectOption({ label: "Rogue" });
   await page.getByLabel("Background").selectOption({ label: "Noble" });
   await continueStep(page);
@@ -155,7 +155,7 @@ test("creation: a warlock picks cantrips + spells that show on the Magic tab", a
   // Identity step.
   await page.getByLabel(/^Name/).fill(name);
   await page.getByLabel(/^Alignment/).selectOption({ label: "True Neutral" });
-  await page.getByLabel(/^Race/).selectOption({ label: "Human" });
+  await page.getByLabel(/^Species/).selectOption({ label: "Human" });
   await page.getByLabel(/^Class/).selectOption({ label: "Warlock" });
   // #1325: a 2024 Warlock's subclass gate is level 3, so creation must offer NO
   // picker. Asserting the disabled panel (not just "no combobox") also fails if
@@ -226,7 +226,7 @@ test("creation: a 2014 warlock must choose its patron at creation", async ({ pag
   // Identity step.
   await page.getByLabel(/^Name/).fill(name);
   await page.getByLabel(/^Alignment/).selectOption({ label: "True Neutral" });
-  await page.getByLabel(/^Race/).selectOption({ label: "Human" });
+  await page.getByLabel(/^Species/).selectOption({ label: "Human" });
   await page.getByLabel(/^Class/).selectOption({ label: "Warlock" });
   await expect(page.getByText(/Chosen at level/)).toHaveCount(0);
   await page.getByLabel("Subclass").selectOption({ label: "The Fiend" });
@@ -295,7 +295,7 @@ test("creation: a 2014 Folk Hero picks artisan's tools from the full catalog", a
 
   await page.getByLabel(/^Name/).fill(name);
   await page.getByLabel(/^Alignment/).selectOption({ label: "True Neutral" });
-  await page.getByLabel(/^Race/).selectOption({ label: "Human" });
+  await page.getByLabel(/^Species/).selectOption({ label: "Human" });
   await page.getByLabel(/^Class/).selectOption({ label: "Rogue" });
   await page.getByLabel("Background").selectOption({ label: "Folk Hero" });
   await continueStep(page);
@@ -320,6 +320,59 @@ test("creation: a 2014 Folk Hero picks artisan's tools from the full catalog", a
   await page.getByRole("button", { name: /Create Character/ }).click();
   await expect(page).toHaveURL(/\/characters\/[0-9a-f-]+$/);
   await expect(page.getByRole("heading", { name, level: 1 })).toBeVisible();
+
+  expect(errors).toEqual([]);
+});
+
+// #1680: the two-step species→variant picker. A variant-bearing species
+// (2014 Dwarf: Hill/Mountain) cannot Continue without a variant chosen, and
+// the created sheet shows the VARIANT's name (Hill Dwarf), not just the bare
+// species — reached via a 2014 campaign like the other 2014 specs above
+// (#1371 gates direct edition selection until #1372 ships).
+test("creation: a 2014 Dwarf must choose a variant (Hill Dwarf) before creation", async ({ page }) => {
+  const name = uniqueName("Stonebeard");
+  const campaignName = uniqueName("Old Ways Deephold");
+
+  await login(page);
+  await createCampaign(page.request, { name: campaignName, rulesEdition: "EDITION_2014" });
+  const errors = collectConsoleErrors(page);
+  await page.getByRole("link", { name: "New Character" }).first().click();
+  await expect(page).toHaveURL(/\/characters\/new$/);
+  await passEntryGate(page, { campaign: campaignName });
+
+  await page.getByLabel(/^Name/).fill(name);
+  await page.getByLabel(/^Alignment/).selectOption({ label: "True Neutral" });
+  await page.getByLabel(/^Species/).selectOption({ label: "Dwarf" });
+  await page.getByLabel(/^Class/).selectOption({ label: "Rogue" });
+  await page.getByLabel("Background").selectOption({ label: "Sage" });
+
+  // Every OTHER identity field is filled, but Dwarf has variant rows
+  // (Hill/Mountain) and none is picked yet — Continue must stay blocked.
+  await expect(page.getByRole("button", { name: /Continue/ })).toBeDisabled();
+
+  await page.getByLabel(/^Variant/).selectOption({ label: "Hill Dwarf" });
+  await expect(page.getByRole("button", { name: /Continue/ })).toBeEnabled();
+  await continueStep(page);
+
+  // Abilities step — no PHB'24 spread under 2014 (#1572); passes straight through.
+  await continueStep(page);
+
+  // Skills & Tools step.
+  await continueStep(page);
+
+  // Equipment step — 2014 keeps the roll-for-gold path (Sage has no own
+  // package under 2014, so this is the only card).
+  await page.getByRole("button", { name: /Starting gold/ }).click();
+  await page.getByRole("button", { name: /^Roll.*×/ }).click();
+  await continueStep(page);
+
+  // Review step — create.
+  await page.getByRole("button", { name: /Create Character/ }).click();
+  await expect(page).toHaveURL(/\/characters\/[0-9a-f-]+$/);
+  await expect(page.getByRole("heading", { name, level: 1 })).toBeVisible();
+
+  // The sheet shows the chosen VARIANT's name (the snapshot), not the bare species.
+  await expect(page.getByText("Hill Dwarf").first()).toBeVisible();
 
   expect(errors).toEqual([]);
 });
