@@ -67,22 +67,29 @@ async function upsertTrait(prisma: PrismaClient, trait: SpeciesTraitSeed, target
   );
 }
 
+// De-dupes the run's targets by their (speciesId, variantId) prune key — the
+// same key seededNamesByTargetKey is built with — so pruneStaleTraits stays
+// under the seed-file cyclomatic budget (CC <= 4: seed code runs uncovered in
+// globalSetup, so CRAP is complexity-driven, #1682/#1679).
+function uniqueTargetsByPruneKey(targets: readonly SpeciesTarget[]): Map<string, SpeciesTarget> {
+  const byKey = new Map<string, SpeciesTarget>();
+  for (const target of targets) {
+    const key = `${target.speciesId}::${target.variantId ?? "null"}`;
+    if (!byKey.has(key)) byKey.set(key, target);
+  }
+  return byKey;
+}
+
 // Drops trait rows no longer authored, scoped to the exact (speciesId,
 // variantId) targets this seed run touched — never a bare `deleteMany` over
-// the whole table (worktree gotcha: never deleteMany a seeded catalog row in
-// a TEST; this is the seed itself, and still stays scoped for the same
-// "don't nuke content a sibling row still needs" reason pruneStaleVariants
-// gives in seed-species.ts).
+// the whole table, for the same "don't nuke content a sibling row still needs"
+// reason pruneStaleVariants gives in seed-species.ts.
 async function pruneStaleTraits(
   prisma: PrismaClient,
   targets: readonly SpeciesTarget[],
   seededNamesByTargetKey: Map<string, string[]>,
 ): Promise<void> {
-  const seen = new Set<string>();
-  for (const target of targets) {
-    const key = `${target.speciesId}::${target.variantId ?? "null"}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
+  for (const [key, target] of uniqueTargetsByPruneKey(targets)) {
     await prisma.speciesTrait.deleteMany({
       where: {
         speciesId: target.speciesId,
