@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 
 import AbilityAssignmentPanel from "@/features/character-create/AbilityAssignmentPanel";
 import { EMPTY_ASSIGNMENTS } from "@/lib/abilityAssignment";
-import type { CreationBackgroundBonuses } from "@/lib/characterCreation";
+import type { CreationBackgroundBonuses, CreationSpeciesBonuses } from "@/lib/characterCreation";
 import { axe } from "@/test/axe";
 import type { AbilityName, AbilityScores } from "@/types/character";
 
@@ -23,6 +23,15 @@ const INERT_BONUSES: CreationBackgroundBonuses = {
   originFeat: null,
   assignment: {},
   complete: false,
+};
+
+// #1681: the inert default for every test that doesn't exercise species bonuses.
+const INERT_SPECIES_BONUSES: CreationSpeciesBonuses = {
+  applicable: false,
+  fixed: {},
+  choice: null,
+  assignment: {},
+  complete: true,
 };
 
 const SAGE_ABILITIES: AbilityName[] = ["constitution", "intelligence", "wisdom"];
@@ -46,6 +55,7 @@ function renderPanel(props: Partial<React.ComponentProps<typeof AbilityAssignmen
       assignments={EMPTY_ASSIGNMENTS}
       scores={ALL_EIGHT}
       bonuses={INERT_BONUSES}
+      speciesBonuses={INERT_SPECIES_BONUSES}
       primaryAbility={[]}
       className=""
       update={update}
@@ -251,5 +261,69 @@ describe("AbilityAssignmentPanel — recommended", () => {
   it("marks both primary abilities", () => {
     renderPanel({ method: "manual", primaryAbility: ["strength", "dexterity"], className: "Fighter" });
     expect(screen.getAllByText("◆ Fighter")).toHaveLength(2);
+  });
+});
+
+// #1681: 2014 species/subrace ability increases.
+const hillDwarfBonuses: CreationSpeciesBonuses = {
+  applicable: true,
+  fixed: { constitution: 2, wisdom: 1 },
+  choice: null,
+  assignment: {},
+  complete: true,
+};
+
+function halfElfBonuses(assignment: Partial<Record<AbilityName, number>> = {}): CreationSpeciesBonuses {
+  return {
+    applicable: true,
+    fixed: { charisma: 2 },
+    choice: { count: 2, amount: 1, abilities: ["strength", "dexterity", "constitution", "intelligence", "wisdom"] },
+    assignment,
+    complete: Object.keys(assignment).length === 2,
+  };
+}
+
+describe("AbilityAssignmentPanel — species bonuses (#1681)", () => {
+  it("omits the Species Bonuses block when inert", () => {
+    renderPanel({ method: "manual" });
+    expect(screen.queryByText("Species Bonuses")).toBeNull();
+  });
+
+  it("shows the fixed increases as announce-only text and folds them into the total", () => {
+    renderPanel({
+      method: "manual",
+      scores: { ...ALL_EIGHT, constitution: 13 },
+      speciesBonuses: hillDwarfBonuses,
+    });
+    expect(screen.getByText("+2 Constitution, +1 Wisdom")).toBeInTheDocument();
+    // CON 13 + 2 = 15; no choose UI for a fixed-only species.
+    expect(screen.getByText("15")).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Species ability choice" })).toBeNull();
+  });
+
+  it("renders a checkbox per eligible ability for a choose-bearing species, capped at `count`", async () => {
+    const user = userEvent.setup();
+    const { update } = renderPanel({ method: "manual", speciesBonuses: halfElfBonuses({ strength: 1 }) });
+
+    const dex = screen.getByRole("button", { name: "Dexterity" });
+    await user.click(dex);
+    expect(update).toHaveBeenCalledWith({ speciesAbilities: { strength: 1, dexterity: 1 } });
+
+    // Charisma isn't offered — it's the fixed ability, not a choice.
+    expect(screen.queryByRole("button", { name: "Charisma" })).toBeNull();
+  });
+
+  it("disables unchecked options once `count` is reached", () => {
+    renderPanel({ method: "manual", speciesBonuses: halfElfBonuses({ strength: 1, dexterity: 1 }) });
+    expect(screen.getByRole("button", { name: "Constitution" })).toBeDisabled();
+    // A checked one stays enabled (so it can be unchecked).
+    expect(screen.getByRole("button", { name: "Strength" })).toBeEnabled();
+  });
+
+  it("unchecking a chosen ability removes it from the assignment", async () => {
+    const user = userEvent.setup();
+    const { update } = renderPanel({ method: "manual", speciesBonuses: halfElfBonuses({ strength: 1, dexterity: 1 }) });
+    await user.click(screen.getByRole("button", { name: "Strength" }));
+    expect(update).toHaveBeenCalledWith({ speciesAbilities: { dexterity: 1 } });
   });
 });

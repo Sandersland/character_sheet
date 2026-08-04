@@ -43,6 +43,7 @@ const SPELL_CATALOG = [
 
 const referenceFixture: ReferenceData = {
   races: [{ id: "race-human", name: "Human", speed: 30, toolProficiencies: [] }],
+  species: [],
   classes: [
     {
       id: "class-bard",

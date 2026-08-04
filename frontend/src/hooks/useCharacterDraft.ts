@@ -46,6 +46,11 @@ export interface CharacterDraft {
   /** PHB'24 background ability spread (#1130): ability→bump map over the
    *  background's three abilityChoices. Empty until assigned / for spec-less backgrounds. */
   backgroundAbilities: Partial<Record<AbilityName, number>>;
+  /** 2014 species/subrace CHOSEN ability increases (#1681): ability→bump map
+   *  over the merged species+variant spec's choose component (Half-Elf's "+1
+   *  to two of your choice"). Empty for a fixed-only or variantless species,
+   *  and for every 2024 species (the spec is always []). */
+  speciesAbilities: Partial<Record<AbilityName, number>>;
   skillProficiencies: SkillName[];
   /** Tool proficiency names chosen by the player at character creation. */
   toolChoices: string[];
@@ -93,6 +98,7 @@ const EMPTY_DRAFT: CharacterDraft = {
   abilityAssignments: EMPTY_ASSIGNMENTS,
   abilityScores: DEFAULT_ABILITY_SCORES,
   backgroundAbilities: {},
+  speciesAbilities: {},
   skillProficiencies: [],
   toolChoices: [],
   cantripIds: [],

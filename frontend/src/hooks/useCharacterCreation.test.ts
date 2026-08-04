@@ -47,6 +47,7 @@ function makeClass(overrides: Partial<ClassOption> = {}): ClassOption {
 
 const reference: ReferenceData = {
   races: [{ id: "race-1", name: "Elf", speed: 30, toolProficiencies: [] }],
+  species: [],
   classes: [
     makeClass(),
     makeClass({
@@ -98,6 +99,7 @@ function seedDraft(overrides: Partial<CharacterDraft>) {
       charisma: 10,
     },
     backgroundAbilities: {},
+    speciesAbilities: {},
     skillProficiencies: [],
     toolChoices: [],
     cantripIds: [],

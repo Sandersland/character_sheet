@@ -45,6 +45,7 @@ function AbilitiesStepBody({ c }: StepBodyProps) {
       assignments={c.draft.abilityAssignments}
       scores={c.draft.abilityScores}
       bonuses={c.backgroundBonuses}
+      speciesBonuses={c.speciesBonuses}
       primaryAbility={c.selections.class?.primaryAbility ?? []}
       className={c.draft.className}
       update={c.update}

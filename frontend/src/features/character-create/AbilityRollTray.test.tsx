@@ -8,7 +8,7 @@ import AbilityAssignmentPanel from "@/features/character-create/AbilityAssignmen
 import { EMPTY_ASSIGNMENTS } from "@/lib/abilityAssignment";
 import { rollAbilityScoreSet } from "@/lib/abilityGen";
 import { DiceRollStyleProvider } from "@/features/dice/DiceRollStyleProvider";
-import type { CreationBackgroundBonuses } from "@/lib/characterCreation";
+import type { CreationBackgroundBonuses, CreationSpeciesBonuses } from "@/lib/characterCreation";
 import type { RollResult } from "@/lib/dice";
 import type { AbilityScores } from "@/types/character";
 
@@ -123,6 +123,14 @@ const INERT: CreationBackgroundBonuses = {
   complete: false,
 };
 
+const INERT_SPECIES: CreationSpeciesBonuses = {
+  applicable: false,
+  fixed: {},
+  choice: null,
+  assignment: {},
+  complete: true,
+};
+
 describe("AbilityAssignmentPanel — roll mode", () => {
   it("shows the roll tray and leaves rows unassignable until a pool exists", () => {
     render(
@@ -133,6 +141,7 @@ describe("AbilityAssignmentPanel — roll mode", () => {
           assignments={EMPTY_ASSIGNMENTS}
           scores={ALL_EIGHT}
           bonuses={INERT}
+          speciesBonuses={INERT_SPECIES}
           primaryAbility={[]}
           className=""
           update={vi.fn()}
