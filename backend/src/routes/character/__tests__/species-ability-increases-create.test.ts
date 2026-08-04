@@ -59,8 +59,9 @@ describe("POST /api/characters — 2014 fixed increases bake at creation (#1681)
     // CON 12 → 14 (species +2), WIS 10 → 11 (variant +1); everything else untouched.
     expect(res.body.abilityScores).toEqual({ ...BASE_SCORES, constitution: 14, wisdom: 11 });
 
-    // CON 14 → +2 mod, Fighter d10 → 12 max HP (base scores' 10 would give 11).
-    expect(res.body.hitPoints.max).toBe(12);
+    // CON 14 → +2 mod, Fighter d10 → 12 base; the Hill Dwarf's Dwarven Toughness
+    // trait (#1682) adds +1/level → 13 at level 1.
+    expect(res.body.hitPoints.max).toBe(13);
     // DEX 12 (unaffected by Dwarf's increases) → +1 mod, no other init bonus.
     expect(res.body.initiativeBonus).toBe(1);
 
