@@ -252,6 +252,10 @@ describe("useCharacterCreation", () => {
       expect.objectContaining({
         name: "Lidda",
         speciesId: "sp-elf",
+        // Legacy race string derived from the chosen species name — kept as a
+        // regression guard on that derivation through the full hook until #1684
+        // removes the compat-window flat-race requirement.
+        race: "Elf",
         background: "Sage",
         classes: [{ name: "Rogue", subclass: null, subclassId: undefined }],
         skillProficiencies: ["perception", "stealth", "acrobatics"],

@@ -75,8 +75,9 @@ export function missingRequirements(input: CreationValidationInput): string[] {
   if (input.alignment.length === 0) missing.push("Alignment");
   if (!input.speciesChosen) missing.push("Species");
   // A variant-bearing species (2014 Dwarf, etc.) cannot Continue without one;
-  // a variantless species (2014 Human) never reaches this branch since the
-  // picker renders no second panel for it.
+  // variantRequired is false for a variantless species (its catalog variants[]
+  // is empty), so this branch is simply skipped for them — the picker's absent
+  // second panel is the consequence of that, not the reason.
   else if (input.variantRequired && !input.variantChosen) missing.push("Variant");
   if (input.className.length === 0) missing.push("Class");
   if (input.backgroundName.length === 0) missing.push("Background");
