@@ -11,7 +11,8 @@
 // reuses upsertEditionRow (lib/rules/catalog-edition.ts) generically: that
 // helper only needs findFirst/create/update, it isn't edition-specific despite
 // its name/JSDoc being framed around Feat/Subclass's nullable-edition case.
-import type { Prisma, PrismaClient } from "../../src/generated/prisma/client.js";
+import { Prisma } from "../../src/generated/prisma/client.js";
+import type { PrismaClient } from "../../src/generated/prisma/client.js";
 import { upsertEditionRow } from "../../src/lib/rules/catalog-edition.js";
 import { SPECIES_TRAITS, type SpeciesTraitSeed } from "./species-traits-data.js";
 import { loadSpeciesByKey } from "./species-seed-lookup.js";
@@ -53,18 +54,23 @@ async function upsertTrait(prisma: PrismaClient, trait: SpeciesTraitSeed, target
   // Prisma.InputJsonValue` precedent; validated at SEED time
   // (speciesTraitSeedSchema), not re-validated on write.
   const improvements = (trait.improvements ?? []) as unknown as Prisma.InputJsonValue;
+  // #1689: NULL (Prisma.DbNull, not a bare `null` — nullable Json columns
+  // reject the literal per Prisma's own type) for every trait with no choice
+  // mechanic, the vast majority.
+  const choice = (trait.choice as unknown as Prisma.InputJsonValue | undefined) ?? Prisma.DbNull;
   const data = {
     speciesId: target.speciesId,
     variantId: target.variantId,
     name: trait.name,
     description: trait.description,
     improvements,
+    choice,
   };
   await upsertEditionRow(
     prisma.speciesTrait,
     { speciesId: target.speciesId, variantId: target.variantId, name: trait.name },
     data,
-    { description: trait.description, improvements },
+    { description: trait.description, improvements, choice },
   );
 }
 

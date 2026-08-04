@@ -4,7 +4,15 @@
 // validation is invented here.
 
 import { ABILITY_ORDER } from "@/lib/abilities";
-import { deriveBackgroundBonuses, deriveCastingAbilityChoice, deriveSpeciesBonuses, resolveBackgroundName } from "@/lib/characterCreation";
+import {
+  deriveBackgroundBonuses,
+  deriveCastingAbilityChoice,
+  deriveSkillChoices,
+  deriveSpeciesBonuses,
+  deriveSpeciesCantripChoice,
+  deriveSpeciesSkillChoice,
+  resolveBackgroundName,
+} from "@/lib/characterCreation";
 import type { CreationSelections } from "@/lib/characterCreation";
 import { missingRequirements } from "@/lib/characterCreationValidation";
 import { creationSpellCounts, creationSpellsMissing } from "@/lib/creationSpells";
@@ -21,10 +29,16 @@ export const CREATION_STEP_LABELS: Record<CreationStepKey, string> = {
   review: "Review",
 };
 
-/** The steps this character walks, in order — spells only for a level-1 caster. */
+/** The steps this character walks, in order — spells for a level-1 caster
+ *  OR (#1689) a species with its own cantrip choice (High Elf), whichever
+ *  applies: a non-caster High Elf still needs the step for ITS cantrip. Reads
+ *  chooseCantrip straight off `selections`, not deriveSpeciesCantripChoice
+ *  (which also needs the draft's current pick) — only the served spec's
+ *  PRESENCE decides whether the step exists. */
 export function creationSteps(selections: CreationSelections): CreationStepKey[] {
   const steps: CreationStepKey[] = ["identity", "abilities", "skills"];
-  if (selections.class?.level1SpellPicks) steps.push("spells");
+  const cantripSpec = selections.species?.chooseCantrip ?? selections.variant?.chooseCantrip;
+  if (selections.class?.level1SpellPicks || cantripSpec) steps.push("spells");
   steps.push("equipment", "review");
   return steps;
 }
@@ -76,6 +90,58 @@ function equipmentMissing(draft: CharacterDraft, selections: CreationSelections)
   return full.slice(identityMissing(draft, selections).length);
 }
 
+// Pool methods (roll / standard array) must be rolled and fully assigned
+// before Continue — the +2/+1 background spread alone no longer clears the
+// step (#1161). Manual / point-buy always carry six live scores, so they
+// only gate on the background spread below. Split out of creationStepMissing
+// purely to keep its own cyclomatic/cognitive complexity under the repo's
+// health gate.
+function abilitiesMissing(draft: CharacterDraft, selections: CreationSelections): string[] {
+  const missing: string[] = [];
+  if (draft.abilityMethod === "roll" || draft.abilityMethod === "standardArray") {
+    if (!draft.abilityPool) missing.push("Roll ability scores");
+    else if (ABILITY_ORDER.some((a) => draft.abilityAssignments[a] === null)) {
+      missing.push("Assign all ability scores");
+    }
+  }
+  const bonuses = deriveBackgroundBonuses(draft, selections);
+  if (bonuses.applicable && !bonuses.complete) missing.push("Background ability scores");
+  // #1681: 2014 species/subrace increases — a fixed-only species (or none
+  // matched) is always complete (nothing to pick), so this only ever blocks a
+  // choose-bearing species (Half-Elf) left unassigned. 2024 never applies
+  // (deriveSpeciesBonuses.applicable is false — every served species row's
+  // spec is []).
+  const speciesBonuses = deriveSpeciesBonuses(draft, selections);
+  if (speciesBonuses.applicable && !speciesBonuses.complete) missing.push("Species ability scores");
+  return missing;
+}
+
+// #1689: the species skill choice (Half-Elf's Skill Versatility) — a
+// fixed-only species (or none matched) is always complete (nothing to pick),
+// so this only ever blocks a choose-bearing species left unassigned. 2024
+// never applies (deriveSpeciesSkillChoice.applicable is false — no 2024 row
+// this slice carries a chooseSkills spec, #1690's content). Re-derives the
+// class/background skill state (deriveSkillChoices) the SkillSection itself
+// renders, same "no second copy of the rule" shape as abilitiesMissing above
+// deriving its own bonuses. Split out for the same complexity-gate reason.
+function skillsMissing(draft: CharacterDraft, selections: CreationSelections): string[] {
+  const classBackgroundSkills = deriveSkillChoices(draft, selections);
+  const skillChoice = deriveSpeciesSkillChoice(draft, selections, [...classBackgroundSkills.granted, ...classBackgroundSkills.selected]);
+  return skillChoice.applicable && !skillChoice.complete ? ["Species skills"] : [];
+}
+
+// #1689: the species cantrip choice (High Elf's Cantrip) rides the same step
+// but is a SEPARATE requirement from the class's own picks — a non-caster
+// class reaches this step with `missing` already empty
+// (creationSpellsMissing's null-counts short-circuit) and gates solely on
+// this. Split out for the same complexity-gate reason as the two above.
+function spellsMissing(draft: CharacterDraft, selections: CreationSelections): string[] {
+  const missing = creationSpellsMissing(creationSpellCounts(selections.class), draft.cantripIds, draft.spellIds);
+  const cantripChoice = deriveSpeciesCantripChoice(draft, selections);
+  if (cantripChoice.applicable && !cantripChoice.complete) missing.push("Species cantrip");
+  return missing;
+}
+
 /** The unmet-requirement labels owned by one creation step. */
 export function creationStepMissing(
   key: CreationStepKey,
@@ -85,34 +151,14 @@ export function creationStepMissing(
   switch (key) {
     case "identity":
       return identityMissing(draft, selections);
-    case "abilities": {
-      const missing: string[] = [];
-      // Pool methods (roll / standard array) must be rolled and fully assigned
-      // before Continue — the +2/+1 background spread alone no longer clears the
-      // step (#1161). Manual / point-buy always carry six live scores, so they
-      // only gate on the background spread below.
-      if (draft.abilityMethod === "roll" || draft.abilityMethod === "standardArray") {
-        if (!draft.abilityPool) missing.push("Roll ability scores");
-        else if (ABILITY_ORDER.some((a) => draft.abilityAssignments[a] === null)) {
-          missing.push("Assign all ability scores");
-        }
-      }
-      const bonuses = deriveBackgroundBonuses(draft, selections);
-      if (bonuses.applicable && !bonuses.complete) missing.push("Background ability scores");
-      // #1681: 2014 species/subrace increases — a fixed-only species (or none
-      // matched) is always complete (nothing to pick), so this only ever
-      // blocks a choose-bearing species (Half-Elf) left unassigned. 2024
-      // never applies (deriveSpeciesBonuses.applicable is false — every
-      // served species row's spec is []).
-      const speciesBonuses = deriveSpeciesBonuses(draft, selections);
-      if (speciesBonuses.applicable && !speciesBonuses.complete) missing.push("Species ability scores");
-      return missing;
-    }
+    case "abilities":
+      return abilitiesMissing(draft, selections);
     case "spells":
-      return creationSpellsMissing(creationSpellCounts(selections.class), draft.cantripIds, draft.spellIds);
+      return spellsMissing(draft, selections);
     case "equipment":
       return equipmentMissing(draft, selections);
     case "skills":
+      return skillsMissing(draft, selections);
     case "review":
       return [];
   }

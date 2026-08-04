@@ -4,7 +4,7 @@
 import type { RulesEdition } from "@character-sheet/shared-types";
 
 import type { ActionCost } from "./actions.js";
-import type { EffectBuffRow } from "./class-feature-rows.js";
+import type { ActivationRequirement, EffectBuffRow } from "./class-feature-rows.js";
 import type { FeatImprovement } from "./resources-state.js";
 import type { SubclassSlug } from "./subclass-slug.js";
 
@@ -136,6 +136,9 @@ export interface AuthoredFeature {
   costPoolKey?: string;
   costBase?: number;
   effectBuffs?: EffectBuffRow[];
+  // Declarative activation-time gates (#1688) — threaded straight through
+  // expandFeatureRow the same way effectBuffs already is.
+  activationRequires?: ActivationRequirement[];
 }
 
 /**

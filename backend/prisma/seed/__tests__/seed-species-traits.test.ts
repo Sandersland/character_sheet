@@ -81,4 +81,23 @@ describe("seeded trait rows served per (species, variant), directly off the DB",
     });
     expect(red2014.description).not.toBe(red2024.description);
   });
+
+  it("#1689: Half-Elf's Skill Versatility row persists its chooseSkills choice spec", async () => {
+    const skillVersatility = await prisma.speciesTrait.findFirstOrThrow({
+      where: { name: "Skill Versatility", species: { slug: "half-elf", edition: "EDITION_2014" } },
+    });
+    expect(skillVersatility.choice).toEqual({ chooseSkills: { count: 2 } });
+  });
+
+  it("#1689: High Elf's Cantrip row persists its chooseCantrip choice spec", async () => {
+    const cantrip = await prisma.speciesTrait.findFirstOrThrow({
+      where: { name: "Cantrip", variant: { slug: "high", species: { slug: "elf", edition: "EDITION_2014" } } },
+    });
+    expect(cantrip.choice).toEqual({ chooseCantrip: { list: "wizard", castingAbility: "intelligence" } });
+  });
+
+  it("#1689: a spec-less trait (Darkvision) persists a null choice column", async () => {
+    const darkvision = await prisma.speciesTrait.findFirstOrThrow({ where: { name: "Darkvision" } });
+    expect(darkvision.choice).toBeNull();
+  });
 });

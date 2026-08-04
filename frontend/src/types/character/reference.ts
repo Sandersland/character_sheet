@@ -46,6 +46,29 @@ export type AbilityIncreaseSpec =
   | { choose: { count: number; amount: number; from?: AbilityName[] } }
   | { floating: number };
 
+/** #1689: the species-granted creation-CHOICE vocabulary (SpeciesTrait.choice,
+ *  backend's speciesTraitChoiceSchema) — a wire-shape mirror only, resolved
+ *  server-side (never a client rule): `null` on both SpeciesOption and
+ *  SpeciesVariantOption is the "no choice served" signal the ceremony panels
+ *  key their own render-or-not off (the #1572 trick, no client edition logic).
+ *  Half-Elf's own row carries chooseSkills; High Elf's own (variant) row
+ *  carries chooseCantrip — present on BOTH levels here, mirroring
+ *  abilityIncreases' own species-and-variant shape, so a future row that
+ *  places either at the OTHER level (a variant-level chooseSkills, or a
+ *  species-level chooseCantrip — neither exists yet) needs no wire-shape change. */
+export interface SpeciesSkillChoiceOption {
+  count: number;
+  /** Omitted = any of the 18 skills is eligible (Half-Elf's shape). */
+  from?: SkillName[];
+}
+
+export interface SpeciesCantripChoiceOption {
+  /** Lowercase class name (matches Spell.classes' own case) — the list
+   *  `GET /api/spells?className=` is queried with. */
+  list: string;
+  castingAbility: AbilityName;
+}
+
 /** A species' second creation step — 2014 subrace, 2024 lineage/legacy/
  *  ancestry (#1679/#1680), served nested inside SpeciesOption.variants: an
  *  empty variants array renders no variant step. Carries its own
@@ -63,6 +86,9 @@ export interface SpeciesVariantOption {
    *  Chthonic/Infernal). False for every 2014 row and every non-spell 2024
    *  variant (Dragonborn ancestry, Goliath's Giant Ancestry). */
   needsCastingAbility: boolean;
+  /** #1689: null for every row but High Elf's own — see the type's own comment. */
+  chooseSkills: SpeciesSkillChoiceOption | null;
+  chooseCantrip: SpeciesCantripChoiceOption | null;
 }
 
 /** Species option (#1679/#1680), served nested per edition (server-filtered
@@ -82,6 +108,9 @@ export interface SpeciesOption {
    *  species level (a grant with no variant chosen) — always false this
    *  wave, kept general for a future species-level grant. */
   needsCastingAbility: boolean;
+  /** #1689: null for every row but Half-Elf's own — see the type's own comment. */
+  chooseSkills: SpeciesSkillChoiceOption | null;
+  chooseCantrip: SpeciesCantripChoiceOption | null;
   variants: SpeciesVariantOption[];
 }
 
@@ -267,6 +296,13 @@ export interface CreateCharacterInput {
    *  required iff the chosen species+variant's needsCastingAbility is true —
    *  see deriveCastingAbilityChoice. */
   castingAbility?: "intelligence" | "wisdom" | "charisma";
+  /** #1689: species-granted creation choices (SpeciesTrait.choice) —
+   *  distinct from `skillProficiencies`/`spells` below, which are the
+   *  class/background pools. Sent only when the resolved species+variant
+   *  carries the matching choice-bearing trait AND the player has completed
+   *  it — see deriveSpeciesSkillChoice/deriveSpeciesCantripChoice. */
+  speciesSkills?: SkillName[];
+  speciesCantripId?: string;
   background: string;
   classes: [{ name: string; subclass?: string | null; subclassId?: string }];
   abilityScores: AbilityScores;

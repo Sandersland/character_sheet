@@ -47,12 +47,37 @@ export interface SpellEntry {
   // for effectKind "buff"; snapshotted from the catalog at learn time.
   buffTarget?: string | null;
   buffModifier?: number | null;
-  // Provenance of the entry; "subclass" and "species" (#1683) both mark a
-  // derived, non-persisted grant (deriveGrantedSpells' sourceKind), "item" a
-  // spell granted by a held magic item (#528, cast from the item).
+  // Provenance of the entry; "subclass" marks a derived, non-persisted grant
+  // (deriveGrantedSpells), "item" a spell granted by a held magic item (#528,
+  // cast from the item). "species" is TWO DIFFERENT MECHANISMS sharing one
+  // tag, distinguished by `id`'s shape, never by a second source value:
+  //   - a #1683 species/LINEAGE grant (a Drow's Dancing Lights) — derived,
+  //     non-persisted exactly like "subclass" (deriveGrantedSpells'
+  //     sourceKind: "species"), `id` always `granted:<name>:<spell>`-shaped.
+  //   - a #1689 species-CHOICE grant (High Elf's Cantrip) — the player
+  //     PICKS it at creation from an open list with no backing catalog
+  //     GrantedSpellSource row, so it IS the persisted record; `id` is a
+  //     random per-character UUID (creationSpellEntry's normal shape), never
+  //     `granted:`-prefixed.
+  // reconcileGrantedSpells (lib/leveling/level-reconciliation.ts) and
+  // persistSpellState (lib/spellcasting/spellcasting.ts) key their
+  // derived-vs-persisted handling off the `granted:` id prefix for exactly
+  // this reason — a source-only check would treat a #1689 pick as a leaked
+  // #1683 grant and strip it.
   source?: "subclass" | "species" | "item";
   // Item-granted-spell fields (#528), present only when source === "item".
   item?: ItemSpellMeta;
+  // #1689: the FIXED casting ability a species-CHOICE grant specifies (High
+  // Elf's Cantrip: Intelligence, independent of the character's own class
+  // ability) — present only on that kind of "species" entry (see `source`'s
+  // own comment above; a #1683 species/lineage entry never sets this field,
+  // which is what lets deriveSpeciesCastingAbility, serialize/spellcasting.ts,
+  // tell the two apart without a second source value). A plain string, not a
+  // real AbilityName union: this module is a leaf (no back-imports, see the
+  // file banner); the value is written by character-create.ts off
+  // ChooseCantrip.castingAbility, itself z.enum(ABILITY_NAMES)-checked at
+  // that seam, so an invalid ability can never reach here.
+  castingAbility?: string;
 }
 
 /**

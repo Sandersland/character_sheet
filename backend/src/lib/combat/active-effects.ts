@@ -50,6 +50,15 @@ export interface ActiveBuff {
   resistDamageTypes?: string[];
   /** State-driven advantage/disadvantage grants (#486), e.g. Rage's advantage on Strength checks & saves. */
   rollEffects?: RollEffect[];
+  /**
+   * Equip-time trigger keys that true-end this buff (#1688) — copied from the
+   * granting row's `EffectBuffRow.clearOn` (or, for a Spell buff, set at cast
+   * time by ability-cast.ts's BUFF_TARGET_CLEAR_ON) onto the instantiated
+   * buff, since the equip hook only ever sees persisted state, never the
+   * row/spell that granted it. Matched by inventory-placement.ts's
+   * equipClearTriggers against whatever the placement just raised.
+   */
+  clearOn?: string[];
 }
 
 export interface ActiveEffectsMutableState {
@@ -67,10 +76,15 @@ function parseRestType(value: unknown): "short" | "long" | undefined {
   return value === "short" || value === "long" ? value : undefined;
 }
 
-function parseResistDamageTypes(value: unknown): string[] | undefined {
+// Shared by resistDamageTypes and clearOn (#1688) — both are "list of
+// strings, empty/absent -> undefined" with no further per-value validation
+// here (the closed CLEAR_ON_TRIGGERS vocabulary is enforced at SEED time,
+// classFeatureSeedSchema; an unmatched trigger on read is a safe no-op, same
+// as an unknown damage type would be).
+function parseStringArray(value: unknown): string[] | undefined {
   if (!Array.isArray(value)) return undefined;
-  const types = value.filter((t): t is string => typeof t === "string");
-  return types.length > 0 ? types : undefined;
+  const items = value.filter((t): t is string => typeof t === "string");
+  return items.length > 0 ? items : undefined;
 }
 
 const ROLL_MODE_KINDS: RollModeKind[] = ["attack", "check", "save", "initiative"];
@@ -99,8 +113,9 @@ function parseRollEffects(value: unknown): RollEffect[] | undefined {
 // Build a valid ActiveBuff from a validated entry (key/target are strings, modifier finite).
 function buildBuff(entry: Record<string, unknown>, key: string, target: string, modifier: number): ActiveBuff {
   const restType = parseRestType(entry.restType);
-  const resistDamageTypes = parseResistDamageTypes(entry.resistDamageTypes);
+  const resistDamageTypes = parseStringArray(entry.resistDamageTypes);
   const rollEffects = parseRollEffects(entry.rollEffects);
+  const clearOn = parseStringArray(entry.clearOn);
   return {
     id: typeof entry.id === "string" ? entry.id : randomUUID(),
     key,
@@ -112,6 +127,7 @@ function buildBuff(entry: Record<string, unknown>, key: string, target: string, 
     ...(restType ? { restType } : {}),
     ...(resistDamageTypes ? { resistDamageTypes } : {}),
     ...(rollEffects ? { rollEffects } : {}),
+    ...(clearOn ? { clearOn } : {}),
   };
 }
 
@@ -142,10 +158,29 @@ export function normalizeActiveEffectsMutable(json: Prisma.JsonValue): ActiveEff
   return { buffs };
 }
 
+// The fields a serialized buff writes only when present, each with its own
+// omission rule (a bare truthy check would wrongly keep "concentration" or an
+// empty array) — a data-driven table instead of N inline conditional spreads
+// keeps serializeActiveEffectsState's own branching budget low (fallow's
+// cyclomatic/CRAP gate) as this list grows (#438 shipped 2, #1688 is the 5th).
+const OPTIONAL_BUFF_FIELDS: ReadonlyArray<{ key: keyof ActiveBuff; include: (b: ActiveBuff) => boolean }> = [
+  { key: "duration", include: (b) => b.duration !== "concentration" },
+  { key: "restType", include: (b) => Boolean(b.restType) },
+  { key: "resistDamageTypes", include: (b) => Boolean(b.resistDamageTypes?.length) },
+  { key: "rollEffects", include: (b) => Boolean(b.rollEffects?.length) },
+  { key: "clearOn", include: (b) => Boolean(b.clearOn?.length) },
+];
+
+function serializeOptionalBuffFields(b: ActiveBuff): Record<string, unknown> {
+  const extra: Record<string, unknown> = {};
+  for (const field of OPTIONAL_BUFF_FIELDS) {
+    if (field.include(b)) extra[field.key] = b[field.key];
+  }
+  return extra;
+}
+
 /** Serialize to the shape written to Character.activeEffects. */
 export function serializeActiveEffectsState(state: ActiveEffectsMutableState): Prisma.InputJsonValue {
-  // "concentration" duration + absent restType are omitted so #438 buffs keep
-  // byte-parity with their pre-duration serialization.
   return {
     buffs: state.buffs.map((b) => ({
       id: b.id,
@@ -154,10 +189,7 @@ export function serializeActiveEffectsState(state: ActiveEffectsMutableState): P
       modifier: b.modifier,
       source: b.source,
       sourceEntryId: b.sourceEntryId ?? null,
-      ...(b.duration !== "concentration" ? { duration: b.duration } : {}),
-      ...(b.restType ? { restType: b.restType } : {}),
-      ...(b.resistDamageTypes && b.resistDamageTypes.length > 0 ? { resistDamageTypes: b.resistDamageTypes } : {}),
-      ...(b.rollEffects && b.rollEffects.length > 0 ? { rollEffects: b.rollEffects } : {}),
+      ...serializeOptionalBuffFields(b),
     })),
   } as unknown as Prisma.InputJsonValue;
 }
@@ -348,35 +380,6 @@ export async function clearBuffByKeyInTx(
     {
       summary: (dropped) => `Cleared ${dropped[0].source} (${reason})`,
       data: (dropped) => ({ key, reason, clearedKeys: dropped.map((b) => b.key) }),
-    },
-    batchId,
-    sessionId,
-  );
-}
-
-/**
- * Clear every non-concentration durable buff aimed at a given target — used for a
- * true-end hook that keys on the buff's *effect* rather than a per-character key
- * (e.g. donning body armor ends Mage Armor, an "acUnarmoredBase" buff, #363; the
- * equip path can't know the caster's per-character spell entry id). No-op + no
- * event when none match. Logs a `buffCleared` event under "effects".
- */
-export async function clearBuffsByTargetInTx(
-  tx: Prisma.TransactionClient,
-  characterId: string,
-  target: string,
-  batchId: string,
-  sessionId: string | null,
-  reason: string,
-): Promise<void> {
-  // Concentration buffs end via clearBuffsForSourceInTx; leave them alone here.
-  await clearBuffsMatchingInTx(
-    tx,
-    characterId,
-    (b) => b.target === target && b.duration !== "concentration",
-    {
-      summary: (dropped) => `Cleared ${dropped[0].source} (${reason})`,
-      data: (dropped) => ({ target, reason, clearedKeys: dropped.map((b) => b.key) }),
     },
     batchId,
     sessionId,

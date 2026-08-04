@@ -71,6 +71,8 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
     backgroundAbilities: {},
     speciesAbilities: {},
     castingAbility: "",
+    speciesSkills: [],
+    speciesCantripId: "",
     skillProficiencies: [],
     toolChoices: [],
     cantripIds: [],
@@ -119,7 +121,15 @@ const specBackground = {
 // generic "a species is chosen" tests use this so they don't also have to
 // carry a variant pick.
 const elfSpecies: SpeciesOption = {
-  id: "sp-elf", name: "Elf", slug: "elf", speed: 30, abilityIncreases: [], needsCastingAbility: false, variants: [],
+  id: "sp-elf",
+  name: "Elf",
+  slug: "elf",
+  speed: 30,
+  abilityIncreases: [],
+  needsCastingAbility: false,
+  chooseSkills: null,
+  chooseCantrip: null,
+  variants: [],
 };
 // Variant-bearing (2014 Dwarf-shaped) species fixture for the #1680
 // variant-required gate.
@@ -130,9 +140,17 @@ const dwarfSpecies: SpeciesOption = {
   speed: 25,
   abilityIncreases: [],
   needsCastingAbility: false,
+  chooseSkills: null,
+  chooseCantrip: null,
   variants: [
-    { id: "var-hill", name: "Hill Dwarf", slug: "hill", abilityIncreases: [], needsCastingAbility: false },
-    { id: "var-mountain", name: "Mountain Dwarf", slug: "mountain", abilityIncreases: [], needsCastingAbility: false },
+    {
+      id: "var-hill", name: "Hill Dwarf", slug: "hill", abilityIncreases: [],
+      needsCastingAbility: false, chooseSkills: null, chooseCantrip: null,
+    },
+    {
+      id: "var-mountain", name: "Mountain Dwarf", slug: "mountain", abilityIncreases: [],
+      needsCastingAbility: false, chooseSkills: null, chooseCantrip: null,
+    },
   ],
 };
 
@@ -149,7 +167,12 @@ const drowLineageElf: SpeciesOption = {
   speed: 30,
   abilityIncreases: [],
   needsCastingAbility: false,
-  variants: [{ id: "var-drow", name: "Drow", slug: "drow", abilityIncreases: [], needsCastingAbility: true }],
+  chooseSkills: null,
+  chooseCantrip: null,
+  variants: [{
+    id: "var-drow", name: "Drow", slug: "drow", abilityIncreases: [],
+    needsCastingAbility: true, chooseSkills: null, chooseCantrip: null,
+  }],
 };
 
 // #1681: Half-Elf-shape species fixture (fixed +2 CHA + choose 2 of 5 at +1) —
@@ -165,8 +188,36 @@ const halfElfSpecies: SpeciesOption = {
     { choose: { count: 2, amount: 1, from: ["strength", "dexterity", "constitution", "intelligence", "wisdom"] } },
   ],
   needsCastingAbility: false,
+  // #1689: Skill Versatility — used by the "skills" step's own missing-gate tests below.
+  chooseSkills: { count: 2 },
+  chooseCantrip: null,
   variants: [],
 };
+
+// #1689: Elf-shape species with a High Elf variant carrying chooseCantrip —
+// used by the "spells" step's own inclusion + missing-gate tests below.
+const highElfSpecies: SpeciesOption = {
+  id: "sp-elf2",
+  name: "Elf",
+  slug: "elf",
+  speed: 30,
+  abilityIncreases: [],
+  needsCastingAbility: false,
+  chooseSkills: null,
+  chooseCantrip: null,
+  variants: [
+    {
+      id: "var-high",
+      name: "High Elf",
+      slug: "high",
+      abilityIncreases: [],
+      needsCastingAbility: false,
+      chooseSkills: null,
+      chooseCantrip: { list: "wizard", castingAbility: "intelligence" },
+    },
+  ],
+};
+const highElfVariant = highElfSpecies.variants[0];
 
 describe("creationSteps", () => {
   it("includes the spells step only for a level-1 caster", () => {
@@ -196,6 +247,29 @@ describe("creationSteps", () => {
   // (2014 Ranger) is excluded the same as a genuine non-caster (rogue above).
   it("excludes the spells step for a 2014 Ranger (level1SpellPicks: null pre-level-2)", () => {
     expect(creationSteps(sel({ class: ranger2014 }))).toEqual([
+      "identity",
+      "abilities",
+      "skills",
+      "equipment",
+      "review",
+    ]);
+  });
+
+  // #1689: a species cantrip choice (High Elf) includes the step even for a
+  // non-caster class — the mechanism is independent of the class's own picks.
+  it("includes the spells step for a non-caster class when the species serves a chooseCantrip spec", () => {
+    expect(creationSteps(sel({ class: rogue, species: highElfSpecies, variant: highElfVariant }))).toEqual([
+      "identity",
+      "abilities",
+      "skills",
+      "spells",
+      "equipment",
+      "review",
+    ]);
+  });
+
+  it("still excludes the spells step for a non-caster with no species cantrip choice (a plain Elf, no variant)", () => {
+    expect(creationSteps(sel({ class: rogue, species: highElfSpecies }))).toEqual([
       "identity",
       "abilities",
       "skills",
@@ -369,9 +443,19 @@ describe("creationStepMissing", () => {
     ]);
   });
 
-  it("skills and review are always empty", () => {
+  it("skills and review are empty with no species skill choice in play", () => {
     expect(creationStepMissing("skills", makeDraft(), sel({ class: rogue }))).toEqual([]);
     expect(creationStepMissing("review", makeDraft(), sel({ class: rogue }))).toEqual([]);
+  });
+
+  // #1689: Half-Elf's Skill Versatility — the "skills" step's own gate.
+  it("skills gates an incomplete species skill choice (Half-Elf) and clears once satisfied", () => {
+    const incomplete = makeDraft({ className: "Rogue", speciesId: "sp-half-elf", speciesSkills: ["stealth"] });
+    expect(creationStepMissing("skills", incomplete, sel({ class: rogue, species: halfElfSpecies }))).toEqual([
+      "Species skills",
+    ]);
+    const complete = makeDraft({ className: "Rogue", speciesId: "sp-half-elf", speciesSkills: ["stealth", "perception"] });
+    expect(creationStepMissing("skills", complete, sel({ class: rogue, species: halfElfSpecies }))).toEqual([]);
   });
 
   it("spells gates an incomplete caster's picks", () => {
@@ -388,6 +472,17 @@ describe("creationStepMissing", () => {
   it("spells clears with 3 cantrips and no spells for a 2014 Cleric/Druid-shaped class", () => {
     const draft = makeDraft({ className: "Cleric", cantripIds: ["c1", "c2", "c3"], spellIds: [] });
     expect(creationStepMissing("spells", draft, sel({ class: cleric2014 }))).toEqual([]);
+  });
+
+  // #1689: High Elf's Cantrip — independent of the class's own picks; a
+  // non-caster class reaches this step gated solely by the species choice.
+  it("spells gates an incomplete species cantrip choice (High Elf) for a non-caster class", () => {
+    const missing = makeDraft({ className: "Rogue", speciesId: "sp-elf2", variantId: "var-high" });
+    expect(creationStepMissing("spells", missing, sel({ class: rogue, species: highElfSpecies, variant: highElfVariant }))).toEqual([
+      "Species cantrip",
+    ]);
+    const complete = makeDraft({ className: "Rogue", speciesId: "sp-elf2", variantId: "var-high", speciesCantripId: "spell-fire-bolt" });
+    expect(creationStepMissing("spells", complete, sel({ class: rogue, species: highElfSpecies, variant: highElfVariant }))).toEqual([]);
   });
 
   it("equipment gates a started-but-incomplete package", () => {

@@ -1,4 +1,4 @@
-import { ABILITY_ORDER, abilityModifier } from "@/lib/abilities";
+import { ABILITY_ORDER, abilityModifier, SKILL_OPTIONS } from "@/lib/abilities";
 import { draftToInput } from "@/lib/startingEquipment";
 import type { CharacterDraft } from "@/hooks/useCharacterDraft";
 import type {
@@ -11,7 +11,9 @@ import type {
   RaceOption,
   ReferenceData,
   SkillName,
+  SpeciesCantripChoiceOption,
   SpeciesOption,
+  SpeciesSkillChoiceOption,
   SpeciesVariantOption,
   StartingEquipmentInput,
 } from "@/types/character";
@@ -197,6 +199,77 @@ export function deriveCastingAbilityChoice(
   };
 }
 
+export interface CreationSpeciesSkillChoice {
+  /** False renders no panel — driven purely by the served spec (#1572
+   *  trick), never a client edition check. */
+  applicable: boolean;
+  count: number;
+  /** Eligible skill options for the picker, already resolved to the served
+   *  `from` restriction (or every skill, absent one) MINUS whatever the
+   *  class/background step already granted/picked — a species pick may not
+   *  duplicate those (server-enforced; this list keeps the picker from ever
+   *  offering an option that would 400). */
+  options: { key: SkillName; label: string }[];
+  selected: SkillName[];
+  complete: boolean;
+}
+
+// Derives the species skill-choice state for the form (#1689, Half-Elf's
+// Skill Versatility): the served spec (species-level OR variant-level — only
+// one is ever populated this wave), the eligible options narrowed by BOTH the
+// spec's own `from` restriction and the class/background skills already
+// spoken for, and whether the current selection satisfies the count. Inert
+// (applicable:false) whenever the server serves no chooseSkills for this
+// species+variant — every 2024 species, Half-Elf's own is the only 2014 row
+// this wave.
+export function deriveSpeciesSkillChoice(
+  draft: CharacterDraft,
+  selections: CreationSelections,
+  classBackgroundSkills: SkillName[],
+): CreationSpeciesSkillChoice {
+  const spec: SpeciesSkillChoiceOption | null = selections.species?.chooseSkills ?? selections.variant?.chooseSkills ?? null;
+  if (!spec) return { applicable: false, count: 0, options: [], selected: [], complete: true };
+
+  const eligible = spec.from ? SKILL_OPTIONS.filter((o) => spec.from!.includes(o.key)) : SKILL_OPTIONS;
+  const options = eligible.filter((o) => !classBackgroundSkills.includes(o.key));
+  const selected = draft.speciesSkills.filter((s) => options.some((o) => o.key === s));
+  return { applicable: true, count: spec.count, options, selected, complete: selected.length === spec.count };
+}
+
+export interface CreationSpeciesCantripChoice {
+  /** False renders no panel — same server-spec-driven shape as the skill
+   *  choice above. */
+  applicable: boolean;
+  /** Lowercase class name the cantrip must come from — forwarded to
+   *  `GET /api/spells?className=` unchanged, the SAME server-filtering seam
+   *  (#1377/#1572) the class's own creation-spells step already uses. */
+  list: string;
+  castingAbility: AbilityName;
+  selectedId: string;
+  complete: boolean;
+}
+
+// Derives the species cantrip-choice state for the form (#1689, High Elf's
+// Cantrip). Unlike the skill choice above, this is independent of the
+// character's own class — a non-caster class still needs the picker (a High
+// Elf Fighter gets the cantrip too), which is why `creationSteps` (#1689)
+// adds the spells step for THIS reason alone even when `level1SpellPicks` is
+// null.
+export function deriveSpeciesCantripChoice(
+  draft: CharacterDraft,
+  selections: CreationSelections,
+): CreationSpeciesCantripChoice {
+  const spec: SpeciesCantripChoiceOption | null = selections.species?.chooseCantrip ?? selections.variant?.chooseCantrip ?? null;
+  if (!spec) return { applicable: false, list: "", castingAbility: "intelligence", selectedId: "", complete: true };
+  return {
+    applicable: true,
+    list: spec.list,
+    castingAbility: spec.castingAbility,
+    selectedId: draft.speciesCantripId,
+    complete: draft.speciesCantripId.length > 0,
+  };
+}
+
 function hitDieFace(hitDie: string): number {
   return Number(hitDie.replace(/^d/i, ""));
 }
@@ -300,6 +373,37 @@ export function derivePreview(
   };
 }
 
+// Only a COMPLETED choice is ever sent — an incomplete or inert one sends
+// undefined, same "the backend 400s a field it didn't ask for" shape as
+// speciesAbilities. Split out purely to keep buildCreatePayload's own
+// cyclomatic/cognitive complexity under the repo's health gate; each of
+// these three collapses one ternary out of that function's own body.
+function completedSpeciesAbilities(bonuses: CreationSpeciesBonuses): Partial<Record<AbilityName, number>> | undefined {
+  return bonuses.choice && bonuses.complete ? bonuses.assignment : undefined;
+}
+function completedSpeciesSkills(choice: CreationSpeciesSkillChoice): SkillName[] | undefined {
+  return choice.applicable && choice.complete ? choice.selected : undefined;
+}
+function completedSpeciesCantripId(choice: CreationSpeciesCantripChoice): string | undefined {
+  return choice.applicable && choice.complete ? choice.selectedId : undefined;
+}
+function completedCastingAbility(choice: CreationCastingAbilityChoice): "intelligence" | "wisdom" | "charisma" | undefined {
+  return choice.applicable && choice.value ? choice.value : undefined;
+}
+
+// #1131/#1689: a level-1 caster's own creation picks — a species cantrip
+// choice rides the SAME `spells` step but a DIFFERENT request field
+// (speciesCantripId above), so a non-caster class with one omits this
+// entirely while still sending that field.
+function creationSpellsField(
+  selections: CreationSelections,
+  draft: CharacterDraft,
+): { spells: { cantripIds: string[]; spellIds: string[] } } | Record<string, never> {
+  return selections.class?.level1SpellPicks
+    ? { spells: { cantripIds: draft.cantripIds, spellIds: draft.spellIds } }
+    : {};
+}
+
 export function buildCreatePayload(
   draft: CharacterDraft,
   selections: CreationSelections,
@@ -309,6 +413,12 @@ export function buildCreatePayload(
   const backgroundBonuses = deriveBackgroundBonuses(draft, selections);
   const speciesBonuses = deriveSpeciesBonuses(draft, selections);
   const castingAbilityChoice = deriveCastingAbilityChoice(draft, selections);
+  const classBackgroundSkills = [...skills.granted, ...skills.selected];
+  // #1689: species creation choices, independent of the #1681 ability spread
+  // above — a species may carry both (Half-Elf: CHA+2/choose-two AND Skill
+  // Versatility) in the same request.
+  const speciesSkillChoice = deriveSpeciesSkillChoice(draft, selections, classBackgroundSkills);
+  const speciesCantripChoice = deriveSpeciesCantripChoice(draft, selections);
   return {
     name: draft.name.trim(),
     alignment: draft.alignment,
@@ -322,11 +432,13 @@ export function buildCreatePayload(
     // Only send a completed CHOICE; a fixed-only species (or none) sends
     // undefined — the backend applies fixed increases unconditionally with no
     // request field and 400s a speciesAbilities it didn't ask for (#1681).
-    speciesAbilities: speciesBonuses.choice && speciesBonuses.complete ? speciesBonuses.assignment : undefined,
+    speciesAbilities: completedSpeciesAbilities(speciesBonuses),
     // #1683: only send a completed choice; a species/variant that grants no
     // spell (or an unanswered choice) sends undefined — the backend 400s a
     // castingAbility it didn't ask for (resolveCastingAbility, character-create.ts).
-    castingAbility: castingAbilityChoice.applicable && castingAbilityChoice.value ? castingAbilityChoice.value : undefined,
+    castingAbility: completedCastingAbility(castingAbilityChoice),
+    speciesSkills: completedSpeciesSkills(speciesSkillChoice),
+    speciesCantripId: completedSpeciesCantripId(speciesCantripChoice),
     background: resolveBackgroundName(draft),
     classes: [{
       name: draft.className,
@@ -336,14 +448,11 @@ export function buildCreatePayload(
     abilityScores: draft.abilityScores,
     // Only send a complete spread; the backend derives HP/init from it (#1130).
     backgroundAbilities: backgroundBonuses.complete ? backgroundBonuses.assignment : undefined,
-    skillProficiencies: [...skills.granted, ...skills.selected],
+    skillProficiencies: classBackgroundSkills,
     toolChoices: selectedToolChoices.length > 0 ? selectedToolChoices : undefined,
     startingEquipment: resolveEquipmentInput(draft, selections.class) ?? undefined,
     backgroundStartingEquipment: resolveBackgroundEquipmentInput(draft, selections.background) ?? undefined,
-    // #1131: casters send their prepared picks; a non-caster omits the field.
-    ...(selections.class?.level1SpellPicks
-      ? { spells: { cantripIds: draft.cantripIds, spellIds: draft.spellIds } }
-      : {}),
+    ...creationSpellsField(selections, draft),
     // #1286: resolved by CreationEntryGate before the ceremony is reachable, so
     // this is always set by the time a real submit happens (never a silent default).
     rulesEdition: draft.rulesEdition ?? undefined,

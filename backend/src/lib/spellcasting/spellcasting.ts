@@ -359,13 +359,17 @@ async function applyLearnSpellOp(ctx: SpellOpContext, op: LearnSpellOperation): 
 
 async function applyForgetSpellOp(ctx: SpellOpContext, op: ForgetSpellOperation): Promise<OpOutcome> {
   const { state } = ctx;
-  // Subclass- AND species-granted (#1683) spells are derived, not persisted —
-  // they cannot be forgotten. Both share the `granted:` id prefix
-  // (deriveGrantedSpells' id scheme), so the prefix check alone already
-  // covers a species entry; the source check is defense-in-depth.
+  // Subclass- AND species/lineage-granted (#1683) spells are derived, not
+  // persisted — they cannot be forgotten. Both share the `granted:` id
+  // prefix (deriveGrantedSpells' id scheme); the source check is
+  // defense-in-depth for the subclass half only — NOT extended to
+  // source === "species", which also matches a #1689 species-CHOICE entry
+  // (High Elf's Cantrip) that IS meant to be forgettable-eligible the same
+  // as any other stored spell (its id is never `granted:`-prefixed, so it
+  // never trips the first branch either).
   const idx = state.spells.findIndex((s) => s.id === op.entryId);
-  if (op.entryId.startsWith("granted:") || state.spells[idx]?.source === "subclass" || state.spells[idx]?.source === "species") {
-    throw new InvalidSpellcastingOperationError("Cannot forget a subclass- or species-granted spell.");
+  if (op.entryId.startsWith("granted:") || state.spells[idx]?.source === "subclass") {
+    throw new InvalidSpellcastingOperationError("Cannot forget a subclass- or species-lineage-granted spell.");
   }
   if (idx === -1) {
     throw new InvalidSpellcastingOperationError(`Spell entry not found: ${op.entryId}`);
@@ -800,13 +804,21 @@ function cloneSpellState(state: SpellcastingMutableState): { spellcasting: Spell
   };
 }
 
-// Strip derived grants + item spells (re-derived on read) and persist the state.
+// Strip derived grants (subclass + #1683 species/lineage) + item spells
+// (all re-derived on read) and persist the state. A #1689 species-CHOICE
+// entry (source:"species", but never `granted:`-id-prefixed) is deliberately
+// KEPT — it IS the persisted record, not a re-derivable grant; see
+// SpellEntry's own `source` comment (spell-state.ts) for the full split.
 async function persistSpellState(
   tx: Prisma.TransactionClient,
   characterId: string,
   state: SpellcastingMutableState,
 ): Promise<void> {
-  state.spells = state.spells.filter((s) => s.source !== "subclass" && s.source !== "species" && s.source !== "item");
+  state.spells = state.spells.filter((s) => {
+    if (s.source === "item" || s.source === "subclass") return false;
+    if (s.source === "species" && s.id.startsWith("granted:")) return false;
+    return true;
+  });
   await tx.character.update({
     where: { id: characterId },
     data: {

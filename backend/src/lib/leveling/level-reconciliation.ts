@@ -122,13 +122,17 @@ async function reconcileSubclass(ctx: ReconcileContext): Promise<void> {
   }
 }
 
-// Defense-in-depth: subclass- AND species-granted spells (#1683) are
+// Defense-in-depth: subclass- AND species/lineage-granted spells (#1683) are
 // pure-derived at read time and never persisted in the happy path, so this
-// only fires if a source:"subclass"/"species" entry ever leaks into the
-// stored spells[]. It strips any leaked grant no longer valid at the new
-// level (re-derived on read anyway). Runs AFTER reconcileSubclass so a
-// cleared subclass yields an empty valid set. Reuses the spellcasting undo
-// branch in activity.ts (restores before.spellcasting) — no new EventType.
+// only fires if a `granted:`-id entry ever leaks into the stored spells[]
+// (deriveGrantedSpells' id scheme — the discriminator, not `source`: a
+// #1689 species-CHOICE entry also carries source:"species" but is the
+// legitimately persisted record, never `granted:`-prefixed — see
+// SpellEntry's own comment, spell-state.ts). It strips any leaked grant no
+// longer valid at the new level (re-derived on read anyway). Runs AFTER
+// reconcileSubclass so a cleared subclass yields an empty valid set. Reuses
+// the spellcasting undo branch in activity.ts (restores before.spellcasting)
+// — no new EventType.
 
 async function reconcileGrantedSpells(ctx: ReconcileContext): Promise<void> {
   const { tx, characterId, newDerivedLevel, edition, batchId } = ctx;
@@ -158,7 +162,10 @@ async function reconcileGrantedSpells(ctx: ReconcileContext): Promise<void> {
   if (!row) return;
 
   const state = normalizeSpellcastingMutable(row.spellcasting);
-  if (!state.spells.some((s) => s.source === "subclass" || s.source === "species")) return; // normal case
+  // `granted:`-id check (isGranted below), not `source` alone — a #1689
+  // species-CHOICE entry (source:"species", random UUID id) must never be
+  // treated as a leaked derived grant.
+  if (!state.spells.some((s) => s.id.startsWith("granted:"))) return; // normal case
 
   const speciesSource = speciesGrantedSpellSourceFromRaceSelection(row.raceSelection);
 
@@ -172,7 +179,10 @@ async function reconcileGrantedSpells(ctx: ReconcileContext): Promise<void> {
     ...deriveGrantedSpells(speciesSource, newDerivedLevel, edition, "species").map((s) => s.id),
   ]);
 
-  const isGranted = (s: { source?: string }) => s.source === "subclass" || s.source === "species";
+  // Same `granted:`-id discriminator as the early-return check above —
+  // deliberately NOT `source`, for the #1689 species-choice reason documented
+  // on this function's own header comment.
+  const isGranted = (s: { id: string }) => s.id.startsWith("granted:");
   const kept = state.spells.filter((s) => !isGranted(s) || validIds.has(s.id));
   if (kept.length === state.spells.length) return; // all leaked grants still valid
 

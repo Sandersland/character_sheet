@@ -61,6 +61,12 @@ export interface CharacterDraft {
    *  empty string when not yet chosen or the selected species/variant has no
    *  such choice (SpeciesVariantOption.needsCastingAbility false). */
   castingAbility: "" | "intelligence" | "wisdom" | "charisma";
+  /** #1689: species-granted skill choice (Half-Elf's Skill Versatility) —
+   *  empty for a species with no chooseSkills spec served. */
+  speciesSkills: SkillName[];
+  /** #1689: species-granted cantrip choice (High Elf's Cantrip) — catalog
+   *  spell id, empty string for none chosen / no chooseCantrip spec served. */
+  speciesCantripId: string;
   skillProficiencies: SkillName[];
   /** Tool proficiency names chosen by the player at character creation. */
   toolChoices: string[];
@@ -111,6 +117,8 @@ const EMPTY_DRAFT: CharacterDraft = {
   backgroundAbilities: {},
   speciesAbilities: {},
   castingAbility: "",
+  speciesSkills: [],
+  speciesCantripId: "",
   skillProficiencies: [],
   toolChoices: [],
   cantripIds: [],

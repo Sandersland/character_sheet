@@ -13,7 +13,6 @@ import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import {
   clearBuffByKeyInTx,
-  clearBuffsByTargetInTx,
   clearBuffsForRestInTx,
   clearBuffsForSourceInTx,
   clearWhileActiveBuffsInTx,
@@ -109,16 +108,6 @@ describe("clear* wrappers — buffCleared event payloads (#593)", () => {
     expect(ev.summary).toBe("Cleared rage (endRage)");
     expect(ev.data).toEqual({ key: "rage", reason: "endRage", clearedKeys: ["rage"] });
     expect(await readKeys()).toEqual(["rage"]); // the concentration one survives
-  });
-
-  it("clearBuffsByTargetInTx: source summary + { target, reason, clearedKeys } data; leaves concentration alone", async () => {
-    await seedBuffs([durable("mageArmor", "acUnarmoredBase", "while-active"), conc("shield", "acUnarmoredBase", "e2")]);
-    await prisma.$transaction((tx) => clearBuffsByTargetInTx(tx, FIXTURE_ID, "acUnarmoredBase", randomUUID(), null, "donnedArmor"));
-
-    const ev = await lastClearEvent();
-    expect(ev.summary).toBe("Cleared mageArmor (donnedArmor)");
-    expect(ev.data).toEqual({ target: "acUnarmoredBase", reason: "donnedArmor", clearedKeys: ["mageArmor"] });
-    expect(await readKeys()).toEqual(["shield"]);
   });
 
   it("clearWhileActiveBuffsInTx: count summary + { reason, clearedKeys } data; only while-active", async () => {

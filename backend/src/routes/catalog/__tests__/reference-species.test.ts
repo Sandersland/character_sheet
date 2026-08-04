@@ -124,3 +124,49 @@ describe("GET /api/reference — species (#1679)", () => {
     });
   });
 });
+
+describe("GET /api/reference — species creation-choice specs (#1689)", () => {
+  it("Half-Elf's own row serves chooseSkills (count 2, no `from` restriction); chooseCantrip is null", async () => {
+    const res = await getReference("EDITION_2014");
+    const halfElf = res.body.species.find((s: { name: string }) => s.name === "Half-Elf");
+    expect(halfElf.chooseSkills).toEqual({ count: 2 });
+    expect(halfElf.chooseCantrip).toBeNull();
+  });
+
+  it("High Elf's own VARIANT row serves chooseCantrip (wizard list, Intelligence); the parent Elf row and every other Elf variant serve null for both", async () => {
+    const res = await getReference("EDITION_2014");
+    const elf = res.body.species.find((s: { name: string }) => s.name === "Elf");
+    expect(elf.chooseSkills).toBeNull();
+    expect(elf.chooseCantrip).toBeNull();
+
+    const highElf = elf.variants.find((v: { name: string }) => v.name === "High Elf");
+    expect(highElf.chooseCantrip).toEqual({ list: "wizard", castingAbility: "intelligence" });
+    expect(highElf.chooseSkills).toBeNull();
+
+    const woodElf = elf.variants.find((v: { name: string }) => v.name === "Wood Elf");
+    expect(woodElf.chooseSkills).toBeNull();
+    expect(woodElf.chooseCantrip).toBeNull();
+  });
+
+  it("a species/variant with no choice-bearing trait (Hill Dwarf) serves null for both fields", async () => {
+    const res = await getReference("EDITION_2014");
+    const dwarf = res.body.species.find((s: { name: string }) => s.name === "Dwarf");
+    expect(dwarf.chooseSkills).toBeNull();
+    expect(dwarf.chooseCantrip).toBeNull();
+    const hillDwarf = dwarf.variants.find((v: { name: string }) => v.name === "Hill Dwarf");
+    expect(hillDwarf.chooseSkills).toBeNull();
+    expect(hillDwarf.chooseCantrip).toBeNull();
+  });
+
+  it("every 2024 species serves null for both fields — no 2024 choice content this slice (#1690's)", async () => {
+    const res = await getReference("EDITION_2024");
+    for (const species of res.body.species as { chooseSkills: unknown; chooseCantrip: unknown; variants: { chooseSkills: unknown; chooseCantrip: unknown }[] }[]) {
+      expect(species.chooseSkills).toBeNull();
+      expect(species.chooseCantrip).toBeNull();
+      for (const variant of species.variants) {
+        expect(variant.chooseSkills).toBeNull();
+        expect(variant.chooseCantrip).toBeNull();
+      }
+    }
+  });
+});

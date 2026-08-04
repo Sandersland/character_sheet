@@ -20,6 +20,7 @@ import { requireEditionOr400 } from "@/lib/http/parse-edition-param.js";
 import { resolveEditionCatalog, withEditionOrShared } from "@/lib/rules/catalog-edition.js";
 import { backgroundGrantsAbilitySpread, backgroundGrantsOriginFeat } from "@/lib/rules/background-grants.js";
 import type { AbilityIncreaseSpec } from "@/lib/srd/species-ability-increases.js";
+import { isChooseCantrip, isChooseSkills, type SpeciesTraitChoice } from "@/lib/srd/species-trait-choices.js";
 
 export const referenceRouter = Router();
 
@@ -43,11 +44,24 @@ referenceRouter.get("/reference", async (req, res) => {
   // grantedSpells (#1683): existence-only (select id) at both levels, purely
   // to derive needsCastingAbility below — the actual grant rows are never
   // served here (resolved live at read/creation time, never a catalog preview).
+  // #1689: `traits` rides along so chooseSkills/chooseCantrip can be resolved
+  // below — species.traits returns EVERY trait FK'd to this speciesId
+  // regardless of variantId (plain Prisma relation semantics, same caveat
+  // serialize/species.ts's activeTraitRows documents), hence `variantId`
+  // selected here so speciesLevelChoice can filter to this species' OWN rows;
+  // variant.traits is already scoped to that one variantId, no filter needed.
   const rawSpecies = await prisma.species.findMany({
     where: { edition },
     orderBy: { name: "asc" },
     include: {
-      variants: { orderBy: { name: "asc" }, include: { grantedSpells: { select: { id: true } } } },
+      traits: { select: { variantId: true, choice: true } },
+      variants: {
+        orderBy: { name: "asc" },
+        include: {
+          traits: { select: { choice: true } },
+          grantedSpells: { select: { id: true } },
+        },
+      },
       // Species.grantedSpells is the UNFILTERED back-relation (every grant
       // FK'd to this speciesId, spanning every variant — the same
       // activeTraitRows gotcha) — variantId carried so the mapping below can
@@ -211,6 +225,20 @@ referenceRouter.get("/reference", async (req, res) => {
     toolProficiencies: r.toolProficiencies,
   }));
 
+  // #1689: resolves chooseSkills/chooseCantrip off a row's own trait rows —
+  // mirrors character-create.ts's fetchSpeciesChoiceSpecs (the SAME "first
+  // match by discriminant" rule, kept in sync only by both reading through
+  // isChooseSkills/isChooseCantrip, not a duplicated inline check).
+  function traitChoices(traits: { choice: unknown }[]): SpeciesTraitChoice[] {
+    return traits.map((t) => t.choice as SpeciesTraitChoice | null).filter((c): c is SpeciesTraitChoice => c != null);
+  }
+  function chooseSkillsOf(traits: { choice: unknown }[]) {
+    return traitChoices(traits).find(isChooseSkills)?.chooseSkills ?? null;
+  }
+  function chooseCantripOf(traits: { choice: unknown }[]) {
+    return traitChoices(traits).find(isChooseCantrip)?.chooseCantrip ?? null;
+  }
+
   // #1679: variants nested inside each species, exactly like
   // classes[].subclasses above. abilityIncreases rides along as of #1681 (cast
   // through the AbilityIncreaseSpec[] shape — a wire mirror only, the frontend
@@ -218,7 +246,11 @@ referenceRouter.get("/reference", async (req, res) => {
   // spec) so the creation ceremony can preview + request the choice; the raw
   // JSON column is [] for every EDITION_2024 row, matching resolveSpeciesGrants'
   // edition gate. speedOverride is NOT served yet — no client needs it before
-  // the variant-speed picker lands (#1680/#1682).
+  // the variant-speed picker lands (#1680/#1682). chooseSkills/chooseCantrip
+  // (#1689) ride the same way — null for every row but Half-Elf's own
+  // (chooseSkills) and High Elf's own (chooseCantrip) this slice; see
+  // SpeciesOption's own JSDoc (reference.ts, frontend) for why both fields
+  // are served at both levels.
   const speciesWithVariants = rawSpecies.map((s) => ({
     id: s.id,
     name: s.name,
@@ -231,6 +263,8 @@ referenceRouter.get("/reference", async (req, res) => {
     // Never true this wave (every 2024 grant is variant-scoped), kept
     // general so a future species-level grant needs no picker rewrite.
     needsCastingAbility: s.grantedSpells.some((g) => g.variantId === null),
+    chooseSkills: chooseSkillsOf(s.traits.filter((t) => t.variantId === null)),
+    chooseCantrip: chooseCantripOf(s.traits.filter((t) => t.variantId === null)),
     variants: s.variants.map((v) => ({
       id: v.id,
       name: v.name,
@@ -238,6 +272,8 @@ referenceRouter.get("/reference", async (req, res) => {
       abilityIncreases: v.abilityIncreases as unknown as AbilityIncreaseSpec[],
       // Already scoped to this variant by Prisma (its own back-relation).
       needsCastingAbility: v.grantedSpells.length > 0,
+      chooseSkills: chooseSkillsOf(v.traits),
+      chooseCantrip: chooseCantripOf(v.traits),
     })),
   }));
 
