@@ -13,10 +13,12 @@
 // was optional and this snapshot never recorded it). Recording that on every
 // one of ~50 test cases would be a wall of one-line adds carrying no signal.
 // `features` is split OUT of the recorded object below; the DB-backed parity
-// test (class-feature-parity.test.ts) is the stronger proof that the move
-// changed no feature content, and it's the one that must be replaced when the
-// TS arrays are finally retired (this snapshot has no such expiry — resources/
-// extras/choices never depended on the TS arrays' feature text at all).
+// test (class-feature-parity.test.ts) was the stronger proof that the move
+// changed no feature content, until #1675 retired it (vacuous the moment
+// Monk, its last un-skipped class, joined LITERAL_ROW_CLASSES —
+// literal-fixture-parity.test.ts, #1593, is the content-drift proof now).
+// This snapshot has no such expiry — resources/extras/choices never depended
+// on the TS arrays' feature text at all.
 import { describe, expect, it } from "vitest";
 
 import { deriveResources, deriveResourcesForCharacterRow, resolveClassDie, type DerivedClassInfo } from "@/lib/classes/class-features.js";

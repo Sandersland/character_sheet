@@ -6,10 +6,12 @@
 // test-feature-rows.fixture.ts carrying the old text. The full backend suite,
 // fallow, e2e and a clean claude-review all passed on that state, because the
 // three suites that could have noticed each look elsewhere by design —
-// class-feature-parity.test.ts `continue`s on LITERAL_ROW_CLASSES, the
-// per-class content tests (sorcerer-2024-content.test.ts and friends) read the
-// DB rather than the fixture, and class-features-snapshot.test.ts strips
-// `.features` before snapshotting.
+// class-feature-parity.test.ts `continue`d on LITERAL_ROW_CLASSES (it has
+// since been retired outright, #1675 — it went vacuous the moment Monk, its
+// last un-skipped class, joined that same set), the per-class content tests
+// (sorcerer-2024-content.test.ts and friends) read the DB rather than the
+// fixture, and class-features-snapshot.test.ts strips `.features` before
+// snapshotting.
 //
 // Lives on the PRISMA side because it has to import both halves and only this
 // direction compiles: backend/tsconfig.json's `rootDir: "src"` makes a src file
