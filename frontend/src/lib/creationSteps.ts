@@ -10,6 +10,7 @@ import {
   deriveSkillChoices,
   deriveSpeciesBonuses,
   deriveSpeciesCantripChoice,
+  deriveSpeciesOriginFeatChoice,
   deriveSpeciesSkillChoice,
   resolveBackgroundName,
 } from "@/lib/characterCreation";
@@ -116,18 +117,24 @@ function abilitiesMissing(draft: CharacterDraft, selections: CreationSelections)
   return missing;
 }
 
-// #1689: the species skill choice (Half-Elf's Skill Versatility) — a
-// fixed-only species (or none matched) is always complete (nothing to pick),
-// so this only ever blocks a choose-bearing species left unassigned. 2024
-// never applies (deriveSpeciesSkillChoice.applicable is false — no 2024 row
-// this slice carries a chooseSkills spec, #1690's content). Re-derives the
-// class/background skill state (deriveSkillChoices) the SkillSection itself
-// renders, same "no second copy of the rule" shape as abilitiesMissing above
-// deriving its own bonuses. Split out for the same complexity-gate reason.
+// #1689/#1690: the species skill choice (Half-Elf's Skill Versatility, 2024
+// Human's Skillful, 2024 Elf's Keen Senses) — a fixed-only species (or none
+// matched) is always complete (nothing to pick), so this only ever blocks a
+// choose-bearing species left unassigned. Re-derives the class/background
+// skill state (deriveSkillChoices) the SkillSection itself renders, same "no
+// second copy of the rule" shape as abilitiesMissing above deriving its own
+// bonuses. Split out for the same complexity-gate reason.
 function skillsMissing(draft: CharacterDraft, selections: CreationSelections): string[] {
   const classBackgroundSkills = deriveSkillChoices(draft, selections);
   const skillChoice = deriveSpeciesSkillChoice(draft, selections, [...classBackgroundSkills.granted, ...classBackgroundSkills.selected]);
-  return skillChoice.applicable && !skillChoice.complete ? ["Species skills"] : [];
+  const missing = skillChoice.applicable && !skillChoice.complete ? ["Species skills"] : [];
+  // #1690: the species Origin feat choice (2024 Human's Versatile) rides the
+  // SAME step as the skill choice above — both are SpeciesTrait.choice-driven
+  // creation choices, independent requirements that may both apply at once
+  // (2024 Human carries both Skillful and Versatile).
+  const originFeatChoice = deriveSpeciesOriginFeatChoice(draft, selections);
+  if (originFeatChoice.applicable && !originFeatChoice.complete) missing.push("Species origin feat");
+  return missing;
 }
 
 // #1689: the species cantrip choice (High Elf's Cantrip) rides the same step

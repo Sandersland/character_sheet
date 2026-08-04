@@ -67,6 +67,10 @@ export interface CharacterDraft {
   /** #1689: species-granted cantrip choice (High Elf's Cantrip) — catalog
    *  spell id, empty string for none chosen / no chooseCantrip spec served. */
   speciesCantripId: string;
+  /** #1690: species-granted Origin feat choice (2024 Human's Versatile) —
+   *  catalog feat id, empty string for none chosen / no chooseOriginFeat
+   *  spec served. */
+  speciesOriginFeatId: string;
   skillProficiencies: SkillName[];
   /** Tool proficiency names chosen by the player at character creation. */
   toolChoices: string[];
@@ -119,6 +123,7 @@ const EMPTY_DRAFT: CharacterDraft = {
   castingAbility: "",
   speciesSkills: [],
   speciesCantripId: "",
+  speciesOriginFeatId: "",
   skillProficiencies: [],
   toolChoices: [],
   cantripIds: [],

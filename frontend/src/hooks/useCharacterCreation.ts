@@ -11,6 +11,7 @@ import {
   deriveSkillChoices,
   deriveSpeciesBonuses,
   deriveSpeciesCantripChoice,
+  deriveSpeciesOriginFeatChoice,
   deriveSpeciesSkillChoice,
   resolveSelections,
 } from "@/lib/characterCreation";
@@ -21,6 +22,7 @@ import type {
   CreationSkillChoices,
   CreationSpeciesBonuses,
   CreationSpeciesCantripChoice,
+  CreationSpeciesOriginFeatChoice,
   CreationSpeciesSkillChoice,
 } from "@/lib/characterCreation";
 import { stepPosition } from "@/lib/ceremonySteps";
@@ -57,6 +59,10 @@ export interface CharacterCreation {
   /** #1689: species-granted cantrip choice (High Elf) — inert (applicable:false)
    *  whenever the server serves no chooseCantrip for this species+variant. */
   speciesCantripChoice: CreationSpeciesCantripChoice;
+  /** #1690: species-granted Origin feat choice (2024 Human's Versatile) —
+   *  inert (applicable:false) whenever the server serves no chooseOriginFeat
+   *  for this species+variant. */
+  speciesOriginFeatChoice: CreationSpeciesOriginFeatChoice;
   catalog: Item[];
   /** #1616: the staged portrait image, uploaded after create. Component state,
    *  not draft state — a File JSON-serializes to {}, so it cannot ride the
@@ -126,6 +132,7 @@ export function useCharacterCreation(): CharacterCreation {
   // ability-increase derivation above — a species may serve both specs at once.
   const speciesSkillChoice = deriveSpeciesSkillChoice(draft, selections, [...skillChoices.granted, ...skillChoices.selected]);
   const speciesCantripChoice = deriveSpeciesCantripChoice(draft, selections);
+  const speciesOriginFeatChoice = deriveSpeciesOriginFeatChoice(draft, selections);
   const toolChoices = useToolProficiencyChoices({
     draft,
     selectedClass: selections.class,
@@ -254,6 +261,7 @@ export function useCharacterCreation(): CharacterCreation {
     speciesBonuses,
     speciesSkillChoice: { ...speciesSkillChoice, toggle: toggleSpeciesSkill },
     speciesCantripChoice,
+    speciesOriginFeatChoice,
     catalog,
     portraitFile,
     setPortraitFile,

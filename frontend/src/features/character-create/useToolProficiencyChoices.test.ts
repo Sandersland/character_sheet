@@ -40,6 +40,7 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
     castingAbility: "",
     speciesSkills: [],
     speciesCantripId: "",
+    speciesOriginFeatId: "",
     skillProficiencies: [],
     toolChoices: [],
     cantripIds: [],

@@ -73,6 +73,7 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
     castingAbility: "",
     speciesSkills: [],
     speciesCantripId: "",
+    speciesOriginFeatId: "",
     skillProficiencies: [],
     toolChoices: [],
     cantripIds: [],
@@ -128,7 +129,7 @@ const elfSpecies: SpeciesOption = {
   abilityIncreases: [],
   needsCastingAbility: false,
   chooseSkills: null,
-  chooseCantrip: null,
+  chooseCantrip: null, chooseOriginFeat: false,
   variants: [],
 };
 // Variant-bearing (2014 Dwarf-shaped) species fixture for the #1680
@@ -141,15 +142,15 @@ const dwarfSpecies: SpeciesOption = {
   abilityIncreases: [],
   needsCastingAbility: false,
   chooseSkills: null,
-  chooseCantrip: null,
+  chooseCantrip: null, chooseOriginFeat: false,
   variants: [
     {
       id: "var-hill", name: "Hill Dwarf", slug: "hill", abilityIncreases: [],
-      needsCastingAbility: false, chooseSkills: null, chooseCantrip: null,
+      needsCastingAbility: false, chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false,
     },
     {
       id: "var-mountain", name: "Mountain Dwarf", slug: "mountain", abilityIncreases: [],
-      needsCastingAbility: false, chooseSkills: null, chooseCantrip: null,
+      needsCastingAbility: false, chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false,
     },
   ],
 };
@@ -169,9 +170,10 @@ const drowLineageElf: SpeciesOption = {
   needsCastingAbility: false,
   chooseSkills: null,
   chooseCantrip: null,
+  chooseOriginFeat: false,
   variants: [{
     id: "var-drow", name: "Drow", slug: "drow", abilityIncreases: [],
-    needsCastingAbility: true, chooseSkills: null, chooseCantrip: null,
+    needsCastingAbility: true, chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false,
   }],
 };
 
@@ -190,7 +192,7 @@ const halfElfSpecies: SpeciesOption = {
   needsCastingAbility: false,
   // #1689: Skill Versatility — used by the "skills" step's own missing-gate tests below.
   chooseSkills: { count: 2 },
-  chooseCantrip: null,
+  chooseCantrip: null, chooseOriginFeat: false,
   variants: [],
 };
 
@@ -204,7 +206,7 @@ const highElfSpecies: SpeciesOption = {
   abilityIncreases: [],
   needsCastingAbility: false,
   chooseSkills: null,
-  chooseCantrip: null,
+  chooseCantrip: null, chooseOriginFeat: false,
   variants: [
     {
       id: "var-high",
@@ -214,10 +216,26 @@ const highElfSpecies: SpeciesOption = {
       needsCastingAbility: false,
       chooseSkills: null,
       chooseCantrip: { list: "wizard", castingAbility: "intelligence" },
+      chooseOriginFeat: false,
     },
   ],
 };
 const highElfVariant = highElfSpecies.variants[0];
+
+// #1690: 2024 Human-shape species fixture carrying chooseOriginFeat — used by
+// the "skills" step's own missing-gate tests below, alongside halfElfSpecies.
+const humanSpecies2024: SpeciesOption = {
+  id: "sp-human2024",
+  name: "Human",
+  slug: "human",
+  speed: 30,
+  abilityIncreases: [],
+  needsCastingAbility: false,
+  chooseSkills: { count: 1 },
+  chooseCantrip: null,
+  chooseOriginFeat: true,
+  variants: [],
+};
 
 describe("creationSteps", () => {
   it("includes the spells step only for a level-1 caster", () => {
@@ -456,6 +474,23 @@ describe("creationStepMissing", () => {
     ]);
     const complete = makeDraft({ className: "Rogue", speciesId: "sp-half-elf", speciesSkills: ["stealth", "perception"] });
     expect(creationStepMissing("skills", complete, sel({ class: rogue, species: halfElfSpecies }))).toEqual([]);
+  });
+
+  // #1690: 2024 Human's Versatile — the "skills" step's own gate, alongside
+  // (and independent of) the skill-choice gate above; both apply at once for
+  // a 2024 Human (Skillful AND Versatile).
+  it("skills gates an incomplete species Origin feat choice (2024 Human) and clears once satisfied", () => {
+    const incomplete = makeDraft({ className: "Rogue", speciesId: "sp-human2024", speciesSkills: ["stealth"] });
+    expect(creationStepMissing("skills", incomplete, sel({ class: rogue, species: humanSpecies2024 }))).toEqual([
+      "Species origin feat",
+    ]);
+    const complete = makeDraft({
+      className: "Rogue",
+      speciesId: "sp-human2024",
+      speciesSkills: ["stealth"],
+      speciesOriginFeatId: "feat-tough",
+    });
+    expect(creationStepMissing("skills", complete, sel({ class: rogue, species: humanSpecies2024 }))).toEqual([]);
   });
 
   it("spells gates an incomplete caster's picks", () => {

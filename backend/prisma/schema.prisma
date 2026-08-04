@@ -1113,6 +1113,13 @@ model CharacterRace {
   // content is #1690's).
   speciesSkills      String[] @default([])
   speciesCantripName String?
+  // #1690: provenance snapshot of a species-granted Origin feat pick (Human's
+  // Versatile) — sibling of speciesCantripName above, same "audit-only" role.
+  // The functional grant lives on Character.resources.advancements as a
+  // slot-exempt AdvancementEntry (the SAME snapshot shape the background's
+  // Origin feat bakes via buildOriginEntry, #1130), never re-derived from
+  // this column. NULL for every species with no chooseOriginFeat trait.
+  speciesOriginFeatName String?
 }
 
 model CharacterBackground {

@@ -69,6 +69,13 @@ export interface SpeciesCantripChoiceOption {
   castingAbility: AbilityName;
 }
 
+/** #1690: whether this row grants a choice of Origin feat (2024 Human's
+ *  Versatile) — a bare boolean, unlike chooseSkills/chooseCantrip above,
+ *  since chooseOriginFeatSchema carries no further spec: "Origin category"
+ *  is the whole rule, resolved live against the Feat catalog at create time,
+ *  never a fixed list baked into the trait row. */
+export type SpeciesOriginFeatChoiceOption = boolean;
+
 /** A species' second creation step — 2014 subrace, 2024 lineage/legacy/
  *  ancestry (#1679/#1680), served nested inside SpeciesOption.variants: an
  *  empty variants array renders no variant step. Carries its own
@@ -86,9 +93,11 @@ export interface SpeciesVariantOption {
    *  Chthonic/Infernal). False for every 2014 row and every non-spell 2024
    *  variant (Dragonborn ancestry, Goliath's Giant Ancestry). */
   needsCastingAbility: boolean;
-  /** #1689: null for every row but High Elf's own — see the type's own comment. */
+  /** #1689/#1690: null/false for every row but the ones that carry the
+   *  matching trait — see the type's own comment. */
   chooseSkills: SpeciesSkillChoiceOption | null;
   chooseCantrip: SpeciesCantripChoiceOption | null;
+  chooseOriginFeat: SpeciesOriginFeatChoiceOption;
 }
 
 /** Species option (#1679/#1680), served nested per edition (server-filtered
@@ -108,9 +117,11 @@ export interface SpeciesOption {
    *  species level (a grant with no variant chosen) — always false this
    *  wave, kept general for a future species-level grant. */
   needsCastingAbility: boolean;
-  /** #1689: null for every row but Half-Elf's own — see the type's own comment. */
+  /** #1689/#1690: null/false for every row but the ones that carry the
+   *  matching trait — see the type's own comment. */
   chooseSkills: SpeciesSkillChoiceOption | null;
   chooseCantrip: SpeciesCantripChoiceOption | null;
+  chooseOriginFeat: SpeciesOriginFeatChoiceOption;
   variants: SpeciesVariantOption[];
 }
 
@@ -303,6 +314,11 @@ export interface CreateCharacterInput {
    *  it — see deriveSpeciesSkillChoice/deriveSpeciesCantripChoice. */
   speciesSkills?: SkillName[];
   speciesCantripId?: string;
+  /** #1690: species-granted Origin feat pick (2024 Human's Versatile) —
+   *  catalog feat id. Sent only when the resolved species+variant carries
+   *  chooseOriginFeat AND the player has completed it — see
+   *  deriveSpeciesOriginFeatChoice. */
+  speciesOriginFeatId?: string;
   background: string;
   classes: [{ name: string; subclass?: string | null; subclassId?: string }];
   abilityScores: AbilityScores;

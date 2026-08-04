@@ -57,6 +57,10 @@ describe("POST /api/characters — 2024 lineage casting-ability choice (#1683)",
       speciesId: elf.id,
       variantId: drowVariant.id,
       castingAbility: "charisma",
+      // #1690: every 2024 Elf lineage also carries the species-level Keen
+      // Senses trait — a real, required choice landed alongside this slice,
+      // not a stray field this test happens to satisfy.
+      speciesSkills: ["survival"],
     });
     expect(res.status).toBe(201);
     createdCharacterIds.push(res.body.id);
@@ -67,7 +71,15 @@ describe("POST /api/characters — 2024 lineage casting-ability choice (#1683)",
 
   it("400s with a distinct message when castingAbility is omitted for a spell-granting lineage", async () => {
     const { elf, drowVariant } = await drow();
-    const res = await post({ ...baseBody, race: "Drow", speciesId: elf.id, variantId: drowVariant.id });
+    // speciesSkills (#1690's Keen Senses) supplied so the 400 below is
+    // provably castingAbility's OWN rejection, not an earlier one.
+    const res = await post({
+      ...baseBody,
+      race: "Drow",
+      speciesId: elf.id,
+      variantId: drowVariant.id,
+      speciesSkills: ["survival"],
+    });
     expect(res.status).toBe(400);
     expect(res.body.error).toBe("castingAbility required: this species/variant grants spells with a chosen casting ability");
   });
@@ -80,6 +92,7 @@ describe("POST /api/characters — 2024 lineage casting-ability choice (#1683)",
       speciesId: elf.id,
       variantId: drowVariant.id,
       castingAbility: "strength",
+      speciesSkills: ["survival"],
     });
     expect(res.status).toBe(400);
   });
@@ -125,6 +138,7 @@ describe("POST /api/characters — 2024 lineage casting-ability choice (#1683)",
       speciesId: elf.id,
       variantId: highElf.id,
       castingAbility: "intelligence",
+      speciesSkills: ["survival"],
     });
     expect(res.status).toBe(201);
     createdCharacterIds.push(res.body.id);

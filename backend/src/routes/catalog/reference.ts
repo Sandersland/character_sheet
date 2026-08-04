@@ -20,7 +20,7 @@ import { requireEditionOr400 } from "@/lib/http/parse-edition-param.js";
 import { resolveEditionCatalog, withEditionOrShared } from "@/lib/rules/catalog-edition.js";
 import { backgroundGrantsAbilitySpread, backgroundGrantsOriginFeat } from "@/lib/rules/background-grants.js";
 import type { AbilityIncreaseSpec } from "@/lib/srd/species-ability-increases.js";
-import { isChooseCantrip, isChooseSkills, type SpeciesTraitChoice } from "@/lib/srd/species-trait-choices.js";
+import { isChooseCantrip, isChooseOriginFeat, isChooseSkills, type SpeciesTraitChoice } from "@/lib/srd/species-trait-choices.js";
 
 export const referenceRouter = Router();
 
@@ -238,6 +238,12 @@ referenceRouter.get("/reference", async (req, res) => {
   function chooseCantripOf(traits: { choice: unknown }[]) {
     return traitChoices(traits).find(isChooseCantrip)?.chooseCantrip ?? null;
   }
+  // #1690: a bare boolean (not object-or-null like the two above) — matches
+  // chooseOriginFeatSchema's own `{chooseOriginFeat: true}` shape, which
+  // carries no further spec to resolve.
+  function chooseOriginFeatOf(traits: { choice: unknown }[]) {
+    return traitChoices(traits).some(isChooseOriginFeat);
+  }
 
   // #1679: variants nested inside each species, exactly like
   // classes[].subclasses above. abilityIncreases rides along as of #1681 (cast
@@ -247,10 +253,12 @@ referenceRouter.get("/reference", async (req, res) => {
   // JSON column is [] for every EDITION_2024 row, matching resolveSpeciesGrants'
   // edition gate. speedOverride is NOT served yet — no client needs it before
   // the variant-speed picker lands (#1680/#1682). chooseSkills/chooseCantrip
-  // (#1689) ride the same way — null for every row but Half-Elf's own
-  // (chooseSkills) and High Elf's own (chooseCantrip) this slice; see
-  // SpeciesOption's own JSDoc (reference.ts, frontend) for why both fields
-  // are served at both levels.
+  // (#1689) and chooseOriginFeat (#1690) ride the same way — null/false for
+  // every row but the ones that carry the matching trait (Half-Elf's own
+  // chooseSkills, High Elf's own chooseCantrip, 2024 Human's own chooseSkills
+  // + chooseOriginFeat, 2024 Elf's own chooseSkills); see SpeciesOption's own
+  // JSDoc (reference.ts, frontend) for why all three fields are served at
+  // both levels.
   const speciesWithVariants = rawSpecies.map((s) => ({
     id: s.id,
     name: s.name,
@@ -265,6 +273,7 @@ referenceRouter.get("/reference", async (req, res) => {
     needsCastingAbility: s.grantedSpells.some((g) => g.variantId === null),
     chooseSkills: chooseSkillsOf(s.traits.filter((t) => t.variantId === null)),
     chooseCantrip: chooseCantripOf(s.traits.filter((t) => t.variantId === null)),
+    chooseOriginFeat: chooseOriginFeatOf(s.traits.filter((t) => t.variantId === null)),
     variants: s.variants.map((v) => ({
       id: v.id,
       name: v.name,
@@ -274,6 +283,7 @@ referenceRouter.get("/reference", async (req, res) => {
       needsCastingAbility: v.grantedSpells.length > 0,
       chooseSkills: chooseSkillsOf(v.traits),
       chooseCantrip: chooseCantripOf(v.traits),
+      chooseOriginFeat: chooseOriginFeatOf(v.traits),
     })),
   }));
 

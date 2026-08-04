@@ -41,6 +41,7 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
     castingAbility: "",
     speciesSkills: [],
     speciesCantripId: "",
+    speciesOriginFeatId: "",
     skillProficiencies: [],
     toolChoices: [],
     cantripIds: [],
@@ -70,21 +71,21 @@ const reference: ReferenceData = {
       abilityIncreases: [],
       needsCastingAbility: false,
       chooseSkills: null,
-      chooseCantrip: null,
+      chooseCantrip: null, chooseOriginFeat: false,
       variants: [
         {
           id: "var-hill", name: "Hill Dwarf", slug: "hill", abilityIncreases: [],
-          needsCastingAbility: false, chooseSkills: null, chooseCantrip: null,
+          needsCastingAbility: false, chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false,
         },
         {
           id: "var-mountain", name: "Mountain Dwarf", slug: "mountain", abilityIncreases: [],
-          needsCastingAbility: false, chooseSkills: null, chooseCantrip: null,
+          needsCastingAbility: false, chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false,
         },
       ],
     },
     {
       id: "sp-human", name: "Human", slug: "human", speed: 30, abilityIncreases: [],
-      needsCastingAbility: false, chooseSkills: null, chooseCantrip: null, variants: [],
+      needsCastingAbility: false, chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false, variants: [],
     },
     // #1683: a 2024 Elf-shaped species with a spell-granting lineage (Drow)
     // and a non-spell-granting one (Wood Elf), for the casting-ability picker.
@@ -97,14 +98,15 @@ const reference: ReferenceData = {
       needsCastingAbility: false,
       chooseSkills: null,
       chooseCantrip: null,
+      chooseOriginFeat: false,
       variants: [
         {
           id: "var-drow", name: "Drow", slug: "drow", abilityIncreases: [],
-          needsCastingAbility: true, chooseSkills: null, chooseCantrip: null,
+          needsCastingAbility: true, chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false,
         },
         {
           id: "var-wood", name: "Wood Elf", slug: "wood", abilityIncreases: [],
-          needsCastingAbility: false, chooseSkills: null, chooseCantrip: null,
+          needsCastingAbility: false, chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false,
         },
       ],
     },

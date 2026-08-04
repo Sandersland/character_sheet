@@ -45,7 +45,7 @@ const referenceFixture: ReferenceData = {
   races: [{ id: "race-human", name: "Human", speed: 30, toolProficiencies: [] }],
   species: [{
     id: "sp-human", name: "Human", slug: "human", speed: 30, abilityIncreases: [],
-    needsCastingAbility: false, chooseSkills: null, chooseCantrip: null, variants: [],
+    needsCastingAbility: false, chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false, variants: [],
   }],
   classes: [
     {

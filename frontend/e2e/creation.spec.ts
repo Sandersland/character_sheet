@@ -11,6 +11,20 @@ function continueStep(page: Page) {
   return page.getByRole("button", { name: /Continue/ }).click();
 }
 
+// 2024 Human's own two SpeciesTrait choices (#1690): Skillful (one skill of
+// your choice) and Versatile (one Origin feat of your choice) — both render
+// on the Skills & Tools step and both gate Continue, so every 2024 Human spec
+// below must satisfy them. `skill` is chosen per test to be OUTSIDE that
+// test's class skillChoices AND the background's own fixed grant, so the
+// checkbox is unambiguous on the page (no same-named checkbox in the Skill
+// Proficiencies panel above it); `feat` likewise avoids the background's own
+// Origin feat (visible on the Abilities step) so the two choices are provably
+// independent, never a same-feat collision the backend would 400 on anyway.
+async function chooseHumanSpeciesTraits(page: Page, skill: string, feat: string) {
+  await page.getByRole("checkbox", { name: skill }).check();
+  await page.locator("li").filter({ hasText: feat }).getByRole("button", { name: "Select" }).click();
+}
+
 // Equipment step, default (2024) edition: PHB'24's packages have no
 // roll-for-gold rule at all (#1535), so "Starting gold" isn't offered — pick
 // the lettered option (A), a single deterministic choice with no open picks
@@ -73,7 +87,11 @@ test("creation: guided ceremony lands on the sheet with the chosen class", async
   await page.getByRole("radio", { name: "+1 to Dexterity" }).check();
   await continueStep(page);
 
-  // Skills & Tools step — no required picks for this build.
+  // Skills & Tools step — the 2024 Human's own Skillful (one skill) and
+  // Versatile (one Origin feat) picks gate Continue (#1690); Stealth is
+  // outside Fighter's skillChoices, and Tough is a different Origin feat
+  // from Soldier's own Savage Attacker grant above.
+  await chooseHumanSpeciesTraits(page, "Stealth", "Tough");
   await continueStep(page);
 
   // Equipment step — the 2024 Fighter package's option (A) (chain mail etc.),
@@ -126,7 +144,10 @@ test("creation: a Noble's background gaming-set pick is satisfiable from a grant
   await page.getByRole("radio", { name: "+1 to Intelligence" }).check();
   await continueStep(page);
 
-  // Skills & Tools step.
+  // Skills & Tools step — the 2024 Human's own Skillful/Versatile picks gate
+  // Continue (#1690); Survival is outside Rogue's skillChoices, and Tough is
+  // a different Origin feat from Noble's own Skilled grant.
+  await chooseHumanSpeciesTraits(page, "Survival", "Tough");
   await continueStep(page);
 
   // Equipment step — two cards now (Rogue's package and Noble's own), and the
@@ -170,7 +191,10 @@ test("creation: a warlock picks cantrips + spells that show on the Magic tab", a
   await page.getByRole("radio", { name: "+1 to Constitution" }).check();
   await continueStep(page);
 
-  // Skills & Tools step.
+  // Skills & Tools step — the 2024 Human's own Skillful/Versatile picks gate
+  // Continue (#1690); Perception is outside Warlock's skillChoices, and Tough
+  // is a different Origin feat from Sage's own Magic Initiate grant.
+  await chooseHumanSpeciesTraits(page, "Perception", "Tough");
   await continueStep(page);
 
   // Spells step (#1160): a level-1 warlock picks 2 cantrips + 2 spells through the
