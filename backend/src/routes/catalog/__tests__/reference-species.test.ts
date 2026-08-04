@@ -68,6 +68,18 @@ describe("GET /api/reference — species (#1679)", () => {
     expect(dwarf.variants).toEqual([]);
   });
 
+  it("serves abilityIncreases on species AND variants (#1681) — [] for every 2024 row", async () => {
+    const res2014 = await getReference("EDITION_2014");
+    const dwarf2014 = res2014.body.species.find((s: { name: string }) => s.name === "Dwarf");
+    expect(dwarf2014.abilityIncreases).toEqual([{ ability: "constitution", amount: 2 }]);
+    const hillDwarf = dwarf2014.variants.find((v: { name: string }) => v.name === "Hill Dwarf");
+    expect(hillDwarf.abilityIncreases).toEqual([{ ability: "wisdom", amount: 1 }]);
+
+    const res2024 = await getReference("EDITION_2024");
+    const dwarf2024 = res2024.body.species.find((s: { name: string }) => s.name === "Dwarf");
+    expect(dwarf2024.abilityIncreases).toEqual([]);
+  });
+
   it("Dragonborn carries its 10 draconic ancestry variants in both editions", async () => {
     const res2014 = await getReference("EDITION_2014");
     const res2024 = await getReference("EDITION_2024");

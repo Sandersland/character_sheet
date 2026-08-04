@@ -23,7 +23,10 @@ import { z } from "zod";
 // empty array is valid for a 2014 row too, e.g. Human's six separate +1
 // fixed entries look nothing like "no increases", so the schema can't tell
 // "2024 species" apart from "2014 species with a genuinely empty spec").
-const ABILITY_NAMES = [
+// Exported: character-create.ts's resolveSpeciesGrants (#1681) needs the full
+// six-name list as a choose spec's default eligible set when it carries no
+// `from` restriction (none does yet, but the schema allows it).
+export const ABILITY_NAMES = [
   "strength",
   "dexterity",
   "constitution",
@@ -73,3 +76,8 @@ const abilityIncreaseSpecSchema = z.union([
 export const abilityIncreasesSchema = z.array(abilityIncreaseSpecSchema);
 
 export type AbilityIncreaseSpec = z.infer<typeof abilityIncreaseSpecSchema>;
+// resolveSpeciesGrants (character-create.ts, #1681) splits a merged spec array
+// by discriminant key ("ability" | "choose" | "floating") and needs this one
+// sub-shape by name — the fixed and floating forms are narrowed inline off
+// AbilityIncreaseSpec instead (no cross-file consumer needs them named).
+export type ChooseIncrease = z.infer<typeof chooseIncreaseSchema>["choose"];

@@ -718,6 +718,15 @@ async function reconcileClassEntryLevels(ctx: ReconcileContext): Promise<void> {
 /**
  * Ordered list of reconcilers. Each runs sequentially in the XP transaction
  * (later reconcilers see earlier ones' results — maneuvers must follow subclass).
+ *
+ * No reconciler for #1681's 2014 species/subrace ability increases (baked into
+ * Character.abilityScores + CharacterRace.abilityBonuses at creation, in
+ * resolveSpeciesGrants): the legal maximum this state can reach is fixed the
+ * moment the character is created and never changes with level — species is
+ * immutable post-creation (no race transaction endpoint, `race` absent from
+ * PATCH), so there is no XP transaction where a species-derived score could
+ * ever drift out of bounds for this reconciler to repair. Same reasoning
+ * background's PHB'24 ability spread (#1130) already established.
  */
 const LEVEL_GATED_RECONCILERS: Reconciler[] = [
   reconcileClassEntryLevels,

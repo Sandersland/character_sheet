@@ -36,13 +36,27 @@ export interface RaceOption {
   toolProficiencies: string[];
 }
 
+/** #1679/#1681: the AbilityIncreaseSpec vocabulary served on Species/SpeciesVariant
+ *  rows (backend's abilityIncreasesSchema, lib/srd/species-ability-increases.ts) —
+ *  a wire-shape mirror, not a rule: the backend alone decides what an ability
+ *  bump is worth (resolveSpeciesGrants); the ceremony only reads this shape to
+ *  render a preview and build the `speciesAbilities` request field. */
+export type AbilityIncreaseSpec =
+  | { ability: AbilityName; amount: number }
+  | { choose: { count: number; amount: number; from?: AbilityName[] } }
+  | { floating: number };
+
 /** A species' second creation step — 2014 subrace, 2024 lineage/legacy/
- *  ancestry (#1679/#1680). Identity only this slice: no abilityIncreases or
- *  speedOverride on the wire yet (#1681's territory). */
+ *  ancestry (#1679/#1680), served nested inside SpeciesOption.variants: an
+ *  empty variants array renders no variant step. Carries its own
+ *  abilityIncreases (#1681), additive to the parent species'. */
 export interface SpeciesVariantOption {
   id: string;
   name: string;
   slug: string;
+  /** Additive to the parent species' own abilityIncreases at creation (Hill
+   *  Dwarf's +1 WIS on top of Dwarf's +2 CON) — [] for every 2024 row. */
+  abilityIncreases: AbilityIncreaseSpec[];
 }
 
 /** Species option (#1679/#1680), served nested per edition (server-filtered
@@ -55,6 +69,9 @@ export interface SpeciesOption {
   name: string;
   slug: string;
   speed: number;
+  /** [] for every EDITION_2024 row — 2024 ability increases come from
+   *  backgrounds only (#1572), never species (#1681). */
+  abilityIncreases: AbilityIncreaseSpec[];
   variants: SpeciesVariantOption[];
 }
 
@@ -190,7 +207,8 @@ export interface EditionsResponse {
 export interface ReferenceData {
   races: RaceOption[];
   /** Species catalog for the two-step species→variant picker (#1679/#1680),
-   *  served alongside the flat `races` list above during its compat window. */
+   *  served alongside the flat `races` list above during its compat window
+   *  (per-edition here supersedes the flat list; both pruned in #1684). */
   species: SpeciesOption[];
   classes: ClassOption[];
   backgrounds: BackgroundOption[];
@@ -226,10 +244,15 @@ export interface CreateCharacterInput {
   race: string;
   /** #1679/#1680: the two-step picker's real selection — ids, like
    *  `subclassId`. `race` above stays required alongside these (the display
-   *  name POST /api/characters still needs until #1684 prunes the legacy
-   *  path); the frontend never presents a race picker for it anymore. */
+   *  name POST /api/characters still needs until #1684 prunes the legacy path);
+   *  the frontend no longer presents a race picker. */
   speciesId?: string;
   variantId?: string;
+  /** 2014 species/subrace ability increases (#1681): the CHOSEN portion only
+   *  (fixed increases apply server-side with no request field). Sent only
+   *  when the merged species+variant spec has a choose component AND the
+   *  player has completed it — see deriveSpeciesBonuses. */
+  speciesAbilities?: Partial<Record<AbilityName, number>>;
   background: string;
   classes: [{ name: string; subclass?: string | null; subclassId?: string }];
   abilityScores: AbilityScores;

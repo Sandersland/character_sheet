@@ -9,6 +9,7 @@ import {
   deriveBackgroundBonuses,
   derivePreview,
   deriveSkillChoices,
+  deriveSpeciesBonuses,
   resolveSelections,
 } from "@/lib/characterCreation";
 import type {
@@ -16,6 +17,7 @@ import type {
   CreationPreview,
   CreationSelections,
   CreationSkillChoices,
+  CreationSpeciesBonuses,
 } from "@/lib/characterCreation";
 import { stepPosition } from "@/lib/ceremonySteps";
 import { creationMissing, creationStepMissing, creationSteps } from "@/lib/creationSteps";
@@ -42,6 +44,9 @@ export interface CharacterCreation {
   skills: CharacterCreationSkills;
   toolChoices: ToolProficiencyChoices;
   backgroundBonuses: CreationBackgroundBonuses;
+  /** #1681: 2014 species/subrace ability increases — inert (applicable:false)
+   *  for a 2024 character or an unmatched/fixed-only race name. */
+  speciesBonuses: CreationSpeciesBonuses;
   catalog: Item[];
   /** #1616: the staged portrait image, uploaded after create. Component state,
    *  not draft state — a File JSON-serializes to {}, so it cannot ride the
@@ -106,6 +111,7 @@ export function useCharacterCreation(): CharacterCreation {
   const selections = resolveSelections(reference, draft);
   const skillChoices = deriveSkillChoices(draft, selections);
   const backgroundBonuses = deriveBackgroundBonuses(draft, selections);
+  const speciesBonuses = deriveSpeciesBonuses(draft, selections);
   const toolChoices = useToolProficiencyChoices({
     draft,
     selectedClass: selections.class,
@@ -221,6 +227,7 @@ export function useCharacterCreation(): CharacterCreation {
     skills: { ...skillChoices, toggle: toggleSkill },
     toolChoices,
     backgroundBonuses,
+    speciesBonuses,
     catalog,
     portraitFile,
     setPortraitFile,

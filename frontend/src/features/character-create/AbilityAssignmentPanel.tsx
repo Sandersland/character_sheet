@@ -15,6 +15,7 @@ import {
   setPlusOne,
   setPlusTwo,
   spreadMode,
+  sumBonusMaps,
   toOneOneOne,
   toTwoOne,
   usedSlotIndices,
@@ -23,7 +24,7 @@ import {
 } from "@/lib/abilityAssignment";
 import AbilityRollTray from "@/features/character-create/AbilityRollTray";
 import { POINT_BUY_BUDGET } from "@/lib/abilityGen";
-import type { CreationBackgroundBonuses } from "@/lib/characterCreation";
+import type { CreationBackgroundBonuses, CreationSpeciesBonuses } from "@/lib/characterCreation";
 import type { AbilityMethod, CharacterDraft } from "@/hooks/useCharacterDraft";
 import type { AbilityName, AbilityScores } from "@/types/character";
 
@@ -33,6 +34,8 @@ interface AbilityAssignmentPanelProps {
   assignments: AbilityAssignments;
   scores: AbilityScores;
   bonuses: CreationBackgroundBonuses;
+  /** #1681: 2014 species/subrace ability increases — inert when applicable is false. */
+  speciesBonuses: CreationSpeciesBonuses;
   /** PHB'24 primary ability/abilities to flag as recommended (#1161). */
   primaryAbility: AbilityName[];
   /** Class display name shown beside a recommended row (e.g. "◆ Fighter"). */
@@ -408,6 +411,75 @@ function SpreadControls({
   );
 }
 
+// #1681: 2014 species/subrace ability increases. Fixed increases (Dwarf's +2
+// CON) are announce-only text — the backend applies them with no player
+// input — while a choose component (Half-Elf's "+1 to two of your choice")
+// gets a checkbox-per-ability picker, capped at `count` selections. Separate
+// block from SpreadControls above: the shapes differ (uniform +amount per
+// pick here, vs background's +2/+1-or-+1/+1/+1 spread) and the two mechanics
+// never both apply to one character (opposite editions).
+function SpeciesBonusBlock({
+  bonuses,
+  update,
+}: {
+  bonuses: CreationSpeciesBonuses;
+  update: Update;
+}) {
+  const { fixed, choice, assignment } = bonuses;
+  const fixedEntries = Object.entries(fixed) as [AbilityName, number][];
+
+  function toggle(ability: AbilityName) {
+    if (!choice) return;
+    const next = { ...assignment };
+    if (next[ability] !== undefined) {
+      delete next[ability];
+    } else if (Object.keys(next).length < choice.count) {
+      next[ability] = choice.amount;
+    }
+    update({ speciesAbilities: next });
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-card border border-parchment-200 bg-parchment-100 p-3">
+      <span className="text-xs font-semibold uppercase tracking-wide text-parchment-600">Species Bonuses</span>
+      {fixedEntries.length > 0 && (
+        <p className="text-sm text-parchment-700">
+          {fixedEntries.map(([ability, amount]) => `+${amount} ${ABILITY_LABELS[ability]}`).join(", ")}
+        </p>
+      )}
+      {choice && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-parchment-600">
+            Choose {choice.count} (+{choice.amount} each):
+          </span>
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Species ability choice">
+            {choice.abilities.map((ability) => {
+              const checked = assignment[ability] !== undefined;
+              const full = !checked && Object.keys(assignment).length >= choice.count;
+              return (
+                <button
+                  key={ability}
+                  type="button"
+                  aria-pressed={checked}
+                  disabled={full}
+                  onClick={() => toggle(ability)}
+                  className={`${CHIP_BASE} ${
+                    checked
+                      ? "border-garnet-surface bg-garnet-surface text-garnet-on-surface"
+                      : "border-parchment-300 text-parchment-700 disabled:opacity-40"
+                  }`}
+                >
+                  {ABILITY_LABELS[ability]}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Column template: Ability | Base | [ +2 | +1 ] or [ +1 dot ] | Total/Mod.
 function gridColumns(applicable: boolean, mode: SpreadMode): string {
   if (!applicable) return "minmax(0,1fr) auto auto";
@@ -427,6 +499,7 @@ export default function AbilityAssignmentPanel({
   assignments,
   scores,
   bonuses,
+  speciesBonuses,
   primaryAbility,
   className,
   update,
@@ -436,6 +509,10 @@ export default function AbilityAssignmentPanel({
   const pooled = isPoolMethod(method);
   const { applicable, abilities: bonusAbilities, assignment: bonusAssignment, originFeat } = bonuses;
   const mode = spreadMode(bonusAssignment);
+  // #1681: the grid's Total/Mod columns fold in species increases too (fixed +
+  // chosen) — the two mechanisms never both apply to one character, but
+  // summing unconditionally means this needs no edition branch of its own.
+  const combinedBonus = sumBonusMaps(bonusAssignment, speciesBonuses.fixed, speciesBonuses.assignment);
 
   function selectMethod(next: AbilityMethod) {
     setHeld(null);
@@ -473,7 +550,7 @@ export default function AbilityAssignmentPanel({
     update({ abilityScores: { ...scores, [ability]: clamped } });
   }
 
-  const rows = abilityRows({ method, scores, pool, assignments, bonus: bonusAssignment, primaryAbility });
+  const rows = abilityRows({ method, scores, pool, assignments, bonus: combinedBonus, primaryAbility });
   const used = usedSlotIndices(assignments);
   const gridCols = gridColumns(applicable, mode);
 
@@ -530,6 +607,8 @@ export default function AbilityAssignmentPanel({
         {applicable && (
           <SpreadControls mode={mode} bonusAbilities={bonusAbilities} originFeat={originFeat} update={update} />
         )}
+
+        {speciesBonuses.applicable && <SpeciesBonusBlock bonuses={speciesBonuses} update={update} />}
       </div>
     </Card>
   );

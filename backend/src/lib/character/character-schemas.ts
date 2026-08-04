@@ -60,6 +60,14 @@ export const createCharacterSchema = z
     // variant rows. variantId is REJECTED without a speciesId (never implies one).
     speciesId: z.string().optional(),
     variantId: z.string().optional(),
+    // 2014 species/subrace ability increases (#1681): the CHOSEN portion only
+    // (fixed increases are applied server-side with no request field, same
+    // as fixed tool profs above). Required iff the merged species+variant
+    // abilityIncreases spec has a choose/floating component; 400 under
+    // EDITION_2024 (mirrors backgroundAbilities' 2024-only gate below, in the
+    // other direction) and when the merged spec is fixed-only — see
+    // resolveSpeciesGrants in character-create.ts.
+    speciesAbilities: z.record(z.string(), z.number().int().positive()).optional(),
     background: z.string().min(1),
     classes: z.array(classChoiceSchema).length(1),
     abilityScores: abilityScoresSchema,

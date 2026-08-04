@@ -4,7 +4,7 @@
 // validation is invented here.
 
 import { ABILITY_ORDER } from "@/lib/abilities";
-import { deriveBackgroundBonuses, resolveBackgroundName } from "@/lib/characterCreation";
+import { deriveBackgroundBonuses, deriveSpeciesBonuses, resolveBackgroundName } from "@/lib/characterCreation";
 import type { CreationSelections } from "@/lib/characterCreation";
 import { missingRequirements } from "@/lib/characterCreationValidation";
 import { creationSpellCounts, creationSpellsMissing } from "@/lib/creationSpells";
@@ -93,6 +93,13 @@ export function creationStepMissing(
       }
       const bonuses = deriveBackgroundBonuses(draft, selections);
       if (bonuses.applicable && !bonuses.complete) missing.push("Background ability scores");
+      // #1681: 2014 species/subrace increases — a fixed-only species (or none
+      // matched) is always complete (nothing to pick), so this only ever
+      // blocks a choose-bearing species (Half-Elf) left unassigned. 2024
+      // never applies (deriveSpeciesBonuses.applicable is false — every
+      // served species row's spec is []).
+      const speciesBonuses = deriveSpeciesBonuses(draft, selections);
+      if (speciesBonuses.applicable && !speciesBonuses.complete) missing.push("Species ability scores");
       return missing;
     }
     case "spells":

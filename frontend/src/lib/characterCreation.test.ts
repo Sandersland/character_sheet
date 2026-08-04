@@ -5,6 +5,7 @@ import {
   deriveBackgroundBonuses,
   derivePreview,
   deriveSkillChoices,
+  deriveSpeciesBonuses,
   resolveBackgroundEquipmentInput,
   resolveBackgroundName,
   resolveEquipmentInput,
@@ -12,7 +13,7 @@ import {
 } from "@/lib/characterCreation";
 import { emptyPackageState } from "@/lib/startingEquipment";
 import type { CharacterDraft } from "@/hooks/useCharacterDraft";
-import type { ClassOption, ClassStartingEquipment, ReferenceData } from "@/types/character";
+import type { ClassOption, ClassStartingEquipment, ReferenceData, SpeciesOption } from "@/types/character";
 
 function makeClass(overrides: Partial<ClassOption> = {}): ClassOption {
   return {
@@ -58,7 +59,7 @@ const CRIMINAL_PACKAGE: ClassStartingEquipment = {
 // race-granted-tool-profs source), never the picker's own source of truth.
 const reference: ReferenceData = {
   races: [{ id: "race-1", name: "Elf", speed: 30, toolProficiencies: [] }],
-  species: [{ id: "sp-elf", name: "Elf", slug: "elf", speed: 30, variants: [] }],
+  species: [{ id: "sp-elf", name: "Elf", slug: "elf", speed: 30, abilityIncreases: [], variants: [] }],
   classes: [makeClass()],
   backgrounds: [
     { id: "bg-1", name: "Sage", skillProficiencies: ["perception"], toolProficiencies: [], abilityChoices: [], originFeat: null, startingEquipment: null },
@@ -110,6 +111,7 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
       charisma: 10,
     },
     backgroundAbilities: {},
+    speciesAbilities: {},
     skillProficiencies: [],
     toolChoices: [],
     cantripIds: [],
@@ -151,12 +153,82 @@ describe("resolveSelections", () => {
           name: "Dwarf",
           slug: "dwarf",
           speed: 25,
-          variants: [{ id: "var-hill", name: "Hill Dwarf", slug: "hill" }],
+          abilityIncreases: [],
+          variants: [{ id: "var-hill", name: "Hill Dwarf", slug: "hill", abilityIncreases: [] }],
         },
       ],
     };
     const draft = makeDraft({ speciesId: "sp-dwarf", variantId: "var-hill" });
     expect(resolveSelections(referenceWithVariants, draft).variant?.name).toBe("Hill Dwarf");
+  });
+});
+
+// #1679/#1681: SpeciesOption fixtures — a variant-bearing species (Dwarf-shape:
+// species-level fixed +2 CON, variant-level fixed +1 WIS) and a choose-bearing
+// one (Half-Elf-shape: fixed +2 CHA + choose 2 of {str,dex,con,int,wis} at +1).
+const DWARF_SPECIES: SpeciesOption = {
+  id: "sp-dwarf",
+  name: "Dwarf",
+  slug: "dwarf",
+  speed: 25,
+  abilityIncreases: [{ ability: "constitution", amount: 2 }],
+  variants: [
+    { id: "var-hill", name: "Hill Dwarf", slug: "hill", abilityIncreases: [{ ability: "wisdom", amount: 1 }] },
+  ],
+};
+const HALF_ELF_SPECIES: SpeciesOption = {
+  id: "sp-half-elf",
+  name: "Half-Elf",
+  slug: "half-elf",
+  speed: 30,
+  abilityIncreases: [
+    { ability: "charisma", amount: 2 },
+    { choose: { count: 2, amount: 1, from: ["strength", "dexterity", "constitution", "intelligence", "wisdom"] } },
+  ],
+  variants: [],
+};
+const speciesReference: ReferenceData = { ...reference, species: [DWARF_SPECIES, HALF_ELF_SPECIES] };
+
+describe("deriveSpeciesBonuses (#1681)", () => {
+  it("is inert (applicable:false) when no species is selected", () => {
+    const draft = makeDraft();
+    const bonuses = deriveSpeciesBonuses(draft, resolveSelections(speciesReference, draft));
+    expect(bonuses).toEqual({ applicable: false, fixed: {}, choice: null, assignment: {}, complete: true });
+  });
+
+  it("a fixed-only species+variant merges both levels' increases and is always complete", () => {
+    const draft = makeDraft({ speciesId: "sp-dwarf", variantId: "var-hill" });
+    const bonuses = deriveSpeciesBonuses(draft, resolveSelections(speciesReference, draft));
+    expect(bonuses.applicable).toBe(true);
+    expect(bonuses.fixed).toEqual({ constitution: 2, wisdom: 1 });
+    expect(bonuses.choice).toBeNull();
+    expect(bonuses.complete).toBe(true);
+  });
+
+  it("a choose-bearing species excludes the fixed ability from the eligible list and starts incomplete", () => {
+    const draft = makeDraft({ speciesId: "sp-half-elf" });
+    const bonuses = deriveSpeciesBonuses(draft, resolveSelections(speciesReference, draft));
+    expect(bonuses.fixed).toEqual({ charisma: 2 });
+    expect(bonuses.choice).toEqual({
+      count: 2,
+      amount: 1,
+      abilities: ["strength", "dexterity", "constitution", "intelligence", "wisdom"],
+    });
+    expect(bonuses.complete).toBe(false);
+  });
+
+  it("is complete once exactly `count` abilities are assigned at `amount` each", () => {
+    const draft = makeDraft({ speciesId: "sp-half-elf", speciesAbilities: { strength: 1, dexterity: 1 } });
+    const bonuses = deriveSpeciesBonuses(draft, resolveSelections(speciesReference, draft));
+    expect(bonuses.assignment).toEqual({ strength: 1, dexterity: 1 });
+    expect(bonuses.complete).toBe(true);
+  });
+
+  it("ignores a stale draft.speciesAbilities entry outside the eligible list (e.g. left over from a prior species)", () => {
+    const draft = makeDraft({ speciesId: "sp-half-elf", speciesAbilities: { charisma: 1, strength: 1 } });
+    const bonuses = deriveSpeciesBonuses(draft, resolveSelections(speciesReference, draft));
+    expect(bonuses.assignment).toEqual({ strength: 1 });
+    expect(bonuses.complete).toBe(false);
   });
 });
 
@@ -337,6 +409,36 @@ describe("buildCreatePayload", () => {
     expect(buildCreatePayload(inert, sel2, deriveSkillChoices(inert, sel2), []).backgroundAbilities).toBeUndefined();
   });
 
+  it("sends speciesId/variantId and a completed speciesAbilities choice (#1681)", () => {
+    const draft = makeDraft({ name: "X", className: "Rogue", speciesId: "sp-half-elf", speciesAbilities: { strength: 1, dexterity: 1 } });
+    const selections = resolveSelections(speciesReference, draft);
+    const payload = buildCreatePayload(draft, selections, deriveSkillChoices(draft, selections), []);
+    expect(payload.speciesId).toBe("sp-half-elf");
+    expect(payload.variantId).toBeUndefined();
+    expect(payload.speciesAbilities).toEqual({ strength: 1, dexterity: 1 });
+  });
+
+  it("omits speciesAbilities for a fixed-only species and for an incomplete choice", () => {
+    const fixedOnly = makeDraft({ name: "X", className: "Rogue", speciesId: "sp-dwarf", variantId: "var-hill" });
+    const sel1 = resolveSelections(speciesReference, fixedOnly);
+    const payload1 = buildCreatePayload(fixedOnly, sel1, deriveSkillChoices(fixedOnly, sel1), []);
+    expect(payload1.speciesId).toBe("sp-dwarf");
+    expect(payload1.variantId).toBe("var-hill");
+    expect(payload1.speciesAbilities).toBeUndefined();
+
+    const incompleteChoice = makeDraft({ name: "X", className: "Rogue", speciesId: "sp-half-elf", speciesAbilities: { strength: 1 } });
+    const sel2 = resolveSelections(speciesReference, incompleteChoice);
+    expect(buildCreatePayload(incompleteChoice, sel2, deriveSkillChoices(incompleteChoice, sel2), []).speciesAbilities).toBeUndefined();
+  });
+
+  it("omits speciesId/variantId when the draft's own empty-string default is untouched (`|| undefined` normalization)", () => {
+    const draft = makeDraft({ name: "X", className: "Rogue" });
+    const selections = resolveSelections(speciesReference, draft);
+    const payload = buildCreatePayload(draft, selections, deriveSkillChoices(draft, selections), []);
+    expect(payload.speciesId).toBeUndefined();
+    expect(payload.variantId).toBeUndefined();
+  });
+
   it("merges granted + selected skills and omits empty optionals", () => {
     const draft = makeDraft({
       name: " Lidda ",
@@ -370,7 +472,8 @@ describe("buildCreatePayload", () => {
           name: "Dwarf",
           slug: "dwarf",
           speed: 25,
-          variants: [{ id: "var-hill", name: "Hill Dwarf", slug: "hill" }],
+          abilityIncreases: [],
+          variants: [{ id: "var-hill", name: "Hill Dwarf", slug: "hill", abilityIncreases: [] }],
         },
       ],
     };

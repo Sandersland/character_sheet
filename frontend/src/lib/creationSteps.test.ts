@@ -69,6 +69,7 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
       charisma: 10,
     },
     backgroundAbilities: {},
+    speciesAbilities: {},
     skillProficiencies: [],
     toolChoices: [],
     cantripIds: [],
@@ -116,7 +117,7 @@ const specBackground = {
 // Variantless (2014 Human-shaped) species fixture — the identity step's
 // generic "a species is chosen" tests use this so they don't also have to
 // carry a variant pick.
-const elfSpecies: SpeciesOption = { id: "sp-elf", name: "Elf", slug: "elf", speed: 30, variants: [] };
+const elfSpecies: SpeciesOption = { id: "sp-elf", name: "Elf", slug: "elf", speed: 30, abilityIncreases: [], variants: [] };
 // Variant-bearing (2014 Dwarf-shaped) species fixture for the #1680
 // variant-required gate.
 const dwarfSpecies: SpeciesOption = {
@@ -124,15 +125,31 @@ const dwarfSpecies: SpeciesOption = {
   name: "Dwarf",
   slug: "dwarf",
   speed: 25,
+  abilityIncreases: [],
   variants: [
-    { id: "var-hill", name: "Hill Dwarf", slug: "hill" },
-    { id: "var-mountain", name: "Mountain Dwarf", slug: "mountain" },
+    { id: "var-hill", name: "Hill Dwarf", slug: "hill", abilityIncreases: [] },
+    { id: "var-mountain", name: "Mountain Dwarf", slug: "mountain", abilityIncreases: [] },
   ],
 };
 
 function sel(overrides: Partial<CreationSelections> = {}): CreationSelections {
   return { species: undefined, variant: undefined, race: undefined, class: undefined, background: undefined, ...overrides };
 }
+
+// #1681: Half-Elf-shape species fixture (fixed +2 CHA + choose 2 of 5 at +1) —
+// the one shape that actually gates the abilities step (a fixed-only species
+// never does, per deriveSpeciesBonuses.complete).
+const halfElfSpecies: SpeciesOption = {
+  id: "sp-half-elf",
+  name: "Half-Elf",
+  slug: "half-elf",
+  speed: 30,
+  abilityIncreases: [
+    { ability: "charisma", amount: 2 },
+    { choose: { count: 2, amount: 1, from: ["strength", "dexterity", "constitution", "intelligence", "wisdom"] } },
+  ],
+  variants: [],
+};
 
 describe("creationSteps", () => {
   it("includes the spells step only for a level-1 caster", () => {
@@ -250,6 +267,19 @@ describe("creationStepMissing", () => {
     expect(creationStepMissing("abilities", complete, sel({ background: specBackground }))).toEqual([]);
 
     // Spec-less / inert background never gates abilities.
+    expect(creationStepMissing("abilities", makeDraft(), sel())).toEqual([]);
+  });
+
+  it("abilities gates a choose-bearing species and clears when complete (#1681)", () => {
+    const incomplete = makeDraft({ speciesId: "sp-half-elf" });
+    expect(creationStepMissing("abilities", incomplete, sel({ species: halfElfSpecies }))).toEqual([
+      "Species ability scores",
+    ]);
+
+    const complete = makeDraft({ speciesId: "sp-half-elf", speciesAbilities: { strength: 1, dexterity: 1 } });
+    expect(creationStepMissing("abilities", complete, sel({ species: halfElfSpecies }))).toEqual([]);
+
+    // A fixed-only (or unmatched) species never gates abilities.
     expect(creationStepMissing("abilities", makeDraft(), sel())).toEqual([]);
   });
 
