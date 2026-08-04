@@ -24,7 +24,7 @@ export type CharacterEventType =
   | "levelUp" | "levelDown" | "deathSave" | "stabilize"      // hitPoints (cont.)
   | "xpAward" | "xpSet"                                       // experience
   | "currencyAdjust"                                           // currency
-  | "castSpell" | "expendSlot" | "restoreSlot"                // spellcasting
+  | "castSpell" | "castAbilitySlot" | "expendSlot" | "restoreSlot" // spellcasting
   | "learnSpell" | "forgetSpell" | "prepareSpell" | "unprepareSpell" // spellcasting (cont.)
   | "concentrationDropped"                                     // spellcasting (cont.)
   | "subclassChosen" | "subclassRemoved"                       // class

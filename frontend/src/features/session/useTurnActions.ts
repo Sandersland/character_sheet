@@ -175,7 +175,7 @@ export function useTurnActions({
   // this server effect (#758). Returns the first op's ExecuteActionResult
   // (#1528) so a server-rolled row-driven action (Second Wind) can surface
   // its roll — undefined on failure or when the server reported nothing.
-  async function send(actionKey: string, opts?: { roll?: number; inventoryItemId?: string }) {
+  async function send(actionKey: string, opts?: { roll?: number; inventoryItemId?: string; slotLevel?: number }) {
     try {
       const updated = await sendAction(actionKey, opts);
       if (updated.batchId) attachBatchId(updated.batchId);
