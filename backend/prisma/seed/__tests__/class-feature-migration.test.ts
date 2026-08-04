@@ -17,7 +17,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { castSpecFromRow } from "@/lib/classes/actions.js";
 import type { ClassFeatureRow } from "@/lib/classes/class-feature-rows.js";
 
-import { CLASS_FEATURES, LITERAL_ROW_CLASSES } from "../class-features.js";
+import { CLASS_FEATURES } from "../class-features.js";
 import { seedClassFeatures } from "../seed-class-features.js";
 import { RESEED_TIMEOUT_MS } from "./reseed-timeout.js";
 
@@ -54,62 +54,19 @@ describe("ClassFeature migration — row count (#1523)", () => {
   });
 });
 
-// The derived half now has ZERO pre-forked names: Cleric's "Domain Spells"
-// (#1225) was the last one, following Warlock's "Expanded Spell List"
-// (#1233) off this path onto its own literal seed data
-// (cleric-features.ts/warlock-features.ts) — both classes are now
-// LITERAL_ROW_CLASSES members, so their rows never reach this test's loop at
-// all (excluded by the `LITERAL_ROW_CLASSES.has(row.className)` `continue`
-// below). By construction every remaining (className, subclassSlug, name,
-// level) group of exactly 2 rows in CLASS_FEATURES must be an untagged
-// feature's 2014/2024 expansion, so its two descriptions must be equal — this
-// needs no separate access to the raw, pre-expansion feature list (which
-// class-features.ts keeps internal).
-
-// This suite reads in-memory CLASS_FEATURES, not the DB — both editions of an
-// untagged row come from the SAME expandFeatureRow spread (class-features.ts),
-// so this can only ever pass: it cannot catch a future author writing
-// divergent 2014/2024 text for what should be one untagged feature, because
-// by the time such a row reached CLASS_FEATURES it would already be two rows
-// with two `feature.edition` tags, i.e. no longer "untagged" by this test's
-// own KNOWN_FORKED_NAMES exclusion. What it DOES guard is expandFeatureRow
-// itself: a future edit that made the untagged branch build two DIFFERENT
-// descriptions (e.g. a copy-paste that varies `edition` into the text) fails
-// here without needing a DB round-trip. The AC this migration actually cares
-// about — that the DB holds what CLASS_FEATURES says — is covered
-// transitively by the exhaustive DB<->TS description-equality suite above and
-// the tuple-existence suite before it.
-//
-// SCOPED TO THE DERIVED HALF ONLY (#1227): LITERAL_ROW_CLASSES' rows
-// (Fighter's, fighter-features.ts) never pass through expandFeatureRow at
-// all — they arrive in CLASS_FEATURES already split one-row-per-edition, by
-// hand, and several same-name/same-level pairs (Second Wind, Action Surge,
-// Indomitable, Improved Critical, ...) are DELIBERATELY divergent text — this
-// suite guards expandFeatureRow, not each LITERAL class's authored content.
-// Excluding LITERAL_ROW_CLASSES rows here is the correct fix, not a second
-// name-keyed allow-list (KNOWN_FORKED_NAMES, deleted #1225 — Cleric's
-// "Domain Spells" was its last member).
-describe("ClassFeature migration — expandFeatureRow's untagged branch keeps both editions byte-identical (#1523)", () => {
-  it("every untagged feature's EDITION_2014/EDITION_2024 pair has equal level and description", async () => {
-    const byKey = new Map<string, typeof CLASS_FEATURES>();
-    for (const row of CLASS_FEATURES) {
-      if (LITERAL_ROW_CLASSES.has(row.className)) continue;
-      const key = `${row.className}::${row.subclassSlug ?? "null"}::${row.name}::${row.level}`;
-      const group = byKey.get(key) ?? [];
-      group.push(row);
-      byKey.set(key, group);
-    }
-
-    const pairs = [...byKey.values()].filter((g) => g.length === 2);
-    expect(pairs.length).toBeGreaterThan(0);
-
-    for (const pair of pairs) {
-      const editions = pair.map((r) => r.edition).sort();
-      expect(editions).toEqual(["EDITION_2014", "EDITION_2024"]);
-      expect(pair[0].description).toBe(pair[1].description);
-    }
-  });
-});
+// The "expandFeatureRow's untagged branch keeps both editions byte-identical"
+// suite that used to live here (#1523) retired by #1675: it read in-memory
+// CLASS_FEATURES filtered to `!LITERAL_ROW_CLASSES.has(row.className)` — the
+// derived half — and Monk was the last class on that path (Cleric's "Domain
+// Spells", #1225, was the last pre-forked NAME, following Warlock's
+// "Expanded Spell List", #1233, off it). Once Monk joined LITERAL_ROW_CLASSES
+// too, the filtered set was permanently empty, so its own anti-vacuity
+// assertion (`pairs.length > 0`) started failing by design — the exact "four
+// suites break by design" shape #1522's own roster-completion note predicted.
+// expandFeatureRow/collectRawFeatures themselves are deleted (class-
+// features.ts, #1675); every class's rows now arrive in CLASS_FEATURES
+// already split one-row-per-edition by hand, the same shape Fighter's rows
+// always had.
 
 describe("ClassFeature migration — the already-forked pairs were not duplicated (#1523)", () => {
   // #1225: Cleric's "Domain Spells" is NO LONGER a forked pair either — both
@@ -181,10 +138,10 @@ function isPopulatedBarbarianRow(row: { className: string; subclassSlug: string 
 
 // #1686: Elemental Attunement's toggle block (activationCost/resolverKind/
 // resourceKey/costKind/costPoolKey/costBase/effectBuffs) — the first Monk
-// row (still on the TS-authoring path, monk.ts) to populate a descriptor
-// column. Elemental Burst/Elemental Strike stay text-only rows; their real
-// ops live in warrior-of-elements.ts's own endpoint (save-DC damage, not a
-// buff), same as before this migration.
+// row to populate a descriptor column, transcribed unchanged onto its
+// literal row by #1675. Elemental Burst/Elemental Strike stay text-only
+// rows; their real ops live in warrior-of-elements.ts's own endpoint
+// (save-DC damage, not a buff), same as before this migration.
 function isPopulatedMonkRow(row: { className: string; subclassSlug: string | null; name: string }): boolean {
   return row.className === "Monk" && row.subclassSlug === "monk-warrior-of-the-elements" && row.name === "Elemental Attunement";
 }

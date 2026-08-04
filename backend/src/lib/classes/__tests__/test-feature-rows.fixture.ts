@@ -6,21 +6,23 @@
 // calling deriveResources with a bare class/subclass name (no DB round-trip)
 // while still exercising the real read path (featuresFromRows).
 //
-// TWO different suites prove this fixture agrees with the seed, and which one
-// applies depends on the class. class-feature-parity.test.ts is the DB-backed
-// proof for classes still authored in TS — but it `continue`s on
-// LITERAL_ROW_CLASSES by design, so for the literal classes mirrored in
-// LITERAL_CLASS_ROWS/LITERAL_SUBCLASS_ROWS below it proves nothing. That gap
-// is what let #1232's corrected Draconic descriptions ship stale here through
-// a fully green suite; literal-fixture-parity.test.ts (#1593, prisma-side
-// because only that direction can import both halves) closes it. This header
-// previously claimed class-feature-parity was the proof for everything, which
-// was the false statement the drift hid behind.
+// literal-fixture-parity.test.ts (#1593, prisma-side because only that
+// direction can import both halves) is what proves LITERAL_CLASS_ROWS/
+// LITERAL_SUBCLASS_ROWS below agree with the real seed — for all twelve
+// classes now that #1675 retired class-feature-parity.test.ts (the DB-backed
+// TS-vs-rows proof this file used to also lean on for whichever classes were
+// still TS-authored; it went vacuous the moment Monk, its last un-skipped
+// class, joined LITERAL_ROW_CLASSES, so keeping it around would have meant a
+// permanently-empty describe block). Without literal-fixture-parity.test.ts,
+// nothing would have caught #1232's corrected Draconic descriptions shipping
+// stale here through an otherwise fully green suite — this header previously
+// claimed class-feature-parity was the proof for everything, which was the
+// false statement that drift hid behind.
 //
 // FIGHTER (#1227, #1528, #1532), BARBARIAN (#1223), CLERIC (#1225), RANGER
 // (#1230), ROGUE (#1231), SORCERER (#1232), WARLOCK (#1233), WIZARD (#1234),
-// BARD (#1224), DRUID (#1226) and PALADIN (#1229) all author their
-// ClassFeature rows as literal seed data
+// BARD (#1224), DRUID (#1226), PALADIN (#1229) and MONK (#1675) all author
+// their ClassFeature rows as literal seed data
 // (prisma/seed/<class>-features.ts), which this src-side fixture can't
 // import — backend/tsconfig.json's `rootDir: "src"` makes a src file importing
 // anything under prisma/ a compile error (TS6059). Every one but Bard's rows
@@ -37,11 +39,8 @@
 // Channel Divinity tests, subclass-grant-level.test.ts) assert on directly. So
 // a class whose rows a real test exercises that way cannot skip the mirror
 // even where `.features` content itself is never asserted (#1225).
-// class-feature-parity.test.ts is the suite that DOES assert on `.features`
-// content, and it skips all nine classes for the same underlying reason (its
-// own file's LITERAL_ROW_CLASSES check).
 //
-// Three different end states sit behind that one list. `lib/classes/
+// Four different end states sit behind that one list. `lib/classes/
 // fighter.ts`, `barbarian.ts` and `rogue.ts` are deleted outright.
 // `warlock.ts`, `wizard.ts`, `sorcerer.ts`, `cleric.ts` and `druid.ts` survive
 // because each carries a subclass `grantLevel` (1 for Warlock's patrons,
@@ -53,7 +52,11 @@
 // (#899/#1353 — its EDITION_2024 Wisdom-modifier resourceFn was retired to a
 // row by #1685); Bard's Cha-modifier/level-tiered-recharge resourceFn (#1224) — both subclasses'
 // `grantLevel: 3` already equal the fallback, so unlike the first five that
-// isn't why either module stays. None of them still exports a base-class
+// isn't why either module stays. `monk.ts` survives for yet another reason
+// (#1675): its own resourceFn (the base Focus/Ki pool) plus three subclasses'
+// resourceFn's (Wholeness of Body, Flurry of Healing and Harm, Hand of
+// Ultimate Mercy) — all four subclasses' `grantLevel: 3` already equal the
+// fallback too, same as Ranger/Bard. None of them still exports a base-class
 // `features` array, which is what matters here.
 //
 // Barbarian's two subclasses (Totem Warrior, Berserker) need no subclassRows
@@ -94,14 +97,13 @@
 // `toRows(undefined?.features ?? [])` -> `[]` for both classRows and
 // subclassRows, identical to Rogue's own shape.
 import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "@/lib/classes/class-feature-rows.js";
-import { monk } from "@/lib/classes/monk.js";
 import { paladin } from "@/lib/classes/paladin.js";
 import { ranger } from "@/lib/classes/ranger.js";
 import { sorcerer } from "@/lib/classes/sorcerer.js";
 import type { AuthoredFeature, ClassDefinition, SubclassDefinition } from "@/lib/classes/types.js";
 import { wizard } from "@/lib/classes/wizard.js";
 const TEST_CLASSES: Record<string, ClassDefinition> = {
-  monk, paladin, ranger, sorcerer, wizard,
+  paladin, ranger, sorcerer, wizard,
 };
 
 // Flat map keyed by subclass name ACROSS all twelve classes, mirroring
@@ -135,9 +137,11 @@ function toRows(features: AuthoredFeature[]): ClassFeatureRow[] {
 // ClassFeature descriptor columns (prisma/seed/fighter-features.ts) — a
 // prisma/ file this src-side fixture can't import (the same rootDir boundary
 // the file header explains for `.features`). Hardcoded here, once, mirroring
-// fighter-features.ts's own descriptor values AND description text exactly
-// (pinned by class-feature-parity.test.ts's DB-backed proof that the two
-// never diverge). Exported so entry-scoped-actions.test.ts/
+// fighter-features.ts's own descriptor values AND description text exactly —
+// literal-fixture-parity.test.ts's DB-backed proof covers the description/
+// level half (its own SeedRow type); the descriptor columns stay a by-hand
+// mirror, same as every other LITERAL_CLASS_ROWS/LITERAL_SUBCLASS_ROWS entry.
+// Exported so entry-scoped-actions.test.ts/
 // entry-scoped-resources.test.ts can build their own per-entry
 // getFeatureRows callback around it.
 export const FIGHTER_BASE_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2024"] as const).flatMap((edition) => [
@@ -2337,6 +2341,306 @@ export const PALADIN_BASE_ROWS: ClassFeatureRow[] = [
   },
 ];
 
+// MONK's base-class rows (#1675): `lib/classes/monk.ts`'s base-class
+// `.features` moved to literal seed data (prisma/seed/monk-features.ts) —
+// the same rootDir boundary FIGHTER_BASE_ROWS'/RANGER_BASE_ROWS' comments
+// explain (monk.ts itself still exists — see its own header for why it
+// isn't deletable — but its base `.features` are gone). Byte-identical
+// across both editions (untagged in the seed — the 2014 rewrite is
+// #1500-#1503's job, not this fixture's). Extra Attack's derivedStat/
+// derivedStatTiers ride this array (unlike `toRows`, which drops those two
+// fields), mirroring FIGHTER_BASE_ROWS'/RANGER_BASE_ROWS' own reasoning.
+export const MONK_BASE_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2024"] as const).flatMap((edition) => [
+  {
+    name: "Unarmored Defense",
+    level: 1,
+    edition,
+    description:
+      "While not wearing armor or wielding a shield, your AC equals 10 + your Dexterity modifier + your Wisdom modifier.",
+  },
+  {
+    name: "Martial Arts",
+    level: 1,
+    edition,
+    description:
+      "With unarmed strikes or monk weapons: use Dexterity instead of Strength for attack and damage rolls; deal 1d6 (L1–4), 1d8 (L5–10), 1d10 (L11–16), or 1d12 (L17+) damage; make one bonus unarmed strike after the Attack action.",
+  },
+  {
+    name: "Focus",
+    level: 2,
+    edition,
+    description:
+      "You have a pool of Focus Points equal to your monk level. Spend them to fuel: Flurry of Blows (1 focus — two bonus unarmed strikes), Patient Defense (free for Disengage as a bonus action, or 1 focus for Disengage + Dodge), Step of the Wind (free for Dash as a bonus action, or 1 focus for Disengage + Dash with jump distance doubled). Focus save DC = 8 + proficiency + Wisdom modifier. Regain all focus on a short or long rest.",
+  },
+  {
+    name: "Unarmored Movement",
+    level: 2,
+    edition,
+    description:
+      "Your speed increases by 10 ft while unarmored and unshielded (+15 at L6; +20 at L10; +25 at L14; +30 at L18). At level 9, you can run up vertical surfaces and across liquids on your turn.",
+  },
+  {
+    name: "Uncanny Metabolism",
+    level: 2,
+    edition,
+    description:
+      "When you roll initiative, you can regain all expended Focus Points; when you do, roll your Martial Arts die and regain hit points equal to your monk level plus the number rolled. Usable once per long rest.",
+  },
+  {
+    name: "Deflect Attacks",
+    level: 3,
+    edition,
+    description:
+      "Use your reaction to reduce bludgeoning, piercing, or slashing damage from a melee or ranged attack that hits you by 1d10 + Dexterity modifier + monk level. If this reduces the damage to 0, spend 1 focus to redirect it: the attacker (melee, within 5 ft) or another creature (ranged, within 60 ft) must succeed on a Dexterity save or take damage equal to two rolls of your Martial Arts die + your Dexterity modifier.",
+  },
+  {
+    name: "Slow Fall",
+    level: 4,
+    edition,
+    description: "Use your reaction to reduce falling damage by 5 × your monk level.",
+  },
+  {
+    name: "Extra Attack",
+    level: 5,
+    edition,
+    description: "You can attack twice whenever you take the Attack action on your turn.",
+    derivedStat: "attacksPerAction",
+    derivedStatTiers: [{ minLevel: 5, value: 2 }],
+  },
+  {
+    name: "Stunning Strike",
+    level: 5,
+    edition,
+    description:
+      "Once per turn when you hit with a monk weapon or unarmed strike, spend 1 focus to attempt a stunning strike. The target makes a Constitution save (focus save DC): on a failure it is stunned until the end of your next turn; on a success its speed is halved until the start of your next turn.",
+  },
+  {
+    name: "Empowered Strikes",
+    level: 6,
+    edition,
+    description:
+      "Your unarmed strikes count as magical for the purpose of overcoming resistance and immunity to nonmagical attacks, and can deal force damage instead of their normal damage type.",
+  },
+  {
+    name: "Evasion",
+    level: 7,
+    edition,
+    description:
+      "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
+  },
+  {
+    name: "Heightened Focus",
+    level: 10,
+    edition,
+    description:
+      "Your focus features grow more potent: Flurry of Blows lets you make three unarmed strikes instead of two (still 1 focus); Patient Defense grants temporary hit points equal to two rolls of your Martial Arts die when you spend focus; Step of the Wind lets you bring one willing Large or smaller creature within 5 ft along with you when you spend focus.",
+  },
+  {
+    name: "Self-Restoration",
+    level: 10,
+    edition,
+    description:
+      "At the end of each of your turns, you can end one Charmed, Frightened, or Poisoned effect on yourself for free. You also no longer suffer exhaustion from lack of food or water.",
+  },
+  {
+    name: "Deflect Energy",
+    level: 13,
+    edition,
+    description:
+      "Your Deflect Attacks feature now works against an attack of any damage type, not just bludgeoning, piercing, or slashing.",
+  },
+  {
+    name: "Disciplined Survivor",
+    level: 14,
+    edition,
+    description:
+      "You gain proficiency in all saving throws. Additionally, whenever you fail a saving throw, you can spend 1 focus to reroll it and take the second result.",
+  },
+  {
+    name: "Perfect Focus",
+    level: 15,
+    edition,
+    description:
+      "When you roll initiative, if you have 3 or fewer focus points, you regain focus points until you have 4.",
+  },
+  {
+    name: "Superior Defense",
+    level: 18,
+    edition,
+    description:
+      "At the start of your turn, spend 3 focus to bolster yourself for 1 minute or until you're incapacitated: during that time you have resistance to all damage except force damage.",
+  },
+  {
+    name: "Body and Mind",
+    level: 20,
+    edition,
+    description: "Your Dexterity and Wisdom scores each increase by 4, to a maximum of 25.",
+  },
+]);
+
+// MONK's four 2024 subclasses (#1675) — each mirrors its own
+// monk-features.ts partition, byte-identical across both editions same as
+// MONK_BASE_ROWS above. Warrior of the Elements' Elemental Attunement row
+// carries the toggle descriptor block (#1686) — the one Monk row any
+// resourceKey-observing test could care about, mirrored here for the same
+// reason FIGHTER_BASE_ROWS hand-builds its populated rows rather than
+// calling `toRows`.
+export const WARRIOR_OF_THE_OPEN_HAND_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2024"] as const).flatMap((edition) => [
+  {
+    name: "Open Hand Technique",
+    level: 3,
+    edition,
+    description:
+      "When you hit a creature with an attack granted by your Flurry of Blows, you can impose one effect: Addle — the creature can't take reactions until the start of its next turn (no save); Push — the creature makes a Strength save or is pushed up to 15 ft away; or Topple — the creature makes a Dexterity save or is knocked prone.",
+  },
+  {
+    name: "Wholeness of Body",
+    level: 6,
+    edition,
+    description:
+      "As a bonus action, roll your Martial Arts die and regain that many hit points plus your Wisdom modifier (minimum 1). Usable a number of times equal to your Wisdom modifier (minimum once); regain all expended uses on a long rest.",
+  },
+  {
+    name: "Fleet Step",
+    level: 11,
+    edition,
+    description:
+      "When you take a bonus action other than Step of the Wind, you can also take the Step of the Wind bonus action immediately afterward.",
+  },
+  {
+    name: "Quivering Palm",
+    level: 17,
+    edition,
+    description:
+      "When you hit with an unarmed strike, spend 4 focus to set imperceptible vibrations in the creature that last for a number of days equal to your monk level. They are harmless unless you use your action to end them — the creature then makes a Constitution save, taking 10d12 force damage on a failure or half as much on a success. You can maintain vibrations in only one creature at a time and can end them harmlessly at any time without using an action.",
+  },
+]);
+
+export const WARRIOR_OF_SHADOW_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2024"] as const).flatMap((edition) => [
+  {
+    name: "Shadow Arts",
+    level: 3,
+    edition,
+    description:
+      "You know the Minor Illusion cantrip (Wisdom). Spend 1 focus to cast Darkness without material components; you can see through the darkness you create, and while it persists you can move it up to 30 ft as a bonus action. You also have Darkvision out to 60 ft, or your Darkvision's range increases by 60 ft if you already have it.",
+  },
+  {
+    name: "Shadow Step",
+    level: 6,
+    edition,
+    description:
+      "While in dim light or darkness, teleport as a bonus action to an unoccupied space you can see that is also in dim light or darkness (up to 60 ft), then make one unarmed strike as part of the same bonus action. You have advantage on the first melee attack you make before the end of the turn.",
+  },
+  {
+    name: "Improved Shadow Step",
+    level: 11,
+    edition,
+    description:
+      "When you Shadow Step, you can spend 1 focus to ignore the requirement that your destination be in dim light or darkness.",
+  },
+  {
+    name: "Cloak of Shadows",
+    level: 17,
+    edition,
+    description:
+      "Spend 3 focus and use your action to become invisible and able to move through other creatures and objects as if they were difficult terrain, for 1 minute or until you're incapacitated. The invisibility ends early if you attack or cast a spell. While it lasts, Flurry of Blows costs no focus.",
+  },
+]);
+
+export const WARRIOR_OF_MERCY_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2024"] as const).flatMap((edition) => [
+  {
+    name: "Implements of Mercy",
+    level: 3,
+    edition,
+    description: "You gain proficiency in the Insight and Medicine skills and with the Herbalism Kit.",
+  },
+  {
+    name: "Hand of Harm",
+    level: 3,
+    edition,
+    description:
+      "Once per turn when you hit a creature with an unarmed strike and deal damage, you can expend 1 focus to deal extra necrotic damage equal to one Martial Arts die plus your Wisdom modifier.",
+  },
+  {
+    name: "Hand of Healing",
+    level: 3,
+    edition,
+    description:
+      "As a Magic action, expend 1 focus to touch a creature and restore hit points equal to one Martial Arts die plus your Wisdom modifier. When you use Flurry of Blows, you can replace one of its unarmed strikes with this effect without spending the extra focus for the heal — Flurry's own focus cost still applies.",
+  },
+  {
+    name: "Physician's Touch",
+    level: 6,
+    edition,
+    description:
+      "Hand of Harm also inflicts the Poisoned condition on the target until the end of your next turn. Hand of Healing also ends one of the following conditions on the target: Blinded, Deafened, Paralyzed, Poisoned, or Stunned.",
+  },
+  {
+    name: "Flurry of Healing and Harm",
+    level: 11,
+    edition,
+    description:
+      "When you use Flurry of Blows, you can replace each of its unarmed strikes with Hand of Healing, and you can apply Hand of Harm to one of its strikes without spending focus (Hand of Harm's once-per-turn limit still applies). Usable a number of times equal to your Wisdom modifier (minimum once) per long rest.",
+  },
+  {
+    name: "Hand of Ultimate Mercy",
+    level: 17,
+    edition,
+    description:
+      "As a Magic action, expend 5 focus to touch a creature that died no more than 24 hours ago and return it to life with 4d10 plus your Wisdom modifier hit points, ending the Blinded, Deafened, Paralyzed, Poisoned, and Stunned conditions on it. Usable once per long rest.",
+  },
+]);
+
+export const WARRIOR_OF_THE_ELEMENTS_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2024"] as const).flatMap((edition) => [
+  {
+    name: "Manipulate Elements",
+    level: 3,
+    edition,
+    description: "You know the Elementalism cantrip. Wisdom is your spellcasting ability for it.",
+  },
+  {
+    name: "Elemental Attunement",
+    level: 3,
+    edition,
+    description:
+      "At the start of your turn, you can expend 1 Focus Point (no action) to imbue yourself with elemental energy for 10 minutes (or until you're Incapacitated). While attuned: your Unarmed Strike reach increases by 10 ft; and once per Unarmed Strike hit you can deal Acid, Cold, Fire, Lightning, or Thunder damage instead of the normal type — when you do, you can force the target to make a Strength saving throw (your focus save DC), moving it up to 10 ft in a direction of your choice on a failure.",
+    resourceKey: "elementalAttunement",
+    activationCost: "free",
+    resolverKind: "toggle",
+    costKind: "pool",
+    costPoolKey: "focus",
+    costBase: 1,
+    effectBuffs: [
+      {
+        key: "elementalAttunement",
+        target: "elementalAttunement",
+        modifier: 0,
+        duration: "while-active",
+      },
+    ],
+  },
+  {
+    name: "Elemental Burst",
+    level: 6,
+    edition,
+    description:
+      "As a Magic action, you can expend 2 Focus Points to create a 20-foot-radius sphere of elemental energy centered on a point within 120 ft. Choose Acid, Cold, Fire, Lightning, or Thunder. Each creature in the sphere makes a Dexterity saving throw (your focus save DC), taking damage equal to three rolls of your Martial Arts die of the chosen type on a failure, or half as much on a success.",
+  },
+  {
+    name: "Stride of the Elements",
+    level: 11,
+    edition,
+    description: "While your Elemental Attunement is active, you have a Fly Speed and a Swim Speed each equal to your Speed.",
+  },
+  {
+    name: "Elemental Epitome",
+    level: 17,
+    edition,
+    description:
+      "While your Elemental Attunement is active you gain: Resistance to Acid, Cold, Fire, Lightning, or Thunder damage (choose one at the start of each of your turns); Destructive Stride (when you use Step of the Wind, your Speed increases by 20 ft that turn, and the first creature you move within 5 ft of takes one roll of your Martial Arts die of your chosen resistance type); and Empowered Strikes (once per turn, one Unarmed Strike deals an extra Martial Arts die of your chosen resistance type on a hit).",
+  },
+]);
+
 export const LITERAL_CLASS_ROWS: Record<string, ClassFeatureRow[]> = {
   fighter: FIGHTER_BASE_ROWS,
   barbarian: BARBARIAN_BASE_ROWS,
@@ -2347,12 +2651,17 @@ export const LITERAL_CLASS_ROWS: Record<string, ClassFeatureRow[]> = {
   cleric: CLERIC_BASE_ROWS,
   druid: DRUID_BASE_ROWS,
   paladin: PALADIN_BASE_ROWS,
+  monk: MONK_BASE_ROWS,
 };
 
 export const LITERAL_SUBCLASS_ROWS: Record<string, ClassFeatureRow[]> = {
   "battle master": BATTLE_MASTER_ROWS,
   "circle of the land": CIRCLE_OF_THE_LAND_ROWS,
   "circle of the moon": CIRCLE_OF_THE_MOON_ROWS,
+  "warrior of the open hand": WARRIOR_OF_THE_OPEN_HAND_ROWS,
+  "warrior of shadow": WARRIOR_OF_SHADOW_ROWS,
+  "warrior of mercy": WARRIOR_OF_MERCY_ROWS,
+  "warrior of the elements": WARRIOR_OF_THE_ELEMENTS_ROWS,
   "school of evocation": WIZARD_EVOCATION_ROWS,
   "school of abjuration": WIZARD_ABJURATION_ROWS,
   "school of illusion": WIZARD_ILLUSION_ROWS,
