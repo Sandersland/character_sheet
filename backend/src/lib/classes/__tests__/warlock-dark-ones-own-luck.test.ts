@@ -1,10 +1,11 @@
-// #1233 commit 3: Dark One's Own Luck's 2024 total is the Charisma modifier
-// (minimum of once) — the one Warlock pool that stays resourceFn-derived
-// (lib/classes/warlock.ts) because resourceTotals' tier table can't express a
-// formula. Proves the real end-to-end path (deriveResources, not a bare
-// poolsFromRows/resourceFn call) resolves the Cha-mod floor correctly, is
-// edition-gated (flat 1 under 2014 regardless of Charisma), and never double-
-// emits the pool from both the resourceFn and a row.
+// #1233 commit 3, migrated onto its row by #1685: Dark One's Own Luck's 2024
+// total is the Charisma modifier (minimum of once) — now a
+// `{ abilityMod: "charisma", min: 1 }` formula tier on the row itself
+// (warlock-features.ts), evaluated by evaluateResourceTotal
+// (class-feature-rows.ts); lib/classes/warlock.ts no longer has a resourceFn
+// at all. Proves the real end-to-end path (deriveResources, not a bare
+// poolsFromRows call) resolves the Cha-mod floor correctly and is
+// edition-gated (flat 1 under 2014 regardless of Charisma).
 import { describe, expect, it } from "vitest";
 
 import { deriveResources } from "@/lib/classes/class-features.js";

@@ -1,66 +1,21 @@
-import { abilityModifier } from "@/lib/srd/srd.js";
-
-import type { ClassDefinition, DerivedResource } from "./types.js";
+import type { ClassDefinition } from "./types.js";
 
 // #1230: Ranger's feature TEXT moved to literal seed data
-// (prisma/seed/ranger-features.ts, commits 1-2); commit 3 (this one) moves
-// Favored Enemy's resourceTotals pool onto its row and adds the ONE
-// resourceFn below for Tireless/Nature's Veil (SRD 5.2 Wisdom-modifier
-// formulas resourceTotals can't express — see ranger-features.ts's own
-// header). This module is NOT deletable, for two independent reasons that
-// both survive this commit:
-//
-// (1) Hunter's `choices` catalog (#899) below — the option-level generic
+// (prisma/seed/ranger-features.ts, commits 1-2); commit 3 moved Favored
+// Enemy's resourceTotals pool onto its row. Tireless/Nature's Veil (SRD 5.2
+// Wisdom-modifier formulas) used to survive here as a small EDITION_2024
+// resourceFn — #1685's `{ abilityMod, min }` tier now expresses both
+// directly on their rows, so this module keeps exactly ONE reason to survive:
+// Hunter's `choices` catalog (#899) below — the option-level generic
 // "choose N" mechanism, owned by #1353 (see that issue's own comment for why
 // the count gate can't yet go edition-aware).
 //
-// (2) The EDITION_2024 Wisdom-modifier resourceFn immediately below.
-//
-// `grantLevel: 3` is NOT one of the reasons — unlike Warlock/Wizard it
-// already equals subclassGateLevel's undefined fallback, so it changes
-// nothing were it omitted; seed-data.test.ts's grantLevel/subclassLevel
-// match and the SUBCLASS_SLUGS bijection tests read `ranger.subclasses`
-// regardless, but that alone wouldn't require this module — (1) and (2) do.
+// `grantLevel: 3` is NOT a reason — unlike Warlock/Wizard it already equals
+// subclassGateLevel's undefined fallback, so it changes nothing were it
+// omitted; seed-data.test.ts's grantLevel/subclassLevel match and the
+// SUBCLASS_SLUGS bijection tests read `ranger.subclasses` regardless, but
+// that alone wouldn't require this module.
 export const ranger: ClassDefinition = {
-  // Tireless (L10) / Nature's Veil (L14), SRD 5.2: "a number of times equal
-  // to your Wisdom modifier (minimum of once)" — identical clause on both
-  // features, a formula no `resourceTotals` tier array can express. Both
-  // rows (ranger-features.ts) declare resourceKey/resourceLabel/
-  // resourceRecharge and deliberately OMIT resourceTotals; this supplies the
-  // total. #416's C3 evaluator retires this, mirroring warlock.ts's Fiend
-  // residue (Dark One's Own Luck). Returns nothing under EDITION_2014 (no
-  // 2014 row declares either key) and nothing below each feature's own grant
-  // level under 2024.
-  resourceFn: (level, abilityScores, _profBonus, _subclassKey, edition) => {
-    if (edition !== "EDITION_2024") return [];
-    const wisMod = Math.max(1, abilityModifier(abilityScores.wisdom ?? 10));
-    const pools: DerivedResource[] = [];
-    if (level >= 10) {
-      pools.push({
-        key: "tireless",
-        label: "Tireless",
-        total: wisMod,
-        recharge: "longRest",
-        // #1528 no-second-string rule: this description MUST agree with the
-        // EDITION_2024 Tireless row's own text (ranger-features.ts) — both
-        // mention "Temporary Hit Points" and "Wisdom modifier" — asserted by
-        // ranger-wisdom-pools.test.ts.
-        description:
-          "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
-      });
-    }
-    if (level >= 14) {
-      pools.push({
-        key: "naturesVeil",
-        label: "Nature's Veil",
-        total: wisMod,
-        recharge: "longRest",
-        description:
-          "As a Bonus Action, you magically become Invisible until the end of your next turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
-      });
-    }
-    return pools;
-  },
   subclasses: {
     hunter: {
       slug: "ranger-hunter",

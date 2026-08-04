@@ -777,10 +777,8 @@ export const WARLOCK_BASE_ROWS: ClassFeatureRow[] = [
 // original commit-1 shape) because the two editions now genuinely diverge —
 // mirrors ranger-features.ts's real content AND resource-pool columns
 // exactly: Favored Enemy's (2024) flat level-tiered resourceTotals, and
-// Tireless's/Nature's Veil's (2024) resourceKey with resourceTotals
-// deliberately OMITTED (both a Wisdom-modifier formula — the REAL total
-// comes from ranger.ts's resourceFn, exercised here via testFeatureRowsFor's
-// TEST_CLASSES import of `ranger`, same as production's deriveBaseLayer).
+// Tireless's/Nature's Veil's (2024) `{ abilityMod: "wisdom", min: 1 }`
+// formula tiers (#1685) — ranger.ts no longer has a resourceFn for either.
 // class-features-snapshot.test.ts calls deriveResources with EDITION_2024
 // only, so the 2014 partition below matters for readability/parity with the
 // other LITERAL_CLASS_ROWS fixtures more than for any assertion — but it is
@@ -924,6 +922,7 @@ export const RANGER_BASE_ROWS: ClassFeatureRow[] = [
     resourceKey: "tireless",
     resourceLabel: "Tireless",
     resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 10, total: { abilityMod: "wisdom", min: 1 } }],
   },
   {
     name: "Vanish",
@@ -947,6 +946,7 @@ export const RANGER_BASE_ROWS: ClassFeatureRow[] = [
     resourceKey: "naturesVeil",
     resourceLabel: "Nature's Veil",
     resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 14, total: { abilityMod: "wisdom", min: 1 } }],
   },
   {
     name: "Precise Hunter",
@@ -989,9 +989,9 @@ export const RANGER_BASE_ROWS: ClassFeatureRow[] = [
 ];
 
 // THE FIEND (#1233): mirrors warlock-features.ts's real SRD 5.2 content and
-// resource-pool columns exactly — Dark One's Own Luck's 2024 row deliberately
-// OMITS resourceTotals (a Charisma-modifier formula, still resourceFn-derived;
-// see warlock.ts's own header), and Hurl Through Hell's resourceTotals/
+// resource-pool columns exactly — Dark One's Own Luck's 2024 row carries a
+// { abilityMod: "charisma", min: 1 } formula tier (#1685; warlock.ts no
+// longer has a resourceFn for it), and Hurl Through Hell's resourceTotals/
 // recharge are identical across both editions (only the description and gate
 // level differ).
 export const THE_FIEND_ROWS: ClassFeatureRow[] = [
@@ -1042,6 +1042,7 @@ export const THE_FIEND_ROWS: ClassFeatureRow[] = [
     resourceKey: "darkOnesOwnLuck",
     resourceLabel: "Dark One's Own Luck",
     resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 6, total: { abilityMod: "charisma", min: 1 } }],
   },
   {
     name: "Fiendish Resilience",
@@ -1786,13 +1787,12 @@ export const CLERIC_TRICKERY_DOMAIN_ROWS: ClassFeatureRow[] = [
 // feature genuinely diverges by #1226's own tagging rule (druid-features.ts's
 // header) — mirrors that file's real content AND resource-pool columns
 // exactly: the EDITION_2024 Wild Shape row's resourceTotals (#1226 commit 3),
-// and Moonlight Step's resourceKey with resourceTotals deliberately OMITTED
-// (a Wisdom-modifier formula — the REAL total comes from
-// lib/classes/druid.ts's Circle of the Moon resourceFn, exercised here via
-// testFeatureRowsFor's TEST_CLASSES import... except Druid is no longer in
+// and Moonlight Step's { abilityMod: "wisdom", min: 1 } formula tier (#1685)
+// — druid.ts no longer has a resourceFn for either, and Druid is no longer in
 // TEST_CLASSES (dropped at #1226 commit 1, same as Fighter/Barbarian/Rogue),
-// so this fixture alone cannot exercise that resourceFn — DB-backed suites
-// (druid-wildshape-pool.test.ts) prove the end-to-end pool instead).
+// so this fixture's own poolsFromRows call is now the whole story for both
+// pools — DB-backed suites (druid-wildshape-pool.test.ts) additionally prove
+// the end-to-end pool through the real seed.
 export const DRUID_BASE_ROWS: ClassFeatureRow[] = [
   {
     name: "Druidic",
@@ -2058,6 +2058,7 @@ export const CIRCLE_OF_THE_MOON_ROWS: ClassFeatureRow[] = [
     resourceKey: "moonlightStep",
     resourceLabel: "Moonlight Step",
     resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 10, total: { abilityMod: "wisdom", min: 1 } }],
   },
   {
     name: "Thousand Forms",

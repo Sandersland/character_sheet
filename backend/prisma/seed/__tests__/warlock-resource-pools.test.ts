@@ -50,7 +50,7 @@ describe("Magical Cunning (base class, #1233): 2024 only, L2, 1/long rest", () =
   });
 });
 
-describe("Dark One's Own Luck (The Fiend, #1233): 2014 flat 1 short-or-long; 2024 defers its total (row omits resourceTotals)", () => {
+describe("Dark One's Own Luck (The Fiend, #1233/#1685): 2014 flat 1 short-or-long; 2024 is now a { abilityMod: \"charisma\", min: 1 } formula tier — poolsFromRows alone resolves both editions, no resourceFn left", () => {
   it("EDITION_2014: absent at level 5, present at level 6 and level 20, short-or-long recharge", () => {
     expect(poolAt(FIEND_ROWS, "darkOnesOwnLuck", 5, "EDITION_2014")).toBeUndefined();
     const at6 = poolAt(FIEND_ROWS, "darkOnesOwnLuck", 6, "EDITION_2014");
@@ -59,9 +59,14 @@ describe("Dark One's Own Luck (The Fiend, #1233): 2014 flat 1 short-or-long; 202
     expect(poolAt(FIEND_ROWS, "darkOnesOwnLuck", 20, "EDITION_2014")?.total).toBe(1);
   });
 
-  it("EDITION_2024: the row itself never derives a pool — resourceTotals is omitted, proving the row deliberately defers to resourceFn", () => {
-    expect(poolAt(FIEND_ROWS, "darkOnesOwnLuck", 6, "EDITION_2024")).toBeUndefined();
-    expect(poolAt(FIEND_ROWS, "darkOnesOwnLuck", 20, "EDITION_2024")).toBeUndefined();
+  it("EDITION_2024: absent below level 6, present at level 6 with the Charisma-modifier total (floored at 1), longRest recharge", () => {
+    expect(poolAt(FIEND_ROWS, "darkOnesOwnLuck", 5, "EDITION_2024", { charisma: 20 })).toBeUndefined();
+    const at6Low = poolAt(FIEND_ROWS, "darkOnesOwnLuck", 6, "EDITION_2024", { charisma: 8 });
+    expect(at6Low?.total).toBe(1); // Cha 8 -> -1 mod, floored to 1
+    expect(at6Low?.recharge).toBe("longRest");
+    const at6High = poolAt(FIEND_ROWS, "darkOnesOwnLuck", 6, "EDITION_2024", { charisma: 20 });
+    expect(at6High?.total).toBe(5); // Cha 20 -> +5 mod
+    expect(poolAt(FIEND_ROWS, "darkOnesOwnLuck", 20, "EDITION_2024", { charisma: 20 })?.total).toBe(5);
   });
 });
 
