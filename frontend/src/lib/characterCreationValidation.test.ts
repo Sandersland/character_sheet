@@ -10,7 +10,9 @@ import type { ClassStartingEquipment } from "@/types/character";
 const VALID_IDENTITY = {
   name: "Aria",
   alignment: "Chaotic Good",
-  race: "Elf",
+  speciesChosen: true,
+  variantRequired: false,
+  variantChosen: false,
   className: "Fighter",
   backgroundName: "Soldier",
 };
@@ -55,7 +57,9 @@ describe("missingRequirements", () => {
     const result = missingRequirements({
       name: "  ",
       alignment: "",
-      race: "",
+      speciesChosen: false,
+      variantRequired: false,
+      variantChosen: false,
       className: "",
       backgroundName: "",
       startingEquipment: null,
@@ -64,10 +68,57 @@ describe("missingRequirements", () => {
     expect(result).toEqual([
       "Name",
       "Alignment",
-      "Race",
+      "Species",
       "Class",
       "Background",
     ]);
+  });
+
+  // #1680: a variant-bearing species (2014 Dwarf) cannot Continue without a
+  // variant — mirrors the subclass-required pattern (an id-presence gate).
+  it("flags a missing variant only when the species requires one", () => {
+    expect(
+      missingRequirements({
+        ...VALID_IDENTITY,
+        variantRequired: true,
+        variantChosen: false,
+        startingEquipment: null,
+        equipmentDraft: null,
+      })
+    ).toEqual(["Variant"]);
+
+    expect(
+      missingRequirements({
+        ...VALID_IDENTITY,
+        variantRequired: true,
+        variantChosen: true,
+        startingEquipment: null,
+        equipmentDraft: null,
+      })
+    ).toEqual([]);
+
+    // Variantless species (2014 Human) — no Variant label even though none is chosen.
+    expect(
+      missingRequirements({
+        ...VALID_IDENTITY,
+        variantRequired: false,
+        variantChosen: false,
+        startingEquipment: null,
+        equipmentDraft: null,
+      })
+    ).toEqual([]);
+  });
+
+  it("never flags Variant when no species is chosen at all — Species is the blocker", () => {
+    const result = missingRequirements({
+      ...VALID_IDENTITY,
+      speciesChosen: false,
+      variantRequired: true,
+      variantChosen: false,
+      startingEquipment: null,
+      equipmentDraft: null,
+    });
+    expect(result).toEqual(["Species"]);
   });
 
   it("ignores an untouched equipment draft (null) — character starts with no inventory", () => {

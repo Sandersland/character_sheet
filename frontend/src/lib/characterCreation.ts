@@ -10,10 +10,20 @@ import type {
   RaceOption,
   ReferenceData,
   SkillName,
+  SpeciesOption,
+  SpeciesVariantOption,
   StartingEquipmentInput,
 } from "@/types/character";
 
 export interface CreationSelections {
+  /** #1680: the two-step picker's own selection. */
+  species: SpeciesOption | undefined;
+  variant: SpeciesVariantOption | undefined;
+  /** Legacy flat-catalog row sharing the chosen species/variant's NAME, if one
+   *  exists — kept only as useToolProficiencyChoices' (currently dormant)
+   *  race-granted-tool-proficiency source, never the picker's own source of
+   *  truth. Absent whenever no flat `Race` row shares that name (e.g. a 2024
+   *  species the flat legacy list never carried). */
   race: RaceOption | undefined;
   class: ClassOption | undefined;
   background: BackgroundOption | undefined;
@@ -91,13 +101,19 @@ function hitDieFace(hitDie: string): number {
   return Number(hitDie.replace(/^d/i, ""));
 }
 
-// Match the draft's chosen race/class/background names to reference entries.
+// Match the draft's chosen species/variant/class/background to reference
+// entries. species/variant resolve by id (#1680, like subclassId); class/
+// background still resolve by name.
 export function resolveSelections(
   reference: ReferenceData | null,
   draft: CharacterDraft
 ): CreationSelections {
+  const species = reference?.species.find((s) => s.id === draft.speciesId);
+  const variant = species?.variants.find((v) => v.id === draft.variantId);
   return {
-    race: reference?.races.find((r) => r.name === draft.race),
+    species,
+    variant,
+    race: reference?.races.find((r) => r.name === (variant?.name ?? species?.name)),
     class: reference?.classes.find((c) => c.name === draft.className),
     background: reference?.backgrounds.find((b) => b.name === draft.background),
   };
@@ -167,7 +183,10 @@ export function derivePreview(
   return {
     armorClass: 10 + dexModifier,
     dexModifier,
-    speed: selections.race?.speed,
+    // #1680: species.speed, not the legacy race match — it's the edition-
+    // accurate value GET /api/reference actually serves for the chosen
+    // species (e.g. 2024 Dwarf is 30 ft, not the flat catalog's 2014 25 ft).
+    speed: selections.species?.speed,
     maxHp: selections.class
       ? Math.max(1, hitDieFace(selections.class.hitDie) + conModifier)
       : undefined,
@@ -184,7 +203,13 @@ export function buildCreatePayload(
   return {
     name: draft.name.trim(),
     alignment: draft.alignment,
-    race: draft.race,
+    // POST /api/characters still requires `race` as a display-name string
+    // (#1679's compat window, pruned in #1684) — resolved from the chosen
+    // species/variant's own name so it always echoes what the two-step
+    // picker (#1680) shows, rather than a second, separately-picked value.
+    race: selections.variant?.name ?? selections.species?.name ?? "",
+    speciesId: draft.speciesId || undefined,
+    variantId: draft.variantId || undefined,
     background: resolveBackgroundName(draft),
     classes: [{
       name: draft.className,

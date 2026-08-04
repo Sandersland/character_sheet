@@ -221,7 +221,7 @@ test("visual: creation ceremony — steps", async ({ page }) => {
   // spread). A fixed name keeps the "Forging · …" kicker pixels stable.
   await page.getByLabel(/^Name/).fill("Aria Brightwood");
   await page.getByLabel(/^Alignment/).selectOption({ label: "True Neutral" });
-  await page.getByLabel(/^Race/).selectOption({ label: "Human" });
+  await page.getByLabel(/^Species/).selectOption({ label: "Human" });
   await page.getByLabel(/^Class/).selectOption({ label: "Fighter" });
   await page.getByLabel("Background").selectOption({ label: "Soldier" });
   await page.getByRole("button", { name: /Continue/ }).click();
