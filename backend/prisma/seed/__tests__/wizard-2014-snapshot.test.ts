@@ -159,8 +159,13 @@ function key(p: { subclassSlug: string | null; name: string }): string {
 }
 
 describe("Wizard EDITION_2014 rows are byte-identical to the pre-#1234 tree (2014 is a transcription, not a rewrite)", () => {
-  it("count matches: exactly the 19 pre-change 2014 features", () => {
-    const actual2014 = WIZARD_FEATURES.filter((r) => r.edition === "EDITION_2014");
+  it("count matches: exactly the 19 pre-change 2014 features, among the pre-#1234 subclasses", () => {
+    // Scoped the same way as the "no EXTRA row" test below — #1676
+    // (Bladesinging) added 4 genuinely new EDITION_2014 rows (Training in War
+    // and Song, Bladesong, Extra Attack, Song of Defense) under a fifth
+    // subclass this snapshot predates.
+    const pinnedSlugs = new Set(PRE_CHANGE_2014.map((p) => p.subclassSlug));
+    const actual2014 = WIZARD_FEATURES.filter((r) => r.edition === "EDITION_2014" && pinnedSlugs.has(r.subclassSlug));
     expect(actual2014).toHaveLength(PRE_CHANGE_2014.length);
     expect(PRE_CHANGE_2014).toHaveLength(19);
   });
@@ -175,8 +180,18 @@ describe("Wizard EDITION_2014 rows are byte-identical to the pre-#1234 tree (201
     }
   });
 
-  it("no EXTRA EDITION_2014 row exists beyond the 19 pinned above", () => {
-    const actualKeys = new Set(WIZARD_FEATURES.filter((r) => r.edition === "EDITION_2014").map((r) => key(r)));
+  it("no EXTRA EDITION_2014 row exists beyond the 19 pinned above, among the pre-#1234 subclasses", () => {
+    // Scoped to the four subclasses this snapshot covers (null/evocation/
+    // abjuration/illusion) — #1676 (Bladesinging) added a FIFTH subclass's
+    // worth of genuinely new EDITION_2014 rows after this file was pinned,
+    // which this snapshot was never meant to catch (it guards against a
+    // pre-#1234 row being silently edited, not against new subclasses being
+    // added later). Filtering by the pinned subclassSlugs keeps that guard
+    // intact without hand-listing Bladesinging's own five rows here too.
+    const pinnedSlugs = new Set(PRE_CHANGE_2014.map((p) => p.subclassSlug));
+    const actualKeys = new Set(
+      WIZARD_FEATURES.filter((r) => r.edition === "EDITION_2014" && pinnedSlugs.has(r.subclassSlug)).map((r) => key(r)),
+    );
     const pinnedKeys = new Set(PRE_CHANGE_2014.map((p) => key(p)));
     expect(actualKeys).toEqual(pinnedKeys);
   });

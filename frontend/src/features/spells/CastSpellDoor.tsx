@@ -131,7 +131,7 @@ export default function CastSpellDoor({ derived, busy, isLive, onCast, onGoToCom
           belowDescription={
             detailSpell.level > 0 ? (
               <SlotLevelSelector
-                spell={detailSpell}
+                baseLevel={detailSpell.level}
                 availableSlots={availableSlots}
                 spellSlot={resolvedLevel}
                 onSelect={setSlotLevel}

@@ -29,7 +29,7 @@ export default function CastSpellDetailSheet({
       onClose={onClose}
       belowDescription={
         <SlotLevelSelector
-          spell={spell}
+          baseLevel={spell.level}
           availableSlots={view.availableSlots}
           spellSlot={view.spellSlot}
           onSelect={(lvl) => picker.patchRow(spell.id, { slotLevel: lvl })}

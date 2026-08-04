@@ -15763,6 +15763,291 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
 ]
 `;
 
+exports[`deriveResources snapshot — pins output for every class/subclass across all 20 levels > wizard / bladesinging 1`] = `
+[
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 1,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 2,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 3,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 4,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 5,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 6,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 7,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 8,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 9,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 10,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 11,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 12,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 13,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 14,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 15,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 16,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 17,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 18,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 19,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 20,
+  },
+]
+`;
+
 exports[`deriveResources snapshot — pins output for every class/subclass across all 20 levels > wizard / school of abjuration 1`] = `
 [
   {
@@ -20167,6 +20452,91 @@ exports[`resolveClassDie snapshot — every class-die pool across all classes/su
 `;
 
 exports[`resolveClassDie snapshot — every class-die pool across all classes/subclasses > wizard / (no subclass) 1`] = `
+[
+  {
+    "dice": {},
+    "level": 1,
+  },
+  {
+    "dice": {},
+    "level": 2,
+  },
+  {
+    "dice": {},
+    "level": 3,
+  },
+  {
+    "dice": {},
+    "level": 4,
+  },
+  {
+    "dice": {},
+    "level": 5,
+  },
+  {
+    "dice": {},
+    "level": 6,
+  },
+  {
+    "dice": {},
+    "level": 7,
+  },
+  {
+    "dice": {},
+    "level": 8,
+  },
+  {
+    "dice": {},
+    "level": 9,
+  },
+  {
+    "dice": {},
+    "level": 10,
+  },
+  {
+    "dice": {},
+    "level": 11,
+  },
+  {
+    "dice": {},
+    "level": 12,
+  },
+  {
+    "dice": {},
+    "level": 13,
+  },
+  {
+    "dice": {},
+    "level": 14,
+  },
+  {
+    "dice": {},
+    "level": 15,
+  },
+  {
+    "dice": {},
+    "level": 16,
+  },
+  {
+    "dice": {},
+    "level": 17,
+  },
+  {
+    "dice": {},
+    "level": 18,
+  },
+  {
+    "dice": {},
+    "level": 19,
+  },
+  {
+    "dice": {},
+    "level": 20,
+  },
+]
+`;
+
+exports[`resolveClassDie snapshot — every class-die pool across all classes/subclasses > wizard / bladesinging 1`] = `
 [
   {
     "dice": {},

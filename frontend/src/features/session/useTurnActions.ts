@@ -281,7 +281,12 @@ export function useTurnActions({
     const plan = planActionClick(resolver, character);
     if (plan.consumeSlot) consumeSlotFor(cost, resolver?.kind);
     void sendForPlan(plan, key, resolver, cost);
-    if (plan.openResolution) openResolution(key);
+    // action carried through so openResolution's own resolverFor call can
+    // synthesize a row-driven resolver too (#1676 fix — see
+    // useActiveResolution's own comment: this was the first "open a sheet"
+    // resolverKind reached only through the wire fallback, never a static
+    // ACTION_RESOLVERS entry, and openResolution silently no-opped without it).
+    if (plan.openResolution) openResolution(key, undefined, action);
     surfaceReminder(key, cost);
   }
 
