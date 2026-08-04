@@ -17,6 +17,7 @@ import { applySpellRenames } from "./seed/rename-spells.js";
 import { seedSubclassGrantedSpells } from "./seed/seed-granted-spells.js";
 import { seedClassFeatures } from "./seed/seed-class-features.js";
 import { seedSubclasses } from "./seed/seed-subclasses.js";
+import { seedSpecies } from "./seed/seed-species.js";
 import { seedStartingEquipment } from "./seed/seed-starting-equipment.js";
 import { PACKS } from "./seed/packs.js";
 import { assertUniqueGrantedAbilityNames } from "./seed/guards.js";
@@ -448,6 +449,9 @@ async function main() {
     ...SUBCLASS_CHOICE_OPTIONS,
   ]);
   await seedRaces(prisma);
+  // #1679: additive, alongside seedRaces above — the flat Race table/seed
+  // keeps serving the legacy creation path until #1684 prunes it.
+  await seedSpecies(prisma);
   const classIds = await seedClasses(prisma);
   await seedSubclasses(prisma, classIds);
   // Feature rows FK both classes and subclasses seeded above (#1522/#1523).

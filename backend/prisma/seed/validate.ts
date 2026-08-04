@@ -27,6 +27,7 @@ import {
 } from "./starting-equipment.js";
 import { ITEMS } from "./catalog-data.js";
 import { PACKS } from "./packs.js";
+import { SPECIES, speciesSeedSchema } from "./species-data.js";
 
 interface SeedFamily {
   schema: z.ZodTypeAny;
@@ -45,6 +46,10 @@ const SEED_FAMILIES: Record<string, SeedFamily> = {
     schema: backgroundStartingEquipmentSeedSchema,
     rows: BACKGROUND_STARTING_EQUIPMENT_PACKAGES,
   },
+  // #1679 — speciesSeedSchema validates the nested variants array too (each
+  // SPECIES row embeds its own variants), so no separate SPECIES_VARIANTS
+  // family is needed.
+  SPECIES: { schema: speciesSeedSchema, rows: SPECIES },
 };
 
 export interface SeedValidationSummary {
@@ -145,6 +150,33 @@ export function assertSeedContentValid(): SeedValidationSummary {
 
   assertCatalogNamesResolve(STARTING_EQUIPMENT_PACKAGES);
   assertCatalogNamesResolve(BACKGROUND_STARTING_EQUIPMENT_PACKAGES, "BACKGROUND_STARTING_EQUIPMENT_PACKAGES");
+
+  // #1679: no two SPECIES rows may share (slug, edition) — the same M2 role
+  // as the SUBCLASSES slug check above, catching what @@unique([slug,
+  // edition]) would otherwise surface as an opaque P2002 mid-seed. Nested
+  // variant slugs are checked per-species, since @@unique([speciesId, slug])
+  // scopes uniqueness to the parent, not the whole table.
+  const rowsBySpeciesKey = new Map<string, number>();
+  SPECIES.forEach((species, index) => {
+    const key = `${species.slug}::${species.edition}`;
+    const seenAt = rowsBySpeciesKey.get(key);
+    if (seenAt !== undefined) {
+      throw new Error(`Seed error: duplicate species slug "${species.slug}" (${species.edition}) (rows ${seenAt} and ${index})`);
+    }
+    rowsBySpeciesKey.set(key, index);
+
+    const rowsByVariantSlug = new Map<string, number>();
+    (species.variants ?? []).forEach((variant, variantIndex) => {
+      const seenVariantAt = rowsByVariantSlug.get(variant.slug);
+      if (seenVariantAt !== undefined) {
+        throw new Error(
+          `Seed error: duplicate variant slug "${variant.slug}" under species "${species.name}" (${species.edition}) ` +
+            `(variants ${seenVariantAt} and ${variantIndex})`,
+        );
+      }
+      rowsByVariantSlug.set(variant.slug, variantIndex);
+    });
+  });
 
   return { familiesChecked: Object.keys(SEED_FAMILIES).length, rowsChecked };
 }

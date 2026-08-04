@@ -33,6 +33,16 @@ referenceRouter.get("/reference", async (req, res) => {
   // Sequential rather than Promise.all — see the matching comment in
   // charactersRouter's POST handler.
   const races = await prisma.race.findMany({ orderBy: { name: "asc" } });
+  // #1679: species nested per edition, ALONGSIDE races above (the flat list
+  // is untouched — pruned only in #1684). Exact-match `edition` filter, not
+  // resolveEditionCatalog/withEditionOrShared: Species.edition is NOT NULL
+  // (no species is edition-neutral), so there is no shared/NULL row to fall
+  // back to — the same reasoning as StartingEquipmentPackage's own query above.
+  const rawSpecies = await prisma.species.findMany({
+    where: { edition },
+    orderBy: { name: "asc" },
+    include: { variants: { orderBy: { name: "asc" } } },
+  });
   // Narrowed to at-most-two-per-key at the DB (withEditionOrShared), then
   // resolveEditionCatalog picks the one row per business key — same D3 shape
   // as originFeatRows/universalActionRows below. `edition` is present on the
@@ -97,12 +107,14 @@ referenceRouter.get("/reference", async (req, res) => {
   // resolveEditionCatalog's fallback, since StartingEquipmentPackage.edition is
   // non-nullable (#1534) — and, since #1535, that resolution reaches genuinely
   // different SRD 5.2 content, not a 2014 copy: a 2024 character gets the real
-  // PHB'24 package. Still deliberately unfiltered by this endpoint: `races`
-  // (species divergence is real — ability increases, roster membership — but
-  // not representable by an edition column alone, #1518); `classes` themselves
-  // (one CharacterClass row serves both editions by design, subclassGateLevel
-  // is the only field that forks, #1308). The spell catalog (`GET /api/spells`)
-  // is a separate endpoint with its own edition gap, #1517.
+  // PHB'24 package. `races` stays deliberately unfiltered by this endpoint —
+  // it's the legacy flat catalog, superseded per-edition by `species` (#1679,
+  // exact match below, same reasoning as startingEquipment's) and pruned
+  // outright in #1684, so filtering the flat list now would only be thrown
+  // away work. `classes` themselves stay unfiltered too (one CharacterClass
+  // row serves both editions by design, subclassGateLevel is the only field
+  // that forks, #1308). The spell catalog (`GET /api/spells`) is a separate
+  // endpoint with its own edition gap, #1517.
   const originFeatNames = [
     ...new Set(backgrounds.map((b) => b.originFeat?.name).filter((n): n is string => n != null)),
   ];
@@ -183,6 +195,24 @@ referenceRouter.get("/reference", async (req, res) => {
     toolProficiencies: r.toolProficiencies,
   }));
 
+  // #1679: variants nested inside each species, exactly like
+  // classes[].subclasses above — abilityIncreases/speedOverride are NOT
+  // served yet (increases aren't applied until #1681, and no client needs
+  // the override before the picker lands in #1680); this slice's payload is
+  // identity only (id/name/slug/speed/variants), enough for a two-step picker
+  // to render.
+  const speciesWithVariants = rawSpecies.map((s) => ({
+    id: s.id,
+    name: s.name,
+    slug: s.slug,
+    speed: s.speed,
+    variants: s.variants.map((v) => ({
+      id: v.id,
+      name: v.name,
+      slug: v.slug,
+    })),
+  }));
+
   const backgroundsWithTools = backgrounds.map((b) => ({
     id: b.id,
     name: b.name,
@@ -232,6 +262,7 @@ referenceRouter.get("/reference", async (req, res) => {
 
   res.json({
     races: racesWithTools,
+    species: speciesWithVariants,
     classes,
     backgrounds: backgroundsWithTools,
     alignments: ALIGNMENTS,
