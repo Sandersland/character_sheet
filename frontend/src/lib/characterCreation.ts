@@ -166,6 +166,37 @@ export function deriveSpeciesBonuses(
   return { applicable, fixed, choice, assignment, complete };
 }
 
+export interface CreationCastingAbilityChoice {
+  /** True when the resolved variant (or species, for a future species-level
+   *  grant) needs the Int/Wis/Cha choice — SpeciesVariantOption/SpeciesOption's
+   *  own served `needsCastingAbility` flag, never re-derived client-side. */
+  applicable: boolean;
+  /** The current draft value, narrowed to the wire enum (or "" = unset). */
+  value: "" | "intelligence" | "wisdom" | "charisma";
+  /** True when there's no choice to make, or a value has been picked. */
+  complete: boolean;
+}
+
+/**
+ * Derives the #1683 casting-ability choice state for the form: whether the
+ * chosen species+variant needs it (server-resolved, via needsCastingAbility)
+ * and whether the draft has answered it. The variant's own flag wins when a
+ * variant is chosen (mirrors deriveSpeciesBonuses' merge precedent); falls
+ * back to the species' own flag for a variantless species (no real PHB'24
+ * row needs this yet — every 2024 grant this wave is variant-scoped).
+ */
+export function deriveCastingAbilityChoice(
+  draft: CharacterDraft,
+  selections: CreationSelections,
+): CreationCastingAbilityChoice {
+  const applicable = selections.variant?.needsCastingAbility ?? selections.species?.needsCastingAbility ?? false;
+  return {
+    applicable,
+    value: draft.castingAbility,
+    complete: !applicable || draft.castingAbility !== "",
+  };
+}
+
 function hitDieFace(hitDie: string): number {
   return Number(hitDie.replace(/^d/i, ""));
 }
@@ -277,6 +308,7 @@ export function buildCreatePayload(
 ): CreateCharacterInput {
   const backgroundBonuses = deriveBackgroundBonuses(draft, selections);
   const speciesBonuses = deriveSpeciesBonuses(draft, selections);
+  const castingAbilityChoice = deriveCastingAbilityChoice(draft, selections);
   return {
     name: draft.name.trim(),
     alignment: draft.alignment,
@@ -291,6 +323,10 @@ export function buildCreatePayload(
     // undefined — the backend applies fixed increases unconditionally with no
     // request field and 400s a speciesAbilities it didn't ask for (#1681).
     speciesAbilities: speciesBonuses.choice && speciesBonuses.complete ? speciesBonuses.assignment : undefined,
+    // #1683: only send a completed choice; a species/variant that grants no
+    // spell (or an unanswered choice) sends undefined — the backend 400s a
+    // castingAbility it didn't ask for (resolveCastingAbility, character-create.ts).
+    castingAbility: castingAbilityChoice.applicable && castingAbilityChoice.value ? castingAbilityChoice.value : undefined,
     background: resolveBackgroundName(draft),
     classes: [{
       name: draft.className,

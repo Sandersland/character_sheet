@@ -40,10 +40,20 @@ referenceRouter.get("/reference", async (req, res) => {
   // resolveEditionCatalog/withEditionOrShared: Species.edition is NOT NULL
   // (no species is edition-neutral), so there is no shared/NULL row to fall
   // back to — the same reasoning as StartingEquipmentPackage's own query above.
+  // grantedSpells (#1683): existence-only (select id) at both levels, purely
+  // to derive needsCastingAbility below — the actual grant rows are never
+  // served here (resolved live at read/creation time, never a catalog preview).
   const rawSpecies = await prisma.species.findMany({
     where: { edition },
     orderBy: { name: "asc" },
-    include: { variants: { orderBy: { name: "asc" } } },
+    include: {
+      variants: { orderBy: { name: "asc" }, include: { grantedSpells: { select: { id: true } } } },
+      // Species.grantedSpells is the UNFILTERED back-relation (every grant
+      // FK'd to this speciesId, spanning every variant — the same
+      // activeTraitRows gotcha) — variantId carried so the mapping below can
+      // narrow to species-level (variantId === null) only.
+      grantedSpells: { select: { id: true, variantId: true } },
+    },
   });
   // Narrowed to at-most-two-per-key at the DB (withEditionOrShared), then
   // resolveEditionCatalog picks the one row per business key — same D3 shape
@@ -215,11 +225,19 @@ referenceRouter.get("/reference", async (req, res) => {
     slug: s.slug,
     speed: s.speed,
     abilityIncreases: s.abilityIncreases as unknown as AbilityIncreaseSpec[],
+    // #1683: whether picking THIS species alone (no variant chosen) grants a
+    // spell — narrowed from the unfiltered back-relation to variantId ===
+    // null, same rule serialize/species.ts's activeTraitRows documents.
+    // Never true this wave (every 2024 grant is variant-scoped), kept
+    // general so a future species-level grant needs no picker rewrite.
+    needsCastingAbility: s.grantedSpells.some((g) => g.variantId === null),
     variants: s.variants.map((v) => ({
       id: v.id,
       name: v.name,
       slug: v.slug,
       abilityIncreases: v.abilityIncreases as unknown as AbilityIncreaseSpec[],
+      // Already scoped to this variant by Prisma (its own back-relation).
+      needsCastingAbility: v.grantedSpells.length > 0,
     })),
   }));
 

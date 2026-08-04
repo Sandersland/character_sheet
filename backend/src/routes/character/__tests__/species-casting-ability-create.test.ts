@@ -1,0 +1,150 @@
+// POST /api/characters — 2024 lineage casting-ability choice (#1683). The
+// Int/Wis/Cha choice a spell-granting lineage/legacy makes at creation,
+// snapshotted onto CharacterRace.castingAbility. Mirrors species-ability-
+// increases-create.test.ts's structure (real seeded Species/SpeciesVariant
+// rows, `species: constitution would exceed 20`-style distinct error text
+// per rejection case).
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import supertest from "supertest";
+
+import { app } from "@/test-support/app-server.js";
+import { authCookie } from "@/test-support/auth.js";
+import { prisma } from "@/lib/core/prisma.js";
+
+const OWNER_ID = "owner-species-casting-ability";
+let COOKIE: string;
+let createdCharacterIds: string[] = [];
+
+beforeAll(async () => {
+  COOKIE = await authCookie(OWNER_ID);
+});
+
+afterEach(async () => {
+  if (createdCharacterIds.length === 0) return;
+  await prisma.character.deleteMany({ where: { id: { in: createdCharacterIds } } });
+  createdCharacterIds = [];
+});
+
+async function post(body: object) {
+  return supertest.agent(app).set("Cookie", COOKIE).post("/api/characters").send(body);
+}
+
+const BASE_SCORES = { strength: 12, dexterity: 12, constitution: 12, intelligence: 10, wisdom: 10, charisma: 10 };
+
+const baseBody = {
+  name: "Casting Ability Tester",
+  alignment: "True Neutral",
+  background: "Acolyte",
+  classes: [{ name: "Fighter" }],
+  abilityScores: BASE_SCORES,
+  rulesEdition: "EDITION_2024" as const,
+};
+
+async function drow() {
+  const elf = await prisma.species.findFirstOrThrow({
+    where: { slug: "elf", edition: "EDITION_2024" },
+    include: { variants: true },
+  });
+  return { elf, drowVariant: elf.variants.find((v) => v.slug === "drow")! };
+}
+
+describe("POST /api/characters — 2024 lineage casting-ability choice (#1683)", () => {
+  it("a Drow Elf's chosen castingAbility snapshots onto CharacterRace", async () => {
+    const { elf, drowVariant } = await drow();
+    const res = await post({
+      ...baseBody,
+      race: "Drow",
+      speciesId: elf.id,
+      variantId: drowVariant.id,
+      castingAbility: "charisma",
+    });
+    expect(res.status).toBe(201);
+    createdCharacterIds.push(res.body.id);
+
+    const raceRow = await prisma.characterRace.findUniqueOrThrow({ where: { characterId: res.body.id } });
+    expect(raceRow.castingAbility).toBe("charisma");
+  });
+
+  it("400s with a distinct message when castingAbility is omitted for a spell-granting lineage", async () => {
+    const { elf, drowVariant } = await drow();
+    const res = await post({ ...baseBody, race: "Drow", speciesId: elf.id, variantId: drowVariant.id });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("castingAbility required: this species/variant grants spells with a chosen casting ability");
+  });
+
+  it("400s an invalid castingAbility value (not one of intelligence/wisdom/charisma)", async () => {
+    const { elf, drowVariant } = await drow();
+    const res = await post({
+      ...baseBody,
+      race: "Drow",
+      speciesId: elf.id,
+      variantId: drowVariant.id,
+      castingAbility: "strength",
+    });
+    expect(res.status).toBe(400);
+  });
+
+  // Goliath (Cloud's Jaunt etc.) has no flat legacy counterpart yet (the
+  // compat-window gap #1684 removes, out of scope here) — a 2024 Dragonborn
+  // dragon-type variant proves the same "grants no spells" rejection using a
+  // species WITH a flat row (Dragonborn ancestry never grants a spell either).
+  it("400s a submitted castingAbility for a species/variant that grants no spells (Dragonborn ancestry)", async () => {
+    const dragonborn = await prisma.species.findFirstOrThrow({
+      where: { slug: "dragonborn", edition: "EDITION_2024" },
+      include: { variants: true },
+    });
+    const redVariant = dragonborn.variants.find((v) => v.slug === "red")!;
+    const res = await post({
+      ...baseBody,
+      // The flat legacy Race table has no per-color split ("Dragonborn" only,
+      // catalog-data.ts) — the compat-window `race` field targets that row.
+      race: "Dragonborn",
+      speciesId: dragonborn.id,
+      variantId: redVariant.id,
+      castingAbility: "wisdom",
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("castingAbility not allowed: this species/variant grants no spells");
+  });
+
+  it("400s a submitted castingAbility when no species was selected", async () => {
+    const res = await post({ ...baseBody, race: "Human", castingAbility: "wisdom" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("castingAbility not allowed: no species selected");
+  });
+
+  it("a species-level (variantless) grant would require castingAbility too — verified via High Elf, a variant-level grant", async () => {
+    const elf = await prisma.species.findFirstOrThrow({
+      where: { slug: "elf", edition: "EDITION_2024" },
+      include: { variants: true },
+    });
+    const highElf = elf.variants.find((v) => v.slug === "high")!;
+    const res = await post({
+      ...baseBody,
+      race: "High Elf",
+      speciesId: elf.id,
+      variantId: highElf.id,
+      castingAbility: "intelligence",
+    });
+    expect(res.status).toBe(201);
+    createdCharacterIds.push(res.body.id);
+    const raceRow = await prisma.characterRace.findUniqueOrThrow({ where: { characterId: res.body.id } });
+    expect(raceRow.castingAbility).toBe("intelligence");
+  });
+
+  it("a 2014 character never carries a castingAbility (no 2014 row grants a spell this slice)", async () => {
+    // Human (2014): no variants, so no variantId is needed — isolates this
+    // test to the castingAbility question alone.
+    const human2014 = await prisma.species.findFirstOrThrow({ where: { slug: "human", edition: "EDITION_2014" } });
+    const res = await post({
+      ...baseBody,
+      rulesEdition: "EDITION_2014",
+      race: "Human",
+      speciesId: human2014.id,
+    });
+    expect(res.status).toBe(201);
+    createdCharacterIds.push(res.body.id);
+    const raceRow = await prisma.characterRace.findUniqueOrThrow({ where: { characterId: res.body.id } });
+    expect(raceRow.castingAbility).toBeNull();
+  });
+});

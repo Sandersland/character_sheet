@@ -57,6 +57,10 @@ export interface CharacterDraft {
    *  to two of your choice"). Empty for a fixed-only or variantless species,
    *  and for every 2024 species (the spec is always []). */
   speciesAbilities: Partial<Record<AbilityName, number>>;
+  /** #1683: the 2024 lineage/legacy casting-ability choice (Int/Wis/Cha) —
+   *  empty string when not yet chosen or the selected species/variant has no
+   *  such choice (SpeciesVariantOption.needsCastingAbility false). */
+  castingAbility: "" | "intelligence" | "wisdom" | "charisma";
   skillProficiencies: SkillName[];
   /** Tool proficiency names chosen by the player at character creation. */
   toolChoices: string[];
@@ -106,6 +110,7 @@ const EMPTY_DRAFT: CharacterDraft = {
   abilityScores: DEFAULT_ABILITY_SCORES,
   backgroundAbilities: {},
   speciesAbilities: {},
+  castingAbility: "",
   skillProficiencies: [],
   toolChoices: [],
   cantripIds: [],

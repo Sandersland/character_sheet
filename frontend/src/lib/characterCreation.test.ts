@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import {
   buildCreatePayload,
   deriveBackgroundBonuses,
+  deriveCastingAbilityChoice,
   derivePreview,
   deriveSkillChoices,
   deriveSpeciesBonuses,
@@ -59,7 +60,7 @@ const CRIMINAL_PACKAGE: ClassStartingEquipment = {
 // race-granted-tool-profs source), never the picker's own source of truth.
 const reference: ReferenceData = {
   races: [{ id: "race-1", name: "Elf", speed: 30, toolProficiencies: [] }],
-  species: [{ id: "sp-elf", name: "Elf", slug: "elf", speed: 30, abilityIncreases: [], variants: [] }],
+  species: [{ id: "sp-elf", name: "Elf", slug: "elf", speed: 30, abilityIncreases: [], needsCastingAbility: false, variants: [] }],
   classes: [makeClass()],
   backgrounds: [
     { id: "bg-1", name: "Sage", skillProficiencies: ["perception"], toolProficiencies: [], abilityChoices: [], originFeat: null, startingEquipment: null },
@@ -112,6 +113,7 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
     },
     backgroundAbilities: {},
     speciesAbilities: {},
+    castingAbility: "",
     skillProficiencies: [],
     toolChoices: [],
     cantripIds: [],
@@ -154,7 +156,8 @@ describe("resolveSelections", () => {
           slug: "dwarf",
           speed: 25,
           abilityIncreases: [],
-          variants: [{ id: "var-hill", name: "Hill Dwarf", slug: "hill", abilityIncreases: [] }],
+          needsCastingAbility: false,
+          variants: [{ id: "var-hill", name: "Hill Dwarf", slug: "hill", abilityIncreases: [], needsCastingAbility: false }],
         },
       ],
     };
@@ -172,8 +175,15 @@ const DWARF_SPECIES: SpeciesOption = {
   slug: "dwarf",
   speed: 25,
   abilityIncreases: [{ ability: "constitution", amount: 2 }],
+  needsCastingAbility: false,
   variants: [
-    { id: "var-hill", name: "Hill Dwarf", slug: "hill", abilityIncreases: [{ ability: "wisdom", amount: 1 }] },
+    {
+      id: "var-hill",
+      name: "Hill Dwarf",
+      slug: "hill",
+      abilityIncreases: [{ ability: "wisdom", amount: 1 }],
+      needsCastingAbility: false,
+    },
   ],
 };
 const HALF_ELF_SPECIES: SpeciesOption = {
@@ -185,6 +195,7 @@ const HALF_ELF_SPECIES: SpeciesOption = {
     { ability: "charisma", amount: 2 },
     { choose: { count: 2, amount: 1, from: ["strength", "dexterity", "constitution", "intelligence", "wisdom"] } },
   ],
+  needsCastingAbility: false,
   variants: [],
 };
 const speciesReference: ReferenceData = { ...reference, species: [DWARF_SPECIES, HALF_ELF_SPECIES] };
@@ -229,6 +240,52 @@ describe("deriveSpeciesBonuses (#1681)", () => {
     const bonuses = deriveSpeciesBonuses(draft, resolveSelections(speciesReference, draft));
     expect(bonuses.assignment).toEqual({ strength: 1 });
     expect(bonuses.complete).toBe(false);
+  });
+});
+
+// #1683: DROW_VARIANT needs the choice (needsCastingAbility: true), the base
+// Elf species does not — mirrors DWARF_SPECIES/HALF_ELF_SPECIES's fixture role.
+const DROW_VARIANT_ELF: SpeciesOption = {
+  id: "sp-elf-2024",
+  name: "Elf",
+  slug: "elf",
+  speed: 30,
+  abilityIncreases: [],
+  needsCastingAbility: false,
+  variants: [
+    { id: "var-drow", name: "Drow", slug: "drow", abilityIncreases: [], needsCastingAbility: true },
+    { id: "var-high", name: "High Elf", slug: "high", abilityIncreases: [], needsCastingAbility: true },
+  ],
+};
+const castingAbilityReference: ReferenceData = { ...reference, species: [DROW_VARIANT_ELF, DWARF_SPECIES] };
+
+describe("deriveCastingAbilityChoice (#1683)", () => {
+  it("is inert (applicable:false, complete:true) when no species is selected", () => {
+    const draft = makeDraft();
+    const choice = deriveCastingAbilityChoice(draft, resolveSelections(castingAbilityReference, draft));
+    expect(choice).toEqual({ applicable: false, value: "", complete: true });
+  });
+
+  it("is inert for a variant whose needsCastingAbility is false (Dwarf's Hill Dwarf)", () => {
+    const draft = makeDraft({ speciesId: "sp-dwarf", variantId: "var-hill" });
+    const choice = deriveCastingAbilityChoice(draft, resolveSelections(castingAbilityReference, draft));
+    expect(choice.applicable).toBe(false);
+    expect(choice.complete).toBe(true);
+  });
+
+  it("is applicable and incomplete for a spell-granting variant with no choice made yet (Drow)", () => {
+    const draft = makeDraft({ speciesId: "sp-elf-2024", variantId: "var-drow" });
+    const choice = deriveCastingAbilityChoice(draft, resolveSelections(castingAbilityReference, draft));
+    expect(choice.applicable).toBe(true);
+    expect(choice.value).toBe("");
+    expect(choice.complete).toBe(false);
+  });
+
+  it("is complete once a value is chosen", () => {
+    const draft = makeDraft({ speciesId: "sp-elf-2024", variantId: "var-drow", castingAbility: "charisma" });
+    const choice = deriveCastingAbilityChoice(draft, resolveSelections(castingAbilityReference, draft));
+    expect(choice.value).toBe("charisma");
+    expect(choice.complete).toBe(true);
   });
 });
 
@@ -431,6 +488,25 @@ describe("buildCreatePayload", () => {
     expect(buildCreatePayload(incompleteChoice, sel2, deriveSkillChoices(incompleteChoice, sel2), []).speciesAbilities).toBeUndefined();
   });
 
+  it("sends a completed castingAbility choice (#1683)", () => {
+    const draft = makeDraft({
+      name: "X", className: "Rogue", speciesId: "sp-elf-2024", variantId: "var-drow", castingAbility: "charisma",
+    });
+    const selections = resolveSelections(castingAbilityReference, draft);
+    const payload = buildCreatePayload(draft, selections, deriveSkillChoices(draft, selections), []);
+    expect(payload.castingAbility).toBe("charisma");
+  });
+
+  it("omits castingAbility for a non-spell-granting variant and for an incomplete choice", () => {
+    const noChoiceNeeded = makeDraft({ name: "X", className: "Rogue", speciesId: "sp-dwarf", variantId: "var-hill" });
+    const sel1 = resolveSelections(speciesReference, noChoiceNeeded);
+    expect(buildCreatePayload(noChoiceNeeded, sel1, deriveSkillChoices(noChoiceNeeded, sel1), []).castingAbility).toBeUndefined();
+
+    const incomplete = makeDraft({ name: "X", className: "Rogue", speciesId: "sp-elf-2024", variantId: "var-drow" });
+    const sel2 = resolveSelections(castingAbilityReference, incomplete);
+    expect(buildCreatePayload(incomplete, sel2, deriveSkillChoices(incomplete, sel2), []).castingAbility).toBeUndefined();
+  });
+
   it("omits speciesId/variantId when the draft's own empty-string default is untouched (`|| undefined` normalization)", () => {
     const draft = makeDraft({ name: "X", className: "Rogue" });
     const selections = resolveSelections(speciesReference, draft);
@@ -473,7 +549,8 @@ describe("buildCreatePayload", () => {
           slug: "dwarf",
           speed: 25,
           abilityIncreases: [],
-          variants: [{ id: "var-hill", name: "Hill Dwarf", slug: "hill", abilityIncreases: [] }],
+          needsCastingAbility: false,
+          variants: [{ id: "var-hill", name: "Hill Dwarf", slug: "hill", abilityIncreases: [], needsCastingAbility: false }],
         },
       ],
     };

@@ -333,6 +333,48 @@ async function resolveSpeciesSelection(
   };
 }
 
+// Whether the resolved species+variant selection grants any spell at all —
+// species-level rows (variantId: null, none seeded this wave) OR the chosen
+// variant's own rows (Elf's Drow/High Elf/Wood Elf, Gnome's Forest/Rock,
+// Tiefling's Abyssal/Chthonic/Infernal, #1683). A count query, not a fetch:
+// resolveCastingAbility below only needs the yes/no, never the rows
+// themselves (those are read live at serialize time, never snapshotted here).
+async function speciesGrantsSpells(speciesId: string, variantId: string | null): Promise<boolean> {
+  const count = await prisma.speciesGrantedSpell.count({
+    where: { speciesId, OR: variantId ? [{ variantId: null }, { variantId }] : [{ variantId: null }] },
+  });
+  return count > 0;
+}
+
+// Phase 1.7 — the #1683 casting-ability choice: required iff the resolved
+// species+variant grants at least one spell (speciesGrantsSpells above),
+// rejected otherwise (no species selected, or a species/variant that grants
+// nothing — Dragonborn's ancestry, Goliath's Giant Ancestry, every 2014
+// species this wave). Immutable post-creation like every other species
+// selection field (no race transaction endpoint) — written straight through
+// to CharacterRace.castingAbility with no further validation here: the zod
+// schema already restricts it to the three ability names.
+async function resolveCastingAbility(
+  input: CreateCharacterBody,
+  speciesSelection: SpeciesSelection,
+): Promise<PhaseResult<{ castingAbility: string | null }>> {
+  const submitted = input.castingAbility;
+  if (!speciesSelection.speciesId) {
+    if (submitted) return { ok: false, status: 400, error: "castingAbility not allowed: no species selected" };
+    return { ok: true, castingAbility: null };
+  }
+
+  const grantsSpells = await speciesGrantsSpells(speciesSelection.speciesId, speciesSelection.variantId);
+  if (!grantsSpells) {
+    if (submitted) return { ok: false, status: 400, error: "castingAbility not allowed: this species/variant grants no spells" };
+    return { ok: true, castingAbility: null };
+  }
+  if (!submitted) {
+    return { ok: false, status: 400, error: "castingAbility required: this species/variant grants spells with a chosen casting ability" };
+  }
+  return { ok: true, castingAbility: submitted };
+}
+
 // Validate player skill selections against the class/background pools.
 function validateSkillChoices(
   skillProficiencies: string[],
@@ -1385,6 +1427,7 @@ async function persistCreatedCharacter(
   spellEntries: SpellEntry[] | null,
   grants: BackgroundGrants,
   speciesGrants: SpeciesGrants,
+  castingAbility: string | null,
 ): Promise<{ id: string }> {
   const { race, characterClass, background, primaryClassChoice } = selections;
   const { inventoryItemCreates, startingCurrency } = equipment;
@@ -1448,6 +1491,10 @@ async function persistCreatedCharacter(
           variantId: selections.speciesSelection.variantId,
           variantName: selections.speciesSelection.variantName,
           abilityBonuses: appliedIncreases as unknown as Prisma.InputJsonValue,
+          // #1683: the 2024 lineage/legacy casting-ability choice, resolved by
+          // resolveCastingAbility — null for a 2014 character, a legacy
+          // `race`-name creation, or a species/variant that grants no spells.
+          castingAbility,
         },
       },
       backgroundSelection: {
@@ -1501,6 +1548,13 @@ export async function createCharacter(
   const speciesGrants = await resolveSpeciesGrants(input, selections.speciesSelection, selections.edition, grants.effectiveScores);
   if (!speciesGrants.ok) return speciesGrants;
 
+  // #1683: the 2024 lineage/legacy casting-ability choice — independent of
+  // speciesGrants (2014 ability increases) but resolved against the SAME
+  // speciesSelection, so the two never disagree about which species/variant
+  // was picked.
+  const castingAbilityResult = await resolveCastingAbility(input, selections.speciesSelection);
+  if (!castingAbilityResult.ok) return castingAbilityResult;
+
   const equipment = await materializeStartingEquipment(
     input,
     selections.characterClass.id,
@@ -1522,6 +1576,15 @@ export async function createCharacter(
   const spells = await resolveCreationSpells(input, selections);
   if (!spells.ok) return spells;
 
-  const { id } = await persistCreatedCharacter(input, ownerId, selections, equipment, spells.spellEntries, grants, speciesGrants);
+  const { id } = await persistCreatedCharacter(
+    input,
+    ownerId,
+    selections,
+    equipment,
+    spells.spellEntries,
+    grants,
+    speciesGrants,
+    castingAbilityResult.castingAbility,
+  );
   return { ok: true, id };
 }
