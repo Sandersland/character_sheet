@@ -193,7 +193,7 @@ describe("serializeCharacter attackRows — equipped weapons", () => {
       modifier: item.weapon!.damage.damageModifier,
     });
     expect(row.attackComponents).toEqual(item.weapon!.attackBonusComponents);
-    expect(row.damageComponents).toEqual({ abilityMod: 3, meleeDamageBonus: 0 });
+    expect(row.damageComponents).toEqual({ abilityMod: 3, meleeDamageBonus: 0, ability: "strength" });
   });
 
   it("emits equipped weapons in inventory order, then the off-hand row, then unarmed, then improvised", async () => {
@@ -298,11 +298,11 @@ describe("serializeCharacter attackRows — off-hand row (Two-Weapon Fighting)",
       weaponRows(withStyle)[0].damageSpec.modifier,
     );
     expect(offHandRow(withStyle)!.damageSpec.modifier).toBe(3);
-    expect(offHandRow(withStyle)!.damageComponents).toEqual({ abilityMod: 3, meleeDamageBonus: 0 });
+    expect(offHandRow(withStyle)!.damageComponents).toEqual({ abilityMod: 3, meleeDamageBonus: 0, ability: "strength" });
 
     const withoutStyle = await serialize(await createFighter(pair));
     expect(offHandRow(withoutStyle)!.damageSpec.modifier).toBe(0);
-    expect(offHandRow(withoutStyle)!.damageComponents).toEqual({ abilityMod: 0, meleeDamageBonus: 0 });
+    expect(offHandRow(withoutStyle)!.damageComponents).toEqual({ abilityMod: 0, meleeDamageBonus: 0, ability: "strength" });
   });
 
   it("keeps a negative ability modifier without the style — only a positive one is dropped", async () => {
@@ -315,7 +315,7 @@ describe("serializeCharacter attackRows — off-hand row (Two-Weapon Fighting)",
     );
     const payload = await serialize(id);
     expect(offHandRow(payload)!.damageSpec.modifier).toBe(-1);
-    expect(offHandRow(payload)!.damageComponents).toEqual({ abilityMod: -1, meleeDamageBonus: 0 });
+    expect(offHandRow(payload)!.damageComponents).toEqual({ abilityMod: -1, meleeDamageBonus: 0, ability: "strength" });
   });
 
   it("keeps a melee-damage buff (Rage) while dropping only the ability component, so the components still sum", async () => {
@@ -331,7 +331,7 @@ describe("serializeCharacter attackRows — off-hand row (Two-Weapon Fighting)",
     expect(weaponRows(payload)[0].damageSpec.modifier).toBe(5); // STR +3 + Rage +2
     const offHand = offHandRow(payload)!;
     expect(offHand.damageSpec.modifier).toBe(2);
-    expect(offHand.damageComponents).toEqual({ abilityMod: 0, meleeDamageBonus: 2 });
+    expect(offHand.damageComponents).toEqual({ abilityMod: 0, meleeDamageBonus: 2, ability: "strength" });
     expect(offHand.damageComponents!.abilityMod + offHand.damageComponents!.meleeDamageBonus).toBe(
       offHand.damageSpec.modifier,
     );

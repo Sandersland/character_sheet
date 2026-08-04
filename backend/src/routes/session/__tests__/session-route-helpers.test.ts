@@ -323,6 +323,32 @@ describe("parseRollInput — #1235 combat-log fields", () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it("carries an ability key through on attackComponents and damageComponents (#1361)", () => {
+    const res = mockRes();
+    const roll = parseRollInput(
+      reqWith({
+        ...valid,
+        attackComponents: { ...attackComponents, ability: "dexterity" },
+        damageComponents: { ...damageComponents, ability: "strength" },
+      }),
+      res as unknown as Response,
+    );
+    expect(res.statusCode).toBeUndefined();
+    expect(roll?.attackComponents?.ability).toBe("dexterity");
+    expect(roll?.damageComponents?.ability).toBe("strength");
+  });
+
+  it("400s on a non-string ability value", () => {
+    const res = mockRes();
+    expect(
+      parseRollInput(
+        reqWith({ ...valid, attackComponents: { ...attackComponents, ability: 3 } }),
+        res as unknown as Response,
+      ),
+    ).toBeNull();
+    expect(res.statusCode).toBe(400);
+  });
+
   it("400s on a swingId over 100 characters", () => {
     const res = mockRes();
     expect(

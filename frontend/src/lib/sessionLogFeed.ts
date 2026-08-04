@@ -10,6 +10,7 @@
  * separators.
  */
 
+import { abilityLabel } from "@/lib/abilities";
 import { formatRollBreakdown } from "@/lib/dice";
 import type { CharacterEvent } from "@/types/character";
 import type {
@@ -131,9 +132,10 @@ function rollModeNote(
 // (component key, display label) pairs, in mockup render order — a lookup
 // instead of one `if` per field, shared by the attack/damage drill-in
 // builders below to keep each a flat, low-branching function (#1237). Only
-// NON-ZERO addends render, per the mockup spec's explicit note — the wire
-// type carries no ability NAME (STR vs DEX) for attack/damage rolls, only the
-// numeric modifier, so addends are labeled generically ("Ability"), never guessed.
+// NON-ZERO addends render, per the mockup spec's explicit note. "abilityMod"'s
+// label here is the fallback for an event logged before #1361 added `ability`
+// to the wire type — labeledAddends swaps in the named ability via
+// `abilityLabel` whenever the component carries one.
 const ATTACK_ADDEND_LABELS: [keyof RollEventAttackComponents, string][] = [
   ["abilityMod", "Ability"],
   ["proficiencyBonus", "Proficiency"],
@@ -149,10 +151,21 @@ const DAMAGE_ADDEND_LABELS: [keyof RollEventDamageComponents, string][] = [
 // `T`'s fields are all-number component records (RollEventAttackComponents /
 // RollEventDamageComponents) but neither declares a string index signature,
 // so `keyof T` is indexed via a cast rather than widening T's own type.
-function labeledAddends<T extends object>(components: T | undefined, labels: [keyof T, string][]): string[] {
+// `ability` is read off `components` directly (never through the cast Record,
+// which is number-only) and resolved to display text via `abilityLabel` —
+// never the raw key (ad-hoc capitalization of ability keys has shipped twice).
+function labeledAddends<T extends { ability?: string }>(
+  components: T | undefined,
+  labels: [keyof T, string][],
+): string[] {
   if (!components) return [];
   const values = components as unknown as Record<keyof T, number>;
-  return labels.filter(([key]) => values[key]).map(([key, label]) => signedAddend(values[key], label));
+  return labels
+    .filter(([key]) => values[key])
+    .map(([key, label]) => {
+      const resolvedLabel = key === "abilityMod" && components.ability ? abilityLabel(components.ability) : label;
+      return signedAddend(values[key], resolvedLabel);
+    });
 }
 
 // `RollEventData.total` is typed as required, but old/malformed persisted

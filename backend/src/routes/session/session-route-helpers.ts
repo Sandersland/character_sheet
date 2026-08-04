@@ -66,6 +66,10 @@ const attackComponentsSchema = z
     proficiencyBonus: z.number().finite(),
     rangedBonus: z.number().finite(),
     attackRollBonus: z.number().finite(),
+    // The ability abilityMod is drawn from (#1361) — same shape as
+    // modeSourceSchema's `ability` (no enum: an ability key, not validated
+    // against the ability list, matching that field's existing treatment).
+    ability: z.string().optional(),
   })
   .strict();
 
@@ -73,6 +77,7 @@ const damageComponentsSchema = z
   .object({
     abilityMod: z.number().finite(),
     meleeDamageBonus: z.number().finite(),
+    ability: z.string().optional(),
   })
   .strict();
 
