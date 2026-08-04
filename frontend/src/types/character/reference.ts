@@ -36,6 +36,28 @@ export interface RaceOption {
   toolProficiencies: string[];
 }
 
+/** A species' second creation step — 2014 subrace, 2024 lineage/legacy/
+ *  ancestry (#1679/#1680). Identity only this slice: no abilityIncreases or
+ *  speedOverride on the wire yet (#1681's territory). */
+export interface SpeciesVariantOption {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+/** Species option (#1679/#1680), served nested per edition (server-filtered
+ *  by `?edition=`, never a client edition check — the #1572 trick) with its
+ *  variants nested inside, exactly like ClassOption.subclasses. An empty
+ *  `variants` array is the signal the two-step picker renders one step, not
+ *  two — e.g. 2014 Human vs. 2014 Dwarf (Hill/Mountain). */
+export interface SpeciesOption {
+  id: string;
+  name: string;
+  slug: string;
+  speed: number;
+  variants: SpeciesVariantOption[];
+}
+
 /** Reference types (GET /api/reference) that populate the character-creation form. */
 export interface ClassOption {
   id: string;
@@ -167,6 +189,9 @@ export interface EditionsResponse {
 
 export interface ReferenceData {
   races: RaceOption[];
+  /** Species catalog for the two-step species→variant picker (#1679/#1680),
+   *  served alongside the flat `races` list above during its compat window. */
+  species: SpeciesOption[];
   classes: ClassOption[];
   backgrounds: BackgroundOption[];
   alignments: string[];
@@ -199,6 +224,12 @@ export interface CreateCharacterInput {
   alignment: string;
   experiencePoints?: number;
   race: string;
+  /** #1679/#1680: the two-step picker's real selection — ids, like
+   *  `subclassId`. `race` above stays required alongside these (the display
+   *  name POST /api/characters still needs until #1684 prunes the legacy
+   *  path); the frontend never presents a race picker for it anymore. */
+  speciesId?: string;
+  variantId?: string;
   background: string;
   classes: [{ name: string; subclass?: string | null; subclassId?: string }];
   abilityScores: AbilityScores;

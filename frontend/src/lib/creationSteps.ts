@@ -29,13 +29,15 @@ export function creationSteps(selections: CreationSelections): CreationStepKey[]
   return steps;
 }
 
-// The five identity-field checks share missingRequirements' rule by asking it
-// with no equipment (startingEquipment null) so nothing but identity is flagged.
-function identityMissing(draft: CharacterDraft): string[] {
+// The identity-field checks share missingRequirements' rule by asking it with
+// no equipment (startingEquipment null) so nothing but identity is flagged.
+function identityMissing(draft: CharacterDraft, selections: CreationSelections): string[] {
   return missingRequirements({
     name: draft.name,
     alignment: draft.alignment,
-    race: draft.race,
+    speciesChosen: draft.speciesId.length > 0,
+    variantRequired: (selections.species?.variants.length ?? 0) > 0,
+    variantChosen: draft.variantId.length > 0,
     className: draft.className,
     backgroundName: resolveBackgroundName(draft),
     startingEquipment: null,
@@ -53,7 +55,9 @@ function equipmentMissing(draft: CharacterDraft, selections: CreationSelections)
   const full = missingRequirements({
     name: draft.name,
     alignment: draft.alignment,
-    race: draft.race,
+    speciesChosen: draft.speciesId.length > 0,
+    variantRequired: (selections.species?.variants.length ?? 0) > 0,
+    variantChosen: draft.variantId.length > 0,
     className: draft.className,
     backgroundName: resolveBackgroundName(draft),
     startingEquipment: selections.class?.startingEquipment ?? null,
@@ -63,7 +67,7 @@ function equipmentMissing(draft: CharacterDraft, selections: CreationSelections)
     backgroundStartingEquipment: selections.background?.startingEquipment ?? null,
     backgroundEquipmentDraft: draft.backgroundEquipmentDraft,
   });
-  return full.slice(identityMissing(draft).length);
+  return full.slice(identityMissing(draft, selections).length);
 }
 
 /** The unmet-requirement labels owned by one creation step. */
@@ -74,7 +78,7 @@ export function creationStepMissing(
 ): string[] {
   switch (key) {
     case "identity":
-      return identityMissing(draft);
+      return identityMissing(draft, selections);
     case "abilities": {
       const missing: string[] = [];
       // Pool methods (roll / standard array) must be rolled and fully assigned

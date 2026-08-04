@@ -53,8 +53,12 @@ const CRIMINAL_PACKAGE: ClassStartingEquipment = {
   gold: null,
 };
 
+// #1680: a flat Race row sharing the species' name — kept only to exercise
+// resolveSelections' compat `race` lookup (useToolProficiencyChoices' dormant
+// race-granted-tool-profs source), never the picker's own source of truth.
 const reference: ReferenceData = {
   races: [{ id: "race-1", name: "Elf", speed: 30, toolProficiencies: [] }],
+  species: [{ id: "sp-elf", name: "Elf", slug: "elf", speed: 30, variants: [] }],
   classes: [makeClass()],
   backgrounds: [
     { id: "bg-1", name: "Sage", skillProficiencies: ["perception"], toolProficiencies: [], abilityChoices: [], originFeat: null, startingEquipment: null },
@@ -79,7 +83,8 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
   return {
     name: "",
     alignment: "",
-    race: "",
+    speciesId: "",
+    variantId: "",
     className: "",
     subclass: "",
     subclassId: "",
@@ -121,14 +126,37 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
 }
 
 describe("resolveSelections", () => {
-  it("matches by name and returns undefined for a null reference", () => {
-    const draft = makeDraft({ race: "Elf", className: "Rogue", background: "Sage" });
-    expect(resolveSelections(reference, draft).class?.name).toBe("Rogue");
+  it("matches species/variant by id and class/background by name; returns undefined for a null reference", () => {
+    const draft = makeDraft({ speciesId: "sp-elf", className: "Rogue", background: "Sage" });
+    const resolved = resolveSelections(reference, draft);
+    expect(resolved.class?.name).toBe("Rogue");
+    expect(resolved.species?.name).toBe("Elf");
+    // #1680: the legacy `race` compat lookup resolves by the species' NAME.
+    expect(resolved.race?.name).toBe("Elf");
     expect(resolveSelections(null, draft)).toEqual({
+      species: undefined,
+      variant: undefined,
       race: undefined,
       class: undefined,
       background: undefined,
     });
+  });
+
+  it("resolves the variant by id, scoped to its own species", () => {
+    const referenceWithVariants: ReferenceData = {
+      ...reference,
+      species: [
+        {
+          id: "sp-dwarf",
+          name: "Dwarf",
+          slug: "dwarf",
+          speed: 25,
+          variants: [{ id: "var-hill", name: "Hill Dwarf", slug: "hill" }],
+        },
+      ],
+    };
+    const draft = makeDraft({ speciesId: "sp-dwarf", variantId: "var-hill" });
+    expect(resolveSelections(referenceWithVariants, draft).variant?.name).toBe("Hill Dwarf");
   });
 });
 
@@ -208,7 +236,7 @@ describe("resolveBackgroundEquipmentInput", () => {
 describe("derivePreview", () => {
   it("computes AC, speed, and max HP from scores and hit die", () => {
     const draft = makeDraft({
-      race: "Elf",
+      speciesId: "sp-elf",
       className: "Rogue",
       abilityScores: {
         strength: 10,
@@ -280,7 +308,7 @@ describe("deriveBackgroundBonuses (#1130)", () => {
 describe("derivePreview with background bonuses", () => {
   it("folds the spread into the effective HP/AC preview", () => {
     const draft = makeDraft({
-      race: "Elf",
+      speciesId: "sp-elf",
       className: "Rogue",
       background: "Criminal",
       backgroundAbilities: { constitution: 2, dexterity: 1 }, // CON 10→12 (+1), DEX 10→11 (+0)
@@ -313,7 +341,7 @@ describe("buildCreatePayload", () => {
     const draft = makeDraft({
       name: " Lidda ",
       alignment: "Neutral Good",
-      race: "Elf",
+      speciesId: "sp-elf",
       className: "Rogue",
       background: "Sage",
       skillProficiencies: ["stealth"],
@@ -329,6 +357,49 @@ describe("buildCreatePayload", () => {
     expect("portraitUrl" in payload).toBe(false);
     expect(payload.startingEquipment).toBeUndefined();
     expect(payload.backgroundStartingEquipment).toBeUndefined();
+  });
+
+  // #1680: the two-step picker's real selection rides speciesId/variantId
+  // (ids, like subclassId); `race` is resolved compat text, not a second pick.
+  it("sends speciesId/variantId and derives the legacy race string from the chosen name", () => {
+    const variantReference: ReferenceData = {
+      ...reference,
+      species: [
+        {
+          id: "sp-dwarf",
+          name: "Dwarf",
+          slug: "dwarf",
+          speed: 25,
+          variants: [{ id: "var-hill", name: "Hill Dwarf", slug: "hill" }],
+        },
+      ],
+    };
+    const draft = makeDraft({
+      name: "Borin",
+      className: "Rogue",
+      background: "Sage",
+      speciesId: "sp-dwarf",
+      variantId: "var-hill",
+    });
+    const selections = resolveSelections(variantReference, draft);
+    const skills = deriveSkillChoices(draft, selections);
+    const payload = buildCreatePayload(draft, selections, skills, []);
+    expect(payload.speciesId).toBe("sp-dwarf");
+    expect(payload.variantId).toBe("var-hill");
+    expect(payload.race).toBe("Hill Dwarf");
+  });
+
+  // A variantless species' payload race falls back to the species' own name,
+  // and variantId is omitted (never an empty string) — mirrors subclassId's
+  // "" → undefined shape.
+  it("omits variantId and uses the species name for a variantless species", () => {
+    const draft = makeDraft({ name: "Alric", className: "Rogue", background: "Sage", speciesId: "sp-elf" });
+    const selections = resolveSelections(reference, draft);
+    const skills = deriveSkillChoices(draft, selections);
+    const payload = buildCreatePayload(draft, selections, skills, []);
+    expect(payload.speciesId).toBe("sp-elf");
+    expect(payload.variantId).toBeUndefined();
+    expect(payload.race).toBe("Elf");
   });
 
   it("passes through non-empty tool choices", () => {
@@ -369,7 +440,13 @@ describe("creation spells (#1131)", () => {
     name: "Wizard",
     level1SpellPicks: { cantrips: 3, spells: 6, maxSpellLevel: 1, spellbookSize: 6 },
   });
-  const casterSelections = { race: undefined, class: caster, background: undefined };
+  const casterSelections = {
+    species: undefined,
+    variant: undefined,
+    race: undefined,
+    class: caster,
+    background: undefined,
+  };
 
   it("buildCreatePayload includes spells for a caster", () => {
     const draft = makeDraft({ name: "Mo", className: "Wizard", cantripIds: ["c1"], spellIds: ["s1"] });

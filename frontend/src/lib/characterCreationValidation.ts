@@ -17,7 +17,16 @@ import type { EquipmentDraft } from "@/lib/startingEquipment";
 export interface CreationValidationInput {
   name: string;
   alignment: string;
-  race: string;
+  /** True once draft.speciesId is non-empty — a raw id-presence check (never
+   *  a catalog lookup), so this stays correct even a render before the
+   *  reference catalog has resolved (mirrors the subclass-required pattern:
+   *  levelUpSteps.ts's `subclassId != null` gate). */
+  speciesChosen: boolean;
+  /** True when the chosen species has variant rows (a catalog fact, so this
+   *  DOES need the resolved species — same shape as the equipment step's
+   *  `selections.class?.startingEquipment` dependency below). */
+  variantRequired: boolean;
+  variantChosen: boolean;
   className: string;
   /** Resolved background name to submit (list selection or trimmed custom). */
   backgroundName: string;
@@ -64,7 +73,11 @@ export function missingRequirements(input: CreationValidationInput): string[] {
 
   if (input.name.trim().length === 0) missing.push("Name");
   if (input.alignment.length === 0) missing.push("Alignment");
-  if (input.race.length === 0) missing.push("Race");
+  if (!input.speciesChosen) missing.push("Species");
+  // A variant-bearing species (2014 Dwarf, etc.) cannot Continue without one;
+  // a variantless species (2014 Human) never reaches this branch since the
+  // picker renders no second panel for it.
+  else if (input.variantRequired && !input.variantChosen) missing.push("Variant");
   if (input.className.length === 0) missing.push("Class");
   if (input.backgroundName.length === 0) missing.push("Background");
 

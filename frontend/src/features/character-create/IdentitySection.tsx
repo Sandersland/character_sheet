@@ -75,22 +75,54 @@ export default function IdentitySection({
 
         <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600">
           <span>
-            Race
+            Species
             <RequiredMark />
           </span>
           <select
-            value={draft.race}
-            onChange={(e) => update({ race: e.target.value })}
+            value={draft.speciesId}
+            onChange={(e) =>
+              // Changing species resets the variant — a variant id only ever
+              // means something relative to its own parent species (#1680).
+              update({ speciesId: e.target.value, variantId: "" })
+            }
             className="rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1.5 text-sm font-normal normal-case text-parchment-900"
           >
-            <option value="">Select race…</option>
-            {reference.races.map((race) => (
-              <option key={race.id} value={race.name}>
-                {race.name}
+            <option value="">Select species…</option>
+            {reference.species.map((species) => (
+              <option key={species.id} value={species.id}>
+                {species.name}
               </option>
             ))}
           </select>
         </label>
+
+        {/* Variant panel — renders ONLY when the chosen species has variant rows
+            (2014 subrace / 2024 lineage-legacy-ancestry); a variantless species
+            (2014 Human) shows no second panel at all (#1680). */}
+        {(() => {
+          const selectedSpecies = reference.species.find((s) => s.id === draft.speciesId);
+          if (!selectedSpecies || selectedSpecies.variants.length === 0) return null;
+          return (
+            <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600">
+              <span>
+                Variant
+                <RequiredMark />
+              </span>
+              <select
+                value={draft.variantId}
+                onChange={(e) => update({ variantId: e.target.value })}
+                className="rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1.5 text-sm font-normal normal-case text-parchment-900"
+              >
+                <option value="">Select variant…</option>
+                {selectedSpecies.variants.map((variant) => (
+                  <option key={variant.id} value={variant.id}>
+                    {variant.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          );
+        })()}
 
         <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600">
           <span>
