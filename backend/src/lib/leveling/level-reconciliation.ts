@@ -47,11 +47,12 @@ import {
   type ResourcesMutableState,
   type ToolProfEntry,
 } from "@/lib/classes/resources.js";
-import { characterAdvancementSlots, characterFightingStyleFeatSlots, derivePreparedSpellLimit } from "@/lib/srd/srd.js";
+import { characterAdvancementSlots, characterFightingStyleFeatSlots, derivePreparedSpellLimit, deriveFeatBonuses } from "@/lib/srd/srd.js";
 import { deriveEntryScopedResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
 import { FEATURE_ROWS_ENTRY_SELECT, featureRowsOf } from "@/lib/classes/feature-rows-select.js";
 import { reverseAdvancementEffects } from "./advancement.js";
-import { normalizeHitPoints } from "@/lib/combat/hitpoints.js";
+import { effectiveMaxHitPoints, normalizeHitDice, normalizeHitPoints } from "@/lib/combat/hitpoints.js";
+import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
 import { clampPreparedToLimit, normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
 import {
   deriveGrantedSpells,
@@ -544,7 +545,7 @@ async function reconcileSubclassChoices(ctx: ReconcileContext): Promise<void> {
 // abilityScores + hitPoints + initiativeBonus + resources in one shot.
 
 async function reconcileAdvancements(ctx: ReconcileContext): Promise<void> {
-  const { tx, characterId, newDerivedLevel, batchId } = ctx;
+  const { tx, characterId, newDerivedLevel, edition, batchId } = ctx;
 
   const row = await tx.character.findUnique({
     where: { id: characterId },
@@ -554,6 +555,10 @@ async function reconcileAdvancements(ctx: ReconcileContext): Promise<void> {
       hitPoints: true,
       hitDice: true,
       initiativeBonus: true,
+      // conditions (#1321): effectiveMaxHitPoints' exhaustion input — this
+      // reconciler is the registry-side twin of serializeCharacter's
+      // clamp-on-read and must resolve the ceiling through the SAME function.
+      conditions: true,
       classEntries: {
         orderBy: { position: "asc" as const },
         // All entries (level + the class relation) — both the ASI/feat-slot
@@ -582,6 +587,7 @@ async function reconcileAdvancements(ctx: ReconcileContext): Promise<void> {
 
   const scores = row.abilityScores as Record<string, number>;
   const hp = normalizeHitPoints(row.hitPoints);
+  const hd = normalizeHitDice(row.hitDice);
   const initBonus = row.initiativeBonus;
 
   // Snapshot before (for undo).
@@ -597,9 +603,19 @@ async function reconcileAdvancements(ctx: ReconcileContext): Promise<void> {
   const reversed = reverseAdvancementEffects(scores, hp, initBonus, toRemove);
   state.advancements = kept;
 
+  // #1321: reverseAdvancementEffects' own internal clamp is against the RAW
+  // max (harmless there — it's an intermediate value this function always
+  // re-clamps below); the persisted current must clamp against the EFFECTIVE
+  // max instead — the same shared function serializeCharacter's clamp-on-read
+  // resolves through (CLAUDE.md: reconciler and clamp-on-read must agree).
+  // `kept` is the POST-reconcile advancement list, matching applyFeatLayer's
+  // own use of the clamped (in-cap) slice.
+  const featMaxHpBonus = deriveFeatBonuses(kept, hd.total).maxHp;
+  const exhaustionLevel = normalizeConditionsMutable(row.conditions).exhaustion;
+  const newEffMax = effectiveMaxHitPoints(reversed.hitPoints.max, featMaxHpBonus, exhaustionLevel, edition);
   const newHp = {
     ...reversed.hitPoints,
-    current: Math.min(reversed.hitPoints.current, reversed.hitPoints.max),
+    current: Math.min(reversed.hitPoints.current, newEffMax),
   };
 
   await tx.character.update({

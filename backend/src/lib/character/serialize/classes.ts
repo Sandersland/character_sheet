@@ -17,7 +17,7 @@ import { deriveManeuverEffect } from "@/lib/classes/maneuver-effect.js";
 import { clampChoicesToCaps, normalizeResourcesMutable, splitAdvancementsBySlotCap, type AdvancementEntry } from "@/lib/classes/resources.js";
 import { effectiveEntryLevel, subclassActiveAt } from "@/lib/leveling/effective-levels.js";
 import { editionOf } from "@/lib/rules/edition.js";
-import { normalizeHitPoints } from "@/lib/combat/hitpoints.js";
+import { effectiveMaxHitPoints, normalizeHitPoints } from "@/lib/combat/hitpoints.js";
 import { reverseAdvancementEffects } from "@/lib/leveling/advancement.js";
 import type { CharacterWithRelations } from "@/lib/character/character-include.js";
 
@@ -205,6 +205,11 @@ export function applyFeatLayer(
   speciesTraitImprovements: FeatImprovement[],
   hitDiceTotal: number,
   maxHp: number,
+  // #1321: exhaustion's PHB'14 p. 291 tier-4 halving is edition/level-gated,
+  // so this needs both to route through effectiveMaxHitPoints (the composition
+  // shared with buildHpOpContext/applyHealInTx — never a fourth inline copy).
+  exhaustionLevel: number,
+  edition: RulesEdition,
 ): {
   featBonuses: ReturnType<typeof deriveImprovementBonuses>;
   effectiveMaxHp: number;
@@ -216,7 +221,7 @@ export function applyFeatLayer(
     ...speciesTraitImprovements,
   ];
   const featBonuses = deriveImprovementBonuses(improvements, hitDiceTotal);
-  const effectiveMaxHp = maxHp + featBonuses.maxHp;
+  const effectiveMaxHp = effectiveMaxHitPoints(maxHp, featBonuses.maxHp, exhaustionLevel, edition);
   // Proficiency grants from feats + class feature rows (skills + saving
   // throws + armor + weapons). Merged with stored proficiencies by the
   // caller using OR — existing proficiency is never removed.

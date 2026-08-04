@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { exhaustionEffectText, exhaustionRollEffects, exhaustionSpeedPenalty } from "@/lib/srd/condition-data.js";
+import {
+  exhaustionEffectText,
+  exhaustionMaxHpPenalty,
+  exhaustionRollEffects,
+  exhaustionSpeedPenalty,
+} from "@/lib/srd/condition-data.js";
+import { effectiveMaxHitPoints } from "@/lib/combat/hitpoints.js";
 
 // SRD 5.2: each exhaustion level reduces Speed by 5 ft (−5 ft×level).
 describe("exhaustionSpeedPenalty — 2024 (SRD 5.2, #1136)", () => {
@@ -21,7 +27,8 @@ describe("exhaustionSpeedPenalty — 2024 (SRD 5.2, #1136)", () => {
 
 // PHB'14 p. 291 (Appendix A), cumulative tiers: 1 disadvantage on ability
 // checks, 2 +speed halved, 3 +disadvantage on attacks/saves, 4 +HP max halved
-// (out of scope, #1307), 5 +speed 0, 6 death.
+// (enforced via exhaustionMaxHpPenalty/effectiveMaxHitPoints, #1321), 5 +speed
+// 0, 6 death.
 describe("exhaustionSpeedPenalty — 2014 (PHB'14 p. 291)", () => {
   it("level 0 or 1: no Speed penalty yet", () => {
     expect(exhaustionSpeedPenalty(0, 30, "EDITION_2014")).toBe(0);
@@ -143,7 +150,7 @@ describe("exhaustionEffectText — 2014 (PHB'14 p. 291, Appendix A)", () => {
     );
   });
 
-  it("level 4: adds HP maximum halved (stated per PHB'14 p. 291 even though the app doesn't enforce it yet — #1400)", () => {
+  it("level 4: adds HP maximum halved (PHB'14 p. 291, enforced by exhaustionMaxHpPenalty since #1321)", () => {
     expect(exhaustionEffectText(4, "EDITION_2014")).toBe(
       "Disadvantage on attack rolls, ability checks, saving throws, and initiative; Speed halved; HP maximum halved.",
     );
@@ -159,7 +166,7 @@ describe("exhaustionEffectText — 2014 (PHB'14 p. 291, Appendix A)", () => {
     expect(exhaustionEffectText(6, "EDITION_2014")).toBe("Death.");
   });
 
-  it("the HP-tier clause is included, honestly reporting an unimplemented rule rather than under-reporting PHB'14 p. 291 (#1400)", () => {
+  it("the HP-tier clause is included, matching the enforced exhaustionMaxHpPenalty halving (PHB'14 p. 291)", () => {
     expect(exhaustionEffectText(4, "EDITION_2014")).toContain("HP maximum halved");
   });
 
@@ -208,5 +215,58 @@ describe("exhaustionEffectText — 2024 (SRD 5.2)", () => {
   it("clamps out-of-range levels", () => {
     expect(exhaustionEffectText(-5, "EDITION_2024")).toBe("No exhaustion.");
     expect(exhaustionEffectText(99, "EDITION_2024")).toBe("Death.");
+  });
+});
+
+// #1321: PHB'14 p. 291's level-4 tier — "Hit point maximum halved" — a direct
+// structural sibling of exhaustionSpeedPenalty (returns the SUBTRAHEND, not the
+// result). SRD 5.2 has no hit-point-maximum tier at all.
+describe("exhaustionMaxHpPenalty — 2014 (PHB'14 p. 291)", () => {
+  it("is 0 below level 4", () => {
+    expect(exhaustionMaxHpPenalty(0, 30, "EDITION_2014")).toBe(0);
+    expect(exhaustionMaxHpPenalty(1, 30, "EDITION_2014")).toBe(0);
+    expect(exhaustionMaxHpPenalty(2, 30, "EDITION_2014")).toBe(0);
+    expect(exhaustionMaxHpPenalty(3, 30, "EDITION_2014")).toBe(0);
+  });
+
+  it("levels 4-6: subtracts ceil(currentMax/2) — PHB'14 p. 7 Round Down means the RESULT (currentMax − penalty) floors", () => {
+    expect(exhaustionMaxHpPenalty(4, 30, "EDITION_2014")).toBe(15);
+    expect(exhaustionMaxHpPenalty(5, 30, "EDITION_2014")).toBe(15);
+    expect(exhaustionMaxHpPenalty(6, 30, "EDITION_2014")).toBe(15);
+    // Odd max: ceil(31/2)=16, so the RESULT 31-16=15 is the floored half.
+    expect(exhaustionMaxHpPenalty(4, 31, "EDITION_2014")).toBe(16);
+  });
+});
+
+describe("exhaustionMaxHpPenalty — 2024 (SRD 5.2)", () => {
+  it("is always 0 — SRD 5.2 has no hit-point-maximum exhaustion tier", () => {
+    for (let level = 0; level <= 6; level++) {
+      expect(exhaustionMaxHpPenalty(level, 30, "EDITION_2024")).toBe(0);
+    }
+  });
+});
+
+// effectiveMaxHitPoints (hp-core.ts) composes the penalty above with the feat
+// layer and the max-HP ≥ 1 floor — the single function every HP-max consumer
+// calls (#1321).
+describe("effectiveMaxHitPoints — composition (#1321)", () => {
+  it("stored max 30, no feat bonus, 2014 exhaustion 4 → floor(30/2) = 15", () => {
+    expect(effectiveMaxHitPoints(30, 0, 4, "EDITION_2014")).toBe(15);
+  });
+
+  it("stored max 31 (odd) → still floors to 15", () => {
+    expect(effectiveMaxHitPoints(31, 0, 4, "EDITION_2014")).toBe(15);
+  });
+
+  it("stored max 1 halves to 0, but floors at 1 (this repo's max-HP ≥ 1 invariant, not RAW 5e text)", () => {
+    expect(effectiveMaxHitPoints(1, 0, 4, "EDITION_2014")).toBe(1);
+  });
+
+  it("2014 exhaustion below 4: no penalty, feat bonus still applies", () => {
+    expect(effectiveMaxHitPoints(30, 4, 3, "EDITION_2014")).toBe(34);
+  });
+
+  it("2024: never halves regardless of exhaustion level", () => {
+    expect(effectiveMaxHitPoints(30, 0, 6, "EDITION_2024")).toBe(30);
   });
 });

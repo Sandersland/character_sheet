@@ -1,4 +1,5 @@
 import type { ExperienceOperation } from "@character-sheet/contracts";
+import type { RulesEdition } from "@character-sheet/shared-types";
 
 import { Prisma } from "@/generated/prisma/client.js";
 import { levelForExperience } from "./experience.js";
@@ -10,8 +11,15 @@ import {
 } from "@/lib/character/character-transaction.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { editionOf } from "@/lib/rules/edition.js";
-import { fixedAverageForDie, normalizeHitDice, normalizeHitPoints } from "@/lib/combat/hitpoints.js";
-import { abilityModifier, hitDieFace } from "@/lib/srd/srd.js";
+import {
+  effectiveMaxHitPoints,
+  fixedAverageForDie,
+  inCapAdvancementsAt,
+  normalizeHitDice,
+  normalizeHitPoints,
+} from "@/lib/combat/hitpoints.js";
+import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
+import { abilityModifier, deriveFeatBonuses, hitDieFace } from "@/lib/srd/srd.js";
 import { recomputeSummaries } from "@/lib/session/sessions.js";
 
 export class InvalidExperienceOperationError extends Error {}
@@ -35,10 +43,16 @@ function computeLevelDownState(
     hitPoints: Prisma.JsonValue;
     hitDice: Prisma.JsonValue;
     abilityScores: Prisma.JsonValue;
-    classEntries: { id: string; level: number }[];
+    resources: Prisma.JsonValue;
+    conditions: Prisma.JsonValue;
+    classEntries: { id: string; level: number; class: { extraAsiLevels: number[] } | null }[];
   },
   levelUpEvents: { data: Prisma.JsonValue }[],
   levelsToReverse: number,
+  // #1321: the post-reversal advancement-slot cap and exhaustion's halving
+  // are both evaluated at the character's FINAL (post-reversal) state.
+  targetLevel: number,
+  edition: RulesEdition,
 ) {
   const hp = normalizeHitPoints(character.hitPoints);
   const hd = normalizeHitDice(character.hitDice);
@@ -52,6 +66,14 @@ function computeLevelDownState(
   const beforeHp = { ...hp };
   const beforeHd = { ...hd };
 
+  // #1321: current must clamp to the EFFECTIVE (exhaustion-halved) max, not
+  // the raw hp.max column — the ticket's checklist names this exact line.
+  // The feat-bonus half of that composition is evaluated once, at the FINAL
+  // (post-reversal) advancement-slot cap, mirroring how deriveFeatBonuses'
+  // appliedLevel argument tracks hd.total inside the loop below.
+  const inCapAdvancements = inCapAdvancementsAt(character.resources, character.classEntries, targetLevel);
+  const exhaustionLevel = normalizeConditionsMutable(character.conditions).exhaustion;
+
   for (let i = 0; i < levelsToReverse; i++) {
     const event = levelUpEvents[i];
     const eventData = (event?.data ?? {}) as Record<string, unknown>;
@@ -61,8 +83,9 @@ function computeLevelDownState(
         : Math.max(1, fixedAverageForDie(faces) + conMod); // best-effort fallback
 
     hp.max = Math.max(1, hp.max - hpGain);
-    hp.current = Math.min(hp.current, hp.max);
     hd.total = Math.max(0, hd.total - 1);
+    const featMaxHpBonus = deriveFeatBonuses(inCapAdvancements, hd.total).maxHp;
+    hp.current = Math.min(hp.current, effectiveMaxHitPoints(hp.max, featMaxHpBonus, exhaustionLevel, edition));
     hd.spent = Math.min(hd.spent, hd.total);
   }
 
@@ -74,6 +97,7 @@ async function revertLevelUps(
   characterId: string,
   currentHdTotal: number,
   targetLevel: number,
+  edition: RulesEdition,
   batchId: string,
   sessionId: string | null,
 ): Promise<void> {
@@ -94,7 +118,14 @@ async function revertLevelUps(
       hitPoints: true,
       hitDice: true,
       abilityScores: true,
-      classEntries: { orderBy: { position: "asc" as const }, select: { id: true, level: true } },
+      // resources/conditions (#1321): effectiveMaxHitPoints' inputs — see
+      // computeLevelDownState's own comment.
+      resources: true,
+      conditions: true,
+      classEntries: {
+        orderBy: { position: "asc" as const },
+        select: { id: true, level: true, class: { select: { extraAsiLevels: true } } },
+      },
     },
   });
   if (!character) throw new InvalidExperienceOperationError(`Character not found: ${characterId}`);
@@ -103,6 +134,8 @@ async function revertLevelUps(
     character,
     levelUpEvents,
     levelsToReverse,
+    targetLevel,
+    edition,
   );
 
   // Repair the position-0 class entry's level to match the new hd.total.
@@ -205,7 +238,7 @@ async function applyExperienceOp(ctx: XpTxContext): Promise<void> {
   // This fixes the stranded-HP bug: lowering XP now rolls HP/hit-dice back.
   const newDerivedLevel = levelForExperience(newXp);
   if (newDerivedLevel < hd.total) {
-    await revertLevelUps(tx, characterId, hd.total, newDerivedLevel, batchId, sessionId);
+    await revertLevelUps(tx, characterId, hd.total, newDerivedLevel, editionOf(row), batchId, sessionId);
   }
 
   // Reconcile all level-gated state (subclass choice, maneuvers known, …) in the

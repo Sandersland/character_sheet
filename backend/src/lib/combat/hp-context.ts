@@ -3,26 +3,14 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 import { Prisma } from "@/generated/prisma/client.js";
 import { capabilityColumnsFromSnapshot, type GrantItem, type CapabilityColumns } from "@/lib/inventory/capabilities.js";
 import { readInventorySnapshot } from "@/lib/inventory/inventory-snapshot-read.js";
-import { levelForExperience } from "@/lib/leveling/experience.js";
 import {
   abilityModifier,
-  characterAdvancementSlots,
-  deriveFeatBonuses,
   hitDieFace,
 } from "@/lib/srd/srd.js";
-// Leaf module (no back-imports), NOT classes/resources.ts (#1243) — that file
-// now also composes applyHealInTx (Uncanny Metabolism's bonus heal), which
-// would close an import cycle back through combat/hitpoints.ts.
-import { normalizeResourcesMutable, splitAdvancementsBySlotCap } from "@/lib/classes/resources-state.js";
 import type { ClassFeatureRow } from "@/lib/classes/class-feature-rows.js";
 import { FEATURE_ROWS_CLASS_FEATURES, FEATURE_ROWS_SUBCLASS_FEATURES } from "@/lib/classes/feature-rows-select.js";
-import {
-  InvalidHitPointOperationError,
-  normalizeHitPoints,
-  normalizeHitDice,
-  type HitPoints,
-  type HitDice,
-} from "./hp-core.js";
+import { InvalidHitPointOperationError, type HitPoints, type HitDice } from "./hp-core.js";
+import { effectiveMaxHitPointsForRow } from "./conditions.js";
 
 // Per-op context: the mutable hp/hd state + row the appliers (hp-ops.ts) read
 // and write, built once per op by buildHpOpContext.
@@ -54,7 +42,12 @@ export interface HpOpContext {
   hd: HitDice;
   conMod: number;
   faces: number;
+  /** effectiveMaxHitPoints(hp.max, featMaxHpBonus, exhaustionLevel, row.rulesEdition) — the effective max AT CONTEXT-BUILD TIME. A consumer that changes exhaustion mid-op (applyLongRestOp, decision 6) must recompute via the two fields below rather than reuse this stale value. */
   effMax: number;
+  /** The feat-bonus half of effMax's composition (e.g. Tough), exposed so a consumer can recompute effMax against a NEW exhaustion level without re-deriving it (#1321). */
+  featMaxHpBonus: number;
+  /** conditions.exhaustion at context-build time — see effMax's own comment. */
+  exhaustionLevel: number;
   primaryEntry: ClassEntryRow | undefined;
   beforeClassLevel: number | null;
 }
@@ -168,8 +161,10 @@ export async function buildHpOpContext(
     throw new InvalidHitPointOperationError(`Character not found: ${characterId}`);
   }
 
-  const hp = normalizeHitPoints(row.hitPoints);
-  const hd = normalizeHitDice(row.hitDice);
+  // #1321: hp/hd/featMaxHpBonus/exhaustionLevel/effMax all come from ONE call
+  // — effectiveMaxHitPointsForRow (conditions.ts) — so this and applyHealInTx
+  // (hp-in-tx.ts) never repeat the composition inline.
+  const { hp, hd, featMaxHpBonus, exhaustionLevel, effMax } = effectiveMaxHitPointsForRow(row);
   const abilityScores = row.abilityScores as Record<string, number>;
   const conMod = abilityModifier(abilityScores.constitution ?? 10);
   const faces = hitDieFace(hd.die);
@@ -197,19 +192,6 @@ export async function buildHpOpContext(
     };
   });
 
-  // Compute the effective HP maximum including feat improvements (e.g. Tough).
-  // This is a read-time overlay — hp.max itself stays the feat-free base so
-  // the value written back to the DB never includes the feat bonus.
-  // Use the in-cap advancements slice so over-cap feats are automatically excluded.
-  const advStateForFeat = normalizeResourcesMutable(row.resources);
-  const featSlotCap = characterAdvancementSlots(row.classEntries, levelForExperience(row.experiencePoints));
-  // Origin feats are kept regardless of the slot cap (#1130).
-  const { kept: inCapAdvancements } = splitAdvancementsBySlotCap(advStateForFeat.advancements, featSlotCap);
-  const featBonus = deriveFeatBonuses(inCapAdvancements, hd.total);
-  // effMax is used for all clamp/ceiling operations instead of hp.max.
-  // hp.max is the stored (feat-free) base and is what gets persisted.
-  const effMax = hp.max + featBonus.maxHp;
-
   return {
     tx,
     characterId,
@@ -219,6 +201,8 @@ export async function buildHpOpContext(
     conMod,
     faces,
     effMax,
+    featMaxHpBonus,
+    exhaustionLevel,
     primaryEntry,
     beforeClassLevel: primaryEntry?.level ?? null,
   };

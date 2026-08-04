@@ -304,8 +304,8 @@ const EXHAUSTION_ROLL_KINDS: RollModeKind[] = ["attack", "check", "save", "initi
 // isn't folded into `check`), but under 2014 Initiative *is* a Dexterity
 // check (PHB'14 p. 189), so a `check`-only effect would silently miss it.
 // Tier 4 (HP max halved) and tier 5 (Speed 0) have no roll-effect shape and
-// are handled elsewhere (tier 5 in exhaustionSpeedPenalty; tier 4 is out of
-// scope for #1307 — it touches derived max HP, not rolls).
+// are handled elsewhere (tier 5 in exhaustionSpeedPenalty; tier 4 in
+// exhaustionMaxHpPenalty, #1321 — it touches derived max HP, not rolls).
 function exhaustionRollEffects2014(level: number): RollEffect[] {
   const effects: RollEffect[] = [];
   if (level >= 1) {
@@ -338,10 +338,11 @@ export function exhaustionRollEffects(level: number, edition: RulesEdition): Rol
 /**
  * Speed reduction (feet) from exhaustion. 2024 (SRD 5.2): −5 ft per level.
  * 2014 (PHB'14 p. 291): 0 below level 2; levels 2-4 halve current Speed
- * (base + all bonuses), rounded down like Prone's half-Speed; level 5+ floors
- * to exactly 0. Returns the amount SUBTRACTED, not the result — so a
- * round-down result needs subtracting ceil(currentSpeed/2), not floor (floor
- * would round the result UP for an odd Speed, e.g. 25 → 13 instead of 12).
+ * (base + all bonuses), rounded down (PHB'14 p. 7, "Round Down") like Prone's
+ * half-Speed; level 5+ floors to exactly 0. Returns the amount SUBTRACTED, not
+ * the result — so a round-down result needs subtracting ceil(currentSpeed/2),
+ * not floor (floor would round the result UP for an odd Speed, e.g. 25 → 13
+ * instead of 12).
  */
 export function exhaustionSpeedPenalty(level: number, currentSpeed: number, edition: RulesEdition): number {
   if (edition === "EDITION_2014") {
@@ -350,6 +351,23 @@ export function exhaustionSpeedPenalty(level: number, currentSpeed: number, edit
     return currentSpeed;
   }
   return 5 * Math.max(0, level);
+}
+
+/**
+ * Hit point maximum penalty from exhaustion (#1321). PHB'14 p. 291 (Appendix
+ * A) tier 4: "Hit point maximum halved" — a direct structural sibling of
+ * exhaustionSpeedPenalty above, including its shape: returns the amount
+ * SUBTRACTED, not the result, so a round-down result (PHB'14 p. 7, "Round
+ * Down") needs subtracting ceil(currentMax/2), not floor. `currentMax` is the
+ * max AFTER any feat bonus (e.g. Tough) is added — see effectiveMaxHitPoints
+ * (hp-core.ts), which composes feat-bonus-then-penalty in that order. SRD 5.2
+ * has no hit-point-maximum exhaustion tier at all — 2024 always returns 0.
+ */
+export function exhaustionMaxHpPenalty(level: number, currentMax: number, edition: RulesEdition): number {
+  if (edition === "EDITION_2014" && level >= 4) {
+    return Math.ceil(currentMax / 2);
+  }
+  return 0;
 }
 
 // PHB'14 p. 291's tiers are cumulative, so the sentence for a given level
@@ -364,13 +382,9 @@ function exhaustionEffectText2014(level: number): string {
   const clauses = [`Disadvantage on ${disadvantageCategories}`];
   if (level >= 5) clauses.push("Speed 0");
   else if (level >= 2) clauses.push("Speed halved");
-  // Tier 4 (HP maximum halved, PHB'14 p. 291) is NOT enforced anywhere in this
-  // app today (see exhaustionRollEffects2014's comment on the same gap) —
-  // hitPoints.max isn't halved for a 2014 character at this level. Stated
-  // anyway rather than silently omitted: this sentence's job is to tell a 2014
-  // player the actual rule, and "Death." at level 6 is already unenforced in
-  // both editions, so there's precedent for describing a rule the engine
-  // doesn't yet apply. Follow-up to implement the halving: #1400.
+  // Tier 4 (HP maximum halved, PHB'14 p. 291) — enforced by
+  // exhaustionMaxHpPenalty/effectiveMaxHitPoints (#1321), same as the
+  // disadvantage/Speed clauses above.
   if (level >= 4) clauses.push("HP maximum halved");
   return `${clauses.join("; ")}.`;
 }

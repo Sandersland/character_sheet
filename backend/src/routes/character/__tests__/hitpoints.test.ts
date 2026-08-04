@@ -419,6 +419,87 @@ describe("POST /api/characters/:id/hp", () => {
   });
 });
 
+// ── exhaustion max-HP halving interacts with heal/shortRest/longRest (#1321) ─
+// PHB'14 p. 291 tier 4 ("Hit point maximum halved") plus PHB'14 p. 196/197's
+// current-can't-exceed-max ceiling: heal/shortRest must clamp to the HALVED
+// max (not 400), and longRest must recover exhaustion BEFORE recomputing the
+// post-rest max (decision 6) — reducing first is the only reading under which
+// "regains all lost hit points" (PHB'14 p. 186) is true of the rested character.
+const EXH_OWNER_ID = "owner-hitpoints-exhaustion";
+const EXH_FIXTURE = {
+  id: "test-hp-exhaustion-1",
+  name: "HP Exhaustion Fixture",
+  alignment: "True Neutral",
+  rulesEdition: "EDITION_2014" as const,
+  initiativeBonus: 0,
+  speed: 30,
+  hitPoints: { current: 10, max: 30, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+  hitDice: { total: 3, die: "d10", spent: 0 },
+  abilityScores: { strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 },
+  savingThrowProficiencies: [],
+  skills: [],
+  toolProficiencies: [],
+  currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
+};
+
+describe("POST /api/characters/:id/hp — exhaustion max-HP halving (2014, #1321)", () => {
+  beforeEach(async () => {
+    await ensureTestOwner(EXH_OWNER_ID);
+    COOKIE = await authCookie(EXH_OWNER_ID);
+    await prisma.character.create({
+      data: { ...EXH_FIXTURE, ownerId: EXH_OWNER_ID, spellcasting: Prisma.JsonNull },
+    });
+  });
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { id: EXH_FIXTURE.id } });
+  });
+
+  async function setExhaustion(level: number) {
+    return supertest(app)
+      .post(`/api/characters/${EXH_FIXTURE.id}/conditions/transactions`)
+      .set("Cookie", COOKIE)
+      .send({ operations: [{ type: "setExhaustion", level }] });
+  }
+
+  it("heal at exhaustion 4 clamps to the halved max (15) instead of the raw stored max (30) — does not 400", async () => {
+    await setExhaustion(4);
+    const res = await post(EXH_FIXTURE.id, { operations: [{ type: "heal", amount: 99 }] });
+    expect(res.status).toBe(200);
+    expect(res.body.hitPoints.current).toBe(15);
+  });
+
+  it("shortRest at exhaustion 4 clamps to the halved max", async () => {
+    await setExhaustion(4);
+    const res = await post(EXH_FIXTURE.id, { operations: [{ type: "shortRest", rolls: [10, 10] }] });
+    expect(res.status).toBe(200);
+    expect(res.body.hitPoints.current).toBe(15);
+  });
+
+  it("longRest at exhaustion 4: recovers exhaustion to 3 FIRST, then restores to the post-rest (un-halved) max 30 (decision 6)", async () => {
+    await setExhaustion(4);
+    const res = await post(EXH_FIXTURE.id, { operations: [{ type: "longRest" }] });
+    expect(res.status).toBe(200);
+    expect(res.body.conditions.exhaustion).toBe(3);
+    expect(res.body.hitPoints.current).toBe(30);
+    expect(res.body.hitPoints.max).toBe(30);
+  });
+
+  it("longRest at exhaustion 5: recovers to exhaustion 4, restores only to the STILL-halved max 15 (decision 6) — hpRestored reflects the post-recovery number", async () => {
+    await setExhaustion(5);
+    const res = await post(EXH_FIXTURE.id, { operations: [{ type: "longRest" }] });
+    expect(res.status).toBe(200);
+    expect(res.body.conditions.exhaustion).toBe(4);
+    expect(res.body.hitPoints.current).toBe(15);
+    expect(res.body.hitPoints.max).toBe(15);
+
+    const activity = await supertest(app).get(`/api/characters/${EXH_FIXTURE.id}/activity`).set("Cookie", COOKIE);
+    const ev = (activity.body as Array<{ type: string; data?: { hpRestored?: number } }>).find((e) => e.type === "longRest")!;
+    // Started at current 10 (fixture); post-recovery max is 15 → hpRestored 5,
+    // NOT 30 - 10 = 20 (the pre-recovery, exhaustion-5 max would floor even lower).
+    expect(ev.data!.hpRestored).toBe(5);
+  });
+});
+
 // ── rest undo preserves resource sub-fields (issue #319) ────────────────────
 
 const FS_OWNER_ID = "owner-hitpoints-rest-undo";

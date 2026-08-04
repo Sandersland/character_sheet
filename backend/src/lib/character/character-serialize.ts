@@ -280,6 +280,10 @@ export function serializeCharacter(rawRow: CharacterRow) {
   //    summed over the kept advancements (origin feats + slot-bounded entries)
   //    TOGETHER WITH active ClassFeature row grants (#1691's classFeatureImprovements)
   //    AND active SpeciesTrait row grants (#1682's speciesTraits.improvements).
+  //    conditions (exhaustion) is hoisted above applyFeatLayer — #1321's
+  //    effectiveMaxHp composes the feat bonus with exhaustion's PHB'14 p. 291
+  //    tier-4 halving, so the feat layer needs the exhaustion level in hand.
+  const conditions = normalizeConditionsMutable(row.conditions);
   const { effectiveScores, hitPoints, effectiveInitBonus, clampedAdvancements, advSlotTotal, usedSlots, fightingStyleSlotTotal, usedFightingStyleSlots } =
     applyAdvancementClamp(row, progress.level, normalizedHitPoints);
   const { featBonuses, effectiveMaxHp, featProficiencies } = applyFeatLayer(
@@ -288,6 +292,8 @@ export function serializeCharacter(rawRow: CharacterRow) {
     speciesTraits.improvements,
     hitDice.total,
     hitPoints.max,
+    conditions.exhaustion,
+    editionOf(row),
   );
 
   // 4. Proficiency grants, the per-target modifier channel (active cast buffs
@@ -296,7 +302,6 @@ export function serializeCharacter(rawRow: CharacterRow) {
   // inventory serialisation (attack-bonus derivation) and the wire response.
   const weaponGrants = buildMergedWeaponProficiencies(row.classEntries, featProficiencies.weapons);
   const activeEffects = normalizeActiveEffectsMutable(row.activeEffects);
-  const conditions = normalizeConditionsMutable(row.conditions);
   const buffTargets = buildTargetModifiers(row, activeEffects);
   const { itemGrants, itemSkillProfs, itemSaveProfs } = buildItemGrantsView(row);
   // Archery Fighting Style feat (#1137): +2 to ranged attack rolls, summed from
