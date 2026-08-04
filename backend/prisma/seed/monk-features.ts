@@ -256,8 +256,8 @@ const WARRIOR_OF_THE_OPEN_HAND_RAW: RawMonkFeature[] = [
 // Darkness cast + passive Minor Illusion/Darkvision grants; Cloak of Shadows
 // moves 11 -> 17 (replacing Opportunist, retired — no 2024 equivalent) and
 // Improved Shadow Step fills the vacated L11 slot. Untagged here regardless
-// — this migration seeds the pre-#1246-rewrite text for BOTH editions
-// (byte-identical to today); the 2014 rewrite is #1500-#1503's job.
+// — this migration seeds the current (post-#1246) text for BOTH editions
+// (byte-identical to today); the 2014 divergence is #1500-#1503's job.
 const WARRIOR_OF_SHADOW_RAW: RawMonkFeature[] = [
   {
     subclassSlug: slug("monk-warrior-of-shadow"),
