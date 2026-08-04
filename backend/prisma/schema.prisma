@@ -611,17 +611,15 @@ model ClassFeature {
   // ---- than re-migrating all 522 text rows a second time when #1528 lands.
 
   // Resource block — replaces the pool this feature declares in resourceFn.
-  // A row may set resourceKey and leave the totals NULL: a formula-computed
-  // pool (Bardic Inspiration = Cha mod, Lay on Hands = level x 5) keeps
-  // resourceFn until #416's C3 evaluator exists. `resourceRecharge` is also a
-  // single scalar, not a tier array — Bardic Inspiration's recharge changes
-  // mid-progression (longRest below level 5, short-or-long from level 5), a
-  // second independent reason no row can carry this pool even with a fixed
-  // total (#1224).
+  // `resourceRecharge` is a single scalar, not a tier array — Bardic
+  // Inspiration's recharge changes mid-progression (longRest below level 5,
+  // short-or-long from level 5), which is why it stays resourceFn-derived
+  // even though #1685's evaluator can now express its Cha-mod total
+  // (`{ abilityMod, min }`) directly on a row (#1224).
   resourceKey      String?
   resourceLabel    String?
   resourceRecharge String? // RechargeOn
-  resourceTotals   Json? // [{ minLevel, total }] — ASCENDING by minLevel, last-match-wins
+  resourceTotals   Json? // [{ minLevel, total }] — total: number | "proficiencyBonus" | { abilityMod, min? } | { levelTimes } (#1685) — ASCENDING by minLevel, last-match-wins
   resourceDieTiers Json? // [{ minLevel, die }]   — ASCENDING by minLevel, last-match-wins
 
   // Activation block — replaces this feature's DERIVED_ACTIONS row. No gate
