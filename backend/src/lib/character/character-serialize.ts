@@ -412,11 +412,12 @@ export function serializeCharacter(rawRow: CharacterRow) {
     ),
     skills: buildSkillsView(row, featProficiencies, itemSkillProfs, buffTargets),
     toolProficiencies: buildToolProficienciesView(row, resources, itemGrants),
-    // Armor/weapon proficiencies — derived fully at read time from class, race,
-    // and feat grants. No persistence needed: these are fixed by class/race and
-    // any feat-granted additions are already tracked in advancements. Deduped
-    // with precedence class > race > feat so a feat re-granting an existing
-    // class proficiency renders as a single class-sourced entry.
+    // Armor/weapon proficiencies — derived fully at read time from class,
+    // species-trait, and feat grants (species grants arrive feat-sourced since
+    // the #1682 RACE_PROFICIENCY_GRANTS retirement). No persistence needed:
+    // feat-granted additions are already tracked in advancements. Deduped with
+    // precedence class > feat so a feat re-granting an existing class
+    // proficiency renders as a single class-sourced entry.
     armorProficiencies: armorGrants,
     weaponProficiencies: itemMergedWeaponGrants,
     inventory,

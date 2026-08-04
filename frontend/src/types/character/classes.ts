@@ -215,23 +215,26 @@ export interface ToolProficiency {
 export type ArmorProficiencyCategory = "light" | "medium" | "heavy" | "shield";
 
 /**
- * One armor proficiency entry — derived at read time from class + race + feats.
- * `category` identifies the armor type; `source` is the highest-priority origin
- * (class wins over race over feat when multiple sources would grant the same category).
+ * One armor proficiency entry — derived at read time from class + species-trait
+ * + feats (species grants arrive feat-sourced since the #1682
+ * RACE_PROFICIENCY_GRANTS retirement). `category` identifies the armor type;
+ * `source` is the highest-priority origin (class wins over feat when multiple
+ * sources would grant the same category).
  */
 export interface ArmorProficiency {
   category: ArmorProficiencyCategory;
-  source: "class" | "race" | "feat";
+  source: "class" | "feat";
 }
 
 /**
- * One weapon proficiency entry — derived at read time from class + race + feats.
- * `name` may be a category ("Simple Weapons", "Martial Weapons") or a specific
- * weapon ("Longswords"). `source` is the highest-priority origin.
+ * One weapon proficiency entry — derived at read time from class + species-trait
+ * + feats (species grants arrive feat-sourced since #1682). `name` may be a
+ * category ("Simple Weapons", "Martial Weapons") or a specific weapon
+ * ("Longswords"). `source` is the highest-priority origin.
  */
 export interface WeaponProficiency {
   name: string;
-  source: "class" | "race" | "feat" | "item";
+  source: "class" | "feat" | "item";
 }
 
 /** Level-gated tool proficiency entry within the resources JSON. */

@@ -77,10 +77,10 @@ describe("SpeciesTrait.improvements (#1682) — 2014 Hill Dwarf", () => {
 
     const res = await get(id);
     expect(res.status).toBe(200);
-    // Level 1 (hitDice.total === 1): +1 maxHp over the base Fighter d10 roll.
+    // Level-1 Fighter d10 + CON 12 (mod +1) = 11 base; Dwarven Toughness adds
+    // +1/level, so 12 at level 1 (the level-delta proof lives in block 3).
     expect(res.body.hitDice.total).toBe(1);
-    const fighterBaseMax = res.body.hitPoints.max - 1;
-    expect(res.body.hitPoints.max).toBe(fighterBaseMax + 1);
+    expect(res.body.hitPoints.max).toBe(12);
 
     const weapons = weaponNames(res.body);
     expect(weapons).toEqual(expect.arrayContaining(["Battleaxes", "Handaxes", "Light Hammers", "Warhammers"]));
@@ -195,7 +195,9 @@ describe("SpeciesTrait.improvements (#1682) — 2024 species shows edition-speci
     expect(darkvision.description).not.toContain("SRD 5.1");
     expect(darkvision.description).toContain("120 feet"); // 2024 Dwarf darkvision is 120 ft, vs 60 ft in 2014
 
-    const fighterBaseMax = res.body.hitPoints.max - 1;
-    expect(res.body.hitPoints.max).toBe(fighterBaseMax + 1); // Dwarven Toughness is a base-species trait in 2024, not variant-gated
+    // 2024 Dwarven Toughness is a BASE-species trait (not variant-gated as in
+    // 2014): a variantless 2024 Dwarf still gets +1/level, so a level-1 Fighter
+    // with CON 12 (base 11) reads 12 — proving the base-row grant fires.
+    expect(res.body.hitPoints.max).toBe(12);
   });
 });

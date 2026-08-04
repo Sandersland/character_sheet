@@ -53,11 +53,11 @@ function buildMergedToolProficiencies(
 export function buildMergedArmorProficiencies(
   classEntries: { class: { armorProficiencies: string[] } | null }[],
   featArmor: Set<string>,
-): Array<{ category: ArmorProficiencyCategory; source: "class" | "race" | "feat" }> {
+): Array<{ category: ArmorProficiencyCategory; source: "class" | "feat" }> {
   const seen = new Set<string>();
-  const out: Array<{ category: ArmorProficiencyCategory; source: "class" | "race" | "feat" }> = [];
+  const out: Array<{ category: ArmorProficiencyCategory; source: "class" | "feat" }> = [];
 
-  const push = (cat: string, source: "class" | "race" | "feat") => {
+  const push = (cat: string, source: "class" | "feat") => {
     if (seen.has(cat)) return;
     seen.add(cat);
     out.push({ category: cat as ArmorProficiencyCategory, source });
@@ -78,11 +78,11 @@ export function buildMergedArmorProficiencies(
 export function buildMergedWeaponProficiencies(
   classEntries: { class: { weaponProficiencies: string[] } | null }[],
   featWeapons: Set<string>,
-): Array<{ name: string; source: "class" | "race" | "feat" }> {
+): Array<{ name: string; source: "class" | "feat" }> {
   const seen = new Set<string>();
-  const out: Array<{ name: string; source: "class" | "race" | "feat" }> = [];
+  const out: Array<{ name: string; source: "class" | "feat" }> = [];
 
-  const push = (name: string, source: "class" | "race" | "feat") => {
+  const push = (name: string, source: "class" | "feat") => {
     if (seen.has(name)) return;
     seen.add(name);
     out.push({ name, source });
@@ -99,10 +99,10 @@ export function buildMergedWeaponProficiencies(
 // Append item-granted weapon proficiencies (#529) after class/race/feat grants,
 // tagged source "item". Deduped by name — an existing grant wins (never demoted).
 export function mergeItemWeaponProficiencies(
-  base: Array<{ name: string; source: "class" | "race" | "feat" | "item" }>,
+  base: Array<{ name: string; source: "class" | "feat" | "item" }>,
   itemProfs: { value: string; source: string }[],
   // fallow-ignore-next-line code-duplication -- input/output share the same source-tagged proficiency shape by contract
-): Array<{ name: string; source: "class" | "race" | "feat" | "item" }> {
+): Array<{ name: string; source: "class" | "feat" | "item" }> {
   const seen = new Set(base.map((e) => e.name));
   const out = [...base];
   for (const p of itemProfs) {
