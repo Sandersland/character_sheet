@@ -68,7 +68,12 @@ const LEVEL_11_XP = 85000;
 
 interface Persona {
   name: string;
-  race: string;
+  // #1684: resolved to a speciesId at creation (resolveSpeciesId below) — the
+  // flat `race`-name create path is gone. Halfling (2024): no #1690 choice
+  // trait (unlike Human's Skillful/Versatile, which would need extra fields
+  // no persona here declares) and no maxHp-granting trait (unlike Dwarf's
+  // Toughness, which would throw off every persona's HP by species alone).
+  speciesName: string;
   background: string;
   className: string;
   experiencePoints?: number;
@@ -89,10 +94,10 @@ interface Persona {
 }
 
 const ROSTER: Persona[] = [
-  { name: "Smoke Fighter", race: "Human", background: "Soldier", className: "Fighter" },
+  { name: "Smoke Fighter", speciesName: "Halfling", background: "Soldier", className: "Fighter" },
   {
     name: "Wizard L5",
-    race: "Human",
+    speciesName: "Halfling",
     background: "Sage",
     className: "Wizard",
     experiencePoints: LEVEL_5_XP,
@@ -105,7 +110,7 @@ const ROSTER: Persona[] = [
   },
   {
     name: "Warlock L1",
-    race: "Human",
+    speciesName: "Halfling",
     background: "Sage",
     className: "Warlock",
     // Warlock level-1 loadout: 2 cantrips (incl. Eldritch Blast) + 2 spells.
@@ -118,7 +123,7 @@ const ROSTER: Persona[] = [
   },
   {
     name: "Battle Master",
-    race: "Human",
+    speciesName: "Halfling",
     background: "Soldier",
     className: "Fighter",
     experiencePoints: LEVEL_5_XP,
@@ -129,14 +134,14 @@ const ROSTER: Persona[] = [
   },
   {
     name: "Session Fighter",
-    race: "Human",
+    speciesName: "Halfling",
     background: "Soldier",
     className: "Fighter",
     campaignName: "E2E Solo — Session Fighter",
   },
   {
     name: "Monk L6",
-    race: "Human",
+    speciesName: "Halfling",
     background: "Soldier",
     className: "Monk",
     experiencePoints: LEVEL_6_XP,
@@ -145,7 +150,7 @@ const ROSTER: Persona[] = [
   },
   {
     name: "Elements Monk",
-    race: "Human",
+    speciesName: "Halfling",
     background: "Soldier",
     className: "Monk",
     experiencePoints: LEVEL_6_XP,
@@ -155,7 +160,7 @@ const ROSTER: Persona[] = [
   },
   {
     name: "Shadow Monk",
-    race: "Human",
+    speciesName: "Halfling",
     background: "Soldier",
     className: "Monk",
     experiencePoints: LEVEL_6_XP,
@@ -169,7 +174,7 @@ const ROSTER: Persona[] = [
     // Stunning Strike (L5), Flurry/Patient Defense/Step of the Wind, and the
     // Open Hand Technique rider (Addle/Push/Topple) in one persona.
     name: "Open Hand Monk L11",
-    race: "Human",
+    speciesName: "Halfling",
     background: "Soldier",
     className: "Monk",
     experiencePoints: LEVEL_11_XP,
@@ -392,6 +397,18 @@ async function endActiveSessions(cookie: string, campaignId: string, campaignNam
   }
 }
 
+// #1684: resolve a species name → catalog id via GET /api/reference (the
+// mechanical anchor replacing the pruned flat `race`-name create field).
+// EDITION_2024 always — no persona this file declares needs 2014.
+async function resolveSpeciesId(cookie: string, name: string): Promise<string> {
+  const response = await api(cookie, "/api/reference?edition=EDITION_2024");
+  if (!response.ok) throw new Error(`Failed to load reference: ${response.status}`);
+  const { species } = (await response.json()) as { species: { id: string; name: string }[] };
+  const match = species.find((s) => s.name === name);
+  if (!match) throw new Error(`Species not found in catalog: ${name}`);
+  return match.id;
+}
+
 // Resolve spell names → catalog ids via GET /api/spells (#1131 create-body picks).
 async function resolveSpellIds(cookie: string, names: string[]): Promise<string[]> {
   const response = await api(cookie, "/api/spells");
@@ -418,13 +435,16 @@ async function creationSpellPicks(cookie: string, persona: Persona): Promise<{ c
 // level-gated extra is layered on afterward through the same transaction
 // endpoints the app uses, so derived state (slots, subclass eligibility) is exact.
 async function seedCharacterShell(cookie: string, persona: Persona): Promise<string> {
-  const spells = await creationSpellPicks(cookie, persona);
+  const [speciesId, spells] = await Promise.all([
+    resolveSpeciesId(cookie, persona.speciesName),
+    creationSpellPicks(cookie, persona),
+  ]);
   const response = await api(cookie, "/api/characters", {
     method: "POST",
     body: JSON.stringify({
       name: persona.name,
       alignment: "True Neutral",
-      race: persona.race,
+      speciesId,
       background: persona.background,
       classes: [{ name: persona.className }],
       abilityScores: ABILITY_SCORES,

@@ -14,7 +14,6 @@ test("session rest button: short rest spends a hit die, long rest is available",
   const id = await createSessionCharacter(page.request, {
     name: uniqueName("Rest Fighter"),
     className: "Fighter",
-    race: "Human",
     background: "Soldier",
   });
 

@@ -86,11 +86,27 @@ type AbilityScores = typeof ABILITY_SCORES;
 interface CreateCharacterOpts {
   name: string;
   className: string;
-  race?: string;
+  // #1684: resolved to a speciesId at creation — the flat `race`-name create
+  // path is gone. Halfling (2024, the default): no #1690 choice trait (unlike
+  // Human's Skillful/Versatile, which would need extra request fields no
+  // caller here declares) and no maxHp-granting trait (unlike Dwarf's
+  // Toughness, which would throw off HP-sensitive specs by species alone).
+  speciesName?: string;
   background?: string;
   experiencePoints?: number;
   // Override the module-level defaults, e.g. Wis 16 for a monk / Con 15 for a barbarian.
   abilityScores?: Partial<AbilityScores>;
+}
+
+// #1684: resolve a species name → catalog id via GET /api/reference.
+// EDITION_2024 always — no e2e fixture this file builds needs 2014.
+async function resolveSpeciesId(request: APIRequestContext, name: string): Promise<string> {
+  const response = await request.get("/api/reference?edition=EDITION_2024");
+  expect(response.ok(), `load reference: ${response.status()}`).toBeTruthy();
+  const { species } = (await response.json()) as { species: { id: string; name: string }[] };
+  const match = species.find((s) => s.name === name);
+  if (!match) throw new Error(`Species not found in catalog: ${name}`);
+  return match.id;
 }
 
 // Create a character and return its id. Sets XP through the transactions
@@ -99,11 +115,12 @@ export async function createCharacter(
   request: APIRequestContext,
   opts: CreateCharacterOpts,
 ): Promise<string> {
+  const speciesId = await resolveSpeciesId(request, opts.speciesName ?? "Halfling");
   const response = await request.post("/api/characters", {
     data: {
       name: opts.name,
       alignment: "True Neutral",
-      race: opts.race ?? "Human",
+      speciesId,
       background: opts.background ?? "Sage",
       classes: [{ name: opts.className }],
       abilityScores: { ...ABILITY_SCORES, ...opts.abilityScores },
