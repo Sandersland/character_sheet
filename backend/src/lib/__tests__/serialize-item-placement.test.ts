@@ -44,20 +44,47 @@ let characterIds: string[] = [];
 // now, not a name lookup — every fixture below must link classId to the REAL
 // seeded catalog row for its className, or the class half of "proficient"
 // silently becomes the homebrew fallback (nothing granted).
+//
+// #1682: RACE_PROFICIENCY_GRANTS (a name-keyed Record) retired — a race grant
+// now resolves via CharacterRace.speciesId/variantId (#1679), the SAME
+// FK-relation fix #1529 already made for the class half above. `raceName`
+// below therefore ALSO resolves the matching seeded SpeciesVariant/Species row
+// (EDITION_2014 — every raceName this file uses is a 2014 subrace name) and
+// links speciesId/variantId, mirroring how classId is resolved from
+// className just above; `rulesEdition` is set to match so the species FK and
+// the character's own edition never disagree.
+async function resolveSpeciesSelectionForRaceName(raceName: string): Promise<{ speciesId: string; variantId: string | null }> {
+  const variant = await prisma.speciesVariant.findFirst({
+    where: { name: raceName, species: { edition: "EDITION_2014" } },
+    select: { id: true, speciesId: true },
+  });
+  if (variant) return { speciesId: variant.speciesId, variantId: variant.id };
+
+  const species = await prisma.species.findFirstOrThrow({
+    where: { name: raceName, edition: "EDITION_2014" },
+    select: { id: true },
+  });
+  return { speciesId: species.id, variantId: null };
+}
+
 async function createCharacter(data: {
   className: string;
   raceName?: string;
   items?: Omit<InventoryItemFixtureInput, "characterId">[];
 }) {
   const classId = (await prisma.characterClass.findFirstOrThrow({ where: { name: data.className }, select: { id: true } })).id;
+  const speciesSelection = data.raceName ? await resolveSpeciesSelectionForRaceName(data.raceName) : null;
   const character = await prisma.character.create({
     data: {
       ...BASE_CHAR,
       name: `Placement ${data.className}`,
       ownerId: OWNER_ID,
       spellcasting: Prisma.JsonNull,
+      ...(data.raceName ? { rulesEdition: "EDITION_2014" } : {}),
       classEntries: { create: { name: data.className, classId, level: 1, position: 0 } },
-      ...(data.raceName ? { raceSelection: { create: { name: data.raceName } } } : {}),
+      ...(data.raceName
+        ? { raceSelection: { create: { name: data.raceName, speciesId: speciesSelection!.speciesId, variantId: speciesSelection!.variantId } } }
+        : {}),
     },
   });
   characterIds.push(character.id);
@@ -209,7 +236,7 @@ describe("serialized proficient (#1433)", () => {
     expect(rowNamed(await serialize(id), "Longsword").proficient).toBe(true);
   });
 
-  it("is true via a race grant (RACE_PROFICIENCY_GRANTS)", async () => {
+  it("is true via a species-trait grant (Dwarven Combat Training, #1682 — RACE_PROFICIENCY_GRANTS retired)", async () => {
     const id = await createCharacter({
       className: "Wizard",
       raceName: "Hill Dwarf",

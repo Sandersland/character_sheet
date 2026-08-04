@@ -652,6 +652,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
       "proficient": false,
     },
   ],
+  "speciesTraits": [],
   "speed": 30,
   "spellcasting": {
     "ability": "intelligence",
@@ -1134,6 +1135,7 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
       "proficient": false,
     },
   ],
+  "speciesTraits": [],
   "speed": 30,
   "spellcasting": undefined,
   "subclass": "battle master",

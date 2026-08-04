@@ -1,0 +1,201 @@
+/**
+ * #1682: SpeciesTrait.improvements — passive species/variant grants
+ * (FeatImprovement[]) mapped through the SAME deriveImprovementBonuses/
+ * deriveImprovementProficiencies evaluator a taken feat's improvements and a
+ * ClassFeature row's improvements already use (#1691's own precedent — see
+ * classfeature-improvements-1691.test.ts, this file's sibling). Proving case
+ * is a 2014 Hill Dwarf: Dwarven Toughness's maxHp bonus and Dwarven Combat
+ * Training's weapon proficiency, both previously granted by the retired
+ * name-keyed RACE_PROFICIENCY_GRANTS record (srd/proficiencies.ts) and now
+ * granted by seeded SpeciesTrait rows resolved via the character's OWN
+ * species/variant selection (CharacterRace.speciesId/variantId, #1679).
+ *
+ * speciesId/variantId are set directly on the create body — the species
+ * PICKER UI ships in #1680 (parallel slice, not yet merged into this
+ * worktree's base), so this bypasses it the same way
+ * classfeature-improvements-1691.test.ts bypasses the (also unshipped at the
+ * time) subclass picker via a raw DB update.
+ */
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import supertest from "supertest";
+
+import { app } from "@/test-support/app-server.js";
+import { prisma } from "@/lib/core/prisma.js";
+import { authCookie } from "@/test-support/auth.js";
+
+let COOKIE: string;
+let createdCharacterIds: string[] = [];
+
+beforeAll(async () => {
+  COOKIE = await authCookie("owner-1682-species-trait-improvements");
+});
+
+afterEach(async () => {
+  if (createdCharacterIds.length === 0) return;
+  await prisma.character.deleteMany({ where: { id: { in: createdCharacterIds } } });
+  createdCharacterIds = [];
+});
+
+const BASE_BODY = {
+  name: "1682 Species Trait Tester",
+  alignment: "True Neutral",
+  background: "Acolyte",
+  classes: [{ name: "Fighter" }],
+  abilityScores: { strength: 12, dexterity: 12, constitution: 12, intelligence: 10, wisdom: 10, charisma: 10 },
+};
+
+async function createCharacter(overrides: Record<string, unknown>) {
+  const res = await supertest(app).post("/api/characters").set("Cookie", COOKIE).send({ ...BASE_BODY, ...overrides });
+  expect(res.status).toBe(201);
+  createdCharacterIds.push(res.body.id);
+  return res.body.id as string;
+}
+
+function get(id: string) {
+  return supertest(app).get(`/api/characters/${id}`).set("Cookie", COOKIE);
+}
+
+function armorCategories(body: { armorProficiencies: { category: string }[] }): string[] {
+  return body.armorProficiencies.map((p) => p.category);
+}
+
+function weaponNames(body: { weaponProficiencies: { name: string }[] }): string[] {
+  return body.weaponProficiencies.map((w) => w.name);
+}
+
+describe("SpeciesTrait.improvements (#1682) — 2014 Hill Dwarf", () => {
+  it("Dwarven Toughness raises max HP by 1 per applied level, Dwarven Combat Training grants the four dwarven weapons, source: 'feat' (RACE_PROFICIENCY_GRANTS retired, #1691's precedent bucket)", async () => {
+    const dwarf = await prisma.species.findFirstOrThrow({ where: { slug: "dwarf", edition: "EDITION_2014" }, include: { variants: true } });
+    const hillDwarf = dwarf.variants.find((v) => v.slug === "hill")!;
+
+    const id = await createCharacter({
+      race: "Hill Dwarf",
+      rulesEdition: "EDITION_2014",
+      speciesId: dwarf.id,
+      variantId: hillDwarf.id,
+    });
+
+    const res = await get(id);
+    expect(res.status).toBe(200);
+    // Level 1 (hitDice.total === 1): +1 maxHp over the base Fighter d10 roll.
+    expect(res.body.hitDice.total).toBe(1);
+    const fighterBaseMax = res.body.hitPoints.max - 1;
+    expect(res.body.hitPoints.max).toBe(fighterBaseMax + 1);
+
+    const weapons = weaponNames(res.body);
+    expect(weapons).toEqual(expect.arrayContaining(["Battleaxes", "Handaxes", "Light Hammers", "Warhammers"]));
+    const battleaxe = res.body.weaponProficiencies.find((w: { name: string }) => w.name === "Battleaxes");
+    expect(battleaxe.source).toBe("feat");
+
+    // Species-granted sheet section (#1682): darkvision announce-only, cited SRD 5.1.
+    const traitNames = res.body.speciesTraits.map((t: { name: string }) => t.name);
+    expect(traitNames).toEqual(expect.arrayContaining(["Darkvision", "Dwarven Resilience", "Dwarven Combat Training", "Stonecunning", "Dwarven Toughness"]));
+    const darkvision = res.body.speciesTraits.find((t: { name: string }) => t.name === "Darkvision");
+    expect(darkvision.description).toContain("SRD 5.1");
+  });
+
+  it("no arithmetic crosses the wire beyond the resolved numbers — speciesTraits carries name+description only", async () => {
+    const dwarf = await prisma.species.findFirstOrThrow({ where: { slug: "dwarf", edition: "EDITION_2014" }, include: { variants: true } });
+    const hillDwarf = dwarf.variants.find((v) => v.slug === "hill")!;
+    const id = await createCharacter({ race: "Hill Dwarf", rulesEdition: "EDITION_2014", speciesId: dwarf.id, variantId: hillDwarf.id });
+
+    const res = await get(id);
+    for (const trait of res.body.speciesTraits) {
+      expect(Object.keys(trait).sort()).toEqual(["description", "name"]);
+    }
+  });
+});
+
+describe("SpeciesTrait.improvements (#1682) — 2014 Mountain Dwarf", () => {
+  it("Dwarven Armor Training grants light + medium armor proficiency, source: 'feat'", async () => {
+    const dwarf = await prisma.species.findFirstOrThrow({ where: { slug: "dwarf", edition: "EDITION_2014" }, include: { variants: true } });
+    const mountainDwarf = dwarf.variants.find((v) => v.slug === "mountain")!;
+
+    const id = await createCharacter({
+      // Wizard (not Fighter/BASE_BODY's default): Wizard grants NO class armor
+      // proficiency, so light/medium below is unambiguously the species grant,
+      // never shadowed by class > feat push-order precedence in
+      // buildMergedArmorProficiencies (Fighter is already proficient with
+      // light+medium+heavy+shields, which would tag "class" first).
+      classes: [{ name: "Wizard" }],
+      race: "Mountain Dwarf",
+      rulesEdition: "EDITION_2014",
+      speciesId: dwarf.id,
+      variantId: mountainDwarf.id,
+    });
+
+    const res = await get(id);
+    expect(res.status).toBe(200);
+    expect(armorCategories(res.body)).toEqual(expect.arrayContaining(["light", "medium"]));
+    const light = res.body.armorProficiencies.find((p: { category: string }) => p.category === "light");
+    expect(light.source).toBe("feat");
+    // Hill Dwarf's own Dwarven Toughness must NOT leak onto a Mountain Dwarf.
+    const traitNames = res.body.speciesTraits.map((t: { name: string }) => t.name);
+    expect(traitNames).not.toContain("Dwarven Toughness");
+    expect(traitNames).toContain("Dwarven Armor Training");
+  });
+});
+
+describe("SpeciesTrait.improvements (#1682) — level-down scales Dwarven Toughness through the existing hitDice-driven derivation, no new reconciler", () => {
+  // Compares a Hill Dwarf against a Human (no maxHp-bearing trait) control
+  // through the SAME level-up/level-down sequence, rather than hand-computing
+  // the base class's average-method HP gain (class hit die + CON mod) — the
+  // delta-of-deltas isolates Dwarven Toughness's own contribution regardless
+  // of what that base number is.
+  async function levelToTwoAndBack(id: string) {
+    const atLevel1 = (await get(id)).body.hitPoints.max as number;
+    const xpUp = await supertest(app).post(`/api/characters/${id}/experience`).set("Cookie", COOKIE).send({ operations: [{ type: "set", value: 300 }] });
+    expect(xpUp.status).toBe(200);
+    const levelUp = await supertest(app).post(`/api/characters/${id}/hp`).set("Cookie", COOKIE).send({ operations: [{ type: "levelUp", method: "average" }] });
+    expect(levelUp.status).toBe(200);
+    const atLevel2Res = await get(id);
+    expect(atLevel2Res.body.hitDice.total).toBe(2);
+    const atLevel2 = atLevel2Res.body.hitPoints.max as number;
+    const xpDown = await supertest(app).post(`/api/characters/${id}/experience`).set("Cookie", COOKIE).send({ operations: [{ type: "set", value: 0 }] });
+    expect(xpDown.status).toBe(200);
+    const afterLevelDownRes = await get(id);
+    expect(afterLevelDownRes.body.hitDice.total).toBe(1);
+    return { atLevel1, atLevel2, afterLevelDown: afterLevelDownRes.body.hitPoints.max as number };
+  }
+
+  it("Dwarven Toughness's per-level delta is exactly 1 more than a no-species-bonus control's, in both directions", async () => {
+    const dwarf = await prisma.species.findFirstOrThrow({ where: { slug: "dwarf", edition: "EDITION_2014" }, include: { variants: true } });
+    const hillDwarf = dwarf.variants.find((v) => v.slug === "hill")!;
+    const dwarfId = await createCharacter({ race: "Hill Dwarf", rulesEdition: "EDITION_2014", speciesId: dwarf.id, variantId: hillDwarf.id });
+    const humanId = await createCharacter({ race: "Human", rulesEdition: "EDITION_2014" }); // no speciesId — legacy path, no species trait bonus
+
+    const dwarfResult = await levelToTwoAndBack(dwarfId);
+    const humanResult = await levelToTwoAndBack(humanId);
+
+    const dwarfDelta = dwarfResult.atLevel2 - dwarfResult.atLevel1;
+    const humanDelta = humanResult.atLevel2 - humanResult.atLevel1;
+    // No species-specific reconciler was added (#1682 touches no file under
+    // lib/leveling/ nor LEVEL_GATED_RECONCILERS) — this +1 is entirely the
+    // perLevel improvement scaling with hitDice.total (deriveImprovementBonuses,
+    // srd/feats.ts), applied at read time on every serialize, the same
+    // mechanism a class feature's own perLevel bonus already used.
+    expect(dwarfDelta).toBe(humanDelta + 1);
+
+    // Reversing via XP drop (revertLevelUps, an existing mechanism unrelated
+    // to #1682) restores each character's own original max exactly.
+    expect(dwarfResult.afterLevelDown).toBe(dwarfResult.atLevel1);
+    expect(humanResult.afterLevelDown).toBe(humanResult.atLevel1);
+  });
+});
+
+describe("SpeciesTrait.improvements (#1682) — 2024 species shows edition-specific trait text (transcription-rule fork)", () => {
+  it("a 2024 Dwarf's Darkvision/Dwarven Toughness text cites SRD 5.2/PHB'24, not SRD 5.1, even where the mechanic (Dwarven Toughness maxHp) agrees", async () => {
+    const dwarf2024 = await prisma.species.findFirstOrThrow({ where: { slug: "dwarf", edition: "EDITION_2024" } });
+    const id = await createCharacter({ race: "Dwarf", rulesEdition: "EDITION_2024", speciesId: dwarf2024.id });
+
+    const res = await get(id);
+    expect(res.status).toBe(200);
+    const darkvision = res.body.speciesTraits.find((t: { name: string }) => t.name === "Darkvision");
+    expect(darkvision.description).toContain("SRD 5.2");
+    expect(darkvision.description).not.toContain("SRD 5.1");
+    expect(darkvision.description).toContain("120 feet"); // 2024 Dwarf darkvision is 120 ft, vs 60 ft in 2014
+
+    const fighterBaseMax = res.body.hitPoints.max - 1;
+    expect(res.body.hitPoints.max).toBe(fighterBaseMax + 1); // Dwarven Toughness is a base-species trait in 2024, not variant-gated
+  });
+});

@@ -14,6 +14,12 @@ import type { AdvancementEntry, AdvancementSlots } from "./leveling";
 import type { AbilityName, AbilityScores, Currency, Skill } from "./primitives";
 import type { Spell, SpellSlots } from "./spells";
 
+/** One species/variant-granted trait (#1682) — cited text, no arithmetic. */
+export interface SpeciesTrait {
+  name: string;
+  description: string;
+}
+
 /**
  * Shape of character data returned by `GET /api/characters` and
  * `GET /api/characters/:id`. `level`/`proficiencyBonus`/threshold fields
@@ -217,6 +223,16 @@ export interface Character {
   fightingStyleSlots: AdvancementSlots;
 
   classes?: ClassEntry[];
+
+  /** Species-granted information (#1682): name + cited text for the character's
+   *  own species/variant selection (SpeciesTrait rows, resolved server-side).
+   *  Announce-only cited text — darkvision included (owner ruling: visible
+   *  info, not a derived combat stat) — the numbers a trait DOES derive
+   *  (Dwarven Toughness's maxHp, weapon/armor training) already fold into
+   *  hitPoints/armorProficiencies/weaponProficiencies above; this array is
+   *  never itself a source of arithmetic on the client. [] for a legacy
+   *  `race`-name-only character with no species picked yet. */
+  speciesTraits: SpeciesTrait[];
 
   journal: JournalEntry[];
 

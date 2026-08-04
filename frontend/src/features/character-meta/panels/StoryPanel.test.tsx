@@ -21,6 +21,10 @@ function makeCharacter(partial: Partial<Character>): Character {
     background: "Sage",
     alignment: "Lawful Good",
     journal: [],
+    // #1682: [] renders SpeciesTraitsCard as nothing (self-guarding, mirrors
+    // ItemGrantsCard) — the trait-content cases live in SpeciesTraitsCard's
+    // own test file.
+    speciesTraits: [],
     ...partial,
   } as unknown as Character;
 }

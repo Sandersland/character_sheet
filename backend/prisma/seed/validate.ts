@@ -28,6 +28,7 @@ import {
 import { ITEMS } from "./catalog-data.js";
 import { PACKS } from "./packs.js";
 import { SPECIES, speciesSeedSchema } from "./species-data.js";
+import { SPECIES_TRAITS, speciesTraitSeedSchema } from "./species-traits-data.js";
 
 interface SeedFamily {
   schema: z.ZodTypeAny;
@@ -50,6 +51,10 @@ const SEED_FAMILIES: Record<string, SeedFamily> = {
   // SPECIES row embeds its own variants), so no separate SPECIES_VARIANTS
   // family is needed.
   SPECIES: { schema: speciesSeedSchema, rows: SPECIES },
+  // #1682 — trait content; cross-referenced against SPECIES below (a
+  // speciesSlug/variantSlug typo is a broken FK resolution at seed time
+  // otherwise, not a zod-catchable shape error).
+  SPECIES_TRAITS: { schema: speciesTraitSeedSchema, rows: SPECIES_TRAITS },
 };
 
 export interface SeedValidationSummary {
@@ -106,6 +111,36 @@ export function assertCatalogNamesResolve(
       throw new Error(`Seed content invalid — ${familyName} references unknown catalogName "${name}"`);
     }
   }
+}
+
+// Every (speciesSlug, speciesEdition) a SPECIES_TRAITS row names must resolve
+// against SPECIES, and a variantSlug (when given) against that species' own
+// variants — the #1682 twin of assertCatalogNamesResolve above, catching a
+// typo'd slug before seedSpeciesTraits' DB-backed resolveTarget throws a much
+// less specific runtime error mid-seed. Also rejects two rows sharing the
+// same (speciesSlug, speciesEdition, variantSlug, name) — the SPECIES_TRAITS
+// twin of the SUBCLASSES/SPECIES duplicate checks below.
+function assertSpeciesTraitsResolve(speciesRows: typeof SPECIES, traitRows: typeof SPECIES_TRAITS): void {
+  const speciesByKey = new Map(speciesRows.map((s) => [`${s.slug}::${s.edition}`, s]));
+  const seen = new Set<string>();
+  traitRows.forEach((trait, index) => {
+    const species = speciesByKey.get(`${trait.speciesSlug}::${trait.speciesEdition}`);
+    if (!species) {
+      throw new Error(
+        `Seed content invalid — SPECIES_TRAITS[${index}] references unknown species "${trait.speciesSlug}" (${trait.speciesEdition})`,
+      );
+    }
+    if (trait.variantSlug && !species.variants?.some((v) => v.slug === trait.variantSlug)) {
+      throw new Error(
+        `Seed content invalid — SPECIES_TRAITS[${index}] references unknown variant "${trait.variantSlug}" under species "${trait.speciesSlug}" (${trait.speciesEdition})`,
+      );
+    }
+    const key = `${trait.speciesSlug}::${trait.speciesEdition}::${trait.variantSlug ?? "null"}::${trait.name}`;
+    if (seen.has(key)) {
+      throw new Error(`Seed error: duplicate species trait "${trait.name}" for target "${key}"`);
+    }
+    seen.add(key);
+  });
 }
 
 /**
@@ -177,6 +212,8 @@ export function assertSeedContentValid(): SeedValidationSummary {
       rowsByVariantSlug.set(variant.slug, variantIndex);
     });
   });
+
+  assertSpeciesTraitsResolve(SPECIES, SPECIES_TRAITS);
 
   return { familiesChecked: Object.keys(SEED_FAMILIES).length, rowsChecked };
 }

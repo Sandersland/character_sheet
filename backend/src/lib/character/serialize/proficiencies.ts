@@ -1,6 +1,5 @@
 import { Prisma } from "@/generated/prisma/client.js";
 import {
-  RACE_PROFICIENCY_GRANTS,
   TOOLS,
   deriveFeatProficiencies,
   type ArmorProficiencyCategory,
@@ -38,9 +37,13 @@ function buildMergedToolProficiencies(
   return merged;
 }
 
-// Armor grants from class(es)/race/feats, deduped, highest-priority source wins
-// (class > race > feat). Multiclass takes the full union — a deliberate,
+// Armor grants from class(es)/feats, deduped, highest-priority source wins
+// (class > feat). Multiclass takes the full union — a deliberate,
 // conservatively permissive simplification of 5e's multiclass restrictions.
+// `featArmor` also carries species-trait-granted armor now (Mountain Dwarf's
+// light+medium, #1682) — RACE_PROFICIENCY_GRANTS's name-keyed race lookup
+// retired; see srd/proficiencies.ts's own retirement comment for why a
+// species grant surfaces as source: "feat" here, not a new "race" bucket.
 //
 // Resolved through the class RELATION (#1529), never `entry.name` — the fix for
 // #1388's class half: a lowercase and a display-name entry with the SAME
@@ -49,7 +52,6 @@ function buildMergedToolProficiencies(
 // this is unreachable — a homebrew entry correctly grants nothing here.
 export function buildMergedArmorProficiencies(
   classEntries: { class: { armorProficiencies: string[] } | null }[],
-  raceName: string | undefined,
   featArmor: Set<string>,
 ): Array<{ category: ArmorProficiencyCategory; source: "class" | "race" | "feat" }> {
   const seen = new Set<string>();
@@ -64,20 +66,17 @@ export function buildMergedArmorProficiencies(
   for (const entry of classEntries) {
     for (const cat of entry.class?.armorProficiencies ?? []) push(cat, "class");
   }
-  if (raceName) {
-    for (const cat of RACE_PROFICIENCY_GRANTS[raceName]?.armor ?? []) push(cat, "race");
-  }
   for (const cat of featArmor) push(cat, "feat");
 
   return out;
 }
 
-// Weapon grants (category-level or specific names) from class(es)/race/feats,
-// deduped, highest-priority wins; see buildMergedArmorProficiencies on multiclass
-// and its class-relation-resolution comment (#1529/#1388).
+// Weapon grants (category-level or specific names) from class(es)/feats,
+// deduped, highest-priority wins; see buildMergedArmorProficiencies on
+// multiclass, the RACE_PROFICIENCY_GRANTS retirement, and the class-relation-
+// resolution comment (#1529/#1388).
 export function buildMergedWeaponProficiencies(
   classEntries: { class: { weaponProficiencies: string[] } | null }[],
-  raceName: string | undefined,
   featWeapons: Set<string>,
 ): Array<{ name: string; source: "class" | "race" | "feat" }> {
   const seen = new Set<string>();
@@ -91,9 +90,6 @@ export function buildMergedWeaponProficiencies(
 
   for (const entry of classEntries) {
     for (const w of entry.class?.weaponProficiencies ?? []) push(w, "class");
-  }
-  if (raceName) {
-    for (const w of RACE_PROFICIENCY_GRANTS[raceName]?.weapons ?? []) push(w, "race");
   }
   for (const w of featWeapons) push(w, "feat");
 
