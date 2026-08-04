@@ -92,7 +92,9 @@ describe("POST /api/characters — 2014 fixed increases bake at creation (#1681)
     });
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toBe("speciesAbilities: constitution would exceed 20");
+    // Fixed +2 CON overflow — server-applied, so the error names "species", not
+    // the speciesAbilities field the client never submitted here (#1681 review).
+    expect(res.body.error).toBe("species: constitution would exceed 20");
   });
 
   it("a legacy race-name-only creation (no speciesId) applies no increase, unchanged from before #1681", async () => {

@@ -674,10 +674,14 @@ function validateSpeciesChoose(
 
   const invalid = entries.filter(([ability]) => !eligible.includes(ability) || fixedAbilities.has(ability));
   if (invalid.length > 0) {
+    // The options list excludes the species' fixed abilities: a fixed +N ability
+    // is never a valid CHOOSE target, so listing it as an option contradicts the
+    // "not eligible" complaint it triggers (e.g. Half-Elf's CHA).
+    const options = eligible.filter((ability) => !fixedAbilities.has(ability));
     return {
       ok: false,
       status: 400,
-      error: `speciesAbilities: ${invalid.map(([a]) => a).join(", ")} not eligible (options: ${eligible.join(", ")})`,
+      error: `speciesAbilities: ${invalid.map(([a]) => a).join(", ")} not eligible (options: ${options.join(", ")})`,
     };
   }
   const wrongAmount = entries.find(([, amount]) => amount !== spec.amount);
@@ -823,7 +827,10 @@ async function resolveSpeciesGrants(
   const specs = await fetchMergedAbilityIncreases(speciesSelection.speciesId, speciesSelection.variantId);
   const { fixedSpread, chooseSpecs, floatingSpecs } = splitAbilityIncreaseSpecs(specs);
 
-  const fixedCapError = abilityCapOverflowError(Object.entries(fixedSpread), baseScores, "speciesAbilities");
+  // Fixed increases are server-applied, not submitted in speciesAbilities — name
+  // the field "species" so a cap overflow doesn't point a client at a field it
+  // never sent (the chosen-increase overflow below still names speciesAbilities).
+  const fixedCapError = abilityCapOverflowError(Object.entries(fixedSpread), baseScores, "species");
   if (fixedCapError) return fixedCapError;
 
   const chosenResult = resolveChosenIncreases(chooseSpecs, floatingSpecs, submitted, new Set(Object.keys(fixedSpread)), baseScores);
