@@ -123,18 +123,25 @@ export function assertCatalogNamesResolve(
 // out of assertSpeciesTraitsResolve to keep every seed validator under the
 // seed-file cyclomatic budget (CC <= 4): they run uncovered in globalSetup, so
 // CRAP is complexity-driven and CC 5+ crosses the ceiling (#1682/#1679).
+// Shared variant-slug resolution check for the SpeciesTrait and
+// SpeciesGrantedSpell seed validators (#1682/#1683): variantSlug must name a
+// real variant of its species. `context` identifies the calling row for the
+// error message (e.g. "SPECIES_TRAITS[3]").
+function assertVariantSlugKnown(species: (typeof SPECIES)[number], variantSlug: string, context: string): void {
+  if (!(species.variants ?? []).some((v) => v.slug === variantSlug)) {
+    throw new Error(
+      `Seed content invalid — ${context} references unknown variant "${variantSlug}" under species "${species.slug}" (${species.edition})`,
+    );
+  }
+}
+
 function assertTraitVariantKnown(
   species: (typeof SPECIES)[number],
   trait: (typeof SPECIES_TRAITS)[number],
   index: number,
 ): void {
   if (!trait.variantSlug) return;
-  const known = (species.variants ?? []).some((v) => v.slug === trait.variantSlug);
-  if (!known) {
-    throw new Error(
-      `Seed content invalid — SPECIES_TRAITS[${index}] references unknown variant "${trait.variantSlug}" under species "${trait.speciesSlug}" (${trait.speciesEdition})`,
-    );
-  }
+  assertVariantSlugKnown(species, trait.variantSlug, `SPECIES_TRAITS[${index}]`);
 }
 
 // One SPECIES_TRAITS row: its species must resolve, its variant (if any) must
@@ -188,12 +195,7 @@ function assertSpeciesGrantedSpellRowResolves(
       `Seed content invalid — SPECIES_GRANTED_SPELLS[${index}] references unknown species "${grant.speciesSlug}" (${grant.speciesEdition})`,
     );
   }
-  const known = (species.variants ?? []).some((v) => v.slug === grant.variantSlug);
-  if (!known) {
-    throw new Error(
-      `Seed content invalid — SPECIES_GRANTED_SPELLS[${index}] references unknown variant "${grant.variantSlug}" under species "${grant.speciesSlug}" (${grant.speciesEdition})`,
-    );
-  }
+  assertVariantSlugKnown(species, grant.variantSlug, `SPECIES_GRANTED_SPELLS[${index}]`);
   if (!spellNames.has(grant.spellName)) {
     throw new Error(`Seed content invalid — SPECIES_GRANTED_SPELLS[${index}] references unknown spell "${grant.spellName}"`);
   }

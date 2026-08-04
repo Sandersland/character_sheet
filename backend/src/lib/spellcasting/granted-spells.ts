@@ -173,9 +173,10 @@ const ABILITY_NAMES = new Set<string>([
   "charisma",
 ]);
 
-// The ability a subclass's granted spells use for save DC / attack bonus, read
-// off the first ADMITTED grant (a cross-edition row must not set the stat for
-// a character it never grants to). The column is a plain `string`, so validate
+// The ability a granted-spell source's spells use for save DC / attack bonus
+// (a subclass, or a 2024 species lineage since #1683), read off the first
+// ADMITTED grant (a cross-edition row must not set the stat for a character it
+// never grants to). The column is a plain `string`, so validate
 // it against the six lowercase ability names — a mis-cased/unknown value falls
 // back to Wisdom rather than silently producing a NaN modifier / wrong save DC.
 export function deriveGrantedCastingAbility(
