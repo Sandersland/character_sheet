@@ -55,9 +55,11 @@ export function normalizeHitDice(json: Prisma.JsonValue): HitDice {
 // Pure helpers (no DB, fully unit-testable).
 
 /**
- * The one composition every HP-max consumer must call (#1321) — replaces the
- * three inline `maxHp + featBonus.maxHp` copies this repo carried
- * (applyFeatLayer, buildHpOpContext, applyHealInTx). Order is load-bearing
+ * The one composition every HP-max consumer must call (#1321) — consolidates
+ * the inline `maxHp + featBonus.maxHp` copies previously in applyFeatLayer,
+ * buildHpOpContext, and applyHealInTx (applyFeatLayer still exists — it now
+ * delegates to this function rather than computing effectiveMaxHp inline).
+ * Order is load-bearing
  * (decision 2): the feat bonus (e.g. Tough) is added to `baseMax` BEFORE
  * exhaustion's PHB'14 p. 291 tier-4 halving is subtracted — halving the raw
  * base first and adding Tough after would be more generous and get the rule
@@ -95,15 +97,25 @@ interface FeatSlotGatedEntry {
  * computeLevelDownState) started repeating the same
  * normalizeResourcesMutable → characterAdvancementSlots →
  * splitAdvancementsBySlotCap dance.
+ *
+ * `fightingStyleSlotTotal` is optional and forwarded verbatim to
+ * splitAdvancementsBySlotCap (whose own default is Infinity — every fs feat
+ * kept, matching this repo's non-reconcile "HP feat-bonus reads keep every fs
+ * feat" convention, resources-state.ts) so this stays an EXACT equivalent of
+ * the 3-arg split it replaces, not a narrower 2-arg-only substitute — a
+ * caller with a real fs cap in hand (mirroring reconcileAdvancements /
+ * applyAdvancementOpInTx) can pass it instead of silently under-counting a
+ * future fs feat that carries an HP-bonus improvement.
  */
 export function inCapAdvancementsAt(
   resources: Prisma.JsonValue,
   classEntries: readonly FeatSlotGatedEntry[],
   derivedLevel: number,
+  fightingStyleSlotTotal?: number,
 ): AdvancementEntry[] {
   const advState = normalizeResourcesMutable(resources);
   const featSlotCap = characterAdvancementSlots(classEntries, derivedLevel);
-  return splitAdvancementsBySlotCap(advState.advancements, featSlotCap).kept;
+  return splitAdvancementsBySlotCap(advState.advancements, featSlotCap, fightingStyleSlotTotal).kept;
 }
 
 /**

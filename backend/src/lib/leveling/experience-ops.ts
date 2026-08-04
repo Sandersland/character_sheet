@@ -19,7 +19,7 @@ import {
   normalizeHitPoints,
 } from "@/lib/combat/hitpoints.js";
 import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
-import { abilityModifier, deriveFeatBonuses, hitDieFace } from "@/lib/srd/srd.js";
+import { abilityModifier, characterFightingStyleFeatSlots, deriveFeatBonuses, hitDieFace } from "@/lib/srd/srd.js";
 import { recomputeSummaries } from "@/lib/session/sessions.js";
 
 export class InvalidExperienceOperationError extends Error {}
@@ -45,7 +45,7 @@ function computeLevelDownState(
     abilityScores: Prisma.JsonValue;
     resources: Prisma.JsonValue;
     conditions: Prisma.JsonValue;
-    classEntries: { id: string; level: number; class: { extraAsiLevels: number[] } | null }[];
+    classEntries: { id: string; level: number; class: { extraAsiLevels: number[]; fightingStyleFeatLevel: number | null } | null }[];
   },
   levelUpEvents: { data: Prisma.JsonValue }[],
   levelsToReverse: number,
@@ -71,7 +71,8 @@ function computeLevelDownState(
   // The feat-bonus half of that composition is evaluated once, at the FINAL
   // (post-reversal) advancement-slot cap, mirroring how deriveFeatBonuses'
   // appliedLevel argument tracks hd.total inside the loop below.
-  const inCapAdvancements = inCapAdvancementsAt(character.resources, character.classEntries, targetLevel);
+  const fightingStyleSlotTotal = characterFightingStyleFeatSlots(character.classEntries, targetLevel);
+  const inCapAdvancements = inCapAdvancementsAt(character.resources, character.classEntries, targetLevel, fightingStyleSlotTotal);
   const exhaustionLevel = normalizeConditionsMutable(character.conditions).exhaustion;
 
   for (let i = 0; i < levelsToReverse; i++) {
@@ -119,12 +120,13 @@ async function revertLevelUps(
       hitDice: true,
       abilityScores: true,
       // resources/conditions (#1321): effectiveMaxHitPoints' inputs — see
-      // computeLevelDownState's own comment.
+      // computeLevelDownState's own comment. `fightingStyleFeatLevel`:
+      // characterFightingStyleFeatSlots' fs-cap arg.
       resources: true,
       conditions: true,
       classEntries: {
         orderBy: { position: "asc" as const },
-        select: { id: true, level: true, class: { select: { extraAsiLevels: true } } },
+        select: { id: true, level: true, class: { select: { extraAsiLevels: true, fightingStyleFeatLevel: true } } },
       },
     },
   });

@@ -27,6 +27,7 @@ import {
 import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
 import {
   abilityModifier,
+  characterFightingStyleFeatSlots,
   deriveFeatBonuses,
   hitDieFace,
   multiclassPrerequisitesMet,
@@ -174,13 +175,14 @@ const ADD_CLASS_SELECT = {
   // resources/conditions/rulesEdition (#1321): effectiveMaxHitPoints' inputs —
   // a multiclass level-up bumps hp.max+current by the SAME gain, which at
   // exhaustion 4+ can push current above the (proportionally smaller-growing)
-  // effective max. `class.extraAsiLevels` mirrors buildHpOpContext's own select.
+  // effective max. `class.extraAsiLevels`/`fightingStyleFeatLevel` mirror
+  // buildHpOpContext's own select.
   resources: true,
   conditions: true,
   rulesEdition: true,
   classEntries: {
     orderBy: { position: "asc" as const },
-    select: { id: true, name: true, level: true, position: true, classId: true, class: { select: { extraAsiLevels: true } } },
+    select: { id: true, name: true, level: true, position: true, classId: true, class: { select: { extraAsiLevels: true, fightingStyleFeatLevel: true } } },
   },
 } satisfies Prisma.CharacterSelect;
 
@@ -261,7 +263,9 @@ async function applyAddClass(ctx: ClassOpContext, op: AddClassOperation): Promis
   // effective max by the same amount — clamp current to the recomputed
   // effective max rather than gain the full `gain` unconditionally (mirrors
   // bumpHpForLevelUp's own reasoning, hp-ops.ts).
-  const inCapAdvancements = inCapAdvancementsAt(character.resources, character.classEntries, levelForExperience(character.experiencePoints));
+  const derivedLevel = levelForExperience(character.experiencePoints);
+  const fightingStyleSlotTotal = characterFightingStyleFeatSlots(character.classEntries, derivedLevel);
+  const inCapAdvancements = inCapAdvancementsAt(character.resources, character.classEntries, derivedLevel, fightingStyleSlotTotal);
   const featMaxHpBonus = deriveFeatBonuses(inCapAdvancements, beforeHd.total + 1).maxHp;
   const exhaustionLevel = normalizeConditionsMutable(character.conditions).exhaustion;
   const newEffMax = effectiveMaxHitPoints(newMax, featMaxHpBonus, exhaustionLevel, character.rulesEdition);

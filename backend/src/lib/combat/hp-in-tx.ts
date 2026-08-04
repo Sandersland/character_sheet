@@ -40,10 +40,11 @@ export async function applyHealInTx(
       // not just the primary (position 0). `class` (#1529): characterAdvancementSlots'
       // extraAsiLevels read — this is one of the reconciler/clamp-on-read pair's
       // seven query sites CLAUDE.md governs; it must resolve the SAME column as
-      // reconcileAdvancements' select.
+      // reconcileAdvancements' select. `fightingStyleFeatLevel` (#1321):
+      // effectiveMaxHitPointsForRow's fs-cap arg.
       classEntries: {
         orderBy: { position: "asc" as const },
-        select: { id: true, level: true, name: true, subclass: true, class: { select: { extraAsiLevels: true } } },
+        select: { id: true, level: true, name: true, subclass: true, class: { select: { extraAsiLevels: true, fightingStyleFeatLevel: true } } },
       },
     },
   });

@@ -140,7 +140,8 @@ export async function buildHpOpContext(
           // FEATURE_ROWS_ENTRY_SELECT, and FEATURE_ROWS_CLASS_FEATURES for why
           // the relation-level fragment it names instead IS shareable (#1545).
           // `extraAsiLevels` (#1529): the featSlotCap read below
-          // (characterAdvancementSlots).
+          // (characterAdvancementSlots). `fightingStyleFeatLevel` (#1321):
+          // effectiveMaxHitPointsForRow's fs-cap arg (characterFightingStyleFeatSlots).
           // `subclassLevel` (#1576): deriveRestPools' carrier needs it so a
           // 2014 Cleric/Sorcerer/Warlock/Druid/Wizard's subclass pools still
           // gate at their PHB'14 level once the class module is gone.
@@ -148,6 +149,7 @@ export async function buildHpOpContext(
             select: {
               hitDie: true,
               extraAsiLevels: true,
+              fightingStyleFeatLevel: true,
               subclassLevel: true,
               features: FEATURE_ROWS_CLASS_FEATURES,
             },

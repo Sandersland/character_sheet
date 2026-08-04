@@ -28,6 +28,7 @@ import { levelForExperience } from "@/lib/leveling/experience.js";
 import {
   CONDITIONS,
   EXHAUSTION_MAX,
+  characterFightingStyleFeatSlots,
   deriveFeatBonuses,
   isKnownCondition,
   type ConditionKey,
@@ -278,10 +279,11 @@ function resolveConditionOp(
 
 // Columns/relations re-read per op (#1321 widened this from `{ conditions:
 // true }` to also cover effectiveMaxHitPoints' inputs): hitPoints/hitDice for
-// the HitPoints shape, resources + classEntries.class.extraAsiLevels +
-// experiencePoints for the feat-slot-cap dance deriveFeatBonuses needs
-// (mirrors buildHpOpContext's own select), and rulesEdition for the edition
-// fork itself.
+// the HitPoints shape, resources + classEntries.class.{extraAsiLevels,
+// fightingStyleFeatLevel} + experiencePoints for the feat-slot-cap dance
+// deriveFeatBonuses needs (mirrors buildHpOpContext's own select — the
+// fightingStyleFeatLevel column feeds inCapAdvancementsAt's fs-cap arg below),
+// and rulesEdition for the edition fork itself.
 const CONDITIONS_SELECT = {
   conditions: true,
   hitPoints: true,
@@ -291,7 +293,7 @@ const CONDITIONS_SELECT = {
   rulesEdition: true,
   classEntries: {
     orderBy: { position: "asc" as const },
-    select: { level: true, class: { select: { extraAsiLevels: true } } },
+    select: { level: true, class: { select: { extraAsiLevels: true, fightingStyleFeatLevel: true } } },
   },
 } satisfies Prisma.CharacterSelect;
 
@@ -312,11 +314,19 @@ export function effectiveMaxHitPointsForRow(row: {
   conditions: Prisma.JsonValue;
   rulesEdition: RulesEdition;
   experiencePoints: number;
-  classEntries: readonly { level: number; class: { extraAsiLevels: readonly number[] } | null }[];
+  classEntries: readonly {
+    level: number;
+    class: { extraAsiLevels: readonly number[]; fightingStyleFeatLevel: number | null } | null;
+  }[];
 }): { hp: HitPoints; hd: HitDice; featMaxHpBonus: number; exhaustionLevel: number; effMax: number } {
   const hp = normalizeHitPoints(row.hitPoints);
   const hd = normalizeHitDice(row.hitDice);
-  const inCapAdvancements = inCapAdvancementsAt(row.resources, row.classEntries, levelForExperience(row.experiencePoints));
+  const derivedLevel = levelForExperience(row.experiencePoints);
+  // Real fs cap (not the Infinity default) so an over-cap fs feat is excluded
+  // from the maxHp-relevant "kept" set exactly like an over-cap ASI/feat would
+  // be — matches reconcileAdvancements/applyAdvancementOpInTx's fidelity.
+  const fightingStyleSlotTotal = characterFightingStyleFeatSlots(row.classEntries, derivedLevel);
+  const inCapAdvancements = inCapAdvancementsAt(row.resources, row.classEntries, derivedLevel, fightingStyleSlotTotal);
   const featMaxHpBonus = deriveFeatBonuses(inCapAdvancements, hd.total).maxHp;
   const exhaustionLevel = normalizeConditionsMutable(row.conditions).exhaustion;
   const effMax = effectiveMaxHitPoints(hp.max, featMaxHpBonus, exhaustionLevel, row.rulesEdition);
