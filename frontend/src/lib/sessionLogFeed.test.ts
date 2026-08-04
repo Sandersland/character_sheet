@@ -256,6 +256,71 @@ describe("buildFeedItems attack rolls with no swing partner (#1237 §3 — spell
   });
 });
 
+describe("buildFeedItems attack/damage drill-in ability naming (#1361)", () => {
+  it("renders the named ability via abilityLabel when attackComponents.ability is present", () => {
+    const events = [
+      makeEvent({
+        id: "spell-atk",
+        type: "attackRoll",
+        category: "roll",
+        summary: "Fire Bolt: 18 (1d20 + 7)",
+        data: {
+          kind: "attack",
+          source: "Fire Bolt",
+          total: 18,
+          specLabel: "1d20 + 7",
+          faces: [11],
+          attackComponents: { abilityMod: 4, proficiencyBonus: 3, rangedBonus: 0, attackRollBonus: 0, ability: "dexterity" },
+        },
+      }),
+    ];
+    const rows = buildFeedItems(events).map(rowOf);
+    expect(rows[0].drillIn?.[0].formula).toContain("+ 4 (Dexterity)");
+  });
+
+  it("falls back to the neutral 'Ability' label when attackComponents carries no ability (pre-existing event)", () => {
+    const events = [
+      makeEvent({
+        id: "spell-atk",
+        type: "attackRoll",
+        category: "roll",
+        summary: "Fire Bolt: 18 (1d20 + 7)",
+        data: {
+          kind: "attack",
+          source: "Fire Bolt",
+          total: 18,
+          specLabel: "1d20 + 7",
+          faces: [11],
+          attackComponents: { abilityMod: 4, proficiencyBonus: 3, rangedBonus: 0, attackRollBonus: 0 },
+        },
+      }),
+    ];
+    const rows = buildFeedItems(events).map(rowOf);
+    expect(rows[0].drillIn?.[0].formula).toContain("+ 4 (Ability)");
+  });
+
+  it("renders the named ability for damage components too", () => {
+    const events = [
+      makeEvent({
+        id: "rider",
+        type: "damageRoll",
+        category: "roll",
+        data: {
+          kind: "damage",
+          source: "Shortsword",
+          total: 8,
+          damageType: "piercing",
+          specLabel: "1d6 + 3",
+          faces: [5],
+          damageComponents: { abilityMod: 3, meleeDamageBonus: 0, ability: "strength" },
+        },
+      }),
+    ];
+    const rows = buildFeedItems(events).map(rowOf);
+    expect(rows[0].drillIn?.[0].formula).toContain("+ 3 (Strength)");
+  });
+});
+
 describe("buildFeedItems attack drill-in dropped d20 face (#1359)", () => {
   function attackEvent(data: Record<string, unknown>) {
     return makeEvent({

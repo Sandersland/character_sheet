@@ -74,6 +74,7 @@ function weaponRow(item: EquippedWeapon): AttackRow {
     damageComponents: {
       abilityMod: damage.abilityModifier,
       meleeDamageBonus: damage.meleeDamageBonus,
+      ability: damage.ability,
     },
   };
 }
@@ -110,6 +111,7 @@ function offHandRow(
     damageComponents: {
       abilityMod: damage.abilityModifier,
       meleeDamageBonus: damage.meleeDamageBonus,
+      ability: damage.ability,
     },
   };
 }

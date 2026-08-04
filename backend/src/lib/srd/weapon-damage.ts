@@ -30,6 +30,9 @@ export type { WeaponGrip };
  * "meleeDamage" buff, e.g. Rage) — surfaced alongside `abilityModifier` for the
  * combat-log decomposition (#1235); `abilityModifier + meleeDamageBonus ===
  * damageModifier` always, by construction (never re-derive it separately).
+ *
+ * `ability` names which score `abilityModifier` came from (#1361) — delegated
+ * to `weaponAbilityMod`, the one place the finesse/ranged choice is decided.
  */
 export function deriveWeaponDamage(
   weapon: {
@@ -57,9 +60,11 @@ export function deriveWeaponDamage(
   meleeDamageBonus: number;
   damageType: string;
   grip: WeaponGrip;
+  /** The ability `abilityModifier` came from — see `weaponAbilityMod`. */
+  ability: "strength" | "dexterity";
 } {
   const isMelee = weapon.weaponRange === "melee";
-  const abilityMod = weaponAbilityMod(weapon, effectiveScores);
+  const { mod: abilityMod, ability } = weaponAbilityMod(weapon, effectiveScores);
   const appliedMeleeDamageBonus = isMelee ? meleeDamageBonus : 0;
   const damageModifier = abilityMod + appliedMeleeDamageBonus;
 
@@ -89,6 +94,7 @@ export function deriveWeaponDamage(
     meleeDamageBonus: appliedMeleeDamageBonus,
     damageType: weapon.damageType,
     grip,
+    ability,
   };
 }
 

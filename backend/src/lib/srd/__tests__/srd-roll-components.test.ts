@@ -56,45 +56,51 @@ describe("deriveWeaponAttackComponents — matches hand-derived 5e math", () => 
     grants: { name: string }[];
     rangedBonus?: number;
     attackRollBonus?: number;
-    expected: { abilityMod: number; proficiencyBonus: number; rangedBonus: number; attackRollBonus: number };
+    expected: {
+      abilityMod: number;
+      proficiencyBonus: number;
+      rangedBonus: number;
+      attackRollBonus: number;
+      ability: "strength" | "dexterity";
+    };
   }> = [
     {
       label: "proficient melee",
       weapon: longsword,
       grants: martialGrant,
-      expected: { abilityMod: 3, proficiencyBonus: 3, rangedBonus: 0, attackRollBonus: 0 },
+      expected: { abilityMod: 3, proficiencyBonus: 3, rangedBonus: 0, attackRollBonus: 0, ability: "strength" },
     },
     {
       label: "non-proficient melee",
       weapon: longsword,
       grants: noGrants,
-      expected: { abilityMod: 3, proficiencyBonus: 0, rangedBonus: 0, attackRollBonus: 0 },
+      expected: { abilityMod: 3, proficiencyBonus: 0, rangedBonus: 0, attackRollBonus: 0, ability: "strength" },
     },
     {
       label: "ranged with Archery fighting-style bonus",
       weapon: longbow,
       grants: martialGrant,
       rangedBonus: 2,
-      expected: { abilityMod: 2, proficiencyBonus: 3, rangedBonus: 2, attackRollBonus: 0 },
+      expected: { abilityMod: 2, proficiencyBonus: 3, rangedBonus: 2, attackRollBonus: 0, ability: "dexterity" },
     },
     {
       label: "ranged without the bonus",
       weapon: longbow,
       grants: martialGrant,
-      expected: { abilityMod: 2, proficiencyBonus: 3, rangedBonus: 0, attackRollBonus: 0 },
+      expected: { abilityMod: 2, proficiencyBonus: 3, rangedBonus: 0, attackRollBonus: 0, ability: "dexterity" },
     },
     {
       label: "finesse weapon (uses higher of STR/DEX)",
       weapon: rapier,
       grants: martialGrant,
-      expected: { abilityMod: 3, proficiencyBonus: 3, rangedBonus: 0, attackRollBonus: 0 },
+      expected: { abilityMod: 3, proficiencyBonus: 3, rangedBonus: 0, attackRollBonus: 0, ability: "strength" },
     },
     {
       label: "attack-roll buff active (Sacred Weapon)",
       weapon: longsword,
       grants: martialGrant,
       attackRollBonus: 3,
-      expected: { abilityMod: 3, proficiencyBonus: 3, rangedBonus: 0, attackRollBonus: 3 },
+      expected: { abilityMod: 3, proficiencyBonus: 3, rangedBonus: 0, attackRollBonus: 3, ability: "strength" },
     },
     {
       label: "proficient + ranged bonus + attack-roll buff stacked",
@@ -102,7 +108,7 @@ describe("deriveWeaponAttackComponents — matches hand-derived 5e math", () => 
       grants: martialGrant,
       rangedBonus: 2,
       attackRollBonus: 1,
-      expected: { abilityMod: 2, proficiencyBonus: 3, rangedBonus: 2, attackRollBonus: 1 },
+      expected: { abilityMod: 2, proficiencyBonus: 3, rangedBonus: 2, attackRollBonus: 1, ability: "dexterity" },
     },
   ];
 
@@ -139,6 +145,30 @@ describe("deriveWeaponAttackComponents — matches hand-derived 5e math", () => 
   });
 });
 
+// #1361: the combat-log drill-in needs to know WHICH ability abilityMod came
+// from (finesse takes the higher of STR/DEX, ranged always DEX) to render
+// "+ 4 (Dexterity)" instead of a neutral label. Asserted through the real
+// derive function, not hardcoded, so a rule regression here would fail.
+describe("deriveWeaponAttackComponents — names the governing ability (#1361)", () => {
+  const dexOverStr = { strength: 10, dexterity: 16 }; // DEX +3 > STR +0
+
+  it("finesse weapon on a STR > DEX character names strength", () => {
+    expect(deriveWeaponAttackComponents(rapier, scores, 3, martialGrant).ability).toBe("strength");
+  });
+
+  it("finesse weapon on a DEX > STR character names dexterity", () => {
+    expect(deriveWeaponAttackComponents(rapier, dexOverStr, 3, martialGrant).ability).toBe("dexterity");
+  });
+
+  it("ranged weapon names dexterity", () => {
+    expect(deriveWeaponAttackComponents(longbow, scores, 3, martialGrant).ability).toBe("dexterity");
+  });
+
+  it("non-finesse melee weapon names strength", () => {
+    expect(deriveWeaponAttackComponents(longsword, scores, 3, martialGrant).ability).toBe("strength");
+  });
+});
+
 // deriveWeaponDamage already exposed `abilityModifier` (#732); this issue
 // surfaces the other hidden addend, `meleeDamageBonus` (Rage etc.), which today
 // is folded silently into `damageModifier`. Same no-drift property: the two
@@ -161,5 +191,23 @@ describe("deriveWeaponDamage — meleeDamageBonus component sums to damageModifi
     expect(d.grip).toBe("versatile-two-handed");
     expect(d.meleeDamageBonus).toBe(0);
     expect(d.abilityModifier + d.meleeDamageBonus).toBe(d.damageModifier);
+  });
+});
+
+// #1361: same rule, same single source (weaponAbilityMod) as the attack side —
+// asserted through the real derive function so a rule regression here fails too.
+describe("deriveWeaponDamage — names the governing ability (#1361)", () => {
+  const dexOverStr = { strength: 10, dexterity: 16 }; // DEX +3 > STR +0
+
+  it("finesse weapon on a STR > DEX character names strength", () => {
+    expect(deriveWeaponDamage(rapier, false, scores).ability).toBe("strength");
+  });
+
+  it("finesse weapon on a DEX > STR character names dexterity", () => {
+    expect(deriveWeaponDamage(rapier, false, dexOverStr).ability).toBe("dexterity");
+  });
+
+  it("ranged weapon names dexterity", () => {
+    expect(deriveWeaponDamage(longbow, false, scores).ability).toBe("dexterity");
   });
 });

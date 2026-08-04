@@ -46,6 +46,8 @@ export interface RollEventAttackComponents {
   proficiencyBonus: number;
   rangedBonus: number;
   attackRollBonus: number;
+  /** The ability `abilityMod` is drawn from (`weaponAbilityMod`) — absent on events logged before this field existed, in which case renderers fall back to a neutral label. */
+  ability?: string;
 }
 
 /**
@@ -55,6 +57,8 @@ export interface RollEventAttackComponents {
 export interface RollEventDamageComponents {
   abilityMod: number;
   meleeDamageBonus: number;
+  /** The ability `abilityMod` is drawn from (`weaponAbilityMod`) — absent on events logged before this field existed, in which case renderers fall back to a neutral label. */
+  ability?: string;
 }
 
 /**
