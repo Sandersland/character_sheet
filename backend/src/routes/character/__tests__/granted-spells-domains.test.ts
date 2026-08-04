@@ -9,7 +9,7 @@
  * marker the prepared-cap logic excludes on).
  */
 
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
 import { app } from "@/test-support/app-server.js";
@@ -49,12 +49,13 @@ afterEach(async () => {
   await prisma.character.deleteMany({ where: { id: CHAR_ID } });
 });
 
-async function createLifeCleric(xp: number) {
+async function createLifeCleric(xp: number, rulesEdition: "EDITION_2014" | "EDITION_2024" = "EDITION_2024") {
   await prisma.character.create({
     data: {
       id: CHAR_ID,
       name: "Life Cleric",
       alignment: "Lawful Good",
+      rulesEdition,
       experiencePoints: xp,
       initiativeBonus: 0,
       speed: 30,
@@ -88,11 +89,17 @@ async function grantedSpells(): Promise<GrantedSpell[]> {
 }
 
 describe("Life Domain granted spells (#913)", () => {
+  // EDITION_2014 explicitly (#1625): this is the PHB'14 domain list, currently
+  // seeded edition-shared. #1626 re-tags the diverging rows and authors the
+  // 2024 twins (Aid/Mass Healing Word replace Spiritual Weapon/Beacon of Hope
+  // at these tiers), which owns the 2024 assertion.
   it("surfaces the level-gated domain spells at cleric level 5, always-prepared", async () => {
-    await createLifeCleric(XP_LVL_5);
+    await createLifeCleric(XP_LVL_5, "EDITION_2014");
     const granted = await grantedSpells();
     const names = granted.map((s) => s.name).sort();
-    // gate 1 (Bless/Cure Wounds), 3 (Lesser Restoration/Spiritual Weapon), 5 (Beacon of Hope/Revivify).
+    // All six rows gate at 3 (Bless/Cure Wounds/Lesser Restoration/Spiritual
+    // Weapon) and 5 (Beacon of Hope/Revivify) — subclass grants start at the
+    // level-3 subclass pick (#1128), not at 1.
     expect(names).toEqual([
       "Beacon of Hope",
       "Bless",
@@ -112,5 +119,48 @@ describe("Life Domain granted spells (#913)", () => {
     await createLifeCleric(XP_LVL_1);
     const names = (await grantedSpells()).map((s) => s.name).sort();
     expect(names).toEqual([]);
+  });
+});
+
+// Mechanism proof for #1625 on the serialize path, independent of what #1626
+// does to the seeded content: fork rows onto the REAL Life Domain subclass and
+// prove each edition's character is served the shared rows plus exactly its
+// own edition's row.
+describe("per-edition grant filtering on the serialize path (#1625)", () => {
+  let forked2014SpellId: string;
+  let forked2024SpellId: string;
+
+  beforeAll(async () => {
+    const spellId = async (name: string) => (await prisma.spell.findFirstOrThrow({ where: { name }, select: { id: true } })).id;
+    forked2014SpellId = await spellId("Charm Person");
+    forked2024SpellId = await spellId("Disguise Self");
+    await prisma.subclassGrantedSpell.createMany({
+      data: [
+        { subclassId: lifeDomainId, spellId: forked2014SpellId, gateLevel: 3, castingAbility: "wisdom", edition: "EDITION_2014" },
+        { subclassId: lifeDomainId, spellId: forked2024SpellId, gateLevel: 3, castingAbility: "wisdom", edition: "EDITION_2024" },
+      ],
+    });
+  });
+
+  afterAll(async () => {
+    await prisma.subclassGrantedSpell.deleteMany({
+      where: { subclassId: lifeDomainId, spellId: { in: [forked2014SpellId, forked2024SpellId] } },
+    });
+  });
+
+  it("a 2024 cleric receives the shared rows plus the EDITION_2024 row and not the EDITION_2014 row", async () => {
+    await createLifeCleric(XP_LVL_5, "EDITION_2024");
+    const names = (await grantedSpells()).map((s) => s.name);
+    expect(names).toContain("Disguise Self");
+    expect(names).not.toContain("Charm Person");
+    expect(names).toContain("Bless"); // shared row still served
+  });
+
+  it("a 2014 cleric receives the shared rows plus the EDITION_2014 row and not the EDITION_2024 row", async () => {
+    await createLifeCleric(XP_LVL_5, "EDITION_2014");
+    const names = (await grantedSpells()).map((s) => s.name);
+    expect(names).toContain("Charm Person");
+    expect(names).not.toContain("Disguise Self");
+    expect(names).toContain("Bless");
   });
 });

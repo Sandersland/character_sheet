@@ -1,4 +1,5 @@
 import Card from "@/components/ui/Card";
+import ImageUploadControl from "@/components/ui/ImageUploadControl";
 import { emptyPackageState } from "@/lib/startingEquipment";
 import type { CharacterDraft } from "@/hooks/useCharacterDraft";
 import type { ReferenceData } from "@/types/character";
@@ -7,6 +8,9 @@ interface IdentitySectionProps {
   draft: CharacterDraft;
   update: (patch: Partial<CharacterDraft>) => void;
   reference: ReferenceData;
+  /** #1616: staged locally (deferred mode) — uploaded by save() after create. */
+  portraitFile: File | null;
+  onPortraitChange: (file: File | null) => void;
 }
 
 // Inline marker for required form fields.
@@ -19,7 +23,13 @@ function RequiredMark() {
   );
 }
 
-export default function IdentitySection({ draft, update, reference }: IdentitySectionProps) {
+export default function IdentitySection({
+  draft,
+  update,
+  reference,
+  portraitFile,
+  onPortraitChange,
+}: IdentitySectionProps) {
   return (
     <Card
       title="Identity"
@@ -232,16 +242,17 @@ export default function IdentitySection({ draft, update, reference }: IdentitySe
           )}
         </div>
 
-        <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600 sm:col-span-2">
-          Portrait URL (optional)
-          <input
-            type="text"
-            value={draft.portraitUrl}
-            onChange={(e) => update({ portraitUrl: e.target.value })}
-            placeholder="https://…"
-            className="rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1.5 text-sm font-normal normal-case text-parchment-900"
-          />
-        </label>
+        <div className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600 sm:col-span-2">
+          <span>Portrait (optional)</span>
+          <div className="font-normal normal-case tracking-normal">
+            <ImageUploadControl
+              file={portraitFile}
+              onSelect={onPortraitChange}
+              onRemove={() => onPortraitChange(null)}
+              label="Portrait"
+            />
+          </div>
+        </div>
       </div>
     </Card>
   );

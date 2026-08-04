@@ -8,6 +8,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
+import { inventoryItemFixtureData } from "@/test-support/inventory-snapshot-fixture.js";
 
 const TEST_USER = { id: "test-user-1", email: "fixture-owner@test.local" };
 let COOKIE: string;
@@ -26,6 +27,7 @@ const TEST_ITEM = {
   category: "weapon" as const,
   weight: 2,
   cost: { cp: 0, sp: 1, gp: 0, pp: 0 },
+  scopeKey: "global",
 };
 const TEST_ITEM_WEAPON_DETAIL = {
   damageDiceCount: 1,
@@ -38,7 +40,6 @@ const FIXTURE = {
   id: "test-character-1",
   name: "Test Fixture",
   alignment: "Lawful Good",
-  portraitUrl: null,
   experiencePoints: 1000,
   initiativeBonus: 1,
   speed: 30,
@@ -92,7 +93,7 @@ describe("characters routes", () => {
       TEST_BACKGROUND,
     );
     const item = await prisma.item.upsert({
-      where: { name: TEST_ITEM.name },
+      where: { scopeKey_name: { scopeKey: "global", name: TEST_ITEM.name } },
       create: { ...TEST_ITEM, weaponDetail: { create: TEST_ITEM_WEAPON_DETAIL } },
       update: {
         ...TEST_ITEM,
@@ -110,30 +111,36 @@ describe("characters routes", () => {
         classEntries: {
           create: [{ name: characterClass.name, classId: characterClass.id, position: 0 }],
         },
-        inventoryItems: {
-          create: [
-            {
-              itemId: item.id,
-              name: item.name,
-              category: item.category,
-              weight: item.weight,
-              cost: TEST_ITEM.cost,
-              quantity: 1,
-              equippedSlot: "MAIN_HAND",
-              position: 0,
-              weaponDetail: { create: TEST_ITEM_WEAPON_DETAIL },
-            },
-            {
-              itemId: null,
-              name: "Homebrew Amulet",
-              category: "gear",
-              description: "A custom magic item with no catalog entry.",
-              quantity: 1,
-              position: 1,
-            },
-          ],
-        },
       },
+    });
+    // #1649: InventoryItem detail now lives on `snapshot`, not the four
+    // Inventory*Detail relations — created separately (rather than nested
+    // under character.create) so inventoryItemFixtureData's snapshot build
+    // can be spread in; itemId is layered on top since the fixture helper
+    // has no catalog-item concept.
+    await prisma.inventoryItem.create({
+      data: {
+        ...inventoryItemFixtureData({
+          characterId: FIXTURE.id,
+          name: item.name,
+          category: item.category,
+          weight: item.weight,
+          cost: TEST_ITEM.cost,
+          equippedSlot: "MAIN_HAND",
+          position: 0,
+          weapon: TEST_ITEM_WEAPON_DETAIL,
+        }),
+        itemId: item.id,
+      },
+    });
+    await prisma.inventoryItem.create({
+      data: inventoryItemFixtureData({
+        characterId: FIXTURE.id,
+        name: "Homebrew Amulet",
+        category: "gear",
+        description: "A custom magic item with no catalog entry.",
+        position: 1,
+      }),
     });
 
     createdCharacterIds = [FIXTURE.id];
@@ -263,27 +270,24 @@ describe("characters routes", () => {
           classEntries: {
             create: classEntries.map((e, i) => ({ name: e.name, level: e.level, position: i })),
           },
-          inventoryItems: equippedArmorCategory
-            ? {
-                create: [
-                  {
-                    name: `${equippedArmorCategory} armor`,
-                    category: "armor",
-                    quantity: 1,
-                    equippedSlot: equippedArmorCategory === "shield" ? "OFF_HAND" : "BODY",
-                    position: 0,
-                    armorDetail: {
-                      create: {
-                        armorCategory: equippedArmorCategory,
-                        baseArmorClass: equippedArmorCategory === "shield" ? 2 : 14,
-                      },
-                    },
-                  },
-                ],
-              }
-            : undefined,
         },
       });
+      if (equippedArmorCategory) {
+        // #1649: armor detail now lives on InventoryItem.snapshot.
+        await prisma.inventoryItem.create({
+          data: inventoryItemFixtureData({
+            characterId: id,
+            name: `${equippedArmorCategory} armor`,
+            category: "armor",
+            equippedSlot: equippedArmorCategory === "shield" ? "OFF_HAND" : "BODY",
+            position: 0,
+            armor: {
+              armorCategory: equippedArmorCategory,
+              baseArmorClass: equippedArmorCategory === "shield" ? 2 : 14,
+            },
+          }),
+        });
+      }
       const response = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${id}`);
       expect(response.status).toBe(200);
       return response.body.speed;
@@ -376,6 +380,46 @@ describe("characters routes", () => {
     expect(response.status).toBe(400);
   });
 
+  // The portrait wire seam (#1615): portraitUrl left PATCH when portraits
+  // became uploaded blobs — a client-supplied URL was the IDOR the upload
+  // pipeline closes. The wire field survives read-only, derived from
+  // Character.portraitKey.
+  describe("portrait wire seam (#1615)", () => {
+    it.each([
+      ["set", "https://example.com/p.jpg"],
+      ["clear", null],
+    ])("PATCH rejects portraitUrl (%s) via .strict() with 400", async (_label, portraitUrl) => {
+      const response = await supertest.agent(app).set("Cookie", COOKIE)
+        .patch(`/api/characters/${FIXTURE.id}`)
+        .send({ portraitUrl });
+
+      expect(response.status).toBe(400);
+    });
+
+    it("derives portraitUrl from the stored key on both detail and summary, never exposing the key", async () => {
+      const version = "0f8fad5b-d9cb-469f-a165-70867728950e";
+      const key = `portraits/characters/${FIXTURE.id}/${version}.webp`;
+      await prisma.character.update({ where: { id: FIXTURE.id }, data: { portraitKey: key } });
+
+      const expectedUrl = `/api/characters/${FIXTURE.id}/portrait?v=${version}`;
+      const detail = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE.id}`);
+      expect(detail.status).toBe(200);
+      expect(detail.body.portraitUrl).toBe(expectedUrl);
+      expect(JSON.stringify(detail.body)).not.toContain(key);
+
+      const list = await supertest.agent(app).set("Cookie", COOKIE).get("/api/characters");
+      expect(list.status).toBe(200);
+      expect(list.body[0].portraitUrl).toBe(expectedUrl);
+      expect(JSON.stringify(list.body)).not.toContain(key);
+    });
+
+    it("omits portraitUrl when no portrait is stored", async () => {
+      const detail = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE.id}`);
+      expect(detail.status).toBe(200);
+      expect(detail.body.portraitUrl).toBeUndefined();
+    });
+  });
+
   it("PATCH 404s for unknown id", async () => {
     // experiencePoints was removed from PATCH — use currency which is still patchable
     const response = await supertest.agent(app).set("Cookie", COOKIE)
@@ -462,6 +506,17 @@ describe("characters routes", () => {
       await expect(prisma.characterClassEntry.findMany({ where: { characterId: id } })).resolves.toHaveLength(0);
 
       createdCharacterIds = createdCharacterIds.filter((existingId) => existingId !== id);
+    });
+
+    // #1616 closed #1615's interim accepted-and-ignored state: the create UI
+    // stages a file and uploads via portraitRouter after create, so a client-
+    // supplied URL is rejected by .strict() like every other unknown field.
+    it("rejects portraitUrl in the create payload with 400 (#1616)", async () => {
+      const response = await supertest.agent(app).set("Cookie", COOKIE)
+        .post("/api/characters")
+        .send({ ...createBody, portraitUrl: "https://example.com/p.jpg" });
+
+      expect(response.status).toBe(400);
     });
 
     it("allows a homebrew background with no catalog match", async () => {

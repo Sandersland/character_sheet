@@ -54,6 +54,7 @@ import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 import { fighterResourceRowsData } from "@/test-support/fighter-resource-rows.js";
+import { readInventorySnapshot } from "@/lib/inventory/inventory-snapshot-read.js";
 
 // Sessions are campaign-level (#245): create a throwaway campaign to host a
 // Session row when a test only needs a valid sessionId to tag events with.
@@ -715,10 +716,7 @@ describe("POST /:id/events/:batchId/revert — inventory undo", () => {
     expect(res.status).toBe(200);
     expect(res.body.currency).toEqual({ cp: 0, sp: 0, gp: 10, pp: 0 }); // proceeds removed
 
-    const restored = await prisma.inventoryItem.findUniqueOrThrow({
-      where: { id: itemId },
-      include: { weaponDetail: true },
-    });
+    const restored = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: itemId } });
     expect(restored).toMatchObject({
       id: itemId,
       name: "Sellable Saber",
@@ -727,7 +725,9 @@ describe("POST /:id/events/:batchId/revert — inventory undo", () => {
       notes: "heirloom",
       position: original.position,
     });
-    expect(restored.weaponDetail).toMatchObject({
+    // The recreated row's frozen half comes back from the persisted `snapshot`
+    // blob verbatim (#1649) — its own detail table is gone.
+    expect(readInventorySnapshot(restored).weapon).toMatchObject({
       damageDiceCount: 1,
       damageDiceFaces: 6,
       damageType: "slashing",
@@ -756,12 +756,9 @@ describe("POST /:id/events/:batchId/revert — inventory undo", () => {
     const res = await revert(INV_ID, batchId);
     expect(res.status).toBe(200);
 
-    const restored = await prisma.inventoryItem.findUniqueOrThrow({
-      where: { id: itemId },
-      include: { armorDetail: true },
-    });
+    const restored = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: itemId } });
     expect(restored.name).toBe("Removable Robe");
-    expect(restored.armorDetail).toMatchObject({ armorCategory: "light", baseArmorClass: 11 });
+    expect(readInventorySnapshot(restored).armor).toMatchObject({ armorCategory: "light", baseArmorClass: 11 });
   });
 
   it("undoes an adjust-to-zero (restores row) and a partial adjust (restores quantity)", async () => {
@@ -911,6 +908,7 @@ describe("POST /:id/events/:batchId/revert — inventory undo", () => {
       data: {
         name: INV_CATALOG_ITEM_NAME,
         category: "gear",
+        scopeKey: "global",
         weight: 1,
         cost: { cp: 0, sp: 0, gp: 1, pp: 0 },
         description: "A bundled catalog torch.",

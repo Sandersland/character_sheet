@@ -34,6 +34,16 @@ import { prisma } from "@/lib/core/prisma.js";
 
 export const campaignItemsRouter = Router();
 
+// Shared by PATCH and DELETE: findFirst with the full predicate, not
+// findUnique(id) + an in-code campaign check — the latter leaks existence
+// through timing and is easy to forget on a new endpoint (#1646).
+function findOwnedCampaignItem(itemId: string, campaignId: string) {
+  return prisma.item.findFirst({
+    where: { id: itemId, scope: "CAMPAIGN", campaignId },
+    include: { link: true },
+  });
+}
+
 /**
  * GET /api/campaigns/:id/items
  * Owner-only full list (Manage tab) — includes dmNotes. Players get 403.
@@ -47,8 +57,10 @@ campaignItemsRouter.get("/campaigns/:id/items", async (req, res) => {
     "Only the campaign owner may manage campaign items",
   );
 
-  const items = await prisma.campaignItem.findMany({
-    where: { campaignId: req.params.id },
+  const items = await prisma.item.findMany({
+    // Campaign items only: a GLOBAL catalog row has no campaignId, but filtering
+    // on scope states the intent rather than relying on that (#1646).
+    where: { scope: "CAMPAIGN", campaignId: req.params.id },
     include: itemInclude,
     orderBy: { name: "asc" },
   });
@@ -69,7 +81,7 @@ campaignItemsRouter.get("/campaigns/:id/items/by-entity/:entityId", async (req, 
     where: { campaignEntityId: req.params.entityId },
     include: {
       campaignEntity: { select: { campaignId: true, visibility: true } },
-      campaignItem: { include: itemInclude },
+      item: { include: itemInclude },
     },
   });
   // Hidden-from-non-owner, foreign-campaign, or missing all 404 identically.
@@ -82,8 +94,8 @@ campaignItemsRouter.get("/campaigns/:id/items/by-entity/:entityId", async (req, 
     return;
   }
 
-  const holders = await campaignItemHolders([link.campaignItem.id]);
-  res.json(serializeCampaignItem(link.campaignItem, isOwner, holders.get(link.campaignItem.id) ?? []));
+  const holders = await campaignItemHolders([link.item.id]);
+  res.json(serializeCampaignItem(link.item, isOwner, holders.get(link.item.id) ?? []));
 });
 
 /**
@@ -112,7 +124,7 @@ campaignItemsRouter.post("/campaigns/:id/items", async (req, res) => {
     const entity = await tx.campaignEntity.create({
       data: { campaignId, type: "ITEM", name: data.name, visibility: "HIDDEN" },
     });
-    return tx.campaignItem.create({
+    return tx.item.create({
       data: {
         ...createItemColumns(campaignId, data),
         ...detailCreate(data),
@@ -144,11 +156,8 @@ campaignItemsRouter.patch("/campaigns/:id/items/:itemId", async (req, res) => {
   const data = parseBodyOr400(updateItemSchema, req.body, res);
   if (data === undefined) return;
 
-  const existing = await prisma.campaignItem.findUnique({
-    where: { id: req.params.itemId },
-    include: { link: true },
-  });
-  if (!existing || existing.campaignId !== req.params.id) {
+  const existing = await findOwnedCampaignItem(req.params.itemId, req.params.id);
+  if (!existing) {
     res.status(404).json({ error: "Item not found" });
     return;
   }
@@ -180,7 +189,7 @@ campaignItemsRouter.patch("/campaigns/:id/items/:itemId", async (req, res) => {
 
   const updated = await prisma.$transaction(async (tx) => {
     await syncLinkedEntityName(tx, existing, data.name);
-    return tx.campaignItem.update({
+    return tx.item.update({
       where: { id: existing.id },
       data: {
         ...pickDefined(data, [
@@ -219,17 +228,14 @@ campaignItemsRouter.delete("/campaigns/:id/items/:itemId", async (req, res) => {
     "Only the campaign owner may manage campaign items",
   );
 
-  const existing = await prisma.campaignItem.findUnique({
-    where: { id: req.params.itemId },
-    include: { link: true },
-  });
-  if (!existing || existing.campaignId !== req.params.id) {
+  const existing = await findOwnedCampaignItem(req.params.itemId, req.params.id);
+  if (!existing) {
     res.status(404).json({ error: "Item not found" });
     return;
   }
 
   await prisma.$transaction(async (tx) => {
-    await tx.campaignItem.delete({ where: { id: existing.id } });
+    await tx.item.delete({ where: { id: existing.id } });
     if (existing.link) {
       await tx.campaignEntity.delete({ where: { id: existing.link.campaignEntityId } });
     }
@@ -274,7 +280,9 @@ campaignItemsRouter.post("/campaigns/:id/items/:campaignItemId/award", async (re
  * POST /api/campaigns/:id/items/:campaignItemId/revoke
  * Owner-only counterpart: removes the provenance-matched inventory row (undoable
  * audit event on the target character). A player-modified snapshot is still
- * revocable — the match is by campaignItemId, not by field equality.
+ * revocable — the match is by the item's id, not by field equality. The URL
+ * param keeps its pre-#1646 name so existing clients keep working; the column
+ * it resolves against is InventoryItem.itemId.
  */
 campaignItemsRouter.post("/campaigns/:id/items/:campaignItemId/revoke", async (req, res) => {
   await assertCampaignOwner(

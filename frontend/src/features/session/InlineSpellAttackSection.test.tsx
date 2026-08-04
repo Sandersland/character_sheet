@@ -163,3 +163,100 @@ describe("InlineSpellAttackSection — nat-20 auto-crit (#766)", () => {
     expect(damageCall!.faces).toHaveLength(2);
   });
 });
+
+// #1360: the attack d20 and the cast's damage roll must group as one swing,
+// mirroring useAttackRolls' swingId/verdict pattern.
+describe("InlineSpellAttackSection — swingId groups attack + damage (#1360)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("shares one swingId between the attack roll and the cast's damage roll on a normal hit", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(Math, "random").mockReturnValue(0.5); // d20 → 11 (neither nat20 nor nat1)
+    renderSection(makeCharacter([fireBolt]));
+    const updated = makeCharacter([fireBolt]);
+    mockCast.mockResolvedValue(updated);
+
+    await user.click(screen.getByRole("button", { name: /^Attack/ }));
+    await user.click(screen.getByRole("button", { name: "Cast" }));
+    await waitFor(() => expect(cachedCharacter("char-1")).toEqual(updated));
+
+    const calls = vi.mocked(logRoll).mock.calls.map((c) => c[2]);
+    const attackEvent = calls.find((e) => e.kind === "attack")!;
+    const damageEvent = calls.find((e) => e.kind === "damage")!;
+    expect(typeof attackEvent.swingId).toBe("string");
+    expect(attackEvent.verdict).toBeUndefined();
+    expect(damageEvent.swingId).toBe(attackEvent.swingId);
+    expect(damageEvent.verdict).toBe("hit");
+    expect(damageEvent.crit).toBe(false);
+  });
+
+  it("nat-20 attack carries verdict='crit', and the cast's damage event shares the id with crit:true", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(Math, "random").mockReturnValue(0.95); // d20 → nat 20
+    renderSection(makeCharacter([fireBolt]));
+    const updated = makeCharacter([fireBolt]);
+    mockCast.mockResolvedValue(updated);
+
+    await user.click(screen.getByRole("button", { name: /^Attack/ }));
+    await user.click(screen.getByRole("button", { name: "Cast" }));
+    await waitFor(() => expect(cachedCharacter("char-1")).toEqual(updated));
+
+    const calls = vi.mocked(logRoll).mock.calls.map((c) => c[2]);
+    const attackEvent = calls.find((e) => e.kind === "attack")!;
+    const damageEvent = calls.find((e) => e.kind === "damage")!;
+    expect(attackEvent).toMatchObject({ nat20: true, nat1: false, crit: true, verdict: "crit" });
+    expect(damageEvent.swingId).toBe(attackEvent.swingId);
+    expect(damageEvent).toMatchObject({ verdict: "crit", crit: true });
+  });
+
+  it("keeps the swingId available for a retry after a failed cast (no re-roll)", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(Math, "random").mockReturnValue(0.5); // d20 → 11
+    renderSection(makeCharacter([fireBolt]));
+
+    await user.click(screen.getByRole("button", { name: /^Attack/ }));
+    const attackId = vi
+      .mocked(logRoll)
+      .mock.calls.map((c) => c[2])
+      .find((e) => e.kind === "attack")!.swingId;
+
+    mockCast.mockRejectedValueOnce(new Error("network blip"));
+    await user.click(screen.getByRole("button", { name: "Cast" }));
+    await waitFor(() => expect(mockCast).toHaveBeenCalledTimes(1));
+
+    vi.mocked(logRoll).mockClear();
+    const updated = makeCharacter([fireBolt]);
+    mockCast.mockResolvedValueOnce(updated);
+    await user.click(screen.getByRole("button", { name: "Cast" }));
+    await waitFor(() => expect(cachedCharacter("char-1")).toEqual(updated));
+
+    const retryDamage = vi
+      .mocked(logRoll)
+      .mock.calls.map((c) => c[2])
+      .find((e) => e.kind === "damage")!;
+    expect(retryDamage.swingId).toBe(attackId);
+    expect(retryDamage.verdict).toBe("hit");
+  });
+
+  it("a nat-1 attack then cast shares the swingId and carries verdict='miss' on the damage event", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(Math, "random").mockReturnValue(0); // d20 → 1 (nat1)
+    renderSection(makeCharacter([fireBolt]));
+    const updated = makeCharacter([fireBolt]);
+    mockCast.mockResolvedValue(updated);
+
+    await user.click(screen.getByRole("button", { name: /^Attack/ }));
+    await user.click(screen.getByRole("button", { name: "Cast" }));
+    await waitFor(() => expect(cachedCharacter("char-1")).toEqual(updated));
+
+    const calls = vi.mocked(logRoll).mock.calls.map((c) => c[2]);
+    const attackEvent = calls.find((e) => e.kind === "attack")!;
+    const damageEvent = calls.find((e) => e.kind === "damage")!;
+    expect(attackEvent).toMatchObject({ nat20: false, nat1: true, crit: false, verdict: "miss" });
+    expect(damageEvent.swingId).toBe(attackEvent.swingId);
+    expect(damageEvent.verdict).toBe("miss");
+    expect(damageEvent.crit).toBe(false);
+  });
+});

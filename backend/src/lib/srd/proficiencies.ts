@@ -111,28 +111,22 @@ export function isProficientWithItem(
 }
 
 /**
- * Derives the melee/ranged attack bonus for a single weapon. Mirrors the
- * derive-don't-persist pattern of `deriveSpellcasting`: computed at read time
- * from character ability scores, proficiency bonus, and the weapon's metadata.
- *
- * Ability selection per 5e PHB rules:
- *   - Ranged weapons (`weaponRange === "ranged"`) → DEX modifier.
- *   - Finesse weapons → higher of STR or DEX modifier.
- *   - All other melee weapons → STR modifier.
- *
- * Proficiency bonus is added only if the character is proficient with the
- * weapon (category-level or name-level match from `isProficientWithWeapon`).
+ * Shared helper — same ability-selection rule used for both attack and
+ * damage, per 5e PHB (both editions agree): ranged weapons use DEX, finesse
+ * weapons the higher of STR/DEX, all other melee weapons STR. Returns WHICH
+ * ability was chosen alongside the modifier (#1361, so the combat-log
+ * drill-in can name it) — the decision lives here and only here; callers
+ * destructure rather than re-deriving it.
  */
-/** Shared helper — same ability-selection rule used for both attack and damage. */
 export function weaponAbilityMod(
   weapon: { finesse: boolean; weaponRange?: string | null },
   effectiveScores: Record<string, number>,
-): number {
+): { mod: number; ability: "strength" | "dexterity" } {
   const strMod = abilityModifier(effectiveScores.strength ?? 10);
   const dexMod = abilityModifier(effectiveScores.dexterity ?? 10);
-  if (weapon.weaponRange === "ranged") return dexMod;
-  if (weapon.finesse) return Math.max(strMod, dexMod);
-  return strMod;
+  if (weapon.weaponRange === "ranged") return { mod: dexMod, ability: "dexterity" };
+  if (weapon.finesse && dexMod > strMod) return { mod: dexMod, ability: "dexterity" };
+  return { mod: strMod, ability: "strength" };
 }
 
 /**
@@ -158,7 +152,7 @@ export function deriveWeaponAttackComponents(
   rangedAttackRollBonus = 0,
   attackRollBonus = 0,
 ): RollEventAttackComponents {
-  const abilityMod = weaponAbilityMod(weapon, effectiveScores);
+  const { mod: abilityMod, ability } = weaponAbilityMod(weapon, effectiveScores);
   const proficient = isProficientWithWeapon(weapon, weaponGrants);
   const rangedBonus = weapon.weaponRange === "ranged" ? rangedAttackRollBonus : 0;
   return {
@@ -166,6 +160,7 @@ export function deriveWeaponAttackComponents(
     proficiencyBonus: proficient ? proficiencyBonus : 0,
     rangedBonus,
     attackRollBonus,
+    ability,
   };
 }
 

@@ -32,6 +32,7 @@ import { inventoryRouter } from "@/routes/character/inventory.js";
 import { itemsRouter } from "@/routes/catalog/items.js";
 import { journalRouter } from "@/routes/session/journal.js";
 import { levelUpRouter } from "@/routes/character/level-up.js";
+import { portraitRouter } from "@/routes/character/portrait.js";
 import { shadowArtsRouter } from "@/routes/character/shadow-arts.js";
 import { maneuversRouter } from "@/routes/character/maneuvers.js";
 import { preferencesRouter } from "@/routes/platform/preferences.js";
@@ -135,6 +136,7 @@ const ROUTER_ENTRIES: RouterEntry[] = [
     probe: { method: "post", path: `/api/characters/${FAKE_ID}/advancement/transactions` },
   },
   { name: "levelUpRouter", router: levelUpRouter, probe: { method: "get", path: `/api/characters/${FAKE_ID}/level-up/plan` } },
+  { name: "portraitRouter", router: portraitRouter, probe: { method: "get", path: `/api/characters/${FAKE_ID}/portrait` } },
   // No GET on actionsRouter by design — see actions.ts's file banner.
   {
     name: "actionsRouter",

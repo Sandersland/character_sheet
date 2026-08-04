@@ -256,6 +256,109 @@ describe("buildFeedItems attack rolls with no swing partner (#1237 §3 — spell
   });
 });
 
+describe("buildFeedItems attack/damage drill-in ability naming (#1361)", () => {
+  it("renders the named ability via abilityLabel when attackComponents.ability is present", () => {
+    const events = [
+      makeEvent({
+        id: "spell-atk",
+        type: "attackRoll",
+        category: "roll",
+        summary: "Fire Bolt: 18 (1d20 + 7)",
+        data: {
+          kind: "attack",
+          source: "Fire Bolt",
+          total: 18,
+          specLabel: "1d20 + 7",
+          faces: [11],
+          attackComponents: { abilityMod: 4, proficiencyBonus: 3, rangedBonus: 0, attackRollBonus: 0, ability: "dexterity" },
+        },
+      }),
+    ];
+    const rows = buildFeedItems(events).map(rowOf);
+    expect(rows[0].drillIn?.[0].formula).toContain("+ 4 (Dexterity)");
+  });
+
+  it("falls back to the neutral 'Ability' label when attackComponents carries no ability (pre-existing event)", () => {
+    const events = [
+      makeEvent({
+        id: "spell-atk",
+        type: "attackRoll",
+        category: "roll",
+        summary: "Fire Bolt: 18 (1d20 + 7)",
+        data: {
+          kind: "attack",
+          source: "Fire Bolt",
+          total: 18,
+          specLabel: "1d20 + 7",
+          faces: [11],
+          attackComponents: { abilityMod: 4, proficiencyBonus: 3, rangedBonus: 0, attackRollBonus: 0 },
+        },
+      }),
+    ];
+    const rows = buildFeedItems(events).map(rowOf);
+    expect(rows[0].drillIn?.[0].formula).toContain("+ 4 (Ability)");
+  });
+
+  it("renders the named ability for damage components too", () => {
+    const events = [
+      makeEvent({
+        id: "rider",
+        type: "damageRoll",
+        category: "roll",
+        data: {
+          kind: "damage",
+          source: "Shortsword",
+          total: 8,
+          damageType: "piercing",
+          specLabel: "1d6 + 3",
+          faces: [5],
+          damageComponents: { abilityMod: 3, meleeDamageBonus: 0, ability: "strength" },
+        },
+      }),
+    ];
+    const rows = buildFeedItems(events).map(rowOf);
+    expect(rows[0].drillIn?.[0].formula).toContain("+ 3 (Strength)");
+  });
+});
+
+describe("buildFeedItems attack drill-in dropped d20 face (#1359)", () => {
+  function attackEvent(data: Record<string, unknown>) {
+    return makeEvent({
+      id: "atk",
+      type: "attackRoll",
+      category: "roll",
+      data: { kind: "attack", source: "Longsword", specLabel: "1d20 + 5", ...data },
+    });
+  }
+
+  it("renders both faces + 'lower kept' when the kept face is below the dropped one (disadvantage)", () => {
+    const rows = buildFeedItems([attackEvent({ total: 10, faces: [5], droppedFaces: [9] })]).map(rowOf);
+    expect(rows[0].drillIn?.[0].formula).toContain("1d20 (5, 9 — lower kept)");
+  });
+
+  it("renders both faces + 'higher kept' when the kept face is above the dropped one (advantage)", () => {
+    const rows = buildFeedItems([attackEvent({ total: 20, faces: [15], droppedFaces: [5] })]).map(rowOf);
+    expect(rows[0].drillIn?.[0].formula).toContain("1d20 (15, 5 — higher kept)");
+  });
+
+  it("renders the neutral 'kept' when both dice landed on the same face", () => {
+    const rows = buildFeedItems([attackEvent({ total: 17, faces: [12], droppedFaces: [12] })]).map(rowOf);
+    expect(rows[0].drillIn?.[0].formula).toContain("1d20 (12, 12 — kept)");
+  });
+
+  it("keeps the nat-20 special case, showing the dropped face alongside it", () => {
+    const rows = buildFeedItems([attackEvent({ total: 25, faces: [20], droppedFaces: [9], nat20: true })]).map(rowOf);
+    expect(rows[0].drillIn?.[0].formula).toContain("1d20 (nat 20, 9 — higher kept)");
+  });
+
+  it("renders the old single-face form unchanged when droppedFaces is absent (pre-existing event)", () => {
+    const rows = buildFeedItems([attackEvent({ total: 17, faces: [12] })]).map(rowOf);
+    const formula = rows[0].drillIn?.[0].formula;
+    expect(formula).toContain("1d20 (12)");
+    expect(formula).not.toContain("kept");
+  });
+});
+
 describe("damage-type tone segments (#1237 color table)", () => {
   it("tags a physical damage word with damageType but no elemental hue applies (caller resolves to neutral ink)", () => {
     const events = [

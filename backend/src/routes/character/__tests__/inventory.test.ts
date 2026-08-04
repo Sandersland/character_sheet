@@ -15,6 +15,7 @@ const TEST_ITEM = {
   category: "weapon" as const,
   weight: 1,
   cost: { cp: 0, sp: 0, gp: 2, pp: 0 },
+  scopeKey: "global",
 };
 const TEST_WEAPON_DETAIL = {
   damageDiceCount: 1,
@@ -49,7 +50,7 @@ describe("POST /api/characters/:id/inventory/transactions", () => {
 
   beforeEach(async () => {
     const item = await prisma.item.upsert({
-      where: { name: TEST_ITEM.name },
+      where: { scopeKey_name: { scopeKey: "global", name: TEST_ITEM.name } },
       create: { ...TEST_ITEM, weaponDetail: { create: TEST_WEAPON_DETAIL } },
       update: {
         ...TEST_ITEM,
@@ -174,6 +175,17 @@ describe("POST /api/characters/:id/inventory/transactions", () => {
       });
     expect(updateResponse.status).toBe(200);
     expect(updateResponse.body.inventory[0]).toMatchObject({
+      name: "Dagger +1",
+      weapon: { damageModifier: 1, damageDiceFaces: 4 },
+    });
+
+    // The divergence path (#1649 AC): the update patched `snapshot` JSON, not
+    // a per-item detail row — reload from a FRESH GET (not just the mutation's
+    // own echo) to prove the bumped field survives and its sibling
+    // (damageDiceFaces) wasn't clobbered by the JSON patch.
+    const reloaded = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE.id}`);
+    expect(reloaded.status).toBe(200);
+    expect(reloaded.body.inventory[0]).toMatchObject({
       name: "Dagger +1",
       weapon: { damageModifier: 1, damageDiceFaces: 4 },
     });

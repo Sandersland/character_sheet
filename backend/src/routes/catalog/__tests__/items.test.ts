@@ -17,6 +17,7 @@ const TEST_ITEM = {
   category: "weapon" as const,
   weight: 1,
   cost: { cp: 0, sp: 0, gp: 2, pp: 0 },
+  scopeKey: "global",
 };
 const TEST_ITEM_WEAPON_DETAIL = {
   damageDiceCount: 1,
@@ -34,7 +35,7 @@ describe("GET /api/items", () => {
 
   it("returns the equipment catalog used to drive the inventory editor", async () => {
     await prisma.item.upsert({
-      where: { name: TEST_ITEM.name },
+      where: { scopeKey_name: { scopeKey: "global", name: TEST_ITEM.name } },
       create: { ...TEST_ITEM, weaponDetail: { create: TEST_ITEM_WEAPON_DETAIL } },
       update: {
         ...TEST_ITEM,

@@ -14,7 +14,7 @@ import { SUBCLASS_CHOICE_OPTIONS } from "./seed/subclass-choices.js";
 import { FEATS } from "./seed/feats.js";
 import { SPELLS, SPELL_RENAMES, type CatalogSpell } from "./seed/spells.js";
 import { applySpellRenames } from "./seed/rename-spells.js";
-import { SUBCLASS_GRANTED_SPELLS } from "./seed/subclass-granted-spells.js";
+import { seedSubclassGrantedSpells } from "./seed/seed-granted-spells.js";
 import { seedClassFeatures } from "./seed/seed-class-features.js";
 import { seedSubclasses } from "./seed/seed-subclasses.js";
 import { seedStartingEquipment } from "./seed/seed-starting-equipment.js";
@@ -81,56 +81,9 @@ async function seedClasses(prisma: PrismaClient) {
 // is, so a test can import its guard/prune directly (seed.ts self-invokes
 // main() at module load and can't be re-run from a test).
 
-// Resolve one granted-spell seed row's subclass + catalog spell to ids and upsert
-// it. A missing class/subclass/spell is a hard seed error (mirrors the other
-// catalogs' fail-fast on unknown references).
-async function upsertGrantedSpell(
-  prisma: PrismaClient,
-  classIds: Map<string, string>,
-  g: (typeof SUBCLASS_GRANTED_SPELLS)[number],
-) {
-  const classId = classIds.get(g.className);
-  if (!classId) throw new Error(`Seed error: unknown class "${g.className}" in SUBCLASS_GRANTED_SPELLS`);
-  // SubclassGrantedSpellSeed carries no `edition` of its own (unlike
-  // SubclassSeed) — it was authored back when every seeded subclass was
-  // edition: null (shared, #1306). #1233 is the first row to break that:
-  // The Archfey/The Great Old One are now tagged EDITION_2014 (their PHB'24
-  // reworks are non-SRD, so they're offered to 2014 characters only), and
-  // this lookup's old hardcoded `edition: null` filter would no longer find
-  // them. Resolving by (classId, name) ALONE — not `resolveEditionRow`, which
-  // needs a character's edition to pick between candidates — is correct as
-  // long as at most one Subclass row exists per name, which the schema's
-  // `@@unique([classId, name, edition])` only guarantees once this data model
-  // itself gains an edition column of its own (not needed today: no name
-  // here has ever forked into two rows). findFirst, not findUnique: the
-  // compound-key shorthand can't express a null edition (upsertEditionRow).
-  //
-  // `orderBy` is load-bearing DESPITE that one-row-per-name invariant: Postgres
-  // LIMIT 1 without ORDER BY is implementation-defined, so the day a name DOES
-  // fork into two rows — and Archfey/GOO are expected to, once their PHB'24
-  // content is authored — this would silently bind whichever row the planner
-  // returned first. It stays deterministic instead, which turns that future
-  // change into a visibly wrong grant rather than a flaky one. Whoever adds the
-  // second row must replace this with a real edition filter, not re-sort it.
-  const subclass = await prisma.subclass.findFirst({
-    where: { classId, name: g.subclassName },
-    orderBy: { id: "asc" },
-    select: { id: true },
-  });
-  if (!subclass) throw new Error(`Seed error: unknown subclass "${g.subclassName}" for ${g.className}`);
-  const spell = await prisma.spell.findUnique({ where: { name: g.spellName }, select: { id: true } });
-  if (!spell) throw new Error(`Seed error: granted spell "${g.spellName}" not in the Spell catalog`);
-  await prisma.subclassGrantedSpell.upsert({
-    where: { subclassId_spellId: { subclassId: subclass.id, spellId: spell.id } },
-    create: { subclassId: subclass.id, spellId: spell.id, gateLevel: g.gateLevel, castingAbility: g.castingAbility },
-    update: { gateLevel: g.gateLevel, castingAbility: g.castingAbility },
-  });
-}
-
-// Subclass-granted spells (#898). Runs after subclasses AND spells are seeded.
-async function seedSubclassGrantedSpells(prisma: PrismaClient, classIds: Map<string, string>) {
-  for (const g of SUBCLASS_GRANTED_SPELLS) await upsertGrantedSpell(prisma, classIds, g);
-}
+// seedSubclassGrantedSpells (edition-aware resolve + id-scoped prune, #1625)
+// lives in ./seed/seed-granted-spells.ts — split out like seedSubclasses so a
+// test can drive the retag/prune shapes directly.
 
 // Upsert the action catalog by (key, edition), then drop stale rows.
 async function seedActions(prisma: PrismaClient) {
@@ -447,8 +400,14 @@ async function seedItems(prisma: PrismaClient) {
   for (const item of ITEMS) {
     const { name, category, weight, cost, description, toolCategory } = item;
     const row = await prisma.item.upsert({
-      where: { name },
-      create: { name, category, weight, cost, description, toolCategory: orNull(toolCategory), ...itemDetailCreateFields(item) },
+      // Names are unique per scope, not globally (#1645), so the seed has to
+      // say WHICH scope it owns — otherwise a DM's campaign row of the same
+      // name would be a candidate for the catalog's upsert.
+      where: { scopeKey_name: { scopeKey: "global", name } },
+      // scope/scopeKey are create-only: an existing row's scope is not the
+      // seed's to change, and writing them on update would let a reseed
+      // silently re-scope a row #1646 had moved.
+      create: { name, category, weight, cost, description, toolCategory: orNull(toolCategory), scope: "GLOBAL", scopeKey: "global", ...itemDetailCreateFields(item) },
       update: { name, category, weight, cost, description, toolCategory: orNull(toolCategory), ...itemDetailUpsertFields(item) },
     });
     itemIdsByName.set(row.name, row.id);

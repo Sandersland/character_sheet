@@ -5,6 +5,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
+import { inventoryItemFixtureData } from "@/test-support/inventory-snapshot-fixture.js";
 
 const OWNER_ID = "owner-serialize-ac-bonus";
 
@@ -45,14 +46,13 @@ describe("serialize applies active-item AC passiveBonus into armorClassBreakdown
     characterId = character.id;
 
     const ring = await prisma.inventoryItem.create({
-      data: {
-        character: { connect: { id: characterId } },
+      data: inventoryItemFixtureData({
+        characterId,
         name: "Ring of Protection",
         category: "gear",
-        quantity: 1,
         requiresAttunement: true,
-        capabilities: { create: [{ kind: "passiveBonus", target: "ac", op: "add", value: 1 }] },
-      },
+        capabilities: [{ kind: "passiveBonus", target: "ac", op: "add", value: 1 }],
+      }),
     });
     ringId = ring.id;
   });
@@ -91,24 +91,22 @@ describe("serialize applies active-item AC passiveBonus into armorClassBreakdown
     await prisma.inventoryItem.update({ where: { id: ringId }, data: { attuned: true } });
     // Chain Shirt (medium, base 13, Dex cap +2) + shield, Dex 10.
     await prisma.inventoryItem.create({
-      data: {
-        character: { connect: { id: characterId } },
+      data: inventoryItemFixtureData({
+        characterId,
         name: "Chain Shirt",
         category: "armor",
-        quantity: 1,
         equippedSlot: "BODY",
-        armorDetail: { create: { armorCategory: "medium", baseArmorClass: 13, dexModifierApplies: true, dexModifierMax: 2 } },
-      },
+        armor: { armorCategory: "medium", baseArmorClass: 13, dexModifierApplies: true, dexModifierMax: 2 },
+      }),
     });
     await prisma.inventoryItem.create({
-      data: {
-        character: { connect: { id: characterId } },
+      data: inventoryItemFixtureData({
+        characterId,
         name: "Shield",
         category: "armor",
-        quantity: 1,
         equippedSlot: "OFF_HAND",
-        armorDetail: { create: { armorCategory: "shield", baseArmorClass: 2 } },
-      },
+        armor: { armorCategory: "shield", baseArmorClass: 2 },
+      }),
     });
     const view = await serialize(characterId);
     // 13 armor + 0 Dex + 2 shield + 1 ring = 16, and the sum equals the breakdown total.
@@ -119,16 +117,13 @@ describe("serialize applies active-item AC passiveBonus into armorClassBreakdown
 
   it("surfaces a conditional AC bonus as reminder text, not applied to the total", async () => {
     await prisma.inventoryItem.create({
-      data: {
-        character: { connect: { id: characterId } },
+      data: inventoryItemFixtureData({
+        characterId,
         name: "Bracers of Defense",
         category: "gear",
-        quantity: 1,
         attuned: true,
-        capabilities: {
-          create: [{ kind: "passiveBonus", target: "ac", op: "add", value: 2, condition: "while wearing no armor and no shield" }],
-        },
-      },
+        capabilities: [{ kind: "passiveBonus", target: "ac", op: "add", value: 2, condition: "while wearing no armor and no shield" }],
+      }),
     });
     const view = await serialize(characterId);
     // Bonus not applied (still unarmored AC 10); condition shown as reminder.

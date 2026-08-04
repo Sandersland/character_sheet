@@ -77,7 +77,7 @@ async function makeCleric(opts: { id: string; xp: number; entryLevel: number; ru
   });
 }
 
-async function makePaladin(opts: { id: string; hitDiceTotal: number; entryLevel: number; subclass: string | null }): Promise<string> {
+async function makePaladin(opts: { id: string; hitDiceTotal: number; entryLevel: number; subclass: string | null; rulesEdition?: "EDITION_2014" | "EDITION_2024" }): Promise<string> {
   const paladin = await prisma.characterClass.findFirstOrThrow({ where: { name: "Paladin" } });
   const subclassId = opts.subclass
     ? (await prisma.subclass.findFirstOrThrow({ where: { name: opts.subclass } })).id
@@ -88,6 +88,7 @@ async function makePaladin(opts: { id: string; hitDiceTotal: number; entryLevel:
       ownerId: OWNER_ID,
       id: opts.id,
       name: `LevelUpPlan ${opts.id}`,
+      rulesEdition: opts.rulesEdition ?? "EDITION_2024",
       experiencePoints: 100000,
       hitPoints: { current: 40, max: 40, temp: 0, deathSaves: { successes: 0, failures: 0 } },
       hitDice: { total: opts.hitDiceTotal, die: "d10", spent: 0 },
@@ -255,8 +256,11 @@ describe("GET /api/characters/:id/level-up/plan", () => {
     expect(step?.meta).toMatchObject({ die: "d6", faces: 6 });
   });
 
+  // EDITION_2014 explicitly (#1625): these are the PHB'14 oath-spell rows,
+  // currently seeded edition-shared. #1626 re-tags them and authors the 2024
+  // twins (Shield of Faith/Aid at this tier), which owns the 2024 assertion.
   it("lists the granted spells a gate level newly turns on, with level + school (#1139, #1159)", async () => {
-    await makePaladin({ id: "lvplan-devotion-5", hitDiceTotal: 4, entryLevel: 4, subclass: "Oath of Devotion" });
+    await makePaladin({ id: "lvplan-devotion-5", hitDiceTotal: 4, entryLevel: 4, subclass: "Oath of Devotion", rulesEdition: "EDITION_2014" });
     const res = await getPlan("lvplan-devotion-5");
     expect(res.status).toBe(200);
     expect(res.body.target.newLevel).toBe(5);
@@ -275,8 +279,9 @@ describe("GET /api/characters/:id/level-up/plan", () => {
     expect(res.body.grantedSpells).toEqual([]);
   });
 
+  // EDITION_2014 explicitly — same #1625/#1626 note as the gate-crossing test above.
   it("lists a re-planned subclass's ≤-level grants on a subclass-pick level (#1139)", async () => {
-    const entryId = await makePaladin({ id: "lvplan-devotion-pick", hitDiceTotal: 2, entryLevel: 2, subclass: null });
+    const entryId = await makePaladin({ id: "lvplan-devotion-pick", hitDiceTotal: 2, entryLevel: 2, subclass: null, rulesEdition: "EDITION_2014" });
     const devotion = await prisma.subclass.findFirstOrThrow({ where: { name: "Oath of Devotion" } });
     const res = await getPlan("lvplan-devotion-pick", `?classEntryId=${entryId}&subclassId=${devotion.id}`);
     expect(res.status).toBe(200);
@@ -284,6 +289,52 @@ describe("GET /api/characters/:id/level-up/plan", () => {
     expect((res.body.grantedSpells as { name: string }[]).map((g) => g.name).sort()).toEqual([
       "Protection from Evil and Good", "Sanctuary",
     ]);
+  });
+
+  // Mechanism proof for #1625 on the plan route, independent of what #1626
+  // does to the seeded content: a fixture subclass carries a shared row plus a
+  // per-edition fork, and each edition's character is served exactly its own
+  // set through the ?subclassId= re-plan.
+  describe("per-edition grant filtering on the plan route (#1625)", () => {
+    const PROBE_SLUG = "zzz-plan-grant-probe-1625";
+    let probeSubclassId: string;
+
+    beforeAll(async () => {
+      const paladin = await prisma.characterClass.findFirstOrThrow({ where: { name: "Paladin" } });
+      const probe = await prisma.subclass.create({
+        data: { classId: paladin.id, name: "Zzz Plan Grant Probe", description: "plan-route edition probe", slug: PROBE_SLUG, edition: null },
+      });
+      probeSubclassId = probe.id;
+      const spellId = async (name: string) => (await prisma.spell.findFirstOrThrow({ where: { name }, select: { id: true } })).id;
+      await prisma.subclassGrantedSpell.createMany({
+        data: [
+          { subclassId: probe.id, spellId: await spellId("Protection from Evil and Good"), gateLevel: 3, castingAbility: "charisma", edition: null },
+          { subclassId: probe.id, spellId: await spellId("Sanctuary"), gateLevel: 3, castingAbility: "charisma", edition: "EDITION_2014" },
+          { subclassId: probe.id, spellId: await spellId("Bless"), gateLevel: 3, castingAbility: "charisma", edition: "EDITION_2024" },
+        ],
+      });
+    });
+
+    afterAll(async () => {
+      // Cascades the grant rows (Subclass onDelete: Cascade).
+      await prisma.subclass.deleteMany({ where: { slug: PROBE_SLUG } });
+    });
+
+    it("serves a 2024 character the shared + 2024 rows and not the 2014 row, and symmetrically for 2014", async () => {
+      const entry2024 = await makePaladin({ id: "lvplan-probe-2024", hitDiceTotal: 2, entryLevel: 2, subclass: null, rulesEdition: "EDITION_2024" });
+      const res2024 = await getPlan("lvplan-probe-2024", `?classEntryId=${entry2024}&subclassId=${probeSubclassId}`);
+      expect(res2024.status).toBe(200);
+      expect((res2024.body.grantedSpells as { name: string }[]).map((g) => g.name).sort()).toEqual([
+        "Bless", "Protection from Evil and Good",
+      ]);
+
+      const entry2014 = await makePaladin({ id: "lvplan-probe-2014", hitDiceTotal: 2, entryLevel: 2, subclass: null, rulesEdition: "EDITION_2014" });
+      const res2014 = await getPlan("lvplan-probe-2014", `?classEntryId=${entry2014}&subclassId=${probeSubclassId}`);
+      expect(res2014.status).toBe(200);
+      expect((res2014.body.grantedSpells as { name: string }[]).map((g) => g.name).sort()).toEqual([
+        "Protection from Evil and Good", "Sanctuary",
+      ]);
+    });
   });
 
   it("400s on an unknown classEntryId", async () => {

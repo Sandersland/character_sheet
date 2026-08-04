@@ -126,7 +126,7 @@ async function reconcileSubclass(ctx: ReconcileContext): Promise<void> {
 // branch in activity.ts (restores before.spellcasting) — no new EventType.
 
 async function reconcileGrantedSpells(ctx: ReconcileContext): Promise<void> {
-  const { tx, characterId, newDerivedLevel, batchId } = ctx;
+  const { tx, characterId, newDerivedLevel, edition, batchId } = ctx;
 
   const row = await tx.character.findUnique({
     where: { id: characterId },
@@ -149,10 +149,11 @@ async function reconcileGrantedSpells(ctx: ReconcileContext): Promise<void> {
   const state = normalizeSpellcastingMutable(row.spellcasting);
   if (!state.spells.some((s) => s.source === "subclass")) return; // normal case
 
-  // Grants across every class entry, symmetric with the serialize read side.
+  // Grants across every class entry, symmetric with the serialize read side —
+  // ctx.edition, the same authority the clamp-on-read resolves via editionOf.
   const validIds = new Set(
     row.classEntries
-      .flatMap((e) => deriveGrantedSpells(e.subclassRef, effectiveEntryLevel(e.level, row.classEntries.length, newDerivedLevel)))
+      .flatMap((e) => deriveGrantedSpells(e.subclassRef, effectiveEntryLevel(e.level, row.classEntries.length, newDerivedLevel), edition))
       .map((s) => s.id),
   );
 
@@ -223,12 +224,13 @@ async function reconcileGrantedSpells(ctx: ReconcileContext): Promise<void> {
 // via an "unprepareSpell" event — no new EventType, mirroring reconcileGrantedSpells.
 
 async function reconcilePreparedSpells(ctx: ReconcileContext): Promise<void> {
-  const { tx, characterId, newDerivedLevel, batchId } = ctx;
+  const { tx, characterId, newDerivedLevel, batchId, edition } = ctx;
 
   const row = await tx.character.findUnique({
     where: { id: characterId },
     select: {
       spellcasting: true,
+      abilityScores: true,
       classEntries: {
         orderBy: { position: "asc" as const },
         select: { name: true, level: true, subclass: true },
@@ -243,7 +245,10 @@ async function reconcilePreparedSpells(ctx: ReconcileContext): Promise<void> {
     level: effectiveEntryLevel(e.level, row.classEntries.length, newDerivedLevel),
     subclass: e.subclass,
   }));
-  const limit = derivePreparedSpellLimit(entries);
+  // Deliberate-coupling latch (#1507 D2/D3): resolves through the same
+  // derivePreparedSpellLimit as buildSpellcastingView's clamp-on-read
+  // (lib/character/serialize/spellcasting.ts) — never a second inline copy.
+  const limit = derivePreparedSpellLimit(entries, row.abilityScores as Record<string, number>, edition);
 
   const state = normalizeSpellcastingMutable(row.spellcasting);
   const { spells, trimmedCount } = clampPreparedToLimit(state.spells, limit);

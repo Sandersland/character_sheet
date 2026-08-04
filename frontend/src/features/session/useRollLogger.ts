@@ -26,7 +26,7 @@ type RollLogKind = "attack" | "damage";
 /**
  * The #1235 combat-log decomposition fields — optional so every non-weapon
  * caller (spells, tally-resolve maneuvers) can keep calling logRollSafe with
- * just the original five args. Only useAttackRolls populates this today.
+ * just the original five args.
  */
 interface RollLogExtra {
   swingId?: string;
@@ -50,6 +50,9 @@ export function useRollLogger(characterId: string, sessionId: string, onLogChang
       damageType?: string,
       extra?: RollLogExtra,
     ) => {
+      // Non-empty only: an empty droppedFaces on every normal roll would be
+      // pure noise on the wire and in the persisted event log.
+      const droppedFaces = result.dice.filter((d) => d.dropped).map((d) => d.value);
       logRoll(characterId, sessionId, {
         kind,
         source,
@@ -57,6 +60,7 @@ export function useRollLogger(characterId: string, sessionId: string, onLogChang
         specLabel: formatRollSpec(spec),
         damageType,
         faces: result.dice.filter((d) => !d.dropped).map((d) => d.value),
+        ...(droppedFaces.length > 0 ? { droppedFaces } : {}),
         ...extra,
       })
         .then(onLogChanged)

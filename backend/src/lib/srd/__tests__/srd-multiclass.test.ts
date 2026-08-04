@@ -58,11 +58,12 @@ describe("deriveMulticlassSpellcasting — single class byte-for-byte with deriv
 
   for (const c of cases) {
     it(`${c.name} ${c.level}${c.subclass ? ` (${c.subclass})` : ""}`, () => {
-      const single = deriveSpellcasting(c.name, c.level, SCORES, 3, c.subclass);
+      const single = deriveSpellcasting(c.name, c.level, SCORES, 3, c.subclass, "EDITION_2024");
       const multi = deriveMulticlassSpellcasting(
         [{ name: c.name, level: c.level, subclass: c.subclass ?? null }],
         SCORES,
         3,
+        "EDITION_2024",
       );
       // Slot totals must match the class's own table exactly (not the multiclass floor math).
       expect(multi.slotTotals).toEqual(single?.slotTotals ?? []);
@@ -79,6 +80,7 @@ describe("deriveMulticlassSpellcasting — multiclass combos (PHB p. 164)", () =
       ],
       SCORES,
       3,
+      "EDITION_2024",
     );
     expect(info.combinedCasterLevel).toBe(8);
     expect(info.slotTotals).toEqual(
@@ -102,6 +104,7 @@ describe("deriveMulticlassSpellcasting — multiclass combos (PHB p. 164)", () =
       ],
       SCORES,
       3,
+      "EDITION_2024",
     );
     expect(info.combinedCasterLevel).toBe(5);
     expect(info.slotTotals).toEqual(
@@ -118,6 +121,7 @@ describe("deriveMulticlassSpellcasting — multiclass combos (PHB p. 164)", () =
       ],
       SCORES,
       2,
+      "EDITION_2024",
     );
     // Only Bard 2 counts toward combined slots (Warlock is pact).
     expect(info.combinedCasterLevel).toBe(2);
@@ -139,6 +143,7 @@ describe("deriveMulticlassSpellcasting — multiclass combos (PHB p. 164)", () =
       ],
       SCORES,
       3,
+      "EDITION_2024",
     );
     expect(info.combinedCasterLevel).toBe(6);
     expect(info.slotTotals).toEqual(
@@ -154,6 +159,7 @@ describe("deriveMulticlassSpellcasting — multiclass combos (PHB p. 164)", () =
       ],
       SCORES,
       3,
+      "EDITION_2024",
     );
     expect(info.combinedCasterLevel).toBe(0);
     expect(info.slotTotals).toEqual([]);
@@ -169,6 +175,7 @@ describe("deriveMulticlassSpellcasting — multiclass combos (PHB p. 164)", () =
       ],
       SCORES,
       4,
+      "EDITION_2024",
     );
     expect(info.arcana).toEqual([{ level: 6, total: 1 }]);
     expect(info.pact?.slotLevel).toBe(5);

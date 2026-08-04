@@ -3,6 +3,8 @@
 // kind-discriminated Capability. All five kinds are materialized: passiveBonus,
 // castSpell (#528), grant (#529), activatedEffect (#543), charges (#555).
 
+import { PROFICIENCY_KINDS, type SnapshotCapability } from "@character-sheet/contracts";
+
 import { casterFractionFor } from "@/lib/srd/srd.js";
 import type {
   ActivatedDurationKind,
@@ -27,10 +29,7 @@ import type {
 
 // The capability vocabulary is the wire contract and lives in shared-types
 // (#1273); re-exported so the ~8 backend modules importing it from here keep
-// resolving it unchanged. The as-const tuples below stay backend-side because
-// they feed the route zod schemas — capability-wire-contract.test.ts latches each
-// tuple to its shared union, which is what the deleted `(typeof X)[number]`
-// definitions used to guarantee for free.
+// resolving it unchanged.
 export type {
   ActivatedDurationKind,
   ActivationType,
@@ -51,49 +50,28 @@ export type {
   SerializedCapability,
 };
 
-// The passiveBonus target enum, as a value tuple so the route's zod schema and
-// the frontend option list share one source of truth with the shared union.
-export const CAPABILITY_TARGETS = [
-  "ac",
-  "attack",
-  "damage",
-  "save",
-  "skill",
-  "abilityScore",
-  "spellAttack",
-  "spellDc",
-  "initiative",
-  "speed",
-  "maxHp",
-] as const;
-
-export const CAPABILITY_OPS = ["add", "setTo"] as const;
-
-export const ATTUNEMENT_PREREQ_KINDS = ["class", "spellcaster", "species", "alignment"] as const;
-
-// castSpell resource + stat-mode enums (#528), value tuples so the route schema
-// and the frontend option lists share one source of truth with the shared unions.
-export const CAST_RESOURCES = ["perRestShort", "perRestLong", "perDayDawn", "perDayDusk", "atWill", "charges"] as const;
-
-export const CAST_STAT_MODES = ["fixed", "wielder"] as const;
-
-// Recharge triggers for a charges pool (#555) — the ItemResourcePeriod values,
-// as a tuple so the route schema and frontend option list share one source.
-export const CHARGE_TRIGGERS = ["short", "long", "dawn", "dusk"] as const;
-
-// grant kind (#529). "sense"/"movement" are reserved: valid enum values the DM
-// can't yet author and no derivation consumes them.
-export const GRANT_TYPES = ["resistance", "immunity", "conditionImmunity", "advantage", "proficiency"] as const;
-
-export const ADVANTAGE_ON = ["save", "check", "initiative", "attack"] as const;
-
-// What grantValue names: a damage type, a condition, a skill/ability/save key,
-// or a weapon/tool/language name. Disambiguates the flat grantValue column.
-export const GRANT_VALUE_KINDS = ["damageType", "condition", "skill", "ability", "save", "weapon", "tool", "language"] as const;
-
-// Proficiency grants name one of these categories via grantValueKind; exported
-// so capability-wire-contract.test.ts can latch it to the shared ProficiencyKind.
-export const PROFICIENCY_KINDS = ["skill", "save", "weapon", "tool", "language"] as const;
+// The capability vocabulary moved to @character-sheet/contracts (#1647): the
+// snapshot schema validates against it and that package is a leaf zone, so a
+// tuple it uses cannot live here. Re-exported so the backend modules importing
+// it from this module keep resolving unchanged, and so
+// capability-wire-contract.test.ts still latches each tuple to its shared union.
+// (CAPABILITY_KINDS has no importer through this module — it's new, not moved
+// — so it isn't re-exported here; consumers reach it via contracts directly.)
+export {
+  ADVANTAGE_ON,
+  ATTUNEMENT_PREREQ_KINDS,
+  CAPABILITY_OPS,
+  CAPABILITY_TARGETS,
+  CAST_RESOURCES,
+  CAST_STAT_MODES,
+  CHARGE_TRIGGERS,
+  GRANT_TYPES,
+  GRANT_VALUE_KINDS,
+} from "@character-sheet/contracts";
+// PROFICIENCY_KINDS is imported above (not just re-exported) because
+// collectProficiencyGrant below needs a local binding — `export { X } from`
+// alone doesn't introduce one.
+export { PROFICIENCY_KINDS };
 
 // The column-read form of a dice-valued bonus: valueDamageType is a nullable
 // column, so this stays nullable where the wire CapabilityDice is not —
@@ -225,7 +203,7 @@ export function chargeTriggerRechargesOn(trigger: ChargeTrigger, rest: "short" |
   return rest === "long";
 }
 
-// The flat columns shared by CampaignItemCapability and InventoryCapability.
+// The flat columns shared by ItemCapability and InventoryCapability.
 export interface CapabilityColumns {
   kind: string;
   description?: string | null;
@@ -371,7 +349,7 @@ const CAPABILITY_READERS: Record<string, ((row: CapabilityColumns) => Capability
   activatedEffect: readActivatedEffectRow,
 };
 
-// Adapter over the flat capability columns — one CampaignItemCapability row per
+// Adapter over the flat capability columns — one ItemCapability row per
 // capability, with no per-kind DB tables (the dispatch table above is code, not
 // schema). A malformed
 // passiveBonus (missing target/op) or grant (missing grantType) reads as opaque
@@ -380,6 +358,144 @@ export function readCapability(row: CapabilityColumns): Capability {
   return (
     CAPABILITY_READERS[row.kind]?.(row) ?? { kind: row.kind as OpaqueCapability["kind"], description: row.description ?? null }
   );
+}
+
+// Per-kind flatteners for capabilityColumnsFromSnapshot below — mirrors
+// readCastSpellRow/readChargesRow/etc.'s per-kind-reader shape (a dispatch
+// table of small functions keeps each one's own complexity low, matching
+// this file's established pattern for the reverse direction).
+function passiveBonusColumns(cap: Extract<SnapshotCapability, { kind: "passiveBonus" }>) {
+  return {
+    target: cap.target,
+    op: cap.op,
+    value: cap.value,
+    targetKey: cap.targetKey ?? null,
+    condition: cap.condition ?? null,
+    valueDiceCount: cap.dice?.count ?? null,
+    valueDiceFaces: cap.dice?.faces ?? null,
+    valueDamageType: cap.dice?.damageType ?? null,
+  };
+}
+
+function castSpellColumns(cap: Extract<SnapshotCapability, { kind: "castSpell" }>) {
+  return {
+    spellId: cap.spellId,
+    spellName: cap.spellName,
+    spellLevel: cap.spellLevel,
+    castLevel: cap.castLevel,
+    castResource: cap.resource,
+    castUses: cap.uses,
+    castConcentration: cap.concentration,
+    dcMode: cap.dcMode,
+    dcValue: cap.dcValue ?? null,
+    attackMode: cap.attackMode,
+    attackValue: cap.attackValue ?? null,
+    chargeCost: cap.chargeCost,
+  };
+}
+
+function activatedEffectColumns(cap: Extract<SnapshotCapability, { kind: "activatedEffect" }>) {
+  return {
+    activation: cap.activation,
+    target: cap.target,
+    op: cap.op,
+    value: cap.value,
+    targetKey: cap.targetKey ?? null,
+    activatedDuration: cap.duration,
+    resourceKind: cap.resourceKind,
+    resourcePeriod: cap.resourcePeriod ?? null,
+    resourceCharges: cap.resourceCharges,
+    chargeCost: cap.chargeCost,
+    durationText: cap.durationText ?? null,
+  };
+}
+
+function grantColumns(cap: Extract<SnapshotCapability, { kind: "grant" }>) {
+  return {
+    grantType: cap.grantType,
+    grantOn: cap.grantOn ?? null,
+    grantValueKind: cap.grantValueKind ?? null,
+    grantValue: cap.grantValue ?? null,
+    cantBeSurprised: cap.cantBeSurprised,
+  };
+}
+
+function chargesColumns(cap: Extract<SnapshotCapability, { kind: "charges" }>) {
+  return {
+    maxCharges: cap.maxCharges,
+    rechargeDiceCount: cap.rechargeDice?.count ?? null,
+    rechargeDiceFaces: cap.rechargeDice?.faces ?? null,
+    rechargeBonus: cap.rechargeBonus ?? null,
+    rechargeTrigger: cap.rechargeTrigger,
+  };
+}
+
+// The inverse of readCapability, for the InventoryItem side (#1649). The
+// snapshot stores a capability as the already-typed union (SnapshotCapability),
+// but every capability consumer in this codebase — chargePoolOf, readCapability
+// itself, deriveItemGrants/deriveItemPassiveBonuses, serializeCapability — is
+// written against the flat CapabilityColumns row shape that used to come off
+// the InventoryCapability table. Rather than rewrite every one of those
+// consumers to a second, parallel code path, this maps a snapshot capability
+// (+ its InventoryCapabilityUse `used` counter) back onto that same flat shape,
+// keyed by `key` (the old InventoryCapability row's id, preserved verbatim in
+// the snapshot) so every existing reader keeps working unchanged.
+export function capabilityColumnsFromSnapshot(
+  cap: SnapshotCapability,
+  used: number,
+): CapabilityColumns & { id: string; used: number } {
+  const base = { id: cap.key, used, kind: cap.kind, description: cap.description ?? null };
+  switch (cap.kind) {
+    case "passiveBonus":
+      return { ...base, ...passiveBonusColumns(cap) };
+    case "castSpell":
+      return { ...base, ...castSpellColumns(cap) };
+    case "activatedEffect":
+      return { ...base, ...activatedEffectColumns(cap) };
+    case "grant":
+      return { ...base, ...grantColumns(cap) };
+    case "charges":
+      return { ...base, ...chargesColumns(cap) };
+  }
+}
+
+// Every CapabilityColumns field except the runtime `used` counter — named
+// once so the two "copy one capability row's columns into a new row" sites
+// (capabilityColumnFields below) can't drift apart on which columns count as
+// "the capability" vs. runtime state.
+//
+// The `satisfies` below rejects a key that is NOT on CapabilityColumns, but
+// nothing catches one that is MISSING: a column added to the capability tables
+// and not added here is silently dropped from every copy, surfacing later as a
+// schema parse failure far from the cause. Add the column in both places.
+const CAPABILITY_COLUMN_KEYS = [
+  "kind", "description", "target", "op", "value", "targetKey", "condition",
+  "valueDiceCount", "valueDiceFaces", "valueDamageType",
+  "spellId", "spellName", "spellLevel", "castLevel", "castResource", "castUses", "castConcentration",
+  "dcMode", "dcValue", "attackMode", "attackValue",
+  "activation", "activatedDuration", "resourceKind", "resourcePeriod", "resourceCharges", "durationText",
+  "grantType", "grantOn", "grantValueKind", "grantValue", "cantBeSurprised",
+  "maxCharges", "rechargeDiceCount", "rechargeDiceFaces", "rechargeBonus", "rechargeTrigger", "chargeCost",
+] as const satisfies readonly (keyof CapabilityColumns)[];
+
+// The flat-column copy shared by every "snapshot one capability row into
+// another" call site — snapshotInventoryItemForUndo (inventory-snapshot.ts,
+// which adds `used` back: undo restores spend state verbatim) and
+// snapshotCampaignItemCapabilityCreates (campaign-item-award.ts, `used`
+// excluded: an awarded pool starts full). Generic over T so a caller passing
+// a live Prisma row keeps its literal column types (e.g. `kind: CapabilityKind`,
+// not the interface's widened `string`) — required for the result to satisfy
+// a Prisma *CreateInput shape directly.
+export function capabilityColumnFields<T extends CapabilityColumns>(
+  c: T,
+): Pick<T, (typeof CAPABILITY_COLUMN_KEYS)[number]> {
+  const out: Record<string, unknown> = {};
+  // Cast on write, not on the function's own signature: the loop's key is
+  // widened to `keyof CapabilityColumns` on each iteration, which TS can't
+  // narrow back to the exact field being assigned — the return type above is
+  // what keeps callers precise.
+  for (const key of CAPABILITY_COLUMN_KEYS) out[key] = c[key];
+  return out as Pick<T, (typeof CAPABILITY_COLUMN_KEYS)[number]>;
 }
 
 // Max uses per recharge for an activatedEffect. atWill is unlimited (null = no

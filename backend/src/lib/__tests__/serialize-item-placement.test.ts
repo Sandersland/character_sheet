@@ -5,6 +5,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
+import { inventoryItemFixtureData, type InventoryItemFixtureInput } from "@/test-support/inventory-snapshot-fixture.js";
 
 // The served placement/proficiency flags (#1433). The snapshot suite cannot
 // cover these: its fixtures' CharacterClass rows are suite-local with empty
@@ -28,8 +29,13 @@ const BASE_CHAR = {
   currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
 };
 
-const LONGSWORD = {
-  create: { damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 0, damageType: "slashing", weaponClass: "martial", weaponRange: "melee" },
+const LONGSWORD_WEAPON = {
+  damageDiceCount: 1,
+  damageDiceFaces: 8,
+  damageModifier: 0,
+  damageType: "slashing",
+  weaponClass: "martial",
+  weaponRange: "melee",
 } as const;
 
 let characterIds: string[] = [];
@@ -41,7 +47,7 @@ let characterIds: string[] = [];
 async function createCharacter(data: {
   className: string;
   raceName?: string;
-  items?: Prisma.InventoryItemCreateWithoutCharacterInput[];
+  items?: Omit<InventoryItemFixtureInput, "characterId">[];
 }) {
   const classId = (await prisma.characterClass.findFirstOrThrow({ where: { name: data.className }, select: { id: true } })).id;
   const character = await prisma.character.create({
@@ -52,10 +58,14 @@ async function createCharacter(data: {
       spellcasting: Prisma.JsonNull,
       classEntries: { create: { name: data.className, classId, level: 1, position: 0 } },
       ...(data.raceName ? { raceSelection: { create: { name: data.raceName } } } : {}),
-      ...(data.items ? { inventoryItems: { create: data.items } } : {}),
     },
   });
   characterIds.push(character.id);
+
+  for (const item of data.items ?? []) {
+    await prisma.inventoryItem.create({ data: inventoryItemFixtureData({ characterId: character.id, ...item }) });
+  }
+
   return character.id;
 }
 
@@ -86,31 +96,28 @@ describe("serialized allowedSlots + equippable (#1433)", () => {
     const id = await createCharacter({
       className: "Fighter",
       items: [
-        { name: "One-Handed Sword", category: "weapon", quantity: 1, position: 0, weaponDetail: LONGSWORD },
+        { name: "One-Handed Sword", category: "weapon", position: 0, weapon: LONGSWORD_WEAPON },
         {
           name: "Greatsword",
           category: "weapon",
-          quantity: 1,
           position: 1,
-          weaponDetail: { create: { damageDiceCount: 2, damageDiceFaces: 6, damageModifier: 0, damageType: "slashing", twoHanded: true, weaponClass: "martial", weaponRange: "melee" } },
+          weapon: { damageDiceCount: 2, damageDiceFaces: 6, damageModifier: 0, damageType: "slashing", twoHanded: true, weaponClass: "martial", weaponRange: "melee" },
         },
         {
           name: "Shield",
           category: "armor",
-          quantity: 1,
           position: 2,
-          armorDetail: { create: { armorCategory: "shield", baseArmorClass: 2, dexModifierApplies: false } },
+          armor: { armorCategory: "shield", baseArmorClass: 2, dexModifierApplies: false },
         },
         {
           name: "Chain Shirt",
           category: "armor",
-          quantity: 1,
           position: 3,
-          armorDetail: { create: { armorCategory: "medium", baseArmorClass: 13, dexModifierApplies: true, dexModifierMax: 2 } },
+          armor: { armorCategory: "medium", baseArmorClass: 13, dexModifierApplies: true, dexModifierMax: 2 },
         },
-        { name: "Circlet", category: "gear", quantity: 1, position: 4, slot: "HEAD" },
-        { name: "Rope", category: "gear", quantity: 1, position: 5 },
-        { name: "Potion", category: "consumable", quantity: 1, position: 6 },
+        { name: "Circlet", category: "gear", position: 4, slot: "HEAD" },
+        { name: "Rope", category: "gear", position: 5 },
+        { name: "Potion", category: "consumable", position: 6 },
       ],
     });
     view = await serialize(id);
@@ -149,10 +156,9 @@ describe("serialized offHandLocked (#1433)", () => {
         {
           name: "Greatsword",
           category: "weapon",
-          quantity: 1,
           position: 0,
           equippedSlot: "MAIN_HAND",
-          weaponDetail: { create: { damageDiceCount: 2, damageDiceFaces: 6, damageModifier: 0, damageType: "slashing", twoHanded: true, weaponClass: "martial", weaponRange: "melee" } },
+          weapon: { damageDiceCount: 2, damageDiceFaces: 6, damageModifier: 0, damageType: "slashing", twoHanded: true, weaponClass: "martial", weaponRange: "melee" },
         },
       ],
     });
@@ -162,7 +168,7 @@ describe("serialized offHandLocked (#1433)", () => {
   it("is false for a one-handed weapon in the main hand", async () => {
     const id = await createCharacter({
       className: "Fighter",
-      items: [{ name: "Longsword", category: "weapon", quantity: 1, position: 0, equippedSlot: "MAIN_HAND", weaponDetail: LONGSWORD }],
+      items: [{ name: "Longsword", category: "weapon", position: 0, equippedSlot: "MAIN_HAND", weapon: LONGSWORD_WEAPON }],
     });
     expect((await serialize(id)).offHandLocked).toBe(false);
   });
@@ -175,9 +181,8 @@ describe("serialized offHandLocked (#1433)", () => {
         {
           name: "Greatsword",
           category: "weapon",
-          quantity: 1,
           position: 0,
-          weaponDetail: { create: { damageDiceCount: 2, damageDiceFaces: 6, damageModifier: 0, damageType: "slashing", twoHanded: true, weaponClass: "martial", weaponRange: "melee" } },
+          weapon: { damageDiceCount: 2, damageDiceFaces: 6, damageModifier: 0, damageType: "slashing", twoHanded: true, weaponClass: "martial", weaponRange: "melee" },
         },
       ],
     });
@@ -186,13 +191,12 @@ describe("serialized offHandLocked (#1433)", () => {
 });
 
 describe("serialized proficient (#1433)", () => {
-  const longswordItem: Prisma.InventoryItemCreateWithoutCharacterInput = {
+  const longswordItem: Omit<InventoryItemFixtureInput, "characterId"> = {
     name: "Longsword",
     category: "weapon",
-    quantity: 1,
     position: 0,
     equippedSlot: "MAIN_HAND",
-    weaponDetail: LONGSWORD,
+    weapon: LONGSWORD_WEAPON,
   };
 
   it("warns for a class whose grants miss the weapon", async () => {
@@ -213,10 +217,9 @@ describe("serialized proficient (#1433)", () => {
         {
           name: "Battleaxe",
           category: "weapon",
-          quantity: 1,
           position: 0,
           equippedSlot: "MAIN_HAND",
-          weaponDetail: { create: { damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 0, damageType: "slashing", weaponClass: "martial", weaponRange: "melee" } },
+          weapon: { damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 0, damageType: "slashing", weaponClass: "martial", weaponRange: "melee" },
         },
       ],
     });
@@ -230,10 +233,9 @@ describe("serialized proficient (#1433)", () => {
         {
           name: "Chain Shirt",
           category: "armor",
-          quantity: 1,
           position: 0,
           equippedSlot: "BODY",
-          armorDetail: { create: { armorCategory: "medium", baseArmorClass: 13, dexModifierApplies: true } },
+          armor: { armorCategory: "medium", baseArmorClass: 13, dexModifierApplies: true },
         },
       ],
     });
@@ -245,10 +247,9 @@ describe("serialized proficient (#1433)", () => {
         {
           name: "Chain Shirt",
           category: "armor",
-          quantity: 1,
           position: 0,
           equippedSlot: "BODY",
-          armorDetail: { create: { armorCategory: "medium", baseArmorClass: 13, dexModifierApplies: true } },
+          armor: { armorCategory: "medium", baseArmorClass: 13, dexModifierApplies: true },
         },
       ],
     });
@@ -268,13 +269,10 @@ describe("serialized proficient (#1433)", () => {
         {
           name: "Gauntlets of Training",
           category: "gear",
-          quantity: 1,
           position: 1,
           slot: "HANDS",
           equippedSlot: "HANDS",
-          capabilities: {
-            create: [{ kind: "grant", grantType: "proficiency", grantValueKind: "weapon", grantValue: "Martial Weapons" }],
-          },
+          capabilities: [{ kind: "grant", grantType: "proficiency", grantValueKind: "weapon", grantValue: "Martial Weapons" }],
         },
       ],
     });
@@ -290,9 +288,9 @@ describe("serialized proficient (#1433)", () => {
     const id = await createCharacter({
       className: "Wizard",
       items: [
-        { name: "Rope", category: "gear", quantity: 1, position: 0 },
-        { name: "Potion", category: "consumable", quantity: 1, position: 1 },
-        { name: "Odd Blade", category: "weapon", quantity: 1, position: 2, weaponDetail: { create: { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 0, damageType: "slashing" } } },
+        { name: "Rope", category: "gear", position: 0 },
+        { name: "Potion", category: "consumable", position: 1 },
+        { name: "Odd Blade", category: "weapon", position: 2, weapon: { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 0, damageType: "slashing" } },
       ],
     });
     const view = await serialize(id);

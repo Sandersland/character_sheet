@@ -107,8 +107,8 @@ async function persistUseDecrement(
   remainingQty: number | null,
 ) {
   if (charged) {
-    await tx.inventoryConsumableDetail.update({
-      where: { inventoryItemId: item.id },
+    await tx.inventoryItem.update({
+      where: { id: item.id },
       data: { usesRemaining: remainingUses ?? 0 },
     });
   } else if (remainingQty === 0) {

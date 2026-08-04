@@ -196,7 +196,6 @@ export function buildCreatePayload(
     backgroundAbilities: backgroundBonuses.complete ? backgroundBonuses.assignment : undefined,
     skillProficiencies: [...skills.granted, ...skills.selected],
     toolChoices: selectedToolChoices.length > 0 ? selectedToolChoices : undefined,
-    portraitUrl: draft.portraitUrl.trim() || null,
     startingEquipment: resolveEquipmentInput(draft, selections.class) ?? undefined,
     backgroundStartingEquipment: resolveBackgroundEquipmentInput(draft, selections.background) ?? undefined,
     // #1131: casters send their prepared picks; a non-caster omits the field.

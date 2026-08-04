@@ -24,6 +24,8 @@ describe("per-worker test databases", () => {
     const [row] = await prisma.$queryRaw<{ db: string }[]>`SELECT current_database() AS db`;
 
     expect(row.db).toBe(workerDatabaseName(baseDatabaseUrl(), Number(process.env.VITEST_POOL_ID)));
-    await expect(prisma.item.findUnique({ where: { name: "Longsword" } })).resolves.not.toBeNull();
+    await expect(
+      prisma.item.findUnique({ where: { scopeKey_name: { scopeKey: "global", name: "Longsword" } } }),
+    ).resolves.not.toBeNull();
   });
 });

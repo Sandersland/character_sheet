@@ -27,6 +27,8 @@ export interface AttackTallyRow {
   attack: TallyAttackRoll;
   damage?: number;
   verdict?: TallyVerdict;
+  /** Correlates this row's roll events (attack/damage/rider) as one swing (#1235). */
+  swingId?: string;
 }
 
 // Verdict forced by the die: nat 20 → crit (auto hit), nat 1 → miss. Any other

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
+import { inventoryItemFixtureData } from "@/test-support/inventory-snapshot-fixture.js";
 
 const OWNER_ID = "owner-serialize-passive";
 
@@ -49,17 +50,14 @@ describe("serialize sums active-item scalar passiveBonus into tempModifier (#545
     characterId = character.id;
 
     const item = await prisma.inventoryItem.create({
-      data: {
-        character: { connect: { id: characterId } },
+      data: inventoryItemFixtureData({
+        characterId,
         name: "Cloak of Elvenkind",
         category: "gear",
-        quantity: 1,
         slot: "CLOAK",
         equippedSlot: null,
-        capabilities: {
-          create: [{ kind: "passiveBonus", target: "skill", op: "add", value: 2, targetKey: "stealth" }],
-        },
-      },
+        capabilities: [{ kind: "passiveBonus", target: "skill", op: "add", value: 2, targetKey: "stealth" }],
+      }),
     });
     itemId = item.id;
   });
@@ -75,13 +73,12 @@ describe("serialize sums active-item scalar passiveBonus into tempModifier (#545
 
   it("surfaces the snapshotted requiresAttunement flag on the serialized item (#545)", async () => {
     const attunable = await prisma.inventoryItem.create({
-      data: {
-        character: { connect: { id: characterId } },
+      data: inventoryItemFixtureData({
+        characterId,
         name: "Ring of Protection",
         category: "gear",
-        quantity: 1,
         requiresAttunement: true,
-      },
+      }),
     });
     const view = await serialize(characterId);
     const ring = view.inventory.find((i) => i.id === attunable.id);
@@ -99,7 +96,7 @@ describe("serialize sums active-item scalar passiveBonus into tempModifier (#545
     ]);
     // A plain item carries no capabilities key at all.
     const bare = await prisma.inventoryItem.create({
-      data: { character: { connect: { id: characterId } }, name: "Torch", category: "gear", quantity: 1 },
+      data: inventoryItemFixtureData({ characterId, name: "Torch", category: "gear" }),
     });
     const reloaded = await serialize(characterId);
     expect(reloaded.inventory.find((i) => i.id === bare.id)?.capabilities).toBeUndefined();

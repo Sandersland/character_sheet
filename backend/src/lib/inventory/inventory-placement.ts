@@ -10,6 +10,7 @@ import {
   getOwnedInventoryItem,
   itemBuffKey,
 } from "./inventory-types.js";
+import { readInventorySnapshot } from "./inventory-snapshot-read.js";
 
 // Paper-doll placement (#565).
 //
@@ -76,9 +77,17 @@ export async function fetchEquippedRows(
   characterId: string,
   excludeId: string,
 ): Promise<EquippedRow[]> {
-  return tx.inventoryItem.findMany({
+  // A Json column can't be sub-selected (#1649) — `weaponDetail: { select: {
+  // twoHanded } }` becomes selecting the whole `snapshot` and narrowing in TS.
+  // Pulls the full blob for a query that only wants one boolean, but the row
+  // set here is one character's equipped items, so the extra bytes are cheap.
+  const rows = await tx.inventoryItem.findMany({
     where: { characterId, equippedSlot: { not: null }, id: { not: excludeId } },
-    select: { equippedSlot: true, weaponDetail: { select: { twoHanded: true } } },
+    select: { id: true, equippedSlot: true, snapshot: true },
+  });
+  return rows.map((r) => {
+    const weapon = readInventorySnapshot(r).weapon;
+    return { equippedSlot: r.equippedSlot, weaponDetail: weapon ? { twoHanded: weapon.twoHanded } : null };
   });
 }
 

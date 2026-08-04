@@ -3,10 +3,11 @@ import IdentityCard from "@/features/character-meta/IdentityCard";
 
 /**
  * Story tab — the low-frequency narrative surfaces: the journal doorway (opens
- * the field-chronicle page) and a read-only identity summary (background/
- * alignment, #927). Campaign preferences moved to the header ⋮ "Campaign
- * settings" sheet (#1087) — they're settings, not story. Takes no props
- * (still assignable to the SheetPanelProps-typed panel registry).
+ * the field-chronicle page) and the identity card, which carries both the
+ * read-only background/alignment summary (#927) and the portrait editor
+ * (#1616, merged in by #1618). Campaign preferences moved to the header ⋮
+ * "Campaign settings" sheet (#1087) — they're settings, not story. Takes no
+ * props (still assignable to the SheetPanelProps-typed panel registry).
  */
 export default function StoryPanel() {
   return (

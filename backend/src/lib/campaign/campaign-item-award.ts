@@ -1,18 +1,22 @@
 import { randomUUID } from "node:crypto";
 
 import { Prisma } from "@/generated/prisma/client.js";
-import { snapshotDetailCreate } from "@/lib/inventory/detail-snapshot.js";
+import { capabilityColumnFields } from "@/lib/inventory/capabilities.js";
+import { consumableDetailFields } from "@/lib/inventory/detail-snapshot.js";
 import { logEvent } from "@/lib/activity/events.js";
-import { snapshotInventoryItemForUndo, inventoryItemDetailInclude } from "@/lib/inventory/inventory.js";
+import { snapshotInventoryItemForUndo, inventoryItemDetailInclude, resolveInventoryItem } from "@/lib/inventory/inventory.js";
+import { asCurrency } from "@/lib/inventory/inventory-currency.js";
+import { buildInventorySnapshot } from "@/lib/inventory/inventory-snapshot-build.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { getActiveSessionId } from "@/lib/session/sessions.js";
 
-// DM item award/revoke (#381). A campaign owner grants a DM-authored
-// CampaignItem into a member character's inventory: the mechanical fields +
-// matching detail row are snapshotted into a new InventoryItem tagged with a
-// campaignItemId provenance FK, the fronting entity is revealed, and an audit
-// event is written on the TARGET character so the grant is LIFO-undoable via
-// the shared inventory revert (category "inventory", shape-driven).
+// DM item award/revoke (#381). A campaign owner grants a CAMPAIGN-scoped Item
+// (#1646; DM-authored, formerly a separate CampaignItem table) into a member
+// character's inventory: the mechanical fields + matching detail row are
+// snapshotted into a new InventoryItem tagged with an itemId provenance FK,
+// the fronting entity is revealed, and an audit event is written on the
+// TARGET character so the grant is LIFO-undoable via the shared inventory
+// revert (category "inventory", shape-driven).
 
 class CampaignItemAwardError extends Error {
   status: number;
@@ -28,9 +32,9 @@ const campaignItemInclude = {
   consumableDetail: true,
   capabilities: true,
   link: { select: { campaignEntityId: true } },
-} satisfies Prisma.CampaignItemInclude;
+} satisfies Prisma.ItemInclude;
 
-type CampaignItemWithDetails = Prisma.CampaignItemGetPayload<{ include: typeof campaignItemInclude }>;
+type CampaignItemWithDetails = Prisma.ItemGetPayload<{ include: typeof campaignItemInclude }>;
 
 export interface CampaignItemHolder {
   characterId: string;
@@ -42,67 +46,15 @@ function toJsonInput(value: Prisma.JsonValue | null): Prisma.InputJsonValue | Pr
   return value === null ? Prisma.JsonNull : (value as Prisma.InputJsonValue);
 }
 
-// Builds the InventoryItem nested detail-create block from a CampaignItem's
-// already-included detail rows — the CampaignItem*Detail tables share the exact
-// shape of the Inventory*Detail tables, so this is a straight field copy.
-function snapshotCampaignItemDetail(item: CampaignItemWithDetails) {
-  return {
-    ...snapshotDetailCreate(item),
-    // Typed capability rows snapshotted 1:1 onto the awarded item (#545) — a
-    // straight column copy, same as the detail tables above. The snapshot is
-    // self-contained, so a later edit/revoke of the source leaves these intact.
-    capabilities:
-      item.capabilities.length > 0
-        ? {
-            create: item.capabilities.map((c) => ({
-              kind: c.kind,
-              description: c.description,
-              target: c.target,
-              op: c.op,
-              value: c.value,
-              targetKey: c.targetKey,
-              condition: c.condition,
-              valueDiceCount: c.valueDiceCount,
-              valueDiceFaces: c.valueDiceFaces,
-              valueDamageType: c.valueDamageType,
-              // castSpell columns (#528) — provenance spellId + authored config.
-              // `used` is NOT copied (runtime state resets to 0 on the new item).
-              spellId: c.spellId,
-              spellName: c.spellName,
-              spellLevel: c.spellLevel,
-              castLevel: c.castLevel,
-              castResource: c.castResource,
-              castUses: c.castUses,
-              castConcentration: c.castConcentration,
-              dcMode: c.dcMode,
-              dcValue: c.dcValue,
-              attackMode: c.attackMode,
-              attackValue: c.attackValue,
-              // activatedEffect columns (#543).
-              activation: c.activation,
-              activatedDuration: c.activatedDuration,
-              resourceKind: c.resourceKind,
-              resourcePeriod: c.resourcePeriod,
-              resourceCharges: c.resourceCharges,
-              durationText: c.durationText,
-              // grant columns (#529).
-              grantType: c.grantType,
-              grantOn: c.grantOn,
-              grantValueKind: c.grantValueKind,
-              grantValue: c.grantValue,
-              cantBeSurprised: c.cantBeSurprised,
-              // charges pool columns (#555). `used` stays uncopied — an awarded
-              // pool starts full (remaining = maxCharges − 0).
-              maxCharges: c.maxCharges,
-              rechargeDiceCount: c.rechargeDiceCount,
-              rechargeDiceFaces: c.rechargeDiceFaces,
-              rechargeBonus: c.rechargeBonus,
-              rechargeTrigger: c.rechargeTrigger,
-              chargeCost: c.chargeCost,
-            })),
-          }
-        : undefined,
-  };
+// Typed capability rows snapshotted 1:1 onto the awarded item (#545) — a
+// straight column copy via capabilityColumnFields (`used` NOT copied: an
+// awarded pool/per-capability counter starts full, remaining = max − 0).
+// Each gets an explicit id (#1648) rather than the column default, generated
+// client-side so the SAME id can key both this InventoryCapability row and
+// its InventoryCapabilityUse mirror, and feed buildInventorySnapshot's
+// capabilities[].key, all from one create() call.
+function snapshotCampaignItemCapabilityCreates(item: CampaignItemWithDetails) {
+  return item.capabilities.map((c) => ({ id: randomUUID(), ...capabilityColumnFields(c) }));
 }
 
 // Resolves the sessionId a loot event threads onto (#382). With no explicit
@@ -131,13 +83,15 @@ async function resolveAwardSessionId(
 }
 
 // Loads the item + target character and enforces the shared guards: item lives
-// in this campaign (404), character is a member of it (400).
+// in this campaign (404), character is a member of it (400). findFirst with the
+// full predicate, not findUnique(id) + an in-code campaign check — the latter
+// leaks existence through timing (#1646).
 async function loadAwardContext(campaignId: string, campaignItemId: string, characterId: string) {
-  const item = await prisma.campaignItem.findUnique({
-    where: { id: campaignItemId },
+  const item = await prisma.item.findFirst({
+    where: { id: campaignItemId, scope: "CAMPAIGN", campaignId },
     include: campaignItemInclude,
   });
-  if (!item || item.campaignId !== campaignId) {
+  if (!item) {
     throw new CampaignItemAwardError(404, "Campaign item not found");
   }
   const character = await prisma.character.findUnique({
@@ -174,7 +128,7 @@ export async function awardCampaignItem(params: {
     // concurrent award can't slip between an outside-the-tx check and the write.
     if (item.isUnique) {
       const held = await tx.inventoryItem.findFirst({
-        where: { campaignItemId: item.id },
+        where: { itemId: item.id },
         select: { character: { select: { name: true } } },
       });
       if (held) {
@@ -186,10 +140,16 @@ export async function awardCampaignItem(params: {
     }
 
     const position = await tx.inventoryItem.count({ where: { characterId: character.id } });
+    // Ids generated up front (#1648) so the same create() call can nest both
+    // `capabilities` and their `capabilityUses` mirror rows, and so
+    // buildInventorySnapshot's capabilities[].key matches the row id that
+    // actually lands — no follow-up read-then-update round trip.
+    const capabilityCreates = snapshotCampaignItemCapabilityCreates(item);
+    const capabilityUseCreates = capabilityCreates.map((c) => ({ capabilityKey: c.id, used: 0 }));
     const created = await tx.inventoryItem.create({
       data: {
         characterId: character.id,
-        campaignItemId: item.id,
+        itemId: item.id,
         name: item.name,
         category: item.category,
         weight: item.weight ?? undefined,
@@ -205,7 +165,29 @@ export async function awardCampaignItem(params: {
         attunementPrereqKind: item.attunementPrereqKind,
         attunementPrereqValue: item.attunementPrereqValue,
         position,
-        ...snapshotCampaignItemDetail(item),
+        // Promoted out of InventoryConsumableDetail (#1648) — same freshCopy
+        // rule as the nested consumableDetail create below (a charged
+        // consumable is awarded full).
+        usesRemaining: item.consumableDetail
+          ? consumableDetailFields(item.consumableDetail, { freshCopy: true }).usesRemaining
+          : null,
+        snapshot: buildInventorySnapshot({
+          name: item.name,
+          category: item.category,
+          weight: item.weight,
+          cost: asCurrency(item.cost),
+          description: item.description,
+          slot: item.slot,
+          rarity: item.rarity,
+          requiresAttunement: item.requiresAttunement,
+          attunementPrereqKind: item.attunementPrereqKind,
+          attunementPrereqValue: item.attunementPrereqValue,
+          weaponDetail: item.weaponDetail,
+          armorDetail: item.armorDetail,
+          consumableDetail: item.consumableDetail,
+          capabilities: capabilityCreates,
+        }) as unknown as Prisma.InputJsonValue,
+        capabilityUses: capabilityUseCreates.length > 0 ? { create: capabilityUseCreates } : undefined,
       },
     });
 
@@ -230,7 +212,13 @@ export async function awardCampaignItem(params: {
       data: {
         itemName: created.name,
         quantityDelta: quantity,
-        campaignItemId: item.id,
+        // `itemId`, not the pre-#1646 `campaignItemId`: this is NEW blob content
+        // and the column it names is now itemId. Award events written before the
+        // merge keep the old key — the log is append-only — but nothing reads
+        // this field, so the two spellings never need reconciling.
+        // resolveSnapshotRefs reads the legacy key off the DELETED-item
+        // snapshot, which is a different blob and does still need its fallback.
+        itemId: item.id,
         recipientName: character.name,
       },
       actor: "dm",
@@ -252,14 +240,15 @@ export async function revokeCampaignItem(params: {
     params.characterId,
   );
 
-  const row = await prisma.inventoryItem.findFirst({
-    where: { characterId: character.id, campaignItemId: item.id },
+  const rawRow = await prisma.inventoryItem.findFirst({
+    where: { characterId: character.id, itemId: item.id },
     orderBy: { position: "desc" },
     include: inventoryItemDetailInclude,
   });
-  if (!row) {
+  if (!rawRow) {
     throw new CampaignItemAwardError(404, `${character.name} does not hold ${item.name}`);
   }
+  const row = resolveInventoryItem(rawRow);
 
   const batchId = randomUUID();
   const sessionId = await getActiveSessionId(character.id);
@@ -289,7 +278,10 @@ export async function revokeCampaignItem(params: {
 }
 
 // Current holders of each campaign item, derived from live InventoryItem rows.
-// Returns a map keyed by campaignItemId; items with no holders are absent.
+// Returns a map keyed by itemId; items with no holders are absent. Matching on
+// itemId is exact even though catalog acquisitions also populate it (#1646):
+// the caller only ever passes CAMPAIGN-scoped Item ids, and a catalog-acquired
+// row's itemId is a GLOBAL id, so the two sets cannot overlap.
 export async function campaignItemHolders(
   campaignItemIds: string[],
 ): Promise<Map<string, CampaignItemHolder[]>> {
@@ -297,9 +289,9 @@ export async function campaignItemHolders(
   if (campaignItemIds.length === 0) return map;
 
   const rows = await prisma.inventoryItem.findMany({
-    where: { campaignItemId: { in: campaignItemIds } },
+    where: { itemId: { in: campaignItemIds } },
     select: {
-      campaignItemId: true,
+      itemId: true,
       characterId: true,
       quantity: true,
       character: { select: { name: true } },
@@ -307,14 +299,17 @@ export async function campaignItemHolders(
   });
 
   for (const row of rows) {
-    if (!row.campaignItemId) continue;
-    const list = map.get(row.campaignItemId) ?? [];
+    // Unreachable at runtime — the query above filters itemId to the given ids.
+    // Present because Prisma types the column `string | null`, and narrowing is
+    // cheaper to read than a non-null assertion.
+    if (!row.itemId) continue;
+    const list = map.get(row.itemId) ?? [];
     list.push({
       characterId: row.characterId,
       characterName: row.character.name,
       quantity: row.quantity,
     });
-    map.set(row.campaignItemId, list);
+    map.set(row.itemId, list);
   }
   return map;
 }

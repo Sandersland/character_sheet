@@ -11,21 +11,25 @@ import {
   preparedSpellCountAt,
   maxSpellLevelForClass,
   magicalSecretsSpellLists,
+  level1SpellPicksFor,
 } from "@/lib/srd/spellcasting-tables.js";
 
 describe("levelUpSpellPicks — 2024 new-spell pick count on level-up", () => {
-  it("Wizard scribes 4 at level 1 (its prepared count), then a flat 2 per level (#1131)", () => {
-    expect(levelUpSpellPicks("wizard", 1)).toBe(4);
+  it("Wizard scribes 6 at level 1 — its spellbook size, not its prepared count (#1513) — then a flat 2 per level", () => {
+    expect(levelUpSpellPicks("wizard", 1)).toBe(6);
     expect(levelUpSpellPicks("wizard", 2)).toBe(2);
     expect(levelUpSpellPicks("Wizard", 8)).toBe(2);
     expect(levelUpSpellPicks("wizard", 20)).toBe(2);
   });
 
-  it("level-1 picks equal the class's prepared count for every caster; 0 for non-casters (#1131)", () => {
-    for (const cls of ["wizard", "cleric", "druid", "bard", "sorcerer", "warlock", "paladin", "ranger"]) {
-      expect(levelUpSpellPicks(cls, 1)).toBe(preparedSpellCountAt(cls, 1));
+  it("level-1 picks equal the class's prepared count for every caster except Wizard (its spellbook, #1513); 0 for non-casters", () => {
+    for (const cls of ["cleric", "druid", "bard", "sorcerer", "warlock", "paladin", "ranger"]) {
+      expect(levelUpSpellPicks(cls, 1)).toBe(preparedSpellCountAt(cls, 1, null, {}, "EDITION_2024"));
     }
-    expect(levelUpSpellPicks("wizard", 1)).toBe(4);
+    // Mutation guard: Wizard's level-1 pick (6, the spellbook) must stay distinct
+    // from its prepared count (4) — the conflation this issue fixes.
+    expect(levelUpSpellPicks("wizard", 1)).toBe(6);
+    expect(preparedSpellCountAt("wizard", 1, null, {}, "EDITION_2024")).toBe(4);
     expect(levelUpSpellPicks("cleric", 1)).toBe(4);
     expect(levelUpSpellPicks("paladin", 1)).toBe(2);
     expect(levelUpSpellPicks("fighter", 1)).toBe(0);
@@ -54,7 +58,7 @@ describe("levelUpSpellPicks — 2024 new-spell pick count on level-up", () => {
 
   it("re-prepare classes offer only the level-1 initial picks, then 0 (Cleric/Druid/Paladin/Ranger) (#1131)", () => {
     for (const cls of ["cleric", "druid", "paladin", "ranger"]) {
-      expect(levelUpSpellPicks(cls, 1)).toBe(preparedSpellCountAt(cls, 1));
+      expect(levelUpSpellPicks(cls, 1)).toBe(preparedSpellCountAt(cls, 1, null, {}, "EDITION_2024"));
       for (let lvl = 2; lvl <= 20; lvl++) expect(levelUpSpellPicks(cls, lvl)).toBe(0);
     }
   });
@@ -69,6 +73,20 @@ describe("levelUpSpellPicks — 2024 new-spell pick count on level-up", () => {
     expect(levelUpSpellPicks("fighter", 3, "Eldritch Knight")).toBe(3); // first prepared: 0 → 3
     expect(levelUpSpellPicks("fighter", 4, "Eldritch Knight")).toBe(1); // 3 → 4
     expect(levelUpSpellPicks("rogue", 12, "Arcane Trickster")).toBe(0); // 8 → 8
+  });
+});
+
+describe("level1SpellPicksFor — spellbookSize marks the Wizard's spellbook/prepared split (#1513)", () => {
+  it("is 6 for Wizard in BOTH editions; every other caster omits the field", () => {
+    for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {
+      expect(level1SpellPicksFor("wizard", null, edition)?.spellbookSize).toBe(6);
+      expect(level1SpellPicksFor("wizard", null, edition)?.spells).toBe(6);
+    }
+    for (const cls of ["bard", "cleric", "sorcerer", "warlock", "paladin", "ranger"]) {
+      expect(level1SpellPicksFor(cls, null, "EDITION_2024")?.spellbookSize).toBeUndefined();
+    }
+    expect(level1SpellPicksFor("fighter", "Eldritch Knight", "EDITION_2024")?.spellbookSize).toBeUndefined();
+    expect(level1SpellPicksFor("rogue", "Arcane Trickster", "EDITION_2024")?.spellbookSize).toBeUndefined();
   });
 });
 
@@ -103,28 +121,34 @@ describe("levelUpCantripPicks — 2024 cantrip pick count on level-up (#1131)", 
 
 describe("maxSpellLevelForClass", () => {
   it("derives the highest slot level a full caster has (ceiling climbs every other level)", () => {
-    expect(maxSpellLevelForClass("wizard", 1)).toBe(1);
-    expect(maxSpellLevelForClass("wizard", 3)).toBe(2);
-    expect(maxSpellLevelForClass("wizard", 8)).toBe(4);
-    expect(maxSpellLevelForClass("wizard", 9)).toBe(5);
-    expect(maxSpellLevelForClass("Bard", 10)).toBe(5);
+    expect(maxSpellLevelForClass("wizard", 1, null, "EDITION_2024")).toBe(1);
+    expect(maxSpellLevelForClass("wizard", 3, null, "EDITION_2024")).toBe(2);
+    expect(maxSpellLevelForClass("wizard", 8, null, "EDITION_2024")).toBe(4);
+    expect(maxSpellLevelForClass("wizard", 9, null, "EDITION_2024")).toBe(5);
+    expect(maxSpellLevelForClass("Bard", 10, null, "EDITION_2024")).toBe(5);
   });
 
   it("half-casters cast from level 1 (SRD 5.2), then climb the half-caster ceiling", () => {
-    expect(maxSpellLevelForClass("ranger", 1)).toBe(1);
-    expect(maxSpellLevelForClass("ranger", 2)).toBe(1);
-    expect(maxSpellLevelForClass("ranger", 5)).toBe(2);
+    expect(maxSpellLevelForClass("ranger", 1, null, "EDITION_2024")).toBe(1);
+    expect(maxSpellLevelForClass("ranger", 2, null, "EDITION_2024")).toBe(1);
+    expect(maxSpellLevelForClass("ranger", 5, null, "EDITION_2024")).toBe(2);
   });
 
   it("reads Pact Magic's single slot level for a Warlock", () => {
-    expect(maxSpellLevelForClass("warlock", 1)).toBe(1);
-    expect(maxSpellLevelForClass("warlock", 3)).toBe(2);
-    expect(maxSpellLevelForClass("warlock", 9)).toBe(5);
+    expect(maxSpellLevelForClass("warlock", 1, null, "EDITION_2024")).toBe(1);
+    expect(maxSpellLevelForClass("warlock", 3, null, "EDITION_2024")).toBe(2);
+    expect(maxSpellLevelForClass("warlock", 9, null, "EDITION_2024")).toBe(5);
   });
 
   it("is 0 for a non-caster (no derived slots)", () => {
-    expect(maxSpellLevelForClass("fighter", 5)).toBe(0);
-    expect(maxSpellLevelForClass("barbarian", 20)).toBe(0);
+    expect(maxSpellLevelForClass("fighter", 5, null, "EDITION_2024")).toBe(0);
+    expect(maxSpellLevelForClass("barbarian", 20, null, "EDITION_2024")).toBe(0);
+  });
+
+  it("2014 half-casters cast from level 2, not level 1 (#1507 D4)", () => {
+    expect(maxSpellLevelForClass("ranger", 1, null, "EDITION_2014")).toBe(0);
+    expect(maxSpellLevelForClass("paladin", 1, null, "EDITION_2014")).toBe(0);
+    expect(maxSpellLevelForClass("ranger", 2, null, "EDITION_2014")).toBe(1);
   });
 });
 

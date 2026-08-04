@@ -614,7 +614,7 @@ const PROF_6 = 6;
 
 describe("deriveSpellcasting — full casters", () => {
   it("derives wizard slots and INT-based DC, with no Mystic Arcanum", () => {
-    const info = deriveSpellcasting("wizard", 1, CASTER_SCORES, PROF_2)!;
+    const info = deriveSpellcasting("wizard", 1, CASTER_SCORES, PROF_2, undefined, "EDITION_2024")!;
     expect(info.ability).toBe("intelligence");
     expect(info.spellSaveDC).toBe(8 + PROF_2 + 1); // INT +1
     expect(slotMap(info)).toEqual({ 1: 2 });
@@ -622,7 +622,7 @@ describe("deriveSpellcasting — full casters", () => {
   });
 
   it("returns null for a non-caster class", () => {
-    expect(deriveSpellcasting("fighter", 5, CASTER_SCORES, PROF_3)).toBeNull();
+    expect(deriveSpellcasting("fighter", 5, CASTER_SCORES, PROF_3, undefined, "EDITION_2024")).toBeNull();
   });
 });
 
@@ -630,37 +630,37 @@ describe("deriveSpellcasting — full casters", () => {
 
 describe("deriveSpellcasting — half-casters", () => {
   it("casts from level 1 with two 1st-level slots (SRD 5.2)", () => {
-    expect(slotMap(deriveSpellcasting("paladin", 1, CASTER_SCORES, PROF_2))).toEqual({ 1: 2 });
-    expect(slotMap(deriveSpellcasting("ranger", 1, CASTER_SCORES, PROF_2))).toEqual({ 1: 2 });
+    expect(slotMap(deriveSpellcasting("paladin", 1, CASTER_SCORES, PROF_2, undefined, "EDITION_2024"))).toEqual({ 1: 2 });
+    expect(slotMap(deriveSpellcasting("ranger", 1, CASTER_SCORES, PROF_2, undefined, "EDITION_2024"))).toEqual({ 1: 2 });
   });
 
   it("grants two 1st-level slots at level 2", () => {
-    expect(slotMap(deriveSpellcasting("paladin", 2, CASTER_SCORES, PROF_2))).toEqual({ 1: 2 });
+    expect(slotMap(deriveSpellcasting("paladin", 2, CASTER_SCORES, PROF_2, undefined, "EDITION_2024"))).toEqual({ 1: 2 });
   });
 
   it("gains 3rd-level slots at level 9", () => {
-    expect(slotMap(deriveSpellcasting("paladin", 9, CASTER_SCORES, PROF_3))).toEqual({
+    expect(slotMap(deriveSpellcasting("paladin", 9, CASTER_SCORES, PROF_3, undefined, "EDITION_2024"))).toEqual({
       1: 4, 2: 3, 3: 2,
     });
   });
 
   it("gains a 5th-level slot at level 17", () => {
-    expect(slotMap(deriveSpellcasting("ranger", 17, CASTER_SCORES, PROF_6))).toEqual({
+    expect(slotMap(deriveSpellcasting("ranger", 17, CASTER_SCORES, PROF_6, undefined, "EDITION_2024"))).toEqual({
       1: 4, 2: 3, 3: 3, 4: 3, 5: 1,
     });
   });
 
   it("uses CHA for Paladin and WIS for Ranger", () => {
-    const pal = deriveSpellcasting("paladin", 5, CASTER_SCORES, PROF_3)!;
+    const pal = deriveSpellcasting("paladin", 5, CASTER_SCORES, PROF_3, undefined, "EDITION_2024")!;
     expect(pal.ability).toBe("charisma");
     expect(pal.spellSaveDC).toBe(8 + PROF_3 + 3); // CHA +3
-    const rng = deriveSpellcasting("ranger", 5, CASTER_SCORES, PROF_3)!;
+    const rng = deriveSpellcasting("ranger", 5, CASTER_SCORES, PROF_3, undefined, "EDITION_2024")!;
     expect(rng.ability).toBe("wisdom");
     expect(rng.spellSaveDC).toBe(8 + PROF_3 + 2); // WIS +2
   });
 
   it("never grants Mystic Arcanum", () => {
-    expect(deriveSpellcasting("paladin", 20, CASTER_SCORES, PROF_6)!.arcana).toEqual([]);
+    expect(deriveSpellcasting("paladin", 20, CASTER_SCORES, PROF_6, undefined, "EDITION_2024")!.arcana).toEqual([]);
   });
 });
 
@@ -668,21 +668,21 @@ describe("deriveSpellcasting — half-casters", () => {
 
 describe("deriveSpellcasting — Warlock Pact Magic", () => {
   it("grants a single 1st-level slot at level 1 (CHA-based)", () => {
-    const info = deriveSpellcasting("warlock", 1, CASTER_SCORES, PROF_2)!;
+    const info = deriveSpellcasting("warlock", 1, CASTER_SCORES, PROF_2, undefined, "EDITION_2024")!;
     expect(info.ability).toBe("charisma");
     expect(info.spellSaveDC).toBe(8 + PROF_2 + 3); // CHA +3
     expect(slotMap(info)).toEqual({ 1: 1 });
   });
 
   it("scales pact slots to a single, ever-rising level", () => {
-    expect(slotMap(deriveSpellcasting("warlock", 5, CASTER_SCORES, PROF_3))).toEqual({ 3: 2 });
-    expect(slotMap(deriveSpellcasting("warlock", 11, CASTER_SCORES, PROF_4))).toEqual({ 5: 3 });
-    expect(slotMap(deriveSpellcasting("warlock", 20, CASTER_SCORES, PROF_6))).toEqual({ 5: 4 });
+    expect(slotMap(deriveSpellcasting("warlock", 5, CASTER_SCORES, PROF_3, undefined, "EDITION_2024"))).toEqual({ 3: 2 });
+    expect(slotMap(deriveSpellcasting("warlock", 11, CASTER_SCORES, PROF_4, undefined, "EDITION_2024"))).toEqual({ 5: 3 });
+    expect(slotMap(deriveSpellcasting("warlock", 20, CASTER_SCORES, PROF_6, undefined, "EDITION_2024"))).toEqual({ 5: 4 });
   });
 
   it("never produces slots above level 5", () => {
     for (let lvl = 1; lvl <= 20; lvl++) {
-      const levels = Object.keys(slotMap(deriveSpellcasting("warlock", lvl, CASTER_SCORES, PROF_2))).map(Number);
+      const levels = Object.keys(slotMap(deriveSpellcasting("warlock", lvl, CASTER_SCORES, PROF_2, undefined, "EDITION_2024"))).map(Number);
       expect(Math.max(...levels)).toBeLessThanOrEqual(5);
     }
   });
@@ -692,17 +692,17 @@ describe("deriveSpellcasting — Warlock Pact Magic", () => {
 
 describe("deriveSpellcasting — Mystic Arcanum", () => {
   it("has no arcanum below level 11", () => {
-    expect(deriveSpellcasting("warlock", 10, CASTER_SCORES, PROF_4)!.arcana).toEqual([]);
+    expect(deriveSpellcasting("warlock", 10, CASTER_SCORES, PROF_4, undefined, "EDITION_2024")!.arcana).toEqual([]);
   });
 
   it("grants a 6th-level arcanum at level 11", () => {
-    expect(deriveSpellcasting("warlock", 11, CASTER_SCORES, PROF_4)!.arcana).toEqual([
+    expect(deriveSpellcasting("warlock", 11, CASTER_SCORES, PROF_4, undefined, "EDITION_2024")!.arcana).toEqual([
       { level: 6, total: 1 },
     ]);
   });
 
   it("grants all four arcana (6th–9th) at level 17", () => {
-    expect(deriveSpellcasting("warlock", 17, CASTER_SCORES, PROF_6)!.arcana).toEqual([
+    expect(deriveSpellcasting("warlock", 17, CASTER_SCORES, PROF_6, undefined, "EDITION_2024")!.arcana).toEqual([
       { level: 6, total: 1 },
       { level: 7, total: 1 },
       { level: 8, total: 1 },
@@ -715,13 +715,13 @@ describe("deriveSpellcasting — Mystic Arcanum", () => {
 
 describe("deriveSpellcasting — third casters", () => {
   it("derives Eldritch Knight slots at level 3 (INT-based, no arcanum)", () => {
-    const info = deriveSpellcasting("fighter", 3, CASTER_SCORES, PROF_2, "Eldritch Knight")!;
+    const info = deriveSpellcasting("fighter", 3, CASTER_SCORES, PROF_2, "Eldritch Knight", "EDITION_2024")!;
     expect(info.ability).toBe("intelligence");
     expect(slotMap(info)).toEqual({ 1: 2 });
     expect(info.arcana).toEqual([]);
   });
 
   it("returns null for an Arcane Trickster below level 3", () => {
-    expect(deriveSpellcasting("rogue", 2, CASTER_SCORES, PROF_2, "Arcane Trickster")).toBeNull();
+    expect(deriveSpellcasting("rogue", 2, CASTER_SCORES, PROF_2, "Arcane Trickster", "EDITION_2024")).toBeNull();
   });
 });

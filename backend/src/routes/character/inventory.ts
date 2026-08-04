@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 
+import { EQUIP_SLOTS } from "@character-sheet/contracts";
 import {
   applyInventoryOperations,
   InsufficientCurrencyError,
@@ -10,19 +11,7 @@ import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
 
 export const inventoryRouter = Router({ mergeParams: true });
 
-const equipSlotSchema = z.enum([
-  "MAIN_HAND",
-  "OFF_HAND",
-  "BODY",
-  "HEAD",
-  "NECK",
-  "CLOAK",
-  "HANDS",
-  "WRISTS",
-  "BELT",
-  "FEET",
-  "RING",
-]);
+const equipSlotSchema = z.enum(EQUIP_SLOTS);
 
 const currencySchema = z.object({
   cp: z.number().int(),

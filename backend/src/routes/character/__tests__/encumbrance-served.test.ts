@@ -17,6 +17,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
+import { inventoryItemFixtureData, type InventoryItemFixtureInput } from "@/test-support/inventory-snapshot-fixture.js";
 
 const OWNER_ID = "owner-encumbrance-served";
 const CHARACTER_ID = "encumbrance-served-character";
@@ -39,9 +40,9 @@ const FIXTURE = {
   currency: { cp: 40, sp: 30, gp: 20, pp: 10 },
 };
 
-async function makeItem(name: string, extra: Partial<Prisma.InventoryItemCreateInput> = {}) {
+async function makeItem(name: string, extra: Partial<InventoryItemFixtureInput> = {}) {
   return prisma.inventoryItem.create({
-    data: { character: { connect: { id: CHARACTER_ID } }, name, category: "gear", quantity: 1, ...extra },
+    data: inventoryItemFixtureData({ characterId: CHARACTER_ID, name, category: "gear", ...extra }),
   });
 }
 

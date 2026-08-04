@@ -76,7 +76,9 @@ describe("GET /api/reference", () => {
 
     expect(byName("Warlock").level1SpellPicks).toEqual({ cantrips: 2, spells: 2, maxSpellLevel: 1 });
     expect(byName("Paladin").level1SpellPicks).toEqual({ cantrips: 0, spells: 2, maxSpellLevel: 1 });
-    expect(byName("Wizard").level1SpellPicks).toEqual({ cantrips: 3, spells: 4, maxSpellLevel: 1 });
+    // Wizard is the one class where the served `spells` count is the spellbook
+    // size (6), not the prepared count (4) — #1513, spellbookSize marks the split.
+    expect(byName("Wizard").level1SpellPicks).toEqual({ cantrips: 3, spells: 6, maxSpellLevel: 1, spellbookSize: 6 });
     expect(byName("Fighter").level1SpellPicks).toBeNull();
 
     // #1377: maxSpellLevel replaces the client's hardcoded 1. It resolves to 1 for
@@ -88,6 +90,59 @@ describe("GET /api/reference", () => {
     for (const caster of casters) {
       expect(caster.level1SpellPicks.maxSpellLevel, caster.name).toBe(1);
     }
+  });
+
+  // #1507/carried #1508 AC + #1510: a 2014 Paladin/Ranger has no Spellcasting
+  // feature until level 2 (PHB'14 p. 84/92), so level1SpellPicks must be null
+  // — never `{ spells: n > 0, maxSpellLevel: 0 }`, the incoherent shape #1508
+  // flagged. The rest of this pins level1SpellPicksFor's fixed SRD 5.1 table
+  // (#1510) via the live route, alongside the pure unit test in
+  // lib/srd/__tests__/level1-spell-picks.test.ts.
+  it("serves level1SpellPicks per the SRD 5.1 table (#1510), null for a 2014 Paladin/Ranger", async () => {
+    const response = await supertest
+      .agent(app)
+      .set("Cookie", COOKIE)
+      .get("/api/reference?edition=EDITION_2014");
+    const byName = (name: string) => response.body.classes.find((c: { name: string }) => c.name === name);
+
+    expect(byName("Bard").level1SpellPicks).toEqual({ cantrips: 2, spells: 4, maxSpellLevel: 1 });
+    expect(byName("Sorcerer").level1SpellPicks).toEqual({ cantrips: 4, spells: 2, maxSpellLevel: 1 });
+    expect(byName("Warlock").level1SpellPicks).toEqual({ cantrips: 2, spells: 2, maxSpellLevel: 1 });
+    // #1513: spellbookSize marks the Wizard's spellbook (6) as distinct from its
+    // prepared count (4) — both editions serve the same six-spell spellbook.
+    expect(byName("Wizard").level1SpellPicks).toEqual({ cantrips: 3, spells: 6, maxSpellLevel: 1, spellbookSize: 6 });
+    // Cleric/Druid: no creation-time list exists in SRD 5.1 (prepared from the
+    // full class list, capped by WIS mod + level on the sheet) — 0 spells,
+    // cantrips only, and maxSpellLevel 0 alongside it (#1510's micro-decision).
+    expect(byName("Cleric").level1SpellPicks).toEqual({ cantrips: 3, spells: 0, maxSpellLevel: 0 });
+    expect(byName("Druid").level1SpellPicks).toEqual({ cantrips: 2, spells: 0, maxSpellLevel: 0 });
+    expect(byName("Paladin").level1SpellPicks).toBeNull();
+    expect(byName("Ranger").level1SpellPicks).toBeNull();
+  });
+
+  // #1513 AC: spellbookSize asserted for both editions from one test, plus
+  // byte-identity for a known caster (Bard), another prepared caster (Cleric),
+  // and a non-caster (Fighter) — the wire proof that only Wizard changed.
+  it("spellbookSize is 6 for Wizard in both editions; Bard/Cleric/Fighter are byte-identical (#1513)", async () => {
+    const res2024 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2024");
+    const res2014 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2014");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- response.body is untyped JSON (supertest), matching this file's existing byName helpers
+    const byName = (body: any, name: string) => body.classes.find((c: { name: string }) => c.name === name);
+
+    expect(byName(res2024.body, "Wizard").level1SpellPicks).toEqual({
+      cantrips: 3, spells: 6, maxSpellLevel: 1, spellbookSize: 6,
+    });
+    expect(byName(res2014.body, "Wizard").level1SpellPicks).toEqual({
+      cantrips: 3, spells: 6, maxSpellLevel: 1, spellbookSize: 6,
+    });
+
+    expect(byName(res2024.body, "Bard").level1SpellPicks).toEqual({ cantrips: 2, spells: 4, maxSpellLevel: 1 });
+    expect(byName(res2024.body, "Cleric").level1SpellPicks).toEqual({ cantrips: 3, spells: 4, maxSpellLevel: 1 });
+    expect(byName(res2024.body, "Fighter").level1SpellPicks).toBeNull();
+
+    expect(byName(res2014.body, "Bard").level1SpellPicks).toEqual({ cantrips: 2, spells: 4, maxSpellLevel: 1 });
+    expect(byName(res2014.body, "Cleric").level1SpellPicks).toEqual({ cantrips: 3, spells: 0, maxSpellLevel: 0 });
+    expect(byName(res2014.body, "Fighter").level1SpellPicks).toBeNull();
   });
 
   // #1161: each class carries its PHB'24 primary ability/abilities so the
@@ -608,11 +663,15 @@ describe("GET /api/reference", () => {
   // on purpose (the describe block above); `startingEquipment` is excluded
   // because #1535 makes IT genuinely edition-divergent content too (a real
   // PHB'24 package, not the pre-#1535 2014 copy) via the same exact
-  // (classId, edition) resolution as subclasses, not a fallback. This latch
-  // guards every OTHER class field against a future "for symmetry" filter,
-  // same shape as this file's itemRarities latch (edition-invariant, not
-  // edition-resolved).
-  it("classes (apart from subclassGateLevel/subclasses/startingEquipment) and races are identical between editions (#1308/#1535)", async () => {
+  // (classId, edition) resolution as subclasses, not a fallback. `level1SpellPicks`
+  // is excluded because #1507 threads `edition` into preparedSpellCountAt/
+  // maxSpellLevelForClass — genuinely null for a 2014 Paladin/Ranger (no
+  // Spellcasting feature until level 2) where it is non-null for 2024, and a
+  // 2014 Bard/Sorcerer/Ranger spell count reads the SRD 5.1 Spells Known table
+  // instead of the SRD 5.2 Prepared Spells one. This latch guards every OTHER
+  // class field against a future "for symmetry" filter, same shape as this
+  // file's itemRarities latch (edition-invariant, not edition-resolved).
+  it("classes (apart from subclassGateLevel/subclasses/startingEquipment/level1SpellPicks) and races are identical between editions (#1308/#1535/#1507)", async () => {
     const res2014 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2014");
     const res2024 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2024");
 
@@ -621,6 +680,7 @@ describe("GET /api/reference", () => {
       delete rest.subclassGateLevel;
       delete rest.subclasses;
       delete rest.startingEquipment;
+      delete rest.level1SpellPicks;
       return rest;
     };
     expect(res2014.body.classes.map(stripEditionDivergentFields)).toEqual(

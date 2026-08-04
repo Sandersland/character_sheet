@@ -18,6 +18,7 @@
     "backfill:combat-round": "tsx scripts/backfill-session-combat-round.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1101.0",
     "@character-sheet/contracts": "*",
     "@character-sheet/shared-types": "*",
     "@prisma/adapter-pg": "^7.8.0",
@@ -27,9 +28,11 @@
     "express-async-errors": "^3.1.1",
     "express-rate-limit": "^8.5.2",
     "helmet": "^8.2.0",
+    "multer": "^2.2.0",
     "pg": "^8.21.0",
     "pino": "^10.3.1",
     "pino-http": "^11.0.0",
+    "sharp": "^0.35.3",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -37,6 +40,7 @@
     "@eslint/js": "^9.17.0",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
+    "@types/multer": "^2.2.0",
     "@types/node": "^22.10.2",
     "@types/pg": "^8.20.0",
     "@types/supertest": "^6.0.2",

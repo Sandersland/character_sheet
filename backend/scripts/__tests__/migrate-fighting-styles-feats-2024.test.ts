@@ -6,6 +6,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
+import { inventoryItemFixtureData, type InventoryItemFixtureInput } from "@/test-support/inventory-snapshot-fixture.js";
 import { migrateFightingStylesToFeats } from "../migrate-fighting-styles-feats-2024.js";
 
 const OWNER_ID = "owner-migrate-fs";
@@ -27,20 +28,29 @@ const BASE = {
   currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
 };
 
-async function seedFighter(id: string, styleKey: string | null, inventory: Prisma.InventoryItemCreateWithoutCharacterInput[] = []) {
+async function seedFighter(
+  id: string,
+  styleKey: string | null,
+  inventory: Omit<InventoryItemFixtureInput, "characterId">[] = [],
+) {
   const resources: Record<string, unknown> = {
     used: {}, maneuversKnown: [], disciplinesKnown: [], toolProficienciesKnown: [], choicesKnown: {}, advancements: [],
   };
   if (styleKey) resources.fightingStyle = styleKey;
-  return prisma.character.create({
+  const character = await prisma.character.create({
     data: {
       ...BASE, id, name: `MigFS ${id}`, ownerId: OWNER_ID, experiencePoints: L5_XP,
       spellcasting: Prisma.JsonNull,
       resources: resources as unknown as Prisma.InputJsonValue,
       classEntries: { create: [{ position: 0, name: "Fighter", classId: fighterClassId, level: 5 }] },
-      ...(inventory.length ? { inventoryItems: { create: inventory } } : {}),
     },
   });
+  // Snapshot-based fixtures (#1649) need a real characterId, so inventory rows
+  // are created after the character rather than nested inside its own create.
+  for (const item of inventory) {
+    await prisma.inventoryItem.create({ data: inventoryItemFixtureData({ characterId: character.id, ...item }) });
+  }
+  return character;
 }
 
 async function get(id: string) {
@@ -61,13 +71,18 @@ afterAll(async () => {
   await prisma.character.deleteMany({ where: { name: { startsWith: "MigFS" } } });
 });
 
-const armor = (name: string, category: "light" | "medium" | "heavy", baseArmorClass: number, dexModifierMax?: number): Prisma.InventoryItemCreateWithoutCharacterInput => ({
+const armor = (
+  name: string,
+  category: "light" | "medium" | "heavy",
+  baseArmorClass: number,
+  dexModifierMax?: number,
+): Omit<InventoryItemFixtureInput, "characterId"> => ({
   name, category: "armor", equippedSlot: "BODY",
-  armorDetail: { create: { armorCategory: category, baseArmorClass, ...(dexModifierMax != null ? { dexModifierMax } : {}) } },
+  armor: { armorCategory: category, baseArmorClass, ...(dexModifierMax != null ? { dexModifierMax } : {}) },
 });
-const longbow: Prisma.InventoryItemCreateWithoutCharacterInput = {
+const longbow: Omit<InventoryItemFixtureInput, "characterId"> = {
   name: "Longbow", category: "weapon", equippedSlot: "MAIN_HAND",
-  weaponDetail: { create: { damageDiceCount: 1, damageDiceFaces: 8, damageType: "piercing", weaponRange: "ranged", twoHanded: true } },
+  weapon: { damageDiceCount: 1, damageDiceFaces: 8, damageType: "piercing", weaponRange: "ranged", twoHanded: true },
 };
 
 describe("migrateFightingStylesToFeats (#1137)", () => {

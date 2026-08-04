@@ -166,4 +166,52 @@ describe("RollProvider — rollAnimated + logging", () => {
       rollMode: "advantage",
     });
   });
+
+  // #1359: an advantage/disadvantage roll must carry its dropped d20 face
+  // onto the logged event, alongside the kept face already in `faces`.
+  it("carries the dropped d20 face in droppedFaces on an advantage roll (quick style, real dice engine)", async () => {
+    localStorage.setItem("cs:pref:diceRoll", "quick");
+    const randomSpy = vi
+      .spyOn(Math, "random")
+      // rollDie(20) = 1 + floor(random * 20): 0.72 -> 15 (kept, higher), 0.22 -> 5 (dropped).
+      .mockReturnValueOnce(0.72)
+      .mockReturnValueOnce(0.22);
+
+    render(
+      <DiceRollStyleProvider>
+        <RollProvider characterId="char-1" sessionId="sess-1">
+          <AnimatedRollOnMount
+            spec={{ count: 1, faces: 20, modifier: 1, mode: "advantage" }}
+            label="Initiative"
+            log={{ kind: "initiative", source: "Initiative" }}
+          />
+        </RollProvider>
+      </DiceRollStyleProvider>,
+    );
+
+    await waitFor(() => expect(mockLogRoll).toHaveBeenCalledTimes(1));
+    expect(mockLogRoll.mock.calls[0][2]).toMatchObject({
+      faces: [15],
+      droppedFaces: [5],
+    });
+    randomSpy.mockRestore();
+  });
+
+  it("omits droppedFaces entirely for a normal roll with no dropped die", async () => {
+    render(
+      <DiceRollStyleProvider>
+        <RollProvider characterId="char-1" sessionId="sess-1">
+          <AnimatedRollOnMount
+            spec={{ count: 1, faces: 20, modifier: 5 }}
+            label="Perception check"
+            log={{ kind: "check", source: "Perception check", ability: "wisdom", skill: "perception" }}
+          />
+          <RollResultSeal />
+        </RollProvider>
+      </DiceRollStyleProvider>,
+    );
+
+    await waitFor(() => expect(mockLogRoll).toHaveBeenCalledTimes(1));
+    expect(mockLogRoll.mock.calls[0][2]).not.toHaveProperty("droppedFaces");
+  });
 });

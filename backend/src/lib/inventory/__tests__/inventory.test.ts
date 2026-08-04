@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { Prisma, type CharacterEventType } from "@/generated/prisma/client.js";
@@ -11,6 +13,8 @@ import {
   InvalidInventoryOperationError,
   revertInventoryEvent,
 } from "@/lib/inventory/inventory.js";
+import { readInventorySnapshot } from "@/lib/inventory/inventory-snapshot-read.js";
+import { buildInventorySnapshot } from "@/lib/inventory/inventory-snapshot-build.js";
 
 const OWNER_ID = "owner-inventory-lib";
 
@@ -61,6 +65,7 @@ const TEST_ITEM = {
   category: "weapon" as const,
   weight: 2,
   cost: { cp: 0, sp: 1, gp: 0, pp: 0 },
+  scopeKey: "global",
 };
 const TEST_WEAPON_DETAIL = {
   damageDiceCount: 1,
@@ -81,7 +86,7 @@ describe("applyInventoryOperations", () => {
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
     const item = await prisma.item.upsert({
-      where: { name: TEST_ITEM.name },
+      where: { scopeKey_name: { scopeKey: "global", name: TEST_ITEM.name } },
       create: { ...TEST_ITEM, weaponDetail: { create: TEST_WEAPON_DETAIL } },
       update: {
         ...TEST_ITEM,
@@ -191,13 +196,15 @@ describe("applyInventoryOperations", () => {
       { type: "update", inventoryItemId: created.id, name: "Club +1", weapon: { damageModifier: 1 } },
     ]);
 
-    const updated = await prisma.inventoryItem.findUniqueOrThrow({
-      where: { id: created.id },
-      include: { weaponDetail: true },
-    });
+    const updated = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: created.id } });
     expect(updated.name).toBe("Club +1");
-    expect(updated.weaponDetail?.damageModifier).toBe(1);
-    expect(updated.weaponDetail?.damageDiceFaces).toBe(4); // untouched fields survive a partial update
+    // The weapon override patches `snapshot` (#1649) — the detail table it used
+    // to nest-update is gone. This is the "Club +1" divergence path: a homebrew
+    // edit to one weapon field must survive a reload without disturbing its
+    // siblings.
+    const weapon = readInventorySnapshot(updated).weapon;
+    expect(weapon?.damageModifier).toBe(1);
+    expect(weapon?.damageDiceFaces).toBe(4); // untouched fields survive a partial update
 
     const events = await prisma.characterEvent.findMany({ where: { characterId: characterAId, category: "inventory" } });
     expect(events).toHaveLength(1); // just the original acquire — update is cosmetic, not logged
@@ -344,10 +351,12 @@ describe("applyInventoryOperations", () => {
     expect(deletedItem.equippedSlot).toBe("MAIN_HAND");
     expect(deletedItem.notes).toBe("keep sharp");
     expect(deletedItem.position).toBe(created.position);
-    expect(deletedItem.armorDetail).toBeNull();
-    expect(deletedItem.consumableDetail).toBeNull();
-    const weaponDetail = deletedItem.weaponDetail as Record<string, unknown>;
-    expect(weaponDetail).toMatchObject({
+    // The frozen half is captured as the already-persisted `snapshot` blob
+    // (#1649), not separate weaponDetail/armorDetail/consumableDetail fields.
+    const snapshot = deletedItem.snapshot as Record<string, unknown>;
+    expect(snapshot.armor).toBeNull();
+    expect(snapshot.consumable).toBeNull();
+    expect(snapshot.weapon).toMatchObject({
       damageDiceCount: 1,
       damageDiceFaces: 4,
       damageType: "piercing",
@@ -547,8 +556,8 @@ describe("applyInventoryOperations", () => {
     expect(deletedItem.id).toBe(created.id);
     expect(deletedItem.itemId).toBe(itemId);
     expect(deletedItem.quantity).toBe(3);
-    const weaponDetail = deletedItem.weaponDetail as Record<string, unknown>;
-    expect(weaponDetail).toMatchObject({ damageDiceFaces: 4, light: true });
+    const snapshot = deletedItem.snapshot as Record<string, unknown>;
+    expect(snapshot.weapon).toMatchObject({ damageDiceFaces: 4, light: true });
   });
 
   it("adjusting to zero snapshots data.deletedItem; a partial adjust does not", async () => {
@@ -698,10 +707,7 @@ describe("applyInventoryOperations", () => {
       const removed = await latestEventOfType(characterAId, "removed");
       await prisma.$transaction((tx) => revertInventoryEvent(tx, characterAId, removed));
 
-      const restored = await prisma.inventoryItem.findUniqueOrThrow({
-        where: { id: created.id },
-        include: { weaponDetail: true },
-      });
+      const restored = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: created.id } });
       expect(restored).toMatchObject({
         id: created.id,
         name: "Revert Test Dagger",
@@ -710,7 +716,9 @@ describe("applyInventoryOperations", () => {
         notes: "sheathed",
         position: created.position,
       });
-      expect(restored.weaponDetail).toMatchObject({
+      // The recreated row's frozen half comes back from the persisted
+      // `snapshot` blob verbatim (#1649) — its own table is gone.
+      expect(readInventorySnapshot(restored).weapon).toMatchObject({
         damageDiceFaces: 4,
         damageType: "piercing",
         finesse: true,
@@ -789,6 +797,77 @@ describe("applyInventoryOperations", () => {
       // …and the row is back (full sell deleted it).
       const restored = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: created.id } });
       expect(restored.quantity).toBe(2);
+    });
+
+    // A pre-#1646 audit blob names the provenance FK `campaignItemId`. The log is
+    // append-only so those blobs are never rewritten; ids were preserved by the
+    // merge migration, so the legacy key still resolves and undo must honour it.
+    it("recreates a pre-merge awarded item from a legacy campaignItemId snapshot", async () => {
+      const campaign = await prisma.campaign.create({
+        data: { name: "Legacy Snapshot Campaign", ownerId: OWNER_ID, inviteCode: randomUUID() },
+      });
+      const campaignItem = await prisma.item.create({
+        data: {
+          name: "Legacy Snapshot Blade",
+          category: "gear",
+          scope: "CAMPAIGN",
+          scopeKey: `campaign:${campaign.id}`,
+          campaignId: campaign.id,
+        },
+      });
+
+      const legacySnapshot = {
+        id: "00000000-0000-0000-0000-000000000001",
+        itemId: null,
+        campaignItemId: campaignItem.id,
+        name: "Legacy Snapshot Blade",
+        category: "gear",
+        weight: null,
+        cost: null,
+        description: null,
+        quantity: 1,
+        equippedSlot: null,
+        slot: null,
+        rarity: null,
+        attuned: false,
+        requiresAttunement: false,
+        attunementPrereqKind: null,
+        attunementPrereqValue: null,
+        notes: null,
+        position: 0,
+        usesRemaining: null,
+        snapshot: buildInventorySnapshot({
+          name: "Legacy Snapshot Blade",
+          category: "gear",
+          weight: null,
+          cost: null,
+          description: null,
+          slot: null,
+          rarity: null,
+          requiresAttunement: false,
+          attunementPrereqKind: null,
+          attunementPrereqValue: null,
+          weaponDetail: null,
+          armorDetail: null,
+          consumableDetail: null,
+          capabilities: [],
+        }),
+        capabilityUses: [],
+      };
+
+      await prisma.$transaction((tx) =>
+        revertInventoryEvent(tx, characterAId, {
+          entityId: legacySnapshot.id,
+          before: { name: legacySnapshot.name, quantity: 1, category: "gear" },
+          data: { deletedItem: legacySnapshot },
+        }),
+      );
+
+      const restored = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: legacySnapshot.id } });
+      expect(restored.itemId).toBe(campaignItem.id);
+
+      await prisma.inventoryItem.delete({ where: { id: legacySnapshot.id } });
+      await prisma.campaign.delete({ where: { id: campaign.id } });
     });
   });
 });

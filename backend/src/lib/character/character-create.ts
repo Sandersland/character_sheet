@@ -7,14 +7,15 @@ import {
   buildInventoryCreateFromCatalog,
   catalogItemDetailInclude,
   selectAutoEquip,
+  stripInventoryCreateForWrite,
 } from "@/lib/inventory/inventory.js";
 import {
   ALIGNMENTS,
-  cantripsKnownAtLevel,
   deriveCreatedCharacter,
+  derivePreparedSpellLimit,
   isKnownTool,
+  level1SpellPicksFor,
   maxSpellLevelForClass,
-  preparedSpellCountAt,
 } from "@/lib/srd/srd.js";
 import { ABILITY_CAP } from "@/lib/leveling/advancement.js";
 import {
@@ -28,7 +29,7 @@ import {
   EQUIPMENT_PACKAGE_INCLUDE,
 } from "@/lib/inventory/starting-equipment-package.js";
 import { creationSpellEntry } from "@/lib/spellcasting/spellcasting.js";
-import type { SpellEntry } from "@/lib/spellcasting/spell-state.js";
+import { clampPreparedToLimit, type SpellEntry } from "@/lib/spellcasting/spell-state.js";
 import { subclassGateLevel } from "@/lib/leveling/effective-levels.js";
 import { DEFAULT_RULES_EDITION } from "@/lib/rules/edition.js";
 import { crossEditionRejection, resolveEditionRow, withEditionOrShared } from "@/lib/rules/catalog-edition.js";
@@ -82,6 +83,12 @@ type ResolvedSelections = {
   subclassName: string | null;
   skillProficiencies: string[];
   creationToolProfs: CreationToolProf[];
+  // #1507/#1510: threaded through to creationSpellCountError's level1SpellPicksFor
+  // call and resolveCreationSpells' maxSpellLevelForClass ceiling. Recomputed
+  // here (not re-derived from input.rulesEdition ?? DEFAULT_RULES_EDITION a
+  // second time) since resolveSelections already resolved it for the
+  // creation-time subclass gate.
+  edition: RulesEdition;
 };
 
 type MaterializedEquipment = {
@@ -118,7 +125,10 @@ async function resolveFixedItems(
 
   const names = [...new Set(expanded.map((r) => r.catalogName))];
   const items = await prisma.item.findMany({
-    where: { name: { in: names } },
+    // Pinned to the GLOBAL catalog (#1645), same rule as validateOpenPick.
+    // itemByName below collapses this on name, so an unpinned read would let a
+    // campaign row OVERWRITE the catalog one and grant the wrong item entirely.
+    where: { scopeKey: "global", name: { in: names } },
     include: catalogItemDetailInclude,
   });
   const itemByName = new Map(items.map((i) => [i.name, i]));
@@ -353,6 +363,7 @@ async function resolveSelections(
     subclassName: subclass.subclassName,
     skillProficiencies: proficiencies.skillProficiencies,
     creationToolProfs: proficiencies.creationToolProfs,
+    edition,
   };
 }
 
@@ -606,7 +617,11 @@ async function validateOpenPick(
   creationToolProfs: CreationToolProf[],
 ): Promise<PhaseResult<{ ref: FixedRef }>> {
   const catalogItem = await prisma.item.findUnique({
-    where: { name: chosenName },
+    // Pinned to the GLOBAL catalog (#1645). Starting equipment resolves seeded
+    // content, so a campaign-scoped row must never satisfy an open pick — once
+    // #1646 merges DM-authored items into this table, an unpinned lookup would
+    // let a homebrew row shadow the catalog name the package meant.
+    where: { scopeKey_name: { scopeKey: "global", name: chosenName } },
     include: { weaponDetail: true },
   });
   const error = openPickFilterError(catalogItem, pick, chosenName, creationToolProfs);
@@ -877,23 +892,32 @@ function creationPickError(
 type CreationSpells = NonNullable<CreateCharacterBody["spells"]>;
 
 // Precondition + count checks for creation picks: the class must cast at level 1,
-// the two lists must match the SRD 5.2 level-1 counts, and no id may repeat.
+// the two lists must match the level-1 counts (per edition), and no id may repeat.
+// #1510 D4: both counts come from level1SpellPicksFor — the SAME function
+// reference.ts serves, so a served count and an enforced count can never
+// disagree by construction (no separate abilityScores-driven read here: a
+// 2014 Cleric/Druid's creation picks are 0 regardless of Wisdom — see that
+// function's comment for why).
 function creationSpellCountError(
   spells: CreationSpells,
   className: string,
   classDisplay: string,
   subclass: string | null,
+  edition: RulesEdition,
 ): Fail | null {
-  const spellCount = preparedSpellCountAt(className, 1, subclass);
-  if (spellCount == null) {
+  // #1508 carried AC, #1510: `null` for a 2014 Paladin/Ranger (no Spellcasting
+  // until level 2) or any non-caster — the "does not cast spells at level 1"
+  // 400 below is the correct, intentional response rather than a silently
+  // accepted pick count.
+  const picks = level1SpellPicksFor(className, subclass, edition);
+  if (picks == null) {
     return { ok: false, status: 400, error: `${classDisplay} does not cast spells at level 1` };
   }
-  const cantripCount = cantripsKnownAtLevel(className, 1, subclass);
-  if (spells.cantripIds.length !== cantripCount) {
-    return { ok: false, status: 400, error: `Expected ${cantripCount} cantrip(s), got ${spells.cantripIds.length}` };
+  if (spells.cantripIds.length !== picks.cantrips) {
+    return { ok: false, status: 400, error: `Expected ${picks.cantrips} cantrip(s), got ${spells.cantripIds.length}` };
   }
-  if (spells.spellIds.length !== spellCount) {
-    return { ok: false, status: 400, error: `Expected ${spellCount} level-1 spell(s), got ${spells.spellIds.length}` };
+  if (spells.spellIds.length !== picks.spells) {
+    return { ok: false, status: 400, error: `Expected ${picks.spells} level-1 spell(s), got ${spells.spellIds.length}` };
   }
   const allIds = [...spells.cantripIds, ...spells.spellIds];
   if (new Set(allIds).size !== allIds.length) {
@@ -904,8 +928,10 @@ function creationSpellCountError(
 
 // Phase 2b — creation spell picks (#1131). A level-1 caster's chosen cantrips +
 // prepared spells become prepared SpellEntry snapshots; every count/list/level is
-// validated against the SRD 5.2 tables via one catalog read. Omitting `spells`
-// yields a null book (back-compat); a non-caster sending `spells` is a 400.
+// validated against the class's per-edition tables via one catalog read.
+// Omitting `spells` yields a null book (back-compat); a non-caster sending
+// `spells` is a 400. #1510: no ability scores needed here — level1SpellPicksFor
+// is a fixed table per edition, not the ability-mod-driven ongoing prepared cap.
 async function resolveCreationSpells(
   input: CreateCharacterBody,
   selections: ResolvedSelections,
@@ -916,13 +942,14 @@ async function resolveCreationSpells(
   const classDisplay = selections.characterClass.name;
   const className = classDisplay.toLowerCase();
   const subclass = selections.subclassName;
-  const countError = creationSpellCountError(spells, className, classDisplay, subclass);
+  const { edition } = selections;
+  const countError = creationSpellCountError(spells, className, classDisplay, subclass, edition);
   if (countError) return countError;
 
   const allIds = [...spells.cantripIds, ...spells.spellIds];
   const rows = allIds.length ? await prisma.spell.findMany({ where: { id: { in: allIds } } }) : [];
   const byId = new Map(rows.map((r) => [r.id, r]));
-  const maxLevel = maxSpellLevelForClass(className, 1, subclass);
+  const maxLevel = maxSpellLevelForClass(className, 1, subclass, edition);
 
   const entries: SpellEntry[] = [];
   for (const [ids, kind] of [[spells.cantripIds, "cantrip"], [spells.spellIds, "spell"]] as const) {
@@ -952,6 +979,33 @@ function creationSpellcasting(spellEntries: SpellEntry[] | null): Prisma.InputJs
   return { slotsUsed: {}, arcanumUsed: {}, spells: spellEntries, concentratingOn: null } as unknown as Prisma.InputJsonValue;
 }
 
+// #1513 D-A: creation prepares the legal max, not every scribed spell — a
+// Wizard's spellbook (6, level1SpellPicksFor's spellbookSize) can exceed its
+// prepared cap (4 at INT 16), so the first `limit` leveled picks (in pick
+// order) stay prepared:true and the rest are stored prepared:false.
+// clampPreparedToLimit is the SAME "keep the first N" rule
+// buildSpellcastingView's read-side clamp applies (#1127) — reusing it here
+// means the stored blob equals the served view (trimmedCount 0 on every read)
+// instead of an over-cap book permanently relying on the read-side fallback to
+// trim it. Cantrips (level 0) are untouched by the clamp. For every non-Wizard,
+// level-1 picks are already <= the limit, so this is a no-op and the stored
+// blob is byte-identical to before. Split out of persistCreatedCharacter to
+// keep that function's complexity under the repo's health gate.
+function clampCreationSpellEntries(
+  spellEntries: SpellEntry[] | null,
+  primaryClassChoice: PrimaryClassChoice,
+  selections: ResolvedSelections,
+  effectiveScores: Record<string, number>,
+): SpellEntry[] | null {
+  if (!spellEntries) return null;
+  const limit = derivePreparedSpellLimit(
+    [{ name: primaryClassChoice.name, level: 1, subclass: selections.subclassName }],
+    effectiveScores,
+    selections.edition,
+  );
+  return clampPreparedToLimit(spellEntries, limit).spells;
+}
+
 // Phase 3 — ability/HP seeding, spell/proficiency setup (deriveCreatedCharacter)
 // and persistence. Returns just the new id; the route re-fetches + serializes.
 async function persistCreatedCharacter(
@@ -978,13 +1032,13 @@ async function persistCreatedCharacter(
   );
 
   const resources = creationResources(originEntry);
+  const clampedSpellEntries = clampCreationSpellEntries(spellEntries, primaryClassChoice, selections, effectiveScores);
 
   const created = await prisma.character.create({
     data: {
       owner: { connect: { id: ownerId } },
       name: input.name,
       alignment: input.alignment,
-      portraitUrl: input.portraitUrl ?? null,
       // The only write of rulesEdition (write-once, #1285). The `edition` local
       // that resolveSelections computed for the creation-time subclass gate
       // check isn't returned to its caller, so this re-derives it from the same
@@ -1002,7 +1056,7 @@ async function persistCreatedCharacter(
       toolProficiencies: derived.toolProficiencies as unknown as Prisma.InputJsonValue,
       // Override derived currency with starting gold if the gold path was chosen.
       ...(startingCurrency ? { currency: startingCurrency } : {}),
-      spellcasting: creationSpellcasting(spellEntries),
+      spellcasting: creationSpellcasting(clampedSpellEntries),
       raceSelection: { create: { name: input.race, raceId: race.id } },
       backgroundSelection: {
         create: { name: input.background, backgroundId: background?.id ?? null },
@@ -1019,7 +1073,7 @@ async function persistCreatedCharacter(
         ],
       },
       ...(inventoryItemCreates.length > 0
-        ? { inventoryItems: { create: inventoryItemCreates } }
+        ? { inventoryItems: { create: inventoryItemCreates.map(stripInventoryCreateForWrite) } }
         : {}),
     },
     select: { id: true },

@@ -96,8 +96,8 @@ async function spendActivationCharges(
   pool: ChargePool,
   chargeCost: number,
 ): Promise<{ before: number; after: number }> {
-  const spent = await tx.inventoryCapability.updateMany({
-    where: { id: pool.row.id, used: { lte: pool.cap.maxCharges - chargeCost } },
+  const spent = await tx.inventoryCapabilityUse.updateMany({
+    where: { capabilityKey: pool.row.id, used: { lte: pool.cap.maxCharges - chargeCost } },
     data: { used: { increment: chargeCost } },
   });
   if (spent.count === 0) {
@@ -106,8 +106,8 @@ async function spendActivationCharges(
     );
   }
   // Re-read for the event snapshot: under a race the pre-read `pool.row.used` is stale.
-  const fresh = await tx.inventoryCapability.findUniqueOrThrow({
-    where: { id: pool.row.id },
+  const fresh = await tx.inventoryCapabilityUse.findFirstOrThrow({
+    where: { capabilityKey: pool.row.id },
     select: { used: true },
   });
   return { after: fresh.used, before: fresh.used - chargeCost };

@@ -23,7 +23,15 @@ interface StepBodyProps {
 }
 
 function IdentityStepBody({ c, reference }: StepBodyProps) {
-  return <IdentitySection draft={c.draft} update={c.update} reference={reference} />;
+  return (
+    <IdentitySection
+      draft={c.draft}
+      update={c.update}
+      reference={reference}
+      portraitFile={c.portraitFile}
+      onPortraitChange={c.setPortraitFile}
+    />
+  );
 }
 
 function AbilitiesStepBody({ c }: StepBodyProps) {

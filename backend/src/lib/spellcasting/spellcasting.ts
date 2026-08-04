@@ -28,6 +28,9 @@ import { sorceryPointCostForSlot, FONT_OF_MAGIC_MAX_SLOT_LEVEL } from "@/lib/cla
 import { readEffectSpec } from "@/lib/combat/effects.js";
 import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/experience.js";
 import { logEvent } from "@/lib/activity/events.js";
+import { mirrorCapabilityUsedIncrement } from "@/lib/inventory/inventory-capability-use.js";
+import { capabilityColumnsFromSnapshot } from "@/lib/inventory/capabilities.js";
+import { readInventorySnapshot } from "@/lib/inventory/inventory-snapshot-read.js";
 import { normalizeSpellcastingMutable } from "./spell-state.js";
 import { deriveGrantedSpells, deriveItemSpells, type GrantedSpellSource } from "./granted-spells.js";
 import type { ItemSpellSourceItem } from "./granted-spells.js";
@@ -37,7 +40,7 @@ import type {
   SpellComponents,
   SpellcastingMutableState,
 } from "./spell-state.js";
-import { deriveSpellcasting, derivePreparedSpellLimit } from "@/lib/srd/srd.js";
+import { deriveSpellcasting, derivePreparedSpellLimit, casterModelForEntries } from "@/lib/srd/srd.js";
 import { deriveResources } from "@/lib/classes/class-features.js";
 import { FEATURE_ROWS_CLASS_FEATURES, FEATURE_ROWS_SUBCLASS_FEATURES, featureRowsOf } from "@/lib/classes/feature-rows-select.js";
 import { editionOf } from "@/lib/rules/edition.js";
@@ -59,6 +62,7 @@ import type {
   LearnSpellOperation,
   PrepareSpellOperation,
   RestoreSlotOperation,
+  RulesEdition,
   SpellcastingOperation,
   UnprepareSpellOperation,
 } from "@character-sheet/shared-types";
@@ -99,8 +103,16 @@ interface SpellOpContext {
   // wielder-mode item spell's DC/attack (#528). Null for a non-caster.
   wielderSpellSaveDC: number | null;
   wielderSpellAttackBonus: number | null;
-  // Derived prepared-spell cap (#883). Null for known/pact/third casters.
+  // Derived prepared-spell cap (#883, edition-forked #1507): null only when no
+  // class entry is a caster at its level — every SRD 5.2 caster and every SRD
+  // 5.1 caster (known or prepared) resolves to a real number via
+  // derivePreparedSpellLimit; Pact Magic is the one caster this cap never
+  // governs, but it still resolves non-null through Warlock's shared array.
   preparedSpellLimit: number | null;
+  // Known vs prepared (#1507 D5/D7): "known" for a 2014 Bard/Sorcerer/Warlock/
+  // Ranger/EK/AT, "prepared" for everything else, null for a non-caster.
+  // Drives applyLearnSpellOp's D7 born-prepared rule below.
+  casterModel: "known" | "prepared" | null;
   // Arcane Recovery (#904): the mutable resources state (the once-per-long-rest
   // use counter lives here), whether the character has the pool, and the wizard
   // level driving the ceil(level/2) slot-level cap.
@@ -255,6 +267,9 @@ function catalogSpellToEntry(catalogSpell: Spell): SpellEntry {
 
 // #1131: a creation-time pick — the same catalog snapshot, but prepared (a fresh
 // caster's chosen cantrips + level-1 spells are all prepared from the start).
+// #1513: a Wizard's spellbook (6) can exceed its prepared cap (4) — that
+// exception is applied AFTER this, by persistCreatedCharacter's write-time
+// clampPreparedToLimit call, not here; every entry is still born prepared:true.
 export function creationSpellEntry(catalogSpell: Spell): SpellEntry {
   return { ...catalogSpellToEntry(catalogSpell), prepared: true };
 }
@@ -311,6 +326,12 @@ async function resolveCatalogSpellEntry(
 // scroll-scribing/DM-grant flows. The level-up ceremony's own eligibility gate
 // (class list + spell-level ceiling) lives in `assertPickSpellEligibility`,
 // which validates against the server-built plan step before this op ever runs.
+//
+// #1507 D7: a 2014 "known" caster's chosen spell is castable the moment it's
+// learned — SRD 5.1 has no separate preparation step for Bard/Sorcerer/
+// Warlock/Ranger/EK/AT, so `ctx.casterModel === "known"` births the entry
+// `prepared: true` here (catalog and custom paths alike). Cantrips are
+// unaffected either way — always castable, never toggled.
 async function applyLearnSpellOp(ctx: SpellOpContext, op: LearnSpellOperation): Promise<OpOutcome> {
   const { tx, state } = ctx;
   if (Boolean(op.spellId) === Boolean(op.custom)) {
@@ -321,6 +342,7 @@ async function applyLearnSpellOp(ctx: SpellOpContext, op: LearnSpellOperation): 
   const newEntry = op.spellId
     ? await resolveCatalogSpellEntry(tx, state, op.spellId)
     : customSpellToEntry(op.custom!);
+  if (ctx.casterModel === "known") newEntry.prepared = true;
   state.spells.push(newEntry);
   return {
     eventType: "learnSpell",
@@ -538,8 +560,17 @@ async function spendItemSpellResource(
     // WHERE re-evaluates against the committed row under its write lock, so
     // racers serialize and an overdraw loses (count 0 → whole tx rolls back)
     // instead of pushing `used` past maxCharges.
-    const spent = await ctx.tx.inventoryCapability.updateMany({
-      where: { id: meta.poolCapabilityId, used: { lte: meta.usesTotal - chargeCost } },
+    // Scoped by inventoryItemId as well as the key: the unique constraint is
+    // (inventoryItemId, capabilityKey), so the key alone does not identify a
+    // row. Keys are per-acquisition UUIDs and a collision is not reachable
+    // today, but this is the overdraw guard — resting it on an unstated
+    // assumption is what makes such a guard quietly stop guarding.
+    const spent = await ctx.tx.inventoryCapabilityUse.updateMany({
+      where: {
+        inventoryItemId: meta.inventoryItemId,
+        capabilityKey: meta.poolCapabilityId,
+        used: { lte: meta.usesTotal - chargeCost },
+      },
       data: { used: { increment: chargeCost } },
     });
     if (spent.count === 0) {
@@ -548,17 +579,17 @@ async function spendItemSpellResource(
       );
     }
     // Re-read for the event data: under a race the pre-tx snapshot is stale.
-    const fresh = await ctx.tx.inventoryCapability.findUniqueOrThrow({
-      where: { id: meta.poolCapabilityId },
+    const fresh = await ctx.tx.inventoryCapabilityUse.findFirstOrThrow({
+      where: { inventoryItemId: meta.inventoryItemId, capabilityKey: meta.poolCapabilityId },
       select: { used: true },
     });
     poolUsedAfter = fresh.used;
     capabilityUsedBefore = { capabilityId: meta.poolCapabilityId, used: fresh.used - chargeCost };
     capabilityUsedAfter = { capabilityId: meta.poolCapabilityId, used: fresh.used };
   } else if (meta.usesTotal !== Infinity) {
-    const updated = await ctx.tx.inventoryCapability.update({
-      where: { id: meta.capabilityId },
-      data: { used: { increment: 1 } },
+    await mirrorCapabilityUsedIncrement(ctx.tx, meta.capabilityId, 1);
+    const updated = await ctx.tx.inventoryCapabilityUse.findFirstOrThrow({
+      where: { inventoryItemId: meta.inventoryItemId, capabilityKey: meta.capabilityId },
       select: { used: true },
     });
     capabilityUsedBefore = { capabilityId: meta.capabilityId, used: updated.used - 1 };
@@ -733,8 +764,9 @@ function injectDerivedSpells(
   subclassRef: GrantedSpellSource | null | undefined,
   level: number,
   itemSources: ItemSpellSourceItem[],
+  edition: RulesEdition,
 ): void {
-  const granted = deriveGrantedSpells(subclassRef, level);
+  const granted = deriveGrantedSpells(subclassRef, level, edition);
   if (granted.length > 0) {
     const names = new Set(state.spells.map((s) => s.name.toLowerCase()));
     for (const g of granted) if (!names.has(g.name.toLowerCase())) state.spells.push(g);
@@ -820,6 +852,7 @@ function buildSpellOpContext(
   arcanaTotals: Record<number, number>,
   derived: DerivedSpellcasting,
   preparedSpellLimit: number | null,
+  casterModel: "known" | "prepared" | null,
   arcaneRecovery: { resources: ResourcesMutableState; available: boolean; wizardLevel: number },
 ): SpellOpContext {
   return {
@@ -832,6 +865,7 @@ function buildSpellOpContext(
     wielderSpellSaveDC: derived?.spellSaveDC ?? null,
     wielderSpellAttackBonus: derived?.spellAttackBonus ?? null,
     preparedSpellLimit,
+    casterModel,
     resources: arcaneRecovery.resources,
     arcaneRecoveryAvailable: arcaneRecovery.available,
     wizardLevel: arcaneRecovery.wizardLevel,
@@ -930,8 +964,11 @@ const SPELLCASTING_SELECT = {
       },
     },
   },
+  // capabilities are reconstructed from `snapshot` + `capabilityUses` in
+  // buildSpellcastingOp below (#1649) — the four Inventory* mirror relations
+  // are gone.
   inventoryItems: {
-    select: { id: true, name: true, equippedSlot: true, attuned: true, capabilities: true },
+    select: { id: true, name: true, equippedSlot: true, attuned: true, snapshot: true, capabilityUses: true },
   },
 } satisfies Prisma.CharacterSelect;
 
@@ -981,13 +1018,22 @@ function buildSpellcastingOp(
   const profBonus = proficiencyBonusForLevel(level);
   const className = row.classEntries[0]?.name ?? "";
   const abilityScores = row.abilityScores as Record<string, number>;
-  const derived = deriveSpellcasting(className, level, abilityScores, profBonus);
+  const edition = editionOf(row);
+  // `subclass` stays undefined here, matching this call's pre-existing behavior
+  // (mechanical edition thread-through only, #1507 — not a scope change).
+  const derived = deriveSpellcasting(className, level, abilityScores, profBonus, undefined, edition);
   // Single-class uses the XP-derived level (per-class column can be stale) so the
   // enforced cap matches the serialized limit; multiclass uses per-entry levels.
   const limitEntries = row.classEntries.length === 1
     ? [{ name: className, level, subclass: row.classEntries[0]?.subclass ?? null }]
     : row.classEntries.map((e) => ({ name: e.name, level: e.level, subclass: e.subclass }));
-  const preparedSpellLimit = derivePreparedSpellLimit(limitEntries);
+  // Deliberate-coupling latch (#1507 D2/D3): resolves through the same
+  // derivePreparedSpellLimit as buildSpellcastingView's clamp-on-read and
+  // reconcilePreparedSpells — never a second inline copy of the cap.
+  const preparedSpellLimit = derivePreparedSpellLimit(limitEntries, abilityScores, edition);
+  // D7: the ONE combiner buildSpellcastingView's served wire field also calls —
+  // never a second inline copy (#1507).
+  const casterModel = casterModelForEntries(limitEntries, edition);
 
   const { slotTotals, arcanaTotals } = computeSlotTables(row.spellcasting, derived);
 
@@ -1000,17 +1046,22 @@ function buildSpellcastingOp(
     state,
     row.classEntries[0]?.subclassRef,
     level,
-    row.inventoryItems.map((i) => ({
-      id: i.id,
-      name: i.name,
-      // #565: `equipped` is derived from equippedSlot (no persisted boolean).
-      equipped: i.equippedSlot != null,
-      attuned: i.attuned,
-      capabilities: i.capabilities,
-    })),
+    row.inventoryItems.map((i) => {
+      const snapshot = readInventorySnapshot(i);
+      const usedByKey = new Map(i.capabilityUses.map((u) => [u.capabilityKey, u.used]));
+      return {
+        id: i.id,
+        name: i.name,
+        // #565: `equipped` is derived from equippedSlot (no persisted boolean).
+        equipped: i.equippedSlot != null,
+        attuned: i.attuned,
+        capabilities: snapshot.capabilities.map((c) => capabilityColumnsFromSnapshot(c, usedByKey.get(c.key) ?? 0)),
+      };
+    }),
+    editionOf(row),
   );
 
-  const ctx = buildSpellOpContext(ids, row, state, slotTotals, arcanaTotals, derived, preparedSpellLimit, arcaneRecovery);
+  const ctx = buildSpellOpContext(ids, row, state, slotTotals, arcanaTotals, derived, preparedSpellLimit, casterModel, arcaneRecovery);
   return { ctx, state, beforeState };
 }
 

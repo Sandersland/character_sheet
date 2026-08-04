@@ -3,6 +3,7 @@ import {
   deriveSpellcasting,
   deriveMulticlassSpellcasting,
   derivePreparedSpellLimit,
+  casterModelForEntries,
 } from "@/lib/srd/srd.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spellcasting.js";
 import { clampPreparedToLimit, type SpellEntry } from "@/lib/spellcasting/spell-state.js";
@@ -15,6 +16,8 @@ import {
 import { readEffectSpec, resolveEffectSpec, type EffectRoll } from "@/lib/combat/effects.js";
 import { SHADOW_ART_CONCENTRATION_PREFIX } from "@/lib/classes/shadow-arts.js";
 import { effectiveEntryLevel } from "@/lib/leveling/effective-levels.js";
+import { editionOf } from "@/lib/rules/edition.js";
+import type { RulesEdition } from "@character-sheet/shared-types";
 import type { CharacterWithRelations } from "@/lib/character/character-include.js";
 import type { PrimaryClass } from "./classes.js";
 
@@ -28,8 +31,8 @@ function mergeGrantedSpells(stored: SpellEntry[], granted: SpellEntry[]): SpellE
 
 // Subclass-granted spells across every class entry, each gated by its effective
 // level (multiclass here → per-entry; single-sourced via effectiveEntryLevel).
-function collectGrantedSpells(entries: CharacterWithRelations["classEntries"], derivedLevel: number): SpellEntry[] {
-  return entries.flatMap((e) => deriveGrantedSpells(e.subclassRef, effectiveEntryLevel(e.level, entries.length, derivedLevel)));
+function collectGrantedSpells(entries: CharacterWithRelations["classEntries"], derivedLevel: number, edition: RulesEdition): SpellEntry[] {
+  return entries.flatMap((e) => deriveGrantedSpells(e.subclassRef, effectiveEntryLevel(e.level, entries.length, derivedLevel), edition));
 }
 
 // Item-granted spells (#528) for a holder's active items. Appended after learned
@@ -49,9 +52,9 @@ function deriveItemSpellsFor(row: CharacterWithRelations): SpellEntry[] {
 
 // Casting ability for the slotless multiclass view — from the first entry that
 // actually grants a spell (defaults to Wisdom when none do).
-function collectGrantedCastingAbility(entries: CharacterWithRelations["classEntries"], derivedLevel: number): keyof AbilityScores {
-  const granting = entries.find((e) => deriveGrantedSpells(e.subclassRef, effectiveEntryLevel(e.level, entries.length, derivedLevel)).length > 0);
-  return deriveGrantedCastingAbility(granting?.subclassRef);
+function collectGrantedCastingAbility(entries: CharacterWithRelations["classEntries"], derivedLevel: number, edition: RulesEdition): keyof AbilityScores {
+  const granting = entries.find((e) => deriveGrantedSpells(e.subclassRef, effectiveEntryLevel(e.level, entries.length, derivedLevel), edition).length > 0);
+  return deriveGrantedCastingAbility(granting?.subclassRef, edition);
 }
 
 // Clamp-on-read for concentration: surface the stored entry when it's a current
@@ -120,7 +123,7 @@ function buildGrantedOnlySpellcastingView(
 ): object {
   const stored = normalizeSpellcastingMutable(row.spellcasting);
   // fallow-ignore-next-line code-duplication -- casting-ability + modifier derivation shared with other spellcasting serializers by design
-  const castingAbility = deriveGrantedCastingAbility(primaryClass?.subclassRef);
+  const castingAbility = deriveGrantedCastingAbility(primaryClass?.subclassRef, editionOf(row));
   const abilMod = abilityModifier(abilityScores[castingAbility] ?? 10);
   const grantedSpells = [...mergeGrantedSpells(stored.spells, granted), ...itemSpells];
   return {
@@ -224,9 +227,11 @@ export function buildSpellcastingView(
 ): object | undefined {
   const view = buildSpellcastingViewBase(row, primaryClass, level, abilityScores, proficiencyBonus);
   if (view === undefined) return undefined;
+  const edition = editionOf(row);
+  const limitEntries = preparedLimitEntries(row, primaryClass, level);
   // Clamp-on-read (#1127): trim any over-cap prepared spells to the derived limit
   // (the reconciler is the write-side; this is the non-destructive read fallback).
-  const limit = derivePreparedSpellLimit(preparedLimitEntries(row, primaryClass, level));
+  const limit = derivePreparedSpellLimit(limitEntries, abilityScores, edition);
   const raw = (view as { spells?: unknown }).spells;
   const clamped = clampPreparedToLimit(Array.isArray(raw) ? (raw as SpellEntry[]) : [], limit).spells;
   // #1381: `abilityScores` here is the same raw row.abilityScores that
@@ -238,7 +243,16 @@ export function buildSpellcastingView(
   const abilityMod = abilityModifier(abilityScores[castableView.ability ?? ""] ?? 10);
   const decorated = decorateSpellEffects(clamped, castableView, level, abilityMod);
   const clampedView = { ...view, spells: decorated };
-  return { ...clampedView, ...derivePreparedFields(clampedView, limit) };
+  // #1507/#1511: whether this character's chosen spells are immediately
+  // castable ("known") or must be prepared from a wider list ("prepared") —
+  // omitted (not `null`) for a non-caster, matching preparedSpellLimit's own
+  // granted-only/non-caster omission shape below.
+  const casterModel = casterModelForEntries(limitEntries, edition);
+  return {
+    ...clampedView,
+    ...derivePreparedFields(clampedView, limit),
+    ...(casterModel != null ? { casterModel } : {}),
+  };
 }
 
 // Class entries feeding the prepared-cap sum: single-class uses the XP-derived
@@ -306,8 +320,9 @@ function buildSingleClassSpellcastingView(
     abilityScores,
     proficiencyBonus,
     primaryClass?.subclass ?? undefined,
+    editionOf(row),
   );
-  const granted = deriveGrantedSpells(primaryClass?.subclassRef, level);
+  const granted = deriveGrantedSpells(primaryClass?.subclassRef, level, editionOf(row));
   const itemSpells = deriveItemSpellsFor(row); // #528: surfaced for any holder, caster or not.
 
   if (derivedSpell) {
@@ -331,10 +346,11 @@ function buildMulticlassSpellcastingView(
     row.classEntries.map((e) => ({ name: e.name, level: e.level, subclass: e.subclass })),
     abilityScores,
     proficiencyBonus,
+    editionOf(row),
   );
 
   // Subclass-granted spells across every class entry (each gated by its own level).
-  const granted = collectGrantedSpells(row.classEntries, level);
+  const granted = collectGrantedSpells(row.classEntries, level, editionOf(row));
   const itemSpells = deriveItemSpellsFor(row);
   const stored = normalizeSpellcastingMutable(row.spellcasting);
 
@@ -342,7 +358,7 @@ function buildMulticlassSpellcastingView(
   // surface a slotless view (ability derived per rule; mirrors the single-class branch).
   if (multi.classes.length === 0) {
     if (granted.length === 0 && itemSpells.length === 0) return undefined;
-    const castingAbility = collectGrantedCastingAbility(row.classEntries, level);
+    const castingAbility = collectGrantedCastingAbility(row.classEntries, level, editionOf(row));
     const abilMod = abilityModifier(abilityScores[castingAbility] ?? 10);
     const grantedSpells = [...mergeGrantedSpells(stored.spells, granted), ...itemSpells];
     return {

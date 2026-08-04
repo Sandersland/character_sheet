@@ -46,7 +46,10 @@ export const createCharacterSchema = z
   .object({
     name: z.string().min(1),
     alignment: z.string().min(1),
-    portraitUrl: z.string().nullable().optional(),
+    // portraitUrl is absent (#1616, closing #1615's interim): portraits are
+    // uploaded blobs keyed by Character.portraitKey, never client-supplied
+    // URLs — the create UI stages a file and uploads it via portraitRouter
+    // after create; .strict() 400s any client still sending a URL.
     experiencePoints: z.number().int().nonnegative().optional(),
     race: z.string().min(1),
     background: z.string().min(1),
@@ -114,7 +117,11 @@ export const updateCharacterSchema = z
   .object({
     name: z.string().min(1),
     alignment: z.string().min(1),
-    portraitUrl: z.string().nullable(),
+    // portraitUrl is absent since #1615: the wire field is read-only, derived
+    // from Character.portraitKey, and the portrait is mutated only via the
+    // dedicated upload/delete endpoints (portraitRouter). Letting PATCH write
+    // an arbitrary URL was the IDOR the upload pipeline closes; .strict()
+    // 400s any attempt.
     // armorClass is absent: it's derived at read time from equipped armor + Dex + shield.
     initiativeBonus: z.number().int(),
     speed: z.number().int().nonnegative(),

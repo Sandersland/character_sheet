@@ -66,6 +66,16 @@ describe("CreationSpellsStep", () => {
     expect(fetchMock).toHaveBeenCalledWith({ className: "warlock", maxLevel: 1 });
   });
 
+  // #1510: a 2014 Cleric/Druid serves maxSpellLevel: 0 (cantrips-only — see
+  // level1SpellPicksFor's comment). `0` must survive to the request unchanged,
+  // not get floored to 1 — the cantrips-only fetch seam #1377 built on the wire
+  // (fetchSpells' `!== undefined` check, spells.test.ts's `?maxLevel=0` pin).
+  it("passes maxSpellLevel: 0 through to the fetch for a cantrips-only class", async () => {
+    renderStep({ className: "cleric", counts: { cantrips: 3, spells: 0, maxSpellLevel: 0 } });
+    await screen.findByRole("button", { name: "Open Eldritch Blast" });
+    expect(fetchMock).toHaveBeenCalledWith({ className: "cleric", maxLevel: 0 });
+  });
+
   // Each render keeps exactly one group alive, which is how the level-0 split can
   // be observed without the picker's <section>s carrying accessible names.
   it("routes level-0 rows to the Cantrips group only", async () => {
@@ -127,5 +137,27 @@ describe("CreationSpellsStep", () => {
     expect(screen.getByRole("status")).toBeInTheDocument();
     await act(async () => { resolve(CATALOG); });
     vi.useRealTimers();
+  });
+
+  // #1513: the Wizard's Spells group relabels to "Spellbook" and carries the
+  // split-explaining note when counts.spellbookSize is served. Every other
+  // caster (this file's default `counts` has no spellbookSize) is unaffected —
+  // the existing tests above pin that byte-identical "Spells" behavior.
+  describe("Wizard spellbook (#1513)", () => {
+    const WIZARD_COUNTS = { cantrips: 3, spells: 6, maxSpellLevel: 1, spellbookSize: 6 };
+
+    it("labels the leveled group Spellbook, shows the split note, and caps at spellbookSize", async () => {
+      renderStep({ className: "wizard", counts: WIZARD_COUNTS });
+      expect(await screen.findByText("Cantrips 0/3 · Spellbook 0/6")).toBeInTheDocument();
+      expect(
+        screen.getByText(/All 6 spells you choose are scribed into your spellbook/),
+      ).toBeInTheDocument();
+    });
+
+    it("does not show the spellbook note or relabel for a non-wizard caster", async () => {
+      renderStep();
+      await screen.findByText("Cantrips 0/2 · Spells 0/2");
+      expect(screen.queryByText(/scribed into your spellbook/)).not.toBeInTheDocument();
+    });
   });
 });

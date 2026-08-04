@@ -10,6 +10,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
+import { inventoryItemFixtureData } from "@/test-support/inventory-snapshot-fixture.js";
 
 const OWNER_ID = "owner-serialize-attack-rows";
 
@@ -66,6 +67,53 @@ const createdIds: string[] = [];
 // (fightingStyleSlotTotal 0 for a homebrew entry).
 let fighterClassId: string;
 
+/** The while-active Rage buff, present only when a bonus is requested. */
+function meleeDamageBuffData(modifier: number | undefined) {
+  if (!modifier) return {};
+  return {
+    activeEffects: {
+      buffs: [
+        { id: "buff-rage", key: "rage", target: "meleeDamage", modifier, source: "Rage", duration: "while-active" },
+      ],
+    },
+  };
+}
+
+/** One weapon fixture's InventoryItem create data, position-ordered. */
+function weaponItemData(characterId: string, position: number, w: WeaponFixture) {
+  return inventoryItemFixtureData({
+    characterId,
+    name: w.name,
+    category: "weapon",
+    position,
+    equippedSlot: w.equippedSlot ?? "MAIN_HAND",
+    requiresAttunement: w.requiresAttunement ?? false,
+    attuned: w.attuned ?? false,
+    weapon: {
+      damageDiceCount: 1,
+      damageDiceFaces: w.damageDiceFaces ?? 8,
+      damageModifier: 0,
+      damageType: w.damageType ?? "slashing",
+      finesse: w.finesse ?? false,
+      ...(w.versatile ? { versatileDiceCount: 1, versatileDiceFaces: 10 } : {}),
+      weaponClass: "martial",
+      weaponRange: "melee",
+    },
+    capabilities: w.riderDice
+      ? [
+          {
+            kind: "passiveBonus",
+            target: "damage",
+            op: "add",
+            valueDiceCount: w.riderDice.count,
+            valueDiceFaces: w.riderDice.faces,
+            valueDamageType: w.riderDice.damageType,
+          },
+        ]
+      : [],
+  });
+}
+
 async function createFighter(
   weapons: WeaponFixture[],
   extra: { abilityScores?: Record<string, number>; resources?: unknown; meleeDamageBuff?: number } = {},
@@ -76,65 +124,16 @@ async function createFighter(
       name: "Attack Rows Fixture",
       abilityScores: extra.abilityScores ?? SCORES,
       ...(extra.resources ? { resources: extra.resources as object } : {}),
-      ...(extra.meleeDamageBuff
-        ? {
-            activeEffects: {
-              buffs: [
-                {
-                  id: "buff-rage",
-                  key: "rage",
-                  target: "meleeDamage",
-                  modifier: extra.meleeDamageBuff,
-                  source: "Rage",
-                  duration: "while-active",
-                },
-              ],
-            },
-          }
-        : {}),
+      ...meleeDamageBuffData(extra.meleeDamageBuff),
       classEntries: { create: [{ name: "Fighter", classId: fighterClassId, position: 0, level: 1 }] },
-      inventoryItems: {
-        create: weapons.map((w, position) => ({
-          name: w.name,
-          category: "weapon",
-          quantity: 1,
-          position,
-          equippedSlot: w.equippedSlot ?? "MAIN_HAND",
-          requiresAttunement: w.requiresAttunement ?? false,
-          attuned: w.attuned ?? false,
-          weaponDetail: {
-            create: {
-              damageDiceCount: 1,
-              damageDiceFaces: w.damageDiceFaces ?? 8,
-              damageModifier: 0,
-              damageType: w.damageType ?? "slashing",
-              finesse: w.finesse ?? false,
-              ...(w.versatile ? { versatileDiceCount: 1, versatileDiceFaces: 10 } : {}),
-              weaponClass: "martial" as const,
-              weaponRange: "melee" as const,
-            },
-          },
-          ...(w.riderDice
-            ? {
-                capabilities: {
-                  create: [
-                    {
-                      kind: "passiveBonus" as const,
-                      target: "damage" as const,
-                      op: "add" as const,
-                      valueDiceCount: w.riderDice.count,
-                      valueDiceFaces: w.riderDice.faces,
-                      valueDamageType: w.riderDice.damageType,
-                    },
-                  ],
-                },
-              }
-            : {}),
-        })),
-      },
     },
   });
   createdIds.push(character.id);
+
+  for (const [position, w] of weapons.entries()) {
+    await prisma.inventoryItem.create({ data: weaponItemData(character.id, position, w) });
+  }
+
   return character.id;
 }
 
@@ -194,7 +193,7 @@ describe("serializeCharacter attackRows — equipped weapons", () => {
       modifier: item.weapon!.damage.damageModifier,
     });
     expect(row.attackComponents).toEqual(item.weapon!.attackBonusComponents);
-    expect(row.damageComponents).toEqual({ abilityMod: 3, meleeDamageBonus: 0 });
+    expect(row.damageComponents).toEqual({ abilityMod: 3, meleeDamageBonus: 0, ability: "strength" });
   });
 
   it("emits equipped weapons in inventory order, then the off-hand row, then unarmed, then improvised", async () => {
@@ -299,11 +298,11 @@ describe("serializeCharacter attackRows — off-hand row (Two-Weapon Fighting)",
       weaponRows(withStyle)[0].damageSpec.modifier,
     );
     expect(offHandRow(withStyle)!.damageSpec.modifier).toBe(3);
-    expect(offHandRow(withStyle)!.damageComponents).toEqual({ abilityMod: 3, meleeDamageBonus: 0 });
+    expect(offHandRow(withStyle)!.damageComponents).toEqual({ abilityMod: 3, meleeDamageBonus: 0, ability: "strength" });
 
     const withoutStyle = await serialize(await createFighter(pair));
     expect(offHandRow(withoutStyle)!.damageSpec.modifier).toBe(0);
-    expect(offHandRow(withoutStyle)!.damageComponents).toEqual({ abilityMod: 0, meleeDamageBonus: 0 });
+    expect(offHandRow(withoutStyle)!.damageComponents).toEqual({ abilityMod: 0, meleeDamageBonus: 0, ability: "strength" });
   });
 
   it("keeps a negative ability modifier without the style — only a positive one is dropped", async () => {
@@ -316,7 +315,7 @@ describe("serializeCharacter attackRows — off-hand row (Two-Weapon Fighting)",
     );
     const payload = await serialize(id);
     expect(offHandRow(payload)!.damageSpec.modifier).toBe(-1);
-    expect(offHandRow(payload)!.damageComponents).toEqual({ abilityMod: -1, meleeDamageBonus: 0 });
+    expect(offHandRow(payload)!.damageComponents).toEqual({ abilityMod: -1, meleeDamageBonus: 0, ability: "strength" });
   });
 
   it("keeps a melee-damage buff (Rage) while dropping only the ability component, so the components still sum", async () => {
@@ -332,7 +331,7 @@ describe("serializeCharacter attackRows — off-hand row (Two-Weapon Fighting)",
     expect(weaponRows(payload)[0].damageSpec.modifier).toBe(5); // STR +3 + Rage +2
     const offHand = offHandRow(payload)!;
     expect(offHand.damageSpec.modifier).toBe(2);
-    expect(offHand.damageComponents).toEqual({ abilityMod: 0, meleeDamageBonus: 2 });
+    expect(offHand.damageComponents).toEqual({ abilityMod: 0, meleeDamageBonus: 2, ability: "strength" });
     expect(offHand.damageComponents!.abilityMod + offHand.damageComponents!.meleeDamageBonus).toBe(
       offHand.damageSpec.modifier,
     );

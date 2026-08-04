@@ -85,8 +85,8 @@ describe("campaign item capabilities route (#546)", () => {
     expect(updated.body.capabilities).toHaveLength(1);
     expect(updated.body.capabilities[0].target).toBe("ac");
 
-    const rows = await prisma.campaignItemCapability.findMany({
-      where: { campaignItemId: created.body.id },
+    const rows = await prisma.itemCapability.findMany({
+      where: { itemId: created.body.id },
     });
     expect(rows).toHaveLength(1);
   });
@@ -107,8 +107,8 @@ describe("campaign item capabilities route (#546)", () => {
       .send({ capabilities: [] });
     expect(updated.status).toBe(200);
     expect(updated.body.capabilities).toBeUndefined();
-    const rows = await prisma.campaignItemCapability.findMany({
-      where: { campaignItemId: created.body.id },
+    const rows = await prisma.itemCapability.findMany({
+      where: { itemId: created.body.id },
     });
     expect(rows).toHaveLength(0);
   });

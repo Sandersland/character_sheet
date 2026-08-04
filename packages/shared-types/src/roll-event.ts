@@ -46,6 +46,14 @@ export interface RollEventAttackComponents {
   proficiencyBonus: number;
   rangedBonus: number;
   attackRollBonus: number;
+  /**
+   * The ability `abilityMod` is drawn from (`weaponAbilityMod`) — absent on
+   * events logged before this field existed, in which case renderers fall
+   * back to a neutral label. Deliberately `string`, not a key union — matches
+   * `RollEventModeSource.ability`'s treatment of unvalidated persisted JSON;
+   * don't narrow it.
+   */
+  ability?: string;
 }
 
 /**
@@ -55,6 +63,14 @@ export interface RollEventAttackComponents {
 export interface RollEventDamageComponents {
   abilityMod: number;
   meleeDamageBonus: number;
+  /**
+   * The ability `abilityMod` is drawn from (`weaponAbilityMod`) — absent on
+   * events logged before this field existed, in which case renderers fall
+   * back to a neutral label. Deliberately `string`, not a key union — matches
+   * `RollEventModeSource.ability`'s treatment of unvalidated persisted JSON;
+   * don't narrow it.
+   */
+  ability?: string;
 }
 
 /**
@@ -71,6 +87,12 @@ export interface RollEventData {
   damageType?: string;
   /** Raw kept die faces (non-dropped), e.g. [12] for 1d20 or [3, 5] for 2d6. */
   faces?: number[];
+  /**
+   * The non-kept d20 face(s) of an advantage/disadvantage roll — absent for a
+   * normal roll and for pre-existing events logged before this field existed.
+   * Currently at most one element; the drill-in display reads only the first.
+   */
+  droppedFaces?: number[];
   /** Ability key for check/save/initiative rolls — source carries the display text. */
   ability?: string;
   /** Skill key for check rolls. */

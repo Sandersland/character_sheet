@@ -83,6 +83,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
   "attackRows": [
     {
       "attackComponents": {
+        "ability": "strength",
         "abilityMod": 0,
         "attackRollBonus": 0,
         "proficiencyBonus": 0,
@@ -94,6 +95,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
         "modifier": 0,
       },
       "damageComponents": {
+        "ability": "strength",
         "abilityMod": 0,
         "meleeDamageBonus": 0,
       },
@@ -277,12 +279,14 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
         "ammunition": false,
         "attackBonus": 0,
         "attackBonusComponents": {
+          "ability": "strength",
           "abilityMod": 0,
           "attackRollBonus": 0,
           "proficiencyBonus": 0,
           "rangedBonus": 0,
         },
         "damage": {
+          "ability": "strength",
           "abilityModifier": 0,
           "damageDiceCount": 1,
           "damageDiceFaces": 8,
@@ -652,6 +656,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
   "spellcasting": {
     "ability": "intelligence",
     "arcana": [],
+    "casterModel": "prepared",
     "classes": [
       {
         "ability": "intelligence",

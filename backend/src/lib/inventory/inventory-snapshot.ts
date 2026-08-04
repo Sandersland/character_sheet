@@ -1,11 +1,6 @@
 import { Prisma, type EquipSlot, type ItemRarity } from "@/generated/prisma/client.js";
 import { type AttunementPrereqKind } from "./capabilities.js";
-import {
-  armorDetailFields,
-  consumableDetailFields,
-  snapshotDetailCreate,
-  weaponDetailFields,
-} from "./detail-snapshot.js";
+import { snapshotDetailCreate } from "./detail-snapshot.js";
 import type {
   ItemCategory,
   ArmorCategory,
@@ -15,6 +10,7 @@ import type {
 } from "./item-detail-inputs.js";
 import { type Currency, asCurrency, toJsonInput } from "./inventory-currency.js";
 import type { InventoryItemWithDetails, CatalogItemWithDetails } from "./inventory-types.js";
+import { buildInventorySnapshot } from "./inventory-snapshot-build.js";
 
 // Damage-roll fields of a weapon detail block, defaulted the same way as
 // their sibling groups below (see normalizeWeaponDetail).
@@ -109,17 +105,27 @@ export function snapshotItemDetail(item: CatalogItemWithDetails) {
 // Undo snapshot.
 //
 // When an op DELETES an InventoryItem row (full sell, remove, adjust-to-zero)
-// the relational row + its detail rows are gone, so `before`/`after` alone
-// can't reconstruct it on undo. We stash a self-contained snapshot under
-// `data.deletedItem` (NOT `before` — `before`/`after` feed diffToFields and
-// would spray spurious field-diff rows; `data` is never diffed). On revert,
-// revertInventoryEvent recreates the row from this snapshot reusing the
-// original id. The detail blocks are typed as Prisma nested-create inputs so
-// they drop straight into inventoryItem.create's `{ create: … }`.
+// the row is gone, so `before`/`after` alone can't reconstruct it on undo. We
+// stash a self-contained snapshot under `data.deletedItem` (NOT `before` —
+// `before`/`after` feed diffToFields and would spray spurious field-diff rows;
+// `data` is never diffed). On revert, revertInventoryEvent recreates the row
+// from this snapshot reusing the original id.
+//
+// #1649 simplified this: the frozen half (weapon/armor/consumable/
+// capabilities) is captured verbatim as the already-persisted `snapshot`
+// blob rather than re-derived field by field from four detail tables that no
+// longer exist — recreate just writes it straight back. `capabilityUses`
+// (runtime `used` counters, keyed by the snapshot's stable `capabilities[].key`)
+// is the only piece that still needs its own array, since it lives in a
+// separate table from the snapshot.
 export interface DeletedInventoryItemSnapshot {
   id: string;
   itemId: string | null;
-  campaignItemId: string | null;
+  // LEGACY, read-only (#1646): the pre-merge name for the same provenance FK.
+  // Audit blobs are append-only, so pre-merge snapshots still carry this key
+  // instead of itemId; resolveSnapshotRefs falls back to it on undo. No writer
+  // sets it any more — snapshotInventoryItemForUndo below only writes itemId.
+  campaignItemId?: string | null;
   name: string;
   category: ItemCategory;
   weight: number | null;
@@ -135,21 +141,19 @@ export interface DeletedInventoryItemSnapshot {
   attunementPrereqValue: string | null;
   notes: string | null;
   position: number;
-  weaponDetail: Prisma.InventoryWeaponDetailCreateWithoutInventoryItemInput | null;
-  armorDetail: Prisma.InventoryArmorDetailCreateWithoutInventoryItemInput | null;
-  consumableDetail: Prisma.InventoryConsumableDetailCreateWithoutInventoryItemInput | null;
-  capabilities: Prisma.InventoryCapabilityCreateWithoutInventoryItemInput[];
+  usesRemaining: number | null;
+  snapshot: Prisma.InputJsonValue;
+  capabilityUses: { capabilityKey: string; used: number }[];
 }
 
 // Serializes an already-fetched InventoryItemWithDetails into the
-// `data.deletedItem` snapshot. Mirror of snapshotItemDetail's field-by-field
-// style, but reads from an InventoryItem (live row) rather than a catalog Item
-// and keeps the scalar item columns alongside the detail blocks.
+// `data.deletedItem` snapshot, reading from an InventoryItem (live row) rather
+// than a catalog Item and keeping the scalar item columns alongside the
+// already-persisted frozen blob.
 export function snapshotInventoryItemForUndo(item: InventoryItemWithDetails): DeletedInventoryItemSnapshot {
   return {
     id: item.id,
     itemId: item.itemId,
-    campaignItemId: item.campaignItemId,
     name: item.name,
     category: item.category,
     weight: item.weight,
@@ -165,52 +169,11 @@ export function snapshotInventoryItemForUndo(item: InventoryItemWithDetails): De
     attunementPrereqValue: item.attunementPrereqValue,
     notes: item.notes,
     position: item.position,
-    // fallow-ignore-next-line code-duplication -- snapshot mirrors the persisted capability shape field-for-field on purpose
-    capabilities: item.capabilities.map((c) => ({
-      kind: c.kind,
-      description: c.description,
-      target: c.target,
-      op: c.op,
-      value: c.value,
-      targetKey: c.targetKey,
-      condition: c.condition,
-      valueDiceCount: c.valueDiceCount,
-      valueDiceFaces: c.valueDiceFaces,
-      valueDamageType: c.valueDamageType,
-      spellId: c.spellId,
-      spellName: c.spellName,
-      spellLevel: c.spellLevel,
-      castLevel: c.castLevel,
-      castResource: c.castResource,
-      castUses: c.castUses,
-      castConcentration: c.castConcentration,
-      dcMode: c.dcMode,
-      dcValue: c.dcValue,
-      attackMode: c.attackMode,
-      attackValue: c.attackValue,
-      activation: c.activation,
-      activatedDuration: c.activatedDuration,
-      resourceKind: c.resourceKind,
-      resourcePeriod: c.resourcePeriod,
-      resourceCharges: c.resourceCharges,
-      durationText: c.durationText,
-      grantType: c.grantType,
-      grantOn: c.grantOn,
-      grantValueKind: c.grantValueKind,
-      grantValue: c.grantValue,
-      cantBeSurprised: c.cantBeSurprised,
-      maxCharges: c.maxCharges,
-      rechargeDiceCount: c.rechargeDiceCount,
-      rechargeDiceFaces: c.rechargeDiceFaces,
-      rechargeBonus: c.rechargeBonus,
-      rechargeTrigger: c.rechargeTrigger,
-      chargeCost: c.chargeCost,
-      // Runtime counter: undo-of-delete restores the row verbatim, spend state included.
-      used: c.used,
-    })),
-    weaponDetail: item.weaponDetail ? weaponDetailFields(item.weaponDetail) : null,
-    armorDetail: item.armorDetail ? armorDetailFields(item.armorDetail) : null,
-    consumableDetail: item.consumableDetail ? consumableDetailFields(item.consumableDetail) : null,
+    usesRemaining: item.usesRemaining,
+    snapshot: item.snapshot as Prisma.InputJsonValue,
+    // `used` included (unlike snapshotCampaignItemCapabilityCreates's award
+    // path): undo-of-delete restores the row verbatim, spend state included.
+    capabilityUses: item.capabilities.map((c) => ({ capabilityKey: c.id, used: c.used })),
   };
 }
 
@@ -220,10 +183,17 @@ export function snapshotInventoryItemForUndo(item: InventoryItemWithDetails): De
 // prisma.character.create, without going through applyInventoryOperations
 // (which would write ledger rows — starting gear is a character's genesis
 // state, not an economic event; same reasoning as prisma/seed.ts).
+//
+// `weaponDetail`/`armorDetail` on the RETURNED object are NOT persisted
+// columns (#1649 dropped those tables) — they're carried here only so
+// selectAutoEquip/autoEquipSlot can read them before the auto-equip pass
+// assigns equippedSlot; stripInventoryCreateForWrite below drops them from
+// the actual `inventoryItems: { create: [...] }` payload.
 export function buildInventoryCreateFromCatalog(
   item: CatalogItemWithDetails,
   opts: { quantity: number; position: number }
 ) {
+  const detail = snapshotItemDetail(item);
   return {
     itemId: item.id,
     name: item.name,
@@ -236,8 +206,47 @@ export function buildInventoryCreateFromCatalog(
     equippedSlot: null as EquipSlot | null,
     slot: item.slot,
     position: opts.position,
-    ...snapshotItemDetail(item),
+    // Promoted out of InventoryConsumableDetail (#1648) — same freshCopy value
+    // the nested consumableDetail create below carries.
+    usesRemaining: detail.consumableDetail?.create.usesRemaining ?? null,
+    // catalogItemDetailInclude doesn't fetch capabilities (starting gear is
+    // catalog-only content, never a capability-bearing DM award), so this is
+    // always built with capabilities: []. rarity/requiresAttunement/
+    // attunementPrereqKind/Value are NOT snapshotted from the catalog item
+    // here (pre-existing behaviour, unchanged by #1648): this create doesn't
+    // set those columns either, so the snapshot must agree with what the row
+    // actually persists, not with the catalog's values.
+    snapshot: buildInventorySnapshot({
+      name: item.name,
+      category: item.category,
+      weight: item.weight ?? null,
+      cost: asCurrency(item.cost),
+      description: item.description ?? null,
+      slot: item.slot,
+      rarity: null,
+      requiresAttunement: false,
+      attunementPrereqKind: null,
+      attunementPrereqValue: null,
+      weaponDetail: detail.weaponDetail?.create ?? null,
+      armorDetail: detail.armorDetail?.create ?? null,
+      consumableDetail: detail.consumableDetail?.create ?? null,
+      capabilities: [],
+    }) as unknown as Prisma.InputJsonValue,
+    weaponDetail: detail.weaponDetail,
+    armorDetail: detail.armorDetail,
   };
+}
+
+// Drops the auto-equip-only `weaponDetail`/`armorDetail` fields
+// buildInventoryCreateFromCatalog's result carries (see its comment) before
+// the array reaches `inventoryItems: { create: [...] }` — those keys aren't
+// valid InventoryItem create fields since #1649.
+export function stripInventoryCreateForWrite<T extends { weaponDetail: unknown; armorDetail: unknown }>(
+  create: T,
+): Omit<T, "weaponDetail" | "armorDetail"> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to exclude these two keys from `rest`
+  const { weaponDetail, armorDetail, ...rest } = create;
+  return rest;
 }
 
 // Minimal shape selectAutoEquip needs to decide what to equip — a subset of

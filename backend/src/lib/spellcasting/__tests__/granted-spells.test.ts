@@ -43,7 +43,7 @@ function catalogSpell(over: Partial<GrantedSpellCatalogSpell> = {}): GrantedSpel
 // Warrior of Shadow → Minor Illusion, as the loaded subclassRef would supply it.
 const warriorOfShadow: GrantedSpellSource = {
   name: "Warrior of Shadow",
-  grantedSpells: [{ gateLevel: 3, castingAbility: "wisdom", spell: catalogSpell() }],
+  grantedSpells: [{ gateLevel: 3, castingAbility: "wisdom", edition: null, spell: catalogSpell() }],
 };
 
 // A minimal castSpell capability row (flat columns + id) for deriveItemSpells.
@@ -69,7 +69,7 @@ function castSpellCap(id: string, spellId: string, over: Partial<ItemSpellSource
 
 describe("deriveGrantedSpells", () => {
   it("grants Minor Illusion to a Warrior of Shadow monk at level 3 (parity with the retired snapshot)", () => {
-    const granted = deriveGrantedSpells(warriorOfShadow, 3);
+    const granted = deriveGrantedSpells(warriorOfShadow, 3, "EDITION_2024");
     expect(granted).toHaveLength(1);
     const [spell] = granted;
     expect(spell.name).toBe("Minor Illusion");
@@ -84,21 +84,21 @@ describe("deriveGrantedSpells", () => {
   });
 
   it("grants nothing below the gate level", () => {
-    expect(deriveGrantedSpells(warriorOfShadow, 2)).toEqual([]);
+    expect(deriveGrantedSpells(warriorOfShadow, 2, "EDITION_2024")).toEqual([]);
   });
 
   it("grants nothing for a null source (no subclass / homebrew without a catalog row)", () => {
-    expect(deriveGrantedSpells(null, 20)).toEqual([]);
-    expect(deriveGrantedSpells(undefined, 20)).toEqual([]);
+    expect(deriveGrantedSpells(null, 20, "EDITION_2024")).toEqual([]);
+    expect(deriveGrantedSpells(undefined, 20, "EDITION_2024")).toEqual([]);
   });
 
   it("grants nothing for a subclass with an empty grant list", () => {
-    expect(deriveGrantedSpells({ name: "Warrior of the Open Hand", grantedSpells: [] }, 20)).toEqual([]);
+    expect(deriveGrantedSpells({ name: "Warrior of the Open Hand", grantedSpells: [] }, 20, "EDITION_2024")).toEqual([]);
   });
 
   it("returns independent nested components objects across calls", () => {
-    const first = deriveGrantedSpells(warriorOfShadow, 3);
-    const second = deriveGrantedSpells(warriorOfShadow, 3);
+    const first = deriveGrantedSpells(warriorOfShadow, 3, "EDITION_2024");
+    const second = deriveGrantedSpells(warriorOfShadow, 3, "EDITION_2024");
     expect(first[0].components).not.toBe(second[0].components);
     first[0].components!.verbal = false;
     expect(second[0].components!.verbal).toBe(true);
@@ -111,6 +111,7 @@ describe("deriveGrantedSpells", () => {
         {
           gateLevel: 9,
           castingAbility: "charisma",
+          edition: null,
           spell: catalogSpell({
             name: "Haste",
             level: 3,
@@ -122,10 +123,54 @@ describe("deriveGrantedSpells", () => {
         },
       ],
     };
-    const [spell] = deriveGrantedSpells(source, 9);
+    const [spell] = deriveGrantedSpells(source, 9, "EDITION_2024");
     expect(spell.id).toBe("granted:oath-of-vengeance:haste");
     expect(spell.concentration).toBe(true);
     expect(spell.effectKind).toBe("buff");
+  });
+
+  // #1625: the loaded grantedSpells rows span every edition; the set filter
+  // (shared-or-own-edition) lives in this module and nowhere else.
+  describe("edition filter (#1625)", () => {
+    const forked: GrantedSpellSource = {
+      name: "Oath of Devotion",
+      grantedSpells: [
+        { gateLevel: 3, castingAbility: "charisma", edition: null, spell: catalogSpell({ name: "Protection from Evil and Good", level: 1 }) },
+        { gateLevel: 3, castingAbility: "charisma", edition: "EDITION_2014", spell: catalogSpell({ name: "Sanctuary", level: 1 }) },
+        { gateLevel: 3, castingAbility: "charisma", edition: "EDITION_2024", spell: catalogSpell({ name: "Shield of Faith", level: 1 }) },
+      ],
+    };
+
+    it("serves a shared (NULL) row to both editions", () => {
+      for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {
+        expect(deriveGrantedSpells(forked, 3, edition).map((s) => s.name)).toContain("Protection from Evil and Good");
+      }
+    });
+
+    it("excludes a 2014-tagged row for a 2024 character and vice versa", () => {
+      const for2024 = deriveGrantedSpells(forked, 3, "EDITION_2024").map((s) => s.name);
+      expect(for2024).toContain("Shield of Faith");
+      expect(for2024).not.toContain("Sanctuary");
+
+      const for2014 = deriveGrantedSpells(forked, 3, "EDITION_2014").map((s) => s.name);
+      expect(for2014).toContain("Sanctuary");
+      expect(for2014).not.toContain("Shield of Faith");
+    });
+
+    it("a per-edition gateLevel fork of the SAME spell yields exactly one entry per edition, each at its own gate", () => {
+      const gateFork: GrantedSpellSource = {
+        name: "Fixture Oath",
+        grantedSpells: [
+          { gateLevel: 3, castingAbility: "charisma", edition: "EDITION_2014", spell: catalogSpell({ name: "Misty Step", level: 2 }) },
+          { gateLevel: 5, castingAbility: "charisma", edition: "EDITION_2024", spell: catalogSpell({ name: "Misty Step", level: 2 }) },
+        ],
+      };
+      expect(deriveGrantedSpells(gateFork, 3, "EDITION_2014").map((s) => s.name)).toEqual(["Misty Step"]);
+      expect(deriveGrantedSpells(gateFork, 3, "EDITION_2024")).toEqual([]);
+      const at5For2024 = deriveGrantedSpells(gateFork, 5, "EDITION_2024");
+      expect(at5For2024.map((s) => s.name)).toEqual(["Misty Step"]);
+      expect(at5For2024).toHaveLength(1);
+    });
   });
 });
 
@@ -134,29 +179,41 @@ describe("grantedSpellsGained (#1139)", () => {
   const archfey: GrantedSpellSource = {
     name: "The Archfey",
     grantedSpells: [
-      { gateLevel: 1, castingAbility: "charisma", spell: catalogSpell({ name: "Faerie Fire", level: 1 }) },
-      { gateLevel: 3, castingAbility: "charisma", spell: catalogSpell({ name: "Calm Emotions", level: 2 }) },
-      { gateLevel: 5, castingAbility: "charisma", spell: catalogSpell({ name: "Blink", level: 3 }) },
+      { gateLevel: 1, castingAbility: "charisma", edition: null, spell: catalogSpell({ name: "Faerie Fire", level: 1 }) },
+      { gateLevel: 3, castingAbility: "charisma", edition: null, spell: catalogSpell({ name: "Calm Emotions", level: 2 }) },
+      { gateLevel: 5, castingAbility: "charisma", edition: null, spell: catalogSpell({ name: "Blink", level: 3 }) },
     ],
   };
 
   it("returns exactly the spells newly gated when a level-up crosses a gate", () => {
-    const gained = grantedSpellsGained(archfey, 4, archfey, 5);
+    const gained = grantedSpellsGained(archfey, 4, archfey, 5, "EDITION_2014");
     expect(gained.map((s) => s.name)).toEqual(["Blink"]);
   });
 
   it("returns nothing for a level-up that crosses no gate", () => {
-    expect(grantedSpellsGained(archfey, 3, archfey, 4)).toEqual([]);
+    expect(grantedSpellsGained(archfey, 3, archfey, 4, "EDITION_2014")).toEqual([]);
   });
 
   it("counts every ≤-level grant as incoming for a fresh subclass pick (null prev)", () => {
-    const gained = grantedSpellsGained(null, 4, archfey, 5);
+    const gained = grantedSpellsGained(null, 4, archfey, 5, "EDITION_2014");
     expect(gained.map((s) => s.name)).toEqual(["Faerie Fire", "Calm Emotions", "Blink"]);
   });
 
   it("returns nothing when there is no next source", () => {
-    expect(grantedSpellsGained(archfey, 4, null, 5)).toEqual([]);
-    expect(grantedSpellsGained(archfey, 4, undefined, 5)).toEqual([]);
+    expect(grantedSpellsGained(archfey, 4, null, 5, "EDITION_2014")).toEqual([]);
+    expect(grantedSpellsGained(archfey, 4, undefined, 5, "EDITION_2014")).toEqual([]);
+  });
+
+  it("never reports a cross-edition row as gained (#1625)", () => {
+    const forked: GrantedSpellSource = {
+      name: "The Archfey",
+      grantedSpells: [
+        { gateLevel: 5, castingAbility: "charisma", edition: "EDITION_2014", spell: catalogSpell({ name: "Blink", level: 3 }) },
+        { gateLevel: 5, castingAbility: "charisma", edition: "EDITION_2024", spell: catalogSpell({ name: "Misty Step", level: 2 }) },
+      ],
+    };
+    expect(grantedSpellsGained(forked, 4, forked, 5, "EDITION_2024").map((s) => s.name)).toEqual(["Misty Step"]);
+    expect(grantedSpellsGained(forked, 4, forked, 5, "EDITION_2014").map((s) => s.name)).toEqual(["Blink"]);
   });
 });
 
@@ -192,28 +249,41 @@ describe("deriveItemSpells (#528)", () => {
 
 describe("deriveGrantedCastingAbility", () => {
   it("returns the grant's casting ability", () => {
-    expect(deriveGrantedCastingAbility(warriorOfShadow)).toBe("wisdom");
+    expect(deriveGrantedCastingAbility(warriorOfShadow, "EDITION_2024")).toBe("wisdom");
   });
 
   it("defaults to wisdom for a source with no grants", () => {
-    expect(deriveGrantedCastingAbility({ name: "Warrior of the Open Hand", grantedSpells: [] })).toBe("wisdom");
+    expect(deriveGrantedCastingAbility({ name: "Warrior of the Open Hand", grantedSpells: [] }, "EDITION_2024")).toBe("wisdom");
   });
 
   it("defaults to wisdom when no source is set", () => {
-    expect(deriveGrantedCastingAbility(null)).toBe("wisdom");
-    expect(deriveGrantedCastingAbility(undefined)).toBe("wisdom");
+    expect(deriveGrantedCastingAbility(null, "EDITION_2024")).toBe("wisdom");
+    expect(deriveGrantedCastingAbility(undefined, "EDITION_2024")).toBe("wisdom");
+  });
+
+  it("reads the first ADMITTED grant's ability, skipping cross-edition rows (#1625)", () => {
+    const forked: GrantedSpellSource = {
+      name: "Fixture Domain",
+      grantedSpells: [
+        { gateLevel: 3, castingAbility: "charisma", edition: "EDITION_2014", spell: catalogSpell() },
+        { gateLevel: 3, castingAbility: "intelligence", edition: null, spell: catalogSpell({ name: "Elementalism" }) },
+      ],
+    };
+    // The 2014-tagged charisma row is not admitted for a 2024 character.
+    expect(deriveGrantedCastingAbility(forked, "EDITION_2024")).toBe("intelligence");
+    expect(deriveGrantedCastingAbility(forked, "EDITION_2014")).toBe("charisma");
   });
 
   it("rejects an invalid (mis-cased / unknown) casting ability and defaults to wisdom", () => {
     const bad: GrantedSpellSource = {
       name: "Homebrew",
-      grantedSpells: [{ gateLevel: 3, castingAbility: "Wisdom", spell: catalogSpell() }], // capital W = invalid key
+      grantedSpells: [{ gateLevel: 3, castingAbility: "Wisdom", edition: null, spell: catalogSpell() }], // capital W = invalid key
     };
-    expect(deriveGrantedCastingAbility(bad)).toBe("wisdom");
+    expect(deriveGrantedCastingAbility(bad, "EDITION_2024")).toBe("wisdom");
     const garbage: GrantedSpellSource = {
       name: "Homebrew",
-      grantedSpells: [{ gateLevel: 3, castingAbility: "luck", spell: catalogSpell() }],
+      grantedSpells: [{ gateLevel: 3, castingAbility: "luck", edition: null, spell: catalogSpell() }],
     };
-    expect(deriveGrantedCastingAbility(garbage)).toBe("wisdom");
+    expect(deriveGrantedCastingAbility(garbage, "EDITION_2024")).toBe("wisdom");
   });
 });

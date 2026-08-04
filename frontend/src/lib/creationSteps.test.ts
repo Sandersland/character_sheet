@@ -46,7 +46,6 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
     className: "",
     subclass: "",
     subclassId: "",
-    portraitUrl: "",
     background: "",
     useCustomBackground: false,
     customBackground: "",
@@ -85,7 +84,23 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
 }
 
 const rogue = makeClass();
-const wizard = makeClass({ name: "Wizard", level1SpellPicks: { cantrips: 3, spells: 4, maxSpellLevel: 1 } });
+// #1513: spellbookSize marks the Wizard's split — its 6-spell spellbook (spells)
+// differs from its 4-spell prepared cap (never served on ClassOption).
+const wizard = makeClass({
+  name: "Wizard",
+  level1SpellPicks: { cantrips: 3, spells: 6, maxSpellLevel: 1, spellbookSize: 6 },
+});
+// #1510 AC-7: a 2014 Ranger IS spellcasting-flagged (unlike rogue above) but
+// has no Spellcasting feature until level 2, so the served level1SpellPicks is
+// null for a different reason — the step must still be omitted either way.
+const ranger2014 = makeClass({ name: "Ranger", isSpellcaster: true, level1SpellPicks: null });
+// #1510 AC-8 (gate half): a 2014 Cleric/Druid-shaped class — cantrips-only,
+// zero level-1 spells to choose (no creation-time list exists in SRD 5.1).
+const cleric2014 = makeClass({
+  name: "Cleric",
+  isSpellcaster: true,
+  level1SpellPicks: { cantrips: 3, spells: 0, maxSpellLevel: 0 },
+});
 
 const specBackground = {
   id: "bg-crim",
@@ -122,6 +137,19 @@ describe("creationSteps", () => {
       "review",
     ]);
     expect(creationSteps(sel())).toEqual(["identity", "abilities", "skills", "equipment", "review"]);
+  });
+
+  // #1510 AC-7: null removes the step regardless of WHY it's null — a
+  // spellcasting-flagged class below its edition's spellcastingStartLevel
+  // (2014 Ranger) is excluded the same as a genuine non-caster (rogue above).
+  it("excludes the spells step for a 2014 Ranger (level1SpellPicks: null pre-level-2)", () => {
+    expect(creationSteps(sel({ class: ranger2014 }))).toEqual([
+      "identity",
+      "abilities",
+      "skills",
+      "equipment",
+      "review",
+    ]);
   });
 
   it("labels every step through the shared display map", () => {
@@ -218,8 +246,16 @@ describe("creationStepMissing", () => {
     const draft = makeDraft({ className: "Wizard", cantripIds: ["c1"], spellIds: [] });
     expect(creationStepMissing("spells", draft, sel({ class: wizard }))).toEqual([
       "Cantrips: choose 3",
-      "Spells: choose 4",
+      "Spells: choose 6",
     ]);
+  });
+
+  // #1510 AC-8 (gate half): a 2014 Cleric/Druid needs 0 spellIds — the
+  // Continue gate must clear on 3 chosen cantrips alone, never asking for a
+  // spell pick that SRD 5.1 never offers.
+  it("spells clears with 3 cantrips and no spells for a 2014 Cleric/Druid-shaped class", () => {
+    const draft = makeDraft({ className: "Cleric", cantripIds: ["c1", "c2", "c3"], spellIds: [] });
+    expect(creationStepMissing("spells", draft, sel({ class: cleric2014 }))).toEqual([]);
   });
 
   it("equipment gates a started-but-incomplete package", () => {
@@ -305,9 +341,14 @@ describe("creationMissing", () => {
   it("blocks an incomplete caster's spell picks and passes a complete one (#1131)", () => {
     const caster = { name: "Mo", alignment: "Neutral Good", race: "Elf", className: "Wizard", background: "Sage" };
     const incomplete = makeDraft({ ...caster, cantripIds: ["c1"], spellIds: [] });
-    expect(creationMissing(incomplete, sel({ class: wizard }))).toEqual(["Cantrips: choose 3", "Spells: choose 4"]);
+    expect(creationMissing(incomplete, sel({ class: wizard }))).toEqual(["Cantrips: choose 3", "Spells: choose 6"]);
 
-    const complete = makeDraft({ ...caster, cantripIds: ["c1", "c2", "c3"], spellIds: ["s1", "s2", "s3", "s4"] });
+    // #1513: a complete Wizard book needs 6 leveled picks, not 4.
+    const complete = makeDraft({
+      ...caster,
+      cantripIds: ["c1", "c2", "c3"],
+      spellIds: ["s1", "s2", "s3", "s4", "s5", "s6"],
+    });
     expect(creationMissing(complete, sel({ class: wizard }))).toEqual([]);
   });
 

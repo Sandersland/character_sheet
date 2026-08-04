@@ -10,7 +10,7 @@
  * #1415 widened GrantedAbility to the same (name, edition) shape, so its block
  * lives here rather than in a second file — one constraint, one proof surface.
  */
-import { afterEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
@@ -87,6 +87,73 @@ describe("NULLS NOT DISTINCT — GrantedAbility(name, edition) admits one row pe
     let error: unknown;
     try {
       await prisma.grantedAbility.create({ data: { name: NAME, source: "shadowArts", description: "second", edition: null } });
+    } catch (err) {
+      error = err;
+    }
+    expect(error).toBeInstanceOf(Prisma.PrismaClientKnownRequestError);
+    expect((error as Prisma.PrismaClientKnownRequestError).code).toBe("P2002");
+  });
+});
+
+// #1625 widened SubclassGrantedSpell to (subclassId, spellId, edition), the
+// same NULLS NOT DISTINCT shape as the blocks above but on an FK-pair identity
+// instead of a name. The 2014/2024-pair case is what lets #1626 fork one
+// spell's gateLevel per edition without forking the Subclass row itself.
+describe("NULLS NOT DISTINCT — SubclassGrantedSpell(subclassId, spellId, edition) admits one row per edition (#1625)", () => {
+  const SUBCLASS_NAME = "Zzz GrantedSpell Edition Probe (#1625)";
+  const SLUG = "zzz-granted-spell-edition-probe-1625";
+  let subclassId: string;
+  let spellId: string;
+
+  beforeAll(async () => {
+    const cls = await prisma.characterClass.findFirstOrThrow({ where: { name: "Monk" }, select: { id: true } });
+    const spell = await prisma.spell.findFirstOrThrow({ where: { name: "Minor Illusion" }, select: { id: true } });
+    spellId = spell.id;
+    const sub = await prisma.subclass.upsert({
+      where: { slug_edition: { slug: SLUG, edition: "EDITION_2024" } },
+      create: { classId: cls.id, name: SUBCLASS_NAME, description: "constraint probe", slug: SLUG, edition: "EDITION_2024" },
+      update: {},
+    });
+    subclassId = sub.id;
+  });
+
+  afterEach(async () => {
+    await prisma.subclassGrantedSpell.deleteMany({ where: { subclassId } });
+  });
+
+  // Cascades the grant rows too (Subclass onDelete: Cascade).
+  afterAll(async () => {
+    await prisma.subclass.deleteMany({ where: { slug: SLUG } });
+  });
+
+  it("a second NULL-edition row for the same (subclass, spell) is rejected by the database", async () => {
+    await prisma.subclassGrantedSpell.create({ data: { subclassId, spellId, gateLevel: 3, castingAbility: "wisdom", edition: null } });
+
+    let error: unknown;
+    try {
+      await prisma.subclassGrantedSpell.create({ data: { subclassId, spellId, gateLevel: 5, castingAbility: "wisdom", edition: null } });
+    } catch (err) {
+      error = err;
+    }
+    expect(error).toBeInstanceOf(Prisma.PrismaClientKnownRequestError);
+    // Code only — Prisma 7 leaves meta.target undefined on P2002.
+    expect((error as Prisma.PrismaClientKnownRequestError).code).toBe("P2002");
+  });
+
+  it("a 2014/2024 pair for the same (subclass, spell) is allowed — the per-edition gateLevel fork #1626 needs", async () => {
+    await prisma.subclassGrantedSpell.create({ data: { subclassId, spellId, gateLevel: 3, castingAbility: "wisdom", edition: "EDITION_2014" } });
+    await prisma.subclassGrantedSpell.create({ data: { subclassId, spellId, gateLevel: 5, castingAbility: "wisdom", edition: "EDITION_2024" } });
+    const rows = await prisma.subclassGrantedSpell.findMany({ where: { subclassId, spellId } });
+    expect(rows.map((r) => r.edition).sort()).toEqual(["EDITION_2014", "EDITION_2024"]);
+  });
+
+  it("a THIRD row re-using an edition already taken for that (subclass, spell) is rejected", async () => {
+    await prisma.subclassGrantedSpell.create({ data: { subclassId, spellId, gateLevel: 3, castingAbility: "wisdom", edition: "EDITION_2014" } });
+    await prisma.subclassGrantedSpell.create({ data: { subclassId, spellId, gateLevel: 5, castingAbility: "wisdom", edition: "EDITION_2024" } });
+
+    let error: unknown;
+    try {
+      await prisma.subclassGrantedSpell.create({ data: { subclassId, spellId, gateLevel: 7, castingAbility: "charisma", edition: "EDITION_2024" } });
     } catch (err) {
       error = err;
     }

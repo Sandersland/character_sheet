@@ -22,6 +22,7 @@ import { inventoryRouter } from "@/routes/character/inventory.js";
 import { itemsRouter } from "@/routes/catalog/items.js";
 import { journalRouter } from "@/routes/session/journal.js";
 import { levelUpRouter } from "@/routes/character/level-up.js";
+import { portraitRouter } from "@/routes/character/portrait.js";
 import { shadowArtsRouter } from "@/routes/character/shadow-arts.js";
 import { maneuversRouter } from "@/routes/character/maneuvers.js";
 import { preferencesRouter } from "@/routes/platform/preferences.js";
@@ -76,6 +77,7 @@ export const routeManifest: RouteMount[] = [
   { router: channelDivinityRouter, mount: "/api/characters/:id/channel-divinity", scope: "authed" },
   { router: advancementRouter, mount: "/api/characters/:id/advancement", scope: "authed" },
   { router: levelUpRouter, mount: "/api/characters/:id/level-up", scope: "authed" },
+  { router: portraitRouter, mount: "/api/characters/:id/portrait", scope: "authed" },
   { router: actionsRouter, mount: "/api/characters/:id/actions", scope: "authed" },
   // One endpoint for every automated class/subclass ability; the feature is
   // chosen by URL key out of ABILITY_REGISTRY rather than by its own mount (#1275).

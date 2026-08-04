@@ -1,7 +1,8 @@
 import type { RulesEdition } from "@character-sheet/shared-types";
 
 import { Prisma } from "@/generated/prisma/client.js";
-import { type GrantItem, type CapabilityColumns } from "@/lib/inventory/capabilities.js";
+import { capabilityColumnsFromSnapshot, type GrantItem, type CapabilityColumns } from "@/lib/inventory/capabilities.js";
+import { readInventorySnapshot } from "@/lib/inventory/inventory-snapshot-read.js";
 import { levelForExperience } from "@/lib/leveling/experience.js";
 import {
   abilityModifier,
@@ -119,6 +120,8 @@ export async function buildHpOpContext(
       // Selected fields feed two seams: id + capabilities (with used) for the
       // castSpell rest reset (#528), and name/requiresAttunement + capabilities
       // for item-granted resistances (#529, feeding the #456 halve flow below).
+      // capabilities are reconstructed from `snapshot` + `capabilityUses` below
+      // (#1649) — the four Inventory* mirror relations are gone.
       inventoryItems: {
         select: {
           id: true,
@@ -126,7 +129,8 @@ export async function buildHpOpContext(
           equippedSlot: true,
           attuned: true,
           requiresAttunement: true,
-          capabilities: true,
+          snapshot: true,
+          capabilityUses: true,
         },
       },
       classEntries: {
@@ -177,6 +181,22 @@ export async function buildHpOpContext(
   const classEntries = row.classEntries as unknown as ClassEntryRow[];
   const primaryEntry = classEntries[0];
 
+  // Reconstructs each item's `capabilities` (with `used`) from `snapshot` +
+  // `capabilityUses` (#1649) — the shape every reader below (castSpell rest
+  // reset, item-granted resistances) already expects.
+  const inventoryItems = row.inventoryItems.map((item) => {
+    const snapshot = readInventorySnapshot(item);
+    const usedByKey = new Map(item.capabilityUses.map((u) => [u.capabilityKey, u.used]));
+    return {
+      id: item.id,
+      name: item.name,
+      equippedSlot: item.equippedSlot,
+      attuned: item.attuned,
+      requiresAttunement: item.requiresAttunement,
+      capabilities: snapshot.capabilities.map((c) => capabilityColumnsFromSnapshot(c, usedByKey.get(c.key) ?? 0)),
+    };
+  });
+
   // Compute the effective HP maximum including feat improvements (e.g. Tough).
   // This is a read-time overlay — hp.max itself stays the feat-free base so
   // the value written back to the DB never includes the feat bonus.
@@ -193,7 +213,7 @@ export async function buildHpOpContext(
   return {
     tx,
     characterId,
-    row: { ...row, classEntries },
+    row: { ...row, classEntries, inventoryItems },
     hp,
     hd,
     conMod,

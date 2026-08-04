@@ -37,7 +37,6 @@ export async function createEntity(
     name: string;
     aliases?: string[];
     notes?: string;
-    portraitUrl?: string | null;
     visibility?: EntityVisibility;
   },
 ): Promise<CampaignEntity> {
@@ -56,7 +55,6 @@ export async function updateEntity(
     name?: string;
     aliases?: string[];
     notes?: string | null;
-    portraitUrl?: string | null;
     visibility?: EntityVisibility;
   },
 ): Promise<CampaignEntity> {
@@ -64,6 +62,38 @@ export async function updateEntity(
     `/campaigns/${campaignId}/entities/${entityId}`,
     jsonBody(patch, "PATCH"),
     "Failed to update entity",
+  );
+}
+
+// Uploads an entity portrait as a multipart body under the `portrait` field —
+// the same #1615 contract as uploadCharacterPortrait, including the deliberate
+// absence of a Content-Type header (the browser must generate the multipart
+// boundary). Owner-only server-side; returns the wire entity whose portraitUrl
+// carries a fresh ?v= version so a cached <img> naturally refetches.
+export async function uploadEntityPortrait(
+  campaignId: string,
+  entityId: string,
+  file: File,
+): Promise<CampaignEntity> {
+  const form = new FormData();
+  form.append("portrait", file);
+  return request<CampaignEntity>(
+    `/campaigns/${campaignId}/entities/${entityId}/portrait`,
+    { method: "POST", body: form },
+    "Failed to upload the portrait",
+  );
+}
+
+// Removes the entity's portrait (idempotent server-side) and returns the wire
+// entity, portraitUrl now null.
+export async function deleteEntityPortrait(
+  campaignId: string,
+  entityId: string,
+): Promise<CampaignEntity> {
+  return request<CampaignEntity>(
+    `/campaigns/${campaignId}/entities/${entityId}/portrait`,
+    { method: "DELETE" },
+    "Failed to remove the portrait",
   );
 }
 

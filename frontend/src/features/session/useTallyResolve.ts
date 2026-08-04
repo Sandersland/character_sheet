@@ -67,7 +67,10 @@ export function useTallyResolve({
       if (!form) return;
       const spec = isCritRow(row) ? critDamageSpec(form.damageSpec) : form.damageSpec;
       const result = roll(spec, form.damageRollLabel);
-      logRollSafe("damage", form.logSource, result, spec, form.damageType);
+      // Carries the row's own swingId (#1235/#1354) — minted at attack time
+      // and threaded onto the row since this hook has no access to
+      // useAttackRolls' swingIdRef.
+      logRollSafe("damage", form.logSource, result, spec, form.damageType, { swingId: row.swingId });
       setTallyDamageAt(index, result.total);
     },
     [formFor, roll, logRollSafe, setTallyDamageAt],

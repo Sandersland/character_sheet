@@ -7,6 +7,7 @@ import { applyHitPointOperations } from "@/lib/combat/hitpoints.js";
 import { applyInventoryOperations, itemBuffKey } from "@/lib/inventory/inventory.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
+import { inventoryItemFixtureData } from "@/test-support/inventory-snapshot-fixture.js";
 
 const OWNER_ID = "owner-activated-effect";
 
@@ -66,15 +67,14 @@ describe("item activatedEffect activate/deactivate (#543)", () => {
     });
     characterId = character.id;
     const item = await prisma.inventoryItem.create({
-      data: {
-        character: { connect: { id: characterId } },
+      data: inventoryItemFixtureData({
+        characterId,
         name: "Boots of Speed",
         category: "gear",
-        quantity: 1,
         attuned: true,
         requiresAttunement: true,
-        capabilities: { create: [bootsCapability] },
-      },
+        capabilities: [bootsCapability],
+      }),
     });
     itemId = item.id;
   });

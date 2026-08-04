@@ -30,6 +30,7 @@ import {
   normalizeArmorDetail,
   normalizeConsumableDetail,
 } from "./inventory-snapshot.js";
+import { buildInventorySnapshot } from "./inventory-snapshot-build.js";
 
 // The resolved item facts an acquire creates its row from — catalog snapshot
 // or homebrew custom, unified so applyAcquire's create is source-agnostic.
@@ -161,7 +162,29 @@ export async function applyAcquire(
       slot: source.slot,
       notes: op.notes,
       position,
-      ...source.detail,
+      // Promoted out of InventoryConsumableDetail (#1648): a fresh charged
+      // consumable starts full, same value the nested consumableDetail create
+      // below carries.
+      usesRemaining: source.detail.consumableDetail?.create.usesRemaining ?? null,
+      // #1648, epic #1644: neither acquire source ever populates capabilities
+      // (custom items can't author them; catalogItemDetailInclude doesn't
+      // fetch a catalog Item's), so this is always built with capabilities: [].
+      snapshot: buildInventorySnapshot({
+        name: source.name,
+        category: source.category,
+        weight: source.weight ?? null,
+        cost: source.cost ?? null,
+        description: source.description ?? null,
+        slot: source.slot,
+        rarity: null,
+        requiresAttunement: false,
+        attunementPrereqKind: null,
+        attunementPrereqValue: null,
+        weaponDetail: source.detail.weaponDetail?.create ?? null,
+        armorDetail: source.detail.armorDetail?.create ?? null,
+        consumableDetail: source.detail.consumableDetail?.create ?? null,
+        capabilities: [],
+      }) as unknown as Prisma.InputJsonValue,
     },
   });
 

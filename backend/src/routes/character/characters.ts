@@ -14,6 +14,8 @@ import {
   updateCharacterSchema,
 } from "@/lib/character/character-schemas.js";
 import { assertCharacterAccess } from "@/lib/auth/access.js";
+import { storedPortraitKey } from "@/lib/character/character-portrait.js";
+import { deletePortraitBlobBestEffort } from "@/lib/storage/portrait-blob.js";
 
 export const charactersRouter = Router();
 
@@ -27,7 +29,7 @@ charactersRouter.get("/characters", async (req, res) => {
       name: true,
       ownerId: true,
       campaignId: true,
-      portraitUrl: true,
+      portraitKey: true,
       experiencePoints: true,
       raceSelection: { select: { name: true } },
       classEntries: { select: { name: true, level: true }, orderBy: { position: "asc" } },
@@ -189,9 +191,14 @@ charactersRouter.patch("/characters/:id/campaign-preferences", async (req, res) 
 charactersRouter.delete("/characters/:id", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
 
+  const portraitKey = await storedPortraitKey(req.params.id);
   // All child relations (CharacterRace, CharacterBackground, CharacterClassEntry,
   // InventoryItem, CharacterEvent/CharacterEventField, and their grandchildren)
   // are onDelete: Cascade in the schema, so a single delete is fully atomic.
   await prisma.character.delete({ where: { id: req.params.id } });
+  // Portrait blob cleanup AFTER the row delete (#1615): the blob store isn't
+  // part of the DB transaction, and best-effort failure only orphans a blob —
+  // never a half-deleted character.
+  await deletePortraitBlobBestEffort(portraitKey);
   res.status(204).end();
 });
