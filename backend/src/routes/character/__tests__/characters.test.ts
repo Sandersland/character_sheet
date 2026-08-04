@@ -670,6 +670,47 @@ describe("characters routes", () => {
       });
     });
 
+    // ── 2014: neither grant exists (#1504, #1572) ──────────────────────────
+    // Origin feats and the background ability spread are both PHB'24-only
+    // mechanics (see backend/src/lib/rules/background-grants.ts). Reuses the
+    // SAME Criminal row as the 2024 describe block above — under EDITION_2014
+    // it must grant neither, proving the gate is on the requesting character's
+    // edition, not on whether the background/feat rows are edition-tagged
+    // (Criminal/Alert both resolve for 2014 in other respects).
+    describe("2014 characters get no origin feat and no ability spread (#1504, #1572)", () => {
+      const criminal2014Body = {
+        name: "Sneak (2014)",
+        alignment: "True Neutral",
+        race: "Human",
+        background: "Criminal",
+        classes: [{ name: "Fighter" }],
+        rulesEdition: "EDITION_2014" as const,
+        abilityScores: { strength: 10, dexterity: 13, constitution: 14, intelligence: 12, wisdom: 10, charisma: 8 },
+      };
+
+      async function post(body: object) {
+        return supertest.agent(app).set("Cookie", COOKIE).post("/api/characters").send(body);
+      }
+
+      it("grants no origin feat and leaves ability scores exactly as submitted", async () => {
+        const res = await post(criminal2014Body);
+        expect(res.status).toBe(201);
+        createdCharacterIds.push(res.body.id);
+
+        expect(res.body.advancements).toHaveLength(0);
+        expect(res.body.abilityScores).toEqual(criminal2014Body.abilityScores);
+        // No spread baked in: CON 14 → +2 mod, Fighter d10 → 12 max HP (not the
+        // 13 a CON-touching 2024 spread would produce, per the sibling test above).
+        expect(res.body.hitPoints.max).toBe(12);
+      });
+
+      it("400s a submitted backgroundAbilities spread with the 2014-specific message", async () => {
+        const res = await post({ ...criminal2014Body, backgroundAbilities: { dexterity: 2, intelligence: 1 } });
+        expect(res.status).toBe(400);
+        expect(res.body.error).toBe("backgroundAbilities not allowed: background ability scores are a 2024 rule");
+      });
+    });
+
     // ── Starting equipment tests ──────────────────────────────────────────
     // These tests rely on the seeded catalog (Wizard/Fighter classes, Human
     // race, Sage/Soldier backgrounds, and the weapon/armor/gear items) which
