@@ -35,12 +35,10 @@ referenceRouter.get("/reference", async (req, res) => {
 
   // Sequential rather than Promise.all — see the matching comment in
   // charactersRouter's POST handler.
-  const races = await prisma.race.findMany({ orderBy: { name: "asc" } });
-  // #1679: species nested per edition, ALONGSIDE races above (the flat list
-  // is untouched — pruned only in #1684). Exact-match `edition` filter, not
-  // resolveEditionCatalog/withEditionOrShared: Species.edition is NOT NULL
-  // (no species is edition-neutral), so there is no shared/NULL row to fall
-  // back to — the same reasoning as StartingEquipmentPackage's own query above.
+  // Exact-match `edition` filter, not resolveEditionCatalog/withEditionOrShared:
+  // Species.edition is NOT NULL (no species is edition-neutral), so there is
+  // no shared/NULL row to fall back to — the same reasoning as
+  // StartingEquipmentPackage's own query above.
   // grantedSpells (#1683): existence-only (select id) at both levels, purely
   // to derive needsCastingAbility below — the actual grant rows are never
   // served here (resolved live at read/creation time, never a catalog preview).
@@ -137,11 +135,7 @@ referenceRouter.get("/reference", async (req, res) => {
   // resolveEditionCatalog's fallback, since StartingEquipmentPackage.edition is
   // non-nullable (#1534) — and, since #1535, that resolution reaches genuinely
   // different SRD 5.2 content, not a 2014 copy: a 2024 character gets the real
-  // PHB'24 package. `races` stays deliberately unfiltered by this endpoint —
-  // it's the legacy flat catalog, superseded per-edition by `species` (#1679,
-  // exact match below, same reasoning as startingEquipment's) and pruned
-  // outright in #1684, so filtering the flat list now would only be thrown
-  // away work. `classes` themselves stay unfiltered too (one CharacterClass
+  // PHB'24 package. `classes` themselves stay unfiltered too (one CharacterClass
   // row serves both editions by design, subclassGateLevel is the only field
   // that forks, #1308). The spell catalog (`GET /api/spells`) is a separate
   // endpoint with its own edition gap, #1517.
@@ -216,13 +210,6 @@ referenceRouter.get("/reference", async (req, res) => {
         ? { options, description: multiclassPrerequisitesMet(options, {}).description }
         : null;
     })(),
-  }));
-
-  const racesWithTools = races.map((r) => ({
-    id: r.id,
-    name: r.name,
-    speed: r.speed,
-    toolProficiencies: r.toolProficiencies,
   }));
 
   // #1689: resolves chooseSkills/chooseCantrip off a row's own trait rows —
@@ -342,7 +329,6 @@ referenceRouter.get("/reference", async (req, res) => {
     .sort((a, b) => a.name.localeCompare(b.name));
 
   res.json({
-    races: racesWithTools,
     species: speciesWithVariants,
     classes,
     backgrounds: backgroundsWithTools,

@@ -1,7 +1,7 @@
-// GET /api/reference serves `species` nested per edition (#1679), alongside
-// the existing flat `races` (which stays untouched — the legacy path is
-// pruned only in #1684). Own file rather than appending to reference.test.ts:
-// this is a self-contained new field, not a change to any existing assertion.
+// GET /api/reference serves `species` nested per edition (#1679) — the sole
+// creation-catalog anchor since #1684 pruned the flat `races` list. Own file
+// rather than appending to reference.test.ts: this is a self-contained new
+// field, not a change to any existing assertion.
 import { beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -20,10 +20,9 @@ async function getReference(edition: "EDITION_2014" | "EDITION_2024") {
 }
 
 describe("GET /api/reference — species (#1679)", () => {
-  it("serves species alongside the existing flat races list", async () => {
+  it("serves species", async () => {
     const response = await getReference("EDITION_2024");
     expect(response.status).toBe(200);
-    expect(response.body).toHaveProperty("races");
     expect(response.body).toHaveProperty("species");
     expect(Array.isArray(response.body.species)).toBe(true);
   });

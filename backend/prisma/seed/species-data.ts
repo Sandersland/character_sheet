@@ -1,12 +1,11 @@
 // Species catalog seed data (#1679, epic #1518) — pure data, no Prisma, no
-// side effects (same split as catalog-data.ts's RACES/CLASSES). Executable
+// side effects (same split as catalog-data.ts's CLASSES/BACKGROUNDS). Executable
 // upsert logic lives in seed-species.ts, mirroring subclasses.ts/seed-
 // subclasses.ts's split.
 //
 // Wave-1 rosters only (epic body "Owner decisions" 6 / review decision 9):
 // 2014 = the 9 PHB'14 races with the FULL PHB'14 subrace list (exceeds SRD
-// 5.1, which carries one subrace per race — see RACES in catalog-data.ts,
-// which already lists every one of these). Variant Human is EXCLUDED (wave 2,
+// 5.1, which carries one subrace per race). Variant Human is EXCLUDED (wave 2,
 // after #1690). 2024 = the 10 PHB'24 species; no Half-Elf/Half-Orc, adds
 // Aasimar/Goliath/Orc. Every speed verified against SRD 5.1 / SRD 5.2 text
 // (2026-08-04 research pass) — PHB'14 Dwarf 25 ft vs PHB'24 Dwarf 30 ft is

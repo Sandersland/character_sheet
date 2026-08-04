@@ -61,7 +61,6 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
 // variantless one (2014 Human-shaped) — the two shapes #1680's picker must
 // tell apart.
 const reference: ReferenceData = {
-  races: [],
   species: [
     {
       id: "sp-dwarf",

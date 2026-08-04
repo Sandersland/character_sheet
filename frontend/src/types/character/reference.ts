@@ -26,15 +26,9 @@ export interface SubclassOption {
 /**
  * Baseline catalog entries served by `GET /api/reference`, used to populate
  * the character-creation form. These are *suggestions* the backend can
- * derive mechanics from — a created character's race/class/background name
+ * derive mechanics from — a created character's species/class/background name
  * can still drift from (or omit) a catalog match (the catalog+snapshot pattern).
  */
-export interface RaceOption {
-  id: string;
-  name: string;
-  speed: number;
-  toolProficiencies: string[];
-}
 
 /** #1679/#1681: the AbilityIncreaseSpec vocabulary served on Species/SpeciesVariant
  *  rows (backend's abilityIncreasesSchema, lib/srd/species-ability-increases.ts) —
@@ -255,10 +249,8 @@ export interface EditionsResponse {
 }
 
 export interface ReferenceData {
-  races: RaceOption[];
-  /** Species catalog for the two-step species→variant picker (#1679/#1680),
-   *  served alongside the flat `races` list above during its compat window
-   *  (per-edition here supersedes the flat list; both pruned in #1684). */
+  /** Species catalog for the two-step species→variant picker (#1679/#1680) —
+   *  the sole creation-catalog anchor since #1684 pruned the flat `races` list. */
   species: SpeciesOption[];
   classes: ClassOption[];
   backgrounds: BackgroundOption[];
