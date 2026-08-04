@@ -933,7 +933,10 @@ export async function castAbilityWithSlotInTx(
 ): Promise<OpOutcome> {
   const row = await tx.character.findUnique({ where: { id: characterId }, select: SLOT_PAY_SELECT });
   if (!row) {
-    throw new InvalidSpellcastingOperationError(`Character not found: ${characterId}`);
+    // Internal invariant, not a client error: the character was already loaded
+    // in this same transaction (applyRowDrivenActionInTx) — a miss here is a
+    // server fault (5xx), so a plain Error, not the 400-mapped op error.
+    throw new Error(`Character not found: ${characterId}`);
   }
 
   const level = levelForExperience(row.experiencePoints);

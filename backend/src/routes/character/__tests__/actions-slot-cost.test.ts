@@ -171,8 +171,7 @@ describe("POST /:id/actions/transactions — slot-shaped ability cost (#1687)", 
   });
 
   it("LIFO revert restores BOTH the slot and the HP together", async () => {
-    const cast = await execute(3);
-    const roll = cast.body.results[0].roll as number;
+    await execute(3);
     const batchId = await latestBatchId();
     const revert = await supertest
       .agent(app)
@@ -180,7 +179,6 @@ describe("POST /:id/actions/transactions — slot-shaped ability cost (#1687)", 
       .post(`/api/characters/${WIZARD_ID}/events/${batchId}/revert`);
     expect(revert.status).toBe(200);
     expect(revert.body.hitPoints.current).toBe(20); // heal undone
-    void roll;
     expect(slot(revert.body, 3)).toMatchObject({ used: 0 }); // slot spend undone
   });
 
