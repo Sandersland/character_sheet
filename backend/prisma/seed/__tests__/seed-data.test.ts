@@ -669,6 +669,19 @@ describe("SUBCLASS_SLUGS — three-way bijection (#1277)", () => {
   // other.
   const ROW_MIGRATED_CLASSES = ["fighter", "barbarian", "rogue"];
 
+  // #1676: wizard-bladesinging is the FIRST real INTENTIONAL_GAPS entry.
+  // Wizard is NOT a row-migrated class in ROW_MIGRATED_CLASSES' sense —
+  // lib/classes/wizard.ts survives (it carries the class's residual subclass
+  // grantLevel, class-features.ts's own header) and its three OTHER
+  // subclasses each still have a real SubclassDefinition. Bladesinging is
+  // identity-only by design (CLAUDE.md: a pure identity/join key carries no
+  // rules text) — its mechanics ride the F1-F5 engine's seed-row vocabulary
+  // entirely (wizard-features.ts's BLADESINGING_RAW), never a
+  // SubclassDefinition, mirroring Fighter's own subclasses' shape without
+  // Fighter's whole-module deletion. Declared here, with a reason, rather
+  // than silently dropped from the bijection check below.
+  const INTENTIONAL_GAPS: SubclassSlug[] = ["wizard-bladesinging"];
+
   it("every SUBCLASSES row's slug is a member of SUBCLASS_SLUGS and maps back to its own (className, name)", () => {
     const bad = SUBCLASSES.filter((s) => {
       const identity = SUBCLASS_IDENTITY[s.slug];
@@ -706,18 +719,18 @@ describe("SUBCLASS_SLUGS — three-way bijection (#1277)", () => {
     }
     const missing = SUBCLASS_SLUGS.filter((slug) => {
       if (definedSlugs.has(slug)) return false;
+      if (INTENTIONAL_GAPS.includes(slug)) return false;
       const identity = SUBCLASS_IDENTITY[slug];
       return !identity || !ROW_MIGRATED_CLASSES.includes(identity.classKey);
     });
     expect(missing, "slug declared but no SubclassDefinition carries it, and not a row-migrated class").toEqual([]);
   });
 
-  // The declared intentional-gap allowlist — deliberately empty. A future
-  // subclass that legitimately can't join (e.g. creation-UX-only, no mechanics
-  // support) would be added HERE with a reason, never by leaving it out of
-  // SUBCLASS_SLUGS silently.
-  const INTENTIONAL_GAPS: SubclassSlug[] = [];
-  it("the intentional-gap allowlist is empty", () => {
-    expect(INTENTIONAL_GAPS).toEqual([]);
+  // The declared intentional-gap allowlist — every entry here is a slug the
+  // bijection check above deliberately excuses from needing a
+  // SubclassDefinition, with its own reason recorded at the declaration site
+  // (never silently dropped from SUBCLASS_SLUGS itself).
+  it("the intentional-gap allowlist names exactly the disclosed engine-first subclasses", () => {
+    expect(INTENTIONAL_GAPS).toEqual(["wizard-bladesinging"]);
   });
 });

@@ -34,6 +34,11 @@ import type { RollSpec } from "@/lib/dice";
  *                   (#1686, e.g. Rage/End Rage) — a distinct kind (not
  *                   simple-confirm) only because it's the row-served value
  *                   `resolverFromRow` receives, not a hand-authored one.
+ *  slot-picker    — the player picks a spell-slot level to expend on a
+ *                   `{costKind:"slot"}` row-driven ability (#1687's UI,
+ *                   deferred to its first real consumer, Bladesinger's Song
+ *                   of Defense, #1676); commits at use-time like heal-input,
+ *                   sending the chosen level as `slotLevel`.
  */
 export type ResolutionKind =
   | "attack-picker"
@@ -45,7 +50,8 @@ export type ResolutionKind =
   | "heal-input"
   | "loadout-picker"
   | "simple-confirm"
-  | "toggle";
+  | "toggle"
+  | "slot-picker";
 
 // Runtime membership list for ResolutionKind, used only to validate a
 // row-served `AvailableAction.resolverKind` string (isResolutionKind below) —
@@ -63,6 +69,7 @@ const RESOLUTION_KINDS = [
   "loadout-picker",
   "simple-confirm",
   "toggle",
+  "slot-picker",
 ] as const satisfies readonly ResolutionKind[];
 type _ResolutionKindsCoverResolutionKind = ResolutionKind extends (typeof RESOLUTION_KINDS)[number] ? true : never;
 const _resolutionKindsCoverResolutionKind: _ResolutionKindsCoverResolutionKind = true;

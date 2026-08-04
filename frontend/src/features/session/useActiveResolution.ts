@@ -14,6 +14,7 @@
 
 import { useState, useCallback } from "react";
 import { resolverFor, type ActionResolver } from "@/features/session/actionResolvers";
+import type { AvailableAction } from "@/types/character";
 
 /** Optional payload carried into the resolution sheet (pre-selection etc.). */
 export interface ResolutionContext {
@@ -32,9 +33,16 @@ export interface ActiveResolutionState {
   /**
    * Open the inline tool for the given action key. No-ops if the key is
    * unrecognized (simple-confirm actions don't use an inline tool, but
-   * callers may still call this — it's filtered in TurnHub logic).
+   * callers may still call this — it's filtered in TurnHub logic). `action`
+   * is optional context threaded to `resolverFor` (#1528's row-driven
+   * fallback, #1676's fix) — every static-key caller here (attack/twf/
+   * flurryOfBlows/castSpellBonus) omits it since those resolve from the
+   * keyed ACTION_RESOLVERS table alone; a row-driven kind that needs an open
+   * sheet (Song of Defense's "slot-picker", the first of its shape) can only
+   * synthesize its resolver from the served AvailableAction, so the generic
+   * `handleActionClick` path must pass it.
    */
-  openResolution: (key: string, context?: ResolutionContext) => void;
+  openResolution: (key: string, context?: ResolutionContext, action?: AvailableAction) => void;
   /** Clear the active resolution (tool dismissed or completed). */
   closeResolution: () => void;
 }
@@ -42,8 +50,8 @@ export interface ActiveResolutionState {
 export function useActiveResolution(): ActiveResolutionState {
   const [activeResolution, setActiveResolution] = useState<ActiveResolution | null>(null);
 
-  const openResolution = useCallback((key: string, context?: ResolutionContext) => {
-    const resolver = resolverFor(key);
+  const openResolution = useCallback((key: string, context?: ResolutionContext, action?: AvailableAction) => {
+    const resolver = resolverFor(key, action);
     if (!resolver) return;
     setActiveResolution(context ? { resolver, context } : { resolver });
   }, []);

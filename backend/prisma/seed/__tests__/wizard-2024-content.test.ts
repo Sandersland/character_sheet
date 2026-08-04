@@ -208,8 +208,8 @@ describe("Illusory Self (#1234): 2024 adds the level-2+ spell-slot restore, alon
   });
 });
 
-describe("Per-partition counts: base 4/8, evocation 5/5, abjuration 5/5, illusion 5/5 (2014/2024) (#1234)", () => {
-  it("counts match exactly (19 total 2014, 23 total 2024)", () => {
+describe("Per-partition counts: base 4/8, evocation 5/5, abjuration 5/5, illusion 5/5, bladesinging 4/0 (2014/2024) (#1234, #1676)", () => {
+  it("counts match exactly (23 total 2014, 23 total 2024)", () => {
     const count = (slug: string | null, edition: Edition) => WIZARD_FEATURES.filter((r) => r.subclassSlug === slug && r.edition === edition).length;
     expect(count(BASE, "EDITION_2014")).toBe(4);
     expect(count(BASE, "EDITION_2024")).toBe(8);
@@ -222,9 +222,14 @@ describe("Per-partition counts: base 4/8, evocation 5/5, abjuration 5/5, illusio
     expect(count(ABJURATION, "EDITION_2024")).toBe(5);
     expect(count(ILLUSION, "EDITION_2014")).toBe(5);
     expect(count(ILLUSION, "EDITION_2024")).toBe(5);
+    // Bladesinging (#1676): 4 rows (Training in War and Song, Bladesong,
+    // Extra Attack, Song of Defense), EDITION_2014 only — TCoE has no
+    // SRD 5.2/PHB'24 printing, so 0 EDITION_2024 rows for this subclass.
+    expect(count("wizard-bladesinging", "EDITION_2014")).toBe(4);
+    expect(count("wizard-bladesinging", "EDITION_2024")).toBe(0);
     const total2014 = WIZARD_FEATURES.filter((r) => r.edition === "EDITION_2014").length;
     const total2024 = WIZARD_FEATURES.filter((r) => r.edition === "EDITION_2024").length;
-    expect(total2014).toBe(19);
+    expect(total2014).toBe(23);
     expect(total2024).toBe(23);
   });
 });

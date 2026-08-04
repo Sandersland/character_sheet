@@ -64,6 +64,21 @@ export const SUBCLASSES: SubclassSeed[] = [
     slug: "fighter-eldritch-knight",
   },
   // ── Wizard ────────────────────────────────────────────────────────────────
+  // Bladesinging (#1676): TCoE (Tasha's Cauldron of Everything) p. 76 is the
+  // settled printing, not SCAG — verified against the transcription the
+  // owner's group uses (proficiency-bonus Bladesong uses/long rest, no race
+  // restriction, the TCoE-only cantrip-substitution rider on Extra Attack).
+  // EDITION_2014 only, no 2024 successor: SRD 5.2/PHB'24 never reprinted
+  // Bladesinging content (out of scope, epic #1281), same "tagged row, zero
+  // 2024 rows" shape as Totem Warrior/The Archfey/The Great Old One above.
+  {
+    className: "Wizard",
+    name: "Bladesinging",
+    description:
+      "You extend your will and magic into a form of martial and magical combat. In battle, you can weave a song of insight and protection as you attack and defend with elegant grace. You gain proficiency with light armor, one type of one-handed melee weapon, and Performance. Your Bladesong grants a bonus to Armor Class and speed, advantage on Acrobatics, and a bonus to concentration saves while it lasts.",
+    slug: "wizard-bladesinging",
+    edition: "EDITION_2014",
+  },
   {
     className: "Wizard",
     name: "School of Evocation",

@@ -1,20 +1,23 @@
 /**
- * Upcast slot picker (#1163): the level already reads off the section header,
- * so this renders nothing in the single-slot case — only when a spell has
- * more than one legal slot does the player need to choose one.
+ * Slot-level picker (#1163): the level already reads off the section header,
+ * so this renders nothing in the single-slot case — only when more than one
+ * legal slot exists does the player need to choose one. Generalized past
+ * spell-casting (#1676, Bladesinger's Song of Defense) to `baseLevel: number`
+ * instead of a full `Spell` — the only spell-specific bit was `spell.level`,
+ * used purely as the "is this an upcast?" comparison baseline, which a
+ * non-spell ability (Song of Defense's own minLevel) needs identically.
  */
 
-import type { Spell } from "@/types/character";
-
 interface SlotLevelSelectorProps {
-  spell: Spell;
+  /** The level a choice above this one renders the "↑" marker for. */
+  baseLevel: number;
   availableSlots: number[];
   spellSlot: number | undefined;
   onSelect: (level: number) => void;
 }
 
 export default function SlotLevelSelector({
-  spell,
+  baseLevel,
   availableSlots,
   spellSlot,
   onSelect,
@@ -36,7 +39,7 @@ export default function SlotLevelSelector({
           }`}
         >
           L{lvl}
-          {lvl !== spell.level && <span className="ml-0.5 opacity-60">↑</span>}
+          {lvl !== baseLevel && <span className="ml-0.5 opacity-60">↑</span>}
         </button>
       ))}
     </div>

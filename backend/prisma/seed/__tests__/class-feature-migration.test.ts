@@ -316,6 +316,17 @@ function isPopulatedPaladinRow(row: RowKey): boolean {
   return row.className === "Paladin" && row.subclassSlug === null && row.name === "Channel Divinity";
 }
 
+// #1676: Bladesinger's two resourceKey-carrying rows — Bladesong (the
+// bladesong pool + toggle/armor-gate block) and Song of Defense (a pure
+// action-key identity, no pool of its own — costKind "slot" spends real
+// spell slots instead, #1687). Training in War and Song sets only
+// `improvements` (#1691, not selected/asserted by this test at all) and
+// stays correctly unpopulated here; Extra Attack's derivedStat is handled by
+// DERIVED_STAT_ROW_KEYS below, not this predicate.
+function isPopulatedBladesingerRow(row: RowKey): boolean {
+  return row.className === "Wizard" && row.subclassSlug === "wizard-bladesinging" && (row.name === "Bladesong" || row.name === "Song of Defense");
+}
+
 // What the descriptor predicates below key on. `edition` is part of the key
 // because a class can populate a descriptor column on ONE edition's row and
 // not the other's, under the same (class, subclass, name): Ranger's Favored
@@ -374,6 +385,7 @@ const POPULATED_ROW_PREDICATES: ((row: RowKey) => boolean)[] = [
   isPopulatedClericRow,
   isPopulatedDruidRow,
   isPopulatedPaladinRow,
+  isPopulatedBladesingerRow,
 ];
 
 function isPopulatedRow(row: RowKey): boolean {
@@ -403,6 +415,8 @@ const DERIVED_STAT_ROW_KEYS = new Set([
   "Bard::bard-college-of-valor::Extra Attack",
   "Fighter::fighter-battle-master::Combat Superiority",
   "Fighter::fighter-battle-master::Student of War",
+  // #1676: Bladesinger's L6 Extra Attack, EDITION_2014 only.
+  "Wizard::wizard-bladesinging::Extra Attack",
 ]);
 
 function isDerivedStatRow(row: RowKey): boolean {
@@ -515,7 +529,7 @@ function expectRowDescriptors(row: DescriptorRow & RowKey): void {
 }
 
 describe("ClassFeature migration — every descriptor column is NULL/default, except the rows isPopulatedRow names", () => {
-  it("no row has a populated descriptor column, except Fighter's (#1528/#1546), Barbarian's Rage (#1223), Wizard's (#1234), Warlock's (#1233), Ranger's (#1230), Sorcerer's (#1232), Cleric's (#1225) and Paladin's (#1229)", async () => {
+  it("no row has a populated descriptor column, except Fighter's (#1528/#1546), Barbarian's Rage (#1223), Wizard's (#1234), Warlock's (#1233), Ranger's (#1230), Sorcerer's (#1232), Cleric's (#1225), Paladin's (#1229) and Wizard's Bladesinger (#1676)", async () => {
     const rows = await prisma.classFeature.findMany({
       select: { name: true, edition: true, class: { select: { name: true } }, subclass: { select: { slug: true } },
         resourceKey: true, resourceLabel: true, resourceRecharge: true, resourceTotals: true, resourceDieTiers: true,
@@ -563,8 +577,10 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
   // 2024-only x1);
   // derivedStatTiers excludes #1530's twelve populated Extra
   // Attack rows PLUS #1546's Combat Superiority/Student of War x2 editions each
-  // (DERIVED_STAT_ROW_KEYS x2 editions each, computed below); resourceDieTiers
-  // excludes only Combat Superiority x2 (the only row with a die-size tier).
+  // (DERIVED_STAT_ROW_KEYS x2 editions each, computed below) PLUS #1676's
+  // Bladesinger Extra Attack row, EDITION_2014 only (x1, not x2 — see the
+  // subtraction below); resourceDieTiers excludes only Combat Superiority x2
+  // (the only row with a die-size tier).
   it("resourceTotals/resourceDieTiers/derivedStatTiers are SQL NULL (Prisma.DbNull), not a stored JSON null, everywhere they aren't authored", async () => {
     // This total is SUMMED across wave-b branches, never taken from one of
     // them: #1230 raised 22 -> 23, #1232 -> 28, #1225 -> 24, then wave C's
@@ -576,14 +592,21 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
     // its other half. #1685 then migrated the four remaining formula pools
     // onto their rows (Dark One's Own Luck's 2024 row, Tireless, Nature's
     // Veil, Moonlight Step), raising Warlock 8 -> 9, Ranger 1 -> 3, Druid
-    // 1 -> 2: 34 + 1 + 2 + 1 = 38.
+    // 1 -> 2: 34 + 1 + 2 + 1 = 38. #1676 (Bladesinger) adds ONE more —
+    // Bladesong's own resourceTotals (EDITION_2014 only, no 2024 twin): 38 + 1
+    // = 39.
     // 6 Fighter + 2 Combat Superiority + 2 Rage + 4 Wizard + 9 Warlock
     // + 3 Ranger + 6 Sorcerer + 2 Cleric + 2 Druid + 2 Paladin (#1229's own
     // Channel Divinity carrier rows, one per edition — see
-    // isPopulatedPaladinRow).
-    const populatedResourceTotalsCount = 38;
+    // isPopulatedPaladinRow) + 1 Bladesong.
+    const populatedResourceTotalsCount = 39;
     const populatedResourceDieTiersCount = 2;
-    const populatedDerivedStatTiersCount = DERIVED_STAT_ROW_KEYS.size * 2;
+    // DERIVED_STAT_ROW_KEYS x2 editions each, MINUS 1: Bladesinger's own
+    // "Wizard::wizard-bladesinging::Extra Attack" key is EDITION_2014 only
+    // (no 2024 successor, #1676), unlike every other keyed row here — see
+    // isPopulatedBladesingerRow's own comment. A future asymmetric addition
+    // needs this same correction, not a silent re-multiply.
+    const populatedDerivedStatTiersCount = DERIVED_STAT_ROW_KEYS.size * 2 - 1;
     for (const column of ["resourceTotals", "resourceDieTiers", "derivedStatTiers"] as const) {
       const expectedDbNull =
         column === "resourceTotals"

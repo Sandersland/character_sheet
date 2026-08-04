@@ -393,9 +393,23 @@ const EXPECTED_EDITION_TAGGED_FEATURES = [
   // Breaker share no name, so neither counts), and Illusion's own 3 (Illusion
   // Savant, Illusory Self, Illusory Reality — Improved Minor Illusion/
   // Improved Illusions and Malleable Illusions/Phantasmal Creatures each
-  // share no name, so none of those four count) = 16 + 5 + 4 + 3 = 28.
+  // share no name, so none of those four count) = 16 + 5 + 4 + 3 = 28. Plus
+  // Bladesinger's own 4 (#1676, below) = 32.
   // Ritual Adept/Scholar/Memorize Spell/Epic Boon are NOT tagged (2024-only,
   // no 2014 twin to diverge from).
+  // Bladesinger's own 4 new triples (#1676): the SAME 4 base names fork under
+  // its new "bladesinging" context too — collectTaggedFeatureKeys always
+  // combines Wizard's classRows (the base 4) with THIS ONE subclass's own
+  // subclassRows, same reason evocation/abjuration/illusion each already
+  // repeat the 4 base names above. Bladesinger's OWN feature names (Training
+  // in War and Song, Bladesong, Extra Attack, Song of Defense) are NOT tagged
+  // here: every one is EDITION_2014-only with no 2024 successor authored at
+  // all (decision: no SCAG/PHB'24 Bladesinger content, epic #1281 out of
+  // scope) — one description under each name, not two, so none of them fork.
+  ["wizard", "bladesinging", "Spellcasting"],
+  ["wizard", "bladesinging", "Arcane Recovery"],
+  ["wizard", "bladesinging", "Spell Mastery"],
+  ["wizard", "bladesinging", "Signature Spells"],
   ["wizard", "undefined", "Spellcasting"],
   ["wizard", "undefined", "Arcane Recovery"],
   ["wizard", "undefined", "Spell Mastery"],

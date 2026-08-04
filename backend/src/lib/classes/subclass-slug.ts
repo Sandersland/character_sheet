@@ -59,12 +59,17 @@ export const SUBCLASS_SLUGS = [
   "warlock-the-archfey",
   "warlock-the-fiend",
   "warlock-the-great-old-one",
+  "wizard-bladesinging",
   "wizard-school-of-abjuration",
   "wizard-school-of-evocation",
   "wizard-school-of-illusion",
-] as const; // 31 members — the seed's row count (#1277 F1) and the
+] as const; // 32 members — the seed's row count (#1277 F1) and the
 // lib/classes/*.ts subclass-definition count (#1277 F2) are already a
-// perfect bijection; this list is exhaustive over both.
+// perfect bijection; this list is exhaustive over both. Bladesinging
+// (#1676, TCoE p.76) is identity-only like Fighter's subclasses — no
+// lib/classes/wizard.ts subclass registration exists or is needed, since its
+// mechanics ride the F1-F5 engine's seed-row vocabulary, not a
+// SubclassDefinition.
 
 export type SubclassSlug = (typeof SUBCLASS_SLUGS)[number];
 
@@ -109,6 +114,7 @@ export const SUBCLASS_IDENTITY: Record<SubclassSlug, SubclassIdentity> = {
   "warlock-the-archfey": { classKey: "warlock", nameKey: "the archfey" },
   "warlock-the-fiend": { classKey: "warlock", nameKey: "the fiend" },
   "warlock-the-great-old-one": { classKey: "warlock", nameKey: "the great old one" },
+  "wizard-bladesinging": { classKey: "wizard", nameKey: "bladesinging" },
   "wizard-school-of-abjuration": { classKey: "wizard", nameKey: "school of abjuration" },
   "wizard-school-of-evocation": { classKey: "wizard", nameKey: "school of evocation" },
   "wizard-school-of-illusion": { classKey: "wizard", nameKey: "school of illusion" },

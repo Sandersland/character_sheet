@@ -13,6 +13,7 @@ import InlineOffHandPicker from "@/features/session/InlineOffHandPicker";
 import InlineItemPicker from "@/features/session/InlineItemPicker";
 import InlineSpellPicker from "@/features/session/InlineSpellPicker";
 import LayOnHandsInput from "@/features/session/LayOnHandsInput";
+import SongOfDefenseInput from "@/features/session/SongOfDefenseInput";
 import type { ActiveResolution } from "@/features/session/useActiveResolution";
 import type { LoadoutSwapControls } from "@/features/session/useLoadoutSwap";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
@@ -40,6 +41,14 @@ function attackKicker(attack: TurnState["attack"]): string {
   return `${count} attack${count === 1 ? "" : "s"} · no target AC tracked — read the roll to your DM`;
 }
 
+// Widened past LayOnHandsInput's own narrower onSend (#1676, Song of
+// Defense's slotLevel op) to the shape useTurnActions' real `send` carries —
+// a shared declaration rather than deriving from one consumer's props, since
+// TS's weak-type check rejects assigning between two ALL-optional object
+// types with no property names in common (LayOnHandsInput's `{roll?}` vs
+// SongOfDefenseInput's `{slotLevel?}`).
+type SendAction = (actionKey: string, opts?: { roll?: number; inventoryItemId?: string; slotLevel?: number }) => Promise<unknown>;
+
 interface TurnResolutionSheetsProps {
   sessionId: string;
   turnState: TurnState & TurnStateActions;
@@ -49,10 +58,11 @@ interface TurnResolutionSheetsProps {
   setShowBonusMenu: React.Dispatch<React.SetStateAction<boolean>>;
   onLogChanged: () => void;
   allies: AllyOption[];
-  send: React.ComponentProps<typeof LayOnHandsInput>["onSend"];
+  send: SendAction;
   loadoutSwap: LoadoutSwapControls;
 }
 
+// fallow-ignore-next-line complexity -- one thin `case -> <XResolutionSheet {...props} />` per resolver kind (kind -> sheet dispatch, this file's whole job per its own header); adding Song of Defense's "slot-picker" case (#1676, the ninth) pushed CRAP over the estimated-coverage threshold, not real branchy logic
 export default function TurnResolutionSheets(props: TurnResolutionSheetsProps) {
   const { character } = useCurrentCharacter();
   switch (props.activeResolution?.resolver.kind) {
@@ -68,6 +78,8 @@ export default function TurnResolutionSheets(props: TurnResolutionSheetsProps) {
       return <ItemResolutionSheet {...props} />;
     case "heal-input":
       return <HealResolutionSheet {...props} />;
+    case "slot-picker":
+      return <SongOfDefenseResolutionSheet {...props} />;
     case "spell-picker":
       return character.spellcasting ? <SpellResolutionSheet {...props} /> : null;
     default:
@@ -264,6 +276,27 @@ function HealResolutionSheet({
       <LayOnHandsInput
         onSend={send}
         onCommit={turnState.consumeAction}
+        onClose={closeResolution}
+      />
+    </BottomSheet>
+  );
+}
+
+// Song of Defense (#1676, TCoE p. 76) — Bladesinger's reaction, gated
+// server-side on Bladesong being active (#1688's requiresActiveBuff; a 400
+// surfaces via the mutation's error state if the player somehow opens this
+// with Bladesong down). Nothing is spent until a slot is picked and used —
+// same "commit at use-time" shape as Lay on Hands above.
+function SongOfDefenseResolutionSheet({
+  turnState,
+  closeResolution,
+  send,
+}: Pick<TurnResolutionSheetsProps, "turnState" | "closeResolution" | "send">) {
+  return (
+    <BottomSheet title="Song of Defense" subtitle="Nothing is spent until you use it" onClose={closeResolution}>
+      <SongOfDefenseInput
+        onSend={send}
+        onCommit={turnState.consumeReaction}
         onClose={closeResolution}
       />
     </BottomSheet>

@@ -51,5 +51,5 @@ export const CLASS_SUBCLASSES: Record<string, (string | undefined)[]> = {
   rogue: [undefined, "arcane trickster", "assassin", "thief"],
   sorcerer: [undefined, "draconic bloodline", "wild magic"],
   warlock: [undefined, "the fiend", "the archfey", "the great old one"],
-  wizard: [undefined, "school of evocation", "school of abjuration", "school of illusion"],
+  wizard: [undefined, "school of evocation", "school of abjuration", "school of illusion", "bladesinging"],
 };
