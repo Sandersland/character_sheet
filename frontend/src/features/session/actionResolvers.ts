@@ -28,7 +28,12 @@ import type { RollSpec } from "@/lib/dice";
  *  heal-roll      — single self-heal dice roll (Second Wind: 1d10+level).
  *  heal-input     — numeric pool draw (Lay on Hands: choose amount up to pool).
  *  loadout-picker — per-hand weapon-swap picker (a held swap costs the Action).
- *  simple-confirm — no tool; just consume the slot (Dodge, Dash, Rage, etc.).
+ *  simple-confirm — no tool; just consume the slot (Dodge, Dash, etc.).
+ *  toggle         — same send shape as simple-confirm, served for a
+ *                   row-declared while-active buff's activate/end pair
+ *                   (#1686, e.g. Rage/End Rage) — a distinct kind (not
+ *                   simple-confirm) only because it's the row-served value
+ *                   `resolverFromRow` receives, not a hand-authored one.
  */
 export type ResolutionKind =
   | "attack-picker"
@@ -39,7 +44,8 @@ export type ResolutionKind =
   | "heal-roll"
   | "heal-input"
   | "loadout-picker"
-  | "simple-confirm";
+  | "simple-confirm"
+  | "toggle";
 
 // Runtime membership list for ResolutionKind, used only to validate a
 // row-served `AvailableAction.resolverKind` string (isResolutionKind below) —
@@ -56,6 +62,7 @@ const RESOLUTION_KINDS = [
   "heal-input",
   "loadout-picker",
   "simple-confirm",
+  "toggle",
 ] as const satisfies readonly ResolutionKind[];
 type _ResolutionKindsCoverResolutionKind = ResolutionKind extends (typeof RESOLUTION_KINDS)[number] ? true : never;
 const _resolutionKindsCoverResolutionKind: _ResolutionKindsCoverResolutionKind = true;
@@ -135,8 +142,11 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
   // Two-Weapon Fighting off-hand bonus attack (#732) — economy-only, like `attack`.
   twf:               { key: "twf",               kind: "twf-picker",     slot: "bonusAction", serverEffect: false },
 
-  rage:              { key: "rage",              kind: "simple-confirm", slot: "bonusAction", serverEffect: true,  resourceKey: "rage" },
-  endRage:           { key: "endRage",           kind: "simple-confirm", slot: "bonusAction", serverEffect: true  },
+  // rage/endRage retired from this table (#1686): row-driven now (a "toggle"
+  // resolverKind ClassFeature row), served via AvailableAction.resolverKind —
+  // resolverFor's fallback path (below) synthesizes the resolver from the
+  // wire instead of a hand-authored entry here, same as Second Wind/Action
+  // Surge's own #1528 retirement.
   recklessAttack:    { key: "recklessAttack",    kind: "simple-confirm", slot: "free",        serverEffect: false },
 
   bardicInspiration: { key: "bardicInspiration", kind: "simple-confirm", slot: "bonusAction", serverEffect: true,  resourceKey: "bardicInspiration" },

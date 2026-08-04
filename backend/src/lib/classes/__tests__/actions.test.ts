@@ -16,13 +16,14 @@ import {
   ACTION_EFFECT_FN,
   castSpecFromRow,
   REGRANTED_UNIVERSAL_KEYS,
-  rageMeleeDamageBonus,
+  toggleRowOps,
   type AvailableAction,
   type ResourcePool,
 } from "@/lib/classes/actions.js";
 import type { ClassFeatureRow } from "@/lib/classes/class-feature-rows.js";
 import { monk } from "@/lib/classes/monk.js";
 import { SUBCLASS_IDENTITY, type SubclassSlug } from "@/lib/classes/subclass-slug.js";
+import { testFeatureRowsFor } from "@/lib/classes/__tests__/test-feature-rows.fixture.js";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -65,9 +66,8 @@ describe("deriveActions — class gates", () => {
     expect(l2).not.toContain("actionSurge");
   });
 
-  it("Barbarian L1 gets rage, L2 adds recklessAttack", () => {
+  it("Barbarian L2 adds recklessAttack (rage/endRage are row-driven now, #1686 — see the dedicated describe block below)", () => {
     const l1 = keys(at("barbarian", undefined, 1, []));
-    expect(l1).toContain("rage");
     expect(l1).not.toContain("recklessAttack");
 
     const l2 = keys(at("barbarian", undefined, 2, []));
@@ -224,28 +224,21 @@ describe("deriveActions — case-insensitivity", () => {
     // left (#1528 — row-driven now); paladin/barbarian cover the same gate.
     // #1229: divineSense is EDITION_2014-only now, so this case-insensitivity
     // check passes the edition explicitly rather than relying on the
-    // (still-2024) default.
+    // (still-2024) default. Barbarian's own case here checks recklessAttack,
+    // not rage — rage is row-driven now (#1686) and bare `at()` (no
+    // featureRows carrier) can never see it; recklessAttack is untouched.
     expect(keys(at("Paladin", undefined, 1, [], true, "EDITION_2014"))).toContain("divineSense");
     expect(keys(at("PALADIN", undefined, 3, []))).toContain("channelDivinity");
-    expect(keys(at("Barbarian", undefined, 1, []))).toContain("rage");
+    expect(keys(at("Barbarian", undefined, 2, []))).toContain("recklessAttack");
   });
 });
 
 describe("deriveActions — resource gating", () => {
-  it("rage is enabled when remaining > 0", () => {
-    const actions = at("barbarian", undefined, 1, [pool("rage", 2)]);
-    const rage = actions.find((a) => a.key === "rage");
-    expect(rage?.enabled).toBe(true);
-    expect(rage?.disabledReason).toBeUndefined();
-  });
-
-  it("rage is disabled with 'No rage remaining' when remaining is 0", () => {
-    const actions = at("barbarian", undefined, 1, [pool("rage", 0)]);
-    const rage = actions.find((a) => a.key === "rage");
-    expect(rage?.enabled).toBe(false);
-    expect(rage?.disabledReason).toBe("No rage remaining");
-  });
-
+  // rage's own enable/disable-by-pool coverage moved to the "Rage —
+  // row-driven toggle (#1686)" describe block below (it's a row-driven
+  // action now, not a bare DERIVED_ACTIONS entry) — flurryOfBlows here
+  // already proves the SAME resolveEnablement mechanism against a
+  // DERIVED_ACTIONS row.
   it("flurryOfBlows needs 1 focus: disabled with 'No focus remaining' at 0 (#1217)", () => {
     const actions = at("monk", undefined, 2, [pool("focus", 0)]);
     const flurry = actions.find((a) => a.key === "flurryOfBlows");
@@ -303,10 +296,13 @@ describe("deriveActions — requiresUnarmored gate (Bonus Unarmed Strike, #1218)
   });
 
   it("actions with no requiresUnarmored flag ignore the unarmoredUnshielded param", () => {
-    // Rage carries no requiresUnarmored — armored/shielded is irrelevant to it.
-    const actions = at("barbarian", undefined, 1, [pool("rage", 1)], false);
-    const rage = actions.find((a) => a.key === "rage");
-    expect(rage?.enabled).toBe(true);
+    // flurryOfBlows carries no requiresUnarmored — armored/shielded is
+    // irrelevant to it (Rage, formerly this test's fixture, is row-driven
+    // now — #1686 — and carries no requiresUnarmored either, but bare
+    // `at()` can no longer see it at all).
+    const actions = at("monk", undefined, 2, [pool("focus", 1)], false);
+    const flurry = actions.find((a) => a.key === "flurryOfBlows");
+    expect(flurry?.enabled).toBe(true);
   });
 });
 
@@ -344,15 +340,61 @@ describe("ACTION_EFFECT_FN — single spendResource keys", () => {
   }
 });
 
-describe("ACTION_EFFECT_FN — Rage durable buff (#457)", () => {
-  it("rage applies a while-active meleeDamage buff (level bonus) and spends a rage", () => {
-    expect(ACTION_EFFECT_FN.rage({ rageDamageBonus: 3 })).toEqual([
+// Rage/endRage retired from DERIVED_ACTIONS/ACTION_EFFECT_FN (#1686) — now a
+// row-driven "toggle" (barbarian-features.ts), reached through
+// deriveEntryScopedActions (toggleActionsFromRow) + toggleRowOps, off the
+// SAME literal rows test-feature-rows.fixture.ts mirrors for barbarian-
+// features.ts (literal-fixture-parity.test.ts pins level/description parity;
+// this suite is the descriptor-column parity proof). Byte-identity with the
+// retired closures (modifier/resistDamageTypes/rollEffects/spend shape) is
+// also pinned end-to-end through the real HTTP route by
+// routes/character/__tests__/actions-rage.test.ts, unmodified by this
+// migration.
+describe("Rage — row-driven toggle (#1686, retired from ACTION_EFFECT_FN)", () => {
+  const rageRow = (edition: "EDITION_2014" | "EDITION_2024") =>
+    testFeatureRowsFor("barbarian", undefined).classRows.find((r) => r.name === "Rage" && r.edition === edition)!;
+
+  it("rage/endRage are absent from the bare DERIVED_ACTIONS table", () => {
+    const l1 = keys(at("barbarian", undefined, 1, []));
+    expect(l1).not.toContain("rage");
+    expect(l1).not.toContain("endRage");
+  });
+
+  it("Barbarian L1 gets a row-driven rage/endRage pair (bonusAction, resolverKind toggle)", () => {
+    const actions = deriveEntryScopedActions(
+      [{ name: "barbarian", subclass: undefined, level: 1 }],
+      1,
+      [{ key: "rage", remaining: 2 }],
+      true,
+      "EDITION_2024",
+      (e) => testFeatureRowsFor(e.name, e.subclass),
+    );
+    expect(actions.find((a) => a.key === "rage")).toMatchObject({ name: "Rage", cost: "bonusAction", resolverKind: "toggle", enabled: true });
+    expect(actions.find((a) => a.key === "endRage")).toMatchObject({ name: "End Rage", cost: "bonusAction", resolverKind: "toggle", enabled: true });
+  });
+
+  it("rage is disabled with 'No rage remaining' at 0, while endRage stays enabled — same disabledReason text the retired DERIVED_ACTIONS row produced", () => {
+    const actions = deriveEntryScopedActions(
+      [{ name: "barbarian", subclass: undefined, level: 1 }],
+      1,
+      [{ key: "rage", remaining: 0 }],
+      true,
+      "EDITION_2024",
+      (e) => testFeatureRowsFor(e.name, e.subclass),
+    );
+    expect(actions.find((a) => a.key === "rage")).toMatchObject({ enabled: false, disabledReason: "No rage remaining" });
+    expect(actions.find((a) => a.key === "endRage")).toMatchObject({ enabled: true });
+  });
+
+  it("activation applies a while-active meleeDamage buff carrying b/p/s resistance + advantage on Strength checks/saves — same shape the retired ACTION_EFFECT_FN.rage closure hand-rolled", () => {
+    const ops = toggleRowOps(rageRow("EDITION_2024"), { level: 1, abilityScores: {}, profBonus: 2 }, false);
+    expect(ops).toEqual([
       {
         type: "applyBuff",
         buff: {
           key: "rage",
           target: "meleeDamage",
-          modifier: 3,
+          modifier: 2,
           source: "Rage",
           duration: "while-active",
           resistDamageTypes: ["bludgeoning", "piercing", "slashing"],
@@ -366,29 +408,28 @@ describe("ACTION_EFFECT_FN — Rage durable buff (#457)", () => {
     ]);
   });
 
-  it("rage defaults the buff modifier to +2 when no bonus is supplied", () => {
-    const ops = ACTION_EFFECT_FN.rage({}) as Array<{ type: string; buff?: { modifier: number } }>;
-    expect(ops[0].buff?.modifier).toBe(2);
+  it("the melee-damage bonus scales +2 / +3 / +4 by the granting entry's level — the tiered effectBuffs modifier replacing the retired rageMeleeDamageBonus function", () => {
+    const modifierAt = (level: number) =>
+      (toggleRowOps(rageRow("EDITION_2024"), { level, abilityScores: {}, profBonus: 2 }, false)[0] as { buff: { modifier: number } }).buff.modifier;
+    expect(modifierAt(1)).toBe(2);
+    expect(modifierAt(8)).toBe(2);
+    expect(modifierAt(9)).toBe(3);
+    expect(modifierAt(15)).toBe(3);
+    expect(modifierAt(16)).toBe(4);
+    expect(modifierAt(20)).toBe(4);
   });
 
-  it("endRage clears the rage buff by key (manual + auto both route here)", () => {
-    expect(ACTION_EFFECT_FN.endRage({})).toEqual([
+  it("endRage clears the rage buff by key, same reason text as the retired ACTION_EFFECT_FN.endRage (manual + auto turn-hook both route here)", () => {
+    expect(toggleRowOps(rageRow("EDITION_2024"), { level: 1, abilityScores: {}, profBonus: 2 }, true)).toEqual([
       { type: "clearBuff", key: "rage", reason: "Rage ended" },
     ]);
   });
 
-  it("rageMeleeDamageBonus scales +2 / +3 / +4 by barbarian level", () => {
-    expect(rageMeleeDamageBonus(1)).toBe(2);
-    expect(rageMeleeDamageBonus(8)).toBe(2);
-    expect(rageMeleeDamageBonus(9)).toBe(3);
-    expect(rageMeleeDamageBonus(15)).toBe(3);
-    expect(rageMeleeDamageBonus(16)).toBe(4);
-    expect(rageMeleeDamageBonus(20)).toBe(4);
-  });
-
-  it("endRage is a barbarian bonus action from L1", () => {
-    expect(keys(at("barbarian", undefined, 1, []))).toContain("endRage");
-    expect(keys(at("fighter", undefined, 20, []))).not.toContain("endRage");
+  it("the 2014 Rage row carries the identical buff shape (edition-invariant mechanic)", () => {
+    const ops = toggleRowOps(rageRow("EDITION_2014"), { level: 9, abilityScores: {}, profBonus: 4 }, false);
+    const buff = (ops[0] as { buff: { modifier: number; resistDamageTypes?: string[] } }).buff;
+    expect(buff.modifier).toBe(3);
+    expect(buff.resistDamageTypes).toEqual(["bludgeoning", "piercing", "slashing"]);
   });
 });
 

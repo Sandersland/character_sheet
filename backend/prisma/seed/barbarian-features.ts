@@ -38,20 +38,27 @@
 // commit deletes. SRD 5.1 grants unlimited Rages at level 20 (encoded as 99,
 // same as the retired resourceFn did); SRD 5.2 caps at 6 from level 17 on —
 // the headline bug this issue fixes (today a level-20 2024 Barbarian
-// resolves the 2014 table and is told "Unlimited uses at level 20"). Only
-// the POOL moved: Rage's ACTIVATION (DERIVED_ACTIONS' "rage"/"endRage"
-// entries, ACTION_EFFECT_FN.rage's resistDamageTypes/rollEffects buff) stays
-// in classes/actions.ts — ClassFeature has no descriptor columns for a
-// buff's resistance list or roll-effect set, so that half isn't a candidate
-// for this migration. #1528's "no-second-string" rule (poolFromRow reads the
-// row's own `description`, never a second hand-written pool string) means
-// the 2014 Rage pool's description is now this row's feature text below,
-// which no longer mentions "Regain all rages on a long rest." or "Unlimited
-// uses at level 20." — those sentences lived only in the retired resourceFn
-// string, not in the byte-identical-pinned row text
-// (barbarian-2014-snapshot.test.ts), so dropping them is this commit's
-// accepted, intended consequence, not a regression to fix.
+// resolves the 2014 table and is told "Unlimited uses at level 20"). #1528's
+// "no-second-string" rule (poolFromRow reads the row's own `description`,
+// never a second hand-written pool string) means the 2014 Rage pool's
+// description is now this row's feature text below, which no longer mentions
+// "Regain all rages on a long rest." or "Unlimited uses at level 20." — those
+// sentences lived only in the retired resourceFn string, not in the
+// byte-identical-pinned row text (barbarian-2014-snapshot.test.ts), so
+// dropping them is this commit's accepted, intended consequence, not a
+// regression to fix.
+//
+// ACTIVATION + BUFF (#1686): Rage's DERIVED_ACTIONS "rage"/"endRage" pair and
+// ACTION_EFFECT_FN.rage's hand-rolled resistDamageTypes/rollEffects/tiered
+// modifier closure are RETIRED — both Rage rows below now carry
+// activationCost/resolverKind ("toggle") + a costKind/costPoolKey/costBase
+// block (paying 1 use from the row's own "rage" pool) + one `effectBuffs`
+// entry whose `modifier` is the +2/+3/+4 tier array evaluateBuffModifier
+// resolves. This is the "buff-granting subclass is authorable as seed rows"
+// proof #1686 exists for — see toggleActionsFromRow/toggleRowOps
+// (lib/classes/actions.ts) for the generic engine this data drives.
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
+import type { EffectBuffRow } from "../../src/lib/classes/class-feature-rows.js";
 import type { SeedEdition } from "./edition.js";
 import type { ClassFeatureSeedRow } from "./class-features.js";
 
@@ -85,6 +92,14 @@ interface RawBarbarianFeature {
   resourceLabel?: string;
   resourceRecharge?: string;
   resourceTotals?: { minLevel: number; total: number; shortRestRegain?: number }[];
+  // Rage's activation block (#1686) — see this file's own header for why
+  // only Rage's two rows below ever set these.
+  activationCost?: string;
+  resolverKind?: string;
+  costKind?: string;
+  costPoolKey?: string;
+  costBase?: number;
+  effectBuffs?: EffectBuffRow[];
 }
 
 function expand(raw: RawBarbarianFeature): ClassFeatureSeedRow[] {
@@ -100,9 +115,46 @@ function expand(raw: RawBarbarianFeature): ClassFeatureSeedRow[] {
     resourceLabel: raw.resourceLabel,
     resourceRecharge: raw.resourceRecharge,
     resourceTotals: raw.resourceTotals,
+    activationCost: raw.activationCost,
+    resolverKind: raw.resolverKind,
+    costKind: raw.costKind,
+    costPoolKey: raw.costPoolKey,
+    costBase: raw.costBase,
+    effectBuffs: raw.effectBuffs,
   };
   const editions: SeedEdition[] = raw.edition ? [raw.edition] : ["EDITION_2014", "EDITION_2024"];
   return editions.map((edition) => ({ ...base, edition }));
+}
+
+// Rage's damage-bonus tier array (#1686) — the +2/+3/+4-by-barbarian-level
+// progression, identical in both editions (SRD 5.1 p.21 / SRD 5.2 p.20),
+// evaluated by evaluateBuffModifier off the granting entry's own level. One
+// shared constant so the 2014/2024 rows below can't drift on the tiers
+// themselves even though their surrounding buff (resist types, roll effects)
+// stays authored per row.
+const RAGE_DAMAGE_TIERS = [
+  { minLevel: 1, value: 2 },
+  { minLevel: 9, value: 3 },
+  { minLevel: 16, value: 4 },
+] as const;
+
+// The while-active buff itself (#1686) — edition-invariant: both SRD 5.1
+// p.21 and SRD 5.2 p.20 grant the identical b/p/s resistance + Strength
+// check/save advantage + level-tiered melee-damage bonus while raging.
+function rageBuff(): EffectBuffRow[] {
+  return [
+    {
+      key: "rage",
+      target: "meleeDamage",
+      modifier: [...RAGE_DAMAGE_TIERS],
+      duration: "while-active",
+      resistDamageTypes: ["bludgeoning", "piercing", "slashing"],
+      rollEffects: [
+        { mode: "advantage", kind: "check", ability: "strength" },
+        { mode: "advantage", kind: "save", ability: "strength" },
+      ],
+    },
+  ];
 }
 
 // ---- Base class — SRD 5.1 Barbarian (2014) / SRD 5.2 Barbarian (2024) -----
@@ -138,6 +190,16 @@ const BARBARIAN_BASE_RAW: RawBarbarianFeature[] = [
       { minLevel: 17, total: 6 },
       { minLevel: 20, total: 99 },
     ],
+    // #1686: activation pays 1 use from this row's OWN "rage" pool (the
+    // resourceTotals above) — costPoolKey equals resourceKey here because
+    // Rage spends its own dedicated pool, unlike a shared-pool toggle
+    // (Elemental Attunement spends the monk's shared "focus" pool instead).
+    activationCost: "bonusAction",
+    resolverKind: "toggle",
+    costKind: "pool",
+    costPoolKey: "rage",
+    costBase: 1,
+    effectBuffs: rageBuff(),
   },
   {
     subclassSlug: null,
@@ -171,6 +233,13 @@ const BARBARIAN_BASE_RAW: RawBarbarianFeature[] = [
       { minLevel: 12, total: 5, shortRestRegain: 1 },
       { minLevel: 17, total: 6, shortRestRegain: 1 },
     ],
+    // #1686 — see the 2014 row above for why costPoolKey === resourceKey.
+    activationCost: "bonusAction",
+    resolverKind: "toggle",
+    costKind: "pool",
+    costPoolKey: "rage",
+    costBase: 1,
+    effectBuffs: rageBuff(),
   },
   {
     subclassSlug: null,

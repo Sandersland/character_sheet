@@ -57,10 +57,10 @@ export class UnknownActionError extends Error {
   status = 400;
 }
 
-/** Rage's melee-damage bonus by barbarian level (+2 / +3 / +4). */
-export function rageMeleeDamageBonus(barbarianLevel: number): number {
-  return barbarianLevel >= 16 ? 4 : barbarianLevel >= 9 ? 3 : 2;
-}
+// rageMeleeDamageBonus retired (#1686) — the +2/+3/+4 progression now lives
+// as a tiered `modifier` on Rage's own effectBuffs entry
+// (barbarian-features.ts), evaluated by evaluateBuffModifier
+// (class-feature-rows.ts) instead of a hardcoded closure here.
 
 /** One class/level gate: this class grants the row from this class level up. */
 interface ActionClassGate {
@@ -207,8 +207,10 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // Only class-specific (non-universal) actions go in availableActions.
 
   // Barbarian
-  { key: "rage", name: "Rage", cost: "bonusAction", grantClass: "barbarian", grantLevel: 1, resourceKey: "rage", resourceAmount: 1 },
-  { key: "endRage", name: "End Rage", cost: "bonusAction", grantClass: "barbarian", grantLevel: 1 },
+  // Rage/endRage retired from this table (#1686) — row-driven now
+  // (barbarian-features.ts's Rage rows, resolverKind "toggle"), synthesized
+  // by toggleActionsFromRow instead of a hand-authored pair here — mirrors
+  // Second Wind/Action Surge's own #1528 retirement.
   { key: "recklessAttack", name: "Reckless Attack", cost: "free", grantClass: "barbarian", grantLevel: 2 },
 
   // Bard
@@ -764,17 +766,24 @@ function resolveEnablement(
 //    range server-side rather than recomputing (same pattern as castSpell.roll).
 //  - A roll made server-side with no client input (e.g. Heightened Focus's
 //    temp-HP roll) is precomputed by the route before dispatch and passed in
-//    via its own ctx field, same shape as `rageDamageBonus` below.
+//    via its own ctx field, same shape as `heightenedFocusTempHp` below.
 //  - Use ONLY existing op types (spendResource, adjustQuantity, heal, tempHp,
 //    applyBuff, clearBuff).
+//
+// A while-active BUFF-GRANTING feature (Rage was the last one here) does NOT
+// belong in this table any more (#1686): author it as a ClassFeature/
+// GrantedAbility row with resolverKind "toggle" + an `effectBuffs` list
+// instead (toggleActionsFromRow/toggleRowOps below) — Rage's own migration
+// (barbarian-features.ts) is the worked example, including the level-tiered
+// modifier and resistDamageTypes/rollEffects passthrough this table's
+// closures used to hand-roll. This table stays for actions with NO buff to
+// grant (spend/heal/tempHp/no-op).
 
 interface ActionContext {
   /** Arbitrary dice roll total supplied by the client (e.g. potion healing). */
   roll?: number;
   /** ID of the inventory item to consume (e.g. healing potion). */
   inventoryItemId?: string;
-  /** Level-derived Rage melee-damage bonus, computed by the route from barbarian level. */
-  rageDamageBonus?: number;
   /**
    * Heightened Focus (monk L10, PHB'24 p.98/SRD 5.2, #1244): temp HP for
    * Patient Defense's Focus variant, rolled server-side (two Martial Arts die
@@ -825,28 +834,10 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
   },
 
   // Barbarian
-  // Rage applies a durable while-active meleeDamage buff (auto-ends via the
-  // session turn-hook / long rest / 0 HP) and spends a rage use.
-  rage: (ctx) => [
-    {
-      type: "applyBuff",
-      buff: {
-        key: "rage",
-        target: "meleeDamage",
-        modifier: ctx.rageDamageBonus ?? 2,
-        source: "Rage",
-        duration: "while-active",
-        resistDamageTypes: ["bludgeoning", "piercing", "slashing"],
-        rollEffects: [
-          { mode: "advantage", kind: "check", ability: "strength" },
-          { mode: "advantage", kind: "save", ability: "strength" },
-        ],
-      },
-    },
-    { type: "spendResource", key: "rage" },
-  ],
-  // Manual end (bonus action) — the same clear the turn-hook fires automatically.
-  endRage: () => [{ type: "clearBuff", key: "rage", reason: "Rage ended" }],
+  // Rage/endRage retired from this table (#1686) — row-driven now
+  // (barbarian-features.ts's Rage rows carry resolverKind "toggle" + a
+  // tiered effectBuffs entry), dispatched through toggleRowOps
+  // (routes/character/actions.ts) instead of a hand-authored closure here.
   recklessAttack: () => [], // ephemeral — advantage/disadvantage is tracked by the table
 
   // Bard

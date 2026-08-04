@@ -31,7 +31,7 @@ import { z } from "zod";
 import { assertCharacterAccess } from "@/lib/auth/access.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
-import { ACTION_EFFECT_FN, castSpecFromRow, endActionKey, rageMeleeDamageBonus, toggleRowOps, UnknownActionError } from "@/lib/classes/actions.js";
+import { ACTION_EFFECT_FN, castSpecFromRow, endActionKey, toggleRowOps, UnknownActionError } from "@/lib/classes/actions.js";
 import { castAbilityInTx } from "@/lib/spellcasting/ability-cast.js";
 import type { PayCostContext } from "@/lib/spellcasting/ability-cost.js";
 import type { SpendResourceOperation } from "@/lib/classes/resources.js";
@@ -144,7 +144,6 @@ async function applyActionOpInTx(
   op: ExecuteActionOperation,
   batchId: string,
   sessionId: string | null,
-  rageDamageBonus: number,
   heightenedFocusTempHp: number,
 ): Promise<ExecuteActionResult> {
   const effectFn = ACTION_EFFECT_FN[op.actionKey];
@@ -152,7 +151,7 @@ async function applyActionOpInTx(
     return applyRowDrivenActionInTx(tx, characterId, op, batchId, sessionId);
   }
 
-  const ctx = { roll: op.roll, inventoryItemId: op.inventoryItemId, rageDamageBonus, heightenedFocusTempHp };
+  const ctx = { roll: op.roll, inventoryItemId: op.inventoryItemId, heightenedFocusTempHp };
   const ops = effectFn(ctx);
   for (const effect of ops) {
     await applyActionEffectInTx(tx, characterId, effect, batchId, sessionId);
@@ -310,27 +309,19 @@ async function assertKnownActionKeys(operations: ExecuteActionOperation[], chara
   }
 }
 
-/**
- * Level-derived Rage melee bonus, resolved before the transaction so the rage
- * effect fn stays pure (no DB). Only hits the DB when a rage op is present.
- */
-async function computeRageDamageBonus(operations: ExecuteActionOperation[], characterId: string): Promise<number> {
-  if (!operations.some((op) => op.actionKey === "rage")) return 0;
-  const classRow = await prisma.character.findUnique({
-    where: { id: characterId },
-    select: { classEntries: { select: { name: true, level: true } } },
-  });
-  const barbarianLevel = classRow?.classEntries.find((e) => e.name.toLowerCase() === "barbarian")?.level ?? 0;
-  return rageMeleeDamageBonus(barbarianLevel);
-}
+// computeRageDamageBonus retired (#1686) — Rage's melee-damage bonus is now
+// evaluated by toggleRowOps off the row's own tiered effectBuffs modifier,
+// using the granting entry's OWN effective level (eligibleRowActions'
+// entryLevel, resolved inside applyRowDrivenActionInTx's toggle branch), so
+// no separate pre-transaction DB read is needed for it any more.
 
 /**
  * Heightened Focus (monk L10, PHB'24 p.98/SRD 5.2, #1244): Patient Defense's
  * Focus variant additionally grants temp HP = two Martial Arts die rolls,
- * rolled server-side (no client input) — mirrors computeRageDamageBonus:
- * only hits the DB when a patientDefenseFocus op is present, and only rolls
- * when the monk is actually L10+ (0 below that, so the effect fn omits the
- * tempHp op entirely rather than granting a zero amount).
+ * rolled server-side (no client input) — only hits the DB when a
+ * patientDefenseFocus op is present, and only rolls when the monk is
+ * actually L10+ (0 below that, so the effect fn omits the tempHp op
+ * entirely rather than granting a zero amount).
  */
 async function computeHeightenedFocusTempHp(operations: ExecuteActionOperation[], characterId: string): Promise<number> {
   if (!operations.some((op) => op.actionKey === "patientDefenseFocus")) return 0;
@@ -368,7 +359,6 @@ actionsRouter.post<{ id: string }>(
     // clean 500 — no message-string sniffing, no hand-rolled 500 here.
     await assertKnownActionKeys(operations, characterId);
 
-    const rageDamageBonus = await computeRageDamageBonus(operations, characterId);
     const heightenedFocusTempHp = await computeHeightenedFocusTempHp(operations, characterId);
     const batchId = randomUUID();
     const sessionId = await getActiveSessionId(characterId);
@@ -382,7 +372,7 @@ actionsRouter.post<{ id: string }>(
     const results: ExecuteActionResult[] = [];
     await prisma.$transaction(async (tx) => {
       for (const op of operations) {
-        results.push(await applyActionOpInTx(tx, characterId, op, batchId, sessionId, rageDamageBonus, heightenedFocusTempHp));
+        results.push(await applyActionOpInTx(tx, characterId, op, batchId, sessionId, heightenedFocusTempHp));
       }
     });
 
