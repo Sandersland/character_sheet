@@ -1,10 +1,12 @@
 // Concatenates every per-class 2014 spell-content module into one union and
-// locks every row's `edition` to EDITION_2014 — the whole spells-2014/
-// subtree is PHB'14 content, so tagging it here once (rather than repeating
+// defaults untagged rows to EDITION_2014 — the whole spells-2014/ subtree is
+// PHB'14 content, so defaulting it here once (rather than repeating
 // `edition: "EDITION_2014"` on every future spell literal) is what keeps a
 // content author's forgotten tag from silently falling through to
 // CatalogSpell's OTHER default (spells.ts's EDITION_2024) and colliding with
-// the 2024 row under the same name.
+// the 2024 row under the same name. An explicit `edition` on an individual
+// row (e.g. a genuinely edition-agnostic spell) still passes through
+// untouched.
 //
 // #1710 (foundation slice 1/3 of epic #1517) creates this file plus the
 // empty per-class arrays it concatenates; the by-class content slices
