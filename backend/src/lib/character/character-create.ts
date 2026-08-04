@@ -48,6 +48,7 @@ import {
 } from "@/lib/srd/species-ability-increases.js";
 import {
   isChooseCantrip,
+  isChooseOriginFeat,
   isChooseSkills,
   type ChooseCantrip,
   type ChooseSkills,
@@ -356,9 +357,15 @@ async function resolveSpeciesSelection(
 type SpeciesChoiceSpecs = {
   chooseSkills: ChooseSkills | null;
   chooseCantrip: ChooseCantrip | null;
+  // #1690: true when the confirmed species+variant carries a chooseOriginFeat
+  // trait (2024 Human's Versatile) — a bare boolean, not a further spec, per
+  // speciesTraitChoiceSchema's chooseOriginFeatSchema (the whole rule is
+  // "Origin category", enforced live against the Feat catalog, never baked
+  // into the trait row itself).
+  chooseOriginFeat: boolean;
 };
 
-const NO_SPECIES_CHOICES: SpeciesChoiceSpecs = { chooseSkills: null, chooseCantrip: null };
+const NO_SPECIES_CHOICES: SpeciesChoiceSpecs = { chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false };
 
 async function fetchSpeciesChoiceSpecs(speciesId: string, variantId: string | null): Promise<SpeciesChoiceSpecs> {
   const traits = await prisma.speciesTrait.findMany({
@@ -371,6 +378,7 @@ async function fetchSpeciesChoiceSpecs(speciesId: string, variantId: string | nu
   return {
     chooseSkills: choices.find(isChooseSkills)?.chooseSkills ?? null,
     chooseCantrip: choices.find(isChooseCantrip)?.chooseCantrip ?? null,
+    chooseOriginFeat: choices.some(isChooseOriginFeat),
   };
 }
 
@@ -1491,12 +1499,108 @@ async function resolveSpeciesCantripGrant(
   return { ok: true, entry };
 }
 
-// The Origin feat rides resources.advancements as a slot-exempt entry (#1130);
-// undefined when the background grants none (the column is left at its default).
-function creationResources(originEntry: AdvancementEntry | null): Prisma.InputJsonValue | undefined {
-  if (!originEntry) return undefined;
+// The "no chooseOriginFeat spec served" branch of resolveSpeciesOriginFeatGrant
+// below — split out purely to keep that function's own cyclomatic/cognitive
+// complexity under the repo's health gate, same reasoning as
+// validateVariantSelection/resolveSpeciesCatalogRow above.
+function speciesOriginFeatNotServedResult(speciesOriginFeatId: string | undefined): PhaseResult<{ entry: null }> {
+  if (speciesOriginFeatId) {
+    return { ok: false, status: 400, error: "speciesOriginFeatId not allowed: this species has no Origin feat choice" };
+  }
+  return { ok: true, entry: null };
+}
+
+type OriginFeatRow = NonNullable<Awaited<ReturnType<typeof prisma.feat.findUnique>>>;
+
+// Validates a resolved Feat row is legal as a SPECIES-granted Origin feat pick:
+// right edition, and — the one check buildOriginEntry's background path never
+// needs (a background's Origin feat is baked from its own fixed FK, never a
+// player-submitted id) — actually Origin category. Split out of
+// resolveSpeciesOriginFeatGrant for the same complexity-gate reason as the
+// helper above.
+function validateOriginFeatRow(feat: OriginFeatRow, edition: RulesEdition): Fail | null {
+  const mismatch = crossEditionRejection(feat, `Feat "${feat.name}"`, edition);
+  if (mismatch) return { ok: false, status: 400, error: mismatch };
+  if (feat.category !== "origin") {
+    return { ok: false, status: 400, error: `speciesOriginFeatId: "${feat.name}" is not an Origin feat` };
+  }
+  return null;
+}
+
+// PHB'24: an Origin feat is normally taken once — the species pick may not
+// repeat the background's own Origin feat unless the feat is explicitly
+// printed repeatable (Magic Initiate, Skilled), in which case taking it twice
+// (once from each grant) is the intended, legal way to gain it again.
+// `backgroundOriginEntry` is `grants.originEntry` (resolveBackgroundGrants,
+// `null` for a 2014 character or a background with no Origin feat) — the ONE
+// place that entry's featId is compared against, so this rule can only ever
+// see the SAME snapshot the background phase already committed to, never a
+// second, independent re-resolution of it.
+function originFeatDuplicateError(feat: OriginFeatRow, backgroundOriginEntry: AdvancementEntry | null): Fail | null {
+  if (backgroundOriginEntry?.featId === feat.id && !feat.repeatable) {
+    return {
+      ok: false,
+      status: 400,
+      error: `speciesOriginFeatId: "${feat.name}" duplicates your background's Origin feat and is not repeatable`,
+    };
+  }
+  return null;
+}
+
+// Builds the SAME slot-exempt snapshot AdvancementEntry shape buildOriginEntry
+// bakes for the background's own Origin feat (origin: true, so
+// applyRemoveAdvancement's guard and splitAdvancementsBySlotCap's slot
+// exemption both apply with zero new logic) — just resolved from a
+// player-chosen feat row instead of the background's fixed FK.
+function buildSpeciesOriginFeatEntry(feat: OriginFeatRow): AdvancementEntry {
+  return {
+    id: randomUUID(),
+    level: 1,
+    kind: "feat",
+    origin: true,
+    abilityDeltas: {},
+    hpDelta: 0,
+    initDelta: 0,
+    featId: feat.id,
+    featName: feat.name,
+    featDescription: feat.description,
+    improvements: (feat.improvements as unknown as FeatImprovement[]) ?? [],
+  };
+}
+
+// Phase 2d — species-granted Origin feat (#1690, 2024 Human's Versatile).
+async function resolveSpeciesOriginFeatGrant(
+  input: CreateCharacterBody,
+  hasSpec: boolean,
+  edition: RulesEdition,
+  backgroundOriginEntry: AdvancementEntry | null,
+): Promise<PhaseResult<{ entry: AdvancementEntry | null }>> {
+  const { speciesOriginFeatId } = input;
+  if (!hasSpec) return speciesOriginFeatNotServedResult(speciesOriginFeatId);
+  if (!speciesOriginFeatId) {
+    return { ok: false, status: 400, error: "speciesOriginFeatId required: this species grants a choice of Origin feat" };
+  }
+  const feat = await prisma.feat.findUnique({ where: { id: speciesOriginFeatId } });
+  if (!feat) {
+    return { ok: false, status: 400, error: `Unknown feat id: ${speciesOriginFeatId}` };
+  }
+  const rowError = validateOriginFeatRow(feat, edition);
+  if (rowError) return rowError;
+  const dupError = originFeatDuplicateError(feat, backgroundOriginEntry);
+  if (dupError) return dupError;
+  return { ok: true, entry: buildSpeciesOriginFeatEntry(feat) };
+}
+
+// The Origin feat(s) ride resources.advancements as slot-exempt entries
+// (#1130) — an array, not a single entry: #1690 lets a character carry TWO at
+// once (the background's own grant plus a species-chosen one, e.g. a 2024
+// Human with a Soldier background). undefined when neither phase granted one
+// (the column is left at its default).
+function creationResources(originEntries: (AdvancementEntry | null)[]): Prisma.InputJsonValue | undefined {
+  const entries = originEntries.filter((e): e is AdvancementEntry => e != null);
+  if (entries.length === 0) return undefined;
   const state = normalizeResourcesMutable(null);
-  state.advancements = [originEntry];
+  state.advancements = entries;
   return serializeResourcesState(state);
 }
 
@@ -1551,6 +1655,7 @@ function raceSelectionCreateInput(
   selections: ResolvedSelections,
   appliedIncreases: SpeciesGrants["appliedIncreases"],
   speciesCantripName: string | null,
+  speciesOriginFeatName: string | null,
 ) {
   return {
     name: input.race,
@@ -1569,6 +1674,11 @@ function raceSelectionCreateInput(
     // choice-bearing trait.
     speciesSkills: input.speciesSkills ?? [],
     speciesCantripName,
+    // #1690: provenance snapshot of a species-granted Origin feat pick
+    // (Human's Versatile) — sibling of speciesCantripName above. The
+    // functional grant is the AdvancementEntry creationResources folds onto
+    // resources.advancements, not this column.
+    speciesOriginFeatName,
   };
 }
 
@@ -1598,6 +1708,7 @@ async function persistCreatedCharacter(
   spellEntries: SpellEntry[] | null,
   grants: BackgroundGrants,
   speciesGrants: SpeciesGrants,
+  speciesOriginFeatEntry: AdvancementEntry | null,
 ): Promise<{ id: string }> {
   const { characterClass, background, primaryClassChoice } = selections;
   const { inventoryItemCreates, startingCurrency } = equipment;
@@ -1622,7 +1733,7 @@ async function persistCreatedCharacter(
     { race: selections.race, characterClass }
   );
 
-  const resources = creationResources(originEntry);
+  const resources = creationResources([originEntry, speciesOriginFeatEntry]);
   const clampedSpellEntries = clampCreationSpellEntries(spellEntries, primaryClassChoice, selections, effectiveScores);
   const speciesCantripName = speciesCantripEntryOf(spellEntries)?.name ?? null;
 
@@ -1649,7 +1760,9 @@ async function persistCreatedCharacter(
       // Override derived currency with starting gold if the gold path was chosen.
       ...currencyField(startingCurrency),
       spellcasting: creationSpellcasting(clampedSpellEntries),
-      raceSelection: { create: raceSelectionCreateInput(input, selections, appliedIncreases, speciesCantripName) },
+      raceSelection: {
+        create: raceSelectionCreateInput(input, selections, appliedIncreases, speciesCantripName, speciesOriginFeatEntry?.featName ?? null),
+      },
       backgroundSelection: {
         create: { name: input.background, backgroundId: background?.id ?? null },
       },
@@ -1729,6 +1842,18 @@ export async function createCharacter(
   if (!speciesCantrip.ok) return speciesCantrip;
   const spellEntries = speciesCantrip.entry ? [...(spells.spellEntries ?? []), speciesCantrip.entry] : spells.spellEntries;
 
-  const { id } = await persistCreatedCharacter(input, ownerId, selections, equipment, spellEntries, grants, speciesGrants);
+  // #1690: the species-granted Origin feat (2024 Human's Versatile), resolved
+  // against grants.originEntry (the background's OWN Origin feat, already
+  // committed above) so the duplicate-vs-background rule compares against
+  // the SAME snapshot persistCreatedCharacter writes, never a second lookup.
+  const speciesOriginFeat = await resolveSpeciesOriginFeatGrant(
+    input,
+    selections.speciesChoiceSpecs.chooseOriginFeat,
+    selections.edition,
+    grants.originEntry,
+  );
+  if (!speciesOriginFeat.ok) return speciesOriginFeat;
+
+  const { id } = await persistCreatedCharacter(input, ownerId, selections, equipment, spellEntries, grants, speciesGrants, speciesOriginFeat.entry);
   return { ok: true, id };
 }

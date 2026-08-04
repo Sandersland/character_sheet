@@ -24,9 +24,10 @@
 //
 // Choice-bearing traits: Half-Elf Skill Versatility and High Elf Cantrip carry
 // a real `choice` spec as of #1689 (speciesTraitChoiceSchema, lib/srd/
-// species-trait-choices.ts). The 2024 pair (Human Skillful/Versatile, Elf Keen
-// Senses) stays announce-only TEXT ROWS — #1690's scope, not this one's (epic
-// review decision 8). No row here may claim a resolved mechanic for those.
+// species-trait-choices.ts). The 2024 trio (Human Skillful/Versatile, Elf Keen
+// Senses) carries one too as of #1690 — Skillful/Keen Senses ride the SAME
+// chooseSkills spec (Keen Senses restricted via `from`; Skillful unrestricted),
+// and Versatile is the first row to use the new chooseOriginFeat spec.
 //
 // Level-gated traits (2024 Dragonborn's Draconic Flight at level 5, Aasimar's
 // Radiant Soul/Necrotic Shroud/Celestial Revelation, Goliath's Large Form) are
@@ -498,7 +499,8 @@ const ELF_2024_BASE: SpeciesTraitSeed[] = [
     speciesSlug: "elf",
     speciesEdition: "EDITION_2024",
     name: "Keen Senses",
-    description: "You have proficiency in one of the following skills of your choice: Insight, Perception, or Survival. (SRD 5.2 p. 24) — choice mechanics are #1690's scope, not authored here.",
+    description: "You have proficiency in one of the following skills of your choice: Insight, Perception, or Survival. (SRD 5.2 p. 24)",
+    choice: { chooseSkills: { count: 1, from: ["insight", "perception", "survival"] } },
   },
   {
     speciesSlug: "elf",
@@ -565,13 +567,15 @@ const HUMAN_2024_BASE: SpeciesTraitSeed[] = [
     speciesSlug: "human",
     speciesEdition: "EDITION_2024",
     name: "Skillful",
-    description: "You gain proficiency in one skill of your choice. (SRD 5.2 p. 36) — choice mechanics are #1690's scope, not authored here.",
+    description: "You gain proficiency in one skill of your choice. (SRD 5.2 p. 36)",
+    choice: { chooseSkills: { count: 1 } },
   },
   {
     speciesSlug: "human",
     speciesEdition: "EDITION_2024",
     name: "Versatile",
-    description: "You gain an Origin feat of your choice. (SRD 5.2 p. 36) — choice mechanics are #1690's scope, not authored here.",
+    description: "You gain an Origin feat of your choice. (SRD 5.2 p. 36)",
+    choice: { chooseOriginFeat: true },
   },
 ];
 

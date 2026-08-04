@@ -239,6 +239,28 @@ export function deriveSpeciesCantripChoice(
   };
 }
 
+export interface CreationSpeciesOriginFeatChoice {
+  /** False renders no panel — driven purely by the served chooseOriginFeat
+   *  boolean (#1572 trick), never a client edition check. */
+  applicable: boolean;
+  selectedId: string;
+  complete: boolean;
+}
+
+// Derives the species Origin-feat-choice state for the form (#1690, 2024
+// Human's Versatile). Unlike the skill/cantrip choices above there is no
+// further spec to resolve here — chooseOriginFeat is a bare boolean, and
+// "Origin category" is enforced server-side against the live Feat catalog
+// (resolveSpeciesOriginFeatGrant), never a client-side filter of a fixed list.
+export function deriveSpeciesOriginFeatChoice(
+  draft: CharacterDraft,
+  selections: CreationSelections,
+): CreationSpeciesOriginFeatChoice {
+  const applicable = Boolean(selections.species?.chooseOriginFeat || selections.variant?.chooseOriginFeat);
+  if (!applicable) return { applicable: false, selectedId: "", complete: true };
+  return { applicable: true, selectedId: draft.speciesOriginFeatId, complete: draft.speciesOriginFeatId.length > 0 };
+}
+
 function hitDieFace(hitDie: string): number {
   return Number(hitDie.replace(/^d/i, ""));
 }
@@ -356,6 +378,9 @@ function completedSpeciesSkills(choice: CreationSpeciesSkillChoice): SkillName[]
 function completedSpeciesCantripId(choice: CreationSpeciesCantripChoice): string | undefined {
   return choice.applicable && choice.complete ? choice.selectedId : undefined;
 }
+function completedSpeciesOriginFeatId(choice: CreationSpeciesOriginFeatChoice): string | undefined {
+  return choice.applicable && choice.complete ? choice.selectedId : undefined;
+}
 
 // #1131/#1689: a level-1 caster's own creation picks — a species cantrip
 // choice rides the SAME `spells` step but a DIFFERENT request field
@@ -384,6 +409,7 @@ export function buildCreatePayload(
   // Versatility) in the same request.
   const speciesSkillChoice = deriveSpeciesSkillChoice(draft, selections, classBackgroundSkills);
   const speciesCantripChoice = deriveSpeciesCantripChoice(draft, selections);
+  const speciesOriginFeatChoice = deriveSpeciesOriginFeatChoice(draft, selections);
   return {
     name: draft.name.trim(),
     alignment: draft.alignment,
@@ -397,6 +423,7 @@ export function buildCreatePayload(
     speciesAbilities: completedSpeciesAbilities(speciesBonuses),
     speciesSkills: completedSpeciesSkills(speciesSkillChoice),
     speciesCantripId: completedSpeciesCantripId(speciesCantripChoice),
+    speciesOriginFeatId: completedSpeciesOriginFeatId(speciesOriginFeatChoice),
     background: resolveBackgroundName(draft),
     classes: [{
       name: draft.className,

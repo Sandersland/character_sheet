@@ -77,6 +77,13 @@ export const createCharacterSchema = z
     // in character-create.ts.
     speciesSkills: z.array(z.string()).optional(),
     speciesCantripId: z.string().optional(),
+    // #1690: the species-granted Origin feat pick (2024 Human's Versatile) —
+    // sibling of speciesCantripId above, same "required iff the resolved
+    // species+variant carries the matching choice-bearing trait" rule.
+    // Validated as an Origin-category Feat and baked via the SAME slot-exempt
+    // snapshot AdvancementEntry path the background's own Origin feat uses
+    // (buildOriginEntry) — see resolveSpeciesOriginFeatGrant in character-create.ts.
+    speciesOriginFeatId: z.string().optional(),
     background: z.string().min(1),
     classes: z.array(classChoiceSchema).length(1),
     abilityScores: abilityScoresSchema,

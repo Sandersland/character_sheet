@@ -113,7 +113,7 @@ describe("Dragonborn Draconic Ancestry trait content — both editions (epic rev
   });
 });
 
-describe("choice-bearing traits (#1689/#1690's scope) land as announce-only text only", () => {
+describe("choice-bearing traits (#1689/#1690) carry no improvements — the choice spec is the whole mechanic", () => {
   it("Half-Elf Skill Versatility, High Elf Cantrip, 2024 Human Skillful/Versatile, and 2024 Elf Keen Senses carry no improvements", () => {
     const choiceBearing = [
       { speciesSlug: "half-elf", speciesEdition: "EDITION_2014" as const, name: "Skill Versatility" },
@@ -132,7 +132,7 @@ describe("choice-bearing traits (#1689/#1690's scope) land as announce-only text
   });
 });
 
-describe("#1689: choice-spec vocabulary lands on exactly the two 2014 wave-1 rows", () => {
+describe("#1689/#1690: choice-spec vocabulary lands on exactly five rows", () => {
   it("Half-Elf's own Skill Versatility row carries chooseSkills: count 2, no `from` restriction (SRD 5.1 places none)", () => {
     const skillVersatility = SPECIES_TRAITS.find((t) => t.speciesSlug === "half-elf" && t.name === "Skill Versatility");
     expect(skillVersatility?.choice).toEqual({ chooseSkills: { count: 2 } });
@@ -143,9 +143,32 @@ describe("#1689: choice-spec vocabulary lands on exactly the two 2014 wave-1 row
     expect(cantrip?.choice).toEqual({ chooseCantrip: { list: "wizard", castingAbility: "intelligence" } });
   });
 
-  it("no other row carries a `choice` — 2024 Human Skillful/Versatile and 2024 Elf Keen Senses stay spec-less this slice (#1690's scope)", () => {
+  it("2024 Human's own Skillful row carries chooseSkills: count 1, no `from` restriction (SRD 5.2 places none, #1690)", () => {
+    const skillful = SPECIES_TRAITS.find((t) => t.speciesSlug === "human" && t.speciesEdition === "EDITION_2024" && t.name === "Skillful");
+    expect(skillful?.choice).toEqual({ chooseSkills: { count: 1 } });
+  });
+
+  it("2024 Human's own Versatile row carries chooseOriginFeat: true (#1690)", () => {
+    const versatile = SPECIES_TRAITS.find((t) => t.speciesSlug === "human" && t.speciesEdition === "EDITION_2024" && t.name === "Versatile");
+    expect(versatile?.choice).toEqual({ chooseOriginFeat: true });
+  });
+
+  it("2024 Elf's own Keen Senses row carries chooseSkills: count 1, restricted to Insight/Perception/Survival (SRD 5.2 p. 24, #1690)", () => {
+    const keenSenses = SPECIES_TRAITS.find((t) => t.speciesSlug === "elf" && t.speciesEdition === "EDITION_2024" && t.name === "Keen Senses");
+    expect(keenSenses?.choice).toEqual({ chooseSkills: { count: 1, from: ["insight", "perception", "survival"] } });
+  });
+
+  it("no other row carries a `choice`", () => {
     const withChoice = SPECIES_TRAITS.filter((t) => t.choice !== undefined);
     const names = withChoice.map((t) => `${t.speciesSlug}::${t.speciesEdition}::${t.variantSlug ?? "base"}::${t.name}`).sort();
-    expect(names).toEqual(["elf::EDITION_2014::high::Cantrip", "half-elf::EDITION_2014::base::Skill Versatility"].sort());
+    expect(names).toEqual(
+      [
+        "elf::EDITION_2014::high::Cantrip",
+        "half-elf::EDITION_2014::base::Skill Versatility",
+        "human::EDITION_2024::base::Skillful",
+        "human::EDITION_2024::base::Versatile",
+        "elf::EDITION_2024::base::Keen Senses",
+      ].sort(),
+    );
   });
 });

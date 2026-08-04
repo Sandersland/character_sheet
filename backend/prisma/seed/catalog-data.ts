@@ -47,6 +47,15 @@ export const RACES = [
   { name: "Dwarf",         speed: 25 },
   { name: "Halfling",      speed: 25 },
   { name: "Gnome",         speed: 25 },
+  // Elf's own bare entry was never needed here pre-#1690: every 2014 Elf
+  // must pick a named subrace (High/Wood/Drow, all listed above), so a bare
+  // "Elf" name never reached this lookup. 2024 Elf (species-data.ts) has NO
+  // lineage variants yet (#1683's scope) — resolveClassAndRace's legacy
+  // `race`-name match (character-create.ts, the #1679 compat window) is a
+  // hard requirement until #1684 prunes it, so a variantless 2024 Elf needs
+  // this row to be creatable at all. Speed 30, matching SRD 5.1 p. 21's base
+  // Elf (Wood Elf's own +5 to 35 lives on ITS own row, unaffected).
+  { name: "Elf",           speed: 30 },
 ];
 
 // #1529: armorProficiencies/weaponProficiencies are SRD 5.1/PHB'14 ONLY —

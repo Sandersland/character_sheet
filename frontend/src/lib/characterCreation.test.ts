@@ -7,6 +7,7 @@ import {
   deriveSkillChoices,
   deriveSpeciesBonuses,
   deriveSpeciesCantripChoice,
+  deriveSpeciesOriginFeatChoice,
   deriveSpeciesSkillChoice,
   resolveBackgroundEquipmentInput,
   resolveBackgroundName,
@@ -61,7 +62,7 @@ const CRIMINAL_PACKAGE: ClassStartingEquipment = {
 // race-granted-tool-profs source), never the picker's own source of truth.
 const reference: ReferenceData = {
   races: [{ id: "race-1", name: "Elf", speed: 30, toolProficiencies: [] }],
-  species: [{ id: "sp-elf", name: "Elf", slug: "elf", speed: 30, abilityIncreases: [], chooseSkills: null, chooseCantrip: null, variants: [] }],
+  species: [{ id: "sp-elf", name: "Elf", slug: "elf", speed: 30, abilityIncreases: [], chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false, variants: [] }],
   classes: [makeClass()],
   backgrounds: [
     { id: "bg-1", name: "Sage", skillProficiencies: ["perception"], toolProficiencies: [], abilityChoices: [], originFeat: null, startingEquipment: null },
@@ -116,6 +117,7 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
     speciesAbilities: {},
     speciesSkills: [],
     speciesCantripId: "",
+    speciesOriginFeatId: "",
     skillProficiencies: [],
     toolChoices: [],
     cantripIds: [],
@@ -159,8 +161,8 @@ describe("resolveSelections", () => {
           speed: 25,
           abilityIncreases: [],
           chooseSkills: null,
-          chooseCantrip: null,
-          variants: [{ id: "var-hill", name: "Hill Dwarf", slug: "hill", abilityIncreases: [], chooseSkills: null, chooseCantrip: null }],
+          chooseCantrip: null, chooseOriginFeat: false,
+          variants: [{ id: "var-hill", name: "Hill Dwarf", slug: "hill", abilityIncreases: [], chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false }],
         },
       ],
     };
@@ -179,9 +181,9 @@ const DWARF_SPECIES: SpeciesOption = {
   speed: 25,
   abilityIncreases: [{ ability: "constitution", amount: 2 }],
   chooseSkills: null,
-  chooseCantrip: null,
+  chooseCantrip: null, chooseOriginFeat: false,
   variants: [
-    { id: "var-hill", name: "Hill Dwarf", slug: "hill", abilityIncreases: [{ ability: "wisdom", amount: 1 }], chooseSkills: null, chooseCantrip: null },
+    { id: "var-hill", name: "Hill Dwarf", slug: "hill", abilityIncreases: [{ ability: "wisdom", amount: 1 }], chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false },
   ],
 };
 const HALF_ELF_SPECIES: SpeciesOption = {
@@ -195,7 +197,7 @@ const HALF_ELF_SPECIES: SpeciesOption = {
   ],
   // #1689: Skill Versatility — no `from` restriction (any of the 18 skills).
   chooseSkills: { count: 2 },
-  chooseCantrip: null,
+  chooseCantrip: null, chooseOriginFeat: false,
   variants: [],
 };
 
@@ -208,7 +210,7 @@ const ELF_SPECIES: SpeciesOption = {
   speed: 30,
   abilityIncreases: [{ ability: "dexterity", amount: 2 }],
   chooseSkills: null,
-  chooseCantrip: null,
+  chooseCantrip: null, chooseOriginFeat: false,
   variants: [
     {
       id: "var-high",
@@ -217,10 +219,25 @@ const ELF_SPECIES: SpeciesOption = {
       abilityIncreases: [{ ability: "intelligence", amount: 1 }],
       chooseSkills: null,
       chooseCantrip: { list: "wizard", castingAbility: "intelligence" },
+      chooseOriginFeat: false,
     },
   ],
 };
-const speciesReference: ReferenceData = { ...reference, species: [DWARF_SPECIES, HALF_ELF_SPECIES, ELF_SPECIES] };
+// #1690: 2024 Human-shape species carrying BOTH a chooseSkills spec
+// (Skillful, unrestricted, count 1) and chooseOriginFeat (Versatile) —
+// matches the real seeded content's species-level shape (no variants).
+const HUMAN_SPECIES: SpeciesOption = {
+  id: "sp-human2024",
+  name: "Human",
+  slug: "human",
+  speed: 30,
+  abilityIncreases: [],
+  chooseSkills: { count: 1 },
+  chooseCantrip: null,
+  chooseOriginFeat: true,
+  variants: [],
+};
+const speciesReference: ReferenceData = { ...reference, species: [DWARF_SPECIES, HALF_ELF_SPECIES, ELF_SPECIES, HUMAN_SPECIES] };
 
 describe("deriveSpeciesBonuses (#1681)", () => {
   it("is inert (applicable:false) when no species is selected", () => {
@@ -317,6 +334,27 @@ describe("deriveSpeciesCantripChoice (#1689, High Elf's Cantrip)", () => {
     const completedDraft = makeDraft({ speciesId: "sp-elf2", variantId: "var-high", speciesCantripId: "spell-fire-bolt" });
     const complete = deriveSpeciesCantripChoice(completedDraft, resolveSelections(speciesReference, completedDraft));
     expect(complete.selectedId).toBe("spell-fire-bolt");
+    expect(complete.complete).toBe(true);
+  });
+});
+
+describe("deriveSpeciesOriginFeatChoice (#1690, 2024 Human's Versatile)", () => {
+  it("is inert (applicable:false) when no chooseOriginFeat spec is served", () => {
+    const draft = makeDraft({ speciesId: "sp-dwarf", variantId: "var-hill" });
+    const choice = deriveSpeciesOriginFeatChoice(draft, resolveSelections(speciesReference, draft));
+    expect(choice.applicable).toBe(false);
+    expect(choice.complete).toBe(true);
+  });
+
+  it("resolves the species-level chooseOriginFeat spec and is complete once a feat id is chosen", () => {
+    const draft = makeDraft({ speciesId: "sp-human2024" });
+    const incomplete = deriveSpeciesOriginFeatChoice(draft, resolveSelections(speciesReference, draft));
+    expect(incomplete.applicable).toBe(true);
+    expect(incomplete.complete).toBe(false);
+
+    const completedDraft = makeDraft({ speciesId: "sp-human2024", speciesOriginFeatId: "feat-tough" });
+    const complete = deriveSpeciesOriginFeatChoice(completedDraft, resolveSelections(speciesReference, completedDraft));
+    expect(complete.selectedId).toBe("feat-tough");
     expect(complete.complete).toBe(true);
   });
 });
@@ -560,6 +598,23 @@ describe("buildCreatePayload", () => {
     expect(buildCreatePayload(unset, sel2, deriveSkillChoices(unset, sel2), []).speciesCantripId).toBeUndefined();
   });
 
+  it("sends a completed speciesOriginFeatId choice (#1690, 2024 Human's Versatile)", () => {
+    const draft = makeDraft({ name: "X", className: "Fighter", speciesId: "sp-human2024", speciesOriginFeatId: "feat-tough" });
+    const selections = resolveSelections(speciesReference, draft);
+    const payload = buildCreatePayload(draft, selections, deriveSkillChoices(draft, selections), []);
+    expect(payload.speciesOriginFeatId).toBe("feat-tough");
+  });
+
+  it("omits speciesOriginFeatId for a species with no chooseOriginFeat spec and when unset", () => {
+    const noSpec = makeDraft({ name: "X", className: "Fighter", speciesId: "sp-dwarf", variantId: "var-hill" });
+    const sel1 = resolveSelections(speciesReference, noSpec);
+    expect(buildCreatePayload(noSpec, sel1, deriveSkillChoices(noSpec, sel1), []).speciesOriginFeatId).toBeUndefined();
+
+    const unset = makeDraft({ name: "X", className: "Fighter", speciesId: "sp-human2024" });
+    const sel2 = resolveSelections(speciesReference, unset);
+    expect(buildCreatePayload(unset, sel2, deriveSkillChoices(unset, sel2), []).speciesOriginFeatId).toBeUndefined();
+  });
+
   it("omits speciesId/variantId when the draft's own empty-string default is untouched (`|| undefined` normalization)", () => {
     const draft = makeDraft({ name: "X", className: "Rogue" });
     const selections = resolveSelections(speciesReference, draft);
@@ -603,8 +658,8 @@ describe("buildCreatePayload", () => {
           speed: 25,
           abilityIncreases: [],
           chooseSkills: null,
-          chooseCantrip: null,
-          variants: [{ id: "var-hill", name: "Hill Dwarf", slug: "hill", abilityIncreases: [], chooseSkills: null, chooseCantrip: null }],
+          chooseCantrip: null, chooseOriginFeat: false,
+          variants: [{ id: "var-hill", name: "Hill Dwarf", slug: "hill", abilityIncreases: [], chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false }],
         },
       ],
     };

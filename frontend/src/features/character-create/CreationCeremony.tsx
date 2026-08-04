@@ -10,6 +10,7 @@ import CreationSpellsStep from "@/features/character-create/CreationSpellsStep";
 import IdentitySection from "@/features/character-create/IdentitySection";
 import SkillSection from "@/features/character-create/SkillSection";
 import SpeciesCantripSection from "@/features/character-create/SpeciesCantripSection";
+import SpeciesOriginFeatSection from "@/features/character-create/SpeciesOriginFeatSection";
 import SpeciesSkillSection from "@/features/character-create/SpeciesSkillSection";
 import StartingEquipmentSection from "@/features/character-create/StartingEquipmentSection";
 import ToolProficiencySection from "@/features/character-create/ToolProficiencySection";
@@ -66,9 +67,17 @@ function SkillsStepBody({ c }: StepBodyProps) {
         selected={c.skills.selected}
         onToggle={c.skills.toggle}
       />
-      {/* #1689: Half-Elf's Skill Versatility — renders only when the server
-          serves a chooseSkills spec for the chosen species+variant. */}
+      {/* #1689/#1690: Half-Elf's Skill Versatility / 2024 Human's Skillful /
+          2024 Elf's Keen Senses — renders only when the server serves a
+          chooseSkills spec for the chosen species+variant. */}
       <SpeciesSkillSection choice={c.speciesSkillChoice} onToggle={c.speciesSkillChoice.toggle} />
+      {/* #1690: 2024 Human's Versatile — renders only when the server serves a
+          chooseOriginFeat spec for the chosen species+variant. */}
+      <SpeciesOriginFeatSection
+        choice={c.speciesOriginFeatChoice}
+        edition={c.draft.rulesEdition}
+        onChange={(speciesOriginFeatId) => c.update({ speciesOriginFeatId })}
+      />
       <ToolProficiencySection
         grantedToolProfs={c.toolChoices.grantedToolProfs}
         toolChoiceOptions={c.toolChoices.toolChoiceOptions}

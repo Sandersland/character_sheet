@@ -41,6 +41,7 @@ set -eu
 ALLOWLIST="backend/src/lib/leveling/advancement.ts:resolveCatalogFeat:guarded by crossEditionRejection (Feat, #1345 Chunk 1)
 backend/src/lib/classes/class.ts:applySetSubclass:guarded by crossEditionRejection (Subclass, #1345 Chunk 2)
 backend/src/lib/character/character-create.ts:resolveSubclass:guarded by crossEditionRejection (Subclass, #1345 Chunk 3)
+backend/src/lib/character/character-create.ts:resolveSpeciesOriginFeatGrant:guarded by crossEditionRejection (Feat, #1690, via validateOriginFeatRow)
 backend/src/lib/classes/resources.ts:applyLearnManeuverOp:guarded by crossEditionRejection (GrantedAbility maneuver, #1345 Chunk 4)
 backend/src/lib/classes/resources.ts:resolveChoiceOption:guarded by crossEditionRejection (GrantedAbility subclass-choice, #1345 Chunk 4)
 backend/src/lib/classes/shadow-arts.ts:applyCastShadowArt:guarded by crossEditionRejection (GrantedAbility, #1345 Chunk 5)

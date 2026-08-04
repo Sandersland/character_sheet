@@ -125,15 +125,42 @@ describe("GET /api/reference — species creation-choice specs (#1689)", () => {
     expect(hillDwarf.chooseCantrip).toBeNull();
   });
 
-  it("every 2024 species serves null for both fields — no 2024 choice content this slice (#1690's)", async () => {
+  it("every 2024 species but Human/Elf serves null chooseSkills and false chooseOriginFeat — no other 2024 choice content this slice (#1690's)", async () => {
     const res = await getReference("EDITION_2024");
-    for (const species of res.body.species as { chooseSkills: unknown; chooseCantrip: unknown; variants: { chooseSkills: unknown; chooseCantrip: unknown }[] }[]) {
-      expect(species.chooseSkills).toBeNull();
+    const rows = res.body.species as {
+      name: string;
+      chooseSkills: unknown;
+      chooseCantrip: unknown;
+      chooseOriginFeat: boolean;
+      variants: { chooseSkills: unknown; chooseCantrip: unknown; chooseOriginFeat: boolean }[];
+    }[];
+    for (const species of rows) {
       expect(species.chooseCantrip).toBeNull();
       for (const variant of species.variants) {
         expect(variant.chooseSkills).toBeNull();
         expect(variant.chooseCantrip).toBeNull();
+        expect(variant.chooseOriginFeat).toBe(false);
       }
+      if (species.name === "Human") {
+        expect(species.chooseSkills).toEqual({ count: 1 });
+        expect(species.chooseOriginFeat).toBe(true);
+      } else if (species.name === "Elf") {
+        expect(species.chooseSkills).toEqual({ count: 1, from: ["insight", "perception", "survival"] });
+        expect(species.chooseOriginFeat).toBe(false);
+      } else {
+        expect(species.chooseSkills).toBeNull();
+        expect(species.chooseOriginFeat).toBe(false);
+      }
+    }
+  });
+});
+
+describe("GET /api/reference — species creation-choice specs, chooseOriginFeat (#1690)", () => {
+  it("2014 species all serve chooseOriginFeat: false — the spec is 2024-only content this wave", async () => {
+    const res = await getReference("EDITION_2014");
+    for (const species of res.body.species as { chooseOriginFeat: boolean; variants: { chooseOriginFeat: boolean }[] }[]) {
+      expect(species.chooseOriginFeat).toBe(false);
+      for (const variant of species.variants) expect(variant.chooseOriginFeat).toBe(false);
     }
   });
 });
