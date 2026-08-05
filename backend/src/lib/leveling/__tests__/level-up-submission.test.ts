@@ -269,6 +269,94 @@ describe("validateLevelUpSubmission — known-spell swap (#1101)", () => {
   });
 });
 
+// #1503: the choose-N swap for Way of the Four Elements' fourElementsDisciplines
+// choice — the first choice whose swapCadence resolves "onLevelUp"
+// (subclassChoiceSwapCadence). Same shape as the known-spell swap suite above,
+// scoped per choiceKey instead of globally.
+describe("validateLevelUpSubmission — choose-N swap (#1503, Way of the Four Elements)", () => {
+  function char4e(level: number): LevelUpPlanCharacter {
+    return { abilityScores: ABILITIES, classEntries: [{ name: "monk", level, subclass: "way of the four elements" }], edition: "EDITION_2014" };
+  }
+  const t4e = (newLevel: number) => target("monk", newLevel, "way of the four elements");
+  const learnDisc = (optionId: string): NonNullable<LevelUpSubmission["subclassChoices"]>[number] => ({
+    type: "learnSubclassChoice",
+    choiceKey: "fourElementsDisciplines",
+    optionId,
+  });
+  const forgetDisc = (entryId: string): NonNullable<LevelUpSubmission["subclassChoicesForgotten"]>[number] => ({
+    type: "forgetSubclassChoice",
+    choiceKey: "fourElementsDisciplines",
+    entryId,
+  });
+  const base = { target: { kind: "existing", classEntryId: "x" } as const, hp: { method: "average" as const } };
+
+  it("5→6 accepts a swap: 2 learns + 1 forget nets to the step's count (1)", () => {
+    const steps = validateLevelUpSubmission(char4e(5), t4e(6), null, {
+      ...base,
+      subclassChoices: [learnDisc("opt-1"), learnDisc("opt-2")],
+      subclassChoicesForgotten: [forgetDisc("entry-1")],
+    });
+    expect(kinds(steps)).toEqual(["hitPoints", "subclassChoice", "review"]);
+  });
+
+  it("rejects two forgets for the same key", () => {
+    expect(() =>
+      validateLevelUpSubmission(char4e(10), t4e(11), null, {
+        ...base,
+        subclassChoices: [learnDisc("opt-1"), learnDisc("opt-2"), learnDisc("opt-3")],
+        subclassChoicesForgotten: [forgetDisc("entry-1"), forgetDisc("entry-2")],
+      }),
+    ).toThrow(/at most one/i);
+  });
+
+  // #1101's own Wizard test picks a case where the NET matches the step's
+  // expected count exactly, so assertCounts passes silently and
+  // assert(SubclassChoice)Forgets is what actually rejects — a forget-only
+  // submission that also fails the count check would be rejected by
+  // assertCounts first with a less specific message. Monk 6→7 is neither an
+  // ASI level (4/8/12/16/19) nor a discipline-growth level (next threshold
+  // 11), so no subclassChoice step exists for fourElementsDisciplines at all.
+  it("rejects a forget on a level with no subclassChoice step for that key at all (no new discipline this level)", () => {
+    expect(() =>
+      validateLevelUpSubmission(char4e(6), t4e(7), null, {
+        ...base,
+        subclassChoicesForgotten: [forgetDisc("entry-1")],
+      }),
+    ).toThrow(/does not allow swapping/i);
+  });
+
+  it("rejects a forget for a choose-N choice whose swapCadence is NOT onLevelUp (Hunter's Prey)", () => {
+    expect(() =>
+      validateLevelUpSubmission(
+        { abilityScores: ABILITIES, classEntries: [{ name: "ranger", level: 6, subclass: "hunter" }], edition: "EDITION_2024" },
+        target("ranger", 7, "hunter"),
+        null,
+        {
+          ...base,
+          // 2 learns - 1 forget = net 1, matching the step's expected count
+          // (1) exactly, so assertCounts passes and the swap-cadence guard is
+          // what actually rejects this.
+          subclassChoices: [
+            { type: "learnSubclassChoice", choiceKey: "defensiveTactics", optionId: "opt-1" },
+            { type: "learnSubclassChoice", choiceKey: "defensiveTactics", optionId: "opt-2" },
+          ],
+          subclassChoicesForgotten: [{ type: "forgetSubclassChoice", choiceKey: "defensiveTactics", entryId: "entry-1" }],
+        },
+      ),
+    ).toThrow(/does not allow swapping/i);
+  });
+
+  it("rejects a net mismatch (1 learn, 1 forget, but step expects 1 net — i.e. 2 learns needed)", () => {
+    expect(() =>
+      validateLevelUpSubmission(char4e(5), t4e(6), null, {
+        ...base,
+        subclassChoices: [learnDisc("opt-1")],
+        subclassChoicesForgotten: [forgetDisc("entry-1")],
+      }),
+    ).toThrow(/fourElementsDisciplines choices/i);
+  });
+});
+
 describe("validateLevelUpSubmission — new cantrips (#1131)", () => {
   const learn = (spellId: string): NonNullable<LevelUpSubmission["spellsLearned"]>[number] => ({ type: "learnSpell", spellId });
   const forget = (entryId: string): NonNullable<LevelUpSubmission["spellsForgotten"]>[number] => ({ type: "forgetSpell", entryId });

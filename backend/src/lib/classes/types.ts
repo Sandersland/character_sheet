@@ -252,6 +252,33 @@ export interface DerivedSubclassChoice {
   count: number;
 }
 
+/**
+ * A choose-N subclass choice's swap-on-learn cadence (#1503, owner decision
+ * 2026-08-03) — the choose-N analog of spellcasting-tables.ts's
+ * `swapCadenceFor`, deliberately a SEPARATE function: `swapCadenceFor` keys
+ * on (class, subclass) and feeds `preparedSpellCountAt`/`maxSpellLevelForClass`,
+ * both spell-shaped; adding a non-caster subclass there would make it read as
+ * a caster to those. Lives here (not resources.ts) so leveling/level-up-plan.ts
+ * — a "no DB, no Prisma" pure planner — can call it without importing
+ * resources.ts's Prisma-typed transaction machinery.
+ *
+ * Every choose-N choice defaults to "never" (the original, still-correct
+ * policy for every OTHER choose-N feature, e.g. Ranger's Hunter's Prey
+ * tiers, Barbarian totems) — "onLevelUp" is the exception, reserved for a
+ * choice whose OWN 5e text states "whenever you learn a new X, you may
+ * replace one you know" (PHB'14 p.80, Way of the Four Elements' Disciple of
+ * the Elements). `edition` last (subclassGateLevel's pattern, #1499) even
+ * though only one source/edition pair currently answers "onLevelUp" — future
+ * choose-N features (#1516) extend this function, never duplicate it. Gates
+ * only the LEVEL-UP CEREMONY's own swap path (LevelUpSubmission.subclassChoicesForgotten);
+ * the generic forgetSubclassChoice op on POST .../resources/transactions
+ * stays unrestricted, same as every other choose-N feature's forget — #1516
+ * is the tracked follow-up for a global choose-N forget policy.
+ */
+export function subclassChoiceSwapCadence(catalogSource: string, edition: RulesEdition): "onLevelUp" | "never" {
+  return catalogSource === "discipline" && edition === "EDITION_2014" ? "onLevelUp" : "never";
+}
+
 // `subclassKey`/`edition` are both required (never optional) so `edition` can
 // sit last (the subclassGateLevel pattern, #1499) — a defaulted-then-skipped
 // middle parameter can't coexist with a later required one. Every existing

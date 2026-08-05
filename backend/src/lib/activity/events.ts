@@ -81,6 +81,13 @@ export type EventType =
   // toggle now logs through the generic buffApplied/buffCleared/
   // spendResource event types (like Rage) instead of its own bespoke one.
   | "castElementalBurst"
+  // Way of the Four Elements (2014, #1503) — cast a known elemental
+  // discipline. The only one of the retired 2014 discipline events
+  // (learnDiscipline/forgetDiscipline/swapDiscipline/disciplinesReconciled/
+  // castDiscipline, #1247/34f5a4cf) that returns: learn/forget ride the
+  // generic learnSubclassChoice/forgetSubclassChoice events, and the reconcile
+  // rides subclassChoicesReconciled — no bespoke discipline-only twins.
+  | "castDiscipline"
   | "elementalStrike"
   | "learnToolProficiency"
   | "forgetToolProficiency"

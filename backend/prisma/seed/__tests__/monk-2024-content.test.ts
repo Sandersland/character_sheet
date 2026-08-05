@@ -37,9 +37,10 @@ const SHADOW = "monk-warrior-of-shadow";
 const WAY_OF_SHADOW = "monk-way-of-shadow";
 const ELEMENTS = "monk-warrior-of-the-elements";
 const MERCY = "monk-warrior-of-mercy";
+const FOUR_ELEMENTS = "monk-way-of-the-four-elements";
 
-describe("Per-partition counts: base 17(2014)/18(2024); open hand (#1501) and shadow (#1502) each fork into two 4-row EDITION-EXCLUSIVE subclasses; elements 5, mercy 6 still identical for 2014/2024 pending #1503", () => {
-  it("counts match exactly (36 total 2014, 37 total 2024)", () => {
+describe("Per-partition counts: base 17(2014)/18(2024); open hand (#1501), shadow (#1502), and the elements (#1503) each fork into two EDITION-EXCLUSIVE subclasses; mercy 6 is the one remaining subclass still identical for 2014/2024", () => {
+  it("counts match exactly (33 total 2014, 37 total 2024)", () => {
     const count = (slug: string | null, edition: Edition) => MONK_FEATURES.filter((r) => r.subclassSlug === slug && r.edition === edition).length;
     expect(count(BASE, "EDITION_2014")).toBe(17);
     expect(count(BASE, "EDITION_2024")).toBe(18);
@@ -50,10 +51,10 @@ describe("Per-partition counts: base 17(2014)/18(2024); open hand (#1501) and sh
     expect(count(OPEN_HAND, "EDITION_2024")).toBe(4);
     expect(count(WAY_OPEN_HAND, "EDITION_2014")).toBe(4);
     expect(count(WAY_OPEN_HAND, "EDITION_2024")).toBe(0);
-    for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {
-      expect(count(ELEMENTS, edition)).toBe(5);
-      expect(count(MERCY, edition)).toBe(6);
-    }
+    // Mercy is the one subclass with no 2014 fork yet — still shared/untagged,
+    // expanded to both editions.
+    expect(count(MERCY, "EDITION_2014")).toBe(6);
+    expect(count(MERCY, "EDITION_2024")).toBe(6);
     // Warrior of Shadow (2024) and Way of Shadow (2014, #1502) are now
     // DISTINCT slugs, each populated in exactly its own edition — the 2014/
     // 2024 swap between them nets to zero on both totals below.
@@ -61,12 +62,33 @@ describe("Per-partition counts: base 17(2014)/18(2024); open hand (#1501) and sh
     expect(count(SHADOW, "EDITION_2024")).toBe(4);
     expect(count(WAY_OF_SHADOW, "EDITION_2014")).toBe(4);
     expect(count(WAY_OF_SHADOW, "EDITION_2024")).toBe(0);
-
+    // Warrior of the Elements (2024, retagged) and Way of the Four Elements
+    // (2014, brand new — no 2024 counterpart of its own, #1503) are also
+    // DISTINCT slugs.
+    expect(count(ELEMENTS, "EDITION_2014")).toBe(0);
+    expect(count(ELEMENTS, "EDITION_2024")).toBe(5);
+    expect(count(FOUR_ELEMENTS, "EDITION_2014")).toBe(2);
+    expect(count(FOUR_ELEMENTS, "EDITION_2024")).toBe(0);
     const total2014 = MONK_FEATURES.filter((r) => r.edition === "EDITION_2014").length;
     const total2024 = MONK_FEATURES.filter((r) => r.edition === "EDITION_2024").length;
-    expect(total2014).toBe(36);
+    expect(total2014).toBe(33);
     expect(total2024).toBe(37);
-    expect(MONK_FEATURES).toHaveLength(73);
+    expect(MONK_FEATURES).toHaveLength(70);
+  });
+});
+
+describe("Way of the Four Elements (#1503): 2014-only, feature text carries the discipline-progression rule, not just the pool mechanism", () => {
+  it("Disciple of the Elements and Elemental Attunement exist for EDITION_2014 only", () => {
+    const r1 = row(FOUR_ELEMENTS, "Disciple of the Elements", "EDITION_2014");
+    expect(r1.level).toBe(3);
+    expect(r1.description).toMatch(/PHB'14/);
+    const r2 = row(FOUR_ELEMENTS, "Elemental Attunement", "EDITION_2014");
+    expect(r2.level).toBe(3);
+    expect(r2.description).toMatch(/PHB'14/);
+  });
+
+  it("carries no EDITION_2024 rows at all", () => {
+    expect(MONK_FEATURES.filter((r) => r.subclassSlug === FOUR_ELEMENTS && r.edition === "EDITION_2024")).toEqual([]);
   });
 });
 
@@ -88,19 +110,19 @@ describe("Extra Attack (#1530): derivedStat/derivedStatTiers transcribed unchang
 });
 
 describe("Elemental Attunement (#1686): the toggle descriptor block transcribed unchanged onto the literal subclass row", () => {
-  it("both editions carry the same toggle/cost/effectBuffs block", () => {
-    for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {
-      const r = row(ELEMENTS, "Elemental Attunement", edition);
-      expect(r.resourceKey).toBe("elementalAttunement");
-      expect(r.activationCost).toBe("free");
-      expect(r.resolverKind).toBe("toggle");
-      expect(r.costKind).toBe("pool");
-      expect(r.costPoolKey).toBe("focus");
-      expect(r.costBase).toBe(1);
-      expect(r.effectBuffs).toEqual([
-        { key: "elementalAttunement", target: "elementalAttunement", modifier: 0, duration: "while-active" },
-      ]);
-    }
+  // #1503 retagged this row's edition (EDITION_2024, alongside its Subclass
+  // row) — a single-edition check now, not a both-editions loop.
+  it("carries the toggle/cost/effectBuffs block", () => {
+    const r = row(ELEMENTS, "Elemental Attunement", "EDITION_2024");
+    expect(r.resourceKey).toBe("elementalAttunement");
+    expect(r.activationCost).toBe("free");
+    expect(r.resolverKind).toBe("toggle");
+    expect(r.costKind).toBe("pool");
+    expect(r.costPoolKey).toBe("focus");
+    expect(r.costBase).toBe(1);
+    expect(r.effectBuffs).toEqual([
+      { key: "elementalAttunement", target: "elementalAttunement", modifier: 0, duration: "while-active" },
+    ]);
   });
 
   it("every OTHER row leaves every descriptor column undefined", () => {
@@ -139,25 +161,29 @@ const ABILITY_SCORES = {
 // Integration-level proof (mirrors wizard-2024-content.test.ts's own
 // loadDbFeatureRows pattern): the REAL seeded rows, read through the REAL
 // derivation path, actually reach a serialized character's derived
-// features — not just MONK_FEATURES' in-memory shape. Both editions read
-// identically in this slice (no edition fork authored yet), so the proof is
-// that a real L17 Warrior of the Elements monk sees all five subclass
-// features under EITHER edition, and that a L2 monk (below every subclass
-// gate) sees none.
-describe("integration (#1675): a real seeded L17 Warrior of the Elements monk has all five subclass features, both editions", () => {
-  it("EDITION_2014 and EDITION_2024 resolve to the identical feature-name set", async () => {
+// features — not just MONK_FEATURES' in-memory shape. #1503 retagged every
+// Warrior of the Elements row EDITION_2024-only, so — unlike before that
+// retag — the two editions no longer read identically: a real L17 EDITION_2024
+// Warrior of the Elements monk still sees all five subclass features, but the
+// SAME subclass name under EDITION_2014 now resolves to none (a 2014
+// character's real equivalent is Way of the Four Elements, a different
+// slug/name entirely — see the Way of the Four Elements integration test
+// below). A L2 monk (below every subclass's grant level 3) sees none either way.
+describe("integration (#1503): a real seeded L17 Warrior of the Elements monk has all five subclass features under EDITION_2024 only", () => {
+  it("EDITION_2024 resolves the full feature-name set; EDITION_2014 resolves none (its Subclass row no longer exists for that edition)", async () => {
     const featureRows = await loadDbFeatureRows("monk", "warrior of the elements");
     const profBonus = proficiencyBonusForLevel(17);
 
     const expectedNames = ["Manipulate Elements", "Elemental Attunement", "Elemental Burst", "Stride of the Elements", "Elemental Epitome"];
 
-    for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {
-      const info = deriveResources("monk", "warrior of the elements", 17, ABILITY_SCORES, profBonus, featureRows, edition);
-      const subclassNames = (info?.features ?? []).filter((f) => f.source === "subclass").map((f) => f.name);
-      for (const name of expectedNames) {
-        expect(subclassNames, `${edition} missing ${name}`).toContain(name);
-      }
+    const info2024 = deriveResources("monk", "warrior of the elements", 17, ABILITY_SCORES, profBonus, featureRows, "EDITION_2024");
+    const subclassNames2024 = (info2024?.features ?? []).filter((f) => f.source === "subclass").map((f) => f.name);
+    for (const name of expectedNames) {
+      expect(subclassNames2024, `EDITION_2024 missing ${name}`).toContain(name);
     }
+
+    const info2014 = deriveResources("monk", "warrior of the elements", 17, ABILITY_SCORES, profBonus, featureRows, "EDITION_2014");
+    expect((info2014?.features ?? []).filter((f) => f.source === "subclass")).toEqual([]);
   });
 
   it("a L2 monk (below every subclass's grant level 3) has zero subclass features, both editions", async () => {
@@ -167,6 +193,22 @@ describe("integration (#1675): a real seeded L17 Warrior of the Elements monk ha
       const info = deriveResources("monk", "warrior of the elements", 2, ABILITY_SCORES, profBonus, featureRows, edition);
       expect((info?.features ?? []).filter((f) => f.source === "subclass")).toEqual([]);
     }
+  });
+});
+
+// Way of the Four Elements' own integration proof — the 2014 slug/name pair.
+describe("integration (#1503): a real seeded L17 Way of the Four Elements monk has both feature rows under EDITION_2014 only", () => {
+  it("EDITION_2014 resolves Disciple of the Elements + Elemental Attunement; EDITION_2024 resolves none", async () => {
+    const featureRows = await loadDbFeatureRows("monk", "way of the four elements");
+    const profBonus = proficiencyBonusForLevel(17);
+
+    const info2014 = deriveResources("monk", "way of the four elements", 17, ABILITY_SCORES, profBonus, featureRows, "EDITION_2014");
+    const subclassNames2014 = (info2014?.features ?? []).filter((f) => f.source === "subclass").map((f) => f.name);
+    expect(subclassNames2014).toContain("Disciple of the Elements");
+    expect(subclassNames2014).toContain("Elemental Attunement");
+
+    const info2024 = deriveResources("monk", "way of the four elements", 17, ABILITY_SCORES, profBonus, featureRows, "EDITION_2024");
+    expect((info2024?.features ?? []).filter((f) => f.source === "subclass")).toEqual([]);
   });
 });
 

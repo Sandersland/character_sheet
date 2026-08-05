@@ -2772,7 +2772,10 @@ export const WARRIOR_OF_MERCY_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITI
   },
 ]);
 
-export const WARRIOR_OF_THE_ELEMENTS_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2024"] as const).flatMap((edition) => [
+// EDITION_2024 only (#1503's retag — its real 2014 predecessor, Way of the
+// Four Elements, is a from-scratch discipline menu, not this subclass under
+// a different edition tag) — was `.flatMap` over both editions before.
+export const WARRIOR_OF_THE_ELEMENTS_ROWS: ClassFeatureRow[] = (["EDITION_2024"] as const).flatMap((edition) => [
   {
     name: "Manipulate Elements",
     level: 3,

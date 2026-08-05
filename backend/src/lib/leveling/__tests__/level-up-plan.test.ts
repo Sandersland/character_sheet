@@ -224,6 +224,50 @@ describe("buildLevelUpPlan — generic subclassChoice (#899)", () => {
   });
 });
 
+// #1503: Way of the Four Elements' fourElementsDisciplines choice is the
+// first choose-N whose swapCadence resolves "onLevelUp" — every OTHER
+// choose-N (Hunter's Prey above) has no canSwap at all (subclassChoiceSwapCadence
+// defaults "never"), so canSwap:true here is the meaningful new assertion.
+describe("buildLevelUpPlan — Way of the Four Elements disciplines (#1503)", () => {
+  it("2→3 grants 1 discipline pick, canSwap true (a new discipline is being learned)", () => {
+    const plan = buildLevelUpPlan(
+      char("monk", 2, null, "EDITION_2014"),
+      target("monk", 3, "way of the four elements"),
+    );
+    const choice = plan.find((s) => s.kind === "subclassChoice");
+    expect(choice?.count).toBe(1);
+    expect(choice?.meta).toMatchObject({ key: "fourElementsDisciplines", catalogSource: "discipline", canSwap: true });
+  });
+
+  it("5→6, 10→11, 16→17 each grant exactly 1 more pick (choice cap 1/2/3/4)", () => {
+    for (const [from, to] of [[5, 6], [10, 11], [16, 17]] as const) {
+      const plan = buildLevelUpPlan(
+        char("monk", from, "way of the four elements", "EDITION_2014"),
+        target("monk", to, "way of the four elements"),
+      );
+      const choice = plan.find((s) => s.kind === "subclassChoice");
+      expect(choice?.count, `L${from}->${to}`).toBe(1);
+      expect(choice?.meta?.canSwap, `L${from}->${to}`).toBe(true);
+    }
+  });
+
+  it("a level with no new discipline grants no subclassChoice step at all (no swap-only step, unlike newSpells)", () => {
+    const plan = buildLevelUpPlan(
+      char("monk", 3, "way of the four elements", "EDITION_2014"),
+      target("monk", 4, "way of the four elements"),
+    );
+    expect(kinds(plan)).not.toContain("subclassChoice");
+  });
+
+  it("2024 Warrior of the Elements has no subclassChoice step at all (no discipline menu in 2024)", () => {
+    const plan = buildLevelUpPlan(
+      char("monk", 2, null, "EDITION_2024"),
+      target("monk", 3, "warrior of the elements"),
+    );
+    expect(kinds(plan)).not.toContain("subclassChoice");
+  });
+});
+
 describe("buildLevelUpPlan — newSpells (2024 prepared model)", () => {
   it("Wizard 7→8 scribes 2 spells, after advancement, before review — no swap", () => {
     const plan = buildLevelUpPlan(char("wizard", 7), target("wizard", 8));
