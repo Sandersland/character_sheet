@@ -40,7 +40,7 @@ function agent() {
 }
 const url = `/api/characters/${FIXTURE_ID}/abilities/quivering-palm/transactions`;
 
-async function createMonk(level: number, subclass?: string) {
+async function createMonk(level: number, subclass?: string, rulesEdition: "EDITION_2014" | "EDITION_2024" = "EDITION_2024") {
   const cls = await prisma.characterClass.upsert({
     where: { name: CLASS_NAME },
     create: { name: CLASS_NAME, hitDie: "d8", savingThrows: ["strength", "dexterity"], skillChoiceCount: 2, skillChoices: ["acrobatics"], isSpellcaster: false },
@@ -50,6 +50,7 @@ async function createMonk(level: number, subclass?: string) {
     data: {
       ...FIXTURE_BASE,
       ownerId: OWNER_ID,
+      rulesEdition,
       classEntries: { create: [{ name: "monk", classId: cls.id, position: 0, level, subclass }] },
     },
   });
@@ -184,14 +185,14 @@ describe("Quivering Palm for an under-level or off-subclass monk", () => {
     await createMonk(16, "Warrior of the Open Hand");
     const res = await agent().post(url).send({ operations: [{ type: "setQuiveringPalm" }] });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/warrior of the open hand/i);
+    expect(res.body.error).toMatch(/open hand/i);
   });
 
   it("rejects a level-17+ monk of a different subclass", async () => {
     await createMonk(20, "Warrior of Shadow");
     const res = await agent().post(url).send({ operations: [{ type: "setQuiveringPalm" }] });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/warrior of the open hand/i);
+    expect(res.body.error).toMatch(/open hand/i);
   });
 
   // #1277: isWarriorOfTheOpenHand used to substring-match ("open hand"), so a
@@ -201,6 +202,52 @@ describe("Quivering Palm for an under-level or off-subclass monk", () => {
     await createMonk(20, "Warrior of the Open Handbook");
     const res = await agent().post(url).send({ operations: [{ type: "setQuiveringPalm" }] });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/warrior of the open hand/i);
+    expect(res.body.error).toMatch(/open hand/i);
+  });
+});
+
+// #1501: the 2014 counterpart — Way of the Open Hand, a SEPARATE subclass.
+// Set spends 3 KI (not 4 focus); Trigger's outcome mapping is INVERTED from
+// 2024's (fail drops to 0 HP, success takes the full rolled damage).
+describe("Quivering Palm for a 2014 Way of the Open Hand monk (#1501)", () => {
+  beforeEach(async () => {
+    await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
+    await createMonk(17, "Way of the Open Hand", "EDITION_2014");
+  });
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { id: FIXTURE_ID } });
+  });
+  afterAll(async () => {
+    await prisma.characterClass.deleteMany({ where: { name: CLASS_NAME } });
+  });
+
+  it("setQuiveringPalm spends 3 ki (not 4 focus) and marks vibrations active for 17 days", async () => {
+    const res = await agent().post(url).send({ operations: [{ type: "setQuiveringPalm" }] });
+    expect(res.status).toBe(200);
+    const result = res.body.results[0];
+    expect(result.active).toBe(true);
+    expect(result.daysRemaining).toBe(17);
+
+    const kiPool = res.body.character.resources.pools.find((p: { key: string }) => p.key === "ki");
+    expect(kiPool.remaining).toBe(14); // 17 total − 3 spent
+  });
+
+  it("triggerQuiveringPalm: a failed save reports dropping to 0 HP, ignoring rawDamage", async () => {
+    await agent().post(url).send({ operations: [{ type: "setQuiveringPalm" }] });
+    const res = await agent()
+      .post(url)
+      .send({ operations: [{ type: "triggerQuiveringPalm", roll: 60 }] });
+    expect(res.status).toBe(200);
+    const result = res.body.results[0];
+    expect(result.rawDamage).toBe(60);
+    if (result.outcome === "fail") {
+      expect(result.appliedDamage).toBe(0);
+      expect(result.summary).toMatch(/dropped to 0 hit points/i);
+    } else {
+      // success: FULL damage, never halved (inverted from 2024's shape)
+      expect(result.appliedDamage).toBe(60);
+      expect(result.summary).toMatch(/necrotic/i);
+    }
   });
 });

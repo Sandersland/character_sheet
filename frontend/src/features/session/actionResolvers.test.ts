@@ -30,6 +30,7 @@ const BACKEND_ACTION_EFFECT_KEYS = new Set([
   "deflectAttacksRedirect",
   "deflectMissilesThrow", // 2014 (#1500)
   "wholenessOfBody",
+  "wholenessOfBodyAction", // 2014 (#1501)
   "handOfHealing", "handOfHealingFlurry",
   "divineSense", "layOnHands",
   "cunningAction",
@@ -171,6 +172,34 @@ describe("actionResolvers", () => {
   it("Open Hand Technique / Quivering Palm have no resolver — post-hit riders with their own sections (#1245)", () => {
     expect(resolverFor("openHandTechnique")).toBeUndefined();
     expect(resolverFor("quiveringPalm")).toBeUndefined();
+  });
+
+  it("Way of the Open Hand (2014): Wholeness of Body is a heal-roll ACTION, a distinct key from the 2024 bonusAction shape (#1501)", () => {
+    const r = resolverFor("wholenessOfBodyAction");
+    expect(r).toBeDefined();
+    expect(r!.kind).toBe("heal-roll");
+    expect(r!.slot).toBe("action");
+    expect(r!.serverEffect).toBe(true);
+    expect(r!.resourceKey).toBe("wholenessOfBody");
+    expect(r!.healRoll).toBeDefined();
+  });
+
+  it("Way of the Open Hand (2014): wholenessOfBodyAction healRoll is a FLAT 3 x monk level, no dice (#1501)", () => {
+    const resolver = resolverFor("wholenessOfBodyAction");
+    expect(resolver).toBeDefined();
+    const healRoll = resolver!.healRoll!;
+    const mock = {
+      classes: [{ id: "1", name: "monk", level: 6, needsSubclass: false, subclassUnavailable: false }],
+    } as Parameters<typeof healRoll>[0];
+    expect(healRoll(mock)).toEqual({ count: 0, faces: 1, modifier: 18 });
+  });
+
+  it("Way of the Open Hand (2014): Tranquility is a pure free-cost reminder (#1501)", () => {
+    const r = resolverFor("tranquility");
+    expect(r).toBeDefined();
+    expect(r!.kind).toBe("simple-confirm");
+    expect(r!.slot).toBe("free");
+    expect(r!.serverEffect).toBe(false);
   });
 
   // Without this entry partitionClassActions filters the backend's fastHands row

@@ -1037,6 +1037,70 @@ describe("Warrior of the Open Hand — Wholeness of Body / Fleet Step (#1245)", 
   });
 });
 
+describe("Way of the Open Hand — 2014 Wholeness of Body / Tranquility (#1501)", () => {
+  const WAY_OPEN_HAND = "Way of the Open Hand";
+  const edition = "EDITION_2014" as const;
+
+  it("2014 monk gets wholenessOfBodyAction as an ACTION at L6, not at L5 — never the 2024 bonusAction key", () => {
+    expect(keys(at("monk", WAY_OPEN_HAND, 5, [], true, edition))).not.toContain("wholenessOfBodyAction");
+    const l6 = at("monk", WAY_OPEN_HAND, 6, [], true, edition);
+    const wholeness = l6.find((a) => a.key === "wholenessOfBodyAction");
+    expect(wholeness).toBeDefined();
+    expect(wholeness?.cost).toBe("action");
+    expect(keys(l6)).not.toContain("wholenessOfBody");
+  });
+
+  it("wholenessOfBodyAction is gated on the SAME wholenessOfBody pool as the 2024 key", () => {
+    const noUses = at("monk", WAY_OPEN_HAND, 6, [pool("wholenessOfBody", 0)], true, edition);
+    expect(noUses.find((a) => a.key === "wholenessOfBodyAction")?.enabled).toBe(false);
+    const withUses = at("monk", WAY_OPEN_HAND, 6, [pool("wholenessOfBody", 1)], true, edition);
+    expect(withUses.find((a) => a.key === "wholenessOfBodyAction")?.enabled).toBe(true);
+  });
+
+  it("ACTION_EFFECT_FN.wholenessOfBodyAction: with roll=18, spends 1 use and heals 18 (mirrors the 2024 handler's shape)", () => {
+    expect(ACTION_EFFECT_FN.wholenessOfBodyAction({ roll: 18 })).toEqual([
+      { type: "spendResource", key: "wholenessOfBody" },
+      { type: "heal", amount: 18 },
+    ]);
+  });
+
+  it("ACTION_EFFECT_FN.wholenessOfBodyAction: without a roll, spends the use but heals nothing", () => {
+    expect(ACTION_EFFECT_FN.wholenessOfBodyAction({})).toEqual([
+      { type: "spendResource", key: "wholenessOfBody" },
+    ]);
+  });
+
+  it("2014 monk gets tranquility as a free-cost reminder at L11, not at L10", () => {
+    expect(keys(at("monk", WAY_OPEN_HAND, 10, [], true, edition))).not.toContain("tranquility");
+    const l11 = at("monk", WAY_OPEN_HAND, 11, [], true, edition);
+    const tranquility = l11.find((a) => a.key === "tranquility");
+    expect(tranquility).toBeDefined();
+    expect(tranquility?.cost).toBe("free");
+    expect(tranquility?.enabled).toBe(true);
+    expect(tranquility?.reminder).toMatch(/sanctuary/i);
+  });
+
+  it("tranquility is a pure reminder — no server effect fn", () => {
+    expect(ACTION_EFFECT_FN.tranquility).toBeUndefined();
+  });
+
+  it("a 2024 monk never sees the 2014 keys, and vice versa", () => {
+    const openHand2024 = keys(at("monk", "Warrior of the Open Hand", 20, [pool("wholenessOfBody", 5)]));
+    expect(openHand2024).not.toContain("wholenessOfBodyAction");
+    expect(openHand2024).not.toContain("tranquility");
+
+    const wayOpenHand2014 = keys(at("monk", WAY_OPEN_HAND, 20, [pool("wholenessOfBody", 5)], true, edition));
+    expect(wayOpenHand2014).not.toContain("wholenessOfBody");
+    expect(wayOpenHand2014).not.toContain("fleetStep");
+  });
+
+  it("subclass gate: a non-Way-of-the-Open-Hand 2014 monk gets neither key", () => {
+    const shadow = keys(at("monk", "Warrior of Shadow", 17, [], true, edition));
+    expect(shadow).not.toContain("wholenessOfBodyAction");
+    expect(shadow).not.toContain("tranquility");
+  });
+});
+
 describe("Warrior of Mercy — Hand of Healing (#1248)", () => {
   const MERCY = "Warrior of Mercy";
 
@@ -1366,17 +1430,24 @@ describe("subclass gate resolves via slug — FK preferred, exact name as fallba
   // through `at()`, so this is the same mechanism the FK path uses, minus the FK.
   // elementalAttunement is deliberately absent from its subclass's list here —
   // it's row-driven (#1686) and unreachable through the bare at() this test
-  // uses; elementalBurst alone still proves the slug match.
-  const MONK_SUBCLASS_GRANT_KEYS: Record<Extract<SubclassSlug, `monk-${string}`>, string[]> = {
-    "monk-warrior-of-shadow": ["shadowStep", "shadowArts", "cloakOfShadows"],
-    "monk-warrior-of-the-elements": ["elementalBurst"],
-    "monk-warrior-of-the-open-hand": ["wholenessOfBody", "fleetStep"],
-    "monk-warrior-of-mercy": ["handOfHealing", "handOfHealingFlurry"],
+  // uses; elementalBurst alone still proves the slug match. #1501 widens the
+  // value shape to carry an optional `edition` (defaulting to EDITION_2024,
+  // `at()`'s own default) — "monk-way-of-the-open-hand" is the first monk
+  // slug whose rows are EDITION_2014-only, so its entry must override it.
+  const MONK_SUBCLASS_GRANT_KEYS: Record<Extract<SubclassSlug, `monk-${string}`>, { keys: string[]; edition?: "EDITION_2014" | "EDITION_2024" }> = {
+    "monk-warrior-of-shadow": { keys: ["shadowStep", "shadowArts", "cloakOfShadows"] },
+    "monk-warrior-of-the-elements": { keys: ["elementalBurst"] },
+    "monk-warrior-of-the-open-hand": { keys: ["wholenessOfBody", "fleetStep"] },
+    "monk-warrior-of-mercy": { keys: ["handOfHealing", "handOfHealingFlurry"] },
+    "monk-way-of-the-open-hand": { keys: ["wholenessOfBodyAction", "tranquility"], edition: "EDITION_2014" },
   };
   it("every subclass-gated row is reachable from its accepted name (#1339, retargeted #1277)", () => {
-    for (const [slug, expectedKeys] of Object.entries(MONK_SUBCLASS_GRANT_KEYS) as [SubclassSlug, string[]][]) {
+    for (const [slug, { keys: expectedKeys, edition }] of Object.entries(MONK_SUBCLASS_GRANT_KEYS) as [
+      SubclassSlug,
+      { keys: string[]; edition?: "EDITION_2014" | "EDITION_2024" },
+    ][]) {
       const name = SUBCLASS_IDENTITY[slug].nameKey;
-      const granted = keys(at("monk", name, 20, [pool("focus", 5), pool("wholenessOfBody", 5)]));
+      const granted = keys(at("monk", name, 20, [pool("focus", 5), pool("wholenessOfBody", 5)], true, edition ?? "EDITION_2024"));
       for (const key of expectedKeys) {
         expect(granted).toContain(key);
       }
@@ -1411,7 +1482,7 @@ describe("no two DERIVED_ACTIONS rows from different classes share a display nam
     cleric: [undefined, "life domain", "trickery domain"],
     druid: [undefined, "circle of the land", "circle of the moon"],
     fighter: [undefined, "battle master", "champion", "eldritch knight"],
-    monk: [undefined, "warrior of the open hand", "warrior of shadow", "warrior of the elements", "warrior of mercy"],
+    monk: [undefined, "warrior of the open hand", "way of the open hand", "warrior of shadow", "warrior of the elements", "warrior of mercy"],
     paladin: [undefined, "oath of devotion", "oath of the ancients", "oath of vengeance"],
     ranger: [undefined, "hunter", "beast master"],
     rogue: [undefined, "arcane trickster", "assassin", "thief"],

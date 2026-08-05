@@ -11,21 +11,29 @@
 // direct database calls or async write logic may live in this file.
 // expand() below is pure content assembly, not seeding logic.
 //
-// SCOPE (#1675 transport, #1500 base-class rewrite): #1675 moved every row
-// here as a byte-identical transcription of what lib/classes/monk.ts's
-// MONK_FEATURES / WARRIOR_OF_*_FEATURES said, both editions sharing one row.
-// #1500 (this slice) rewrites the 18 BASE-CLASS rows (MONK_BASE_RAW below)
-// from real SRD 5.1 / PHB'14 text — a genuine content fork per feature, not a
-// retag: several 2014 features have no 2024 name at all (Uncanny Metabolism/
-// Heightened Focus/Self-Restoration/Perfect Focus are 2024-only; Stillness of
-// Mind/Purity of Body/Tongue of the Sun and Moon/Timeless Body/Empty Body/
-// Perfect Self are 2014-only), so the 2014 partition is 17 rows against the
-// 2024 partition's 18 (monk-2024-content.test.ts's per-partition count pins
-// this exactly). The four 2024-only Warrior subclasses below are untouched —
-// no 2014 monk subclass slug exists yet (#1500-#1503's later slices), so
-// their rows stay byte-identical transcriptions pending #1501-#1503.
+// SCOPE (#1675 transport, #1500 base-class rewrite, #1501 Open Hand fork):
+// #1675 moved every row here as a byte-identical transcription of what
+// lib/classes/monk.ts's MONK_FEATURES / WARRIOR_OF_*_FEATURES said, both
+// editions sharing one row. #1500 rewrites the 18 BASE-CLASS rows
+// (MONK_BASE_RAW below) from real SRD 5.1 / PHB'14 text — a genuine content
+// fork per feature, not a retag: several 2014 features have no 2024 name at
+// all (Uncanny Metabolism/Heightened Focus/Self-Restoration/Perfect Focus are
+// 2024-only; Stillness of Mind/Purity of Body/Tongue of the Sun and
+// Moon/Timeless Body/Empty Body/Perfect Self are 2014-only), so the 2014
+// partition is 17 rows against the 2024 partition's 18
+// (monk-2024-content.test.ts's per-partition count pins this exactly). #1501
+// (this slice) forks Warrior of the Open Hand into two SEPARATE subclasses —
+// "Warrior of the Open Hand" stays EDITION_2024-only (its four rows tagged in
+// this same commit) and "Way of the Open Hand" is authored fresh as
+// EDITION_2014-only (SRD 5.1's only monastic tradition) — rather than one
+// slug hosting both editions' text, since the 2014 and 2024 names genuinely
+// differ (monk.ts's two SubclassDefinition entries are the same split). The
+// three remaining 2024-only subclasses (Shadow, Elements, Mercy) are still
+// untouched — no 2014 slug exists for any of them yet (#1502-#1503's later
+// slices), so their rows stay byte-identical transcriptions pending those.
 // monk.ts keeps its resourceFn for the ki/focus pool (now edition-forked, see
-// monkPoolKey) and every subclass resourceFn unchanged.
+// monkPoolKey) and every subclass resourceFn unchanged (except Way of the
+// Open Hand, which needs none — see monk.ts's own comment).
 //
 // Two rows carry descriptor columns, both already set on their source
 // AuthoredFeature entries in monk.ts before this migration (#1530's Extra
@@ -70,12 +78,20 @@ interface RawMonkFeature {
    * unconditionally — #1500-#1503's later slices.
    */
   edition?: SeedEdition;
-  // ---- Descriptor columns (#1530/#1686), transcribed unchanged from their
-  // ---- source AuthoredFeature entries — see file header. Every other row
-  // ---- leaves these undefined, which expand() passes straight through.
+  // ---- Descriptor columns (#1530/#1686/#1501), transcribed unchanged from
+  // ---- their source AuthoredFeature entries (or, for #1501's Wholeness of
+  // ---- Body, authored fresh as a row-owned FIXED total — #1134's
+  // ---- discriminator: a flat, ability-score-independent pool total belongs
+  // ---- on the row, not a resourceFn). Every other row leaves these
+  // ---- undefined, which expand() passes straight through.
   derivedStat?: string;
   derivedStatTiers?: { minLevel: number; value: number | string }[];
+  // fallow-ignore-next-line code-duplication -- the descriptor-column field list intentionally mirrors fighter-features.ts's/wizard-features.ts's own shape (#1501 widens it onto Monk the same way #1676 widened it onto Wizard); each Raw*Feature interface is authored independently per class file by existing convention, never a shared base type
   resourceKey?: string;
+  resourceLabel?: string;
+  resourceRecharge?: string;
+  // fallow-ignore-next-line code-duplication -- same intentional per-class-file mirror as the comment three fields up (fighter-features.ts's/wizard-features.ts's own resourceTotals shape)
+  resourceTotals?: { minLevel: number; total: number }[];
   activationCost?: string;
   resolverKind?: string;
   costKind?: string;
@@ -87,6 +103,7 @@ interface RawMonkFeature {
 function expand(raw: RawMonkFeature): ClassFeatureSeedRow[] {
   const base: Omit<ClassFeatureSeedRow, "edition"> = {
     className: "Monk",
+    // fallow-ignore-next-line code-duplication -- expand()'s field-by-field copy intentionally mirrors fighter-features.ts's/wizard-features.ts's own expand() (every Raw*Feature -> ClassFeatureSeedRow adapter across this file family repeats this shape by convention, never a shared helper)
     subclassSlug: raw.subclassSlug,
     name: raw.name,
     level: raw.level,
@@ -94,6 +111,9 @@ function expand(raw: RawMonkFeature): ClassFeatureSeedRow[] {
     derivedStat: raw.derivedStat,
     derivedStatTiers: raw.derivedStatTiers,
     resourceKey: raw.resourceKey,
+    resourceLabel: raw.resourceLabel,
+    resourceRecharge: raw.resourceRecharge,
+    resourceTotals: raw.resourceTotals,
     activationCost: raw.activationCost,
     resolverKind: raw.resolverKind,
     costKind: raw.costKind,
@@ -415,19 +435,38 @@ const MONK_BASE_RAW: RawMonkFeature[] = [
   },
 ];
 
-// ---- Warrior of the Open Hand — SRD 5.1 / SRD 5.2 p. 90 --------------------
+// ---- Warrior of the Open Hand — SRD 5.2 p. 90 (#1501: tagged EDITION_2024,
+// ---- bound to the "Warrior of the Open Hand" Subclass row's own retag in
+// ---- the same commit — see subclasses.ts). Its 2014 counterpart, "Way of
+// ---- the Open Hand" (SRD 5.1 p.78, the ONLY monastic tradition SRD 5.1
+// ---- prints), is its own block below — a separate subclass, not a fork of
+// ---- this one; the two share three feature NAMES but genuinely differ in
+// ---- mechanics on all three (Open Hand Technique's Addle duration, Wholeness
+// ---- of Body's cost/pool/formula, Quivering Palm's cost/damage/outcome
+// ---- mapping) plus a fourth feature (Fleet Step / Tranquility) that has no
+// ---- counterpart in the other edition at all — CLAUDE.md's #1430 "one
+// ---- description can't cite two documents" precedent, same shape as the
+// ---- base class's own forked rows.
 const WARRIOR_OF_THE_OPEN_HAND_RAW: RawMonkFeature[] = [
   {
     subclassSlug: slug("monk-warrior-of-the-open-hand"),
     name: "Open Hand Technique",
     level: 3,
+    edition: "EDITION_2024",
+    // Addle corrected 2026-08 (#1501): SRD 5.2's actual text is "can't make
+    // Opportunity Attacks until the start of its next turn" — narrower than
+    // "take reactions" (this row's pre-#1501 wording) and DOES mean the
+    // TARGET's own next turn ("its"), verified against the SRD 5.2 API text
+    // directly rather than assumed from the pre-existing drift between this
+    // row and the module-header comment #1501's issue flagged.
     description:
-      "When you hit a creature with an attack granted by your Flurry of Blows, you can impose one effect: Addle — the creature can't take reactions until the start of its next turn (no save); Push — the creature makes a Strength save or is pushed up to 15 ft away; or Topple — the creature makes a Dexterity save or is knocked prone.",
+      "When you hit a creature with an attack granted by your Flurry of Blows, you can impose one effect: Addle — the creature can't make Opportunity Attacks until the start of its next turn (no save); Push — the creature makes a Strength save or is pushed up to 15 ft away; or Topple — the creature makes a Dexterity save or is knocked prone.",
   },
   {
     subclassSlug: slug("monk-warrior-of-the-open-hand"),
     name: "Wholeness of Body",
     level: 6,
+    edition: "EDITION_2024",
     description:
       "As a bonus action, roll your Martial Arts die and regain that many hit points plus your Wisdom modifier (minimum 1). Usable a number of times equal to your Wisdom modifier (minimum once); regain all expended uses on a long rest.",
   },
@@ -435,6 +474,7 @@ const WARRIOR_OF_THE_OPEN_HAND_RAW: RawMonkFeature[] = [
     subclassSlug: slug("monk-warrior-of-the-open-hand"),
     name: "Fleet Step",
     level: 11,
+    edition: "EDITION_2024",
     description:
       "When you take a bonus action other than Step of the Wind, you can also take the Step of the Wind bonus action immediately afterward.",
   },
@@ -442,8 +482,60 @@ const WARRIOR_OF_THE_OPEN_HAND_RAW: RawMonkFeature[] = [
     subclassSlug: slug("monk-warrior-of-the-open-hand"),
     name: "Quivering Palm",
     level: 17,
+    edition: "EDITION_2024",
     description:
       "When you hit with an unarmed strike, spend 4 focus to set imperceptible vibrations in the creature that last for a number of days equal to your monk level. They are harmless unless you use your action to end them — the creature then makes a Constitution save, taking 10d12 force damage on a failure or half as much on a success. You can maintain vibrations in only one creature at a time and can end them harmlessly at any time without using an action.",
+  },
+];
+
+// ---- Way of the Open Hand — SRD 5.1 p. 78 / PHB'14 p.78 (#1501) -----------
+// Verified against dnd5eapi.co's 2014 feature text directly. Open Hand
+// Technique's Addle duration is "until the end of YOUR next turn" (the
+// monk's own next turn, no save) — genuinely longer than 2024's "until the
+// start of ITS [the target's] next turn", not a wording variant of it.
+// Quivering Palm's outcome mapping is INVERTED from 2024's (fail = drops to
+// 0 HP outright, success = full 10d10 necrotic — never halved); transcribed
+// as SRD 5.1 states it, not normalized to 2024's fail-full/success-half
+// shape (#1501's issue note).
+const WAY_OF_THE_OPEN_HAND_RAW: RawMonkFeature[] = [
+  {
+    subclassSlug: slug("monk-way-of-the-open-hand"),
+    name: "Open Hand Technique",
+    level: 3,
+    edition: "EDITION_2014",
+    description:
+      "Whenever you hit a creature with one of the attacks granted by your Flurry of Blows, you can impose one effect: it must succeed on a Dexterity save or be knocked prone; it must make a Strength save or you can push it up to 15 ft away from you; or it can't take reactions until the end of your next turn (no save).",
+  },
+  {
+    subclassSlug: slug("monk-way-of-the-open-hand"),
+    name: "Wholeness of Body",
+    level: 6,
+    edition: "EDITION_2014",
+    description:
+      "As an action, regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again.",
+    // Row-owned pool (#1134's discriminator: a FIXED total needs no
+    // ability-score-dependent resourceFn, unlike the 2024 sibling's Wis-mod
+    // formula, which stays in monk.ts's own resourceFn).
+    resourceKey: "wholenessOfBody",
+    resourceLabel: "Wholeness of Body",
+    resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 6, total: 1 }],
+  },
+  {
+    subclassSlug: slug("monk-way-of-the-open-hand"),
+    name: "Tranquility",
+    level: 11,
+    edition: "EDITION_2014",
+    description:
+      "At the end of a long rest, you gain the effect of a sanctuary spell that lasts until the start of your next long rest (the spell can end early as normal). The saving throw DC equals your ki save DC.",
+  },
+  {
+    subclassSlug: slug("monk-way-of-the-open-hand"),
+    name: "Quivering Palm",
+    level: 17,
+    edition: "EDITION_2014",
+    description:
+      "When you hit a creature with an unarmed strike, you can spend 3 ki points to start imperceptible vibrations in its body, lasting a number of days equal to your monk level. You can have only one creature under this effect at a time, and you can end the vibrations harmlessly without using an action. To end them harmfully, you and the target must be on the same plane of existence — use your action to force a Constitution save: on a failure the target drops to 0 hit points; on a success it takes 10d10 necrotic damage.",
   },
 ];
 
@@ -606,14 +698,18 @@ const WARRIOR_OF_THE_ELEMENTS_RAW: RawMonkFeature[] = [
 ];
 
 // The full Monk seed family: base class (17 EDITION_2014 rows / 18
-// EDITION_2024 rows, #1500) + four 2024-only subclasses (4 + 4 + 6 + 5 = 19
-// features, still expanded to both editions pending #1501-#1503 — see the
-// file header) = 36 EDITION_2014 + 37 EDITION_2024 = 73 rows total.
-// Concatenated into class-features.ts's CLASS_FEATURES the same way every
-// other literal class's export is.
+// EDITION_2024 rows, #1500) + Way of the Open Hand (4 EDITION_2014-only
+// rows, #1501) + Warrior of the Open Hand (4 EDITION_2024-only rows, #1501)
+// + three 2024-only subclasses still expanded to both editions pending
+// #1502-#1503 (Shadow 4, Elements 5, Mercy 6 = 15 features x 2 editions =
+// 30 rows) = 36 EDITION_2014 + 37 EDITION_2024 = 73 rows total (the Open
+// Hand swap is a wash: 4 rows move from the shared-count column to their own
+// edition-exclusive one on each side). Concatenated into class-features.ts's
+// CLASS_FEATURES the same way every other literal class's export is.
 export const MONK_FEATURES: ClassFeatureSeedRow[] = [
   ...MONK_BASE_RAW.flatMap(expand),
   ...WARRIOR_OF_THE_OPEN_HAND_RAW.flatMap(expand),
+  ...WAY_OF_THE_OPEN_HAND_RAW.flatMap(expand),
   ...WARRIOR_OF_SHADOW_RAW.flatMap(expand),
   ...WARRIOR_OF_MERCY_RAW.flatMap(expand),
   ...WARRIOR_OF_THE_ELEMENTS_RAW.flatMap(expand),

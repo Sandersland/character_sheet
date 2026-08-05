@@ -2585,36 +2585,84 @@ export const MONK_BASE_ROWS: ClassFeatureRow[] = [
 // resourceKey-observing test could care about, mirrored here for the same
 // reason FIGHTER_BASE_ROWS hand-builds its populated rows rather than
 // calling `toRows`.
-export const WARRIOR_OF_THE_OPEN_HAND_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2024"] as const).flatMap((edition) => [
+// EDITION_2024-only as of #1501 (tagged in monk-features.ts, bound to the
+// "Warrior of the Open Hand" Subclass row's own retag) — "Way of the Open
+// Hand" below is its SEPARATE 2014 counterpart, not a fork of this row set.
+export const WARRIOR_OF_THE_OPEN_HAND_ROWS: ClassFeatureRow[] = [
   {
     name: "Open Hand Technique",
     level: 3,
-    edition,
+    edition: "EDITION_2024",
+    // Addle corrected 2026-08 (#1501): SRD 5.2's actual text is "can't make
+    // Opportunity Attacks until the start of its next turn", not "take
+    // reactions" — see open-hand-technique.ts's addleClause for the verified
+    // source text.
     description:
-      "When you hit a creature with an attack granted by your Flurry of Blows, you can impose one effect: Addle — the creature can't take reactions until the start of its next turn (no save); Push — the creature makes a Strength save or is pushed up to 15 ft away; or Topple — the creature makes a Dexterity save or is knocked prone.",
+      "When you hit a creature with an attack granted by your Flurry of Blows, you can impose one effect: Addle — the creature can't make Opportunity Attacks until the start of its next turn (no save); Push — the creature makes a Strength save or is pushed up to 15 ft away; or Topple — the creature makes a Dexterity save or is knocked prone.",
   },
   {
     name: "Wholeness of Body",
     level: 6,
-    edition,
+    edition: "EDITION_2024",
     description:
       "As a bonus action, roll your Martial Arts die and regain that many hit points plus your Wisdom modifier (minimum 1). Usable a number of times equal to your Wisdom modifier (minimum once); regain all expended uses on a long rest.",
   },
   {
     name: "Fleet Step",
     level: 11,
-    edition,
+    edition: "EDITION_2024",
     description:
       "When you take a bonus action other than Step of the Wind, you can also take the Step of the Wind bonus action immediately afterward.",
   },
   {
     name: "Quivering Palm",
     level: 17,
-    edition,
+    edition: "EDITION_2024",
     description:
       "When you hit with an unarmed strike, spend 4 focus to set imperceptible vibrations in the creature that last for a number of days equal to your monk level. They are harmless unless you use your action to end them — the creature then makes a Constitution save, taking 10d12 force damage on a failure or half as much on a success. You can maintain vibrations in only one creature at a time and can end them harmlessly at any time without using an action.",
   },
-]);
+];
+
+// EDITION_2014-only (#1501): SRD 5.1's only monastic tradition, a SEPARATE
+// subclass from Warrior of the Open Hand above, not its 2014 fork — mirrors
+// monk-features.ts's WAY_OF_THE_OPEN_HAND_RAW exactly, including Wholeness of
+// Body's row-owned pool (resourceKey/resourceRecharge/resourceTotals — a
+// fixed total, so no ability-score-dependent resourceFn is needed, unlike
+// the 2024 sibling's Wis-mod formula).
+export const WAY_OF_THE_OPEN_HAND_ROWS: ClassFeatureRow[] = [
+  {
+    name: "Open Hand Technique",
+    level: 3,
+    edition: "EDITION_2014",
+    description:
+      "Whenever you hit a creature with one of the attacks granted by your Flurry of Blows, you can impose one effect: it must succeed on a Dexterity save or be knocked prone; it must make a Strength save or you can push it up to 15 ft away from you; or it can't take reactions until the end of your next turn (no save).",
+  },
+  {
+    name: "Wholeness of Body",
+    level: 6,
+    edition: "EDITION_2014",
+    description:
+      "As an action, regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again.",
+    resourceKey: "wholenessOfBody",
+    resourceLabel: "Wholeness of Body",
+    resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 6, total: 1 }],
+  },
+  {
+    name: "Tranquility",
+    level: 11,
+    edition: "EDITION_2014",
+    description:
+      "At the end of a long rest, you gain the effect of a sanctuary spell that lasts until the start of your next long rest (the spell can end early as normal). The saving throw DC equals your ki save DC.",
+  },
+  {
+    name: "Quivering Palm",
+    level: 17,
+    edition: "EDITION_2014",
+    description:
+      "When you hit a creature with an unarmed strike, you can spend 3 ki points to start imperceptible vibrations in its body, lasting a number of days equal to your monk level. You can have only one creature under this effect at a time, and you can end the vibrations harmlessly without using an action. To end them harmfully, you and the target must be on the same plane of existence — use your action to force a Constitution save: on a failure the target drops to 0 hit points; on a success it takes 10d10 necrotic damage.",
+  },
+];
 
 export const WARRIOR_OF_SHADOW_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2024"] as const).flatMap((edition) => [
   {
@@ -2759,6 +2807,7 @@ export const LITERAL_SUBCLASS_ROWS: Record<string, ClassFeatureRow[]> = {
   "circle of the land": CIRCLE_OF_THE_LAND_ROWS,
   "circle of the moon": CIRCLE_OF_THE_MOON_ROWS,
   "warrior of the open hand": WARRIOR_OF_THE_OPEN_HAND_ROWS,
+  "way of the open hand": WAY_OF_THE_OPEN_HAND_ROWS,
   "warrior of shadow": WARRIOR_OF_SHADOW_ROWS,
   "warrior of mercy": WARRIOR_OF_MERCY_ROWS,
   "warrior of the elements": WARRIOR_OF_THE_ELEMENTS_ROWS,

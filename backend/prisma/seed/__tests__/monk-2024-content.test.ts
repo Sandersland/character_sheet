@@ -32,17 +32,24 @@ function row(subclassSlug: string | null, name: string, edition: Edition) {
 
 const BASE = null;
 const OPEN_HAND = "monk-warrior-of-the-open-hand";
+const WAY_OPEN_HAND = "monk-way-of-the-open-hand";
 const SHADOW = "monk-warrior-of-shadow";
 const ELEMENTS = "monk-warrior-of-the-elements";
 const MERCY = "monk-warrior-of-mercy";
 
-describe("Per-partition counts: base 17(2014)/18(2024), subclasses open hand 4, shadow 4, elements 5, mercy 6 — identical for 2014/2024 (#1500 forks the base class; #1675 subclasses stay a transport-only twin pending #1501-#1503)", () => {
+describe("Per-partition counts: base 17(2014)/18(2024); open hand forks into two 4-row EDITION-EXCLUSIVE subclasses (#1501); shadow 4, elements 5, mercy 6 still identical for 2014/2024 pending #1502-#1503", () => {
   it("counts match exactly (36 total 2014, 37 total 2024)", () => {
     const count = (slug: string | null, edition: Edition) => MONK_FEATURES.filter((r) => r.subclassSlug === slug && r.edition === edition).length;
     expect(count(BASE, "EDITION_2014")).toBe(17);
     expect(count(BASE, "EDITION_2024")).toBe(18);
+    // Open Hand forked (#1501): "Warrior of the Open Hand" is 2024-only,
+    // "Way of the Open Hand" is its own 2014-only sibling — neither slug has
+    // rows in the other edition.
+    expect(count(OPEN_HAND, "EDITION_2014")).toBe(0);
+    expect(count(OPEN_HAND, "EDITION_2024")).toBe(4);
+    expect(count(WAY_OPEN_HAND, "EDITION_2014")).toBe(4);
+    expect(count(WAY_OPEN_HAND, "EDITION_2024")).toBe(0);
     for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {
-      expect(count(OPEN_HAND, edition)).toBe(4);
       expect(count(SHADOW, edition)).toBe(4);
       expect(count(ELEMENTS, edition)).toBe(5);
       expect(count(MERCY, edition)).toBe(6);
@@ -90,13 +97,27 @@ describe("Elemental Attunement (#1686): the toggle descriptor block transcribed 
 
   it("every OTHER row leaves every descriptor column undefined", () => {
     for (const r of MONK_FEATURES) {
-      if (r.name === "Extra Attack" && r.subclassSlug === null) continue;
-      if (r.name === "Elemental Attunement" && r.subclassSlug === ELEMENTS) continue;
+      if (isExemptDescriptorRow(r)) continue;
       expect(r.resourceKey, `${r.subclassSlug ?? "base"}/${r.name}`).toBeUndefined();
       expect(r.derivedStat, `${r.subclassSlug ?? "base"}/${r.name}`).toBeUndefined();
     }
   });
 });
+
+// The three rows populated elsewhere in this suite — pulled out of the loop
+// above to keep that test's own cyclomatic/cognitive score flat (mirrors
+// class-feature-migration.test.ts's own POPULATED_ROW_PREDICATES pattern).
+function isExemptDescriptorRow(r: (typeof MONK_FEATURES)[number]): boolean {
+  if (r.name === "Extra Attack" && r.subclassSlug === null) return true;
+  if (r.name === "Elemental Attunement" && r.subclassSlug === ELEMENTS) return true;
+  // #1501: Way of the Open Hand's Wholeness of Body is the third row-owned
+  // descriptor block — a row-owned FIXED pool total (resourceKey/
+  // resourceRecharge/resourceTotals), not the toggle shape the other two
+  // exemptions above carry. See monk-2014-open-hand.test.ts for its own
+  // dedicated assertions on this row's exact descriptor values.
+  if (r.name === "Wholeness of Body" && r.subclassSlug === WAY_OPEN_HAND) return true;
+  return false;
+}
 
 const ABILITY_SCORES = {
   strength: 10,

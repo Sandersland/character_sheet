@@ -197,6 +197,22 @@ export const SUBCLASSES: SubclassSeed[] = [
     description:
       "You master techniques to push and trip opponents, cover yourself in a shroud of focus, and enter a trance state that heals your wounds. Open Hand Technique allows you to impose special effects on creatures hit by your Flurry of Blows — knocking them prone, pushing them 15 ft, or denying their reactions.",
     slug: "monk-warrior-of-the-open-hand",
+    // #1501: SRD 5.2's own subclass — retagged (bound in the same commit as
+    // "Way of the Open Hand" below, its 2014 counterpart) so
+    // resolveSubclassId/assertEverySubclassEditionPopulated never see an
+    // untagged row whose 2014 partition is now empty.
+    edition: "EDITION_2024",
+  },
+  {
+    className: "Monk",
+    name: "Way of the Open Hand",
+    description:
+      "You master techniques to push and trip opponents, manipulate ki to heal your wounds, and practice a meditation that wards you with an aura of peace. Open Hand Technique lets you impose special effects on creatures hit by your Flurry of Blows — knocking them prone, pushing them 15 ft, or denying their reactions until the end of your next turn.",
+    // SRD 5.1's own monastic tradition (the only one present in the SRD) —
+    // a SEPARATE subclass from "Warrior of the Open Hand" above, not a retag
+    // of it (#1501; monk.ts's two SubclassDefinition entries are the same split).
+    slug: "monk-way-of-the-open-hand",
+    edition: "EDITION_2014",
   },
   {
     className: "Monk",

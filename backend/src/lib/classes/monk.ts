@@ -122,6 +122,18 @@ export const monk: ClassDefinition = {
         ];
       },
     },
+    // Way of the Open Hand (SRD 5.1 / PHB'14 p.78, #1501) — a SEPARATE
+    // subclass from "warrior of the open hand" above, not a 2014 variant of
+    // it (the two names differ, so no edition axis belongs on
+    // SubclassDefinition itself; see subclass-slug.ts's SUBCLASS_IDENTITY).
+    // No resourceFn: Wholeness of Body's 2014 pool is a FIXED 1 use/long
+    // rest with no ability-score dependency, so it's authored directly on
+    // the feature row (monk-features.ts's resourceTotals) rather than here —
+    // the row-owned discriminator #1134 established for a flat total.
+    "way of the open hand": {
+      slug: "monk-way-of-the-open-hand",
+      grantLevel: 3,
+    },
     "warrior of shadow": {
       slug: "monk-warrior-of-shadow",
       grantLevel: 3,

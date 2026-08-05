@@ -651,30 +651,41 @@ const EXPECTED_EDITION_TAGGED_FEATURES = [
   ["paladin", "oath of vengeance", "Relentless Avenger"],
   ["paladin", "oath of vengeance", "Soul of Vengeance"],
   ["paladin", "oath of vengeance", "Avenging Angel"],
-  // Monk's 10 new triples (#1500, base class only — the four Warrior-of-*
-  // subclasses stay an untouched transport-only twin, #1501-#1503): of the
-  // base class's 12 forked-or-unique-per-edition features, only "Martial
-  // Arts" and "Stunning Strike" keep the SAME NAME across both editions
-  // (SRD 5.1 and PHB'24 both call them that, with genuinely different text)
-  // — taggedNamesFor only flags a name carrying two DIFFERENT descriptions,
-  // so a rename is never tagged (mirrors Warlock's Expanded Spell List ->
-  // Fiend Spells, Cleric's Domain Spells -> Life/Trickery Domain Spells
-  // above): "Ki"/"Focus", "Deflect Missiles"/"Deflect Attacks",
-  // "Ki-Empowered Strikes"/"Empowered Strikes", "Diamond Soul"/"Disciplined
-  // Survivor" are each a single description under their own name, and the
-  // eleven wholly edition-exclusive names (Uncanny Metabolism/Heightened
-  // Focus/Self-Restoration/Perfect Focus/Superior Defense on the 2024 side;
-  // Stillness of Mind/Purity of Body/Tongue of the Sun and Moon/Timeless
-  // Body/Empty Body/Perfect Self on the 2014 side) have no counterpart to
-  // fork against at all. Both base names show up under EVERY subclass
-  // context Monk has (undefined/warrior of the open hand/warrior of
+  // Monk's 12 new triples (#1500 base class + #1501 Open Hand's new context
+  // — the two remaining Warrior-of-* subclasses stay an untouched
+  // transport-only twin, #1502-#1503): of the base class's 12
+  // forked-or-unique-per-edition features, only "Martial Arts" and
+  // "Stunning Strike" keep the SAME NAME across both editions (SRD 5.1 and
+  // PHB'24 both call them that, with genuinely different text) — taggedNamesFor
+  // only flags a name carrying two DIFFERENT descriptions, so a rename is
+  // never tagged (mirrors Warlock's Expanded Spell List -> Fiend Spells,
+  // Cleric's Domain Spells -> Life/Trickery Domain Spells above):
+  // "Ki"/"Focus", "Deflect Missiles"/"Deflect Attacks", "Ki-Empowered
+  // Strikes"/"Empowered Strikes", "Diamond Soul"/"Disciplined Survivor" are
+  // each a single description under their own name, and the eleven wholly
+  // edition-exclusive names (Uncanny Metabolism/Heightened Focus/Self-
+  // Restoration/Perfect Focus/Superior Defense on the 2024 side; Stillness
+  // of Mind/Purity of Body/Tongue of the Sun and Moon/Timeless Body/Empty
+  // Body/Perfect Self on the 2014 side) have no counterpart to fork against
+  // at all. Both base names show up under EVERY subclass context Monk has
+  // (undefined/warrior of the open hand/way of the open hand/warrior of
   // shadow/warrior of the elements/warrior of mercy — collectTaggedFeatureKeys
   // combines classRows, always ALL of them, with each context's own
-  // subclassRows) — 2 names x 5 contexts = 10.
+  // subclassRows) — 2 names x 6 contexts = 12. Way of the Open Hand's OWN
+  // four feature names are NOT tagged here — #1501 forked it into a
+  // SEPARATE 2014-only subclass rather than a same-slug fork, so
+  // loadDbFeatureRows("monk", "way of the open hand") only ever returns
+  // EDITION_2014 rows: one description per name, not two (same "separate
+  // subclass, not a fork" shape as Barbarian's Totem Warrior or Warlock's
+  // The Archfey above). Warrior of the Open Hand's own four names are no
+  // longer tagged either (they used to be, pre-#1501, when one slug held
+  // both editions' text) — that slug's rows are now EDITION_2024-only too.
   ["monk", "undefined", "Martial Arts"],
   ["monk", "undefined", "Stunning Strike"],
   ["monk", "warrior of the open hand", "Martial Arts"],
   ["monk", "warrior of the open hand", "Stunning Strike"],
+  ["monk", "way of the open hand", "Martial Arts"],
+  ["monk", "way of the open hand", "Stunning Strike"],
   ["monk", "warrior of shadow", "Martial Arts"],
   ["monk", "warrior of shadow", "Stunning Strike"],
   ["monk", "warrior of the elements", "Martial Arts"],

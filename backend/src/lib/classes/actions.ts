@@ -439,15 +439,19 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     edition: "EDITION_2014",
   },
 
-  // Every row below (Warrior of Shadow / Warrior of the Elements / Warrior of
-  // the Open Hand / Warrior of Mercy) is subclass-gated via grantSubclassSlugs
-  // and deliberately left UNTAGGED (#1499) even though all four subclasses are
-  // 2024-only content: SUBCLASS_SLUGS (subclass-slug.ts) contains no 2014 monk
-  // subclass, so matchesSubclassGate already excludes every one of these rows
-  // for a 2014 monk (no slug can ever resolve) — an edition tag would add no
-  // observable behaviour. Tagging wholenessOfBody in particular would also
-  // pre-decide a content question that belongs to #1500 (PHB'14 Way of the
-  // Open Hand has its own Wholeness of Body at a different level).
+  // Every row below for Warrior of Shadow / Warrior of the Elements / Warrior
+  // of Mercy is subclass-gated via grantSubclassSlugs and deliberately left
+  // UNTAGGED (#1499): SUBCLASS_SLUGS (subclass-slug.ts) still contains no
+  // 2014 slug for any of those three, so matchesSubclassGate already excludes
+  // every one of their rows for a 2014 monk — an edition tag would add no
+  // observable behaviour, pending #1502-#1503. Warrior of the Open Hand is
+  // DIFFERENT as of #1501: it now has a real 2014 sibling ("Way of the Open
+  // Hand", its own slug, its own rows below) sharing the SAME action key
+  // ("wholenessOfBody") — reusing an untagged row here would serve the 2024
+  // shape (bonus action, Wis-mod pool) to a 2014 character too, so
+  // wholenessOfBody/fleetStep below are now tagged EDITION_2024, bound in the
+  // same commit as the "Warrior of the Open Hand" Subclass row's own retag
+  // (subclasses.ts).
   // Warrior of Shadow reminder action (2024 rewrite, #1246) — no resourceKey, no
   // server effect; reminder is the deliverable. Improved Shadow Step (L11)
   // upgrades the SAME bonus action (ignore the dim/dark destination requirement
@@ -528,13 +532,26 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // like Stunning Strike bypasses this catalog — neither is a selectable action.
   // Wholeness of Body IS a selectable action: a Bonus Action heal, spending the
   // #1228 wholenessOfBody pool (Martial Arts die + Wis mod, client-rolled).
-  { key: "wholenessOfBody", name: "Wholeness of Body", cost: "bonusAction", grantClass: "monk", grantSubclassSlugs: ["monk-warrior-of-the-open-hand"], grantLevel: 6, resourceKey: "wholenessOfBody", resourceAmount: 1 },
+  // Tagged EDITION_2024 (#1501) now that a real 2014 sibling exists below.
+  {
+    key: "wholenessOfBody",
+    name: "Wholeness of Body",
+    cost: "bonusAction",
+    grantClass: "monk",
+    grantSubclassSlugs: ["monk-warrior-of-the-open-hand"],
+    grantLevel: 6,
+    resourceKey: "wholenessOfBody",
+    resourceAmount: 1,
+    edition: "EDITION_2024",
+  },
   // Fleet Step (L11): not a discrete action — it lets you ALSO take Step of the
   // Wind after any OTHER bonus action, so it carries no resourceKey/slot (like
   // Reckless Attack/Metamagic's cost:"free" reminders) rather than competing
   // with Wholeness of Body/Flurry/Bonus Unarmed Strike for the same bonus
   // action. Full automation of "which bonus action did you just take" is heavy
   // for a one-line rider — the reminder is the deliverable (ticket #1245).
+  // Tagged EDITION_2024 (#1501) — 2014's Way of the Open Hand has Tranquility
+  // at L11 instead (below), not Fleet Step.
   {
     key: "fleetStep",
     name: "Fleet Step",
@@ -543,6 +560,48 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     grantSubclassSlugs: ["monk-warrior-of-the-open-hand"],
     grantLevel: 11,
     reminder: "When you take a bonus action other than Step of the Wind, you can also take Step of the Wind immediately afterward (no extra cost).",
+    edition: "EDITION_2024",
+  },
+
+  // Way of the Open Hand (SRD 5.1 / PHB'14 p.78, #1501) — 2014's counterpart,
+  // a SEPARATE subclass from Warrior of the Open Hand above (see
+  // subclass-slug.ts's SUBCLASS_IDENTITY). Open Hand Technique and Quivering
+  // Palm stay post-hit-rider/set-trigger verticals with no catalog row here,
+  // same as the 2024 subclass. Wholeness of Body needs its OWN key
+  // ("wholenessOfBodyAction", not the 2024 row's "wholenessOfBody") because
+  // its shape genuinely differs — an action, not a bonus action, healing a
+  // FLAT 3 x monk level with no die roll at all, vs. 2024's Martial Arts die
+  // + Wis mod — mirrors patientDefenseKi/stepOfTheWindKi's own same-feature-
+  // different-key precedent above. Both spend the same "wholenessOfBody"
+  // resource key and pool total (row-owned, monk-features.ts), so
+  // ACTION_EFFECT_FN.wholenessOfBodyAction is a thin duplicate of
+  // .wholenessOfBody's spend+client-rolled-heal shape, registered under the
+  // new key; the frontend resolver (actionResolvers.ts) computes the flat
+  // total from the MONK entry's own level (not total character level) —
+  // see that entry's own comment for why that's safe here specifically.
+  {
+    key: "wholenessOfBodyAction",
+    name: "Wholeness of Body",
+    cost: "action",
+    grantClass: "monk",
+    grantSubclassSlugs: ["monk-way-of-the-open-hand"],
+    grantLevel: 6,
+    resourceKey: "wholenessOfBody",
+    resourceAmount: 1,
+    edition: "EDITION_2014",
+  },
+  // Tranquility (L11): a passive gained at the end of a long rest (sanctuary
+  // until the next long rest), not a mid-turn action — reminder-only, like
+  // Fleet Step's own shape, with no resourceKey (nothing is spent to gain it).
+  {
+    key: "tranquility",
+    name: "Tranquility",
+    cost: "free",
+    grantClass: "monk",
+    grantSubclassSlugs: ["monk-way-of-the-open-hand"],
+    grantLevel: 11,
+    reminder: "At the end of a long rest, you gain the effect of sanctuary (DC = your ki save DC) until the start of your next long rest.",
+    edition: "EDITION_2014",
   },
   // Warrior of Mercy (#1248): Hand of Healing is a Magic-action heal spending
   // 1 Focus (mirrors Wholeness of Body's shape) plus a free Flurry-strike
@@ -1008,8 +1067,20 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
     }
     return ops;
   },
-  // fleetStep has no entry here — it's a pure reminder (cost:"free") like
-  // recklessAttack/metamagic: no server state to spend.
+  // Way of the Open Hand's 2014 Wholeness of Body (#1501) — a thin duplicate
+  // of wholenessOfBody's own spend+client-rolled-heal shape, registered under
+  // its own key (see the DERIVED_ACTIONS comment above for why the key
+  // itself must differ even though the SPEND is identical).
+  // fallow-ignore-next-line code-duplication -- deliberately identical body to wholenessOfBody above; ACTION_EFFECT_FN is keyed by action key, not shared by reference, and the two keys must stay distinct (see the DERIVED_ACTIONS comment above)
+  wholenessOfBodyAction: (ctx) => {
+    const ops: ActionOp[] = [{ type: "spendResource", key: "wholenessOfBody" }];
+    if (ctx.roll !== undefined && ctx.roll > 0) {
+      ops.push({ type: "heal", amount: ctx.roll });
+    }
+    return ops;
+  },
+  // fleetStep/tranquility have no entry here — both are pure reminders
+  // (cost:"free") like recklessAttack/metamagic: no server state to spend.
   // Warrior of Mercy (#1248): Hand of Healing's rule text is "touch a
   // creature", but — like layOnHands/wholenessOfBody above — this app has no
   // cross-character heal path via the actions endpoint, so it applies to the
