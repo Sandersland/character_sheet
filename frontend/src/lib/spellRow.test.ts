@@ -129,4 +129,26 @@ describe("runeState", () => {
   it("reports a known-but-unprepared leveled spell", () => {
     expect(runeState({ ...leveled, prepared: false })).toBe("unprepared");
   });
+
+  // #1511 D3: a 2014 known caster's leveled spells are castable the moment
+  // they're learned — the SAME "locked" state a cantrip/granted spell already
+  // renders (SRD 5.1's Spells Known heading vs. SRD 5.2, which has no split).
+  describe("casterModel (#1511 D3)", () => {
+    it("locks a leveled spell for a known caster regardless of `prepared`", () => {
+      expect(runeState(leveled, "known")).toBe("locked");
+      expect(runeState({ ...leveled, prepared: true }, "known")).toBe("locked");
+    });
+
+    it("leaves a prepared caster's leveled spell prepared/unprepared per the boolean", () => {
+      expect(runeState({ ...leveled, prepared: true }, "prepared")).toBe("prepared");
+      expect(runeState({ ...leveled, prepared: false }, "prepared")).toBe("unprepared");
+    });
+
+    it("locks a cantrip and a subclass-granted spell under both models (regression pin)", () => {
+      expect(runeState(cantrip, "known")).toBe("locked");
+      expect(runeState(cantrip, "prepared")).toBe("locked");
+      expect(runeState({ ...leveled, source: "subclass" }, "known")).toBe("locked");
+      expect(runeState({ ...leveled, source: "subclass" }, "prepared")).toBe("locked");
+    });
+  });
 });

@@ -1,6 +1,6 @@
 // Rune prepare-toggle + Remove controls for a spellbook row. Cast left the
 // grimoire (#1162) — the row's name now opens the shared detail card instead.
-import { canPrepare, type PreparedBudget } from "@/lib/spellList";
+import { alwaysAvailableLabelOf, canPrepare, type PreparedBudget } from "@/lib/spellList";
 import { runeState, type SpellRowDerived } from "@/lib/spellRow";
 import type { Spell } from "@/types/character";
 
@@ -14,12 +14,15 @@ interface SpellRowActionsProps {
 }
 
 function PrepareRune({ spell, budget, busy, onPrepare }: Pick<SpellRowActionsProps, "spell" | "budget" | "busy" | "onPrepare">) {
-  const state = runeState(spell);
+  const state = runeState(spell, budget.casterModel);
   if (state === "locked") {
+    // #1511 D4: served, not hardcoded — a known caster's leveled spells
+    // render this same dot but were never "prepared" at all.
+    const label = alwaysAvailableLabelOf(budget);
     return (
       <span
-        aria-label="Always prepared"
-        title="Always prepared"
+        aria-label={label}
+        title={label}
         className="h-5 w-5 shrink-0 rounded-full border border-arcane-600 bg-arcane-500"
       />
     );

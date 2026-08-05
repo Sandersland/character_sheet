@@ -2,6 +2,7 @@
 // leveled spells. View/manage only (#1162) — casting moved to the record's
 // single "Cast a spell" door (CastSpellDoor); this list has no affordances.
 import { derivePreparedCastable } from "@/lib/preparedSpells";
+import { preparedLabelOf } from "@/lib/spellList";
 import { slotOrdinal } from "@/lib/spellMeta";
 import type { Character, Spell } from "@/types/character";
 
@@ -40,10 +41,12 @@ function Group({ heading, spells, cantrip }: { heading: string; spells: Spell[];
 export default function PreparedSpellList({ spellcasting }: PreparedSpellListProps) {
   const { cantrips, prepared } = derivePreparedCastable(spellcasting);
   if (cantrips.length === 0 && prepared.length === 0) return null;
+  // #1511 D7: served noun — a known caster's roster reads "Spells known · leveled".
+  const preparedLabel = preparedLabelOf(spellcasting);
   return (
     <div className="text-sm">
       <Group heading="Cantrips · at will" spells={cantrips} cantrip />
-      <Group heading="Prepared · leveled" spells={prepared} cantrip={false} />
+      <Group heading={`${preparedLabel} · leveled`} spells={prepared} cantrip={false} />
     </div>
   );
 }

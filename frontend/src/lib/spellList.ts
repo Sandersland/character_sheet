@@ -52,31 +52,57 @@ export function pactMagicNote(slotLevel: number): string {
 }
 
 // Prepared-spell budget (#883): N prepared of the derived cap, plus atLimit gate.
-// limit === null only for non-casters (2024: every caster has a prepared cap).
+// limit === null only for a non-caster — a 2014 known caster's Spells Known
+// number is a non-null limit same as any 2024 prepared caster's (#1507); it's
+// casterModel, not this null check, that tells the two mechanics apart.
 export interface PreparedBudget {
   count: number;
   limit: number | null;
   atLimit: boolean;
+  /** Served model (#1511 D2) — carried here so SpellRow/SpellbookList need not re-read the payload. */
+  casterModel?: "known" | "prepared" | null;
+  /** Served locked-rune tooltip word (#1511 D4), e.g. "Always prepared" / "Known". */
+  alwaysAvailableLabel?: string;
+  /** Served meter/roster noun (#1511 D4), e.g. "Prepared" / "Spells known". */
+  preparedLabel?: string;
 }
 
 export function preparedBudget(sc: Spellcasting): PreparedBudget {
   const summary = derivePreparedSummary(sc);
-  if (!summary) return { count: 0, limit: null, atLimit: false };
+  const casterModel = sc.casterModel ?? null;
+  const alwaysAvailableLabel = sc.alwaysAvailableLabel;
+  const preparedLabel = sc.preparedLabel;
+  if (!summary) return { count: 0, limit: null, atLimit: false, casterModel, alwaysAvailableLabel, preparedLabel };
   const { count, limit } = summary;
-  return { count, limit, atLimit: limit != null && count >= limit };
+  return { count, limit, atLimit: limit != null && count >= limit, casterModel, alwaysAvailableLabel, preparedLabel };
+}
+
+// The served label with its fallback — kept HERE (lib/, not features/spells)
+// so the grimoire components never author the literal word themselves (#1511
+// D4's grep AC: no "Always prepared"/"Prepared" literal in features/spells).
+// Structural param types accept both PreparedBudget and a raw Spellcasting.
+export function alwaysAvailableLabelOf(source: { alwaysAvailableLabel?: string }): string {
+  return source.alwaysAvailableLabel ?? "Always prepared";
+}
+
+export function preparedLabelOf(source: { preparedLabel?: string }): string {
+  return source.preparedLabel ?? "Prepared";
 }
 
 // Whether toggling a spell's rune *to prepared* is allowed. Unpreparing (already
-// prepared) and always-prepared runes are never blocked; a new prepare is blocked
-// only at the cap. Only non-casters (limit null) are unbounded.
+// prepared) and always-prepared/known-locked runes are never blocked; a new
+// prepare is blocked only at the cap. Only non-casters (limit null) are unbounded.
 export function canPrepare(spell: Spell, budget: PreparedBudget): boolean {
-  if (spell.prepared || runeState(spell) === "locked") return true;
+  if (spell.prepared || runeState(spell, budget.casterModel) === "locked") return true;
   return !budget.atLimit;
 }
 
-// At-cap swap targets (#938): runeState "prepared" already excludes cantrips/granted.
-export function swapCandidates(spells: Spell[]): Spell[] {
-  return spells.filter((s) => runeState(s) === "prepared");
+// At-cap swap targets (#938): runeState "prepared" already excludes
+// cantrips/granted AND (#1511) a known caster's leveled spells, which are
+// "locked" rather than "prepared" — so this is empty for a known caster,
+// making the at-cap swap bar unreachable for one.
+export function swapCandidates(spells: Spell[], casterModel?: "known" | "prepared" | null): Spell[] {
+  return spells.filter((s) => runeState(s, casterModel) === "prepared");
 }
 
 // Grimoire filter strip: level / school / prepared-only / ritual-only.
@@ -87,11 +113,15 @@ export interface SpellbookFilter {
   ritual: boolean;
 }
 
-export function filterSpellbook(spells: Spell[], f: SpellbookFilter): Spell[] {
+export function filterSpellbook(
+  spells: Spell[],
+  f: SpellbookFilter,
+  casterModel?: "known" | "prepared" | null,
+): Spell[] {
   return spells.filter((s) => {
     if (f.level != null && s.level !== f.level) return false;
     if (f.school && s.school !== f.school) return false;
-    if (f.prepared && runeState(s) === "unprepared") return false;
+    if (f.prepared && runeState(s, casterModel) === "unprepared") return false;
     if (f.ritual && !s.ritual) return false;
     return true;
   });

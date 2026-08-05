@@ -389,7 +389,13 @@ export function useSpellPicker(opts: UseSpellPickerOptions): UseSpellPicker {
     emptyMessage:
       slotLevels.length === 0
         ? "No spell slots remaining."
-        : "No prepared spells available to cast right now.",
+        // #1511: reads the served casterModel, not composed from preparedLabel —
+        // "Spells known" doesn't fit the "No ___ spells available" template
+        // without doubling "spells" ("No spells known spells available…"), so a
+        // known caster gets its own fixed copy instead of the generic template.
+        : spellcasting.casterModel === "known"
+          ? "No known spells available to cast right now."
+          : `No ${(spellcasting.preparedLabel ?? "Prepared").toLowerCase()} spells available to cast right now.`,
     hasCastable: castableSpells.length > 0,
     rowFor,
     viewFor,

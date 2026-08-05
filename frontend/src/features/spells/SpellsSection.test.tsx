@@ -282,6 +282,69 @@ describe("SpellsSection at-cap swap bar (#938)", () => {
   });
 });
 
+// #1511: the grimoire renders the SERVED casterModel — a 2014 Bard's known
+// spells relabel the meter and roster and drop the toggleable prepare rune.
+describe("SpellsSection grimoire — known caster (#1511)", () => {
+  function makeKnownBard(): Character {
+    const vm: Spell = {
+      id: "entry-vicious-mockery", name: "Vicious Mockery", level: 0, school: "enchantment",
+      prepared: true, castingTime: "1 action", range: "60 ft", duration: "1 round", description: "",
+    };
+    const charmPerson: Spell = {
+      id: "entry-charm-person", name: "Charm Person", level: 1, school: "enchantment",
+      prepared: true, castingTime: "1 action", range: "30 ft", duration: "1 hour", description: "",
+    };
+    return {
+      id: "bard-known-1",
+      level: 5,
+      abilityScores: {
+        strength: 10, dexterity: 10, constitution: 10,
+        intelligence: 10, wisdom: 10, charisma: 16,
+      },
+      classes: [{ name: "Bard" }],
+      spellcasting: {
+        ability: "charisma",
+        spellSaveDC: 13,
+        spellAttackBonus: 5,
+        slots: [{ level: 1, total: 4, used: 0 }],
+        arcana: [],
+        spells: [vm, charmPerson],
+        concentratingOn: null,
+        preparedSpellCount: 8,
+        preparedSpellLimit: 8,
+        casterModel: "known",
+        preparedLabel: "Spells known",
+        alwaysAvailableLabel: "Known",
+      },
+    } as unknown as Character;
+  }
+
+  it("relabels the meter and hides the Prepared chip", async () => {
+    const user = userEvent.setup();
+    render(makeKnownBard());
+    await openGrimoire(user);
+
+    expect(screen.getByText("Spells known")).toBeInTheDocument();
+    expect(screen.getByText("8 / 8")).toBeInTheDocument();
+    expect(screen.queryByText("Prepared")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Prepared" })).not.toBeInTheDocument();
+  });
+
+  it("renders no toggleable prepare rune on any leveled row", async () => {
+    const user = userEvent.setup();
+    render(makeKnownBard());
+    await openGrimoire(user);
+
+    expect(screen.queryByRole("button", { name: /Prepare|Unprepare/i })).not.toBeInTheDocument();
+    expect(screen.getAllByLabelText("Known").length).toBeGreaterThan(0);
+  });
+
+  it("shows the served roster heading on the record view", () => {
+    render(makeKnownBard());
+    expect(screen.getByText("Spells known · leveled")).toBeInTheDocument();
+  });
+});
+
 describe("SpellsSection slot labelling", () => {
   // Single-class warlock: pact slots live in `slots` and carry the Pact Magic label.
   function warlockOnly(): Character {
