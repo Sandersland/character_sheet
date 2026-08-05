@@ -308,7 +308,11 @@ describe("POST /api/characters/:id/level-up/transactions — Wizard 3→4 (hp + 
 
   it("crafted request: a Wizard 3→4 cannot scribe Fireball, above the level-2 ceiling (400)", async () => {
     const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
-    const fireball = await prisma.spell.findFirstOrThrow({ where: { name: "Fireball" }, select: { id: true } });
+    // #1714 forked Fireball to EDITION_2014 (Sorcerer+Wizard, 2-list) — this
+    // fixture's character is 2024 rules, so the pick must pin edition or it
+    // can land on the 2014 sibling and 400 on the wrong-edition guard instead
+    // of the level-ceiling check this test actually exercises.
+    const fireball = await prisma.spell.findFirstOrThrow({ where: { name: "Fireball", edition: "EDITION_2024" }, select: { id: true } });
     const [wizardSpell] = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "wizard" } }, level: { gt: 0, lte: 2 }, edition: "EDITION_2024" }, orderBy: { level: "asc" }, take: 1, select: { id: true } });
     const cantrip = await prisma.spell.findFirstOrThrow({ where: { classMemberships: { some: { className: "wizard" } }, level: 0, edition: "EDITION_2024" }, select: { id: true } });
 
@@ -426,7 +430,11 @@ describe("POST …/level-up/transactions — Bard Magical Secrets eligibility ga
   it("a Bard reaching 10 may take Fireball via Magical Secrets (200)", async () => {
     const CHAR_ID = "lvtx-bard-10";
     const entryId = await makeBard(CHAR_ID, { hitDiceTotal: 9, xp: 64000 });
-    const fireball = await prisma.spell.findFirstOrThrow({ where: { name: "Fireball" }, select: { id: true } });
+    // #1714 forked Fireball to EDITION_2014 (Sorcerer+Wizard, 2-list) — this
+    // fixture's character is 2024 rules, so pin edition or the pick can land
+    // on the 2014 sibling and 400 on the wrong-edition guard instead of
+    // exercising Magical Secrets eligibility.
+    const fireball = await prisma.spell.findFirstOrThrow({ where: { name: "Fireball", edition: "EDITION_2024" }, select: { id: true } });
     // #1713 forked several Bard-list cantrips for real (Mage Hand, ...) — this
     // fixture defaults to EDITION_2024 (no `edition` opt passed), so pin it.
     const cantrip = await prisma.spell.findFirstOrThrow({ where: { classMemberships: { some: { className: "bard" } }, level: 0, edition: "EDITION_2024" }, select: { id: true } });
@@ -465,7 +473,10 @@ describe("POST …/level-up/transactions — Bard Magical Secrets eligibility ga
   it("a Bard reaching 9 (no Magical Secrets yet) may NOT take Fireball (400)", async () => {
     const CHAR_ID = "lvtx-bard-9";
     const entryId = await makeBard(CHAR_ID, { hitDiceTotal: 8, xp: 48000 });
-    const fireball = await prisma.spell.findFirstOrThrow({ where: { name: "Fireball" }, select: { id: true } });
+    // #1714 forked Fireball to EDITION_2014 — pin edition so this 2024 Bard's
+    // pick can't land on the 2014 sibling (which would 400 on the
+    // wrong-edition guard instead of "not on the Bard spell list").
+    const fireball = await prisma.spell.findFirstOrThrow({ where: { name: "Fireball", edition: "EDITION_2024" }, select: { id: true } });
     const [bardSpell] = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "bard" } }, level: { gt: 0 }, edition: "EDITION_2024", name: { not: "Fireball" } }, orderBy: { level: "asc" }, take: 1, select: { id: true } });
 
     const res = await post(CHAR_ID, {
@@ -509,7 +520,10 @@ describe("POST …/level-up/transactions — Bard Magical Secrets eligibility ga
   it("a 2024 Bard reaching 10 may NOT take a wizard-only cantrip — 2024 Magical Secrets never broadens cantrips (400)", async () => {
     const CHAR_ID = "lvtx-bard-10-cantrip-2024";
     const entryId = await makeBard(CHAR_ID, { hitDiceTotal: 9, xp: 64000 });
-    const fireBolt = await prisma.spell.findFirstOrThrow({ where: { name: "Fire Bolt" }, select: { id: true } });
+    // #1714 forked Fire Bolt to EDITION_2014 (Sorcerer+Wizard, 2-list) — pin
+    // edition so this 2024 Bard's pick can't land on the 2014 sibling
+    // (wrong-edition guard) instead of exercising the cantrip-list rejection.
+    const fireBolt = await prisma.spell.findFirstOrThrow({ where: { name: "Fire Bolt", edition: "EDITION_2024" }, select: { id: true } });
     const [bardSpell] = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "bard" } }, level: { gt: 0 }, edition: "EDITION_2024" }, orderBy: { level: "asc" }, take: 1, select: { id: true } });
 
     const res = await post(CHAR_ID, {
@@ -526,7 +540,12 @@ describe("POST …/level-up/transactions — Bard Magical Secrets eligibility ga
   it("a 2014 Bard reaching 10 MAY take a wizard-only cantrip (PHB'14 \"…or a cantrip\")", async () => {
     const CHAR_ID = "lvtx-bard-10-cantrip-2014";
     const entryId = await makeBard(CHAR_ID, { hitDiceTotal: 9, xp: 64000, edition: "EDITION_2014" });
-    const fireBolt = await prisma.spell.findFirstOrThrow({ where: { name: "Fire Bolt" }, select: { id: true } });
+    // #1714 forked Fire Bolt to EDITION_2014 too — this fixture's character
+    // IS 2014 rules, so pin edition for determinism (an unordered
+    // findFirstOrThrow across two same-named rows isn't guaranteed to return
+    // either one consistently, even though this test happened to pass before
+    // this pin was added).
+    const fireBolt = await prisma.spell.findFirstOrThrow({ where: { name: "Fire Bolt", edition: "EDITION_2014" }, select: { id: true } });
     const ensnaringStrike = await prisma.spell.findFirstOrThrow({ where: { name: "Ensnaring Strike" }, select: { id: true } });
     // #1509: SRD 5.1's Bard 9→10 Spells Known delta is 2, not 2024's 1 — see the sibling test above.
     // `lte: 5` + `orderBy`: same reasoning as the sibling test above — a bare

@@ -57,8 +57,14 @@ async function highElf() {
   return { elf, highElfVariant: elf.variants.find((v) => v.slug === "high")! };
 }
 
-async function fireBolt() {
-  return prisma.spell.findFirstOrThrow({ where: { name: "Fire Bolt" } });
+// #1714 forked Fire Bolt to EDITION_2014 (Sorcerer+Wizard, 2-list) — this
+// suite exercises BOTH a 2014 character (baseBody's default rulesEdition)
+// and, at the bottom, a 2024 one (explicit override), so a single
+// no-argument lookup can no longer serve every caller correctly: an
+// unordered findFirstOrThrow across two same-named rows isn't guaranteed to
+// return the one matching the character under test.
+async function fireBolt(edition: "EDITION_2014" | "EDITION_2024" = "EDITION_2014") {
+  return prisma.spell.findFirstOrThrow({ where: { name: "Fire Bolt", edition } });
 }
 
 describe("POST /api/characters — Half-Elf Skill Versatility (#1689)", () => {
@@ -171,7 +177,9 @@ describe("POST /api/characters — High Elf Cantrip (#1689)", () => {
 
   it("400s a leveled spell (Magic Missile) offered as the species cantrip", async () => {
     const { elf, highElfVariant } = await highElf();
-    const magicMissile = await prisma.spell.findFirstOrThrow({ where: { name: "Magic Missile" } });
+    // #1714 forked Magic Missile to EDITION_2014 too — this character is 2014
+    // rules (baseBody's default), so pin edition for determinism.
+    const magicMissile = await prisma.spell.findFirstOrThrow({ where: { name: "Magic Missile", edition: "EDITION_2014" } });
 
     const res = await post({
       ...baseBody,
@@ -254,7 +262,7 @@ describe("POST /api/characters — no-spec pins, both directions (#1689)", () =>
 
   it("a 2024 species with no choice-bearing trait (Dwarf) 400s on speciesCantripId — same pin, other field", async () => {
     const dwarf2024 = await prisma.species.findFirstOrThrow({ where: { slug: "dwarf", edition: "EDITION_2024" } });
-    const spell = await fireBolt();
+    const spell = await fireBolt("EDITION_2024");
     const res = await post({
       ...baseBody,
       rulesEdition: "EDITION_2024",
