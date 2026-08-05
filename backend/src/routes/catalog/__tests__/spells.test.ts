@@ -265,17 +265,18 @@ describe("GET /api/spells — ?edition= is required (#1712)", () => {
   });
 });
 
-// #1712: the real plumbing proof — a genuine 2014/2024 fork (same name, two
-// rows) must resolve to exactly ONE row per requesting edition, and an
-// edition-EXCLUSIVE row (no shared/other-edition sibling) must never leak
-// into the other edition's response. Today's real ~109-row catalog has no
-// forks yet (2014 content slices #1713-#1721 are still to land), so this
-// proves the mechanism with fixture rows rather than catalog completeness —
-// exactly the distinction #1712's own build note calls out.
+// #1712: the real plumbing proof — a GENUINE 2014/2024 fork (same name, two
+// rows) must resolve to exactly ONE row per requesting edition. A lone
+// single-edition-tagged row with NO sibling — today's entire real ~109-row
+// catalog, all EDITION_2024 with no 2014 counterpart (2014 content slices
+// #1713-#1721 haven't landed) — is graceful instead: served to BOTH editions
+// until a real sibling exists (resolveSpellCatalogForEdition's own comment
+// has the full reasoning; a stricter "exclude on bare tag mismatch" version
+// emptied the 2014 creation picker and broke creation.spec.ts's 2014 Warlock
+// e2e test, which documents spells as edition-invariant today by design).
 describe("GET /api/spells — genuine edition fork resolves to one row per edition (#1712)", () => {
   const FORK_NAME = "Test Fork Catalog Spell";
-  const EXCLUSIVE_2014_NAME = "Test 2014-Only Catalog Spell";
-  const EXCLUSIVE_2024_NAME = "Test 2024-Only Catalog Spell";
+  const LONE_2024_NAME = "Test Lone 2024-Tagged Catalog Spell";
 
   function forkRow(name: string, description: string) {
     return {
@@ -294,7 +295,7 @@ describe("GET /api/spells — genuine edition fork resolves to one row per editi
 
   afterAll(async () => {
     await prisma.spell.deleteMany({
-      where: { name: { in: [FORK_NAME, EXCLUSIVE_2014_NAME, EXCLUSIVE_2024_NAME] } },
+      where: { name: { in: [FORK_NAME, LONE_2024_NAME] } },
     });
   });
 
@@ -317,18 +318,35 @@ describe("GET /api/spells — genuine edition fork resolves to one row per editi
     expect(matches2024[0].description).toBe("The SRD 5.2 text.");
   });
 
-  it("a 2014 request never returns a 2024-only row, and a 2024 request never returns a 2014-only row", async () => {
-    const row2014 = forkRow(EXCLUSIVE_2014_NAME, "Only exists for PHB'14.");
-    const row2024 = forkRow(EXCLUSIVE_2024_NAME, "Only exists for SRD 5.2.");
-    await upsertEditionRow(prisma.spell, { name: EXCLUSIVE_2014_NAME, edition: "EDITION_2014" }, { ...row2014, edition: "EDITION_2014" }, row2014);
-    await upsertEditionRow(prisma.spell, { name: EXCLUSIVE_2024_NAME, edition: "EDITION_2024" }, { ...row2024, edition: "EDITION_2024" }, row2024);
+  it("once a 2014 sibling exists, the 2024 row STOPS leaking into the 2014 response (proof the graceful fallback yields to a real fork)", async () => {
+    const row2024 = forkRow(FORK_NAME, "The SRD 5.2 text.");
+    await upsertEditionRow(prisma.spell, { name: FORK_NAME, edition: "EDITION_2024" }, { ...row2024, edition: "EDITION_2024" }, row2024);
+
+    // Before the 2014 sibling exists: graceful fallback serves the lone 2024
+    // row to a 2014 request too (today's real-catalog behavior).
+    const before = await get("/api/spells", "EDITION_2014");
+    expect(names(before.body).filter((n: string) => n === FORK_NAME)).toHaveLength(1);
+
+    // Once the sibling lands, the fork becomes genuine and exact-match wins —
+    // the 2024 row no longer reaches a 2014 request.
+    const row2014 = forkRow(FORK_NAME, "The PHB'14 text.");
+    const fork2014 = await upsertEditionRow(prisma.spell, { name: FORK_NAME, edition: "EDITION_2014" }, { ...row2014, edition: "EDITION_2014" }, row2014);
+    const after = await get("/api/spells", "EDITION_2014");
+    const matches = after.body.filter((s: { name: string }) => s.name === FORK_NAME);
+    expect(matches).toHaveLength(1);
+    expect(matches[0].id).toBe(fork2014.id);
+  });
+
+  it("a lone EDITION_2024-tagged row with no sibling is served to a 2014 request too (graceful — matches today's real catalog)", async () => {
+    const row2024 = forkRow(LONE_2024_NAME, "Ordinary 2024-tagged content, no 2014 fork yet.");
+    const lone = await upsertEditionRow(prisma.spell, { name: LONE_2024_NAME, edition: "EDITION_2024" }, { ...row2024, edition: "EDITION_2024" }, row2024);
 
     const res2014 = await get("/api/spells", "EDITION_2014");
-    expect(names(res2014.body)).toContain(EXCLUSIVE_2014_NAME);
-    expect(names(res2014.body)).not.toContain(EXCLUSIVE_2024_NAME);
+    const matches2014 = res2014.body.filter((s: { name: string }) => s.name === LONE_2024_NAME);
+    expect(matches2014).toHaveLength(1);
+    expect(matches2014[0].id).toBe(lone.id);
 
     const res2024 = await get("/api/spells", "EDITION_2024");
-    expect(names(res2024.body)).toContain(EXCLUSIVE_2024_NAME);
-    expect(names(res2024.body)).not.toContain(EXCLUSIVE_2014_NAME);
+    expect(names(res2024.body)).toContain(LONE_2024_NAME);
   });
 });

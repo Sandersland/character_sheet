@@ -4,8 +4,7 @@ import { parseClassFilterOr400 } from "@/lib/http/parse-class-param.js";
 import { parseMaxSpellLevelOr400 } from "@/lib/http/parse-max-spell-level-param.js";
 import { requireEditionOr400 } from "@/lib/http/parse-edition-param.js";
 import { prisma } from "@/lib/core/prisma.js";
-import { resolveEditionCatalog, withEditionOrShared } from "@/lib/rules/catalog-edition.js";
-import { classesOf, SPELL_CLASS_MEMBERSHIP_SELECT } from "@/lib/spellcasting/spell-classes.js";
+import { classesOf, resolveSpellCatalogForEdition, SPELL_CLASS_MEMBERSHIP_SELECT } from "@/lib/spellcasting/spell-classes.js";
 
 export const spellsRouter = Router();
 
@@ -22,16 +21,25 @@ export const spellsRouter = Router();
  *
  * `?edition=` is now REQUIRED (#1712, F3 of epic #1517 — reverses #1377's "no
  * `?edition=`"): Spell has carried an `edition` column since #1710, but this
- * route didn't filter by it until now, so a 2014 request could see a
- * 2024-only row. Same required-param shape as featsRouter/referenceRouter
- * (#1411/#1412): absent 400s, unrecognized 400s. `withEditionOrShared`
- * narrows the DB read to at-most-two-per-name candidates (an exact-edition
- * row and/or the shared NULL row); `resolveEditionCatalog` then collapses
- * each name to the single row the requesting edition resolves to, so a
- * genuine 2014/2024 fork never serves both rows under one name. Today's
- * catalog is ~109 EDITION_2024 rows plus a little 2014 content (#1710), so
- * `?edition=EDITION_2014` legitimately serves few/no leveled spells until the
- * 2014 content slices (#1713-#1721) land — expected, not a bug.
+ * route didn't filter by it until now. Same required-param shape as
+ * featsRouter/referenceRouter (#1411/#1412): absent 400s, unrecognized 400s.
+ *
+ * Resolution is NOT `withEditionOrShared` + `resolveEditionCatalog` (the
+ * feats.ts/reference.ts pattern) — deliberately: those catalogs already have
+ * full coverage on both editions, so a bare tag mismatch always means a
+ * genuine edition-exclusive row there. The spell catalog does not have that
+ * coverage yet (today's ~109 rows are ALL tagged EDITION_2024 with no 2014
+ * counterpart), so that pattern would empty the picker for every 2014 caster
+ * and block character creation outright. `resolveSpellCatalogForEdition`
+ * (spell-classes.ts) is the spell-specific variant: same exact-then-shared
+ * preference, but falls back to a name's only candidate rather than
+ * excluding it — see that function's own comment for the full reasoning and
+ * the e2e regression (creation.spec.ts's 2014 Warlock test) that caught the
+ * stricter version. Still resolves a genuine 2014/2024 fork correctly (the
+ * exact-match branch wins before the fallback ever runs); only a
+ * single-edition-tagged name with no sibling — today's whole real catalog —
+ * takes the graceful branch, until the 2014 content slices (#1713-#1721)
+ * give it one.
  *
  * `?class=` filters through the SpellClass join (#1711), not a scalar
  * column — `classMemberships.some` finds rows with at least one matching
@@ -49,17 +57,14 @@ spellsRouter.get("/spells", async (req, res) => {
   if (!levelFilter.ok) return;
 
   const rows = await prisma.spell.findMany({
-    where: withEditionOrShared(
-      {
-        ...(classFilter.className ? { classMemberships: { some: { className: classFilter.className } } } : {}),
-        ...(levelFilter.maxLevel === undefined ? {} : { level: { lte: levelFilter.maxLevel } }),
-      },
-      edition,
-    ),
+    where: {
+      ...(classFilter.className ? { classMemberships: { some: { className: classFilter.className } } } : {}),
+      ...(levelFilter.maxLevel === undefined ? {} : { level: { lte: levelFilter.maxLevel } }),
+    },
     include: SPELL_CLASS_MEMBERSHIP_SELECT,
     orderBy: [{ level: "asc" }, { name: "asc" }],
   });
-  const spells = resolveEditionCatalog(rows, edition, (row) => row.name);
+  const spells = resolveSpellCatalogForEdition(rows, edition);
 
   res.json(
     spells.map((row) => ({

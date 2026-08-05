@@ -71,3 +71,50 @@ export async function rejectCrossEditionSpellForks(
   }
   return null;
 }
+
+/**
+ * List-serving counterpart to rejectCrossEditionSpellForks, for GET
+ * /api/spells (#1712) — same "shared until proven otherwise" posture, applied
+ * to WHICH rows are offered rather than which submitted id is admitted.
+ *
+ * Groups candidates by name and prefers, in order: the exact-edition row, the
+ * shared (edition: null) row, and — the one place this diverges from
+ * resolveEditionCatalog (catalog-edition.ts) — the group's remaining row when
+ * neither exists. That divergence is deliberate: resolveEditionCatalog's
+ * plain exact-then-NULL rule is correct for Feat/Subclass/Background, whose
+ * catalogs already have full coverage on both editions, so "no match" always
+ * means a genuine edition-exclusive row. The spell catalog does NOT have that
+ * coverage yet (epic #1517 mid-migration) — today's ~109 rows are ALL tagged
+ * EDITION_2024 with no 2014 counterpart, so treating a bare tag mismatch as
+ * "not in this edition's catalog" would empty the creation/level-up picker
+ * for every 2014 caster and block character creation outright (caught by
+ * creation.spec.ts's 2014 Warlock e2e test, which documents "level1SpellPicks
+ * is edition-invariant, so a 2014 Warlock still walks it exactly like the
+ * 2024 case" as existing, deliberate product behavior).
+ *
+ * This is inert once a genuine fork lands: a name with BOTH a 2014 and a
+ * 2024 row still resolves to exactly the requesting edition's own row (the
+ * exact-match branch wins before the fallback ever runs) — proven by
+ * spells.test.ts's fork-disjointness suite. Only a name with a SINGLE,
+ * single-edition-tagged row (today's whole real catalog) falls through to
+ * the graceful branch and is served to both editions until #1713-#1721 give
+ * it a real 2014 sibling.
+ */
+export function resolveSpellCatalogForEdition<T extends { name: string; edition: RulesEdition | null }>(
+  rows: T[],
+  edition: RulesEdition,
+): T[] {
+  const byName = new Map<string, T[]>();
+  for (const row of rows) {
+    const group = byName.get(row.name);
+    if (group) group.push(row);
+    else byName.set(row.name, [row]);
+  }
+  const resolved: T[] = [];
+  for (const group of byName.values()) {
+    const exact = group.find((row) => row.edition === edition);
+    const shared = group.find((row) => row.edition === null);
+    resolved.push(exact ?? shared ?? group[0]);
+  }
+  return resolved;
+}
