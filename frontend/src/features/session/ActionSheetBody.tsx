@@ -73,13 +73,9 @@ export function ClassActionCard({
   busy: boolean;
   onClick: () => void;
 }) {
-  // Regranted action names win the subtitle over a row's own curated reminder
-  // (#1431/#1505) — a name list ("Disengage · Dodge") is more scannable than
-  // the prose it was drawn from, and the prose stays available via the card's
-  // on-use toast/drill-in. `option.subtitle` here is only ever a resolver's
-  // static text (e.g. Bonus Unarmed Strike's dice-math line) or a heal-roll
-  // preview, both of which take priority — see classActionSubtitle
-  // (turnOptions.ts) — because neither one is a reminder a regrant could stand in for.
+  // Regranted action names win the subtitle unconditionally (#1431/#1505) — safe today
+  // only because no action carries both regrantNames and a heal-roll/resolver subtitle;
+  // that's not enforced by this code.
   const subtitle = option.regrantNames?.join(" · ") ?? option.subtitle;
   return (
     <OptionCard

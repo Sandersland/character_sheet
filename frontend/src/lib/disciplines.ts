@@ -1,12 +1,6 @@
 /**
- * Pure Way of the Four Elements discipline row derivations (#1505). No JSX,
- * and — unlike the pre-#1381 disciplines.ts this replaces (reference only,
- * `34f5a4cf^:frontend/src/lib/disciplines.ts`) — no rule arithmetic either:
- * every selectable ki amount and its resolved roll already arrives on
- * `CatalogDiscipline.steps` (GET /api/disciplines, disciplineCastSteps
- * backend-side). This module only SELECTS among served steps and formats
- * labels; it never computes `base + step * dicePerStep` or a per-cast ki cap
- * itself (the client never computes the cap — #1505's explicit design).
+ * Pure Way of the Four Elements row derivations (#1505) — selects/formats served
+ * `CatalogDiscipline.steps` only; never computes dice counts or the ki cap itself.
  */
 
 import type { CatalogDiscipline, DisciplineCastStep } from "@/types/character";

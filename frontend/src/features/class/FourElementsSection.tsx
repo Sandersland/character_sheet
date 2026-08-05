@@ -1,12 +1,6 @@
 /**
- * FourElementsSection — Way of the Four Elements block inside
- * ClassFeaturesSection (2014-only, #1505). Fetches the discipline catalog
- * once (shared by every known row) and lists the disciplines chosen through
- * the level-up ceremony's subclassChoice step (monk L3/6/11/17,
- * `fourElementsDisciplines`, monk.ts) — mirrors ManeuversSection's
- * known-list half, but disciplines are picked ONLY at level-up (no
- * anytime-swap AddManeuverPanel-style panel here: PHB'14 grants no free
- * re-pick, unlike a Battle Master's maneuvers).
+ * FourElementsSection — 2014-only Way of the Four Elements block (#1505); disciplines are
+ * fixed at level-up (monk.ts), so unlike ManeuversSection there's no anytime-swap panel.
  */
 
 import { useEffect, useState } from "react";

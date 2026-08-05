@@ -1,10 +1,6 @@
 /**
- * DisciplineRow — a known Way of the Four Elements discipline with an
- * expandable description and a ki-fuelled cast affordance (#1505). Renders
- * through AbilityRowShell (shared with ManeuverRow/ShadowArtRow). Unlike
- * ShadowArtRow's flat 1-focus cast, a discipline can scale — the ki-amount
- * picker offers every step CatalogDiscipline.steps served (already resolved
- * server-side); this component never computes a roll's dice count itself.
+ * DisciplineRow — a scalable Way of the Four Elements cast row (#1505); picks among
+ * server-resolved CatalogDiscipline.steps and never computes a roll's dice itself.
  */
 
 import { useState } from "react";
@@ -40,6 +36,12 @@ function buildCastOp(
     ...(catalog.cost.kind === "pool" ? { requestedKi: step?.ki ?? view.costBase } : {}),
     ...(step ? { roll: rollSpec(step.roll).total } : {}),
   };
+}
+
+// The ki the picker/cast actually use, given the live selection — split out
+// (like buildCastOp/castTitle) so its own null-check stays out of DisciplineRow's budget.
+function effectiveKiFor(view: DisciplineCastView | undefined, selectedKi: number | undefined): number | undefined {
+  return view ? effectiveStep(view, selectedKi)?.ki : undefined;
 }
 
 // Cast-button title: explains a disabled button, or names the spend.
@@ -91,10 +93,14 @@ function KiPicker({
 export default function DisciplineRow({ entry, catalog, kiAvailable, busy, onCast }: Props) {
   const [selectedKi, setSelectedKi] = useState<number | undefined>(undefined);
   const view = catalog ? disciplineCastView(catalog, kiAvailable) : undefined;
+  // Normalised through effectiveStep so a mid-session ki spend that drops the
+  // selected option from view.options can't leave the picker showing a value
+  // no <option> renders (blank select) while the op submits a different one.
+  const effectiveKi = effectiveKiFor(view, selectedKi);
 
   function handleCast() {
     if (busy || !catalog || !view?.canAfford) return;
-    onCast(buildCastOp(entry.id, catalog, view, selectedKi));
+    onCast(buildCastOp(entry.id, catalog, view, effectiveKi));
   }
 
   return (
@@ -114,7 +120,7 @@ export default function DisciplineRow({ entry, catalog, kiAvailable, busy, onCas
               entryId={entry.id}
               entryName={entry.name}
               view={view}
-              selectedKi={selectedKi}
+              selectedKi={effectiveKi}
               busy={busy}
               onChange={setSelectedKi}
             />

@@ -1,10 +1,6 @@
 /**
- * Way of the Four Elements discipline catalog + cast endpoint (#1505). Split
- * out of abilities.ts (the 250-line-per-module ceiling, barrel.test.ts) —
- * every other ability family already gets its own file at this size
- * (channel-divinity's cast lives in abilities.ts only because it's small;
- * this one earns its own module the same way shadow-arts' route did on the
- * backend).
+ * Way of the Four Elements catalog + cast endpoint (#1505) — split out of abilities.ts
+ * for the 250-line-per-module ceiling (barrel.test.ts), like shadow-arts' own module.
  */
 
 import type { CatalogDiscipline, Character, DisciplineOperation } from "@/types/character";
