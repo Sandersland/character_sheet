@@ -95,8 +95,17 @@ describe("WIZARD_SPELLS_2014 — structured-field invariants (mirrors SPELLS' #1
     expect(bad, "dice fields not matching a damage/heal effectKind").toEqual([]);
   });
 
-  it("damageType appears iff effectKind is 'damage'", () => {
-    const bad = WIZARD_SPELLS_2014.filter((s) => (s.damageType != null) !== (s.effectKind === "damage")).map((s) => s.name);
+  // Chromatic Orb is the one deliberate exception: its damage type is the
+  // CASTER'S CHOICE among 6 options (not a spell-level constant), so
+  // effectKind is still "damage" (dice/upcast are real, fixed values) but
+  // damageType is intentionally absent — there's no single correct value to
+  // put there. Every other row keeps the strict iff pairing.
+  const DAMAGE_TYPE_EXCEPTIONS = new Set(["Chromatic Orb"]);
+
+  it("damageType appears iff effectKind is 'damage' (except the documented caster-chosen-type exceptions)", () => {
+    const bad = WIZARD_SPELLS_2014.filter(
+      (s) => !DAMAGE_TYPE_EXCEPTIONS.has(s.name) && (s.damageType != null) !== (s.effectKind === "damage"),
+    ).map((s) => s.name);
     expect(bad, "damageType present without effectKind 'damage', or vice versa").toEqual([]);
   });
 });
@@ -156,7 +165,7 @@ function find(name: string): CatalogSpell {
 }
 
 // Spot-checks on the trickiest edge cases this slice hand-authored or
-// hand-transcribed — not exhaustive (100 rows), but enough to catch a
+// hand-transcribed — not exhaustive (99 rows), but enough to catch a
 // transcription or transform regression on the rows most likely to be
 // touched again.
 describe("WIZARD_SPELLS_2014 — value spot-checks", () => {
@@ -171,12 +180,19 @@ describe("WIZARD_SPELLS_2014 — value spot-checks", () => {
     expect(s.upcastDicePerLevel).toBe(1);
   });
 
-  it("Chromatic Orb: PHB'14-only (not in dnd5eapi), caster-chosen damage type stays a utility row (no single damageType)", () => {
+  it("Chromatic Orb: EEPC/Xanathar's (NOT PHB'14 core), 3d8 + upcast, no leap-on-doubles (that's the 2024 PHB version only)", () => {
     const s = find("Chromatic Orb");
     expect(s.level).toBe(1);
     expect(s.classes).toEqual(["wizard", "sorcerer"]);
-    expect(s.effectKind).toBeUndefined();
+    expect(s.attackType).toBe("attack");
+    expect(s.effectKind).toBe("damage");
+    expect(s.effectDiceCount).toBe(3);
+    expect(s.effectDiceFaces).toBe(8);
+    expect(s.upcastDicePerLevel).toBe(1);
+    // damageType is deliberately unset (caster's choice among 6 options) —
+    // covered by the invariant test's DAMAGE_TYPE_EXCEPTIONS, not re-asserted here.
     expect(s.description).toMatch(/3d8 damage of the type you chose/);
+    expect(s.description).not.toMatch(/leaps? to a new target/i);
   });
 
   it("Meteor Swarm: fire AND bludgeoning in one instance can't fit one damageType, so it stays a utility row (matches Ice Storm precedent)", () => {
@@ -208,12 +224,9 @@ describe("WIZARD_SPELLS_2014 — value spot-checks", () => {
     expect(s.buffTarget).toBeUndefined();
   });
 
-  it("Trap the Soul: PHB'14-only, wizard-exclusive, Charisma save, no damage", () => {
-    const s = find("Trap the Soul");
-    expect(s.classes).toEqual(["wizard"]);
-    expect(s.attackType).toBe("save");
-    expect(s.saveAbility).toBe("charisma");
-    expect(s.effectKind).toBeUndefined();
+  it("'Trap the Soul' does NOT exist in this catalog — it's a 3.5e spell, not 5e (the mandatory rules-accuracy pass caught an earlier draft's fabrication); the 5e soul-trapping mechanic lives inside Imprisonment's Minimus Containment option instead", () => {
+    expect(WIZARD_SPELLS_2014.find((s) => s.name === "Trap the Soul")).toBeUndefined();
+    expect(find("Imprisonment").description).toMatch(/Minimus Containment/);
   });
 
   it("Telepathy: PHB'14-only, wizard-exclusive, pure utility (no attack/save)", () => {

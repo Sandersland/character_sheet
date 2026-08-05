@@ -29,13 +29,24 @@
 // differs, so the file-level SRD 5.1 citation still covers the content;
 // PHB'14 is cited only for the identity of the title itself.
 //
-// 4 rows (Chromatic Orb, Ray of Sickness, Telepathy, Trap the Soul) are
-// PHB'14-only spells absent from dnd5eapi's SRD 5.1 dataset entirely
-// (verified against both dnd5eapi and open5e's srd-2014 document, which cap
-// out at the same 319-spell set) — hand-transcribed from PHB'14 knowledge,
-// cited PHB'14 p.NN per CLAUDE.md. Trap the Soul is the lowest-confidence
-// transcription in this slice (flagged inline) and should get extra scrutiny
-// in the mandatory Opus rules-accuracy pass.
+// 3 rows (Chromatic Orb, Ray of Sickness, Telepathy) are absent from
+// dnd5eapi's SRD 5.1 dataset entirely (verified against both dnd5eapi and
+// open5e's srd-2014 document, which cap out at the same 319-spell set) —
+// hand-transcribed, cited per-row. Chromatic Orb is NOT PHB'14 core (it's
+// Elemental Evil Player's Companion, reprinted in Xanathar's Guide to
+// Everything) — the mandatory Opus rules-accuracy pass caught an earlier
+// draft of this row bleeding in the 2024 PHB's "leap on matching d8s"
+// mechanic, which the 2014/EEPC version does not have; fixed, cited
+// correctly below. Ray of Sickness and Telepathy ARE real PHB'14 spells,
+// re-verified against the same pass.
+//
+// A 4th hand-transcribed row, "Trap the Soul," was REMOVED after the same
+// pass found it doesn't exist in 5e at all — it's a 3.5e spell this file
+// mistakenly reconstructed from memory (flagged lowest-confidence in the
+// original draft, which is exactly why the flag existed). The 5e
+// soul-trapping mechanic lives inside 9th-level Imprisonment's "Minimus
+// Containment" option instead (already authored below, dnd5eapi-derived) —
+// there is no standalone spell for it.
 //
 // Two OTHER PHB'14-only spells that Wizard also gets — Witch Bolt
 // (Sorcerer/Warlock/Wizard) and Feign Death (Bard/Cleric/Wizard) — sit on 3+
@@ -150,11 +161,16 @@ export const WIZARD_SPELLS_2014: CatalogSpell[] = [
     damageType: "fire",
     upcastDicePerLevel: 1,
   },
-  // PHB'14 p. 221. Not in dnd5eapi/open5e's SRD 5.1 dataset (confirmed: both
-  // cap at the same 319-spell set with no "Chromatic Orb" entry). Damage type
-  // is the caster's CHOICE among 6 options, not a fixed value — same
-  // "no single damageType" shape as Ice Storm/Meteor Swarm, so this stays a
-  // utility row (3d8 + 1d8/slot lives in prose only).
+  // Elemental Evil Player's Companion (2015), reprinted in Xanathar's Guide
+  // to Everything p. 150 — NOT PHB'14 core. Not in dnd5eapi/open5e's SRD 5.1
+  // dataset. An earlier draft of this row wrongly carried the 2024 PHB's
+  // "leap to a new target on matching d8s" mechanic, caught by the mandatory
+  // Opus rules-accuracy pass — the 2014/EEPC version has no leap at all,
+  // just a flat ranged-spell-attack hit. Damage type is the caster's CHOICE
+  // among 6 options, not a fixed value, so effectKind is still set (unlike
+  // Ice Storm/Meteor Swarm's two-FIXED-types shape) but damageType stays
+  // unset — the one deliberate exception to "damageType iff effectKind
+  // 'damage'", carved out explicitly in this slice's data test.
   {
     name: "Chromatic Orb",
     level: 1,
@@ -162,10 +178,14 @@ export const WIZARD_SPELLS_2014: CatalogSpell[] = [
     castingTime: "1 action",
     range: "90 feet",
     duration: "Instantaneous",
-    description: "You hurl a 4-inch-diameter sphere of energy at a creature that you can see within range. You choose acid, cold, fire, lightning, poison, or thunder for the type of orb you create, and then make a ranged spell attack against the target. If the attack hits, the creature takes 3d8 damage of the type you chose. If you roll the same number on two or more of the d8s, the orb leaps to a new target of your choice within 30 feet of the target. Make a new attack roll against the new target, and make a new damage roll. The orb can't leap again unless you roll the same number on two or more of the d8s again. A creature can only be struck once by each casting of this spell. At Higher Levels. When you cast this spell using a spell slot of 2nd level or higher, the damage increases by 1d8 for each slot level above 1st.",
+    description: "You hurl a 4-inch-diameter sphere of energy at a creature that you can see within range. You choose acid, cold, fire, lightning, poison, or thunder for the type of orb you create, and then make a ranged spell attack against the target. If the attack hits, the creature takes 3d8 damage of the type you chose. At Higher Levels. When you cast this spell using a spell slot of 2nd level or higher, the damage increases by 1d8 for each slot level above 1st.",
     classes: ["wizard", "sorcerer"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "a diamond worth at least 50 gp" },
     attackType: "attack",
+    effectKind: "damage",
+    effectDiceCount: 3,
+    effectDiceFaces: 8,
+    upcastDicePerLevel: 1,
   },
   {
     name: "Color Spray",
@@ -1333,23 +1353,6 @@ export const WIZARD_SPELLS_2014: CatalogSpell[] = [
     description: "You create a telepathic link between yourself and a willing creature with which you are familiar. The creature can be anywhere on the same plane of existence as you. The spell ends if you or the target are no longer on the same plane. Until the spell ends, you and the target can communicate telepathically through the link. The creature doesn't need to speak a language to understand this telepathic communication.",
     classes: ["wizard"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "a pair of linked silver rings" },
-  },
-  // PHB'14 p. 283. Not in dnd5eapi/open5e's SRD 5.1 dataset.
-  // LOWEST-CONFIDENCE transcription in this slice — the two-casting-method
-  // mechanism is reconstructed from memory, not copied from a live source;
-  // flagged for extra scrutiny in the mandatory Opus rules-accuracy pass.
-  {
-    name: "Trap the Soul",
-    level: 8,
-    school: "conjuration",
-    castingTime: "1 action",
-    range: "30 feet",
-    duration: "Instantaneous",
-    description: "You attempt to trap a creature's soul in a gem worth at least 1,000 gp, provided the gem is not already occupied. The target must be within range. You cast this spell in one of two ways: You cast the spell as a reaction to dealing damage to a creature that drops to 0 hit points as a result of that damage. The creature's soul must succeed on a Charisma saving throw or be trapped in the gem. You cast the spell on a creature you can see within range. The target must succeed on a Charisma saving throw or its soul is trapped in the gem; this use of the spell has no effect on the target's body. Once a soul is trapped in the gem, it remains there until the gem is broken, releasing the soul, whereupon the creature (if it isn't already dead) returns to life with all its hit points if its body is present and undamaged.",
-    classes: ["wizard"],
-    components: { verbal: true, somatic: true, material: true, materialDescription: "a gem worth at least 1,000 gp, which the spell consumes" },
-    attackType: "save",
-    saveAbility: "charisma",
   },
   // ── Level 9 ───────────────────────────────────────────────────────────────
   {
