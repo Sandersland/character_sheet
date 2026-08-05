@@ -91,6 +91,12 @@ function SkillsStepBody({ c }: StepBodyProps) {
 
 function SpellsStepBody({ c }: StepBodyProps) {
   const picks = c.selections.class?.level1SpellPicks;
+  // draft.rulesEdition is RulesEdition | null (unresolved until the entry
+  // gate, CreationCeremony's own early return above) — narrowed here so the
+  // spell-catalog fetches below can take a required RulesEdition (#1712).
+  // Unreachable in practice: this step never renders before the gate resolves it.
+  const { rulesEdition } = c.draft;
+  if (!rulesEdition) return null;
   return (
     <>
       {picks && (
@@ -99,6 +105,7 @@ function SpellsStepBody({ c }: StepBodyProps) {
           counts={picks}
           cantripIds={c.draft.cantripIds}
           spellIds={c.draft.spellIds}
+          edition={rulesEdition}
           onChange={c.update}
         />
       )}
@@ -107,6 +114,7 @@ function SpellsStepBody({ c }: StepBodyProps) {
           is the ONLY content on the step for a non-caster High Elf. */}
       <SpeciesCantripSection
         choice={c.speciesCantripChoice}
+        edition={rulesEdition}
         onChange={(speciesCantripId) => c.update({ speciesCantripId })}
       />
     </>

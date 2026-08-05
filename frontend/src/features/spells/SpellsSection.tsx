@@ -80,6 +80,7 @@ export default function SpellsSection({
             onClose={() => setAddPanelOpen(false)}
             busy={busy}
             learnedSpellIds={derived.learnedSpellIds}
+            edition={character.rulesEdition}
           />
         )}
 

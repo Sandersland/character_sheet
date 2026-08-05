@@ -270,7 +270,8 @@ export async function learnSpells(
   characterId: string,
   spellNames: string[],
 ): Promise<void> {
-  const catalogResponse = await request.get("/api/spells");
+  // `?edition=` is required (#1712); every e2e persona is a default-2024 character.
+  const catalogResponse = await request.get("/api/spells?edition=EDITION_2024");
   expect(catalogResponse.ok(), `list spells: ${catalogResponse.status()}`).toBeTruthy();
   const catalog = (await catalogResponse.json()) as { id: string; name: string; level: number }[];
 

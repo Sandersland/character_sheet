@@ -6,15 +6,17 @@ import SpellCatalogRow from "@/features/spells/SpellCatalogRow";
 import { useSpellCatalog } from "@/features/spells/useSpellCatalog";
 import { INPUT_CLS, LEVEL_OPTIONS, filterCatalog } from "@/lib/addSpell";
 import type { CatalogSpell } from "@/types/character";
+import type { RulesEdition } from "@character-sheet/shared-types";
 
 interface SpellCatalogTabProps {
   busy: boolean;
   learnedSpellIds: Set<string>;
+  edition: RulesEdition;
   onLearn: (spell: CatalogSpell) => void;
 }
 
-export default function SpellCatalogTab({ busy, learnedSpellIds, onLearn }: SpellCatalogTabProps) {
-  const { catalog, error, showSpinner } = useSpellCatalog();
+export default function SpellCatalogTab({ busy, learnedSpellIds, edition, onLearn }: SpellCatalogTabProps) {
+  const { catalog, error, showSpinner } = useSpellCatalog(edition);
   const [search, setSearch] = useState("");
   const [levelFilter, setLevelFilter] = useState("");
 

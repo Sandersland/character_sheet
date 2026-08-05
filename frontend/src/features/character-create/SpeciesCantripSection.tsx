@@ -11,9 +11,11 @@ import { abilityLabel } from "@/lib/abilities";
 import type { CreationSpeciesCantripChoice } from "@/lib/characterCreation";
 import SpellPicker, { type SpellPickerGroup } from "@/features/spells/SpellPicker";
 import { useSpellCatalog } from "@/features/spells/useSpellCatalog";
+import type { RulesEdition } from "@character-sheet/shared-types";
 
 interface SpeciesCantripSectionProps {
   choice: CreationSpeciesCantripChoice;
+  edition: RulesEdition;
   onChange: (spellId: string) => void;
 }
 
@@ -23,14 +25,16 @@ interface SpeciesCantripSectionProps {
 // `className: ""` request for a species with no cantrip choice.
 function SpeciesCantripPicker({
   choice,
+  edition,
   onChange,
 }: {
   choice: CreationSpeciesCantripChoice;
+  edition: RulesEdition;
   onChange: (spellId: string) => void;
 }) {
   // Cantrips only (maxLevel: 0) — a species-granted cantrip choice never
   // reaches into leveled spells.
-  const { catalog, error, showSpinner } = useSpellCatalog({ className: choice.list, maxLevel: 0 });
+  const { catalog, error, showSpinner } = useSpellCatalog(edition, { className: choice.list, maxLevel: 0 });
 
   const selectedIds = choice.selectedId ? [choice.selectedId] : [];
   const groups: SpellPickerGroup[] = [
@@ -63,7 +67,7 @@ function SpeciesCantripPicker({
   );
 }
 
-export default function SpeciesCantripSection({ choice, onChange }: SpeciesCantripSectionProps) {
+export default function SpeciesCantripSection({ choice, edition, onChange }: SpeciesCantripSectionProps) {
   if (!choice.applicable) return null;
-  return <SpeciesCantripPicker choice={choice} onChange={onChange} />;
+  return <SpeciesCantripPicker choice={choice} edition={edition} onChange={onChange} />;
 }

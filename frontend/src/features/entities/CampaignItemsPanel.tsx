@@ -76,6 +76,7 @@ export default function CampaignItemsPanel({ campaignId, characters, edition }: 
             catalog={catalog}
             busyId={busyId}
             rarities={rarities}
+            edition={edition}
             onSubmit={handleSubmit}
             onCancel={cancelForm}
           />

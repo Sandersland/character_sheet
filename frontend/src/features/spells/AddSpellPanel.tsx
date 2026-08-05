@@ -6,6 +6,7 @@ import { useState } from "react";
 import CustomSpellForm from "@/features/spells/CustomSpellForm";
 import SpellCatalogTab from "@/features/spells/SpellCatalogTab";
 import type { CatalogSpell, LearnSpellOperation } from "@/types/character";
+import type { RulesEdition } from "@character-sheet/shared-types";
 
 interface AddSpellPanelProps {
   /** Called with the op to send; parent batches and fires the API. */
@@ -14,9 +15,10 @@ interface AddSpellPanelProps {
   busy: boolean;
   /** Set of spellId values already in the spellbook (to disable duplicates). */
   learnedSpellIds: Set<string>;
+  edition: RulesEdition;
 }
 
-export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds }: AddSpellPanelProps) {
+export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds, edition }: AddSpellPanelProps) {
   const [tab, setTab] = useState<"catalog" | "custom">("catalog");
 
   function handleCatalogLearn(spell: CatalogSpell) {
@@ -58,7 +60,7 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds 
       </div>
 
       {tab === "catalog" ? (
-        <SpellCatalogTab busy={busy} learnedSpellIds={learnedSpellIds} onLearn={handleCatalogLearn} />
+        <SpellCatalogTab busy={busy} learnedSpellIds={learnedSpellIds} edition={edition} onLearn={handleCatalogLearn} />
       ) : (
         <CustomSpellForm busy={busy} onLearn={onLearn} onClose={onClose} />
       )}

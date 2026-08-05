@@ -19,7 +19,7 @@ import {
 import { applyResourceOpInTx, type ResourceOperation } from "@/lib/classes/resources.js";
 import { applySpellcastingOpInTx, type LearnSpellOperation, type SpellcastingOperation } from "@/lib/spellcasting/spellcasting.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
-import { classesOf, SPELL_CLASS_MEMBERSHIP_SELECT } from "@/lib/spellcasting/spell-classes.js";
+import { classesOf, rejectCrossEditionSpellForks, SPELL_CLASS_MEMBERSHIP_SELECT } from "@/lib/spellcasting/spell-classes.js";
 import {
   advancingHitDie,
   applyLevelUpHpInTx,
@@ -340,14 +340,22 @@ type SpellPickRow = { id: string; name: string; level: number; classes: string[]
 async function loadPickCatalogRows(
   cantripOps: LearnSpellOperation[],
   spellOps: LearnSpellOperation[],
+  edition: RulesEdition,
 ): Promise<{ rowById: Map<string, SpellPickRow>; levelOf: (op: LearnSpellOperation) => number | undefined }> {
   const ids = [...cantripOps, ...spellOps].map((o) => o.spellId).filter((id): id is string => Boolean(id));
   const rows = ids.length
     ? await prisma.spell.findMany({
         where: { id: { in: ids } },
-        select: { id: true, name: true, level: true, ...SPELL_CLASS_MEMBERSHIP_SELECT },
+        select: { id: true, name: true, level: true, edition: true, ...SPELL_CLASS_MEMBERSHIP_SELECT },
       })
     : [];
+  // #1712: reject an id that's provably the WRONG edition's fork before it
+  // ever reaches assertOnSpellList/assertCantripEligibility below — see
+  // rejectCrossEditionSpellForks's own comment for why this doesn't reject
+  // every 2014 pick just because today's catalog is 2024-tagged (would
+  // regress #1729's shipped 2014 known-caster level-up).
+  const forkError = await rejectCrossEditionSpellForks(rows, edition);
+  if (forkError) throw new InvalidLevelUpError(forkError);
   // Flattened to SpellPickRow's `classes: string[]` here (#1711) so the
   // eligibility checks below (assertOnSpellList, assertCantripEligibility)
   // never see the join shape — one seam resolves membership, not two.
@@ -508,10 +516,11 @@ async function assertPickSpellEligibility(
   submission: LevelUpSubmission,
   steps: LevelUpStep[],
   className: string,
+  edition: RulesEdition,
 ): Promise<void> {
   const cantripOps = submission.cantripsLearned ?? [];
   const spellOps = submission.spellsLearned ?? [];
-  const { rowById, levelOf } = await loadPickCatalogRows(cantripOps, spellOps);
+  const { rowById, levelOf } = await loadPickCatalogRows(cantripOps, spellOps, edition);
   assertCantripVsLeveledPlacement(cantripOps, spellOps, levelOf);
 
   const gate = resolveNewSpellsGate(steps);
@@ -543,7 +552,7 @@ export async function applyLevelUpTransaction(
     await resolveLevelUpContext(characterId, submission.target, submission.subclassId);
 
   const steps = validateLevelUpSubmission(planCharacter, targetEntry, chosenSubclassName, submission, pickedSubclassFeatureRows);
-  await assertPickSpellEligibility(submission, steps, targetEntry.name);
+  await assertPickSpellEligibility(submission, steps, targetEntry.name, planCharacter.edition);
 
   const ops = buildLevelUpOps(steps, submission);
 

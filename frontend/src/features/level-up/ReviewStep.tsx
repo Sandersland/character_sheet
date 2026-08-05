@@ -47,21 +47,28 @@ function useLedgerResolvers(draft: LevelUpDraft, edition: RulesEdition): { resol
   );
   const maneuvers = useCatalogNames(maneuverFetcher);
   // Cantrips share the spell catalog, so either list gates the same fetch (#1157).
-  const spells = useCatalogNames(draft.spellsLearned?.length || draft.cantripsLearned?.length ? fetchSpells : undefined);
+  //
+  // The edition is threaded here for the wire contract, not as an admission gate:
+  // this site resolves an id→name for an ALREADY-COMMITTED pick, so no
+  // cross-edition row can be introduced through it (#1411) — same reasoning
+  // as the feat fetcher below. `?edition=` became REQUIRED on GET /api/spells
+  // in #1712, so fetchSpells joined maneuvers/feats on the memoised-fetcher
+  // side of the line below (it could no longer get away with a bare module ref).
+  const needsSpells = !!(draft.spellsLearned?.length || draft.cantripsLearned?.length);
+  const spellFetcher = useMemo(
+    () => (needsSpells ? () => fetchSpells(edition) : undefined),
+    [needsSpells, edition],
+  );
+  const spells = useCatalogNames(spellFetcher);
   // Any taken feat fetches the catalog — a custom feat resolves by its own name,
   // so this needs no second (featId) guard. A Fighting Style feat (#1137) resolves
   // through the same catalog.
   //
-  // The edition is threaded here for the wire contract, not as an admission gate:
-  // this site resolves an id→name for an ALREADY-COMMITTED pick, so no
-  // cross-edition row can be introduced through it (#1411).
-  //
   // Keyed on the BOOLEAN, never on draft.fightingStyleFeat's object identity, and
   // never an inline arrow: useCatalogNames's effect depends on [fetcher], so a
   // fresh identity every render means fetch → setMap → re-render → fetch, forever.
-  // Only fetchSpells still gets away with a bare module ref, because it alone
-  // takes no argument — every edition-scoped fetcher must be memoised, and
-  // #1412 moved maneuvers across that line.
+  // Every edition-scoped fetcher must be memoised — #1412 moved maneuvers across
+  // that line, #1712 moved spells.
   const needsFeats = draft.advancement?.type === "takeFeat" || !!draft.fightingStyleFeat;
   const featFetcher = useMemo(
     () => (needsFeats ? () => fetchFeats(edition) : undefined),

@@ -2,8 +2,9 @@ import { Router } from "express";
 
 import { parseClassFilterOr400 } from "@/lib/http/parse-class-param.js";
 import { parseMaxSpellLevelOr400 } from "@/lib/http/parse-max-spell-level-param.js";
+import { requireEditionOr400 } from "@/lib/http/parse-edition-param.js";
 import { prisma } from "@/lib/core/prisma.js";
-import { classesOf, SPELL_CLASS_MEMBERSHIP_SELECT } from "@/lib/spellcasting/spell-classes.js";
+import { classesOf, resolveSpellCatalogForEdition, SPELL_CLASS_MEMBERSHIP_SELECT } from "@/lib/spellcasting/spell-classes.js";
 
 export const spellsRouter = Router();
 
@@ -12,13 +13,33 @@ export const spellsRouter = Router();
  * as GET /api/items feeds the inventory editor. Ordered by level then name
  * so the UI can group by level without sorting client-side.
  *
- * `?class=` and `?maxLevel=` are OPTIONAL, unlike `?edition=` elsewhere: the
- * creation ceremony asks for one class's legal band, while the sheet's picker
- * legitimately wants everything. Server-applied so the eligibility rule — on the
- * class's list, inside the legal level band — has exactly one home (#1377).
- * No `?edition=` yet: Spell carries an `edition` column (#1710, foundation
- * for the 2014 catalog) but this route doesn't filter by it — every row
- * returns regardless of edition. Wiring `?edition=` in is F2/F3's job.
+ * `?class=` and `?maxLevel=` stay OPTIONAL: the creation ceremony asks for
+ * one class's legal band, while the sheet's picker legitimately wants
+ * everything (within one edition). Server-applied so the eligibility rule —
+ * on the class's list, inside the legal level band — has exactly one home
+ * (#1377).
+ *
+ * `?edition=` is now REQUIRED (#1712, F3 of epic #1517 — reverses #1377's "no
+ * `?edition=`"): Spell has carried an `edition` column since #1710, but this
+ * route didn't filter by it until now. Same required-param shape as
+ * featsRouter/referenceRouter (#1411/#1412): absent 400s, unrecognized 400s.
+ *
+ * Resolution is NOT `withEditionOrShared` + `resolveEditionCatalog` (the
+ * feats.ts/reference.ts pattern) — deliberately: those catalogs already have
+ * full coverage on both editions, so a bare tag mismatch always means a
+ * genuine edition-exclusive row there. The spell catalog does not have that
+ * coverage yet (today's ~109 rows are ALL tagged EDITION_2024 with no 2014
+ * counterpart), so that pattern would empty the picker for every 2014 caster
+ * and block character creation outright. `resolveSpellCatalogForEdition`
+ * (spell-classes.ts) is the spell-specific variant: same exact-then-shared
+ * preference, but falls back to a name's only candidate rather than
+ * excluding it — see that function's own comment for the full reasoning and
+ * the e2e regression (creation.spec.ts's 2014 Warlock test) that caught the
+ * stricter version. Still resolves a genuine 2014/2024 fork correctly (the
+ * exact-match branch wins before the fallback ever runs); only a
+ * single-edition-tagged name with no sibling — today's whole real catalog —
+ * takes the graceful branch, until the 2014 content slices (#1713-#1721)
+ * give it one.
  *
  * `?class=` filters through the SpellClass join (#1711), not a scalar
  * column — `classMemberships.some` finds rows with at least one matching
@@ -27,12 +48,15 @@ export const spellsRouter = Router();
  * spellList.ts consume the response unchanged.
  */
 spellsRouter.get("/spells", async (req, res) => {
+  const edition = requireEditionOr400(req, res);
+  if (edition === undefined) return;
+
   const classFilter = parseClassFilterOr400(req, res);
   if (!classFilter.ok) return;
   const levelFilter = parseMaxSpellLevelOr400(req, res);
   if (!levelFilter.ok) return;
 
-  const spells = await prisma.spell.findMany({
+  const rows = await prisma.spell.findMany({
     where: {
       ...(classFilter.className ? { classMemberships: { some: { className: classFilter.className } } } : {}),
       ...(levelFilter.maxLevel === undefined ? {} : { level: { lte: levelFilter.maxLevel } }),
@@ -40,6 +64,7 @@ spellsRouter.get("/spells", async (req, res) => {
     include: SPELL_CLASS_MEMBERSHIP_SELECT,
     orderBy: [{ level: "asc" }, { name: "asc" }],
   });
+  const spells = resolveSpellCatalogForEdition(rows, edition);
 
   res.json(
     spells.map((row) => ({

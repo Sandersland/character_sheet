@@ -240,7 +240,7 @@ function LeveledSpellsSection({
 export default function NewSpellsStep({ step }: { step: LevelUpStep }) {
   const { character } = useLevelUpStepContext();
   const selection = useNewSpellsSelection(step);
-  const { catalog, error, showSpinner } = useSpellCatalog();
+  const { catalog, error, showSpinner } = useSpellCatalog(character.rulesEdition);
   const [cantripSearch, setCantripSearch] = useState("");
 
   const learnedSpellIds = character.spellcasting ? deriveSpellList(character).learnedSpellIds : NO_KNOWN;
