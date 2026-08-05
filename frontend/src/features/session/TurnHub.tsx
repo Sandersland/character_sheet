@@ -91,7 +91,7 @@ function TurnHubIdle({
   // Only the Reaction slot needs the Deflect Attacks interception — the
   // Action/Bonus slots keep the plain handleActionClick from useTurnActions.
   function handleReactionActionClick(key: string, cost: "action" | "bonusAction" | "reaction") {
-    if (key === "deflectAttacks") {
+    if (key === "deflectAttacks" || key === "deflectMissiles") {
       deflect.handleDeflectAttacks();
       return;
     }
@@ -168,6 +168,7 @@ function TurnHubIdle({
           handleReactionManeuver={handleReactionManeuver}
           consumeReaction={consumeReaction}
           deflectRedirectAvailable={deflect.deflectRedirectAvailable}
+          redirectLabel={deflect.redirectLabel}
           handleDeflectAttacksRedirect={deflect.handleDeflectAttacksRedirect}
         />
 
@@ -443,7 +444,7 @@ export default function TurnHub({ sessionId, turnState, onLogChanged, allies, ov
   // Only the Reaction slot needs the Deflect Attacks interception — the
   // Action/Bonus slots keep the plain handleActionClick from useTurnActions.
   function handleReactionActionClick(key: string, cost: "action" | "bonusAction" | "reaction") {
-    if (key === "deflectAttacks") {
+    if (key === "deflectAttacks" || key === "deflectMissiles") {
       deflect.handleDeflectAttacks();
       return;
     }
@@ -529,6 +530,7 @@ export default function TurnHub({ sessionId, turnState, onLogChanged, allies, ov
       handleReactionManeuver={handleReactionManeuver}
       consumeReaction={consumeReaction}
       deflectRedirectAvailable={deflect.deflectRedirectAvailable}
+      redirectLabel={deflect.redirectLabel}
       handleDeflectAttacksRedirect={deflect.handleDeflectAttacksRedirect}
     />
   );

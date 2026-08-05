@@ -24,13 +24,13 @@ import { Prisma } from "@/generated/prisma/client.js";
 import type { CastDisciplineOperation } from "@character-sheet/contracts";
 
 import { castAbilityInTx } from "@/lib/spellcasting/ability-cast.js";
-import { readAbilityCost, type PayCostContext } from "@/lib/spellcasting/ability-cost.js";
+import { readAbilityCost, type AbilityCost, type PayCostContext } from "@/lib/spellcasting/ability-cost.js";
 import { runCharacterTransaction, type CharacterTxContext } from "@/lib/character/character-transaction.js";
 import { levelForExperience } from "@/lib/leveling/experience.js";
 import { effectiveEntryLevel } from "@/lib/leveling/effective-levels.js";
 import { editionOf } from "@/lib/rules/edition.js";
 import { deriveEntryScopedActions } from "./actions.js";
-import { catalogEffectSpec, type EffectSpec } from "@/lib/combat/effects.js";
+import { catalogEffectSpec, resolveEffectSpec, type EffectSpec } from "@/lib/combat/effects.js";
 import { normalizeResourcesMutable, type ChoiceEntry } from "./resources.js";
 import { normalizeSpellcastingMutable, snapshotSpellcasting } from "@/lib/spellcasting/spell-state.js";
 import { FOCUS_CAST_CHARACTER_SELECT, emitFocusCastEvents } from "./focus-cast.js";
@@ -80,6 +80,37 @@ export function disciplineEffectSpec(row: DisciplineEffectRow): EffectSpec {
     scaling: { mode: "poolStep", dicePerStep: row.costPerStep ?? 0 },
     concentrates: (name) => CONCENTRATION_DISCIPLINES.has(name),
   });
+}
+
+/** One selectable ki amount for a discipline's cast picker, and the roll the
+ *  client rolls at that amount (#1505's GET /api/disciplines catalog). */
+export interface DisciplineCastStep {
+  ki: number;
+  roll: { count: number; faces: number; modifier: number };
+}
+
+// Ki amounts the cast picker offers (base..maxKiPerDiscipline(17) ceiling), each with its
+// resolved roll — client reads a roll verbatim, never computes it (mirrors effectRolls[]).
+// Character-agnostic; the real per-monk cap is enforced at cast time by assertDisciplineKiSpend.
+// One step only for a non-scalable row (no costPerStep) — PHB'14 allows overspend only when
+// the discipline's text says so (#1505).
+export function disciplineCastSteps(row: DisciplineEffectRow, cost: AbilityCost): DisciplineCastStep[] {
+  if (cost.kind !== "pool") return [];
+  const effect = disciplineEffectSpec(row);
+  if (!effect.dice) return [];
+  const base = resolveEffectSpec(effect, 0, { characterLevel: 0 });
+  if (!base) return [];
+  if (!cost.perStep) return [{ ki: cost.base, roll: base }];
+  // maxKiPerDiscipline is monotonic and flattens at monk L17 (min(6, ...)),
+  // so any level >= 17 reads its asymptote — 17 is not a rules fact copied
+  // in here, just the smallest input that reaches the function's own ceiling.
+  const ceiling = maxKiPerDiscipline(17);
+  const steps: DisciplineCastStep[] = [{ ki: cost.base, roll: base }];
+  for (let ki = cost.base + 1; ki <= ceiling; ki++) {
+    const roll = resolveEffectSpec(effect, ki - cost.base, { characterLevel: 0 });
+    if (roll) steps.push({ ki, roll });
+  }
+  return steps;
 }
 
 type DisciplineRow = Prisma.CharacterGetPayload<{ select: typeof FOCUS_CAST_CHARACTER_SELECT }>;
@@ -134,7 +165,9 @@ async function loadKnownDiscipline(
   return { entry, catalog };
 }
 
-/** Validate the ki spent on a discipline: within [base, per-cast cap] for a pool-cost row, 0 for a costless row. */
+// Validate ki spent: [base, per-cast cap] for a scalable row (costPerStep, PHB'14 p.80),
+// exactly base for a non-scaling one, 0 for costless. The !cost.perStep branch (#1505) stops a
+// flat-cost discipline (e.g. Fist of Four Thunders) from accepting overspend for an unchanged roll.
 function assertDisciplineKiSpend(
   disciplineName: string,
   cost: ReturnType<typeof readAbilityCost>,
@@ -143,6 +176,12 @@ function assertDisciplineKiSpend(
 ): void {
   if (cost.kind !== "pool") {
     if (kiSpent !== 0) throw new InvalidDisciplineOperationError(`${disciplineName} costs no ki`);
+    return;
+  }
+  if (!cost.perStep) {
+    if (kiSpent !== cost.base) {
+      throw new InvalidDisciplineOperationError(`${disciplineName} costs a flat ${cost.base} ki (no scaling)`);
+    }
     return;
   }
   const maxKi = maxKiPerDiscipline(monkLevel);

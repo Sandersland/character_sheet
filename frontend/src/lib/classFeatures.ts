@@ -15,6 +15,8 @@ export interface ClassFeatureFlags {
   hasShadowArts: boolean;
   hasChannelDivinity: boolean;
   hasCloakOfShadows: boolean;
+  /** Way of the Four Elements monk (2014-only, #1505) — castDiscipline presence. */
+  hasFourElements: boolean;
   hasFeatures: boolean;
   hasFightingStyle: boolean;
   /** Fighting Style feats taken (#1137) — the fightingStyle-slot advancements. */
@@ -56,11 +58,28 @@ function deriveManeuverIds(resources: CharacterResources | undefined): string[] 
     .map((m) => m.maneuverId as string);
 }
 
-// Warrior of the Elements/Shadow entitlement is availableActions[] presence
-// (#1315) — the same gated DERIVED_ACTIONS rows the turn tracker reads —
-// rather than a resources boolean, so it's independent of the resources block.
+// A feature's entitlement is availableActions[] presence (#1315) — the same
+// gated DERIVED_ACTIONS rows the turn tracker reads — rather than a
+// resources boolean, so it's independent of the resources block. Bare
+// key-presence is only safe for a key that names ONE feature across both
+// editions (castDiscipline, 2014-only, no 2024 counterpart at all); a key
+// two editions both grant needs one of the collision-aware helpers below.
 function hasAction(character: Character, key: string): boolean {
   return (character.availableActions ?? []).some((a) => a.key === key);
+}
+
+// "elementalAttunement" collides across editions (#1505): the 2024 Warrior toggle
+// sets resolverKind "toggle" (only toggleActionsFromRow does); the 2014 reminder row
+// doesn't — so bare hasAction leaked the 2024 Focus UI onto a 2014 sheet.
+function hasElementsWarriorToggle(character: Character): boolean {
+  return (character.availableActions ?? []).some((a) => a.key === "elementalAttunement" && a.resolverKind === "toggle");
+}
+
+// "shadowArts"/"cloakOfShadows" collide across editions (#1505) with no per-row
+// signal to tell them apart (neither is row-driven), so gate on the character's own
+// edition — the 2024-shaped UI must never reach a 2014 sheet (2014's cast UI is #1738).
+function has2024ShadowAction(character: Character, key: string): boolean {
+  return character.rulesEdition === "EDITION_2024" && (character.availableActions ?? []).some((a) => a.key === key);
 }
 
 function deriveFlags(character: Character): ClassFeatureFlags {
@@ -69,9 +88,10 @@ function deriveFlags(character: Character): ClassFeatureFlags {
   // independent of the resources block.
   const hasFightingStyle = (character.fightingStyleSlots?.total ?? 0) > 0;
   const fightingStyleFeats = (character.advancements ?? []).filter((a) => a.slot === "fightingStyle");
-  const hasElementsWarrior = hasAction(character, "elementalAttunement");
-  const hasShadowArts = hasAction(character, "shadowArts");
-  const hasCloakOfShadows = hasAction(character, "cloakOfShadows");
+  const hasElementsWarrior = hasElementsWarriorToggle(character);
+  const hasShadowArts = has2024ShadowAction(character, "shadowArts");
+  const hasCloakOfShadows = has2024ShadowAction(character, "cloakOfShadows");
+  const hasFourElements = hasAction(character, "castDiscipline");
   const resources: CharacterResources | undefined = character.resources;
   if (!resources) {
     return {
@@ -81,6 +101,7 @@ function deriveFlags(character: Character): ClassFeatureFlags {
       hasShadowArts,
       hasChannelDivinity: false,
       hasCloakOfShadows,
+      hasFourElements,
       hasFeatures: false,
       hasFightingStyle,
       fightingStyleFeats,
@@ -93,28 +114,34 @@ function deriveFlags(character: Character): ClassFeatureFlags {
     hasShadowArts,
     hasChannelDivinity: resources.pools.some((p) => p.key === "channelDivinity"),
     hasCloakOfShadows,
+    hasFourElements,
     hasFeatures: resources.features.length > 0,
     hasFightingStyle,
     fightingStyleFeats,
   };
 }
 
+// Data-driven so a new flag (hasFourElements, #1505) is one more array entry,
+// not another branch — keeps this function's own cyclomatic complexity flat
+// regardless of how many entitlement flags ClassFeatureFlags grows to.
 function isFeatureViewEmpty(
   flags: ClassFeatureFlags,
   hasSubclass: boolean,
   needsSubclass: boolean,
 ): boolean {
-  return (
-    !flags.hasPools &&
-    !flags.hasManeuvers &&
-    !flags.hasElementsWarrior &&
-    !flags.hasShadowArts &&
-    !flags.hasCloakOfShadows &&
-    !flags.hasFeatures &&
-    !flags.hasFightingStyle &&
-    !hasSubclass &&
-    !needsSubclass
-  );
+  const signals = [
+    flags.hasPools,
+    flags.hasManeuvers,
+    flags.hasElementsWarrior,
+    flags.hasShadowArts,
+    flags.hasCloakOfShadows,
+    flags.hasFourElements,
+    flags.hasFeatures,
+    flags.hasFightingStyle,
+    hasSubclass,
+    needsSubclass,
+  ];
+  return signals.every((signal) => !signal);
 }
 
 export function deriveClassFeatureView(

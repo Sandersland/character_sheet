@@ -1186,6 +1186,10 @@ describe("TurnHub — Deflect Attacks reaction (#1241)", () => {
           enabled: true,
           reminder:
             "Reaction: when hit by a melee or ranged attack dealing bludgeoning, piercing, or slashing damage (any damage type at L13, Deflect Energy), reduce the damage by 1d10 + Dex modifier + monk level.",
+          // Server-resolved (#1505) — below L13 by default; the L13 test below
+          // overrides this to "any damage type" itself, the same way the real
+          // backend would, instead of the client re-deriving the threshold.
+          damageTypeClause: "bludgeoning, piercing, or slashing damage",
         },
         { key: "deflectAttacksRedirect", name: "Deflect Attacks — Redirect", cost: "free", enabled: true, resourceKey: "focus" },
       ],
@@ -1264,9 +1268,23 @@ describe("TurnHub — Deflect Attacks reaction (#1241)", () => {
     expect(screen.queryByRole("button", { name: /Redirect/ })).not.toBeInTheDocument();
   });
 
-  it("names 'any damage type' at monk L13 (Deflect Energy)", async () => {
+  it("names 'any damage type' at monk L13 (Deflect Energy) — served, never re-derived from the level", async () => {
     const user = userEvent.setup();
-    renderHub(deflectMonk({ level: 13 }));
+    renderHub(
+      deflectMonk({
+        level: 13,
+        availableActions: [
+          {
+            key: "deflectAttacks",
+            name: "Deflect Attacks",
+            cost: "reaction",
+            enabled: true,
+            damageTypeClause: "any damage type",
+          },
+          { key: "deflectAttacksRedirect", name: "Deflect Attacks — Redirect", cost: "free", enabled: true, resourceKey: "focus" },
+        ],
+      } as unknown as Partial<Character>),
+    );
     await startTurn(user);
 
     await user.click(screen.getByRole("button", { name: "Use Reaction" }));

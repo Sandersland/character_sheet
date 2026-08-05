@@ -680,6 +680,50 @@ describe("Monk Deflect Attacks / Deflect Energy (#1241)", () => {
     expect(fighter).not.toContain("deflectAttacks");
     expect(fighter).not.toContain("deflectAttacksRedirect");
   });
+
+  it("resolves damageTypeClause server-side (#1505) — B/P/S below L13, any damage type at L13+", () => {
+    const l3 = at("monk", undefined, 3, []).find((a) => a.key === "deflectAttacks");
+    expect(l3?.damageTypeClause).toBe("bludgeoning, piercing, or slashing damage");
+    const l13 = at("monk", undefined, 13, []).find((a) => a.key === "deflectAttacks");
+    expect(l13?.damageTypeClause).toBe("any damage type");
+  });
+
+  it("damageTypeClause resolves off the Monk entry's own level for a multiclass character (Monk 3 / Fighter 10)", () => {
+    const entries = [
+      { name: "monk", level: 3 },
+      { name: "fighter", level: 10 },
+    ];
+    const actions = deriveEntryScopedActions(entries, 13, [], true, "EDITION_2024");
+    expect(actions.find((a) => a.key === "deflectAttacks")?.damageTypeClause).toBe(
+      "bludgeoning, piercing, or slashing damage",
+    );
+  });
+});
+
+describe("Flurry of Blows strike count (#1505) — resolved server-side, never a client threshold", () => {
+  it("2024: count is 2 below Heightened Focus (monk L10) and 3 at L10+", () => {
+    expect(at("monk", undefined, 9, [pool("focus", 1)]).find((a) => a.key === "flurryOfBlows")?.count).toBe(2);
+    expect(at("monk", undefined, 10, [pool("focus", 1)]).find((a) => a.key === "flurryOfBlows")?.count).toBe(3);
+    expect(at("monk", undefined, 20, [pool("focus", 1)]).find((a) => a.key === "flurryOfBlows")?.count).toBe(3);
+  });
+
+  it("2014: count is a flat 2 at every level — no Heightened Focus upgrade exists", () => {
+    const l2 = at("monk", undefined, 2, [pool("ki", 1)], true, "EDITION_2014").find((a) => a.key === "flurryOfBlows");
+    const l10 = at("monk", undefined, 10, [pool("ki", 1)], true, "EDITION_2014").find((a) => a.key === "flurryOfBlows");
+    const l20 = at("monk", undefined, 20, [pool("ki", 1)], true, "EDITION_2014").find((a) => a.key === "flurryOfBlows");
+    expect(l2?.count).toBe(2);
+    expect(l10?.count).toBe(2);
+    expect(l20?.count).toBe(2);
+  });
+
+  it("count resolves off the Monk entry's own level for a multiclass 2024 character (Monk 10 / Fighter 5)", () => {
+    const entries = [
+      { name: "monk", level: 10 },
+      { name: "fighter", level: 5 },
+    ];
+    const actions = deriveEntryScopedActions(entries, 15, [pool("focus", 1)], true, "EDITION_2024");
+    expect(actions.find((a) => a.key === "flurryOfBlows")?.count).toBe(3);
+  });
 });
 
 describe("2014 Monk ki actions — Flurry of Blows / Patient Defense / Step of the Wind (#1500)", () => {

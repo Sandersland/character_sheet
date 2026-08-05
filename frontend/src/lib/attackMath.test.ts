@@ -345,35 +345,36 @@ describe("buildUnarmedOnlyForms (#1217)", () => {
   });
 });
 
+// The strike count is resolved server-side now (#1505) onto the served
+// flurryOfBlows row's `count` — these pin that the function reads the wire
+// value verbatim rather than re-deriving Heightened Focus from a level.
+function flurryOfBlowsAction(count: number) {
+  return [{ key: "flurryOfBlows", name: "Flurry of Blows", cost: "bonusAction", enabled: true, count }];
+}
+
 describe("flurryStrikeCount (#1217, Heightened Focus upgrade #1244)", () => {
-  it("is 2 below monk L10", () => {
-    expect(flurryStrikeCount(makeCharacter({ level: 9 }))).toBe(2);
+  it("reads the served count — 2 below monk L10", () => {
+    expect(flurryStrikeCount(makeCharacter({ availableActions: flurryOfBlowsAction(2) } as unknown as Partial<Character>))).toBe(2);
   });
 
-  it("is 3 at monk L10+ (Heightened Focus)", () => {
-    expect(flurryStrikeCount(makeCharacter({ level: 10 }))).toBe(3);
+  it("reads the served count — 3 at monk L10+ (Heightened Focus)", () => {
+    expect(flurryStrikeCount(makeCharacter({ availableActions: flurryOfBlowsAction(3) } as unknown as Partial<Character>))).toBe(3);
   });
 
-  it("reads the Monk entry level, not total character level, for a multiclass character (Monk 9 / Rogue 3)", () => {
+  it("falls back to 2 (every edition's floor) when the row hasn't loaded yet", () => {
+    expect(flurryStrikeCount(makeCharacter({ availableActions: [] } as unknown as Partial<Character>))).toBe(2);
+  });
+
+  it("never re-derives the count from monk level — a stale/absent level does not change the served value", () => {
     const character = makeCharacter({
-      level: 12,
-      classes: [
-        { name: "Monk", level: 9 },
-        { name: "Rogue", level: 3 },
-      ],
+      level: 20,
+      classes: [{ name: "Monk", level: 20 }],
+      availableActions: flurryOfBlowsAction(2),
     } as unknown as Partial<Character>);
+    // A 2014 monk at L20 has no three-strike upgrade at all — the server
+    // would serve 2 here regardless of level, and the client must not
+    // second-guess it with its own >= 10 threshold.
     expect(flurryStrikeCount(character)).toBe(2);
-  });
-
-  it("is 3 for a multiclass character whose Monk entry itself reaches L10 (Monk 10 / Rogue 2)", () => {
-    const character = makeCharacter({
-      level: 12,
-      classes: [
-        { name: "Monk", level: 10 },
-        { name: "Rogue", level: 2 },
-      ],
-    } as unknown as Partial<Character>);
-    expect(flurryStrikeCount(character)).toBe(3);
   });
 });
 

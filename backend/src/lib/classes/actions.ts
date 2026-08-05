@@ -121,6 +121,24 @@ interface DerivedActionRecord {
   // (Heightened Focus, monk L10, #1244) lets patientDefenseFocus/
   // stepOfTheWindFocus swap in their L10 rider text without a second row.
   reminder?: string | ((level: number) => string);
+  /**
+   * A resolved numeric fact about this action the client renders verbatim
+   * (#1505) — today only Flurry of Blows' strike count: flat 2 in SRD 5.1,
+   * 2 (3 at Heightened Focus, monk L10) in SRD 5.2. A function form mirrors
+   * `reminder`'s so the 2024 row can resolve its own level-gated value
+   * without a second row. Generic name (not `strikeCount`) because a future
+   * action needing "how many of X" can reuse the same field instead of
+   * inventing its own — the frontend must never recompute this from a level.
+   */
+  count?: number | ((level: number) => number);
+  /**
+   * Deflect Attacks' damage-type clause (#1505), resolved from the L13
+   * Deflect Energy threshold so the client never re-derives it: "bludgeoning,
+   * piercing, or slashing damage" below L13, "any damage type" at L13+. SRD
+   * 5.1's Deflect Missiles carries no such clause — only the deflectAttacks
+   * row below sets this.
+   */
+  damageTypeClause?: string | ((level: number) => string);
   // Martial Arts' blanket condition (Bonus Unarmed Strike, #1218): gates on
   // `unarmoredUnshielded` instead of/alongside a resource pool. Generic so any
   // future Martial-Arts-conditioned action can reuse the same gate.
@@ -178,6 +196,10 @@ export interface AvailableAction {
    *  universalActions for its edition-correct name; it never knows what a key
    *  means. */
   regrants?: string[];
+  /** Resolved numeric fact (#1505) — see DerivedActionRecord.count. */
+  count?: number;
+  /** Resolved damage-type clause (#1505) — see DerivedActionRecord.damageTypeClause. */
+  damageTypeClause?: string;
   /**
    * Which inline resolution tool the client renders for this action (#1528) —
    * served only for a row-driven action (`actionsFromRows` below); a
@@ -265,13 +287,39 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // tagged EDITION_2024 below, with a 2014 counterpart under monkPoolKey's
   // "ki" pool authored alongside it, #1500).
   { key: "bonusUnarmedStrike", name: "Bonus Unarmed Strike", cost: "bonusAction", grantClass: "monk", grantLevel: 1, requiresUnarmored: true },
-  { key: "flurryOfBlows", name: "Flurry of Blows", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "focus", resourceAmount: 1, edition: "EDITION_2024" },
+  // `count` (#1505): resolved strike count the client renders verbatim,
+  // instead of re-deriving Heightened Focus from a level threshold
+  // (frontend/src/lib/attackMath.ts's retired flurryStrikeCount). 2 normally,
+  // 3 at Heightened Focus (monk L10, #1244).
+  {
+    key: "flurryOfBlows",
+    name: "Flurry of Blows",
+    cost: "bonusAction",
+    grantClass: "monk",
+    grantLevel: 2,
+    resourceKey: "focus",
+    resourceAmount: 1,
+    count: (level) => (level >= 10 ? 3 : 2),
+    edition: "EDITION_2024",
+  },
   // 2014 (SRD 5.1 / PHB'14 p.77): flat 1-ki cost, no Heightened Focus
   // three-strike upgrade (2024-only) — same key as the row above (mirrors
   // Lay on Hands' same-key edition fork), safe to reuse because
   // ACTION_EFFECT_FN.flurryOfBlows resolves its pool through ctx.edition
-  // (monkPoolKey) rather than a hardcoded key — see that entry below.
-  { key: "flurryOfBlows", name: "Flurry of Blows", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "ki", resourceAmount: 1, reminder: "Immediately after taking the Attack action, spend 1 ki to make two unarmed strikes as a bonus action.", edition: "EDITION_2014" },
+  // (monkPoolKey) rather than a hardcoded key — see that entry below. `count`
+  // is a flat 2 at every level — SRD 5.1 has no three-strike upgrade at all.
+  {
+    key: "flurryOfBlows",
+    name: "Flurry of Blows",
+    cost: "bonusAction",
+    grantClass: "monk",
+    grantLevel: 2,
+    resourceKey: "ki",
+    resourceAmount: 1,
+    count: 2,
+    reminder: "Immediately after taking the Attack action, spend 1 ki to make two unarmed strikes as a bonus action.",
+    edition: "EDITION_2014",
+  },
   // Patient Defense / Step of the Wind (PHB'24 p.98, SRD 5.2, #1240) each grant
   // TWO menu entries — a free variant and a 1-Focus variant — rather than the
   // 2014 SRD's flat "always costs 1 ki" shape. Both compete for the same bonus
@@ -283,16 +331,15 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // temp-HP roll; stepOfTheWindFocus's reminder gains a narrated move-a-
   // willing-creature rider (no server state — this app has no ally/NPC
   // combatant model to move).
-  // These four rows' `regrants` (#1431) is data ONLY — deliberately unrendered,
-  // and the curated reminders above/below stay the card subtitle. All four are
-  // now tagged edition: "EDITION_2024" (#1499): SRD 5.1 Patient Defense buys
-  // DODGE for a flat 1 ki (no free variant), and SRD 5.1 Step of the Wind buys
-  // Disengage-or-Dash for a flat 1 ki the same way — neither 2014 shape is
-  // these two-menu-entries-per-feature rows, so serving them to a 2014 monk
-  // would be wrong, not merely unnamed. #1500 authors the 2014-keyed
-  // equivalents under monkPoolKey's "ki" pool. Naming the regrant on the card
-  // remains future work regardless of edition — Rogue's Cunning Action and
-  // Thief's Fast Hands are invariant in both editions and DO render theirs.
+  // These four rows' `regrants` (#1431) now render on the card too (#1505,
+  // ActionSheetBody's regrantNames-first precedence) — the curated reminders
+  // stay in the toast/drill-in, they just no longer win the subtitle over the
+  // resolved regrant names. All four are tagged edition: "EDITION_2024"
+  // (#1499): SRD 5.1 Patient Defense buys DODGE for a flat 1 ki (no free
+  // variant), and SRD 5.1 Step of the Wind buys Disengage-or-Dash for a flat
+  // 1 ki the same way — neither 2014 shape is these two-menu-entries-per-
+  // feature rows, so serving them to a 2014 monk would be wrong. #1500
+  // authors the 2014-keyed equivalents under monkPoolKey's "ki" pool, below.
   { key: "patientDefense", name: "Patient Defense", cost: "bonusAction", grantClass: "monk", grantLevel: 2, regrants: ["disengage"], reminder: "Disengage (free bonus action).", edition: "EDITION_2024" },
   {
     key: "patientDefenseFocus",
@@ -375,6 +422,9 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     grantLevel: 3,
     reminder:
       "Reaction: when hit by a melee or ranged attack dealing bludgeoning, piercing, or slashing damage (any damage type at L13, Deflect Energy), reduce the damage by 1d10 + Dex modifier + monk level.",
+    // Resolved for the toast (frontend/src/lib/deflectAttacks.ts, #1505) so
+    // the client never re-derives the L13 Deflect Energy threshold itself.
+    damageTypeClause: (level) => (level >= 13 ? "any damage type" : "bludgeoning, piercing, or slashing damage"),
     edition: "EDITION_2024",
   },
   // Redirect rider: only meaningful once a ranged hit is reduced to 0 — a "free"
@@ -883,6 +933,8 @@ export function deriveActions(
     .map((a): AvailableAction => {
       const { enabled, disabledReason } = resolveEnablement(a, poolMap, unarmoredUnshielded);
       const reminder = typeof a.reminder === "function" ? a.reminder(level) : a.reminder;
+      const count = typeof a.count === "function" ? a.count(level) : a.count;
+      const damageTypeClause = typeof a.damageTypeClause === "function" ? a.damageTypeClause(level) : a.damageTypeClause;
       return {
         key: a.key,
         name: a.name,
@@ -891,6 +943,8 @@ export function deriveActions(
         ...(disabledReason ? { disabledReason } : {}),
         ...(reminder ? { reminder } : {}),
         ...(a.regrants ? { regrants: [...a.regrants] } : {}),
+        ...(count !== undefined ? { count } : {}),
+        ...(damageTypeClause !== undefined ? { damageTypeClause } : {}),
       };
     });
 }

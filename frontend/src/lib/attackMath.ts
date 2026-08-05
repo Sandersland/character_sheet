@@ -6,7 +6,6 @@
 
 import { formatRollSpec } from "@/lib/dice";
 import type { RollSpec } from "@/lib/dice";
-import { classEntryLevel } from "@/lib/multiclass";
 import type { Character } from "@/types/character";
 import type {
   AttackDamageRider,
@@ -278,19 +277,17 @@ export function buildUnarmedOnlyForms(character: Character): AttackEntry[] {
   return [decorateRow(character, rowOfKind(character, "unarmed"))];
 }
 
-// Flurry of Blows strike count (SRD 5.2 "Focus"): expend 1 Focus Point to make
-// two Unarmed Strikes as a bonus action — three at Heightened Focus, Monk
-// level 10 (#1244) — scaled on Monk level via classEntryLevel, not total
-// character level (#1441).
-//
-// PHB'14 Flurry of Blows is always two unarmed strikes at every level — there
-// is no 2014 three-strike upgrade. `DERIVED_ACTIONS`'s flurryOfBlows row is
-// now tagged EDITION_2024 (#1499), so a 2014 Monk is no longer served this
-// action at all — flurryStrikeCount itself still takes no edition parameter
-// (isn't forked client-side); rules-edition forks stay backend-owned.
-// Tracked on #1435 / #1313.
+// Flurry of Blows strike count: two Unarmed Strikes as a bonus action —
+// three at Heightened Focus, Monk level 10 in SRD 5.2 (#1244); SRD 5.1 has
+// no three-strike upgrade at any level. Both facts are resolved server-side
+// now (#1505) onto the served `flurryOfBlows` AvailableAction's `count`
+// (DERIVED_ACTIONS, actions.ts) — this reads that value rather than
+// re-deriving a level threshold, which is what let a 2014 monk at L10+
+// wrongly get a three-strike Flurry from a client-side rule blind to
+// edition. Falls back to 2 (every edition's floor) when the character has
+// no flurryOfBlows row yet (e.g. mid-fetch).
 export function flurryStrikeCount(character: Character): number {
-  return classEntryLevel(character, "monk") >= 10 ? 3 : 2;
+  return character.availableActions?.find((a) => a.key === "flurryOfBlows")?.count ?? 2;
 }
 
 // The "Attacking with" form options for the single attack card (#786): deduped

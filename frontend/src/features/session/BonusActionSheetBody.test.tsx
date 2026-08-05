@@ -1,15 +1,17 @@
 /**
- * #1431: what the Bonus Action sheet's class cards say about the universal
- * actions their class feature re-costs.
+ * #1431/#1505: what the Bonus Action sheet's class cards say about the
+ * universal actions their class feature re-costs.
  *
  * The options are built through the real `classActionOption` against the real
  * served-row fixtures, so this covers the whole seam — backend `regrants` keys →
  * edition-resolved names → card subtitle — rather than a hand-made view model.
  *
- * The monk block is the scope latch: those four rows carry `regrants` as data
- * but must keep their curated reminders verbatim, because they are 2024-shaped
- * on an edition-blind catalog (see DERIVED_ACTIONS) and naming their grant would
- * lie to a 2014 monk.
+ * Resolved regrant names win the subtitle over a row's own curated reminder
+ * (#1505) — a name list is more scannable, and the reminder prose stays
+ * available via the on-use toast/drill-in. The monk block is the scope latch:
+ * those four rows carry `regrants` that are 2024-shaped on an edition-blind
+ * catalog (see DERIVED_ACTIONS), so a 2014 monk is never SERVED them at all —
+ * naming a served row's regrant never lies to the wrong edition.
  */
 
 import { describe, it, expect, vi } from "vitest";
@@ -62,10 +64,10 @@ describe("BonusActionSheetBody — regranted action names (#1431)", () => {
     expect(card("Cunning Action")).toHaveTextContent("Dash · Disengage · Hide");
   });
 
-  it("names the object-use action under each edition's own name on the Fast Hands pair", () => {
+  it("names the object-use action under each edition's own name on the Fast Hands pair, even though the row also carries its own reminder", () => {
     // Fast Hands carries rule text of its own (it spends Cunning Action's Bonus
-    // Action rather than a second one), so its subtitle stays that text; the
-    // regranted key rides the wire and is asserted in turnOptions.test.ts.
+    // Action rather than a second one) — the resolved regrant name still wins
+    // the subtitle (#1505); the reminder prose surfaces on-use instead.
     const fastHands = action({
       key: "fastHands",
       name: "Fast Hands",
@@ -73,7 +75,7 @@ describe("BonusActionSheetBody — regranted action names (#1431)", () => {
       reminder: "Uses Cunning Action's Bonus Action, not an extra one.",
     });
     renderSheet([cunningAction, fastHands]);
-    expect(card("Fast Hands")).toHaveTextContent("Uses Cunning Action's Bonus Action, not an extra one.");
+    expect(card("Fast Hands")).toHaveTextContent("Utilize");
     expect(card("Cunning Action")).toHaveTextContent("Dash · Disengage · Hide");
   });
 
@@ -92,14 +94,16 @@ describe("BonusActionSheetBody — regranted action names (#1431)", () => {
   });
 });
 
-describe("BonusActionSheetBody — the monk cards' subtitles are unchanged (#1431 scope latch)", () => {
-  // Byte-identical to the DERIVED_ACTIONS reminders a monk L2 is served. If a
-  // future change makes a regranting row's names win over its own rule text,
-  // these four go red — which is the point.
+describe("BonusActionSheetBody — the monk cards name their regrants (#1431/#1505)", () => {
+  // A 2024 monk L2 is served all four rows (the free/1-Focus pair for each of
+  // Patient Defense/Step of the Wind); each now shows its resolved regrant
+  // names instead of the curated reminder prose that used to win (#1505 —
+  // ActionSheetBody's regrantNames-first precedence). Byte-identical to the
+  // real DERIVED_ACTIONS rows' `regrants` arrays and reminders.
   const MONK_L2: [AvailableAction, string][] = [
     [
       action({ key: "patientDefense", name: "Patient Defense", regrants: ["disengage"], reminder: "Disengage (free bonus action)." }),
-      "Disengage (free bonus action).",
+      "Disengage",
     ],
     [
       action({
@@ -108,11 +112,11 @@ describe("BonusActionSheetBody — the monk cards' subtitles are unchanged (#143
         regrants: ["disengage", "dodge"],
         reminder: "Disengage + Dodge (spend 1 Focus).",
       }),
-      "Disengage + Dodge (spend 1 Focus).",
+      "Disengage · Dodge",
     ],
     [
       action({ key: "stepOfTheWind", name: "Step of the Wind", regrants: ["dash"], reminder: "Dash (free bonus action)." }),
-      "Dash (free bonus action).",
+      "Dash",
     ],
     [
       action({
@@ -121,16 +125,20 @@ describe("BonusActionSheetBody — the monk cards' subtitles are unchanged (#143
         regrants: ["disengage", "dash"],
         reminder: "Disengage + Dash, jump distance doubled this turn (spend 1 Focus).",
       }),
-      "Disengage + Dash, jump distance doubled this turn (spend 1 Focus).",
+      "Disengage · Dash",
     ],
   ];
 
-  it("keeps every curated reminder verbatim and names no regrant", () => {
+  it("names each row's resolved regrants instead of its curated reminder", () => {
     renderSheet(MONK_L2.map(([a]) => a));
-    for (const [a, reminder] of MONK_L2) {
-      expect(card(a.name)).toHaveTextContent(reminder);
-      // The name list would join with " · " — no monk card may show one.
-      expect(card(a.name)).not.toHaveTextContent("·");
+    for (const [a, names] of MONK_L2) {
+      expect(card(a.name)).toHaveTextContent(names);
     }
+  });
+
+  it("falls back to the curated reminder before the reference query resolves", () => {
+    const [patientDefense] = MONK_L2[0];
+    renderSheet([patientDefense], []);
+    expect(card(patientDefense.name)).toHaveTextContent(patientDefense.reminder!);
   });
 });
