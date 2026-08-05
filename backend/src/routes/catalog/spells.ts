@@ -42,10 +42,21 @@ export const spellsRouter = Router();
  * give it one.
  *
  * `?class=` filters through the SpellClass join (#1711), not a scalar
- * column — `classMemberships.some` finds rows with at least one matching
- * membership row. The served JSON still flattens back to `classes:
- * string[]` via classesOf, so frontend/src/lib/newSpells.ts and
- * spellList.ts consume the response unchanged.
+ * column, but — critically — AFTER edition resolution, not in the SQL
+ * `where`. Filtering by `classMemberships.some` at the DB level would match
+ * on whichever edition's row happens to carry that membership, which is
+ * unsound the moment a name's two editions have genuinely DIFFERENT class
+ * lists (#1715: 2014 Command is cleric+paladin only, but the 2024 SRD 5.2
+ * revision added bard — a real one-of-a-kind divergence). Pre-filtering
+ * would fetch only the 2024 row (the 2014 row has no bard membership to
+ * match), and since it's then the group's ONLY candidate,
+ * resolveSpellCatalogForEdition's graceful single-candidate fallback would
+ * serve 2024 Command to a 2014 Bard's picker — exactly backwards. Resolving
+ * first and filtering the RESOLVED row's own classesOf() list keeps the
+ * class check scoped to the edition actually being served. The served JSON
+ * still flattens back to `classes: string[]` via classesOf, so
+ * frontend/src/lib/newSpells.ts and spellList.ts consume the response
+ * unchanged.
  */
 spellsRouter.get("/spells", async (req, res) => {
   const edition = requireEditionOr400(req, res);
@@ -57,14 +68,12 @@ spellsRouter.get("/spells", async (req, res) => {
   if (!levelFilter.ok) return;
 
   const rows = await prisma.spell.findMany({
-    where: {
-      ...(classFilter.className ? { classMemberships: { some: { className: classFilter.className } } } : {}),
-      ...(levelFilter.maxLevel === undefined ? {} : { level: { lte: levelFilter.maxLevel } }),
-    },
+    where: levelFilter.maxLevel === undefined ? {} : { level: { lte: levelFilter.maxLevel } },
     include: SPELL_CLASS_MEMBERSHIP_SELECT,
     orderBy: [{ level: "asc" }, { name: "asc" }],
   });
-  const spells = resolveSpellCatalogForEdition(rows, edition);
+  const resolved = resolveSpellCatalogForEdition(rows, edition);
+  const spells = classFilter.className ? resolved.filter((row) => classesOf(row).includes(classFilter.className!)) : resolved;
 
   res.json(
     spells.map((row) => ({
