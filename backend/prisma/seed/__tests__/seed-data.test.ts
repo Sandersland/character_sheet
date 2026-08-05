@@ -321,6 +321,66 @@ describe("FEATS — PHB'24 category invariants", () => {
   });
 });
 
+// PHB'14 p. 72 (Fighter) / p. 82 (Paladin) / p. 91 (Ranger), = SRD 5.1 (#1311).
+// A 2014 Fighting Style has six options; SRD 5.2 has four (Dueling and
+// Protection have no 2024 counterpart). Per-class option gating (Fighter gets
+// all six, Paladin/Ranger a four-style subset each) is #1495, not this issue.
+describe("FEATS — 2014 Fighting Style feats (#1311)", () => {
+  const STYLES_2014 = ["Archery", "Defense", "Dueling", "Great Weapon Fighting", "Protection", "Two-Weapon Fighting"];
+  const STYLES_2024 = ["Archery", "Defense", "Great Weapon Fighting", "Two-Weapon Fighting"];
+
+  it("seeds exactly the six PHB'14 Fighting Style feats as EDITION_2014 rows", () => {
+    const names = FEATS.filter((f) => f.category === "fighting_style" && f.edition === "EDITION_2014")
+      .map((f) => f.name)
+      .sort();
+    expect(names).toEqual([...STYLES_2014].sort());
+  });
+
+  it("the four SRD 5.2 Fighting Style feats are stamped EDITION_2024, not left shared", () => {
+    const rows = FEATS.filter((f) => f.category === "fighting_style" && STYLES_2024.includes(f.name) && f.edition === "EDITION_2024");
+    expect(rows.map((f) => f.name).sort()).toEqual([...STYLES_2024].sort());
+  });
+
+  it("no fighting_style row is left edition-NULL (ACTIONS/#1430 precedent: no universal row)", () => {
+    const shared = FEATS.filter((f) => f.category === "fighting_style" && !f.edition).map((f) => f.name);
+    expect(shared).toEqual([]);
+  });
+
+  it("Dueling and Protection exist only as EDITION_2014 rows (no SRD 5.2 counterpart)", () => {
+    for (const name of ["Dueling", "Protection"]) {
+      const rows = FEATS.filter((f) => f.name === name);
+      expect(rows, name).toHaveLength(1);
+      expect(rows[0].edition, name).toBe("EDITION_2014");
+      expect(rows[0].category, name).toBe("fighting_style");
+    }
+  });
+
+  it("2014 Archery/Defense/Two-Weapon Fighting carry the same derived improvement as their 2024 sibling", () => {
+    const byNameEdition = (name: string, edition: "EDITION_2014" | "EDITION_2024") =>
+      FEATS.find((f) => f.name === name && f.edition === edition);
+
+    expect(byNameEdition("Archery", "EDITION_2014")?.improvements).toEqual(byNameEdition("Archery", "EDITION_2024")?.improvements);
+    expect(byNameEdition("Defense", "EDITION_2014")?.improvements).toEqual(byNameEdition("Defense", "EDITION_2024")?.improvements);
+    expect(byNameEdition("Two-Weapon Fighting", "EDITION_2014")?.improvements).toEqual(
+      byNameEdition("Two-Weapon Fighting", "EDITION_2024")?.improvements,
+    );
+  });
+
+  it("2014 Great Weapon Fighting, Dueling, and Protection stay descriptive (not automated)", () => {
+    for (const name of ["Great Weapon Fighting", "Dueling", "Protection"]) {
+      const row = FEATS.find((f) => f.name === name && f.edition === "EDITION_2014");
+      expect(row?.improvements ?? [], name).toEqual([]);
+    }
+  });
+
+  it("every 2014 Fighting Style feat names its Fighting Style prerequisite", () => {
+    for (const name of STYLES_2014) {
+      const row = FEATS.find((f) => f.name === name && f.edition === "EDITION_2014");
+      expect(row?.prerequisite ?? "", name).toContain("Fighting Style");
+    }
+  });
+});
+
 // #1131: the creation spell picker needs real choice — strictly MORE spells on a
 // class's list than it takes at level 1, so a fresh caster is never forced.
 describe("SPELLS — creation picker coverage (#1131)", () => {
