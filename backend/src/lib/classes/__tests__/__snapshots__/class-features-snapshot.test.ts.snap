@@ -1,5 +1,1390 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`deriveResources snapshot — 2014 Monk (#1506), same pipeline under EDITION_2014 > monk / (no subclass) 1`] = `
+[
+  {
+    "info": {
+      "resources": [],
+    },
+    "level": 1,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 11. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 2,
+        },
+      ],
+    },
+    "level": 2,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 11. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 3,
+        },
+      ],
+    },
+    "level": 3,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 11. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 4,
+        },
+      ],
+    },
+    "level": 4,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 5,
+        },
+      ],
+    },
+    "level": 5,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 6,
+        },
+      ],
+    },
+    "level": 6,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 7,
+        },
+      ],
+    },
+    "level": 7,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 8,
+        },
+      ],
+    },
+    "level": 8,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 9,
+        },
+      ],
+    },
+    "level": 9,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 10,
+        },
+      ],
+    },
+    "level": 10,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 11,
+        },
+      ],
+    },
+    "level": 11,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 12,
+        },
+      ],
+    },
+    "level": 12,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 13,
+        },
+      ],
+    },
+    "level": 13,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 14,
+        },
+      ],
+    },
+    "level": 14,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 15,
+        },
+      ],
+    },
+    "level": 15,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 16,
+        },
+      ],
+    },
+    "level": 16,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 17,
+        },
+      ],
+    },
+    "level": 17,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 18,
+        },
+      ],
+    },
+    "level": 18,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 19,
+        },
+      ],
+    },
+    "level": 19,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "onInitiative": [
+            {
+              "amount": 4,
+              "id": "perfectSelf",
+              "threshold": 0,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 20,
+        },
+      ],
+    },
+    "level": 20,
+  },
+]
+`;
+
+exports[`deriveResources snapshot — 2014 Monk (#1506), same pipeline under EDITION_2014 > monk / way of shadow 1`] = `
+[
+  {
+    "info": {
+      "resources": [],
+    },
+    "level": 1,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 11. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 2,
+        },
+      ],
+    },
+    "level": 2,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 11. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 3,
+        },
+      ],
+    },
+    "level": 3,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 11. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 4,
+        },
+      ],
+    },
+    "level": 4,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 5,
+        },
+      ],
+    },
+    "level": 5,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 6,
+        },
+      ],
+    },
+    "level": 6,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 7,
+        },
+      ],
+    },
+    "level": 7,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 8,
+        },
+      ],
+    },
+    "level": 8,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 9,
+        },
+      ],
+    },
+    "level": 9,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 10,
+        },
+      ],
+    },
+    "level": 10,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 11,
+        },
+      ],
+    },
+    "level": 11,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 12,
+        },
+      ],
+    },
+    "level": 12,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 13,
+        },
+      ],
+    },
+    "level": 13,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 14,
+        },
+      ],
+    },
+    "level": 14,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 15,
+        },
+      ],
+    },
+    "level": 15,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 16,
+        },
+      ],
+    },
+    "level": 16,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 17,
+        },
+      ],
+    },
+    "level": 17,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 18,
+        },
+      ],
+    },
+    "level": 18,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 19,
+        },
+      ],
+    },
+    "level": 19,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "onInitiative": [
+            {
+              "amount": 4,
+              "id": "perfectSelf",
+              "threshold": 0,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 20,
+        },
+      ],
+    },
+    "level": 20,
+  },
+]
+`;
+
+exports[`deriveResources snapshot — 2014 Monk (#1506), same pipeline under EDITION_2014 > monk / way of the four elements 1`] = `
+[
+  {
+    "info": {
+      "resources": [],
+    },
+    "level": 1,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 11. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 2,
+        },
+      ],
+    },
+    "level": 2,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 11. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 3,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 1,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 3,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 11. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 4,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 1,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 4,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 5,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 1,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 5,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 6,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 2,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 6,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 7,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 2,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 7,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 8,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 2,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 8,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 9,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 2,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 9,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 10,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 2,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 10,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 11,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 3,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 11,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 12,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 3,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 12,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 13,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 3,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 13,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 14,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 3,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 14,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 15,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 3,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 15,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 16,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 3,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 16,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 17,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 4,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 17,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 18,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 4,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 18,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 19,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 4,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 19,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "onInitiative": [
+            {
+              "amount": 4,
+              "id": "perfectSelf",
+              "threshold": 0,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 20,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 4,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 20,
+  },
+]
+`;
+
+exports[`deriveResources snapshot — 2014 Monk (#1506), same pipeline under EDITION_2014 > monk / way of the open hand 1`] = `
+[
+  {
+    "info": {
+      "resources": [],
+    },
+    "level": 1,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 11. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 2,
+        },
+      ],
+    },
+    "level": 2,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 11. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 3,
+        },
+      ],
+    },
+    "level": 3,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 11. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 4,
+        },
+      ],
+    },
+    "level": 4,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 5,
+        },
+      ],
+    },
+    "level": 5,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 6,
+        },
+        {
+          "description": "As an action, regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again.",
+          "key": "wholenessOfBody",
+          "label": "Wholeness of Body",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 6,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 7,
+        },
+        {
+          "description": "As an action, regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again.",
+          "key": "wholenessOfBody",
+          "label": "Wholeness of Body",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 7,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 8,
+        },
+        {
+          "description": "As an action, regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again.",
+          "key": "wholenessOfBody",
+          "label": "Wholeness of Body",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 8,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 9,
+        },
+        {
+          "description": "As an action, regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again.",
+          "key": "wholenessOfBody",
+          "label": "Wholeness of Body",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 9,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 10,
+        },
+        {
+          "description": "As an action, regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again.",
+          "key": "wholenessOfBody",
+          "label": "Wholeness of Body",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 10,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 11,
+        },
+        {
+          "description": "As an action, regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again.",
+          "key": "wholenessOfBody",
+          "label": "Wholeness of Body",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 11,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 12,
+        },
+        {
+          "description": "As an action, regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again.",
+          "key": "wholenessOfBody",
+          "label": "Wholeness of Body",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 12,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 13,
+        },
+        {
+          "description": "As an action, regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again.",
+          "key": "wholenessOfBody",
+          "label": "Wholeness of Body",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 13,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 14,
+        },
+        {
+          "description": "As an action, regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again.",
+          "key": "wholenessOfBody",
+          "label": "Wholeness of Body",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 14,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 15,
+        },
+        {
+          "description": "As an action, regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again.",
+          "key": "wholenessOfBody",
+          "label": "Wholeness of Body",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 15,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 16,
+        },
+        {
+          "description": "As an action, regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again.",
+          "key": "wholenessOfBody",
+          "label": "Wholeness of Body",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 16,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 17,
+        },
+        {
+          "description": "As an action, regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again.",
+          "key": "wholenessOfBody",
+          "label": "Wholeness of Body",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 17,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 18,
+        },
+        {
+          "description": "As an action, regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again.",
+          "key": "wholenessOfBody",
+          "label": "Wholeness of Body",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 18,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 19,
+        },
+        {
+          "description": "As an action, regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again.",
+          "key": "wholenessOfBody",
+          "label": "Wholeness of Body",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 19,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "onInitiative": [
+            {
+              "amount": 4,
+              "id": "perfectSelf",
+              "threshold": 0,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 20,
+        },
+        {
+          "description": "As an action, regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again.",
+          "key": "wholenessOfBody",
+          "label": "Wholeness of Body",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 20,
+  },
+]
+`;
+
 exports[`deriveResources snapshot — pins output for every class/subclass across all 20 levels > barbarian / (no subclass) 1`] = `
 [
   {

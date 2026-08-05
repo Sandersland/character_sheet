@@ -11,20 +11,50 @@
 // this by default; it is hard-disabled in production regardless of the env).
 //
 // Usage:
-//   npm run seed:verify                                    # default localhost
+//   npm run seed:verify                                    # default localhost, EDITION_2024
+//   SEED_VERIFY_EDITION=EDITION_2014 npm run seed:verify   # provision a 2014 character instead
 //   BACKEND_URL=http://localhost:4010 \
 //   FRONTEND_URL=http://localhost:5183 npm run seed:verify # a worktree slot
 //
 // On success it prints the `cs_session` cookie and the frontend URL, ready to
 // inject into Playwright before navigating.
 
-import { pickClassChoice, planInventory, type CatalogRow, type RefClass } from "./seed-verify-helpers.js";
+import { DEFAULT_RULES_EDITION, isRulesEdition, RULES_EDITION_LABELS } from "@/lib/rules/edition.js";
+import type { RulesEdition } from "@character-sheet/shared-types";
+
+import {
+  assertCatalogPopulated,
+  pickClassChoice,
+  pickSpecies,
+  planInventory,
+  type CatalogRow,
+  type RefClass,
+  type RefSpecies,
+} from "./seed-verify-helpers.js";
 
 const BACKEND_URL = (process.env.BACKEND_URL ?? "http://localhost:4000").replace(/\/$/, "");
 const FRONTEND_URL = (process.env.FRONTEND_URL ?? "http://localhost:5173").replace(/\/$/, "");
 
 const SESSION_COOKIE = "cs_session";
-const CHARACTER_NAME = "Verify Dummy";
+
+// Edition is a REQUESTED input here (an env var), same trust level as a query
+// param or a body field — isRulesEdition is the one guard for that (#1506,
+// edition.ts), never a re-typed literal union of its own.
+const rawEdition = process.env.SEED_VERIFY_EDITION;
+if (rawEdition !== undefined && !isRulesEdition(rawEdition)) {
+  console.error(
+    `\n✗ seed-verify failed: SEED_VERIFY_EDITION must be EDITION_2014 or EDITION_2024, got ${JSON.stringify(rawEdition)}\n`,
+  );
+  process.exit(1);
+}
+const EDITION: RulesEdition = rawEdition ?? DEFAULT_RULES_EDITION;
+
+// Edition-suffixed (#1506) so findExisting (below) can never hand back the
+// OTHER edition's character — reusing one "Verify Dummy" name across both
+// editions was the sharpest trap in this file: a 2014 run would silently
+// reuse a pre-existing 2024 row (findExisting returns BEFORE /api/reference
+// is ever loaded) and report success without ever exercising 2014 at all.
+const CHARACTER_NAME = `Verify Dummy (${RULES_EDITION_LABELS[EDITION]})`;
 
 function die(message: string): never {
   console.error(`\n✗ seed-verify failed: ${message}\n`);
@@ -78,10 +108,19 @@ function report(cookie: string, token: string, charId: string) {
 }
 
 type Reference = {
-  races: { name: string }[];
+  // #1684/#1506: the flat `race`-name creation path was pruned — `species` is
+  // the mechanical anchor now (POST /api/characters' speciesId), same as
+  // every other creation caller in this repo (frontend/e2e's own
+  // resolveSpeciesId, global-setup.ts's).
+  species: RefSpecies[];
   classes: RefClass[];
   backgrounds: { name: string }[];
   alignments: string[];
+  // Edition-FORKED lists (#1506) — see assertCatalogPopulated's own comment
+  // (seed-verify-helpers.ts) for why these two, specifically, catch a
+  // half-shipped edition that species/classes/backgrounds alone would miss.
+  conditions: unknown[];
+  universalActions: unknown[];
 };
 
 // Prefer the Set-Cookie token, falling back to the JSON body token.
@@ -117,16 +156,12 @@ async function findExisting(cookie: string): Promise<{ id: string; name: string 
   return null;
 }
 
-function assertCatalogPopulated(ref: Reference) {
-  const empty = [ref.races, ref.classes, ref.backgrounds].some((xs) => !xs?.length);
-  if (empty) die("catalog is empty — run the DB seed first (the dev stack does this on boot)");
-}
-
-// 2. Read valid creation options from the catalog.
+// 2. Read valid creation options from the catalog, for the requested edition.
 async function loadReference(cookie: string): Promise<Reference> {
-  const ref = await api<Reference>("/api/reference?edition=EDITION_2024", { cookie });
+  const ref = await api<Reference>(`/api/reference?edition=${EDITION}`, { cookie });
   if (ref.status !== 200) die(`GET /api/reference returned ${ref.status}: ${JSON.stringify(ref.body)}`);
-  assertCatalogPopulated(ref.body);
+  const problem = assertCatalogPopulated(ref.body);
+  if (problem) die(problem);
   return ref.body;
 }
 
@@ -136,17 +171,34 @@ async function createCharacter(
   ref: Reference,
   classChoice: { name: string; subclassId?: string },
 ): Promise<string> {
+  // pickSpecies (like pickClassChoice) prefers a species that needs no extra
+  // creation fields — see its own comment for why a blind `species[0]` isn't
+  // safe (a variant-bearing or choice-bearing first row 400s, #1506).
+  const speciesChoice = pickSpecies(ref.species);
   const create = await api<{ id: string; name: string }>("/api/characters", {
     method: "POST",
     cookie,
     body: JSON.stringify({
       name: CHARACTER_NAME,
       alignment: ref.alignments[0],
-      race: ref.races[0].name,
+      ...speciesChoice,
       background: ref.backgrounds[0].name,
       classes: [classChoice],
       abilityScores: { strength: 15, dexterity: 14, constitution: 13, intelligence: 12, wisdom: 10, charisma: 8 },
-      startingEquipment: { mode: "gold", gold: 75 },
+      // No `startingEquipment` (#1506, live pre-existing break found here):
+      // `mode: "gold"` is a 2014-only path now — PHB'24 has no roll-for-gold
+      // rule at all (character-create.ts's resolveStartingGold), so a
+      // hardcoded gold-mode body 400s for EVERY EDITION_2024 class, not just
+      // some. `mode: "package"` needs a per-class optionIndex/openPicks plan
+      // this script has no reason to carry — omitting the field entirely
+      // (it's optional) leaves the character at 0 starting currency, and
+      // seedInventory below adds real representative gear either way via the
+      // same inventory transactions endpoint the app itself uses.
+      //
+      // Write-once (character-schemas.ts) — always sent explicitly rather
+      // than relying on the server default so a 2014 run can never silently
+      // provision a 2024 character.
+      rulesEdition: EDITION,
     }),
   });
   if (create.status !== 201 && create.status !== 200) {
@@ -236,6 +288,10 @@ async function main() {
     return;
   }
 
+  // ref.classes is already scoped to EDITION (loadReference's ?edition=), so
+  // pickClassChoice's subclasses[0].id below can only ever resolve a
+  // same-edition subclassId — a 2014 character can never be created with a
+  // 2024 subclassId (#1506; crossEditionRejection would 400 it, character-create.ts).
   const ref = await loadReference(cookie);
   const { classChoice } = pickClassChoice(ref.classes);
   const charId = await createCharacter(cookie, ref, classChoice);
