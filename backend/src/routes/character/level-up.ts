@@ -12,6 +12,7 @@ import { assertCharacterAccess } from "@/lib/auth/access.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { applyLevelUpTransaction, resolveLevelUpContext } from "@/lib/leveling/level-up-transaction.js";
 import { grantedSpellsGained, type GrantedSpellSource } from "@/lib/spellcasting/granted-spells.js";
+import { casterModelFor } from "@/lib/srd/spellcasting-tables.js";
 import { InvalidLevelUpError, resolveLevelUpPlan } from "@/lib/leveling/level-up-submission.js";
 import { InvalidHitPointOperationError } from "@/lib/combat/hitpoints.js";
 import { InvalidAdvancementOperationError } from "@/lib/leveling/advancement.js";
@@ -111,12 +112,18 @@ levelUpRouter.get<{ id: string }>("/plan", async (req, res) => {
       context.targetEntry.newLevel,
       context.planCharacter.edition,
     );
+    const targetSubclass = context.chosenSubclassName ?? context.targetEntry.subclass ?? null;
     res.json({
       target: {
         className: context.targetEntry.name,
-        subclass: context.chosenSubclassName ?? context.targetEntry.subclass ?? null,
+        subclass: targetSubclass,
         newLevel: context.targetEntry.newLevel,
         isPrimary: context.targetIsPrimary,
+        // #1509 D5: served so the Review step's granted-spells footnote (a
+        // subclass grant like a Domain/Pact spell, independent of any
+        // newSpells step) can render the right noun without re-deriving the
+        // rule — null for a non-caster target.
+        casterModel: casterModelFor(context.targetEntry.name, targetSubclass, context.planCharacter.edition),
       },
       steps,
       grantedSpells: gained.map((s) => ({ name: s.name, level: s.level, school: s.school })),

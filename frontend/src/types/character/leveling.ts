@@ -168,6 +168,16 @@ export interface LevelUpPlanResponse {
     newLevel: number;
     /** False for a non-primary multiclass target — subclass/fightingStyle steps can't commit yet (#1065). */
     isPrimary: boolean;
+    /**
+     * #1509 D5: the served known-vs-prepared model for this target (null/absent
+     * for a non-caster). Drives the Review step's granted-spells footnote noun;
+     * the newSpells step itself carries the SAME fact on its own
+     * `meta.casterModel` (read via readNewSpellsMeta) — this is the top-level
+     * echo for steps/cards that render outside that step, e.g. GrantedSpellsCard.
+     * Optional (not every fixture across the ceremony's ~15 test files sets it)
+     * — callers fall back to "prepared", the majority model.
+     */
+    casterModel?: "known" | "prepared" | null;
   };
   steps: LevelUpStep[];
   /** Subclass spells this level newly grants — always present ([] when none); shown in Review (#1139, #1159). */

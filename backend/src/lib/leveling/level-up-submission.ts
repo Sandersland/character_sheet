@@ -211,24 +211,39 @@ function isSwappableEntry(entry: NonNullable<LevelUpPlanCharacter["spellEntries"
   return entry != null && entry.level > 0 && entry.source == null;
 }
 
+// #1509 D5: the noun every assertForgets message below names — "known spell"
+// for a 2014 Bard/Sorcerer/Warlock/Ranger (+ EK/AT), "prepared spell"
+// otherwise, including when there is no newSpells step at all (a non-caster
+// level has nothing to name, and "prepared" is the majority case). Split out
+// so assertForgets' own branch count stays under the health gate. Never
+// re-derived from className/edition — this module has neither in scope, by
+// design (#1440).
+function swapNoun(step: LevelUpStep | undefined): string {
+  return step?.meta?.casterModel === "known" ? "known spell" : "prepared spell";
+}
+
 // #1127: a swap forgets exactly one user-learned leveled spell, only on a
 // newSpells step that carries meta.canSwap (onLevelUp-cadence casters). A
 // missing/non-swap step throws the same way, so a re-prepare or non-caster level
-// rejects a stray forget too.
+// rejects a stray forget too. #1509 D5: `plan.find()` now runs BEFORE the
+// `length > 1` guard (swapNoun needs the step to name the noun in every
+// message below, including the "at most one" one) — a negligible extra find()
+// on the throw path, but real: the guard no longer short-circuits first.
 function assertForgets(plan: LevelUpStep[], character: LevelUpPlanCharacter, submission: LevelUpSubmission): void {
   const forgets = submission.spellsForgotten ?? [];
   if (forgets.length === 0) return;
-  if (forgets.length > 1) {
-    throw new InvalidLevelUpError("You may swap at most one prepared spell per level-up.");
-  }
   const step = plan.find((s) => s.kind === "newSpells");
+  const noun = swapNoun(step);
+  if (forgets.length > 1) {
+    throw new InvalidLevelUpError(`You may swap at most one ${noun} per level-up.`);
+  }
   if (step?.meta?.canSwap !== true) {
-    throw new InvalidLevelUpError("this level-up does not allow swapping a prepared spell");
+    throw new InvalidLevelUpError(`this level-up does not allow swapping a ${noun}`);
   }
   const entries = character.spellEntries ?? [];
   for (const op of forgets) {
     if (!isSwappableEntry(entries.find((e) => e.id === op.entryId))) {
-      throw new InvalidLevelUpError(`Cannot swap that spell: ${op.entryId} is not a swappable prepared spell.`);
+      throw new InvalidLevelUpError(`Cannot swap that spell: ${op.entryId} is not a swappable ${noun}.`);
     }
   }
 }

@@ -16,7 +16,7 @@ import { useNewSpellsSelection, type NewSpellsSelection } from "@/features/level
 import { useLevelUpStepContext } from "@/features/level-up/useLevelUpStepContext";
 import { useSpellCatalog } from "@/features/spells/useSpellCatalog";
 import { INPUT_CLS, filterCatalog } from "@/lib/addSpell";
-import { eligibleNewCantrips, eligibleNewSpells, spellListsLabel, swappableKnownSpells } from "@/lib/newSpells";
+import { casterModelNoun, eligibleNewCantrips, eligibleNewSpells, spellListsLabel, swappableKnownSpells } from "@/lib/newSpells";
 import { deriveSpellList } from "@/lib/spellList";
 import { pickDetailCtaLabel, pickRowState } from "@/lib/spellPickerView";
 import type { CatalogSpell, Character, LevelUpStep } from "@/types/character";
@@ -26,18 +26,20 @@ const NO_KNOWN: ReadonlySet<string> = new Set();
 // #1101: the budget header — a staged swap raises "Choose N" to "Choose N+1
 // (N + 1 swap)"; a swap-only level (count 0) reads as optional, and once its
 // swap is staged the "(0 + 1 swap)" arithmetic is hidden as "(swap replacement)".
-function budgetHeadline(count: number, chosen: number, swapping: boolean): string {
+// #1509 D5: the swapped noun ("known"/"prepared") is the served casterModel,
+// never re-derived — see casterModelNoun.
+function budgetHeadline(count: number, chosen: number, swapping: boolean, casterModel: "known" | "prepared" | null): string {
   const cap = count + (swapping ? 1 : 0);
-  if (cap === 0) return "No new spells at this level, but you may swap one prepared spell";
+  if (cap === 0) return `No new spells at this level, but you may swap one ${casterModelNoun(casterModel)}`;
   const swapNote = count === 0 ? "(swap replacement)" : `(${count} + 1 swap)`;
   const label = swapping ? `Choose ${cap} ${swapNote}` : `Choose ${cap}`;
   return `${label} — ${chosen} of ${cap} chosen`;
 }
 
 // #1139: spell out that the N learns and the optional swap are separate rules.
-function learnSummary(count: number, canSwap: boolean): string | null {
+function learnSummary(count: number, canSwap: boolean, casterModel: "known" | "prepared" | null): string | null {
   if (count === 0) return null;
-  const swap = canSwap ? " You may also swap one spell for another." : "";
+  const swap = canSwap ? ` You may also swap one ${casterModelNoun(casterModel)} for another.` : "";
   return `You learn ${count} new spell${count === 1 ? "" : "s"}.${swap}`;
 }
 
@@ -185,23 +187,23 @@ function LeveledSpellsSection({
   learnedSpellIds: ReadonlySet<string>;
   framed: boolean;
 }) {
-  const { count, maxSpellLevel, magicalSecrets, spellLists, canSwap, selectedIds, forgottenEntryId, toggle, toggleForget } = selection;
+  const { count, maxSpellLevel, magicalSecrets, spellLists, canSwap, selectedIds, forgottenEntryId, toggle, toggleForget, casterModel } = selection;
   const [search, setSearch] = useState("");
   const eligible = eligibleNewSpells(catalog, { maxSpellLevel, spellLists });
   const filtered = filterCatalog(eligible, search, "");
   const swapCandidates = swappableKnownSpells(character.spellcasting?.spells ?? []);
-  const learnCopy = learnSummary(count, canSwap);
+  const learnCopy = learnSummary(count, canSwap, casterModel);
   // #1101: a staged swap raises the learn cap by one (mirrors useNewSpellsSelection's cap).
   const cap = count + (forgottenEntryId != null ? 1 : 0);
 
   return (
     <div className={framed ? "mt-4 border-t border-parchment-200 pt-4" : ""}>
       <p className="text-center text-sm font-medium text-parchment-700">
-        {budgetHeadline(count, selectedIds.length, forgottenEntryId != null)}
+        {budgetHeadline(count, selectedIds.length, forgottenEntryId != null, casterModel)}
       </p>
       {learnCopy && <p className="mt-1 text-center text-xs text-parchment-600">{learnCopy}</p>}
       {canSwap && (
-        <SwapPanel candidates={swapCandidates} forgottenEntryId={forgottenEntryId} onToggle={toggleForget} />
+        <SwapPanel candidates={swapCandidates} forgottenEntryId={forgottenEntryId} onToggle={toggleForget} casterModel={casterModel} />
       )}
       {magicalSecrets && (
         <p className="mt-1 text-center text-xs text-arcane-700">

@@ -39,7 +39,7 @@ describe("readNewSpellsMeta", () => {
     };
     expect(readNewSpellsMeta(step)).toEqual({
       count: 2, maxSpellLevel: 5, magicalSecrets: true, canSwap: false, cantrips: 0,
-      spellLists: ["bard", "wizard"], cantripLists: ["bard"],
+      spellLists: ["bard", "wizard"], cantripLists: ["bard"], casterModel: null,
     });
   });
 
@@ -47,7 +47,7 @@ describe("readNewSpellsMeta", () => {
     const step: LevelUpStep = { kind: "newSpells", count: 1 };
     expect(readNewSpellsMeta(step)).toEqual({
       count: 1, maxSpellLevel: 0, magicalSecrets: false, canSwap: false, cantrips: 0,
-      spellLists: null, cantripLists: null,
+      spellLists: null, cantripLists: null, casterModel: null,
     });
   });
 
@@ -65,6 +65,12 @@ describe("readNewSpellsMeta", () => {
     const step: LevelUpStep = { kind: "newSpells", count: 1, meta: { spellLists: null, cantripLists: null } };
     expect(readNewSpellsMeta(step).spellLists).toBeNull();
     expect(readNewSpellsMeta(step).cantripLists).toBeNull();
+  });
+
+  it("reads casterModel from meta — known/prepared/absent-defaults-to-null (#1509)", () => {
+    expect(readNewSpellsMeta({ kind: "newSpells", count: 1, meta: { casterModel: "known" } }).casterModel).toBe("known");
+    expect(readNewSpellsMeta({ kind: "newSpells", count: 1, meta: { casterModel: "prepared" } }).casterModel).toBe("prepared");
+    expect(readNewSpellsMeta({ kind: "newSpells", count: 1 }).casterModel).toBeNull();
   });
 });
 
