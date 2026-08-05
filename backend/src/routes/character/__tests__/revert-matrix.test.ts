@@ -137,7 +137,11 @@ describe("revert-matrix — reverseEvent per-category undo (#615)", () => {
   it("effects: undo of a buff cast restores activeEffects (Mage Armor removed)", async () => {
     await createWizard("rm-effects");
     // Casting Mage Armor applies a durable AC buff → an `effects` buffApplied event.
-    const spell = await prisma.spell.findFirstOrThrow({ where: { name: "Mage Armor" } });
+    // #1714 forked Mage Armor to EDITION_2014 too (identical buff value in
+    // both editions, so this pick was never actually ambiguous for THIS
+    // test's assertions — pinned anyway so a future edition divergence can't
+    // silently slip through this fixture).
+    const spell = await prisma.spell.findFirstOrThrow({ where: { name: "Mage Armor", edition: "EDITION_2024" } });
     await applySpellcastingOperations("rm-effects", [{ type: "learnSpell", spellId: spell.id }], OWNER_ID);
     const row = await prisma.character.findUniqueOrThrow({ where: { id: "rm-effects" }, select: { spellcasting: true } });
     const entryId = (row.spellcasting as { spells: { id: string; spellId?: string }[] }).spells.find((s) => s.spellId === spell.id)!.id;
