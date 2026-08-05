@@ -4,12 +4,14 @@
 // (foundation slice 1/3 of epic #1517) created the empty array + wiring;
 // this slice (#1713) fills it in.
 //
-// Source: every row below is verbatim SRD 5.1 text (dnd5eapi.co's 2014 spell
-// set — see `/api/2014/spells/<slug>`), cited SRD 5.1 as a whole rather than
-// per-row since all 136 rows share that one source. A handful of rows fix a
-// scraping artifact from that source, not a rules choice: dnd5eapi
-// genericizes PHB'14's "the DM" to "the GM" (restored here — this repo's own
-// term, see feats.ts's "the DM"), a few entries had a stray-space typo
+// Source: every row below except one is verbatim SRD 5.1 text (dnd5eapi.co's
+// 2014 spell set — see `/api/2014/spells/<slug>`), cited SRD 5.1 as a whole
+// rather than per-row since all 136 of those rows share that one source. The
+// one exception, Witch Bolt, is hand-transcribed and cited per-row (#1718) —
+// dnd5eapi/open5e's SRD 5.1 dataset doesn't include it at all. A handful of
+// the SRD rows fix a scraping artifact from that source, not a rules choice:
+// dnd5eapi genericizes PHB'14's "the DM" to "the GM" (restored here — this
+// repo's own term, see feats.ts's "the DM"), a few entries had a stray-space typo
 // ("o f" for "of", "10d 10" for "10d10"), and five spells whose reference
 // tables (Confusion's d10 behavior table, Animate Objects' size statblock,
 // Scrying's/Teleport's/Control Weather's modifier and stage tables) render as
@@ -429,6 +431,33 @@ export const SHARED_SPELLS_2014: CatalogSpell[] = [
     ritual: true,
     classes: ["wizard", "bard", "warlock"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "a piece of string and a bit of wood" },
+  },
+  // PHB'14 p. 302. Not in dnd5eapi/open5e's SRD 5.1 dataset (both cap out at
+  // the same 319-spell set — see wizard.ts's header). Sorcerer/Warlock/Wizard
+  // is a 3-list spell so it belongs here per the row-ownership rule, but it
+  // was missing from every slice authored so far (#1713-#1717) — a real gap
+  // that blocked #1718 (Sorcerer)'s "every PHB'14 Sorcerer spell resolves"
+  // acceptance criterion, so it's added here rather than left for a future
+  // slice to rediscover. Verified against a second source (dnd5e.wikidot.com)
+  // since it's hand-transcribed, not API-derived.
+  {
+    name: "Witch Bolt",
+    level: 1,
+    school: "evocation",
+    castingTime: "1 action",
+    range: "30 feet",
+    duration: "Concentration, up to 1 minute",
+    description:
+      "A beam of crackling, blue energy lances out toward a creature within range, forming a sustained arc of lightning between you and the target. Make a ranged spell attack against that creature. On a hit, the target takes 1d12 lightning damage, and on each of your turns for the duration, you can use your action to deal 1d12 lightning damage to the target automatically. The spell ends if you use your action to do anything else. The spell also ends if the target ever moves more than 30 feet away from you and doesn't return to that range by the end of your turn. At Higher Levels. When you cast this spell using a spell slot of 2nd level or higher, the initial damage increases by 1d12 for each slot level above 1st.",
+    concentration: true,
+    classes: ["wizard", "sorcerer", "warlock"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "a twig from a tree that has been struck by lightning" },
+    attackType: "attack",
+    effectKind: "damage",
+    effectDiceCount: 1,
+    effectDiceFaces: 12,
+    damageType: "lightning",
+    upcastDicePerLevel: 1,
   },
   // ── Level 2 ───────────────────────────────────────────────────────────────
   {
