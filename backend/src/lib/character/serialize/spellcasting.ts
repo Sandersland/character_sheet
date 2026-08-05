@@ -4,6 +4,7 @@ import {
   deriveMulticlassSpellcasting,
   derivePreparedSpellLimit,
   casterModelForEntries,
+  CASTER_MODEL_LABELS,
 } from "@/lib/srd/srd.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spellcasting.js";
 import { clampPreparedToLimit, type SpellEntry } from "@/lib/spellcasting/spell-state.js";
@@ -309,10 +310,15 @@ export function buildSpellcastingView(
   // omitted (not `null`) for a non-caster, matching preparedSpellLimit's own
   // granted-only/non-caster omission shape below.
   const casterModel = casterModelForEntries(limitEntries, edition);
+  // #1511 D4: the meter/roster noun and the locked-rune tooltip word, served
+  // alongside casterModel so the grimoire never composes "known"-vs-"prepared"
+  // copy itself — same omission shape as casterModel above.
+  const labels = casterModel != null ? CASTER_MODEL_LABELS[casterModel] : null;
   return {
     ...clampedView,
     ...derivePreparedFields(clampedView, limit),
     ...(casterModel != null ? { casterModel } : {}),
+    ...(labels != null ? labels : {}),
   };
 }
 

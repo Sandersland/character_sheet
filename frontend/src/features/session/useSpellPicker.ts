@@ -389,7 +389,12 @@ export function useSpellPicker(opts: UseSpellPickerOptions): UseSpellPicker {
     emptyMessage:
       slotLevels.length === 0
         ? "No spell slots remaining."
-        : "No prepared spells available to cast right now.",
+        // #1511: served noun, not "prepared" hardcoded — a known caster reads
+        // "No spells known spells available…" (accepted redundancy: the served
+        // model gives no separate adjective-only form, and this message is not
+        // the primary flow for a known caster, whose learned spells are always
+        // castable the moment they're learned).
+        : `No ${(spellcasting.preparedLabel ?? "Prepared").toLowerCase()} spells available to cast right now.`,
     hasCastable: castableSpells.length > 0,
     rowFor,
     viewFor,

@@ -169,7 +169,7 @@ describe("pactMagicNote", () => {
 describe("preparedBudget", () => {
   it("prefers the server-derived count and limit", () => {
     expect(preparedBudget(sc({ preparedSpellCount: 11, preparedSpellLimit: 12 }))).toEqual({
-      count: 11, limit: 12, atLimit: false,
+      count: 11, limit: 12, atLimit: false, casterModel: null, alwaysAvailableLabel: undefined, preparedLabel: undefined,
     });
   });
 
@@ -179,7 +179,7 @@ describe("preparedBudget", () => {
 
   it("is unbounded only for a non-caster (null limit); every caster now has a cap", () => {
     expect(preparedBudget(sc({ preparedSpellLimit: null }))).toEqual({
-      count: 0, limit: null, atLimit: false,
+      count: 0, limit: null, atLimit: false, casterModel: null, alwaysAvailableLabel: undefined, preparedLabel: undefined,
     });
   });
 
@@ -197,6 +197,21 @@ describe("preparedBudget", () => {
     }));
     expect(b.count).toBe(1);
   });
+
+  // #1511 D2/D4: carries the served model + labels through so SpellRow/
+  // SpellbookList need not re-read the character payload.
+  it("carries the served casterModel and labels through", () => {
+    const b = preparedBudget(sc({
+      preparedSpellCount: 8,
+      preparedSpellLimit: 8,
+      casterModel: "known",
+      preparedLabel: "Spells known",
+      alwaysAvailableLabel: "Known",
+    }));
+    expect(b.casterModel).toBe("known");
+    expect(b.preparedLabel).toBe("Spells known");
+    expect(b.alwaysAvailableLabel).toBe("Known");
+  });
 });
 
 describe("canPrepare", () => {
@@ -212,6 +227,13 @@ describe("canPrepare", () => {
   });
   it("allows preparing when under the cap", () => {
     expect(canPrepare(spell({ id: "x", name: "X", level: 1 }), { count: 3, limit: 12, atLimit: false })).toBe(true);
+  });
+
+  // #1511 D3: a known caster's leveled spell is "locked", not "unprepared" —
+  // canPrepare's own locked-rune early-return already covers it.
+  it("never blocks a known caster's leveled spell (it's locked, not toggleable)", () => {
+    const knownBudget = { count: 8, limit: 8, atLimit: true, casterModel: "known" as const };
+    expect(canPrepare(spell({ id: "x", name: "X", level: 1, prepared: false }), knownBudget)).toBe(true);
   });
 });
 
@@ -240,6 +262,17 @@ describe("swapCandidates", () => {
       swapCandidates([spell({ id: "shield", name: "Shield", level: 1, prepared: false })]),
     ).toEqual([]);
   });
+
+  // #1511 D3/AC: every leveled spell is "locked" (not "prepared") for a known
+  // caster, so there is nothing to swap out — the at-cap swap bar becomes
+  // unreachable for one.
+  it("is empty for a known caster even with prepared-flagged spells", () => {
+    const spells = [
+      spell({ id: "bless", name: "Bless", level: 1, prepared: true }),
+      spell({ id: "web", name: "Web", level: 2, prepared: true }),
+    ];
+    expect(swapCandidates(spells, "known")).toEqual([]);
+  });
 });
 
 describe("filterSpellbook", () => {
@@ -265,6 +298,14 @@ describe("filterSpellbook", () => {
   });
   it("ritual filter keeps only rituals", () => {
     expect(filterSpellbook(spells, { ...base, ritual: true }).map((s) => s.id)).toEqual(["ff"]);
+  });
+
+  // #1511 D6: the predicate itself is unchanged — the chip driving it is
+  // hidden client-side for a known caster, not this function.
+  it("prepared filter keeps everything for a known caster (every leveled row is locked)", () => {
+    expect(filterSpellbook(spells, { ...base, prepared: true }, "known").map((s) => s.id)).toEqual([
+      "c", "mm", "ff", "fb",
+    ]);
   });
 });
 

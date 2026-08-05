@@ -1287,4 +1287,18 @@ describe("GET /api/characters/:id — casterModel + edition-forked preparedSpell
     expect(res.body.spellcasting.preparedSpellLimit).toBe(9);
     expect(res.body.spellcasting.casterModel).toBe("prepared");
   });
+
+  // #1511 D4: the grimoire/meter nouns ride alongside casterModel — served,
+  // never composed client-side.
+  it("2014 Bard 5 serves the known-caster labels", async () => {
+    const res = await supertest(app).get(`/api/characters/${BARD_2014_ID}`).set("Cookie", COOKIE);
+    expect(res.body.spellcasting.preparedLabel).toBe("Spells known");
+    expect(res.body.spellcasting.alwaysAvailableLabel).toBe("Known");
+  });
+
+  it("2024 Bard 5 serves the prepared-caster labels", async () => {
+    const res = await supertest(app).get(`/api/characters/${BARD_2024_ID}`).set("Cookie", COOKIE);
+    expect(res.body.spellcasting.preparedLabel).toBe("Prepared");
+    expect(res.body.spellcasting.alwaysAvailableLabel).toBe("Always prepared");
+  });
 });

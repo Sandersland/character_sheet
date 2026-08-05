@@ -124,10 +124,18 @@ export interface Character {
      * Whether this character's chosen spells are immediately castable ("known",
      * SRD 5.1 Bard/Sorcerer/Warlock/Ranger/EK/AT) or must be prepared from a
      * wider list ("prepared", every SRD 5.2 caster). Absent for a non-caster.
-     * Served by buildSpellcastingView (#1507); consumed by #1511 — no
-     * component reads it yet.
+     * Served by buildSpellcastingView (#1507).
      */
     casterModel?: "known" | "prepared";
+    /**
+     * The noun for the meter/roster (e.g. "Prepared" / "Spells known") and the
+     * locked-rune tooltip word (e.g. "Always prepared" / "Known"), served
+     * alongside casterModel (#1511 D4) — the client renders these verbatim and
+     * never composes known-vs-prepared copy itself. Both absent exactly when
+     * casterModel is.
+     */
+    preparedLabel?: string;
+    alwaysAvailableLabel?: string;
     /**
      * The spell the character is currently concentrating on (5e: only one at a
      * time), or null. `entryId` matches a `Spell.id` in `spells`.

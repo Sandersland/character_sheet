@@ -55,4 +55,19 @@ describe("PreparedSpellList", () => {
     const { container } = render(<PreparedSpellList spellcasting={sc([])} />);
     expect(container).toBeEmptyDOMElement();
   });
+
+  // #1511 D7: the roster heading reads the served label for a known caster.
+  it("reads the served label in the roster heading for a known caster", () => {
+    render(
+      <PreparedSpellList
+        spellcasting={{
+          ...sc([spell({ name: "Charm Person", level: 1, prepared: true })]),
+          casterModel: "known",
+          preparedLabel: "Spells known",
+        }}
+      />,
+    );
+    expect(screen.getByText("Spells known · leveled")).toBeInTheDocument();
+    expect(screen.queryByText("Prepared · leveled")).not.toBeInTheDocument();
+  });
 });

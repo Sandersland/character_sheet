@@ -435,6 +435,20 @@ export function casterModelForEntries(
   return allKnown ? "known" : "prepared";
 }
 
+// #1511 D4: user-facing nouns for the served caster model — served, never
+// composed client-side (CLAUDE.md: the frontend never originates a rule). A
+// known caster's chosen spells are never "prepared" in the SRD 5.1 sense, so
+// the meter/roster noun and the rune's locked-state word both fork off the
+// same casterModel this module already computes; this map carries no rules
+// text of its own, only the copy naming a model decided above.
+export const CASTER_MODEL_LABELS: Record<
+  "known" | "prepared",
+  { preparedLabel: string; alwaysAvailableLabel: string }
+> = {
+  known: { preparedLabel: "Spells known", alwaysAvailableLabel: "Known" },
+  prepared: { preparedLabel: "Prepared", alwaysAvailableLabel: "Always prepared" },
+};
+
 // Cantrips known, as [minLevel, count] breakpoints (highest applicable wins).
 // Verified byte-identical between SRD 5.1 and SRD 5.2 (#1507) for all six
 // progressions — no `edition`. Paladin/Ranger prepare no cantrips. Drives

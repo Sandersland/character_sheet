@@ -656,6 +656,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
   "speed": 30,
   "spellcasting": {
     "ability": "intelligence",
+    "alwaysAvailableLabel": "Always prepared",
     "arcana": [],
     "casterModel": "prepared",
     "classes": [
@@ -673,6 +674,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
       "spellName": "Fireball",
     },
     "pact": null,
+    "preparedLabel": "Prepared",
     "preparedSpellCount": 1,
     "preparedSpellLimit": 9,
     "slots": [

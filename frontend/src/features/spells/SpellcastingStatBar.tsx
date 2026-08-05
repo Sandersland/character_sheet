@@ -30,7 +30,7 @@ export default function SpellcastingStatBar({
       <StatBox label="Save DC" value={String(spellSaveDC)} />
       <StatBox label="Spell Attack" value={formatModifier(spellAttackBonus)} />
       {prepared && (
-        <StatBox label="Prepared" value={`${prepared.count} / ${prepared.limit ?? "—"}`} />
+        <StatBox label={prepared.label} value={`${prepared.count} / ${prepared.limit ?? "—"}`} />
       )}
     </div>
   );
