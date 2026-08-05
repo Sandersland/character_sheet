@@ -547,8 +547,8 @@ async function resolveSpeciesId(
 }
 
 // Resolve spell names → catalog ids via GET /api/spells (#1131 create-body picks).
-// `?edition=` is REQUIRED since #1712 — EDITION_2024 always, same as
-// resolveSpeciesId above: no persona this file declares needs 2014.
+// `?edition=` is REQUIRED since #1712 — EDITION_2024 always: no caster persona here
+// needs 2014 (unlike resolveSpeciesId, edition-parameterized by #1506).
 async function resolveSpellIds(cookie: string, names: string[]): Promise<string[]> {
   const response = await api(cookie, "/api/spells?edition=EDITION_2024");
   if (!response.ok) throw new Error(`Failed to load spells: ${response.status}`);
