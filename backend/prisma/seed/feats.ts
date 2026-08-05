@@ -1,5 +1,6 @@
-// ── Feat catalog (2024 rules) ──────────────────────────────────────────────────
-// SRD 5.2.1 pp. 87-88 for the 16 SRD feats; PHB'24 for the re-authored rest.
+// ── Feat catalog (2024 + 2014 rules) ────────────────────────────────────────────
+// SRD 5.2.1 pp. 87-88 for the 16 SRD feats; PHB'24 for the re-authored rest;
+// PHB'14 pp. 72/82/91 (= SRD 5.1) for the six 2014 Fighting Style feats (#1311).
 // abilityOptions/abilityIncrease drive the half-feat bump; category/levelPrerequisite
 // gate which slot may take a feat (see featOfferedForAsiSlot). Ability Score
 // Improvement is NOT seeded — it stays the takeAsi advancement branch.
@@ -107,13 +108,18 @@ export const FEATS: FeatSeed[] = [
   // ── Fighting Style feats (SRD 5.2.1) — granted by a Fighting Style feature ──
   // Improvements carry the same derived effects the former scalar styles applied
   // (#1137). Great Weapon Fighting's damage-die floor is not automated, so it stays
-  // descriptive.
+  // descriptive. Stamped EDITION_2024 (#1311): SRD 5.2 has exactly these four names
+  // and any class with the Fighting Style feature may take any of them (no
+  // per-class subset, unlike 2014 below) — content transcribed from SRD 5.2.1, not
+  // a universal row, per the ACTIONS/#1430 "no shared row stays edition-NULL"
+  // precedent.
   {
     name: "Archery",
     description: "You gain a +2 bonus to attack rolls you make with ranged weapons.",
     category: "fighting_style",
     prerequisite: "Fighting Style feature",
     improvements: [{ target: "rangedAttackRoll", amount: 2 }],
+    edition: "EDITION_2024",
   },
   {
     name: "Defense",
@@ -121,6 +127,7 @@ export const FEATS: FeatSeed[] = [
     category: "fighting_style",
     prerequisite: "Fighting Style feature",
     improvements: [{ target: "armorClassWhileArmored", amount: 1 }],
+    edition: "EDITION_2024",
   },
   {
     name: "Great Weapon Fighting",
@@ -128,6 +135,7 @@ export const FEATS: FeatSeed[] = [
       "When you roll damage for an attack with a melee weapon you are wielding with two hands, you can treat any 1 or 2 on a damage die as a 3. The weapon must have the Two-Handed or Versatile property.",
     category: "fighting_style",
     prerequisite: "Fighting Style feature",
+    edition: "EDITION_2024",
   },
   {
     name: "Two-Weapon Fighting",
@@ -137,6 +145,68 @@ export const FEATS: FeatSeed[] = [
     category: "fighting_style",
     prerequisite: "Fighting Style feature",
     improvements: [{ target: "offhandAbilityDamage", amount: 1 }],
+    edition: "EDITION_2024",
+  },
+
+  // ── 2014 Fighting Style feats (PHB'14 p. 72 Fighter / p. 82 Paladin / p. 91
+  // Ranger, = SRD 5.1) — #1311. A Fighting Style is per-class in 2014 (Fighter
+  // gets all six; Paladin/Ranger get a four-style subset each), but the
+  // per-class option gating is #1495's scope, not this one — every 2014 class
+  // with the feature is offered all six rows here until that lands. Dueling
+  // and Protection have no SRD 5.2 counterpart, so they exist only as
+  // EDITION_2014 rows. Archery/Defense/Two-Weapon Fighting carry the same
+  // improvement as their 2024 sibling (the derived effect is identical; only
+  // the transcribed wording differs) — Great Weapon Fighting's reroll and
+  // Protection's imposed-disadvantage-on-another-creature's-roll stay
+  // descriptive (self-or-announce; GWF also untracked in 2024 above).
+  {
+    name: "Archery",
+    description: "You gain a +2 bonus to attack rolls you make with ranged weapons.",
+    category: "fighting_style",
+    prerequisite: "Fighting Style feature",
+    improvements: [{ target: "rangedAttackRoll", amount: 2 }],
+    edition: "EDITION_2014",
+  },
+  {
+    name: "Defense",
+    description: "While you are wearing armor, you gain a +1 bonus to AC.",
+    category: "fighting_style",
+    prerequisite: "Fighting Style feature",
+    improvements: [{ target: "armorClassWhileArmored", amount: 1 }],
+    edition: "EDITION_2014",
+  },
+  {
+    name: "Dueling",
+    description:
+      "When you are wielding a melee weapon in one hand and no other weapons, you gain a +2 bonus to damage rolls with that weapon.",
+    category: "fighting_style",
+    prerequisite: "Fighting Style feature",
+    edition: "EDITION_2014",
+  },
+  {
+    name: "Great Weapon Fighting",
+    description:
+      "When you roll a 1 or 2 on a damage die for an attack you make with a melee weapon that you are wielding with two hands, you can reroll the die and must use the new roll, even if the new roll is a 1 or a 2. The weapon must have the two-handed or versatile property for you to gain this benefit.",
+    category: "fighting_style",
+    prerequisite: "Fighting Style feature",
+    edition: "EDITION_2014",
+  },
+  {
+    name: "Protection",
+    description:
+      "When a creature you can see attacks a target other than you that is within 5 feet of you, you can use your reaction to impose disadvantage on the attack roll. You must be wielding a shield.",
+    category: "fighting_style",
+    prerequisite: "Fighting Style feature",
+    edition: "EDITION_2014",
+  },
+  {
+    name: "Two-Weapon Fighting",
+    description:
+      "When you engage in two-weapon fighting, you can add your ability modifier to the damage of the second attack.",
+    category: "fighting_style",
+    prerequisite: "Fighting Style feature",
+    improvements: [{ target: "offhandAbilityDamage", amount: 1 }],
+    edition: "EDITION_2014",
   },
 
   // ── General feats (level 4+) — each grants +1 to a listed ability ──────────

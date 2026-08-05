@@ -143,3 +143,40 @@ describe("GET /api/feats?asiLevel= — server-side ASI eligibility (#1438)", () 
     }
   });
 });
+
+/**
+ * PHB'14 p. 72 (Fighter) / p. 82 (Paladin) / p. 91 (Ranger), = SRD 5.1 (#1311).
+ * Runs against the REAL SEEDED catalog, same as the asiLevel suite above — the
+ * absolute counts (6 vs 4) are what proves the six 2014 rows resolve for a
+ * 2014 character and are hidden from a 2024 one, not just present somewhere
+ * in the table.
+ */
+describe("GET /api/feats — 2014 Fighting Style feats resolve distinctly from 2024's (#1311)", () => {
+  async function get(edition: string): Promise<{ name: string; category: string; description: string }[]> {
+    const res = await supertest(app).get(`/api/feats?edition=${edition}`).set("Cookie", COOKIE);
+    expect(res.status).toBe(200);
+    return res.body;
+  }
+
+  const fightingStyles = (rows: { name: string; category: string }[]) =>
+    rows.filter((r) => r.category === "fighting_style").map((r) => r.name).sort();
+
+  it("EDITION_2014 resolves all six PHB'14 styles, including Dueling and Protection", async () => {
+    const rows = await get("EDITION_2014");
+    expect(fightingStyles(rows)).toEqual(
+      ["Archery", "Defense", "Dueling", "Great Weapon Fighting", "Protection", "Two-Weapon Fighting"],
+    );
+  });
+
+  it("EDITION_2024 resolves exactly the four SRD 5.2 styles — Dueling and Protection are absent", async () => {
+    const rows = await get("EDITION_2024");
+    expect(fightingStyles(rows)).toEqual(["Archery", "Defense", "Great Weapon Fighting", "Two-Weapon Fighting"]);
+  });
+
+  it("Great Weapon Fighting's id and reroll-vs-treat-as-3 text differ by edition (genuine mechanical fork)", async () => {
+    const gwf2014 = (await get("EDITION_2014")).find((r) => r.name === "Great Weapon Fighting")!;
+    const gwf2024 = (await get("EDITION_2024")).find((r) => r.name === "Great Weapon Fighting")!;
+    expect(gwf2014.description).toMatch(/reroll the die/i);
+    expect(gwf2024.description).toMatch(/treat any 1 or 2.*as a 3/i);
+  });
+});

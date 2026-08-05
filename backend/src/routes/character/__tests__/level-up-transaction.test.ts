@@ -1056,7 +1056,10 @@ describe("POST …/level-up/transactions — multiclass ceremonies (#1065)", () 
   it("multiclass INTO Fighter applies hp + fighting-style feat under one batchId, and it survives serialization", async () => {
     const wizard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" } });
     const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
-    const defense = await prisma.feat.findFirstOrThrow({ where: { name: "Defense", category: "fighting_style" } });
+    // Pinned to EDITION_2024 (#1311): these fixtures never set rulesEdition, so
+    // they default to EDITION_2024, and a bare name+category match became
+    // ambiguous the moment a 2014 "Defense" row exists alongside it.
+    const defense = await prisma.feat.findFirstOrThrow({ where: { name: "Defense", category: "fighting_style", edition: "EDITION_2024" } });
     const evocation = (await prisma.subclass.findFirstOrThrow({ where: { classId: wizard.id, name: "School of Evocation" } })).id;
     const CHAR_ID = "lvtx-mc-into-fighter";
     await prisma.character.create({
@@ -1101,7 +1104,10 @@ describe("POST …/level-up/transactions — multiclass ceremonies (#1065)", () 
   it("single revert undoes the whole multiclass ceremony: entry gone, fs feat cleared", async () => {
     const wizard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" } });
     const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
-    const defense = await prisma.feat.findFirstOrThrow({ where: { name: "Defense", category: "fighting_style" } });
+    // Pinned to EDITION_2024 (#1311): these fixtures never set rulesEdition, so
+    // they default to EDITION_2024, and a bare name+category match became
+    // ambiguous the moment a 2014 "Defense" row exists alongside it.
+    const defense = await prisma.feat.findFirstOrThrow({ where: { name: "Defense", category: "fighting_style", edition: "EDITION_2024" } });
     const evocation = (await prisma.subclass.findFirstOrThrow({ where: { classId: wizard.id, name: "School of Evocation" } })).id;
     const CHAR_ID = "lvtx-mc-undo";
     await prisma.character.create({
@@ -1509,7 +1515,10 @@ describe("POST …/level-up/transactions — multiclass add via ceremony (#1131)
 
   it("adds a Fighter second class and commits its fighting-style feat against the new entry", async () => {
     const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
-    const defense = await prisma.feat.findFirstOrThrow({ where: { name: "Defense", category: "fighting_style" } });
+    // Pinned to EDITION_2024 (#1311): these fixtures never set rulesEdition, so
+    // they default to EDITION_2024, and a bare name+category match became
+    // ambiguous the moment a 2014 "Defense" row exists alongside it.
+    const defense = await prisma.feat.findFirstOrThrow({ where: { name: "Defense", category: "fighting_style", edition: "EDITION_2024" } });
 
     const res = await post(CHAR_ID, {
       target: { kind: "new", classId: fighter.id },

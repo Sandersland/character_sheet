@@ -53,6 +53,7 @@ async function elf2024() {
   return { elf, woodElf };
 }
 async function featByName(name: string) {
+  // safe while these feats have no edition fork — pin edition if a 2014 sibling appears
   return prisma.feat.findFirstOrThrow({ where: { name } });
 }
 
@@ -103,7 +104,10 @@ describe("POST /api/characters — 2024 Human Skillful + Versatile (#1690)", () 
   it("400s with a distinct message for a non-Origin-category feat", async () => {
     const human = await human2024();
     // Great Weapon Fighting is a fighting_style feat, never an Origin one.
-    const style = await featByName("Great Weapon Fighting");
+    // Pinned to EDITION_2024 (#1311): featByName's bare name lookup became
+    // ambiguous once a 2014 "Great Weapon Fighting" row existed alongside it,
+    // and this create is itself a 2024 character (human2024).
+    const style = await prisma.feat.findFirstOrThrow({ where: { name: "Great Weapon Fighting", edition: "EDITION_2024" } });
     const res = await post({
       ...baseBody,
       speciesId: human.id,
