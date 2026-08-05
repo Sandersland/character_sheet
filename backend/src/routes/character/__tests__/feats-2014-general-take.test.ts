@@ -85,7 +85,12 @@ describe("a 2014 character takes a real 2014 general-category feat via an ASI sl
     expect(entry.abilityDeltas).toEqual({ strength: 1 });
   });
 
-  it("a 2014 character CANNOT take a 2014-tagged feat before level 4 (the `?? 4` general default, live)", async () => {
+  // NOTE: this is a level-1 character with ZERO ASI slots, so the 400 below
+  // comes from "no available ASI slot", not featOfferedForAsiSlot's `?? 4`
+  // category default — that proof (atThree=0/atFour=26, same character, an
+  // ASI slot present at both levels) lives in feats.test.ts's "2014
+  // general/origin feats" suite instead.
+  it("a 2014 character at level 1 has no ASI slot to take a feat", async () => {
     const sentinel2014 = await prisma.feat.findFirstOrThrow({
       where: { name: "Sentinel", edition: "EDITION_2014" },
     });
