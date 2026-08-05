@@ -26,12 +26,21 @@ export interface NewSpellsMeta {
    * from spellLists (2024 Magical Secrets never broadens cantrips; a qualifying
    * 2014 Bard is unrestricted on both facets). */
   cantripLists: string[] | null;
+  /**
+   * #1509 D5: "known" for a 2014 Bard/Sorcerer/Warlock/Ranger (+ EK/AT in either
+   * edition), "prepared" for every SRD 5.2 caster and every 2014 re-prepare
+   * class; `null` when absent (no newSpells step, or a non-caster). Drives the
+   * noun in the ceremony's swap copy — never re-derived from the character's
+   * edition on the client.
+   */
+  casterModel: "known" | "prepared" | null;
 }
 
-/** Safe reads of the newSpells step: count, the derived ceiling, secrets, swap, cantrip count, and the served lists. */
+/** Safe reads of the newSpells step: count, the derived ceiling, secrets, swap, cantrip count, the served lists, and the caster model. */
 export function readNewSpellsMeta(step: LevelUpStep): NewSpellsMeta {
   const max = step.meta?.maxSpellLevel;
   const cantrips = step.meta?.cantrips;
+  const casterModel = step.meta?.casterModel;
   return {
     count: step.count ?? 0,
     maxSpellLevel: typeof max === "number" ? max : 0,
@@ -40,10 +49,16 @@ export function readNewSpellsMeta(step: LevelUpStep): NewSpellsMeta {
     cantrips: typeof cantrips === "number" ? cantrips : 0,
     spellLists: (step.meta?.spellLists as string[] | null | undefined) ?? null,
     cantripLists: (step.meta?.cantripLists as string[] | null | undefined) ?? null,
+    casterModel: casterModel === "known" || casterModel === "prepared" ? casterModel : null,
   };
 }
 
-/** Swappable prepared spells (#1101/#1127): a user-learned (source null) leveled spell — not a cantrip or granted/item spell. */
+/**
+ * The #1101/#1127 swap's candidate pool: a user-learned (source null) leveled
+ * spell — not a cantrip or granted/item spell. Named for the mechanic (swap),
+ * not the caster model — this predicate is model-agnostic; the copy that
+ * offers it renders "known" or "prepared" from the served casterModel instead.
+ */
 export function swappableKnownSpells(spells: Spell[]): Spell[] {
   return spells.filter((s) => s.source == null && s.level > 0);
 }
@@ -95,6 +110,17 @@ export function eligibleNewCantrips(
   return (catalog ?? []).filter(
     (s) => s.level === 0 && (opts.cantripLists === null || s.classes.some((c) => opts.cantripLists!.includes(c))),
   );
+}
+
+/**
+ * #1509 D5: the served noun the ceremony's swap copy renders — "known spell"
+ * for a 2014 Bard/Sorcerer/Warlock/Ranger (+ EK/AT), "prepared spell"
+ * otherwise, including when `casterModel` is absent/null (no newSpells step
+ * served it, or a non-caster) — "prepared" is the majority model and matches
+ * the same default `assertForgets` (backend) falls back to.
+ */
+export function casterModelNoun(casterModel: "known" | "prepared" | null): string {
+  return casterModel === "known" ? "known spell" : "prepared spell";
 }
 
 const capitalize = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);

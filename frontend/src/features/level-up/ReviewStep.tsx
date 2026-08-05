@@ -116,7 +116,20 @@ function ListRow({ row, resolving }: { row: LedgerRow; resolving: boolean }) {
 // distinguishing it from the plain before→after ledger rows since a free spell
 // grant is a bigger deal than a delta. One line per spell (school-tinted name +
 // "Level N · School"), never a run-together name list.
-function GrantedSpellsCard({ row }: { row: LedgerRow }) {
+// #1509 D5: the granted-spell footnote's noun follows the target's served
+// casterModel, not a hardcoded "prepared" — a 2014 known caster's granted
+// spell (e.g. a Pact Boon spell) is analogous to Pact of the Chain/Tome's
+// "doesn't count against your number of spells known" (PHB'14 p. 107), not
+// SRD 5.2's Always-Prepared Spells glossary text. `casterModel` here is the
+// PLAN's top-level echo (`plan.target.casterModel`), not the newSpells step's
+// meta — this card renders whether or not that step exists this level-up.
+function grantedSpellsFootnote(casterModel: "known" | "prepared" | null | undefined): string {
+  return casterModel === "known"
+    ? "Doesn't count against your number of spells known."
+    : "Always prepared — doesn't count against your spells known.";
+}
+
+function GrantedSpellsCard({ row, casterModel }: { row: LedgerRow; casterModel: "known" | "prepared" | null | undefined }) {
   return (
     <div className="mt-2 rounded-card border border-gold-300 bg-gradient-to-r from-gold-50 to-gold-100 p-4">
       <p className="flex items-center gap-1.5 font-display text-sm font-semibold text-gold-900">
@@ -133,15 +146,15 @@ function GrantedSpellsCard({ row }: { row: LedgerRow }) {
           </li>
         ))}
       </ul>
-      <p className="mt-2 text-xs text-gold-800">Always prepared — doesn't count against your spells known.</p>
+      <p className="mt-2 text-xs text-gold-800">{grantedSpellsFootnote(casterModel)}</p>
     </div>
   );
 }
 
-function LedgerRowView({ row, resolving }: { row: LedgerRow; resolving: boolean }) {
+function LedgerRowView({ row, resolving, casterModel }: { row: LedgerRow; resolving: boolean; casterModel: "known" | "prepared" | null | undefined }) {
   if (row.variant === "note") return <NoteRow row={row} />;
   if (row.variant === "list") return <ListRow row={row} resolving={resolving} />;
-  if (row.variant === "grantedSpells") return <GrantedSpellsCard row={row} />;
+  if (row.variant === "grantedSpells") return <GrantedSpellsCard row={row} casterModel={casterModel} />;
   return <DeltaRow row={row} />;
 }
 
@@ -163,7 +176,7 @@ export default function ReviewStep() {
 
       <div className="mt-5">
         {rows.map((row, i) => (
-          <LedgerRowView key={`${row.label}-${i}`} row={row} resolving={resolving} />
+          <LedgerRowView key={`${row.label}-${i}`} row={row} resolving={resolving} casterModel={plan.target.casterModel} />
         ))}
       </div>
     </div>

@@ -1,21 +1,27 @@
-// Collapsed disclosure for the optional known-spell swap (#1101): a known caster
-// may forget one user-learned leveled spell in exchange for an extra learn. The
-// candidate list comes from swappableKnownSpells; picking one stages the forget.
+// Collapsed disclosure for the optional spell swap (#1101): an onLevelUp-cadence
+// caster may forget one user-learned leveled spell in exchange for an extra
+// learn. The candidate list comes from swappableKnownSpells; picking one stages
+// the forget. #1509 D5: the "known"/"prepared" noun in the disclosure label and
+// empty state is the served casterModel, never hardcoded.
 import { useState } from "react";
 
+import { casterModelNoun } from "@/lib/newSpells";
 import type { Spell } from "@/types/character";
 
 export default function SwapPanel({
   candidates,
   forgottenEntryId,
   onToggle,
+  casterModel,
 }: {
   candidates: Spell[];
   forgottenEntryId: string | null;
   onToggle: (entryId: string) => void;
+  casterModel: "known" | "prepared" | null;
 }) {
   const [open, setOpen] = useState(false);
   const forgotten = candidates.find((s) => s.id === forgottenEntryId);
+  const noun = casterModelNoun(casterModel);
 
   return (
     <div className="mt-3 rounded border border-arcane-200 bg-arcane-50/40 p-2">
@@ -25,7 +31,7 @@ export default function SwapPanel({
         onClick={() => setOpen((o) => !o)}
         className="flex w-full items-center justify-between text-left text-sm font-medium text-arcane-800"
       >
-        <span>Swap a known spell (optional)</span>
+        <span>Swap a {noun} (optional)</span>
         <span aria-hidden="true">{open ? "▾" : "▸"}</span>
       </button>
 
@@ -36,7 +42,7 @@ export default function SwapPanel({
       {open && (
         <ul className="mt-2 max-h-[160px] overflow-y-auto">
           {candidates.length === 0 && (
-            <li className="py-2 text-center text-xs text-parchment-600">No known spells to swap.</li>
+            <li className="py-2 text-center text-xs text-parchment-600">No {noun}s to swap.</li>
           )}
           {candidates.map((s) => (
             <li key={s.id}>

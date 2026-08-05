@@ -16,63 +16,118 @@ import {
 
 describe("levelUpSpellPicks — 2024 new-spell pick count on level-up", () => {
   it("Wizard scribes 6 at level 1 — its spellbook size, not its prepared count (#1513) — then a flat 2 per level", () => {
-    expect(levelUpSpellPicks("wizard", 1)).toBe(6);
-    expect(levelUpSpellPicks("wizard", 2)).toBe(2);
-    expect(levelUpSpellPicks("Wizard", 8)).toBe(2);
-    expect(levelUpSpellPicks("wizard", 20)).toBe(2);
+    expect(levelUpSpellPicks("wizard", 1, null, "EDITION_2024")).toBe(6);
+    expect(levelUpSpellPicks("wizard", 2, null, "EDITION_2024")).toBe(2);
+    expect(levelUpSpellPicks("Wizard", 8, null, "EDITION_2024")).toBe(2);
+    expect(levelUpSpellPicks("wizard", 20, null, "EDITION_2024")).toBe(2);
   });
 
   it("level-1 picks equal the class's prepared count for every caster except Wizard (its spellbook, #1513); 0 for non-casters", () => {
     for (const cls of ["cleric", "druid", "bard", "sorcerer", "warlock", "paladin", "ranger"]) {
-      expect(levelUpSpellPicks(cls, 1)).toBe(preparedSpellCountAt(cls, 1, null, {}, "EDITION_2024"));
+      expect(levelUpSpellPicks(cls, 1, null, "EDITION_2024")).toBe(preparedSpellCountAt(cls, 1, null, {}, "EDITION_2024"));
     }
     // Mutation guard: Wizard's level-1 pick (6, the spellbook) must stay distinct
     // from its prepared count (4) — the conflation this issue fixes.
-    expect(levelUpSpellPicks("wizard", 1)).toBe(6);
+    expect(levelUpSpellPicks("wizard", 1, null, "EDITION_2024")).toBe(6);
     expect(preparedSpellCountAt("wizard", 1, null, {}, "EDITION_2024")).toBe(4);
-    expect(levelUpSpellPicks("cleric", 1)).toBe(4);
-    expect(levelUpSpellPicks("paladin", 1)).toBe(2);
-    expect(levelUpSpellPicks("fighter", 1)).toBe(0);
-    expect(levelUpSpellPicks("monk", 1)).toBe(0);
+    expect(levelUpSpellPicks("cleric", 1, null, "EDITION_2024")).toBe(4);
+    expect(levelUpSpellPicks("paladin", 1, null, "EDITION_2024")).toBe(2);
+    expect(levelUpSpellPicks("fighter", 1, null, "EDITION_2024")).toBe(0);
+    expect(levelUpSpellPicks("monk", 1, null, "EDITION_2024")).toBe(0);
   });
 
   it("Sorcerer offers the prepared-count delta on each onLevelUp level", () => {
-    expect(levelUpSpellPicks("sorcerer", 1)).toBe(2); // prepares 2 at level 1
-    expect(levelUpSpellPicks("sorcerer", 2)).toBe(2); // 2 → 4
-    expect(levelUpSpellPicks("sorcerer", 4)).toBe(1); // 6 → 7
-    expect(levelUpSpellPicks("sorcerer", 11)).toBe(1); // 15 → 16
-    expect(levelUpSpellPicks("sorcerer", 12)).toBe(0); // 16 → 16 (swap-only)
+    expect(levelUpSpellPicks("sorcerer", 1, null, "EDITION_2024")).toBe(2); // prepares 2 at level 1
+    expect(levelUpSpellPicks("sorcerer", 2, null, "EDITION_2024")).toBe(2); // 2 → 4
+    expect(levelUpSpellPicks("sorcerer", 4, null, "EDITION_2024")).toBe(1); // 6 → 7
+    expect(levelUpSpellPicks("sorcerer", 11, null, "EDITION_2024")).toBe(1); // 15 → 16
+    expect(levelUpSpellPicks("sorcerer", 12, null, "EDITION_2024")).toBe(0); // 16 → 16 (swap-only)
   });
 
   it("Bard offers a delta pick each level (Magical Secrets is a separate flag)", () => {
-    expect(levelUpSpellPicks("bard", 2)).toBe(1);
-    expect(levelUpSpellPicks("bard", 10)).toBe(1);
-    expect(levelUpSpellPicks("bard", 12)).toBe(0);
+    expect(levelUpSpellPicks("bard", 2, null, "EDITION_2024")).toBe(1);
+    expect(levelUpSpellPicks("bard", 10, null, "EDITION_2024")).toBe(1);
+    expect(levelUpSpellPicks("bard", 12, null, "EDITION_2024")).toBe(0);
   });
 
   it("Warlock offers +1 on growth levels and 0 on flat levels", () => {
-    expect(levelUpSpellPicks("warlock", 2)).toBe(1);
-    expect(levelUpSpellPicks("warlock", 10)).toBe(0);
-    expect(levelUpSpellPicks("warlock", 11)).toBe(1);
+    expect(levelUpSpellPicks("warlock", 2, null, "EDITION_2024")).toBe(1);
+    expect(levelUpSpellPicks("warlock", 10, null, "EDITION_2024")).toBe(0);
+    expect(levelUpSpellPicks("warlock", 11, null, "EDITION_2024")).toBe(1);
   });
 
   it("re-prepare classes offer only the level-1 initial picks, then 0 (Cleric/Druid/Paladin/Ranger) (#1131)", () => {
     for (const cls of ["cleric", "druid", "paladin", "ranger"]) {
-      expect(levelUpSpellPicks(cls, 1)).toBe(preparedSpellCountAt(cls, 1, null, {}, "EDITION_2024"));
-      for (let lvl = 2; lvl <= 20; lvl++) expect(levelUpSpellPicks(cls, lvl)).toBe(0);
+      expect(levelUpSpellPicks(cls, 1, null, "EDITION_2024")).toBe(preparedSpellCountAt(cls, 1, null, {}, "EDITION_2024"));
+      for (let lvl = 2; lvl <= 20; lvl++) expect(levelUpSpellPicks(cls, lvl, null, "EDITION_2024")).toBe(0);
     }
   });
 
   it("non-casters never offer a pick", () => {
     for (const cls of ["fighter", "barbarian", "monk"]) {
-      for (let lvl = 1; lvl <= 20; lvl++) expect(levelUpSpellPicks(cls, lvl)).toBe(0);
+      for (let lvl = 1; lvl <= 20; lvl++) expect(levelUpSpellPicks(cls, lvl, null, "EDITION_2024")).toBe(0);
     }
   });
 
   it("Eldritch Knight / Arcane Trickster offer the third-caster delta from level 3", () => {
-    expect(levelUpSpellPicks("fighter", 3, "Eldritch Knight")).toBe(3); // first prepared: 0 → 3
-    expect(levelUpSpellPicks("fighter", 4, "Eldritch Knight")).toBe(1); // 3 → 4
-    expect(levelUpSpellPicks("rogue", 12, "Arcane Trickster")).toBe(0); // 8 → 8
+    expect(levelUpSpellPicks("fighter", 3, "Eldritch Knight", "EDITION_2024")).toBe(3); // first prepared: 0 → 3
+    expect(levelUpSpellPicks("fighter", 4, "Eldritch Knight", "EDITION_2024")).toBe(1); // 3 → 4
+    expect(levelUpSpellPicks("rogue", 12, "Arcane Trickster", "EDITION_2024")).toBe(0); // 8 → 8
+  });
+});
+
+// #1509: the 2014 known-caster fork. SRD 5.1's "Spells Known of 1st Level and
+// Higher" table (Bard/Sorcerer/Ranger, plus the identical-numbers Warlock/EK/AT
+// share with 2024) drives the SAME delta arithmetic as the 2024 branch above —
+// preparedSpellCountAt already resolves the right table per #1507, so this is a
+// pure table-source fork, not a second code path.
+describe("levelUpSpellPicks — 2014 known-caster new-spell pick count on level-up (#1509)", () => {
+  it("Bard 4→5: SRD 5.1 grants 8-7=1 (2024 grants 9-7=2, the bug #1509 fixes)", () => {
+    expect(levelUpSpellPicks("bard", 5, null, "EDITION_2014")).toBe(1);
+    expect(levelUpSpellPicks("bard", 5, null, "EDITION_2024")).toBe(2);
+  });
+
+  it("Sorcerer 4→5: SRD 5.1 grants 6-5=1 (2024 grants 9-7=2)", () => {
+    expect(levelUpSpellPicks("sorcerer", 5, null, "EDITION_2014")).toBe(1);
+    expect(levelUpSpellPicks("sorcerer", 5, null, "EDITION_2024")).toBe(2);
+  });
+
+  it("Warlock's identical 20-number table gives the same delta in both editions", () => {
+    expect(levelUpSpellPicks("warlock", 4, null, "EDITION_2014")).toBe(levelUpSpellPicks("warlock", 4, null, "EDITION_2024"));
+    expect(levelUpSpellPicks("warlock", 11, null, "EDITION_2014")).toBe(levelUpSpellPicks("warlock", 11, null, "EDITION_2024"));
+  });
+
+  it("Wizard's flat-2 scribe (level >= 2) is edition-invariant", () => {
+    expect(levelUpSpellPicks("wizard", 5, null, "EDITION_2014")).toBe(2);
+    expect(levelUpSpellPicks("wizard", 5, null, "EDITION_2024")).toBe(2);
+  });
+
+  it("2014 Cleric/Druid/Wizard re-prepare — no level-up pick (swapCadenceFor is anyOnLongRest)", () => {
+    for (const cls of ["cleric", "druid"]) {
+      for (let lvl = 2; lvl <= 20; lvl++) expect(levelUpSpellPicks(cls, lvl, null, "EDITION_2014")).toBe(0);
+    }
+  });
+
+  it("2014 Paladin re-prepares too — correct by accident today (its 2024 cadence is oneOnLongRest, also 0)", () => {
+    for (let lvl = 2; lvl <= 20; lvl++) expect(levelUpSpellPicks("paladin", lvl, null, "EDITION_2014")).toBe(0);
+  });
+
+  it("2014 Ranger 1→2: below spellcastingStartLevel the previous count is null, read as 0 (#1509 D3) — the level-2 pick is the FULL initial list (2), not a 2-0-by-accident delta", () => {
+    expect(preparedSpellCountAt("ranger", 1, null, {}, "EDITION_2014")).toBeNull();
+    expect(levelUpSpellPicks("ranger", 2, null, "EDITION_2014")).toBe(2);
+  });
+
+  it("2014 Ranger keeps offering the Spells Known delta at higher levels (SRD 5.1 onLevelUp swap class)", () => {
+    expect(levelUpSpellPicks("ranger", 3, null, "EDITION_2014")).toBe(1); // 2 → 3
+    expect(levelUpSpellPicks("ranger", 5, null, "EDITION_2014")).toBe(1); // 3 → 4
+  });
+
+  it("2024 Ranger re-prepares (oneOnLongRest) — 0 at every level-up past its level-1 initial picks", () => {
+    for (let lvl = 2; lvl <= 20; lvl++) expect(levelUpSpellPicks("ranger", lvl, null, "EDITION_2024")).toBe(0);
+  });
+
+  it("EK/AT's identical 18-number table gives the same delta in both editions", () => {
+    expect(levelUpSpellPicks("fighter", 4, "Eldritch Knight", "EDITION_2014")).toBe(levelUpSpellPicks("fighter", 4, "Eldritch Knight", "EDITION_2024"));
   });
 });
 

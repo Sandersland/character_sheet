@@ -11,6 +11,7 @@ import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 import { abilityModifier, advancementSlotsForLevel, fightingStyleFeatSlots, hitDieFace } from "@/lib/srd/srd.js";
 import {
   bardMagicalSecretsAt,
+  casterModelFor,
   levelUpCantripPicks,
   levelUpSpellPicks,
   magicalSecretsSpellLists,
@@ -213,27 +214,34 @@ function subclassChoiceSteps({ now, prev }: PlanContext): LevelUpStep[] {
     }));
 }
 
-// 2024: onLevelUp-cadence casters (Bard/Sorcerer/Warlock + EK/AT) offer the
-// prepared-count delta plus one optional swap (#1101), so a swap-only step
-// (count 0, canSwap) is emitted even on a no-new-spells level; the Wizard scribes
-// a flat 2 with no swap. #1131: every caster also picks new cantrips on a
-// cantrips-known growth level (so Cleric/Druid get a cantrips-only step at 4/10),
-// and a fresh level-1 entry offers its full initial spell+cantrip picks with no
-// swap (a new entry may not swap other classes' spells). Bard picks from level 10
-// are Magical Secrets. `spellLists`/`cantripLists` (#1440) are the served
-// membership facts: the eligibility gate (assertPickSpellEligibility) and the
-// picker (eligibleNewSpells/eligibleNewCantrips) both read these rather than
+// Per-edition: onLevelUp-cadence casters offer the prepared/known-count delta
+// plus one optional swap (#1101), so a swap-only step (count 0, canSwap) is
+// emitted even on a no-new-spells level — Bard/Sorcerer/Warlock + EK/AT in BOTH
+// editions, plus the 2014 Ranger (SRD 5.1 swaps on level-up; SRD 5.2's Ranger
+// re-prepares on a rest instead, #1509). The Wizard scribes a flat 2 with no
+// swap. #1131: every caster also picks new cantrips on a cantrips-known growth
+// level (so Cleric/Druid get a cantrips-only step at 4/10), and a fresh level-1
+// entry offers its full initial spell+cantrip picks with no swap (a new entry
+// may not swap other classes' spells). Bard picks from level 10 are Magical
+// Secrets. `spellLists`/`cantripLists` (#1440) are the served membership facts:
+// the eligibility gate (assertPickSpellEligibility) and the picker
+// (eligibleNewSpells/eligibleNewCantrips) both read these rather than
 // re-deriving magicalSecretsSpellLists themselves — one rule, one call site,
 // emitted unconditionally (including when null) so "explicitly unrestricted"
-// stays distinguishable from "absent".
+// stays distinguishable from "absent". `casterModel` (#1509 D5) is the served
+// noun the ceremony's swap copy renders — "known" for a 2014 Bard/Sorcerer/
+// Warlock/Ranger (+ EK/AT in either edition), "prepared" for every SRD 5.2
+// caster and every 2014 re-prepare class — so level-up-submission.ts's swap
+// messages and the frontend never re-derive it from className/edition.
 function newSpellsStep({ target, edition }: PlanContext): LevelUpStep | null {
-  const count = levelUpSpellPicks(target.name, target.newLevel, target.subclass);
+  const count = levelUpSpellPicks(target.name, target.newLevel, target.subclass, edition);
   const cantrips = levelUpCantripPicks(target.name, target.newLevel, target.subclass);
   const canSwap = swapCadenceFor(target.name, target.subclass, edition) === "onLevelUp" && target.newLevel >= 2;
   if (count <= 0 && cantrips <= 0 && !canSwap) return null;
   const magicalSecrets = bardMagicalSecretsAt(target.name, target.newLevel);
   const maxSpellLevel = maxSpellLevelForClass(target.name, target.newLevel, target.subclass, edition);
   const lists = magicalSecretsSpellLists(target.name, target.newLevel, target.subclass, edition);
+  const casterModel = casterModelFor(target.name, target.subclass, edition);
   return {
     kind: "newSpells",
     count,
@@ -244,6 +252,7 @@ function newSpellsStep({ target, edition }: PlanContext): LevelUpStep | null {
       ...(magicalSecrets ? { magicalSecrets: true } : {}),
       ...(canSwap ? { canSwap: true } : {}),
       ...(cantrips > 0 ? { cantrips } : {}),
+      ...(casterModel ? { casterModel } : {}),
     },
   };
 }
