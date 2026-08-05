@@ -1,5 +1,737 @@
-// PHB'14 cleric spell list — a by-class content slice fills this in. #1710
-// (foundation slice 1/3 of epic #1517) creates the empty array + wiring only.
+// PHB'14 (2014) Cleric spell list — content slice of epic #1517 (#1715).
+// Per the epic's row-ownership rule (tie-break Wizard > Cleric > Druid > Bard >
+// Sorcerer > Warlock > Paladin > Ranger), Cleric is 2nd priority, so this file
+// authors every spell on 1-2 class lists where Cleric is the highest-priority
+// class present (i.e. Wizard is NOT on that spell's list). A spell on 3+ lists
+// (e.g. Cure Wounds, Guardian of Faith is NOT one of these — see below) is
+// authored in shared.ts (#1713) instead; this file never re-transcribes one,
+// only relies on shared.ts already fanning "cleric" into its classes[] (verified:
+// every 3+-list PHB'14 Cleric spell already carries a cleric membership row in
+// shared.ts, so no membership-only edits were needed there for this slice).
+// Wizard-owned 2-list spells Cleric also gets (Continual Flame, Gentle Repose,
+// Animate Dead, Arcane Eye, Antimagic Field) are likewise already tagged with
+// cleric membership in wizard.ts (#1714) — not re-authored here either.
+//
+// Source: dnd5eapi.co's 2014 spell set (/api/2014/classes/cleric/spells,
+// cross-checked against /api/2014/spells for the full 319-spell 2014 dataset
+// wizard.ts's own header cites). All 46 rows this slice owns ARE present in
+// that dataset — unlike the Wizard slice, this one has zero hand-transcribed
+// or non-SRD spells to scrutinize. Cited SRD 5.1 as a whole (this file's own
+// convention, matching wizard.ts/shared.ts) rather than per-row. Structured
+// effect fields (effectKind/dice/save/saveEffect/upcast) are derived from that
+// same API response's damage/dc JSON, then individually audited against each
+// row's own prose — see spells-2014-cleric-data.test.ts's prose-vs-field audit
+// block, copied from the Wizard slice's pattern (#1714) since dnd5eapi's own
+// dc/damage fields have documented gaps (found there on 9 rows).
+//
+// Two of THIS file's rows hit that same gap: Sanctuary (dc: null despite "must
+// first make a wisdom saving throw") and Spirit Guardians (dc AND damage both
+// null despite "wisdom saving throw... 3d8 radiant damage ... or half as much
+// damage"). Both hand-fixed from their own prose, same as Wizard's Levitate/Web.
+//
+// Scraping artifacts cleaned: dnd5eapi's "the GM" restored to this repo's "the
+// DM" (Augury, Calm Emotions, Command, Commune, Conjure Celestial, Hallow,
+// Planar Ally — 7 rows), and markdown "***Heading.***" sub-labels (Command's
+// Approach/Drop/Flee/Grovel/Halt, Contagion's five disease names, Create or
+// Destroy Water's Create/Destroy halves, Dispel Evil and Good's Break
+// Enchantment/Dismissal, Hallow's bound-effect list) stripped of their
+// asterisks — SpellDetailCard has no markdown parser. Inline "- " dash bullet
+// lists (Augury's omens, Divine Word's HP thresholds, Thaumaturgy's six
+// effects) are left as prose, matching shared.ts/wizard.ts's own precedent
+// (Bigby's Hand, Mordenkainen's Magnificent Mansion already do this).
+// Hallow's "such as ores or trolls" is the official SRD 5.1 text verbatim
+// (confirmed against a second independent source, open5e) — not a scraping
+// artifact of this repo's own pipeline, so left untouched rather than silently
+// "corrected" away from the cited document.
+//
+// Structured-field calls worth flagging for the rules-accuracy pass:
+// - Forbiddance: 5d10 damage triggers automatically (no attack roll, no save —
+//   matches Magic Missile's "unconditional hit" shape), and the type is the
+//   CASTER'S CHOICE (radiant or necrotic) each time the spell is cast, not a
+//   spell-level constant — effectKind stays "damage" (real, fixed dice) but
+//   damageType is intentionally absent, the same shape as Chromatic Orb/Fire
+//   Shield in wizard.ts.
+// - Spirit Guardians: damage type is radiant OR necrotic depending on the
+//   CASTER's alignment (good/neutral vs. evil) at the moment of casting, not a
+//   choice made per-cast and not a spell-level constant either — same
+//   "damageType iff effectKind 'damage', except..." exception as Forbiddance.
+// - Flame Strike: 4d6 fire AND 4d6 radiant in ONE instance, no single
+//   damageType fits — matches wizard.ts's Meteor Swarm/Ice Storm precedent
+//   exactly (utility row: effectKind/saveEffect left unset despite the "half
+//   as much damage" prose, attackType/saveAbility still set).
+// - Guardian of Faith: the 20 radiant damage (and Meld Into Stone's 6d6/50
+//   bludgeoning self-harm numbers) are FLAT integers, not dice — inexpressible
+//   in effectDiceCount/effectDiceFaces, so these stay utility rows with the
+//   numbers carried only in prose, matching the 2024 SPELLS row's own Aid
+//   precedent ("Flat +5 HP-max... is inexpressible as a dice heal — utility
+//   row").
+// - Spiritual Weapon: PHB'14's real upcast rate is "+1d8 for every TWO slot
+//   levels above 2nd" — genuinely different from the 2024 SRD 5.2 revision's
+//   "+1d8 per slot level" (see the 2024 SPELLS row's own upcastDicePerLevel:
+//   1). upcastDicePerLevel is a per-1-level-only field, so reusing that 2024
+//   value here would silently bleed the 2024 mechanic into a 2014 row — the
+//   exact edition-mixing bug a prior slice's Chromatic Orb draft committed.
+//   Left unset; the description's own "every two slot levels" text is the only
+//   carrier of this rule.
+// - Aid, Heal, Mass Heal: all heal a FLAT integer (or flat-per-slot-level)
+//   amount, not dice — utility rows, matching Aid's existing 2024 SPELLS
+//   precedent exactly.
 import type { CatalogSpell } from "../spells.js";
 
-export const CLERIC_SPELLS_2014: CatalogSpell[] = [];
+export const CLERIC_SPELLS_2014: CatalogSpell[] = [
+  // ── Cantrips ──────────────────────────────────────────────────────────────
+  {
+    name: "Guidance",
+    level: 0,
+    school: "divination",
+    castingTime: "1 action",
+    range: "Touch",
+    duration: "Up to 1 minute",
+    concentration: true,
+    description: "You touch one willing creature. Once before the spell ends, the target can roll a d4 and add the number rolled to one ability check of its choice. It can roll the die before or after making the ability check. The spell then ends.",
+    classes: ["cleric", "druid"],
+    components: { verbal: true, somatic: true, material: false },
+  },
+  {
+    name: "Resistance",
+    level: 0,
+    school: "abjuration",
+    castingTime: "1 action",
+    range: "Touch",
+    duration: "Up to 1 minute",
+    concentration: true,
+    description: "You touch one willing creature. Once before the spell ends, the target can roll a d4 and add the number rolled to one saving throw of its choice. It can roll the die before or after making the saving throw. The spell then ends.",
+    classes: ["cleric", "druid"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "a miniature cloak" },
+  },
+  {
+    name: "Sacred Flame",
+    level: 0,
+    school: "evocation",
+    castingTime: "1 action",
+    range: "60 feet",
+    duration: "Instantaneous",
+    description: "Flame-like radiance descends on a creature that you can see within range. The target must succeed on a dexterity saving throw or take 1d8 radiant damage. The target gains no benefit from cover for this saving throw. The spell's damage increases by 1d8 when you reach 5th level (2d8), 11th level (3d8), and 17th level (4d8).",
+    classes: ["cleric"],
+    components: { verbal: true, somatic: true, material: false },
+    attackType: "save",
+    saveAbility: "dexterity",
+    saveEffect: "none",
+    effectKind: "damage",
+    effectDiceCount: 1,
+    effectDiceFaces: 8,
+    damageType: "radiant",
+    cantripScaling: true,
+  },
+  {
+    name: "Spare the Dying",
+    level: 0,
+    school: "necromancy",
+    castingTime: "1 action",
+    range: "Touch",
+    duration: "Instantaneous",
+    description: "You touch a living creature that has 0 hit points. The creature becomes stable. This spell has no effect on undead or constructs.",
+    classes: ["cleric"],
+    components: { verbal: true, somatic: true, material: false },
+  },
+  {
+    name: "Thaumaturgy",
+    level: 0,
+    school: "transmutation",
+    castingTime: "1 action",
+    range: "30 feet",
+    duration: "1 minute",
+    description: "You manifest a minor wonder, a sign of supernatural power, within range. You create one of the following magical effects within range. - Your voice booms up to three times as loud as normal for 1 minute. - You cause flames to flicker, brighten, dim, or change color for 1 minute. - You cause harmless tremors in the ground for 1 minute. - You create an instantaneous sound that originates from a point of your choice within range, such as a rumble of thunder, the cry of a raven, or ominous whispers. - You instantaneously cause an unlocked door or window to fly open or slam shut. - You alter the appearance of your eyes for 1 minute. If you cast this spell multiple times, you can have up to three of its 1-minute effects active at a time, and you can dismiss such an effect as an action.",
+    classes: ["cleric"],
+    components: { verbal: true, somatic: false, material: false },
+  },
+  // ── Level 1 ───────────────────────────────────────────────────────────────
+  {
+    name: "Bane",
+    level: 1,
+    school: "enchantment",
+    castingTime: "1 action",
+    range: "30 feet",
+    duration: "Up to 1 minute",
+    concentration: true,
+    description: "Up to three creatures of your choice that you can see within range must make charisma saving throws. Whenever a target that fails this saving throw makes an attack roll or a saving throw before the spell ends, the target must roll a d4 and subtract the number rolled from the attack roll or saving throw. At Higher Levels. When you cast this spell using a spell slot of 2nd level or higher, you can target one additional creature for each slot level above 1st.",
+    classes: ["cleric", "bard"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "a drop of blood" },
+    attackType: "save",
+    saveAbility: "charisma",
+  },
+  {
+    name: "Bless",
+    level: 1,
+    school: "enchantment",
+    castingTime: "1 action",
+    range: "30 feet",
+    duration: "Up to 1 minute",
+    concentration: true,
+    description: "You bless up to three creatures of your choice within range. Whenever a target makes an attack roll or a saving throw before the spell ends, the target can roll a d4 and add the number rolled to the attack roll or saving throw. At Higher Levels. When you cast this spell using a spell slot of 2nd level or higher, you can target one additional creature for each slot level above 1st.",
+    classes: ["cleric", "paladin"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "a sprinkling of holy water" },
+  },
+  {
+    name: "Command",
+    level: 1,
+    school: "enchantment",
+    castingTime: "1 action",
+    range: "60 feet",
+    duration: "1 round",
+    description: "You speak a one-word command to a creature you can see within range. The target must succeed on a wisdom saving throw or follow the command on its next turn. The spell has no effect if the target is undead, if it doesn't understand your language, or if your command is directly harmful to it. Some typical commands and their effects follow. You might issue a command other than one described here. If you do so, the DM determines how the target behaves. If the target can't follow your command, the spell ends. Approach. The target moves toward you by the shortest and most direct route, ending its turn if it moves within 5 feet of you. Drop. The target drops whatever it is holding and then ends its turn. Flee. The target spends its turn moving away from you by the fastest available means. Grovel. The target falls prone and then ends its turn. Halt. The target doesn't move and takes no actions. A flying creature stays aloft, provided that it is able to do so. If it must move to stay aloft, it flies the minimum distance needed to remain in the air. At Higher Levels. When you cast this spell using a spell slot of 2nd level or higher, you can affect one additional creature for each slot level above 1st. The creatures must be within 30 feet of each other when you target them.",
+    classes: ["cleric", "paladin"],
+    components: { verbal: true, somatic: false, material: false },
+    attackType: "save",
+    saveAbility: "wisdom",
+  },
+  {
+    name: "Create or Destroy Water",
+    level: 1,
+    school: "transmutation",
+    castingTime: "1 action",
+    range: "30 feet",
+    duration: "Instantaneous",
+    description: "You either create or destroy water. Create Water. You create up to 10 gallons of clean water within range in an open container. Alternatively, the water falls as rain in a 30-foot cube within range. Destroy Water. You destroy up to 10 gallons of water in an open container within range. Alternatively, you destroy fog in a 30-foot cube within range. At Higher Levels. When you cast this spell using a spell slot of 2nd level or higher, you create or destroy 10 additional gallons of water, or the size of the cube increases by 5 feet, for each slot level above 1st.",
+    classes: ["cleric", "druid"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "a drop of water if creating water, or a few grains of sand if destroying it" },
+  },
+  {
+    name: "Detect Evil and Good",
+    level: 1,
+    school: "divination",
+    castingTime: "1 action",
+    range: "Self",
+    duration: "Up to 10 minutes",
+    concentration: true,
+    description: "For the duration, you know if there is an aberration, celestial, elemental, fey, fiend, or undead within 30 feet of you, as well as where the creature is located. Similarly, you know if there is a place or object within 30 feet of you that has been magically consecrated or desecrated. The spell can penetrate most barriers, but it is blocked by 1 foot of stone, 1 inch of common metal, a thin sheet of lead, or 3 feet of wood or dirt.",
+    classes: ["cleric", "paladin"],
+    components: { verbal: true, somatic: true, material: false },
+  },
+  {
+    name: "Guiding Bolt",
+    level: 1,
+    school: "evocation",
+    castingTime: "1 action",
+    range: "120 feet",
+    duration: "1 round",
+    description: "A flash of light streaks toward a creature of your choice within range. Make a ranged spell attack against the target. On a hit, the target takes 4d6 radiant damage, and the next attack roll made against this target before the end of your next turn has advantage, thanks to the mystical dim light glittering on the target until then. At Higher Levels. When you cast this spell using a spell slot of 2nd level or higher, the damage increases by 1d6 for each slot level above 1st.",
+    classes: ["cleric"],
+    components: { verbal: true, somatic: true, material: false },
+    attackType: "attack",
+    effectKind: "damage",
+    effectDiceCount: 4,
+    effectDiceFaces: 6,
+    damageType: "radiant",
+    upcastDicePerLevel: 1,
+  },
+  {
+    name: "Inflict Wounds",
+    level: 1,
+    school: "necromancy",
+    castingTime: "1 action",
+    range: "Touch",
+    duration: "Instantaneous",
+    description: "Make a melee spell attack against a creature you can reach. On a hit, the target takes 3d10 necrotic damage. At Higher Levels. When you cast this spell using a spell slot of 2nd level or higher, the damage increases by 1d10 for each slot level above 1st.",
+    classes: ["cleric"],
+    components: { verbal: true, somatic: true, material: false },
+    attackType: "attack",
+    effectKind: "damage",
+    effectDiceCount: 3,
+    effectDiceFaces: 10,
+    damageType: "necrotic",
+    upcastDicePerLevel: 1,
+  },
+  {
+    name: "Sanctuary",
+    level: 1,
+    school: "abjuration",
+    castingTime: "1 bonus action",
+    range: "30 feet",
+    duration: "1 minute",
+    description: "You ward a creature within range against attack. Until the spell ends, any creature who targets the warded creature with an attack or a harmful spell must first make a wisdom saving throw. On a failed save, the creature must choose a new target or lose the attack or spell. This spell doesn't protect the warded creature from area effects, such as the explosion of a fireball. If the warded creature makes an attack or casts a spell that affects an enemy creature, this spell ends.",
+    classes: ["cleric"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "a small silver mirror" },
+    // dnd5eapi's own dc field is null despite the prose clearly gating on a
+    // wisdom save — same API-gap class the Wizard slice found on Levitate/Web
+    // (#1714). Hand-added from this row's own text, not a separate guess.
+    attackType: "save",
+    saveAbility: "wisdom",
+  },
+  {
+    name: "Shield of Faith",
+    level: 1,
+    school: "abjuration",
+    castingTime: "1 bonus action",
+    range: "60 feet",
+    duration: "Up to 10 minutes",
+    concentration: true,
+    description: "A shimmering field appears and surrounds a creature of your choice within range, granting it a +2 bonus to AC for the duration.",
+    classes: ["cleric", "paladin"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "a small parchment with a bit of holy text written on it" },
+    // Flat +2 AC — matches the 2024 SPELLS row's own buffTarget:"ac" precedent
+    // exactly (identical mechanic both editions); rides the #383 additive `ac`
+    // breakdown channel, drops when concentration breaks.
+    effectKind: "buff",
+    buffTarget: "ac",
+    buffModifier: 2,
+  },
+  // ── Level 2 ───────────────────────────────────────────────────────────────
+  {
+    name: "Aid",
+    level: 2,
+    school: "abjuration",
+    castingTime: "1 action",
+    range: "30 feet",
+    duration: "8 hours",
+    description: "Your spell bolsters your allies with toughness and resolve. Choose up to three creatures within range. Each target's hit point maximum and current hit points increase by 5 for the duration. At Higher Levels. When you cast this spell using a spell slot of 3rd level or higher, a target's hit points increase by an additional 5 for each slot level above 2nd.",
+    classes: ["cleric", "paladin"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "a tiny strip of white cloth" },
+    // Flat +5 HP-max/current is inexpressible as a dice heal — utility row,
+    // matches the 2024 SPELLS row's own Aid precedent (same spell, PHB'14 text
+    // adds "tiny" to the material — SRD 5.2 narrowed it, a real edition diff).
+  },
+  {
+    name: "Augury",
+    level: 2,
+    school: "divination",
+    castingTime: "1 minute",
+    range: "Self",
+    duration: "Instantaneous",
+    ritual: true,
+    description: "By casting gem-inlaid sticks, rolling dragon bones, laying out ornate cards, or employing some other divining tool, you receive an omen from an otherworldly entity about the results of a specific course of action that you plan to take within the next 30 minutes. The DM chooses from the following possible omens: - Weal, for good results - Woe, for bad results - Weal and woe, for both good and bad results - Nothing, for results that aren't especially good or bad The spell doesn't take into account any possible circumstances that might change the outcome, such as the casting of additional spells or the loss or gain of a companion. If you cast the spell two or more times before completing your next long rest, there is a cumulative 25 percent chance for each casting after the first that you get a random reading. The DM makes this roll in secret.",
+    classes: ["cleric"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "specially marked sticks, bones, or similar tokens worth at least 25gp" },
+  },
+  {
+    name: "Calm Emotions",
+    level: 2,
+    school: "enchantment",
+    castingTime: "1 action",
+    range: "60 feet",
+    duration: "Up to 1 minute",
+    concentration: true,
+    description: "You attempt to suppress strong emotions in a group of people. Each humanoid in a 20-foot-radius sphere centered on a point you choose within range must make a charisma saving throw; a creature can choose to fail this saving throw if it wishes. If a creature fails its saving throw, choose one of the following two effects. You can suppress any effect causing a target to be charmed or frightened. When this spell ends, any suppressed effect resumes, provided that its duration has not expired in the meantime. Alternatively, you can make a target indifferent about creatures of your choice that it is hostile toward. This indifference ends if the target is attacked or harmed by a spell or if it witnesses any of its friends being harmed. When the spell ends, the creature becomes hostile again, unless the DM rules otherwise.",
+    classes: ["cleric", "bard"],
+    components: { verbal: true, somatic: true, material: false },
+    attackType: "save",
+    saveAbility: "charisma",
+  },
+  {
+    name: "Prayer of Healing",
+    level: 2,
+    school: "evocation",
+    castingTime: "10 minutes",
+    range: "30 feet",
+    duration: "Instantaneous",
+    description: "Up to six creatures of your choice that you can see within range each regain hit points equal to 2d8 + your spellcasting ability modifier. This spell has no effect on undead or constructs. At Higher Levels. When you cast this spell using a spell slot of 3rd level or higher, the healing increases by 1d8 for each slot level above 2nd.",
+    classes: ["cleric"],
+    components: { verbal: true, somatic: false, material: false },
+    effectKind: "heal",
+    effectDiceCount: 2,
+    effectDiceFaces: 8,
+    upcastDicePerLevel: 1,
+  },
+  {
+    name: "Spiritual Weapon",
+    level: 2,
+    school: "evocation",
+    castingTime: "1 bonus action",
+    range: "60 feet",
+    duration: "1 minute",
+    description: "You create a floating, spectral weapon within range that lasts for the duration or until you cast this spell again. When you cast the spell, you can make a melee spell attack against a creature within 5 feet of the weapon. On a hit, the target takes force damage equal to 1d8 + your spellcasting ability modifier. As a bonus action on your turn, you can move the weapon up to 20 feet and repeat the attack against a creature within 5 feet of it. The weapon can take whatever form you choose. Clerics of deities who are associated with a particular weapon (as St. Cuthbert is known for his mace and Thor for his hammer) make this spell's effect resemble that weapon. At Higher Levels. When you cast this spell using a spell slot of 3rd level or higher, the damage increases by 1d8 for every two slot levels above the 2nd.",
+    classes: ["cleric"],
+    components: { verbal: true, somatic: true, material: false },
+    attackType: "attack",
+    effectKind: "damage",
+    effectDiceCount: 1,
+    effectDiceFaces: 8,
+    damageType: "force",
+    // upcastDicePerLevel deliberately UNSET: PHB'14's real rate is "+1d8 for
+    // EVERY TWO slot levels above 2nd," not per-level — the 2024 SPELLS row's
+    // upcastDicePerLevel:1 is the SRD 5.2 revision and would edition-mix if
+    // reused here (see file header). The description's own text is the only
+    // carrier of this row's actual upcast rule.
+  },
+  {
+    name: "Warding Bond",
+    level: 2,
+    school: "abjuration",
+    castingTime: "1 action",
+    range: "Touch",
+    duration: "1 hour",
+    description: "This spell wards a willing creature you touch and creates a mystic connection between you and the target until the spell ends. While the target is within 60 feet of you, it gains a +1 bonus to AC and saving throws, and it has resistance to all damage. Also, each time it takes damage, you take the same amount of damage. The spell ends if you drop to 0 hit points or if you and the target become separated by more than 60 feet. It also ends if the spell is cast again on either of the connected creatures. You can also dismiss the spell as an action.",
+    classes: ["cleric"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "a pair of platinum rings worth at least 50gp each, which you and the target must wear for the duration" },
+    // Not modeled via buffTarget: the +1 AC rides alongside a +1 save bonus,
+    // full damage resistance, and a two-way damage-sharing link — more than
+    // the generic additive `ac` channel's single-number shape covers.
+  },
+  // ── Level 3 ───────────────────────────────────────────────────────────────
+  {
+    name: "Beacon of Hope",
+    level: 3,
+    school: "abjuration",
+    castingTime: "1 action",
+    range: "30 feet",
+    duration: "Up to 1 minute",
+    concentration: true,
+    description: "This spell bestows hope and vitality. Choose any number of creatures within range. For the duration, each target has advantage on wisdom saving throws and death saving throws, and regains the maximum number of hit points possible from any healing.",
+    classes: ["cleric"],
+    components: { verbal: true, somatic: true, material: false },
+  },
+  {
+    name: "Mass Healing Word",
+    level: 3,
+    school: "evocation",
+    castingTime: "1 bonus action",
+    range: "60 feet",
+    duration: "Instantaneous",
+    description: "As you call out words of restoration, up to six creatures of your choice that you can see within range regain hit points equal to 1d4 + your spellcasting ability modifier. This spell has no effect on undead or constructs. At Higher Levels. When you cast this spell using a spell slot of 4th level or higher, the healing increases by 1d4 for each slot level above 3rd.",
+    classes: ["cleric"],
+    components: { verbal: true, somatic: false, material: false },
+    effectKind: "heal",
+    effectDiceCount: 1,
+    effectDiceFaces: 4,
+    upcastDicePerLevel: 1,
+  },
+  {
+    name: "Meld Into Stone",
+    level: 3,
+    school: "transmutation",
+    castingTime: "1 action",
+    range: "Touch",
+    duration: "8 hours",
+    ritual: true,
+    description: "You step into a stone object or surface large enough to fully contain your body, melding yourself and all the equipment you carry with the stone for the duration. Using your movement, you step into the stone at a point you can touch. Nothing of your presence remains visible or otherwise detectable by nonmagical senses. While merged with the stone, you can't see what occurs outside it, and any Wisdom (Perception) checks you make to hear sounds outside it are made with disadvantage. You remain aware of the passage of time and can cast spells on yourself while merged in the stone. You can use your movement to leave the stone where you entered it, which ends the spell. You otherwise can't move. Minor physical damage to the stone doesn't harm you, but its partial destruction or a change in its shape (to the extent that you no longer fit within it) expels you and deals 6d6 bludgeoning damage to you. The stone's complete destruction (or transmutation into a different substance) expels you and deals 50 bludgeoning damage to you. If expelled, you fall prone in an unoccupied space closest to where you first entered.",
+    classes: ["cleric"],
+    components: { verbal: true, somatic: true, material: false },
+  },
+  {
+    name: "Revivify",
+    level: 3,
+    school: "conjuration",
+    castingTime: "1 action",
+    range: "Touch",
+    duration: "Instantaneous",
+    description: "You touch a creature that has died within the last minute. That creature returns to life with 1 hit point. This spell can't return to life a creature that has died of old age, nor can it restore any missing body parts.",
+    classes: ["cleric", "paladin"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "diamonds worth 300gp, which the spell consumes" },
+  },
+  {
+    name: "Speak with Dead",
+    level: 3,
+    school: "necromancy",
+    castingTime: "1 action",
+    range: "10 feet",
+    duration: "10 minutes",
+    description: "You grant the semblance of life and intelligence to a corpse of your choice within range, allowing it to answer the questions you pose. The corpse must still have a mouth and can't be undead. The spell fails if the corpse was the target of this spell within the last 10 days. Until the spell ends, you can ask the corpse up to five questions. The corpse knows only what it knew in life, including the languages it knew. Answers are usually brief, cryptic, or repetitive, and the corpse is under no compulsion to offer a truthful answer if you are hostile to it or it recognizes you as an enemy. This spell doesn't return the creature's soul to its body, only its animating spirit. Thus, the corpse can't learn new information, doesn't comprehend anything that has happened since it died, and can't speculate about future events.",
+    classes: ["cleric", "bard"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "burning incense" },
+  },
+  {
+    name: "Spirit Guardians",
+    level: 3,
+    school: "conjuration",
+    castingTime: "1 action",
+    range: "Self",
+    duration: "Up to 10 minutes",
+    concentration: true,
+    description: "You call forth spirits to protect you. They flit around you to a distance of 15 feet for the duration. If you are good or neutral, their spectral form appears angelic or fey (your choice). If you are evil, they appear fiendish. When you cast this spell, you can designate any number of creatures you can see to be unaffected by it. An affected creature's speed is halved in the area, and when the creature enters the area for the first time on a turn or starts its turn there, it must make a wisdom saving throw. On a failed save, the creature takes 3d8 radiant damage (if you are good or neutral) or 3d8 necrotic damage (if you are evil). On a successful save, the creature takes half as much damage. At Higher Levels. When you cast this spell using a spell slot of 4th level or higher, the damage increases by 1d8 for each slot level above 3rd.",
+    classes: ["cleric"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "a holy symbol" },
+    // dnd5eapi's own dc AND damage fields are both null despite the prose
+    // clearly describing a wisdom save and 3d8 damage — same API-gap class as
+    // Flaming Sphere/Scorching Ray (#1714). damageType is deliberately absent
+    // (radiant if good/neutral, necrotic if evil — the CASTER's alignment at
+    // cast time, not a single constant), the same exception shape as
+    // Chromatic Orb.
+    attackType: "save",
+    saveAbility: "wisdom",
+    saveEffect: "half",
+    effectKind: "damage",
+    effectDiceCount: 3,
+    effectDiceFaces: 8,
+    upcastDicePerLevel: 1,
+  },
+  // ── Level 4 ───────────────────────────────────────────────────────────────
+  {
+    name: "Death Ward",
+    level: 4,
+    school: "abjuration",
+    castingTime: "1 action",
+    range: "Touch",
+    duration: "8 hours",
+    description: "You touch a creature and grant it a measure of protection from death. The first time the target would drop to 0 hit points as a result of taking damage, the target instead drops to 1 hit point, and the spell ends. If the spell is still in effect when the target is subjected to an effect that would kill it instantaneously without dealing damage, that effect is instead negated against the target, and the spell ends.",
+    classes: ["cleric", "paladin"],
+    components: { verbal: true, somatic: true, material: false },
+  },
+  {
+    name: "Guardian of Faith",
+    level: 4,
+    school: "conjuration",
+    castingTime: "1 action",
+    range: "30 feet",
+    duration: "8 hours",
+    description: "A Large spectral guardian appears and hovers for the duration in an unoccupied space of your choice that you can see within range. The guardian occupies that space and is indistinct except for a gleaming sword and shield emblazoned with the symbol of your deity. Any creature hostile to you that moves to a space within 10 feet of the guardian for the first time on a turn must succeed on a dexterity saving throw. The creature takes 20 radiant damage on a failed save, or half as much damage on a successful one. The guardian vanishes when it has dealt a total of 60 damage.",
+    classes: ["cleric"],
+    components: { verbal: true, somatic: false, material: false },
+    // 20 radiant damage is a FLAT integer, not dice — inexpressible in
+    // effectDiceCount/effectDiceFaces (matches Aid's flat-heal precedent), so
+    // this stays a utility row despite the save/half-damage prose.
+    attackType: "save",
+    saveAbility: "dexterity",
+  },
+  // ── Level 5 ───────────────────────────────────────────────────────────────
+  {
+    name: "Commune",
+    level: 5,
+    school: "divination",
+    castingTime: "1 minute",
+    range: "Self",
+    duration: "1 minute",
+    ritual: true,
+    description: "You contact your deity or a divine proxy and ask up to three questions that can be answered with a yes or no. You must ask your questions before the spell ends. You receive a correct answer for each question. Divine beings aren't necessarily omniscient, so you might receive \"unclear\" as an answer if a question pertains to information that lies beyond the deity's knowledge. In a case where a one-word answer could be misleading or contrary to the deity's interests, the DM might offer a short phrase as an answer instead. If you cast the spell two or more times before finishing your next long rest, there is a cumulative 25 percent chance for each casting after the first that you get no answer. The DM makes this roll in secret.",
+    classes: ["cleric"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "incense and a vial of holy or unholy water" },
+  },
+  {
+    name: "Contagion",
+    level: 5,
+    school: "necromancy",
+    castingTime: "1 action",
+    range: "Touch",
+    duration: "7 days",
+    description: "Your touch inflicts disease. Make a melee spell attack against a creature within your reach. On a hit, you afflict the creature with a disease of your choice from any of the ones described below. At the end of each of the target's turns, it must make a constitution saving throw. After failing three of these saving throws, the disease's effects last for the duration, and the creature stops making these saves. After succeeding on three of these saving throws, the creature recovers from the disease, and the spell ends. Since this spell induces a natural disease in its target, any effect that removes a disease or otherwise ameliorates a disease's effects apply to it. Blinding Sickness. Pain grips the creature's mind, and its eyes turn milky white. The creature has disadvantage on wisdom checks and wisdom saving throws and is blinded. Filth Fever. A raging fever sweeps through the creature's body. The creature has disadvantage on strength checks, strength saving throws, and attack rolls that use Strength. Flesh Rot. The creature's flesh decays. The creature has disadvantage on Charisma checks and vulnerability to all damage. Mindfire. The creature's mind becomes feverish. The creature has disadvantage on intelligence checks and intelligence saving throws, and the creature behaves as if under the effects of the confusion spell during combat. Seizure. The creature is overcome with shaking. The creature has disadvantage on dexterity checks, dexterity saving throws, and attack rolls that use Dexterity. Slimy Doom. The creature begins to bleed uncontrollably. The creature has disadvantage on constitution checks and constitution saving throws. In addition, whenever the creature takes damage, it is stunned until the end of its next turn.",
+    classes: ["cleric", "druid"],
+    components: { verbal: true, somatic: true, material: false },
+    // The melee spell attack is what applies the disease (attackType
+    // "attack"); the recurring constitution saving throws afterward only
+    // determine whether the disease locks in or is thrown off, not this
+    // spell's initial resolution.
+    attackType: "attack",
+  },
+  {
+    name: "Dispel Evil and Good",
+    level: 5,
+    school: "abjuration",
+    castingTime: "1 action",
+    range: "Self",
+    duration: "Up to 1 minute",
+    concentration: true,
+    description: "Shimmering energy surrounds and protects you from fey, undead, and creatures originating from beyond the Material Plane. For the duration, celestials, elementals, fey, fiends, and undead have disadvantage on attack rolls against you. You can end the spell early by using either of the following special functions. Break Enchantment. As your action, you touch a creature you can reach that is charmed, frightened, or possessed by a celestial, an elemental, a fey, a fiend, or an undead. The creature you touch is no longer charmed, frightened, or possessed by such creatures. Dismissal. As your action, make a melee spell attack against a celestial, an elemental, a fey, a fiend, or an undead you can reach. On a hit, you attempt to drive the creature back to its home plane. The creature must succeed on a charisma saving throw or be sent back to its home plane (if it isn't there already). If they aren't on their home plane, undead are sent to the Shadowfell, and fey are sent to the Feywild.",
+    classes: ["cleric", "paladin"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "holy water or powdered silver and iron" },
+    // Two alternate special functions (Break Enchantment: no roll at all;
+    // Dismissal: melee spell attack + charisma save) — no single attackType
+    // fits the spell as a whole, matching Bigby's Hand's multi-branch shape.
+  },
+  {
+    name: "Flame Strike",
+    level: 5,
+    school: "evocation",
+    castingTime: "1 action",
+    range: "60 feet",
+    duration: "Instantaneous",
+    description: "A vertical column of divine fire roars down from the heavens in a location you specify. Each creature in a 10-foot-radius, 40-foot-high cylinder centered on a point within range must make a dexterity saving throw. A creature takes 4d6 fire damage and 4d6 radiant damage on a failed save, or half as much damage on a successful one. At Higher Levels. When you cast this spell using a spell slot of 6th level or higher, the fire damage or the radiant damage (your choice) increases by 1d6 for each slot level above 5th.",
+    classes: ["cleric"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "pinch of sulfur" },
+    // fire AND radiant in one instance can't fit one damageType — matches
+    // wizard.ts's Meteor Swarm/Ice Storm precedent: stays a utility row
+    // (effectKind/saveEffect unset) despite the save + half-damage prose.
+    attackType: "save",
+    saveAbility: "dexterity",
+  },
+  {
+    name: "Hallow",
+    level: 5,
+    school: "evocation",
+    castingTime: "24 hours",
+    range: "Touch",
+    duration: "Until dispelled",
+    description: "You touch a point and infuse an area around it with holy (or unholy) power. The area can have a radius up to 60 feet, and the spell fails if the radius includes an area already under the effect a hallow spell. The affected area is subject to the following effects. First, celestials, elementals, fey, fiends, and undead can't enter the area, nor can such creatures charm, frighten, or possess creatures within it. Any creature charmed, frightened, or possessed by such a creature is no longer charmed, frightened, or possessed upon entering the area. You can exclude one or more of those types of creatures from this effect. Second, you can bind an extra effect to the area. Choose the effect from the following list, or choose an effect offered by the DM. Some of these effects apply to creatures in the area; you can designate whether the effect applies to all creatures, creatures that follow a specific deity or leader, or creatures of a specific sort, such as ores or trolls. When a creature that would be affected enters the spell's area for the first time on a turn or starts its turn there, it can make a charisma saving throw. On a success, the creature ignores the extra effect until it leaves the area. Courage. Affected creatures can't be frightened while in the area. Darkness. Darkness fills the area. Normal light, as well as magical light created by spells of a lower level than the slot you used to cast this spell, can't illuminate the area. Daylight. Bright light fills the area. Magical darkness created by spells of a lower level than the slot you used to cast this spell can't extinguish the light. Energy Protection. Affected creatures in the area have resistance to one damage type of your choice, except for bludgeoning, piercing, or slashing. Energy Vulnerability. Affected creatures in the area have vulnerability to one damage type of your choice, except for bludgeoning, piercing, or slashing. Everlasting Rest. Dead bodies interred in the area can't be turned into undead. Extradimensional Interference. Affected creatures can't move or travel using teleportation or by extradimensional or interplanar means. Fear. Affected creatures are frightened while in the area. Silence. No sound can emanate from within the area, and no sound can reach into it. Tongues. Affected creatures can communicate with any other creature in the area, even if they don't share a common language.",
+    classes: ["cleric"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "herbs, oils, and incense worth at least 1,000 gp, which the spell consumes" },
+    attackType: "save",
+    saveAbility: "charisma",
+  },
+  // ── Level 6 ───────────────────────────────────────────────────────────────
+  {
+    name: "Blade Barrier",
+    level: 6,
+    school: "evocation",
+    castingTime: "1 action",
+    range: "90 feet",
+    duration: "Up to 10 minutes",
+    concentration: true,
+    description: "You create a vertical wall of whirling, razor-sharp blades made of magical energy. The wall appears within range and lasts for the duration. You can make a straight wall up to 100 feet long, 20 feet high, and 5 feet thick, or a ringed wall up to 60 feet in diameter, 20 feet high, and 5 feet thick. The wall provides three-quarters cover to creatures behind it, and its space is difficult terrain. When a creature enters the wall's area for the first time on a turn or starts its turn there, the creature must make a dexterity saving throw. On a failed save, the creature takes 6d10 slashing damage. On a successful save, the creature takes half as much damage.",
+    classes: ["cleric"],
+    components: { verbal: true, somatic: true, material: false },
+    attackType: "save",
+    saveAbility: "dexterity",
+    saveEffect: "half",
+    effectKind: "damage",
+    effectDiceCount: 6,
+    effectDiceFaces: 10,
+    damageType: "slashing",
+  },
+  {
+    name: "Forbiddance",
+    level: 6,
+    school: "abjuration",
+    castingTime: "10 minutes",
+    range: "Touch",
+    duration: "24 hours",
+    ritual: true,
+    description: "You create a ward against magical travel that protects up to 40,000 square feet of floor space to a height of 30 feet above the floor. For the duration, creatures can't teleport into the area or use portals, such as those created by the gate spell, to enter the area. The spell proofs the area against planar travel, and therefore prevents creatures from accessing the area by way of the Astral Plane, Ethereal Plane, Feywild, Shadowfell, or the plane shift spell. In addition, the spell damages types of creatures that you choose when you cast it. Choose one or more of the following: celestials, elementals, fey, fiends, and undead. When a chosen creature enters the spell's area for the first time on a turn or starts its turn there, the creature takes 5d10 radiant or necrotic damage (your choice when you cast this spell). When you cast this spell, you can designate a password. A creature that speaks the password as it enters the area takes no damage from the spell. The spell's area can't overlap with the area of another forbiddance spell. If you cast forbiddance every day for 30 days in the same location, the spell lasts until it is dispelled, and the material components are consumed on the last casting.",
+    classes: ["cleric"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "a sprinkling of holy water, rare incense, and powdered ruby worth at least 1,000 gp" },
+    // No attack roll or save gates this damage — it triggers automatically
+    // (matches Magic Missile's "unconditional hit" shape). damageType is
+    // deliberately absent: radiant or necrotic is the CASTER's choice each
+    // time the spell is cast, not a spell-level constant (same exception
+    // shape as Chromatic Orb/Fire Shield).
+    effectKind: "damage",
+    effectDiceCount: 5,
+    effectDiceFaces: 10,
+  },
+  {
+    name: "Harm",
+    level: 6,
+    school: "necromancy",
+    castingTime: "1 action",
+    range: "60 feet",
+    duration: "Instantaneous",
+    description: "You unleash a virulent disease on a creature that you can see within range. The target must make a constitution saving throw. On a failed save, it takes 14d6 necrotic damage, or half as much damage on a successful save. The damage can't reduce the target's hit points below 1. If the target fails the saving throw, its hit point maximum is reduced for 1 hour by an amount equal to the necrotic damage it took. Any effect that removes a disease allows a creature's hit point maximum to return to normal before that time passes.",
+    classes: ["cleric"],
+    components: { verbal: true, somatic: true, material: false },
+    attackType: "save",
+    saveAbility: "constitution",
+    saveEffect: "half",
+    effectKind: "damage",
+    effectDiceCount: 14,
+    effectDiceFaces: 6,
+    damageType: "necrotic",
+  },
+  {
+    name: "Heal",
+    level: 6,
+    school: "evocation",
+    castingTime: "1 action",
+    range: "60 feet",
+    duration: "Instantaneous",
+    description: "Choose a creature that you can see within range. A surge of positive energy washes through the creature, causing it to regain 70 hit points. This spell also ends blindness, deafness, and any diseases affecting the target. This spell has no effect on constructs or undead. At Higher Levels. When you cast this spell using a spell slot of 7th level or higher, the amount of healing increases by 10 for each slot level above 6th.",
+    classes: ["cleric", "druid"],
+    components: { verbal: true, somatic: true, material: false },
+    // Flat 70 (+10/slot level) HP is inexpressible as a dice heal — utility
+    // row, matches Aid's precedent.
+  },
+  {
+    name: "Heroes' Feast",
+    level: 6,
+    school: "conjuration",
+    castingTime: "10 minutes",
+    range: "30 feet",
+    duration: "Instantaneous",
+    description: "You bring forth a great feast, including magnificent food and drink. The feast takes 1 hour to consume and disappears at the end of that time, and the beneficial effects don't set in until this hour is over. Up to twelve other creatures can partake of the feast. A creature that partakes of the feast gains several benefits. The creature is cured of all diseases and poison, becomes immune to poison and being frightened, and makes all wisdom saving throws with advantage. Its hit point maximum also increases by 2d10, and it gains the same number of hit points. These benefits last for 24 hours.",
+    classes: ["cleric", "druid"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "a gem-encrusted bowl worth at least 1,000gp, which the spell consumes" },
+  },
+  {
+    name: "Planar Ally",
+    level: 6,
+    school: "conjuration",
+    castingTime: "10 minutes",
+    range: "60 feet",
+    duration: "Instantaneous",
+    description: "You beseech an otherworldly entity for aid. The being must be known to you: a god, a primordial, a demon prince, or some other being of cosmic power. That entity sends a celestial, an elemental, or a fiend loyal to it to aid you, making the creature appear in an unoccupied space within range. If you know a specific creature's name, you can speak that name when you cast this spell to request that creature, though you might get a different creature anyway (DM's choice). When the creature appears, it is under no compulsion to behave in any particular way. You can ask the creature to perform a service in exchange for payment, but it isn't obliged to do so. The requested task could range from simple (fly us across the chasm, or help us fight a battle) to complex (spy on our enemies, or protect us during our foray into the dungeon). You must be able to communicate with the creature to bargain for its services. Payment can take a variety of forms. A celestial might require a sizable donation of gold or magic items to an allied temple, while a fiend might demand a living sacrifice or a gift of treasure. Some creatures might exchange their service for a quest undertaken by you. As a rule of thumb, a task that can be measured in minutes requires a payment worth 100 gp per minute. A task measured in hours requires 1,000 gp per hour. And a task measured in days (up to 10 days) requires 10,000 gp per day. The DM can adjust these payments based on the circumstances under which you cast the spell. If the task is aligned with the creature's ethos, the payment might be halved or even waived. Nonhazardous tasks typically require only half the suggested payment, while especially dangerous tasks might require a greater gift. Creatures rarely accept tasks that seem suicidal. After the creature completes the task, or when the agreed-upon duration of service expires, the creature returns to its home plane after reporting back to you, if appropriate to the task and if possible. If you are unable to agree on a price for the creature's service, the creature immediately returns to its home plane. A creature enlisted to join your group counts as a member of it, receiving a full share of experience points awarded.",
+    classes: ["cleric"],
+    components: { verbal: true, somatic: true, material: false },
+  },
+  {
+    name: "Word of Recall",
+    level: 6,
+    school: "conjuration",
+    castingTime: "1 action",
+    range: "5 feet",
+    duration: "Instantaneous",
+    description: "You and up to five willing creatures within 5 feet of you instantly teleport to a previously designated sanctuary. You and any creatures that teleport with you appear in the nearest unoccupied space to the spot you designated when you prepared your sanctuary (see below). If you cast this spell without first preparing a sanctuary, the spell has no effect. You must designate a sanctuary by casting this spell within a location, such as a temple, dedicated to or strongly linked to your deity. If you attempt to cast the spell in this manner in an area that isn't dedicated to your deity, the spell has no effect.",
+    classes: ["cleric"],
+    components: { verbal: true, somatic: false, material: false },
+  },
+  // ── Level 7 ───────────────────────────────────────────────────────────────
+  {
+    name: "Conjure Celestial",
+    level: 7,
+    school: "conjuration",
+    castingTime: "1 minute",
+    range: "90 feet",
+    duration: "Up to 1 hour",
+    concentration: true,
+    description: "You summon a celestial of challenge rating 4 or lower, which appears in an unoccupied space that you can see within range. The celestial disappears when it drops to 0 hit points or when the spell ends. The celestial is friendly to you and your companions for the duration. Roll initiative for the celestial, which has its own turns. It obeys any verbal commands that you issue to it (no action required by you), as long as they don't violate its alignment. If you don't issue any commands to the celestial, it defends itself from hostile creatures but otherwise takes no actions. The DM has the celestial's statistics. At Higher Levels. When you cast this spell using a 9th-level spell slot, you summon a celestial of challenge rating 5 or lower.",
+    classes: ["cleric"],
+    components: { verbal: true, somatic: true, material: false },
+  },
+  {
+    name: "Divine Word",
+    level: 7,
+    school: "evocation",
+    castingTime: "1 bonus action",
+    range: "30 feet",
+    duration: "Instantaneous",
+    description: "You utter a divine word, imbued with the power that shaped the world at the dawn of creation. Choose any number of creatures you can see within range. Each creature that can hear you must make a Charisma saving throw. On a failed save, a creature suffers an effect based on its current hit points: - 50 hit points or fewer: deafened for 1 minute - 40 hit points or fewer: deafened and blinded for 10 minutes - 30 hit points or fewer: blinded, deafened, and stunned for 1 hour - 20 hit points or fewer: killed instantly Regardless of its current hit points, a celestial, an elemental, a fey, or a fiend that fails its save is forced back to its plane of origin (if it isn't there already) and can't return to your current plane for 24 hours by any means short of a wish spell.",
+    classes: ["cleric"],
+    components: { verbal: true, somatic: false, material: false },
+    attackType: "save",
+    saveAbility: "charisma",
+  },
+  {
+    name: "Resurrection",
+    level: 7,
+    school: "necromancy",
+    castingTime: "1 hour",
+    range: "Touch",
+    duration: "Instantaneous",
+    description: "You touch a dead creature that has been dead for no more than a century, that didn't die of old age, and that isn't undead. If its soul is free and willing, the target returns to life with all its hit points. This spell neutralizes any poisons and cures normal diseases afflicting the creature when it died. It doesn't, however, remove magical diseases, curses, and the like; if such effects aren't removed prior to casting the spell, they afflict the target on its return to life. This spell closes all mortal wounds and restores any missing body parts. Coming back from the dead is an ordeal. The target takes a -4 penalty to all attack rolls, saving throws, and ability checks. Every time the target finishes a long rest, the penalty is reduced by 1 until it disappears. Casting this spell to restore life to a creature that has been dead for one year or longer taxes you greatly. Until you finish a long rest, you can't cast spells again, and you have disadvantage on all attack rolls, ability checks, and saving throws.",
+    classes: ["cleric", "bard"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "a diamond worth at least 1,000gp, which the spell consumes" },
+  },
+  // ── Level 8 ───────────────────────────────────────────────────────────────
+  {
+    name: "Holy Aura",
+    level: 8,
+    school: "abjuration",
+    castingTime: "1 action",
+    range: "Self",
+    duration: "Up to 1 minute",
+    concentration: true,
+    description: "Divine light washes out from you and coalesces in a soft radiance in a 30-foot radius around you. Creatures of your choice in that radius when you cast this spell shed dim light in a 5-foot radius and have advantage on all saving throws, and other creatures have disadvantage on attack rolls against them until the spell ends. In addition, when a fiend or an undead hits an affected creature with a melee attack, the aura flashes with brilliant light. The attacker must succeed on a constitution saving throw or be blinded until the spell ends.",
+    classes: ["cleric"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "a tiny reliquary worth at least 1,000gp containing a sacred relic, such as a scrap of cloth from a saint's robe or a piece of parchment from a religious text" },
+  },
+  // ── Level 9 ───────────────────────────────────────────────────────────────
+  {
+    name: "Mass Heal",
+    level: 9,
+    school: "conjuration",
+    castingTime: "1 action",
+    range: "60 feet",
+    duration: "Instantaneous",
+    description: "A flood of healing energy flows from you into injured creatures around you. You restore up to 700 hit points, divided as you choose among any number of creatures that you can see within range. Creatures healed by this spell are also cured of all diseases and any effect making them blinded or deafened. This spell has no effect on undead or constructs.",
+    classes: ["cleric"],
+    components: { verbal: true, somatic: true, material: false },
+    // Flat 700 HP is inexpressible as a dice heal — utility row, matches Aid's
+    // precedent.
+  },
+  {
+    name: "True Resurrection",
+    level: 9,
+    school: "necromancy",
+    castingTime: "1 hour",
+    range: "Touch",
+    duration: "Instantaneous",
+    description: "You touch a creature that has been dead for no longer than 200 years and that died for any reason except old age. If the creature's soul is free and willing, the creature is restored to life with all its hit points. This spell closes all wounds, neutralizes any poison, cures all diseases, and lifts any curses affecting the creature when it died. The spell replaces damaged or missing organs and limbs. The spell can even provide a new body if the original no longer exists, in which case you must speak the creature's name. The creature then appears in an unoccupied space you choose within 10 feet of you.",
+    classes: ["cleric", "druid"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "a sprinkle of holy water and diamonds worth at least 25,000gp, which the spell consumes" },
+  },
+];

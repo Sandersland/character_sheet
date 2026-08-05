@@ -349,4 +349,43 @@ describe("GET /api/spells — genuine edition fork resolves to one row per editi
     const res2024 = await get("/api/spells", "EDITION_2024");
     expect(names(res2024.body)).toContain(LONE_2024_NAME);
   });
+
+  // #1715: the real-world case that exposed this — 2014 Command is
+  // cleric+paladin only, but the 2024 SRD 5.2 revision added bard to its
+  // list. `?class=bard` must resolve the RIGHT edition's row first and check
+  // ITS OWN class list, not fetch whichever edition's row happens to carry a
+  // "bard" SpellClass membership and serve that one regardless of edition.
+  it("?class= reflects the RESOLVED edition's own class list, not a membership that exists only on the other edition's row", async () => {
+    const DIVERGENT_NAME = "Test Divergent Class List Spell";
+    const row2014 = forkRow(DIVERGENT_NAME, "The PHB'14 text (cleric + paladin only).");
+    const row2024 = forkRow(DIVERGENT_NAME, "The SRD 5.2 text (cleric + paladin + bard).");
+    const fork2014 = await upsertEditionRow(
+      prisma.spell,
+      { name: DIVERGENT_NAME, edition: "EDITION_2014" },
+      { ...row2014, edition: "EDITION_2014" },
+      row2014,
+    );
+    const fork2024 = await upsertEditionRow(
+      prisma.spell,
+      { name: DIVERGENT_NAME, edition: "EDITION_2024" },
+      { ...row2024, edition: "EDITION_2024" },
+      row2024,
+    );
+    await seedSpellClasses(fork2014.id, ["cleric", "paladin"]);
+    await seedSpellClasses(fork2024.id, ["cleric", "paladin", "bard"]);
+
+    try {
+      const bard2014 = await get("/api/spells?class=bard", "EDITION_2014");
+      expect(names(bard2014.body)).not.toContain(DIVERGENT_NAME);
+
+      const bard2024 = await get("/api/spells?class=bard", "EDITION_2024");
+      expect(names(bard2024.body)).toContain(DIVERGENT_NAME);
+
+      const cleric2014 = await get("/api/spells?class=cleric", "EDITION_2014");
+      const clericMatch = cleric2014.body.find((s: { name: string }) => s.name === DIVERGENT_NAME);
+      expect(clericMatch?.id).toBe(fork2014.id);
+    } finally {
+      await prisma.spell.deleteMany({ where: { name: DIVERGENT_NAME } });
+    }
+  });
 });
