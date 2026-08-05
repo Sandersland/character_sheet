@@ -34,7 +34,6 @@ const TEST_SPELL = {
   attackType: "save",
   saveAbility: "dexterity",
   upcastDicePerLevel: 1,
-  classes: ["wizard"],
 };
 
 const TEST_CANTRIP = {
@@ -51,7 +50,6 @@ const TEST_CANTRIP = {
   damageType: "fire",
   attackType: "attack",
   cantripScaling: true,
-  classes: ["wizard"],
 };
 
 // ── Character fixture ─────────────────────────────────────────────────────────

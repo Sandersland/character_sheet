@@ -22,7 +22,6 @@ const TEST_SPELL = {
   range: "120 ft",
   duration: "Instantaneous",
   description: "3d4+1 force damage.",
-  classes: ["wizard"],
 };
 
 const BASE_CHAR = {
@@ -160,7 +159,6 @@ describe("applySpellcastingOpInTx — learnSpell born-prepared (#1507 D7)", () =
       range: "60 ft",
       duration: "Instantaneous",
       description: "1d4 psychic damage.",
-      classes: ["bard"],
     };
     const spell = await upsertEditionRow(
       prisma.spell,

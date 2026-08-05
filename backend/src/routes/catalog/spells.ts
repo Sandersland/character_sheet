@@ -3,6 +3,7 @@ import { Router } from "express";
 import { parseClassFilterOr400 } from "@/lib/http/parse-class-param.js";
 import { parseMaxSpellLevelOr400 } from "@/lib/http/parse-max-spell-level-param.js";
 import { prisma } from "@/lib/core/prisma.js";
+import { classesOf, SPELL_CLASS_MEMBERSHIP_SELECT } from "@/lib/spellcasting/spell-classes.js";
 
 export const spellsRouter = Router();
 
@@ -18,6 +19,12 @@ export const spellsRouter = Router();
  * No `?edition=` yet: Spell carries an `edition` column (#1710, foundation
  * for the 2014 catalog) but this route doesn't filter by it — every row
  * returns regardless of edition. Wiring `?edition=` in is F2/F3's job.
+ *
+ * `?class=` filters through the SpellClass join (#1711), not a scalar
+ * column — `classMemberships.some` finds rows with at least one matching
+ * membership row. The served JSON still flattens back to `classes:
+ * string[]` via classesOf, so frontend/src/lib/newSpells.ts and
+ * spellList.ts consume the response unchanged.
  */
 spellsRouter.get("/spells", async (req, res) => {
   const classFilter = parseClassFilterOr400(req, res);
@@ -27,9 +34,10 @@ spellsRouter.get("/spells", async (req, res) => {
 
   const spells = await prisma.spell.findMany({
     where: {
-      ...(classFilter.className ? { classes: { has: classFilter.className } } : {}),
+      ...(classFilter.className ? { classMemberships: { some: { className: classFilter.className } } } : {}),
       ...(levelFilter.maxLevel === undefined ? {} : { level: { lte: levelFilter.maxLevel } }),
     },
+    include: SPELL_CLASS_MEMBERSHIP_SELECT,
     orderBy: [{ level: "asc" }, { name: "asc" }],
   });
 
@@ -45,7 +53,7 @@ spellsRouter.get("/spells", async (req, res) => {
       description: row.description,
       concentration: row.concentration,
       ritual: row.ritual,
-      classes: row.classes,
+      classes: classesOf(row),
       effectKind: row.effectKind ?? undefined,
       effectDiceCount: row.effectDiceCount ?? undefined,
       effectDiceFaces: row.effectDiceFaces ?? undefined,

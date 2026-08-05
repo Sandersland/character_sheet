@@ -15,7 +15,10 @@ beforeAll(async () => {
 
 // A fully-populated damage spell (every nullable effect column set) and a bare
 // utility cantrip (all effect columns null) — together they exercise both sides
-// of each `?? undefined` fallback in the row mapper.
+// of each `?? undefined` fallback in the row mapper. `classes` (#1711) is no
+// longer a Spell column — kept here only as the fixture's OWN membership list,
+// written into SpellClass by seedFixtures below.
+const DAMAGE_SPELL_CLASSES = ["wizard", "sorcerer"];
 const DAMAGE_SPELL = {
   name: "Test Firebolt Catalog",
   level: 2,
@@ -26,7 +29,6 @@ const DAMAGE_SPELL = {
   description: "A test damage spell.",
   concentration: false,
   ritual: false,
-  classes: ["wizard", "sorcerer"],
   effectKind: "damage",
   effectDiceCount: 3,
   effectDiceFaces: 6,
@@ -37,6 +39,7 @@ const DAMAGE_SPELL = {
   upcastDicePerLevel: 1,
   cantripScaling: false,
 };
+const UTILITY_SPELL_CLASSES = ["cleric", "druid"];
 const UTILITY_SPELL = {
   name: "Test Guidance Catalog",
   level: 0,
@@ -47,15 +50,29 @@ const UTILITY_SPELL = {
   description: "A test utility cantrip.",
   concentration: true,
   ritual: false,
-  classes: ["cleric", "druid"],
   cantripScaling: true,
 };
+
+// Writes one SpellClass row per className, proving the served `classes: [...]`
+// comes entirely off the join (#1711) — the Spell row itself carries no
+// membership data at all.
+async function seedSpellClasses(spellId: string, classNames: string[]) {
+  for (const className of classNames) {
+    await prisma.spellClass.upsert({
+      where: { spellId_className: { spellId, className } },
+      create: { spellId, className },
+      update: {},
+    });
+  }
+}
 
 // upsertEditionRow, not .upsert(): Spell's business key is now (name,
 // edition) (#1710), and these fixture spells are edition-neutral.
 async function seedFixtures() {
-  await upsertEditionRow(prisma.spell, { name: DAMAGE_SPELL.name, edition: null }, { ...DAMAGE_SPELL, edition: null }, DAMAGE_SPELL);
-  await upsertEditionRow(prisma.spell, { name: UTILITY_SPELL.name, edition: null }, { ...UTILITY_SPELL, edition: null }, UTILITY_SPELL);
+  const damage = await upsertEditionRow(prisma.spell, { name: DAMAGE_SPELL.name, edition: null }, { ...DAMAGE_SPELL, edition: null }, DAMAGE_SPELL);
+  const utility = await upsertEditionRow(prisma.spell, { name: UTILITY_SPELL.name, edition: null }, { ...UTILITY_SPELL, edition: null }, UTILITY_SPELL);
+  await seedSpellClasses(damage.id, DAMAGE_SPELL_CLASSES);
+  await seedSpellClasses(utility.id, UTILITY_SPELL_CLASSES);
 }
 
 function get(path: string) {
@@ -89,7 +106,7 @@ describe("GET /api/spells", () => {
       school: "evocation",
       concentration: false,
       ritual: false,
-      classes: ["wizard", "sorcerer"],
+      classes: DAMAGE_SPELL_CLASSES,
       effectKind: "damage",
       effectDiceCount: 3,
       effectDiceFaces: 6,
@@ -180,5 +197,40 @@ describe("GET /api/spells — ?class= / ?maxLevel= filters (#1377)", () => {
     expect(names(all.body)).toContain(DAMAGE_SPELL.name);
     expect(names(all.body)).toContain(UTILITY_SPELL.name);
     expect(all.body.length).toBeGreaterThan(filtered.body.length);
+  });
+});
+
+// #1711: membership is served entirely off the SpellClass join now — Spell
+// itself carries no `classes` column at all — so a membership row's own
+// lifecycle (add/remove), not any Spell field, is what the route reflects.
+describe("GET /api/spells — class membership served from the SpellClass join (#1711)", () => {
+  afterAll(async () => {
+    await prisma.spell.deleteMany({ where: { name: DAMAGE_SPELL.name } });
+  });
+
+  it("a class only reaches the response after its SpellClass row exists, and stops after it's removed", async () => {
+    const damage = await upsertEditionRow(prisma.spell, { name: DAMAGE_SPELL.name, edition: null }, { ...DAMAGE_SPELL, edition: null }, DAMAGE_SPELL);
+
+    const beforeAdd = await get("/api/spells?class=ranger");
+    expect(names(beforeAdd.body)).not.toContain(DAMAGE_SPELL.name);
+
+    await prisma.spellClass.create({ data: { spellId: damage.id, className: "ranger" } });
+    const afterAdd = await get("/api/spells?class=ranger");
+    expect(names(afterAdd.body)).toContain(DAMAGE_SPELL.name);
+    const served = afterAdd.body.find((s: { name: string }) => s.name === DAMAGE_SPELL.name);
+    expect(served.classes).toEqual(["ranger"]);
+
+    await prisma.spellClass.deleteMany({ where: { spellId: damage.id, className: "ranger" } });
+    const afterRemove = await get("/api/spells?class=ranger");
+    expect(names(afterRemove.body)).not.toContain(DAMAGE_SPELL.name);
+  });
+
+  it("cascades: deleting the Spell row drops its SpellClass rows too (onDelete: Cascade)", async () => {
+    const damage = await upsertEditionRow(prisma.spell, { name: DAMAGE_SPELL.name, edition: null }, { ...DAMAGE_SPELL, edition: null }, DAMAGE_SPELL);
+    await prisma.spellClass.create({ data: { spellId: damage.id, className: "wizard" } });
+
+    await prisma.spell.delete({ where: { id: damage.id } });
+
+    expect(await prisma.spellClass.findMany({ where: { spellId: damage.id } })).toEqual([]);
   });
 });

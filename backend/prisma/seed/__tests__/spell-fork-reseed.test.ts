@@ -30,7 +30,6 @@ const row = (name: string, edition: "EDITION_2014" | "EDITION_2024" | null, desc
   range: "30 ft",
   duration: "Instantaneous",
   description,
-  classes: ["wizard"],
   edition,
 });
 

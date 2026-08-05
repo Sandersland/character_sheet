@@ -19,6 +19,7 @@ import {
 import { applyResourceOpInTx, type ResourceOperation } from "@/lib/classes/resources.js";
 import { applySpellcastingOpInTx, type LearnSpellOperation, type SpellcastingOperation } from "@/lib/spellcasting/spellcasting.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
+import { classesOf, SPELL_CLASS_MEMBERSHIP_SELECT } from "@/lib/spellcasting/spell-classes.js";
 import {
   advancingHitDie,
   applyLevelUpHpInTx,
@@ -342,9 +343,15 @@ async function loadPickCatalogRows(
 ): Promise<{ rowById: Map<string, SpellPickRow>; levelOf: (op: LearnSpellOperation) => number | undefined }> {
   const ids = [...cantripOps, ...spellOps].map((o) => o.spellId).filter((id): id is string => Boolean(id));
   const rows = ids.length
-    ? await prisma.spell.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, level: true, classes: true } })
+    ? await prisma.spell.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, name: true, level: true, ...SPELL_CLASS_MEMBERSHIP_SELECT },
+      })
     : [];
-  const rowById = new Map(rows.map((r) => [r.id, r]));
+  // Flattened to SpellPickRow's `classes: string[]` here (#1711) so the
+  // eligibility checks below (assertOnSpellList, assertCantripEligibility)
+  // never see the join shape — one seam resolves membership, not two.
+  const rowById = new Map(rows.map((r) => [r.id, { id: r.id, name: r.name, level: r.level, classes: classesOf(r) }]));
   const levelOf = (op: LearnSpellOperation): number | undefined =>
     op.spellId ? rowById.get(op.spellId)?.level : op.custom?.level;
   return { rowById, levelOf };

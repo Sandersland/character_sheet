@@ -27,7 +27,6 @@ const SPELL = {
   effectDiceFaces: 12,
   damageType: "lightning",
   attackType: "attack",
-  classes: ["wizard"],
 };
 
 const BASE = {

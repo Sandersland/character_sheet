@@ -770,8 +770,10 @@ export interface MagicalSecretsLists {
  * from, the closest available mapping is: at a qualifying 2014 Bard level,
  * neither facet is class-restricted. This is not full PHB'14 fidelity.
  *
- * Also known: `Spell.classes` is un-editioned, 2024-seeded catalog content — see
- * `Spell.classes` in schema.prisma.
+ * Also known: class membership lives in the SpellClass join, keyed off the
+ * parent Spell row rather than carrying its own edition column (#1711) —
+ * today's seeded catalog is 2024-only; the 2014 by-class content slices
+ * (#1713-#1721) are what populate 2014-tagged Spell/SpellClass rows.
  *
  * `subclass` is currently unused but is the deliberate seam for PHB'24 College of
  * Lore *Magical Discoveries* (level 6, a Cleric/Druid/Wizard cantrip OR a spell

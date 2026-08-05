@@ -15,6 +15,7 @@ import { FEATS } from "./seed/feats.js";
 import { SPELLS, SPELL_RENAMES, type CatalogSpell } from "./seed/spells.js";
 import { SPELLS_2014 } from "./seed/spells-2014/index.js";
 import { applySpellRenames } from "./seed/rename-spells.js";
+import { seedSpellClassesFor } from "./seed/seed-spell-classes.js";
 import { seedSubclassGrantedSpells } from "./seed/seed-granted-spells.js";
 import { seedClassFeatures } from "./seed/seed-class-features.js";
 import { seedSubclasses } from "./seed/seed-subclasses.js";
@@ -364,9 +365,14 @@ const SPELL_COLUMN_DEFAULTS = {
 // actually resets on re-seed (#1132): a bare partial update leaves an absent
 // optional column at its prior value (this stranded Barkskin at
 // concentration=true when SRD 5.2 dropped its concentration). Spread order —
-// defaults first — means any field the spell declares still wins.
+// defaults first — means any field the spell declares still wins. `classes`
+// is dropped here (#1711): it's no longer a Spell column — seedSpells writes
+// it to SpellClass separately, via seedSpellClassesFor, once the row's id is
+// known.
 function spellSeedData(spell: CatalogSpell) {
-  return { ...SPELL_COLUMN_DEFAULTS, ...spell };
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to exclude `classes` from `rest`; SpellClass owns membership (#1711)
+  const { classes, ...rest } = spell;
+  return { ...SPELL_COLUMN_DEFAULTS, ...rest };
 }
 
 // spells.ts entries default to EDITION_2024 (they're SRD 5.2 text, not
@@ -395,7 +401,11 @@ async function seedSpells(prisma: PrismaClient) {
     // express a null edition, and every spell here resolves to a concrete
     // one anyway (see resolvedSpellEdition) — used for consistency with
     // every other editioned catalog seeder.
-    await upsertEditionRow(prisma.spell, { name: spell.name, edition }, data, data);
+    const row = await upsertEditionRow(prisma.spell, { name: spell.name, edition }, data, data);
+    // #1711: SpellClass rows carry no edition column (Shape 1) — this
+    // spell's own row already IS the edition fork, so its membership rows
+    // never need one.
+    await seedSpellClassesFor(prisma, row.id, spell.classes);
   }
   const staleWhere = staleCatalogRowsWhere("name", allSpells.map((s) => ({ identity: s.name, edition: resolvedSpellEdition(s) })));
   const stale = await prisma.spell.findMany({ where: staleWhere, select: { name: true, edition: true } });
