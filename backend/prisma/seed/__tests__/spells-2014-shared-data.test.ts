@@ -222,5 +222,14 @@ describe("SHARED_SPELLS_2014 — value spot-checks", () => {
     expect(s.damageType).toBe("lightning");
     expect(s.upcastDicePerLevel).toBe(1);
     expect(s.components).toEqual({ verbal: true, somatic: true, material: true, materialDescription: "a twig from a tree that has been struck by lightning" });
+    // Regression guard: an earlier draft of this row invented a "moves more
+    // than 30 feet away and doesn't return by end of turn" end condition
+    // that doesn't exist in the real spell, dropping the genuine second end
+    // condition (total cover) in the process — caught by the mandatory
+    // rules-accuracy pass, re-verified word-for-word against dnd5e.wikidot.com.
+    expect(s.description).toMatch(
+      /The spell also ends if the target is ever outside the spell's range or if it has total cover from you\./,
+    );
+    expect(s.description).not.toMatch(/doesn't return to that range/);
   });
 });
