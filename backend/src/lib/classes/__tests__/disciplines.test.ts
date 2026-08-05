@@ -73,4 +73,42 @@ describe("disciplineEffectSpec", () => {
     expect(spec.dice).toBeUndefined();
     expect(spec.effectType).toBe("utility");
   });
+
+  // #1503 review fix: Fist of Unbroken Air and Water Whip both deal half
+  // damage on a successful save per their own PHB'14 p.81 descriptions, but
+  // their seed rows omitted `saveEffect: "half"` — catalogEffectSpec would
+  // then resolve `saveEffect: null` and a successful save would wrongly deal
+  // FULL damage. Exercises the actual runtime resolution path the cast
+  // handler uses (disciplineEffectSpec -> catalogEffectSpec ->
+  // readEffectSpec's saveEffect passthrough), not just the raw seed row —
+  // see prisma/seed/__tests__/disciplines-content.test.ts for the seed-data-
+  // level version of this same assertion (and the general invariant over
+  // every save-based damage discipline).
+  it("resolves saveEffect \"half\" end-to-end for Fist of Unbroken Air and Water Whip", () => {
+    const unbrokenAir = disciplineEffectSpec({
+      name: "Fist of Unbroken Air",
+      costPerStep: 1,
+      effectKind: "damage",
+      effectDiceCount: 3,
+      effectDiceFaces: 10,
+      damageType: "bludgeoning",
+      attackType: "save",
+      saveAbility: "strength",
+      saveEffect: "half",
+    });
+    expect(unbrokenAir.saveEffect).toBe("half");
+
+    const waterWhip = disciplineEffectSpec({
+      name: "Water Whip",
+      costPerStep: 1,
+      effectKind: "damage",
+      effectDiceCount: 3,
+      effectDiceFaces: 10,
+      damageType: "bludgeoning",
+      attackType: "save",
+      saveAbility: "dexterity",
+      saveEffect: "half",
+    });
+    expect(waterWhip.saveEffect).toBe("half");
+  });
 });

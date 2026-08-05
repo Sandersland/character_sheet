@@ -50,7 +50,13 @@ export const castDisciplineOpSchema = z.object({
   type: z.literal("castDiscipline"),
   entryId: z.string().min(1),
   requestedKi: z.number().int().positive().optional(),
-  roll: z.number().nonnegative().optional(),
+  // .positive(), not .nonnegative() — matches every sibling roll field in
+  // this file (castElementalBurst/triggerQuiveringPalm/dealHandOfHarm/
+  // useHandOfUltimateMercy). 0 is never legitimate: the minimum roll on any
+  // discipline's dice (e.g. 1d10) is 1, and disciplines.ts's own server-side
+  // check already rejects roll <= 0 for a damage discipline — this just
+  // catches the same rule one layer earlier, with a clearer validation error.
+  roll: z.number().positive().optional(),
 });
 export type CastDisciplineOperation = z.infer<typeof castDisciplineOpSchema>;
 export type DisciplineOperation = CastDisciplineOperation;

@@ -107,6 +107,7 @@ export const DISCIPLINES: DisciplineSeed[] = [
     damageType: "bludgeoning",
     attackType: "save",
     saveAbility: "strength",
+    saveEffect: "half",
     description:
       "As an action, spend 2 ki: choose a creature within 30 ft. It makes a Strength save, taking 3d10 bludgeoning damage (plus 1d10 per additional ki spent, up to your per-cast ki cap), being pushed 20 ft away, and knocked prone on a failure; on a success it takes half damage and suffers neither push nor prone. PHB'14 p.81.",
   },
@@ -163,6 +164,7 @@ export const DISCIPLINES: DisciplineSeed[] = [
     damageType: "bludgeoning",
     attackType: "save",
     saveAbility: "dexterity",
+    saveEffect: "half",
     description:
       "As an action, spend 2 ki: choose a creature you can see within 30 ft. It makes a Dexterity save, taking 3d10 bludgeoning damage (plus 1d10 per additional ki spent, up to your per-cast ki cap) and — your choice — being knocked prone or pulled up to 25 ft toward you on a failure; on a success it takes half damage and suffers neither. PHB'14 p.81.",
   },
