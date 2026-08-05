@@ -2664,7 +2664,7 @@ export const WAY_OF_THE_OPEN_HAND_ROWS: ClassFeatureRow[] = [
   },
 ];
 
-export const WARRIOR_OF_SHADOW_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2024"] as const).flatMap((edition) => [
+export const WARRIOR_OF_SHADOW_ROWS: ClassFeatureRow[] = (["EDITION_2024"] as const).flatMap((edition) => [
   {
     name: "Shadow Arts",
     level: 3,
@@ -2692,6 +2692,39 @@ export const WARRIOR_OF_SHADOW_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDIT
     edition,
     description:
       "Spend 3 focus and use your action to become invisible and able to move through other creatures and objects as if they were difficult terrain, for 1 minute or until you're incapacitated. The invisibility ends early if you attack or cast a spell. While it lasts, Flurry of Blows costs no focus.",
+  },
+]);
+
+// PHB'14 pp.79-80 (not in SRD 5.1, #1502) — a materially different fork, not a
+// retab: see monk-features.ts's WAY_OF_SHADOW_RAW header for what diverges.
+export const WAY_OF_SHADOW_ROWS: ClassFeatureRow[] = (["EDITION_2014"] as const).flatMap((edition) => [
+  {
+    name: "Shadow Arts",
+    level: 3,
+    edition,
+    description:
+      "Starting when you choose this tradition at 3rd level, you can use your ki to duplicate the effects of certain spells. As an action, you can spend 2 ki points to cast darkness, darkvision, pass without trace, or silence, without providing material components. Additionally, you gain the minor illusion cantrip if you don't already know it (PHB'14 pp.79-80 — not in SRD 5.1).",
+  },
+  {
+    name: "Shadow Step",
+    level: 6,
+    edition,
+    description:
+      "At 6th level, you gain the ability to step from one shadow to another. When you are in dim light or darkness, as a bonus action you can teleport up to 60 feet to an unoccupied space you can see that is also in dim light or darkness. You then have advantage on the first melee attack you make before the end of the current turn (PHB'14 p.80 — not in SRD 5.1).",
+  },
+  {
+    name: "Cloak of Shadows",
+    level: 11,
+    edition,
+    description:
+      "By 11th level, you have learned to become one with the shadows. When you are in an area of dim light or darkness, you can use your action to become invisible. You remain invisible until you make an attack, cast a spell, or are in an area of bright light (PHB'14 p.80 — not in SRD 5.1).",
+  },
+  {
+    name: "Opportunist",
+    level: 17,
+    edition,
+    description:
+      "Beginning at 17th level, you can exploit a creature's momentary distraction when it is hit by an attack. When a creature within 5 feet of you is hit by an attack made by a creature other than you, you can use your reaction to make a melee attack against that creature (PHB'14 p.80 — not in SRD 5.1).",
   },
 ]);
 
@@ -2809,6 +2842,7 @@ export const LITERAL_SUBCLASS_ROWS: Record<string, ClassFeatureRow[]> = {
   "warrior of the open hand": WARRIOR_OF_THE_OPEN_HAND_ROWS,
   "way of the open hand": WAY_OF_THE_OPEN_HAND_ROWS,
   "warrior of shadow": WARRIOR_OF_SHADOW_ROWS,
+  "way of shadow": WAY_OF_SHADOW_ROWS,
   "warrior of mercy": WARRIOR_OF_MERCY_ROWS,
   "warrior of the elements": WARRIOR_OF_THE_ELEMENTS_ROWS,
   "school of evocation": WIZARD_EVOCATION_ROWS,

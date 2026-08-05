@@ -220,6 +220,18 @@ export const SUBCLASSES: SubclassSeed[] = [
     description:
       "You follow a tradition that values stealth and subtlety. You know Minor Illusion, cast Darkness for 1 focus, and see in the dark. You teleport between areas of shadow, and at higher levels can spend focus to teleport freely and, ultimately, cloak yourself in invisibility.",
     slug: "monk-warrior-of-shadow",
+    edition: "EDITION_2024",
+  },
+  // PHB'14 pp.79-80 — not in SRD 5.1, which ships only Way of the Open Hand
+  // for monk (#1502). A DISTINCT slug from Warrior of Shadow above, not a
+  // retag: the two lineages coexist per campaign (epic #1281).
+  {
+    className: "Monk",
+    name: "Way of Shadow",
+    description:
+      "You follow a monastic tradition that values stealth and subtlety. You know Minor Illusion and can spend ki to duplicate Darkness, Darkvision, Pass without Trace, or Silence. You teleport between areas of shadow, and at higher levels can cloak yourself in invisibility and capitalize when an ally strikes a foe near you.",
+    slug: "monk-way-of-shadow",
+    edition: "EDITION_2014",
   },
   {
     className: "Monk",

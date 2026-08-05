@@ -1,22 +1,36 @@
 /**
- * Warrior of Shadow cast handlers (#1246, 2024 rewrite of the former #441 Way of
- * Shadow) — two focus-fuelled abilities live here:
+ * Warrior of Shadow / Way of Shadow cast handlers — two focus/ki-fuelled
+ * abilities live here, both edition-aware since #1502:
  *
- *   castShadowArt          — the L3 Shadow Arts feature's 1-focus Darkness cast.
- *                             A GrantedAbility row (source "shadowArts") read from
- *                             the catalog, routed through castAbilityInTx like a
- *                             Channel Divinity cast.
- *   activateCloakOfShadows — the L17 Cloak of Shadows feature: spend 3 focus,
- *                             self-apply the invisible condition. No catalog row
- *                             (a single fixed feature, not a "choose one" menu),
- *                             so its cost/effect are hardcoded here.
+ *   castShadowArt          — the L3 Shadow Arts feature's cast. A
+ *                             GrantedAbility row (source "shadowArts") read
+ *                             from the catalog, routed through castAbilityInTx
+ *                             like a Channel Divinity cast. 2024 (Warrior of
+ *                             Shadow, PHB'24 p.91, #1246): exactly one cast,
+ *                             1 focus, Darkness, always concentrates. 2014
+ *                             (Way of Shadow, PHB'14 pp.79-80 — not in SRD
+ *                             5.1, #1502): a 4-spell 2-ki menu (Darkness/
+ *                             Darkvision/Pass without Trace/Silence); only
+ *                             Darkness/Pass without Trace/Silence concentrate
+ *                             (Darkvision does not) — see
+ *                             shadowArtEffectSpec's name-keyed concentrates.
+ *                             Every field (cost pool/amount, concentration)
+ *                             is read from the catalog row itself, so this
+ *                             function needs no `edition` branch of its own.
+ *   activateCloakOfShadows — the Cloak of Shadows feature: self-apply the
+ *                             invisible condition. No catalog row (a single
+ *                             fixed feature, not a "choose one" menu), so its
+ *                             cost/effect are hardcoded here — edition-
+ *                             branched, since the 2014 and 2024 shapes
+ *                             genuinely diverge (2014, L11: action only, no
+ *                             ki cost, no duration cap beyond "until you
+ *                             attack, cast a spell, or are in bright light";
+ *                             2024, L17: 3 focus, 1 minute, frees Flurry of
+ *                             Blows while it lasts).
  *
- * The 2014 model (flat 2-focus cost, a 4-spell menu of Darkness/Darkvision/Pass
- * without Trace/Silence, and a per-name concentration set) is retired: 2024
- * Shadow Arts has exactly one cast (Darkness, always concentrates) plus passive
- * Minor Illusion + Darkvision grants that carry no persisted state (Minor
- * Illusion is a subclass-granted spell, seed/subclass-granted-spells.ts;
- * Darkvision is flavor text — this app tracks no senses).
+ * Both level gates (3/17 for 2024, 3/6/11/17 for 2014) live as DERIVED_ACTIONS
+ * rows (actions.ts) — this file never hardcodes a level, only reads whether
+ * the entry-scoped action key is present.
  */
 
 import type { CastShadowArtOperation, ShadowArtOperation } from "@character-sheet/contracts";
@@ -41,14 +55,19 @@ export class InvalidShadowArtOperationError extends Error {}
 // Prefix stamped on a Shadow Art's concentration entryId so its id space never overlaps a spellbook Spell.id.
 export const SHADOW_ART_CONCENTRATION_PREFIX = "shadow-art:";
 
-// Cloak of Shadows carries no GrantedAbility catalog row (a single fixed L17
+// Cloak of Shadows carries no GrantedAbility catalog row (a single fixed
 // feature, not a "choose one" menu like Shadow Arts) — its cost/effect/entryId
-// are fixed constants rather than read from the DB.
+// are fixed constants rather than read from the DB. 2024's cost (PHB'24 p.91);
+// 2014 costs nothing (PHB'14 p.80, "no ki cost, no duration cap") — expressed
+// via AbilityCost's existing `{kind:"none"}` variant, not a fake 0-base pool
+// spend, so payAbilityCostInTx's `case "none"` short-circuit (no
+// applySpendResourceInTx call at all) does the right thing for free.
 const CLOAK_OF_SHADOWS_NAME = "Cloak of Shadows";
 const CLOAK_OF_SHADOWS_ENTRY_ID = "cloak-of-shadows";
 // Narrowed to the "pool" variant (not the bare AbilityCost union) so `.base` is
 // accessible below without a runtime kind check — this constant is always a pool cost.
-const CLOAK_OF_SHADOWS_COST: Extract<AbilityCost, { kind: "pool" }> = { kind: "pool", key: "focus", base: 3 };
+const CLOAK_OF_SHADOWS_2024_COST: Extract<AbilityCost, { kind: "pool" }> = { kind: "pool", key: "focus", base: 3 };
+const CLOAK_OF_SHADOWS_2014_COST: Extract<AbilityCost, { kind: "none" }> = { kind: "none" };
 const CLOAK_OF_SHADOWS_EFFECT: EffectSpec = {
   effectType: "utility",
   damageType: null,
@@ -59,7 +78,7 @@ const CLOAK_OF_SHADOWS_EFFECT: EffectSpec = {
   concentration: false,
 };
 
-// Catalog columns needed to build the Shadow Arts Darkness cast's flat EffectSpec.
+// Catalog columns needed to build a Shadow Art cast's flat EffectSpec.
 export interface ShadowArtEffectRow {
   name: string;
   effectKind?: string | null;
@@ -67,17 +86,25 @@ export interface ShadowArtEffectRow {
   buffModifier?: number | null;
 }
 
+// The one 2014 Shadow Art that does NOT concentrate — Darkvision (PHB'14: "Duration:
+// 8 hours", no "Concentration" prefix), unlike Darkness/Pass without Trace/Silence
+// (all "Duration: Concentration, up to ..."). 2024's sole row ("Shadow Arts:
+// Darkness") is untouched by this set. Name-keyed rather than edition-keyed: the
+// same predicate is correct for both editions without this function ever taking
+// an `edition` parameter, since only ONE name in the whole catalog is exempt.
+const SHADOW_ARTS_NO_CONCENTRATION = new Set(["Shadow Arts: Darkvision"]);
+
 /**
- * Build the Darkness cast's EffectSpec via the shared catalogEffectSpec builder:
- * flat (scaling.mode "none"), always concentrates — 2024 Shadow Arts has exactly
- * one cast and it's Darkness (SRD 5.2). Kept on the shared row→spec mapping
+ * Build a Shadow Art cast's EffectSpec via the shared catalogEffectSpec builder:
+ * flat (scaling.mode "none"); concentrates unless the row's name is in
+ * SHADOW_ARTS_NO_CONCENTRATION above. Kept on the shared row→spec mapping
  * (lib/combat/effects.ts, #817) rather than inlined, since the same builder also
  * serves Channel Divinity.
  */
 export function shadowArtEffectSpec(row: ShadowArtEffectRow): EffectSpec {
   return catalogEffectSpec(row, {
     scaling: { mode: "none" },
-    concentrates: () => true,
+    concentrates: (name) => !SHADOW_ARTS_NO_CONCENTRATION.has(name),
   });
 }
 
@@ -133,6 +160,13 @@ async function applyCastShadowArt(
   // log the undoable spellcasting event (restores concentratingOn on revert).
   // The resources cast record restores nothing (focus refunded by the pool
   // payer's spendResource event, concentration by the event above).
+  //
+  // The spend field name is keyed off `cost.key` (the catalog row's own
+  // costPoolKey, "ki" or "focus"), not hardcoded — a 2014 Way of Shadow cast
+  // spends ki, and a hardcoded `focusSpent` would mislabel that spend in the
+  // persisted CharacterEvent.data column (the human-readable `resourceSummary`
+  // already says "Ki Points" via the shared spendResource summary; this is
+  // the structured half).
   await emitFocusCastEvents(tx, {
     characterId,
     batchId,
@@ -144,21 +178,24 @@ async function applyCastShadowArt(
     concentrationName: catalog.name,
     concentrationData: { shadowArtId: catalog.id, shadowArtName: catalog.name },
     resourceSummary: outcome.summary,
-    resourceData: { shadowArtId: catalog.id, focusSpent: cost.base },
+    resourceData: { shadowArtId: catalog.id, [`${cost.key}Spent`]: cost.base },
   });
 }
 
-// Pay Cloak of Shadows' fixed 3-focus cost, self-apply invisible, and log the
-// combined result. No concentration (it ends manually on attack/cast/bright
-// light, like the 2014 version), so this skips emitFocusCastEvents' concentration
-// branch and instead mirrors applyChannelDivinityOperations' invisible-kind tail.
+// Pay Cloak of Shadows' cost (3 focus in 2024, nothing in 2014 — see the
+// constants above), self-apply invisible, and log the combined result. No
+// concentration (it ends manually on attack/cast/bright light, matching the
+// 2014 text exactly and mirroring the 2024 rewrite), so this skips
+// emitFocusCastEvents' concentration branch and instead mirrors
+// applyChannelDivinityOperations' invisible-kind tail.
 async function applyActivateCloakOfShadows(
   tx: Prisma.TransactionClient,
   characterId: string,
   batchId: string,
   sessionId: string | null,
-  row: { spellcasting: Prisma.JsonValue },
+  row: { spellcasting: Prisma.JsonValue; rulesEdition: RulesEdition },
 ): Promise<void> {
+  const cost = editionOf(row) === "EDITION_2014" ? CLOAK_OF_SHADOWS_2014_COST : CLOAK_OF_SHADOWS_2024_COST;
   const spellState = normalizeSpellcastingMutable(row.spellcasting);
   const costCtx: PayCostContext = { tx, characterId, batchId, sessionId };
   const outcome = await castAbilityInTx(
@@ -166,9 +203,9 @@ async function applyActivateCloakOfShadows(
     {
       name: CLOAK_OF_SHADOWS_NAME,
       entryId: CLOAK_OF_SHADOWS_ENTRY_ID,
-      cost: CLOAK_OF_SHADOWS_COST,
+      cost,
       effect: CLOAK_OF_SHADOWS_EFFECT,
-      requested: CLOAK_OF_SHADOWS_COST.base,
+      requested: cost.kind === "pool" ? cost.base : undefined,
       roll: 0,
       eventType: "castShadowArt",
       concentrates: false,
@@ -182,7 +219,7 @@ async function applyActivateCloakOfShadows(
     category: "resources",
     type: "castShadowArt",
     summary: outcome.summary,
-    data: { focusSpent: CLOAK_OF_SHADOWS_COST.base },
+    data: { focusSpent: cost.kind === "pool" ? cost.base : 0 },
     batchId,
     sessionId,
   });
@@ -216,12 +253,18 @@ export async function applyShadowArtsOperations(
       // would wrongly reject every cast; if that's ever needed, pass the real
       // pools instead of widening this comment.
       const level = levelForExperience(row.experiencePoints);
-      const actions = deriveEntryScopedActions(row.classEntries, level, [], true, editionOf(row));
+      const edition = editionOf(row);
+      const actions = deriveEntryScopedActions(row.classEntries, level, [], true, edition);
+      // Error text names the edition-correct subclass and level — 2014's Way
+      // of Shadow gates Cloak of Shadows at L11, not 2024's L17 (PHB'14 p.80
+      // vs PHB'24 p.91); Shadow Arts gates at L3 in both.
+      const subclassLabel = edition === "EDITION_2014" ? "Way of Shadow" : "Warrior of Shadow";
 
       if (op.type === "activateCloakOfShadows") {
         if (!actions.some((a) => a.key === "cloakOfShadows")) {
+          const gateLevel = edition === "EDITION_2014" ? 11 : 17;
           throw new InvalidShadowArtOperationError(
-            "Only a Warrior of Shadow monk (level 17+) can use Cloak of Shadows",
+            `Only a ${subclassLabel} monk (level ${gateLevel}+) can use Cloak of Shadows`,
           );
         }
         await applyActivateCloakOfShadows(tx, characterId, batchId, sessionId, row);
@@ -230,7 +273,7 @@ export async function applyShadowArtsOperations(
 
       if (!actions.some((a) => a.key === "shadowArts")) {
         throw new InvalidShadowArtOperationError(
-          "Only a Warrior of Shadow monk (level 3+) can cast Shadow Arts spells",
+          `Only a ${subclassLabel} monk (level 3+) can cast Shadow Arts spells`,
         );
       }
       await applyCastShadowArt(tx, characterId, op, batchId, sessionId, row);

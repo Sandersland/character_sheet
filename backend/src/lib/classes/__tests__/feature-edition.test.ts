@@ -651,9 +651,9 @@ const EXPECTED_EDITION_TAGGED_FEATURES = [
   ["paladin", "oath of vengeance", "Relentless Avenger"],
   ["paladin", "oath of vengeance", "Soul of Vengeance"],
   ["paladin", "oath of vengeance", "Avenging Angel"],
-  // Monk's 12 new triples (#1500 base class + #1501 Open Hand's new context
-  // — the two remaining Warrior-of-* subclasses stay an untouched
-  // transport-only twin, #1502-#1503): of the base class's 12
+  // Monk's 14 new triples (#1500 base class + #1501 Open Hand's new context +
+  // #1502 Shadow's new context — Warrior of the Elements/Warrior of Mercy
+  // stay an untouched transport-only twin, #1503): of the base class's 12
   // forked-or-unique-per-edition features, only "Martial Arts" and
   // "Stunning Strike" keep the SAME NAME across both editions (SRD 5.1 and
   // PHB'24 both call them that, with genuinely different text) — taggedNamesFor
@@ -669,17 +669,18 @@ const EXPECTED_EDITION_TAGGED_FEATURES = [
   // Body/Perfect Self on the 2014 side) have no counterpart to fork against
   // at all. Both base names show up under EVERY subclass context Monk has
   // (undefined/warrior of the open hand/way of the open hand/warrior of
-  // shadow/warrior of the elements/warrior of mercy — collectTaggedFeatureKeys
-  // combines classRows, always ALL of them, with each context's own
-  // subclassRows) — 2 names x 6 contexts = 12. Way of the Open Hand's OWN
-  // four feature names are NOT tagged here — #1501 forked it into a
-  // SEPARATE 2014-only subclass rather than a same-slug fork, so
-  // loadDbFeatureRows("monk", "way of the open hand") only ever returns
-  // EDITION_2014 rows: one description per name, not two (same "separate
-  // subclass, not a fork" shape as Barbarian's Totem Warrior or Warlock's
-  // The Archfey above). Warrior of the Open Hand's own four names are no
-  // longer tagged either (they used to be, pre-#1501, when one slug held
-  // both editions' text) — that slug's rows are now EDITION_2024-only too.
+  // shadow/way of shadow/warrior of the elements/warrior of mercy —
+  // collectTaggedFeatureKeys combines classRows, always ALL of them, with
+  // each context's own subclassRows) — 2 names x 7 contexts = 14. Neither
+  // Way of the Open Hand's nor Way of Shadow's OWN feature names are tagged
+  // here — #1501/#1502 each forked their 2014 sibling into a SEPARATE
+  // subclass rather than a same-slug fork, so loadDbFeatureRows("monk", "way
+  // of …") only ever returns EDITION_2014 rows: one description per name,
+  // not two (same "separate subclass, not a fork" shape as Barbarian's Totem
+  // Warrior or Warlock's The Archfey above). Warrior of the Open Hand's and
+  // Warrior of Shadow's own feature names are no longer tagged either (they
+  // used to be, pre-#1501/#1502, when one slug held both editions' text) —
+  // both slugs' rows are now EDITION_2024-only too.
   ["monk", "undefined", "Martial Arts"],
   ["monk", "undefined", "Stunning Strike"],
   ["monk", "warrior of the open hand", "Martial Arts"],
@@ -688,6 +689,8 @@ const EXPECTED_EDITION_TAGGED_FEATURES = [
   ["monk", "way of the open hand", "Stunning Strike"],
   ["monk", "warrior of shadow", "Martial Arts"],
   ["monk", "warrior of shadow", "Stunning Strike"],
+  ["monk", "way of shadow", "Martial Arts"],
+  ["monk", "way of shadow", "Stunning Strike"],
   ["monk", "warrior of the elements", "Martial Arts"],
   ["monk", "warrior of the elements", "Stunning Strike"],
   ["monk", "warrior of mercy", "Martial Arts"],

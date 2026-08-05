@@ -34,10 +34,11 @@ const BASE = null;
 const OPEN_HAND = "monk-warrior-of-the-open-hand";
 const WAY_OPEN_HAND = "monk-way-of-the-open-hand";
 const SHADOW = "monk-warrior-of-shadow";
+const WAY_OF_SHADOW = "monk-way-of-shadow";
 const ELEMENTS = "monk-warrior-of-the-elements";
 const MERCY = "monk-warrior-of-mercy";
 
-describe("Per-partition counts: base 17(2014)/18(2024); open hand forks into two 4-row EDITION-EXCLUSIVE subclasses (#1501); shadow 4, elements 5, mercy 6 still identical for 2014/2024 pending #1502-#1503", () => {
+describe("Per-partition counts: base 17(2014)/18(2024); open hand (#1501) and shadow (#1502) each fork into two 4-row EDITION-EXCLUSIVE subclasses; elements 5, mercy 6 still identical for 2014/2024 pending #1503", () => {
   it("counts match exactly (36 total 2014, 37 total 2024)", () => {
     const count = (slug: string | null, edition: Edition) => MONK_FEATURES.filter((r) => r.subclassSlug === slug && r.edition === edition).length;
     expect(count(BASE, "EDITION_2014")).toBe(17);
@@ -50,10 +51,17 @@ describe("Per-partition counts: base 17(2014)/18(2024); open hand forks into two
     expect(count(WAY_OPEN_HAND, "EDITION_2014")).toBe(4);
     expect(count(WAY_OPEN_HAND, "EDITION_2024")).toBe(0);
     for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {
-      expect(count(SHADOW, edition)).toBe(4);
       expect(count(ELEMENTS, edition)).toBe(5);
       expect(count(MERCY, edition)).toBe(6);
     }
+    // Warrior of Shadow (2024) and Way of Shadow (2014, #1502) are now
+    // DISTINCT slugs, each populated in exactly its own edition — the 2014/
+    // 2024 swap between them nets to zero on both totals below.
+    expect(count(SHADOW, "EDITION_2014")).toBe(0);
+    expect(count(SHADOW, "EDITION_2024")).toBe(4);
+    expect(count(WAY_OF_SHADOW, "EDITION_2014")).toBe(4);
+    expect(count(WAY_OF_SHADOW, "EDITION_2024")).toBe(0);
+
     const total2014 = MONK_FEATURES.filter((r) => r.edition === "EDITION_2014").length;
     const total2024 = MONK_FEATURES.filter((r) => r.edition === "EDITION_2024").length;
     expect(total2014).toBe(36);

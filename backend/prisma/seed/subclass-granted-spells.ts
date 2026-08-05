@@ -72,6 +72,19 @@ export const SUBCLASS_GRANTED_SPELLS: SubclassGrantedSpellSeed[] = [
     castingAbility: "wisdom",
     edition: "EDITION_2024",
   },
+  // Way of Shadow (Monk) — Shadow Arts (PHB'14 pp.79-80 — not in SRD 5.1,
+  // #1502): "you gain the minor illusion cantrip if you don't already know
+  // it," same L3/Wisdom shape as the 2024 grant above, on its OWN
+  // EDITION_2014-tagged Subclass row (monk-way-of-shadow) so it never leaks
+  // to a 2024 Warrior of Shadow monk or vice versa.
+  {
+    className: "Monk",
+    subclassName: "Way of Shadow",
+    spellName: "Minor Illusion",
+    gateLevel: 3,
+    castingAbility: "wisdom",
+    edition: "EDITION_2014",
+  },
   // Warrior of the Elements (Monk) — Manipulate Elements (L3) grants the
   // Elementalism cantrip (#1247, SRD 5.2 / PHB'24). EDITION_2024 for the same
   // reason as Warrior of Shadow above.

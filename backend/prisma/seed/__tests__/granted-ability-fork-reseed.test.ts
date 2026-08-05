@@ -20,6 +20,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 
 import { staleCatalogRowsWhere } from "../prune.js";
+import { SHADOW_ARTS } from "../shadow-arts.js";
 
 const MANEUVER_NAME = "Zzz Fork Reseed Maneuver (#1415)";
 const ART_NAME = "Zzz Fork Reseed Shadow Art (#1415)";
@@ -80,9 +81,12 @@ describe("the converse: an undeclared fork is pruned (#1313's remaining work)", 
       data: { name: ART_NAME, source: "shadowArts", description: "2024", edition: "EDITION_2024" },
     });
 
-    // The shape seedShadowArts passes today: `SHADOW_ARTS.map(a => ({ identity: a.name, edition: null }))`.
-    // The name IS declared, but only in the null partition — the 2014/2024
-    // partitions get `notIn: []`, which matches everything in them.
+    // A flat-null seeded list (every ShadowArtSeed.edition omitted) leaves the
+    // name declared only in the null partition — the 2014/2024 partitions get
+    // `notIn: []`, which matches everything in them and deletes both forks.
+    // No real seeder passes this shape any more (SHADOW_ARTS' edition is
+    // required, #1502) — this block stays as the CONVERSE half of the
+    // property below, proving the failure mode threading edition prevents.
     const seededAsToday = [{ identity: ART_NAME, edition: null }];
     await prisma.grantedAbility.deleteMany({
       where: staleCatalogRowsWhere("name", seededAsToday, { source: "shadowArts", ...ONLY_THIS_FILES_ROWS }),
@@ -100,8 +104,9 @@ describe("the converse: an undeclared fork is pruned (#1313's remaining work)", 
       data: { name: ART_NAME, source: "shadowArts", description: "2024", edition: "EDITION_2024" },
     });
 
-    // What #1313 must do: ShadowArtSeed gains `edition?: SeedEdition` and
-    // seedShadowArts maps `{ identity: a.name, edition: a.edition ?? null }`.
+    // What seedShadowArts does today (#1415/#1502): each row's OWN edition
+    // threads into the seeded list — `SHADOW_ARTS.map(a => ({ identity:
+    // a.name, edition: a.edition }))`, proven against the real catalog below.
     const seededWithEditions = [
       { identity: ART_NAME, edition: "EDITION_2014" as const },
       { identity: ART_NAME, edition: "EDITION_2024" as const },
@@ -112,6 +117,51 @@ describe("the converse: an undeclared fork is pruned (#1313's remaining work)", 
 
     const surviving = (await prisma.grantedAbility.findMany({ where: { name: ART_NAME } })).map((r) => r.edition);
     expect(surviving.sort()).toEqual(["EDITION_2014", "EDITION_2024"]);
+  });
+});
+
+// #1502: the real SHADOW_ARTS catalog (not a fixture) exercises the exact
+// mechanism above end-to-end — four EDITION_2014 rows plus one EDITION_2024
+// row, "Shadow Arts: Darkness" among them exactly once per edition. Safe to
+// run against the shared dev DB: reproducing seedShadowArts' own upsert-then-
+// prune shape against ITS OWN real, already-seeded rows twice is exactly what
+// a real `prisma db seed` run does, so this leaves the catalog in the same
+// state it started in (no fixture, nothing to clean up in afterEach).
+describe("the real SHADOW_ARTS catalog round-trips a reseed (#1502)", () => {
+  it("seeding twice leaves exactly 5 rows — 4 EDITION_2014 + 1 EDITION_2024 — with Darkness once per edition", async () => {
+    for (let run = 0; run < 2; run += 1) {
+      for (const art of SHADOW_ARTS) {
+        const data = {
+          name: art.name,
+          edition: art.edition,
+          source: "shadowArts",
+          description: art.description,
+          minLevel: 3,
+          alwaysKnown: true,
+          costKind: "pool",
+          costPoolKey: art.costPoolKey,
+          costBase: art.costBase,
+          costPerStep: null,
+          effectKind: null,
+          buffTarget: null,
+          buffModifier: null,
+        };
+        await upsertEditionRow(prisma.grantedAbility, { name: art.name, edition: art.edition }, data, data);
+      }
+      const staleWhere = staleCatalogRowsWhere(
+        "name",
+        SHADOW_ARTS.map((a) => ({ identity: a.name, edition: a.edition })),
+        { source: "shadowArts" },
+      );
+      await prisma.grantedAbility.deleteMany({ where: staleWhere });
+    }
+
+    const rows = await prisma.grantedAbility.findMany({ where: { source: "shadowArts" } });
+    expect(rows).toHaveLength(5);
+    expect(rows.filter((r) => r.edition === "EDITION_2014")).toHaveLength(4);
+    expect(rows.filter((r) => r.edition === "EDITION_2024")).toHaveLength(1);
+    const darkness = rows.filter((r) => r.name === "Shadow Arts: Darkness");
+    expect(darkness.map((r) => r.edition).sort()).toEqual(["EDITION_2014", "EDITION_2024"]);
   });
 });
 
