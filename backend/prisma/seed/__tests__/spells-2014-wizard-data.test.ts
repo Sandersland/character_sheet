@@ -14,6 +14,16 @@ import { SHARED_SPELLS_2014 } from "../spells-2014/shared.js";
 
 const CLASS_ROSTER = new Set(["wizard", "cleric", "druid", "bard", "sorcerer", "warlock", "paladin", "ranger"]);
 
+// Chromatic Orb and Fire Shield are the two deliberate exceptions to
+// "damageType iff effectKind 'damage'": each one's damage type is the
+// CASTER'S CHOICE (6 options for Chromatic Orb, warm-vs-chill for Fire
+// Shield), not a spell-level constant, so effectKind is still "damage"
+// (dice are real, fixed values) but damageType is intentionally absent —
+// there's no single correct value to put there. Shared at module scope
+// since both the field invariant and the prose-audit describe blocks below
+// need the same exception list.
+const DAMAGE_TYPE_EXCEPTIONS = new Set(["Chromatic Orb", "Fire Shield"]);
+
 function duplicates(names: string[]): string[] {
   const seen = new Set<string>();
   const dupes = new Set<string>();
@@ -95,13 +105,6 @@ describe("WIZARD_SPELLS_2014 — structured-field invariants (mirrors SPELLS' #1
     expect(bad, "dice fields not matching a damage/heal effectKind").toEqual([]);
   });
 
-  // Chromatic Orb is the one deliberate exception: its damage type is the
-  // CASTER'S CHOICE among 6 options (not a spell-level constant), so
-  // effectKind is still "damage" (dice/upcast are real, fixed values) but
-  // damageType is intentionally absent — there's no single correct value to
-  // put there. Every other row keeps the strict iff pairing.
-  const DAMAGE_TYPE_EXCEPTIONS = new Set(["Chromatic Orb"]);
-
   it("damageType appears iff effectKind is 'damage' (except the documented caster-chosen-type exceptions)", () => {
     const bad = WIZARD_SPELLS_2014.filter(
       (s) => !DAMAGE_TYPE_EXCEPTIONS.has(s.name) && (s.damageType != null) !== (s.effectKind === "damage"),
@@ -131,11 +134,87 @@ describe("WIZARD_SPELLS_2014 — saveEffect matches its own description text (fi
   });
 });
 
+// A rules-accuracy pass found dnd5eapi's own damage/dc JSON has real gaps —
+// Flaming Sphere and Scorching Ray had dc/attack_type: null despite their
+// prose clearly describing a save/attack, and Weird had damage: null
+// despite describing unconditional 4d10 psychic damage (the API simply
+// failed to structure them, unlike the mechanically-identical Phantasmal
+// Killer). derive-wizard.mjs's "trust the API's own fields" approach can't
+// catch what the API itself dropped, so this describe block audits the
+// PROSE directly against every row's structured fields — the same sweep
+// that found 5 more gaps (Levitate, Web, Otto's Irresistible Dance,
+// Antipathy/Sympathy, Contact Other Plane) beyond the first 4 — as a
+// permanent regression guard, not a one-time spot-check.
+describe("WIZARD_SPELLS_2014 — prose-vs-structured-field audit (catches what dnd5eapi's own JSON gaps hid)", () => {
+  // Rows where a damage/attack-shaped phrase in the prose is NOT the row's
+  // own primary structured effect — each has its own comment at the row
+  // explaining why (conditional/optional branch, weapon-damage buff, a
+  // per-ray/per-layer choice, or a narrative drawback unrelated to casting
+  // the spell itself). Every one of these was individually reviewed, not
+  // bulk-excluded.
+  const CONDITIONAL_OR_MULTI_EFFECT = new Set([
+    "Alter Self", // Natural Weapons is one of 3 selectable forms, chosen type
+    "Enlarge/Reduce", // 1d4 extra/less damage is a WEAPON-ATTACK buff, not a spell effect
+    "Bigby's Hand", // Clenched Fist is one of 4 selectable actions per turn
+    "Prismatic Wall", // 7 layers, each a different save ability AND damage type
+    "Wish", // 1d10/spell-level is a stress DRAWBACK on future casts, not Wish's own effect
+    "Meteor Swarm", // fire AND bludgeoning in one instance, no single damageType
+    "Prismatic Spray", // 8 rays, each a different type chosen per-ray
+    "Ray of Enfeeblement", // attack roll applies the debuff; the CON save only ends it early
+    "Ray of Sickness", // attack roll deals damage unconditionally; CON save only gates "poisoned"
+    "Web", // the restrain save is structured; 2d4 fire is a conditional "if set alight" bonus
+    "Haste", // "advantage on dexterity saving throws" is a BUFF it grants, not a save against Haste
+    "Shapechange", // "saving throw proficiencies" is prose about what you retain, not a save
+  ]);
+
+  it("every row mentioning 'saving throw' has attackType 'save', unless documented as conditional/multi-effect", () => {
+    const bad = WIZARD_SPELLS_2014.filter(
+      (s) => !CONDITIONAL_OR_MULTI_EFFECT.has(s.name) && /saving throw/i.test(s.description) && s.attackType !== "save",
+    ).map((s) => s.name);
+    expect(bad, "prose describes a saving throw but attackType isn't 'save'").toEqual([]);
+  });
+
+  it("every row mentioning '(melee|ranged) spell attack' has attackType 'attack', unless documented as conditional/multi-effect", () => {
+    const bad = WIZARD_SPELLS_2014.filter(
+      (s) => !CONDITIONAL_OR_MULTI_EFFECT.has(s.name) && /\b(melee|ranged)\s+spell\s+attack/i.test(s.description) && s.attackType !== "attack",
+    ).map((s) => s.name);
+    expect(bad, "prose describes a spell attack but attackType isn't 'attack'").toEqual([]);
+  });
+
+  it("every attackType:'save' row has a saveAbility", () => {
+    const bad = WIZARD_SPELLS_2014.filter((s) => s.attackType === "save" && !s.saveAbility).map((s) => s.name);
+    expect(bad).toEqual([]);
+  });
+
+  it("every row with an 'XdY <type> damage' phrase in prose has effectKind 'damage', unless documented as conditional/multi-effect", () => {
+    const bad = WIZARD_SPELLS_2014.filter((s) => {
+      if (CONDITIONAL_OR_MULTI_EFFECT.has(s.name) || DAMAGE_TYPE_EXCEPTIONS.has(s.name)) return false;
+      return /\d+d\d+[^.]{0,40}?damage/i.test(s.description) && s.effectKind !== "damage";
+    }).map((s) => s.name);
+    expect(bad, "prose describes dice damage but effectKind isn't 'damage'").toEqual([]);
+  });
+});
+
 describe("WIZARD_SPELLS_2014 — scraping-artifact guards (same shapes spells-2014-shared-data.test.ts found live)", () => {
   it("no row carries the dnd5eapi 'GM' genericization or its 'o f'/'10d 10' scraping artifacts", () => {
     const bad = WIZARD_SPELLS_2014.filter((s) => /\bGM\b/.test(s.description) || /\bo f\b/.test(s.description) || /\d+d \d+/.test(s.description)).map(
       (s) => s.name,
     );
+    expect(bad).toEqual([]);
+  });
+
+  // Fire Shield's dnd5eapi source had a duplicated "bright light bright
+  // light" phrase and a garbled, un-parseable sentence that reads like a
+  // French-to-English machine-translation artifact ("depending on the
+  // model" for what should be "depending on the shield you chose") — caught
+  // by the mandatory rules-accuracy pass. Guarded here so a future dnd5eapi
+  // re-scrape can't quietly reintroduce either shape.
+  it("no description repeats a whole word back-to-back (e.g. 'bright light bright light'), or carries a stray 'depending on the model' translation artifact", () => {
+    const bad = WIZARD_SPELLS_2014.filter((s) => {
+      const dupedWordPhrase = /\b(\w+ \w+)\b \1\b/i.test(s.description);
+      const translationArtifact = /depending on the model/i.test(s.description);
+      return dupedWordPhrase || translationArtifact;
+    }).map((s) => s.name);
     expect(bad).toEqual([]);
   });
 
@@ -260,5 +339,85 @@ describe("WIZARD_SPELLS_2014 — value spot-checks", () => {
   it("Fireball and Magic Missile are 2-list (Sorcerer+Wizard only in PHB'14) — authored here, NOT shared.ts's territory", () => {
     expect(find("Fireball").classes).toEqual(["wizard", "sorcerer"]);
     expect(find("Magic Missile").classes).toEqual(["wizard", "sorcerer"]);
+  });
+
+  it("Flaming Sphere: DEX save, half on success, 2d6 fire + upcast — dnd5eapi's own dc field was null despite the prose", () => {
+    const s = find("Flaming Sphere");
+    expect(s.attackType).toBe("save");
+    expect(s.saveAbility).toBe("dexterity");
+    expect(s.saveEffect).toBe("half");
+    expect(s.effectDiceCount).toBe(2);
+    expect(s.effectDiceFaces).toBe(6);
+    expect(s.damageType).toBe("fire");
+    expect(s.upcastDicePerLevel).toBe(1);
+  });
+
+  it("Scorching Ray: ranged spell attack per ray, 2d6 fire — dnd5eapi's own attack_type field was null despite the prose", () => {
+    const s = find("Scorching Ray");
+    expect(s.attackType).toBe("attack");
+    expect(s.effectKind).toBe("damage");
+    expect(s.effectDiceCount).toBe(2);
+    expect(s.effectDiceFaces).toBe(6);
+    expect(s.damageType).toBe("fire");
+  });
+
+  it("Weird: the mass Phantasmal Killer — 4d10 psychic, saveEffect 'none', hand-added since dnd5eapi's own damage field was null (unlike Phantasmal Killer's identical mechanic)", () => {
+    const s = find("Weird");
+    expect(s.attackType).toBe("save");
+    expect(s.saveAbility).toBe("wisdom");
+    expect(s.saveEffect).toBe("none");
+    expect(s.effectKind).toBe("damage");
+    expect(s.effectDiceCount).toBe(4);
+    expect(s.effectDiceFaces).toBe(10);
+    expect(s.damageType).toBe("psychic");
+  });
+
+  it("Fire Shield: 2d8 damage, warm-vs-chill is the caster's choice (no fixed damageType), no scraping-artifact text survives", () => {
+    const s = find("Fire Shield");
+    expect(s.effectKind).toBe("damage");
+    expect(s.effectDiceCount).toBe(2);
+    expect(s.effectDiceFaces).toBe(8);
+    expect(s.damageType).toBeUndefined();
+    expect(s.description).not.toMatch(/bright light bright light/i);
+    expect(s.description).not.toMatch(/depending on the model/i);
+  });
+
+  it("Levitate: an unwilling target resists with a CON save — no damage, dnd5eapi's own dc field was null despite the prose", () => {
+    const s = find("Levitate");
+    expect(s.attackType).toBe("save");
+    expect(s.saveAbility).toBe("constitution");
+    expect(s.effectKind).toBeUndefined();
+  });
+
+  it("Web: DEX save to avoid being restrained (the 2d4 fire is a conditional 'if set alight' bonus, not the default effect)", () => {
+    const s = find("Web");
+    expect(s.attackType).toBe("save");
+    expect(s.saveAbility).toBe("dexterity");
+    expect(s.effectKind).toBeUndefined();
+  });
+
+  it("Otto's Irresistible Dance: WIS save to regain control — no damage, dnd5eapi's own dc field was null despite the prose", () => {
+    const s = find("Otto's Irresistible Dance");
+    expect(s.attackType).toBe("save");
+    expect(s.saveAbility).toBe("wisdom");
+    expect(s.effectKind).toBeUndefined();
+  });
+
+  it("Antipathy/Sympathy: WIS save (either aura) — no damage, dnd5eapi's own dc field was null despite the prose", () => {
+    const s = find("Antipathy/Sympathy");
+    expect(s.attackType).toBe("save");
+    expect(s.saveAbility).toBe("wisdom");
+    expect(s.effectKind).toBeUndefined();
+  });
+
+  it("Contact Other Plane: 6d6 psychic on a failed INT save, saveEffect 'none' — hand-added since dnd5eapi's own damage field was null (same gap class as Weird)", () => {
+    const s = find("Contact Other Plane");
+    expect(s.attackType).toBe("save");
+    expect(s.saveAbility).toBe("intelligence");
+    expect(s.saveEffect).toBe("none");
+    expect(s.effectKind).toBe("damage");
+    expect(s.effectDiceCount).toBe(6);
+    expect(s.effectDiceFaces).toBe(6);
+    expect(s.damageType).toBe("psychic");
   });
 });

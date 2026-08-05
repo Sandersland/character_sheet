@@ -269,13 +269,20 @@ test("creation: a 2014 warlock must choose its patron at creation", async ({ pag
   await continueStep(page);
 
   // Spells step — level1SpellPicks is edition-invariant, so a 2014 Warlock
-  // still walks it exactly like the 2024 case above.
+  // still walks it exactly like the 2024 case above, EXCEPT the last pick:
+  // #1714 forked Hideous Laughter to its real PHB'14 text (Bard+Wizard only —
+  // Warlock's access to it is a 2024 addition, SRD 5.2's own class list
+  // widened it, see spells.ts's own "Hideous Laughter is warlock-legal under
+  // SRD 5.2" comment on the 2024 test above). Before that fork, this spec
+  // passed only because the no-2014-row fallback served the 2024 (warlock-
+  // legal) row to a 2014 character too; a real fork now correctly excludes
+  // it. Protection from Evil and Good is warlock-legal in BOTH editions.
   await expect(page.getByRole("heading", { name: "Learn your magic" })).toBeVisible();
   await page.getByRole("button", { name: "Open Eldritch Blast" }).click();
   await page.getByRole("button", { name: /Learn Eldritch Blast/ }).click();
   await page.getByRole("button", { name: "Add Poison Spray" }).click();
   await page.getByRole("button", { name: "Add Charm Person" }).click();
-  await page.getByRole("button", { name: "Add Hideous Laughter" }).click();
+  await page.getByRole("button", { name: "Add Protection from Evil and Good" }).click();
   await continueStep(page);
 
   // Equipment step — unlike the 2024 case above, a 2014 Warlock package still

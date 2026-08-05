@@ -55,6 +55,18 @@
 // (a real gap, flagged for follow-up, left unfixed to avoid touching a
 // sibling slice's file). Protection from Energy (Cleric/Druid/Ranger/
 // Sorcerer/Wizard, 5-list) has the same shared.ts gap.
+//
+// A rules-accuracy pass found 4 more effect-field bugs (Flaming Sphere,
+// Scorching Ray, Weird, Fire Shield — each detailed inline at its own row)
+// and a follow-up audit of EVERY damage/save row in this file (grepping the
+// prose itself for "saving throw"/"spell attack"/"XdY ... damage" and
+// diffing against each row's structured fields, not just trusting dnd5eapi's
+// own damage/dc JSON) found 5 more: Levitate, Web, Otto's Irresistible
+// Dance, Antipathy/Sympathy, and Contact Other Plane were all real save
+// spells dnd5eapi's own data left dc:null on, same root cause as Flaming
+// Sphere/Scorching Ray — the API's structured fields have gaps this file's
+// derivation script trusted too readily. Every hand-added field below still
+// traces to the row's OWN prose, not a separate guess.
 import type { CatalogSpell } from "../spells.js";
 
 export const WIZARD_SPELLS_2014: CatalogSpell[] = [
@@ -407,6 +419,14 @@ export const WIZARD_SPELLS_2014: CatalogSpell[] = [
     concentration: true,
     classes: ["wizard", "druid"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "a bit of tallow, a pinch of brimstone, and a dusting of powdered iron" },
+    // dnd5eapi's own dc field was null for this spell despite the prose
+    // clearly describing a save ("must make a dexterity saving throw...half
+    // as much damage on a successful one") — a real gap in the API's
+    // structured data the coordinator's review pass caught, not a rules
+    // choice. Hand-added.
+    attackType: "save",
+    saveAbility: "dexterity",
+    saveEffect: "half",
     effectKind: "damage",
     effectDiceCount: 2,
     effectDiceFaces: 6,
@@ -436,6 +456,10 @@ export const WIZARD_SPELLS_2014: CatalogSpell[] = [
     concentration: true,
     classes: ["wizard", "sorcerer"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "either a small leather loop or a piece of golden wire bent into a cup shape with a long shank on one end" },
+    // Real save (an unwilling creature resists), not modeled with damage —
+    // API's own dc field was null despite the prose. Coordinator's audit finding.
+    attackType: "save",
+    saveAbility: "constitution",
   },
   {
     name: "Magic Mouth",
@@ -525,6 +549,10 @@ export const WIZARD_SPELLS_2014: CatalogSpell[] = [
     description: "You create three rays of fire and hurl them at targets within range. You can hurl them at one target or several. Make a ranged spell attack for each ray. On a hit, the target takes 2d6 fire damage. At Higher Levels. When you cast this spell using a spell slot of 3rd level or higher, you create one additional ray for each slot level above 2nd.",
     classes: ["wizard", "sorcerer"],
     components: { verbal: true, somatic: true, material: false },
+    // dnd5eapi's own attack_type field was null despite the prose saying
+    // "Make a ranged spell attack for each ray" — hand-added (same API gap
+    // class as Flaming Sphere's missing save).
+    attackType: "attack",
     effectKind: "damage",
     effectDiceCount: 2,
     effectDiceFaces: 6,
@@ -541,6 +569,13 @@ export const WIZARD_SPELLS_2014: CatalogSpell[] = [
     concentration: true,
     classes: ["wizard", "sorcerer"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "a bit of spiderweb" },
+    // The restrain save is the spell's primary/unconditional effect — API's
+    // own dc field was null despite the prose. The 2d4 fire damage is a
+    // separate, conditional effect (only if the webs are set alight), left
+    // out of effectKind (matches the "conditional, not the default effect"
+    // precedent — Bigby's Hand/Control Water). Coordinator's audit finding.
+    attackType: "save",
+    saveAbility: "dexterity",
   },
   // ── Level 3 ───────────────────────────────────────────────────────────────
   {
@@ -727,6 +762,15 @@ export const WIZARD_SPELLS_2014: CatalogSpell[] = [
     classes: ["wizard"],
     components: { verbal: true, somatic: true, material: false },
   },
+  // dnd5eapi's own desc[] for this spell was corrupted at the source — a
+  // duplicated "bright light bright light" phrase, and a garbled sentence
+  // ("The flames are around you a heat shield or cold, your choice...")
+  // that reads like a mistranslation artifact rather than genuine SRD prose
+  // — caught by the coordinator's rules-accuracy review. Reconstructed from
+  // PHB'14 knowledge below rather than patched word-by-word, since the
+  // source sentence's grammar was broken beyond a single fix. Mechanics
+  // (10-min duration, bright/dim light radii, resistance choice, 2d8
+  // damage to a melee attacker) are unchanged from the source's own numbers.
   {
     name: "Fire Shield",
     level: 4,
@@ -734,13 +778,16 @@ export const WIZARD_SPELLS_2014: CatalogSpell[] = [
     castingTime: "1 action",
     range: "Self",
     duration: "10 minutes",
-    description: "Thin and vaporous flame surround your body for the duration of the spell, radiating a bright light bright light in a 10-foot radius and dim light for an additional 10 feet. You can end the spell using an action to make it disappear. The flames are around you a heat shield or cold, your choice. The heat shield gives you cold damage resistance and the cold resistance to fire damage. In addition, whenever a creature within 5 feet of you hits you with a melee attack, flames spring from the shield. The attacker then suffers 2d8 points of fire damage or cold, depending on the model.",
+    description: "Thin and vaporous flames wreathe your body for the duration, shedding bright light in a 10-foot radius and dim light for an additional 10 feet. You can end the spell early by using an action to dismiss it. The flames provide you with a warm shield or a chill shield, as you choose. The warm shield grants you resistance to cold damage, and the chill shield grants you resistance to fire damage. In addition, whenever a creature within 5 feet of you hits you with a melee attack, the shield erupts with flame. The attacker takes 2d8 fire damage from a warm shield or 2d8 cold damage from a chill shield.",
     classes: ["wizard"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "a little phosphorus or a firefly" },
+    // damageType is the caster's CHOICE (warm shield deals fire, chill
+    // shield deals cold — a binary version of Chromatic Orb's 6-way
+    // choice), so it's unset — the second documented DAMAGE_TYPE_EXCEPTIONS
+    // entry in this slice's data test.
     effectKind: "damage",
     effectDiceCount: 2,
     effectDiceFaces: 8,
-    damageType: "fire",
   },
   // PHB'14's actual title — dnd5eapi's SRD 5.1 text genericizes this to "Secret Chest".
   {
@@ -895,6 +942,18 @@ export const WIZARD_SPELLS_2014: CatalogSpell[] = [
     components: { verbal: true, somatic: false, material: false },
     attackType: "save",
     saveAbility: "intelligence",
+    // dnd5eapi's own damage field was null (dc_success was "other", not
+    // "none", since success also grants five questions — a branch beyond
+    // plain half/none) despite the prose describing unconditional 6d6
+    // psychic damage on a failed save; success means zero damage, so
+    // saveEffect "none" fits for the damage dimension specifically (the
+    // insanity status isn't modeled, same as Ray of Sickness's poisoned).
+    // Same API-gap class as Weird. Coordinator's audit finding.
+    saveEffect: "none",
+    effectKind: "damage",
+    effectDiceCount: 6,
+    effectDiceFaces: 6,
+    damageType: "psychic",
   },
   {
     name: "Creation",
@@ -1124,6 +1183,10 @@ export const WIZARD_SPELLS_2014: CatalogSpell[] = [
     concentration: true,
     classes: ["wizard", "bard"],
     components: { verbal: true, somatic: false, material: false },
+    // WIS save to regain control — no damage. API's own dc field was null
+    // despite the prose. Coordinator's audit finding.
+    attackType: "save",
+    saveAbility: "wisdom",
   },
   {
     name: "Programmed Illusion",
@@ -1277,6 +1340,10 @@ export const WIZARD_SPELLS_2014: CatalogSpell[] = [
     description: "This spell attracts or repels creatures of your choice. You target something within range, either a Huge or smaller object or creature or an area that is no larger than a 200-foot cube. Then specify a kind of intelligent creature, such as red dragons, goblins, or vampires. You invest the target with an aura that either attracts or repels the specified creatures for the duration. Choose antipathy or sympathy as the aura's effect. Antipathy. The enchantment causes creatures of the kind you designated to feel an intense urge to leave the area and avoid the target. When such a creature can see the target or comes within 60 feet of it, the creature must succeed on a wisdom saving throw or become frightened. The creature remains frightened while it can see the target or is within 60 feet of it. While frightened by the target, the creature must use its movement to move to the nearest safe spot from which it can't see the target. If the creature moves more than 60 feet from the target and can't see it, the creature is no longer frightened, but the creature becomes frightened again if it regains sight of the target or moves within 60 feet of it. Sympathy. The enchantment causes the specified creatures to feel an intense urge to approach the target while within 60 feet of it or able to see it. When such a creature can see the target or comes within 60 feet of it, the creature must succeed on a wisdom saving throw or use its movement on each of its turns to enter the area or move within reach of the target. When the creature has done so, it can't willingly move away from the target. If the target damages or otherwise harms an affected creature, the affected creature can make a wisdom saving throw to end the effect, as described below. Ending the Effect. If an affected creature ends its turn while not within 60 feet of the target or able to see it, the creature makes a wisdom saving throw. On a successful save, the creature is no longer affected by the target and recognizes the feeling of repugnance or attraction as magical. In addition, a creature affected by the spell is allowed another wisdom saving throw every 24 hours while the spell persists. A creature that successfully saves against this effect is immune to it for 1 minute, after which time it can be affected again.",
     classes: ["wizard", "druid"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "either a lump of alum soaked in vinegar for the antipathy effect or a drop of honey for the sympathy effect" },
+    // WIS save (either aura) — no damage. API's own dc field was null
+    // despite the prose. Coordinator's audit finding.
+    attackType: "save",
+    saveAbility: "wisdom",
   },
   {
     name: "Clone",
@@ -1428,6 +1495,17 @@ export const WIZARD_SPELLS_2014: CatalogSpell[] = [
     components: { verbal: true, somatic: true, material: false },
     attackType: "save",
     saveAbility: "wisdom",
+    // dnd5eapi's own damage field was null for this spell (dc_success was
+    // still "none", just no structured damage block) despite the prose
+    // describing unconditional 4d10 psychic damage on a failed per-turn
+    // save — the mass version of Phantasmal Killer, which the API DID
+    // structure correctly (same mechanic, same numbers). Hand-added to
+    // match; caught by the coordinator's rules-accuracy review.
+    saveEffect: "none",
+    effectKind: "damage",
+    effectDiceCount: 4,
+    effectDiceFaces: 10,
+    damageType: "psychic",
   },
   {
     name: "Wish",
