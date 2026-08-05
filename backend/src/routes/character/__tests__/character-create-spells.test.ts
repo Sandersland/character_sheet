@@ -27,18 +27,37 @@ async function create(body: { rulesEdition?: string } & Record<string, unknown>)
   return supertest(app).post("/api/characters").set("Cookie", COOKIE).send({ ...anchor, ...body });
 }
 
-async function warlockPicks() {
-  const cantrips = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "warlock" } }, level: 0 }, take: 2, select: { id: true } });
-  const spells = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "warlock" } }, level: 1 }, take: 2, select: { id: true } });
-  return { cantripIds: cantrips.map((s) => s.id), spellIds: spells.map((s) => s.id) };
+// #1713 landed genuine 2014/2024 forks for many real class-list spells (the
+// shared/3+-list bucket: Mage Hand, Charm Person, Cure Wounds, ...), and the
+// per-class 2014 content slices (#1714-#1721) will land more over time — a
+// raw classMembership+level Prisma query can no longer tell which rows a
+// GIVEN edition would actually resolve to (a name might have a real 2014
+// fork, or gracefully fall back to its only EDITION_2024-tagged row — see
+// resolveSpellCatalogForEdition's own comment). Rather than re-implement that
+// resolution here (and drift from it as more slices land), these pickers hit
+// the real `GET /api/spells` route and take whatever IT resolves for the
+// requested class+edition — the same source of truth `create()` validates
+// against.
+async function catalogSpellIds(className: string, level: number, edition: "EDITION_2014" | "EDITION_2024", count: number): Promise<string[]> {
+  const res = await supertest(app).get(`/api/spells?class=${className}&edition=${edition}`).set("Cookie", COOKIE);
+  const matches = (res.body as Array<{ id: string; level: number }>).filter((s) => s.level === level);
+  return matches.slice(0, count).map((s) => s.id);
+}
+
+async function warlockPicks(edition: "EDITION_2014" | "EDITION_2024" = "EDITION_2024") {
+  return {
+    cantripIds: await catalogSpellIds("warlock", 0, edition, 2),
+    spellIds: await catalogSpellIds("warlock", 1, edition, 2),
+  };
 }
 
 // #1510: picks a class's spell-list catalog rows for a 2014 creation body —
 // cantripCount cantrips + spellCount level-1 spells, from the real seeded catalog.
-async function picksFor(className: string, cantripCount: number, spellCount: number) {
-  const cantrips = await prisma.spell.findMany({ where: { classMemberships: { some: { className: className } }, level: 0 }, take: cantripCount, select: { id: true } });
-  const spells = await prisma.spell.findMany({ where: { classMemberships: { some: { className: className } }, level: 1 }, take: spellCount, select: { id: true } });
-  return { cantripIds: cantrips.map((s) => s.id), spellIds: spells.map((s) => s.id) };
+async function picksFor(className: string, cantripCount: number, spellCount: number, edition: "EDITION_2014" | "EDITION_2024" = "EDITION_2014") {
+  return {
+    cantripIds: await catalogSpellIds(className, 0, edition, cantripCount),
+    spellIds: await catalogSpellIds(className, 1, edition, spellCount),
+  };
 }
 
 beforeAll(async () => {
@@ -103,7 +122,7 @@ describe("POST /api/characters — creation spell/cantrip picks (#1131)", () => 
 
   it("rejects an off-list spell", async () => {
     const picks = await warlockPicks();
-    const clericSpell = await prisma.spell.findFirstOrThrow({ where: { classMemberships: { some: { className: "cleric" } }, level: 1, NOT: { classMemberships: { some: { className: "warlock" } } } }, select: { id: true } });
+    const clericSpell = await prisma.spell.findFirstOrThrow({ where: { classMemberships: { some: { className: "cleric" } }, level: 1, edition: "EDITION_2024", NOT: { classMemberships: { some: { className: "warlock" } } } }, select: { id: true } });
     const res = await create({
       ...BASE,
       name: "CreateSpells OffList",
@@ -117,7 +136,7 @@ describe("POST /api/characters — creation spell/cantrip picks (#1131)", () => 
   it("rejects a leveled spell placed in cantripIds", async () => {
     const picks = await warlockPicks();
     // A third, distinct leveled warlock spell so the level check (not the dup check) fires.
-    const [, , extra] = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "warlock" } }, level: 1 }, take: 3, select: { id: true } });
+    const [, , extra] = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "warlock" } }, level: 1, edition: "EDITION_2024" }, take: 3, select: { id: true } });
     const res = await create({
       ...BASE,
       name: "CreateSpells LeveledCantrip",
@@ -303,7 +322,7 @@ describe("POST /api/characters — 2014 creation spell picks (#1510)", () => {
 describe("POST /api/characters — wizard spellbook vs. prepared cap (#1513)", () => {
   it("a Wizard scribes 6 level-1 spells and has exactly 4 prepared (INT 16) — both editions", async () => {
     for (const rulesEdition of ["EDITION_2014", "EDITION_2024"] as const) {
-      const picks = await picksFor("wizard", 3, 6);
+      const picks = await picksFor("wizard", 3, 6, rulesEdition);
       const res = await create({
         ...BASE,
         name: `CreateSpells1513 Wizard ${rulesEdition}`,
@@ -340,7 +359,7 @@ describe("POST /api/characters — wizard spellbook vs. prepared cap (#1513)", (
   });
 
   it("a 2024 Wizard sending 4 level-1 spells is a 400 naming 6, not 4 (mutation proof for the spellbook/prepared conflation)", async () => {
-    const picks = await picksFor("wizard", 3, 4);
+    const picks = await picksFor("wizard", 3, 4, "EDITION_2024");
     const res = await create({
       ...BASE,
       name: "CreateSpells1513 WizardTooFew2024",
@@ -364,11 +383,11 @@ describe("POST /api/characters — wizard spellbook vs. prepared cap (#1513)", (
 
 // #1712: cross-edition admission — resolveCreationSpells rejects a submitted
 // spell id that is provably the WRONG edition's fork of a name (a same-named
-// row the requesting edition actually resolves to exists). Today's real
-// catalog has no forks (2014 content slices haven't landed), so this proves
-// the mechanism with a fixture fork rather than real catalog rows — the two
-// existing describe blocks above already prove a 2014/2024 creation accepts
-// today's (unforked, EDITION_2024-tagged) real catalog unchanged.
+// row the requesting edition actually resolves to exists). A dedicated
+// fixture fork (rather than a real catalog name) keeps this mechanism proof
+// independent of which real spells #1713+'s content slices happen to fork —
+// the two existing describe blocks above already prove a 2014/2024 creation
+// accepts today's real catalog (forked or not) unchanged.
 describe("POST /api/characters — cross-edition spell-fork rejection (#1712)", () => {
   const FORK_NAME = "CreateSpells1712 Fork Cantrip";
 
@@ -395,9 +414,9 @@ describe("POST /api/characters — cross-edition spell-fork rejection (#1712)", 
   // exist as warlock-tagged level-0 spells they're eligible to be picked BY
   // that query too, which would silently duplicate the fork id in a two-cantrip
   // submission (a "chosen only once" 400 masking the assertion under test).
-  async function otherWarlockCantripId(): Promise<string> {
+  async function otherWarlockCantripId(edition: "EDITION_2014" | "EDITION_2024" = "EDITION_2024"): Promise<string> {
     const row = await prisma.spell.findFirstOrThrow({
-      where: { classMemberships: { some: { className: "warlock" } }, level: 0, name: { not: FORK_NAME } },
+      where: { classMemberships: { some: { className: "warlock" } }, level: 0, edition, name: { not: FORK_NAME } },
       select: { id: true },
     });
     return row.id;
@@ -423,12 +442,13 @@ describe("POST /api/characters — cross-edition spell-fork rejection (#1712)", 
 
   it("rejects a 2014 creation submitting the 2024 fork's id, naming the spell", async () => {
     const { fork2024 } = await seedFork();
-    const otherCantrip = await otherWarlockCantripId();
-    // Warlock has no 2014-tagged cantrip catalog yet — pairing the wrong-fork id
-    // with the OTHER real (unforked, EDITION_2024) cantrip id it accepts
-    // elsewhere in this file is enough: this test targets the fork check
-    // specifically, not the full 2014 Warlock creation count.
-    const picks = await warlockPicks();
+    // #1713 gave Warlock a real 2014-tagged cantrip/L1 catalog (the shared/3+-
+    // list bucket: Mage Hand, Minor Illusion, ... are genuine 2014 rows now) —
+    // pair the wrong-fork id with the requesting edition's OWN real rows, or
+    // the 400 this test targets gets masked by an unrelated cross-edition
+    // rejection on `otherCantrip`/`picks` themselves.
+    const otherCantrip = await otherWarlockCantripId("EDITION_2014");
+    const picks = await warlockPicks("EDITION_2014");
     const res = await create({
       ...BASE,
       name: "CreateSpells1712 Wrong2024",
