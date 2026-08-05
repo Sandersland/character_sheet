@@ -242,6 +242,36 @@ describe("BARD_SPELLS_2014 — prose-vs-structured-field audit (catches what dnd
   });
 });
 
+// PR #1745's review pass found a DIFFERENT bug class than the structured-field
+// audit above catches: dnd5eapi's own JSON can drop a whole trailing sentence
+// (not just a null damage/dc field) — its 2014 Heroism response had
+// higher_level: [] despite real SRD 5.1 genuinely carrying an "At Higher
+// Levels" upcast clause. This is a permanent regression guard against that
+// same class of dropped-tail transcription bug: ground truth below was
+// individually verified against a second source (5thsrd.org, which mirrors
+// the OGL SRD 5.1 text) for all 5 of this slice's owned rows, not just
+// Heroism — future edits to this file must keep this set in sync with
+// whichever rows genuinely have upcast text.
+describe("BARD_SPELLS_2014 — no dropped 'At Higher Levels' tail text (dnd5eapi JSON-vs-real-SRD-text gap, PR #1745 review finding)", () => {
+  // Verified against 5thsrd.org: only Heroism has a real upcast clause among
+  // this slice's 5 owned rows (Enthrall/Compulsion/Glibness genuinely have
+  // none; Vicious Mockery's scaling is the cantrip-scaling sentence, not an
+  // "At Higher Levels" heading).
+  const HAS_AT_HIGHER_LEVELS_TEXT = new Set(["Heroism"]);
+
+  it("every row verified to have real SRD 'At Higher Levels' text actually carries it in its description", () => {
+    const missing = [...HAS_AT_HIGHER_LEVELS_TEXT].filter((name) => !/At Higher Levels\./.test(find(name).description));
+    expect(missing, "a row with verified upcast text is missing its 'At Higher Levels' sentence").toEqual([]);
+  });
+
+  it("no OTHER row in this slice claims 'At Higher Levels' text it wasn't verified to have (catches an accidental copy-paste in the other direction)", () => {
+    const unexpected = BARD_SPELLS_2014.filter(
+      (s) => !HAS_AT_HIGHER_LEVELS_TEXT.has(s.name) && /At Higher Levels\./.test(s.description),
+    ).map((s) => s.name);
+    expect(unexpected).toEqual([]);
+  });
+});
+
 describe("BARD_SPELLS_2014 — scraping-artifact guards (same shapes spells-2014-shared/wizard/cleric/druid-data.test.ts found live)", () => {
   it("no row carries the dnd5eapi 'GM' genericization or its 'o f'/'10d 10' scraping artifacts", () => {
     const bad = BARD_SPELLS_2014.filter((s) => /\bGM\b/.test(s.description) || /\bo f\b/.test(s.description) || /\d+d \d+/.test(s.description)).map(
@@ -306,13 +336,14 @@ describe("BARD_SPELLS_2014 — value spot-checks", () => {
     expect(s.cantripScaling).toBe(true);
   });
 
-  it("Heroism: 2-list (Bard + Paladin) — authored here (Bard outranks Paladin in the tie-break), not Paladin's territory; no attack/save/effectKind (temp-HP-per-turn is inexpressible as a dice heal)", () => {
+  it("Heroism: 2-list (Bard + Paladin) — authored here (Bard outranks Paladin in the tie-break), not Paladin's territory; no attack/save/effectKind (temp-HP-per-turn is inexpressible as a dice heal); carries its 'At Higher Levels' clause (dnd5eapi's own JSON dropped this — see PR #1745 review finding, hand-restored from a second source)", () => {
     const s = find("Heroism");
     expect(s.classes).toEqual(["bard", "paladin"]);
     expect(s.level).toBe(1);
     expect(s.concentration).toBe(true);
     expect(s.attackType).toBeUndefined();
     expect(s.effectKind).toBeUndefined();
+    expect(s.description).toMatch(/At Higher Levels\. When you cast this spell using a spell slot of 2nd level or higher, you can target one additional creature for each slot level above 1st\./);
   });
 
   it("Enthrall: 2-list (Bard + Warlock) — authored here (Bard outranks Warlock); WIS save gates a Perception-check penalty, no effectKind", () => {

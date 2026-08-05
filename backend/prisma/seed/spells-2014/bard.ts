@@ -45,6 +45,17 @@
 // Mockery's dc/damage JSON was fully populated (unlike the Wizard/Cleric/
 // Druid slices' documented gaps), and the other 4 owned rows carry no
 // damage/attack shape at all (pure save-or-be-affected utility spells).
+//
+// dnd5eapi's own TEXT (not just structured fields) has a gap too: its 2014
+// Heroism response silently drops the "At Higher Levels" sentence real
+// SRD 5.1 carries (higher_level: [] in its JSON, despite the PHB'14 text
+// genuinely having an upcast clause) — cross-checked and hand-restored from
+// a second source (5thsrd.org, which mirrors the OGL SRD 5.1 text). The
+// other 4 owned rows were individually cross-checked against the same
+// second source and confirmed to have NO "At Higher Levels" clause in the
+// real text (Enthrall, Compulsion, Glibness genuinely have none; Vicious
+// Mockery's scaling is the cantrip-scaling sentence already present) — so
+// dnd5eapi's JSON was complete for those 4, just not for Heroism.
 import type { CatalogSpell } from "../spells.js";
 
 export const BARD_SPELLS_2014: CatalogSpell[] = [
@@ -79,7 +90,7 @@ export const BARD_SPELLS_2014: CatalogSpell[] = [
     duration: "Up to 1 minute",
     concentration: true,
     description:
-      "A willing creature you touch is imbued with bravery. Until the spell ends, the creature is immune to being frightened and gains temporary hit points equal to your spellcasting ability modifier at the start of each of its turns. When the spell ends, the target loses any remaining temporary hit points from this spell.",
+      "A willing creature you touch is imbued with bravery. Until the spell ends, the creature is immune to being frightened and gains temporary hit points equal to your spellcasting ability modifier at the start of each of its turns. When the spell ends, the target loses any remaining temporary hit points from this spell. At Higher Levels. When you cast this spell using a spell slot of 2nd level or higher, you can target one additional creature for each slot level above 1st.",
     classes: ["bard", "paladin"],
     components: { verbal: true, somatic: true, material: false },
     // A per-turn temporary-hit-points grant tied to the caster's own ability
