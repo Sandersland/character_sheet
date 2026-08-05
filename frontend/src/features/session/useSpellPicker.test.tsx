@@ -114,6 +114,16 @@ describe("useSpellPicker", () => {
     expect(result.current.emptyMessage).toMatch(/No prepared spells/i);
   });
 
+  // #1511: a known caster's empty message reads its own fixed copy — the
+  // generic "No {label} spells" template would double "spells" ("No spells
+  // known spells available…") if it read the served preparedLabel verbatim.
+  it("reads its own copy for a known caster instead of doubling 'spells'", () => {
+    const known = makeCharacter([attackSpell]);
+    known.spellcasting = { ...known.spellcasting!, casterModel: "known", preparedLabel: "Spells known" };
+    const { result } = render(makeOpts([attackSpell], { character: known, castingTimeFilter: "1 bonus action" }));
+    expect(result.current.emptyMessage).toBe("No known spells available to cast right now.");
+  });
+
   it("surfaces the 5e restriction hint without an isEmpty early-out", () => {
     const { result } = render(
       makeOpts([healSpell], { slot: "bonusAction", spellCastThisTurn: { action: "leveled" } }),
