@@ -682,12 +682,138 @@ describe("Monk Deflect Attacks / Deflect Energy (#1241)", () => {
   });
 });
 
-// #1499: the class-derivation layer's edition axis. Only the seven base-class
-// monk rows tagged EDITION_2024 fork; every other row (including
-// bonusUnarmedStrike, deliberately shared) is served to both editions.
-describe("DERIVED_ACTIONS edition axis — 2014 Monk gets none of the seven 2024-tagged rows (#1499)", () => {
-  const TAGGED_2024_ROWS = [
-    "flurryOfBlows",
+describe("2014 Monk ki actions — Flurry of Blows / Patient Defense / Step of the Wind (#1500)", () => {
+  it("2014 monk L2 gets flurryOfBlows/patientDefenseKi/stepOfTheWindKi, each resourceKey ki amount 1 — and NOT the 2024 free/paid pair", () => {
+    const l2 = at("monk", undefined, 2, [pool("ki", 2)], true, "EDITION_2014");
+    const l2Keys = keys(l2);
+    expect(l2Keys).toContain("flurryOfBlows");
+    expect(l2Keys).toContain("patientDefenseKi");
+    expect(l2Keys).toContain("stepOfTheWindKi");
+    expect(l2Keys).not.toContain("patientDefense");
+    expect(l2Keys).not.toContain("patientDefenseFocus");
+    expect(l2Keys).not.toContain("stepOfTheWind");
+    expect(l2Keys).not.toContain("stepOfTheWindFocus");
+
+    for (const key of ["flurryOfBlows", "patientDefenseKi", "stepOfTheWindKi"]) {
+      const action = l2.find((a) => a.key === key);
+      expect(action, key).toBeDefined();
+      expect(action?.cost, key).toBe("bonusAction");
+    }
+  });
+
+  it("exactly one 2014 Patient Defense row and one 2014 Step of the Wind row — never two menu entries like 2024", () => {
+    const l2 = keys(at("monk", undefined, 2, [], true, "EDITION_2014"));
+    expect(l2.filter((k) => k === "patientDefenseKi")).toHaveLength(1);
+    expect(l2.filter((k) => k === "stepOfTheWindKi")).toHaveLength(1);
+  });
+
+  it("all three are gated on 1 remaining ki, like any other resource-gated action", () => {
+    const noKi = at("monk", undefined, 2, [pool("ki", 0)], true, "EDITION_2014");
+    for (const key of ["flurryOfBlows", "patientDefenseKi", "stepOfTheWindKi"]) {
+      const action = noKi.find((a) => a.key === key);
+      expect(action?.enabled, key).toBe(false);
+      expect(action?.disabledReason, key).toBe("No ki remaining");
+    }
+    const withKi = at("monk", undefined, 2, [pool("ki", 1)], true, "EDITION_2014");
+    for (const key of ["flurryOfBlows", "patientDefenseKi", "stepOfTheWindKi"]) {
+      expect(withKi.find((a) => a.key === key)?.enabled, key).toBe(true);
+    }
+  });
+
+  it("flurryOfBlows spends the EDITION-CORRECT pool via ctx.edition — ki for 2014, focus for 2024 (#1500)", () => {
+    expect(ACTION_EFFECT_FN.flurryOfBlows({ edition: "EDITION_2014" })).toEqual([
+      { type: "spendResource", key: "ki" },
+    ]);
+    expect(ACTION_EFFECT_FN.flurryOfBlows({ edition: "EDITION_2024" })).toEqual([
+      { type: "spendResource", key: "focus" },
+    ]);
+  });
+
+  it("patientDefenseKi/stepOfTheWindKi each spend exactly 1 ki", () => {
+    expect(ACTION_EFFECT_FN.patientDefenseKi({})).toEqual([{ type: "spendResource", key: "ki" }]);
+    expect(ACTION_EFFECT_FN.stepOfTheWindKi({})).toEqual([{ type: "spendResource", key: "ki" }]);
+  });
+
+  it("class gate: a non-monk gets none of the three keys", () => {
+    const fighter = keys(at("fighter", undefined, 20, [], true, "EDITION_2014"));
+    expect(fighter).not.toContain("flurryOfBlows");
+    expect(fighter).not.toContain("patientDefenseKi");
+    expect(fighter).not.toContain("stepOfTheWindKi");
+  });
+});
+
+describe("2014 Monk Deflect Missiles (#1500)", () => {
+  it("is granted at monk L3 as a reaction with no resourceKey (free reminder, base reduction costs nothing) — ranged only", () => {
+    expect(keys(at("monk", undefined, 2, [], true, "EDITION_2014"))).not.toContain("deflectMissiles");
+    const l3 = at("monk", undefined, 3, [], true, "EDITION_2014");
+    const deflect = l3.find((a) => a.key === "deflectMissiles");
+    expect(deflect).toBeDefined();
+    expect(deflect?.cost).toBe("reaction");
+    expect(deflect?.enabled).toBe(true);
+    expect(deflect?.reminder).toMatch(/ranged weapon attack/i);
+  });
+
+  it("is a pure reminder action — no server effect fn for the base reduction", () => {
+    expect(ACTION_EFFECT_FN.deflectMissiles).toBeUndefined();
+  });
+
+  it("deflectMissilesThrow is granted at monk L3, costs 1 ki, and spends it", () => {
+    const l3 = at("monk", undefined, 3, [pool("ki", 3)], true, "EDITION_2014");
+    const throwBack = l3.find((a) => a.key === "deflectMissilesThrow");
+    expect(throwBack).toBeDefined();
+    expect(throwBack?.cost).toBe("free");
+    expect(throwBack?.enabled).toBe(true);
+    expect(ACTION_EFFECT_FN.deflectMissilesThrow({})).toEqual([{ type: "spendResource", key: "ki" }]);
+  });
+
+  it("deflectMissilesThrow is disabled with no ki remaining", () => {
+    const throwBack = at("monk", undefined, 3, [pool("ki", 0)], true, "EDITION_2014").find(
+      (a) => a.key === "deflectMissilesThrow",
+    );
+    expect(throwBack?.enabled).toBe(false);
+  });
+
+  it("neither deflectAttacks/deflectAttacksRedirect (2024) is served to a 2014 monk, and vice versa", () => {
+    const monk2014 = keys(at("monk", undefined, 20, [pool("ki", 20)], true, "EDITION_2014"));
+    expect(monk2014).not.toContain("deflectAttacks");
+    expect(monk2014).not.toContain("deflectAttacksRedirect");
+    const monk2024 = keys(at("monk", undefined, 20, [pool("focus", 20)], true, "EDITION_2024"));
+    expect(monk2024).not.toContain("deflectMissiles");
+    expect(monk2024).not.toContain("deflectMissilesThrow");
+  });
+});
+
+describe("2014 Monk Empty Body (L18, #1500) — gating/reminder rows, no dedicated cast vertical yet", () => {
+  it("emptyBody (4 ki) and emptyBodyAstralProjection (8 ki) are granted at L18, not L17", () => {
+    expect(keys(at("monk", undefined, 17, [], true, "EDITION_2014"))).not.toContain("emptyBody");
+    const l18 = at("monk", undefined, 18, [pool("ki", 18)], true, "EDITION_2014");
+    const body = l18.find((a) => a.key === "emptyBody");
+    const astral = l18.find((a) => a.key === "emptyBodyAstralProjection");
+    expect(body?.enabled).toBe(true);
+    expect(astral?.enabled).toBe(true);
+  });
+
+  it("each is disabled below its own ki cost", () => {
+    const l18 = at("monk", undefined, 18, [pool("ki", 5)], true, "EDITION_2014");
+    expect(l18.find((a) => a.key === "emptyBody")?.enabled).toBe(true); // 5 >= 4
+    expect(l18.find((a) => a.key === "emptyBodyAstralProjection")?.enabled).toBe(false); // 5 < 8
+  });
+
+  it("neither has an ACTION_EFFECT_FN entry — reminder-only, like shadowArts/cloakOfShadows", () => {
+    expect(ACTION_EFFECT_FN.emptyBody).toBeUndefined();
+    expect(ACTION_EFFECT_FN.emptyBodyAstralProjection).toBeUndefined();
+  });
+});
+
+// #1499/#1500: the class-derivation layer's edition axis. Six base-class
+// monk rows are EDITION_2024-only (patientDefense/patientDefenseFocus/
+// stepOfTheWind/stepOfTheWindFocus/deflectAttacks/deflectAttacksRedirect —
+// no 2014 shape resembles the 2024 free/paid-pair or melee+ranged model);
+// flurryOfBlows is tagged for BOTH editions now under the SAME key (#1500,
+// mirrors Lay on Hands) rather than being 2024-exclusive; bonusUnarmedStrike
+// stays deliberately shared/untagged.
+describe("DERIVED_ACTIONS edition axis — 2014 Monk gets none of the six 2024-only rows (#1499/#1500)", () => {
+  const TAGGED_2024_ONLY_ROWS = [
     "patientDefense",
     "patientDefenseFocus",
     "stepOfTheWind",
@@ -696,28 +822,34 @@ describe("DERIVED_ACTIONS edition axis — 2014 Monk gets none of the seven 2024
     "deflectAttacksRedirect",
   ];
 
-  it("a level-20 EDITION_2014 monk has none of the seven tagged rows — the 2014 shapes are #1500's follow-up", () => {
+  it("a level-20 EDITION_2014 monk has none of the six 2024-only rows", () => {
     const l20 = keys(
       at("monk", undefined, 20, [pool("focus", 20), pool("wholenessOfBody", 5)], true, "EDITION_2014"),
     );
-    for (const key of TAGGED_2024_ROWS) {
+    for (const key of TAGGED_2024_ONLY_ROWS) {
       expect(l20).not.toContain(key);
     }
   });
 
-  it("the same 2014 monk still has bonusUnarmedStrike — the shared row is not swept up by the tagging pass", () => {
-    const l20 = keys(at("monk", undefined, 20, [], true, "EDITION_2014"));
+  it("the same 2014 monk still has bonusUnarmedStrike (shared) and its OWN flurryOfBlows/patientDefenseKi/stepOfTheWindKi rows (#1500)", () => {
+    const l20 = keys(at("monk", undefined, 20, [pool("ki", 20)], true, "EDITION_2014"));
     expect(l20).toContain("bonusUnarmedStrike");
+    expect(l20).toContain("flurryOfBlows");
+    expect(l20).toContain("patientDefenseKi");
+    expect(l20).toContain("stepOfTheWindKi");
   });
 
-  it("a level-20 EDITION_2024 monk is unaffected — has every one of the seven tagged rows", () => {
+  it("a level-20 EDITION_2024 monk is unaffected — has every one of the six 2024-only rows plus flurryOfBlows", () => {
     const l20 = keys(
       at("monk", undefined, 20, [pool("focus", 20), pool("wholenessOfBody", 5)], true, "EDITION_2024"),
     );
-    for (const key of TAGGED_2024_ROWS) {
+    for (const key of TAGGED_2024_ONLY_ROWS) {
       expect(l20).toContain(key);
     }
     expect(l20).toContain("bonusUnarmedStrike");
+    expect(l20).toContain("flurryOfBlows");
+    expect(l20).not.toContain("patientDefenseKi");
+    expect(l20).not.toContain("stepOfTheWindKi");
   });
 
   // Extends the #1431 synthetic-record test onto the edition axis: the SAME
@@ -730,15 +862,17 @@ describe("DERIVED_ACTIONS edition axis — 2014 Monk gets none of the seven 2024
     expect(matchesActionGate({ ...row, edition: "EDITION_2024" as const }, "monk", undefined, 20, "EDITION_2024")).toBe(true);
   });
 
-  it("actionGrantLevel filters on edition before find (#1499)", () => {
-    // flurryOfBlows is tagged EDITION_2024 only — a 2014 lookup finds nothing
-    // (no 2014-keyed row exists yet; #1500 adds one), while a 2024 lookup
-    // still resolves to its grantLevel.
+  it("actionGrantLevel resolves flurryOfBlows for BOTH editions now (#1500 — was EDITION_2014-undefined before this slice)", () => {
     expect(actionGrantLevel("flurryOfBlows", "EDITION_2024")).toBe(2);
-    expect(actionGrantLevel("flurryOfBlows", "EDITION_2014")).toBeUndefined();
+    expect(actionGrantLevel("flurryOfBlows", "EDITION_2014")).toBe(2);
     // bonusUnarmedStrike is untagged (shared) — resolves for both editions.
     expect(actionGrantLevel("bonusUnarmedStrike", "EDITION_2014")).toBe(1);
     expect(actionGrantLevel("bonusUnarmedStrike", "EDITION_2024")).toBe(1);
+    // patientDefenseKi/stepOfTheWindKi are EDITION_2014-only.
+    expect(actionGrantLevel("patientDefenseKi", "EDITION_2014")).toBe(2);
+    expect(actionGrantLevel("patientDefenseKi", "EDITION_2024")).toBeUndefined();
+    expect(actionGrantLevel("stepOfTheWindKi", "EDITION_2014")).toBe(2);
+    expect(actionGrantLevel("stepOfTheWindKi", "EDITION_2024")).toBeUndefined();
   });
 });
 

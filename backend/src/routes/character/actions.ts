@@ -24,7 +24,7 @@
 import { randomUUID } from "node:crypto";
 
 import { executeActionOpSchema, type ExecuteActionOperation } from "@character-sheet/contracts";
-import type { ExecuteActionResult } from "@character-sheet/shared-types";
+import type { ExecuteActionResult, RulesEdition } from "@character-sheet/shared-types";
 import { Router } from "express";
 import { z } from "zod";
 
@@ -41,7 +41,7 @@ import { applyAdjustQuantity } from "@/lib/inventory/inventory.js";
 import { applyHealInTx, applyTempHpInTx } from "@/lib/combat/hitpoints.js";
 import { applySpendResourceInTx } from "@/lib/classes/resources.js";
 import { deriveMartialArtsDie } from "@/lib/srd/srd.js";
-import { editionOf } from "@/lib/rules/edition.js";
+import { DEFAULT_RULES_EDITION, editionOf } from "@/lib/rules/edition.js";
 import { rollDie } from "@/lib/core/dice.js";
 import { appendActiveBuffInTx, clearBuffByKeyInTx, normalizeActiveEffectsMutable } from "@/lib/combat/active-effects.js";
 import { currentArmorStateInTx, unmetActivationRequirements, ActivationRequirementError } from "@/lib/classes/activation-requires.js";
@@ -153,13 +153,14 @@ async function applyActionOpInTx(
   batchId: string,
   sessionId: string | null,
   heightenedFocusTempHp: number,
+  edition: RulesEdition,
 ): Promise<ExecuteActionResult> {
   const effectFn = ACTION_EFFECT_FN[op.actionKey];
   if (!effectFn) {
     return applyRowDrivenActionInTx(tx, characterId, op, batchId, sessionId);
   }
 
-  const ctx = { roll: op.roll, inventoryItemId: op.inventoryItemId, heightenedFocusTempHp };
+  const ctx = { roll: op.roll, inventoryItemId: op.inventoryItemId, heightenedFocusTempHp, edition };
   const ops = effectFn(ctx);
   for (const effect of ops) {
     await applyActionEffectInTx(tx, characterId, effect, batchId, sessionId);
@@ -396,6 +397,21 @@ async function computeHeightenedFocusTempHp(operations: ExecuteActionOperation[]
   return rollDie(dieFaces) + rollDie(dieFaces);
 }
 
+/**
+ * The character's rules edition (#1500) — read unconditionally (one cheap
+ * `rulesEdition` column) so `ACTION_EFFECT_FN.flurryOfBlows` can resolve its
+ * edition-forked pool key (monkPoolKey) via `ActionContext.edition`, the same
+ * way `heightenedFocusTempHp` above is precomputed once before the
+ * transaction rather than re-read per op. Falls back to the schema default
+ * for a character somehow missing between this read and the transaction —
+ * exact parity with every other route's "not found" tolerance here would add
+ * a second DB round trip for a case the transaction itself already guards.
+ */
+async function characterEdition(characterId: string): Promise<RulesEdition> {
+  const row = await prisma.character.findUnique({ where: { id: characterId }, select: { rulesEdition: true } });
+  return row ? editionOf(row) : DEFAULT_RULES_EDITION;
+}
+
 actionsRouter.post<{ id: string }>(
   "/transactions",
   async (req, res) => {
@@ -420,6 +436,7 @@ actionsRouter.post<{ id: string }>(
     await assertKnownActionKeys(operations, characterId);
 
     const heightenedFocusTempHp = await computeHeightenedFocusTempHp(operations, characterId);
+    const edition = await characterEdition(characterId);
     const batchId = randomUUID();
     const sessionId = await getActiveSessionId(characterId);
 
@@ -432,7 +449,7 @@ actionsRouter.post<{ id: string }>(
     const results: ExecuteActionResult[] = [];
     await prisma.$transaction(async (tx) => {
       for (const op of operations) {
-        results.push(await applyActionOpInTx(tx, characterId, op, batchId, sessionId, heightenedFocusTempHp));
+        results.push(await applyActionOpInTx(tx, characterId, op, batchId, sessionId, heightenedFocusTempHp, edition));
       }
     });
 

@@ -2341,16 +2341,23 @@ export const PALADIN_BASE_ROWS: ClassFeatureRow[] = [
   },
 ];
 
-// MONK's base-class rows (#1675): `lib/classes/monk.ts`'s base-class
-// `.features` moved to literal seed data (prisma/seed/monk-features.ts) —
-// the same rootDir boundary FIGHTER_BASE_ROWS'/RANGER_BASE_ROWS' comments
-// explain (monk.ts itself still exists — see its own header for why it
-// isn't deletable — but its base `.features` are gone). Byte-identical
-// across both editions (untagged in the seed — the 2014 rewrite is
-// #1500-#1503's job, not this fixture's). Extra Attack's derivedStat/
-// derivedStatTiers ride this array (unlike `toRows`, which drops those two
-// fields), mirroring FIGHTER_BASE_ROWS'/RANGER_BASE_ROWS' own reasoning.
-export const MONK_BASE_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2024"] as const).flatMap((edition) => [
+// MONK's base-class rows (#1675 transport, #1500 base-class rewrite):
+// `lib/classes/monk.ts`'s base-class `.features` moved to literal seed data
+// (prisma/seed/monk-features.ts) — the same rootDir boundary
+// FIGHTER_BASE_ROWS'/RANGER_BASE_ROWS' comments explain (monk.ts itself
+// still exists — see its own header for why it isn't deletable — but its
+// base `.features` are gone). #1500 forked the base class from real SRD 5.1
+// text — mirrors monk-features.ts's own MONK_BASE_RAW row-for-row
+// (literal-fixture-parity.test.ts enforces byte parity), so this fixture is
+// no longer a uniform flatMap over both editions: five 2024-only rows
+// (Uncanny Metabolism/Heightened Focus/Self-Restoration/Perfect
+// Focus/Superior Defense) and six 2014-only rows (Stillness of
+// Mind/Purity of Body/Tongue of the Sun and Moon/Diamond Soul/Timeless
+// Body/Empty Body/Perfect Self) exist for one edition only. Extra Attack's
+// derivedStat/derivedStatTiers ride this array (unlike `toRows`, which
+// drops those two fields), mirroring FIGHTER_BASE_ROWS'/RANGER_BASE_ROWS'
+// own reasoning.
+const MONK_BASE_ROWS_SHARED: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2024"] as const).flatMap((edition) => [
   {
     name: "Unarmored Defense",
     level: 1,
@@ -2359,39 +2366,11 @@ export const MONK_BASE_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2024
       "While not wearing armor or wielding a shield, your AC equals 10 + your Dexterity modifier + your Wisdom modifier.",
   },
   {
-    name: "Martial Arts",
-    level: 1,
-    edition,
-    description:
-      "With unarmed strikes or monk weapons: use Dexterity instead of Strength for attack and damage rolls; deal 1d6 (L1–4), 1d8 (L5–10), 1d10 (L11–16), or 1d12 (L17+) damage; make one bonus unarmed strike after the Attack action.",
-  },
-  {
-    name: "Focus",
-    level: 2,
-    edition,
-    description:
-      "You have a pool of Focus Points equal to your monk level. Spend them to fuel: Flurry of Blows (1 focus — two bonus unarmed strikes), Patient Defense (free for Disengage as a bonus action, or 1 focus for Disengage + Dodge), Step of the Wind (free for Dash as a bonus action, or 1 focus for Disengage + Dash with jump distance doubled). Focus save DC = 8 + proficiency + Wisdom modifier. Regain all focus on a short or long rest.",
-  },
-  {
     name: "Unarmored Movement",
     level: 2,
     edition,
     description:
       "Your speed increases by 10 ft while unarmored and unshielded (+15 at L6; +20 at L10; +25 at L14; +30 at L18). At level 9, you can run up vertical surfaces and across liquids on your turn.",
-  },
-  {
-    name: "Uncanny Metabolism",
-    level: 2,
-    edition,
-    description:
-      "When you roll initiative, you can regain all expended Focus Points; when you do, roll your Martial Arts die and regain hit points equal to your monk level plus the number rolled. Usable once per long rest.",
-  },
-  {
-    name: "Deflect Attacks",
-    level: 3,
-    edition,
-    description:
-      "Use your reaction to reduce bludgeoning, piercing, or slashing damage from a melee or ranged attack that hits you by 1d10 + Dexterity modifier + monk level. If this reduces the damage to 0, spend 1 focus to redirect it: the attacker (melee, within 5 ft) or another creature (ranged, within 60 ft) must succeed on a Dexterity save or take damage equal to two rolls of your Martial Arts die + your Dexterity modifier.",
   },
   {
     name: "Slow Fall",
@@ -2408,75 +2387,196 @@ export const MONK_BASE_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2024
     derivedStatTiers: [{ minLevel: 5, value: 2 }],
   },
   {
-    name: "Stunning Strike",
-    level: 5,
-    edition,
-    description:
-      "Once per turn when you hit with a monk weapon or unarmed strike, spend 1 focus to attempt a stunning strike. The target makes a Constitution save (focus save DC): on a failure it is stunned until the end of your next turn; on a success its speed is halved until the start of your next turn.",
-  },
-  {
-    name: "Empowered Strikes",
-    level: 6,
-    edition,
-    description:
-      "Your unarmed strikes count as magical for the purpose of overcoming resistance and immunity to nonmagical attacks, and can deal force damage instead of their normal damage type.",
-  },
-  {
     name: "Evasion",
     level: 7,
     edition,
     description:
       "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
   },
+]);
+
+const MONK_BASE_ROWS_2014: ClassFeatureRow[] = [
+  {
+    name: "Martial Arts",
+    level: 1,
+    edition: "EDITION_2014",
+    description:
+      "With unarmed strikes or monk weapons (shortsword and any simple melee weapon without the two-handed or heavy property): use Dexterity instead of Strength for attack and damage rolls; deal 1d4 (L1–4), 1d6 (L5–10), 1d8 (L11–16), or 1d10 (L17+) damage; immediately after you take the Attack action on your turn, make one unarmed strike as a bonus action.",
+  },
+  {
+    name: "Ki",
+    level: 2,
+    edition: "EDITION_2014",
+    description:
+      "You have a pool of Ki Points equal to your monk level. Spend them to fuel: Flurry of Blows (1 ki — immediately after taking the Attack action, make two unarmed strikes as a bonus action), Patient Defense (1 ki — take the Dodge action as a bonus action), Step of the Wind (1 ki — take the Disengage or Dash action as a bonus action, jump distance doubled for the turn). Ki save DC = 8 + proficiency + Wisdom modifier. Regain all ki on a short or long rest.",
+  },
+  {
+    name: "Deflect Missiles",
+    level: 3,
+    edition: "EDITION_2014",
+    description:
+      "Use your reaction to reduce damage from a ranged weapon attack that hits you by 1d10 + Dexterity modifier + monk level. If this reduces the damage to 0 and the missile is small enough to hold in one hand with a hand free, you catch it. You can then spend 1 ki to make a ranged attack with it as part of the same reaction — range 20/60 ft, always made with proficiency — dealing 1d6 + Dexterity modifier bludgeoning damage to one creature within range on a hit.",
+  },
+  {
+    name: "Stunning Strike",
+    level: 5,
+    edition: "EDITION_2014",
+    description:
+      "When you hit another creature with a melee weapon attack, you can spend 1 ki point to attempt a stunning strike. The target must succeed on a Constitution save (ki save DC) or be stunned until the end of your next turn. Unlike Flurry of Blows, this can be attempted more than once per turn as long as you have ki points to spend.",
+  },
+  {
+    name: "Ki-Empowered Strikes",
+    level: 6,
+    edition: "EDITION_2014",
+    description:
+      "Your unarmed strikes count as magical for the purpose of overcoming resistance and immunity to nonmagical attacks and damage.",
+  },
+  {
+    name: "Stillness of Mind",
+    level: 7,
+    edition: "EDITION_2014",
+    description: "Use your action to end one effect on yourself that is causing you to be charmed or frightened.",
+  },
+  {
+    name: "Purity of Body",
+    level: 10,
+    edition: "EDITION_2014",
+    description: "You are immune to disease and poison.",
+  },
+  {
+    name: "Tongue of the Sun and Moon",
+    level: 13,
+    edition: "EDITION_2014",
+    description:
+      "You understand all spoken languages, and any creature that can understand a language understands what you say.",
+  },
+  {
+    name: "Diamond Soul",
+    level: 14,
+    edition: "EDITION_2014",
+    description:
+      "You gain proficiency in all saving throws. Additionally, whenever you fail a saving throw, you can spend 1 ki point to reroll it and take the second result.",
+  },
+  {
+    name: "Timeless Body",
+    level: 15,
+    edition: "EDITION_2014",
+    description:
+      "Your ki sustains you so that you suffer none of the frailty of old age, and you can't be aged magically (though you can still die of old age). You no longer need food or water.",
+  },
+  {
+    name: "Empty Body",
+    level: 18,
+    edition: "EDITION_2014",
+    description:
+      "Use your action to spend 4 ki points to become invisible for 1 minute; during that time you also have resistance to all damage but force damage. Additionally, you can spend 8 ki points to cast astral projection without expending a material component; when you do, you can't take any other creatures with you.",
+  },
+  {
+    name: "Perfect Self",
+    level: 20,
+    edition: "EDITION_2014",
+    description: "When you roll initiative and have no ki points remaining, you regain 4 ki points.",
+  },
+];
+
+const MONK_BASE_ROWS_2024: ClassFeatureRow[] = [
+  {
+    name: "Martial Arts",
+    level: 1,
+    edition: "EDITION_2024",
+    description:
+      "With unarmed strikes or monk weapons: use Dexterity instead of Strength for attack and damage rolls; deal 1d6 (L1–4), 1d8 (L5–10), 1d10 (L11–16), or 1d12 (L17+) damage; make one bonus unarmed strike after the Attack action.",
+  },
+  {
+    name: "Focus",
+    level: 2,
+    edition: "EDITION_2024",
+    description:
+      "You have a pool of Focus Points equal to your monk level. Spend them to fuel: Flurry of Blows (1 focus — two bonus unarmed strikes), Patient Defense (free for Disengage as a bonus action, or 1 focus for Disengage + Dodge), Step of the Wind (free for Dash as a bonus action, or 1 focus for Disengage + Dash with jump distance doubled). Focus save DC = 8 + proficiency + Wisdom modifier. Regain all focus on a short or long rest.",
+  },
+  {
+    name: "Uncanny Metabolism",
+    level: 2,
+    edition: "EDITION_2024",
+    description:
+      "When you roll initiative, you can regain all expended Focus Points; when you do, roll your Martial Arts die and regain hit points equal to your monk level plus the number rolled. Usable once per long rest.",
+  },
+  {
+    name: "Deflect Attacks",
+    level: 3,
+    edition: "EDITION_2024",
+    description:
+      "Use your reaction to reduce bludgeoning, piercing, or slashing damage from a melee or ranged attack that hits you by 1d10 + Dexterity modifier + monk level. If this reduces the damage to 0, spend 1 focus to redirect it: the attacker (melee, within 5 ft) or another creature (ranged, within 60 ft) must succeed on a Dexterity save or take damage equal to two rolls of your Martial Arts die + your Dexterity modifier.",
+  },
+  {
+    name: "Stunning Strike",
+    level: 5,
+    edition: "EDITION_2024",
+    description:
+      "Once per turn when you hit with a monk weapon or unarmed strike, spend 1 focus to attempt a stunning strike. The target makes a Constitution save (focus save DC): on a failure it is stunned until the end of your next turn; on a success its speed is halved until the start of your next turn.",
+  },
+  {
+    name: "Empowered Strikes",
+    level: 6,
+    edition: "EDITION_2024",
+    description:
+      "Your unarmed strikes count as magical for the purpose of overcoming resistance and immunity to nonmagical attacks, and can deal force damage instead of their normal damage type.",
+  },
   {
     name: "Heightened Focus",
     level: 10,
-    edition,
+    edition: "EDITION_2024",
     description:
       "Your focus features grow more potent: Flurry of Blows lets you make three unarmed strikes instead of two (still 1 focus); Patient Defense grants temporary hit points equal to two rolls of your Martial Arts die when you spend focus; Step of the Wind lets you bring one willing Large or smaller creature within 5 ft along with you when you spend focus.",
   },
   {
     name: "Self-Restoration",
     level: 10,
-    edition,
+    edition: "EDITION_2024",
     description:
       "At the end of each of your turns, you can end one Charmed, Frightened, or Poisoned effect on yourself for free. You also no longer suffer exhaustion from lack of food or water.",
   },
   {
     name: "Deflect Energy",
     level: 13,
-    edition,
+    edition: "EDITION_2024",
     description:
       "Your Deflect Attacks feature now works against an attack of any damage type, not just bludgeoning, piercing, or slashing.",
   },
   {
     name: "Disciplined Survivor",
     level: 14,
-    edition,
+    edition: "EDITION_2024",
     description:
       "You gain proficiency in all saving throws. Additionally, whenever you fail a saving throw, you can spend 1 focus to reroll it and take the second result.",
   },
   {
     name: "Perfect Focus",
     level: 15,
-    edition,
+    edition: "EDITION_2024",
     description:
       "When you roll initiative, if you have 3 or fewer focus points, you regain focus points until you have 4.",
   },
   {
     name: "Superior Defense",
     level: 18,
-    edition,
+    edition: "EDITION_2024",
     description:
       "At the start of your turn, spend 3 focus to bolster yourself for 1 minute or until you're incapacitated: during that time you have resistance to all damage except force damage.",
   },
   {
     name: "Body and Mind",
     level: 20,
-    edition,
+    edition: "EDITION_2024",
     description: "Your Dexterity and Wisdom scores each increase by 4, to a maximum of 25.",
   },
-]);
+];
+
+export const MONK_BASE_ROWS: ClassFeatureRow[] = [
+  ...MONK_BASE_ROWS_SHARED,
+  ...MONK_BASE_ROWS_2014,
+  ...MONK_BASE_ROWS_2024,
+];
 
 // MONK's four 2024 subclasses (#1675) — each mirrors its own
 // monk-features.ts partition, byte-identical across both editions same as

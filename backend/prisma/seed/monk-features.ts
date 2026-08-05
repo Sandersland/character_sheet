@@ -11,16 +11,21 @@
 // direct database calls or async write logic may live in this file.
 // expand() below is pure content assembly, not seeding logic.
 //
-// SCOPE (#1675): TRANSPORT ONLY, zero behavior change. Every row below is a
-// byte-identical transcription of what lib/classes/monk.ts's MONK_FEATURES /
-// WARRIOR_OF_THE_OPEN_HAND_FEATURES / WARRIOR_OF_SHADOW_FEATURES /
-// WARRIOR_OF_THE_ELEMENTS_FEATURES / WARRIOR_OF_MERCY_FEATURES said before
-// this migration, expanded through class-features.ts's old expandFeatureRow
-// (both editions get the same text — pinned by monk-2014-snapshot.test.ts's
-// pre-change snapshot). The 2014 rewrite (real SRD 5.1/PHB'14 divergent
-// text) is #1500-#1503's job, not this one — moving no pools either (monk.ts
-// keeps its resourceFn for the ki/focus pool and every subclass resourceFn
-// unchanged).
+// SCOPE (#1675 transport, #1500 base-class rewrite): #1675 moved every row
+// here as a byte-identical transcription of what lib/classes/monk.ts's
+// MONK_FEATURES / WARRIOR_OF_*_FEATURES said, both editions sharing one row.
+// #1500 (this slice) rewrites the 18 BASE-CLASS rows (MONK_BASE_RAW below)
+// from real SRD 5.1 / PHB'14 text — a genuine content fork per feature, not a
+// retag: several 2014 features have no 2024 name at all (Uncanny Metabolism/
+// Heightened Focus/Self-Restoration/Perfect Focus are 2024-only; Stillness of
+// Mind/Purity of Body/Tongue of the Sun and Moon/Timeless Body/Empty Body/
+// Perfect Self are 2014-only), so the 2014 partition is 17 rows against the
+// 2024 partition's 18 (monk-2024-content.test.ts's per-partition count pins
+// this exactly). The four 2024-only Warrior subclasses below are untouched —
+// no 2014 monk subclass slug exists yet (#1500-#1503's later slices), so
+// their rows stay byte-identical transcriptions pending #1501-#1503.
+// monk.ts keeps its resourceFn for the ki/focus pool (now edition-forked, see
+// monkPoolKey) and every subclass resourceFn unchanged.
 //
 // Two rows carry descriptor columns, both already set on their source
 // AuthoredFeature entries in monk.ts before this migration (#1530's Extra
@@ -50,7 +55,20 @@ interface RawMonkFeature {
   name: string;
   level: number;
   description: string;
-  /** Omitted -> identical text seeded for both editions (see file header) — every row below omits it; the 2014 rewrite is #1500-#1503's job. */
+  /**
+   * Omitted -> identical text seeded for both editions (a genuinely
+   * edition-invariant feature, e.g. Unarmored Defense/Slow Fall/Extra
+   * Attack). Set -> this row exists for ONE edition only, either because its
+   * text diverges from its same-named counterpart (Martial Arts, Ki/Focus,
+   * Deflect Missiles/Attacks, Stunning Strike, Ki-Empowered/Empowered
+   * Strikes, Diamond Soul/Disciplined Survivor — #1430's "one description
+   * cannot cite two documents" precedent) or because the feature has no
+   * counterpart in the other edition at all (Uncanny Metabolism/Heightened
+   * Focus/Self-Restoration/Perfect Focus are 2024-only; Stillness of
+   * Mind/Purity of Body/Tongue of the Sun and Moon/Timeless Body/Empty
+   * Body/Perfect Self are 2014-only). Subclass rows below still omit it
+   * unconditionally — #1500-#1503's later slices.
+   */
   edition?: SeedEdition;
   // ---- Descriptor columns (#1530/#1686), transcribed unchanged from their
   // ---- source AuthoredFeature entries — see file header. Every other row
@@ -87,9 +105,19 @@ function expand(raw: RawMonkFeature): ClassFeatureSeedRow[] {
   return editions.map((edition) => ({ ...base, edition }));
 }
 
-// ---- Base class — SRD 5.1 p. 46-49 (2014) / SRD 5.2 p.87-89 (2024) --------
-// 18 rows, byte-identical across both editions (untagged — see file header).
+// ---- Base class — SRD 5.1 p. 46-49 / PHB'14 pp.76-79 (2014) / SRD 5.2
+// p.87-89 / PHB'24 pp.87-89 (2024). 17 EDITION_2014 rows + 18 EDITION_2024
+// rows (35 total) — the two counts differ by exactly one because 2024 has
+// TWO L10 features (Heightened Focus + Self-Restoration) against 2014's
+// ONE (Purity of Body), while 2014 has one extra L7 feature of its own
+// (Stillness of Mind, alongside the shared Evasion) that 2024 lacks — those
+// two one-row deltas cancel to net +1 for 2024. Every other level's row
+// count matches 1:1 between editions (see each row's own comment for
+// whether that's a shared/untagged row or a same-level forked pair). Exact
+// counts pinned by monk-2024-content.test.ts's per-partition assertion.
 const MONK_BASE_RAW: RawMonkFeature[] = [
+  // Edition-invariant (untagged, one row each — SRD 5.1 and SRD 5.2 agree
+  // word-for-word on the mechanic, per #1313's "Do NOT fork" table).
   {
     subclassSlug: null,
     name: "Unarmored Defense",
@@ -99,38 +127,10 @@ const MONK_BASE_RAW: RawMonkFeature[] = [
   },
   {
     subclassSlug: null,
-    name: "Martial Arts",
-    level: 1,
-    description:
-      "With unarmed strikes or monk weapons: use Dexterity instead of Strength for attack and damage rolls; deal 1d6 (L1–4), 1d8 (L5–10), 1d10 (L11–16), or 1d12 (L17+) damage; make one bonus unarmed strike after the Attack action.",
-  },
-  {
-    subclassSlug: null,
-    name: "Focus",
-    level: 2,
-    description:
-      "You have a pool of Focus Points equal to your monk level. Spend them to fuel: Flurry of Blows (1 focus — two bonus unarmed strikes), Patient Defense (free for Disengage as a bonus action, or 1 focus for Disengage + Dodge), Step of the Wind (free for Dash as a bonus action, or 1 focus for Disengage + Dash with jump distance doubled). Focus save DC = 8 + proficiency + Wisdom modifier. Regain all focus on a short or long rest.",
-  },
-  {
-    subclassSlug: null,
     name: "Unarmored Movement",
     level: 2,
     description:
       "Your speed increases by 10 ft while unarmored and unshielded (+15 at L6; +20 at L10; +25 at L14; +30 at L18). At level 9, you can run up vertical surfaces and across liquids on your turn.",
-  },
-  {
-    subclassSlug: null,
-    name: "Uncanny Metabolism",
-    level: 2,
-    description:
-      "When you roll initiative, you can regain all expended Focus Points; when you do, roll your Martial Arts die and regain hit points equal to your monk level plus the number rolled. Usable once per long rest.",
-  },
-  {
-    subclassSlug: null,
-    name: "Deflect Attacks",
-    level: 3,
-    description:
-      "Use your reaction to reduce bludgeoning, piercing, or slashing damage from a melee or ranged attack that hits you by 1d10 + Dexterity modifier + monk level. If this reduces the damage to 0, spend 1 focus to redirect it: the attacker (melee, within 5 ft) or another creature (ranged, within 60 ft) must succeed on a Dexterity save or take damage equal to two rolls of your Martial Arts die + your Dexterity modifier.",
   },
   {
     subclassSlug: null,
@@ -150,29 +150,149 @@ const MONK_BASE_RAW: RawMonkFeature[] = [
   },
   {
     subclassSlug: null,
-    name: "Stunning Strike",
-    level: 5,
-    description:
-      "Once per turn when you hit with a monk weapon or unarmed strike, spend 1 focus to attempt a stunning strike. The target makes a Constitution save (focus save DC): on a failure it is stunned until the end of your next turn; on a success its speed is halved until the start of your next turn.",
-  },
-  {
-    subclassSlug: null,
-    name: "Empowered Strikes",
-    level: 6,
-    description:
-      "Your unarmed strikes count as magical for the purpose of overcoming resistance and immunity to nonmagical attacks, and can deal force damage instead of their normal damage type.",
-  },
-  {
-    subclassSlug: null,
     name: "Evasion",
     level: 7,
     description:
       "When subjected to an effect that allows a Dexterity save for half damage, you take no damage on a success and half damage on a failure.",
   },
+
+  // Martial Arts (L1) — die progression AND the Flurry/bonus-strike prereq
+  // fork (SRD 5.1 p.46 requires the Attack action first; SRD 5.2 p.87 does
+  // not) — #1430 precedent: one description can't cite two documents.
+  {
+    subclassSlug: null,
+    name: "Martial Arts",
+    level: 1,
+    edition: "EDITION_2014",
+    description:
+      "With unarmed strikes or monk weapons (shortsword and any simple melee weapon without the two-handed or heavy property): use Dexterity instead of Strength for attack and damage rolls; deal 1d4 (L1–4), 1d6 (L5–10), 1d8 (L11–16), or 1d10 (L17+) damage; immediately after you take the Attack action on your turn, make one unarmed strike as a bonus action.",
+  },
+  {
+    subclassSlug: null,
+    name: "Martial Arts",
+    level: 1,
+    edition: "EDITION_2024",
+    description:
+      "With unarmed strikes or monk weapons: use Dexterity instead of Strength for attack and damage rolls; deal 1d6 (L1–4), 1d8 (L5–10), 1d10 (L11–16), or 1d12 (L17+) damage; make one bonus unarmed strike after the Attack action.",
+  },
+
+  // Ki (SRD 5.1 p.46 / PHB'14 p.77) / Focus (2024) — the resource pool
+  // feature itself. 2014's Ki has no Uncanny Metabolism analog (below) and
+  // its three ki-spend options are flat single-cost menus (Flurry always
+  // needs the Attack action first; Patient Defense/Step of the Wind have no
+  // free variant) — a materially different feature from 2024's Focus, not a
+  // text variant of it.
+  {
+    subclassSlug: null,
+    name: "Ki",
+    level: 2,
+    edition: "EDITION_2014",
+    description:
+      "You have a pool of Ki Points equal to your monk level. Spend them to fuel: Flurry of Blows (1 ki — immediately after taking the Attack action, make two unarmed strikes as a bonus action), Patient Defense (1 ki — take the Dodge action as a bonus action), Step of the Wind (1 ki — take the Disengage or Dash action as a bonus action, jump distance doubled for the turn). Ki save DC = 8 + proficiency + Wisdom modifier. Regain all ki on a short or long rest.",
+  },
+  {
+    subclassSlug: null,
+    name: "Focus",
+    level: 2,
+    edition: "EDITION_2024",
+    description:
+      "You have a pool of Focus Points equal to your monk level. Spend them to fuel: Flurry of Blows (1 focus — two bonus unarmed strikes), Patient Defense (free for Disengage as a bonus action, or 1 focus for Disengage + Dodge), Step of the Wind (free for Dash as a bonus action, or 1 focus for Disengage + Dash with jump distance doubled). Focus save DC = 8 + proficiency + Wisdom modifier. Regain all focus on a short or long rest.",
+  },
+
+  // Uncanny Metabolism — NEW in 2024 (PHB'24 p.87); SRD 5.1 has no L2
+  // roll-initiative regen at all, so this row has no EDITION_2014 twin.
+  {
+    subclassSlug: null,
+    name: "Uncanny Metabolism",
+    level: 2,
+    edition: "EDITION_2024",
+    description:
+      "When you roll initiative, you can regain all expended Focus Points; when you do, roll your Martial Arts die and regain hit points equal to your monk level plus the number rolled. Usable once per long rest.",
+  },
+
+  // Deflect Missiles (SRD 5.1 p.46 / PHB'14 p.77) / Deflect Attacks (2024) —
+  // SRD 5.1's version is RANGED WEAPON ATTACKS ONLY (no melee), with a
+  // catch-and-throw-back rider instead of 2024's Dexterity-save redirect. A
+  // materially different feature under a different name, not a text variant
+  // (#1313's fork table).
+  {
+    subclassSlug: null,
+    name: "Deflect Missiles",
+    level: 3,
+    edition: "EDITION_2014",
+    description:
+      "Use your reaction to reduce damage from a ranged weapon attack that hits you by 1d10 + Dexterity modifier + monk level. If this reduces the damage to 0 and the missile is small enough to hold in one hand with a hand free, you catch it. You can then spend 1 ki to make a ranged attack with it as part of the same reaction — range 20/60 ft, always made with proficiency — dealing 1d6 + Dexterity modifier bludgeoning damage to one creature within range on a hit.",
+  },
+  {
+    subclassSlug: null,
+    name: "Deflect Attacks",
+    level: 3,
+    edition: "EDITION_2024",
+    description:
+      "Use your reaction to reduce bludgeoning, piercing, or slashing damage from a melee or ranged attack that hits you by 1d10 + Dexterity modifier + monk level. If this reduces the damage to 0, spend 1 focus to redirect it: the attacker (melee, within 5 ft) or another creature (ranged, within 60 ft) must succeed on a Dexterity save or take damage equal to two rolls of your Martial Arts die + your Dexterity modifier.",
+  },
+
+  // Stunning Strike (L5, SRD 5.1 p.46 / PHB'14 p.77) — 2014 has no
+  // once-per-turn cap and no success rider (a failed save just does nothing
+  // further); see lib/classes/stunning-strike.ts for the live-play
+  // automation of this fork.
+  {
+    subclassSlug: null,
+    name: "Stunning Strike",
+    level: 5,
+    edition: "EDITION_2014",
+    description:
+      "When you hit another creature with a melee weapon attack, you can spend 1 ki point to attempt a stunning strike. The target must succeed on a Constitution save (ki save DC) or be stunned until the end of your next turn. Unlike Flurry of Blows, this can be attempted more than once per turn as long as you have ki points to spend.",
+  },
+  {
+    subclassSlug: null,
+    name: "Stunning Strike",
+    level: 5,
+    edition: "EDITION_2024",
+    description:
+      "Once per turn when you hit with a monk weapon or unarmed strike, spend 1 focus to attempt a stunning strike. The target makes a Constitution save (focus save DC): on a failure it is stunned until the end of your next turn; on a success its speed is halved until the start of your next turn.",
+  },
+
+  // Ki-Empowered Strikes (SRD 5.1 p.46 / PHB'14 p.77) / Empowered Strikes
+  // (2024) — same core mechanic (magical unarmed strikes), different
+  // name/citation; 2024 adds an optional force-damage swap SRD 5.1 doesn't have.
+  {
+    subclassSlug: null,
+    name: "Ki-Empowered Strikes",
+    level: 6,
+    edition: "EDITION_2014",
+    description:
+      "Your unarmed strikes count as magical for the purpose of overcoming resistance and immunity to nonmagical attacks and damage.",
+  },
+  {
+    subclassSlug: null,
+    name: "Empowered Strikes",
+    level: 6,
+    edition: "EDITION_2024",
+    description:
+      "Your unarmed strikes count as magical for the purpose of overcoming resistance and immunity to nonmagical attacks, and can deal force damage instead of their normal damage type.",
+  },
+
+  // Stillness of Mind (SRD 5.1 p.46 / PHB'14 p.77) — 2014-only, a SEPARATE
+  // L7 feature alongside Evasion (which stays shared above); 2024 has no
+  // counterpart (Self-Restoration, L10, is a broader but differently-scoped
+  // replacement).
+  {
+    subclassSlug: null,
+    name: "Stillness of Mind",
+    level: 7,
+    edition: "EDITION_2014",
+    description: "Use your action to end one effect on yourself that is causing you to be charmed or frightened.",
+  },
+
+  // Heightened Focus / Self-Restoration — both NEW in 2024 (PHB'24 p.88),
+  // sharing L10 with no 2014 counterpart of either name; 2014's own L10
+  // feature is Purity of Body below.
   {
     subclassSlug: null,
     name: "Heightened Focus",
     level: 10,
+    edition: "EDITION_2024",
     description:
       "Your focus features grow more potent: Flurry of Blows lets you make three unarmed strikes instead of two (still 1 focus); Patient Defense grants temporary hit points equal to two rolls of your Martial Arts die when you spend focus; Step of the Wind lets you bring one willing Large or smaller creature within 5 ft along with you when you spend focus.",
   },
@@ -180,42 +300,118 @@ const MONK_BASE_RAW: RawMonkFeature[] = [
     subclassSlug: null,
     name: "Self-Restoration",
     level: 10,
+    edition: "EDITION_2024",
     description:
       "At the end of each of your turns, you can end one Charmed, Frightened, or Poisoned effect on yourself for free. You also no longer suffer exhaustion from lack of food or water.",
   },
+
+  // Purity of Body — 2014's own L10 feature (SRD 5.1 p.47), no 2024 successor.
+  {
+    subclassSlug: null,
+    name: "Purity of Body",
+    level: 10,
+    edition: "EDITION_2014",
+    description: "You are immune to disease and poison.",
+  },
+
+  // Deflect Energy — 2024-only widening of Deflect Attacks to any damage
+  // type; 2014's own L13 feature is Tongue of the Sun and Moon (SRD 5.1 p.47
+  // / PHB'14 p.78) below (Deflect Missiles never widens beyond ranged weapon
+  // attacks in SRD 5.1).
   {
     subclassSlug: null,
     name: "Deflect Energy",
     level: 13,
+    edition: "EDITION_2024",
     description:
       "Your Deflect Attacks feature now works against an attack of any damage type, not just bludgeoning, piercing, or slashing.",
   },
   {
     subclassSlug: null,
+    name: "Tongue of the Sun and Moon",
+    level: 13,
+    edition: "EDITION_2014",
+    description:
+      "You understand all spoken languages, and any creature that can understand a language understands what you say.",
+  },
+
+  // Diamond Soul (SRD 5.1 p.47 / PHB'14 p.78) / Disciplined Survivor (2024)
+  // — identical mechanic (all-save proficiency + spend-1-to-reroll a failed
+  // save), different name/citation (#1430 precedent).
+  {
+    subclassSlug: null,
+    name: "Diamond Soul",
+    level: 14,
+    edition: "EDITION_2014",
+    description:
+      "You gain proficiency in all saving throws. Additionally, whenever you fail a saving throw, you can spend 1 ki point to reroll it and take the second result.",
+  },
+  {
+    subclassSlug: null,
     name: "Disciplined Survivor",
     level: 14,
+    edition: "EDITION_2024",
     description:
       "You gain proficiency in all saving throws. Additionally, whenever you fail a saving throw, you can spend 1 focus to reroll it and take the second result.",
   },
+
+  // Perfect Focus — 2024-only (PHB'24 p.88); 2014's own L15 feature is
+  // Timeless Body (SRD 5.1 p.47 / PHB'14 p.78) below (a wholly different
+  // effect at the same level).
   {
     subclassSlug: null,
     name: "Perfect Focus",
     level: 15,
+    edition: "EDITION_2024",
     description:
       "When you roll initiative, if you have 3 or fewer focus points, you regain focus points until you have 4.",
   },
   {
     subclassSlug: null,
+    name: "Timeless Body",
+    level: 15,
+    edition: "EDITION_2014",
+    description:
+      "Your ki sustains you so that you suffer none of the frailty of old age, and you can't be aged magically (though you can still die of old age). You no longer need food or water.",
+  },
+
+  // Superior Defense — 2024-only (PHB'24 p.89); 2014's own L18 feature is
+  // Empty Body (SRD 5.1 p.48 / PHB'14 p.78) below.
+  {
+    subclassSlug: null,
     name: "Superior Defense",
     level: 18,
+    edition: "EDITION_2024",
     description:
       "At the start of your turn, spend 3 focus to bolster yourself for 1 minute or until you're incapacitated: during that time you have resistance to all damage except force damage.",
   },
   {
     subclassSlug: null,
+    name: "Empty Body",
+    level: 18,
+    edition: "EDITION_2014",
+    description:
+      "Use your action to spend 4 ki points to become invisible for 1 minute; during that time you also have resistance to all damage but force damage. Additionally, you can spend 8 ki points to cast astral projection without expending a material component; when you do, you can't take any other creatures with you.",
+  },
+
+  // Body and Mind (2024) / Perfect Self (SRD 5.1 p.48 / PHB'14 p.79, 2014) —
+  // different L20 capstones: 2024 is a flat +4/+4 ability-score bump, 2014
+  // is a ki-shortfall safety net (regain 4 ki when you roll initiative with
+  // none remaining) — see monk.ts's resourceFn for the onInitiative
+  // descriptor this feature grants.
+  {
+    subclassSlug: null,
     name: "Body and Mind",
     level: 20,
+    edition: "EDITION_2024",
     description: "Your Dexterity and Wisdom scores each increase by 4, to a maximum of 25.",
+  },
+  {
+    subclassSlug: null,
+    name: "Perfect Self",
+    level: 20,
+    edition: "EDITION_2014",
+    description: "When you roll initiative and have no ki points remaining, you regain 4 ki points.",
   },
 ];
 
@@ -409,10 +605,12 @@ const WARRIOR_OF_THE_ELEMENTS_RAW: RawMonkFeature[] = [
   },
 ];
 
-// The full Monk seed family: base class (18 features) + four 2024 subclasses
-// (4 + 4 + 6 + 5 = 19 features), 37 total, each expanded to both editions —
-// 74 rows. Concatenated into class-features.ts's CLASS_FEATURES the same way
-// every other literal class's export is.
+// The full Monk seed family: base class (17 EDITION_2014 rows / 18
+// EDITION_2024 rows, #1500) + four 2024-only subclasses (4 + 4 + 6 + 5 = 19
+// features, still expanded to both editions pending #1501-#1503 — see the
+// file header) = 36 EDITION_2014 + 37 EDITION_2024 = 73 rows total.
+// Concatenated into class-features.ts's CLASS_FEATURES the same way every
+// other literal class's export is.
 export const MONK_FEATURES: ClassFeatureSeedRow[] = [
   ...MONK_BASE_RAW.flatMap(expand),
   ...WARRIOR_OF_THE_OPEN_HAND_RAW.flatMap(expand),

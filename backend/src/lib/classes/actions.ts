@@ -48,6 +48,8 @@ import { readEffectSpec, resolveEffectSpec, type EffectSpec } from "@/lib/combat
 import { effectiveEntryLevel } from "@/lib/leveling/effective-levels.js";
 import { resolveSubclassSlug, type SubclassSlug, type SubclassIdentityInput } from "./subclass-slug.js";
 import { effectBuffsFromRow, type ClassFeatureRow, type ClassFeatureRowsCarrier, type ResourceTotalContext } from "./class-feature-rows.js";
+import { monkPoolKey } from "./monk.js";
+import { DEFAULT_RULES_EDITION } from "@/lib/rules/edition.js";
 
 export type ActionCost = "action" | "bonusAction" | "reaction" | "free" | "special";
 
@@ -252,14 +254,24 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // this comment used to assert the 2024 reading as if it were universal
   // (corrected by #1499). The row stays SHARED across editions regardless:
   // both editions gate on the identical unarmored/no-shield condition, and the
-  // Attack-action difference is reminder TEXT, not a gate — `reminder` here is
-  // `(level) => string`, not edition-parameterized, so forking the wording is
-  // #1500's work, not this slice's. Distinct from Flurry of Blows (#1217, the
-  // two-strike Focus version, tagged EDITION_2024 below — SRD 5.1's Flurry
-  // costs 1 ki for two strikes into the "ki" pool (monkPoolKey), a different
-  // resource key from this row's "focus").
+  // Attack-action difference is reminder TEXT, not a gate. DEFERRED (#1500):
+  // forking this row's reminder is still not worth doing — the frontend's
+  // static ACTION_RESOLVERS.bonusUnarmedStrike.subtitle (dice-math text) wins
+  // over any served `reminder` in classActionOption's priority order
+  // (turnOptions.ts), so an edition-forked reminder here would never actually
+  // render; the substantive 2014 text lives on the Martial Arts ClassFeature
+  // row instead (monk-features.ts), which #1500 DID rewrite from SRD 5.1.
+  // Distinct from Flurry of Blows (#1217, the two-strike Focus version,
+  // tagged EDITION_2024 below, with a 2014 counterpart under monkPoolKey's
+  // "ki" pool authored alongside it, #1500).
   { key: "bonusUnarmedStrike", name: "Bonus Unarmed Strike", cost: "bonusAction", grantClass: "monk", grantLevel: 1, requiresUnarmored: true },
   { key: "flurryOfBlows", name: "Flurry of Blows", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "focus", resourceAmount: 1, edition: "EDITION_2024" },
+  // 2014 (SRD 5.1 / PHB'14 p.77): flat 1-ki cost, no Heightened Focus
+  // three-strike upgrade (2024-only) — same key as the row above (mirrors
+  // Lay on Hands' same-key edition fork), safe to reuse because
+  // ACTION_EFFECT_FN.flurryOfBlows resolves its pool through ctx.edition
+  // (monkPoolKey) rather than a hardcoded key — see that entry below.
+  { key: "flurryOfBlows", name: "Flurry of Blows", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "ki", resourceAmount: 1, reminder: "Immediately after taking the Attack action, spend 1 ki to make two unarmed strikes as a bonus action.", edition: "EDITION_2014" },
   // Patient Defense / Step of the Wind (PHB'24 p.98, SRD 5.2, #1240) each grant
   // TWO menu entries — a free variant and a 1-Focus variant — rather than the
   // 2014 SRD's flat "always costs 1 ki" shape. Both compete for the same bonus
@@ -313,6 +325,36 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
         : "Disengage + Dash, jump distance doubled this turn (spend 1 Focus).",
     edition: "EDITION_2024",
   },
+  // 2014 (SRD 5.1 / PHB'14 p.77): ONE row apiece, not the 2024 free/paid
+  // pair — a flat 1-ki cost with no free variant. Distinct keys from the
+  // 2024 rows above (NOT `patientDefense`/`stepOfTheWind`): those exact keys
+  // are pinned `serverEffect: false` in the frontend's ACTION_RESOLVERS
+  // table (actionResolvers.ts) for the FREE 2024 variant, so a 2014 1-ki row
+  // reusing either key would render but silently never spend.
+  {
+    key: "patientDefenseKi",
+    name: "Patient Defense",
+    cost: "bonusAction",
+    grantClass: "monk",
+    grantLevel: 2,
+    resourceKey: "ki",
+    resourceAmount: 1,
+    regrants: ["dodge"],
+    reminder: "Spend 1 ki to take the Dodge action as a bonus action.",
+    edition: "EDITION_2014",
+  },
+  {
+    key: "stepOfTheWindKi",
+    name: "Step of the Wind",
+    cost: "bonusAction",
+    grantClass: "monk",
+    grantLevel: 2,
+    resourceKey: "ki",
+    resourceAmount: 1,
+    regrants: ["disengage", "dash"],
+    reminder: "Spend 1 ki to take the Disengage or Dash action as a bonus action; your jump distance is doubled for the turn.",
+    edition: "EDITION_2014",
+  },
   // Stunning Strike (L5) is NOT a selectable action — it's a post-hit rider
   // (spend + Con save + fail/success outcome), built as its own dedicated
   // vertical in stunning-strike.ts, exactly like Sneak Attack bypasses this
@@ -341,6 +383,61 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // the free base reduction above. Tagged EDITION_2024 alongside deflectAttacks —
   // PHB'14's Deflect Missiles has no redirect rider at all.
   { key: "deflectAttacksRedirect", name: "Deflect Attacks — Redirect", cost: "free", grantClass: "monk", grantLevel: 3, resourceKey: "focus", resourceAmount: 1, edition: "EDITION_2024" },
+
+  // Deflect Missiles (SRD 5.1 / PHB'14 p.77, #1500) — the 2014 counterpart to
+  // Deflect Attacks above: RANGED WEAPON ATTACKS ONLY (no melee), same base
+  // reduction formula, no resourceKey on the base row (free, narrated —
+  // mirrors deflectAttacks' own shape). The throw-back rider is a catch +
+  // ranged attack, not a save-forcing redirect, so it's a real 1-ki spend.
+  {
+    key: "deflectMissiles",
+    name: "Deflect Missiles",
+    cost: "reaction",
+    grantClass: "monk",
+    grantLevel: 3,
+    reminder:
+      "Reaction: when hit by a ranged weapon attack, reduce the damage by 1d10 + Dex modifier + monk level. If this reduces it to 0 and you have a free hand, catch the missile.",
+    edition: "EDITION_2014",
+  },
+  {
+    key: "deflectMissilesThrow",
+    name: "Deflect Missiles — Throw Back",
+    cost: "free",
+    grantClass: "monk",
+    grantLevel: 3,
+    resourceKey: "ki",
+    resourceAmount: 1,
+    reminder: "Spend 1 ki to make a ranged attack with the caught missile (range 20/60, always proficient) — 1d6 + Dex modifier bludgeoning on a hit.",
+    edition: "EDITION_2014",
+  },
+
+  // Empty Body (SRD 5.1 / PHB'14 p.79, L18, #1500) — two independent
+  // ki-spend options with no server effect beyond the spend itself (no
+  // buff/condition model for the astral-projection clause, and invisibility
+  // has no target model to persist against — mirrors Cloak of Shadows/Shadow
+  // Arts below: gating + reminder rows only, no dedicated cast vertical yet).
+  {
+    key: "emptyBody",
+    name: "Empty Body — Invisibility",
+    cost: "action",
+    grantClass: "monk",
+    grantLevel: 18,
+    resourceKey: "ki",
+    resourceAmount: 4,
+    reminder: "Spend 4 ki to become invisible for 1 minute, with resistance to all damage but force damage during that time.",
+    edition: "EDITION_2014",
+  },
+  {
+    key: "emptyBodyAstralProjection",
+    name: "Empty Body — Astral Projection",
+    cost: "action",
+    grantClass: "monk",
+    grantLevel: 18,
+    resourceKey: "ki",
+    resourceAmount: 8,
+    reminder: "Spend 8 ki to cast astral projection on yourself without a material component; you can't take other creatures with you.",
+    edition: "EDITION_2014",
+  },
 
   // Every row below (Warrior of Shadow / Warrior of the Elements / Warrior of
   // the Open Hand / Warrior of Mercy) is subclass-gated via grantSubclassSlugs
@@ -783,6 +880,18 @@ interface ActionContext {
    * L10, so patientDefenseFocus simply omits the tempHp op.
    */
   heightenedFocusTempHp?: number;
+  /**
+   * The character's rules edition (#1500) — read by any effect fn whose spend
+   * targets an edition-forked pool key under the SAME action key (Flurry of
+   * Blows: "focus" for a 2024 monk, "ki" for a 2014 monk, via monkPoolKey).
+   * Every OTHER effect fn ignores this field. Optional (not required, unlike
+   * heightenedFocusTempHp) purely so the ~45 existing unit-test call sites
+   * exercising unrelated keys don't all need to start threading a field they
+   * never read; the real route (routes/character/actions.ts) always supplies
+   * it — flurryOfBlows below falls back to DEFAULT_RULES_EDITION only for a
+   * direct unit-test call that omits it.
+   */
+  edition?: RulesEdition;
 }
 
 type SpendResourceOp = { type: "spendResource"; key: string; amount?: number };
@@ -852,13 +961,18 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
   // bonusUnarmedStrike is economy-only, like `attack`/`twf` — no server state
   // to spend, the gate is already applied at derive time (requiresUnarmored).
   bonusUnarmedStrike: () => [],
-  // SRD 5.2 Focus: Flurry expends 1 Focus Point to make two Unarmed Strikes
-  // (#1217 — was miscoded at 2 Focus, a 2014-rules holdover).
-  flurryOfBlows: () => [{ type: "spendResource", key: "focus" }],
-  // patientDefense / stepOfTheWind (the FREE variants) have no ACTION_EFFECT_FN
-  // entry — like Shadow Step/Opportunist, they're economy-only (consume the
-  // bonus action, spend nothing); planActionClick never calls send() for a
-  // serverEffect:false resolver, so no dispatch entry is needed here.
+  // Flurry expends 1 ki/focus to make two Unarmed Strikes (#1217 — was
+  // miscoded at 2 Focus, a 2014-rules holdover). ONE function serves BOTH
+  // editions' `flurryOfBlows` DERIVED_ACTIONS row (#1500) — the pool key
+  // itself forks (monkPoolKey), so this resolves it from ctx.edition rather
+  // than hardcoding "focus" the way every OTHER monk spend below safely can
+  // (their action KEYS are edition-exclusive; this one key is shared).
+  flurryOfBlows: (ctx) => [{ type: "spendResource", key: monkPoolKey(ctx.edition ?? DEFAULT_RULES_EDITION) }],
+  // patientDefense / stepOfTheWind (the FREE 2024 variants) have no
+  // ACTION_EFFECT_FN entry — like Shadow Step/Opportunist, they're
+  // economy-only (consume the bonus action, spend nothing); planActionClick
+  // never calls send() for a serverEffect:false resolver, so no dispatch
+  // entry is needed here.
   patientDefenseFocus: (ctx) => {
     const ops: ActionOp[] = [{ type: "spendResource", key: "focus" }];
     // Heightened Focus (monk L10, #1244): the route pre-rolls two Martial Arts
@@ -873,6 +987,15 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
   // no server state to apply — this app has no NPC/ally combatant model — so
   // it's surfaced only via the level-gated reminder text above, not here.
   stepOfTheWindFocus: () => [{ type: "spendResource", key: "focus" }],
+  // 2014 (SRD 5.1, #1500): flat 1-ki cost, no free variant, so each gets its
+  // own distinct key rather than reusing patientDefense/stepOfTheWind (those
+  // exact keys are pinned serverEffect:false in the frontend's
+  // ACTION_RESOLVERS table — see the DERIVED_ACTIONS comment above). Both
+  // action keys are 2014-exclusive (no 2024 row shares them), so hardcoding
+  // "ki" here is safe the same way deflectAttacksRedirect safely hardcodes
+  // "focus" below.
+  patientDefenseKi: () => [{ type: "spendResource", key: "ki" }],
+  stepOfTheWindKi: () => [{ type: "spendResource", key: "ki" }],
   // stunningStrike is not here — it's a post-hit rider in stunning-strike.ts (#1242).
   // Warrior of the Open Hand (#1245): Wholeness of Body mirrors layOnHands'
   // shape (spend the pool, heal the client-rolled amount) but spends a flat 1
@@ -914,6 +1037,18 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
   // calls the transactions endpoint (nothing persisted). Only the redirect
   // below is real, persisted state.
   deflectAttacksRedirect: () => [{ type: "spendResource", key: "focus" }],
+  // deflectMissiles (2014 base reduction) has no entry here either, same
+  // reasoning — the client rolls 1d10 + Dex + monk level. The throw-back is
+  // the persisted 1-ki spend (its own damage roll is client-rolled and
+  // narrated only, mirroring wholenessOfBody's client-rolled heal — no
+  // target-combatant model to apply it to, #1242's disclosed simplification).
+  deflectMissilesThrow: () => [{ type: "spendResource", key: "ki" }],
+  // emptyBody / emptyBodyAstralProjection have no entry here — like
+  // shadowArts/cloakOfShadows below, they're gating + reminder rows only
+  // (resourceKey/resourceAmount drive the enabled/disabled display); no
+  // ACTION_RESOLVERS entry exists either, so neither renders a clickable
+  // card yet — a dedicated cast vertical is future work, disclosed rather
+  // than half-wired.
 
   // Paladin
   divineSense: () => [{ type: "spendResource", key: "divineSense" }],

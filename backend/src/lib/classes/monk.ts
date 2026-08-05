@@ -21,8 +21,9 @@ export function monkSaveDC(abilityScores: Record<string, number>, profBonus: num
 // The Monk pool's vocabulary by edition (#1313 D3) — Ki Points (SRD 5.1 /
 // PHB'14 p.78) vs Focus Points (SRD 5.2 / PHB'24 p.88). Count, start level (2),
 // and recharge (short or long rest) are identical in both editions and don't
-// fork — only this name does. Nothing consumes the "ki" branch yet; #1500
-// wires up the 2014 monk's own pool under this key.
+// fork — only this name does. Consumed by resourceFn below (#1500), the 2014
+// monk action rows (lib/classes/actions.ts), and Stunning Strike
+// (stunning-strike.ts)'s own pool spend.
 export function monkPoolKey(edition: RulesEdition): "ki" | "focus" {
   return edition === "EDITION_2014" ? "ki" : "focus";
 }
@@ -43,13 +44,41 @@ export const monk: ClassDefinition = {
   // typecheck for every OTHER class's resourceFn).
   resourceFn: (level, abilityScores, profBonus, _subclassKey, edition) => {
     if (level < 2) return [];
-    const focusDC = monkSaveDC(abilityScores, profBonus);
-    // Uncanny Metabolism (L2, SRD 5.2): on rolling Initiative, regain all
-    // expended Focus once per long rest, plus heal monk level + a Martial Arts
-    // die roll (the roll itself happens in the impure rollInitiative op —
-    // resourceFn only declares the descriptor). Perfect Focus (L15) layers on
-    // top: every combat, top Focus up to 4 when at 3 or fewer. #1243 needs BOTH
-    // behaviors on this one pool at different levels, hence the array.
+    const saveDC = monkSaveDC(abilityScores, profBonus);
+    const key = monkPoolKey(edition);
+
+    // 2014 (SRD 5.1 / PHB'14 p.78): Ki has no Uncanny Metabolism/Perfect
+    // Focus analog — the only onInitiative descriptor is Perfect Self (L20),
+    // firing ONLY when ki is fully exhausted (`threshold: 0`), unlike 2024's
+    // "3 or fewer" trigger. #1313's scope: "2014 emits no onInitiative below
+    // L20 (no Uncanny Metabolism, no Perfect Focus)."
+    if (edition === "EDITION_2014") {
+      const onInitiative: InitiativeRegen[] = level >= 20 ? [{ id: "perfectSelf", amount: 4, threshold: 0 }] : [];
+      return [
+        {
+          key,
+          label: "Ki Points",
+          total: level,
+          recharge: "short-or-long",
+          ...(onInitiative.length > 0 ? { onInitiative } : {}),
+          description: `Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC ${saveDC}. Regain all ki on a short or long rest.`,
+        },
+      ];
+    }
+
+    // 2024 (SRD 5.2 / PHB'24 p.88): Uncanny Metabolism (L2) — on rolling
+    // Initiative, regain all expended Focus once per long rest, plus heal
+    // monk level + a Martial Arts die roll (the roll itself happens in the
+    // impure rollInitiative op — resourceFn only declares the descriptor).
+    // Perfect Focus (L15) layers on top: every combat, top Focus up to 4 when
+    // at 3 or fewer. #1243 needs BOTH behaviors on this one pool at different
+    // levels, hence the array. Deliberately UNCHANGED shape (no explicit
+    // `threshold`, #1500's InitiativeRegen.threshold addition) — class-
+    // features-snapshot.test.ts pins this exact byte shape for EDITION_2024,
+    // and amount:4 alone already implies the identical remaining<4 trigger
+    // (see regenTargetUsed) for an integer pool. 2014's Perfect Self below
+    // DOES need `threshold` explicitly (0, not implied by any `amount`), so
+    // that's where the new field earns its keep.
     const onInitiative: InitiativeRegen[] = [
       {
         id: "uncannyMetabolism",
@@ -59,20 +88,16 @@ export const monk: ClassDefinition = {
       },
     ];
     if (level >= 15) {
-      // "if you have 3 or fewer focus points, you regain focus points until you
-      // have 4" — amount:4 already encodes the "3 or fewer" trigger (a pool
-      // at/above the target is a no-op in applyInitiativeRegen), so no separate
-      // threshold check is needed here.
       onInitiative.push({ id: "perfectFocus", amount: 4 });
     }
     return [
       {
-        key: "focus",
+        key,
         label: "Focus Points",
         total: level,
         recharge: "short-or-long",
         onInitiative,
-        description: `Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC ${focusDC}. Regain all focus on a short or long rest.`,
+        description: `Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC ${saveDC}. Regain all focus on a short or long rest.`,
       },
     ];
   },

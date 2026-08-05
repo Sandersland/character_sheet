@@ -230,17 +230,28 @@ function regenTargetUsed(pool: DerivedResource, regen: InitiativeRegen, used: nu
   return regen.amount === "all" ? 0 : Math.max(0, Math.min(used, pool.total - regen.amount));
 }
 
-function applyOneInitiativeDescriptor(
+// Whether `regen`'s explicit threshold (#1500) permits firing, given the
+// pool's current REMAINING count — independent of `amount` (Perfect Self
+// only fires at 0 remaining, not "below 4" the way topping to 4 alone would
+// imply). Always true for a descriptor with no threshold. Split out (mirrors
+// markerAllowsFiring above) so applyOneInitiativeDescriptor itself stays
+// under the complexity gate — one combined function tripped it (CRAP 43)
+// even before this field existed.
+function meetsThreshold(pool: DerivedResource, regen: InitiativeRegen, used: number): boolean {
+  return regen.threshold === undefined || pool.total - used <= regen.threshold;
+}
+
+// The InitiativeRegenResult object, or null when there's nothing to report
+// (nothing restored and no bonusHeal to signal) — split out purely to keep
+// applyOneInitiativeDescriptor's own branching budget low (fallow's
+// complexity gate; one combined function tripped it at CRAP 43 even before
+// the #1500 threshold field existed).
+function regenResult(
   state: ResourcesMutableState,
   pool: DerivedResource,
   regen: InitiativeRegen,
-  discriminator: string | number,
+  restored: number,
 ): InitiativeRegenResult | null {
-  if (!markerAllowsFiring(state, pool, regen, discriminator)) return null;
-  const used = state.used[pool.key] ?? 0;
-  const targetUsed = regenTargetUsed(pool, regen, used);
-  const restored = targetUsed < used ? used - targetUsed : 0;
-  if (restored > 0) state.used[pool.key] = targetUsed;
   if (restored === 0 && !regen.bonusHeal) return null;
   return {
     key: pool.key,
@@ -249,6 +260,21 @@ function applyOneInitiativeDescriptor(
     remaining: pool.total - (state.used[pool.key] ?? 0),
     ...(regen.bonusHeal ? { bonusHeal: regen.bonusHeal } : {}),
   };
+}
+
+function applyOneInitiativeDescriptor(
+  state: ResourcesMutableState,
+  pool: DerivedResource,
+  regen: InitiativeRegen,
+  discriminator: string | number,
+): InitiativeRegenResult | null {
+  if (!markerAllowsFiring(state, pool, regen, discriminator)) return null;
+  const used = state.used[pool.key] ?? 0;
+  if (!meetsThreshold(pool, regen, used)) return null;
+  const targetUsed = regenTargetUsed(pool, regen, used);
+  const restored = targetUsed < used ? used - targetUsed : 0;
+  if (restored > 0) state.used[pool.key] = targetUsed;
+  return regenResult(state, pool, regen, restored);
 }
 
 export function applyInitiativeRegen(

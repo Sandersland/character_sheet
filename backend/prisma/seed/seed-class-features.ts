@@ -515,9 +515,16 @@ const MIN_ROWS_PER_PAIR = 10;
 // mirror-sourced (owner decision, not in SRD 5.2) with two values (Vow of
 // Enmity's action cost, Avenging Angel's duration) deliberately unverified
 // against a licensed source — see paladin-features.ts's own header.
-const EDITIONS_STILL_IDENTICAL = new Set<string>([
-  "Monk",
-]);
+//
+// "Monk" removed here (#1500, same diff as the content that makes its base
+// class genuinely diverge: 18->17 EDITION_2014 rows — Uncanny Metabolism/
+// Heightened Focus/Self-Restoration/Perfect Focus/Superior Defense are
+// 2024-only; Stillness of Mind/Purity of Body/Tongue of the Sun and
+// Moon/Diamond Soul/Timeless Body/Empty Body/Perfect Self are 2014-only, see
+// monk-features.ts's own header). The four Warrior-of-* subclasses are still
+// an untouched transport-only twin (#1501-#1503) — out of scope for this
+// removal, since the class-level count is already unequal regardless.
+const EDITIONS_STILL_IDENTICAL = new Set<string>([]);
 
 export interface ClassEditionPopulationSummary {
   pairsChecked: number;
