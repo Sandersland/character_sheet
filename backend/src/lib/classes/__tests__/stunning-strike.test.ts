@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { canAttemptStunningStrike, resolveStunningStrikeOutcome } from "@/lib/classes/stunning-strike.js";
+import { canAttemptStunningStrike, resolveStunningStrikeOutcome, stunningStrikeSummary } from "@/lib/classes/stunning-strike.js";
 import { monkSaveDC, monkPoolKey } from "@/lib/classes/monk.js";
 
 // Renamed for #1499 (the old name cited only the 2024 "Focus" pool). SRD 5.1
@@ -36,26 +36,60 @@ describe("monkPoolKey (#1313 D3)", () => {
   });
 });
 
-describe("canAttemptStunningStrike (once-per-turn guard)", () => {
-  it("allows a first attempt this turn", () => {
-    expect(canAttemptStunningStrike({ usedThisTurn: false })).toBe(true);
+describe("canAttemptStunningStrike (2024: once-per-turn guard; 2014: no cap, #1500)", () => {
+  it("2024: allows a first attempt this turn", () => {
+    expect(canAttemptStunningStrike({ usedThisTurn: false }, "EDITION_2024")).toBe(true);
   });
 
-  it("blocks a second attempt in the same turn", () => {
-    expect(canAttemptStunningStrike({ usedThisTurn: true })).toBe(false);
+  it("2024: blocks a second attempt in the same turn", () => {
+    expect(canAttemptStunningStrike({ usedThisTurn: true }, "EDITION_2024")).toBe(false);
+  });
+
+  it("2014: allows a first attempt this turn", () => {
+    expect(canAttemptStunningStrike({ usedThisTurn: false }, "EDITION_2014")).toBe(true);
+  });
+
+  it("2014: allows a SECOND attempt in the same turn — SRD 5.1 has no once-per-turn cap", () => {
+    expect(canAttemptStunningStrike({ usedThisTurn: true }, "EDITION_2014")).toBe(true);
   });
 });
 
-describe("resolveStunningStrikeOutcome (Con save vs focus DC)", () => {
+describe("resolveStunningStrikeOutcome (Con save vs ki/focus save DC — edition-invariant outcome logic)", () => {
   it("is a fail (Stunned) when the roll is below the DC", () => {
     expect(resolveStunningStrikeOutcome(10, 14)).toBe("fail");
   });
 
-  it("is a success (half-speed + advantage) when the roll meets the DC", () => {
+  it("is a success when the roll meets the DC", () => {
     expect(resolveStunningStrikeOutcome(14, 14)).toBe("success");
   });
 
   it("is a success when the roll exceeds the DC", () => {
     expect(resolveStunningStrikeOutcome(20, 14)).toBe("success");
+  });
+});
+
+describe("stunningStrikeSummary (#1500 — 2014 has no success rider and a different fail-duration wording)", () => {
+  it("2024 fail: Stunned until the START of the monk's next turn", () => {
+    expect(stunningStrikeSummary(14, 10, "fail", "EDITION_2024")).toBe(
+      "Stunning Strike — DC 14, target rolled 10: failed the save — Stunned until the start of your next turn.",
+    );
+  });
+
+  it("2024 success: half-speed + advantage rider", () => {
+    expect(stunningStrikeSummary(14, 14, "success", "EDITION_2024")).toBe(
+      "Stunning Strike — DC 14, target rolled 14: made the save — its speed is halved until the start of your next turn, and the next attack roll against it before then has advantage.",
+    );
+  });
+
+  it("2014 fail: Stunned until the END of the monk's next turn (not the start)", () => {
+    expect(stunningStrikeSummary(14, 10, "fail", "EDITION_2014")).toBe(
+      "Stunning Strike — DC 14, target rolled 10: failed the save — Stunned until the end of your next turn.",
+    );
+  });
+
+  it("2014 success: no rider at all", () => {
+    expect(stunningStrikeSummary(14, 14, "success", "EDITION_2014")).toBe(
+      "Stunning Strike — DC 14, target rolled 14: made the save — no effect.",
+    );
   });
 });

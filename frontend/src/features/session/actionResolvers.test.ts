@@ -26,7 +26,9 @@ const BACKEND_ACTION_EFFECT_KEYS = new Set([
   "wildShape",
   "bonusUnarmedStrike",
   "flurryOfBlows", "patientDefenseFocus", "stepOfTheWindFocus",
+  "patientDefenseKi", "stepOfTheWindKi", // 2014 (#1500)
   "deflectAttacksRedirect",
+  "deflectMissilesThrow", // 2014 (#1500)
   "wholenessOfBody",
   "handOfHealing", "handOfHealingFlurry",
   "divineSense", "layOnHands",

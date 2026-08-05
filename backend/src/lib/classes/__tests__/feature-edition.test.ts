@@ -651,6 +651,36 @@ const EXPECTED_EDITION_TAGGED_FEATURES = [
   ["paladin", "oath of vengeance", "Relentless Avenger"],
   ["paladin", "oath of vengeance", "Soul of Vengeance"],
   ["paladin", "oath of vengeance", "Avenging Angel"],
+  // Monk's 10 new triples (#1500, base class only — the four Warrior-of-*
+  // subclasses stay an untouched transport-only twin, #1501-#1503): of the
+  // base class's 12 forked-or-unique-per-edition features, only "Martial
+  // Arts" and "Stunning Strike" keep the SAME NAME across both editions
+  // (SRD 5.1 and PHB'24 both call them that, with genuinely different text)
+  // — taggedNamesFor only flags a name carrying two DIFFERENT descriptions,
+  // so a rename is never tagged (mirrors Warlock's Expanded Spell List ->
+  // Fiend Spells, Cleric's Domain Spells -> Life/Trickery Domain Spells
+  // above): "Ki"/"Focus", "Deflect Missiles"/"Deflect Attacks",
+  // "Ki-Empowered Strikes"/"Empowered Strikes", "Diamond Soul"/"Disciplined
+  // Survivor" are each a single description under their own name, and the
+  // eleven wholly edition-exclusive names (Uncanny Metabolism/Heightened
+  // Focus/Self-Restoration/Perfect Focus/Superior Defense on the 2024 side;
+  // Stillness of Mind/Purity of Body/Tongue of the Sun and Moon/Timeless
+  // Body/Empty Body/Perfect Self on the 2014 side) have no counterpart to
+  // fork against at all. Both base names show up under EVERY subclass
+  // context Monk has (undefined/warrior of the open hand/warrior of
+  // shadow/warrior of the elements/warrior of mercy — collectTaggedFeatureKeys
+  // combines classRows, always ALL of them, with each context's own
+  // subclassRows) — 2 names x 5 contexts = 10.
+  ["monk", "undefined", "Martial Arts"],
+  ["monk", "undefined", "Stunning Strike"],
+  ["monk", "warrior of the open hand", "Martial Arts"],
+  ["monk", "warrior of the open hand", "Stunning Strike"],
+  ["monk", "warrior of shadow", "Martial Arts"],
+  ["monk", "warrior of shadow", "Stunning Strike"],
+  ["monk", "warrior of the elements", "Martial Arts"],
+  ["monk", "warrior of the elements", "Stunning Strike"],
+  ["monk", "warrior of mercy", "Martial Arts"],
+  ["monk", "warrior of mercy", "Stunning Strike"],
 ] as const;
 
 // A (class, subclass, name) is "tagged" if its two seeded rows carry

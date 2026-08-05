@@ -113,18 +113,12 @@ describe("GET /api/characters/:id — availableActions[].regrants", () => {
       // Without this the loop above passes vacuously on an empty payload. The
       // set is every key any DERIVED_ACTIONS row regrants today FOR THIS
       // edition, so a new row regranting something else has to widen this
-      // deliberately. EDITION_2014 omits "dodge" (see the comment above);
-      // EDITION_2024 is unchanged. This narrowed 2014 list is a snapshot of an
-      // intentionally incomplete slice, not settled 5e: SRD 5.1 Patient Defense
-      // (PHB'14 p. 78) does buy Dodge for 1 ki ("You can spend 1 ki point to
-      // take the Dodge action as a bonus action on your turn"). #1500 authors
-      // the ki-costed 2014 Patient Defense row and must widen EDITION_2014's
-      // expected keys back to include "dodge" — do not read this list as
-      // settled.
-      const expectedKeys =
-        edition === "EDITION_2024"
-          ? ["dash", "disengage", "dodge", "hide", "useObject"]
-          : ["dash", "disengage", "hide", "useObject"];
+      // deliberately. #1500 authors the ki-costed 2014 patientDefenseKi row
+      // (SRD 5.1 PHB'14 p.78: "You can spend 1 ki point to take the Dodge
+      // action as a bonus action on your turn") — both editions now regrant
+      // the identical five-key set, just via different rows/keys
+      // (patientDefenseFocus for 2024, patientDefenseKi for 2014).
+      const expectedKeys = ["dash", "disengage", "dodge", "hide", "useObject"];
       expect([...seen].sort()).toEqual(expectedKeys);
 
       // The reason the class row stores keys: this ONE key resolves to two

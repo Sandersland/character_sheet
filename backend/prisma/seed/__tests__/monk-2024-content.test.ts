@@ -36,11 +36,12 @@ const SHADOW = "monk-warrior-of-shadow";
 const ELEMENTS = "monk-warrior-of-the-elements";
 const MERCY = "monk-warrior-of-mercy";
 
-describe("Per-partition counts: base 18, open hand 4, shadow 4, elements 5, mercy 6 — identical for 2014/2024 (#1675)", () => {
-  it("counts match exactly (37 total 2014, 37 total 2024)", () => {
+describe("Per-partition counts: base 17(2014)/18(2024), subclasses open hand 4, shadow 4, elements 5, mercy 6 — identical for 2014/2024 (#1500 forks the base class; #1675 subclasses stay a transport-only twin pending #1501-#1503)", () => {
+  it("counts match exactly (36 total 2014, 37 total 2024)", () => {
     const count = (slug: string | null, edition: Edition) => MONK_FEATURES.filter((r) => r.subclassSlug === slug && r.edition === edition).length;
+    expect(count(BASE, "EDITION_2014")).toBe(17);
+    expect(count(BASE, "EDITION_2024")).toBe(18);
     for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {
-      expect(count(BASE, edition)).toBe(18);
       expect(count(OPEN_HAND, edition)).toBe(4);
       expect(count(SHADOW, edition)).toBe(4);
       expect(count(ELEMENTS, edition)).toBe(5);
@@ -48,9 +49,9 @@ describe("Per-partition counts: base 18, open hand 4, shadow 4, elements 5, merc
     }
     const total2014 = MONK_FEATURES.filter((r) => r.edition === "EDITION_2014").length;
     const total2024 = MONK_FEATURES.filter((r) => r.edition === "EDITION_2024").length;
-    expect(total2014).toBe(37);
+    expect(total2014).toBe(36);
     expect(total2024).toBe(37);
-    expect(MONK_FEATURES).toHaveLength(74);
+    expect(MONK_FEATURES).toHaveLength(73);
   });
 });
 
@@ -140,8 +141,8 @@ describe("integration (#1675): a real seeded L17 Warrior of the Elements monk ha
   });
 });
 
-describe("monk-2014-snapshot.test.ts must pass unmodified alongside this commit's changes", () => {
-  it("the 2014 base-class row count is unaffected (still 18)", () => {
-    expect(MONK_FEATURES.filter((r) => r.subclassSlug === null && r.edition === "EDITION_2014")).toHaveLength(18);
+describe("#1500: the 2014 base-class row count reflects real SRD 5.1 content (17, not 2024's 18)", () => {
+  it("the 2014 base-class row count is 17", () => {
+    expect(MONK_FEATURES.filter((r) => r.subclassSlug === null && r.edition === "EDITION_2014")).toHaveLength(17);
   });
 });

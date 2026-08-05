@@ -175,16 +175,27 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
   // profile. Gated server-side by requiresUnarmored, not a resource pool.
   bonusUnarmedStrike: { key: "bonusUnarmedStrike", kind: "twf-picker", slot: "bonusAction", serverEffect: false, subtitle: "One Unarmed Strike as a Bonus Action (Dex + Martial Arts die)." },
   // Dispatched via its own handleFlurryAction (like twf), not planActionClick —
-  // 2024 Flurry is Unarmed Strikes only (#1217), so it never opens the weapon picker.
+  // Flurry is Unarmed Strikes only (both editions, #1217/#1500), so it never
+  // opens the weapon picker. `resourceKey: "focus"` is cosmetic ONLY (the
+  // pool-badge lookup in turnOptions.ts poolBadgeFor) — the served
+  // AvailableAction carries no resourceKey on the wire, so this static table
+  // can't fork per edition; a 2014 monk's card falls back to
+  // classActionOption's flurrySpendLabel special case instead, which checks
+  // both "focus" and "ki" directly against the character's own pools.
   flurryOfBlows:     { key: "flurryOfBlows",     kind: "flurry-picker",  slot: "bonusAction", serverEffect: true,  resourceKey: "focus", resourceAmount: 1 },
-  // Patient Defense / Step of the Wind (#1240) — free vs 1-Focus variants, each
-  // its own menu entry (mirrors rage/endRage). The free entries are
+  // Patient Defense / Step of the Wind — 2024 free vs 1-Focus variants (#1240),
+  // each its own menu entry (mirrors rage/endRage). The free entries are
   // economy-only, like Shadow Step: no backend ACTION_EFFECT_FN, so
   // serverEffect:false and no resourceKey.
   patientDefense:      { key: "patientDefense",      kind: "simple-confirm", slot: "bonusAction", serverEffect: false },
   patientDefenseFocus: { key: "patientDefenseFocus", kind: "simple-confirm", slot: "bonusAction", serverEffect: true,  resourceKey: "focus" },
   stepOfTheWind:       { key: "stepOfTheWind",       kind: "simple-confirm", slot: "bonusAction", serverEffect: false },
   stepOfTheWindFocus:  { key: "stepOfTheWindFocus",  kind: "simple-confirm", slot: "bonusAction", serverEffect: true,  resourceKey: "focus" },
+  // 2014 (SRD 5.1, #1500) — ONE row apiece (flat 1-ki, no free variant),
+  // distinct keys from the 2024 pair above (see actions.ts's own comment on
+  // why patientDefense/stepOfTheWind can't be reused).
+  patientDefenseKi: { key: "patientDefenseKi", kind: "simple-confirm", slot: "bonusAction", serverEffect: true, resourceKey: "ki" },
+  stepOfTheWindKi:  { key: "stepOfTheWindKi",  kind: "simple-confirm", slot: "bonusAction", serverEffect: true, resourceKey: "ki" },
   // Stunning Strike (L5) has no resolver here — it's a post-hit rider rendered
   // by StunningStrikeSection (mirrors SneakAttackSection), not a selectable
   // action (#1242 supersedes the #392 bare-spend stub formerly here).
@@ -195,6 +206,11 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
   // Redirect rider — a "free" decision within the same reaction (not its own
   // slot), spending 1 Focus server-side once a ranged hit is reduced to 0.
   deflectAttacksRedirect: { key: "deflectAttacksRedirect", kind: "simple-confirm", slot: "free", serverEffect: true, resourceKey: "focus" },
+  // 2014 (SRD 5.1, #1500) — Deflect Missiles: same reminder-only-reaction
+  // shape as deflectAttacks (no bespoke roll math wired yet — #1501-#1503
+  // follow-up), and its throw-back mirrors deflectAttacksRedirect's shape.
+  deflectMissiles:      { key: "deflectMissiles",      kind: "simple-confirm", slot: "reaction", serverEffect: false },
+  deflectMissilesThrow: { key: "deflectMissilesThrow", kind: "simple-confirm", slot: "free",     serverEffect: true, resourceKey: "ki" },
   // Warrior of Shadow reminder action (2024 rewrite, #1246) — economy-only, like
   // twf; no backend effect fn. Opportunist (2014 L17) is retired — Cloak of
   // Shadows (L17) is a real cast now, wired through ClassResourceBlocks'

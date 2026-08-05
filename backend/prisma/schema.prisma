@@ -1372,8 +1372,9 @@ model Action {
   grantLevel    Int? // minimum character level for this action to appear
 
   // Optional scalar resource-spend hint — used by deriveActions to determine
-  // `enabled` (e.g. Rage costs 1 "rage"; Flurry costs 2 "ki"). No program,
-  // just two columns that let deriveActions check remaining > amount.
+  // `enabled` (e.g. Rage costs 1 "rage"; Flurry of Blows costs 1 "ki" or 1
+  // "focus" depending on edition, #1500). No program, just two columns that
+  // let deriveActions check remaining > amount.
   resourceKey    String? // matches DerivedResource.key, e.g. "rage"
   resourceAmount Int? // units required; null means no resource check needed
 

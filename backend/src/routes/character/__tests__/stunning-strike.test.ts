@@ -2,6 +2,8 @@
  * Stunning Strike route tests (#1242). A level-5 monk (Wis 16, prof +3) has
  * focus DC 14; the once-per-turn guard rejects a repeat attempt, insufficient
  * focus is rejected, and a non-monk (or a monk below L5) has no Stunning Strike.
+ * #1500 adds a 2014 (Ki) counterpart proving the once-per-turn guard is
+ * LIFTED and the resource spend targets "ki" instead of "focus".
  */
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -138,6 +140,82 @@ describe("POST /api/characters/:id/abilities/stunning-strike/transactions", () =
       .send({ operations: [{ type: "attemptStunningStrike", usedThisTurn: false }] });
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/focus/i);
+  });
+});
+
+const CLASS_NAME_2014 = "Stunning Strike Route Test Monk 2014";
+const FIXTURE_ID_2014 = "test-stunning-strike-character-2014";
+const url2014 = `/api/characters/${FIXTURE_ID_2014}/abilities/stunning-strike/transactions`;
+
+async function createMonk2014(level: number, resources?: Prisma.InputJsonValue) {
+  const cls = await prisma.characterClass.upsert({
+    where: { name: CLASS_NAME_2014 },
+    create: { name: CLASS_NAME_2014, hitDie: "d8", savingThrows: ["strength", "dexterity"], skillChoiceCount: 2, skillChoices: ["acrobatics"], isSpellcaster: false },
+    update: {},
+  });
+  await prisma.character.create({
+    data: {
+      ...FIXTURE_BASE,
+      id: FIXTURE_ID_2014,
+      ownerId: OWNER_ID,
+      rulesEdition: "EDITION_2014",
+      resources: resources ?? Prisma.JsonNull,
+      classEntries: { create: [{ name: "monk", classId: cls.id, position: 0, level }] },
+    },
+  });
+}
+
+describe("POST /api/characters/:id/abilities/stunning-strike/transactions — EDITION_2014 (#1500)", () => {
+  beforeEach(async () => {
+    await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
+    await createMonk2014(5);
+  });
+
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { id: FIXTURE_ID_2014 } });
+  });
+  afterAll(async () => {
+    await prisma.characterClass.deleteMany({ where: { name: CLASS_NAME_2014 } });
+  });
+
+  it("spends 1 ki (not focus) and rolls a Con save vs DC 14 for a level-5 monk", async () => {
+    const res = await agent()
+      .post(url2014)
+      .send({ operations: [{ type: "attemptStunningStrike", usedThisTurn: false }] });
+    expect(res.status).toBe(200);
+    const result = res.body.results[0];
+    expect(result.dc).toBe(14);
+    expect(result.summary).toContain(`DC ${result.dc}`);
+
+    const kiPool = res.body.character.resources.pools.find((p: { key: string }) => p.key === "ki");
+    expect(kiPool.remaining).toBe(4); // 5 total − 1 spent
+    expect(res.body.character.resources.pools.find((p: { key: string }) => p.key === "focus")).toBeUndefined();
+  });
+
+  it("succeeds TWICE in the same turn — SRD 5.1 has no once-per-turn cap", async () => {
+    const first = await agent()
+      .post(url2014)
+      .send({ operations: [{ type: "attemptStunningStrike", usedThisTurn: true }] });
+    expect(first.status).toBe(200);
+
+    const second = await agent()
+      .post(url2014)
+      .send({ operations: [{ type: "attemptStunningStrike", usedThisTurn: true }] });
+    expect(second.status).toBe(200);
+
+    const kiPool = second.body.character.resources.pools.find((p: { key: string }) => p.key === "ki");
+    expect(kiPool.remaining).toBe(3); // 5 total − 2 spent across the two attempts
+  });
+
+  it("rejects an attempt with no ki remaining", async () => {
+    await prisma.character.deleteMany({ where: { id: FIXTURE_ID_2014 } });
+    await createMonk2014(5, { used: { ki: 5 } } as Prisma.InputJsonValue);
+    const res = await agent()
+      .post(url2014)
+      .send({ operations: [{ type: "attemptStunningStrike", usedThisTurn: false }] });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/ki/i);
   });
 });
 

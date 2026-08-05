@@ -56,6 +56,19 @@ export interface InitiativeRegen {
   id?: string;
   /** A bonus HP heal this descriptor grants whenever it fires. Absent for a plain regen (Perfect Focus has none). */
   bonusHeal?: InitiativeBonusHeal;
+  /**
+   * Fire only when the pool's REMAINING (available) count is at or below this
+   * value (#1500) — e.g. 2014 Perfect Self ("when you roll initiative and
+   * have no ki points remaining") is `{ amount: 4, threshold: 0 }`: it never
+   * fires with 1+ ki left, and tops to 4 when it does. Absent ⇒ the old
+   * implicit rule (fires whenever remaining < amount) still applies — 2024
+   * Perfect Focus stays on that implicit rule deliberately (an explicit
+   * `threshold: 3` would behave identically, since amount:4 alone already
+   * implies a remaining<4 ⇔ remaining<=3 trigger for an integer pool, but
+   * class-features-snapshot.test.ts pins Perfect Focus's exact byte shape
+   * for EDITION_2024 and this slice's own AC requires no delta there).
+   */
+  threshold?: number;
 }
 
 export interface DerivedResource {

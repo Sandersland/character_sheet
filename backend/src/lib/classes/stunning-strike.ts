@@ -1,10 +1,15 @@
-// Stunning Strike (Monk L5, SRD 5.2 / PHB'24 p.88) live-play automation — the
-// monk counterpart to applySneakAttackOperations. Once per turn, after hitting
-// with an Unarmed Strike or a monk weapon, spend 1 focus to force a
-// Constitution save against the monk's focus save DC (8 + prof + Wis): fail →
-// Stunned until the start of the monk's next turn; success (2024 rule) → the
+// Stunning Strike (Monk L5) live-play automation — the monk counterpart to
+// applySneakAttackOperations. SRD 5.2 / PHB'24 p.88 (2024): once per turn,
+// after hitting with an Unarmed Strike or a monk weapon, spend 1 focus to
+// force a Constitution save against the monk's focus save DC (8 + prof +
+// Wis): fail → Stunned until the start of the monk's next turn; success → the
 // target's speed is halved until the start of the monk's next turn, and the
-// next attack roll against it before then has advantage.
+// next attack roll against it before then has advantage. SRD 5.1 / PHB'14
+// p.77 (2014, #1500): NO once-per-turn cap (any melee weapon attack hit can
+// attempt one, as long as ki remains), spends 1 ki against the monk's ki save
+// DC (same formula), and NO success rider at all — a made save simply does
+// nothing further; a failed save is Stunned until the END of the monk's next
+// turn (not the start).
 //
 // Target-rider modeling choice (#1242): this app has no NPC/monster Combatant
 // model — Session/SessionParticipant track only the party's own Characters,
@@ -23,14 +28,16 @@
 // NPC stat-block model. The DM may narrate an override if the target's actual
 // Constitution save would differ materially.
 
+import type { RulesEdition } from "@character-sheet/shared-types";
 import type { AttemptStunningStrikeOperation, StunningStrikeOperation } from "@character-sheet/contracts";
 
 import { Prisma } from "@/generated/prisma/client.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { levelForExperience, proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
+import { editionOf } from "@/lib/rules/edition.js";
 import { runCharacterTransaction, type CharacterTxContext } from "@/lib/character/character-transaction.js";
 import { applySpendResourceInTx } from "./resources.js";
-import { monkSaveDC } from "./monk.js";
+import { monkSaveDC, monkPoolKey } from "./monk.js";
 
 export class InvalidStunningStrikeOperationError extends Error {}
 
@@ -43,18 +50,33 @@ export interface StunningStrikeAttemptResult {
   summary: string;
 }
 
-/** Once-per-turn guard — pure so the red/green test can exercise it directly. */
-export function canAttemptStunningStrike(input: { usedThisTurn: boolean }): boolean {
-  return !input.usedThisTurn;
+/**
+ * Once-per-turn guard — pure so the red/green test can exercise it directly.
+ * 2014 (SRD 5.1 / PHB'14 p.77) has NO once-per-turn cap at all: any melee
+ * weapon attack hit can attempt one, gated only on ki remaining (enforced by
+ * the resource spend below, not here) — `edition` last, one function per rule.
+ */
+export function canAttemptStunningStrike(input: { usedThisTurn: boolean }, edition: RulesEdition): boolean {
+  return edition === "EDITION_2014" ? true : !input.usedThisTurn;
 }
 
-/** SRD 5.2 Constitution save: fail (roll < DC) is Stunned; success halves speed + grants advantage on the next attack roll against it. */
+/** Constitution save (both editions): fail (roll < DC) is Stunned. 2024 success halves speed + grants advantage; 2014 has no success rider (see stunningStrikeSummary). */
 export function resolveStunningStrikeOutcome(roll: number, dc: number): StunningStrikeOutcome {
   return roll >= dc ? "success" : "fail";
 }
 
-function stunningStrikeSummary(dc: number, roll: number, outcome: StunningStrikeOutcome): string {
+/**
+ * 2014 (SRD 5.1 / PHB'14 p.77): a failed save is Stunned until the END of the
+ * monk's next turn (not the start, unlike 2024) and a made save does nothing
+ * further — no half-speed/advantage rider exists in SRD 5.1 at all.
+ */
+export function stunningStrikeSummary(dc: number, roll: number, outcome: StunningStrikeOutcome, edition: RulesEdition): string {
   const base = `Stunning Strike — DC ${dc}, target rolled ${roll}`;
+  if (edition === "EDITION_2014") {
+    return outcome === "fail"
+      ? `${base}: failed the save — Stunned until the end of your next turn.`
+      : `${base}: made the save — no effect.`;
+  }
   return outcome === "fail"
     ? `${base}: failed the save — Stunned until the start of your next turn.`
     : `${base}: made the save — its speed is halved until the start of your next turn, and the next attack roll against it before then has advantage.`;
@@ -63,6 +85,7 @@ function stunningStrikeSummary(dc: number, roll: number, outcome: StunningStrike
 const STUNNING_STRIKE_SELECT = {
   experiencePoints: true,
   abilityScores: true,
+  rulesEdition: true,
   classEntries: {
     orderBy: { position: "asc" as const },
     select: { name: true, level: true },
@@ -86,7 +109,8 @@ async function attemptStunningStrike(
   if (monkLevel(row) < 5) {
     throw new InvalidStunningStrikeOperationError("Only a monk (level 5+) has Stunning Strike");
   }
-  if (!canAttemptStunningStrike({ usedThisTurn: op.usedThisTurn })) {
+  const edition = editionOf(row);
+  if (!canAttemptStunningStrike({ usedThisTurn: op.usedThisTurn }, edition)) {
     throw new InvalidStunningStrikeOperationError("Stunning Strike can only be attempted once per turn");
   }
 
@@ -97,14 +121,15 @@ async function attemptStunningStrike(
   const abilityScores = row.abilityScores as Record<string, number>;
   const dc = monkSaveDC(abilityScores, profBonus);
 
-  // Spend 1 focus BEFORE rolling — insufficient focus throws
+  // Spend 1 ki/focus BEFORE rolling (#1500: monkPoolKey resolves the pool
+  // name per edition) — insufficient resource throws
   // InvalidResourceOperationError (its own 400), so a failed spend never
   // reaches (or narrates) a save attempt.
-  await applySpendResourceInTx(tx, characterId, { type: "spendResource", key: "focus" }, batchId, sessionId);
+  await applySpendResourceInTx(tx, characterId, { type: "spendResource", key: monkPoolKey(edition) }, batchId, sessionId);
 
   const roll = 1 + Math.floor(Math.random() * 20);
   const outcome = resolveStunningStrikeOutcome(roll, dc);
-  const summary = stunningStrikeSummary(dc, roll, outcome);
+  const summary = stunningStrikeSummary(dc, roll, outcome, edition);
 
   await logEvent(tx, {
     characterId,
