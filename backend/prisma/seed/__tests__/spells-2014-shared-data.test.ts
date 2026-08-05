@@ -232,4 +232,48 @@ describe("SHARED_SPELLS_2014 — value spot-checks", () => {
     );
     expect(s.description).not.toMatch(/doesn't return to that range/);
   });
+
+  // #1719 (Warlock) added these three rows: all genuine PHB'14 4-list
+  // spells (Bard/Sorcerer/Warlock/Wizard) missing from every prior slice
+  // entirely, not API-derived — dnd5eapi/open5e's SRD 5.1 dataset doesn't
+  // carry any of them — so they're hand-transcribed and get their own
+  // spot-checks, each cross-checked word-for-word against a second source
+  // (dnd5e.wikidot.com).
+  it("Friends: no Verbal component (S + M only — unusual for a cantrip), Concentration duration, no attackType/effectKind (self-buff only)", () => {
+    const s = find("Friends");
+    expect(s.level).toBe(0);
+    expect(s.concentration).toBe(true);
+    expect(s.classes).toEqual(["wizard", "bard", "sorcerer", "warlock"]);
+    expect(s.components).toEqual({
+      verbal: false,
+      somatic: true,
+      material: true,
+      materialDescription: "a small amount of makeup applied to the face as this spell is cast",
+    });
+    expect(s.attackType).toBeUndefined();
+    expect(s.effectKind).toBeUndefined();
+  });
+
+  it("Cloud of Daggers: automatic 4d4 slashing (no attack/save — matches Magic Missile's shape), +2d4 per upcast level", () => {
+    const s = find("Cloud of Daggers");
+    expect(s.level).toBe(2);
+    expect(s.concentration).toBe(true);
+    expect(s.classes).toEqual(["wizard", "bard", "sorcerer", "warlock"]);
+    expect(s.effectKind).toBe("damage");
+    expect(s.effectDiceCount).toBe(4);
+    expect(s.effectDiceFaces).toBe(4);
+    expect(s.damageType).toBe("slashing");
+    expect(s.attackType).toBeUndefined();
+    expect(s.upcastDicePerLevel).toBe(2);
+  });
+
+  it("Crown of Madness: WIS save gates a forced-attack charm, no effectKind (control spell, not damage)", () => {
+    const s = find("Crown of Madness");
+    expect(s.level).toBe(2);
+    expect(s.concentration).toBe(true);
+    expect(s.classes).toEqual(["wizard", "bard", "sorcerer", "warlock"]);
+    expect(s.attackType).toBe("save");
+    expect(s.saveAbility).toBe("wisdom");
+    expect(s.effectKind).toBeUndefined();
+  });
 });

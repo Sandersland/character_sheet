@@ -35,15 +35,20 @@ describe("SORCERER_SPELLS_2014 — row-ownership rule (epic #1517)", () => {
 });
 
 describe("SORCERER_SPELLS_2014 — full PHB'14 Sorcerer membership is complete across all authoring slices", () => {
-  // The full PHB'14 Sorcerer spell list (123 spells: dnd5eapi.co's
+  // The full PHB'14 Sorcerer spell list (126 spells: dnd5eapi.co's
   // /api/2014/classes/sorcerer/spells enumerates 120; Chromatic Orb and Ray
   // of Sickness are real PHB'14 Sorcerer spells absent from that SRD-based
   // dataset (already authored in wizard.ts, #1714); Witch Bolt is a third
   // absent-from-SRD PHB'14 Sorcerer spell this slice found missing from every
-  // file and added to shared.ts) partitioned by which slice authors the row.
-  // Every name below must carry "sorcerer" in its classes[] wherever it's
-  // actually authored — this test is the permanent guard that the "already
-  // fanned" claim in sorcerer.ts's header holds.
+  // file and added to shared.ts. #1719 (Warlock)'s own manual sweep for
+  // spells absent from dnd5eapi found 3 MORE: Cloud of Daggers, Crown of
+  // Madness, and Friends are all genuine PHB'14 Sorcerer spells (each a
+  // Bard/Sorcerer/Warlock/Wizard 4-list spell) missing from every slice
+  // until #1719 added them to shared.ts — bumping this total from 123 to
+  // 126) partitioned by which slice authors the row. Every name below must
+  // carry "sorcerer" in its classes[] wherever it's actually authored —
+  // this test is the permanent guard that the "already fanned" claim in
+  // sorcerer.ts's header holds.
   const WIZARD_OWNED_SORCERER_SPELLS = [
     "Acid Splash",
     "Fire Bolt",
@@ -105,10 +110,10 @@ describe("SORCERER_SPELLS_2014 — full PHB'14 Sorcerer membership is complete a
     expect(BARD_SPELLS_2014.filter((s) => s.classes.includes("sorcerer")).map((s) => s.name)).toEqual([]);
   });
 
-  it("SHARED_SPELLS_2014's sorcerer-tagged row count plus the Wizard/Druid owner slices' sorcerer-tagged counts plus this slice's own 0 rows equals the full 123-spell PHB'14 Sorcerer list", () => {
+  it("SHARED_SPELLS_2014's sorcerer-tagged row count plus the Wizard/Druid owner slices' sorcerer-tagged counts plus this slice's own 0 rows equals the full 126-spell PHB'14 Sorcerer list", () => {
     const sharedSorcererCount = SHARED_SPELLS_2014.filter((s) => s.classes.includes("sorcerer")).length;
     const total = sharedSorcererCount + WIZARD_OWNED_SORCERER_SPELLS.length + DRUID_OWNED_SORCERER_SPELLS.length + SORCERER_SPELLS_2014.length;
-    expect(total).toBe(123);
+    expect(total).toBe(126);
   });
 
   it("no PHB'14 2024-only Sorcerer addition (e.g. Chaos Bolt, Shield of Faith reassigned to Sorcerer in 2024) is offered anywhere in the 2014 tables — this slice's membership check only counts genuine 2014 Sorcerer-owned spells", () => {

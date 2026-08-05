@@ -4,11 +4,14 @@
 // (foundation slice 1/3 of epic #1517) created the empty array + wiring;
 // this slice (#1713) fills it in.
 //
-// Source: every row below except one is verbatim SRD 5.1 text (dnd5eapi.co's
+// Source: every row below except four is verbatim SRD 5.1 text (dnd5eapi.co's
 // 2014 spell set — see `/api/2014/spells/<slug>`), cited SRD 5.1 as a whole
 // rather than per-row since all 136 of those rows share that one source. The
-// one exception, Witch Bolt, is hand-transcribed and cited per-row (#1718) —
-// dnd5eapi/open5e's SRD 5.1 dataset doesn't include it at all. A handful of
+// four exceptions — Witch Bolt (#1718), and Friends, Cloud of Daggers, and
+// Crown of Madness (#1719) — are hand-transcribed and cited per-row, each
+// cross-checked word-for-word against a second source (dnd5e.wikidot.com):
+// dnd5eapi/open5e's SRD 5.1 dataset doesn't include any of the four at all.
+// A handful of
 // the SRD rows fix a scraping artifact from that source, not a rules choice:
 // dnd5eapi genericizes PHB'14's "the DM" to "the GM" (restored here — this
 // repo's own term, see feats.ts's "the DM"), a few entries had a stray-space typo
@@ -166,6 +169,30 @@ export const SHARED_SPELLS_2014: CatalogSpell[] = [
     concentration: true,
     classes: ["wizard", "bard", "sorcerer", "warlock"],
     components: { verbal: false, somatic: true, material: false },
+  },
+  // PHB'14 p. 244. Not in dnd5eapi/open5e's SRD 5.1 dataset (same gap class
+  // as Witch Bolt, #1718) — Bard/Sorcerer/Warlock/Wizard is a 4-list spell
+  // so it belongs here per the row-ownership rule, but was missing from
+  // every slice authored so far; added here rather than left for a future
+  // slice to rediscover (found by #1719/Warlock's manual sweep for real
+  // PHB'14 spells absent from the API). Verified word-for-word against a
+  // second source (dnd5e.wikidot.com/spell:friends), which corroborates
+  // 5e-spellbook.app's 2014-edition text exactly, including the
+  // distinctive, error-prone detail that this spell has NO Verbal
+  // component — only Somatic + Material (unusual among cantrips) — and a
+  // Concentration duration (also unusual for a cantrip).
+  {
+    name: "Friends",
+    level: 0,
+    school: "enchantment",
+    castingTime: "1 action",
+    range: "Self",
+    duration: "Concentration, up to 1 minute",
+    description:
+      "For the duration, you have advantage on all Charisma checks directed at one creature of your choice that isn't hostile toward you. When the spell ends, the creature realizes that you used magic to influence its mood and becomes hostile toward you. A creature prone to violence might attack you. Another creature might seek retribution in other ways (at the DM's discretion), depending on the nature of your interaction with it.",
+    concentration: true,
+    classes: ["wizard", "bard", "sorcerer", "warlock"],
+    components: { verbal: false, somatic: true, material: true, materialDescription: "a small amount of makeup applied to the face as this spell is cast" },
   },
   // ── Level 1 ───────────────────────────────────────────────────────────────
   {
@@ -747,6 +774,57 @@ export const SHARED_SPELLS_2014: CatalogSpell[] = [
     description: "You create a magical zone that guards against deception in a 15-foot-radius sphere centered on a point of your choice within range. Until the spell ends, a creature that enters the spell's area for the first time on a turn or starts its turn there must make a Charisma saving throw. On a failed save, a creature can't speak a deliberate lie while in the radius. You know whether each creature succeeds or fails on its saving throw. An affected creature is aware of the spell and can thus avoid answering questions to which it would normally respond with a lie. Such a creature can remain evasive in its answers as long as it remains within the boundaries of the truth.",
     classes: ["cleric", "bard", "paladin"],
     components: { verbal: true, somatic: true, material: false },
+  },
+  // PHB'14 p. 222. Not in dnd5eapi/open5e's SRD 5.1 dataset (same gap class
+  // as Witch Bolt, #1718) — Bard/Sorcerer/Warlock/Wizard is a 4-list spell
+  // so it belongs here per the row-ownership rule, but was missing from
+  // every slice authored so far; added here (found by #1719/Warlock's
+  // manual sweep). Verified word-for-word against a second source
+  // (dnd5e.wikidot.com/spell:cloud-of-daggers), which corroborates
+  // 5e-spellbook.app's 2014-edition text exactly. Damage is automatic (no
+  // attack roll or save — matches Magic Missile's "effectKind:'damage' with
+  // no attackType" shape), triggered by entering/starting a turn in the
+  // area rather than at cast time.
+  {
+    name: "Cloud of Daggers",
+    level: 2,
+    school: "conjuration",
+    castingTime: "1 action",
+    range: "60 feet",
+    duration: "Concentration, up to 1 minute",
+    description:
+      "You fill the air with spinning daggers in a cube 5 feet on each side, centered on a point you choose within range. A creature takes 4d4 slashing damage when it enters the spell's area for the first time on a turn or starts its turn there. At Higher Levels. When you cast this spell using a spell slot of 3rd level or higher, the damage increases by 2d4 for each slot level above 2nd.",
+    concentration: true,
+    classes: ["wizard", "bard", "sorcerer", "warlock"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "a sliver of glass" },
+    effectKind: "damage",
+    effectDiceCount: 4,
+    effectDiceFaces: 4,
+    damageType: "slashing",
+    upcastDicePerLevel: 2,
+  },
+  // PHB'14 p. 229. Not in dnd5eapi/open5e's SRD 5.1 dataset (same gap class
+  // as Witch Bolt, #1718) — Bard/Sorcerer/Warlock/Wizard is a 4-list spell
+  // so it belongs here per the row-ownership rule, but was missing from
+  // every slice authored so far; added here (found by #1719/Warlock's
+  // manual sweep). Verified word-for-word against a second source
+  // (dnd5e.wikidot.com/spell:crown-of-madness), which corroborates
+  // 5e-spellbook.app's 2014-edition text exactly, including that neither
+  // source carries an "At Higher Levels" clause for this spell.
+  {
+    name: "Crown of Madness",
+    level: 2,
+    school: "enchantment",
+    castingTime: "1 action",
+    range: "120 feet",
+    duration: "Concentration, up to 1 minute",
+    description:
+      "One humanoid of your choice that you can see within range must succeed on a Wisdom saving throw or become charmed by you for the duration. While the target is charmed in this way, a twisted crown of jagged iron appears on its head, and a madness glows in its eyes. The charmed target must use its action before moving on each of its turns to make a melee attack against a creature other than itself that you mentally choose. The target can act normally on its turn if you choose no creature or if none are within its reach. On your subsequent turns, you must use your action to maintain control over the target, or the spell ends. Also, the target can make a Wisdom saving throw at the end of each of its turns. On a success, the spell ends.",
+    concentration: true,
+    classes: ["wizard", "bard", "sorcerer", "warlock"],
+    components: { verbal: true, somatic: true, material: false },
+    attackType: "save",
+    saveAbility: "wisdom",
   },
   // ── Level 3 ───────────────────────────────────────────────────────────────
   {

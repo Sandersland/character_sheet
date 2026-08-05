@@ -83,8 +83,12 @@ describe("BARD_SPELLS_2014 — row-ownership rule (epic #1517)", () => {
 });
 
 describe("BARD_SPELLS_2014 — full PHB'14 Bard membership is complete across all four authoring slices", () => {
-  // The full PHB'14 Bard spell list (111 spells, cross-checked against
-  // dnd5eapi.co's /api/2014/classes/bard/spells) partitioned by which slice
+  // The full PHB'14 Bard spell list (114 spells: dnd5eapi.co's
+  // /api/2014/classes/bard/spells enumerates 111; #1719 (Warlock)'s own
+  // manual sweep for spells absent from dnd5eapi found 3 more genuine
+  // PHB'14 Bard spells missing from every slice until it added them to
+  // shared.ts — Cloud of Daggers, Crown of Madness, and Friends, each a
+  // Bard/Sorcerer/Warlock/Wizard 4-list spell) partitioned by which slice
   // authors the row. Every name below must carry "bard" in its classes[]
   // wherever it's actually authored — this test is the permanent guard that
   // the "already fanned" claim in this file's header holds.
@@ -130,7 +134,7 @@ describe("BARD_SPELLS_2014 — full PHB'14 Bard membership is complete across al
     expect(missing, "a Druid-owned Bard spell missing its bard membership tag in druid.ts").toEqual([]);
   });
 
-  it("SHARED_SPELLS_2014's bard-tagged row count plus the three owner slices' bard-tagged counts plus this slice's own 5 rows equals the full 111-spell PHB'14 Bard list", () => {
+  it("SHARED_SPELLS_2014's bard-tagged row count plus the three owner slices' bard-tagged counts plus this slice's own 5 rows equals the full 114-spell PHB'14 Bard list", () => {
     const sharedBardCount = SHARED_SPELLS_2014.filter((s) => s.classes.includes("bard")).length;
     const total =
       sharedBardCount +
@@ -138,7 +142,7 @@ describe("BARD_SPELLS_2014 — full PHB'14 Bard membership is complete across al
       CLERIC_OWNED_BARD_SPELLS.length +
       DRUID_OWNED_BARD_SPELLS.length +
       BARD_SPELLS_2014.length;
-    expect(total).toBe(111);
+    expect(total).toBe(114);
   });
 });
 
