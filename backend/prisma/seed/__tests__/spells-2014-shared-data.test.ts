@@ -107,7 +107,7 @@ function find(name: string): CatalogSpell {
 }
 
 // Spot-checks on the widest fan-outs and the trickiest edge cases this slice
-// hand-authored — not exhaustive (136 rows), but enough to catch a transcription
+// hand-authored — not exhaustive (137 rows), but enough to catch a transcription
 // or transform regression on the spells most likely to be touched again.
 describe("SHARED_SPELLS_2014 — value spot-checks", () => {
   it("Detect Magic: PHB'14's widest fan-out, all 7 casters that get it (no Warlock in 2014)", () => {
@@ -201,5 +201,35 @@ describe("SHARED_SPELLS_2014 — value spot-checks", () => {
       return sentences.some((sentence, i) => i > 0 && sentence === sentences[i - 1]);
     }).map((s) => s.name);
     expect(bad).toEqual([]);
+  });
+
+  // #1718 (Sorcerer) added this row: Witch Bolt is a genuine 3-list PHB'14
+  // spell (Sorcerer/Warlock/Wizard) that was missing from every prior slice
+  // entirely, not API-derived like the rest of this file — dnd5eapi/open5e's
+  // SRD 5.1 dataset doesn't carry it — so it's hand-transcribed and gets its
+  // own spot-check rather than relying on the generic API-sourced checks
+  // above (which don't apply to a row with no API source).
+  it("Witch Bolt: 1d12 lightning ranged spell attack, concentration, +1d12 per upcast level, Sorcerer/Warlock/Wizard", () => {
+    const s = find("Witch Bolt");
+    expect(s.level).toBe(1);
+    expect(s.school).toBe("evocation");
+    expect(s.concentration).toBe(true);
+    expect(s.classes).toEqual(["wizard", "sorcerer", "warlock"]);
+    expect(s.attackType).toBe("attack");
+    expect(s.effectKind).toBe("damage");
+    expect(s.effectDiceCount).toBe(1);
+    expect(s.effectDiceFaces).toBe(12);
+    expect(s.damageType).toBe("lightning");
+    expect(s.upcastDicePerLevel).toBe(1);
+    expect(s.components).toEqual({ verbal: true, somatic: true, material: true, materialDescription: "a twig from a tree that has been struck by lightning" });
+    // Regression guard: an earlier draft of this row invented a "moves more
+    // than 30 feet away and doesn't return by end of turn" end condition
+    // that doesn't exist in the real spell, dropping the genuine second end
+    // condition (total cover) in the process — caught by the mandatory
+    // rules-accuracy pass, re-verified word-for-word against dnd5e.wikidot.com.
+    expect(s.description).toMatch(
+      /The spell also ends if the target is ever outside the spell's range or if it has total cover from you\./,
+    );
+    expect(s.description).not.toMatch(/doesn't return to that range/);
   });
 });
