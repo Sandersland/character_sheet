@@ -11,26 +11,31 @@
 // direct database calls or async write logic may live in this file.
 // expand() below is pure content assembly, not seeding logic.
 //
-// SCOPE (#1675 transport, #1500 base-class rewrite, #1501 Open Hand fork):
-// #1675 moved every row here as a byte-identical transcription of what
-// lib/classes/monk.ts's MONK_FEATURES / WARRIOR_OF_*_FEATURES said, both
-// editions sharing one row. #1500 rewrites the 18 BASE-CLASS rows
-// (MONK_BASE_RAW below) from real SRD 5.1 / PHB'14 text — a genuine content
-// fork per feature, not a retag: several 2014 features have no 2024 name at
-// all (Uncanny Metabolism/Heightened Focus/Self-Restoration/Perfect Focus are
-// 2024-only; Stillness of Mind/Purity of Body/Tongue of the Sun and
-// Moon/Timeless Body/Empty Body/Perfect Self are 2014-only), so the 2014
-// partition is 17 rows against the 2024 partition's 18
-// (monk-2024-content.test.ts's per-partition count pins this exactly). #1501
-// (this slice) forks Warrior of the Open Hand into two SEPARATE subclasses —
-// "Warrior of the Open Hand" stays EDITION_2024-only (its four rows tagged in
-// this same commit) and "Way of the Open Hand" is authored fresh as
-// EDITION_2014-only (SRD 5.1's only monastic tradition) — rather than one
-// slug hosting both editions' text, since the 2014 and 2024 names genuinely
-// differ (monk.ts's two SubclassDefinition entries are the same split). The
-// three remaining 2024-only subclasses (Shadow, Elements, Mercy) are still
-// untouched — no 2014 slug exists for any of them yet (#1502-#1503's later
-// slices), so their rows stay byte-identical transcriptions pending those.
+// SCOPE (#1675 transport, #1500 base-class rewrite, #1501 Open Hand fork,
+// #1502 Shadow fork): #1675 moved every row here as a byte-identical
+// transcription of what lib/classes/monk.ts's MONK_FEATURES /
+// WARRIOR_OF_*_FEATURES said, both editions sharing one row. #1500 rewrites
+// the 18 BASE-CLASS rows (MONK_BASE_RAW below) from real SRD 5.1 / PHB'14
+// text — a genuine content fork per feature, not a retag: several 2014
+// features have no 2024 name at all (Uncanny Metabolism/Heightened
+// Focus/Self-Restoration/Perfect Focus are 2024-only; Stillness of
+// Mind/Purity of Body/Tongue of the Sun and Moon/Timeless Body/Empty
+// Body/Perfect Self are 2014-only), so the 2014 partition is 17 rows against
+// the 2024 partition's 18 (monk-2024-content.test.ts's per-partition count
+// pins this exactly). #1501 forks Warrior of the Open Hand into two SEPARATE
+// subclasses — "Warrior of the Open Hand" stays EDITION_2024-only (its four
+// rows tagged in that same commit) and "Way of the Open Hand" is authored
+// fresh as EDITION_2014-only (SRD 5.1's only monastic tradition) — rather
+// than one slug hosting both editions' text, since the 2014 and 2024 names
+// genuinely differ (monk.ts's two SubclassDefinition entries are the same
+// split). #1502 forks Warrior of Shadow the same way: its four rows are now
+// tagged EDITION_2024 (they still exist under monk-warrior-of-shadow's slug,
+// just no longer a both-editions transcription), and a NEW Way of Shadow
+// subclass (monk-way-of-shadow, a DISTINCT slug) carries its own four
+// EDITION_2014 rows, real PHB'14 pp.79-80 content (not in SRD 5.1). The one
+// remaining 2024-only subclass (Warrior of the Elements) is still
+// untouched — no 2014 slug exists for it yet (#1503's later slice), so its
+// rows stay a byte-identical transcription pending that.
 // monk.ts keeps its resourceFn for the ki/focus pool (now edition-forked, see
 // monkPoolKey) and every subclass resourceFn unchanged (except Way of the
 // Open Hand, which needs none — see monk.ts's own comment).
@@ -543,14 +548,15 @@ const WAY_OF_THE_OPEN_HAND_RAW: RawMonkFeature[] = [
 // Shadow Arts drops the 2014 flat-2-focus/4-spell menu for a single 1-focus
 // Darkness cast + passive Minor Illusion/Darkvision grants; Cloak of Shadows
 // moves 11 -> 17 (replacing Opportunist, retired — no 2024 equivalent) and
-// Improved Shadow Step fills the vacated L11 slot. Untagged here regardless
-// — this migration seeds the current (post-#1246) text for BOTH editions
-// (byte-identical to today); the 2014 divergence is #1500-#1503's job.
+// Improved Shadow Step fills the vacated L11 slot. Tagged EDITION_2024 (#1502
+// — a real 2014 monk subclass, Way of Shadow, now exists under its OWN slug
+// below, so this text is no longer a both-editions transcription).
 const WARRIOR_OF_SHADOW_RAW: RawMonkFeature[] = [
   {
     subclassSlug: slug("monk-warrior-of-shadow"),
     name: "Shadow Arts",
     level: 3,
+    edition: "EDITION_2024",
     description:
       "You know the Minor Illusion cantrip (Wisdom). Spend 1 focus to cast Darkness without material components; you can see through the darkness you create, and while it persists you can move it up to 30 ft as a bonus action. You also have Darkvision out to 60 ft, or your Darkvision's range increases by 60 ft if you already have it.",
   },
@@ -558,6 +564,7 @@ const WARRIOR_OF_SHADOW_RAW: RawMonkFeature[] = [
     subclassSlug: slug("monk-warrior-of-shadow"),
     name: "Shadow Step",
     level: 6,
+    edition: "EDITION_2024",
     description:
       "While in dim light or darkness, teleport as a bonus action to an unoccupied space you can see that is also in dim light or darkness (up to 60 ft), then make one unarmed strike as part of the same bonus action. You have advantage on the first melee attack you make before the end of the turn.",
   },
@@ -565,6 +572,7 @@ const WARRIOR_OF_SHADOW_RAW: RawMonkFeature[] = [
     subclassSlug: slug("monk-warrior-of-shadow"),
     name: "Improved Shadow Step",
     level: 11,
+    edition: "EDITION_2024",
     description:
       "When you Shadow Step, you can spend 1 focus to ignore the requirement that your destination be in dim light or darkness.",
   },
@@ -572,8 +580,57 @@ const WARRIOR_OF_SHADOW_RAW: RawMonkFeature[] = [
     subclassSlug: slug("monk-warrior-of-shadow"),
     name: "Cloak of Shadows",
     level: 17,
+    edition: "EDITION_2024",
     description:
       "Spend 3 focus and use your action to become invisible and able to move through other creatures and objects as if they were difficult terrain, for 1 minute or until you're incapacitated. The invisibility ends early if you attack or cast a spell. While it lasts, Flurry of Blows costs no focus.",
+  },
+];
+
+// ---- Way of Shadow — PHB'14 pp.79-80 (not in SRD 5.1, #1502) ---------------
+// A materially different fork from the 2024 rewrite above, not a retab:
+// Shadow Arts is a flat 4-spell 2-ki menu (the per-spell catalog rows live in
+// shadow-arts.ts, not here — this row is the feature TEXT); Shadow Step
+// grants no free unarmed strike and never upgrades (no Improved Shadow Step —
+// that's 2024-only, filling the L11 slot THIS subclass uses for Cloak of
+// Shadows instead); Cloak of Shadows costs no ki and has no duration cap
+// beyond "until you attack, cast a spell, or are in bright light"; Opportunist
+// (no 2024 counterpart — retired there in favor of Cloak of Shadows at L17)
+// returns as its own L17 feature. DISTINCT subclassSlug from Warrior of
+// Shadow above (monk-way-of-shadow, not monk-warrior-of-shadow) — the two
+// lineages coexist per campaign (epic #1281), never merged or substring-
+// matched (#1339).
+const WAY_OF_SHADOW_RAW: RawMonkFeature[] = [
+  {
+    subclassSlug: slug("monk-way-of-shadow"),
+    name: "Shadow Arts",
+    level: 3,
+    edition: "EDITION_2014",
+    description:
+      "Starting when you choose this tradition at 3rd level, you can use your ki to duplicate the effects of certain spells. As an action, you can spend 2 ki points to cast darkness, darkvision, pass without trace, or silence, without providing material components. Additionally, you gain the minor illusion cantrip if you don't already know it (PHB'14 pp.79-80 — not in SRD 5.1).",
+  },
+  {
+    subclassSlug: slug("monk-way-of-shadow"),
+    name: "Shadow Step",
+    level: 6,
+    edition: "EDITION_2014",
+    description:
+      "At 6th level, you gain the ability to step from one shadow to another. When you are in dim light or darkness, as a bonus action you can teleport up to 60 feet to an unoccupied space you can see that is also in dim light or darkness. You then have advantage on the first melee attack you make before the end of the current turn (PHB'14 p.80 — not in SRD 5.1).",
+  },
+  {
+    subclassSlug: slug("monk-way-of-shadow"),
+    name: "Cloak of Shadows",
+    level: 11,
+    edition: "EDITION_2014",
+    description:
+      "By 11th level, you have learned to become one with the shadows. When you are in an area of dim light or darkness, you can use your action to become invisible. You remain invisible until you make an attack, cast a spell, or are in an area of bright light (PHB'14 p.80 — not in SRD 5.1).",
+  },
+  {
+    subclassSlug: slug("monk-way-of-shadow"),
+    name: "Opportunist",
+    level: 17,
+    edition: "EDITION_2014",
+    description:
+      "Beginning at 17th level, you can exploit a creature's momentary distraction when it is hit by an attack. When a creature within 5 feet of you is hit by an attack made by a creature other than you, you can use your reaction to make a melee attack against that creature (PHB'14 p.80 — not in SRD 5.1).",
   },
 ];
 
@@ -700,17 +757,22 @@ const WARRIOR_OF_THE_ELEMENTS_RAW: RawMonkFeature[] = [
 // The full Monk seed family: base class (17 EDITION_2014 rows / 18
 // EDITION_2024 rows, #1500) + Way of the Open Hand (4 EDITION_2014-only
 // rows, #1501) + Warrior of the Open Hand (4 EDITION_2024-only rows, #1501)
-// + three 2024-only subclasses still expanded to both editions pending
-// #1502-#1503 (Shadow 4, Elements 5, Mercy 6 = 15 features x 2 editions =
-// 30 rows) = 36 EDITION_2014 + 37 EDITION_2024 = 73 rows total (the Open
-// Hand swap is a wash: 4 rows move from the shared-count column to their own
-// edition-exclusive one on each side). Concatenated into class-features.ts's
-// CLASS_FEATURES the same way every other literal class's export is.
+// + Way of Shadow (4 EDITION_2014-only rows, #1502) + Warrior of Shadow (4
+// EDITION_2024-only rows, #1502) + the two still-untagged 2024-only
+// subclasses expanded to both editions pending #1503 (Elements 5, Mercy 6 =
+// 11 features x 2 editions = 22 rows) = 36 EDITION_2014 + 37 EDITION_2024 =
+// 73 rows total (monk-2024-content.test.ts pins the per-partition counts
+// exactly — each fork's 2014/2024 row swap is a wash: 4 rows move from the
+// shared-count column to their own edition-exclusive one on each side,
+// netting to zero on both totals).
+// Concatenated into class-features.ts's CLASS_FEATURES the same way every
+// other literal class's export is.
 export const MONK_FEATURES: ClassFeatureSeedRow[] = [
   ...MONK_BASE_RAW.flatMap(expand),
   ...WARRIOR_OF_THE_OPEN_HAND_RAW.flatMap(expand),
   ...WAY_OF_THE_OPEN_HAND_RAW.flatMap(expand),
   ...WARRIOR_OF_SHADOW_RAW.flatMap(expand),
+  ...WAY_OF_SHADOW_RAW.flatMap(expand),
   ...WARRIOR_OF_MERCY_RAW.flatMap(expand),
   ...WARRIOR_OF_THE_ELEMENTS_RAW.flatMap(expand),
 ];

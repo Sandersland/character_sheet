@@ -142,6 +142,17 @@ export const monk: ClassDefinition = {
       // than deriveExtras booleans — one shared level-gate registry for every
       // monk action instead of a second copy here (#1315).
     },
+    "way of shadow": {
+      slug: "monk-way-of-shadow",
+      grantLevel: 3,
+      // 2014 fork of Warrior of Shadow (PHB'14 pp.79-80 — not in SRD 5.1,
+      // #1502): Shadow Arts (L3, 2 ki, four-spell menu) / Shadow Step (L6, no
+      // free unarmed strike) / Cloak of Shadows (L11, no resource cost) /
+      // Opportunist (L17) gate live as DERIVED_ACTIONS rows (actions.ts),
+      // tagged EDITION_2014 and gated on THIS subclass's own slug — same
+      // discipline as Warrior of Shadow above, never a second registry. No
+      // dedicated pool of its own: every cost draws on the base Ki pool.
+    },
     "warrior of the elements": {
       slug: "monk-warrior-of-the-elements",
       grantLevel: 3,

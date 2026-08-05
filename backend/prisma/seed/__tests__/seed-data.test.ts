@@ -63,15 +63,16 @@ describe("SUBCLASS_GRANTED_SPELLS — referential integrity", () => {
     expect(grant!.castingAbility).toBe("wisdom");
   });
 
-  // #1625: the two Monk grants are PHB'24/SRD 5.2-native content on shared
-  // Subclass rows — untagged, they would leak to 2014 Monks once #1313/#1372
-  // seed the 2014 Way of * content. Pins the tag so a content resweep can't
-  // silently drop it.
-  it("the two Monk grants are tagged EDITION_2024 (2024-native content, #1625)", () => {
+  // #1625: the Warrior of * grants are PHB'24/SRD 5.2-native content on their
+  // OWN edition-tagged Subclass rows — untagged, they would leak across
+  // editions. Way of Shadow's own Minor Illusion grant (#1502) joined this
+  // list tagged EDITION_2014, for the same reason in the other direction.
+  it("every Monk grant is tagged its subclass's own edition (#1625, #1502)", () => {
     const monkGrants = SUBCLASS_GRANTED_SPELLS.filter((g) => g.className === "Monk");
     expect(monkGrants.map((g) => `${g.subclassName}::${g.spellName}::${g.edition}`).sort()).toEqual([
       "Warrior of Shadow::Minor Illusion::EDITION_2024",
       "Warrior of the Elements::Elementalism::EDITION_2024",
+      "Way of Shadow::Minor Illusion::EDITION_2014",
     ]);
   });
 
@@ -196,8 +197,12 @@ describe("per-domain business-key uniqueness", () => {
     expect(duplicates(MANEUVERS.map((m) => m.name))).toEqual([]);
   });
 
-  it("SHADOW_ARTS have unique names", () => {
-    expect(duplicates(SHADOW_ARTS.map((s) => s.name))).toEqual([]);
+  // Keyed on (name, edition) rather than name alone (#1415/#1502): "Shadow
+  // Arts: Darkness" legitimately repeats its name once per edition (a
+  // genuine mechanical fork — 1 focus vs 2 ki) — only a same-name/
+  // same-edition collision would collapse in the DB's (name, edition) upsert.
+  it("SHADOW_ARTS have unique (name, edition) pairs", () => {
+    expect(duplicates(SHADOW_ARTS.map((s) => `${s.name}::${s.edition}`))).toEqual([]);
   });
 
   // Keyed on (name, edition) rather than name alone (#1229): Nature's Wrath

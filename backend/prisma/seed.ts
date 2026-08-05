@@ -159,13 +159,15 @@ async function seedManeuvers(prisma: PrismaClient) {
   }
 }
 
-// Seed the Shadow Arts catalog — upsert by (name, edition). Flat 1-focus, no scaling
-// (2024 rewrite, #1246: was flat 2-focus across a 4-spell menu; now a single
-// always-concentrating Darkness cast, so effectKind/buffTarget/buffModifier are
-// fixed nulls rather than per-row fields).
+// Seed the Shadow Arts catalog — upsert by (name, edition). No scaling on any
+// row (2024's single Darkness cast; 2014's flat-2-ki four-spell menu, #1502),
+// so effectKind/buffTarget/buffModifier stay fixed nulls rather than per-row
+// fields. costPoolKey/costBase are per-row (ki/2 for 2014, focus/1 for
+// 2024) — the one thing that genuinely forks; minLevel/alwaysKnown/costKind
+// stay hardcoded since every row, both editions, agrees on them.
 async function seedShadowArts(prisma: PrismaClient) {
   for (const art of SHADOW_ARTS) {
-    const edition = art.edition ?? null;
+    const edition = art.edition;
     const data = {
       name: art.name,
       edition,
@@ -174,8 +176,8 @@ async function seedShadowArts(prisma: PrismaClient) {
       minLevel: 3,
       alwaysKnown: true,
       costKind: "pool",
-      costPoolKey: "focus",
-      costBase: 1,
+      costPoolKey: art.costPoolKey,
+      costBase: art.costBase,
       costPerStep: null,
       effectKind: null,
       buffTarget: null,
@@ -183,9 +185,9 @@ async function seedShadowArts(prisma: PrismaClient) {
     };
     await upsertEditionRow(prisma.grantedAbility, { name: art.name, edition }, data, data);
   }
-  // Drop the retired 2014 rows (Silence/Pass without Trace/Darkvision) — same
-  // edition-partitioned staleCatalogRowsWhere seedFeats uses (#1306); source:
-  // "shadowArts" passed in as extraWhere so this never touches
+  // Drop stale catalog rows (e.g. an edition retag stranding its old row) —
+  // same edition-partitioned staleCatalogRowsWhere seedFeats uses (#1306);
+  // source: "shadowArts" passed in as extraWhere so this never touches
   // maneuvers/channelDivinity rows sharing the same table.
   //
   // Each row's OWN edition goes into the seeded list, not a flat null: an
@@ -194,7 +196,7 @@ async function seedShadowArts(prisma: PrismaClient) {
   // next reseed (proven in granted-ability-fork-reseed.test.ts).
   const staleWhere = staleCatalogRowsWhere(
     "name",
-    SHADOW_ARTS.map((a) => ({ identity: a.name, edition: a.edition ?? null })),
+    SHADOW_ARTS.map((a) => ({ identity: a.name, edition: a.edition })),
     { source: "shadowArts" },
   );
   const stale = await prisma.grantedAbility.findMany({ where: staleWhere, select: { name: true } });

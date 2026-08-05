@@ -123,7 +123,11 @@ describe("Shadow Arts cast endpoint", () => {
       { gateLevel: 3, castingAbility: "wisdom" },
     );
 
-    darknessId = (await prisma.grantedAbility.findFirst({ where: { name: "Shadow Arts: Darkness" } }))!.id;
+    // This suite's fixtures default to EDITION_2024 (rulesEdition unset) — the
+    // real "Shadow Arts: Darkness" name now exists once per edition (#1502),
+    // so the lookup must pin the 2024 row explicitly or a bare findFirst is
+    // nondeterministic between the two.
+    darknessId = (await prisma.grantedAbility.findFirst({ where: { name: "Shadow Arts: Darkness", edition: "EDITION_2024" } }))!.id;
   });
 
   afterAll(async () => {
@@ -359,6 +363,189 @@ describe("Shadow Arts cast endpoint", () => {
   });
 });
 
+// #1502: 2014 Way of Shadow (PHB'14 pp.79-80 — not in SRD 5.1) — its OWN
+// edition-tagged fixture (rulesEdition: EDITION_2014), proving the real cast
+// mechanics: the four-spell 2-ki menu, per-spell concentration (Darkness/Pass
+// without Trace/Silence concentrate, Darkvision does not), Shadow Step at L6,
+// Cloak of Shadows at L11 with no ki cost, and Opportunist at L17 (reminder
+// only, no cast endpoint).
+describe("2014 Way of Shadow — real edition-tagged cast mechanics (#1502)", () => {
+  const WAY_ID = "test-way-of-shadow-monk-1";
+  const WAY_CLASS_NAME = "Way of Shadow Test Monk";
+  let wayClassId: string;
+  const wayArtId: Record<string, string> = {};
+
+  beforeAll(async () => {
+    const cls = await prisma.characterClass.upsert({
+      where: { name: WAY_CLASS_NAME },
+      create: { name: WAY_CLASS_NAME, hitDie: "d8", savingThrows: ["strength", "dexterity"], skillChoiceCount: 2, skillChoices: ["acrobatics", "stealth"], isSpellcaster: false },
+      update: {},
+    });
+    wayClassId = cls.id;
+
+    // Way of Shadow grants Minor Illusion at L3 as data (#898, #1502) — this
+    // is what gives a pure (non-caster) Way of Shadow monk a serialized
+    // spellcasting view at all, mirroring the 2024 fixture's own setup above.
+    const way = await upsertEditionRow(
+      prisma.subclass,
+      { classId: wayClassId, name: "Way of Shadow", edition: "EDITION_2014" },
+      // Distinct from the real seeded "monk-way-of-shadow" (#1277) — this
+      // test's Monk class is its own throwaway row.
+      { classId: wayClassId, name: "Way of Shadow", description: "Test subclass", slug: "monk-way-of-shadow-cast-test", edition: "EDITION_2014" },
+      {},
+    );
+    const minorIllusion = await prisma.spell.findFirst({ where: { name: "Minor Illusion" }, select: { id: true } });
+    if (!minorIllusion) throw new Error("Minor Illusion not seeded — run `prisma db seed` before tests");
+    await upsertEditionRow(
+      prisma.subclassGrantedSpell,
+      { subclassId: way.id, spellId: minorIllusion.id, edition: "EDITION_2014" },
+      { subclassId: way.id, spellId: minorIllusion.id, gateLevel: 3, castingAbility: "wisdom", edition: "EDITION_2014" },
+      { gateLevel: 3, castingAbility: "wisdom" },
+    );
+
+    for (const name of ["Shadow Arts: Darkness", "Shadow Arts: Darkvision", "Shadow Arts: Pass without Trace", "Shadow Arts: Silence"]) {
+      const row = await prisma.grantedAbility.findFirst({ where: { name, edition: "EDITION_2014" } });
+      if (!row) throw new Error(`${name} (EDITION_2014) not seeded — run \`prisma db seed\` before tests`);
+      wayArtId[name] = row.id;
+    }
+  });
+
+  afterAll(async () => {
+    await prisma.characterClass.deleteMany({ where: { name: WAY_CLASS_NAME } });
+  });
+
+  beforeEach(async () => {
+    await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
+  });
+
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { id: WAY_ID } });
+  });
+
+  async function createWayOfShadowMonk(experiencePoints: number) {
+    const sub = await prisma.subclass.findFirst({
+      where: { classId: wayClassId, name: { equals: "Way of Shadow", mode: "insensitive" } },
+      select: { id: true },
+    });
+    await prisma.character.create({
+      data: {
+        ...FIXTURE_BASE,
+        id: WAY_ID,
+        experiencePoints,
+        ownerId: OWNER_ID,
+        rulesEdition: "EDITION_2014",
+        resources: Prisma.JsonNull,
+        classEntries: {
+          create: [{ name: "monk", subclass: "Way of Shadow", subclassId: sub?.id, classId: wayClassId, position: 0 }],
+        },
+      },
+    });
+  }
+
+  const wayUrl = `/api/characters/${WAY_ID}/abilities/shadow-arts/transactions`;
+  const wayActivityUrl = `/api/characters/${WAY_ID}/activity?category=resources`;
+  async function wayCast(operations: unknown[]) {
+    return agent().post(wayUrl).send({ operations });
+  }
+  async function wayActivity(): Promise<ActivityEvent[]> {
+    const res = await agent().get(wayActivityUrl);
+    return res.body as ActivityEvent[];
+  }
+
+  it("shadowArts (L3) spends exactly 2 ki, regardless of which of the four spells is cast", async () => {
+    await createWayOfShadowMonk(XP_L3);
+    const res = await wayCast([{ type: "castShadowArt", shadowArtId: wayArtId["Shadow Arts: Silence"] }]);
+    expect(res.status).toBe(200);
+    const ki = res.body.resources.pools.find((p: { key: string }) => p.key === "ki");
+    expect(ki.used).toBe(2);
+  });
+
+  // The structured audit `data` column must name the resource actually spent
+  // (ki, not focus) — the summary text already says "Ki Points" via the
+  // shared spendResource path; this pins the sibling field shadow-arts.ts's
+  // own castShadowArt event carries.
+  it("records the audit event's spend under kiSpent, never focusSpent (edition-correct resource key)", async () => {
+    await createWayOfShadowMonk(XP_L3);
+    const res = await wayCast([{ type: "castShadowArt", shadowArtId: wayArtId["Shadow Arts: Silence"] }]);
+    expect(res.status).toBe(200);
+    const events = await wayActivity();
+    const castEvent = events.find((e) => e.type === "castShadowArt");
+    expect(castEvent?.data).toMatchObject({ kiSpent: 2 });
+    expect(castEvent?.data).not.toHaveProperty("focusSpent");
+  });
+
+  it("concentrates on Darkness, Pass without Trace, and Silence, but NOT Darkvision (PHB'14: only Darkvision's duration is non-concentration)", async () => {
+    await createWayOfShadowMonk(XP_L3);
+    const darkvision = await wayCast([{ type: "castShadowArt", shadowArtId: wayArtId["Shadow Arts: Darkvision"] }]);
+    expect(darkvision.status).toBe(200);
+    expect(darkvision.body.spellcasting.concentratingOn).toBeNull();
+    await prisma.character.deleteMany({ where: { id: WAY_ID } });
+
+    await createWayOfShadowMonk(XP_L3);
+    const passWithoutTrace = await wayCast([{ type: "castShadowArt", shadowArtId: wayArtId["Shadow Arts: Pass without Trace"] }]);
+    expect(passWithoutTrace.status).toBe(200);
+    expect(passWithoutTrace.body.spellcasting.concentratingOn).toMatchObject({ spellName: "Shadow Arts: Pass without Trace" });
+  });
+
+  it("gets shadowStep at L6 and shadowArts at L3, but not cloakOfShadows or opportunist yet", async () => {
+    await createWayOfShadowMonk(XP_L3);
+    const l3 = await agent().get(`/api/characters/${WAY_ID}`);
+    const l3Keys = (l3.body.availableActions as { key: string }[]).map((a) => a.key);
+    expect(l3Keys).toContain("shadowArts");
+    expect(l3Keys).not.toContain("shadowStep");
+    expect(l3Keys).not.toContain("cloakOfShadows");
+    expect(l3Keys).not.toContain("opportunist");
+  });
+
+  it("activateCloakOfShadows (L11) costs no ki at all", async () => {
+    // XP for level 11 (experience.ts's XP table: level 11 = 85000 XP).
+    await createWayOfShadowMonk(85000);
+    const l11 = await agent().get(`/api/characters/${WAY_ID}`);
+    expect((l11.body.availableActions as { key: string }[]).some((a) => a.key === "cloakOfShadows")).toBe(true);
+    expect((l11.body.availableActions as { key: string }[]).some((a) => a.key === "shadowStep")).toBe(true);
+
+    const res = await wayCast([{ type: "activateCloakOfShadows" }]);
+    expect(res.status).toBe(200);
+    const ki = res.body.resources.pools.find((p: { key: string }) => p.key === "ki");
+    expect(ki.used).toBe(0);
+    expect(res.body.conditions.active).toContainEqual(
+      expect.objectContaining({ key: "invisible", source: "Cloak of Shadows" }),
+    );
+
+    const events = await wayActivity();
+    expect(events.some((e) => e.type === "castShadowArt" && e.data?.focusSpent === 0)).toBe(true);
+  });
+
+  it("rejects activateCloakOfShadows below L11 (not L17 — the 2024 gate)", async () => {
+    await createWayOfShadowMonk(XP_L3);
+    const res = await wayCast([{ type: "activateCloakOfShadows" }]);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/Way of Shadow/i);
+    expect(res.body.error).toMatch(/level 11/i);
+  });
+
+  it("opportunist (L17) surfaces on the sheet as a reminder-only reaction — no cast endpoint", async () => {
+    await createWayOfShadowMonk(XP_L17);
+    const l17 = await agent().get(`/api/characters/${WAY_ID}`);
+    const opportunist = (l17.body.availableActions as { key: string; cost: string }[]).find((a) => a.key === "opportunist");
+    expect(opportunist).toBeDefined();
+    expect(opportunist?.cost).toBe("reaction");
+  });
+
+  it("a 2014 Way of Shadow monk's shadowArts picker (edition=EDITION_2014) lists exactly the four 2014 arts, never the 2024 one", async () => {
+    const res = await agent().get("/api/shadow-arts?edition=EDITION_2014");
+    expect(res.status).toBe(200);
+    const names = (res.body as { name: string }[]).map((a) => a.name).sort();
+    expect(names).toEqual([
+      "Shadow Arts: Darkness",
+      "Shadow Arts: Darkvision",
+      "Shadow Arts: Pass without Trace",
+      "Shadow Arts: Silence",
+    ]);
+  });
+});
+
 // #1315: availableActions is entry-scoped (mirrors deriveEntryScopedResources,
 // #1206) — a secondary Warrior of Shadow monk's shadowArts/cloakOfShadows key
 // off the MONK entry's own level, not the primary entry's class or the
@@ -467,7 +654,7 @@ describe("resolveConcentration clamp for multiclass Warrior of Shadow", () => {
       update: {},
     });
     mcClassId = cls.id;
-    mcDarknessId = (await prisma.grantedAbility.findFirst({ where: { name: "Shadow Arts: Darkness" } }))!.id;
+    mcDarknessId = (await prisma.grantedAbility.findFirst({ where: { name: "Shadow Arts: Darkness", edition: "EDITION_2024" } }))!.id;
   });
 
   afterAll(async () => {
@@ -536,9 +723,9 @@ describe("shadowArtEffectSpec", () => {
   });
 
   it("still resolves the generic buff shape (shared catalogEffectSpec builder) for a hypothetical buff row", () => {
-    // No current Shadow Art carries a buff (the 2014 Pass without Trace option
-    // is retired, #1246) — this pins that the shared row→spec mapping still
-    // works, since it's reused by Channel Divinity too.
+    // No real Shadow Art carries an effectKind:"buff" row (every 2014/2024
+    // art is a flat utility cast, #1502) — this pins that the shared
+    // row→spec mapping still works, since it's reused by Channel Divinity too.
     const spec = shadowArtEffectSpec({
       name: "Shadow Arts: Hypothetical Buff",
       effectKind: "buff",
@@ -621,13 +808,14 @@ describe("Shadow Arts source guard", () => {
       const as2024 = await agent().get("/api/shadow-arts?edition=EDITION_2024");
       expect(as2024.status).toBe(200);
       expect((as2024.body as { id: string }[]).some((a) => a.id === row.id)).toBe(false);
-      // The NULL-edition seeded Darkness row still reaches both editions.
+      // The real EDITION_2024-tagged Darkness row (#1502 — no longer shared/null).
       expect((as2024.body as { name: string }[]).length).toBe(1);
 
       const as2014 = await agent().get("/api/shadow-arts?edition=EDITION_2014");
       expect(as2014.status).toBe(200);
       expect((as2014.body as { id: string }[]).some((a) => a.id === row.id)).toBe(true);
-      expect((as2014.body as { name: string }[]).length).toBe(2);
+      // The four real EDITION_2014 Shadow Arts rows (#1502) plus this fixture's own.
+      expect((as2014.body as { name: string }[]).length).toBe(5);
     } finally {
       await prisma.grantedAbility.deleteMany({ where: { name: FIXTURE_NAME } });
     }

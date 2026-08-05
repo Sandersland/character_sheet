@@ -439,32 +439,40 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     edition: "EDITION_2014",
   },
 
-  // Every row below for Warrior of Shadow / Warrior of the Elements / Warrior
-  // of Mercy is subclass-gated via grantSubclassSlugs and deliberately left
-  // UNTAGGED (#1499): SUBCLASS_SLUGS (subclass-slug.ts) still contains no
-  // 2014 slug for any of those three, so matchesSubclassGate already excludes
-  // every one of their rows for a 2014 monk — an edition tag would add no
-  // observable behaviour, pending #1502-#1503. Warrior of the Open Hand is
-  // DIFFERENT as of #1501: it now has a real 2014 sibling ("Way of the Open
-  // Hand", its own slug, its own rows below) sharing the SAME action key
-  // ("wholenessOfBody") — reusing an untagged row here would serve the 2024
-  // shape (bonus action, Wis-mod pool) to a 2014 character too, so
-  // wholenessOfBody/fleetStep below are now tagged EDITION_2024, bound in the
-  // same commit as the "Warrior of the Open Hand" Subclass row's own retag
-  // (subclasses.ts).
+  // Every row below is subclass-gated via grantSubclassSlugs. Warrior of the
+  // Elements / Warrior of Mercy stay deliberately UNTAGGED (#1499):
+  // SUBCLASS_SLUGS still contains no 2014 slug for either, so
+  // matchesSubclassGate already excludes every one of their rows for a 2014
+  // monk — an edition tag would add no observable behaviour, pending #1503.
+  // Warrior of Shadow (#1502) and Warrior of the Open Hand (#1501) are BOTH
+  // now explicitly tagged EDITION_2024, for the same underlying reason:
+  // SUBCLASS_SLUGS gained a real 2014 sibling for each (monk-way-of-shadow,
+  // monk-way-of-the-open-hand), so slug-gating alone already isolates the
+  // 2024 rows below, but the edition tag is now load-bearing defence-in-depth
+  // rather than a no-op. The two siblings diverge on KEY REUSE, not just
+  // content: Way of Shadow's rows reuse the SAME keys as Warrior of Shadow
+  // (shadowArts/shadowStep/cloakOfShadows — see the 2014 block further down,
+  // disambiguated by edition + grantSubclassSlugs alone), while Way of the
+  // Open Hand's Wholeness of Body needs its OWN key
+  // ("wholenessOfBodyAction", not this block's "wholenessOfBody") because its
+  // shape differs enough that reusing the key would blur two client-side
+  // resolvers — see that row's own comment. Both retags are bound in the
+  // same commit as their Subclass row's own edition tag (subclasses.ts).
   // Warrior of Shadow reminder action (2024 rewrite, #1246) — no resourceKey, no
   // server effect; reminder is the deliverable. Improved Shadow Step (L11)
   // upgrades the SAME bonus action (ignore the dim/dark destination requirement
   // for 1 focus) rather than adding a competing catalog row — mirrors how
   // Heightened Focus upgrades patientDefenseFocus/stepOfTheWindFocus in place.
-  // Opportunist (2014 L17 reaction) is retired — replaced by Cloak of Shadows
-  // (shadow-arts.ts activateCloakOfShadows), a real resourceKey-gated cast, not
-  // a catalog reminder.
+  // Opportunist (2014 L17 reaction) is retired for THIS (2024) subclass —
+  // replaced by Cloak of Shadows (shadow-arts.ts activateCloakOfShadows), a
+  // real resourceKey-gated cast, not a catalog reminder. The 2014 Way of
+  // Shadow fork below reinstates Opportunist under its own slug (#1502).
   {
     key: "shadowStep",
     name: "Shadow Step",
     cost: "bonusAction",
     grantClass: "monk",
+    edition: "EDITION_2024",
     grantSubclassSlugs: ["monk-warrior-of-shadow"],
     grantLevel: 6,
     reminder: (level) =>
@@ -487,6 +495,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     name: "Shadow Arts (Darkness)",
     cost: "action",
     grantClass: "monk",
+    edition: "EDITION_2024",
     grantSubclassSlugs: ["monk-warrior-of-shadow"],
     grantLevel: 3,
     resourceKey: "focus",
@@ -498,11 +507,66 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     name: "Cloak of Shadows",
     cost: "action",
     grantClass: "monk",
+    edition: "EDITION_2024",
     grantSubclassSlugs: ["monk-warrior-of-shadow"],
     grantLevel: 17,
     resourceKey: "focus",
     resourceAmount: 3,
     reminder: "Magic action, entirely within dim light or darkness: spend 3 focus to become invisible and move through creatures/objects as difficult terrain for 1 minute (or until incapacitated, or you end your turn in bright light). Flurry of Blows costs no focus while it lasts.",
+  },
+
+  // 2014 Way of Shadow (PHB'14 pp.79-80 — not in SRD 5.1, #1502): a
+  // materially different fork from the 2024 rewrite above, not a retab —
+  // Shadow Arts is a flat 4-spell 2-ki menu (Darkness/Darkvision/Pass without
+  // Trace/Silence, the exact per-spell menu resolved from the GrantedAbility
+  // catalog by shadow-arts.ts, not this row), Shadow Step grants no free
+  // unarmed strike, Cloak of Shadows moves to L11 with NO resource cost (no
+  // resourceKey at all — action only), and Opportunist returns at L17 as a
+  // pure reminder reaction (no 2024 equivalent). Same KEY NAMES as the 2024
+  // rows above (shadowArts/shadowStep/cloakOfShadows) — the edition tag plus
+  // grantSubclassSlugs disambiguates, never a second vocabulary; opportunist
+  // is the one 2014-only key with no 2024 counterpart.
+  {
+    key: "shadowArts",
+    name: "Shadow Arts",
+    cost: "action",
+    grantClass: "monk",
+    edition: "EDITION_2014",
+    grantSubclassSlugs: ["monk-way-of-shadow"],
+    grantLevel: 3,
+    resourceKey: "ki",
+    resourceAmount: 2,
+    reminder: "Spend 2 ki to cast darkness, darkvision, pass without trace, or silence, without material components (PHB'14 pp.79-80 — not in SRD 5.1).",
+  },
+  {
+    key: "shadowStep",
+    name: "Shadow Step",
+    cost: "bonusAction",
+    grantClass: "monk",
+    edition: "EDITION_2014",
+    grantSubclassSlugs: ["monk-way-of-shadow"],
+    grantLevel: 6,
+    reminder: "While in dim light or darkness, teleport as a bonus action up to 60 ft to an unoccupied space you can see that is also in dim light or darkness; you then have advantage on the first melee attack you make before the end of the turn.",
+  },
+  {
+    key: "cloakOfShadows",
+    name: "Cloak of Shadows",
+    cost: "action",
+    grantClass: "monk",
+    edition: "EDITION_2014",
+    grantSubclassSlugs: ["monk-way-of-shadow"],
+    grantLevel: 11,
+    reminder: "While in dim light or darkness, use your action to become invisible; you remain invisible until you make an attack, cast a spell, or are in an area of bright light. No ki cost, no duration cap.",
+  },
+  {
+    key: "opportunist",
+    name: "Opportunist",
+    cost: "reaction",
+    grantClass: "monk",
+    edition: "EDITION_2014",
+    grantSubclassSlugs: ["monk-way-of-shadow"],
+    grantLevel: 17,
+    reminder: "When a creature within 5 ft of you is hit by an attack made by a creature other than you, use your reaction to make a melee attack against that creature.",
   },
 
   // Warrior of the Elements (PHB'24 p.90 — not in SRD 5.2, which ships only

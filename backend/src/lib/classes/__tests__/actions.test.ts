@@ -1243,6 +1243,78 @@ describe("Warrior of Shadow — Shadow Arts / Cloak of Shadows catalog rows (#13
   });
 });
 
+// #1502: 2014 Way of Shadow (PHB'14 pp. 79-80 — not in SRD 5.1) reinstates the
+// four-spell 2-ki Shadow Arts menu, Shadow Step without the free unarmed
+// strike, Cloak of Shadows at L11 with no resource cost, and Opportunist at
+// L17 — under the SAME action keys as the 2024 Warrior of Shadow rows
+// (shadowArts/shadowStep/cloakOfShadows), disambiguated by `edition` +
+// `grantSubclassSlugs: ["monk-way-of-shadow"]`, never a second vocabulary.
+describe("Way of Shadow (2014) — Shadow Arts / Shadow Step / Cloak of Shadows / Opportunist (#1502)", () => {
+  const WAY: SubclassSlug = "monk-way-of-shadow";
+
+  it("gets shadowArts at L3, not L2, gated on 2 ki", () => {
+    expect(keys(deriveActions("monk", WAY, 2, [], true, "EDITION_2014"))).not.toContain("shadowArts");
+    const l3 = deriveActions("monk", WAY, 3, [pool("ki", 2)], true, "EDITION_2014");
+    const shadowArts = l3.find((a) => a.key === "shadowArts");
+    expect(shadowArts).toBeDefined();
+    expect(shadowArts?.cost).toBe("action");
+    expect(shadowArts?.enabled).toBe(true);
+    const short = deriveActions("monk", WAY, 3, [pool("ki", 1)], true, "EDITION_2014");
+    expect(short.find((a) => a.key === "shadowArts")?.enabled).toBe(false);
+  });
+
+  it("gets shadowStep at L6, not L5, free (no resourceKey), with no unarmed-strike clause", () => {
+    expect(keys(deriveActions("monk", WAY, 5, [], true, "EDITION_2014"))).not.toContain("shadowStep");
+    const l6 = deriveActions("monk", WAY, 6, [], true, "EDITION_2014");
+    const shadowStep = l6.find((a) => a.key === "shadowStep");
+    expect(shadowStep).toBeDefined();
+    expect(shadowStep?.cost).toBe("bonusAction");
+    expect(shadowStep?.enabled).toBe(true);
+    expect(shadowStep?.reminder).not.toMatch(/unarmed strike/i);
+  });
+
+  it("gets cloakOfShadows at L11, not L10, with no resource cost", () => {
+    expect(keys(deriveActions("monk", WAY, 10, [], true, "EDITION_2014"))).not.toContain("cloakOfShadows");
+    const l11 = deriveActions("monk", WAY, 11, [], true, "EDITION_2014");
+    const cloak = l11.find((a) => a.key === "cloakOfShadows");
+    expect(cloak).toBeDefined();
+    expect(cloak?.cost).toBe("action");
+    expect(cloak?.enabled).toBe(true);
+  });
+
+  it("gets opportunist at L17, not L16, as a reminder-only reaction", () => {
+    expect(keys(deriveActions("monk", WAY, 16, [], true, "EDITION_2014"))).not.toContain("opportunist");
+    const l17 = deriveActions("monk", WAY, 17, [], true, "EDITION_2014");
+    const opportunist = l17.find((a) => a.key === "opportunist");
+    expect(opportunist).toBeDefined();
+    expect(opportunist?.cost).toBe("reaction");
+    expect(opportunist?.enabled).toBe(true);
+  });
+
+  it("is a pure reminder action — no ACTION_EFFECT_FN entry (mirrors 2014's own shadowStep)", () => {
+    expect(ACTION_EFFECT_FN.opportunist).toBeUndefined();
+  });
+
+  it("none of the four rows leak to an EDITION_2024 request, even for the same slug", () => {
+    const asIf2024 = keys(deriveActions("monk", WAY, 20, [pool("ki", 5)], true, "EDITION_2024"));
+    expect(asIf2024).not.toContain("shadowArts");
+    expect(asIf2024).not.toContain("shadowStep");
+    expect(asIf2024).not.toContain("cloakOfShadows");
+    expect(asIf2024).not.toContain("opportunist");
+  });
+
+  it("subclass gate: the 2024 Warrior of Shadow slug never gets Opportunist, even under EDITION_2014", () => {
+    // opportunist has no 2024 counterpart at all, so it's the one key here
+    // that isolates the subclass gate cleanly (shadowArts/shadowStep/
+    // cloakOfShadows share their KEY NAME with the 2024 rows, so a same-slug
+    // mismatch on those is already covered by the edition-gate test above).
+    const warriorOfShadow2014 = keys(
+      deriveActions("monk", "monk-warrior-of-shadow", 20, [pool("ki", 5)], true, "EDITION_2014"),
+    );
+    expect(warriorOfShadow2014).not.toContain("opportunist");
+  });
+});
+
 describe("Warrior of the Elements — Elemental Attunement / Elemental Burst catalog rows (#1315)", () => {
   const ELEMENTS = "Warrior of the Elements";
 
@@ -1430,24 +1502,32 @@ describe("subclass gate resolves via slug — FK preferred, exact name as fallba
   // through `at()`, so this is the same mechanism the FK path uses, minus the FK.
   // elementalAttunement is deliberately absent from its subclass's list here —
   // it's row-driven (#1686) and unreachable through the bare at() this test
-  // uses; elementalBurst alone still proves the slug match. #1501 widens the
-  // value shape to carry an optional `edition` (defaulting to EDITION_2024,
-  // `at()`'s own default) — "monk-way-of-the-open-hand" is the first monk
-  // slug whose rows are EDITION_2014-only, so its entry must override it.
-  const MONK_SUBCLASS_GRANT_KEYS: Record<Extract<SubclassSlug, `monk-${string}`>, { keys: string[]; edition?: "EDITION_2014" | "EDITION_2024" }> = {
-    "monk-warrior-of-shadow": { keys: ["shadowStep", "shadowArts", "cloakOfShadows"] },
-    "monk-warrior-of-the-elements": { keys: ["elementalBurst"] },
-    "monk-warrior-of-the-open-hand": { keys: ["wholenessOfBody", "fleetStep"] },
-    "monk-warrior-of-mercy": { keys: ["handOfHealing", "handOfHealingFlurry"] },
-    "monk-way-of-the-open-hand": { keys: ["wholenessOfBodyAction", "tranquility"], edition: "EDITION_2014" },
+  // uses; elementalBurst alone still proves the slug match. Each entry now
+  // carries its OWN `edition` (#1501/#1502): "monk-way-of-the-open-hand" and
+  // "monk-way-of-shadow" are each EDITION_2014-only, so a blanket
+  // EDITION_2024 loop (the shape before these two slices) would wrongly
+  // report their rows unreachable — the edition gate excludes them, not the
+  // subclass gate this test means to exercise.
+  const MONK_SUBCLASS_GRANT_KEYS: Record<
+    Extract<SubclassSlug, `monk-${string}`>,
+    { edition: "EDITION_2014" | "EDITION_2024"; keys: string[] }
+  > = {
+    "monk-warrior-of-shadow": { edition: "EDITION_2024", keys: ["shadowStep", "shadowArts", "cloakOfShadows"] },
+    "monk-warrior-of-the-elements": { edition: "EDITION_2024", keys: ["elementalBurst"] },
+    "monk-warrior-of-the-open-hand": { edition: "EDITION_2024", keys: ["wholenessOfBody", "fleetStep"] },
+    "monk-warrior-of-mercy": { edition: "EDITION_2024", keys: ["handOfHealing", "handOfHealingFlurry"] },
+    "monk-way-of-the-open-hand": { edition: "EDITION_2014", keys: ["wholenessOfBodyAction", "tranquility"] },
+    "monk-way-of-shadow": { edition: "EDITION_2014", keys: ["shadowArts", "shadowStep", "cloakOfShadows", "opportunist"] },
   };
   it("every subclass-gated row is reachable from its accepted name (#1339, retargeted #1277)", () => {
-    for (const [slug, { keys: expectedKeys, edition }] of Object.entries(MONK_SUBCLASS_GRANT_KEYS) as [
+    for (const [slug, { edition, keys: expectedKeys }] of Object.entries(MONK_SUBCLASS_GRANT_KEYS) as [
       SubclassSlug,
-      { keys: string[]; edition?: "EDITION_2014" | "EDITION_2024" },
+      { edition: "EDITION_2014" | "EDITION_2024"; keys: string[] },
     ][]) {
       const name = SUBCLASS_IDENTITY[slug].nameKey;
-      const granted = keys(at("monk", name, 20, [pool("focus", 5), pool("wholenessOfBody", 5)], true, edition ?? "EDITION_2024"));
+      const granted = keys(
+        at("monk", name, 20, [pool("focus", 5), pool("wholenessOfBody", 5), pool("ki", 5)], true, edition),
+      );
       for (const key of expectedKeys) {
         expect(granted).toContain(key);
       }
