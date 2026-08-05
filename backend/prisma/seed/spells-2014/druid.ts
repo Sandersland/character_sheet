@@ -32,10 +32,18 @@
 // (authored below), 7 are Cleric-owned, 5 are Wizard-owned, and 64 are
 // shared — all cross-checked as described above.
 //
-// Zero hand-transcribed or non-SRD spells in this slice (same finding as the
-// Cleric slice, #1715) — every one of the 30 owned rows below is verbatim
-// SRD 5.1 text via dnd5eapi, cited SRD 5.1 as a whole rather than per-row
-// (this file's own convention, matching cleric.ts/wizard.ts/shared.ts).
+// ADDENDUM (#1721, the Ranger slice): dnd5eapi's SRD-only dataset above
+// misses two more real PHB'14 Druid+Ranger 2-list spells entirely — Beast
+// Sense (L2) and Grasping Vine (L4) — found by #1721's authoritative-lookup
+// sweep (5etools' generated spell-source lookup) and added below per the
+// tie-break (Druid outranks Ranger), each cited PHB'14 p.NN individually and
+// cross-checked word-for-word against a second source (see their own
+// per-row comments). This file now owns 32 rows total (30 SRD + these 2
+// hand-transcribed), 108 total PHB'14 Druid spells.
+//
+// Every OTHER owned row below (the original 30) is verbatim SRD 5.1 text via
+// dnd5eapi, cited SRD 5.1 as a whole rather than per-row (this file's own
+// convention, matching cleric.ts/wizard.ts/shared.ts).
 // Structured effect fields (effectKind/dice/save/saveEffect/upcast) are
 // derived from that same API response's damage/dc JSON, then individually
 // audited against each row's own prose (dnd5eapi's dc/damage fields have
@@ -210,6 +218,29 @@ export const DRUID_SPELLS_2014: CatalogSpell[] = [
     effectKind: "buff",
     buffTarget: "acFloor",
     buffModifier: 16,
+  },
+  // PHB'14 p. 217. Not in dnd5eapi/open5e's SRD dataset. Found by #1721's
+  // (Ranger slice) authoritative-lookup sweep (5etools' generated
+  // spell-source lookup) — a genuine gap in this file's own SRD-only sweep,
+  // since Beast Sense isn't SRD content either. Cross-checked word-for-word
+  // against a second source (dnd5e.wikidot.com/spell:beast-sense), which
+  // corroborates 5etools' own PHB-sourced text exactly, including the
+  // ritual tag. Druid AND Ranger both carry base PHB'14 class access (no
+  // "(Optional)" tag on either in the lookup) — added here per the
+  // tie-break (Druid outranks Ranger), with a ranger membership tag.
+  {
+    name: "Beast Sense",
+    level: 2,
+    school: "divination",
+    castingTime: "1 action",
+    range: "Touch",
+    duration: "Up to 1 hour",
+    concentration: true,
+    ritual: true,
+    description:
+      "You touch a willing beast. For the duration of the spell, you can use your action to see through the beast's eyes and hear what it hears, and continue to do so until you use your action to return to your normal senses. While perceiving through the beast's senses, you gain the benefits of any special senses possessed by that creature, though you are blinded and deafened to your own surroundings.",
+    classes: ["druid", "ranger"],
+    components: { verbal: false, somatic: true, material: false },
   },
   {
     name: "Flame Blade",
@@ -415,6 +446,30 @@ export const DRUID_SPELLS_2014: CatalogSpell[] = [
     components: { verbal: true, somatic: true, material: false },
     // Any damage dealt comes from the transformed creatures' own stat
     // blocks, not this spell directly — utility row.
+  },
+  // PHB'14 p. 246. Not in dnd5eapi/open5e's SRD dataset. Found by #1721's
+  // (Ranger slice) authoritative-lookup sweep — the same class of gap as
+  // Beast Sense above. Cross-checked word-for-word against a second source
+  // (dnd5e.wikidot.com/spell:grasping-vine), which corroborates 5etools' own
+  // PHB-sourced text exactly; neither source carries an "At Higher Levels"
+  // clause. Druid AND Ranger both carry base PHB'14 class access (no
+  // "(Optional)" tag on either) — added here per the tie-break, with a
+  // ranger membership tag. Pure pull/control effect (no damage at all) — a
+  // clean attackType:"save" row, same shape as Entangle above.
+  {
+    name: "Grasping Vine",
+    level: 4,
+    school: "conjuration",
+    castingTime: "1 bonus action",
+    range: "30 feet",
+    duration: "Up to 1 minute",
+    concentration: true,
+    description:
+      "You conjure a vine that sprouts from the ground in an unoccupied space of your choice that you can see within range. When you cast this spell, you can direct the vine to lash out at a creature within 30 feet of it that you can see. That creature must succeed on a Dexterity saving throw or be pulled 20 feet directly toward the vine. Until the spell ends, you can direct the vine to lash out at the same creature or another one as a bonus action on each of your turns.",
+    classes: ["druid", "ranger"],
+    components: { verbal: true, somatic: true, material: false },
+    attackType: "save",
+    saveAbility: "dexterity",
   },
   // ── Level 5 ───────────────────────────────────────────────────────────────
   {

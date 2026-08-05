@@ -28,8 +28,8 @@ function duplicates(names: string[]): string[] {
 }
 
 describe("DRUID_SPELLS_2014 — row-ownership rule (epic #1517)", () => {
-  it("is exactly the 30 rows this slice owns (30 Druid-owned / 106 total PHB'14 Druid spells — the other 76 are Wizard/Cleric-owned or shared)", () => {
-    expect(DRUID_SPELLS_2014.length).toBe(30);
+  it("is exactly the 32 rows this slice owns (32 Druid-owned / 108 total PHB'14 Druid spells — the other 76 are Wizard/Cleric-owned or shared; 2 of the 32 — Beast Sense, Grasping Vine — were added by #1721's authoritative-lookup sweep, a gap in this slice's own SRD-only dataset)", () => {
+    expect(DRUID_SPELLS_2014.length).toBe(32);
   });
 
   it("every row sits on 1-2 classes (3+ belongs in shared.ts instead), each lowercase and a real class name", () => {
@@ -293,12 +293,32 @@ describe("DRUID_SPELLS_2014 — value spot-checks", () => {
     expect(s.description).not.toMatch(/\*/);
   });
 
-  it("Goodberry, Divination, Antilife Shell: no attack/save/damage shape at all (utility rows)", () => {
-    for (const name of ["Goodberry", "Divination", "Antilife Shell"]) {
+  it("Goodberry, Divination, Antilife Shell, Beast Sense: no attack/save/damage shape at all (utility rows)", () => {
+    for (const name of ["Goodberry", "Divination", "Antilife Shell", "Beast Sense"]) {
       const s = find(name);
       expect(s.attackType, `${name} should have no attackType`).toBeUndefined();
       expect(s.effectKind, `${name} should have no effectKind`).toBeUndefined();
     }
+  });
+
+  it("Beast Sense: added by #1721's authoritative-lookup sweep (not in dnd5eapi's SRD dataset), Druid+Ranger 2-list, ritual, touch, somatic-only", () => {
+    const s = find("Beast Sense");
+    expect(s.classes).toEqual(["druid", "ranger"]);
+    expect(s.level).toBe(2);
+    expect(s.ritual).toBe(true);
+    expect(s.range).toBe("Touch");
+    expect(s.components).toEqual({ verbal: false, somatic: true, material: false });
+  });
+
+  it("Grasping Vine: added by #1721's authoritative-lookup sweep (not in dnd5eapi's SRD dataset), Druid+Ranger 2-list, Dex save pulls the target, no damage/upcast", () => {
+    const s = find("Grasping Vine");
+    expect(s.classes).toEqual(["druid", "ranger"]);
+    expect(s.level).toBe(4);
+    expect(s.attackType).toBe("save");
+    expect(s.saveAbility).toBe("dexterity");
+    expect(s.effectKind).toBeUndefined();
+    expect(s.description).toMatch(/pulled 20 feet directly toward the vine/);
+    expect(s.description).not.toMatch(/At Higher Levels\./);
   });
 
   it("Druidcraft's stray dnd5eapi quote-mark artifact is cleaned and the odor/order typo is corrected", () => {
