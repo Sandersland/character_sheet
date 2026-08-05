@@ -8,7 +8,7 @@
 // enumerates 31 spells) plus a manual sweep for real PHB'14 Paladin spells that
 // dataset omits entirely (the same gap class prior slices found — Warlock's
 // Hex/Armor of Agathys/Arms of Hadar/Hunger of Hadar, Sorcerer's Witch Bolt):
-//   - Of the 31 in dnd5eapi's list, 27 sit on 2+ class lists with a
+//   - Of the 31 in dnd5eapi's list, 28 sit on 2+ class lists with a
 //     higher-priority owner and are ALREADY authored + membership-tagged
 //     "paladin" in shared.ts/cleric.ts/bard.ts/wizard.ts — individually
 //     verified below, zero edits needed to any of those four files for this
@@ -19,8 +19,8 @@
 //     from Poison, Zone of Truth, Create Food and Water, Daylight, Dispel
 //     Magic, Magic Circle, Remove Curse, Banishment, Locate Creature, Geas,
 //     Raise Dead (shared.ts); Heroism (bard.ts); Magic Weapon (wizard.ts).
-//   - The remaining 4 of the 31 (Divine Favor, Find Steed, Branding Smite,
-//     and... no others) are genuinely Paladin-only and authored below.
+//   - The remaining 3 of the 31 (Divine Favor, Find Steed, Branding Smite)
+//     are genuinely Paladin-only and authored below.
 //
 // Beyond the API's 31, a manual sweep (cross-checked class-list membership
 // per spell via roll20.net's compendium redirect, which routes each spell to
@@ -53,8 +53,8 @@
 // Net: 16 rows owned here (3 API-derived: Divine Favor, Find Steed, Branding
 // Smite; 13 hand-transcribed, each cross-checked word-for-word against a
 // second source beyond the primary source used — 5e-spellbook.app, which
-// publishes 2014-vs-2024 diffed spell text — namely dnd5e.wikidot.com), 43
-// total PHB'14 Paladin spells across all authoring files (27 shared/other-
+// publishes 2014-vs-2024 diffed spell text — namely dnd5e.wikidot.com), 44
+// total PHB'14 Paladin spells across all authoring files (28 shared/other-
 // class-owned + 16 owned here — see spells-2014-paladin-data.test.ts for the
 // permanent membership-completeness guard). Paladin is a half-caster capped at
 // 5th-level spells in PHB'14 (spells of level 6-9 don't exist on this list),
