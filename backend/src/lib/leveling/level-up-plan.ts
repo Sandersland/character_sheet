@@ -6,6 +6,7 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 
 import { deriveResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
 import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "@/lib/classes/class-feature-rows.js";
+import { subclassChoiceSwapCadence } from "@/lib/classes/types.js";
 import { fixedAverageForDie, levelUpHpGain } from "@/lib/combat/hitpoints.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 import { abilityModifier, advancementSlotsForLevel, fightingStyleFeatSlots, hitDieFace } from "@/lib/srd/srd.js";
@@ -201,8 +202,14 @@ function choiceCountStep(
   return delta > 0 ? { kind, count: delta } : null;
 }
 
-// Generic subclass "choose N from a catalog" (#899): one step per key that grew.
-function subclassChoiceSteps({ now, prev }: PlanContext): LevelUpStep[] {
+// Generic subclass "choose N from a catalog" (#899): one step per key that
+// grew. `canSwap` (#1503) rides `meta` for a catalogSource whose swap cadence
+// is "onLevelUp" — unlike newSpellsStep's swap (legal even on a no-new-picks
+// level, so it needs its own swap-only step), a choose-N swap is PHB'14-legal
+// only "whenever you learn a new X" — exactly the condition that already
+// gates this step's existence (delta > 0) — so no separate swap-only step is
+// needed; canSwap just rides the step that's already there.
+function subclassChoiceSteps({ now, prev, edition }: PlanContext): LevelUpStep[] {
   const prevCounts = new Map((prev?.subclassChoices ?? []).map((c) => [c.key, c.count]));
   return (now?.subclassChoices ?? [])
     .map((choice) => ({ choice, delta: choice.count - (prevCounts.get(choice.key) ?? 0) }))
@@ -210,7 +217,12 @@ function subclassChoiceSteps({ now, prev }: PlanContext): LevelUpStep[] {
     .map(({ choice, delta }) => ({
       kind: "subclassChoice" as const,
       count: delta,
-      meta: { key: choice.key, label: choice.label, catalogSource: choice.catalogSource },
+      meta: {
+        key: choice.key,
+        label: choice.label,
+        catalogSource: choice.catalogSource,
+        ...(subclassChoiceSwapCadence(choice.catalogSource, edition) === "onLevelUp" ? { canSwap: true } : {}),
+      },
     }));
 }
 

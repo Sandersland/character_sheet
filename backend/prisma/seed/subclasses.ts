@@ -239,6 +239,20 @@ export const SUBCLASSES: SubclassSeed[] = [
     description:
       "You wield the elements of air, earth, fire, and water. Manipulate Elements grants the Elementalism cantrip, and Elemental Attunement lets you spend 1 Focus Point to imbue yourself for 10 minutes — extending your Unarmed Strike reach and letting your strikes deal elemental damage that shoves foes. Elemental Burst (level 6) unleashes a 20-ft sphere for three Martial Arts dice, Stride of the Elements (level 11) grants flight and swimming while attuned, and Elemental Epitome (level 17) adds elemental resistance, a destructive stride, and empowered strikes.",
     slug: "monk-warrior-of-the-elements",
+    // Retagged EDITION_2024 (#1503, alongside authoring the 2014 predecessor
+    // below) — a from-scratch PHB'24 rebuild (Elementalism cantrip + a
+    // Focus-fuelled buff toggle + Elemental Burst/Strike), not a retab of Way
+    // of the Four Elements' discipline menu. Was untagged/shared since #1246;
+    // this is the first PR to author the 2014 half, so the two must fork.
+    edition: "EDITION_2024",
+  },
+  {
+    className: "Monk",
+    name: "Way of the Four Elements",
+    description:
+      "You harness the elements of air, earth, fire, and water through Elemental Disciplines fueled by ki. You always know Elemental Attunement (a free, at-will minor elemental effect) plus one other discipline at 3rd level, learning one more at 6th, 11th, and 17th — from a menu that includes reshaping Thunderwave, Burning Hands, and Fireball into your own strikes, or casting Fly, Gaseous Form, and Stoneskin on yourself. Whenever you learn a new discipline, you may replace one you already know with a different one. Not in SRD 5.1 — PHB'14 pp. 78, 80–81.",
+    slug: "monk-way-of-the-four-elements",
+    edition: "EDITION_2014",
   },
   {
     className: "Monk",

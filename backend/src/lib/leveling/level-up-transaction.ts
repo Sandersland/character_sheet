@@ -301,10 +301,15 @@ const STEP_OP_BUILDERS: Record<LevelUpStepKind, (submission: LevelUpSubmission, 
   fightingStyleFeat: (s) => [{ domain: "advancement", op: { ...s.fightingStyleFeat!, slot: "fightingStyle" } }],
   maneuvers: (s) => (s.maneuvers ?? []).map((op) => ({ domain: "resources", op })),
   toolProficiency: (s) => (s.toolProficiencies ?? []).map((op) => ({ domain: "resources", op })),
-  subclassChoice: (s, step) =>
-    (s.subclassChoices ?? [])
-      .filter((c) => c.choiceKey === step.meta?.key)
-      .map((op) => ({ domain: "resources", op })),
+  // #1503: forgets apply BEFORE learns (ops run sequentially in tx order),
+  // mirroring #1101's newSpells ordering — resolveChoiceOption's dup guard
+  // reads the CURRENT known list, so a forget-first ordering lets a swap
+  // proceed cleanly even in the (RAW-disallowed but not worth special-casing)
+  // edge of re-picking the same option.
+  subclassChoice: (s, step) => [
+    ...(s.subclassChoicesForgotten ?? []).filter((c) => c.choiceKey === step.meta?.key),
+    ...(s.subclassChoices ?? []).filter((c) => c.choiceKey === step.meta?.key),
+  ].map((op) => ({ domain: "resources", op })),
   // #1101: forgets apply BEFORE learns (ops run sequentially in tx order), so a
   // swap can re-learn the just-forgotten spellId without tripping the dup guard.
   // #1131: cantrips are ordinary learns applied first (disjoint from the swap).

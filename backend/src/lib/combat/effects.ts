@@ -161,7 +161,10 @@ export function resolveEffectSpec(
     if (ctx.characterLevel >= 17) count *= 4;
     else if (ctx.characterLevel >= 11) count *= 3;
     else if (ctx.characterLevel >= 5) count *= 2;
-  } else if (spec.scaling.mode === "slotUpcast") {
+  } else if (spec.scaling.mode === "slotUpcast" || spec.scaling.mode === "poolStep") {
+    // Same formula for both: a spell-slot upcast step and a pool (ki/focus)
+    // overspend step (#1503) each add `dicePerStep` dice per step above the
+    // effect's base cost.
     count += effectiveStep * (spec.scaling.dicePerStep ?? 0);
   }
 

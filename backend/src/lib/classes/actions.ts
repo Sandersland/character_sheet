@@ -590,6 +590,45 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     reminder: "Magic action, 2 focus: 20-ft-radius sphere within 120 ft, chosen damage type. Each creature makes a Dexterity save (focus DC) — 3 Martial Arts dice on a failure, half as much on a success.",
   },
 
+  // Way of the Four Elements (2014-only, PHB'14 pp.78/80-81, #1503). Both
+  // rows tagged EDITION_2014 and gated to the 2014-only slug — pre-blessed
+  // safe to reuse the "elementalAttunement" key against the 2024 row above
+  // (actionGrantLevel filters by edition BEFORE matching by key, and the two
+  // rows' grantSubclassSlugs are disjoint slugs regardless — #1503's own
+  // execution-decision comment names this the FIRST same-key-different-
+  // edition collision this table has ever carried, #1499's own comment
+  // anticipated it). Elemental Attunement here is free/uncapped and carries
+  // no resourceKey — unlike 2024's Focus-fuelled buff toggle, PHB'14's
+  // version is a flat reminder action with no persisted state at all.
+  // castDiscipline is a discoverability/gate tile only — no ACTION_EFFECT_FN
+  // entry, same shape as shadowArts below: the real cast is one
+  // ABILITY_REGISTRY entry (lib/classes/disciplines.ts, "disciplines"),
+  // dispatched through POST /api/characters/:id/abilities/disciplines/
+  // transactions, not this table's generic action-execute path.
+  {
+    key: "elementalAttunement",
+    name: "Elemental Attunement",
+    cost: "action",
+    grantClass: "monk",
+    grantSubclassSlugs: ["monk-way-of-the-four-elements"],
+    grantLevel: 3,
+    edition: "EDITION_2014",
+    reminder:
+      "Briefly control elemental forces within 30 ft: create a harmless sensory effect; light or snuff a small flame; chill or warm up to 1 lb of nonliving material for 1 hour; or shape a small amount of nonliving earth, fire, water, or mist for 1 minute. Free — always known, no ki cost.",
+  },
+  {
+    key: "castDiscipline",
+    name: "Elemental Discipline",
+    cost: "action",
+    grantClass: "monk",
+    grantSubclassSlugs: ["monk-way-of-the-four-elements"],
+    grantLevel: 3,
+    edition: "EDITION_2014",
+    resourceKey: "ki",
+    resourceAmount: 1,
+    reminder: "Spend ki to cast a known elemental discipline (2-6 ki, capped by your monk level).",
+  },
+
   // Warrior of the Open Hand (#1245): Open Hand Technique (Flurry-hit rider)
   // and Quivering Palm (set/trigger) are post-hit riders with their own
   // dedicated verticals (open-hand-technique.ts / quivering-palm.ts), exactly

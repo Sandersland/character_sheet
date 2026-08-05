@@ -70,7 +70,11 @@ export const learnSubclassChoiceOpSchema = z.object({
   custom: z.object({ name: z.string().min(1), description: z.string().min(1) }).optional(),
 });
 
-const forgetSubclassChoiceOpSchema = z.object({
+// Exported (#1503) so the level-up ceremony's own submission schema
+// (routes/character/level-up.ts) can reuse it verbatim for
+// subclassChoicesForgotten — same "one op schema, two call sites" pattern as
+// learnSubclassChoiceOpSchema above.
+export const forgetSubclassChoiceOpSchema = z.object({
   type: z.literal("forgetSubclassChoice"),
   choiceKey: z.string().min(1),
   entryId: z.string().min(1),

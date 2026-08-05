@@ -99,6 +99,26 @@ describe("resolveEffectSpec — golden byte-parity", () => {
   it("utility spell resolves to null", () => {
     expect(resolveEffectSpec(readEffectSpec(detectMagic), 0, { characterLevel: 1 })).toBeNull();
   });
+
+  // #1503: poolStep is the pool-cost analog of slotUpcast (extra ki/focus spent
+  // above a discipline's base cost adds costPerStep dice, same formula as an
+  // upcast spell slot) — the generalised successor to the pre-#1373 disciplines
+  // engine's discipline-only "focus" scaling mode.
+  it("poolStep scales by the pool overspend step, identically to slotUpcast", () => {
+    const spec = catalogEffectSpec(
+      {
+        name: "Fangs of the Fire Snake",
+        effectKind: "damage",
+        effectDiceCount: 1,
+        effectDiceFaces: 10,
+        damageType: "fire",
+        attackType: "attack",
+      },
+      { scaling: { mode: "poolStep", dicePerStep: 1 }, concentrates: () => false },
+    );
+    expect(resolveEffectSpec(spec, 0, { characterLevel: 3 })).toEqual({ count: 1, faces: 10, modifier: 0 });
+    expect(resolveEffectSpec(spec, 3, { characterLevel: 3 })).toEqual({ count: 4, faces: 10, modifier: 0 });
+  });
 });
 
 // #817 pins: the shared catalog-row→EffectSpec builder. Today only

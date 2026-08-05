@@ -9,9 +9,12 @@
 export type EffectType = "damage" | "heal" | "utility" | "buff";
 
 // How the dice count grows: cantrips scale by character level, leveled spells by
-// slot upcast steps.
+// slot upcast steps, a pool-fuelled ability (e.g. a Way of the Four Elements
+// discipline, #1503) by ki/focus spent above its base cost — the generalised
+// successor to the pre-#1373 disciplines engine's discipline-only "focus" mode,
+// now usable by any pool-cost GrantedAbility (readAbilityCost's effectiveStep).
 export interface EffectScaling {
-  mode: "none" | "slotUpcast" | "cantripLevel";
+  mode: "none" | "slotUpcast" | "cantripLevel" | "poolStep";
   dicePerStep?: number;
 }
 

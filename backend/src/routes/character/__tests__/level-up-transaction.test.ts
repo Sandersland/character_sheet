@@ -1611,6 +1611,92 @@ describe("POST …/level-up/transactions — subclassChoice validator messages",
   });
 });
 
+// #1503: Way of the Four Elements riding the level-up ceremony end-to-end —
+// the ceremony's own STEP_OP_BUILDERS/domain-dispatch wiring, not just the
+// pure validator (already covered unit-level in level-up-submission.test.ts).
+describe("POST …/level-up/transactions — Way of the Four Elements disciplines (#1503)", () => {
+  it("2→3: picking the subclass + learning the free discipline pick lands both under one batch", async () => {
+    const monk = await prisma.characterClass.findFirstOrThrow({ where: { name: "Monk" } });
+    const fourElements = await prisma.subclass.findFirstOrThrow({ where: { name: "Way of the Four Elements", classId: monk.id } });
+    const fangs = await prisma.grantedAbility.findFirstOrThrow({ where: { name: "Fangs of the Fire Snake", source: "discipline" } });
+    await prisma.character.create({
+      data: {
+        ...BASE,
+        ownerId: OWNER_ID,
+        id: "lvtx-four-elements-3",
+        name: "LevelUpTx Four Elements 3",
+        rulesEdition: "EDITION_2014",
+        experiencePoints: 900, // monk level 3 threshold; hitDice.total 2 → 1 pending
+        hitPoints: { current: 16, max: 16, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 2, die: "d8", spent: 0 },
+        abilityScores: { strength: 10, dexterity: 16, constitution: 12, intelligence: 10, wisdom: 16, charisma: 10 },
+        spellcasting: Prisma.JsonNull,
+        classEntries: { create: [{ name: "monk", subclass: null, classId: monk.id, position: 0, level: 2 }] },
+      },
+    });
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: "lvtx-four-elements-3" } });
+
+    const res = await post("lvtx-four-elements-3", {
+      target: { kind: "existing", classEntryId: entry.id },
+      hp: { method: "average" },
+      subclassId: fourElements.id,
+      subclassChoices: [{ type: "learnSubclassChoice", choiceKey: "fourElementsDisciplines", optionId: fangs.id }],
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.resources.choicesKnown.fourElementsDisciplines).toHaveLength(1);
+    expect(res.body.resources.choicesKnown.fourElementsDisciplines[0].optionId).toBe(fangs.id);
+    expect((res.body.availableActions as { key: string }[]).some((a) => a.key === "castDiscipline")).toBe(true);
+    expect(await distinctBatchIds("lvtx-four-elements-3")).toHaveLength(1);
+  });
+
+  it("5→6: a swap (2 learns + 1 forget netting to the step's count 1) commits atomically", async () => {
+    const monk = await prisma.characterClass.findFirstOrThrow({ where: { name: "Monk" } });
+    const fourElementsSub = await prisma.subclass.findFirstOrThrow({ where: { name: "Way of the Four Elements", classId: monk.id } });
+    const fangs = await prisma.grantedAbility.findFirstOrThrow({ where: { name: "Fangs of the Fire Snake", source: "discipline" } });
+    const water = await prisma.grantedAbility.findFirstOrThrow({ where: { name: "Water Whip", source: "discipline" } });
+    const river = await prisma.grantedAbility.findFirstOrThrow({ where: { name: "Shape the Flowing River", source: "discipline" } });
+    await prisma.character.create({
+      data: {
+        ...BASE,
+        ownerId: OWNER_ID,
+        id: "lvtx-four-elements-6",
+        name: "LevelUpTx Four Elements 6",
+        rulesEdition: "EDITION_2014",
+        experiencePoints: 14000, // monk level 6 threshold; hitDice.total 5 → 1 pending
+        hitPoints: { current: 34, max: 34, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 5, die: "d8", spent: 0 },
+        abilityScores: { strength: 10, dexterity: 16, constitution: 12, intelligence: 10, wisdom: 16, charisma: 10 },
+        spellcasting: Prisma.JsonNull,
+        resources: {
+          used: {},
+          maneuversKnown: [],
+          toolProficienciesKnown: [],
+          choicesKnown: { fourElementsDisciplines: [{ id: "e-fangs", optionId: fangs.id, name: fangs.name, description: fangs.description }] },
+          advancements: [],
+        } as unknown as Prisma.InputJsonValue,
+        classEntries: {
+          create: [{ name: "monk", subclass: "way of the four elements", subclassId: fourElementsSub.id, classId: monk.id, position: 0, level: 5 }],
+        },
+      },
+    });
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: "lvtx-four-elements-6" } });
+
+    const res = await post("lvtx-four-elements-6", {
+      target: { kind: "existing", classEntryId: entry.id },
+      hp: { method: "average" },
+      subclassChoices: [
+        { type: "learnSubclassChoice", choiceKey: "fourElementsDisciplines", optionId: water.id },
+        { type: "learnSubclassChoice", choiceKey: "fourElementsDisciplines", optionId: river.id },
+      ],
+      subclassChoicesForgotten: [{ type: "forgetSubclassChoice", choiceKey: "fourElementsDisciplines", entryId: "e-fangs" }],
+    });
+    expect(res.status).toBe(200);
+    const known = res.body.resources.choicesKnown.fourElementsDisciplines as { optionId: string }[];
+    expect(known.map((k) => k.optionId).sort()).toEqual([river.id, water.id].sort());
+    expect(await distinctBatchIds("lvtx-four-elements-6")).toHaveLength(1);
+  });
+});
+
 // #1131: cantrip progression through the ceremony. Warlock gains its 3rd cantrip
 // and a prepared spell at level 4 (plus an ASI), so the newSpells step now carries
 // a cantrip pick alongside the leveled pick.

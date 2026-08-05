@@ -31,11 +31,13 @@ export function monkPoolKey(edition: RulesEdition): "ki" | "focus" {
 // Feature TEXT moved off this module onto literal seed rows
 // (prisma/seed/monk-features.ts, #1675) — the twelfth and last class retab
 // (#1134/#1522's roster completion). This module survives (unlike fighter.ts/
-// barbarian.ts/rogue.ts, deleted outright) purely for its resourceFn's: the
-// base Focus/Ki pool below, and three subclasses' own pools (Wholeness of
-// Body, Flurry of Healing and Harm, Hand of Ultimate Mercy) — none of which
-// #1675 moved (transport-only slice, pools are a later chunk's job per
-// #1313's plan).
+// barbarian.ts/rogue.ts, deleted outright) for its resourceFn's — the base
+// Focus/Ki pool below, and three subclasses' own pools (Wholeness of Body,
+// Flurry of Healing and Harm, Hand of Ultimate Mercy) — and, since #1503, for
+// Way of the Four Elements' `choices` declaration: the ONE piece of a
+// SubclassDefinition #1675 never migrated to monk-features.ts, because
+// choices (#899) is a mechanism, not feature text (its option catalog is
+// disciplines.ts, its own seed module).
 export const monk: ClassDefinition = {
   // subclassKey is unused here — the base monk pool never needs to resolve a
   // subclass-specific variant (unlike druid's wildShape, #906) — but the full
@@ -194,6 +196,32 @@ export const monk: ClassDefinition = {
         }
         return pools;
       },
+    },
+    "way of the four elements": {
+      slug: "monk-way-of-the-four-elements",
+      grantLevel: 3,
+      // Disciple of the Elements (L3, PHB'14 p.78/80) / Elemental Attunement
+      // (L3, always-known, a free reminder action) / castDiscipline (L3) gate
+      // as DERIVED_ACTIONS rows (actions.ts), same as every other monk
+      // subclass action (#1315) — no deriveExtras booleans here. Feature TEXT
+      // lives in monk-features.ts (#1675's pattern); this is the ONE
+      // mechanical piece feature text can't express — the generic "choose N
+      // from a catalog" declaration (#899). Elemental Attunement is
+      // deliberately absent from `choices`: PHB'14 grants it free and
+      // uncapped, so it's a feature row, not a catalog pick.
+      //
+      // count is the discipline SLOT cap, not the total known (which also
+      // includes the always-known Elemental Attunement): 1/2/3/4 at
+      // L3/6/11/17, so total known reads 2/3/4/5 — do not "fix" this to
+      // 2/3/4/5 (#1503's explicit decision).
+      choices: [
+        {
+          key: "fourElementsDisciplines",
+          label: "Elemental Disciplines",
+          catalogSource: "discipline",
+          count: (level) => (level >= 17 ? 4 : level >= 11 ? 3 : level >= 6 ? 2 : level >= 3 ? 1 : 0),
+        },
+      ],
     },
   },
 };

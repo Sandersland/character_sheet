@@ -37,6 +37,25 @@ export const castShadowArtOpSchema = z.object({
 export type CastShadowArtOperation = z.infer<typeof castShadowArtOpSchema>;
 
 /**
+ * Cast a known Way of the Four Elements discipline (2014, #1503). `entryId` is
+ * the KNOWN entry's id (choicesKnown["fourElementsDisciplines"][].id, not the
+ * catalog GrantedAbility.id — mirrors castManeuver's entryId). `requestedKi`
+ * overspends above the discipline's base ki cost to scale its damage dice
+ * (EffectScaling "poolStep"); omitted spends the base cost. `roll` is the
+ * client-computed damage total for a discipline that deals damage (mirrors
+ * castSpell/castElementalBurst: the client rolls its own supernatural effect,
+ * trusted server-side) — omitted for a discipline with no damage roll.
+ */
+export const castDisciplineOpSchema = z.object({
+  type: z.literal("castDiscipline"),
+  entryId: z.string().min(1),
+  requestedKi: z.number().int().positive().optional(),
+  roll: z.number().nonnegative().optional(),
+});
+export type CastDisciplineOperation = z.infer<typeof castDisciplineOpSchema>;
+export type DisciplineOperation = CastDisciplineOperation;
+
+/**
  * Activate Cloak of Shadows (L17): spend 3 focus, become invisible. No catalog
  * id — unlike castShadowArt this is one fixed feature, not a granted-ability row.
  */

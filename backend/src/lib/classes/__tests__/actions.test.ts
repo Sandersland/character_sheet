@@ -1500,14 +1500,19 @@ describe("subclass gate resolves via slug — FK preferred, exact name as fallba
   // maintained table). Still exercises the name-fallback path at runtime: for
   // each slug, resolve its accepted NAME via SUBCLASS_IDENTITY and call
   // through `at()`, so this is the same mechanism the FK path uses, minus the FK.
-  // elementalAttunement is deliberately absent from its subclass's list here —
-  // it's row-driven (#1686) and unreachable through the bare at() this test
-  // uses; elementalBurst alone still proves the slug match. Each entry now
-  // carries its OWN `edition` (#1501/#1502): "monk-way-of-the-open-hand" and
-  // "monk-way-of-shadow" are each EDITION_2014-only, so a blanket
-  // EDITION_2024 loop (the shape before these two slices) would wrongly
-  // report their rows unreachable — the edition gate excludes them, not the
-  // subclass gate this test means to exercise.
+  // elementalAttunement is deliberately absent from the 2024 Warrior of the
+  // Elements/Warrior of Shadow/Warrior of the Open Hand lists here — it's
+  // row-driven (#1686) and unreachable through the bare at() this test uses;
+  // elementalBurst alone still proves the slug match for that subclass. The
+  // 2014 Way of the Four Elements elementalAttunement is a PLAIN
+  // DERIVED_ACTIONS reminder row (#1503, not row-driven), so it IS reachable
+  // and listed. Each entry carries its OWN `edition` (#1501/#1502/#1503):
+  // "monk-way-of-the-open-hand", "monk-way-of-shadow", and
+  // "monk-way-of-the-four-elements" are each EDITION_2014-only, so a blanket
+  // EDITION_2024 loop (the shape before these three slices) would wrongly
+  // report their rows unreachable — `at()`'s own default (EDITION_2024)
+  // would silently exclude them, the exact same-key-different-edition trap
+  // #1499 anticipated.
   const MONK_SUBCLASS_GRANT_KEYS: Record<
     Extract<SubclassSlug, `monk-${string}`>,
     { edition: "EDITION_2014" | "EDITION_2024"; keys: string[] }
@@ -1516,6 +1521,7 @@ describe("subclass gate resolves via slug — FK preferred, exact name as fallba
     "monk-warrior-of-the-elements": { edition: "EDITION_2024", keys: ["elementalBurst"] },
     "monk-warrior-of-the-open-hand": { edition: "EDITION_2024", keys: ["wholenessOfBody", "fleetStep"] },
     "monk-warrior-of-mercy": { edition: "EDITION_2024", keys: ["handOfHealing", "handOfHealingFlurry"] },
+    "monk-way-of-the-four-elements": { edition: "EDITION_2014", keys: ["elementalAttunement", "castDiscipline"] },
     "monk-way-of-the-open-hand": { edition: "EDITION_2014", keys: ["wholenessOfBodyAction", "tranquility"] },
     "monk-way-of-shadow": { edition: "EDITION_2014", keys: ["shadowArts", "shadowStep", "cloakOfShadows", "opportunist"] },
   };

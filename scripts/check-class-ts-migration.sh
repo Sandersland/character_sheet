@@ -36,7 +36,7 @@ NOT_YET_MIGRATED="bard cleric druid monk paladin ranger sorcerer warlock wizard"
 # check below, which fails loudly the moment a file in that directory is
 # neither here nor in ALL_CLASSES, rather than silently scanning it as
 # "migrated" (a thirteenth class's module would otherwise land unclassified).
-NON_CLASS_MODULES="ability-registry actions activation-requires channel-divinity class class-feature-rows class-features feature-rows-select focus-cast hand-of-harm hand-of-ultimate-mercy maneuver-effect maneuvers open-hand-technique quivering-palm registry resources resources-state shadow-arts sneak-attack stunning-strike subclass-slug types warrior-of-elements"
+NON_CLASS_MODULES="ability-registry actions activation-requires channel-divinity class class-feature-rows class-features disciplines feature-rows-select focus-cast hand-of-harm hand-of-ultimate-mercy maneuver-effect maneuvers open-hand-technique quivering-palm registry resources resources-state shadow-arts sneak-attack stunning-strike subclass-slug types warrior-of-elements"
 
 # Reverse check: every backend/src/lib/classes/*.ts file's basename must be
 # classified as EITHER a class (ALL_CLASSES) or shared infrastructure

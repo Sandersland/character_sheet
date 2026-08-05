@@ -63,6 +63,7 @@ import type {
 // submission/transaction, ability-cost, the actions + resources routes) keep
 // resolving them unchanged.
 export type {
+  ForgetSubclassChoiceOperation,
   LearnManeuverOperation,
   LearnSubclassChoiceOperation,
   LearnToolProficiencyOperation,
@@ -106,6 +107,7 @@ function applySpendResourceOp(
 ): ResourceOpAudit {
   const amount = op.amount ?? 1;
   if (amount <= 0) {
+    // fallow-ignore-next-line code-duplication -- applySpendResourceOp/applyRestoreResourceOp share a parallel validate-amount/find-pool/bounds-check shape (spend bounds against pool.total, restore bounds against 0) — pre-existing (unrelated to #1503's own diff), not a target for consolidation here.
     throw new InvalidResourceOperationError("spendResource: amount must be positive");
   }
   const pool = derivedInfo?.resources.find((r) => r.key === op.key);

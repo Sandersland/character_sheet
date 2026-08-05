@@ -9,6 +9,7 @@ import { CLASSES, BACKGROUNDS, ITEMS, type CatalogItem } from "./seed/catalog-da
 import { ACTIONS } from "./seed/actions.js";
 import { MANEUVERS } from "./seed/maneuvers.js";
 import { SHADOW_ARTS } from "./seed/shadow-arts.js";
+import { DISCIPLINES } from "./seed/disciplines.js";
 import { CHANNEL_DIVINITIES } from "./seed/channel-divinity.js";
 import { SUBCLASS_CHOICE_OPTIONS } from "./seed/subclass-choices.js";
 import { FEATS } from "./seed/feats.js";
@@ -201,6 +202,60 @@ async function seedShadowArts(prisma: PrismaClient) {
   );
   const stale = await prisma.grantedAbility.findMany({ where: staleWhere, select: { name: true } });
   if (stale.length) console.log(`seedShadowArts: dropping stale catalog rows: ${stale.map((a) => a.name).join(", ")}`);
+  await prisma.grantedAbility.deleteMany({ where: staleWhere });
+}
+
+// Seed the Way of the Four Elements discipline catalog (2014-only, #1503) —
+// upsert by (name, edition). Unlike seedSubclassChoiceOptions below, each row
+// carries its own cost (Ki, "pool") and, where the discipline deals damage, an
+// EffectSpec — the cast handler (lib/classes/disciplines.ts) reads both.
+async function seedDisciplines(prisma: PrismaClient) {
+  for (const discipline of DISCIPLINES) {
+    const data = {
+      name: discipline.name,
+      edition: discipline.edition,
+      source: "discipline",
+      description: discipline.description,
+      minLevel: discipline.minLevel,
+      alwaysKnown: orElse(discipline.alwaysKnown, false),
+      costKind: discipline.costKind,
+      costPoolKey: orNull(discipline.costPoolKey),
+      costBase: orNull(discipline.costBase),
+      costPerStep: orNull(discipline.costPerStep),
+      effectKind: orNull(discipline.effectKind),
+      effectDiceCount: orNull(discipline.effectDiceCount),
+      effectDiceFaces: orNull(discipline.effectDiceFaces),
+      damageType: orNull(discipline.damageType),
+      attackType: orNull(discipline.attackType),
+      saveAbility: orNull(discipline.saveAbility),
+      saveEffect: orNull(discipline.saveEffect),
+    };
+    await upsertEditionRow(
+      prisma.grantedAbility,
+      { name: discipline.name, edition: discipline.edition },
+      data,
+      data,
+    );
+  }
+  // Every seeded row is EDITION_2014 (Way of the Four Elements has no 2024
+  // counterpart — 2024's Warrior of the Elements is a from-scratch rebuild,
+  // not a discipline menu), so the NULL and EDITION_2024 partitions both get
+  // `notIn: []`, matching every `source: "discipline"` row in them —
+  // deliberately: this is what sweeps the 17 orphaned pre-#1373-retirement
+  // rows (edition: NULL, a stale *Fangs of the Fire Snake* etc. snapshot)
+  // still sitting in a long-lived dev database (#1503's own decision comment,
+  // 2026-08-03). The same NULL-partition-empties-to-notIn-everything shape is
+  // a DATA-LOSS bug the other direction — see prune.ts's own header — but
+  // here, with an all-EDITION_2014 seeded list, it is the intended cleanup.
+  const staleWhere = staleCatalogRowsWhere(
+    "name",
+    DISCIPLINES.map((d) => ({ identity: d.name, edition: d.edition })),
+    { source: "discipline" },
+  );
+  const stale = await prisma.grantedAbility.findMany({ where: staleWhere, select: { name: true, edition: true } });
+  if (stale.length) {
+    console.log(`seedDisciplines: dropping stale catalog rows: ${stale.map((d) => `${d.name} (${d.edition ?? "shared"})`).join(", ")}`);
+  }
   await prisma.grantedAbility.deleteMany({ where: staleWhere });
 }
 
@@ -469,6 +524,7 @@ async function main() {
     ...SHADOW_ARTS,
     ...CHANNEL_DIVINITIES,
     ...SUBCLASS_CHOICE_OPTIONS,
+    ...DISCIPLINES,
   ]);
   await seedSpecies(prisma);
   // #1682: trait content, resolved against the Species/SpeciesVariant rows
@@ -481,6 +537,7 @@ async function main() {
   await seedActions(prisma);
   await seedManeuvers(prisma);
   await seedShadowArts(prisma);
+  await seedDisciplines(prisma);
   await seedChannelDivinities(prisma);
   await seedSubclassChoiceOptions(prisma);
   await seedFeats(prisma);

@@ -12,30 +12,40 @@
 // expand() below is pure content assembly, not seeding logic.
 //
 // SCOPE (#1675 transport, #1500 base-class rewrite, #1501 Open Hand fork,
-// #1502 Shadow fork): #1675 moved every row here as a byte-identical
-// transcription of what lib/classes/monk.ts's MONK_FEATURES /
-// WARRIOR_OF_*_FEATURES said, both editions sharing one row. #1500 rewrites
-// the 18 BASE-CLASS rows (MONK_BASE_RAW below) from real SRD 5.1 / PHB'14
-// text — a genuine content fork per feature, not a retag: several 2014
-// features have no 2024 name at all (Uncanny Metabolism/Heightened
-// Focus/Self-Restoration/Perfect Focus are 2024-only; Stillness of
-// Mind/Purity of Body/Tongue of the Sun and Moon/Timeless Body/Empty
-// Body/Perfect Self are 2014-only), so the 2014 partition is 17 rows against
-// the 2024 partition's 18 (monk-2024-content.test.ts's per-partition count
-// pins this exactly). #1501 forks Warrior of the Open Hand into two SEPARATE
-// subclasses — "Warrior of the Open Hand" stays EDITION_2024-only (its four
-// rows tagged in that same commit) and "Way of the Open Hand" is authored
-// fresh as EDITION_2014-only (SRD 5.1's only monastic tradition) — rather
-// than one slug hosting both editions' text, since the 2014 and 2024 names
-// genuinely differ (monk.ts's two SubclassDefinition entries are the same
-// split). #1502 forks Warrior of Shadow the same way: its four rows are now
-// tagged EDITION_2024 (they still exist under monk-warrior-of-shadow's slug,
-// just no longer a both-editions transcription), and a NEW Way of Shadow
-// subclass (monk-way-of-shadow, a DISTINCT slug) carries its own four
-// EDITION_2014 rows, real PHB'14 pp.79-80 content (not in SRD 5.1). The one
-// remaining 2024-only subclass (Warrior of the Elements) is still
-// untouched — no 2014 slug exists for it yet (#1503's later slice), so its
-// rows stay a byte-identical transcription pending that.
+// #1502 Shadow fork, #1503 Warrior of the Elements retag + Way of the Four
+// Elements): #1675 moved every row here as a byte-identical transcription of
+// what lib/classes/monk.ts's MONK_FEATURES / WARRIOR_OF_*_FEATURES said, both
+// editions sharing one row. #1500 rewrites the 18 BASE-CLASS rows
+// (MONK_BASE_RAW below) from real SRD 5.1 / PHB'14 text — a genuine content
+// fork per feature, not a retag: several 2014 features have no 2024 name at
+// all (Uncanny Metabolism/Heightened Focus/Self-Restoration/Perfect Focus are
+// 2024-only; Stillness of Mind/Purity of Body/Tongue of the Sun and
+// Moon/Timeless Body/Empty Body/Perfect Self are 2014-only), so the 2014
+// partition is 17 rows against the 2024 partition's 18
+// (monk-2024-content.test.ts's per-partition count pins this exactly).
+// #1501 forks Warrior of the Open Hand into two SEPARATE subclasses —
+// "Warrior of the Open Hand" stays EDITION_2024-only (its four rows tagged in
+// that same commit) and "Way of the Open Hand" is authored fresh as
+// EDITION_2014-only (SRD 5.1's only monastic tradition) — rather than one
+// slug hosting both editions' text, since the 2014 and 2024 names genuinely
+// differ (monk.ts's two SubclassDefinition entries are the same split).
+// #1502 forks Warrior of Shadow the same way: its four rows are now tagged
+// EDITION_2024 (they still exist under monk-warrior-of-shadow's slug, just no
+// longer a both-editions transcription), and a NEW Way of Shadow subclass
+// (monk-way-of-shadow, a DISTINCT slug) carries its own four EDITION_2014
+// rows, real PHB'14 pp.79-80 content (not in SRD 5.1). #1503 retags Warrior
+// of the Elements EDITION_2024 (its four rows, same "no longer shared" shape
+// as #1501/#1502's retags) and adds Way of the Four Elements
+// (monk-way-of-the-four-elements) as a brand-new 2014-only slug with NO 2024
+// counterpart at all — Warrior of the Elements is a from-scratch PHB'24
+// rebuild, not this subclass under a different edition tag, so there was
+// nothing to retag it FROM; see resolveSubclassId, seed-class-features.ts for
+// why a retagged Subclass row forces its ClassFeature rows to fork too (a
+// shared/untagged row has nothing to resolve against once its Subclass row
+// stops being NULL-edition). Warrior of Mercy is the one remaining
+// 2024-only subclass still untouched — no 2014 monk subclass slug exists for
+// it yet — so its rows stay a byte-identical transcription shared across
+// both editions.
 // monk.ts keeps its resourceFn for the ki/focus pool (now edition-forked, see
 // monkPoolKey) and every subclass resourceFn unchanged (except Way of the
 // Open Hand, which needs none — see monk.ts's own comment).
@@ -106,6 +116,7 @@ interface RawMonkFeature {
 }
 
 function expand(raw: RawMonkFeature): ClassFeatureSeedRow[] {
+  // fallow-ignore-next-line code-duplication -- this expand()/base-object shape (and the MONK_BASE_RAW array of {subclassSlug,name,level,description,...} entries below it) intentionally mirrors barbarian-features.ts's own expand()/RAW array — each class's literal seed module is authored independently by existing convention (fighter-features.ts, wizard-features.ts, ...), never a shared base type; see wizard-features.ts's own identical suppression for the RawWizardFeature interface.
   const base: Omit<ClassFeatureSeedRow, "edition"> = {
     className: "Monk",
     // fallow-ignore-next-line code-duplication -- expand()'s field-by-field copy intentionally mirrors fighter-features.ts's/wizard-features.ts's own expand() (every Raw*Feature -> ClassFeatureSeedRow adapter across this file family repeats this shape by convention, never a shared helper)
@@ -693,18 +704,24 @@ const WARRIOR_OF_MERCY_RAW: RawMonkFeature[] = [
 // Elements + Elemental Attunement at L3, Elemental Burst at L6, Stride of
 // the Elements at L11, and the Elemental Epitome capstone at L17. Elemental
 // Attunement is modeled as a while-active buff + two Focus-spending session
-// actions (toggle + Elemental Burst) — see warrior-of-elements.ts.
+// actions (toggle + Elemental Burst) — see warrior-of-elements.ts. Every row
+// tagged EDITION_2024 (#1503) — see the file header's note on why this
+// subclass, unlike Open Hand/Shadow/Mercy, can't stay untagged/shared: its
+// Subclass row forked the moment Way of the Four Elements (its real 2014
+// predecessor) was authored with its own slug.
 const WARRIOR_OF_THE_ELEMENTS_RAW: RawMonkFeature[] = [
   {
     subclassSlug: slug("monk-warrior-of-the-elements"),
     name: "Manipulate Elements",
     level: 3,
+    edition: "EDITION_2024",
     description: "You know the Elementalism cantrip. Wisdom is your spellcasting ability for it.",
   },
   {
     subclassSlug: slug("monk-warrior-of-the-elements"),
     name: "Elemental Attunement",
     level: 3,
+    edition: "EDITION_2024",
     description:
       "At the start of your turn, you can expend 1 Focus Point (no action) to imbue yourself with elemental energy for 10 minutes (or until you're Incapacitated). While attuned: your Unarmed Strike reach increases by 10 ft; and once per Unarmed Strike hit you can deal Acid, Cold, Fire, Lightning, or Thunder damage instead of the normal type — when you do, you can force the target to make a Strength saving throw (your focus save DC), moving it up to 10 ft in a direction of your choice on a failure.",
     // #1686: the TOGGLE half only — activating/ending the buff that gates
@@ -736,6 +753,7 @@ const WARRIOR_OF_THE_ELEMENTS_RAW: RawMonkFeature[] = [
     subclassSlug: slug("monk-warrior-of-the-elements"),
     name: "Elemental Burst",
     level: 6,
+    edition: "EDITION_2024",
     description:
       "As a Magic action, you can expend 2 Focus Points to create a 20-foot-radius sphere of elemental energy centered on a point within 120 ft. Choose Acid, Cold, Fire, Lightning, or Thunder. Each creature in the sphere makes a Dexterity saving throw (your focus save DC), taking damage equal to three rolls of your Martial Arts die of the chosen type on a failure, or half as much on a success.",
   },
@@ -743,14 +761,47 @@ const WARRIOR_OF_THE_ELEMENTS_RAW: RawMonkFeature[] = [
     subclassSlug: slug("monk-warrior-of-the-elements"),
     name: "Stride of the Elements",
     level: 11,
+    edition: "EDITION_2024",
     description: "While your Elemental Attunement is active, you have a Fly Speed and a Swim Speed each equal to your Speed.",
   },
   {
     subclassSlug: slug("monk-warrior-of-the-elements"),
     name: "Elemental Epitome",
     level: 17,
+    edition: "EDITION_2024",
     description:
       "While your Elemental Attunement is active you gain: Resistance to Acid, Cold, Fire, Lightning, or Thunder damage (choose one at the start of each of your turns); Destructive Stride (when you use Step of the Wind, your Speed increases by 20 ft that turn, and the first creature you move within 5 ft of takes one roll of your Martial Arts die of your chosen resistance type); and Empowered Strikes (once per turn, one Unarmed Strike deals an extra Martial Arts die of your chosen resistance type on a hit).",
+  },
+];
+
+// ---- Way of the Four Elements (2014-only, #1503) — PHB'14 pp. 78, 80-81, ---
+// ---- not in SRD 5.1 ---------------------------------------------------------
+// Disciple of the Elements (L3) is the mechanism feature: it names the
+// ki-fueled discipline menu, the known-discipline progression (1/2/3/4 chosen
+// disciplines at L3/6/11/17, i.e. 2/3/4/5 total with the always-known
+// Elemental Attunement), and the learn-a-new/swap-one-known rule. The actual
+// catalog is disciplines.ts (16 rows, source "discipline") plus
+// monk.ts's `choices` declaration (#899) — this row is player-facing text
+// only, no mechanics of its own. Elemental Attunement (also L3) is the one
+// ALWAYS-known discipline (free, uncapped) — its own row here is flavor text;
+// the reminder action + level gate are a DERIVED_ACTIONS row (actions.ts),
+// matching every other monk subclass action (#1315).
+const WAY_OF_THE_FOUR_ELEMENTS_RAW: RawMonkFeature[] = [
+  {
+    subclassSlug: slug("monk-way-of-the-four-elements"),
+    name: "Disciple of the Elements",
+    level: 3,
+    edition: "EDITION_2014",
+    description:
+      "You learn magical disciplines that harness the power of the four elements. You know Elemental Attunement plus one other elemental discipline of your choice, learning one more at 6th, 11th, and 17th level (2/3/4/5 known total). A discipline requires you to spend ki points each time you use it, and some disciplines require you to reach a specified monk level before you can use them. Whenever you learn a new elemental discipline, you can also replace one you already know with a different discipline. PHB'14 pp. 78, 80.",
+  },
+  {
+    subclassSlug: slug("monk-way-of-the-four-elements"),
+    name: "Elemental Attunement",
+    level: 3,
+    edition: "EDITION_2014",
+    description:
+      "You always know this elemental discipline, and it doesn't count against the number of elemental disciplines you know. As an action, you can briefly control elemental forces within 30 ft of you, causing one of the following effects: create a harmless, sensory elemental effect; instantaneously light or snuff out a candle, torch, or small campfire; chill or warm up to 1 pound of nonliving material for up to 1 hour; or shape a small amount of nonliving earth, fire, water, or mist for up to 1 minute. PHB'14 p.80.",
   },
 ];
 
@@ -758,15 +809,13 @@ const WARRIOR_OF_THE_ELEMENTS_RAW: RawMonkFeature[] = [
 // EDITION_2024 rows, #1500) + Way of the Open Hand (4 EDITION_2014-only
 // rows, #1501) + Warrior of the Open Hand (4 EDITION_2024-only rows, #1501)
 // + Way of Shadow (4 EDITION_2014-only rows, #1502) + Warrior of Shadow (4
-// EDITION_2024-only rows, #1502) + the two still-untagged 2024-only
-// subclasses expanded to both editions pending #1503 (Elements 5, Mercy 6 =
-// 11 features x 2 editions = 22 rows) = 36 EDITION_2014 + 37 EDITION_2024 =
-// 73 rows total (monk-2024-content.test.ts pins the per-partition counts
-// exactly — each fork's 2014/2024 row swap is a wash: 4 rows move from the
-// shared-count column to their own edition-exclusive one on each side,
-// netting to zero on both totals).
-// Concatenated into class-features.ts's CLASS_FEATURES the same way every
-// other literal class's export is.
+// EDITION_2024-only rows, #1502) + Warrior of Mercy (6 features, still
+// shared/untagged — no 2014 fork exists yet) + Warrior of the Elements (5
+// EDITION_2024-only rows, #1503's retag) + Way of the Four Elements (2
+// EDITION_2014-only rows, #1503) = 33 EDITION_2014 + 37 EDITION_2024 = 70
+// rows total (monk-2024-content.test.ts pins the per-partition counts
+// exactly). Concatenated into class-features.ts's CLASS_FEATURES the same
+// way every other literal class's export is.
 export const MONK_FEATURES: ClassFeatureSeedRow[] = [
   ...MONK_BASE_RAW.flatMap(expand),
   ...WARRIOR_OF_THE_OPEN_HAND_RAW.flatMap(expand),
@@ -775,4 +824,5 @@ export const MONK_FEATURES: ClassFeatureSeedRow[] = [
   ...WAY_OF_SHADOW_RAW.flatMap(expand),
   ...WARRIOR_OF_MERCY_RAW.flatMap(expand),
   ...WARRIOR_OF_THE_ELEMENTS_RAW.flatMap(expand),
+  ...WAY_OF_THE_FOUR_ELEMENTS_RAW.flatMap(expand),
 ];

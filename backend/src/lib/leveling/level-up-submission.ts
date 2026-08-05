@@ -9,6 +9,7 @@ import type { LevelUpTarget } from "@character-sheet/contracts";
 import type { AdvancementOperation, TakeFeatOperation } from "@/lib/leveling/advancement.js";
 import type { ClassFeatureRow } from "@/lib/classes/class-feature-rows.js";
 import type {
+  ForgetSubclassChoiceOperation,
   LearnManeuverOperation,
   LearnToolProficiencyOperation,
   LearnSubclassChoiceOperation,
@@ -43,6 +44,11 @@ export interface LevelUpSubmission {
   maneuvers?: LearnManeuverOperation[];
   toolProficiencies?: LearnToolProficiencyOperation[];
   subclassChoices?: LearnSubclassChoiceOperation[];
+  // #1503: a swap for a choose-N choice whose swapCadence is "onLevelUp"
+  // (today: Way of the Four Elements' disciplines) — one forgotten entry
+  // offset by one extra learn under the SAME choiceKey, mirroring
+  // spellsForgotten's own shape/assert (assertSubclassChoiceForgets below).
+  subclassChoicesForgotten?: ForgetSubclassChoiceOperation[];
   spellsLearned?: LearnSpellOperation[];
   // #1131: new cantrips picked this level — counted against the newSpells step's
   // meta.cantrips, separately from leveled picks (a cantrip never offsets a swap).
@@ -162,6 +168,15 @@ function netSpellsLearned(submission: LevelUpSubmission): number {
   return (submission.spellsLearned?.length ?? 0) - (submission.spellsForgotten?.length ?? 0);
 }
 
+// #1503: same shape as netSpellsLearned, scoped to one choiceKey — a swap
+// (forget one, learn a different one) offsets, so the NET learn count for
+// that key must equal the step's own count.
+function netSubclassChoiceLearned(key: unknown, submission: LevelUpSubmission): number {
+  const learned = (submission.subclassChoices ?? []).filter((c) => c.choiceKey === key).length;
+  const forgotten = (submission.subclassChoicesForgotten ?? []).filter((c) => c.choiceKey === key).length;
+  return learned - forgotten;
+}
+
 function stepProvided(
   step: LevelUpStep,
   chosenSubclassName: string | null,
@@ -172,8 +187,7 @@ function stepProvided(
   }
   if (step.kind === "subclassChoice") {
     const key = step.meta?.key;
-    const provided = (submission.subclassChoices ?? []).filter((c) => c.choiceKey === key).length;
-    return { provided, noun: `${String(key)} choices` };
+    return { provided: netSubclassChoiceLearned(key, submission), noun: `${String(key)} choices` };
   }
   // #1101: a swap offsets its extra learn — the NET learn count must equal the
   // step count (spellsLearned.length === step.count + spellsForgotten.length).
@@ -248,6 +262,33 @@ function assertForgets(plan: LevelUpStep[], character: LevelUpPlanCharacter, sub
   }
 }
 
+// #1503: a choose-N swap forgets at most one entry PER choiceKey, only on a
+// subclassChoice step whose meta.canSwap is true (subclassChoiceSwapCadence
+// resolved "onLevelUp" for that catalogSource/edition) — sibling of
+// assertForgets above, same shape, scoped per-key rather than globally since
+// each choiceKey is an independent slot. Entry-existence (does the forgotten
+// entryId actually belong to that choicesKnown[key] list) is NOT re-checked
+// here — applyForgetSubclassChoiceOp (resources.ts) already rejects an
+// unknown entryId at apply time; duplicating that check here would be the
+// "second bespoke guard" #1503's own decision says not to add.
+function assertSubclassChoiceForgets(plan: LevelUpStep[], submission: LevelUpSubmission): void {
+  const forgets = submission.subclassChoicesForgotten ?? [];
+  if (forgets.length === 0) return;
+  const byKey = new Map<string, number>();
+  for (const op of forgets) {
+    byKey.set(op.choiceKey, (byKey.get(op.choiceKey) ?? 0) + 1);
+  }
+  for (const [key, count] of byKey) {
+    if (count > 1) {
+      throw new InvalidLevelUpError(`You may swap at most one ${key} choice per level-up.`);
+    }
+    const step = plan.find((s) => s.kind === "subclassChoice" && s.meta?.key === key);
+    if (step?.meta?.canSwap !== true) {
+      throw new InvalidLevelUpError(`this level-up does not allow swapping a "${key}" choice`);
+    }
+  }
+}
+
 // #1131: new cantrips ride the newSpells step's meta.cantrips, counted separately
 // from leveled picks (a cantrip never offsets a swap forget). A level with no
 // newSpells step — or one granting no cantrips — rejects any cantripsLearned.
@@ -282,6 +323,7 @@ export function validateLevelUpSubmission(
   assertCounts(plan, chosenSubclassName, submission);
   assertNoExcess(plan, submission);
   assertForgets(plan, character, submission);
+  assertSubclassChoiceForgets(plan, submission);
   assertCantrips(plan, submission);
   return plan;
 }

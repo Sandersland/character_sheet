@@ -47,6 +47,7 @@ export const SUBCLASS_SLUGS = [
   "monk-warrior-of-the-elements",
   "monk-warrior-of-the-open-hand",
   "monk-way-of-shadow",
+  "monk-way-of-the-four-elements",
   "monk-way-of-the-open-hand",
   "paladin-oath-of-devotion",
   "paladin-oath-of-the-ancients",
@@ -65,7 +66,7 @@ export const SUBCLASS_SLUGS = [
   "wizard-school-of-abjuration",
   "wizard-school-of-evocation",
   "wizard-school-of-illusion",
-] as const; // 34 members — the seed's row count (#1277 F1) and the
+] as const; // 35 members — the seed's row count (#1277 F1) and the
 // lib/classes/*.ts subclass-definition count (#1277 F2) are already a
 // perfect bijection; this list is exhaustive over both. Bladesinging
 // (#1676, TCoE p.76) is identity-only like Fighter's subclasses — no
@@ -79,6 +80,11 @@ export const SUBCLASS_SLUGS = [
 // whose 2014 and 2024 counterparts are genuinely SEPARATE subclasses (Way of
 // the Open Hand / Warrior of the Open Hand) rather than one name shared
 // across editions — see monk.ts's own two SubclassDefinition entries.
+// monk-way-of-the-four-elements (#1503, PHB'14 pp.80-81) is the third 2014
+// monk fork and the first with no 2024 counterpart at all (Warrior of the
+// Elements is a from-scratch PHB'24 rebuild, not this subclass under a
+// different edition tag) — it DOES register a SubclassDefinition (monk.ts),
+// unlike Bladesinging.
 
 export type SubclassSlug = (typeof SUBCLASS_SLUGS)[number];
 
@@ -111,6 +117,7 @@ export const SUBCLASS_IDENTITY: Record<SubclassSlug, SubclassIdentity> = {
   "monk-warrior-of-the-elements": { classKey: "monk", nameKey: "warrior of the elements" },
   "monk-warrior-of-the-open-hand": { classKey: "monk", nameKey: "warrior of the open hand" },
   "monk-way-of-shadow": { classKey: "monk", nameKey: "way of shadow" },
+  "monk-way-of-the-four-elements": { classKey: "monk", nameKey: "way of the four elements" },
   "monk-way-of-the-open-hand": { classKey: "monk", nameKey: "way of the open hand" },
   "paladin-oath-of-devotion": { classKey: "paladin", nameKey: "oath of devotion" },
   "paladin-oath-of-the-ancients": { classKey: "paladin", nameKey: "oath of the ancients" },

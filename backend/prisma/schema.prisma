@@ -2031,6 +2031,7 @@ enum CharacterEventType {
   learnSubclassChoice
   forgetSubclassChoice
   subclassChoicesReconciled
+  castDiscipline
   // advancement (ASI + feats)
   abilityScoreImprovement
   featTaken
