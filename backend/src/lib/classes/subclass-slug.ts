@@ -46,6 +46,7 @@ export const SUBCLASS_SLUGS = [
   "monk-warrior-of-shadow",
   "monk-warrior-of-the-elements",
   "monk-warrior-of-the-open-hand",
+  "monk-way-of-the-open-hand",
   "paladin-oath-of-devotion",
   "paladin-oath-of-the-ancients",
   "paladin-oath-of-vengeance",
@@ -63,13 +64,16 @@ export const SUBCLASS_SLUGS = [
   "wizard-school-of-abjuration",
   "wizard-school-of-evocation",
   "wizard-school-of-illusion",
-] as const; // 32 members — the seed's row count (#1277 F1) and the
+] as const; // 33 members — the seed's row count (#1277 F1) and the
 // lib/classes/*.ts subclass-definition count (#1277 F2) are already a
 // perfect bijection; this list is exhaustive over both. Bladesinging
 // (#1676, TCoE p.76) is identity-only like Fighter's subclasses — no
 // lib/classes/wizard.ts subclass registration exists or is needed, since its
 // mechanics ride the F1-F5 engine's seed-row vocabulary, not a
-// SubclassDefinition.
+// SubclassDefinition. "monk-way-of-the-open-hand" (#1501) is the first slug
+// whose 2014 and 2024 counterparts are genuinely SEPARATE subclasses (Way of
+// the Open Hand / Warrior of the Open Hand) rather than one name shared
+// across editions — see monk.ts's own two SubclassDefinition entries.
 
 export type SubclassSlug = (typeof SUBCLASS_SLUGS)[number];
 
@@ -101,6 +105,7 @@ export const SUBCLASS_IDENTITY: Record<SubclassSlug, SubclassIdentity> = {
   "monk-warrior-of-shadow": { classKey: "monk", nameKey: "warrior of shadow" },
   "monk-warrior-of-the-elements": { classKey: "monk", nameKey: "warrior of the elements" },
   "monk-warrior-of-the-open-hand": { classKey: "monk", nameKey: "warrior of the open hand" },
+  "monk-way-of-the-open-hand": { classKey: "monk", nameKey: "way of the open hand" },
   "paladin-oath-of-devotion": { classKey: "paladin", nameKey: "oath of devotion" },
   "paladin-oath-of-the-ancients": { classKey: "paladin", nameKey: "oath of the ancients" },
   "paladin-oath-of-vengeance": { classKey: "paladin", nameKey: "oath of vengeance" },

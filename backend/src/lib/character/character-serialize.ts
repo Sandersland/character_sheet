@@ -78,14 +78,20 @@ function stunningStrikeRider(
 
 type RiderClassEntry = SubclassIdentityInput & { name: string; level: number };
 
-// Warrior of the Open Hand's monk class entry, or undefined off-subclass —
-// shared by openHandTechniqueRider/quiveringPalmRider. Resolved via slug
-// (#1277: FK preferred, exact name as fallback) — was substring-matched on
-// the words "open hand", the same failure class #1339 fixed at the
-// DERIVED_ACTIONS gate.
+// Both editions' Open Hand subclasses grant Open Hand Technique/Quivering
+// Palm — "Warrior of the Open Hand" (SRD 5.2, EDITION_2024) and "Way of the
+// Open Hand" (SRD 5.1, EDITION_2014, #1501) are SEPARATE subclasses, not one
+// forked across editions, so a character resolves to at most one of the two.
+const OPEN_HAND_SLUGS = ["monk-warrior-of-the-open-hand", "monk-way-of-the-open-hand"];
+
+// The Open Hand monk's own class entry, or undefined off-subclass — shared by
+// openHandTechniqueRider/quiveringPalmRider. Resolved via slug (#1277: FK
+// preferred, exact name as fallback) — was substring-matched on the words
+// "open hand", the same failure class #1339 fixed at the DERIVED_ACTIONS gate.
 function openHandMonkEntry(classEntries: RiderClassEntry[]): RiderClassEntry | undefined {
   const monk = classEntries.find((c) => c.name.toLowerCase() === "monk");
-  return monk && resolveSubclassSlug("monk", monk) === "monk-warrior-of-the-open-hand" ? monk : undefined;
+  const slug = monk && resolveSubclassSlug("monk", monk);
+  return slug && OPEN_HAND_SLUGS.includes(slug) ? monk : undefined;
 }
 
 // Open Hand Technique (Warrior of the Open Hand L3, #1245): the focus save DC

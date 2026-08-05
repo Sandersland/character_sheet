@@ -18,14 +18,16 @@
 // (Heightened Focus, #1244) from re-choosing a rider on every individual
 // strike within the same Flurry use.
 
+import type { RulesEdition } from "@character-sheet/shared-types";
 import type { ImposeOpenHandRiderOperation, OpenHandRider, OpenHandTechniqueOperation } from "@character-sheet/contracts";
 
 import { Prisma } from "@/generated/prisma/client.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { levelForExperience, proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
+import { editionOf } from "@/lib/rules/edition.js";
 import { runCharacterTransaction, type CharacterTxContext } from "@/lib/character/character-transaction.js";
 import { monkSaveDC } from "./monk.js";
-import { resolveSubclassSlug } from "./subclass-slug.js";
+import { resolveSubclassSlug, type SubclassSlug } from "./subclass-slug.js";
 
 export class InvalidOpenHandTechniqueOperationError extends Error {}
 
@@ -63,14 +65,31 @@ const RIDER_EFFECT: Record<OpenHandRider, string> = {
   topple: "knocked prone",
 };
 
-function openHandRiderSummary(
+// Addle's duration text (#1501): the only clause that forks. Verified
+// against each edition's own source directly, reconciling the pre-#1501
+// disagreement between this row's old wording and the module comment —
+// SRD 5.2 (dnd5eapi.co 2024 API text): "The target can't make Opportunity
+// Attacks until the start of its [the TARGET's] next turn." SRD 5.1
+// (dnd5eapi.co 2014 API text): "It can't take reactions until the end of
+// your [the MONK's] next turn." The two forks on both the reaction scope
+// (all reactions vs. Opportunity Attacks specifically) AND whose next turn
+// the clock runs to (the monk's vs. the target's) — 2014's window is
+// materially longer, not a wording variant of 2024's.
+function addleClause(edition: RulesEdition): string {
+  return edition === "EDITION_2014"
+    ? "the target can't take reactions until the end of your next turn"
+    : "the target can't make Opportunity Attacks until the start of its next turn";
+}
+
+export function openHandRiderSummary(
   rider: OpenHandRider,
   dc: number,
   roll: number | undefined,
   outcome: OpenHandRiderOutcome,
+  edition: RulesEdition,
 ): string {
   if (rider === "addle") {
-    return "Open Hand Technique — Addle (no save): the target can't take reactions until the start of your next turn.";
+    return `Open Hand Technique — Addle (no save): ${addleClause(edition)}.`;
   }
   const base = `Open Hand Technique — ${RIDER_LABEL[rider]} (${RIDER_SAVE[rider]} save), DC ${dc}, target rolled ${roll}`;
   return outcome === "applied"
@@ -81,6 +100,7 @@ function openHandRiderSummary(
 const OPEN_HAND_TECHNIQUE_SELECT = {
   experiencePoints: true,
   abilityScores: true,
+  rulesEdition: true,
   classEntries: {
     orderBy: { position: "asc" as const },
     select: { name: true, level: true, subclass: true, subclassRef: { select: { slug: true } } },
@@ -89,19 +109,26 @@ const OPEN_HAND_TECHNIQUE_SELECT = {
 
 type OpenHandTechniqueRow = Prisma.CharacterGetPayload<{ select: typeof OPEN_HAND_TECHNIQUE_SELECT }>;
 
-// Open Hand Technique is a subclass feature (Warrior of the Open Hand), unlike
-// Stunning Strike's base-class monkLevel() gate — so it checks the monk
-// entry's own subclass identity too, resolved via resolveSubclassSlug (#1277:
-// FK preferred, exact normalized name as fallback). Was substring-matched on
-// the words "open hand" — the same failure class #1339 fixed at the
-// DERIVED_ACTIONS gate.
+// Both editions' Open Hand subclasses grant this feature — "Warrior of the
+// Open Hand" (SRD 5.2, EDITION_2024) and "Way of the Open Hand" (SRD 5.1,
+// EDITION_2014, #1501) are SEPARATE subclasses (different names, different
+// slugs), not one subclass forked across editions, so a character can only
+// ever resolve to one of the two — matching against either slug is safe.
+const OPEN_HAND_SLUGS: readonly SubclassSlug[] = ["monk-warrior-of-the-open-hand", "monk-way-of-the-open-hand"];
+
+// Open Hand Technique is a subclass feature, unlike Stunning Strike's
+// base-class monkLevel() gate — so it checks the monk entry's own subclass
+// identity too, resolved via resolveSubclassSlug (#1277: FK preferred, exact
+// normalized name as fallback). Was substring-matched on the words "open
+// hand" — the same failure class #1339 fixed at the DERIVED_ACTIONS gate.
 function monkEntry(row: OpenHandTechniqueRow) {
   return row.classEntries.find((c) => c.name.toLowerCase() === "monk");
 }
 
-function isWarriorOfTheOpenHand(row: OpenHandTechniqueRow): boolean {
+function isOpenHandFamily(row: OpenHandTechniqueRow): boolean {
   const monk = monkEntry(row);
-  return !!monk && resolveSubclassSlug("monk", monk) === "monk-warrior-of-the-open-hand";
+  const slug = monk && resolveSubclassSlug("monk", monk);
+  return !!slug && OPEN_HAND_SLUGS.includes(slug);
 }
 
 async function imposeOpenHandRider(
@@ -110,25 +137,27 @@ async function imposeOpenHandRider(
   const { row, op, characterId, tx, batchId, sessionId } = ctx;
   const monk = monkEntry(row);
 
-  if (!monk || monk.level < 3 || !isWarriorOfTheOpenHand(row)) {
+  if (!monk || monk.level < 3 || !isOpenHandFamily(row)) {
     throw new InvalidOpenHandTechniqueOperationError(
-      "Only a Warrior of the Open Hand monk (level 3+) has Open Hand Technique",
+      "Only an Open Hand monk (level 3+) has Open Hand Technique",
     );
   }
   if (!canImposeOpenHandRider({ usedThisTurn: op.usedThisTurn })) {
     throw new InvalidOpenHandTechniqueOperationError("Open Hand Technique can only be imposed once per turn");
   }
 
+  // fallow-ignore-next-line code-duplication -- the level/profBonus/DC/edition read is intentionally repeated per Open Hand vertical (mirrors quivering-palm.ts's/stunning-strike.ts's own identical block) rather than a shared helper, matching every other monk save-DC vertical in this file family
   // Proficiency bonus is a character-total-level function (not monk-level),
   // matching every other DC formula in this codebase (deriveEntryScopedResources).
   const level = levelForExperience(row.experiencePoints);
   const profBonus = proficiencyBonusForLevel(level);
   const abilityScores = row.abilityScores as Record<string, number>;
   const dc = monkSaveDC(abilityScores, profBonus);
+  const edition = editionOf(row);
 
   const roll = op.rider === "addle" ? undefined : 1 + Math.floor(Math.random() * 20);
   const outcome = resolveOpenHandRiderOutcome(op.rider, roll ?? 0, dc);
-  const summary = openHandRiderSummary(op.rider, dc, roll, outcome);
+  const summary = openHandRiderSummary(op.rider, dc, roll, outcome, edition);
 
   await logEvent(tx, {
     characterId,

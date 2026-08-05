@@ -143,7 +143,13 @@ function isPopulatedBarbarianRow(row: { className: string; subclassSlug: string 
 // rows; their real ops live in warrior-of-elements.ts's own endpoint
 // (save-DC damage, not a buff), same as before this migration.
 function isPopulatedMonkRow(row: { className: string; subclassSlug: string | null; name: string }): boolean {
-  return row.className === "Monk" && row.subclassSlug === "monk-warrior-of-the-elements" && row.name === "Elemental Attunement";
+  if (row.className !== "Monk") return false;
+  if (row.subclassSlug === "monk-warrior-of-the-elements" && row.name === "Elemental Attunement") return true;
+  // #1501: Way of the Open Hand's Wholeness of Body — a row-owned FIXED
+  // resource pool (resourceKey/resourceRecharge/resourceTotals), not a
+  // toggle like Elemental Attunement above.
+  if (row.subclassSlug === "monk-way-of-the-open-hand" && row.name === "Wholeness of Body") return true;
+  return false;
 }
 
 // #1234: Arcane Recovery's resource pool (base Wizard, both editions — 2
@@ -551,12 +557,15 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
     // Veil, Moonlight Step), raising Warlock 8 -> 9, Ranger 1 -> 3, Druid
     // 1 -> 2: 34 + 1 + 2 + 1 = 38. #1676 (Bladesinger) adds ONE more —
     // Bladesong's own resourceTotals (EDITION_2014 only, no 2024 twin): 38 + 1
-    // = 39.
+    // = 39. #1501 (Way of the Open Hand) adds ONE more — Wholeness of Body's
+    // own resourceTotals (EDITION_2014 only, no 2024 twin, same one-row shape
+    // as Bladesong): 39 + 1 = 40.
     // 6 Fighter + 2 Combat Superiority + 2 Rage + 4 Wizard + 9 Warlock
     // + 3 Ranger + 6 Sorcerer + 2 Cleric + 2 Druid + 2 Paladin (#1229's own
     // Channel Divinity carrier rows, one per edition — see
-    // isPopulatedPaladinRow) + 1 Bladesong.
-    const populatedResourceTotalsCount = 39;
+    // isPopulatedPaladinRow) + 1 Bladesong + 1 Way of the Open Hand's
+    // Wholeness of Body.
+    const populatedResourceTotalsCount = 40;
     const populatedResourceDieTiersCount = 2;
     // DERIVED_STAT_ROW_KEYS x2 editions each, MINUS 1: Bladesinger's own
     // "Wizard::wizard-bladesinging::Extra Attack" key is EDITION_2014 only

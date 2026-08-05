@@ -211,11 +211,13 @@ export interface Character {
   /** Monk Stunning Strike focus save DC, absent below monk L5 (#1242). */
   stunningStrike?: SaveRider;
 
-  /** Warrior of the Open Hand Open Hand Technique focus save DC (Push/Topple),
-   *  absent below monk L3 off-subclass (#1245). Addle carries no save. */
+  /** Open Hand Technique's ki/focus save DC (Push/Topple) — Warrior of the
+   *  Open Hand (2024) or Way of the Open Hand (2014, #1501), absent below
+   *  monk L3 off-subclass (#1245). Addle carries no save. */
   openHandTechnique?: SaveRider;
-  /** Warrior of the Open Hand Quivering Palm — focus save DC + whether
-   *  vibrations are currently set, absent below monk L17 off-subclass (#1245). */
+  /** Quivering Palm — ki/focus save DC + whether vibrations are currently
+   *  set, absent below monk L17 off-subclass (#1245). Granted by either
+   *  edition's Open Hand subclass (#1501). */
   quiveringPalm?: SaveRider;
   /** Battle Master maneuver save DC (#1316) — folded into the rider contract,
    *  named for the feature like every other rider; absent for non-Battle-

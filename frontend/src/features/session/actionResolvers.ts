@@ -232,6 +232,33 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
   // Fleet Step (L11) is a pure reminder (cost:"free", no server effect), like
   // Reckless Attack/Metamagic — see the DERIVED_ACTIONS comment in actions.ts.
   fleetStep: { key: "fleetStep", kind: "simple-confirm", slot: "free", serverEffect: false },
+  // Way of the Open Hand's 2014 Wholeness of Body (#1501) — SRD 5.1's shape
+  // is a flat "3 x monk level" heal with NO die roll at all (unlike 2024's
+  // Martial Arts die + Wis mod above), so it needs its own key AND its own
+  // healRoll: `{ count: 0, ... }` rolls zero dice (rollSpec sums an empty
+  // array), leaving the modifier as the entire total — exactly 3 x monk
+  // level, deterministic. This is a DELIBERATE, narrow exception to this
+  // file's own "every surviving healRoll user scales off an ability
+  // modifier, never a level" doc comment above (which exists because the
+  // client can't generally see which class entry granted a feature for a
+  // multiclass character): Wholeness of Body is gated behind the Way of the
+  // Open Hand SUBCLASS, and 5e forbids taking one class twice, so there is
+  // always exactly one unambiguous "the monk entry" to read `.level` from —
+  // the same guarantee openHandMonkEntry relies on server-side.
+  wholenessOfBodyAction: {
+    key: "wholenessOfBodyAction",
+    kind: "heal-roll",
+    slot: "action",
+    serverEffect: true,
+    resourceKey: "wholenessOfBody",
+    healRoll: (c) => {
+      const monkLevel = c.classes?.find((cls) => cls.name.toLowerCase() === "monk")?.level ?? 0;
+      return { count: 0, faces: 1, modifier: 3 * monkLevel };
+    },
+  },
+  // Tranquility (L11, #1501) — gained passively at the end of a long rest;
+  // no die roll, no resource spend, just the reminder text.
+  tranquility: { key: "tranquility", kind: "simple-confirm", slot: "free", serverEffect: false },
   // Warrior of Mercy (#1248): Hand of Harm / Hand of Ultimate Mercy have no
   // resolver here — they're their own dedicated verticals (mirrors Stunning
   // Strike / Quivering Palm's bypass above). Hand of Healing reuses Wholeness

@@ -25,6 +25,7 @@ const CHAR_IDS = [
   "riders-open-handbook-l17",
   "riders-no-classes",
   "riders-rogue3-monk5",
+  "riders-way-open-hand-l17",
 ];
 
 async function serialize(characterId: string) {
@@ -293,6 +294,30 @@ describe("serializeCharacter rider contract (#1316)", () => {
     expect(payload).not.toHaveProperty("openHandTechnique");
     expect(payload).not.toHaveProperty("quiveringPalm");
     expect(payload).not.toHaveProperty("maneuvers");
+  });
+
+  // #1501: Way of the Open Hand (2014) is a SEPARATE subclass from Warrior of
+  // the Open Hand (2024), not a fork sharing the same slug — openHandMonkEntry
+  // must recognize both slugs, since both grant the same two riders.
+  it("a 2014 Way of the Open Hand monk carries both Open Hand riders, same as its 2024 counterpart", async () => {
+    await prisma.character.create({
+      data: {
+        ...BASE,
+        id: "riders-way-open-hand-l17",
+        name: "Way of the Open Hand L17 Snapshot",
+        rulesEdition: "EDITION_2014",
+        experiencePoints: 225000, // level 17, proficiency +6
+        hitDice: { total: 17, die: "d8", spent: 17 },
+        abilityScores: { strength: 10, dexterity: 16, constitution: 12, intelligence: 10, wisdom: 16, charisma: 10 },
+        classEntries: { create: [{ name: "monk", position: 0, level: 17, subclass: "Way of the Open Hand" }] },
+      },
+    });
+    const payload = await serialize("riders-way-open-hand-l17");
+
+    // Wis 16 (+3), prof +6 → DC 17 — the ki/focus save DC formula is
+    // edition-invariant (monkSaveDC).
+    expect(payload.openHandTechnique).toEqual({ saveDC: 17 });
+    expect(payload.quiveringPalm).toEqual({ saveDC: 17, active: false });
   });
 
   it("a Rogue 3 / Monk 5 multiclass carries both riders, each gated on its own entry's level", async () => {
