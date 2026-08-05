@@ -1,5 +1,6 @@
-// ── Feat catalog (2024 rules) ──────────────────────────────────────────────────
-// SRD 5.2.1 pp. 87-88 for the 16 SRD feats; PHB'24 for the re-authored rest.
+// ── Feat catalog (2024 + 2014 rules) ────────────────────────────────────────────
+// SRD 5.2.1 pp. 87-88 for the 16 SRD feats; PHB'24 for the re-authored rest;
+// PHB'14 pp. 72/82/91 (= SRD 5.1) for the six 2014 Fighting Style feats (#1311).
 // abilityOptions/abilityIncrease drive the half-feat bump; category/levelPrerequisite
 // gate which slot may take a feat (see featOfferedForAsiSlot). Ability Score
 // Improvement is NOT seeded — it stays the takeAsi advancement branch.
@@ -185,7 +186,7 @@ export const FEATS: FeatSeed[] = [
   {
     name: "Great Weapon Fighting",
     description:
-      "When you roll a 1 or 2 on a damage die for an attack you make with a melee weapon that you are wielding with two hands, you can reroll the die and must use the new roll.",
+      "When you roll a 1 or 2 on a damage die for an attack you make with a melee weapon that you are wielding with two hands, you can reroll the die and must use the new roll, even if the new roll is a 1 or a 2. The weapon must have the two-handed or versatile property for you to gain this benefit.",
     category: "fighting_style",
     prerequisite: "Fighting Style feature",
     edition: "EDITION_2014",

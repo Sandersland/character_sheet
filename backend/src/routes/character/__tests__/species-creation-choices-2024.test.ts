@@ -53,6 +53,7 @@ async function elf2024() {
   return { elf, woodElf };
 }
 async function featByName(name: string) {
+  // safe while these feats have no edition fork — pin edition if a 2014 sibling appears
   return prisma.feat.findFirstOrThrow({ where: { name } });
 }
 
