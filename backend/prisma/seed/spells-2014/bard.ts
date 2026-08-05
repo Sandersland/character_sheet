@@ -13,6 +13,12 @@
 //   - 87 sit on 3+ class lists -> already authored in shared.ts (#1713),
 //     which already fans "bard" membership onto every one of them (verified:
 //     87 "bard" tags in shared.ts == 87 3+-list PHB'14 Bard spells, zero gaps).
+//     #1719 (Warlock)'s own manual sweep for spells absent from dnd5eapi
+//     later found 3 MORE genuine PHB'14 Bard spells missing entirely (Cloud
+//     of Daggers, Crown of Madness, Friends — all Bard/Sorcerer/Warlock/
+//     Wizard 4-list) and added them to shared.ts, bumping Bard's real total
+//     from 111 to 114; see spells-2014-bard-data.test.ts for the updated
+//     count guard.
 //   - 13 are Wizard-owned 2-list spells Bard also gets (Hideous Laughter,
 //     Identify, Magic Mouth, Leomund's Tiny Hut, Otto's Irresistible Dance,
 //     Programmed Illusion, Mordenkainen's Magnificent Mansion, Mordenkainen's
