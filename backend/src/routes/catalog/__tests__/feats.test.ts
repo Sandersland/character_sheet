@@ -3,9 +3,10 @@
  * `?edition=` is mandatory: an absent one and an unrecognized one both 400,
  * and both assert their message — two 400s are not distinguishable by status
  * alone, and the whole point of the required param is that a caller learns
- * which mistake it made. The 2014/2024/Grappler cases are unchanged from
- * #1306 on purpose: they are the proof that making the param required left
- * resolveEditionCatalog's exact-then-shared resolution undisturbed.
+ * which mistake it made. The Alert case is unchanged from #1306 on purpose —
+ * proof that making the param required left resolveEditionCatalog's
+ * exact-then-shared resolution undisturbed. Grappler's case inverts under
+ * #1310: it now forks like Alert instead of staying one shared row.
  */
 import { beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
@@ -45,13 +46,20 @@ describe("GET /api/feats — edition resolution (#1306)", () => {
     expect(alerts[0].improvements).toEqual([{ target: "initiative", amount: 1, scaling: "proficiencyBonus" }]);
   });
 
-  it("either edition resolves Grappler to the same single shared row", async () => {
+  // #1310 inverts this: Grappler now forks (SRD 5.2 half-feat vs SRD 5.1 flat
+  // Strength 13+ prerequisite) — every Feat row is edition-tagged, so no name
+  // resolves to the same row across editions any more.
+  it("each edition resolves Grappler to its OWN row, not a shared one", async () => {
     const res2014 = await supertest(app).get("/api/feats?edition=EDITION_2014").set("Cookie", COOKIE);
     const res2024 = await supertest(app).get("/api/feats?edition=EDITION_2024").set("Cookie", COOKIE);
 
     const grappler2014 = res2014.body.find((f: { name: string }) => f.name === "Grappler");
     const grappler2024 = res2024.body.find((f: { name: string }) => f.name === "Grappler");
-    expect(grappler2014.id).toBe(grappler2024.id);
+    expect(grappler2014.id).not.toBe(grappler2024.id);
+    // abilityIncrease defaults to 0 at the DB layer (seed.ts's orElse), not
+    // NULL — 0 is the "no half-feat bump" wire value, unlike levelPrerequisite.
+    expect(grappler2014.abilityIncrease).toBe(0);
+    expect(grappler2024.abilityIncrease).toBe(1);
   });
 
   it("an unrecognized ?edition= value 400s with a message distinct from the missing-param one", async () => {
@@ -63,11 +71,17 @@ describe("GET /api/feats — edition resolution (#1306)", () => {
 
 /**
  * Every case here runs against the REAL SEEDED catalog (backend/prisma/seed/feats.ts)
- * — no fixture rows, which is why it can assert absolute category counts. The
- * `?? 4` / `?? 19` category defaults are unreachable from the seed (all 19 general
- * rows carry an explicit levelPrerequisite 4 and all 7 epic_boon rows an explicit
- * 19), so those branches are covered by the fixture rows in
- * feats-asi-level-defaults.test.ts instead.
+ * — no fixture rows, which is why it can assert absolute category counts. Scoped
+ * to `edition=EDITION_2024` throughout: all 19 2024 general rows carry an explicit
+ * levelPrerequisite 4 and all 7 epic_boon rows an explicit 19, so the `?? 4` /
+ * `?? 19` category defaults are unreachable from THIS edition's real catalog —
+ * covered by the fixture rows in feats-asi-level-defaults.test.ts instead.
+ *
+ * `?? 4` IS reachable from the real catalog since #1310: every one of the 26
+ * EDITION_2014 general rows has a NULL levelPrerequisite (PHB'14 has no
+ * per-feat level gate). See "GET /api/feats?asiLevel= — 2014 general/origin
+ * feats" below for that proof; `?? 19` stays fixture-only (2014 has no
+ * epic_boon feats at all).
  */
 describe("GET /api/feats?asiLevel= — server-side ASI eligibility (#1438)", () => {
   async function get(query: string): Promise<{ name: string; category: string }[]> {
@@ -178,5 +192,50 @@ describe("GET /api/feats — 2014 Fighting Style feats resolve distinctly from 2
     const gwf2024 = (await get("EDITION_2024")).find((r) => r.name === "Great Weapon Fighting")!;
     expect(gwf2014.description).toMatch(/reroll the die/i);
     expect(gwf2024.description).toMatch(/treat any 1 or 2.*as a 3/i);
+  });
+});
+
+/**
+ * PHB'14 pp. 165-170 (#1310): the 26-name general/origin restore. Runs against
+ * the REAL SEEDED catalog, same pattern as the two suites above — proves
+ * featOfferedForAsiSlot's `general` branch reads a NULL levelPrerequisite as
+ * "offered from level 4" for real 2014 rows, not just fixture ones
+ * (feats-asi-level-defaults.test.ts already covers the fixture side).
+ */
+describe("GET /api/feats?asiLevel= — 2014 general/origin feats (#1310)", () => {
+  async function get(query: string): Promise<{ name: string; category: string }[]> {
+    const res = await supertest(app).get(`/api/feats?${query}`).set("Cookie", COOKIE);
+    expect(res.status).toBe(200);
+    return res.body;
+  }
+
+  it("edition=EDITION_2014 returns exactly 32 rows (26 general/origin + 6 fighting_style), no duplicate name", async () => {
+    const rows = await get("edition=EDITION_2014");
+    expect(rows).toHaveLength(32);
+    const names = rows.map((f) => f.name);
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it("edition=EDITION_2024 returns exactly 37 rows, no duplicate name", async () => {
+    const rows = await get("edition=EDITION_2024");
+    expect(rows).toHaveLength(37);
+    const names = rows.map((f) => f.name);
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it("edition=EDITION_2014 serves zero origin/epic_boon rows — every non-fighting_style row is general", async () => {
+    const rows = await get("edition=EDITION_2014");
+    expect(rows.filter((f) => f.category === "origin")).toHaveLength(0);
+    expect(rows.filter((f) => f.category === "epic_boon")).toHaveLength(0);
+  });
+
+  it("gates the 2014 general feats on the `?? 4` category default — the AC that no fixture-only test can give", async () => {
+    const atThree = await get("edition=EDITION_2014&asiLevel=3");
+    const atFour = await get("edition=EDITION_2014&asiLevel=4");
+    // All 26 rows share a NULL levelPrerequisite (no PHB'14 feat has a level
+    // gate), so all 26 flip from excluded to offered at the SAME asiLevel —
+    // the `?? 4` default applying uniformly, not per-row overrides.
+    expect(atThree).toHaveLength(0);
+    expect(atFour).toHaveLength(26);
   });
 });

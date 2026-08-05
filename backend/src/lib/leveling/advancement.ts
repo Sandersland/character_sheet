@@ -379,9 +379,10 @@ async function resolveCatalogFeat(
         `takeFeat: "${catalogFeat.name}" (${category}) is not a Fighting Style feat`,
       );
     }
-  } else if (!featOfferedForAsiSlot({ category, levelPrerequisite: catalogFeat.levelPrerequisite }, level, edition)) {
-    // PHB'24: only General/Epic Boon feats the character's level satisfies may be
-    // taken via an ASI slot — Origin (backgrounds) and Fighting Style (class) can't.
+  } else if (!featOfferedForAsiSlot({ category, levelPrerequisite: catalogFeat.levelPrerequisite }, level)) {
+    // Edition-invariant (#1310): only General/Epic Boon feats the character's
+    // level satisfies may be taken via an ASI slot — Origin (backgrounds) and
+    // Fighting Style (class) can't, in either edition.
     throw new InvalidAdvancementOperationError(
       `takeFeat: "${catalogFeat.name}" (${category}) is not available at level ${level}`,
     );

@@ -53,8 +53,10 @@ async function elf2024() {
   return { elf, woodElf };
 }
 async function featByName(name: string) {
-  // safe while these feats have no edition fork — pin edition if a 2014 sibling appears
-  return prisma.feat.findFirstOrThrow({ where: { name } });
+  // This whole file exercises 2024 characters only — pinned to EDITION_2024
+  // since #1310 gave every General/Origin feat a 2014 sibling (a bare-name
+  // lookup would resolve non-deterministically between the two rows).
+  return prisma.feat.findFirstOrThrow({ where: { name, edition: "EDITION_2024" } });
 }
 
 // Soldier's own Origin feat is Savage Attacker (catalog-data.ts) — a DIFFERENT

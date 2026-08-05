@@ -6,6 +6,12 @@
 // granted-ability-fork-reseed.test.ts's retag scenario (#1229), applied to
 // Feat/staleCatalogRowsWhere instead of GrantedAbility.
 //
+// The mechanism doesn't branch on `category` — #1310 retags 32 previously-
+// shared General/Origin rows the same way (verified live: `prisma db seed`
+// run twice against the real catalog leaves 32 EDITION_2014 / 37 EDITION_2024
+// / 0 NULL rows both times), so this fixture (built on `fighting_style`) is
+// not duplicated per category.
+//
 // Fixture rule: every row uses a Zzz-prefixed name unique to this file so
 // staleCatalogRowsWhere's "everything NOT in the seeded list" scope never
 // touches the real seeded catalog.
