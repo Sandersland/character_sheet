@@ -181,4 +181,25 @@ describe("SHARED_SPELLS_2014 — value spot-checks", () => {
     );
     expect(bad).toEqual([]);
   });
+
+  // #1740 review caught two more scraping artifacts live: Shatter's
+  // higher_level text arrived from dnd5eapi as "...for each level of higher
+  // spell slot 2." (a broken ordinal — should read "above 2nd"), and Wall of
+  // Fire's desc paragraphs concatenated a sentence dnd5eapi repeats verbatim
+  // ("The other side of the wall deals no damage." twice). Both classes of
+  // artifact are checked over EVERY row, not spot-checked, so a by-class
+  // slice (#1714-#1721) reusing this same dnd5eapi pipeline inherits the
+  // guard rather than re-discovering these two the hard way.
+  it("no description ends a sentence on a bare 'level N.'/'slot N.' (a broken-ordinal artifact, e.g. Shatter's 'higher spell slot 2.')", () => {
+    const bad = SHARED_SPELLS_2014.filter((s) => /\b(?:level|slot)s?\s+\d+\.(?:\s|$)/i.test(s.description)).map((s) => s.name);
+    expect(bad).toEqual([]);
+  });
+
+  it("no description repeats the exact same sentence back to back (Wall of Fire's doubled 'no damage' sentence)", () => {
+    const bad = SHARED_SPELLS_2014.filter((s) => {
+      const sentences = s.description.split(/(?<=[.!?])\s+/).map((sentence) => sentence.trim()).filter(Boolean);
+      return sentences.some((sentence, i) => i > 0 && sentence === sentences[i - 1]);
+    }).map((s) => s.name);
+    expect(bad).toEqual([]);
+  });
 });

@@ -485,7 +485,14 @@ describe("POST …/level-up/transactions — Bard Magical Secrets eligibility ga
     // #1509: SRD 5.1's Bard 9→10 Spells Known delta is 12→14 = 2 (not 2024's
     // 9→10 = 1) — a second pick is now REQUIRED for this level-up to validate,
     // proof the edition-correct count reaches this Magical Secrets gate too.
-    const [second] = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "bard" } }, level: { gt: 0 }, edition: "EDITION_2014", name: { not: "Ensnaring Strike" } }, take: 1, select: { id: true } });
+    // #1713 review: `level: { gt: 0 }` alone is not enough now that the 2014
+    // shared/3+-list bucket gave Bard real level 6-9 spells (Etherealness,
+    // ...) — an un-ordered `take: 1` could land on one of those and blow the
+    // level-9 caster's highest-learnable-level ceiling (5), 400ing on
+    // "exceeds the highest spell level you can learn" instead of exercising
+    // Magical Secrets. `lte: 5` + `orderBy` keeps the pick both legal and
+    // deterministic.
+    const [second] = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "bard" } }, level: { gt: 0, lte: 5 }, edition: "EDITION_2014", name: { not: "Ensnaring Strike" } }, orderBy: { level: "asc" }, take: 1, select: { id: true } });
     const cantrip = await prisma.spell.findFirstOrThrow({ where: { classMemberships: { some: { className: "bard" } }, level: 0, edition: "EDITION_2014" }, select: { id: true } });
 
     const res = await post(CHAR_ID, {
@@ -522,7 +529,10 @@ describe("POST …/level-up/transactions — Bard Magical Secrets eligibility ga
     const fireBolt = await prisma.spell.findFirstOrThrow({ where: { name: "Fire Bolt" }, select: { id: true } });
     const ensnaringStrike = await prisma.spell.findFirstOrThrow({ where: { name: "Ensnaring Strike" }, select: { id: true } });
     // #1509: SRD 5.1's Bard 9→10 Spells Known delta is 2, not 2024's 1 — see the sibling test above.
-    const [second] = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "bard" } }, level: { gt: 0 }, edition: "EDITION_2014", name: { not: "Ensnaring Strike" } }, take: 1, select: { id: true } });
+    // `lte: 5` + `orderBy`: same reasoning as the sibling test above — a bare
+    // `level: { gt: 0 }` can land on one of the 2014 shared bucket's level
+    // 6-9 Bard spells and blow this level-9 caster's learnable-level ceiling.
+    const [second] = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "bard" } }, level: { gt: 0, lte: 5 }, edition: "EDITION_2014", name: { not: "Ensnaring Strike" } }, orderBy: { level: "asc" }, take: 1, select: { id: true } });
 
     const res = await post(CHAR_ID, {
       target: { kind: "existing", classEntryId: entryId },

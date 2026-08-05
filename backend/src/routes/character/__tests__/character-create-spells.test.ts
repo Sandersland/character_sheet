@@ -135,8 +135,15 @@ describe("POST /api/characters — creation spell/cantrip picks (#1131)", () => 
 
   it("rejects a leveled spell placed in cantripIds", async () => {
     const picks = await warlockPicks();
-    // A third, distinct leveled warlock spell so the level check (not the dup check) fires.
-    const [, , extra] = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "warlock" } }, level: 1, edition: "EDITION_2024" }, take: 3, select: { id: true } });
+    // A third, distinct leveled warlock spell so the level check (not the dup
+    // check) fires. `picks.spellIds` now comes from the real /api/spells
+    // route (level asc, then name asc — see catalogSpellIds), a DIFFERENT
+    // order than this raw Prisma query's own (unordered) row scan — with the
+    // 2014 shared bucket enlarging the underlying candidate pool, the two
+    // orderings are no longer guaranteed to agree on "first N", so `extra`
+    // must explicitly exclude `picks.spellIds` rather than relying on a
+    // `take: 3` position never colliding with a `take: 2` from elsewhere.
+    const [extra] = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "warlock" } }, level: 1, edition: "EDITION_2024", id: { notIn: picks.spellIds } }, take: 1, select: { id: true } });
     const res = await create({
       ...BASE,
       name: "CreateSpells LeveledCantrip",
