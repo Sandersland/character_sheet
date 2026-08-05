@@ -453,7 +453,11 @@ describe("POST …/level-up/transactions — Bard Magical Secrets eligibility ga
   it("a Bard reaching 10 may NOT take ranger-only Ensnaring Strike (400)", async () => {
     const CHAR_ID = "lvtx-bard-10-ensnaring";
     const entryId = await makeBard(CHAR_ID, { hitDiceTotal: 9, xp: 64000 });
-    const ensnaringStrike = await prisma.spell.findFirstOrThrow({ where: { name: "Ensnaring Strike" }, select: { id: true } });
+    // #1721 authored a real 2014 "Ensnaring Strike" row (previously only the
+    // 2024 catalog had one) — pin edition so this 2024 Bard's pick can't
+    // land on the 2014 sibling (which would 400 on the wrong-edition guard
+    // instead of exercising the 4-list Magical Secrets rejection below).
+    const ensnaringStrike = await prisma.spell.findFirstOrThrow({ where: { name: "Ensnaring Strike", edition: "EDITION_2024" }, select: { id: true } });
     const cantrip = await prisma.spell.findFirstOrThrow({ where: { classMemberships: { some: { className: "bard" } }, level: 0, edition: "EDITION_2024" }, select: { id: true } });
 
     const res = await post(CHAR_ID, {
@@ -492,7 +496,11 @@ describe("POST …/level-up/transactions — Bard Magical Secrets eligibility ga
   it("a 2014 Bard reaching 10 may take ranger-only Ensnaring Strike (unrestricted, PHB'14)", async () => {
     const CHAR_ID = "lvtx-bard-10-2014";
     const entryId = await makeBard(CHAR_ID, { hitDiceTotal: 9, xp: 64000, edition: "EDITION_2014" });
-    const ensnaringStrike = await prisma.spell.findFirstOrThrow({ where: { name: "Ensnaring Strike" }, select: { id: true } });
+    // #1721 authored this row for real (previously only the 2024 catalog had
+    // one) — pin edition so this 2014 Bard's pick can't land on the 2024
+    // sibling (wrong-edition guard) instead of exercising the PHB'14
+    // unrestricted-Magical-Secrets path this test is named for.
+    const ensnaringStrike = await prisma.spell.findFirstOrThrow({ where: { name: "Ensnaring Strike", edition: "EDITION_2014" }, select: { id: true } });
     // #1509: SRD 5.1's Bard 9→10 Spells Known delta is 12→14 = 2 (not 2024's
     // 9→10 = 1) — a second pick is now REQUIRED for this level-up to validate,
     // proof the edition-correct count reaches this Magical Secrets gate too.
