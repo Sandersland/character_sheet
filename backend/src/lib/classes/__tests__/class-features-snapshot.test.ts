@@ -70,6 +70,32 @@ describe("deriveResources snapshot — pins output for every class/subclass acro
   });
 });
 
+// #1506: the generic loop above always calls deriveResources with
+// "EDITION_2024" — CLASS_SUBCLASSES.monk lists both editions' subclass names
+// (2014's "way of …" trio alongside 2024's "warrior of …" ones, #1500-#1503),
+// but no combination there is ever exercised under EDITION_2014 itself, so the
+// base Ki-pool shape (monkPoolKey, monk.ts) and each 2014 subclass's own pool
+// never got a pinned snapshot of their own. Additive only — the 2024 monk
+// snapshots above are untouched (#1506's own AC: no churn on 2024 fixtures).
+describe("deriveResources snapshot — 2014 Monk (#1506), same pipeline under EDITION_2014", () => {
+  const monk2014Subclasses = [undefined, "way of the open hand", "way of shadow", "way of the four elements"];
+
+  for (const subclass of monk2014Subclasses) {
+    it(`monk / ${subclass ?? "(no subclass)"}`, () => {
+      const featureRows = testFeatureRowsFor("monk", subclass);
+      const byLevel = Array.from({ length: 20 }, (_, i) => {
+        const level = i + 1;
+        const profBonus = proficiencyBonusForLevel(level);
+        return {
+          level,
+          info: withoutFeatures(deriveResources("monk", subclass, level, ABILITY_SCORES, profBonus, featureRows, "EDITION_2014")),
+        };
+      });
+      expect(byLevel).toMatchSnapshot();
+    });
+  }
+});
+
 describe("resolveClassDie snapshot — every class-die pool across all classes/subclasses", () => {
   for (const [className, subclasses] of Object.entries(CLASS_SUBCLASSES)) {
     for (const subclass of subclasses) {

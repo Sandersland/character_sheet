@@ -1,7 +1,14 @@
 // Unit tests for the pure class-choice picker extracted from seed-verify.ts main().
 import { describe, it, expect } from "vitest";
 
-import { pickClassChoice, planInventory, type CatalogRow, type RefClass } from "../seed-verify-helpers.js";
+import {
+  assertCatalogPopulated,
+  pickClassChoice,
+  planInventory,
+  type CatalogRow,
+  type ReferenceCatalog,
+  type RefClass,
+} from "../seed-verify-helpers.js";
 
 describe("pickClassChoice", () => {
   it("prefers a class that does not pick its subclass at level 1", () => {
@@ -69,5 +76,40 @@ describe("planInventory", () => {
     const { acquireOps, trinketIds } = planInventory([]);
     expect(acquireOps).toEqual([]);
     expect(trinketIds.size).toBe(0);
+  });
+});
+
+describe("assertCatalogPopulated", () => {
+  const full: ReferenceCatalog = {
+    species: [{}],
+    classes: [{}],
+    backgrounds: [{}],
+    conditions: [{}],
+    universalActions: [{}],
+  };
+
+  it("returns null when every list is populated", () => {
+    expect(assertCatalogPopulated(full)).toBeNull();
+  });
+
+  // #1506: a half-shipped edition can leave the two EDITION-FORKED lists
+  // (universalActions, conditions) empty while species/classes/backgrounds
+  // still resolve fine off the shared/NULL rows — exactly the failure this
+  // function exists to catch. This proves it does, without a running backend.
+  it("fails loudly when universalActions is empty for the requested edition", () => {
+    const message = assertCatalogPopulated({ ...full, universalActions: [] });
+    expect(message).toMatch(/universalActions/);
+  });
+
+  it("fails loudly when conditions is empty for the requested edition", () => {
+    const message = assertCatalogPopulated({ ...full, conditions: [] });
+    expect(message).toMatch(/conditions/);
+  });
+
+  it("names every empty list at once", () => {
+    const message = assertCatalogPopulated({ ...full, species: [], classes: [] });
+    expect(message).toMatch(/species/);
+    expect(message).toMatch(/classes/);
+    expect(message).not.toMatch(/backgrounds/);
   });
 });
