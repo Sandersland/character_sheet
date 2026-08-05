@@ -37,6 +37,21 @@ export interface AvailableAction {
    */
   regrants?: string[];
   /**
+   * A resolved numeric fact about this action, rendered verbatim (#1505) —
+   * today only Flurry of Blows' strike count (2, or 3 at Heightened Focus,
+   * monk L10 in SRD 5.2; flat 2 in SRD 5.1). Never re-derive this from a
+   * level threshold client-side — see `flurryStrikeCount` (attackMath.ts).
+   */
+  count?: number;
+  /**
+   * Deflect Attacks' resolved damage-type clause (#1505): "bludgeoning,
+   * piercing, or slashing damage" below monk L13, "any damage type" at L13+
+   * (Deflect Energy). Only the `deflectAttacks` row ever carries this — see
+   * `deflectAttacksDamageTypeClause` (lib/deflectAttacks.ts), which is the
+   * only reader.
+   */
+  damageTypeClause?: string;
+  /**
    * Which inline resolution tool to render for this action (#1528) — served
    * only for a row-driven action (backend's actionsFromRows); a class still
    * on the DERIVED_ACTIONS/ACTION_RESOLVERS path leaves this undefined, and

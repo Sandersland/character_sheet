@@ -21,6 +21,7 @@ import { campaignsRouter } from "@/routes/campaign/campaigns.js";
 import { classRouter } from "@/routes/character/class.js";
 import { charactersRouter } from "@/routes/character/characters.js";
 import { conditionsRouter } from "@/routes/character/conditions.js";
+import { disciplinesRouter } from "@/routes/character/disciplines.js";
 import { editionsRouter } from "@/routes/catalog/editions.js";
 import { entitiesRouter } from "@/routes/campaign/entities.js";
 import { sessionsRouter } from "@/routes/session/sessions.js";
@@ -152,6 +153,7 @@ const ROUTER_ENTRIES: RouterEntry[] = [
   { name: "activityRouter", router: activityRouter, probe: { method: "get", path: `/api/characters/${FAKE_ID}/activity` } },
   { name: "maneuversRouter", router: maneuversRouter, probe: { method: "get", path: "/api/maneuvers" } },
   { name: "shadowArtsRouter", router: shadowArtsRouter, probe: { method: "get", path: "/api/shadow-arts" } },
+  { name: "disciplinesRouter", router: disciplinesRouter, probe: { method: "get", path: "/api/disciplines" } },
   {
     name: "subclassChoicesRouter",
     router: subclassChoicesRouter,

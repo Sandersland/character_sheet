@@ -82,10 +82,13 @@ function ManeuverReactionCard({
  */
 function DeflectRedirectButton({
   available,
+  label,
   busy,
   onRedirect,
 }: {
   available: boolean;
+  /** "Redirect · spend 1 Focus" (2024) / "Throw back · spend 1 ki" (2014) — see useDeflectAttacksReaction. */
+  label: string;
   busy: boolean;
   onRedirect: () => void;
 }) {
@@ -97,7 +100,7 @@ function DeflectRedirectButton({
       onClick={onRedirect}
       className="mt-2 w-full rounded-control border border-gold-300 bg-gold-100 px-3 py-1.5 text-xs font-semibold text-gold-800 transition-colors hover:bg-gold-200 disabled:cursor-not-allowed disabled:opacity-40"
     >
-      Redirect · spend 1 Focus
+      {label}
     </button>
   );
 }
@@ -113,6 +116,7 @@ function ReactionSlotResult({
   error,
   reactionMessage,
   deflectRedirectAvailable,
+  redirectLabel,
   busy,
   onDeflectRedirect,
 }: {
@@ -120,6 +124,7 @@ function ReactionSlotResult({
   error: string | null;
   reactionMessage: string | null;
   deflectRedirectAvailable: boolean;
+  redirectLabel: string;
   busy: boolean;
   onDeflectRedirect: () => void;
 }) {
@@ -129,7 +134,7 @@ function ReactionSlotResult({
   return (
     <>
       <ReactionResult message={reactionMessage} />
-      <DeflectRedirectButton available={deflectRedirectAvailable} busy={busy} onRedirect={onDeflectRedirect} />
+      <DeflectRedirectButton available={deflectRedirectAvailable} label={redirectLabel} busy={busy} onRedirect={onDeflectRedirect} />
     </>
   );
 }
@@ -225,6 +230,7 @@ function ReactionSheetBody({
  * The Reaction economy slot — shared between idle and active render branches
  * so both always show the same state and the same result strip.
  */
+// fallow-ignore-next-line complexity -- threading `redirectLabel` (#1505: the edition-resolved "Redirect · spend 1 Focus" / "Throw back · spend 1 ki" button text, replacing a hardcoded 2024 string) is one more pass-through prop on an already-flat JSX-composition component, not new branchy logic — every existing prop here is likewise a plain pass-through to ReactionSlotResult/ReactionSheetBody.
 export default function ReactionSlot({
   reactionUsed,
   showReactionMenu,
@@ -242,6 +248,7 @@ export default function ReactionSlot({
   handleReactionManeuver,
   consumeReaction,
   deflectRedirectAvailable,
+  redirectLabel,
   handleDeflectAttacksRedirect,
 }: {
   reactionUsed: boolean;
@@ -260,8 +267,10 @@ export default function ReactionSlot({
   handleReactionManeuver: (entryId: string, name: string) => Promise<void>;
   /** "Other reaction" catch-all — consume the slot without a specific action. */
   consumeReaction: () => void;
-  /** Deflect Attacks (#1241): true once the base roll fired and 1+ Focus remains. */
+  /** Deflect Attacks/Deflect Missiles (#1241/#1505): true once the base roll fired and the redirect's resource remains. */
   deflectRedirectAvailable: boolean;
+  /** See useDeflectAttacksReaction's own doc — edition-resolved, never hardcoded here. */
+  redirectLabel: string;
   handleDeflectAttacksRedirect: () => Promise<void>;
 }) {
   const { universalReactions, preview } = deriveReactionOptions(
@@ -286,6 +295,7 @@ export default function ReactionSlot({
           error={error}
           reactionMessage={reactionMessage}
           deflectRedirectAvailable={deflectRedirectAvailable}
+          redirectLabel={redirectLabel}
           busy={busy}
           onDeflectRedirect={() => void handleDeflectAttacksRedirect()}
         />

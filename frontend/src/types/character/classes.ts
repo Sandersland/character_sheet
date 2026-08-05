@@ -49,6 +49,7 @@ export type {
   CastChannelDivinityOperation,
   CastShadowArtOperation,
   ChannelDivinityOperation,
+  DisciplineOperation,
   ImposeOpenHandRiderOperation,
   ManeuverOperation,
   OpenHandRider,
@@ -71,6 +72,37 @@ export interface CatalogShadowArt {
   minLevel: number;
   cost: AbilityCost;
   effect: EffectSpec;
+}
+
+/**
+ * One selectable ki amount for a Way of the Four Elements discipline's cast
+ * picker, and the roll it resolves to (#1505) — mirrors SpellEntry's
+ * `effectRolls[]` (spellcasting.ts): the client picks a `ki` and reads the
+ * matching `roll` verbatim off `CatalogDiscipline.steps`, it never computes
+ * the ki-scaled dice count itself.
+ */
+export interface DisciplineCastStep {
+  ki: number;
+  roll: { count: number; faces: number; modifier: number };
+}
+
+/**
+ * A Way of the Four Elements discipline (2014-only, #1503/#1505) from GET
+ * /api/disciplines. `steps` is empty for a no-dice utility discipline (Shape
+ * the Flowing River) and for `cost.kind !== "pool"`; the per-cast ki CAP by
+ * monk level (`maxKiPerDiscipline`, backend) is enforced server-side at cast
+ * time, never client-side — `steps` may offer more ki than a given monk can
+ * currently afford, which the server refuses rather than the client
+ * silently clamping (#1505's explicit AC).
+ */
+export interface CatalogDiscipline {
+  id: string;
+  name: string;
+  description: string;
+  minLevel: number;
+  cost: AbilityCost;
+  effect: EffectSpec;
+  steps: DisciplineCastStep[];
 }
 
 /** How a Channel Divinity option expresses through the declarative core (#419). */

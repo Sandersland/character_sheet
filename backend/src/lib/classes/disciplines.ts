@@ -24,13 +24,13 @@ import { Prisma } from "@/generated/prisma/client.js";
 import type { CastDisciplineOperation } from "@character-sheet/contracts";
 
 import { castAbilityInTx } from "@/lib/spellcasting/ability-cast.js";
-import { readAbilityCost, type PayCostContext } from "@/lib/spellcasting/ability-cost.js";
+import { readAbilityCost, type AbilityCost, type PayCostContext } from "@/lib/spellcasting/ability-cost.js";
 import { runCharacterTransaction, type CharacterTxContext } from "@/lib/character/character-transaction.js";
 import { levelForExperience } from "@/lib/leveling/experience.js";
 import { effectiveEntryLevel } from "@/lib/leveling/effective-levels.js";
 import { editionOf } from "@/lib/rules/edition.js";
 import { deriveEntryScopedActions } from "./actions.js";
-import { catalogEffectSpec, type EffectSpec } from "@/lib/combat/effects.js";
+import { catalogEffectSpec, resolveEffectSpec, type EffectSpec } from "@/lib/combat/effects.js";
 import { normalizeResourcesMutable, type ChoiceEntry } from "./resources.js";
 import { normalizeSpellcastingMutable, snapshotSpellcasting } from "@/lib/spellcasting/spell-state.js";
 import { FOCUS_CAST_CHARACTER_SELECT, emitFocusCastEvents } from "./focus-cast.js";
@@ -80,6 +80,51 @@ export function disciplineEffectSpec(row: DisciplineEffectRow): EffectSpec {
     scaling: { mode: "poolStep", dicePerStep: row.costPerStep ?? 0 },
     concentrates: (name) => CONCENTRATION_DISCIPLINES.has(name),
   });
+}
+
+/** One selectable ki amount for a discipline's cast picker, and the roll the
+ *  client rolls at that amount (#1505's GET /api/disciplines catalog). */
+export interface DisciplineCastStep {
+  ki: number;
+  roll: { count: number; faces: number; modifier: number };
+}
+
+/**
+ * Every ki amount a discipline's cast picker can offer, base cost through the
+ * PHB'14 Elemental Disciplines table's global ceiling (`maxKiPerDiscipline`'s
+ * own asymptote at monk L17+), each paired with its resolved roll — mirrors
+ * decorateSpellEffects' `effectRolls[]` (serialize/spellcasting.ts): the
+ * client picks a ki amount and reads the matching roll verbatim, it never
+ * computes `base + step * dicePerStep` itself. Character-agnostic on purpose
+ * (this route has no character in scope): the true PER-CHARACTER cap by monk
+ * level is still enforced server-side at cast time
+ * (assertDisciplineKiSpend below) — a picker offering more steps than a
+ * given monk can currently afford is exactly the "refused by the server,
+ * not silently clamped client-side" behavior #1505 calls for. Empty for a
+ * non-pool-cost row (Elemental Attunement has no discipline catalog row at
+ * all, but a future no-cost row would land here) or a row with no dice
+ * (a pure-utility discipline like Shape the Flowing River). A single step
+ * at the base cost for a NON-scalable pool-cost row (no `costPerStep` — PHB'14
+ * only allows overspend when the discipline's own text says so): offering
+ * more would invite a cast assertDisciplineKiSpend now correctly refuses.
+ */
+export function disciplineCastSteps(row: DisciplineEffectRow, cost: AbilityCost): DisciplineCastStep[] {
+  if (cost.kind !== "pool") return [];
+  const effect = disciplineEffectSpec(row);
+  if (!effect.dice) return [];
+  const base = resolveEffectSpec(effect, 0, { characterLevel: 0 });
+  if (!base) return [];
+  if (!cost.perStep) return [{ ki: cost.base, roll: base }];
+  // maxKiPerDiscipline is monotonic and flattens at monk L17 (min(6, ...)),
+  // so any level >= 17 reads its asymptote — 17 is not a rules fact copied
+  // in here, just the smallest input that reaches the function's own ceiling.
+  const ceiling = maxKiPerDiscipline(17);
+  const steps: DisciplineCastStep[] = [{ ki: cost.base, roll: base }];
+  for (let ki = cost.base + 1; ki <= ceiling; ki++) {
+    const roll = resolveEffectSpec(effect, ki - cost.base, { characterLevel: 0 });
+    if (roll) steps.push({ ki, roll });
+  }
+  return steps;
 }
 
 type DisciplineRow = Prisma.CharacterGetPayload<{ select: typeof FOCUS_CAST_CHARACTER_SELECT }>;
@@ -134,7 +179,17 @@ async function loadKnownDiscipline(
   return { entry, catalog };
 }
 
-/** Validate the ki spent on a discipline: within [base, per-cast cap] for a pool-cost row, 0 for a costless row. */
+/**
+ * Validate the ki spent on a discipline: within [base, per-cast cap] for a
+ * SCALABLE pool-cost row (costPerStep set — PHB'14 p.80: "you can spend
+ * additional ki points to increase the effect, when the discipline
+ * description says so"), exactly the flat base for a non-scaling one (no
+ * such clause — overspending buys nothing and isn't offered by the text at
+ * all), 0 for a costless row. #1505: found via the discipline cast UI's own
+ * browser verification — without the `!cost.perStep` branch, a flat-cost
+ * discipline like Fist of Four Thunders (2 ki, no scaling clause) accepted
+ * any ki up to the per-level cap for an identical, unchanged roll.
+ */
 function assertDisciplineKiSpend(
   disciplineName: string,
   cost: ReturnType<typeof readAbilityCost>,
@@ -143,6 +198,12 @@ function assertDisciplineKiSpend(
 ): void {
   if (cost.kind !== "pool") {
     if (kiSpent !== 0) throw new InvalidDisciplineOperationError(`${disciplineName} costs no ki`);
+    return;
+  }
+  if (!cost.perStep) {
+    if (kiSpent !== cost.base) {
+      throw new InvalidDisciplineOperationError(`${disciplineName} costs a flat ${cost.base} ki (no scaling)`);
+    }
     return;
   }
   const maxKi = maxKiPerDiscipline(monkLevel);

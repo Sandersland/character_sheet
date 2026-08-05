@@ -183,6 +183,24 @@ describe("Discipline cast endpoint (#1503)", () => {
     expect(res.body.error).toMatch(/1-2 ki at monk level 3/);
   });
 
+  // #1505 (found via the discipline cast UI's own browser verification): a
+  // discipline with no `costPerStep` (Fist of Four Thunders, flat 2 ki) has
+  // no PHB'14 "spend additional ki" clause at all — overspending it must be
+  // refused, not silently accepted for an unchanged roll.
+  it("rejects overspending a non-scalable discipline (Fist of Four Thunders, flat 2 ki) even within the per-cast cap", async () => {
+    await createMonk(XP_L5, [knownDiscipline("e1", "Fist of Four Thunders")]);
+    const res = await cast([{ type: "castDiscipline", entryId: "e1", requestedKi: 3, roll: 10 }]);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/flat 2 ki \(no scaling\)/);
+  });
+
+  it("casts a non-scalable discipline at exactly its flat cost", async () => {
+    await createMonk(XP_L5, [knownDiscipline("e1", "Fist of Four Thunders")]);
+    const res = await cast([{ type: "castDiscipline", entryId: "e1", roll: 10 }]);
+    expect(res.status).toBe(200);
+    expect(res.body.resources.pools.find((p: { key: string }) => p.key === "ki").used).toBe(2);
+  });
+
   it("rejects a cast of a discipline above the character's level (Eternal Mountain Defense, minLevel 13)", async () => {
     await createMonk(XP_L11, [knownDiscipline("e1", "Eternal Mountain Defense")]);
     const res = await cast([{ type: "castDiscipline", entryId: "e1" }]);
