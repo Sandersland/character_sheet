@@ -15,7 +15,7 @@ async function makeSpell(name: string) {
   return prisma.spell.create({
     data: {
       name, level: 1, school: "evocation", castingTime: "1 action", range: "60 ft",
-      duration: "Instantaneous", description: `desc ${name}`, classes: ["wizard"],
+      duration: "Instantaneous", description: `desc ${name}`,
       edition: "EDITION_2024",
     },
   });

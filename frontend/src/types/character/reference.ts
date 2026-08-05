@@ -57,8 +57,9 @@ export interface SpeciesSkillChoiceOption {
 }
 
 export interface SpeciesCantripChoiceOption {
-  /** Lowercase class name (matches Spell.classes' own case) — the list
-   *  `GET /api/spells?className=` is queried with. */
+  /** Lowercase class name (matches the served `classes` entries' own case,
+   *  backend: SpellClass.className) — the list `GET /api/spells?class=` is
+   *  queried with. */
   list: string;
   castingAbility: AbilityName;
 }

@@ -71,8 +71,8 @@ describe("parseClassFilterOr400", () => {
     expect(res.status).not.toHaveBeenCalled();
   });
 
-  // Spell.classes is stored lowercase, so the caller's casing must never reach
-  // the query — the client passes a display-cased name ("Warlock").
+  // SpellClass.className is stored lowercase, so the caller's casing must
+  // never reach the query — the client passes a display-cased name ("Warlock").
   it("lowercases and trims the class name", () => {
     expect(parseClassFilterOr400(reqWith({ class: "  Warlock " }), mockRes())).toEqual({
       ok: true,

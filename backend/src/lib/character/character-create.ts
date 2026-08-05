@@ -31,6 +31,7 @@ import {
 } from "@/lib/inventory/starting-equipment-package.js";
 import { creationSpellEntry } from "@/lib/spellcasting/spellcasting.js";
 import { clampPreparedToLimit, type SpellEntry } from "@/lib/spellcasting/spell-state.js";
+import { classesOf, SPELL_CLASS_MEMBERSHIP_SELECT } from "@/lib/spellcasting/spell-classes.js";
 import { subclassGateLevel } from "@/lib/leveling/effective-levels.js";
 import { DEFAULT_RULES_EDITION } from "@/lib/rules/edition.js";
 import { crossEditionRejection, resolveEditionRow, withEditionOrShared } from "@/lib/rules/catalog-edition.js";
@@ -1393,7 +1394,10 @@ async function materializeStartingEquipment(
   return { ok: true, inventoryItemCreates, startingCurrency };
 }
 
-type CreationSpellRow = NonNullable<Awaited<ReturnType<typeof prisma.spell.findFirst>>>;
+// The base catalog row plus the join-resolved `classes: string[]` (#1711) —
+// every creation-picker read attaches this via classesOf so creationPickError
+// can check membership without knowing the join exists.
+type CreationSpellRow = NonNullable<Awaited<ReturnType<typeof prisma.spell.findFirst>>> & { classes: string[] };
 
 // Validate one chosen catalog row against the class list and its expected level
 // band (cantrip = level 0; leveled = 1..maxLevel). Null when the pick is legal.
@@ -1476,8 +1480,10 @@ async function resolveCreationSpells(
   if (countError) return countError;
 
   const allIds = [...spells.cantripIds, ...spells.spellIds];
-  const rows = allIds.length ? await prisma.spell.findMany({ where: { id: { in: allIds } } }) : [];
-  const byId = new Map(rows.map((r) => [r.id, r]));
+  const rows = allIds.length
+    ? await prisma.spell.findMany({ where: { id: { in: allIds } }, include: SPELL_CLASS_MEMBERSHIP_SELECT })
+    : [];
+  const byId = new Map(rows.map((r) => [r.id, { ...r, classes: classesOf(r) }]));
   const maxLevel = maxSpellLevelForClass(className, 1, subclass, edition);
 
   const entries: SpellEntry[] = [];
@@ -1516,7 +1522,11 @@ async function resolveSpeciesCantripGrant(
   if (existingEntries.some((e) => e.spellId === speciesCantripId)) {
     return { ok: false, status: 400, error: "speciesCantripId duplicates a class-picked spell" };
   }
-  const row = (await prisma.spell.findUnique({ where: { id: speciesCantripId } })) ?? undefined;
+  const raw = await prisma.spell.findUnique({
+    where: { id: speciesCantripId },
+    include: SPELL_CLASS_MEMBERSHIP_SELECT,
+  });
+  const row = raw ? { ...raw, classes: classesOf(raw) } : undefined;
   const classDisplay = spec.list.charAt(0).toUpperCase() + spec.list.slice(1);
   const error = creationPickError(row, speciesCantripId, "cantrip", spec.list, classDisplay, 0);
   if (error) return error;

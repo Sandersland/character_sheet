@@ -1527,7 +1527,6 @@ model Spell {
   description   String
   concentration Boolean     @default(false)
   ritual        Boolean     @default(false)
-  classes       String[] // lowercase class names the spell appears on, e.g. ["wizard","sorcerer"]
 
   // Spell components for spellbook display + future component checks.
   // { verbal: bool, somatic: bool, material: bool, materialDescription?: string }
@@ -1563,6 +1562,12 @@ model Spell {
   grantedBy        SubclassGrantedSpell[]
   // Species/variants that grant this spell for free (#1679's table; no rows yet).
   speciesGrantedBy SpeciesGrantedSpell[]
+  // Class-membership join (#1711 F2 of epic #1517) — replaces the old
+  // `classes String[]` column. No `edition` filter needed on this side: a
+  // 2014-fork Spell row and its 2024 sibling are separate Spell rows (Shape
+  // 1, edition rides the parent row below), so each owns disjoint
+  // SpellClass rows already.
+  classMemberships SpellClass[]
 
   // NULL = valid in both editions; a diverging spell forks into one row per
   // edition sharing this name (#1710, foundation for epic #1517's 2014
@@ -1577,6 +1582,26 @@ model Spell {
   edition RulesEdition?
 
   @@unique([name, edition])
+}
+
+// Spell↔class membership join (#1711, F2 of epic #1517's 2014 catalog fork).
+// Replaces `Spell.classes String[]`: a single array column can't hold two
+// editions' class lists when they diverge (SRD 5.2 reassigned/renamed
+// spells), so membership moves to a queryable, homebrew-friendly join.
+//
+// No `edition` column — Shape 1 (settled here, referenced by #1495's
+// identical join question): edition rides the parent Spell row, so a
+// 2014-fork spell and its 2024 sibling are two separate Spell rows, each
+// with its own disjoint SpellClass rows. onDelete: Cascade so a content
+// slice's reseed pruning a stale Spell row never leaves an orphaned
+// membership row behind.
+model SpellClass {
+  id        String @id @default(uuid())
+  spellId   String
+  spell     Spell  @relation(fields: [spellId], references: [id], onDelete: Cascade)
+  className String // lowercase class name, e.g. "wizard"
+
+  @@unique([spellId, className])
 }
 
 // Baseline equipment catalog, same role as Species/CharacterClass above: seeded

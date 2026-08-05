@@ -12,8 +12,8 @@ import { ABILITY_NAMES } from "./species-ability-increases.js";
 //                       Senses (`from`-restricted to Insight/Perception/
 //                       Survival, #1690).
 //   - chooseCantrip:    pick one cantrip from a named class spell list
-//                       (`list`, lowercase — matches Spell.classes' own case),
-//                       with a FIXED casting ability that need not be the
+//                       (`list`, lowercase — matches SpellClass.className's own
+//                       case), with a FIXED casting ability that need not be the
 //                       character's own class ability — High Elf's Cantrip
 //                       (Intelligence, regardless of the character's class).
 //   - chooseOriginFeat: pick one Origin-category Feat (#1690, 2024 Human's
@@ -54,8 +54,9 @@ const chooseCantripSchema = z
   .object({
     chooseCantrip: z
       .object({
-        // Lowercase class name, matching Spell.classes' own stored case
-        // (creationPickError's `row.classes.includes(className)` check) —
+        // Lowercase class name, matching SpellClass.className's own stored
+        // case (creationPickError's `row.classes.includes(className)` check,
+        // resolved off the join — see spell-classes.ts) —
         // "wizard" for High Elf, never "Wizard".
         list: z.string().min(1),
         castingAbility: z.enum(ABILITY_NAMES),

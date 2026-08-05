@@ -25,7 +25,10 @@
 # the find-then-write upsert and id-scoped stale-grant prune),
 # species-seed-lookup.ts (#1683 — the shared (slug, edition) -> Species row
 # lookup seed-species-traits.ts and seed-species-granted-spells.ts both
-# resolve their targets against; a query helper, not content).
+# resolve their targets against; a query helper, not content),
+# seed-spell-classes.ts (#1711 — same split for spells.ts's per-spell
+# `classes` field: authors SpellClass rows for one just-upserted spell and
+# prunes any class dropped from its list, scoped to that spellId).
 # validate.ts is NOT listed here on purpose — it's also logic, but it happens
 # to carry none of the three tokens (pure zod validation, no DB access), so it
 # passes the scan as a plain data module would; adding it to the exception
@@ -36,7 +39,7 @@
 # deleting a module or mistyping the glob turns this red, not silently green.
 set -eu
 
-LOGIC_EXCEPTIONS="prisma/seed/guards.ts prisma/seed/prune.ts prisma/seed/rename-spells.ts prisma/seed/seed-class-features.ts prisma/seed/seed-granted-spells.ts prisma/seed/seed-starting-equipment.ts prisma/seed/seed-subclasses.ts prisma/seed/seed-species.ts prisma/seed/seed-species-traits.ts prisma/seed/seed-species-granted-spells.ts prisma/seed/species-seed-lookup.ts"
+LOGIC_EXCEPTIONS="prisma/seed/guards.ts prisma/seed/prune.ts prisma/seed/rename-spells.ts prisma/seed/seed-class-features.ts prisma/seed/seed-granted-spells.ts prisma/seed/seed-starting-equipment.ts prisma/seed/seed-subclasses.ts prisma/seed/seed-species.ts prisma/seed/seed-species-traits.ts prisma/seed/seed-species-granted-spells.ts prisma/seed/species-seed-lookup.ts prisma/seed/seed-spell-classes.ts"
 
 is_exception() {
   target="$1"

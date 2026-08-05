@@ -419,7 +419,6 @@ const MUTABLE_SPELL = {
   effectDiceCount: 1,
   effectDiceFaces: 6,
   damageType: "force",
-  classes: ["wizard"],
 };
 
 async function capabilityUse(capabilityKey: string) {

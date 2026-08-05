@@ -32,7 +32,6 @@ const SPELL = {
   effectDiceCount: 3,
   effectDiceFaces: 4,
   damageType: "force",
-  classes: ["wizard"],
 };
 
 const BASE_CHAR = {

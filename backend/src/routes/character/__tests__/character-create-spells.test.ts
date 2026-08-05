@@ -27,16 +27,16 @@ async function create(body: { rulesEdition?: string } & Record<string, unknown>)
 }
 
 async function warlockPicks() {
-  const cantrips = await prisma.spell.findMany({ where: { classes: { has: "warlock" }, level: 0 }, take: 2, select: { id: true } });
-  const spells = await prisma.spell.findMany({ where: { classes: { has: "warlock" }, level: 1 }, take: 2, select: { id: true } });
+  const cantrips = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "warlock" } }, level: 0 }, take: 2, select: { id: true } });
+  const spells = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "warlock" } }, level: 1 }, take: 2, select: { id: true } });
   return { cantripIds: cantrips.map((s) => s.id), spellIds: spells.map((s) => s.id) };
 }
 
 // #1510: picks a class's spell-list catalog rows for a 2014 creation body —
 // cantripCount cantrips + spellCount level-1 spells, from the real seeded catalog.
 async function picksFor(className: string, cantripCount: number, spellCount: number) {
-  const cantrips = await prisma.spell.findMany({ where: { classes: { has: className }, level: 0 }, take: cantripCount, select: { id: true } });
-  const spells = await prisma.spell.findMany({ where: { classes: { has: className }, level: 1 }, take: spellCount, select: { id: true } });
+  const cantrips = await prisma.spell.findMany({ where: { classMemberships: { some: { className: className } }, level: 0 }, take: cantripCount, select: { id: true } });
+  const spells = await prisma.spell.findMany({ where: { classMemberships: { some: { className: className } }, level: 1 }, take: spellCount, select: { id: true } });
   return { cantripIds: cantrips.map((s) => s.id), spellIds: spells.map((s) => s.id) };
 }
 
@@ -102,7 +102,7 @@ describe("POST /api/characters — creation spell/cantrip picks (#1131)", () => 
 
   it("rejects an off-list spell", async () => {
     const picks = await warlockPicks();
-    const clericSpell = await prisma.spell.findFirstOrThrow({ where: { classes: { has: "cleric" }, level: 1, NOT: { classes: { has: "warlock" } } }, select: { id: true } });
+    const clericSpell = await prisma.spell.findFirstOrThrow({ where: { classMemberships: { some: { className: "cleric" } }, level: 1, NOT: { classMemberships: { some: { className: "warlock" } } } }, select: { id: true } });
     const res = await create({
       ...BASE,
       name: "CreateSpells OffList",
@@ -116,7 +116,7 @@ describe("POST /api/characters — creation spell/cantrip picks (#1131)", () => 
   it("rejects a leveled spell placed in cantripIds", async () => {
     const picks = await warlockPicks();
     // A third, distinct leveled warlock spell so the level check (not the dup check) fires.
-    const [, , extra] = await prisma.spell.findMany({ where: { classes: { has: "warlock" }, level: 1 }, take: 3, select: { id: true } });
+    const [, , extra] = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "warlock" } }, level: 1 }, take: 3, select: { id: true } });
     const res = await create({
       ...BASE,
       name: "CreateSpells LeveledCantrip",
