@@ -89,25 +89,11 @@ export interface DisciplineCastStep {
   roll: { count: number; faces: number; modifier: number };
 }
 
-/**
- * Every ki amount a discipline's cast picker can offer, base cost through the
- * PHB'14 Elemental Disciplines table's global ceiling (`maxKiPerDiscipline`'s
- * own asymptote at monk L17+), each paired with its resolved roll — mirrors
- * decorateSpellEffects' `effectRolls[]` (serialize/spellcasting.ts): the
- * client picks a ki amount and reads the matching roll verbatim, it never
- * computes `base + step * dicePerStep` itself. Character-agnostic on purpose
- * (this route has no character in scope): the true PER-CHARACTER cap by monk
- * level is still enforced server-side at cast time
- * (assertDisciplineKiSpend below) — a picker offering more steps than a
- * given monk can currently afford is exactly the "refused by the server,
- * not silently clamped client-side" behavior #1505 calls for. Empty for a
- * non-pool-cost row (Elemental Attunement has no discipline catalog row at
- * all, but a future no-cost row would land here) or a row with no dice
- * (a pure-utility discipline like Shape the Flowing River). A single step
- * at the base cost for a NON-scalable pool-cost row (no `costPerStep` — PHB'14
- * only allows overspend when the discipline's own text says so): offering
- * more would invite a cast assertDisciplineKiSpend now correctly refuses.
- */
+// Ki amounts the cast picker offers (base..maxKiPerDiscipline(17) ceiling), each with its
+// resolved roll — client reads a roll verbatim, never computes it (mirrors effectRolls[]).
+// Character-agnostic; the real per-monk cap is enforced at cast time by assertDisciplineKiSpend.
+// One step only for a non-scalable row (no costPerStep) — PHB'14 allows overspend only when
+// the discipline's text says so (#1505).
 export function disciplineCastSteps(row: DisciplineEffectRow, cost: AbilityCost): DisciplineCastStep[] {
   if (cost.kind !== "pool") return [];
   const effect = disciplineEffectSpec(row);
@@ -179,17 +165,9 @@ async function loadKnownDiscipline(
   return { entry, catalog };
 }
 
-/**
- * Validate the ki spent on a discipline: within [base, per-cast cap] for a
- * SCALABLE pool-cost row (costPerStep set — PHB'14 p.80: "you can spend
- * additional ki points to increase the effect, when the discipline
- * description says so"), exactly the flat base for a non-scaling one (no
- * such clause — overspending buys nothing and isn't offered by the text at
- * all), 0 for a costless row. #1505: found via the discipline cast UI's own
- * browser verification — without the `!cost.perStep` branch, a flat-cost
- * discipline like Fist of Four Thunders (2 ki, no scaling clause) accepted
- * any ki up to the per-level cap for an identical, unchanged roll.
- */
+// Validate ki spent: [base, per-cast cap] for a scalable row (costPerStep, PHB'14 p.80),
+// exactly base for a non-scaling one, 0 for costless. The !cost.perStep branch (#1505) stops a
+// flat-cost discipline (e.g. Fist of Four Thunders) from accepting overspend for an unchanged roll.
 function assertDisciplineKiSpend(
   disciplineName: string,
   cost: ReturnType<typeof readAbilityCost>,

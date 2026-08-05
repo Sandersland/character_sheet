@@ -68,37 +68,16 @@ function hasAction(character: Character, key: string): boolean {
   return (character.availableActions ?? []).some((a) => a.key === key);
 }
 
-// "elementalAttunement" is a SAME-KEY collision across editions (#1505,
-// discovered live in browser verification, not a unit-test-caught gap): a
-// 2014 Way of the Four Elements monk's Elemental Attunement is a static
-// DERIVED_ACTIONS reminder row (actions.ts) with no `resolverKind`, while
-// 2024 Warrior of the Elements' is a row-driven ClassFeature toggle
-// (toggleActionsFromRow) that always sets `resolverKind: "toggle"` — the
-// one field DERIVED_ACTIONS never sets (AvailableAction's own doc comment).
-// A bare `hasAction` here fired true for BOTH, rendering WarriorOfElements-
-// Section's 2024 Focus-toggle UI alongside FourElementsSection on a 2014
-// monk that has never seen a Focus point.
+// "elementalAttunement" collides across editions (#1505): the 2024 Warrior toggle
+// sets resolverKind "toggle" (only toggleActionsFromRow does); the 2014 reminder row
+// doesn't — so bare hasAction leaked the 2024 Focus UI onto a 2014 sheet.
 function hasElementsWarriorToggle(character: Character): boolean {
   return (character.availableActions ?? []).some((a) => a.key === "elementalAttunement" && a.resolverKind === "toggle");
 }
 
-// "shadowArts"/"cloakOfShadows" are the SAME same-key collision (#1505,
-// also caught live in browser verification): 2014 Way of Shadow and 2024
-// Warrior of Shadow both grant these exact keys (actions.ts's own comment:
-// "Same KEY NAMES as the 2024 rows above... the edition tag plus
-// grantSubclassSlugs disambiguates"), but the served AvailableAction never
-// carries the row's `resourceKey` (focus vs ki) or edition for the client to
-// tell them apart — unlike elementalAttunement, NEITHER row is row-driven,
-// so there is no resolverKind signal either. ShadowArtsSection/
-// CloakOfShadowsSection are 2024-shaped (hardcoded "focus" copy, the single-
-// Darkness cast, the always-3-focus Cloak) with no 2014 counterpart built
-// yet — 2014 Way of Shadow's Shadow Arts (a 4-spell 2-ki menu) and Cloak of
-// Shadows (free at L11, no resource) are a materially different UI this
-// issue does not build. Gating on the character's own edition (already the
-// blessed pattern: ShadowArtsSection itself calls fetchShadowArts(character.
-// rulesEdition)) keeps the mismatched 2024 UI from ever reaching a 2014
-// sheet; the class-feature TEXT (featuresFromRows) already describes both
-// editions correctly on its own, so nothing is lost, only the broken cast UI.
+// "shadowArts"/"cloakOfShadows" collide across editions (#1505) with no per-row
+// signal to tell them apart (neither is row-driven), so gate on the character's own
+// edition — the 2024-shaped UI must never reach a 2014 sheet (2014's cast UI is #1738).
 function has2024ShadowAction(character: Character, key: string): boolean {
   return character.rulesEdition === "EDITION_2024" && (character.availableActions ?? []).some((a) => a.key === key);
 }
