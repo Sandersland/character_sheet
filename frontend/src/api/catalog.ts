@@ -24,15 +24,18 @@ export interface SpellCatalogFilter {
 // Feeds the spellcasting section's "learn from catalog" picker.
 // Ordered by level then name server-side; no client-side re-sort needed.
 //
-// The filter is optional, following fetchFeats' query-string pattern: the
-// creation ceremony asks for one class's legal band and the server applies the
-// eligibility rule (#1377), while the sheet's picker wants the whole catalog.
-export async function fetchSpells(filter: SpellCatalogFilter = {}): Promise<CatalogSpell[]> {
-  const params = new URLSearchParams();
+// `edition` is required and the route 400s without it (#1712, same shape as
+// fetchFeats/fetchReference) — every caller passes the VIEWING character's
+// edition (or the creation draft's chosen edition, before a character exists)
+// so a 2014 request never sees a 2024-only row. `class`/`maxLevel` stay
+// optional, following fetchFeats' asiLevel pattern: the creation ceremony
+// asks for one class's legal band and the server applies the eligibility
+// rule (#1377), while the sheet's picker wants the whole (one-edition) catalog.
+export async function fetchSpells(edition: RulesEdition, filter: SpellCatalogFilter = {}): Promise<CatalogSpell[]> {
+  const params = new URLSearchParams({ edition });
   if (filter.className !== undefined) params.set("class", filter.className);
   if (filter.maxLevel !== undefined) params.set("maxLevel", String(filter.maxLevel));
-  const query = params.toString();
-  return request<CatalogSpell[]>(query ? `/spells?${query}` : "/spells", undefined, "Failed to fetch spell catalog");
+  return request<CatalogSpell[]>(`/spells?${params.toString()}`, undefined, "Failed to fetch spell catalog");
 }
 
 // Feeds the advancement section's feat picker — same role as fetchManeuvers.

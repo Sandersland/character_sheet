@@ -23,6 +23,7 @@ describe("AddSpellPanel accessibility", () => {
         onClose={noop}
         busy={false}
         learnedSpellIds={new Set()}
+        edition="EDITION_2024"
       />
     );
 

@@ -11,6 +11,7 @@ import {
 import { buildFormSetters } from "@/features/entities/campaignItemFormSetters";
 import { type FormState } from "@/lib/campaignItemForm";
 import type { Item, ItemRarityOption } from "@/types/character";
+import type { RulesEdition } from "@character-sheet/shared-types";
 
 interface CampaignItemFormProps {
   form: FormState;
@@ -20,6 +21,8 @@ interface CampaignItemFormProps {
   busyId: string | null;
   /** Served rarity rows (#1437), passed in so the form holds no query observer. */
   rarities: ItemRarityOption[];
+  /** The campaign's edition (#1712) — threaded to MagicFieldset's spell picker. */
+  edition: RulesEdition;
   onSubmit: () => void;
   onCancel: () => void;
 }
@@ -31,6 +34,7 @@ export default function CampaignItemForm({
   catalog,
   busyId,
   rarities,
+  edition,
   onSubmit,
   onCancel,
 }: CampaignItemFormProps) {
@@ -42,7 +46,7 @@ export default function CampaignItemForm({
 
       <IdentityFieldset form={form} setters={setters} />
       <CategoryDetailsFieldset form={form} setters={setters} />
-      <MagicFieldset form={form} setters={setters} rarities={rarities} />
+      <MagicFieldset form={form} setters={setters} rarities={rarities} edition={edition} />
       <ValueWeightFieldset form={form} setters={setters} />
       <DescriptionFieldset form={form} setters={setters} />
 

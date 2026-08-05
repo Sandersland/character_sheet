@@ -43,7 +43,7 @@ function renderSection(choice: Partial<CreationSpeciesCantripChoice> = {}, onCha
     complete: false,
     ...choice,
   };
-  render(<SpeciesCantripSection choice={fullChoice} onChange={onChange} />);
+  render(<SpeciesCantripSection choice={fullChoice} edition="EDITION_2024" onChange={onChange} />);
   return { onChange };
 }
 
@@ -57,6 +57,7 @@ describe("SpeciesCantripSection (#1689)", () => {
     const { container } = render(
       <SpeciesCantripSection
         choice={{ applicable: false, list: "", castingAbility: "intelligence", selectedId: "", complete: true }}
+        edition="EDITION_2024"
         onChange={vi.fn()}
       />,
     );
@@ -67,7 +68,7 @@ describe("SpeciesCantripSection (#1689)", () => {
   it("queries the spec's OWN class list, cantrips only (maxLevel: 0) — never the character's class", async () => {
     renderSection();
     await screen.findByRole("button", { name: "Open Fire Bolt" });
-    expect(fetchMock).toHaveBeenCalledWith({ className: "wizard", maxLevel: 0 });
+    expect(fetchMock).toHaveBeenCalledWith("EDITION_2024", { className: "wizard", maxLevel: 0 });
   });
 
   it("names the spec's casting ability in the panel copy", async () => {

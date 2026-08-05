@@ -6,6 +6,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
 import { seededSpeciesAnchor } from "@/test-support/species.js";
+import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 
 // #1131: the creation spell/cantrip picker. A level-1 caster (Warlock: 2 cantrips
 // + 2 prepared spells per SRD 5.2) finishes with a prepared spellbook; a
@@ -358,5 +359,99 @@ describe("POST /api/characters — wizard spellbook vs. prepared cap (#1513)", (
     expect(book).toHaveLength(4);
     expect(book.every((s) => s.prepared)).toBe(true);
     expect(res.body.spellcasting.preparedSpellCount).toBe(2);
+  });
+});
+
+// #1712: cross-edition admission — resolveCreationSpells rejects a submitted
+// spell id that is provably the WRONG edition's fork of a name (a same-named
+// row the requesting edition actually resolves to exists). Today's real
+// catalog has no forks (2014 content slices haven't landed), so this proves
+// the mechanism with a fixture fork rather than real catalog rows — the two
+// existing describe blocks above already prove a 2014/2024 creation accepts
+// today's (unforked, EDITION_2024-tagged) real catalog unchanged.
+describe("POST /api/characters — cross-edition spell-fork rejection (#1712)", () => {
+  const FORK_NAME = "CreateSpells1712 Fork Cantrip";
+
+  async function seedFork() {
+    const row2014 = {
+      name: FORK_NAME, level: 0, school: "evocation" as const, castingTime: "1 action", range: "30 feet",
+      duration: "Instantaneous", description: "The PHB'14 text.", concentration: false, ritual: false, cantripScaling: true,
+    };
+    const row2024 = { ...row2014, description: "The SRD 5.2 text." };
+    const fork2014 = await upsertEditionRow(prisma.spell, { name: FORK_NAME, edition: "EDITION_2014" }, { ...row2014, edition: "EDITION_2014" }, row2014);
+    const fork2024 = await upsertEditionRow(prisma.spell, { name: FORK_NAME, edition: "EDITION_2024" }, { ...row2024, edition: "EDITION_2024" }, row2024);
+    for (const spellId of [fork2014.id, fork2024.id]) {
+      await prisma.spellClass.upsert({
+        where: { spellId_className: { spellId, className: "warlock" } },
+        create: { spellId, className: "warlock" },
+        update: {},
+      });
+    }
+    return { fork2014, fork2024 };
+  }
+
+  // A second warlock cantrip id, explicitly excluding FORK_NAME — warlockPicks()
+  // takes an unordered `take: 2` off the live catalog, and once the fork rows
+  // exist as warlock-tagged level-0 spells they're eligible to be picked BY
+  // that query too, which would silently duplicate the fork id in a two-cantrip
+  // submission (a "chosen only once" 400 masking the assertion under test).
+  async function otherWarlockCantripId(): Promise<string> {
+    const row = await prisma.spell.findFirstOrThrow({
+      where: { classMemberships: { some: { className: "warlock" } }, level: 0, name: { not: FORK_NAME } },
+      select: { id: true },
+    });
+    return row.id;
+  }
+
+  afterAll(async () => {
+    await prisma.spell.deleteMany({ where: { name: FORK_NAME } });
+  });
+
+  it("rejects a 2024 creation submitting the 2014 fork's id, naming the spell", async () => {
+    const { fork2014 } = await seedFork();
+    const otherCantrip = await otherWarlockCantripId();
+    const picks = await warlockPicks();
+    const res = await create({
+      ...BASE,
+      name: "CreateSpells1712 Wrong2014",
+      classes: [{ name: "Warlock" }],
+      spells: { cantripIds: [fork2014.id, otherCantrip], spellIds: picks.spellIds },
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe(`${FORK_NAME} is 2014 rules content, not usable by a 2024 rules character`);
+  });
+
+  it("rejects a 2014 creation submitting the 2024 fork's id, naming the spell", async () => {
+    const { fork2024 } = await seedFork();
+    const otherCantrip = await otherWarlockCantripId();
+    // Warlock has no 2014-tagged cantrip catalog yet — pairing the wrong-fork id
+    // with the OTHER real (unforked, EDITION_2024) cantrip id it accepts
+    // elsewhere in this file is enough: this test targets the fork check
+    // specifically, not the full 2014 Warlock creation count.
+    const picks = await warlockPicks();
+    const res = await create({
+      ...BASE,
+      name: "CreateSpells1712 Wrong2024",
+      rulesEdition: "EDITION_2014",
+      classes: [{ name: "Warlock" }],
+      spells: { cantripIds: [fork2024.id, otherCantrip], spellIds: picks.spellIds },
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe(`${FORK_NAME} is 2024 rules content, not usable by a 2014 rules character`);
+  });
+
+  it("admits the requesting edition's OWN fork — the rejection is fork-specific, not a blanket cross-edition ban", async () => {
+    const { fork2024 } = await seedFork();
+    const otherCantrip = await otherWarlockCantripId();
+    const picks = await warlockPicks();
+    const res = await create({
+      ...BASE,
+      name: "CreateSpells1712 RightFork",
+      classes: [{ name: "Warlock" }],
+      spells: { cantripIds: [fork2024.id, otherCantrip], spellIds: picks.spellIds },
+    });
+    expect(res.status, res.body.error ?? "").toBe(201);
+    const names = (res.body.spellcasting.spells as Array<{ name: string }>).map((s) => s.name);
+    expect(names).toContain(FORK_NAME);
   });
 });

@@ -6,23 +6,28 @@ import { useEffect, useState } from "react";
 import { fetchSpells, type SpellCatalogFilter } from "@/api/client";
 import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 import type { CatalogSpell } from "@/types/character";
+import type { RulesEdition } from "@character-sheet/shared-types";
 
-export function useSpellCatalog(filter?: SpellCatalogFilter) {
+// `edition` is required (#1712): every caller already has the viewing
+// character's edition (or the creation draft's chosen one) in hand, so
+// threading it through here is what keeps the picker from ever offering a
+// cross-edition row.
+export function useSpellCatalog(edition: RulesEdition, filter?: SpellCatalogFilter) {
   const [catalog, setCatalog] = useState<CatalogSpell[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const showSpinner = useDelayedFlag(catalog === null && !error);
-  // Destructured so the effect depends on the two primitives, not on a fresh
+  // Destructured so the effect depends on the primitives, not on a fresh
   // object identity every render (which would refetch in a loop).
   const className = filter?.className;
   const maxLevel = filter?.maxLevel;
 
   useEffect(() => {
     let mounted = true;
-    fetchSpells({ className, maxLevel })
+    fetchSpells(edition, { className, maxLevel })
       .then((spells) => { if (mounted) setCatalog(spells); })
       .catch(() => { if (mounted) setError("Couldn't load spell catalog."); });
     return () => { mounted = false; };
-  }, [className, maxLevel]);
+  }, [edition, className, maxLevel]);
 
   return { catalog, error, showSpinner };
 }

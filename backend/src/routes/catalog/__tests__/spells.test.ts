@@ -75,8 +75,14 @@ async function seedFixtures() {
   await seedSpellClasses(utility.id, UTILITY_SPELL_CLASSES);
 }
 
-function get(path: string) {
-  return supertest.agent(app).set("Cookie", COOKIE).get(path);
+// `?edition=` is now REQUIRED (#1712) — every existing call in this file
+// exercises `?class=`/`?maxLevel=`/membership behavior, not the edition gate
+// itself, so this helper appends a default edition rather than touching every
+// call site. The dedicated 400/fork describe blocks below call supertest
+// directly (or pass an explicit edition) where the param IS the thing under test.
+function get(path: string, edition: string = "EDITION_2024") {
+  const sep = path.includes("?") ? "&" : "?";
+  return supertest.agent(app).set("Cookie", COOKIE).get(`${path}${sep}edition=${edition}`);
 }
 
 function names(body: { name: string }[]): string[] {
@@ -232,5 +238,97 @@ describe("GET /api/spells — class membership served from the SpellClass join (
     await prisma.spell.delete({ where: { id: damage.id } });
 
     expect(await prisma.spellClass.findMany({ where: { spellId: damage.id } })).toEqual([]);
+  });
+});
+
+// #1712: `?edition=` is now REQUIRED — reverses #1377's "no ?edition=" (the
+// docstring this route carried at spells.ts:18 before this slice). Absent and
+// unrecognized both 400, matching featsRouter/referenceRouter's precedent
+// (#1411/#1412) exactly, including the two distinct messages.
+describe("GET /api/spells — ?edition= is required (#1712)", () => {
+  it("400s with no ?edition= at all, rather than serving a flat cross-edition catalog", async () => {
+    const res = await supertest(app).get("/api/spells").set("Cookie", COOKIE);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("Missing required query parameter: edition");
+  });
+
+  it("400s an unrecognized ?edition= value, with a message distinct from the missing-param one", async () => {
+    const res = await supertest(app).get("/api/spells?edition=bogus").set("Cookie", COOKIE);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/^Unknown edition: /);
+  });
+
+  it("400s for edition even when class/maxLevel are also present", async () => {
+    const res = await supertest(app).get("/api/spells?class=wizard&maxLevel=3").set("Cookie", COOKIE);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("Missing required query parameter: edition");
+  });
+});
+
+// #1712: the real plumbing proof — a genuine 2014/2024 fork (same name, two
+// rows) must resolve to exactly ONE row per requesting edition, and an
+// edition-EXCLUSIVE row (no shared/other-edition sibling) must never leak
+// into the other edition's response. Today's real ~109-row catalog has no
+// forks yet (2014 content slices #1713-#1721 are still to land), so this
+// proves the mechanism with fixture rows rather than catalog completeness —
+// exactly the distinction #1712's own build note calls out.
+describe("GET /api/spells — genuine edition fork resolves to one row per edition (#1712)", () => {
+  const FORK_NAME = "Test Fork Catalog Spell";
+  const EXCLUSIVE_2014_NAME = "Test 2014-Only Catalog Spell";
+  const EXCLUSIVE_2024_NAME = "Test 2024-Only Catalog Spell";
+
+  function forkRow(name: string, description: string) {
+    return {
+      name,
+      level: 1,
+      school: "evocation" as const,
+      castingTime: "1 action",
+      range: "30 feet",
+      duration: "Instantaneous",
+      description,
+      concentration: false,
+      ritual: false,
+      cantripScaling: false,
+    };
+  }
+
+  afterAll(async () => {
+    await prisma.spell.deleteMany({
+      where: { name: { in: [FORK_NAME, EXCLUSIVE_2014_NAME, EXCLUSIVE_2024_NAME] } },
+    });
+  });
+
+  it("a name with both a 2014 and a 2024 row resolves to exactly the requesting edition's own row", async () => {
+    const row2014 = forkRow(FORK_NAME, "The PHB'14 text.");
+    const row2024 = forkRow(FORK_NAME, "The SRD 5.2 text.");
+    const fork2014 = await upsertEditionRow(prisma.spell, { name: FORK_NAME, edition: "EDITION_2014" }, { ...row2014, edition: "EDITION_2014" }, row2014);
+    const fork2024 = await upsertEditionRow(prisma.spell, { name: FORK_NAME, edition: "EDITION_2024" }, { ...row2024, edition: "EDITION_2024" }, row2024);
+
+    const res2014 = await get("/api/spells", "EDITION_2014");
+    const matches2014 = res2014.body.filter((s: { name: string }) => s.name === FORK_NAME);
+    expect(matches2014).toHaveLength(1);
+    expect(matches2014[0].id).toBe(fork2014.id);
+    expect(matches2014[0].description).toBe("The PHB'14 text.");
+
+    const res2024 = await get("/api/spells", "EDITION_2024");
+    const matches2024 = res2024.body.filter((s: { name: string }) => s.name === FORK_NAME);
+    expect(matches2024).toHaveLength(1);
+    expect(matches2024[0].id).toBe(fork2024.id);
+    expect(matches2024[0].description).toBe("The SRD 5.2 text.");
+  });
+
+  it("a 2014 request never returns a 2024-only row, and a 2024 request never returns a 2014-only row", async () => {
+    const row2014 = forkRow(EXCLUSIVE_2014_NAME, "Only exists for PHB'14.");
+    const row2024 = forkRow(EXCLUSIVE_2024_NAME, "Only exists for SRD 5.2.");
+    await upsertEditionRow(prisma.spell, { name: EXCLUSIVE_2014_NAME, edition: "EDITION_2014" }, { ...row2014, edition: "EDITION_2014" }, row2014);
+    await upsertEditionRow(prisma.spell, { name: EXCLUSIVE_2024_NAME, edition: "EDITION_2024" }, { ...row2024, edition: "EDITION_2024" }, row2024);
+
+    const res2014 = await get("/api/spells", "EDITION_2014");
+    expect(names(res2014.body)).toContain(EXCLUSIVE_2014_NAME);
+    expect(names(res2014.body)).not.toContain(EXCLUSIVE_2024_NAME);
+
+    const res2024 = await get("/api/spells", "EDITION_2024");
+    expect(names(res2024.body)).toContain(EXCLUSIVE_2024_NAME);
+    expect(names(res2024.body)).not.toContain(EXCLUSIVE_2014_NAME);
   });
 });

@@ -6,6 +6,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
+import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 
 const OWNER_ID = "owner-level-up-tx";
 let COOKIE: string;
@@ -1691,6 +1692,95 @@ describe("POST …/level-up/transactions — Warlock 3→4 cantrip + spell (#113
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/cantrip/i);
     expect(await eventCount(CHAR_ID)).toBe(0);
+  });
+});
+
+// #1712: cross-edition admission for the level-up learn path —
+// loadPickCatalogRows rejects a submitted spellId that's provably the WRONG
+// edition's fork of a name (a same-named row the character's OWN edition
+// actually resolves to exists). Reuses the Warlock 3→4 fixture shape above.
+// Today's real catalog has no forks yet (2014 content slices haven't
+// landed), so a fixture fork proves the mechanism; the Bard Magical Secrets
+// and #1509 known-caster describe blocks above already prove a 2014
+// character's level-up accepts today's (unforked, EDITION_2024-tagged) real
+// catalog unchanged.
+describe("POST …/level-up/transactions — cross-edition spell-fork rejection (#1712)", () => {
+  const CHAR_ID = "lvtx-1712-fork";
+  const FORK_NAME = "LevelUpTx1712 Fork Cantrip";
+
+  beforeEach(async () => {
+    const warlock = await prisma.characterClass.findFirstOrThrow({ where: { name: "Warlock" } });
+    const theFiend = (await prisma.subclass.findFirstOrThrow({ where: { classId: warlock.id, name: "The Fiend" } })).id;
+    await prisma.character.create({
+      data: {
+        ...BASE,
+        ownerId: OWNER_ID,
+        id: CHAR_ID,
+        name: "LevelUpTx1712 Warlock",
+        experiencePoints: 2700, // level 4 threshold; hitDice.total 3 → 1 pending
+        hitPoints: { current: 22, max: 22, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 3, die: "d8", spent: 0 },
+        abilityScores: { strength: 8, dexterity: 14, constitution: 14, intelligence: 10, wisdom: 10, charisma: 16 },
+        spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
+        classEntries: { create: [{ name: "warlock", subclass: "The Fiend", subclassId: theFiend, classId: warlock.id, position: 0, level: 3 }] },
+      },
+    });
+  });
+
+  afterEach(async () => {
+    await prisma.spell.deleteMany({ where: { name: FORK_NAME } });
+  });
+
+  async function seedFork() {
+    const row2014 = {
+      name: FORK_NAME, level: 0, school: "evocation" as const, castingTime: "1 action", range: "30 feet",
+      duration: "Instantaneous", description: "The PHB'14 text.", concentration: false, ritual: false, cantripScaling: true,
+    };
+    const row2024 = { ...row2014, description: "The SRD 5.2 text." };
+    const fork2014 = await upsertEditionRow(prisma.spell, { name: FORK_NAME, edition: "EDITION_2014" }, { ...row2014, edition: "EDITION_2014" }, row2014);
+    const fork2024 = await upsertEditionRow(prisma.spell, { name: FORK_NAME, edition: "EDITION_2024" }, { ...row2024, edition: "EDITION_2024" }, row2024);
+    for (const spellId of [fork2014.id, fork2024.id]) {
+      await prisma.spellClass.upsert({
+        where: { spellId_className: { spellId, className: "warlock" } },
+        create: { spellId, className: "warlock" },
+        update: {},
+      });
+    }
+    return { fork2014, fork2024 };
+  }
+
+  it("rejects a 2024 character's level-up submitting the 2014 fork's id, naming the spell", async () => {
+    const { fork2014 } = await seedFork();
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
+    const spell = await prisma.spell.findFirstOrThrow({ where: { classMemberships: { some: { className: "warlock" } }, level: 1 }, select: { id: true } });
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entry.id },
+      hp: { method: "average" },
+      advancement: { type: "takeAsi", increases: [{ ability: "charisma", amount: 2 }] },
+      spellsLearned: [{ type: "learnSpell", spellId: spell.id }],
+      cantripsLearned: [{ type: "learnSpell", spellId: fork2014.id }],
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe(`${FORK_NAME} is 2014 rules content, not usable by a 2024 rules character`);
+    expect(await eventCount(CHAR_ID)).toBe(0);
+  });
+
+  it("admits the character's OWN edition fork — the rejection is fork-specific, not a blanket cross-edition ban", async () => {
+    const { fork2024 } = await seedFork();
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
+    const spell = await prisma.spell.findFirstOrThrow({ where: { classMemberships: { some: { className: "warlock" } }, level: 1 }, select: { id: true } });
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entry.id },
+      hp: { method: "average" },
+      advancement: { type: "takeAsi", increases: [{ ability: "charisma", amount: 2 }] },
+      spellsLearned: [{ type: "learnSpell", spellId: spell.id }],
+      cantripsLearned: [{ type: "learnSpell", spellId: fork2024.id }],
+    });
+    expect(res.status, res.body.error ?? "").toBe(200);
+    const names = res.body.spellcasting.spells.map((s: { name: string }) => s.name);
+    expect(names).toContain(FORK_NAME);
   });
 });
 

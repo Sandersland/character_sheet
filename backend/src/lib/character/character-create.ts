@@ -31,7 +31,7 @@ import {
 } from "@/lib/inventory/starting-equipment-package.js";
 import { creationSpellEntry } from "@/lib/spellcasting/spellcasting.js";
 import { clampPreparedToLimit, type SpellEntry } from "@/lib/spellcasting/spell-state.js";
-import { classesOf, SPELL_CLASS_MEMBERSHIP_SELECT } from "@/lib/spellcasting/spell-classes.js";
+import { classesOf, rejectCrossEditionSpellForks, SPELL_CLASS_MEMBERSHIP_SELECT } from "@/lib/spellcasting/spell-classes.js";
 import { subclassGateLevel } from "@/lib/leveling/effective-levels.js";
 import { DEFAULT_RULES_EDITION } from "@/lib/rules/edition.js";
 import { crossEditionRejection, resolveEditionRow, withEditionOrShared } from "@/lib/rules/catalog-edition.js";
@@ -1483,6 +1483,11 @@ async function resolveCreationSpells(
   const rows = allIds.length
     ? await prisma.spell.findMany({ where: { id: { in: allIds } }, include: SPELL_CLASS_MEMBERSHIP_SELECT })
     : [];
+  // #1712: reject a submitted id that's provably the WRONG edition's fork —
+  // see rejectCrossEditionSpellForks's own comment for why this doesn't
+  // reject every 2014 pick just because today's catalog is 2024-tagged.
+  const forkError = await rejectCrossEditionSpellForks(rows, edition);
+  if (forkError) return { ok: false, status: 400, error: forkError };
   const byId = new Map(rows.map((r) => [r.id, { ...r, classes: classesOf(r) }]));
   const maxLevel = maxSpellLevelForClass(className, 1, subclass, edition);
 

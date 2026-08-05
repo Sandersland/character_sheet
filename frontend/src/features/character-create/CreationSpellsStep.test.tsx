@@ -45,6 +45,7 @@ function renderStep(over: Partial<Parameters<typeof CreationSpellsStep>[0]> = {}
       counts={COUNTS}
       cantripIds={[]}
       spellIds={[]}
+      edition="EDITION_2024"
       onChange={onChange}
       {...over}
     />,
@@ -63,7 +64,7 @@ describe("CreationSpellsStep", () => {
   it("asks the server for the class's legal band, passing the served maxSpellLevel", async () => {
     renderStep();
     await screen.findByRole("button", { name: "Open Eldritch Blast" });
-    expect(fetchMock).toHaveBeenCalledWith({ className: "warlock", maxLevel: 1 });
+    expect(fetchMock).toHaveBeenCalledWith("EDITION_2024", { className: "warlock", maxLevel: 1 });
   });
 
   // #1510: a 2014 Cleric/Druid serves maxSpellLevel: 0 (cantrips-only — see
@@ -73,7 +74,7 @@ describe("CreationSpellsStep", () => {
   it("passes maxSpellLevel: 0 through to the fetch for a cantrips-only class", async () => {
     renderStep({ className: "cleric", counts: { cantrips: 3, spells: 0, maxSpellLevel: 0 } });
     await screen.findByRole("button", { name: "Open Eldritch Blast" });
-    expect(fetchMock).toHaveBeenCalledWith({ className: "cleric", maxLevel: 0 });
+    expect(fetchMock).toHaveBeenCalledWith("EDITION_2024", { className: "cleric", maxLevel: 0 });
   });
 
   // Each render keeps exactly one group alive, which is how the level-0 split can

@@ -1603,6 +1603,13 @@ model SpellClass {
   className String // lowercase class name, e.g. "wizard"
 
   @@unique([spellId, className])
+  // #1712 (folded in from #1711's review): className isn't the leading
+  // column of the unique(spellId, className) index above, so the ?class=
+  // route filter (classMemberships.some, spells.ts) can't use it — a
+  // dedicated index before the 2014 content slices (#1713-#1721) multiply
+  // the row count. See the hand-written migration's own comment for why this
+  // needed a manual migration.sql rather than `prisma migrate dev`.
+  @@index([className])
 }
 
 // Baseline equipment catalog, same role as Species/CharacterClass above: seeded
