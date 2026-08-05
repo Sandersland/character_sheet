@@ -163,7 +163,7 @@ describe("NULLS NOT DISTINCT — SubclassGrantedSpell(subclassId, spellId, editi
 });
 
 describe("worked example against the real seeded catalog (#1306)", () => {
-  it("Alert resolves to a different row per edition; Grappler resolves to the same shared row", async () => {
+  it("Alert AND Grappler both resolve to a different row per edition (#1310: Grappler forks too, superseding #1306's original 'stays shared' illustration)", async () => {
     const alertRows = await prisma.feat.findMany({
       where: { name: "Alert" },
       select: { id: true, edition: true, improvements: true },
@@ -182,11 +182,12 @@ describe("worked example against the real seeded catalog (#1306)", () => {
       where: { name: "Grappler" },
       select: { id: true, edition: true },
     });
-    expect(grapplerRows).toHaveLength(1);
+    expect(grapplerRows).toHaveLength(2);
     const grappler2014 = resolveEditionRow(grapplerRows, "EDITION_2014");
     const grappler2024 = resolveEditionRow(grapplerRows, "EDITION_2024");
     expect(grappler2014).toBeDefined();
-    expect(grappler2014!.id).toBe(grappler2024!.id);
+    expect(grappler2024).toBeDefined();
+    expect(grappler2014!.id).not.toBe(grappler2024!.id);
   });
 
   it("neither edition resolves a name absent from the catalog", async () => {

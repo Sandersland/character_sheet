@@ -18,7 +18,7 @@ import type { ClassDefinition } from "@/lib/classes/types.js";
 import { warlock } from "@/lib/classes/warlock.js";
 import { wizard } from "@/lib/classes/wizard.js";
 
-import { CLASSES, ITEMS } from "../catalog-data.js";
+import { BACKGROUNDS, CLASSES, ITEMS } from "../catalog-data.js";
 import { ACTIONS, TWENTY_FOUR_ONLY_ACTION_KEYS } from "../actions.js";
 import { SUBCLASSES } from "../subclasses.js";
 import { MANEUVERS } from "../maneuvers.js";
@@ -239,8 +239,11 @@ describe("FEATS — PHB'24 category invariants", () => {
     expect(missing, "feats without a category").toEqual([]);
   });
 
-  it("General feats have levelPrerequisite 4, a nonempty abilityOptions, and abilityIncrease 1", () => {
-    for (const f of FEATS.filter((f) => f.category === "general")) {
+  // #1310: scoped to EDITION_2024 — PHB'14's "general" rows (below) carry no
+  // levelPrerequisite (PHB'14 p.165 has no per-feat level gate) and 13 of the
+  // 18 shared General names grant no PHB'14 ability bump.
+  it("2024 General feats have levelPrerequisite 4, a nonempty abilityOptions, and abilityIncrease 1", () => {
+    for (const f of FEATS.filter((f) => f.category === "general" && f.edition === "EDITION_2024")) {
       expect(f.levelPrerequisite, `${f.name} levelPrerequisite`).toBe(4);
       expect((f.abilityOptions ?? []).length, `${f.name} abilityOptions`).toBeGreaterThan(0);
       expect(f.abilityIncrease, `${f.name} abilityIncrease`).toBe(1);
@@ -279,10 +282,11 @@ describe("FEATS — PHB'24 category invariants", () => {
     expect(byName.get("Great Weapon Fighting")?.improvements ?? []).toEqual([]);
   });
 
-  // #1306 worked example: the epic's own illustration (Alert forks, Grappler
-  // stays shared) — pins the actual seeded data, not just resolveEditionRow's
-  // pure logic.
-  it("Alert forks by edition (SRD 5.2 vs PHB'14 p.165); Grappler stays one shared row", () => {
+  // #1306 worked example, superseded by #1310: Grappler now forks too — every
+  // Feat row is edition-tagged (empty shared-NULL set, ACTIONS/#1430 precedent),
+  // so "Grappler stays one shared row" (#1306's original illustration) is
+  // deliberately inverted here rather than left passing for the wrong reason.
+  it("Alert AND Grappler both fork by edition (SRD 5.2 vs PHB'14 p.165; SRD 5.2 vs SRD 5.1)", () => {
     const alerts = FEATS.filter((f) => f.name === "Alert");
     expect(alerts).toHaveLength(2);
     expect(alerts.map((f) => f.edition).sort()).toEqual(["EDITION_2014", "EDITION_2024"]);
@@ -290,10 +294,22 @@ describe("FEATS — PHB'24 category invariants", () => {
     const alert2024 = alerts.find((f) => f.edition === "EDITION_2024")!;
     expect(alert2014.improvements).toEqual([{ target: "initiative", amount: 5 }]);
     expect(alert2024.improvements).toEqual([{ target: "initiative", amount: 1, scaling: "proficiencyBonus" }]);
+    // #1310: PHB'14 has no Origin taxonomy — the 2014 row's category moves to
+    // "general" (the corollary is it takes an ASI slot; the 2024 row stays
+    // "origin", background-granted only).
+    expect(alert2014.category).toBe("general");
+    expect(alert2024.category).toBe("origin");
 
     const grapplers = FEATS.filter((f) => f.name === "Grappler");
-    expect(grapplers).toHaveLength(1);
-    expect(grapplers[0].edition).toBeUndefined();
+    expect(grapplers).toHaveLength(2);
+    expect(grapplers.map((f) => f.edition).sort()).toEqual(["EDITION_2014", "EDITION_2024"]);
+    const grappler2014 = grapplers.find((f) => f.edition === "EDITION_2014")!;
+    const grappler2024 = grapplers.find((f) => f.edition === "EDITION_2024")!;
+    // 2014 (SRD 5.1): no ability bump, flat Strength 13+ prerequisite.
+    expect(grappler2014.abilityIncrease).toBeUndefined();
+    expect(grappler2014.prerequisite).toBe("Strength 13+");
+    // 2024: adds the half-feat bump and a Strength-or-Dexterity choice.
+    expect(grappler2024.abilityIncrease).toBe(1);
   });
 
   it("only Magic Initiate and Skilled are repeatable", () => {
@@ -377,6 +393,86 @@ describe("FEATS — 2014 Fighting Style feats (#1311)", () => {
     for (const name of STYLES_2014) {
       const row = FEATS.find((f) => f.name === name && f.edition === "EDITION_2014");
       expect(row?.prerequisite ?? "", name).toContain("Fighting Style");
+    }
+  });
+});
+
+// PHB'14 pp. 165-170 (#1310): restores the 2014 half of the catalog `6491c528`
+// (#1154) replaced. PHB'14 has no Origin/Fighting Style/Epic Boon taxonomy, so
+// every 2014 row is "general" with no levelPrerequisite — featOfferedForAsiSlot's
+// `?? 4` default IS the 2014 "earliest ASI is level 4" rule, not a fudge.
+describe("FEATS — 2014 general/origin catalog (#1310)", () => {
+  const feats2014 = () => FEATS.filter((f) => f.edition === "EDITION_2014" && f.category !== "fighting_style");
+
+  it("seeds exactly 26 EDITION_2014 general-category rows (the 24 6491c528 deleted, plus Grappler and Savage Attacker)", () => {
+    const rows = feats2014();
+    expect(rows).toHaveLength(26);
+    expect(rows.every((f) => f.category === "general")).toBe(true);
+    expect(rows.every((f) => f.levelPrerequisite == null)).toBe(true);
+  });
+
+  it("contains Mobile, not Speedy; the 2024 catalog has Speedy, not Mobile", () => {
+    const names2014 = new Set(feats2014().map((f) => f.name));
+    expect(names2014.has("Mobile")).toBe(true);
+    expect(names2014.has("Speedy")).toBe(false);
+
+    const names2024 = new Set(FEATS.filter((f) => f.edition === "EDITION_2024").map((f) => f.name));
+    expect(names2024.has("Speedy")).toBe(true);
+    expect(names2024.has("Mobile")).toBe(false);
+  });
+
+  it("Mobile carries the +10 speed improvement recovered verbatim from the pre-#1154 catalog", () => {
+    const mobile = feats2014().find((f) => f.name === "Mobile");
+    expect(mobile?.improvements).toEqual([{ target: "speed", amount: 10 }]);
+  });
+
+  it("2014 Grappler has no ability bump and a flat Strength 13+ prerequisite (SRD 5.1)", () => {
+    const grappler = feats2014().find((f) => f.name === "Grappler");
+    expect(grappler?.prerequisite).toBe("Strength 13+");
+    expect(grappler?.abilityOptions ?? []).toEqual([]);
+    expect(grappler?.abilityIncrease).toBeUndefined();
+  });
+
+  it("2014 Savage Attacker is melee-only and grants no ability bump (PHB'14, distinct from 2024's any-weapon Origin version)", () => {
+    const savageAttacker = feats2014().find((f) => f.name === "Savage Attacker");
+    expect(savageAttacker?.description).toMatch(/melee weapon attack/i);
+    expect(savageAttacker?.abilityOptions ?? []).toEqual([]);
+  });
+
+  it("2014 Weapon Master states the weapon choice in its description and carries no hardcoded improvements", () => {
+    const weaponMaster = feats2014().find((f) => f.name === "Weapon Master");
+    expect(weaponMaster?.description).toMatch(/of your choice/i);
+    expect(weaponMaster?.improvements ?? []).toEqual([]);
+  });
+
+  it("2014 Magic Initiate and Skilled are not repeatable (PHB'14 p.165: once-only unless stated otherwise)", () => {
+    for (const name of ["Magic Initiate", "Skilled"]) {
+      const row = feats2014().find((f) => f.name === name);
+      expect(row?.repeatable, name).toBeFalsy();
+    }
+  });
+
+  it("carries zero rows of category origin, fighting_style, or epic_boon", () => {
+    const rows = FEATS.filter((f) => f.edition === "EDITION_2014");
+    const offCategory = rows.filter((f) => (["origin", "epic_boon"] as const).includes(f.category as never));
+    expect(offCategory.map((f) => f.name)).toEqual([]);
+  });
+
+  it("no Feat row is left edition-NULL — every row (2014 or 2024) carries an edition", () => {
+    const shared = FEATS.filter((f) => !f.edition).map((f) => f.name);
+    expect(shared).toEqual([]);
+  });
+
+  // The four originFeatName values BACKGROUNDS references — buildOriginEntry
+  // resolves them by name against the creating character's edition and returns
+  // null on a miss (character-create.ts), so a gap here would silently drop a
+  // background's Origin feat grant for whichever edition the miss lands on.
+  it("every BACKGROUNDS originFeatName has both an EDITION_2014 and EDITION_2024 row", () => {
+    const originFeatNames = [...new Set(BACKGROUNDS.map((b) => b.originFeatName).filter((n): n is string => !!n))];
+    expect(originFeatNames.length).toBeGreaterThan(0);
+    for (const name of originFeatNames) {
+      const editions = FEATS.filter((f) => f.name === name).map((f) => f.edition).sort();
+      expect(editions, name).toEqual(["EDITION_2014", "EDITION_2024"]);
     }
   });
 });

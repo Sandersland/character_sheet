@@ -69,8 +69,9 @@ describe("GET /api/reference", () => {
   // mechanics — the SAME Criminal/Soldier rows that grant both above (#1130)
   // must serve neither under EDITION_2014, proving the gate is on the
   // requesting edition and not merely on which rows are edition-tagged
-  // (Soldier's Savage Attacker is a shared `edition: null` row, granted to
-  // both editions before this fix).
+  // (Soldier's Savage Attacker is edition-tagged the same as Alert since
+  // #1310 — a real EDITION_2014 row exists and IS reachable by 2014 in every
+  // other respect, but still suppressed here).
   it("suppresses the ability spread and origin feat for every background under EDITION_2014 (#1504, #1572)", async () => {
     const response = await supertest
       .agent(app)
@@ -259,9 +260,10 @@ describe("GET /api/reference", () => {
     expect(byName(criminal2014.body, "Folk Hero").originFeat).toBeNull();
     expect(byName(criminal2024.body, "Folk Hero")).toBeUndefined();
 
-    // Soldier: Savage Attacker is edition: null (shared path) — reachable by
-    // 2014 in every OTHER respect, but still suppressed here: the gate is on
-    // the REQUESTING edition, not on whether the feat row is edition-tagged.
+    // Soldier: Savage Attacker is edition-tagged (#1310, both an EDITION_2014
+    // and EDITION_2024 row exist) — reachable by 2014 in every OTHER respect,
+    // but still suppressed here: the gate is on the REQUESTING edition, not
+    // on whether the feat row is edition-tagged.
     expect(byName(criminal2014.body, "Soldier").originFeat).toBeNull();
     expect(byName(criminal2024.body, "Soldier").originFeat.name).toBe("Savage Attacker");
   });

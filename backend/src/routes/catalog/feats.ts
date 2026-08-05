@@ -49,7 +49,6 @@ featsRouter.get("/feats", async (req, res) => {
           featOfferedForAsiSlot(
             { category: row.category as FeatCategory, levelPrerequisite: row.levelPrerequisite },
             asiLevel,
-            edition,
           ),
         );
 

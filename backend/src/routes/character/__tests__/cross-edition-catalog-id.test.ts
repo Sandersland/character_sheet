@@ -37,10 +37,11 @@ beforeAll(async () => {
 });
 
 describe("Chunk 1 — Feat / advancement.takeFeat (lib/leveling/advancement.ts:353)", () => {
-  // The seeded Alert fork (#1306's worked example) is unusable here: both rows
-  // are category "origin", rejected by featOfferedForAsiSlot BEFORE the guard
-  // runs — a naive test against Alert would pass for the wrong reason. This
-  // trio is "general" category, reachable through the ASI slot at level 4.
+  // The seeded Alert fork (#1306's worked example) is unusable here: the
+  // Alert 2024 row is "origin"-gated, rejected by featOfferedForAsiSlot
+  // BEFORE the guard runs — a naive test against Alert would pass for the
+  // wrong reason. This trio is "general" category, reachable through the ASI
+  // slot at level 4.
   const FEAT_2014 = "XEd General 2014";
   const FEAT_2024 = "XEd General 2024";
   const FEAT_SHARED = "XEd General Shared";

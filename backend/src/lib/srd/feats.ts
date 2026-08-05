@@ -3,28 +3,28 @@ import { z } from "zod";
 import type { AdvancementEntry } from "@/lib/classes/resources.js";
 import type { FeatImprovement } from "@/lib/classes/resources-state.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
-import type { RulesEdition } from "@character-sheet/shared-types";
 
 /** PHB'24 feat categories (local union keeps srd/ a dependency leaf). */
 export type FeatCategory = "origin" | "general" | "fighting_style" | "epic_boon";
 
 /**
- * Whether a feat may be taken via an Ability Score Improvement slot at `level`
- * (PHB'24 pp. 87-88). Origin feats come from backgrounds and Fighting Style from
- * class features, so neither is ever offered here; General unlocks at level 4 and
- * Epic Boon at level 19 unless the feat overrides levelPrerequisite.
+ * Whether a feat may be taken via an Ability Score Improvement slot at `level`.
+ * Origin feats come from backgrounds and Fighting Style from class features, so
+ * neither is ever offered here; General unlocks at level 4 and Epic Boon at
+ * level 19 unless the feat overrides levelPrerequisite.
  *
- * Both editions resolve identically today: origin/general/fighting_style/epic_boon
- * is PHB'24 taxonomy and no 2014 Feat rows exist outside the already-forked Alert
- * pair, so there is nothing for a 2014 branch to decide yet. `edition` is threaded
- * now (last parameter, per subclassGateLevel) so #1310's 2014 feat catalog changes
- * this body instead of every call site — a unit test pins the two verdicts equal.
+ * Edition-invariant (#1310): PHB'24 pp. 87-88 draws this exact taxonomy, and
+ * PHB'14's every-feat-is-general-with-no-level-gate rule (p.165, earliest ASI
+ * at level 4 in any 2014 class) is faithfully encoded by 2014's Feat rows
+ * carrying `category: "general"` with a NULL levelPrerequisite — so the
+ * `general` branch's `?? 4` default already IS the 2014 rule, with no fork
+ * needed. `origin`/`fighting_style`/`epic_boon` rows are all EDITION_2024-tagged,
+ * so a 2014 character can never reach those branches at all. No `edition`
+ * parameter, per CLAUDE.md: "an edition-invariant rule takes no edition."
  */
 export function featOfferedForAsiSlot(
   feat: { category: FeatCategory; levelPrerequisite?: number | null },
   level: number,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- the #1310 fork seam; see JSDoc, both editions resolve identically until 2014 feats exist
-  edition: RulesEdition,
 ): boolean {
   switch (feat.category) {
     case "origin":
