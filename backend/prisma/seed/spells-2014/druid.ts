@@ -5,9 +5,13 @@
 // class present (i.e. neither Wizard nor Cleric is on that spell's list). A
 // spell on 3+ lists is authored in shared.ts (#1713) instead; this file never
 // re-transcribes one, only relies on shared.ts already fanning "druid" into
-// its classes[] (verified: every one of the 64 3+-list PHB'14 Druid spells
-// already carries a druid membership row in shared.ts — no gaps found, no
-// membership edits needed there for this slice).
+// its classes[] (verified at the time: every one of the 64 3+-list PHB'14
+// Druid spells already carried a druid membership row in shared.ts — no
+// gaps found, no membership edits needed there for this slice. #1742's own
+// non-SRD-3+-list audit later found one more — Feign Death, a
+// Bard/Cleric/Druid/Wizard 4-list spell missing from every slice entirely —
+// and added it to shared.ts with a druid tag, bumping this count from 64 to
+// 65).
 // Wizard-owned 2-list spells Druid also gets (Flaming Sphere, Conjure Minor
 // Elementals, Conjure Elemental, Antipathy/Sympathy, Shapechange) are already
 // tagged with druid membership in wizard.ts (#1714) — not re-authored here.
@@ -39,7 +43,8 @@
 // tie-break (Druid outranks Ranger), each cited PHB'14 p.NN individually and
 // cross-checked word-for-word against a second source (see their own
 // per-row comments). This file now owns 32 rows total (30 SRD + these 2
-// hand-transcribed), 108 total PHB'14 Druid spells.
+// hand-transcribed), 109 total PHB'14 Druid spells (108 as of #1721, bumped
+// to 109 by #1742's Feign Death addition to shared.ts above).
 //
 // Every OTHER owned row below (the original 30) is verbatim SRD 5.1 text via
 // dnd5eapi, cited SRD 5.1 as a whole rather than per-row (this file's own

@@ -139,7 +139,7 @@ describe("RANGER_SPELLS_2014 — full PHB'14 Ranger membership is complete acros
     "Daylight",
     "Nondetection",
     "Plant Growth",
-    "Protection From Energy",
+    "Protection from Energy",
     "Speak with Plants",
     "Water Breathing",
     "Water Walk",
