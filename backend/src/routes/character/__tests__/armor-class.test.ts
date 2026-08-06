@@ -269,4 +269,52 @@ describe("derived armorClass", () => {
       { label: "Shield", value: 2 },
     ]);
   });
+
+  // Draconic Resilience (#1122, PHB'14 p.106): "When you aren't wearing armor,
+  // your AC equals 13 + your Dexterity modifier." 2014-only for now — the 2024
+  // fork (10+Dex+Cha at Sorcerer L3) is out of scope, see draconicResilienceBase.
+  describe("Draconic Resilience (#1122, 2014)", () => {
+    beforeEach(async () => {
+      await prisma.character.update({
+        where: { id: FIXTURE_ID },
+        data: {
+          rulesEdition: "EDITION_2014",
+          abilityScores: { ...FIXTURE.abilityScores, dexterity: 14 },
+          classEntries: { create: [{ name: "Sorcerer", subclass: "Draconic Bloodline", position: 0 }] },
+        },
+      });
+    });
+
+    it("unarmored Draconic sorcerer with Dex 14 has AC 15, +2 with a shield", async () => {
+      const res = await get();
+      expect(res.body.armorClass).toBe(15); // 13 + Dex 2
+      expect(res.body.armorClassBreakdown).toEqual([
+        { label: "Draconic Resilience", value: 13 },
+        { label: "Dex", value: 2 },
+      ]);
+      const withShield = await acquire(shield);
+      expect(withShield.body.armorClass).toBe(17);
+    });
+
+    it("wearing armor lets the armor formula win (feature inactive)", async () => {
+      const res = await acquire(chainMail);
+      expect(res.body.armorClass).toBe(16); // heavy armor, Draconic Resilience suppressed
+      expect(res.body.armorClassBreakdown).toEqual([{ label: "Test Chain Mail", value: 16 }]);
+    });
+
+    it("a non-Draconic sorcerer subclass does not get the override", async () => {
+      await prisma.characterClassEntry.updateMany({
+        where: { characterId: FIXTURE_ID },
+        data: { subclass: "Wild Magic" },
+      });
+      const res = await get();
+      expect(res.body.armorClass).toBe(12); // 10 + Dex 2, no override
+    });
+
+    it("is gated to EDITION_2014 (2024 fork not implemented, #1122)", async () => {
+      await prisma.character.update({ where: { id: FIXTURE_ID }, data: { rulesEdition: "EDITION_2024" } });
+      const res = await get();
+      expect(res.body.armorClass).toBe(12); // 10 + Dex 2, override withheld pending the 2024 fork
+    });
+  });
 });
