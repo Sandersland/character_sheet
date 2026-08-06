@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { deriveArmorClass, deriveArmorClassParts } from "@/lib/srd/srd.js";
+import { deriveArmorClass, deriveArmorClassParts, draconicResilienceBase } from "@/lib/srd/srd.js";
 
 const leather = { armorCategory: "light" as const, baseArmorClass: 11 };
 const halfPlate = { armorCategory: "medium" as const, baseArmorClass: 15, dexModifierMax: 2 };
@@ -214,5 +214,48 @@ describe("Mage Armor unarmored base override (#363)", () => {
 
   it("is ignored while wearing body armor (suppressed at derive time)", () => {
     expect(deriveArmorClass(leather, false, 2, undefined, mageArmor)).toBe(deriveArmorClass(leather, false, 2));
+  });
+});
+
+describe("draconicResilienceBase (#1122)", () => {
+  it("is 13 + Dex in 2014 (PHB'14 p.106)", () => {
+    expect(draconicResilienceBase("EDITION_2014")).toEqual({ label: "Draconic Resilience", value: 13 });
+  });
+
+  it("is not implemented for 2024 yet — the 10+Dex+Cha@L3 fork is out of scope for #1122", () => {
+    expect(draconicResilienceBase("EDITION_2024")).toBeUndefined();
+  });
+});
+
+describe("Draconic Resilience unarmored base override (#1122)", () => {
+  const ud = (classNames: string[], conMod: number, wisMod: number) => ({ classNames, conMod, wisMod });
+  const draconicResilience = { label: "Draconic Resilience", value: 13 };
+
+  it("sets the unarmored base to 13 + Dex, beating 10 + Dex", () => {
+    const parts = deriveArmorClassParts(null, false, 2, undefined, undefined, draconicResilience);
+    expect(parts).toEqual([{ label: "Draconic Resilience", value: 13 }, { label: "Dex", value: 2 }]);
+    expect(parts.reduce((t, p) => t + p.value, 0)).toBe(15);
+  });
+
+  it("Dex 14 (+2), unarmored: AC 15, shield stacks to 17 (acceptance criteria)", () => {
+    expect(deriveArmorClass(null, false, 2, undefined, undefined, draconicResilience)).toBe(15);
+    expect(deriveArmorClass(null, true, 2, undefined, undefined, draconicResilience)).toBe(17);
+  });
+
+  it("keeps the higher of Draconic Resilience and Unarmored Defense (best-of)", () => {
+    // Barbarian 10 + Dex2 + Con5 = 17 beats Draconic Resilience 13 + Dex2 = 15.
+    expect(deriveArmorClass(null, false, 2, ud(["barbarian"], 5, 0), undefined, draconicResilience)).toBe(17);
+    // Draconic Resilience 13 + Dex2 = 15 beats a Con-less barbarian 10 + Dex2 = 12.
+    expect(deriveArmorClass(null, false, 2, ud(["barbarian"], 0, 0), undefined, draconicResilience)).toBe(15);
+  });
+
+  it("competes best-of with a simultaneous Mage Armor override", () => {
+    // Same 13+Dex shape, so they tie — either label wins, but the value is unaffected.
+    const parts = deriveArmorClassParts(null, false, 2, undefined, { label: "Mage Armor", value: 13 }, draconicResilience);
+    expect(parts.reduce((t, p) => t + p.value, 0)).toBe(15);
+  });
+
+  it("is ignored while wearing body armor (feature inactive per acceptance criteria)", () => {
+    expect(deriveArmorClass(leather, false, 2, undefined, undefined, draconicResilience)).toBe(deriveArmorClass(leather, false, 2));
   });
 });

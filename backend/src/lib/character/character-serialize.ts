@@ -351,6 +351,7 @@ export function serializeCharacter(rawRow: CharacterRow) {
     clampedAdvancements,
     featBonuses,
     buffTargets,
+    editionOf(row),
   );
   const speed = buildSpeedView(row, bestArmor, hasShield, featBonuses, buffTargets, conditions.exhaustion, editionOf(row));
   const unarmedAttacks = buildUnarmedAttacksView(
