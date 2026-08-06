@@ -11,11 +11,20 @@ import { ABILITY_NAMES } from "./species-ability-increases.js";
 //                       Versatility, 2024 Human's Skillful, 2024 Elf's Keen
 //                       Senses (`from`-restricted to Insight/Perception/
 //                       Survival, #1690).
-//   - chooseCantrip:    pick one cantrip from a named class spell list
+//   - chooseCantrip:    pick one cantrip, from EITHER a named class spell list
 //                       (`list`, lowercase — matches SpellClass.className's own
-//                       case), with a FIXED casting ability that need not be the
-//                       character's own class ability — High Elf's Cantrip
-//                       (Intelligence, regardless of the character's class).
+//                       case; High Elf's whole wizard list) OR an explicit set
+//                       of named cantrips (`spells`; Astral Fire's Dancing
+//                       Lights / Light / Sacred Flame, #1756) — exactly one of
+//                       the two. `castingAbility` is optional: present pins a
+//                       FIXED ability that need not be the character's own class
+//                       ability (High Elf's Intelligence); absent means the
+//                       player chooses Int/Wis/Cha at creation (Astral Fire),
+//                       the same input.castingAbility field a 2024 lineage grant
+//                       uses. resolveSpeciesCantripGrant validates the pick
+//                       against whichever of list/spells is set;
+//                       resolveCastingAbility requires the player's ability iff
+//                       chooseCantripNeedsPlayerAbility.
 //   - chooseOriginFeat: pick one Origin-category Feat (#1690, 2024 Human's
 //                       Versatile) — validated + baked via the SAME
 //                       slot-exempt snapshot AdvancementEntry path the
@@ -58,10 +67,20 @@ const chooseCantripSchema = z
         // case (creationPickError's `row.classes.includes(className)` check,
         // resolved off the join — see spell-classes.ts) —
         // "wizard" for High Elf, never "Wizard".
-        list: z.string().min(1),
-        castingAbility: z.enum(ABILITY_NAMES),
+        list: z.string().min(1).optional(),
+        // Explicit named cantrips (Astral Fire, #1756) — matched by Spell.name
+        // in resolveSpeciesCantripGrant, mutually exclusive with `list`.
+        spells: z.array(z.string().min(1)).min(1).optional(),
+        // Absent = the player picks Int/Wis/Cha at creation
+        // (chooseCantripNeedsPlayerAbility); present pins a fixed ability.
+        castingAbility: z.enum(ABILITY_NAMES).optional(),
       })
-      .strict(),
+      .strict()
+      // #1756: exactly one of list/spells — a class list OR a named set, never
+      // both and never neither.
+      .refine((c) => (c.list == null) !== (c.spells == null), {
+        message: "chooseCantrip must carry exactly one of `list` or `spells`",
+      }),
   })
   .strict();
 
@@ -83,6 +102,14 @@ export function isChooseSkills(choice: SpeciesTraitChoice): choice is { chooseSk
 
 export function isChooseCantrip(choice: SpeciesTraitChoice): choice is { chooseCantrip: ChooseCantrip } {
   return "chooseCantrip" in choice;
+}
+
+// #1756: whether a chooseCantrip spec leaves the casting ability to the player
+// (Astral Fire) rather than pinning it (High Elf's Intelligence). Shared by the
+// create path (resolveCastingAbility) and reference serialization
+// (needsCastingAbility) so the "player must choose" predicate can't drift.
+export function chooseCantripNeedsPlayerAbility(spec: ChooseCantrip | null): boolean {
+  return spec != null && spec.castingAbility == null;
 }
 
 export function isChooseOriginFeat(choice: SpeciesTraitChoice): choice is { chooseOriginFeat: true } {

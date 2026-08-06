@@ -292,9 +292,10 @@ const ELF_2014: SpeciesTraitSeed[] = [
     ],
   },
   // Astral Elf (#1751) — Spelljammer: Astral Adventurer's Guide, non-SRD, so
-  // cited SJ:AAG (not SRD/PHB), announce-only. Astral Fire's cantrip +
-  // casting-ability pick and Astral Trance's per-rest skill/tool pick remain
-  // genuine choices, not creation-time FeatImprovements. Keen Senses is NOT
+  // cited SJ:AAG (not SRD/PHB). Astral Fire is a real chooseCantrip choice
+  // (#1756) — its cantrip + casting-ability pick; Astral Trance's per-rest
+  // skill/tool pick remains announce-only (a per-rest, not creation-time,
+  // choice). Neither is a creation-time FeatImprovement. Keen Senses is NOT
   // re-declared here: the base Elf's own species-level Keen Senses is a fixed
   // skillProficiency:perception grant (SRD 5.1 p. 21, #1754) that renders for
   // this variant exactly the way base Darkvision/Fey Ancestry do
@@ -307,7 +308,12 @@ const ELF_2014: SpeciesTraitSeed[] = [
     variantSlug: "astral",
     name: "Astral Fire",
     description:
-      "You know one cantrip of your choice from Dancing Lights, Light, or Sacred Flame. Intelligence, Wisdom, or Charisma is your spellcasting ability for it (choose when you select this species). (SJ:AAG p. 10) — choice mechanics deferred, as with High Elf Cantrip.",
+      "You know one cantrip of your choice from Dancing Lights, Light, or Sacred Flame. Intelligence, Wisdom, or Charisma is your spellcasting ability for it (choose when you select this species). (SJ:AAG p. 10)",
+    // #1756: an explicit 3-cantrip list with a player-chosen casting ability —
+    // resolveSpeciesCantripGrant validates the pick against `spells`, and
+    // chooseCantripNeedsPlayerAbility keys the required Int/Wis/Cha choice off
+    // the absent castingAbility.
+    choice: { chooseCantrip: { spells: ["Dancing Lights", "Light", "Sacred Flame"] } },
   },
   {
     speciesSlug: "elf",
