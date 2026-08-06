@@ -5,14 +5,17 @@ import { expect, type Page } from "@playwright/test";
 // Identity step is reachable at all. Solo + the 2024 default are pre-selected,
 // so any spec that just wants to walk the ceremony accepts them with one click.
 //
-// #1371 gates the picker so 2014 can never be chosen directly — reaching a 2014
-// character now means inheriting from a 2014 campaign, so `campaign` (the
-// campaign card's accessible name) selects that card instead of a rules radio.
-// #1372 (the ungate) restores a direct edition-selection path here.
-export async function passEntryGate(page: Page, opts: { campaign?: string } = {}): Promise<void> {
+// Two ways to land on 2014: `campaign` inherits it from a 2014 campaign card
+// (the pre-#1372 route, still real — a player joining a 2014 table never sees
+// a picker at all); `edition` clicks the "2014 rules" radio directly, the path
+// #1372 restored. Passing both is meaningless (a chosen campaign hides the
+// picker entirely), so callers pick one.
+export async function passEntryGate(page: Page, opts: { campaign?: string; edition?: "2014" | "2024" } = {}): Promise<void> {
   await expect(page.getByRole("heading", { name: "Who's this character for?" })).toBeVisible();
   if (opts.campaign) {
     await page.getByRole("radio", { name: opts.campaign }).click();
+  } else if (opts.edition) {
+    await page.getByRole("radio", { name: `${opts.edition} rules` }).click();
   }
   await page.getByRole("button", { name: /Continue/ }).click();
 }

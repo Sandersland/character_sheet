@@ -38,13 +38,14 @@ describe("GET /api/editions", () => {
     expect(res.body.defaultEdition).toBe("EDITION_2024");
   });
 
-  it("carries unavailableReason on 2014 only (#1371/#1372)", async () => {
+  // #1372 ungates 2014: both rows are the same shape and neither carries
+  // unavailableReason — the field #1371 added and this issue removes.
+  it("serves both editions selectable, with no unavailableReason on either (#1372)", async () => {
     const res = await supertest(app).get("/api/editions").set("Cookie", COOKIE);
     const [twentyFour, fourteen] = res.body.editions;
 
     expect(Object.keys(twentyFour).sort()).toEqual(["description", "key", "label"]);
-    expect(Object.keys(fourteen).sort()).toEqual(["description", "key", "label", "unavailableReason"]);
-    expect(fourteen.unavailableReason).toMatch(/Not available yet/);
+    expect(Object.keys(fourteen).sort()).toEqual(["description", "key", "label"]);
   });
 
   it("ignores ?edition= rather than validating it — the param is meaningless here", async () => {

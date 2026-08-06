@@ -3,7 +3,6 @@ import { Router } from "express";
 import {
   DEFAULT_RULES_EDITION,
   EDITION_DESCRIPTIONS,
-  EDITION_UNAVAILABLE,
   RULES_EDITION_DISPLAY_ORDER,
   RULES_EDITION_LABELS,
 } from "@/lib/rules/edition.js";
@@ -37,9 +36,6 @@ editionsRouter.get("/editions", (_req, res) => {
       key,
       label: RULES_EDITION_LABELS[key],
       description: EDITION_DESCRIPTIONS[key],
-      // Omitted, not null, for an available edition — the client's presence
-      // check is what marks a card unselectable (#1371).
-      ...(EDITION_UNAVAILABLE[key] ? { unavailableReason: EDITION_UNAVAILABLE[key] } : {}),
     })),
   });
 });

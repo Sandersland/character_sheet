@@ -96,12 +96,22 @@ interface CreateCharacterOpts {
   experiencePoints?: number;
   // Override the module-level defaults, e.g. Wis 16 for a monk / Con 15 for a barbarian.
   abilityScores?: Partial<AbilityScores>;
+  // #1372: omit for the EDITION_2024 default every other e2e fixture wants;
+  // a 2014 character needs its species resolved against the 2014 catalog too
+  // (a 2024-only species id would 400 cross-edition), so this one field drives
+  // both the species lookup and the create body's own rulesEdition.
+  rulesEdition?: "EDITION_2014" | "EDITION_2024";
 }
 
-// #1684: resolve a species name → catalog id via GET /api/reference.
-// EDITION_2024 always — no e2e fixture this file builds needs 2014.
-async function resolveSpeciesId(request: APIRequestContext, name: string): Promise<string> {
-  const response = await request.get("/api/reference?edition=EDITION_2024");
+// #1684: resolve a species name → catalog id via GET /api/reference, scoped to
+// the requesting character's own edition (#1372) — a species id from the wrong
+// edition's catalog 400s at creation (crossEditionRejection).
+async function resolveSpeciesId(
+  request: APIRequestContext,
+  name: string,
+  edition: "EDITION_2014" | "EDITION_2024",
+): Promise<string> {
+  const response = await request.get(`/api/reference?edition=${edition}`);
   expect(response.ok(), `load reference: ${response.status()}`).toBeTruthy();
   const { species } = (await response.json()) as { species: { id: string; name: string }[] };
   const match = species.find((s) => s.name === name);
@@ -115,7 +125,8 @@ export async function createCharacter(
   request: APIRequestContext,
   opts: CreateCharacterOpts,
 ): Promise<string> {
-  const speciesId = await resolveSpeciesId(request, opts.speciesName ?? "Halfling");
+  const edition = opts.rulesEdition ?? "EDITION_2024";
+  const speciesId = await resolveSpeciesId(request, opts.speciesName ?? "Halfling", edition);
   const response = await request.post("/api/characters", {
     data: {
       name: opts.name,
@@ -124,6 +135,7 @@ export async function createCharacter(
       background: opts.background ?? "Sage",
       classes: [{ name: opts.className }],
       abilityScores: { ...ABILITY_SCORES, ...opts.abilityScores },
+      ...(opts.rulesEdition ? { rulesEdition: opts.rulesEdition } : {}),
     },
   });
   expect(response.ok(), `create ${opts.name}: ${response.status()}`).toBeTruthy();
@@ -146,9 +158,9 @@ export async function setExperience(
   expect(response.ok(), `set XP: ${response.status()}`).toBeTruthy();
 }
 
-// Create a campaign via the API and return its id. #1371 gates the picker so no
-// UI path can create a 2014 campaign; a 2014 campaign is only reachable through
-// this endpoint (or pre-existing data), so specs that need one must go through it.
+// Create a campaign via the API and return its id — faster and more direct
+// than driving CampaignsPage's form for a spec that only needs the campaign to
+// exist (e.g. to inherit its edition), not to exercise the creation UI itself.
 export async function createCampaign(
   request: APIRequestContext,
   opts: { name: string; rulesEdition?: "EDITION_2014" | "EDITION_2024" },

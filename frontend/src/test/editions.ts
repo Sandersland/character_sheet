@@ -14,9 +14,6 @@ export const SERVED_EDITIONS: EditionOption[] = [
     key: "EDITION_2014",
     label: "2014 rules",
     description: "The original 5th edition rulebooks, sometimes called \"classic\" 5e.",
-    // #1506: "Monk rules" dropped — the 2014 Monk shipped in full (epic #1313).
-    unavailableReason:
-      "Not available yet — the 2014 feats, fighting styles, and caster model haven't shipped, and a character's edition can't be changed later.",
   },
 ];
 

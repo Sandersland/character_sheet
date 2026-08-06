@@ -233,12 +233,12 @@ export interface ItemRarityOption {
 
 /** One selectable rules edition, served by `GET /api/editions` (#1436) with its
  *  copy already resolved — the frontend holds no edition label/description table.
- *  `unavailableReason` present means visible but unselectable (#1371). */
+ *  Both editions are fully selectable (#1372 removed the visible-but-unselectable
+ *  `unavailableReason` gate #1371 added). */
 export interface EditionOption {
   key: RulesEdition;
   label: string;
   description: string;
-  unavailableReason?: string;
 }
 
 /** `GET /api/editions` (#1436). `editions` is in display order and `defaultEdition`
