@@ -100,6 +100,72 @@ describe("SHARED_SPELLS_2014 — saveEffect matches its own description text (fi
   });
 });
 
+// #1746: an audit of every pre-#1717 2014 slice for the same dropped-tail bug
+// PR #1745's review found in Heroism (dnd5eapi's higher_level JSON can be
+// empty despite the real SRD 5.1 text carrying an "At Higher Levels" clause).
+// Ground truth below was cross-checked against 5etools' PHB spell dataset
+// (its entriesHigherLevel field, hand-transcribed from the book) and spot-
+// verified against dnd5e.wikidot.com (an SRD 5.1 mirror) for Animal
+// Friendship, the one row this slice's audit found missing its clause; every
+// other one of this slice's 132 leveled rows was checked and genuinely has
+// no upcast clause in the real SRD text.
+describe("SHARED_SPELLS_2014 — no dropped 'At Higher Levels' tail text (dnd5eapi JSON-vs-real-SRD-text gap, #1746)", () => {
+  const HAS_AT_HIGHER_LEVELS_TEXT = new Set([
+    "Charm Person",
+    "Cure Wounds",
+    "Fog Cloud",
+    "Healing Word",
+    "Longstrider",
+    "Sleep",
+    "Thunderwave",
+    "Witch Bolt",
+    "Animal Friendship",
+    "Animal Messenger",
+    "Blindness/Deafness",
+    "Enhance Ability",
+    "Hold Person",
+    "Invisibility",
+    "Shatter",
+    "Cloud of Daggers",
+    "Bestow Curse",
+    "Counterspell",
+    "Dispel Magic",
+    "Fly",
+    "Glyph of Warding",
+    "Magic Circle",
+    "Major Image",
+    "Banishment",
+    "Blight",
+    "Confusion",
+    "Ice Storm",
+    "Wall of Fire",
+    "Animate Objects",
+    "Dominate Person",
+    "Geas",
+    "Hold Monster",
+    "Insect Plague",
+    "Mass Cure Wounds",
+    "Planar Binding",
+    "Circle of Death",
+    "Create Undead",
+    "Mass Suggestion",
+    "Etherealness",
+    "Dominate Monster",
+  ]);
+
+  it("every row verified to have real SRD 'At Higher Levels' text actually carries it in its description", () => {
+    const missing = [...HAS_AT_HIGHER_LEVELS_TEXT].filter((name) => !/At Higher Levels\./.test(find(name).description));
+    expect(missing, "a row with verified upcast text is missing its 'At Higher Levels' sentence").toEqual([]);
+  });
+
+  it("no OTHER row in this slice claims 'At Higher Levels' text it wasn't verified to have (catches an accidental copy-paste in the other direction)", () => {
+    const unexpected = SHARED_SPELLS_2014.filter(
+      (s) => !HAS_AT_HIGHER_LEVELS_TEXT.has(s.name) && /At Higher Levels\./.test(s.description),
+    ).map((s) => s.name);
+    expect(unexpected).toEqual([]);
+  });
+});
+
 function find(name: string): CatalogSpell {
   const s = SHARED_SPELLS_2014.find((sp) => sp.name === name);
   if (!s) throw new Error(`SHARED_SPELLS_2014 has no "${name}"`);
