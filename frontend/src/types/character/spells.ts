@@ -30,8 +30,8 @@ export type {
 export interface Spell {
   id: string;
   spellId?: string;   // catalog Spell.id provenance — undefined for custom spells
-  /** Provenance; "subclass"/"item" mark derived, non-persisted grants (no Remove ✕). */
-  source?: "subclass" | "item";
+  /** Provenance; "subclass"/"species"/"item" mark derived, non-persisted grants (no Remove ✕). */
+  source?: "subclass" | "species" | "item";
   /** Item-granted-spell metadata, present only when source === "item" (#528). */
   item?: ItemSpellMeta;
   name: string;

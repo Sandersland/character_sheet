@@ -88,15 +88,59 @@ export interface ClassActionOption {
 }
 
 /**
- * "Spend 1 Focus Points" caption for Flurry of Blows — its card otherwise
- * shows only the pool's REMAINING total (the badge), never the per-use cost
- * (#1217). Reads the pool's own `label` (never the raw resourceKey) so this
- * never renders a bare camelCase key in the UI. Undefined when the pool isn't
- * on the character (e.g. a non-monk somehow seeing this action).
+ * Flurry of Blows spends "focus" (2024) or "ki" (2014, #1500) — the served
+ * AvailableAction carries no resourceKey on the wire (only a row-driven
+ * action does), so the client can't read the edition-correct pool key off
+ * anything server-sent; it looks for whichever of the two the character
+ * actually has instead (a monk only ever has one).
+ */
+function monkFlurryPool(pools: ResourcePool[] | undefined): ResourcePool | undefined {
+  return pools?.find((p) => p.key === "focus" || p.key === "ki");
+}
+
+/**
+ * "Spend 1 Focus Points" / "Spend 1 Ki Points" caption for Flurry of Blows —
+ * its card otherwise shows only the pool's REMAINING total (the badge),
+ * never the per-use cost (#1217). Reads the pool's own `label` (never the
+ * raw resourceKey) so this never renders a bare camelCase key in the UI.
+ * Undefined when neither pool is on the character (e.g. a non-monk somehow
+ * seeing this action).
  */
 function flurrySpendLabel(pools: ResourcePool[] | undefined): string | undefined {
-  const pool = pools?.find((p) => p.key === "focus");
+  const pool = monkFlurryPool(pools);
   return pool ? `Spend 1 ${pool.label}` : undefined;
+}
+
+/**
+ * Pool badge for one class action — split out of classActionOption to keep
+ * that function's own branching budget low (fallow's complexity gate).
+ * Flurry of Blows (#1500) is the one exception to "read resolver.resourceKey":
+ * it resolves off whichever monk pool the character actually has (see
+ * monkFlurryPool) rather than the static ACTION_RESOLVERS table's hardcoded
+ * "focus" — a 2014 monk's card would otherwise show no badge at all.
+ */
+function classActionBadge(action: AvailableAction, resolver: ActionResolver | undefined, character: Character): string | undefined {
+  const pools = character.resources?.pools;
+  const resourceKey = action.key === "flurryOfBlows" ? monkFlurryPool(pools)?.key : resolver?.resourceKey;
+  return poolBadgeFor(resourceKey, pools);
+}
+
+/**
+ * Subtitle for one class action — split out of classActionOption for the
+ * same complexity-budget reason as classActionBadge above. Heal-roll actions
+ * preview their heal; a resolver-level static subtitle (Bonus Unarmed
+ * Strike, #1218) wins next; Flurry surfaces its Focus/Ki cost (#1217/#1500,
+ * singled out rather than generalized to every resource-costing action — a
+ * broader "spend N" caption is a separate design call); every other
+ * reminder-only action (e.g. Shadow Step) shows its rule text.
+ */
+function classActionSubtitle(action: AvailableAction, resolver: ActionResolver | undefined, character: Character): string | undefined {
+  if (resolver?.kind === "heal-roll" && resolver.healRoll) {
+    return `Regain ${formatRollSpec(resolver.healRoll(character))} HP`;
+  }
+  if (resolver?.subtitle) return resolver.subtitle;
+  if (action.key === "flurryOfBlows") return flurrySpendLabel(character.resources?.pools);
+  return action.reminder;
 }
 
 /** Enrich a backend AvailableAction with resolver-derived subtitle + pool badge. */
@@ -113,20 +157,8 @@ export function classActionOption(
     .map((key) => universalActions.find((u) => u.key === key)?.name)
     .filter((name): name is string => name !== undefined);
   const heal = resolver?.kind === "heal-roll" || resolver?.kind === "heal-input";
-  const badge = poolBadgeFor(resolver?.resourceKey, character.resources?.pools);
-  // Heal-roll actions preview their heal; a resolver-level static subtitle
-  // (Bonus Unarmed Strike, #1218) wins next; Flurry surfaces its Focus cost
-  // (#1217, singled out rather than generalized to every resource-costing
-  // action — a broader "spend N" caption is a separate design call); every
-  // other reminder-only action (e.g. Shadow Step) shows its rule text.
-  const subtitle =
-    resolver?.kind === "heal-roll" && resolver.healRoll
-      ? `Regain ${formatRollSpec(resolver.healRoll(character))} HP`
-      : resolver?.subtitle
-        ? resolver.subtitle
-        : action.key === "flurryOfBlows"
-          ? flurrySpendLabel(character.resources?.pools)
-          : action.reminder;
+  const badge = classActionBadge(action, resolver, character);
+  const subtitle = classActionSubtitle(action, resolver, character);
   return {
     key: action.key,
     title: action.name,

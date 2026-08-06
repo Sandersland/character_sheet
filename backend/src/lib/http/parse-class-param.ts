@@ -9,8 +9,8 @@ import type { Request, Response } from "express";
  * discriminated result out (absent is success — the unfiltered catalog is what
  * the sheet's learn-from-catalog picker wants).
  *
- * Lowercased here because `Spell.classes` is stored lowercase, so the caller's
- * casing must never reach the query. An unknown class name is NOT an error: the
+ * Lowercased here because `SpellClass.className` is stored lowercase, so the
+ * caller's casing must never reach the query. An unknown class name is NOT an error: the
  * catalog legitimately answers "no such spells" with an empty list, and
  * validating against the class table would make a pure catalog read depend on it.
  */

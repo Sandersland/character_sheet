@@ -157,7 +157,9 @@ describe("GET /api/characters/:id/level-up/plan", () => {
 
     const res = await getPlan("lvplan-fighter-8");
     expect(res.status).toBe(200);
-    expect(res.body.target).toEqual({ className: "fighter", subclass: "Champion", newLevel: 8, isPrimary: true });
+    // #1509: casterModel is null for a non-caster target (a plain Fighter, no
+    // third-caster subclass) — served alongside className/subclass/newLevel.
+    expect(res.body.target).toEqual({ className: "fighter", subclass: "Champion", newLevel: 8, isPrimary: true, casterModel: null });
     expect(res.body.steps.map((s: { kind: string }) => s.kind)).toEqual(["hitPoints", "advancement", "review"]);
   });
 

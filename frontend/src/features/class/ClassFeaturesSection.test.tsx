@@ -98,6 +98,10 @@ describe("ClassFeaturesSection — Cloak of Shadows (2024 rewrite, #1246: L11 ->
     return {
       id: "char-1",
       class: "Monk",
+      // hasCloakOfShadows is edition-gated (#1505 — the "cloakOfShadows" key
+      // collides with 2014 Way of Shadow's own free-at-L11 row, and this
+      // fixture is explicitly the 2024 rewrite per this describe block's title).
+      rulesEdition: "EDITION_2024",
       level: cloakAvailable ? 17 : 11,
       subclass: "Warrior of Shadow",
       conditions: { active: [], exhaustion: 0 },

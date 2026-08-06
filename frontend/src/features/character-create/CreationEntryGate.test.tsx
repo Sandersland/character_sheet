@@ -62,24 +62,23 @@ describe("CreationEntryGate (#1286)", () => {
     expect(await screen.findByRole("radio", { name: "2024 rules" })).toHaveAttribute("aria-checked", "true");
     expect(screen.queryByRole("radiogroup", { name: /campaign/i })).not.toBeInTheDocument();
 
-    // Irreversibility stated at the moment of choosing. Scoped to "locked in at
-    // creation" (not the shorter "can't be changed later") because #1371's
-    // EDITION_UNAVAILABLE reason text also contains "can't be changed later",
-    // and its sr-only span is in the DOM here too (the 2014 card always renders).
+    // Irreversibility stated at the moment of choosing.
     expect(screen.getByText(/locked in at creation/i)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /continue/i }));
     expect(onResolved).toHaveBeenCalledWith({ campaignId: null, campaignName: null, rulesEdition: "EDITION_2024" });
   });
 
-  it("does not let a solo player pick 2014 while its content is gated (#1371)", async () => {
+  // #1372 restores this to a positive assertion: 2014 is selectable for a solo
+  // character now that its content has shipped (reverses #1371's gate).
+  it("lets a solo player switch to 2014 before continuing", async () => {
     mockFetchCampaigns.mockResolvedValue([]);
     const onResolved = vi.fn();
     render(<CreationEntryGate onResolved={onResolved} />);
 
     await userEvent.click(await screen.findByRole("radio", { name: "2014 rules" }));
     await userEvent.click(screen.getByRole("button", { name: /continue/i }));
-    expect(onResolved).toHaveBeenCalledWith({ campaignId: null, campaignName: null, rulesEdition: "EDITION_2024" });
+    expect(onResolved).toHaveBeenCalledWith({ campaignId: null, campaignName: null, rulesEdition: "EDITION_2014" });
   });
 
   it("with campaigns, asks which campaign first and defaults to Solo", async () => {

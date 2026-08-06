@@ -4,12 +4,29 @@ import {
   deflectAttacksDamageTypeClause,
   deflectAttacksReductionRoll,
   deflectAttacksRedirectRoll,
+  deflectBaseAction,
+  deflectMissilesThrowRoll,
   formatDeflectAttacksMessage,
   formatDeflectAttacksRedirectMessage,
-  hasDeflectEnergy,
+  formatDeflectMissilesThrowMessage,
 } from "@/lib/deflectAttacks";
 import { summarizeRoll } from "@/lib/dice";
-import type { Character } from "@/types/character";
+import type { AvailableAction, Character } from "@/types/character";
+
+const DEFLECT_ATTACKS_2024 = (damageTypeClause: string): AvailableAction => ({
+  key: "deflectAttacks",
+  name: "Deflect Attacks",
+  cost: "reaction",
+  enabled: true,
+  damageTypeClause,
+});
+
+const DEFLECT_MISSILES_2014: AvailableAction = {
+  key: "deflectMissiles",
+  name: "Deflect Missiles",
+  cost: "reaction",
+  enabled: true,
+};
 
 function monk(overrides: Partial<Character> = {}): Character {
   return {
@@ -22,6 +39,7 @@ function monk(overrides: Partial<Character> = {}): Character {
       attackBonus: 6,
       damage: { count: 1, faces: 8, modifier: 3, damageType: "bludgeoning" },
     },
+    availableActions: [DEFLECT_ATTACKS_2024("bludgeoning, piercing, or slashing damage")],
     ...overrides,
   } as unknown as Character;
 }
@@ -40,35 +58,38 @@ function monkFighter(overrides: Partial<Character> = {}): Character {
   } as unknown as Partial<Character>);
 }
 
-describe("hasDeflectEnergy", () => {
-  it("is false below monk L13 and true at L13+", () => {
-    expect(hasDeflectEnergy(monk({ level: 12 }))).toBe(false);
-    expect(hasDeflectEnergy(monk({ level: 13 }))).toBe(true);
-    expect(hasDeflectEnergy(monk({ level: 20 }))).toBe(true);
+describe("deflectBaseAction", () => {
+  it("finds the served deflectAttacks row (SRD 5.2)", () => {
+    expect(deflectBaseAction(monk())?.key).toBe("deflectAttacks");
   });
 
-  it("reads the Monk entry level, not total character level, for a multiclass character (Monk 3 / Fighter 10)", () => {
-    expect(hasDeflectEnergy(monkFighter())).toBe(false);
+  it("finds the served deflectMissiles row (SRD 5.1) when that's what's served instead", () => {
+    const character = monk({ availableActions: [DEFLECT_MISSILES_2014] });
+    expect(deflectBaseAction(character)?.key).toBe("deflectMissiles");
   });
 
-  it("single-class Monk 13 (no multiclassing) still gets Deflect Energy — regression guard", () => {
-    expect(hasDeflectEnergy(monk({ level: 13, classes: [{ name: "Monk", level: 13 }] } as unknown as Partial<Character>))).toBe(
-      true,
-    );
-    // The no-`classes` fallback path (deriveRoster) must behave identically.
-    expect(hasDeflectEnergy(monk({ level: 13, class: "Monk" } as unknown as Partial<Character>))).toBe(true);
+  it("is undefined for a non-monk with neither row", () => {
+    expect(deflectBaseAction(monk({ availableActions: [] }))).toBeUndefined();
   });
 });
 
 describe("deflectAttacksDamageTypeClause", () => {
-  it("names B/P/S below L13 and any damage type at L13+", () => {
-    expect(deflectAttacksDamageTypeClause(monk({ level: 3 }))).toMatch(/bludgeoning, piercing, or slashing/);
-    expect(deflectAttacksDamageTypeClause(monk({ level: 13 }))).toBe("any damage type");
+  it("reads the served row's resolved clause verbatim — never a level threshold", () => {
+    expect(deflectAttacksDamageTypeClause(monk({ availableActions: [DEFLECT_ATTACKS_2024("bludgeoning, piercing, or slashing damage")] }))).toBe(
+      "bludgeoning, piercing, or slashing damage",
+    );
+    expect(deflectAttacksDamageTypeClause(monk({ availableActions: [DEFLECT_ATTACKS_2024("any damage type")] }))).toBe(
+      "any damage type",
+    );
+  });
+
+  it("falls back to the B/P/S default when the row isn't served (e.g. mid-fetch)", () => {
+    expect(deflectAttacksDamageTypeClause(monk({ availableActions: [] }))).toMatch(/bludgeoning, piercing, or slashing/);
   });
 });
 
 describe("deflectAttacksReductionRoll", () => {
-  it("is 1d10 + Dex modifier + monk level (SRD 5.2 L3)", () => {
+  it("is 1d10 + Dex modifier + monk level (edition-invariant)", () => {
     // Dex 16 → +3 modifier; level 5 → spec modifier is 3 + 5 = 8.
     expect(deflectAttacksReductionRoll(monk({ level: 5 }))).toEqual({ count: 1, faces: 10, modifier: 8 });
   });
@@ -90,37 +111,56 @@ describe("deflectAttacksReductionRoll", () => {
 });
 
 describe("deflectAttacksRedirectRoll", () => {
-  it("is two Martial Arts die rolls + Dex modifier, reusing the derived unarmedStrike die", () => {
+  it("is two Martial Arts die rolls + Dex modifier, reusing the derived unarmedStrike die (SRD 5.2)", () => {
     // faces: 8 (from the unarmedStrike fixture) — count 2, Dex mod +3.
     expect(deflectAttacksRedirectRoll(monk())).toEqual({ count: 2, faces: 8, modifier: 3 });
   });
 });
 
+describe("deflectMissilesThrowRoll", () => {
+  it("is 1d6 + Dex modifier (SRD 5.1 throw-back, an attack roll not a save)", () => {
+    expect(deflectMissilesThrowRoll(monk())).toEqual({ count: 1, faces: 6, modifier: 3 });
+  });
+});
+
 describe("formatDeflectAttacksMessage", () => {
-  it("reports the total and the rolled components, below L13", () => {
+  it("reports the total and the rolled components for the SRD 5.2 row", () => {
+    const character = monk({ level: 5, availableActions: [DEFLECT_ATTACKS_2024("bludgeoning, piercing, or slashing damage")] });
     const roll = summarizeRoll([6], { count: 1, faces: 10, modifier: 8 });
-    const msg = formatDeflectAttacksMessage(monk({ level: 5 }), roll, true);
+    const msg = formatDeflectAttacksMessage(character, DEFLECT_ATTACKS_2024("bludgeoning, piercing, or slashing damage"), roll, true);
+    expect(msg).toMatch(/^Deflect Attacks/);
     expect(msg).toMatch(/reduce bludgeoning, piercing, or slashing damage/);
     expect(msg).toMatch(/by 14/); // 6 + 8
     expect(msg).toMatch(/1d10 rolled 6/);
     expect(msg).toMatch(/DEX \+3/);
     expect(msg).toMatch(/monk level 5/);
-    // Redirect hint only when a Focus point is available.
+    // Redirect hint only when the redirect's resource is available.
     expect(msg).toMatch(/redirect/i);
   });
 
-  it("names any damage type at L13+ and omits the redirect hint when Focus is unavailable", () => {
+  it("names any damage type when the served row's clause says so, and omits the redirect hint when the resource is unavailable", () => {
+    const character = monk({ level: 13, availableActions: [DEFLECT_ATTACKS_2024("any damage type")] });
     const roll = summarizeRoll([4], { count: 1, faces: 10, modifier: 16 });
-    const msg = formatDeflectAttacksMessage(monk({ level: 13 }), roll, false);
+    const msg = formatDeflectAttacksMessage(character, DEFLECT_ATTACKS_2024("any damage type"), roll, false);
     expect(msg).toMatch(/reduce any damage type/);
     expect(msg).not.toMatch(/redirect/i);
   });
 
-  it("reports the Monk entry level, not total character level, and the B/P/S clause for a multiclass character below Monk 13", () => {
+  it("names Deflect Missiles and the SRD 5.1 ranged-only flavor for the deflectMissiles row", () => {
+    const character = monk({ availableActions: [DEFLECT_MISSILES_2014] });
+    const roll = summarizeRoll([6], { count: 1, faces: 10, modifier: 8 });
+    const msg = formatDeflectAttacksMessage(character, DEFLECT_MISSILES_2014, roll, true);
+    expect(msg).toMatch(/^Deflect Missiles/);
+    expect(msg).toMatch(/reduce ranged weapon attack damage/);
+    expect(msg).not.toMatch(/bludgeoning, piercing, or slashing/);
+    expect(msg).toMatch(/throw it back/i);
+  });
+
+  it("reports the Monk entry level for a multiclass character below Monk 13", () => {
+    const character = monkFighter({ availableActions: [DEFLECT_ATTACKS_2024("bludgeoning, piercing, or slashing damage")] });
     const roll = summarizeRoll([6], { count: 1, faces: 10, modifier: 6 });
-    const msg = formatDeflectAttacksMessage(monkFighter(), roll, true);
+    const msg = formatDeflectAttacksMessage(character, DEFLECT_ATTACKS_2024("bludgeoning, piercing, or slashing damage"), roll, true);
     expect(msg).toContain("monk level 3)");
-    expect(msg).not.toMatch(/any damage type/);
   });
 });
 
@@ -131,5 +171,16 @@ describe("formatDeflectAttacksRedirectMessage", () => {
     expect(msg).toMatch(/Dexterity sav/i);
     expect(msg).toMatch(/11/); // 5 + 3 + 3
     expect(msg).toMatch(/60 ft/);
+  });
+});
+
+describe("formatDeflectMissilesThrowMessage", () => {
+  it("reports the throw-back's attack-roll damage (SRD 5.1 — an attack, not a save)", () => {
+    const roll = summarizeRoll([4], { count: 1, faces: 6, modifier: 3 });
+    const msg = formatDeflectMissilesThrowMessage(roll);
+    expect(msg).toMatch(/ranged attack/i);
+    expect(msg).toMatch(/7/); // 4 + 3
+    expect(msg).toMatch(/bludgeoning/);
+    expect(msg).not.toMatch(/sav/i);
   });
 });

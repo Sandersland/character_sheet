@@ -10,7 +10,7 @@ export interface NewSpellsSelection {
   count: number;
   maxSpellLevel: number;
   magicalSecrets: boolean;
-  /** #1101/#1127: an onLevelUp-cadence caster may swap one prepared spell this level-up. */
+  /** #1101/#1127: an onLevelUp-cadence caster (either edition's model) may swap one spell this level-up. */
   canSwap: boolean;
   selectedIds: string[];
   /** The entry id of the spell staged to be swapped out, or null. */
@@ -24,11 +24,13 @@ export interface NewSpellsSelection {
   /** #1440: the server-served class-list facts (null = unrestricted). */
   spellLists: string[] | null;
   cantripLists: string[] | null;
+  /** #1509 D5: the served known-vs-prepared noun for this step's swap copy. */
+  casterModel: "known" | "prepared" | null;
 }
 
 export function useNewSpellsSelection(step: LevelUpStep): NewSpellsSelection {
   const { draft, setDraft } = useLevelUpStepContext();
-  const { count, maxSpellLevel, magicalSecrets, canSwap, cantrips, spellLists, cantripLists } = readNewSpellsMeta(step);
+  const { count, maxSpellLevel, magicalSecrets, canSwap, cantrips, spellLists, cantripLists, casterModel } = readNewSpellsMeta(step);
   const selectedIds = selectedSpellIds(draft.spellsLearned);
   const cantripSelectedIds = selectedSpellIds(draft.cantripsLearned);
   const forgottenEntryId = draft.spellsForgotten?.[0]?.entryId ?? null;
@@ -57,6 +59,6 @@ export function useNewSpellsSelection(step: LevelUpStep): NewSpellsSelection {
     count, maxSpellLevel, magicalSecrets, canSwap,
     selectedIds, forgottenEntryId, toggle, toggleForget,
     cantrips, cantripSelectedIds, toggleCantrip,
-    spellLists, cantripLists,
+    spellLists, cantripLists, casterModel,
   };
 }

@@ -86,11 +86,37 @@ type AbilityScores = typeof ABILITY_SCORES;
 interface CreateCharacterOpts {
   name: string;
   className: string;
-  race?: string;
+  // #1684: resolved to a speciesId at creation — the flat `race`-name create
+  // path is gone. Halfling (2024, the default): no #1690 choice trait (unlike
+  // Human's Skillful/Versatile, which would need extra request fields no
+  // caller here declares) and no maxHp-granting trait (unlike Dwarf's
+  // Toughness, which would throw off HP-sensitive specs by species alone).
+  speciesName?: string;
   background?: string;
   experiencePoints?: number;
   // Override the module-level defaults, e.g. Wis 16 for a monk / Con 15 for a barbarian.
   abilityScores?: Partial<AbilityScores>;
+  // #1372: omit for the EDITION_2024 default every other e2e fixture wants;
+  // a 2014 character needs its species resolved against the 2014 catalog too
+  // (a 2024-only species id would 400 cross-edition), so this one field drives
+  // both the species lookup and the create body's own rulesEdition.
+  rulesEdition?: "EDITION_2014" | "EDITION_2024";
+}
+
+// #1684: resolve a species name → catalog id via GET /api/reference, scoped to
+// the requesting character's own edition (#1372) — a species id from the wrong
+// edition's catalog 400s at creation (crossEditionRejection).
+async function resolveSpeciesId(
+  request: APIRequestContext,
+  name: string,
+  edition: "EDITION_2014" | "EDITION_2024",
+): Promise<string> {
+  const response = await request.get(`/api/reference?edition=${edition}`);
+  expect(response.ok(), `load reference: ${response.status()}`).toBeTruthy();
+  const { species } = (await response.json()) as { species: { id: string; name: string }[] };
+  const match = species.find((s) => s.name === name);
+  if (!match) throw new Error(`Species not found in catalog: ${name}`);
+  return match.id;
 }
 
 // Create a character and return its id. Sets XP through the transactions
@@ -99,14 +125,17 @@ export async function createCharacter(
   request: APIRequestContext,
   opts: CreateCharacterOpts,
 ): Promise<string> {
+  const edition = opts.rulesEdition ?? "EDITION_2024";
+  const speciesId = await resolveSpeciesId(request, opts.speciesName ?? "Halfling", edition);
   const response = await request.post("/api/characters", {
     data: {
       name: opts.name,
       alignment: "True Neutral",
-      race: opts.race ?? "Human",
+      speciesId,
       background: opts.background ?? "Sage",
       classes: [{ name: opts.className }],
       abilityScores: { ...ABILITY_SCORES, ...opts.abilityScores },
+      ...(opts.rulesEdition ? { rulesEdition: opts.rulesEdition } : {}),
     },
   });
   expect(response.ok(), `create ${opts.name}: ${response.status()}`).toBeTruthy();
@@ -129,9 +158,9 @@ export async function setExperience(
   expect(response.ok(), `set XP: ${response.status()}`).toBeTruthy();
 }
 
-// Create a campaign via the API and return its id. #1371 gates the picker so no
-// UI path can create a 2014 campaign; a 2014 campaign is only reachable through
-// this endpoint (or pre-existing data), so specs that need one must go through it.
+// Create a campaign via the API and return its id — faster and more direct
+// than driving CampaignsPage's form for a spec that only needs the campaign to
+// exist (e.g. to inherit its edition), not to exercise the creation UI itself.
 export async function createCampaign(
   request: APIRequestContext,
   opts: { name: string; rulesEdition?: "EDITION_2014" | "EDITION_2024" },
@@ -253,7 +282,8 @@ export async function learnSpells(
   characterId: string,
   spellNames: string[],
 ): Promise<void> {
-  const catalogResponse = await request.get("/api/spells");
+  // `?edition=` is required (#1712); every e2e persona is a default-2024 character.
+  const catalogResponse = await request.get("/api/spells?edition=EDITION_2024");
   expect(catalogResponse.ok(), `list spells: ${catalogResponse.status()}`).toBeTruthy();
   const catalog = (await catalogResponse.json()) as { id: string; name: string; level: number }[];
 

@@ -1,10 +1,10 @@
 /**
- * Shared scaffolding for the Monk focus-cast handlers (currently: shadow-arts).
- * Wraps castAbilityInTx with a shared character-select and audit-event tail; the
- * per-subclass 5e rules (effect specs, level gates, focus costs) stay in their
- * own files. Full unification of those divergent parts is the job of the
- * declarative subclass engine (#416) — this module only removes the
- * byte-for-byte clone (fallow dup:a64b5a27).
+ * Shared scaffolding for the Monk focus/ki-cast handlers (shadow-arts,
+ * disciplines). Wraps castAbilityInTx with a shared character-select and
+ * audit-event tail; the per-subclass 5e rules (effect specs, level gates,
+ * pool costs) stay in their own files. Full unification of those divergent
+ * parts is the job of the declarative subclass engine (#416) — this module
+ * only removes the byte-for-byte clone (fallow dup:a64b5a27).
  */
 
 import { Prisma } from "@/generated/prisma/client.js";
@@ -34,7 +34,7 @@ export const FOCUS_CAST_CHARACTER_SELECT = {
 } satisfies Prisma.CharacterSelect;
 
 /** The audit-event `type`s emitted by the shared focus-cast tail. */
-type FocusCastEventType = Extract<EventType, "castShadowArt">;
+type FocusCastEventType = Extract<EventType, "castShadowArt" | "castDiscipline">;
 
 export interface EmitFocusCastEventsParams {
   characterId: string;

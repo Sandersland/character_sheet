@@ -6,15 +6,24 @@
 // matches the already-renamed row. Idempotent (source-gone = no-op); a target
 // collision is logged and skipped rather than crashing the seed.
 //
+// Scoped to `edition: "EDITION_2024"` (#1710): these are SRD 5.2 renames only
+// — the "from" name (e.g. "Tasha's Hideous Laughter") is exactly the PHB'14
+// name a future spells-2014/*.ts content slice seeds under its own
+// EDITION_2014 row, and `name` is no longer globally unique now that Spell
+// carries `edition`. An unscoped lookup would risk renaming that 2014 row
+// instead of (or nondeterministically alongside) the intended 2024 one.
+//
 // Imports only prisma types + the SPELL_RENAMES data, per the seed/migration rule.
 import type { PrismaClient } from "../../src/generated/prisma/client.js";
 import type { SpellRename } from "./spells.js";
 
+const RENAME_EDITION = "EDITION_2024" as const;
+
 export async function applySpellRenames(prisma: PrismaClient, renames: SpellRename[]): Promise<void> {
   for (const { from, to } of renames) {
-    const source = await prisma.spell.findUnique({ where: { name: from }, select: { id: true } });
+    const source = await prisma.spell.findFirst({ where: { name: from, edition: RENAME_EDITION }, select: { id: true } });
     if (!source) continue; // already renamed or never existed — idempotent
-    const target = await prisma.spell.findUnique({ where: { name: to }, select: { id: true } });
+    const target = await prisma.spell.findFirst({ where: { name: to, edition: RENAME_EDITION }, select: { id: true } });
     if (target) {
       console.log(`applySpellRenames: "${to}" already exists — skipping rename of "${from}"`);
       continue;

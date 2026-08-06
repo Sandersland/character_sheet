@@ -56,9 +56,19 @@ describe("planActionClick", () => {
     expect(plan).toEqual({ consumeSlot: false, openResolution: true, send: "none" });
   });
 
-  it("simple-confirm with serverEffect consumes and sends (Rage)", () => {
-    const plan = planActionClick(resolverFor("rage"), character);
+  it("simple-confirm with serverEffect consumes and sends (Bardic Inspiration)", () => {
+    const plan = planActionClick(resolverFor("bardicInspiration"), character);
     expect(plan).toEqual({ consumeSlot: true, openResolution: false, send: "plain" });
+  });
+
+  it("toggle shares simple-confirm's exact send shape (Rage, #1686 — row-driven now, no ACTION_RESOLVERS entry)", () => {
+    const rageResolver = {
+      key: "rage", kind: "toggle" as const, slot: "bonusAction" as const, serverEffect: true, resourceKey: "rage",
+    };
+    expect(planActionClick(rageResolver, character)).toEqual({ consumeSlot: true, openResolution: false, send: "plain" });
+
+    const endRageResolver = { key: "endRage", kind: "toggle" as const, slot: "bonusAction" as const, serverEffect: true };
+    expect(planActionClick(endRageResolver, character)).toEqual({ consumeSlot: true, openResolution: false, send: "plain" });
   });
 
   it("simple-confirm without serverEffect only consumes (Dodge)", () => {

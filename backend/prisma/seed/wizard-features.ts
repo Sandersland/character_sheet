@@ -62,6 +62,12 @@
 // player-initiated cost, not a rest regain, so it has no descriptor column
 // and stays text-only (see that row's own comment).
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
+import type {
+  ActivationRequirement,
+  EffectBuffRow,
+  ResourceTotalFormula,
+} from "../../src/lib/classes/class-feature-rows.js";
+import type { FeatImprovement } from "../../src/lib/classes/resources-state.js";
 import type { SeedEdition } from "./edition.js";
 import type { ClassFeatureSeedRow } from "./class-features.js";
 
@@ -75,24 +81,58 @@ function slug(s: SubclassSlug): SubclassSlug {
 }
 
 interface RawWizardFeature {
+  // fallow-ignore-next-line code-duplication -- the descriptor-column field list intentionally mirrors fighter-features.ts's/class-features.ts's own shape (#1676's "widen to fighter's field set" instruction); each Raw*Feature interface is authored independently per class file by existing convention (barbarian-features.ts, cleric-features.ts, ...), never a shared base type
   subclassSlug: SubclassSlug | null;
   name: string;
   level: number;
   description: string;
   /** Omitted -> identical text seeded for both editions (see file header). */
   edition?: SeedEdition;
-  // Resource-pool descriptor columns (#1234 commit 3) — see this file's own
-  // header RESOURCE POOL block for why only Arcane Recovery's and Illusory
-  // Self's rows below ever set these.
+  // Resource-pool descriptor columns (#1234 commit 3, widened #1676 to
+  // fighter-features.ts's field set) — see this file's own header RESOURCE
+  // POOL block for why only Arcane Recovery's/Illusory Self's/Bladesong's
+  // rows below ever set these. `total: ResourceTotalFormula` (#1685) widens
+  // past the original flat-number-only shape — Bladesong's PB-per-long-rest
+  // pool is the first Wizard consumer of the formula form.
   resourceKey?: string;
   resourceLabel?: string;
   resourceRecharge?: string;
-  resourceTotals?: { minLevel: number; total: number; shortRestRegain?: number }[];
+  // fallow-ignore-next-line code-duplication -- same intentional per-class-file mirror as the comment two fields up (fighter-features.ts's own resourceTotals..saveDcAbilities block)
+  resourceTotals?: { minLevel: number; total: ResourceTotalFormula; shortRestRegain?: number }[];
+  resourceDieTiers?: { minLevel: number; die: string }[];
+  // Activation/cost/effect + derived-stat descriptor columns (#1528/#1530),
+  // widened onto Wizard by #1676 (Bladesinger — the first Wizard row to need
+  // them: Bladesong's toggle, Song of Defense's slot-cost reaction, Extra
+  // Attack's derivedStat). Fighter's field set is the template
+  // (fighter-features.ts); saveDcAbilities rides along for parity even
+  // though no Wizard row sets it yet.
+  activationCost?: string;
+  resolverKind?: string;
+  costKind?: string;
+  costPoolKey?: string;
+  costBase?: number;
+  effectKind?: string;
+  effectDiceCount?: number;
+  effectDiceFaces?: number;
+  effectModifierSource?: string;
+  derivedStat?: string;
+  derivedStatTiers?: { minLevel: number; value: number | string }[];
+  saveDcAbilities?: string[];
+  // Bladesinger-specific vocabulary (#1676) — past fighter-features.ts's own
+  // field set, since Fighter's #1528/#1530 retab never needed a while-active
+  // buff, an activation gate, or a passive grant. effectBuffs (#1686):
+  // Bladesong's AC/speed/melee-damage buffs. activationRequires (#1688):
+  // Bladesong's armor gate, Song of Defense's requiresActiveBuff. improvements
+  // (#1691): Training in War and Song's light-armor/Performance grant.
+  effectBuffs?: EffectBuffRow[];
+  activationRequires?: ActivationRequirement[];
+  improvements?: FeatImprovement[];
 }
 
 function expand(raw: RawWizardFeature): ClassFeatureSeedRow[] {
   const base: Omit<ClassFeatureSeedRow, "edition"> = {
     className: "Wizard",
+    // fallow-ignore-next-line code-duplication -- expand()'s field-by-field copy intentionally mirrors fighter-features.ts's own expand() (every Raw*Feature -> ClassFeatureSeedRow adapter across this file family repeats this shape by convention, never a shared helper)
     subclassSlug: raw.subclassSlug,
     name: raw.name,
     level: raw.level,
@@ -101,6 +141,22 @@ function expand(raw: RawWizardFeature): ClassFeatureSeedRow[] {
     resourceLabel: raw.resourceLabel,
     resourceRecharge: raw.resourceRecharge,
     resourceTotals: raw.resourceTotals,
+    resourceDieTiers: raw.resourceDieTiers,
+    activationCost: raw.activationCost,
+    resolverKind: raw.resolverKind,
+    costKind: raw.costKind,
+    costPoolKey: raw.costPoolKey,
+    costBase: raw.costBase,
+    effectKind: raw.effectKind,
+    effectDiceCount: raw.effectDiceCount,
+    effectDiceFaces: raw.effectDiceFaces,
+    effectModifierSource: raw.effectModifierSource,
+    derivedStat: raw.derivedStat,
+    derivedStatTiers: raw.derivedStatTiers,
+    saveDcAbilities: raw.saveDcAbilities,
+    effectBuffs: raw.effectBuffs,
+    activationRequires: raw.activationRequires,
+    improvements: raw.improvements,
   };
   const editions: SeedEdition[] = raw.edition ? [raw.edition] : ["EDITION_2014", "EDITION_2024"];
   return editions.map((edition) => ({ ...base, edition }));
@@ -590,4 +646,153 @@ const ILLUSION_RAW: RawWizardFeature[] = [
   },
 ];
 
-export const WIZARD_FEATURES: ClassFeatureSeedRow[] = [...WIZARD_BASE_RAW, ...EVOCATION_RAW, ...ABJURATION_RAW, ...ILLUSION_RAW].flatMap(expand);
+// ---- Bladesinging — TCoE (Tasha's Cauldron of Everything) p. 76 (2014) ----
+// EDITION_2014 only — no SRD 5.2/PHB'24 printing exists (out of scope, epic
+// #1281); `crossEditionRejection` + the tagged Subclass row (subclasses.ts)
+// are the whole 2024 story (a 2024 wizard picking this slug 400s). All-seed-
+// row: the #1685-#1691 F1-F5 engine rungs (formula pool totals, row-declared
+// effectBuffs + generic toggle resolver, slot-shaped ability costs,
+// declarative activationRequires + equip-driven clearing, passive
+// improvements) express every mechanic below with ZERO new
+// ACTION_EFFECT_FN/resourceFn/hand-written gate — Bladesinger is their first
+// content consumer (#1676).
+const BLADESINGING_SLUG = slug("wizard-bladesinging");
+
+// Shared by every effectBuffs entry below (#1688) — Bladesong can't be
+// activated in medium/heavy armor or with a shield, and ends early if you
+// don any of the three (light armor is deliberately absent from both lists —
+// TCoE's whole point is that light armor doesn't interfere).
+const BLADESONG_ARMOR_GATE = ["noMediumArmor", "noHeavyArmor", "noShield"] as const;
+const BLADESONG_CLEAR_ON = ["equipMediumArmor", "equipHeavyArmor", "equipShield"] as const;
+
+const BLADESINGING_RAW: RawWizardFeature[] = [
+  {
+    subclassSlug: BLADESINGING_SLUG,
+    name: "Training in War and Song",
+    level: 2,
+    edition: "EDITION_2014",
+    // TCoE p. 76.
+    description:
+      "You gain proficiency with light armor, one type of one-handed melee weapon of your choice, and the Performance skill.",
+    // #1691: the light-armor/Performance grants are DERIVED via improvements
+    // (the fixed half of the trait); the one-handed-weapon TYPE choice has no
+    // subclass-choice machinery to back it (decision 6) — announce-only, the
+    // description above carries the instruction.
+    improvements: [
+      { target: "armorProficiency", amount: 1, key: "light" },
+      { target: "skillProficiency", amount: 1, key: "performance" },
+    ],
+  },
+  {
+    subclassSlug: BLADESINGING_SLUG,
+    name: "Bladesong",
+    level: 2,
+    edition: "EDITION_2014",
+    // TCoE p. 76. Announce-only riders folded into this description rather
+    // than a second row (decision 5, #1676): the Acrobatics/concentration
+    // bonuses have no skill-granular/concentration-bonus axis to ride, and
+    // the 1-minute/incapacitated/two-handed-attack end conditions are
+    // reminder text (endReminder below), not a turn-hook predicate — Rage's
+    // own precedent for what stays announce-only. Song of Victory (L14) is
+    // folded in too rather than its own row — it rides this SAME toggle via
+    // a level-gated effectBuffs entry (#1686's motivating case), mirroring
+    // how Rage's 2014 row states its L9/L16 damage tiers in one row's text.
+    description:
+      "As a bonus action, weave a Bladesong that lasts 1 minute. While it lasts, you gain a bonus to your AC equal to your Intelligence modifier (minimum +1), your walking speed increases by 10 feet, you have advantage on Dexterity (Acrobatics) checks, and you gain a bonus to concentration checks equal to your Intelligence modifier (minimum +1). You have a number of uses of this feature equal to your proficiency bonus, regained on a long rest. You can't activate Bladesong while wearing medium or heavy armor or wielding a shield. At 14th level (Song of Victory), while your Bladesong is active you also add your Intelligence modifier to your melee weapon damage rolls.",
+    resourceKey: "bladesong",
+    resourceLabel: "Bladesong",
+    resourceRecharge: "longRest",
+    // #1685: proficiency-bonus uses per long rest — TCoE's own number, not a
+    // flat/tiered count.
+    resourceTotals: [{ minLevel: 2, total: "proficiencyBonus" }],
+    activationCost: "bonusAction",
+    resolverKind: "toggle",
+    costKind: "pool",
+    costPoolKey: "bladesong",
+    costBase: 1,
+    // #1688: the armor/shield activation gate — light armor is deliberately
+    // absent (TCoE's whole point).
+    activationRequires: [...BLADESONG_ARMOR_GATE],
+    // #1686: three separate ActiveBuff entries (AC/speed/melee-damage) — one
+    // ActiveBuff carries exactly one target/modifier pair, so a 3-target
+    // toggle needs 3 entries. appendActiveBuffInTx dedupes by `key` on
+    // apply/replace, so each entry needs its OWN key — only the AC entry
+    // uses the row's identity key ("bladesong") itself, which is what
+    // Song of Defense's `requiresActiveBuff: "bladesong"` gate below actually
+    // checks for (activeBuffKeys is a set of every active buff's key, so one
+    // matching entry is sufficient; it doesn't need every entry to share it).
+    effectBuffs: [
+      {
+        key: "bladesong",
+        target: "ac",
+        modifier: { abilityMod: "intelligence", min: 1 },
+        duration: "while-active",
+        clearOn: [...BLADESONG_CLEAR_ON],
+        endReminder:
+          "Bladesong ends after 1 minute, or early if you're incapacitated, don medium or heavy armor or a shield, or make a weapon attack using two hands.",
+      },
+      {
+        key: "bladesongSpeed",
+        target: "speed",
+        modifier: 10,
+        duration: "while-active",
+        clearOn: [...BLADESONG_CLEAR_ON],
+      },
+      {
+        // Song of Victory (L14) — same toggle, level-gated entry (#1686's
+        // motivating case): absent below level 14, present without a second
+        // activation once reached.
+        key: "bladesongMeleeDamage",
+        target: "meleeDamage",
+        modifier: { abilityMod: "intelligence", min: 1 },
+        duration: "while-active",
+        minLevel: 14,
+        clearOn: [...BLADESONG_CLEAR_ON],
+      },
+    ],
+  },
+  {
+    subclassSlug: BLADESINGING_SLUG,
+    name: "Extra Attack",
+    level: 6,
+    edition: "EDITION_2014",
+    // TCoE p. 76: the cantrip-substitution rider is TCoE-only (absent from
+    // the SCAG printing, decision 1) — announce text, no cantrip-swap
+    // machinery exists.
+    description:
+      "You can attack twice, instead of once, whenever you take the Attack action on your turn. You can replace one of those attacks with a cast of one of your cantrips that has a casting time of 1 action.",
+    derivedStat: "attacksPerAction",
+    derivedStatTiers: [{ minLevel: 6, value: 2 }],
+  },
+  {
+    subclassSlug: BLADESINGING_SLUG,
+    name: "Song of Defense",
+    level: 10,
+    edition: "EDITION_2014",
+    // TCoE p. 76. The 5x-slot-level damage reduction is announce-only
+    // (decision 5, #1676 — no damage-reduction machinery exists); the player
+    // applies the number the slot-level picker (frontend) interpolates.
+    description:
+      "While your Bladesong is active, you can use your reaction when you take damage to expend a spell slot and reduce that damage to yourself by 5 times the slot's level.",
+    activationCost: "reaction",
+    // #1687: costKind "slot" — no dedicated resource pool, so resourceKey
+    // here is a pure action-key IDENTITY (mirrors toggleActionsFromRow's own
+    // "resourceKey is this row's identity, not necessarily its pool" rule),
+    // never a poolsFromRows consumer (no resourceTotals set, so no pool is
+    // synthesized). effectKind "utility" (no dice) is what routes this row
+    // through castAbilityWithSlotInTx rather than applyRowDrivenActionInTx's
+    // pure-counter branch, which would otherwise try to spend "songOfDefense"
+    // as a nonexistent pool.
+    resourceKey: "songOfDefense",
+    resolverKind: "slot-picker",
+    costKind: "slot",
+    costBase: 1,
+    effectKind: "utility",
+    // #1688: gated on Bladesong being active — TCoE's own "while your
+    // Bladesong is active" (decision 7). Named by Bladesong's own buff key
+    // above, not this row's resourceKey.
+    activationRequires: [{ requiresActiveBuff: "bladesong" }],
+  },
+];
+
+export const WIZARD_FEATURES: ClassFeatureSeedRow[] = [...WIZARD_BASE_RAW, ...EVOCATION_RAW, ...ABJURATION_RAW, ...ILLUSION_RAW, ...BLADESINGING_RAW].flatMap(expand);

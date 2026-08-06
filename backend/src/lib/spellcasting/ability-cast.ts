@@ -10,7 +10,7 @@
  */
 
 import { Prisma } from "@/generated/prisma/client.js";
-import { payAbilityCostInTx, type AbilityCost, type PayCostContext } from "./ability-cost.js";
+import { payAbilityCostInTx, type AbilityCost, type PayCostContext, type SlotCostSubject } from "./ability-cost.js";
 import { appendActiveBuffInTx, clearBuffsForSourceInTx } from "@/lib/combat/active-effects.js";
 import { assertCampaignMembership } from "@/lib/auth/access.js";
 import { AuthorizationError } from "@/lib/auth/errors.js";
@@ -18,9 +18,27 @@ import { resolveBuffSpec, type EffectSpec } from "@/lib/combat/effects.js";
 import { logEvent, type EventType } from "@/lib/activity/events.js";
 import { applyHealInTx, applyDamageInTx, applyTempHpInTx } from "@/lib/combat/hitpoints.js";
 import type { ConcentrationState, SpellcastingMutableState } from "./spell-state.js";
+import type { ClearOnTrigger } from "@/lib/classes/class-feature-rows.js";
 
 /** A cast's effect target: the caster themselves, or a consenting ally's sheet (#462). */
 export type CastTarget = "self" | { characterId: string };
+
+/**
+ * Mage Armor's "the spell ends if the target dons armor" (#363) — migrated
+ * (#1688) off the equip hook's own hardcoded target check onto the buff's own
+ * `clearOn` metadata, the same path every effectBuffs-driven buff's
+ * equip-driven true-end now rides (equipClearTriggers). "acUnarmoredBase" is
+ * the only buffTarget any seeded
+ * Spell/GrantedAbility sets that needs one; "equipBodyArmor" fires for EVERY
+ * armor category (light included) — the same condition the old hardcoded
+ * `slot === "BODY"` check applied regardless of category, so this keeps that
+ * behavior byte-for-byte. A future buffTarget needing an equip-driven
+ * true-end is one more entry here, not a second special case in the equip
+ * hook.
+ */
+const BUFF_TARGET_CLEAR_ON: Partial<Record<string, ClearOnTrigger[]>> = {
+  acUnarmoredBase: ["equipBodyArmor"],
+};
 
 // The per-op result the dispatcher logs (before/after snapshots + logEvent).
 export interface OpOutcome {
@@ -59,6 +77,9 @@ export interface CastAbilityInput {
   eventType: EventType;
   concentrates: boolean;
   apply?: { target: CastTarget; kind: "heal" | "damage" | "tempHp"; amount: number };
+  // Below-minLevel wording for a `{kind:"slot"}` cost (#1687) — omitted for a
+  // spell cast (payAbilityCostInTx's own "cast a level-N spell" default).
+  costSubject?: SlotCostSubject;
 }
 
 // Byte-load-bearing: reproduces the current castSpell summary exactly.
@@ -165,7 +186,7 @@ async function applyPartyHealInTx(
 
 // The one shared cast sequence. Returns the OpOutcome the dispatcher logs.
 export async function castAbilityInTx(ctx: CastAbilityContext, input: CastAbilityInput): Promise<OpOutcome> {
-  const paid = await payAbilityCostInTx(ctx.cost, input.cost, input.requested);
+  const paid = await payAbilityCostInTx(ctx.cost, input.cost, input.requested, input.costSubject);
   const summary = buildCastSummary(input.name, paid.label, input.effect, input.roll);
   const slotLevel = input.cost.kind === "slot" ? (input.requested ?? input.cost.minLevel) : null;
   const eventData: Record<string, unknown> = {
@@ -194,6 +215,7 @@ export async function castAbilityInTx(ctx: CastAbilityContext, input: CastAbilit
         source: input.name,
         sourceEntryId: input.entryId,
         duration: input.concentrates ? "concentration" : "while-active",
+        ...(BUFF_TARGET_CLEAR_ON[buff.target] ? { clearOn: BUFF_TARGET_CLEAR_ON[buff.target] } : {}),
       },
       ctx.batchId,
       ctx.sessionId,

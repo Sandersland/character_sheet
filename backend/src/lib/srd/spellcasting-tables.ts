@@ -435,6 +435,20 @@ export function casterModelForEntries(
   return allKnown ? "known" : "prepared";
 }
 
+// #1511 D4: user-facing nouns for the served caster model — served, never
+// composed client-side (CLAUDE.md: the frontend never originates a rule). A
+// known caster's chosen spells are never "prepared" in the SRD 5.1 sense, so
+// the meter/roster noun and the rune's locked-state word both fork off the
+// same casterModel this module already computes; this map carries no rules
+// text of its own, only the copy naming a model decided above.
+export const CASTER_MODEL_LABELS: Record<
+  "known" | "prepared",
+  { preparedLabel: string; alwaysAvailableLabel: string }
+> = {
+  known: { preparedLabel: "Spells known", alwaysAvailableLabel: "Known" },
+  prepared: { preparedLabel: "Prepared", alwaysAvailableLabel: "Always prepared" },
+};
+
 // Cantrips known, as [minLevel, count] breakpoints (highest applicable wins).
 // Verified byte-identical between SRD 5.1 and SRD 5.2 (#1507) for all six
 // progressions — no `edition`. Paladin/Ranger prepare no cantrips. Drives
@@ -689,33 +703,48 @@ export function deriveSpellcasting(
 }
 
 /**
- * Number of new spells a class offers on reaching `level` (SRD 5.2). Wizard
- * scribes a flat 2 into its spellbook per level from level 2 up. onLevelUp-cadence
- * classes (Bard/Sorcerer/Warlock + EK/AT) offer the prepared-count delta. Every
- * other class re-prepares on a rest and offers no level-up pick (returns 0).
+ * Number of new spells a class offers on reaching `level`. Wizard scribes a flat
+ * 2 into its spellbook per level from level 2 up — edition-invariant (PHB'14
+ * p. 114 / PHB'24 p. 115 carry the identical "add two wizard spells" clause, see
+ * WIZARD_LEVEL1_SPELLBOOK_SIZE's own comment). onLevelUp-cadence classes offer
+ * the prepared/known-count delta (swapCadenceFor, forked below): Bard/Sorcerer/
+ * Warlock + EK/AT in BOTH editions, plus the 2014 Ranger (SRD 5.1's per-class
+ * "when you gain a level … replace it with another spell" clause — the 2024
+ * Ranger re-prepares on a rest instead and offers no level-up pick). Every other
+ * class returns 0 after its level-1 initial picks.
  *
- * #1509 deferral latch: level-up PICK COUNTS are explicitly #1509's fork (the
- * 2014 model's counts differ from 2024's), so this function keeps its
- * no-`edition` signature and its internal preparedSpellCountAt/swapCadenceFor
- * calls are pinned to "EDITION_2024" rather than threading a caller's edition
- * in — doing so here would silently change 2014 pick counts before #1509
- * defines them. This is the one "EDITION_2024" string literal in this module
- * written outside an edition branch; it is a scope latch, not a default.
+ * `edition` forks the table this reads (#1509 D2): a 2014 known caster's delta
+ * comes from SPELLS_KNOWN_BY_CLASS_2014 via preparedSpellCountAt's EDITION_2014
+ * branch — the SAME lookup #1507's caps already route through, so this needs no
+ * second table and no new symbol.
  */
-export function levelUpSpellPicks(className: string, level: number, subclass?: string | null): number {
+export function levelUpSpellPicks(
+  className: string,
+  level: number,
+  subclass: string | null | undefined,
+  edition: RulesEdition,
+): number {
   // #1131: a fresh level-1 entry (creation or multiclass-add) picks its full
   // prepared count — including re-prepare classes, which offer no picks after.
+  // A 2014 half-caster (Paladin/Ranger) below spellcastingStartLevel has no
+  // spellcasting feature yet, so preparedSpellCountAt returns null here — `?? 0`
+  // reads that as "nothing to pick", not a table miss (#1509 D3; this is also
+  // the multiclass-add path).
   // #1513: Wizard is the exception — a level-1 pick fills the spellbook (6),
   // not the prepared count (4); WIZARD_LEVEL1_SPELLBOOK_SIZE is the one place
   // that number lives, shared with level1SpellPicksFor.
   if (level <= 1) {
     if (className.toLowerCase() === "wizard") return WIZARD_LEVEL1_SPELLBOOK_SIZE;
-    return preparedSpellCountAt(className, 1, subclass, {}, "EDITION_2024") ?? 0;
+    return preparedSpellCountAt(className, 1, subclass, {}, edition) ?? 0;
   }
   if (className.toLowerCase() === "wizard") return 2;
-  if (swapCadenceFor(className, subclass, "EDITION_2024") !== "onLevelUp") return 0;
-  const now = preparedSpellCountAt(className, level, subclass, {}, "EDITION_2024") ?? 0;
-  const prev = preparedSpellCountAt(className, level - 1, subclass, {}, "EDITION_2024") ?? 0;
+  if (swapCadenceFor(className, subclass, edition) !== "onLevelUp") return 0;
+  // #1509 D3: a previous-level count of null (below spellcastingStartLevel — a
+  // 2014 Ranger reading its own level 1) reads as 0, not "no data": the class
+  // had nothing to compare against, so the whole level-N count is new. Same
+  // null-safe read the fresh-entry branch above uses.
+  const now = preparedSpellCountAt(className, level, subclass, {}, edition) ?? 0;
+  const prev = preparedSpellCountAt(className, level - 1, subclass, {}, edition) ?? 0;
   return Math.max(0, now - prev);
 }
 
@@ -770,8 +799,10 @@ export interface MagicalSecretsLists {
  * from, the closest available mapping is: at a qualifying 2014 Bard level,
  * neither facet is class-restricted. This is not full PHB'14 fidelity.
  *
- * Also known: `Spell.classes` is un-editioned, 2024-seeded catalog content — see
- * `Spell.classes` in schema.prisma.
+ * Also known: class membership lives in the SpellClass join, keyed off the
+ * parent Spell row rather than carrying its own edition column (#1711) —
+ * today's seeded catalog is 2024-only; the 2014 by-class content slices
+ * (#1713-#1721) are what populate 2014-tagged Spell/SpellClass rows.
  *
  * `subclass` is currently unused but is the deliberate seam for PHB'24 College of
  * Lore *Magical Discoveries* (level 6, a Cleric/Druid/Wizard cantrip OR a spell

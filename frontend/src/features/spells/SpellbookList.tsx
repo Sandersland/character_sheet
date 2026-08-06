@@ -18,6 +18,7 @@ import {
   canPrepare,
   filterSpellbook,
   pactMagicNote,
+  preparedLabelOf,
   swapCandidates,
   type PreparedBudget,
   type SpellbookFilter,
@@ -92,19 +93,93 @@ function SpellLevelGroup({
 
 const EMPTY_FILTER: SpellbookFilter = { level: null, school: null, prepared: false, ritual: false };
 
+// The budget meter, split out so SpellbookList's own branching stays under
+// fallow's complexity gate. #1511 D5: served noun, not "Prepared" hardcoded.
+function SpellbookMeter({ budget }: { budget: PreparedBudget }) {
+  const label = preparedLabelOf(budget);
+  return (
+    <div className="w-40 text-right">
+      <p className="text-[9px] font-bold uppercase tracking-wide text-parchment-500">{label}</p>
+      <p className="font-display text-sm font-bold text-parchment-900 tabular-nums">
+        {budget.count} / {budget.limit}
+      </p>
+      <div className="mt-1">
+        <MeterBar
+          current={budget.count}
+          // Never actually 0: the caller only renders this component when
+          // budget.limit != null, but that narrowing doesn't cross the
+          // component boundary for MeterBar's non-null `max` prop.
+          max={budget.limit ?? 0}
+          tone="arcane"
+          label={`${budget.count} of ${budget.limit} ${label.toLowerCase()}`}
+        />
+      </div>
+    </div>
+  );
+}
+
+// The filter strip, split out for the same reason as SpellbookMeter above.
+// #1511 D6: the "Prepared" chip is hidden for a known caster — every leveled
+// row is "locked", so the predicate it drives would filter nothing.
+function SpellbookFilterStrip({
+  filter,
+  setFilter,
+  casterModel,
+}: {
+  filter: SpellbookFilter;
+  setFilter: (update: (f: SpellbookFilter) => SpellbookFilter) => void;
+  casterModel: PreparedBudget["casterModel"];
+}) {
+  return (
+    <div className="mb-4 flex flex-wrap items-center gap-2">
+      <ChipGroup label="Spellbook filters">
+        {casterModel !== "known" && (
+          <ChipToggle pressed={filter.prepared} onChange={(v) => setFilter((f) => ({ ...f, prepared: v }))}>
+            Prepared
+          </ChipToggle>
+        )}
+        <ChipToggle pressed={filter.ritual} onChange={(v) => setFilter((f) => ({ ...f, ritual: v }))}>
+          Ritual
+        </ChipToggle>
+      </ChipGroup>
+      <Select
+        aria-label="Filter by level"
+        className="w-auto"
+        value={filter.level == null ? "" : String(filter.level)}
+        onChange={(e) => setFilter((f) => ({ ...f, level: e.target.value === "" ? null : Number(e.target.value) }))}
+      >
+        {LEVEL_OPTIONS.map((o) => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </Select>
+      <Select
+        aria-label="Filter by school"
+        className="w-auto"
+        value={filter.school ?? ""}
+        onChange={(e) => setFilter((f) => ({ ...f, school: e.target.value === "" ? null : (e.target.value as SpellSchool) }))}
+      >
+        <option value="">All schools</option>
+        {SPELL_SCHOOLS.map((s) => (
+          <option key={s} value={s}>{schoolLabel(s)}</option>
+        ))}
+      </Select>
+    </div>
+  );
+}
+
 export default function SpellbookList({
   spells, sortedSpells, budget, onAddSpell, onPrepare, onSwap, ...rest
 }: SpellbookListProps) {
   const [filter, setFilter] = useState<SpellbookFilter>(EMPTY_FILTER);
   const [swapForId, setSwapForId] = useState<string | null>(null);
 
-  const visible = filterSpellbook(sortedSpells, filter);
+  const visible = filterSpellbook(sortedSpells, filter, budget.casterModel);
   const levels = [...new Set(visible.map((s) => s.level))].sort((a, b) => a - b);
 
-  const candidates = swapCandidates(sortedSpells);
+  const candidates = swapCandidates(sortedSpells, budget.casterModel);
   // Derived, so the bar auto-closes if its target got prepared or left the book.
   const swapFor = sortedSpells.find(
-    (s) => s.id === swapForId && runeState(s) === "unprepared",
+    (s) => s.id === swapForId && runeState(s, budget.casterModel) === "unprepared",
   );
 
   // Intercept a cap-blocked prepare tap into swap mode when there's something to drop;
@@ -126,22 +201,7 @@ export default function SpellbookList({
             {spells.length} spell{spells.length === 1 ? "" : "s"}
           </h3>
         </div>
-        {budget.limit != null && (
-          <div className="w-40 text-right">
-            <p className="text-[9px] font-bold uppercase tracking-wide text-parchment-500">Prepared today</p>
-            <p className="font-display text-sm font-bold text-parchment-900 tabular-nums">
-              {budget.count} / {budget.limit}
-            </p>
-            <div className="mt-1">
-              <MeterBar
-                current={budget.count}
-                max={budget.limit}
-                tone="arcane"
-                label={`${budget.count} of ${budget.limit} prepared`}
-              />
-            </div>
-          </div>
-        )}
+        {budget.limit != null && <SpellbookMeter budget={budget} />}
       </div>
 
       {swapFor && budget.limit != null && (
@@ -168,37 +228,7 @@ export default function SpellbookList({
         />
       ) : (
         <>
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <ChipGroup label="Spellbook filters">
-              <ChipToggle pressed={filter.prepared} onChange={(v) => setFilter((f) => ({ ...f, prepared: v }))}>
-                Prepared
-              </ChipToggle>
-              <ChipToggle pressed={filter.ritual} onChange={(v) => setFilter((f) => ({ ...f, ritual: v }))}>
-                Ritual
-              </ChipToggle>
-            </ChipGroup>
-            <Select
-              aria-label="Filter by level"
-              className="w-auto"
-              value={filter.level == null ? "" : String(filter.level)}
-              onChange={(e) => setFilter((f) => ({ ...f, level: e.target.value === "" ? null : Number(e.target.value) }))}
-            >
-              {LEVEL_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </Select>
-            <Select
-              aria-label="Filter by school"
-              className="w-auto"
-              value={filter.school ?? ""}
-              onChange={(e) => setFilter((f) => ({ ...f, school: e.target.value === "" ? null : (e.target.value as SpellSchool) }))}
-            >
-              <option value="">All schools</option>
-              {SPELL_SCHOOLS.map((s) => (
-                <option key={s} value={s}>{schoolLabel(s)}</option>
-              ))}
-            </Select>
-          </div>
+          <SpellbookFilterStrip filter={filter} setFilter={setFilter} casterModel={budget.casterModel} />
 
           {visible.length === 0 ? (
             <p className="py-6 text-center text-xs text-parchment-600">No spells match these filters.</p>

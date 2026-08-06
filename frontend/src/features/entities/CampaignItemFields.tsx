@@ -39,6 +39,7 @@ import type {
   ItemRarity,
   ItemRarityOption,
 } from "@/types/character";
+import type { RulesEdition } from "@character-sheet/shared-types";
 
 const legendCls = "text-sm font-semibold text-parchment-800";
 const fieldsetCls =
@@ -300,7 +301,7 @@ function AttunementPrereqFields({ form, set }: { form: FormState; set: SetField 
   );
 }
 
-export function MagicFieldset({ form, setters, rarities }: FieldsProps & { rarities: ItemRarityOption[] }) {
+export function MagicFieldset({ form, setters, rarities, edition }: FieldsProps & { rarities: ItemRarityOption[]; edition: RulesEdition }) {
   const { set } = setters;
   const isMagic = form.rarity !== "";
   const rarityHint = rarityValueHint(form.rarity || undefined, rarities, {
@@ -351,6 +352,7 @@ export function MagicFieldset({ form, setters, rarities }: FieldsProps & { rarit
           capabilities={form.capabilities}
           onChange={(capabilities) => set("capabilities", capabilities)}
           spellcasterAttunable={form.requiresAttunement && form.attunementPrereqKind === "spellcaster"}
+          edition={edition}
         />
       )}
     </fieldset>

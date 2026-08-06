@@ -18,7 +18,7 @@ import type { ClassDefinition } from "@/lib/classes/types.js";
 import { warlock } from "@/lib/classes/warlock.js";
 import { wizard } from "@/lib/classes/wizard.js";
 
-import { CLASSES, ITEMS } from "../catalog-data.js";
+import { BACKGROUNDS, CLASSES, ITEMS } from "../catalog-data.js";
 import { ACTIONS, TWENTY_FOUR_ONLY_ACTION_KEYS } from "../actions.js";
 import { SUBCLASSES } from "../subclasses.js";
 import { MANEUVERS } from "../maneuvers.js";
@@ -63,15 +63,16 @@ describe("SUBCLASS_GRANTED_SPELLS — referential integrity", () => {
     expect(grant!.castingAbility).toBe("wisdom");
   });
 
-  // #1625: the two Monk grants are PHB'24/SRD 5.2-native content on shared
-  // Subclass rows — untagged, they would leak to 2014 Monks once #1313/#1372
-  // seed the 2014 Way of * content. Pins the tag so a content resweep can't
-  // silently drop it.
-  it("the two Monk grants are tagged EDITION_2024 (2024-native content, #1625)", () => {
+  // #1625: the Warrior of * grants are PHB'24/SRD 5.2-native content on their
+  // OWN edition-tagged Subclass rows — untagged, they would leak across
+  // editions. Way of Shadow's own Minor Illusion grant (#1502) joined this
+  // list tagged EDITION_2014, for the same reason in the other direction.
+  it("every Monk grant is tagged its subclass's own edition (#1625, #1502)", () => {
     const monkGrants = SUBCLASS_GRANTED_SPELLS.filter((g) => g.className === "Monk");
     expect(monkGrants.map((g) => `${g.subclassName}::${g.spellName}::${g.edition}`).sort()).toEqual([
       "Warrior of Shadow::Minor Illusion::EDITION_2024",
       "Warrior of the Elements::Elementalism::EDITION_2024",
+      "Way of Shadow::Minor Illusion::EDITION_2014",
     ]);
   });
 
@@ -196,8 +197,12 @@ describe("per-domain business-key uniqueness", () => {
     expect(duplicates(MANEUVERS.map((m) => m.name))).toEqual([]);
   });
 
-  it("SHADOW_ARTS have unique names", () => {
-    expect(duplicates(SHADOW_ARTS.map((s) => s.name))).toEqual([]);
+  // Keyed on (name, edition) rather than name alone (#1415/#1502): "Shadow
+  // Arts: Darkness" legitimately repeats its name once per edition (a
+  // genuine mechanical fork — 1 focus vs 2 ki) — only a same-name/
+  // same-edition collision would collapse in the DB's (name, edition) upsert.
+  it("SHADOW_ARTS have unique (name, edition) pairs", () => {
+    expect(duplicates(SHADOW_ARTS.map((s) => `${s.name}::${s.edition}`))).toEqual([]);
   });
 
   // Keyed on (name, edition) rather than name alone (#1229): Nature's Wrath
@@ -239,8 +244,11 @@ describe("FEATS — PHB'24 category invariants", () => {
     expect(missing, "feats without a category").toEqual([]);
   });
 
-  it("General feats have levelPrerequisite 4, a nonempty abilityOptions, and abilityIncrease 1", () => {
-    for (const f of FEATS.filter((f) => f.category === "general")) {
+  // #1310: scoped to EDITION_2024 — PHB'14's "general" rows (below) carry no
+  // levelPrerequisite (PHB'14 p.165 has no per-feat level gate) and 13 of the
+  // 18 shared General names grant no PHB'14 ability bump.
+  it("2024 General feats have levelPrerequisite 4, a nonempty abilityOptions, and abilityIncrease 1", () => {
+    for (const f of FEATS.filter((f) => f.category === "general" && f.edition === "EDITION_2024")) {
       expect(f.levelPrerequisite, `${f.name} levelPrerequisite`).toBe(4);
       expect((f.abilityOptions ?? []).length, `${f.name} abilityOptions`).toBeGreaterThan(0);
       expect(f.abilityIncrease, `${f.name} abilityIncrease`).toBe(1);
@@ -279,10 +287,11 @@ describe("FEATS — PHB'24 category invariants", () => {
     expect(byName.get("Great Weapon Fighting")?.improvements ?? []).toEqual([]);
   });
 
-  // #1306 worked example: the epic's own illustration (Alert forks, Grappler
-  // stays shared) — pins the actual seeded data, not just resolveEditionRow's
-  // pure logic.
-  it("Alert forks by edition (SRD 5.2 vs PHB'14 p.165); Grappler stays one shared row", () => {
+  // #1306 worked example, superseded by #1310: Grappler now forks too — every
+  // Feat row is edition-tagged (empty shared-NULL set, ACTIONS/#1430 precedent),
+  // so "Grappler stays one shared row" (#1306's original illustration) is
+  // deliberately inverted here rather than left passing for the wrong reason.
+  it("Alert AND Grappler both fork by edition (SRD 5.2 vs PHB'14 p.165; SRD 5.2 vs SRD 5.1)", () => {
     const alerts = FEATS.filter((f) => f.name === "Alert");
     expect(alerts).toHaveLength(2);
     expect(alerts.map((f) => f.edition).sort()).toEqual(["EDITION_2014", "EDITION_2024"]);
@@ -290,10 +299,22 @@ describe("FEATS — PHB'24 category invariants", () => {
     const alert2024 = alerts.find((f) => f.edition === "EDITION_2024")!;
     expect(alert2014.improvements).toEqual([{ target: "initiative", amount: 5 }]);
     expect(alert2024.improvements).toEqual([{ target: "initiative", amount: 1, scaling: "proficiencyBonus" }]);
+    // #1310: PHB'14 has no Origin taxonomy — the 2014 row's category moves to
+    // "general" (the corollary is it takes an ASI slot; the 2024 row stays
+    // "origin", background-granted only).
+    expect(alert2014.category).toBe("general");
+    expect(alert2024.category).toBe("origin");
 
     const grapplers = FEATS.filter((f) => f.name === "Grappler");
-    expect(grapplers).toHaveLength(1);
-    expect(grapplers[0].edition).toBeUndefined();
+    expect(grapplers).toHaveLength(2);
+    expect(grapplers.map((f) => f.edition).sort()).toEqual(["EDITION_2014", "EDITION_2024"]);
+    const grappler2014 = grapplers.find((f) => f.edition === "EDITION_2014")!;
+    const grappler2024 = grapplers.find((f) => f.edition === "EDITION_2024")!;
+    // 2014 (SRD 5.1): no ability bump, flat Strength 13+ prerequisite.
+    expect(grappler2014.abilityIncrease).toBeUndefined();
+    expect(grappler2014.prerequisite).toBe("Strength 13+");
+    // 2024: adds the half-feat bump and a Strength-or-Dexterity choice.
+    expect(grappler2024.abilityIncrease).toBe(1);
   });
 
   it("only Magic Initiate and Skilled are repeatable", () => {
@@ -318,6 +339,146 @@ describe("FEATS — PHB'24 category invariants", () => {
     ];
     const missing = srd.filter((n) => !names.has(n));
     expect(missing, "missing SRD 5.2.1 feats").toEqual([]);
+  });
+});
+
+// PHB'14 p. 72 (Fighter) / p. 82 (Paladin) / p. 91 (Ranger), = SRD 5.1 (#1311).
+// A 2014 Fighting Style has six options; SRD 5.2 has four (Dueling and
+// Protection have no 2024 counterpart). Per-class option gating (Fighter gets
+// all six, Paladin/Ranger a four-style subset each) is #1495, not this issue.
+describe("FEATS — 2014 Fighting Style feats (#1311)", () => {
+  const STYLES_2014 = ["Archery", "Defense", "Dueling", "Great Weapon Fighting", "Protection", "Two-Weapon Fighting"];
+  const STYLES_2024 = ["Archery", "Defense", "Great Weapon Fighting", "Two-Weapon Fighting"];
+
+  it("seeds exactly the six PHB'14 Fighting Style feats as EDITION_2014 rows", () => {
+    const names = FEATS.filter((f) => f.category === "fighting_style" && f.edition === "EDITION_2014")
+      .map((f) => f.name)
+      .sort();
+    expect(names).toEqual([...STYLES_2014].sort());
+  });
+
+  it("the four SRD 5.2 Fighting Style feats are stamped EDITION_2024, not left shared", () => {
+    const rows = FEATS.filter((f) => f.category === "fighting_style" && STYLES_2024.includes(f.name) && f.edition === "EDITION_2024");
+    expect(rows.map((f) => f.name).sort()).toEqual([...STYLES_2024].sort());
+  });
+
+  it("no fighting_style row is left edition-NULL (ACTIONS/#1430 precedent: no universal row)", () => {
+    const shared = FEATS.filter((f) => f.category === "fighting_style" && !f.edition).map((f) => f.name);
+    expect(shared).toEqual([]);
+  });
+
+  it("Dueling and Protection exist only as EDITION_2014 rows (no SRD 5.2 counterpart)", () => {
+    for (const name of ["Dueling", "Protection"]) {
+      const rows = FEATS.filter((f) => f.name === name);
+      expect(rows, name).toHaveLength(1);
+      expect(rows[0].edition, name).toBe("EDITION_2014");
+      expect(rows[0].category, name).toBe("fighting_style");
+    }
+  });
+
+  it("2014 Archery/Defense/Two-Weapon Fighting carry the same derived improvement as their 2024 sibling", () => {
+    const byNameEdition = (name: string, edition: "EDITION_2014" | "EDITION_2024") =>
+      FEATS.find((f) => f.name === name && f.edition === edition);
+
+    expect(byNameEdition("Archery", "EDITION_2014")?.improvements).toEqual(byNameEdition("Archery", "EDITION_2024")?.improvements);
+    expect(byNameEdition("Defense", "EDITION_2014")?.improvements).toEqual(byNameEdition("Defense", "EDITION_2024")?.improvements);
+    expect(byNameEdition("Two-Weapon Fighting", "EDITION_2014")?.improvements).toEqual(
+      byNameEdition("Two-Weapon Fighting", "EDITION_2024")?.improvements,
+    );
+  });
+
+  it("2014 Great Weapon Fighting, Dueling, and Protection stay descriptive (not automated)", () => {
+    for (const name of ["Great Weapon Fighting", "Dueling", "Protection"]) {
+      const row = FEATS.find((f) => f.name === name && f.edition === "EDITION_2014");
+      expect(row?.improvements ?? [], name).toEqual([]);
+    }
+  });
+
+  it("every 2014 Fighting Style feat names its Fighting Style prerequisite", () => {
+    for (const name of STYLES_2014) {
+      const row = FEATS.find((f) => f.name === name && f.edition === "EDITION_2014");
+      expect(row?.prerequisite ?? "", name).toContain("Fighting Style");
+    }
+  });
+});
+
+// PHB'14 pp. 165-170 (#1310): restores the 2014 half of the catalog `6491c528`
+// (#1154) replaced. PHB'14 has no Origin/Fighting Style/Epic Boon taxonomy, so
+// every 2014 row is "general" with no levelPrerequisite — featOfferedForAsiSlot's
+// `?? 4` default IS the 2014 "earliest ASI is level 4" rule, not a fudge.
+describe("FEATS — 2014 general/origin catalog (#1310)", () => {
+  const feats2014 = () => FEATS.filter((f) => f.edition === "EDITION_2014" && f.category !== "fighting_style");
+
+  it("seeds exactly 26 EDITION_2014 general-category rows (the 24 6491c528 deleted, plus Grappler and Savage Attacker)", () => {
+    const rows = feats2014();
+    expect(rows).toHaveLength(26);
+    expect(rows.every((f) => f.category === "general")).toBe(true);
+    expect(rows.every((f) => f.levelPrerequisite == null)).toBe(true);
+  });
+
+  it("contains Mobile, not Speedy; the 2024 catalog has Speedy, not Mobile", () => {
+    const names2014 = new Set(feats2014().map((f) => f.name));
+    expect(names2014.has("Mobile")).toBe(true);
+    expect(names2014.has("Speedy")).toBe(false);
+
+    const names2024 = new Set(FEATS.filter((f) => f.edition === "EDITION_2024").map((f) => f.name));
+    expect(names2024.has("Speedy")).toBe(true);
+    expect(names2024.has("Mobile")).toBe(false);
+  });
+
+  it("Mobile carries the +10 speed improvement recovered verbatim from the pre-#1154 catalog", () => {
+    const mobile = feats2014().find((f) => f.name === "Mobile");
+    expect(mobile?.improvements).toEqual([{ target: "speed", amount: 10 }]);
+  });
+
+  it("2014 Grappler has no ability bump and a flat Strength 13+ prerequisite (SRD 5.1)", () => {
+    const grappler = feats2014().find((f) => f.name === "Grappler");
+    expect(grappler?.prerequisite).toBe("Strength 13+");
+    expect(grappler?.abilityOptions ?? []).toEqual([]);
+    expect(grappler?.abilityIncrease).toBeUndefined();
+  });
+
+  it("2014 Savage Attacker is melee-only and grants no ability bump (PHB'14, distinct from 2024's any-weapon Origin version)", () => {
+    const savageAttacker = feats2014().find((f) => f.name === "Savage Attacker");
+    expect(savageAttacker?.description).toMatch(/melee weapon attack/i);
+    expect(savageAttacker?.abilityOptions ?? []).toEqual([]);
+  });
+
+  it("2014 Weapon Master states the weapon choice in its description and carries no hardcoded improvements", () => {
+    const weaponMaster = feats2014().find((f) => f.name === "Weapon Master");
+    expect(weaponMaster?.description).toMatch(/of your choice/i);
+    expect(weaponMaster?.improvements ?? []).toEqual([]);
+  });
+
+  it("2014 Magic Initiate and Skilled are not repeatable (PHB'14 p.165: once-only unless stated otherwise)", () => {
+    for (const name of ["Magic Initiate", "Skilled"]) {
+      const row = feats2014().find((f) => f.name === name);
+      expect(row?.repeatable, name).toBeFalsy();
+    }
+  });
+
+  it("carries zero rows of category origin, fighting_style, or epic_boon", () => {
+    const rows = FEATS.filter((f) => f.edition === "EDITION_2014");
+    const offCategory = rows.filter((f) => (["origin", "epic_boon"] as const).includes(f.category as never));
+    expect(offCategory.map((f) => f.name)).toEqual([]);
+  });
+
+  it("no Feat row is left edition-NULL — every row (2014 or 2024) carries an edition", () => {
+    const shared = FEATS.filter((f) => !f.edition).map((f) => f.name);
+    expect(shared).toEqual([]);
+  });
+
+  // The four originFeatName values BACKGROUNDS references — buildOriginEntry
+  // resolves them by name against the creating character's edition and returns
+  // null on a miss (character-create.ts), so a gap here would silently drop a
+  // background's Origin feat grant for whichever edition the miss lands on.
+  it("every BACKGROUNDS originFeatName has both an EDITION_2014 and EDITION_2024 row", () => {
+    const originFeatNames = [...new Set(BACKGROUNDS.map((b) => b.originFeatName).filter((n): n is string => !!n))];
+    expect(originFeatNames.length).toBeGreaterThan(0);
+    for (const name of originFeatNames) {
+      const editions = FEATS.filter((f) => f.name === name).map((f) => f.edition).sort();
+      expect(editions, name).toEqual(["EDITION_2014", "EDITION_2024"]);
+    }
   });
 });
 
@@ -669,6 +830,19 @@ describe("SUBCLASS_SLUGS — three-way bijection (#1277)", () => {
   // other.
   const ROW_MIGRATED_CLASSES = ["fighter", "barbarian", "rogue"];
 
+  // #1676: wizard-bladesinging is the FIRST real INTENTIONAL_GAPS entry.
+  // Wizard is NOT a row-migrated class in ROW_MIGRATED_CLASSES' sense —
+  // lib/classes/wizard.ts survives (it carries the class's residual subclass
+  // grantLevel, class-features.ts's own header) and its three OTHER
+  // subclasses each still have a real SubclassDefinition. Bladesinging is
+  // identity-only by design (CLAUDE.md: a pure identity/join key carries no
+  // rules text) — its mechanics ride the F1-F5 engine's seed-row vocabulary
+  // entirely (wizard-features.ts's BLADESINGING_RAW), never a
+  // SubclassDefinition, mirroring Fighter's own subclasses' shape without
+  // Fighter's whole-module deletion. Declared here, with a reason, rather
+  // than silently dropped from the bijection check below.
+  const INTENTIONAL_GAPS: SubclassSlug[] = ["wizard-bladesinging"];
+
   it("every SUBCLASSES row's slug is a member of SUBCLASS_SLUGS and maps back to its own (className, name)", () => {
     const bad = SUBCLASSES.filter((s) => {
       const identity = SUBCLASS_IDENTITY[s.slug];
@@ -706,18 +880,18 @@ describe("SUBCLASS_SLUGS — three-way bijection (#1277)", () => {
     }
     const missing = SUBCLASS_SLUGS.filter((slug) => {
       if (definedSlugs.has(slug)) return false;
+      if (INTENTIONAL_GAPS.includes(slug)) return false;
       const identity = SUBCLASS_IDENTITY[slug];
       return !identity || !ROW_MIGRATED_CLASSES.includes(identity.classKey);
     });
     expect(missing, "slug declared but no SubclassDefinition carries it, and not a row-migrated class").toEqual([]);
   });
 
-  // The declared intentional-gap allowlist — deliberately empty. A future
-  // subclass that legitimately can't join (e.g. creation-UX-only, no mechanics
-  // support) would be added HERE with a reason, never by leaving it out of
-  // SUBCLASS_SLUGS silently.
-  const INTENTIONAL_GAPS: SubclassSlug[] = [];
-  it("the intentional-gap allowlist is empty", () => {
-    expect(INTENTIONAL_GAPS).toEqual([]);
+  // The declared intentional-gap allowlist — every entry here is a slug the
+  // bijection check above deliberately excuses from needing a
+  // SubclassDefinition, with its own reason recorded at the declaration site
+  // (never silently dropped from SUBCLASS_SLUGS itself).
+  it("the intentional-gap allowlist names exactly the disclosed engine-first subclasses", () => {
+    expect(INTENTIONAL_GAPS).toEqual(["wizard-bladesinging"]);
   });
 });

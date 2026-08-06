@@ -92,4 +92,7 @@ export {
   Trash2,
   TriangleAlert,
   ScrollText,
+  // #1682 — SpeciesTraitsCard's Darkvision accent (owner ruling: prominent,
+  // visible info, not a derived combat stat).
+  Eye,
 } from "lucide-react";

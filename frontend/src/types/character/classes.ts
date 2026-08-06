@@ -26,7 +26,6 @@ export type {
   RestoreResourceOperation,
   RollInitiativeOperation,
   SpendResourceOperation,
-  ToggleElementalAttunementOperation,
   WarriorOfElementsOperation,
   WarriorOfElementsResult,
 } from "@character-sheet/shared-types";
@@ -50,6 +49,7 @@ export type {
   CastChannelDivinityOperation,
   CastShadowArtOperation,
   ChannelDivinityOperation,
+  DisciplineOperation,
   ImposeOpenHandRiderOperation,
   ManeuverOperation,
   OpenHandRider,
@@ -72,6 +72,37 @@ export interface CatalogShadowArt {
   minLevel: number;
   cost: AbilityCost;
   effect: EffectSpec;
+}
+
+/**
+ * One selectable ki amount for a Way of the Four Elements discipline's cast
+ * picker, and the roll it resolves to (#1505) — mirrors SpellEntry's
+ * `effectRolls[]` (spellcasting.ts): the client picks a `ki` and reads the
+ * matching `roll` verbatim off `CatalogDiscipline.steps`, it never computes
+ * the ki-scaled dice count itself.
+ */
+export interface DisciplineCastStep {
+  ki: number;
+  roll: { count: number; faces: number; modifier: number };
+}
+
+/**
+ * A Way of the Four Elements discipline (2014-only, #1503/#1505) from GET
+ * /api/disciplines. `steps` is empty for a no-dice utility discipline (Shape
+ * the Flowing River) and for `cost.kind !== "pool"`; the per-cast ki CAP by
+ * monk level (`maxKiPerDiscipline`, backend) is enforced server-side at cast
+ * time, never client-side — `steps` may offer more ki than a given monk can
+ * currently afford, which the server refuses rather than the client
+ * silently clamping (#1505's explicit AC).
+ */
+export interface CatalogDiscipline {
+  id: string;
+  name: string;
+  description: string;
+  minLevel: number;
+  cost: AbilityCost;
+  effect: EffectSpec;
+  steps: DisciplineCastStep[];
 }
 
 /** How a Channel Divinity option expresses through the declarative core (#419). */
@@ -201,37 +232,40 @@ export type QuiveringPalmResult = SetQuiveringPalmResult | TriggerQuiveringPalmR
 
 /**
  * One merged tool proficiency entry on the character wire type.
- * Creation-fixed profs (background/class/race) and level-gated subclass
+ * Creation-fixed profs (background/class) and level-gated subclass
  * profs (Student of War) are merged by serializeCharacter before sending.
  */
 export interface ToolProficiency {
   name: string;
   category: "artisan" | "gamingSet" | "musicalInstrument" | "other";
   /** Where this proficiency came from ("item" = a magic item grant, #529). */
-  source: "background" | "class" | "race" | "subclass" | "item";
+  source: "background" | "class" | "subclass" | "item";
 }
 
 /** Armor category that a character is proficient with. */
 export type ArmorProficiencyCategory = "light" | "medium" | "heavy" | "shield";
 
 /**
- * One armor proficiency entry — derived at read time from class + race + feats.
- * `category` identifies the armor type; `source` is the highest-priority origin
- * (class wins over race over feat when multiple sources would grant the same category).
+ * One armor proficiency entry — derived at read time from class + species-trait
+ * + feats (species grants arrive feat-sourced since the #1682
+ * RACE_PROFICIENCY_GRANTS retirement). `category` identifies the armor type;
+ * `source` is the highest-priority origin (class wins over feat when multiple
+ * sources would grant the same category).
  */
 export interface ArmorProficiency {
   category: ArmorProficiencyCategory;
-  source: "class" | "race" | "feat";
+  source: "class" | "feat";
 }
 
 /**
- * One weapon proficiency entry — derived at read time from class + race + feats.
- * `name` may be a category ("Simple Weapons", "Martial Weapons") or a specific
- * weapon ("Longswords"). `source` is the highest-priority origin.
+ * One weapon proficiency entry — derived at read time from class + species-trait
+ * + feats (species grants arrive feat-sourced since #1682). `name` may be a
+ * category ("Simple Weapons", "Martial Weapons") or a specific weapon
+ * ("Longswords"). `source` is the highest-priority origin.
  */
 export interface WeaponProficiency {
   name: string;
-  source: "class" | "race" | "feat" | "item";
+  source: "class" | "feat" | "item";
 }
 
 /** Level-gated tool proficiency entry within the resources JSON. */

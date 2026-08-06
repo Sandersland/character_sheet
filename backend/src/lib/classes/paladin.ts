@@ -14,13 +14,20 @@ import type { ClassDefinition, DerivedResource } from "./types.js";
 // subclassGateLevel's fallback — Warlock/Wizard/Sorcerer/Cleric's own
 // reason), and unlike Ranger it isn't the `choices` catalog. It survives
 // purely because TWO of its THREE pools are formula-shaped, not tier tables:
-// `divineSense`'s total is `1 + Charisma modifier` (a computed value, and
-// gated off entirely for a 2024 Paladin — 2024 removed Divine Sense as its
-// own pool, see the #1499 edition fork below) and `layOnHands`'s total is
-// `level × 5` with that computed value interpolated into its own
-// description (ClassFeature.resourceKey's schema comment names Lay on Hands
-// as a canonical stay-in-TS case). `channelDivinity`'s pool, a flat/tiered
-// total with no computed value, is the one that moved onto its rows — see
+// `divineSense`'s total is `1 + Charisma modifier` — an ADDITIVE offset, not
+// the `Math.max(min, mod)` floor #1685's `{ abilityMod, min }` evaluates, so
+// it stays out of scope for that vocabulary (and is gated off entirely for a
+// 2024 Paladin — 2024 removed Divine Sense as its own pool, see the #1499
+// edition fork below) — and `layOnHands`'s total IS the #1685 `{ levelTimes:
+// 5 }` shape, but its own description states the formula IN WORDS ("a pool of
+// 5 × your paladin level" / "a pool equal to five times your Paladin level"),
+// while this resourceFn's description below states the COMPUTED NUMBER
+// (`Pool of ${level * 5} healing HP`) — migrating would swap what a player
+// actually reads (a formula) for what they read today (a live number),
+// failing #1685's byte-identical AC outright, so Lay on Hands is EXCLUDED
+// here alongside Bardic Inspiration (bard.ts) rather than migrated as the
+// issue's named stretch goal. `channelDivinity`'s pool, a flat/tiered total
+// with no computed value, is the one that moved onto its rows — see
 // paladin-features.ts's own RESOURCE POOL header block for why exactly one
 // row per edition carries it.
 export const paladin: ClassDefinition = {

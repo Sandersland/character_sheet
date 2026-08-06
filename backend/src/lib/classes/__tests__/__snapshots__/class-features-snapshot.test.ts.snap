@@ -1,5 +1,1390 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`deriveResources snapshot — 2014 Monk (#1506), same pipeline under EDITION_2014 > monk / (no subclass) 1`] = `
+[
+  {
+    "info": {
+      "resources": [],
+    },
+    "level": 1,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 11. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 2,
+        },
+      ],
+    },
+    "level": 2,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 11. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 3,
+        },
+      ],
+    },
+    "level": 3,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 11. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 4,
+        },
+      ],
+    },
+    "level": 4,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 5,
+        },
+      ],
+    },
+    "level": 5,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 6,
+        },
+      ],
+    },
+    "level": 6,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 7,
+        },
+      ],
+    },
+    "level": 7,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 8,
+        },
+      ],
+    },
+    "level": 8,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 9,
+        },
+      ],
+    },
+    "level": 9,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 10,
+        },
+      ],
+    },
+    "level": 10,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 11,
+        },
+      ],
+    },
+    "level": 11,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 12,
+        },
+      ],
+    },
+    "level": 12,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 13,
+        },
+      ],
+    },
+    "level": 13,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 14,
+        },
+      ],
+    },
+    "level": 14,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 15,
+        },
+      ],
+    },
+    "level": 15,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 16,
+        },
+      ],
+    },
+    "level": 16,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 17,
+        },
+      ],
+    },
+    "level": 17,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 18,
+        },
+      ],
+    },
+    "level": 18,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 19,
+        },
+      ],
+    },
+    "level": 19,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "onInitiative": [
+            {
+              "amount": 4,
+              "id": "perfectSelf",
+              "threshold": 0,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 20,
+        },
+      ],
+    },
+    "level": 20,
+  },
+]
+`;
+
+exports[`deriveResources snapshot — 2014 Monk (#1506), same pipeline under EDITION_2014 > monk / way of shadow 1`] = `
+[
+  {
+    "info": {
+      "resources": [],
+    },
+    "level": 1,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 11. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 2,
+        },
+      ],
+    },
+    "level": 2,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 11. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 3,
+        },
+      ],
+    },
+    "level": 3,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 11. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 4,
+        },
+      ],
+    },
+    "level": 4,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 5,
+        },
+      ],
+    },
+    "level": 5,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 6,
+        },
+      ],
+    },
+    "level": 6,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 7,
+        },
+      ],
+    },
+    "level": 7,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 8,
+        },
+      ],
+    },
+    "level": 8,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 9,
+        },
+      ],
+    },
+    "level": 9,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 10,
+        },
+      ],
+    },
+    "level": 10,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 11,
+        },
+      ],
+    },
+    "level": 11,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 12,
+        },
+      ],
+    },
+    "level": 12,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 13,
+        },
+      ],
+    },
+    "level": 13,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 14,
+        },
+      ],
+    },
+    "level": 14,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 15,
+        },
+      ],
+    },
+    "level": 15,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 16,
+        },
+      ],
+    },
+    "level": 16,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 17,
+        },
+      ],
+    },
+    "level": 17,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 18,
+        },
+      ],
+    },
+    "level": 18,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 19,
+        },
+      ],
+    },
+    "level": 19,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "onInitiative": [
+            {
+              "amount": 4,
+              "id": "perfectSelf",
+              "threshold": 0,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 20,
+        },
+      ],
+    },
+    "level": 20,
+  },
+]
+`;
+
+exports[`deriveResources snapshot — 2014 Monk (#1506), same pipeline under EDITION_2014 > monk / way of the four elements 1`] = `
+[
+  {
+    "info": {
+      "resources": [],
+    },
+    "level": 1,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 11. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 2,
+        },
+      ],
+    },
+    "level": 2,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 11. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 3,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 1,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 3,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 11. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 4,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 1,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 4,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 5,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 1,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 5,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 6,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 2,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 6,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 7,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 2,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 7,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 8,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 2,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 8,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 9,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 2,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 9,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 10,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 2,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 10,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 11,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 3,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 11,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 12,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 3,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 12,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 13,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 3,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 13,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 14,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 3,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 14,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 15,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 3,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 15,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 16,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 3,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 16,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 17,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 4,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 17,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 18,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 4,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 18,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 19,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 4,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 19,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "onInitiative": [
+            {
+              "amount": 4,
+              "id": "perfectSelf",
+              "threshold": 0,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 20,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 4,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 20,
+  },
+]
+`;
+
+exports[`deriveResources snapshot — 2014 Monk (#1506), same pipeline under EDITION_2014 > monk / way of the open hand 1`] = `
+[
+  {
+    "info": {
+      "resources": [],
+    },
+    "level": 1,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 11. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 2,
+        },
+      ],
+    },
+    "level": 2,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 11. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 3,
+        },
+      ],
+    },
+    "level": 3,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 11. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 4,
+        },
+      ],
+    },
+    "level": 4,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 5,
+        },
+      ],
+    },
+    "level": 5,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 6,
+        },
+        {
+          "description": "As an action, regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again.",
+          "key": "wholenessOfBody",
+          "label": "Wholeness of Body",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 6,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 7,
+        },
+        {
+          "description": "As an action, regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again.",
+          "key": "wholenessOfBody",
+          "label": "Wholeness of Body",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 7,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 12. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 8,
+        },
+        {
+          "description": "As an action, regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again.",
+          "key": "wholenessOfBody",
+          "label": "Wholeness of Body",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 8,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 9,
+        },
+        {
+          "description": "As an action, regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again.",
+          "key": "wholenessOfBody",
+          "label": "Wholeness of Body",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 9,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 10,
+        },
+        {
+          "description": "As an action, regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again.",
+          "key": "wholenessOfBody",
+          "label": "Wholeness of Body",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 10,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 11,
+        },
+        {
+          "description": "As an action, regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again.",
+          "key": "wholenessOfBody",
+          "label": "Wholeness of Body",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 11,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 13. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 12,
+        },
+        {
+          "description": "As an action, regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again.",
+          "key": "wholenessOfBody",
+          "label": "Wholeness of Body",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 12,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 13,
+        },
+        {
+          "description": "As an action, regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again.",
+          "key": "wholenessOfBody",
+          "label": "Wholeness of Body",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 13,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 14,
+        },
+        {
+          "description": "As an action, regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again.",
+          "key": "wholenessOfBody",
+          "label": "Wholeness of Body",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 14,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 15,
+        },
+        {
+          "description": "As an action, regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again.",
+          "key": "wholenessOfBody",
+          "label": "Wholeness of Body",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 15,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 14. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 16,
+        },
+        {
+          "description": "As an action, regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again.",
+          "key": "wholenessOfBody",
+          "label": "Wholeness of Body",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 16,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 17,
+        },
+        {
+          "description": "As an action, regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again.",
+          "key": "wholenessOfBody",
+          "label": "Wholeness of Body",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 17,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 18,
+        },
+        {
+          "description": "As an action, regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again.",
+          "key": "wholenessOfBody",
+          "label": "Wholeness of Body",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 18,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "recharge": "short-or-long",
+          "total": 19,
+        },
+        {
+          "description": "As an action, regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again.",
+          "key": "wholenessOfBody",
+          "label": "Wholeness of Body",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 19,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel ki features: Flurry of Blows (1 ki), Patient Defense (1 ki), Step of the Wind (1 ki), Deflect Missiles' throw-back (1 ki), and subclass abilities. Ki save DC 15. Regain all ki on a short or long rest.",
+          "key": "ki",
+          "label": "Ki Points",
+          "onInitiative": [
+            {
+              "amount": 4,
+              "id": "perfectSelf",
+              "threshold": 0,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 20,
+        },
+        {
+          "description": "As an action, regain hit points equal to three times your monk level. You must finish a long rest before you can use this feature again.",
+          "key": "wholenessOfBody",
+          "label": "Wholeness of Body",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 20,
+  },
+]
+`;
+
 exports[`deriveResources snapshot — pins output for every class/subclass across all 20 levels > barbarian / (no subclass) 1`] = `
 [
   {
@@ -8817,6 +10202,1737 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
 ]
 `;
 
+exports[`deriveResources snapshot — pins output for every class/subclass across all 20 levels > monk / way of shadow 1`] = `
+[
+  {
+    "info": {
+      "resources": [],
+    },
+    "level": 1,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 11. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 6,
+                "flatBonus": 2,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 2,
+        },
+      ],
+    },
+    "level": 2,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 11. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 6,
+                "flatBonus": 3,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 3,
+        },
+      ],
+    },
+    "level": 3,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 11. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 6,
+                "flatBonus": 4,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 4,
+        },
+      ],
+    },
+    "level": 4,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 5,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 5,
+        },
+      ],
+    },
+    "level": 5,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 6,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 6,
+        },
+      ],
+    },
+    "level": 6,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 7,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 7,
+        },
+      ],
+    },
+    "level": 7,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 8,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 8,
+        },
+      ],
+    },
+    "level": 8,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 9,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 9,
+        },
+      ],
+    },
+    "level": 9,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 10,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 10,
+        },
+      ],
+    },
+    "level": 10,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 11,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 11,
+        },
+      ],
+    },
+    "level": 11,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 12,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 12,
+        },
+      ],
+    },
+    "level": 12,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 13,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 13,
+        },
+      ],
+    },
+    "level": 13,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 14,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 14,
+        },
+      ],
+    },
+    "level": 14,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 15,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 15,
+        },
+      ],
+    },
+    "level": 15,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 16,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 16,
+        },
+      ],
+    },
+    "level": 16,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 12,
+                "flatBonus": 17,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 17,
+        },
+      ],
+    },
+    "level": 17,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 12,
+                "flatBonus": 18,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 18,
+        },
+      ],
+    },
+    "level": 18,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 12,
+                "flatBonus": 19,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 19,
+        },
+      ],
+    },
+    "level": 19,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 12,
+                "flatBonus": 20,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 20,
+        },
+      ],
+    },
+    "level": 20,
+  },
+]
+`;
+
+exports[`deriveResources snapshot — pins output for every class/subclass across all 20 levels > monk / way of the four elements 1`] = `
+[
+  {
+    "info": {
+      "resources": [],
+    },
+    "level": 1,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 11. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 6,
+                "flatBonus": 2,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 2,
+        },
+      ],
+    },
+    "level": 2,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 11. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 6,
+                "flatBonus": 3,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 3,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 1,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 3,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 11. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 6,
+                "flatBonus": 4,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 4,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 1,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 4,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 5,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 5,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 1,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 5,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 6,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 6,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 2,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 6,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 7,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 7,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 2,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 7,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 8,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 8,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 2,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 8,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 9,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 9,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 2,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 9,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 10,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 10,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 2,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 10,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 11,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 11,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 3,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 11,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 12,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 12,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 3,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 12,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 13,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 13,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 3,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 13,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 14,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 14,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 3,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 14,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 15,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 15,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 3,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 15,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 16,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 16,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 3,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 16,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 12,
+                "flatBonus": 17,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 17,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 4,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 17,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 12,
+                "flatBonus": 18,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 18,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 4,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 18,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 12,
+                "flatBonus": 19,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 19,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 4,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 19,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 12,
+                "flatBonus": 20,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 20,
+        },
+      ],
+      "subclassChoices": [
+        {
+          "catalogSource": "discipline",
+          "count": 4,
+          "key": "fourElementsDisciplines",
+          "label": "Elemental Disciplines",
+        },
+      ],
+    },
+    "level": 20,
+  },
+]
+`;
+
+exports[`deriveResources snapshot — pins output for every class/subclass across all 20 levels > monk / way of the open hand 1`] = `
+[
+  {
+    "info": {
+      "resources": [],
+    },
+    "level": 1,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 11. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 6,
+                "flatBonus": 2,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 2,
+        },
+      ],
+    },
+    "level": 2,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 11. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 6,
+                "flatBonus": 3,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 3,
+        },
+      ],
+    },
+    "level": 3,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 11. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 6,
+                "flatBonus": 4,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 4,
+        },
+      ],
+    },
+    "level": 4,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 5,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 5,
+        },
+      ],
+    },
+    "level": 5,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 6,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 6,
+        },
+      ],
+    },
+    "level": 6,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 7,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 7,
+        },
+      ],
+    },
+    "level": 7,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 12. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 8,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 8,
+        },
+      ],
+    },
+    "level": 8,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 9,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 9,
+        },
+      ],
+    },
+    "level": 9,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 8,
+                "flatBonus": 10,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 10,
+        },
+      ],
+    },
+    "level": 10,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 11,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 11,
+        },
+      ],
+    },
+    "level": 11,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 13. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 12,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 12,
+        },
+      ],
+    },
+    "level": 12,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 13,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 13,
+        },
+      ],
+    },
+    "level": 13,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 14,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 14,
+        },
+      ],
+    },
+    "level": 14,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 15,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 15,
+        },
+      ],
+    },
+    "level": 15,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 14. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 10,
+                "flatBonus": 16,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 16,
+        },
+      ],
+    },
+    "level": 16,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 12,
+                "flatBonus": 17,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 17,
+        },
+      ],
+    },
+    "level": 17,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 12,
+                "flatBonus": 18,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 18,
+        },
+      ],
+    },
+    "level": 18,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 12,
+                "flatBonus": 19,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 19,
+        },
+      ],
+    },
+    "level": 19,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "Fuel focus features: Flurry of Blows (1 focus), Patient Defense (free, or 1 focus for more), Step of the Wind (free, or 1 focus for more), and subclass abilities. Focus save DC 15. Regain all focus on a short or long rest.",
+          "key": "focus",
+          "label": "Focus Points",
+          "onInitiative": [
+            {
+              "amount": "all",
+              "bonusHeal": {
+                "dieFaces": 12,
+                "flatBonus": 20,
+                "sourceName": "Uncanny Metabolism",
+              },
+              "id": "uncannyMetabolism",
+              "oncePerLongRest": true,
+            },
+            {
+              "amount": 4,
+              "id": "perfectFocus",
+            },
+          ],
+          "recharge": "short-or-long",
+          "total": 20,
+        },
+      ],
+    },
+    "level": 20,
+  },
+]
+`;
+
 exports[`deriveResources snapshot — pins output for every class/subclass across all 20 levels > paladin / (no subclass) 1`] = `
 [
   {
@@ -10665,18 +13781,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
-          "key": "tireless",
-          "label": "Tireless",
-          "recharge": "longRest",
-          "total": 1,
-        },
-        {
           "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
           "key": "favoredEnemy",
           "label": "Favored Enemy (Hunter's Mark)",
           "recharge": "longRest",
           "total": 4,
+        },
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -10686,18 +13802,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
-          "key": "tireless",
-          "label": "Tireless",
-          "recharge": "longRest",
-          "total": 1,
-        },
-        {
           "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
           "key": "favoredEnemy",
           "label": "Favored Enemy (Hunter's Mark)",
           "recharge": "longRest",
           "total": 4,
+        },
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -10707,18 +13823,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
-          "key": "tireless",
-          "label": "Tireless",
-          "recharge": "longRest",
-          "total": 1,
-        },
-        {
           "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
           "key": "favoredEnemy",
           "label": "Favored Enemy (Hunter's Mark)",
           "recharge": "longRest",
           "total": 4,
+        },
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -10728,18 +13844,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
-          "key": "tireless",
-          "label": "Tireless",
-          "recharge": "longRest",
-          "total": 1,
-        },
-        {
           "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
           "key": "favoredEnemy",
           "label": "Favored Enemy (Hunter's Mark)",
           "recharge": "longRest",
           "total": 5,
+        },
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -10749,6 +13865,13 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 5,
+        },
+        {
           "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
           "key": "tireless",
           "label": "Tireless",
@@ -10761,13 +13884,6 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "label": "Nature's Veil",
           "recharge": "longRest",
           "total": 1,
-        },
-        {
-          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
-          "key": "favoredEnemy",
-          "label": "Favored Enemy (Hunter's Mark)",
-          "recharge": "longRest",
-          "total": 5,
         },
       ],
     },
@@ -10777,6 +13893,13 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 5,
+        },
+        {
           "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
           "key": "tireless",
           "label": "Tireless",
@@ -10789,13 +13912,6 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "label": "Nature's Veil",
           "recharge": "longRest",
           "total": 1,
-        },
-        {
-          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
-          "key": "favoredEnemy",
-          "label": "Favored Enemy (Hunter's Mark)",
-          "recharge": "longRest",
-          "total": 5,
         },
       ],
     },
@@ -10805,6 +13921,13 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 5,
+        },
+        {
           "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
           "key": "tireless",
           "label": "Tireless",
@@ -10817,13 +13940,6 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "label": "Nature's Veil",
           "recharge": "longRest",
           "total": 1,
-        },
-        {
-          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
-          "key": "favoredEnemy",
-          "label": "Favored Enemy (Hunter's Mark)",
-          "recharge": "longRest",
-          "total": 5,
         },
       ],
     },
@@ -10833,6 +13949,13 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 6,
+        },
+        {
           "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
           "key": "tireless",
           "label": "Tireless",
@@ -10845,13 +13968,6 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "label": "Nature's Veil",
           "recharge": "longRest",
           "total": 1,
-        },
-        {
-          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
-          "key": "favoredEnemy",
-          "label": "Favored Enemy (Hunter's Mark)",
-          "recharge": "longRest",
-          "total": 6,
         },
       ],
     },
@@ -10861,6 +13977,13 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 6,
+        },
+        {
           "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
           "key": "tireless",
           "label": "Tireless",
@@ -10873,13 +13996,6 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "label": "Nature's Veil",
           "recharge": "longRest",
           "total": 1,
-        },
-        {
-          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
-          "key": "favoredEnemy",
-          "label": "Favored Enemy (Hunter's Mark)",
-          "recharge": "longRest",
-          "total": 6,
         },
       ],
     },
@@ -10889,6 +14005,13 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 6,
+        },
+        {
           "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
           "key": "tireless",
           "label": "Tireless",
@@ -10901,13 +14024,6 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "label": "Nature's Veil",
           "recharge": "longRest",
           "total": 1,
-        },
-        {
-          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
-          "key": "favoredEnemy",
-          "label": "Favored Enemy (Hunter's Mark)",
-          "recharge": "longRest",
-          "total": 6,
         },
       ],
     },
@@ -10917,6 +14033,13 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 6,
+        },
+        {
           "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
           "key": "tireless",
           "label": "Tireless",
@@ -10929,13 +14052,6 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "label": "Nature's Veil",
           "recharge": "longRest",
           "total": 1,
-        },
-        {
-          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
-          "key": "favoredEnemy",
-          "label": "Favored Enemy (Hunter's Mark)",
-          "recharge": "longRest",
-          "total": 6,
         },
       ],
     },
@@ -11076,18 +14192,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
-          "key": "tireless",
-          "label": "Tireless",
-          "recharge": "longRest",
-          "total": 1,
-        },
-        {
           "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
           "key": "favoredEnemy",
           "label": "Favored Enemy (Hunter's Mark)",
           "recharge": "longRest",
           "total": 4,
+        },
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -11097,18 +14213,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
-          "key": "tireless",
-          "label": "Tireless",
-          "recharge": "longRest",
-          "total": 1,
-        },
-        {
           "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
           "key": "favoredEnemy",
           "label": "Favored Enemy (Hunter's Mark)",
           "recharge": "longRest",
           "total": 4,
+        },
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -11118,18 +14234,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
-          "key": "tireless",
-          "label": "Tireless",
-          "recharge": "longRest",
-          "total": 1,
-        },
-        {
           "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
           "key": "favoredEnemy",
           "label": "Favored Enemy (Hunter's Mark)",
           "recharge": "longRest",
           "total": 4,
+        },
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -11139,18 +14255,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
-          "key": "tireless",
-          "label": "Tireless",
-          "recharge": "longRest",
-          "total": 1,
-        },
-        {
           "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
           "key": "favoredEnemy",
           "label": "Favored Enemy (Hunter's Mark)",
           "recharge": "longRest",
           "total": 5,
+        },
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
     },
@@ -11160,6 +14276,13 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 5,
+        },
+        {
           "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
           "key": "tireless",
           "label": "Tireless",
@@ -11172,13 +14295,6 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "label": "Nature's Veil",
           "recharge": "longRest",
           "total": 1,
-        },
-        {
-          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
-          "key": "favoredEnemy",
-          "label": "Favored Enemy (Hunter's Mark)",
-          "recharge": "longRest",
-          "total": 5,
         },
       ],
     },
@@ -11188,6 +14304,13 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 5,
+        },
+        {
           "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
           "key": "tireless",
           "label": "Tireless",
@@ -11200,13 +14323,6 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "label": "Nature's Veil",
           "recharge": "longRest",
           "total": 1,
-        },
-        {
-          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
-          "key": "favoredEnemy",
-          "label": "Favored Enemy (Hunter's Mark)",
-          "recharge": "longRest",
-          "total": 5,
         },
       ],
     },
@@ -11216,6 +14332,13 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 5,
+        },
+        {
           "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
           "key": "tireless",
           "label": "Tireless",
@@ -11228,13 +14351,6 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "label": "Nature's Veil",
           "recharge": "longRest",
           "total": 1,
-        },
-        {
-          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
-          "key": "favoredEnemy",
-          "label": "Favored Enemy (Hunter's Mark)",
-          "recharge": "longRest",
-          "total": 5,
         },
       ],
     },
@@ -11244,6 +14360,13 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 6,
+        },
+        {
           "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
           "key": "tireless",
           "label": "Tireless",
@@ -11256,13 +14379,6 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "label": "Nature's Veil",
           "recharge": "longRest",
           "total": 1,
-        },
-        {
-          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
-          "key": "favoredEnemy",
-          "label": "Favored Enemy (Hunter's Mark)",
-          "recharge": "longRest",
-          "total": 6,
         },
       ],
     },
@@ -11272,6 +14388,13 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 6,
+        },
+        {
           "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
           "key": "tireless",
           "label": "Tireless",
@@ -11284,13 +14407,6 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "label": "Nature's Veil",
           "recharge": "longRest",
           "total": 1,
-        },
-        {
-          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
-          "key": "favoredEnemy",
-          "label": "Favored Enemy (Hunter's Mark)",
-          "recharge": "longRest",
-          "total": 6,
         },
       ],
     },
@@ -11300,6 +14416,13 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 6,
+        },
+        {
           "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
           "key": "tireless",
           "label": "Tireless",
@@ -11312,13 +14435,6 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "label": "Nature's Veil",
           "recharge": "longRest",
           "total": 1,
-        },
-        {
-          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
-          "key": "favoredEnemy",
-          "label": "Favored Enemy (Hunter's Mark)",
-          "recharge": "longRest",
-          "total": 6,
         },
       ],
     },
@@ -11328,6 +14444,13 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 6,
+        },
+        {
           "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
           "key": "tireless",
           "label": "Tireless",
@@ -11340,13 +14463,6 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "label": "Nature's Veil",
           "recharge": "longRest",
           "total": 1,
-        },
-        {
-          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
-          "key": "favoredEnemy",
-          "label": "Favored Enemy (Hunter's Mark)",
-          "recharge": "longRest",
-          "total": 6,
         },
       ],
     },
@@ -11561,18 +14677,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
-          "key": "tireless",
-          "label": "Tireless",
-          "recharge": "longRest",
-          "total": 1,
-        },
-        {
           "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
           "key": "favoredEnemy",
           "label": "Favored Enemy (Hunter's Mark)",
           "recharge": "longRest",
           "total": 4,
+        },
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
       "subclassChoices": [
@@ -11596,18 +14712,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
-          "key": "tireless",
-          "label": "Tireless",
-          "recharge": "longRest",
-          "total": 1,
-        },
-        {
           "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
           "key": "favoredEnemy",
           "label": "Favored Enemy (Hunter's Mark)",
           "recharge": "longRest",
           "total": 4,
+        },
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
       "subclassChoices": [
@@ -11637,18 +14753,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
-          "key": "tireless",
-          "label": "Tireless",
-          "recharge": "longRest",
-          "total": 1,
-        },
-        {
           "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
           "key": "favoredEnemy",
           "label": "Favored Enemy (Hunter's Mark)",
           "recharge": "longRest",
           "total": 4,
+        },
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
       "subclassChoices": [
@@ -11678,18 +14794,18 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
-          "key": "tireless",
-          "label": "Tireless",
-          "recharge": "longRest",
-          "total": 1,
-        },
-        {
           "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
           "key": "favoredEnemy",
           "label": "Favored Enemy (Hunter's Mark)",
           "recharge": "longRest",
           "total": 5,
+        },
+        {
+          "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
+          "key": "tireless",
+          "label": "Tireless",
+          "recharge": "longRest",
+          "total": 1,
         },
       ],
       "subclassChoices": [
@@ -11719,6 +14835,13 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 5,
+        },
+        {
           "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
           "key": "tireless",
           "label": "Tireless",
@@ -11731,13 +14854,6 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "label": "Nature's Veil",
           "recharge": "longRest",
           "total": 1,
-        },
-        {
-          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
-          "key": "favoredEnemy",
-          "label": "Favored Enemy (Hunter's Mark)",
-          "recharge": "longRest",
-          "total": 5,
         },
       ],
       "subclassChoices": [
@@ -11767,6 +14883,13 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 5,
+        },
+        {
           "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
           "key": "tireless",
           "label": "Tireless",
@@ -11779,13 +14902,6 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "label": "Nature's Veil",
           "recharge": "longRest",
           "total": 1,
-        },
-        {
-          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
-          "key": "favoredEnemy",
-          "label": "Favored Enemy (Hunter's Mark)",
-          "recharge": "longRest",
-          "total": 5,
         },
       ],
       "subclassChoices": [
@@ -11821,6 +14937,13 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 5,
+        },
+        {
           "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
           "key": "tireless",
           "label": "Tireless",
@@ -11833,13 +14956,6 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "label": "Nature's Veil",
           "recharge": "longRest",
           "total": 1,
-        },
-        {
-          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
-          "key": "favoredEnemy",
-          "label": "Favored Enemy (Hunter's Mark)",
-          "recharge": "longRest",
-          "total": 5,
         },
       ],
       "subclassChoices": [
@@ -11875,6 +14991,13 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 6,
+        },
+        {
           "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
           "key": "tireless",
           "label": "Tireless",
@@ -11887,13 +15010,6 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "label": "Nature's Veil",
           "recharge": "longRest",
           "total": 1,
-        },
-        {
-          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
-          "key": "favoredEnemy",
-          "label": "Favored Enemy (Hunter's Mark)",
-          "recharge": "longRest",
-          "total": 6,
         },
       ],
       "subclassChoices": [
@@ -11929,6 +15045,13 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 6,
+        },
+        {
           "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
           "key": "tireless",
           "label": "Tireless",
@@ -11941,13 +15064,6 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "label": "Nature's Veil",
           "recharge": "longRest",
           "total": 1,
-        },
-        {
-          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
-          "key": "favoredEnemy",
-          "label": "Favored Enemy (Hunter's Mark)",
-          "recharge": "longRest",
-          "total": 6,
         },
       ],
       "subclassChoices": [
@@ -11983,6 +15099,13 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 6,
+        },
+        {
           "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
           "key": "tireless",
           "label": "Tireless",
@@ -11995,13 +15118,6 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "label": "Nature's Veil",
           "recharge": "longRest",
           "total": 1,
-        },
-        {
-          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
-          "key": "favoredEnemy",
-          "label": "Favored Enemy (Hunter's Mark)",
-          "recharge": "longRest",
-          "total": 6,
         },
       ],
       "subclassChoices": [
@@ -12037,6 +15153,13 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
+          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
+          "key": "favoredEnemy",
+          "label": "Favored Enemy (Hunter's Mark)",
+          "recharge": "longRest",
+          "total": 6,
+        },
+        {
           "description": "As a Magic action, you gain Temporary Hit Points equal to 1d8 plus your Wisdom modifier, and your Exhaustion level (if any) decreases by 1. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
           "key": "tireless",
           "label": "Tireless",
@@ -12049,13 +15172,6 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "label": "Nature's Veil",
           "recharge": "longRest",
           "total": 1,
-        },
-        {
-          "description": "You always have the Hunter's Mark spell prepared; it doesn't count against the number of spells you can prepare. You can cast it without expending a spell slot a number of times (2 at level 1, rising to 3/4/5/6 at levels 5/9/13/17), and you regain all expended uses when you finish a Long Rest.",
-          "key": "favoredEnemy",
-          "label": "Favored Enemy (Hunter's Mark)",
-          "recharge": "longRest",
-          "total": 6,
         },
       ],
       "subclassChoices": [
@@ -15763,6 +18879,291 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
 ]
 `;
 
+exports[`deriveResources snapshot — pins output for every class/subclass across all 20 levels > wizard / bladesinging 1`] = `
+[
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 1,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 2,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 3,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 4,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 5,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 6,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 7,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 8,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 9,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 10,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 11,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 12,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 13,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 14,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 15,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 16,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 17,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 18,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 19,
+  },
+  {
+    "info": {
+      "resources": [
+        {
+          "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+          "key": "arcaneRecovery",
+          "label": "Arcane Recovery",
+          "recharge": "longRest",
+          "total": 1,
+        },
+      ],
+    },
+    "level": 20,
+  },
+]
+`;
+
 exports[`deriveResources snapshot — pins output for every class/subclass across all 20 levels > wizard / school of abjuration 1`] = `
 [
   {
@@ -18636,6 +22037,261 @@ exports[`resolveClassDie snapshot — every class-die pool across all classes/su
 ]
 `;
 
+exports[`resolveClassDie snapshot — every class-die pool across all classes/subclasses > monk / way of shadow 1`] = `
+[
+  {
+    "dice": {},
+    "level": 1,
+  },
+  {
+    "dice": {},
+    "level": 2,
+  },
+  {
+    "dice": {},
+    "level": 3,
+  },
+  {
+    "dice": {},
+    "level": 4,
+  },
+  {
+    "dice": {},
+    "level": 5,
+  },
+  {
+    "dice": {},
+    "level": 6,
+  },
+  {
+    "dice": {},
+    "level": 7,
+  },
+  {
+    "dice": {},
+    "level": 8,
+  },
+  {
+    "dice": {},
+    "level": 9,
+  },
+  {
+    "dice": {},
+    "level": 10,
+  },
+  {
+    "dice": {},
+    "level": 11,
+  },
+  {
+    "dice": {},
+    "level": 12,
+  },
+  {
+    "dice": {},
+    "level": 13,
+  },
+  {
+    "dice": {},
+    "level": 14,
+  },
+  {
+    "dice": {},
+    "level": 15,
+  },
+  {
+    "dice": {},
+    "level": 16,
+  },
+  {
+    "dice": {},
+    "level": 17,
+  },
+  {
+    "dice": {},
+    "level": 18,
+  },
+  {
+    "dice": {},
+    "level": 19,
+  },
+  {
+    "dice": {},
+    "level": 20,
+  },
+]
+`;
+
+exports[`resolveClassDie snapshot — every class-die pool across all classes/subclasses > monk / way of the four elements 1`] = `
+[
+  {
+    "dice": {},
+    "level": 1,
+  },
+  {
+    "dice": {},
+    "level": 2,
+  },
+  {
+    "dice": {},
+    "level": 3,
+  },
+  {
+    "dice": {},
+    "level": 4,
+  },
+  {
+    "dice": {},
+    "level": 5,
+  },
+  {
+    "dice": {},
+    "level": 6,
+  },
+  {
+    "dice": {},
+    "level": 7,
+  },
+  {
+    "dice": {},
+    "level": 8,
+  },
+  {
+    "dice": {},
+    "level": 9,
+  },
+  {
+    "dice": {},
+    "level": 10,
+  },
+  {
+    "dice": {},
+    "level": 11,
+  },
+  {
+    "dice": {},
+    "level": 12,
+  },
+  {
+    "dice": {},
+    "level": 13,
+  },
+  {
+    "dice": {},
+    "level": 14,
+  },
+  {
+    "dice": {},
+    "level": 15,
+  },
+  {
+    "dice": {},
+    "level": 16,
+  },
+  {
+    "dice": {},
+    "level": 17,
+  },
+  {
+    "dice": {},
+    "level": 18,
+  },
+  {
+    "dice": {},
+    "level": 19,
+  },
+  {
+    "dice": {},
+    "level": 20,
+  },
+]
+`;
+
+exports[`resolveClassDie snapshot — every class-die pool across all classes/subclasses > monk / way of the open hand 1`] = `
+[
+  {
+    "dice": {},
+    "level": 1,
+  },
+  {
+    "dice": {},
+    "level": 2,
+  },
+  {
+    "dice": {},
+    "level": 3,
+  },
+  {
+    "dice": {},
+    "level": 4,
+  },
+  {
+    "dice": {},
+    "level": 5,
+  },
+  {
+    "dice": {},
+    "level": 6,
+  },
+  {
+    "dice": {},
+    "level": 7,
+  },
+  {
+    "dice": {},
+    "level": 8,
+  },
+  {
+    "dice": {},
+    "level": 9,
+  },
+  {
+    "dice": {},
+    "level": 10,
+  },
+  {
+    "dice": {},
+    "level": 11,
+  },
+  {
+    "dice": {},
+    "level": 12,
+  },
+  {
+    "dice": {},
+    "level": 13,
+  },
+  {
+    "dice": {},
+    "level": 14,
+  },
+  {
+    "dice": {},
+    "level": 15,
+  },
+  {
+    "dice": {},
+    "level": 16,
+  },
+  {
+    "dice": {},
+    "level": 17,
+  },
+  {
+    "dice": {},
+    "level": 18,
+  },
+  {
+    "dice": {},
+    "level": 19,
+  },
+  {
+    "dice": {},
+    "level": 20,
+  },
+]
+`;
+
 exports[`resolveClassDie snapshot — every class-die pool across all classes/subclasses > paladin / (no subclass) 1`] = `
 [
   {
@@ -20167,6 +23823,91 @@ exports[`resolveClassDie snapshot — every class-die pool across all classes/su
 `;
 
 exports[`resolveClassDie snapshot — every class-die pool across all classes/subclasses > wizard / (no subclass) 1`] = `
+[
+  {
+    "dice": {},
+    "level": 1,
+  },
+  {
+    "dice": {},
+    "level": 2,
+  },
+  {
+    "dice": {},
+    "level": 3,
+  },
+  {
+    "dice": {},
+    "level": 4,
+  },
+  {
+    "dice": {},
+    "level": 5,
+  },
+  {
+    "dice": {},
+    "level": 6,
+  },
+  {
+    "dice": {},
+    "level": 7,
+  },
+  {
+    "dice": {},
+    "level": 8,
+  },
+  {
+    "dice": {},
+    "level": 9,
+  },
+  {
+    "dice": {},
+    "level": 10,
+  },
+  {
+    "dice": {},
+    "level": 11,
+  },
+  {
+    "dice": {},
+    "level": 12,
+  },
+  {
+    "dice": {},
+    "level": 13,
+  },
+  {
+    "dice": {},
+    "level": 14,
+  },
+  {
+    "dice": {},
+    "level": 15,
+  },
+  {
+    "dice": {},
+    "level": 16,
+  },
+  {
+    "dice": {},
+    "level": 17,
+  },
+  {
+    "dice": {},
+    "level": 18,
+  },
+  {
+    "dice": {},
+    "level": 19,
+  },
+  {
+    "dice": {},
+    "level": 20,
+  },
+]
+`;
+
+exports[`resolveClassDie snapshot — every class-die pool across all classes/subclasses > wizard / bladesinging 1`] = `
 [
   {
     "dice": {},

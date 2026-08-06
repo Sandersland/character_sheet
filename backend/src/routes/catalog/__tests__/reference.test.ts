@@ -20,12 +20,12 @@ describe("GET /api/reference", () => {
       .get("/api/reference?edition=EDITION_2024");
 
     expect(response.status).toBe(200);
-    expect(response.body).toHaveProperty("races");
+    expect(response.body).toHaveProperty("species");
     expect(response.body).toHaveProperty("classes");
     expect(response.body).toHaveProperty("backgrounds");
     expect(response.body).toHaveProperty("alignments");
 
-    expect(Array.isArray(response.body.races)).toBe(true);
+    expect(Array.isArray(response.body.species)).toBe(true);
     expect(Array.isArray(response.body.classes)).toBe(true);
     expect(Array.isArray(response.body.backgrounds)).toBe(true);
     expect(response.body.alignments).toEqual(
@@ -63,6 +63,30 @@ describe("GET /api/reference", () => {
     // Folk Hero, and offering it here is what silently cost a 2024 character
     // their ability spread and Origin feat. Its 2014 half is asserted below.
     expect(response.body.backgrounds.map((b: { name: string }) => b.name)).not.toContain("Folk Hero");
+  });
+
+  // #1504/#1572: Origin feats and the ability spread are both PHB'24-only
+  // mechanics — the SAME Criminal/Soldier rows that grant both above (#1130)
+  // must serve neither under EDITION_2014, proving the gate is on the
+  // requesting edition and not merely on which rows are edition-tagged
+  // (Soldier's Savage Attacker is edition-tagged the same as Alert since
+  // #1310 — a real EDITION_2014 row exists and IS reachable by 2014 in every
+  // other respect, but still suppressed here).
+  it("suppresses the ability spread and origin feat for every background under EDITION_2014 (#1504, #1572)", async () => {
+    const response = await supertest
+      .agent(app)
+      .set("Cookie", COOKIE)
+      .get("/api/reference?edition=EDITION_2014");
+
+    const criminal = response.body.backgrounds.find((b: { name: string }) => b.name === "Criminal");
+    expect(criminal).toBeDefined();
+    expect(criminal.abilityChoices).toEqual([]);
+    expect(criminal.originFeat).toBeNull();
+
+    const soldier = response.body.backgrounds.find((b: { name: string }) => b.name === "Soldier");
+    expect(soldier).toBeDefined();
+    expect(soldier.abilityChoices).toEqual([]);
+    expect(soldier.originFeat).toBeNull();
   });
 
   // #1131: each class carries its level-1 creation pick counts (or null for a
@@ -203,36 +227,44 @@ describe("GET /api/reference", () => {
     expect(response.body.error).toContain("edition");
   });
 
-  // #1325/#1348: Background.originFeatId is a raw FK baked onto the 2024 Feat
-  // row at seed time (resolveOriginFeatId) — resolving it BY NAME through
-  // resolveEditionCatalog instead makes this preview agree with what
-  // buildOriginEntry actually grants a 2014 character. Alert is the only
-  // origin feat with textually distinct 2014/2024 rows.
-  it("resolves a background's origin feat for the requested edition (#1348 cross-link)", async () => {
+  // #1325/#1348/#1504: Background.originFeatId is a raw FK baked onto the 2024
+  // Feat row at seed time (resolveOriginFeatId) — resolving it BY NAME through
+  // resolveEditionCatalog, gated by backgroundGrantsOriginFeat, makes this
+  // preview agree with what buildOriginEntry actually grants a character. An
+  // Origin feat is a PHB'24-only mechanic (#1504), so EVERY background —
+  // Alert's textually-forked pair included — serves `null` under EDITION_2014,
+  // not a 2014-flavored feat.
+  it("resolves a background's origin feat for the requested edition, null under 2014 (#1348, #1504)", async () => {
     const criminal2014 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2014");
     const criminal2024 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2024");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- response.body is untyped JSON (supertest), matching this file's existing byName helpers
     const byName = (body: any, name: string) => body.backgrounds.find((b: { name: string }) => b.name === name);
 
-    const alert2014 = byName(criminal2014.body, "Criminal").originFeat;
     const alert2024 = byName(criminal2024.body, "Criminal").originFeat;
-    expect(alert2014.name).toBe("Alert");
     expect(alert2024.name).toBe("Alert");
-    expect(alert2014.description).toMatch(/\+5 bonus to initiative/);
     expect(alert2024.description).toMatch(/Proficiency Bonus/);
 
     // The resolved row must be projected back to OriginFeatOption's four fields:
     // `edition` is selected only to drive resolveEditionCatalog and would
     // otherwise ride along on the wire, widening the contract silently.
-    expect(Object.keys(alert2014).sort()).toEqual(["category", "description", "id", "name"]);
+    expect(Object.keys(alert2024).sort()).toEqual(["category", "description", "id", "name"]);
 
-    // Folk Hero: 2014 only (#1570), and no origin feat there — an Origin feat is
-    // a 2024 concept, which is precisely why this row could never serve 2024.
+    // 2014: no Origin feat at all, even though Alert's 2014-tagged row exists
+    // in the catalog (buildOriginEntry would resolve it if the gate weren't
+    // there first) — this is the live bug #1504 found: 2014 must not see
+    // EITHER edition's Alert text.
+    expect(byName(criminal2014.body, "Criminal").originFeat).toBeNull();
+
+    // Folk Hero: 2014 only (#1570); still null, for the same reason as every
+    // other 2014 background, not merely because Folk Hero itself has no feat.
     expect(byName(criminal2014.body, "Folk Hero").originFeat).toBeNull();
     expect(byName(criminal2024.body, "Folk Hero")).toBeUndefined();
 
-    // Soldier: Savage Attacker is edition: null (shared path) — same row both editions.
-    expect(byName(criminal2014.body, "Soldier").originFeat.name).toBe("Savage Attacker");
+    // Soldier: Savage Attacker is edition-tagged (#1310, both an EDITION_2014
+    // and EDITION_2024 row exist) — reachable by 2014 in every OTHER respect,
+    // but still suppressed here: the gate is on the REQUESTING edition, not
+    // on whether the feat row is edition-tagged.
+    expect(byName(criminal2014.body, "Soldier").originFeat).toBeNull();
     expect(byName(criminal2024.body, "Soldier").originFeat.name).toBe("Savage Attacker");
   });
 
@@ -671,7 +703,7 @@ describe("GET /api/reference", () => {
   // instead of the SRD 5.2 Prepared Spells one. This latch guards every OTHER
   // class field against a future "for symmetry" filter, same shape as this
   // file's itemRarities latch (edition-invariant, not edition-resolved).
-  it("classes (apart from subclassGateLevel/subclasses/startingEquipment/level1SpellPicks) and races are identical between editions (#1308/#1535/#1507)", async () => {
+  it("classes (apart from subclassGateLevel/subclasses/startingEquipment/level1SpellPicks) are identical between editions (#1308/#1535/#1507)", async () => {
     const res2014 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2014");
     const res2024 = await supertest.agent(app).set("Cookie", COOKIE).get("/api/reference?edition=EDITION_2024");
 
@@ -686,7 +718,8 @@ describe("GET /api/reference", () => {
     expect(res2014.body.classes.map(stripEditionDivergentFields)).toEqual(
       res2024.body.classes.map(stripEditionDivergentFields),
     );
-    expect(res2014.body.races).toEqual(res2024.body.races);
+    // species (unlike classes) is DELIBERATELY edition-divergent (#1684's own
+    // compat-gap fix) — reference-species.test.ts pins the roster differences.
   });
 
   // #1559: proves #1336's edition-scoping and #1559's Subclass tag compose —

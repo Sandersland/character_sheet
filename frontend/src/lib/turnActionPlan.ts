@@ -63,14 +63,24 @@ export function planActionClick(
     // Slot is committed by the picker on use/cast/heal, not on open (#765) —
     // closing the sheet without acting stays free, like the spell picker. The
     // loadout picker (#815) likewise owns the Action itself — a held-item swap
-    // spends it, a free-hand draw/stow is free.
+    // spends it, a free-hand draw/stow is free. slot-picker (#1676/#1687)
+    // shares this shape: Song of Defense's reaction commits only once a slot
+    // level is actually chosen and used, not on opening the sheet.
     case "heal-input":
     case "item-picker":
     case "spell-picker":
     case "loadout-picker":
+    case "slot-picker":
       return { consumeSlot: false, openResolution: true, send: "none" };
 
+    // A row-served "toggle" (#1686, e.g. Rage/End Rage) shares simple-confirm's
+    // exact send shape — kept as its own case (not folded into
+    // "simple-confirm") because it's the value resolverFromRow actually
+    // receives off the wire, and a shared case keeps this switch's
+    // exhaustiveness check honest about which kinds a future toggle row can
+    // reach here through.
     case "simple-confirm":
+    case "toggle":
       return {
         consumeSlot: true,
         openResolution: false,

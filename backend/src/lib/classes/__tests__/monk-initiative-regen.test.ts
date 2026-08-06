@@ -1,7 +1,9 @@
 /**
- * Monk Focus onInitiative shape tests (#1243): Uncanny Metabolism (L2, full
- * Focus refill once/long rest + a bonusHeal descriptor) and Perfect Focus (L15,
- * every-combat top-up to 4). Pure — exercises the REAL monk.resourceFn
+ * Monk onInitiative shape tests: EDITION_2024's Uncanny Metabolism (#1243,
+ * L2, full Focus refill once/long rest + a bonusHeal descriptor) and Perfect
+ * Focus (L15, every-combat top-up to 4); EDITION_2014's Perfect Self (#1500,
+ * L20, ki-exhausted-only top-up to 4 via the new `threshold` gate) — 2014 has
+ * no L2/L15 analog at all. Pure — exercises the REAL monk.resourceFn
  * descriptors through applyInitiativeRegen (no DB, no dice rolled): the actual
  * HP heal (rolling the Martial Arts die + applying it) needs the impure
  * rollInitiative op and is covered by the DB-backed
@@ -51,19 +53,31 @@ describe("Monk Focus onInitiative — Uncanny Metabolism / Perfect Focus (#1243)
     ]);
   });
 
-  // #1499: bonusHeal.dieFaces reads the Martial Arts die through the newly
-  // edition-threaded resourceFn — the 2014 monk table (SRD 5.1 / PHB'14 p.78)
-  // is 1d4 at L1-4, so a level-2 EDITION_2014 monk's Uncanny Metabolism heal
-  // uses dieFaces 4, not the 2024 table's 6.
-  it("(a, EDITION_2014) L2: bonusHeal.dieFaces uses the 2014 Martial Arts die (4), not the 2024 one (6)", () => {
-    const state = stateWithUsed({ focus: 2 });
+  // #1500: 2014's Ki has no Uncanny Metabolism analog at all (SRD 5.1 /
+  // PHB'14 p.78 — the only 2014 onInitiative descriptor is Perfect Self,
+  // L20) — a level-2 EDITION_2014 monk's roll-Initiative is inert, unlike
+  // its 2024 twin above.
+  it("(EDITION_2014) L2: no onInitiative descriptor at all — 2014 Ki has no Uncanny Metabolism analog", () => {
+    const state = stateWithUsed({ ki: 2 });
     const regen = applyInitiativeRegen(state, focusInfo(2, 2, "EDITION_2014"));
-    expect(regen).toEqual([
-      {
-        key: "focus", label: "Focus Points", restored: 2, remaining: 2,
-        bonusHeal: { sourceName: "Uncanny Metabolism", dieFaces: 4, flatBonus: 2 },
-      },
-    ]);
+    expect(regen).toEqual([]);
+    expect(state.used.ki).toBe(2); // untouched
+  });
+
+  // Perfect Self (SRD 5.1 / PHB'14 p.79, L20): "When you roll initiative and
+  // have no ki points remaining, you regain 4 ki points" — threshold:0 means
+  // it does NOT fire with 1+ ki remaining, unlike 2024 Perfect Focus's
+  // "3 or fewer" trigger (#1500's InitiativeRegen.threshold).
+  it("(EDITION_2014) L20: Perfect Self is a no-op with 1+ ki remaining, and regains 4 when at 0", () => {
+    const state = stateWithUsed({ ki: 19 }); // 1 remaining — above the threshold of 0
+    const noop = applyInitiativeRegen(state, focusInfo(20, 6, "EDITION_2014"));
+    expect(noop).toEqual([]);
+    expect(state.used.ki).toBe(19);
+
+    state.used.ki = 20; // 0 remaining
+    const regen = applyInitiativeRegen(state, focusInfo(20, 6, "EDITION_2014"));
+    expect(state.used.ki).toBe(16); // topped up to 4 remaining (20 - 16)
+    expect(regen).toEqual([{ key: "ki", label: "Ki Points", restored: 4, remaining: 4 }]);
   });
 
   it("(c) L2 (below 15): the once-per-rest refill does not repeat mid-rest, and there is no top-up descriptor yet", () => {

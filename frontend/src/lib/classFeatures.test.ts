@@ -82,12 +82,13 @@ describe("deriveClassFeatureView", () => {
     const view = deriveClassFeatureView(
       makeChar(
         {
+          rulesEdition: "EDITION_2024",
           fightingStyleSlots: { total: 1, used: 1 },
           advancements: [
             { id: "fs1", slot: "fightingStyle", featId: "archery", featName: "Archery" },
           ] as unknown as Character["advancements"],
-          // shadowArts/cloakOfShadows entitlement is availableActions[] presence (#1315),
-          // not a resources boolean.
+          // shadowArts/cloakOfShadows entitlement is availableActions[] presence (#1315)
+          // gated to 2024 (#1505 — see has2024ShadowAction), not a resources boolean.
           availableActions: [
             { key: "shadowArts", name: "Shadow Arts (Darkness)", cost: "action", enabled: true },
             { key: "cloakOfShadows", name: "Cloak of Shadows", cost: "action", enabled: true },
@@ -114,7 +115,10 @@ describe("deriveClassFeatureView", () => {
 
   it("hasShadowArts/hasCloakOfShadows/hasElementsWarrior are false when availableActions lacks the matching key", () => {
     const view = deriveClassFeatureView(
-      makeChar({ availableActions: [{ key: "shadowArts", name: "Shadow Arts (Darkness)", cost: "action", enabled: true }] }),
+      makeChar({
+        rulesEdition: "EDITION_2024",
+        availableActions: [{ key: "shadowArts", name: "Shadow Arts (Darkness)", cost: "action", enabled: true }],
+      }),
       [fighterDef],
     );
     expect(view.hasShadowArts).toBe(true);
@@ -122,16 +126,75 @@ describe("deriveClassFeatureView", () => {
     expect(view.hasElementsWarrior).toBe(false);
   });
 
+  // #1505 regression: 2014 Way of Shadow grants the SAME "shadowArts"/
+  // "cloakOfShadows" keys as 2024 Warrior of Shadow (actions.ts), but their
+  // 2024-shaped UI (hardcoded "focus" copy, single Darkness cast, always-
+  // 3-focus Cloak) is wrong for a ki-based 2014 monk and has no 2014
+  // counterpart built — hasShadowArts/hasCloakOfShadows must stay false so
+  // that mismatched panel never reaches a 2014 sheet (browser-verification-
+  // caught, like the elementalAttunement collision above).
+  it("hasShadowArts/hasCloakOfShadows are false on a 2014 character even though it carries the same action keys", () => {
+    const view = deriveClassFeatureView(
+      makeChar({
+        rulesEdition: "EDITION_2014",
+        availableActions: [
+          { key: "shadowArts", name: "Shadow Arts", cost: "action", enabled: true, reminder: "Spend 2 ki…" },
+          { key: "cloakOfShadows", name: "Cloak of Shadows", cost: "action", enabled: true, reminder: "…" },
+        ],
+      }),
+      [fighterDef],
+    );
+    expect(view.hasShadowArts).toBe(false);
+    expect(view.hasCloakOfShadows).toBe(false);
+  });
+
   // Positive case for hasElementsWarrior — previously untested: a wrong/renamed
   // key here would silently delete the whole Warrior of the Elements panel
   // (ClassResourceBlocks.tsx gates WarriorOfElementsSection on this flag) with
   // no failing test to catch it.
-  it("hasElementsWarrior is true when availableActions contains elementalAttunement", () => {
+  it("hasElementsWarrior is true when availableActions contains the row-driven (resolverKind: toggle) elementalAttunement", () => {
     const view = deriveClassFeatureView(
-      makeChar({ availableActions: [{ key: "elementalAttunement", name: "Elemental Attunement", cost: "free", enabled: true }] }),
+      makeChar({
+        availableActions: [
+          { key: "elementalAttunement", name: "Elemental Attunement", cost: "free", enabled: true, resolverKind: "toggle" },
+        ],
+      }),
       [fighterDef],
     );
     expect(view.hasElementsWarrior).toBe(true);
+  });
+
+  // #1505 regression: a 2014 Way of the Four Elements monk's Elemental
+  // Attunement is the SAME key but a static DERIVED_ACTIONS reminder row
+  // (no resolverKind) — hasElementsWarrior must stay false so
+  // WarriorOfElementsSection's 2024 Focus-toggle UI never renders for it
+  // (browser-verification-caught bug, not unit-test-caught).
+  it("hasElementsWarrior is false for the 2014 reminder-only elementalAttunement row (no resolverKind)", () => {
+    const view = deriveClassFeatureView(
+      makeChar({
+        availableActions: [
+          { key: "elementalAttunement", name: "Elemental Attunement", cost: "action", enabled: true, reminder: "Briefly control elemental forces…" },
+          { key: "castDiscipline", name: "Elemental Discipline", cost: "action", enabled: true },
+        ],
+      }),
+      [fighterDef],
+    );
+    expect(view.hasElementsWarrior).toBe(false);
+    expect(view.hasFourElements).toBe(true);
+  });
+
+  // Way of the Four Elements (2014-only, #1505) — same availableActions[]-
+  // presence gate as Warrior of Shadow/Elements, not a resources boolean.
+  it("hasFourElements is true when availableActions contains castDiscipline, and false otherwise", () => {
+    const withDiscipline = deriveClassFeatureView(
+      makeChar({ availableActions: [{ key: "castDiscipline", name: "Elemental Discipline", cost: "action", enabled: true }] }),
+      [fighterDef],
+    );
+    expect(withDiscipline.hasFourElements).toBe(true);
+    expect(withDiscipline.isEmpty).toBe(false);
+
+    const without = deriveClassFeatureView(makeChar({ availableActions: [] }), [fighterDef]);
+    expect(without.hasFourElements).toBe(false);
   });
 
   it("reports all flags false and isEmpty true when no resources", () => {

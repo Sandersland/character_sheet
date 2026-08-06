@@ -6,6 +6,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
+import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 
 const OWNER_ID = "owner-level-up-tx";
 let COOKIE: string;
@@ -221,11 +222,11 @@ describe("POST /api/characters/:id/level-up/transactions — Wizard 3→4 (hp + 
 
   it("learns 2 spells + 1 cantrip alongside hp + ASI under one batchId", async () => {
     const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
-    const spells = await prisma.spell.findMany({ where: { classes: { has: "wizard" }, level: { gt: 0, lte: 2 } }, orderBy: { level: "asc" }, take: 2, select: { id: true, name: true } });
+    const spells = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "wizard" } }, level: { gt: 0, lte: 2 }, edition: "EDITION_2024" }, orderBy: { level: "asc" }, take: 2, select: { id: true, name: true } });
     expect(spells).toHaveLength(2);
     // #1131: wizard gains its 4th cantrip at level 4, so the newSpells step now
     // demands exactly one cantrip pick alongside the two scribed spells.
-    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classes: { has: "wizard" }, level: 0 }, select: { id: true, name: true } });
+    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classMemberships: { some: { className: "wizard" } }, level: 0, edition: "EDITION_2024" }, select: { id: true, name: true } });
 
     const res = await post(CHAR_ID, {
       target: { kind: "existing", classEntryId: entry.id },
@@ -254,8 +255,8 @@ describe("POST /api/characters/:id/level-up/transactions — Wizard 3→4 (hp + 
   // ceremony covers the two domains the Battle Master undo test can't.
   it("single revert restores hp, ability delta, hit die, and unlearns the spells", async () => {
     const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
-    const spells = await prisma.spell.findMany({ where: { classes: { has: "wizard" }, level: { gt: 0, lte: 2 } }, orderBy: { level: "asc" }, take: 2, select: { id: true } });
-    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classes: { has: "wizard" }, level: 0 }, select: { id: true } });
+    const spells = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "wizard" } }, level: { gt: 0, lte: 2 }, edition: "EDITION_2024" }, orderBy: { level: "asc" }, take: 2, select: { id: true } });
+    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classMemberships: { some: { className: "wizard" } }, level: 0, edition: "EDITION_2024" }, select: { id: true } });
 
     const ceremony = await post(CHAR_ID, {
       target: { kind: "existing", classEntryId: entry.id },
@@ -281,9 +282,12 @@ describe("POST /api/characters/:id/level-up/transactions — Wizard 3→4 (hp + 
   // entirely. These are direct hand-crafted POSTs, not client-filtered picks.
   it("crafted request: a Wizard 3→4 cannot scribe off-class Cure Wounds (400, nothing in the spellbook)", async () => {
     const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
-    const cureWounds = await prisma.spell.findFirstOrThrow({ where: { name: "Cure Wounds" }, select: { id: true } });
-    const [wizardSpell] = await prisma.spell.findMany({ where: { classes: { has: "wizard" }, level: { gt: 0, lte: 2 }, name: { not: "Cure Wounds" } }, orderBy: { level: "asc" }, take: 1, select: { id: true } });
-    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classes: { has: "wizard" }, level: 0 }, select: { id: true } });
+    // #1713 forked Cure Wounds (2014/2024 both exist now) — this fixture's
+    // Wizard character defaults to EDITION_2024, so pin the fetch to that
+    // fork rather than an unfiltered name lookup that could return either.
+    const cureWounds = await prisma.spell.findFirstOrThrow({ where: { name: "Cure Wounds", edition: "EDITION_2024" }, select: { id: true } });
+    const [wizardSpell] = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "wizard" } }, level: { gt: 0, lte: 2 }, edition: "EDITION_2024", name: { not: "Cure Wounds" } }, orderBy: { level: "asc" }, take: 1, select: { id: true } });
+    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classMemberships: { some: { className: "wizard" } }, level: 0, edition: "EDITION_2024" }, select: { id: true } });
 
     const res = await post(CHAR_ID, {
       target: { kind: "existing", classEntryId: entry.id },
@@ -304,9 +308,13 @@ describe("POST /api/characters/:id/level-up/transactions — Wizard 3→4 (hp + 
 
   it("crafted request: a Wizard 3→4 cannot scribe Fireball, above the level-2 ceiling (400)", async () => {
     const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
-    const fireball = await prisma.spell.findFirstOrThrow({ where: { name: "Fireball" }, select: { id: true } });
-    const [wizardSpell] = await prisma.spell.findMany({ where: { classes: { has: "wizard" }, level: { gt: 0, lte: 2 } }, orderBy: { level: "asc" }, take: 1, select: { id: true } });
-    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classes: { has: "wizard" }, level: 0 }, select: { id: true } });
+    // #1714 forked Fireball to EDITION_2014 (Sorcerer+Wizard, 2-list) — this
+    // fixture's character is 2024 rules, so the pick must pin edition or it
+    // can land on the 2014 sibling and 400 on the wrong-edition guard instead
+    // of the level-ceiling check this test actually exercises.
+    const fireball = await prisma.spell.findFirstOrThrow({ where: { name: "Fireball", edition: "EDITION_2024" }, select: { id: true } });
+    const [wizardSpell] = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "wizard" } }, level: { gt: 0, lte: 2 }, edition: "EDITION_2024" }, orderBy: { level: "asc" }, take: 1, select: { id: true } });
+    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classMemberships: { some: { className: "wizard" } }, level: 0, edition: "EDITION_2024" }, select: { id: true } });
 
     const res = await post(CHAR_ID, {
       target: { kind: "existing", classEntryId: entry.id },
@@ -323,7 +331,7 @@ describe("POST /api/characters/:id/level-up/transactions — Wizard 3→4 (hp + 
 
   it("an op.custom pick at the ceiling succeeds; above it is rejected", async () => {
     const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
-    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classes: { has: "wizard" }, level: 0 }, select: { id: true } });
+    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classMemberships: { some: { className: "wizard" } }, level: 0, edition: "EDITION_2024" }, select: { id: true } });
     const customSpell = (level: number) => ({
       type: "learnSpell" as const,
       custom: {
@@ -349,7 +357,7 @@ describe("POST /api/characters/:id/level-up/transactions — Wizard 3→4 (hp + 
 
   it("an op.custom pick above the ceiling is rejected (400)", async () => {
     const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
-    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classes: { has: "wizard" }, level: 0 }, select: { id: true } });
+    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classMemberships: { some: { className: "wizard" } }, level: 0, edition: "EDITION_2024" }, select: { id: true } });
 
     const res = await post(CHAR_ID, {
       target: { kind: "existing", classEntryId: entry.id },
@@ -422,8 +430,14 @@ describe("POST …/level-up/transactions — Bard Magical Secrets eligibility ga
   it("a Bard reaching 10 may take Fireball via Magical Secrets (200)", async () => {
     const CHAR_ID = "lvtx-bard-10";
     const entryId = await makeBard(CHAR_ID, { hitDiceTotal: 9, xp: 64000 });
-    const fireball = await prisma.spell.findFirstOrThrow({ where: { name: "Fireball" }, select: { id: true } });
-    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classes: { has: "bard" }, level: 0 }, select: { id: true } });
+    // #1714 forked Fireball to EDITION_2014 (Sorcerer+Wizard, 2-list) — this
+    // fixture's character is 2024 rules, so pin edition or the pick can land
+    // on the 2014 sibling and 400 on the wrong-edition guard instead of
+    // exercising Magical Secrets eligibility.
+    const fireball = await prisma.spell.findFirstOrThrow({ where: { name: "Fireball", edition: "EDITION_2024" }, select: { id: true } });
+    // #1713 forked several Bard-list cantrips for real (Mage Hand, ...) — this
+    // fixture defaults to EDITION_2024 (no `edition` opt passed), so pin it.
+    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classMemberships: { some: { className: "bard" } }, level: 0, edition: "EDITION_2024" }, select: { id: true } });
 
     const res = await post(CHAR_ID, {
       target: { kind: "existing", classEntryId: entryId },
@@ -439,8 +453,12 @@ describe("POST …/level-up/transactions — Bard Magical Secrets eligibility ga
   it("a Bard reaching 10 may NOT take ranger-only Ensnaring Strike (400)", async () => {
     const CHAR_ID = "lvtx-bard-10-ensnaring";
     const entryId = await makeBard(CHAR_ID, { hitDiceTotal: 9, xp: 64000 });
-    const ensnaringStrike = await prisma.spell.findFirstOrThrow({ where: { name: "Ensnaring Strike" }, select: { id: true } });
-    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classes: { has: "bard" }, level: 0 }, select: { id: true } });
+    // #1721 authored a real 2014 "Ensnaring Strike" row (previously only the
+    // 2024 catalog had one) — pin edition so this 2024 Bard's pick can't
+    // land on the 2014 sibling (which would 400 on the wrong-edition guard
+    // instead of exercising the 4-list Magical Secrets rejection below).
+    const ensnaringStrike = await prisma.spell.findFirstOrThrow({ where: { name: "Ensnaring Strike", edition: "EDITION_2024" }, select: { id: true } });
+    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classMemberships: { some: { className: "bard" } }, level: 0, edition: "EDITION_2024" }, select: { id: true } });
 
     const res = await post(CHAR_ID, {
       target: { kind: "existing", classEntryId: entryId },
@@ -459,8 +477,11 @@ describe("POST …/level-up/transactions — Bard Magical Secrets eligibility ga
   it("a Bard reaching 9 (no Magical Secrets yet) may NOT take Fireball (400)", async () => {
     const CHAR_ID = "lvtx-bard-9";
     const entryId = await makeBard(CHAR_ID, { hitDiceTotal: 8, xp: 48000 });
-    const fireball = await prisma.spell.findFirstOrThrow({ where: { name: "Fireball" }, select: { id: true } });
-    const [bardSpell] = await prisma.spell.findMany({ where: { classes: { has: "bard" }, level: { gt: 0 }, name: { not: "Fireball" } }, orderBy: { level: "asc" }, take: 1, select: { id: true } });
+    // #1714 forked Fireball to EDITION_2014 — pin edition so this 2024 Bard's
+    // pick can't land on the 2014 sibling (which would 400 on the
+    // wrong-edition guard instead of "not on the Bard spell list").
+    const fireball = await prisma.spell.findFirstOrThrow({ where: { name: "Fireball", edition: "EDITION_2024" }, select: { id: true } });
+    const [bardSpell] = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "bard" } }, level: { gt: 0 }, edition: "EDITION_2024", name: { not: "Fireball" } }, orderBy: { level: "asc" }, take: 1, select: { id: true } });
 
     const res = await post(CHAR_ID, {
       target: { kind: "existing", classEntryId: entryId },
@@ -475,13 +496,28 @@ describe("POST …/level-up/transactions — Bard Magical Secrets eligibility ga
   it("a 2014 Bard reaching 10 may take ranger-only Ensnaring Strike (unrestricted, PHB'14)", async () => {
     const CHAR_ID = "lvtx-bard-10-2014";
     const entryId = await makeBard(CHAR_ID, { hitDiceTotal: 9, xp: 64000, edition: "EDITION_2014" });
-    const ensnaringStrike = await prisma.spell.findFirstOrThrow({ where: { name: "Ensnaring Strike" }, select: { id: true } });
-    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classes: { has: "bard" }, level: 0 }, select: { id: true } });
+    // #1721 authored this row for real (previously only the 2024 catalog had
+    // one) — pin edition so this 2014 Bard's pick can't land on the 2024
+    // sibling (wrong-edition guard) instead of exercising the PHB'14
+    // unrestricted-Magical-Secrets path this test is named for.
+    const ensnaringStrike = await prisma.spell.findFirstOrThrow({ where: { name: "Ensnaring Strike", edition: "EDITION_2014" }, select: { id: true } });
+    // #1509: SRD 5.1's Bard 9→10 Spells Known delta is 12→14 = 2 (not 2024's
+    // 9→10 = 1) — a second pick is now REQUIRED for this level-up to validate,
+    // proof the edition-correct count reaches this Magical Secrets gate too.
+    // #1713 review: `level: { gt: 0 }` alone is not enough now that the 2014
+    // shared/3+-list bucket gave Bard real level 6-9 spells (Etherealness,
+    // ...) — an un-ordered `take: 1` could land on one of those and blow the
+    // level-9 caster's highest-learnable-level ceiling (5), 400ing on
+    // "exceeds the highest spell level you can learn" instead of exercising
+    // Magical Secrets. `lte: 5` + `orderBy` keeps the pick both legal and
+    // deterministic.
+    const [second] = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "bard" } }, level: { gt: 0, lte: 5 }, edition: "EDITION_2014", name: { not: "Ensnaring Strike" } }, orderBy: { level: "asc" }, take: 1, select: { id: true } });
+    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classMemberships: { some: { className: "bard" } }, level: 0, edition: "EDITION_2014" }, select: { id: true } });
 
     const res = await post(CHAR_ID, {
       target: { kind: "existing", classEntryId: entryId },
       hp: { method: "average" },
-      spellsLearned: [{ type: "learnSpell", spellId: ensnaringStrike.id }],
+      spellsLearned: [{ type: "learnSpell", spellId: ensnaringStrike.id }, { type: "learnSpell", spellId: second.id }],
       cantripsLearned: [{ type: "learnSpell", spellId: cantrip.id }],
     });
     expect(res.status).toBe(200);
@@ -492,8 +528,11 @@ describe("POST …/level-up/transactions — Bard Magical Secrets eligibility ga
   it("a 2024 Bard reaching 10 may NOT take a wizard-only cantrip — 2024 Magical Secrets never broadens cantrips (400)", async () => {
     const CHAR_ID = "lvtx-bard-10-cantrip-2024";
     const entryId = await makeBard(CHAR_ID, { hitDiceTotal: 9, xp: 64000 });
-    const fireBolt = await prisma.spell.findFirstOrThrow({ where: { name: "Fire Bolt" }, select: { id: true } });
-    const [bardSpell] = await prisma.spell.findMany({ where: { classes: { has: "bard" }, level: { gt: 0 } }, orderBy: { level: "asc" }, take: 1, select: { id: true } });
+    // #1714 forked Fire Bolt to EDITION_2014 (Sorcerer+Wizard, 2-list) — pin
+    // edition so this 2024 Bard's pick can't land on the 2014 sibling
+    // (wrong-edition guard) instead of exercising the cantrip-list rejection.
+    const fireBolt = await prisma.spell.findFirstOrThrow({ where: { name: "Fire Bolt", edition: "EDITION_2024" }, select: { id: true } });
+    const [bardSpell] = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "bard" } }, level: { gt: 0 }, edition: "EDITION_2024" }, orderBy: { level: "asc" }, take: 1, select: { id: true } });
 
     const res = await post(CHAR_ID, {
       target: { kind: "existing", classEntryId: entryId },
@@ -509,13 +548,23 @@ describe("POST …/level-up/transactions — Bard Magical Secrets eligibility ga
   it("a 2014 Bard reaching 10 MAY take a wizard-only cantrip (PHB'14 \"…or a cantrip\")", async () => {
     const CHAR_ID = "lvtx-bard-10-cantrip-2014";
     const entryId = await makeBard(CHAR_ID, { hitDiceTotal: 9, xp: 64000, edition: "EDITION_2014" });
-    const fireBolt = await prisma.spell.findFirstOrThrow({ where: { name: "Fire Bolt" }, select: { id: true } });
+    // #1714 forked Fire Bolt to EDITION_2014 too — this fixture's character
+    // IS 2014 rules, so pin edition for determinism (an unordered
+    // findFirstOrThrow across two same-named rows isn't guaranteed to return
+    // either one consistently, even though this test happened to pass before
+    // this pin was added).
+    const fireBolt = await prisma.spell.findFirstOrThrow({ where: { name: "Fire Bolt", edition: "EDITION_2014" }, select: { id: true } });
     const ensnaringStrike = await prisma.spell.findFirstOrThrow({ where: { name: "Ensnaring Strike" }, select: { id: true } });
+    // #1509: SRD 5.1's Bard 9→10 Spells Known delta is 2, not 2024's 1 — see the sibling test above.
+    // `lte: 5` + `orderBy`: same reasoning as the sibling test above — a bare
+    // `level: { gt: 0 }` can land on one of the 2014 shared bucket's level
+    // 6-9 Bard spells and blow this level-9 caster's learnable-level ceiling.
+    const [second] = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "bard" } }, level: { gt: 0, lte: 5 }, edition: "EDITION_2014", name: { not: "Ensnaring Strike" } }, orderBy: { level: "asc" }, take: 1, select: { id: true } });
 
     const res = await post(CHAR_ID, {
       target: { kind: "existing", classEntryId: entryId },
       hp: { method: "average" },
-      spellsLearned: [{ type: "learnSpell", spellId: ensnaringStrike.id }],
+      spellsLearned: [{ type: "learnSpell", spellId: ensnaringStrike.id }, { type: "learnSpell", spellId: second.id }],
       cantripsLearned: [{ type: "learnSpell", spellId: fireBolt.id }],
     });
     expect(res.status).toBe(200);
@@ -527,7 +576,7 @@ describe("POST …/level-up/transactions — Bard Magical Secrets eligibility ga
   it("an unknown spellId still falls through to the catalog not-found error, not the eligibility gate", async () => {
     const CHAR_ID = "lvtx-bard-10-unknown";
     const entryId = await makeBard(CHAR_ID, { hitDiceTotal: 9, xp: 64000 });
-    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classes: { has: "bard" }, level: 0 }, select: { id: true } });
+    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classMemberships: { some: { className: "bard" } }, level: 0, edition: "EDITION_2024" }, select: { id: true } });
 
     const res = await post(CHAR_ID, {
       target: { kind: "existing", classEntryId: entryId },
@@ -538,6 +587,231 @@ describe("POST …/level-up/transactions — Bard Magical Secrets eligibility ga
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/spell not found in catalog/i);
     expect(await eventCount(CHAR_ID)).toBe(0);
+  });
+});
+
+// #1509: the 2014 known-caster fork reaches the level-up TRANSACTION endpoint —
+// edition-correct pick counts enforced server-side (not just previewed by the
+// plan), the Ranger's onLevelUp swap, and the known-vs-prepared noun in the
+// three swap-rejection messages (#1509 D5).
+describe("POST …/level-up/transactions — 2014 known-caster level-up (#1509)", () => {
+  async function make1509Bard(
+    id: string,
+    opts: { hitDiceTotal: number; xp: number; edition: "EDITION_2014" | "EDITION_2024"; known?: { id: string; name: string }[] },
+  ): Promise<string> {
+    const bard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Bard" } });
+    const collegeOfLore = (await prisma.subclass.findFirstOrThrow({ where: { classId: bard.id, name: "College of Lore" } })).id;
+    await prisma.character.create({
+      data: {
+        ...BASE,
+        ownerId: OWNER_ID,
+        id,
+        name: "LevelUpTx Bard 1509",
+        rulesEdition: opts.edition,
+        experiencePoints: opts.xp,
+        hitPoints: { current: 40, max: 40, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: opts.hitDiceTotal, die: "d8", spent: 0 },
+        abilityScores: { strength: 10, dexterity: 14, constitution: 14, intelligence: 10, wisdom: 10, charisma: 16 },
+        spellcasting: {
+          slotsUsed: {}, arcanumUsed: {}, concentratingOn: null,
+          spells: (opts.known ?? []).map((s, i) => ({
+            id: `bard-1509-known-${i}`, spellId: s.id, name: s.name, level: 1, school: "enchantment",
+            prepared: true, castingTime: "1 action", range: "30 ft", duration: "Instantaneous", description: "x",
+          })),
+        },
+        classEntries: {
+          create: [{ name: "bard", subclass: "College of Lore", subclassId: collegeOfLore, classId: bard.id, position: 0, level: opts.hitDiceTotal }],
+        },
+      },
+    });
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: id } });
+    return entry.id;
+  }
+
+  it("a 2014 Bard 4→5 submitting 2 spellsLearned with no forget is rejected 400 (the plan grants 1)", async () => {
+    const CHAR_ID = "lvtx-1509-bard-2014-reject";
+    const entryId = await make1509Bard(CHAR_ID, { hitDiceTotal: 4, xp: 6500, edition: "EDITION_2014" });
+    // #1713 forked several Bard-list spells for real (Cure Wounds, Charm
+    // Person, ...) — `edition` keeps this on the requesting character's own
+    // catalog rows, same as the app itself resolves.
+    const spells = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "bard" } }, level: 1, edition: "EDITION_2014" }, take: 2, select: { id: true } });
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entryId },
+      hp: { method: "average" },
+      spellsLearned: spells.map((s) => ({ type: "learnSpell", spellId: s.id })),
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/expected 1 new spells for this level-up, got 2/i);
+  });
+
+  it("a 2014 Bard 4→5 submitting 1 spellsLearned succeeds", async () => {
+    const CHAR_ID = "lvtx-1509-bard-2014-ok";
+    const entryId = await make1509Bard(CHAR_ID, { hitDiceTotal: 4, xp: 6500, edition: "EDITION_2014" });
+    const [spell] = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "bard" } }, level: 1, edition: "EDITION_2014" }, take: 1, select: { id: true, name: true } });
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entryId },
+      hp: { method: "average" },
+      spellsLearned: [{ type: "learnSpell", spellId: spell.id }],
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.spellcasting.spells.map((s: { name: string }) => s.name)).toContain(spell.name);
+  });
+
+  it("a 2014 Bard 4→5 submitting 2 spellsLearned with 1 spellsForgotten succeeds (the #1101 swap)", async () => {
+    const known = await prisma.spell.findFirstOrThrow({ where: { classMemberships: { some: { className: "bard" } }, level: 1, edition: "EDITION_2014" }, select: { id: true, name: true } });
+    const CHAR_ID = "lvtx-1509-bard-2014-swap";
+    const entryId = await make1509Bard(CHAR_ID, { hitDiceTotal: 4, xp: 6500, edition: "EDITION_2014", known: [known] });
+    const fresh = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "bard" } }, level: 1, edition: "EDITION_2014", id: { not: known.id } }, take: 2, select: { id: true, name: true } });
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entryId },
+      hp: { method: "average" },
+      spellsForgotten: [{ type: "forgetSpell", entryId: "bard-1509-known-0" }],
+      spellsLearned: fresh.map((s) => ({ type: "learnSpell", spellId: s.id })),
+    });
+    expect(res.status).toBe(200);
+    const names = res.body.spellcasting.spells.map((s: { name: string }) => s.name);
+    expect(names).not.toContain(known.name);
+    for (const s of fresh) expect(names).toContain(s.name);
+  });
+
+  it("the same 2-learn submission succeeds for a 2024 Bard — the proof the fork is the count, not the validator", async () => {
+    const CHAR_ID = "lvtx-1509-bard-2024-ok";
+    const entryId = await make1509Bard(CHAR_ID, { hitDiceTotal: 4, xp: 6500, edition: "EDITION_2024" });
+    const spells = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "bard" } }, level: 1, edition: "EDITION_2024" }, take: 2, select: { id: true } });
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entryId },
+      hp: { method: "average" },
+      spellsLearned: spells.map((s) => ({ type: "learnSpell", spellId: s.id })),
+    });
+    expect(res.status).toBe(200);
+  });
+
+  it("swap-rejection messages say 'known spell' for a 2014 Bard and 'prepared spell' for a 2024 Bard", async () => {
+    // Bard 4→5 grants count 1 under EDITION_2014, 2 under EDITION_2024 (#1509) —
+    // net learns must equal `count` for assertCounts to pass and reach the
+    // forget-specific checks these cases actually target.
+    const cases = [
+      { edition: "EDITION_2014" as const, id: "lvtx-1509-bard-noun-2014", noun: "known spell", count: 1 },
+      { edition: "EDITION_2024" as const, id: "lvtx-1509-bard-noun-2024", noun: "prepared spell", count: 2 },
+    ];
+    for (const { edition, id, noun, count } of cases) {
+      const entryId = await make1509Bard(id, { hitDiceTotal: 4, xp: 6500, edition });
+      const spells = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "bard" } }, level: 1, edition }, take: count + 2, select: { id: true } });
+
+      const tooMany = await post(id, {
+        target: { kind: "existing", classEntryId: entryId },
+        hp: { method: "average" },
+        spellsForgotten: [{ type: "forgetSpell", entryId: "x" }, { type: "forgetSpell", entryId: "y" }],
+        spellsLearned: spells.map((s) => ({ type: "learnSpell", spellId: s.id })),
+      });
+      expect(tooMany.status).toBe(400);
+      expect(tooMany.body.error).toBe(`You may swap at most one ${noun} per level-up.`);
+
+      const notSwappable = await post(id, {
+        target: { kind: "existing", classEntryId: entryId },
+        hp: { method: "average" },
+        spellsForgotten: [{ type: "forgetSpell", entryId: "bogus-entry" }],
+        spellsLearned: spells.slice(0, count + 1).map((s) => ({ type: "learnSpell", spellId: s.id })),
+      });
+      expect(notSwappable.status).toBe(400);
+      expect(notSwappable.body.error).toBe(`Cannot swap that spell: bogus-entry is not a swappable ${noun}.`);
+    }
+  });
+
+  it("a 2014 Ranger 1→2 offers the onLevelUp swap; a 2024 Ranger 1→2 is flatly rejected (does not allow swapping)", async () => {
+    async function makeRanger(id: string, edition: "EDITION_2014" | "EDITION_2024"): Promise<string> {
+      const ranger = await prisma.characterClass.findFirstOrThrow({ where: { name: "Ranger" } });
+      await prisma.character.create({
+        data: {
+          ...BASE,
+          ownerId: OWNER_ID,
+          id,
+          name: "LevelUpTx Ranger 1509",
+          rulesEdition: edition,
+          experiencePoints: 300, // level 2 threshold
+          hitPoints: { current: 18, max: 18, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+          hitDice: { total: 1, die: "d10", spent: 0 },
+          abilityScores: { strength: 12, dexterity: 16, constitution: 14, intelligence: 10, wisdom: 14, charisma: 8 },
+          spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
+          classEntries: { create: [{ name: "ranger", subclass: null, classId: ranger.id, position: 0, level: 1 }] },
+        },
+      });
+      const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: id } });
+      return entry.id;
+    }
+
+    // Ranger 1→2 also grants its Fighting Style feat pick (#1137) — every request
+    // below includes it so the ONLY 400 in play is the swap-related one under test.
+    // #1726 seeded a 2014-edition "Defense" row alongside the pre-existing 2024
+    // one — a bare `{ name: "Defense" }` lookup is ambiguous the moment both
+    // exist, and each Ranger character below must take the feat matching its
+    // OWN edition or crossEditionRejection (lib/leveling/advancement.ts) 400s
+    // the take-feat op before the swap logic under test is even reached.
+    const defense2024 = await prisma.feat.findFirstOrThrow({ where: { name: "Defense", category: "fighting_style", edition: "EDITION_2024" } });
+    const defense2014 = await prisma.feat.findFirstOrThrow({ where: { name: "Defense", category: "fighting_style", edition: "EDITION_2014" } });
+
+    const entry2024 = await makeRanger("lvtx-1509-ranger-2024", "EDITION_2024");
+    const res2024 = await post("lvtx-1509-ranger-2024", {
+      target: { kind: "existing", classEntryId: entry2024 },
+      hp: { method: "average" },
+      fightingStyleFeat: { type: "takeFeat", featId: defense2024.id },
+      spellsForgotten: [{ type: "forgetSpell", entryId: "whatever" }],
+    });
+    expect(res2024.status).toBe(400);
+    expect(res2024.body.error).toMatch(/does not allow swapping/i);
+
+    // A 2014 Ranger 1→2 is the class's FIRST spellcasting level (SRD 5.1 gates
+    // Spellcasting to level 2), so there is no prior known spell to name — but
+    // canSwap IS true (onLevelUp cadence), so the rejection comes from the
+    // specific-entry check, not the cadence gate. That is a materially
+    // different message from the 2024 case above, and proves the fork.
+    const entry2014 = await makeRanger("lvtx-1509-ranger-2014", "EDITION_2014");
+    const spells = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "ranger" } }, level: 1, edition: "EDITION_2014" }, take: 3, select: { id: true } });
+    expect(spells.length).toBe(3);
+    const res2014 = await post("lvtx-1509-ranger-2014", {
+      target: { kind: "existing", classEntryId: entry2014 },
+      hp: { method: "average" },
+      fightingStyleFeat: { type: "takeFeat", featId: defense2014.id },
+      spellsForgotten: [{ type: "forgetSpell", entryId: "whatever" }],
+      spellsLearned: spells.map((s) => ({ type: "learnSpell", spellId: s.id })),
+    });
+    expect(res2014.status).toBe(400);
+    expect(res2014.body.error).not.toMatch(/does not allow swapping/i);
+    expect(res2014.body.error).toBe("Cannot swap that spell: whatever is not a swappable known spell.");
+  });
+
+  // #1440 regression pin, now edition-correct (#1507 D4): a 2014 Ranger has no
+  // Spellcasting feature until level 2, so a fresh level-1 add (multiclass) has
+  // NO newSpells step at all — a spellsLearned submission is flatly excess.
+  it("a 2014 Ranger added at level 1 (multiclass) cannot submit a level-1 spellsLearned pick", async () => {
+    const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    const champion = (await prisma.subclass.findFirstOrThrow({ where: { classId: fighter.id, name: "Champion" } })).id;
+    const CHAR_ID = "lvtx-1509-ranger-mc-2014";
+    await prisma.character.create({
+      data: {
+        ...BASE,
+        ownerId: OWNER_ID,
+        id: CHAR_ID,
+        name: "LevelUpTx Ranger MC 1509",
+        rulesEdition: "EDITION_2014",
+        experiencePoints: 14000, // level 6 threshold; hitDice.total 5 → 1 pending
+        hitPoints: { current: 40, max: 40, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 5, die: "d10", spent: 0 },
+        abilityScores: { strength: 15, dexterity: 15, constitution: 15, intelligence: 15, wisdom: 15, charisma: 15 },
+        spellcasting: Prisma.JsonNull,
+        classEntries: { create: [{ name: "fighter", subclass: "Champion", subclassId: champion, classId: fighter.id, position: 0, level: 5 }] },
+      },
+    });
+    const ranger = await prisma.characterClass.findFirstOrThrow({ where: { name: "Ranger" } });
+    const [spell] = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "ranger" } }, level: 1, edition: "EDITION_2014" }, take: 1, select: { id: true } });
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "new", classId: ranger.id },
+      hp: { method: "average" },
+      spellsLearned: [{ type: "learnSpell", spellId: spell.id }],
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/does not grant new spells/i);
   });
 });
 
@@ -569,7 +843,10 @@ describe("POST …/level-up/transactions — prepared-spell swap (Sorcerer 5→6
   beforeEach(async () => {
     const sorcerer = await prisma.characterClass.findFirstOrThrow({ where: { name: "Sorcerer" } });
     const draconicBloodline = (await prisma.subclass.findFirstOrThrow({ where: { classId: sorcerer.id, name: "Draconic Bloodline" } })).id;
-    const pool = await prisma.spell.findMany({ where: { classes: { has: "sorcerer" }, level: 1 }, take: 5 });
+    // #1713 forked several Sorcerer-list level-1 spells for real (Charm
+    // Person, Thunderwave, ...) — this fixture defaults to EDITION_2024, so
+    // pin the pool to that fork rather than an edition-unaware query.
+    const pool = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "sorcerer" } }, level: 1, edition: "EDITION_2024" }, take: 5 });
     expect(pool.length).toBe(5);
     seeded = [pool[0], pool[1]];
     fresh = [pool[2], pool[3], pool[4]];
@@ -735,11 +1012,11 @@ describe("POST …/level-up/transactions — atomicity (mid-apply failure rolls 
 
   it("rolls back hp + ASI + the first (valid) spell when the LAST spell id is bogus", async () => {
     const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
-    const [realSpell] = await prisma.spell.findMany({ where: { classes: { has: "wizard" }, level: { gt: 0, lte: 2 } }, orderBy: { level: "asc" }, take: 1, select: { id: true, name: true } });
+    const [realSpell] = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "wizard" } }, level: { gt: 0, lte: 2 }, edition: "EDITION_2024" }, orderBy: { level: "asc" }, take: 1, select: { id: true, name: true } });
     expect(realSpell).toBeDefined();
     // #1131: wizard L4 also demands one cantrip; a valid one keeps the failure in
     // the LAST leveled spell so the atomicity assertion still exercises the rollback.
-    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classes: { has: "wizard" }, level: 0 }, select: { id: true } });
+    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classMemberships: { some: { className: "wizard" } }, level: 0, edition: "EDITION_2024" }, select: { id: true } });
 
     const res = await post(CHAR_ID, {
       target: { kind: "existing", classEntryId: entry.id },
@@ -1056,7 +1333,10 @@ describe("POST …/level-up/transactions — multiclass ceremonies (#1065)", () 
   it("multiclass INTO Fighter applies hp + fighting-style feat under one batchId, and it survives serialization", async () => {
     const wizard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" } });
     const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
-    const defense = await prisma.feat.findFirstOrThrow({ where: { name: "Defense", category: "fighting_style" } });
+    // Pinned to EDITION_2024 (#1311): these fixtures never set rulesEdition, so
+    // they default to EDITION_2024, and a bare name+category match became
+    // ambiguous the moment a 2014 "Defense" row exists alongside it.
+    const defense = await prisma.feat.findFirstOrThrow({ where: { name: "Defense", category: "fighting_style", edition: "EDITION_2024" } });
     const evocation = (await prisma.subclass.findFirstOrThrow({ where: { classId: wizard.id, name: "School of Evocation" } })).id;
     const CHAR_ID = "lvtx-mc-into-fighter";
     await prisma.character.create({
@@ -1101,7 +1381,10 @@ describe("POST …/level-up/transactions — multiclass ceremonies (#1065)", () 
   it("single revert undoes the whole multiclass ceremony: entry gone, fs feat cleared", async () => {
     const wizard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" } });
     const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
-    const defense = await prisma.feat.findFirstOrThrow({ where: { name: "Defense", category: "fighting_style" } });
+    // Pinned to EDITION_2024 (#1311): these fixtures never set rulesEdition, so
+    // they default to EDITION_2024, and a bare name+category match became
+    // ambiguous the moment a 2014 "Defense" row exists alongside it.
+    const defense = await prisma.feat.findFirstOrThrow({ where: { name: "Defense", category: "fighting_style", edition: "EDITION_2024" } });
     const evocation = (await prisma.subclass.findFirstOrThrow({ where: { classId: wizard.id, name: "School of Evocation" } })).id;
     const CHAR_ID = "lvtx-mc-undo";
     await prisma.character.create({
@@ -1377,6 +1660,92 @@ describe("POST …/level-up/transactions — subclassChoice validator messages",
   });
 });
 
+// #1503: Way of the Four Elements riding the level-up ceremony end-to-end —
+// the ceremony's own STEP_OP_BUILDERS/domain-dispatch wiring, not just the
+// pure validator (already covered unit-level in level-up-submission.test.ts).
+describe("POST …/level-up/transactions — Way of the Four Elements disciplines (#1503)", () => {
+  it("2→3: picking the subclass + learning the free discipline pick lands both under one batch", async () => {
+    const monk = await prisma.characterClass.findFirstOrThrow({ where: { name: "Monk" } });
+    const fourElements = await prisma.subclass.findFirstOrThrow({ where: { name: "Way of the Four Elements", classId: monk.id } });
+    const fangs = await prisma.grantedAbility.findFirstOrThrow({ where: { name: "Fangs of the Fire Snake", source: "discipline" } });
+    await prisma.character.create({
+      data: {
+        ...BASE,
+        ownerId: OWNER_ID,
+        id: "lvtx-four-elements-3",
+        name: "LevelUpTx Four Elements 3",
+        rulesEdition: "EDITION_2014",
+        experiencePoints: 900, // monk level 3 threshold; hitDice.total 2 → 1 pending
+        hitPoints: { current: 16, max: 16, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 2, die: "d8", spent: 0 },
+        abilityScores: { strength: 10, dexterity: 16, constitution: 12, intelligence: 10, wisdom: 16, charisma: 10 },
+        spellcasting: Prisma.JsonNull,
+        classEntries: { create: [{ name: "monk", subclass: null, classId: monk.id, position: 0, level: 2 }] },
+      },
+    });
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: "lvtx-four-elements-3" } });
+
+    const res = await post("lvtx-four-elements-3", {
+      target: { kind: "existing", classEntryId: entry.id },
+      hp: { method: "average" },
+      subclassId: fourElements.id,
+      subclassChoices: [{ type: "learnSubclassChoice", choiceKey: "fourElementsDisciplines", optionId: fangs.id }],
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.resources.choicesKnown.fourElementsDisciplines).toHaveLength(1);
+    expect(res.body.resources.choicesKnown.fourElementsDisciplines[0].optionId).toBe(fangs.id);
+    expect((res.body.availableActions as { key: string }[]).some((a) => a.key === "castDiscipline")).toBe(true);
+    expect(await distinctBatchIds("lvtx-four-elements-3")).toHaveLength(1);
+  });
+
+  it("5→6: a swap (2 learns + 1 forget netting to the step's count 1) commits atomically", async () => {
+    const monk = await prisma.characterClass.findFirstOrThrow({ where: { name: "Monk" } });
+    const fourElementsSub = await prisma.subclass.findFirstOrThrow({ where: { name: "Way of the Four Elements", classId: monk.id } });
+    const fangs = await prisma.grantedAbility.findFirstOrThrow({ where: { name: "Fangs of the Fire Snake", source: "discipline" } });
+    const water = await prisma.grantedAbility.findFirstOrThrow({ where: { name: "Water Whip", source: "discipline" } });
+    const river = await prisma.grantedAbility.findFirstOrThrow({ where: { name: "Shape the Flowing River", source: "discipline" } });
+    await prisma.character.create({
+      data: {
+        ...BASE,
+        ownerId: OWNER_ID,
+        id: "lvtx-four-elements-6",
+        name: "LevelUpTx Four Elements 6",
+        rulesEdition: "EDITION_2014",
+        experiencePoints: 14000, // monk level 6 threshold; hitDice.total 5 → 1 pending
+        hitPoints: { current: 34, max: 34, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 5, die: "d8", spent: 0 },
+        abilityScores: { strength: 10, dexterity: 16, constitution: 12, intelligence: 10, wisdom: 16, charisma: 10 },
+        spellcasting: Prisma.JsonNull,
+        resources: {
+          used: {},
+          maneuversKnown: [],
+          toolProficienciesKnown: [],
+          choicesKnown: { fourElementsDisciplines: [{ id: "e-fangs", optionId: fangs.id, name: fangs.name, description: fangs.description }] },
+          advancements: [],
+        } as unknown as Prisma.InputJsonValue,
+        classEntries: {
+          create: [{ name: "monk", subclass: "way of the four elements", subclassId: fourElementsSub.id, classId: monk.id, position: 0, level: 5 }],
+        },
+      },
+    });
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: "lvtx-four-elements-6" } });
+
+    const res = await post("lvtx-four-elements-6", {
+      target: { kind: "existing", classEntryId: entry.id },
+      hp: { method: "average" },
+      subclassChoices: [
+        { type: "learnSubclassChoice", choiceKey: "fourElementsDisciplines", optionId: water.id },
+        { type: "learnSubclassChoice", choiceKey: "fourElementsDisciplines", optionId: river.id },
+      ],
+      subclassChoicesForgotten: [{ type: "forgetSubclassChoice", choiceKey: "fourElementsDisciplines", entryId: "e-fangs" }],
+    });
+    expect(res.status).toBe(200);
+    const known = res.body.resources.choicesKnown.fourElementsDisciplines as { optionId: string }[];
+    expect(known.map((k) => k.optionId).sort()).toEqual([river.id, water.id].sort());
+    expect(await distinctBatchIds("lvtx-four-elements-6")).toHaveLength(1);
+  });
+});
+
 // #1131: cantrip progression through the ceremony. Warlock gains its 3rd cantrip
 // and a prepared spell at level 4 (plus an ASI), so the newSpells step now carries
 // a cantrip pick alongside the leveled pick.
@@ -1404,8 +1773,10 @@ describe("POST …/level-up/transactions — Warlock 3→4 cantrip + spell (#113
 
   it("commits one new cantrip and one new spell together with hp + ASI", async () => {
     const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
-    const spell = await prisma.spell.findFirstOrThrow({ where: { classes: { has: "warlock" }, level: 1 }, select: { id: true, name: true } });
-    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classes: { has: "warlock" }, level: 0 }, select: { id: true, name: true } });
+    // #1713 forked several Warlock-list cantrips/spells (Mage Hand, Charm
+    // Person, ...) — this fixture defaults to EDITION_2024, so pin the fetch.
+    const spell = await prisma.spell.findFirstOrThrow({ where: { classMemberships: { some: { className: "warlock" } }, level: 1, edition: "EDITION_2024" }, select: { id: true, name: true } });
+    const cantrip = await prisma.spell.findFirstOrThrow({ where: { classMemberships: { some: { className: "warlock" } }, level: 0, edition: "EDITION_2024" }, select: { id: true, name: true } });
 
     const res = await post(CHAR_ID, {
       target: { kind: "existing", classEntryId: entry.id },
@@ -1425,7 +1796,7 @@ describe("POST …/level-up/transactions — Warlock 3→4 cantrip + spell (#113
 
   it("rejects a leveled spell submitted as a cantrip (400)", async () => {
     const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
-    const spells = await prisma.spell.findMany({ where: { classes: { has: "warlock" }, level: 1 }, take: 2, select: { id: true } });
+    const spells = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "warlock" } }, level: 1, edition: "EDITION_2024" }, take: 2, select: { id: true } });
     expect(spells).toHaveLength(2);
 
     const res = await post(CHAR_ID, {
@@ -1444,7 +1815,7 @@ describe("POST …/level-up/transactions — Warlock 3→4 cantrip + spell (#113
   it("rejects a cantrip submitted as a leveled spell (400)", async () => {
     const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
     // Two distinct cantrips: one misplaced in the leveled slot, one valid in the cantrip slot.
-    const [misplaced, validCantrip] = await prisma.spell.findMany({ where: { classes: { has: "warlock" }, level: 0 }, take: 2, select: { id: true } });
+    const [misplaced, validCantrip] = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "warlock" } }, level: 0, edition: "EDITION_2024" }, take: 2, select: { id: true } });
     expect(misplaced.id).not.toBe(validCantrip.id);
 
     const res = await post(CHAR_ID, {
@@ -1457,6 +1828,95 @@ describe("POST …/level-up/transactions — Warlock 3→4 cantrip + spell (#113
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/cantrip/i);
     expect(await eventCount(CHAR_ID)).toBe(0);
+  });
+});
+
+// #1712: cross-edition admission for the level-up learn path —
+// loadPickCatalogRows rejects a submitted spellId that's provably the WRONG
+// edition's fork of a name (a same-named row the character's OWN edition
+// actually resolves to exists). Reuses the Warlock 3→4 fixture shape above.
+// A dedicated fixture fork (rather than a real catalog name) keeps this
+// mechanism proof independent of which real spells #1713+'s content slices
+// happen to fork; the Bard Magical Secrets and #1509 known-caster describe
+// blocks above prove a 2014 character's level-up accepts today's real
+// catalog (forked or not) unchanged.
+describe("POST …/level-up/transactions — cross-edition spell-fork rejection (#1712)", () => {
+  const CHAR_ID = "lvtx-1712-fork";
+  const FORK_NAME = "LevelUpTx1712 Fork Cantrip";
+
+  beforeEach(async () => {
+    const warlock = await prisma.characterClass.findFirstOrThrow({ where: { name: "Warlock" } });
+    const theFiend = (await prisma.subclass.findFirstOrThrow({ where: { classId: warlock.id, name: "The Fiend" } })).id;
+    await prisma.character.create({
+      data: {
+        ...BASE,
+        ownerId: OWNER_ID,
+        id: CHAR_ID,
+        name: "LevelUpTx1712 Warlock",
+        experiencePoints: 2700, // level 4 threshold; hitDice.total 3 → 1 pending
+        hitPoints: { current: 22, max: 22, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 3, die: "d8", spent: 0 },
+        abilityScores: { strength: 8, dexterity: 14, constitution: 14, intelligence: 10, wisdom: 10, charisma: 16 },
+        spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
+        classEntries: { create: [{ name: "warlock", subclass: "The Fiend", subclassId: theFiend, classId: warlock.id, position: 0, level: 3 }] },
+      },
+    });
+  });
+
+  afterEach(async () => {
+    await prisma.spell.deleteMany({ where: { name: FORK_NAME } });
+  });
+
+  async function seedFork() {
+    const row2014 = {
+      name: FORK_NAME, level: 0, school: "evocation" as const, castingTime: "1 action", range: "30 feet",
+      duration: "Instantaneous", description: "The PHB'14 text.", concentration: false, ritual: false, cantripScaling: true,
+    };
+    const row2024 = { ...row2014, description: "The SRD 5.2 text." };
+    const fork2014 = await upsertEditionRow(prisma.spell, { name: FORK_NAME, edition: "EDITION_2014" }, { ...row2014, edition: "EDITION_2014" }, row2014);
+    const fork2024 = await upsertEditionRow(prisma.spell, { name: FORK_NAME, edition: "EDITION_2024" }, { ...row2024, edition: "EDITION_2024" }, row2024);
+    for (const spellId of [fork2014.id, fork2024.id]) {
+      await prisma.spellClass.upsert({
+        where: { spellId_className: { spellId, className: "warlock" } },
+        create: { spellId, className: "warlock" },
+        update: {},
+      });
+    }
+    return { fork2014, fork2024 };
+  }
+
+  it("rejects a 2024 character's level-up submitting the 2014 fork's id, naming the spell", async () => {
+    const { fork2014 } = await seedFork();
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
+    const spell = await prisma.spell.findFirstOrThrow({ where: { classMemberships: { some: { className: "warlock" } }, level: 1, edition: "EDITION_2024" }, select: { id: true } });
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entry.id },
+      hp: { method: "average" },
+      advancement: { type: "takeAsi", increases: [{ ability: "charisma", amount: 2 }] },
+      spellsLearned: [{ type: "learnSpell", spellId: spell.id }],
+      cantripsLearned: [{ type: "learnSpell", spellId: fork2014.id }],
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe(`${FORK_NAME} is 2014 rules content, not usable by a 2024 rules character`);
+    expect(await eventCount(CHAR_ID)).toBe(0);
+  });
+
+  it("admits the character's OWN edition fork — the rejection is fork-specific, not a blanket cross-edition ban", async () => {
+    const { fork2024 } = await seedFork();
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
+    const spell = await prisma.spell.findFirstOrThrow({ where: { classMemberships: { some: { className: "warlock" } }, level: 1, edition: "EDITION_2024" }, select: { id: true } });
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entry.id },
+      hp: { method: "average" },
+      advancement: { type: "takeAsi", increases: [{ ability: "charisma", amount: 2 }] },
+      spellsLearned: [{ type: "learnSpell", spellId: spell.id }],
+      cantripsLearned: [{ type: "learnSpell", spellId: fork2024.id }],
+    });
+    expect(res.status, res.body.error ?? "").toBe(200);
+    const names = res.body.spellcasting.spells.map((s: { name: string }) => s.name);
+    expect(names).toContain(FORK_NAME);
   });
 });
 
@@ -1488,8 +1948,8 @@ describe("POST …/level-up/transactions — multiclass add via ceremony (#1131)
 
   it("adds a Warlock second class and applies its 2 cantrips + 2 spells", async () => {
     const warlock = await prisma.characterClass.findFirstOrThrow({ where: { name: "Warlock" } });
-    const cantrips = await prisma.spell.findMany({ where: { classes: { has: "warlock" }, level: 0 }, take: 2, select: { id: true } });
-    const spells = await prisma.spell.findMany({ where: { classes: { has: "warlock" }, level: 1 }, take: 2, select: { id: true } });
+    const cantrips = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "warlock" } }, level: 0, edition: "EDITION_2024" }, take: 2, select: { id: true } });
+    const spells = await prisma.spell.findMany({ where: { classMemberships: { some: { className: "warlock" } }, level: 1, edition: "EDITION_2024" }, take: 2, select: { id: true } });
 
     const res = await post(CHAR_ID, {
       target: { kind: "new", classId: warlock.id },
@@ -1509,7 +1969,10 @@ describe("POST …/level-up/transactions — multiclass add via ceremony (#1131)
 
   it("adds a Fighter second class and commits its fighting-style feat against the new entry", async () => {
     const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
-    const defense = await prisma.feat.findFirstOrThrow({ where: { name: "Defense", category: "fighting_style" } });
+    // Pinned to EDITION_2024 (#1311): these fixtures never set rulesEdition, so
+    // they default to EDITION_2024, and a bare name+category match became
+    // ambiguous the moment a 2014 "Defense" row exists alongside it.
+    const defense = await prisma.feat.findFirstOrThrow({ where: { name: "Defense", category: "fighting_style", edition: "EDITION_2024" } });
 
     const res = await post(CHAR_ID, {
       target: { kind: "new", classId: fighter.id },

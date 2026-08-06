@@ -26,14 +26,112 @@ export interface SubclassOption {
 /**
  * Baseline catalog entries served by `GET /api/reference`, used to populate
  * the character-creation form. These are *suggestions* the backend can
- * derive mechanics from — a created character's race/class/background name
+ * derive mechanics from — a created character's species/class/background name
  * can still drift from (or omit) a catalog match (the catalog+snapshot pattern).
  */
-export interface RaceOption {
+
+/** #1679/#1681: the AbilityIncreaseSpec vocabulary served on Species/SpeciesVariant
+ *  rows (backend's abilityIncreasesSchema, lib/srd/species-ability-increases.ts) —
+ *  a wire-shape mirror, not a rule: the backend alone decides what an ability
+ *  bump is worth (resolveSpeciesGrants); the ceremony only reads this shape to
+ *  render a preview and build the `speciesAbilities` request field. */
+export type AbilityIncreaseSpec =
+  | { ability: AbilityName; amount: number }
+  | { choose: { count: number; amount: number; from?: AbilityName[] } }
+  | { floating: number };
+
+/** #1689: the species-granted creation-CHOICE vocabulary (SpeciesTrait.choice,
+ *  backend's speciesTraitChoiceSchema) — a wire-shape mirror only, resolved
+ *  server-side (never a client rule): `null` on both SpeciesOption and
+ *  SpeciesVariantOption is the "no choice served" signal the ceremony panels
+ *  key their own render-or-not off (the #1572 trick, no client edition logic).
+ *  Half-Elf's own row carries chooseSkills; High Elf's own (variant) row
+ *  carries chooseCantrip — present on BOTH levels here, mirroring
+ *  abilityIncreases' own species-and-variant shape, so a future row that
+ *  places either at the OTHER level (a variant-level chooseSkills, or a
+ *  species-level chooseCantrip — neither exists yet) needs no wire-shape change. */
+export interface SpeciesSkillChoiceOption {
+  count: number;
+  /** Omitted = any of the 18 skills is eligible (Half-Elf's shape). */
+  from?: SkillName[];
+}
+
+export interface SpeciesCantripChoiceOption {
+  /** #1756: exactly one of `list`/`spells` is present. `list` is a lowercase
+   *  class name (matches the served `classes` entries' own case, backend:
+   *  SpellClass.className) — the whole class list `GET /api/spells?class=` is
+   *  queried with (High Elf's wizard list). */
+  list?: string;
+  /** #1756: an explicit set of cantrip NAMES the pick is narrowed to (Astral
+   *  Fire's Dancing Lights / Light / Sacred Flame) — mutually exclusive with
+   *  `list`. The picker fetches all cantrips and filters to these by name. */
+  spells?: string[];
+  /** Absent (#1756) = the player chooses Int/Wis/Cha via the identity step's
+   *  casting-ability control (SpeciesOption/SpeciesVariantOption.
+   *  needsCastingAbility is true); present pins a fixed ability (High Elf's
+   *  Intelligence). */
+  castingAbility?: AbilityName;
+}
+
+/** #1690: whether this row grants a choice of Origin feat (2024 Human's
+ *  Versatile) — a bare boolean, unlike chooseSkills/chooseCantrip above,
+ *  since chooseOriginFeatSchema carries no further spec: "Origin category"
+ *  is the whole rule, resolved live against the Feat catalog at create time,
+ *  never a fixed list baked into the trait row. */
+export type SpeciesOriginFeatChoiceOption = boolean;
+
+/** A species' second creation step — 2014 subrace, 2024 lineage/legacy/
+ *  ancestry (#1679/#1680), served nested inside SpeciesOption.variants: an
+ *  empty variants array renders no variant step. Carries its own
+ *  abilityIncreases (#1681), additive to the parent species'. */
+export interface SpeciesVariantOption {
   id: string;
   name: string;
+  slug: string;
+  /** Additive to the parent species' own abilityIncreases at creation (Hill
+   *  Dwarf's +1 WIS on top of Dwarf's +2 CON) — [] for every 2024 row. */
+  abilityIncreases: AbilityIncreaseSpec[];
+  /** #1758/#1751: when true, `abilityIncreases` REPLACE the parent species'
+   *  rather than stacking (Astral Elf drops the base Elf's +2 DEX). Mirrors the
+   *  backend's fetchMergedAbilityIncreases merge; false for every real subrace.
+   *  No SpeciesOption twin — replace only means something against a parent. */
+  abilityIncreasesReplace: boolean;
+  /** #1683: true when picking this variant requires the Int/Wis/Cha
+   *  casting-ability choice (a 2024 lineage/legacy that grants a spell —
+   *  Elf's Drow/High Elf/Wood Elf, Gnome's Forest/Rock, Tiefling's Abyssal/
+   *  Chthonic/Infernal). False for every 2014 row and every non-spell 2024
+   *  variant (Dragonborn ancestry, Goliath's Giant Ancestry). */
+  needsCastingAbility: boolean;
+  /** #1689/#1690: null/false for every row but the ones that carry the
+   *  matching trait — see the type's own comment. */
+  chooseSkills: SpeciesSkillChoiceOption | null;
+  chooseCantrip: SpeciesCantripChoiceOption | null;
+  chooseOriginFeat: SpeciesOriginFeatChoiceOption;
+}
+
+/** Species option (#1679/#1680), served nested per edition (server-filtered
+ *  by `?edition=`, never a client edition check — the #1572 trick) with its
+ *  variants nested inside, exactly like ClassOption.subclasses. An empty
+ *  `variants` array is the signal the two-step picker renders one step, not
+ *  two — e.g. 2014 Human vs. 2014 Dwarf (Hill/Mountain). */
+export interface SpeciesOption {
+  id: string;
+  name: string;
+  slug: string;
   speed: number;
-  toolProficiencies: string[];
+  /** [] for every EDITION_2024 row — 2024 ability increases come from
+   *  backgrounds only (#1572), never species (#1681). */
+  abilityIncreases: AbilityIncreaseSpec[];
+  /** #1683: same signal as SpeciesVariantOption.needsCastingAbility, at the
+   *  species level (a grant with no variant chosen) — always false this
+   *  wave, kept general for a future species-level grant. */
+  needsCastingAbility: boolean;
+  /** #1689/#1690: null/false for every row but the ones that carry the
+   *  matching trait — see the type's own comment. */
+  chooseSkills: SpeciesSkillChoiceOption | null;
+  chooseCantrip: SpeciesCantripChoiceOption | null;
+  chooseOriginFeat: SpeciesOriginFeatChoiceOption;
+  variants: SpeciesVariantOption[];
 }
 
 /** Reference types (GET /api/reference) that populate the character-creation form. */
@@ -149,12 +247,12 @@ export interface ItemRarityOption {
 
 /** One selectable rules edition, served by `GET /api/editions` (#1436) with its
  *  copy already resolved — the frontend holds no edition label/description table.
- *  `unavailableReason` present means visible but unselectable (#1371). */
+ *  Both editions are fully selectable (#1372 removed the visible-but-unselectable
+ *  `unavailableReason` gate #1371 added). */
 export interface EditionOption {
   key: RulesEdition;
   label: string;
   description: string;
-  unavailableReason?: string;
 }
 
 /** `GET /api/editions` (#1436). `editions` is in display order and `defaultEdition`
@@ -166,7 +264,9 @@ export interface EditionsResponse {
 }
 
 export interface ReferenceData {
-  races: RaceOption[];
+  /** Species catalog for the two-step species→variant picker (#1679/#1680) —
+   *  the sole creation-catalog anchor since #1684 pruned the flat `races` list. */
+  species: SpeciesOption[];
   classes: ClassOption[];
   backgrounds: BackgroundOption[];
   alignments: string[];
@@ -182,7 +282,7 @@ export interface ReferenceData {
 }
 
 /** Body for `POST /api/characters`. The backend derives AC/HP/saves/skills
- * from `race`/`classes[0]`/`abilityScores` via `deriveCreatedCharacter` —
+ * from `speciesId`/`classes[0]`/`abilityScores` via `deriveCreatedCharacter` —
  * rather than the client computing and sending them. */
 // One selection per equipment choice group when mode:"package".
 export interface PackageSelection {
@@ -198,7 +298,32 @@ export interface CreateCharacterInput {
   name: string;
   alignment: string;
   experiencePoints?: number;
-  race: string;
+  /** #1679/#1680/#1684: the two-step picker's real selection — ids, like
+   *  `subclassId`. The sole mechanical anchor since the flat `race` field and
+   *  its legacy create path were pruned. */
+  speciesId: string;
+  variantId?: string;
+  /** 2014 species/subrace ability increases (#1681): the CHOSEN portion only
+   *  (fixed increases apply server-side with no request field). Sent only
+   *  when the merged species+variant spec has a choose component AND the
+   *  player has completed it — see deriveSpeciesBonuses. */
+  speciesAbilities?: Partial<Record<AbilityName, number>>;
+  /** #1683: the 2024 lineage/legacy casting-ability choice (Int/Wis/Cha),
+   *  required iff the chosen species+variant's needsCastingAbility is true —
+   *  see deriveCastingAbilityChoice. */
+  castingAbility?: "intelligence" | "wisdom" | "charisma";
+  /** #1689: species-granted creation choices (SpeciesTrait.choice) —
+   *  distinct from `skillProficiencies`/`spells` below, which are the
+   *  class/background pools. Sent only when the resolved species+variant
+   *  carries the matching choice-bearing trait AND the player has completed
+   *  it — see deriveSpeciesSkillChoice/deriveSpeciesCantripChoice. */
+  speciesSkills?: SkillName[];
+  speciesCantripId?: string;
+  /** #1690: species-granted Origin feat pick (2024 Human's Versatile) —
+   *  catalog feat id. Sent only when the resolved species+variant carries
+   *  chooseOriginFeat AND the player has completed it — see
+   *  deriveSpeciesOriginFeatChoice. */
+  speciesOriginFeatId?: string;
   background: string;
   classes: [{ name: string; subclass?: string | null; subclassId?: string }];
   abilityScores: AbilityScores;

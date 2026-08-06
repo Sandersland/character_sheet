@@ -1,6 +1,7 @@
 import { Prisma, type EquipSlot } from "@/generated/prisma/client.js";
-import { clearBuffsByTargetInTx, clearBuffByKeyInTx } from "@/lib/combat/active-effects.js";
+import { clearBuffByKeyInTx, normalizeActiveEffectsMutable } from "@/lib/combat/active-effects.js";
 import { logEvent } from "@/lib/activity/events.js";
+import type { ClearOnTrigger } from "@/lib/classes/class-feature-rows.js";
 import type { ItemCategory, ArmorCategory } from "./item-detail-inputs.js";
 import { InvalidInventoryOperationError } from "./inventory-currency.js";
 import {
@@ -119,6 +120,60 @@ export function firstFreeSlot(rows: EquippedRow[], item: PlaceableItem): EquipSl
   return null;
 }
 
+// The equip-time trigger keys donning `item` into `slot` raises (#1688) —
+// matched against every active buff's own `clearOn` list by
+// clearBuffsOnEquipInTx below, instead of a hardcoded per-target clear call.
+// Body armor raises its own category trigger PLUS "equipBodyArmor" (fires for
+// EVERY category — Mage Armor's RAW shape: "the spell ends if the target dons
+// armor", #363); a shield (OFF_HAND) raises only "equipShield" — RAW,
+// wielding a shield doesn't "don armor", so Mage Armor's own clearOn
+// deliberately excludes it. Light armor raises no medium/heavy/shield
+// trigger, which is what lets a Bladesong-shaped buff (clearOn: medium/
+// heavy/shield only) survive donning it.
+const BODY_ARMOR_TRIGGERS: Record<Exclude<ArmorCategory, "shield">, ClearOnTrigger[]> = {
+  light: ["equipBodyArmor", "equipLightArmor"],
+  medium: ["equipBodyArmor", "equipMediumArmor"],
+  heavy: ["equipBodyArmor", "equipHeavyArmor"],
+};
+
+function equipClearTriggers(item: PlaceableItem, slot: EquipSlot): ClearOnTrigger[] {
+  if (slot === "BODY" && item.armorDetail && item.armorDetail.armorCategory !== "shield") {
+    return BODY_ARMOR_TRIGGERS[item.armorDetail.armorCategory];
+  }
+  if (slot === "OFF_HAND" && item.armorDetail?.armorCategory === "shield") {
+    return ["equipShield"];
+  }
+  return [];
+}
+
+// True-ends every active buff whose own `clearOn` names a trigger this
+// placement just raised (#1688) — the generic counterpart to the old
+// hardcoded "BODY slot -> clear the acUnarmoredBase target" call. Reuses
+// clearBuffByKeyInTx per matching buff rather than a new clearing primitive;
+// equipClearTriggers above is the only new logic, and it answers "which
+// triggers does THIS placement raise", not "which buffs die".
+async function clearBuffsOnEquipInTx(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  item: InventoryItemWithDetails,
+  slot: EquipSlot,
+  batchId: string,
+  sessionId: string | null,
+): Promise<void> {
+  const triggers = equipClearTriggers(item, slot);
+  if (triggers.length === 0) return;
+  const row = await tx.character.findUnique({ where: { id: characterId }, select: { activeEffects: true } });
+  if (!row) return;
+  const { buffs } = normalizeActiveEffectsMutable(row.activeEffects);
+  for (const buff of buffs) {
+    // buff.clearOn is persisted, untrusted text; compare it as a plain string
+    // against the known triggers rather than asserting it IS a ClearOnTrigger.
+    if ((buff.clearOn ?? []).some((t) => (triggers as readonly string[]).includes(t))) {
+      await clearBuffByKeyInTx(tx, characterId, buff.key, batchId, sessionId, `donned ${item.name}`);
+    }
+  }
+}
+
 // Places an item into a validated slot + logs the undoable `equipped` event.
 async function equipIntoSlot(
   tx: Prisma.TransactionClient,
@@ -129,12 +184,7 @@ async function equipIntoSlot(
   sessionId: string | null,
 ) {
   await tx.inventoryItem.update({ where: { id: item.id }, data: { equippedSlot: slot } });
-  // Donning body armor true-ends Mage Armor (an "acUnarmoredBase" buff) per RAW —
-  // "The spell ends if the target dons armor" — so it must be recast (#363).
-  // A shield (OFF_HAND) doesn't count; concentration AC buffs are unaffected.
-  if (slot === "BODY") {
-    await clearBuffsByTargetInTx(tx, characterId, "acUnarmoredBase", batchId, sessionId, `donned ${item.name}`);
-  }
+  await clearBuffsOnEquipInTx(tx, characterId, item, slot, batchId, sessionId);
   await logEvent(tx, {
     characterId,
     category: "inventory",

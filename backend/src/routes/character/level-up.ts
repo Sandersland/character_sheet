@@ -12,6 +12,7 @@ import { assertCharacterAccess } from "@/lib/auth/access.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { applyLevelUpTransaction, resolveLevelUpContext } from "@/lib/leveling/level-up-transaction.js";
 import { grantedSpellsGained, type GrantedSpellSource } from "@/lib/spellcasting/granted-spells.js";
+import { casterModelFor } from "@/lib/srd/spellcasting-tables.js";
 import { InvalidLevelUpError, resolveLevelUpPlan } from "@/lib/leveling/level-up-submission.js";
 import { InvalidHitPointOperationError } from "@/lib/combat/hitpoints.js";
 import { InvalidAdvancementOperationError } from "@/lib/leveling/advancement.js";
@@ -21,6 +22,7 @@ import { InvalidSpellcastingOperationError } from "@/lib/spellcasting/spellcasti
 import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
 import { takeAsiOpSchema, takeFeatOpSchema } from "@/routes/character/advancement.js";
 import {
+  forgetSubclassChoiceOpSchema,
   learnManeuverOpSchema,
   learnToolProficiencyOpSchema,
   learnSubclassChoiceOpSchema,
@@ -111,12 +113,18 @@ levelUpRouter.get<{ id: string }>("/plan", async (req, res) => {
       context.targetEntry.newLevel,
       context.planCharacter.edition,
     );
+    const targetSubclass = context.chosenSubclassName ?? context.targetEntry.subclass ?? null;
     res.json({
       target: {
         className: context.targetEntry.name,
-        subclass: context.chosenSubclassName ?? context.targetEntry.subclass ?? null,
+        subclass: targetSubclass,
         newLevel: context.targetEntry.newLevel,
         isPrimary: context.targetIsPrimary,
+        // #1509 D5: served so the Review step's granted-spells footnote (a
+        // subclass grant like a Domain/Pact spell, independent of any
+        // newSpells step) can render the right noun without re-deriving the
+        // rule — null for a non-caster target.
+        casterModel: casterModelFor(context.targetEntry.name, targetSubclass, context.planCharacter.edition),
       },
       steps,
       grantedSpells: gained.map((s) => ({ name: s.name, level: s.level, school: s.school })),
@@ -142,6 +150,9 @@ const levelUpSubmissionSchema = z.object({
   maneuvers: z.array(learnManeuverOpSchema).optional(),
   toolProficiencies: z.array(learnToolProficiencyOpSchema).optional(),
   subclassChoices: z.array(learnSubclassChoiceOpSchema).optional(),
+  // #1503: a choose-N swap (e.g. Way of the Four Elements) — validated
+  // against its step's meta.canSwap by assertSubclassChoiceForgets.
+  subclassChoicesForgotten: z.array(forgetSubclassChoiceOpSchema).optional(),
   spellsLearned: z.array(learnSpellOpSchema).optional(),
   cantripsLearned: z.array(learnSpellOpSchema).optional(),
   spellsForgotten: z.array(forgetSpellOpSchema).optional(),

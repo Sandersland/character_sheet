@@ -46,7 +46,10 @@ function makeClass(overrides: Partial<ClassOption> = {}): ClassOption {
 }
 
 const reference: ReferenceData = {
-  races: [{ id: "race-1", name: "Elf", speed: 30, toolProficiencies: [] }],
+  species: [{
+    id: "sp-elf", name: "Elf", slug: "elf", speed: 30, abilityIncreases: [],
+    needsCastingAbility: false, chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false, variants: [],
+  }],
   classes: [
     makeClass(),
     makeClass({
@@ -72,7 +75,8 @@ function seedDraft(overrides: Partial<CharacterDraft>) {
   const base: CharacterDraft = {
     name: "",
     alignment: "",
-    race: "",
+    speciesId: "",
+    variantId: "",
     className: "",
     subclass: "",
     subclassId: "",
@@ -98,6 +102,11 @@ function seedDraft(overrides: Partial<CharacterDraft>) {
       charisma: 10,
     },
     backgroundAbilities: {},
+    speciesAbilities: {},
+    castingAbility: "",
+    speciesSkills: [],
+    speciesCantripId: "",
+    speciesOriginFeatId: "",
     skillProficiencies: [],
     toolChoices: [],
     cantripIds: [],
@@ -119,7 +128,7 @@ function validDraft(): Partial<CharacterDraft> {
   return {
     name: "Lidda",
     alignment: "Neutral Good",
-    race: "Elf",
+    speciesId: "sp-elf",
     className: "Rogue",
     background: "Sage",
     skillProficiencies: ["stealth", "acrobatics"],
@@ -148,7 +157,7 @@ afterEach(() => {
 
 describe("useCharacterCreation", () => {
   it("derives granted skills from the background and excludes them from class options", async () => {
-    seedDraft({ race: "Elf", className: "Rogue", background: "Sage" });
+    seedDraft({ speciesId: "sp-elf", className: "Rogue", background: "Sage" });
     const { result } = await mount();
     expect(result.current.skills.granted).toEqual(["perception"]);
     expect(result.current.skills.options).toEqual(["acrobatics", "stealth"]);
@@ -187,14 +196,14 @@ describe("useCharacterCreation", () => {
     seedDraft({});
     const { result } = await mount();
     expect(result.current.isValid).toBe(false);
-    expect(result.current.missing).toEqual(["Name", "Alignment", "Race", "Class", "Background"]);
+    expect(result.current.missing).toEqual(["Name", "Alignment", "Species", "Class", "Background"]);
   });
 
   it("uses the trimmed custom background name for validation when custom is on", async () => {
     seedDraft({
       name: "A",
       alignment: "Neutral Good",
-      race: "Elf",
+      speciesId: "sp-elf",
       className: "Rogue",
       useCustomBackground: true,
       customBackground: "   ",
@@ -212,7 +221,7 @@ describe("useCharacterCreation", () => {
 
   it("derives preview AC, speed, and max HP from scores and class hit die", async () => {
     seedDraft({
-      race: "Elf",
+      speciesId: "sp-elf",
       className: "Rogue",
       abilityScores: {
         strength: 10,
@@ -230,7 +239,7 @@ describe("useCharacterCreation", () => {
     expect(result.current.preview.maxHp).toBe(10); // d8 + con mod 2
   });
 
-  it("has no preview speed or maxHp before race/class are chosen", async () => {
+  it("has no preview speed or maxHp before species/class are chosen", async () => {
     seedDraft({});
     const { result } = await mount();
     expect(result.current.preview.speed).toBeUndefined();
@@ -249,7 +258,7 @@ describe("useCharacterCreation", () => {
     expect(createCharacter).toHaveBeenCalledWith(
       expect.objectContaining({
         name: "Lidda",
-        race: "Elf",
+        speciesId: "sp-elf",
         background: "Sage",
         classes: [{ name: "Rogue", subclass: null, subclassId: undefined }],
         skillProficiencies: ["perception", "stealth", "acrobatics"],

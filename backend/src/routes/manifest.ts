@@ -11,6 +11,7 @@ import { campaignsRouter } from "@/routes/campaign/campaigns.js";
 import { classRouter } from "@/routes/character/class.js";
 import { charactersRouter } from "@/routes/character/characters.js";
 import { conditionsRouter } from "@/routes/character/conditions.js";
+import { disciplinesRouter } from "@/routes/character/disciplines.js";
 import { editionsRouter } from "@/routes/catalog/editions.js";
 import { entitiesRouter } from "@/routes/campaign/entities.js";
 import { sessionsRouter } from "@/routes/session/sessions.js";
@@ -89,6 +90,7 @@ export const routeManifest: RouteMount[] = [
   // Catalog pickers for abilities whose transactions live on abilitiesRouter (#1275).
   { router: maneuversRouter, mount: "/api/maneuvers", scope: "authed" },
   { router: shadowArtsRouter, mount: "/api/shadow-arts", scope: "authed" },
+  { router: disciplinesRouter, mount: "/api/disciplines", scope: "authed" },
   { router: subclassChoicesRouter, mount: "/api/subclass-choices", scope: "authed" },
 
   { router: sessionsRouter, mount: "/api", scope: "authed" },

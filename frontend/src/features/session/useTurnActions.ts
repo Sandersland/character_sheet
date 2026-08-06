@@ -175,7 +175,7 @@ export function useTurnActions({
   // this server effect (#758). Returns the first op's ExecuteActionResult
   // (#1528) so a server-rolled row-driven action (Second Wind) can surface
   // its roll — undefined on failure or when the server reported nothing.
-  async function send(actionKey: string, opts?: { roll?: number; inventoryItemId?: string }) {
+  async function send(actionKey: string, opts?: { roll?: number; inventoryItemId?: string; slotLevel?: number }) {
     try {
       const updated = await sendAction(actionKey, opts);
       if (updated.batchId) attachBatchId(updated.batchId);
@@ -281,7 +281,12 @@ export function useTurnActions({
     const plan = planActionClick(resolver, character);
     if (plan.consumeSlot) consumeSlotFor(cost, resolver?.kind);
     void sendForPlan(plan, key, resolver, cost);
-    if (plan.openResolution) openResolution(key);
+    // action carried through so openResolution's own resolverFor call can
+    // synthesize a row-driven resolver too (#1676 fix — see
+    // useActiveResolution's own comment: this was the first "open a sheet"
+    // resolverKind reached only through the wire fallback, never a static
+    // ACTION_RESOLVERS entry, and openResolution silently no-opped without it).
+    if (plan.openResolution) openResolution(key, undefined, action);
     surfaceReminder(key, cost);
   }
 

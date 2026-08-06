@@ -12,6 +12,7 @@ import {
   type CreationSpellCounts,
 } from "@/lib/creationSpells";
 import type { CharacterDraft } from "@/hooks/useCharacterDraft";
+import type { RulesEdition } from "@character-sheet/shared-types";
 
 // #1513: shown only for the Wizard (counts.spellbookSize present) — the
 // prepared number is deliberately unstated: it's ability-score-dependent
@@ -63,15 +64,17 @@ export default function CreationSpellsStep({
   counts,
   cantripIds,
   spellIds,
+  edition,
   onChange,
 }: {
   className: string;
   counts: CreationSpellCounts;
   cantripIds: string[];
   spellIds: string[];
+  edition: RulesEdition;
   onChange: (patch: Partial<CharacterDraft>) => void;
 }) {
-  const { catalog, error, showSpinner } = useSpellCatalog({ className, maxLevel: counts.maxSpellLevel });
+  const { catalog, error, showSpinner } = useSpellCatalog(edition, { className, maxLevel: counts.maxSpellLevel });
 
   const options = splitCreationCatalog(catalog);
   const groups = buildSpellGroups(counts, options, cantripIds, spellIds, onChange);

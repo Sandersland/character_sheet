@@ -1,13 +1,16 @@
 import {
+  applyActionTransactions,
   applyChannelDivinityTransactions,
   applyResourceTransactions,
   applyShadowArtsTransactions,
   applyWarriorOfElementsTransactions,
+  castDisciplineTransaction,
 } from "@/api/client";
 import type {
   CastChannelDivinityOperation,
   CastShadowArtOperation,
   Character,
+  DisciplineOperation,
   LearnManeuverOperation,
   ResourceOperation,
   ShadowArtOperation,
@@ -16,6 +19,7 @@ import type {
 import type { ClassFeatureView } from "@/lib/classFeatures";
 import ChannelDivinitySection from "@/features/class/ChannelDivinitySection";
 import CloakOfShadowsSection from "@/features/class/CloakOfShadowsSection";
+import FourElementsSection from "@/features/class/FourElementsSection";
 import ManeuversSection from "@/features/class/ManeuversSection";
 import ResourcePoolsSection from "@/features/class/ResourcePoolsSection";
 import ShadowArtsSection from "@/features/class/ShadowArtsSection";
@@ -70,6 +74,16 @@ export default function ClassResourceBlocks({ view, busy, run }: Props) {
           onOperations={(ops: WarriorOfElementsOperation[]) =>
             run(() => applyWarriorOfElementsTransactions(character.id, ops).then((r) => r.character))
           }
+          // Elemental Attunement's own toggle is row-driven now (#1686) — a
+          // plain executeAction op on the generic actions endpoint, not a
+          // WarriorOfElementsOperation on this subclass's own endpoint.
+          onToggleAttunement={(activate) =>
+            run(() =>
+              applyActionTransactions(character.id, [
+                { type: "executeAction", actionKey: activate ? "elementalAttunement" : "endElementalAttunement" },
+              ]),
+            )
+          }
         />
       )}
 
@@ -77,6 +91,13 @@ export default function ClassResourceBlocks({ view, busy, run }: Props) {
         <ShadowArtsSection
           busy={busy}
           onCast={(op: CastShadowArtOperation) => run(() => applyShadowArtsTransactions(character.id, [op]))}
+        />
+      )}
+
+      {view.hasFourElements && (
+        <FourElementsSection
+          busy={busy}
+          onCast={(op: DisciplineOperation) => run(() => castDisciplineTransaction(character.id, [op]))}
         />
       )}
 

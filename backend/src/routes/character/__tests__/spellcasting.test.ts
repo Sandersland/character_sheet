@@ -34,7 +34,6 @@ const TEST_SPELL = {
   attackType: "save",
   saveAbility: "dexterity",
   upcastDicePerLevel: 1,
-  classes: ["wizard"],
 };
 
 const TEST_CANTRIP = {
@@ -51,7 +50,6 @@ const TEST_CANTRIP = {
   damageType: "fire",
   attackType: "attack",
   cantripScaling: true,
-  classes: ["wizard"],
 };
 
 // ── Character fixture ─────────────────────────────────────────────────────────
@@ -182,18 +180,22 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
     });
     wizardClassId = cls.id;
 
-    // Upsert catalog spells for learnSpell-from-catalog tests.
-    const catalogSpell = await prisma.spell.upsert({
-      where: { name: TEST_SPELL.name },
-      create: TEST_SPELL,
-      update: TEST_SPELL,
-    });
+    // Upsert catalog spells for learnSpell-from-catalog tests. upsertEditionRow,
+    // not .upsert(): Spell's business key is now (name, edition) (#1710), and
+    // these fixture spells are edition-neutral.
+    const catalogSpell = await upsertEditionRow(
+      prisma.spell,
+      { name: TEST_SPELL.name, edition: null },
+      { ...TEST_SPELL, edition: null },
+      TEST_SPELL,
+    );
     catalogSpellId = catalogSpell.id;
-    await prisma.spell.upsert({
-      where: { name: TEST_CANTRIP.name },
-      create: TEST_CANTRIP,
-      update: TEST_CANTRIP,
-    });
+    await upsertEditionRow(
+      prisma.spell,
+      { name: TEST_CANTRIP.name, edition: null },
+      { ...TEST_CANTRIP, edition: null },
+      TEST_CANTRIP,
+    );
 
     // Create the fixture character. The class entry's `name` snapshot is "wizard"
     // (lowercase) — that's what deriveSpellcasting reads to look up the caster type.
@@ -733,7 +735,7 @@ describe("subclass-granted spells", () => {
       },
       {},
     );
-    const minorIllusion = await prisma.spell.findUnique({ where: { name: "Minor Illusion" }, select: { id: true } });
+    const minorIllusion = await prisma.spell.findFirst({ where: { name: "Minor Illusion" }, select: { id: true } });
     if (!minorIllusion) throw new Error("Minor Illusion not seeded — run `prisma db seed` before tests");
     // upsertEditionRow: the widened (subclassId, spellId, edition) shorthand
     // can't express a null edition at runtime (#1625).
@@ -1282,5 +1284,19 @@ describe("GET /api/characters/:id — casterModel + edition-forked preparedSpell
     expect(res.status).toBe(200);
     expect(res.body.spellcasting.preparedSpellLimit).toBe(9);
     expect(res.body.spellcasting.casterModel).toBe("prepared");
+  });
+
+  // #1511 D4: the grimoire/meter nouns ride alongside casterModel — served,
+  // never composed client-side.
+  it("2014 Bard 5 serves the known-caster labels", async () => {
+    const res = await supertest(app).get(`/api/characters/${BARD_2014_ID}`).set("Cookie", COOKIE);
+    expect(res.body.spellcasting.preparedLabel).toBe("Spells known");
+    expect(res.body.spellcasting.alwaysAvailableLabel).toBe("Known");
+  });
+
+  it("2024 Bard 5 serves the prepared-caster labels", async () => {
+    const res = await supertest(app).get(`/api/characters/${BARD_2024_ID}`).set("Cookie", COOKIE);
+    expect(res.body.spellcasting.preparedLabel).toBe("Prepared");
+    expect(res.body.spellcasting.alwaysAvailableLabel).toBe("Always prepared");
   });
 });

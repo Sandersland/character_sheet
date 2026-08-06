@@ -14,13 +14,13 @@ describe("buildMergedArmorProficiencies / buildMergedWeaponProficiencies — res
     const lowercase = [{ name: "fighter", class: FIGHTER_GRANTS }];
     const displayName = [{ name: "Fighter", class: FIGHTER_GRANTS }];
 
-    const armorLower = buildMergedArmorProficiencies(lowercase, undefined, new Set());
-    const armorDisplay = buildMergedArmorProficiencies(displayName, undefined, new Set());
+    const armorLower = buildMergedArmorProficiencies(lowercase, new Set());
+    const armorDisplay = buildMergedArmorProficiencies(displayName, new Set());
     expect(armorLower).toEqual(armorDisplay);
     expect(armorLower.map((g) => g.category)).toEqual(["light", "medium", "heavy", "shield"]);
 
-    const weaponLower = buildMergedWeaponProficiencies(lowercase, undefined, new Set());
-    const weaponDisplay = buildMergedWeaponProficiencies(displayName, undefined, new Set());
+    const weaponLower = buildMergedWeaponProficiencies(lowercase, new Set());
+    const weaponDisplay = buildMergedWeaponProficiencies(displayName, new Set());
     expect(weaponLower).toEqual(weaponDisplay);
     expect(weaponLower.map((g) => g.name)).toEqual(["Simple Weapons", "Martial Weapons"]);
   });
@@ -31,15 +31,15 @@ describe("buildMergedArmorProficiencies / buildMergedWeaponProficiencies — res
   // there is no code path left to feed a differing name into.
   it("a homebrew entry (no class relation) grants nothing, even when its name matches a real class", () => {
     const homebrew = [{ name: "Fighter", class: null }] as unknown as { class: { armorProficiencies: string[] } | null }[];
-    expect(buildMergedArmorProficiencies(homebrew, undefined, new Set())).toEqual([]);
+    expect(buildMergedArmorProficiencies(homebrew, new Set())).toEqual([]);
     expect(
-      buildMergedWeaponProficiencies(homebrew as unknown as { class: { weaponProficiencies: string[] } | null }[], undefined, new Set()),
+      buildMergedWeaponProficiencies(homebrew as unknown as { class: { weaponProficiencies: string[] } | null }[], new Set()),
     ).toEqual([]);
   });
 
-  it("feat/race grants still layer on top of an absent class relation", () => {
+  it("feat grants (which include #1682 species-trait grants, e.g. Mountain Dwarf armor) still layer on top of an absent class relation", () => {
     const homebrew = [{ class: null }];
-    const armor = buildMergedArmorProficiencies(homebrew, undefined, new Set(["light"]));
+    const armor = buildMergedArmorProficiencies(homebrew, new Set(["light"]));
     expect(armor).toEqual([{ category: "light", source: "feat" }]);
   });
 });

@@ -19,6 +19,7 @@ import {
 import { applyResourceOpInTx, type ResourceOperation } from "@/lib/classes/resources.js";
 import { applySpellcastingOpInTx, type LearnSpellOperation, type SpellcastingOperation } from "@/lib/spellcasting/spellcasting.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
+import { classesOf, rejectCrossEditionSpellForks, SPELL_CLASS_MEMBERSHIP_SELECT } from "@/lib/spellcasting/spell-classes.js";
 import {
   advancingHitDie,
   applyLevelUpHpInTx,
@@ -300,10 +301,15 @@ const STEP_OP_BUILDERS: Record<LevelUpStepKind, (submission: LevelUpSubmission, 
   fightingStyleFeat: (s) => [{ domain: "advancement", op: { ...s.fightingStyleFeat!, slot: "fightingStyle" } }],
   maneuvers: (s) => (s.maneuvers ?? []).map((op) => ({ domain: "resources", op })),
   toolProficiency: (s) => (s.toolProficiencies ?? []).map((op) => ({ domain: "resources", op })),
-  subclassChoice: (s, step) =>
-    (s.subclassChoices ?? [])
-      .filter((c) => c.choiceKey === step.meta?.key)
-      .map((op) => ({ domain: "resources", op })),
+  // #1503: forgets apply BEFORE learns (ops run sequentially in tx order),
+  // mirroring #1101's newSpells ordering — resolveChoiceOption's dup guard
+  // reads the CURRENT known list, so a forget-first ordering lets a swap
+  // proceed cleanly even in the (RAW-disallowed but not worth special-casing)
+  // edge of re-picking the same option.
+  subclassChoice: (s, step) => [
+    ...(s.subclassChoicesForgotten ?? []).filter((c) => c.choiceKey === step.meta?.key),
+    ...(s.subclassChoices ?? []).filter((c) => c.choiceKey === step.meta?.key),
+  ].map((op) => ({ domain: "resources", op })),
   // #1101: forgets apply BEFORE learns (ops run sequentially in tx order), so a
   // swap can re-learn the just-forgotten spellId without tripping the dup guard.
   // #1131: cantrips are ordinary learns applied first (disjoint from the swap).
@@ -339,12 +345,26 @@ type SpellPickRow = { id: string; name: string; level: number; classes: string[]
 async function loadPickCatalogRows(
   cantripOps: LearnSpellOperation[],
   spellOps: LearnSpellOperation[],
+  edition: RulesEdition,
 ): Promise<{ rowById: Map<string, SpellPickRow>; levelOf: (op: LearnSpellOperation) => number | undefined }> {
   const ids = [...cantripOps, ...spellOps].map((o) => o.spellId).filter((id): id is string => Boolean(id));
   const rows = ids.length
-    ? await prisma.spell.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, level: true, classes: true } })
+    ? await prisma.spell.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, name: true, level: true, edition: true, ...SPELL_CLASS_MEMBERSHIP_SELECT },
+      })
     : [];
-  const rowById = new Map(rows.map((r) => [r.id, r]));
+  // #1712: reject an id that's provably the WRONG edition's fork before it
+  // ever reaches assertOnSpellList/assertCantripEligibility below — see
+  // rejectCrossEditionSpellForks's own comment for why this doesn't reject
+  // every 2014 pick just because today's catalog is 2024-tagged (would
+  // regress #1729's shipped 2014 known-caster level-up).
+  const forkError = await rejectCrossEditionSpellForks(rows, edition);
+  if (forkError) throw new InvalidLevelUpError(forkError);
+  // Flattened to SpellPickRow's `classes: string[]` here (#1711) so the
+  // eligibility checks below (assertOnSpellList, assertCantripEligibility)
+  // never see the join shape — one seam resolves membership, not two.
+  const rowById = new Map(rows.map((r) => [r.id, { id: r.id, name: r.name, level: r.level, classes: classesOf(r) }]));
   const levelOf = (op: LearnSpellOperation): number | undefined =>
     op.spellId ? rowById.get(op.spellId)?.level : op.custom?.level;
   return { rowById, levelOf };
@@ -501,10 +521,11 @@ async function assertPickSpellEligibility(
   submission: LevelUpSubmission,
   steps: LevelUpStep[],
   className: string,
+  edition: RulesEdition,
 ): Promise<void> {
   const cantripOps = submission.cantripsLearned ?? [];
   const spellOps = submission.spellsLearned ?? [];
-  const { rowById, levelOf } = await loadPickCatalogRows(cantripOps, spellOps);
+  const { rowById, levelOf } = await loadPickCatalogRows(cantripOps, spellOps, edition);
   assertCantripVsLeveledPlacement(cantripOps, spellOps, levelOf);
 
   const gate = resolveNewSpellsGate(steps);
@@ -536,7 +557,7 @@ export async function applyLevelUpTransaction(
     await resolveLevelUpContext(characterId, submission.target, submission.subclassId);
 
   const steps = validateLevelUpSubmission(planCharacter, targetEntry, chosenSubclassName, submission, pickedSubclassFeatureRows);
-  await assertPickSpellEligibility(submission, steps, targetEntry.name);
+  await assertPickSpellEligibility(submission, steps, targetEntry.name, planCharacter.edition);
 
   const ops = buildLevelUpOps(steps, submission);
 

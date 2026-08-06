@@ -1,14 +1,15 @@
-// Warrior of the Elements (2024, PHB'24 p.90) — the two Focus-spending
-// session actions plus the Elemental Strikes rider, built as a dedicated vertical
-// like quivering-palm.ts (a bespoke monk-subclass flow that bypasses the generic
-// action catalog).
+// Warrior of the Elements (2024, PHB'24 p.90) — Elemental Burst plus the
+// Elemental Strikes rider, built as a dedicated vertical like quivering-palm.ts
+// (a bespoke monk-subclass flow that bypasses the generic action catalog).
+// Elemental Attunement's own toggle (activate/end) moved OFF this file (#1686)
+// onto a row-driven "toggle" (monk.ts's AuthoredFeature entry, dispatched
+// through routes/character/actions.ts's generic toggle handler) — it is no
+// longer a WarriorOfElementsOperation at all.
 //
-// Elemental Attunement is modeled as a "while-active" activeEffects buff (the
-// same durable-buff registry Rage uses): activating it (no action, start of your
-// turn) spends 1 Focus and rides the character for 10 minutes / until
-// Incapacitated — narrated, since this app has no wall-clock combat timer (see
-// quivering-palm.ts's day-count note). Stride of the Elements (L11) and Elemental
-// Epitome (L17) read that active state; here it is the buff's presence.
+// What stays here reads attunementActive() (below) — a plain presence check
+// against the SAME "while-active" activeEffects buff registry Rage uses,
+// still keyed ELEMENTAL_ATTUNEMENT_BUFF_KEY — since Elemental Strike gates on
+// it and Stride of the Elements (L11)/Elemental Epitome (L17) narrate off it.
 //
 // Roll ownership (mirrors Stunning Strike / Quivering Palm): the Dex/Str save is
 // a flat d20 with no modifier — the DC is exact, the save roll is a deliberate
@@ -20,9 +21,10 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { levelForExperience, proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 import { runCharacterTransaction, type CharacterTxContext } from "@/lib/character/character-transaction.js";
-import { appendActiveBuffInTx, clearBuffByKeyInTx, normalizeActiveEffectsMutable } from "@/lib/combat/active-effects.js";
+import { normalizeActiveEffectsMutable } from "@/lib/combat/active-effects.js";
 import { applySpendResourceInTx } from "./resources.js";
 import { actionGrantLevel, deriveEntryScopedActions } from "./actions.js";
+import { FEATURE_ROWS_CLASS_FEATURES, FEATURE_ROWS_SUBCLASS_FEATURES, featureRowsOf } from "./feature-rows-select.js";
 import { monkSaveDC } from "./monk.js";
 import { editionOf } from "@/lib/rules/edition.js";
 import type {
@@ -31,8 +33,6 @@ import type {
   ElementalSaveOutcome,
   ElementalStrikeOperation,
   ElementalStrikeResult,
-  ToggleAttunementResult,
-  ToggleElementalAttunementOperation,
   WarriorOfElementsOperation,
   WarriorOfElementsResult,
 } from "@character-sheet/shared-types";
@@ -41,7 +41,6 @@ export class InvalidWarriorOfElementsOperationError extends Error {}
 
 export const ELEMENTAL_ATTUNEMENT_BUFF_KEY = "elementalAttunement";
 const ELEMENTAL_BURST_FOCUS_COST = 2;
-const ELEMENTAL_ATTUNEMENT_FOCUS_COST = 1;
 
 // The five elemental damage types a Warrior of the Elements can deal (PHB'24 p.90).
 // The tuple stays here because the route's z.enum consumes it; the union it used
@@ -66,10 +65,22 @@ const WARRIOR_OF_ELEMENTS_SELECT = {
   // subclassRef.slug (#1277) is what deriveEntryScopedActions' assertWarriorOfElements
   // gate resolves the subclass identity through — see resolveSubclassSlug.
   // NOT in #1339's handover (measured 2026-07-26): this select was missed
-  // entirely by that issue's site table.
+  // entirely by that issue's site table. class.features/subclassRef.features
+  // (#1686, the FEATURE_ROWS_CLASS_FEATURES/FEATURE_ROWS_SUBCLASS_FEATURES
+  // fragments — not the folded FEATURE_ROWS_ENTRY_SELECT, which collides
+  // with this select's own subclassRef.slug field, see that file's own
+  // comment on why some callers can't spread it) are what let that same gate
+  // see Elemental Attunement's own row-driven "elementalAttunement" key now
+  // that it's off DERIVED_ACTIONS.
   classEntries: {
     orderBy: { position: "asc" as const },
-    select: { name: true, level: true, subclass: true, subclassRef: { select: { slug: true } } },
+    select: {
+      name: true,
+      level: true,
+      subclass: true,
+      subclassRef: { select: { slug: true, features: FEATURE_ROWS_SUBCLASS_FEATURES } },
+      class: { select: { subclassLevel: true, features: FEATURE_ROWS_CLASS_FEATURES } },
+    },
   },
 } satisfies Prisma.CharacterSelect;
 
@@ -90,13 +101,18 @@ function monkEntry(row: WarriorOfElementsRow) {
  * Passes pools:[] deliberately — this only reads `.key` presence (the gate
  * itself), never `.enabled`; the actual focus spend is validated by
  * applySpendResourceInTx below, so a future `.enabled` check here would
- * wrongly reject every call.
+ * wrongly reject every call. `featureRowsOf` (#1686) is threaded through so
+ * a row-driven key (Elemental Attunement's own "elementalAttunement", now
+ * off DERIVED_ACTIONS) resolves through the SAME gate a hand-authored
+ * DERIVED_ACTIONS key (Elemental Burst) does — elementalStrike's own
+ * "elementalAttunement" gate check is what makes this load-bearing, not
+ * just cosmetic.
  */
 function assertWarriorOfElements(row: WarriorOfElementsRow, actionKey: string, feature: string): number {
   const monk = monkEntry(row);
   const totalLevel = levelForExperience(row.experiencePoints);
   const edition = editionOf(row);
-  const granted = deriveEntryScopedActions(row.classEntries, totalLevel, [], true, edition).some((a) => a.key === actionKey);
+  const granted = deriveEntryScopedActions(row.classEntries, totalLevel, [], true, edition, featureRowsOf).some((a) => a.key === actionKey);
   if (!monk || !granted) {
     throw new InvalidWarriorOfElementsOperationError(
       `Only a Warrior of the Elements monk (level ${actionGrantLevel(actionKey, edition) ?? "?"}+) has ${feature}`,
@@ -117,71 +133,14 @@ function attunementActive(row: WarriorOfElementsRow): boolean {
   );
 }
 
-async function toggleElementalAttunement(
-  tx: Prisma.TransactionClient,
-  row: WarriorOfElementsRow,
-  op: ToggleElementalAttunementOperation,
-  characterId: string,
-  batchId: string,
-  sessionId: string | null,
-): Promise<ToggleAttunementResult> {
-  assertWarriorOfElements(row, "elementalAttunement", "Elemental Attunement");
-
-  if (op.active) {
-    if (attunementActive(row)) {
-      throw new InvalidWarriorOfElementsOperationError("Elemental Attunement is already active");
-    }
-    // Start of your turn, no action: expend 1 Focus to imbue yourself for 10
-    // minutes (or until Incapacitated) — modeled as a durable while-active buff.
-    await applySpendResourceInTx(
-      tx,
-      characterId,
-      { type: "spendResource", key: "focus", amount: ELEMENTAL_ATTUNEMENT_FOCUS_COST },
-      batchId,
-      sessionId,
-    );
-    await appendActiveBuffInTx(
-      tx,
-      characterId,
-      {
-        key: ELEMENTAL_ATTUNEMENT_BUFF_KEY,
-        target: ELEMENTAL_ATTUNEMENT_BUFF_KEY,
-        modifier: 0,
-        source: "Elemental Attunement",
-        duration: "while-active",
-      },
-      batchId,
-      sessionId,
-    );
-    const summary = "Elemental Attunement — imbued with elemental energy for 10 minutes (or until Incapacitated).";
-    await logEvent(tx, {
-      characterId,
-      category: "resources",
-      type: "toggleElementalAttunement",
-      summary,
-      data: { active: true },
-      batchId,
-      sessionId,
-    });
-    return { active: true, summary };
-  }
-
-  if (!attunementActive(row)) {
-    throw new InvalidWarriorOfElementsOperationError("Elemental Attunement is not active");
-  }
-  await clearBuffByKeyInTx(tx, characterId, ELEMENTAL_ATTUNEMENT_BUFF_KEY, batchId, sessionId, "Elemental Attunement ended");
-  const summary = "Elemental Attunement ended.";
-  await logEvent(tx, {
-    characterId,
-    category: "resources",
-    type: "toggleElementalAttunement",
-    summary,
-    data: { active: false },
-    batchId,
-    sessionId,
-  });
-  return { active: false, summary };
-}
+// toggleElementalAttunement retired (#1686) — the activate/end toggle is
+// row-driven now (monk.ts's AuthoredFeature entry, resolverKind "toggle"),
+// dispatched through the GENERIC toggle handler
+// (routes/character/actions.ts's applyRowDrivenActionInTx +
+// lib/classes/actions.ts's toggleRowOps) instead of this bespoke function —
+// same reason Rage's own ACTION_EFFECT_FN closure retired. attunementActive()
+// above still reads the resulting buff's presence for Elemental Strike's own
+// gate and Stride of the Elements'/Elemental Epitome's narration.
 
 async function castElementalBurst(
   tx: Prisma.TransactionClient,
@@ -274,9 +233,11 @@ async function elementalStrike(
 
 /**
  * Applies a batch of Warrior of the Elements operations atomically. Mirrors
- * applyQuiveringPalmOperations: one batchId, state re-read per op. Focus spends
- * (Attunement toggle-on, Elemental Burst) log their own undoable spendResource
- * event; the buff registry logs its own effects event.
+ * applyQuiveringPalmOperations: one batchId, state re-read per op. Elemental
+ * Burst's Focus spend logs its own undoable spendResource event. The
+ * Attunement toggle no longer flows through here at all (#1686) — it's a
+ * plain executeAction "elementalAttunement"/"endElementalAttunement" op on
+ * the generic actions endpoint now.
  */
 export async function applyWarriorOfElementsOperations(
   characterId: string,
@@ -288,9 +249,7 @@ export async function applyWarriorOfElementsOperations(
     notFound: (id) => new InvalidWarriorOfElementsOperationError(`Character not found: ${id}`),
     applyOp: async (ctx: CharacterTxContext<WarriorOfElementsRow, WarriorOfElementsOperation>) => {
       const { tx, row, op, characterId: id, batchId, sessionId } = ctx;
-      if (op.type === "toggleElementalAttunement") {
-        results.push(await toggleElementalAttunement(tx, row, op, id, batchId, sessionId));
-      } else if (op.type === "castElementalBurst") {
+      if (op.type === "castElementalBurst") {
         results.push(await castElementalBurst(tx, row, op, id, batchId, sessionId));
       } else {
         results.push(await elementalStrike(tx, row, op, id, batchId, sessionId));

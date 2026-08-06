@@ -28,7 +28,17 @@ import type { RollSpec } from "@/lib/dice";
  *  heal-roll      — single self-heal dice roll (Second Wind: 1d10+level).
  *  heal-input     — numeric pool draw (Lay on Hands: choose amount up to pool).
  *  loadout-picker — per-hand weapon-swap picker (a held swap costs the Action).
- *  simple-confirm — no tool; just consume the slot (Dodge, Dash, Rage, etc.).
+ *  simple-confirm — no tool; just consume the slot (Dodge, Dash, etc.).
+ *  toggle         — same send shape as simple-confirm, served for a
+ *                   row-declared while-active buff's activate/end pair
+ *                   (#1686, e.g. Rage/End Rage) — a distinct kind (not
+ *                   simple-confirm) only because it's the row-served value
+ *                   `resolverFromRow` receives, not a hand-authored one.
+ *  slot-picker    — the player picks a spell-slot level to expend on a
+ *                   `{costKind:"slot"}` row-driven ability (#1687's UI,
+ *                   deferred to its first real consumer, Bladesinger's Song
+ *                   of Defense, #1676); commits at use-time like heal-input,
+ *                   sending the chosen level as `slotLevel`.
  */
 export type ResolutionKind =
   | "attack-picker"
@@ -39,7 +49,9 @@ export type ResolutionKind =
   | "heal-roll"
   | "heal-input"
   | "loadout-picker"
-  | "simple-confirm";
+  | "simple-confirm"
+  | "toggle"
+  | "slot-picker";
 
 // Runtime membership list for ResolutionKind, used only to validate a
 // row-served `AvailableAction.resolverKind` string (isResolutionKind below) —
@@ -56,6 +68,8 @@ const RESOLUTION_KINDS = [
   "heal-input",
   "loadout-picker",
   "simple-confirm",
+  "toggle",
+  "slot-picker",
 ] as const satisfies readonly ResolutionKind[];
 type _ResolutionKindsCoverResolutionKind = ResolutionKind extends (typeof RESOLUTION_KINDS)[number] ? true : never;
 const _resolutionKindsCoverResolutionKind: _ResolutionKindsCoverResolutionKind = true;
@@ -135,8 +149,11 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
   // Two-Weapon Fighting off-hand bonus attack (#732) — economy-only, like `attack`.
   twf:               { key: "twf",               kind: "twf-picker",     slot: "bonusAction", serverEffect: false },
 
-  rage:              { key: "rage",              kind: "simple-confirm", slot: "bonusAction", serverEffect: true,  resourceKey: "rage" },
-  endRage:           { key: "endRage",           kind: "simple-confirm", slot: "bonusAction", serverEffect: true  },
+  // rage/endRage retired from this table (#1686): row-driven now (a "toggle"
+  // resolverKind ClassFeature row), served via AvailableAction.resolverKind —
+  // resolverFor's fallback path (below) synthesizes the resolver from the
+  // wire instead of a hand-authored entry here, same as Second Wind/Action
+  // Surge's own #1528 retirement.
   recklessAttack:    { key: "recklessAttack",    kind: "simple-confirm", slot: "free",        serverEffect: false },
 
   bardicInspiration: { key: "bardicInspiration", kind: "simple-confirm", slot: "bonusAction", serverEffect: true,  resourceKey: "bardicInspiration" },
@@ -158,16 +175,27 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
   // profile. Gated server-side by requiresUnarmored, not a resource pool.
   bonusUnarmedStrike: { key: "bonusUnarmedStrike", kind: "twf-picker", slot: "bonusAction", serverEffect: false, subtitle: "One Unarmed Strike as a Bonus Action (Dex + Martial Arts die)." },
   // Dispatched via its own handleFlurryAction (like twf), not planActionClick —
-  // 2024 Flurry is Unarmed Strikes only (#1217), so it never opens the weapon picker.
+  // Flurry is Unarmed Strikes only (both editions, #1217/#1500), so it never
+  // opens the weapon picker. `resourceKey: "focus"` is cosmetic ONLY (the
+  // pool-badge lookup in turnOptions.ts poolBadgeFor) — the served
+  // AvailableAction carries no resourceKey on the wire, so this static table
+  // can't fork per edition; a 2014 monk's card falls back to
+  // classActionOption's flurrySpendLabel special case instead, which checks
+  // both "focus" and "ki" directly against the character's own pools.
   flurryOfBlows:     { key: "flurryOfBlows",     kind: "flurry-picker",  slot: "bonusAction", serverEffect: true,  resourceKey: "focus", resourceAmount: 1 },
-  // Patient Defense / Step of the Wind (#1240) — free vs 1-Focus variants, each
-  // its own menu entry (mirrors rage/endRage). The free entries are
+  // Patient Defense / Step of the Wind — 2024 free vs 1-Focus variants (#1240),
+  // each its own menu entry (mirrors rage/endRage). The free entries are
   // economy-only, like Shadow Step: no backend ACTION_EFFECT_FN, so
   // serverEffect:false and no resourceKey.
   patientDefense:      { key: "patientDefense",      kind: "simple-confirm", slot: "bonusAction", serverEffect: false },
   patientDefenseFocus: { key: "patientDefenseFocus", kind: "simple-confirm", slot: "bonusAction", serverEffect: true,  resourceKey: "focus" },
   stepOfTheWind:       { key: "stepOfTheWind",       kind: "simple-confirm", slot: "bonusAction", serverEffect: false },
   stepOfTheWindFocus:  { key: "stepOfTheWindFocus",  kind: "simple-confirm", slot: "bonusAction", serverEffect: true,  resourceKey: "focus" },
+  // 2014 (SRD 5.1, #1500) — ONE row apiece (flat 1-ki, no free variant),
+  // distinct keys from the 2024 pair above (see actions.ts's own comment on
+  // why patientDefense/stepOfTheWind can't be reused).
+  patientDefenseKi: { key: "patientDefenseKi", kind: "simple-confirm", slot: "bonusAction", serverEffect: true, resourceKey: "ki" },
+  stepOfTheWindKi:  { key: "stepOfTheWindKi",  kind: "simple-confirm", slot: "bonusAction", serverEffect: true, resourceKey: "ki" },
   // Stunning Strike (L5) has no resolver here — it's a post-hit rider rendered
   // by StunningStrikeSection (mirrors SneakAttackSection), not a selectable
   // action (#1242 supersedes the #392 bare-spend stub formerly here).
@@ -178,6 +206,11 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
   // Redirect rider — a "free" decision within the same reaction (not its own
   // slot), spending 1 Focus server-side once a ranged hit is reduced to 0.
   deflectAttacksRedirect: { key: "deflectAttacksRedirect", kind: "simple-confirm", slot: "free", serverEffect: true, resourceKey: "focus" },
+  // 2014 (SRD 5.1, #1500) — Deflect Missiles: same reminder-only-reaction
+  // shape as deflectAttacks (no bespoke roll math wired yet — #1501-#1503
+  // follow-up), and its throw-back mirrors deflectAttacksRedirect's shape.
+  deflectMissiles:      { key: "deflectMissiles",      kind: "simple-confirm", slot: "reaction", serverEffect: false },
+  deflectMissilesThrow: { key: "deflectMissilesThrow", kind: "simple-confirm", slot: "free",     serverEffect: true, resourceKey: "ki" },
   // Warrior of Shadow reminder action (2024 rewrite, #1246) — economy-only, like
   // twf; no backend effect fn. Opportunist (2014 L17) is retired — Cloak of
   // Shadows (L17) is a real cast now, wired through ClassResourceBlocks'
@@ -199,6 +232,33 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
   // Fleet Step (L11) is a pure reminder (cost:"free", no server effect), like
   // Reckless Attack/Metamagic — see the DERIVED_ACTIONS comment in actions.ts.
   fleetStep: { key: "fleetStep", kind: "simple-confirm", slot: "free", serverEffect: false },
+  // Way of the Open Hand's 2014 Wholeness of Body (#1501) — SRD 5.1's shape
+  // is a flat "3 x monk level" heal with NO die roll at all (unlike 2024's
+  // Martial Arts die + Wis mod above), so it needs its own key AND its own
+  // healRoll: `{ count: 0, ... }` rolls zero dice (rollSpec sums an empty
+  // array), leaving the modifier as the entire total — exactly 3 x monk
+  // level, deterministic. This is a DELIBERATE, narrow exception to this
+  // file's own "every surviving healRoll user scales off an ability
+  // modifier, never a level" doc comment above (which exists because the
+  // client can't generally see which class entry granted a feature for a
+  // multiclass character): Wholeness of Body is gated behind the Way of the
+  // Open Hand SUBCLASS, and 5e forbids taking one class twice, so there is
+  // always exactly one unambiguous "the monk entry" to read `.level` from —
+  // the same guarantee openHandMonkEntry relies on server-side.
+  wholenessOfBodyAction: {
+    key: "wholenessOfBodyAction",
+    kind: "heal-roll",
+    slot: "action",
+    serverEffect: true,
+    resourceKey: "wholenessOfBody",
+    healRoll: (c) => {
+      const monkLevel = c.classes?.find((cls) => cls.name.toLowerCase() === "monk")?.level ?? 0;
+      return { count: 0, faces: 1, modifier: 3 * monkLevel };
+    },
+  },
+  // Tranquility (L11, #1501) — gained passively at the end of a long rest;
+  // no die roll, no resource spend, just the reminder text.
+  tranquility: { key: "tranquility", kind: "simple-confirm", slot: "free", serverEffect: false },
   // Warrior of Mercy (#1248): Hand of Harm / Hand of Ultimate Mercy have no
   // resolver here — they're their own dedicated verticals (mirrors Stunning
   // Strike / Quivering Palm's bypass above). Hand of Healing reuses Wholeness

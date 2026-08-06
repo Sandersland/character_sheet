@@ -36,7 +36,7 @@ NOT_YET_MIGRATED="bard cleric druid monk paladin ranger sorcerer warlock wizard"
 # check below, which fails loudly the moment a file in that directory is
 # neither here nor in ALL_CLASSES, rather than silently scanning it as
 # "migrated" (a thirteenth class's module would otherwise land unclassified).
-NON_CLASS_MODULES="ability-registry actions channel-divinity class class-feature-rows class-features feature-rows-select focus-cast hand-of-harm hand-of-ultimate-mercy maneuver-effect maneuvers open-hand-technique quivering-palm registry resources resources-state shadow-arts sneak-attack stunning-strike subclass-slug types warrior-of-elements"
+NON_CLASS_MODULES="ability-registry actions activation-requires channel-divinity class class-feature-rows class-features disciplines feature-rows-select focus-cast hand-of-harm hand-of-ultimate-mercy maneuver-effect maneuvers open-hand-technique quivering-palm registry resources resources-state shadow-arts sneak-attack stunning-strike subclass-slug types warrior-of-elements"
 
 # Reverse check: every backend/src/lib/classes/*.ts file's basename must be
 # classified as EITHER a class (ALL_CLASSES) or shared infrastructure
@@ -131,20 +131,22 @@ fi
 #     mechanics — only a key that must be type-checked"). After #1546 Part A
 #     it also carries subclass REGISTRATION, which strengthens rather than
 #     weakens the ruling.
-#   - classes/actions.ts, routes/character/actions.ts: PERMANENT (#1223,
-#     #1231). Barbarian's DERIVED_ACTIONS "rage"/"endRage" entries
-#     (grantClass: "barbarian") and computeRageDamageBonus' classEntries
-#     lookup are Rage's ACTIVATION/buff half, not its resource pool — #1223's
-#     own scope decision is that this half stays here: the buff carries
-#     resistDamageTypes/rollEffects, for which ClassFeature has no descriptor
-#     columns. Rogue's own DERIVED_ACTIONS entries — "cunningAction"
-#     (grantClass: "rogue") and "fastHands" (grantSubclassSlugs:
-#     ["rogue-thief"]) — are the same shape: an action-economy grant with no
-#     resource pool of its own, so ClassFeature's descriptor columns have
-#     nothing for either to populate. Unlike starting-equipment.ts above,
-#     there is no follow-up issue that retires any of this — it is the same
-#     permanent gap a class-keyed DERIVED_ACTIONS entry always had, not
-#     migration debt.
+#   - classes/actions.ts: PERMANENT (#1231; was ALSO #1223 until #1686 moved
+#     Rage's DERIVED_ACTIONS "rage"/"endRage" pair onto its ClassFeature rows
+#     as a "toggle" resolverKind — the buff's resistDamageTypes/rollEffects/
+#     tiered modifier now DO have descriptor columns, `effectBuffs`, so that
+#     half of the #1223 exemption is retired, not merely moved). What remains
+#     is Rogue's own DERIVED_ACTIONS entries — "cunningAction" (grantClass:
+#     "rogue") and "fastHands" (grantSubclassSlugs: ["rogue-thief"]) — an
+#     action-economy grant with no resource pool of its own, so
+#     ClassFeature's descriptor columns have nothing to populate for either.
+#     Unlike starting-equipment.ts above, there is no follow-up issue that
+#     retires any of this — it is the same permanent gap a class-keyed
+#     DERIVED_ACTIONS entry always had, not migration debt.
+#     routes/character/actions.ts DROPPED OFF this list in the same #1686
+#     diff that deleted its last "barbarian" occurrence
+#     (computeRageDamageBonus's classEntries lookup) — the generic toggle
+#     dispatcher it replaced that function with reads no class name at all.
 #   - character/serialize/combat.ts, srd/armor-class.ts: PERMANENT (#1223).
 #     Fast Movement's speed bonus (deriveFastMovement) and Unarmored Defense's
 #     AC candidate were never part of barbarian.ts's row-migrated surface —
@@ -167,7 +169,6 @@ fi
 #     `name.toLowerCase() === "rogue"` lookup) would otherwise flag red.
 FILE_ALLOWLIST="backend/src/lib/classes/subclass-slug.ts
 backend/src/lib/classes/actions.ts
-backend/src/routes/character/actions.ts
 backend/src/lib/character/serialize/combat.ts
 backend/src/lib/srd/armor-class.ts
 backend/src/lib/classes/sneak-attack.ts"

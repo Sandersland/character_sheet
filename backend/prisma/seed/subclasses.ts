@@ -64,6 +64,21 @@ export const SUBCLASSES: SubclassSeed[] = [
     slug: "fighter-eldritch-knight",
   },
   // ── Wizard ────────────────────────────────────────────────────────────────
+  // Bladesinging (#1676): TCoE (Tasha's Cauldron of Everything) p. 76 is the
+  // settled printing, not SCAG — verified against the transcription the
+  // owner's group uses (proficiency-bonus Bladesong uses/long rest, no race
+  // restriction, the TCoE-only cantrip-substitution rider on Extra Attack).
+  // EDITION_2014 only, no 2024 successor: SRD 5.2/PHB'24 never reprinted
+  // Bladesinging content (out of scope, epic #1281), same "tagged row, zero
+  // 2024 rows" shape as Totem Warrior/The Archfey/The Great Old One above.
+  {
+    className: "Wizard",
+    name: "Bladesinging",
+    description:
+      "You extend your will and magic into a form of martial and magical combat. In battle, you can weave a song of insight and protection as you attack and defend with elegant grace. You gain proficiency with light armor, one type of one-handed melee weapon, and Performance. Your Bladesong grants a bonus to Armor Class and speed, advantage on Acrobatics, and a bonus to concentration saves while it lasts.",
+    slug: "wizard-bladesinging",
+    edition: "EDITION_2014",
+  },
   {
     className: "Wizard",
     name: "School of Evocation",
@@ -182,6 +197,22 @@ export const SUBCLASSES: SubclassSeed[] = [
     description:
       "You master techniques to push and trip opponents, cover yourself in a shroud of focus, and enter a trance state that heals your wounds. Open Hand Technique allows you to impose special effects on creatures hit by your Flurry of Blows — knocking them prone, pushing them 15 ft, or denying their reactions.",
     slug: "monk-warrior-of-the-open-hand",
+    // #1501: SRD 5.2's own subclass — retagged (bound in the same commit as
+    // "Way of the Open Hand" below, its 2014 counterpart) so
+    // resolveSubclassId/assertEverySubclassEditionPopulated never see an
+    // untagged row whose 2014 partition is now empty.
+    edition: "EDITION_2024",
+  },
+  {
+    className: "Monk",
+    name: "Way of the Open Hand",
+    description:
+      "You master techniques to push and trip opponents, manipulate ki to heal your wounds, and practice a meditation that wards you with an aura of peace. Open Hand Technique lets you impose special effects on creatures hit by your Flurry of Blows — knocking them prone, pushing them 15 ft, or denying their reactions until the end of your next turn.",
+    // SRD 5.1's own monastic tradition (the only one present in the SRD) —
+    // a SEPARATE subclass from "Warrior of the Open Hand" above, not a retag
+    // of it (#1501; monk.ts's two SubclassDefinition entries are the same split).
+    slug: "monk-way-of-the-open-hand",
+    edition: "EDITION_2014",
   },
   {
     className: "Monk",
@@ -189,6 +220,18 @@ export const SUBCLASSES: SubclassSeed[] = [
     description:
       "You follow a tradition that values stealth and subtlety. You know Minor Illusion, cast Darkness for 1 focus, and see in the dark. You teleport between areas of shadow, and at higher levels can spend focus to teleport freely and, ultimately, cloak yourself in invisibility.",
     slug: "monk-warrior-of-shadow",
+    edition: "EDITION_2024",
+  },
+  // PHB'14 pp.79-80 — not in SRD 5.1, which ships only Way of the Open Hand
+  // for monk (#1502). A DISTINCT slug from Warrior of Shadow above, not a
+  // retag: the two lineages coexist per campaign (epic #1281).
+  {
+    className: "Monk",
+    name: "Way of Shadow",
+    description:
+      "You follow a monastic tradition that values stealth and subtlety. You know Minor Illusion and can spend ki to duplicate Darkness, Darkvision, Pass without Trace, or Silence. You teleport between areas of shadow, and at higher levels can cloak yourself in invisibility and capitalize when an ally strikes a foe near you.",
+    slug: "monk-way-of-shadow",
+    edition: "EDITION_2014",
   },
   {
     className: "Monk",
@@ -196,6 +239,20 @@ export const SUBCLASSES: SubclassSeed[] = [
     description:
       "You wield the elements of air, earth, fire, and water. Manipulate Elements grants the Elementalism cantrip, and Elemental Attunement lets you spend 1 Focus Point to imbue yourself for 10 minutes — extending your Unarmed Strike reach and letting your strikes deal elemental damage that shoves foes. Elemental Burst (level 6) unleashes a 20-ft sphere for three Martial Arts dice, Stride of the Elements (level 11) grants flight and swimming while attuned, and Elemental Epitome (level 17) adds elemental resistance, a destructive stride, and empowered strikes.",
     slug: "monk-warrior-of-the-elements",
+    // Retagged EDITION_2024 (#1503, alongside authoring the 2014 predecessor
+    // below) — a from-scratch PHB'24 rebuild (Elementalism cantrip + a
+    // Focus-fuelled buff toggle + Elemental Burst/Strike), not a retab of Way
+    // of the Four Elements' discipline menu. Was untagged/shared since #1246;
+    // this is the first PR to author the 2014 half, so the two must fork.
+    edition: "EDITION_2024",
+  },
+  {
+    className: "Monk",
+    name: "Way of the Four Elements",
+    description:
+      "You harness the elements of air, earth, fire, and water through Elemental Disciplines fueled by ki. You always know Elemental Attunement (a free, at-will minor elemental effect) plus one other discipline at 3rd level, learning one more at 6th, 11th, and 17th — from a menu that includes reshaping Thunderwave, Burning Hands, and Fireball into your own strikes, or casting Fly, Gaseous Form, and Stoneskin on yourself. Whenever you learn a new discipline, you may replace one you already know with a different one. Not in SRD 5.1 — PHB'14 pp. 78, 80–81.",
+    slug: "monk-way-of-the-four-elements",
+    edition: "EDITION_2014",
   },
   {
     className: "Monk",

@@ -14,6 +14,12 @@ import type { AdvancementEntry, AdvancementSlots } from "./leveling";
 import type { AbilityName, AbilityScores, Currency, Skill } from "./primitives";
 import type { Spell, SpellSlots } from "./spells";
 
+/** One species/variant-granted trait (#1682) — cited text, no arithmetic. */
+export interface SpeciesTrait {
+  name: string;
+  description: string;
+}
+
 /**
  * Shape of character data returned by `GET /api/characters` and
  * `GET /api/characters/:id`. `level`/`proficiencyBonus`/threshold fields
@@ -118,10 +124,18 @@ export interface Character {
      * Whether this character's chosen spells are immediately castable ("known",
      * SRD 5.1 Bard/Sorcerer/Warlock/Ranger/EK/AT) or must be prepared from a
      * wider list ("prepared", every SRD 5.2 caster). Absent for a non-caster.
-     * Served by buildSpellcastingView (#1507); consumed by #1511 — no
-     * component reads it yet.
+     * Served by buildSpellcastingView (#1507).
      */
     casterModel?: "known" | "prepared";
+    /**
+     * The noun for the meter/roster (e.g. "Prepared" / "Spells known") and the
+     * locked-rune tooltip word (e.g. "Always prepared" / "Known"), served
+     * alongside casterModel (#1511 D4) — the client renders these verbatim and
+     * never composes known-vs-prepared copy itself. Both absent exactly when
+     * casterModel is.
+     */
+    preparedLabel?: string;
+    alwaysAvailableLabel?: string;
     /**
      * The spell the character is currently concentrating on (5e: only one at a
      * time), or null. `entryId` matches a `Spell.id` in `spells`.
@@ -197,11 +211,13 @@ export interface Character {
   /** Monk Stunning Strike focus save DC, absent below monk L5 (#1242). */
   stunningStrike?: SaveRider;
 
-  /** Warrior of the Open Hand Open Hand Technique focus save DC (Push/Topple),
-   *  absent below monk L3 off-subclass (#1245). Addle carries no save. */
+  /** Open Hand Technique's ki/focus save DC (Push/Topple) — Warrior of the
+   *  Open Hand (2024) or Way of the Open Hand (2014, #1501), absent below
+   *  monk L3 off-subclass (#1245). Addle carries no save. */
   openHandTechnique?: SaveRider;
-  /** Warrior of the Open Hand Quivering Palm — focus save DC + whether
-   *  vibrations are currently set, absent below monk L17 off-subclass (#1245). */
+  /** Quivering Palm — ki/focus save DC + whether vibrations are currently
+   *  set, absent below monk L17 off-subclass (#1245). Granted by either
+   *  edition's Open Hand subclass (#1501). */
   quiveringPalm?: SaveRider;
   /** Battle Master maneuver save DC (#1316) — folded into the rider contract,
    *  named for the feature like every other rider; absent for non-Battle-
@@ -217,6 +233,16 @@ export interface Character {
   fightingStyleSlots: AdvancementSlots;
 
   classes?: ClassEntry[];
+
+  /** Species-granted information (#1682): name + cited text for the character's
+   *  own species/variant selection (SpeciesTrait rows, resolved server-side).
+   *  Announce-only cited text — darkvision included (owner ruling: visible
+   *  info, not a derived combat stat) — the numbers a trait DOES derive
+   *  (Dwarven Toughness's maxHp, weapon/armor training) already fold into
+   *  hitPoints/armorProficiencies/weaponProficiencies above; this array is
+   *  never itself a source of arithmetic on the client. [] for a legacy
+   *  `race`-name-only character with no species picked yet. */
+  speciesTraits: SpeciesTrait[];
 
   journal: JournalEntry[];
 

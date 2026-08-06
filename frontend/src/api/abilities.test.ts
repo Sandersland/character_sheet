@@ -52,7 +52,9 @@ describe("applyWarriorOfElementsTransactions", () => {
       .mockResolvedValue({ ok: true, json: async () => ({ character: { id: "1" }, results: [] }) });
     vi.stubGlobal("fetch", fetchMock);
 
-    await applyWarriorOfElementsTransactions("1", [{ type: "toggleElementalAttunement", active: true }]);
+    // Elemental Attunement's own toggle moved off this endpoint (#1686) —
+    // elementalStrike is a still-live WarriorOfElementsOperation.
+    await applyWarriorOfElementsTransactions("1", [{ type: "elementalStrike", damageType: "fire" }]);
 
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("/characters/1/abilities/warrior-of-elements/transactions"),

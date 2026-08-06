@@ -6,11 +6,12 @@
 /** The five elemental damage types a Warrior of the Elements can deal (PHB'24 p.90). */
 export type ElementalDamageType = "acid" | "cold" | "fire" | "lightning" | "thunder";
 
-/** Toggle Elemental Attunement on (spends 1 Focus) or off (no refund). */
-export interface ToggleElementalAttunementOperation {
-  type: "toggleElementalAttunement";
-  active: boolean;
-}
+// ToggleElementalAttunementOperation/ToggleAttunementResult retired (#1686):
+// Elemental Attunement's activate/end toggle is a plain executeAction
+// "elementalAttunement"/"endElementalAttunement" op on the generic actions
+// endpoint now (ExecuteActionOperation, contracts/actions), not a
+// WarriorOfElementsOperation — this file's own header still describes the
+// two ops that DO remain bespoke (they're save-DC damage ops, not buffs).
 
 /** Elemental Burst (L6): Magic action, 2 Focus, 3× Martial Arts die, Dex save. */
 export interface CastElementalBurstOperation {
@@ -30,16 +31,10 @@ export interface ElementalStrikeOperation {
 }
 
 export type WarriorOfElementsOperation =
-  | ToggleElementalAttunementOperation
   | CastElementalBurstOperation
   | ElementalStrikeOperation;
 
 export type ElementalSaveOutcome = "fail" | "success";
-
-export interface ToggleAttunementResult {
-  active: boolean;
-  summary: string;
-}
 
 export interface ElementalBurstResult {
   dc: number;
@@ -63,6 +58,5 @@ export interface ElementalStrikeResult {
 // A union, not an all-optional bag: each op returns exactly one member, so a
 // caller narrows on the fields it finds rather than null-checking every field.
 export type WarriorOfElementsResult =
-  | ToggleAttunementResult
   | ElementalBurstResult
   | ElementalStrikeResult;

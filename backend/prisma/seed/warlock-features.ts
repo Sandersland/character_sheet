@@ -52,18 +52,17 @@
 // own PR for the list of dropped "Regain use on a …" sentences that lived
 // only in the retired resourceFn strings, never in the byte-identical-pinned
 // 2014 row text, so dropping them is this commit's accepted, intended
-// consequence, not a regression to fix. ONE pool could not move: The Fiend's
-// 2024 Dark One's Own Luck sets its uses to the Charisma modifier (minimum
-// once) — a formula, not a tier table — so its 2024 row below sets
-// resourceKey/resourceLabel/resourceRecharge and deliberately OMITS
-// resourceTotals (ClassFeature.resourceKey's own schema.prisma comment
-// sanctions exactly this "declares the pool, defers the total" shape); the
-// total itself stays in warlock.ts's small EDITION_2024-gated resourceFn
-// residue. Its 2014 row's pool (flat 1) moves onto the row normally. Per the
-// owner's decision (#1233), NO `contactPatron` pool is authored — out of the
-// issue's named pool set, and Mystic Arcanum's uses are already tracked
+// consequence, not a regression to fix. The Fiend's 2024 Dark One's Own Luck
+// (Charisma modifier, minimum once) moved onto its row too, #1685: its total
+// is now `{ abilityMod: "charisma", min: 1 }`, evaluated by
+// evaluateResourceTotal (class-feature-rows.ts) — warlock.ts's own resourceFn
+// residue that used to supply it is deleted outright. Its 2014 row's pool
+// (flat 1) already moved onto the row normally, commit 3's original pass. Per
+// the owner's decision (#1233), NO `contactPatron` pool is authored — out of
+// the issue's named pool set, and Mystic Arcanum's uses are already tracked
 // separately as `arcanumUsed` (not by this ClassFeature machinery at all) —
 // "every long-rest feature gets a pool" is not this codebase's rule.
+import type { ResourceTotalFormula } from "../../src/lib/classes/class-feature-rows.js";
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { SeedEdition } from "./edition.js";
 import type { ClassFeatureSeedRow } from "./class-features.js";
@@ -84,16 +83,14 @@ interface RawWarlockFeature {
   description: string;
   /** Omitted -> identical text seeded for both editions (see file header). */
   edition?: SeedEdition;
-  // Resource-pool descriptor columns (#1233 commit 3) — see this file's own
-  // header for why only Magical Cunning's, Dark One's Own Luck's, Hurl
-  // Through Hell's, Fey Presence's, Misty Escape's, Dark Delirium's and
-  // Entropic Ward's rows ever set these. Dark One's Own Luck's 2024 row sets
-  // resourceKey/resourceLabel/resourceRecharge only — its total is a
-  // Charisma-modifier formula, still resourceFn-derived.
+  // Resource-pool descriptor columns (#1233 commit 3, widened #1685) — see
+  // this file's own header for why only Magical Cunning's, Dark One's Own
+  // Luck's, Hurl Through Hell's, Fey Presence's, Misty Escape's, Dark
+  // Delirium's and Entropic Ward's rows ever set these.
   resourceKey?: string;
   resourceLabel?: string;
   resourceRecharge?: string;
-  resourceTotals?: { minLevel: number; total: number; shortRestRegain?: number }[];
+  resourceTotals?: { minLevel: number; total: ResourceTotalFormula; shortRestRegain?: number }[];
 }
 
 function expand(raw: RawWarlockFeature): ClassFeatureSeedRow[] {
@@ -319,16 +316,16 @@ const FIEND_RAW: RawWarlockFeature[] = [
     level: 6,
     edition: "EDITION_2024",
     // SRD 5.2 p.76: uses become the Charisma modifier (minimum of once) and
-    // recharge narrows to a Long Rest only (2014 is short-or-long). The pool
-    // itself (uses-per-rest total) is a formula, not a tier table — moved
-    // onto lib/classes/warlock.ts's small EDITION_2024-gated resourceFn
-    // residue instead, never onto this row's resourceTotals (deliberately
-    // omitted below — see this file's own header).
+    // recharge narrows to a Long Rest only (2014 is short-or-long). #1685:
+    // the total is now `{ abilityMod: "charisma", min: 1 }` — evaluated by
+    // evaluateResourceTotal (class-feature-rows.ts), retiring
+    // lib/classes/warlock.ts's EDITION_2024-gated resourceFn residue.
     description:
       "You can call on your fiendish patron to alter fate in your favor. When you make an ability check or a saving throw, add 1d10 to the roll after seeing it but before its effects occur. You can do this a number of times equal to your Charisma modifier (minimum of once), but no more than once per roll. Regain all expended uses when you finish a Long Rest.",
     resourceKey: "darkOnesOwnLuck",
     resourceLabel: "Dark One's Own Luck",
     resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 6, total: { abilityMod: "charisma", min: 1 } }],
   },
   {
     name: "Fiendish Resilience",

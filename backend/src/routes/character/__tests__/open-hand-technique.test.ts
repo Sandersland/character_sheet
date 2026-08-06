@@ -40,7 +40,7 @@ function agent() {
 }
 const url = `/api/characters/${FIXTURE_ID}/abilities/open-hand-technique/transactions`;
 
-async function createMonk(level: number, subclass?: string) {
+async function createMonk(level: number, subclass?: string, rulesEdition: "EDITION_2014" | "EDITION_2024" = "EDITION_2024") {
   const cls = await prisma.characterClass.upsert({
     where: { name: CLASS_NAME },
     create: { name: CLASS_NAME, hitDie: "d8", savingThrows: ["strength", "dexterity"], skillChoiceCount: 2, skillChoices: ["acrobatics"], isSpellcaster: false },
@@ -50,6 +50,7 @@ async function createMonk(level: number, subclass?: string) {
     data: {
       ...FIXTURE_BASE,
       ownerId: OWNER_ID,
+      rulesEdition,
       classEntries: { create: [{ name: "monk", classId: cls.id, position: 0, level, subclass }] },
     },
   });
@@ -94,8 +95,12 @@ describe("POST /api/characters/:id/abilities/open-hand-technique/transactions", 
       {
         category: "resources",
         type: "imposeOpenHandRider",
+        // #1501: corrected to SRD 5.2's actual wording — "can't make
+        // Opportunity Attacks" (not "take reactions"), ending at the start of
+        // the TARGET's ("its") next turn. See open-hand-technique.ts's
+        // addleClause for the verified source text.
         summary:
-          "Open Hand Technique — Addle (no save): the target can't take reactions until the start of your next turn.",
+          "Open Hand Technique — Addle (no save): the target can't make Opportunity Attacks until the start of its next turn.",
         before: null,
         after: null,
         data: { rider: "addle", dc: 13, roll: null, outcome: "applied" },
@@ -160,7 +165,7 @@ describe("Open Hand Technique for an under-level or off-subclass monk", () => {
       .post(url)
       .send({ operations: [{ type: "imposeOpenHandRider", rider: "addle", usedThisTurn: false }] });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/warrior of the open hand/i);
+    expect(res.body.error).toMatch(/open hand/i);
   });
 
   it("rejects a level-3+ monk of a different subclass", async () => {
@@ -169,7 +174,7 @@ describe("Open Hand Technique for an under-level or off-subclass monk", () => {
       .post(url)
       .send({ operations: [{ type: "imposeOpenHandRider", rider: "addle", usedThisTurn: false }] });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/warrior of the open hand/i);
+    expect(res.body.error).toMatch(/open hand/i);
   });
 
   // #1277: isWarriorOfTheOpenHand used to substring-match ("open hand"), so a
@@ -183,7 +188,45 @@ describe("Open Hand Technique for an under-level or off-subclass monk", () => {
       .post(url)
       .send({ operations: [{ type: "imposeOpenHandRider", rider: "addle", usedThisTurn: false }] });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/warrior of the open hand/i);
+    expect(res.body.error).toMatch(/open hand/i);
+  });
+});
+
+// #1501: the 2014 counterpart — Way of the Open Hand, a SEPARATE subclass
+// (not a fork of Warrior of the Open Hand). Addle's duration text is the
+// only clause that differs at this route: "end of your next turn" (the
+// monk's own), not 2024's "start of its next turn" (the target's).
+describe("Open Hand Technique for a 2014 Way of the Open Hand monk (#1501)", () => {
+  beforeEach(async () => {
+    await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
+    await createMonk(3, "Way of the Open Hand", "EDITION_2014");
+  });
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { id: FIXTURE_ID } });
+  });
+  afterAll(async () => {
+    await prisma.characterClass.deleteMany({ where: { name: CLASS_NAME } });
+  });
+
+  it("addle reports the 2014 wording (ends at the end of your next turn, covers all reactions)", async () => {
+    const res = await agent()
+      .post(url)
+      .send({ operations: [{ type: "imposeOpenHandRider", rider: "addle", usedThisTurn: false }] });
+    expect(res.status).toBe(200);
+    const result = res.body.results[0];
+    expect(result.summary).toBe(
+      "Open Hand Technique — Addle (no save): the target can't take reactions until the end of your next turn.",
+    );
+  });
+
+  it("push/topple are unaffected by the edition fork — same DC formula, same outcome logic", async () => {
+    const res = await agent()
+      .post(url)
+      .send({ operations: [{ type: "imposeOpenHandRider", rider: "push", usedThisTurn: false }] });
+    expect(res.status).toBe(200);
+    const result = res.body.results[0];
+    expect(result.dc).toBe(13);
   });
 });
 
@@ -222,6 +265,6 @@ describe("Open Hand Technique prefers the subclass catalog FK over a misleading 
       .post(url)
       .send({ operations: [{ type: "imposeOpenHandRider", rider: "addle", usedThisTurn: false }] });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/warrior of the open hand/i);
+    expect(res.body.error).toMatch(/open hand/i);
   });
 });

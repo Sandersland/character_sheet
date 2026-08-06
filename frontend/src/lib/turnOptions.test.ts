@@ -305,6 +305,24 @@ describe("classActionOption", () => {
     });
   });
 
+  it("surfaces Flurry of Blows' 1-ki spend as the subtitle for a 2014 monk (#1500) — the served action carries no resourceKey to fork on", () => {
+    const c = makeCharacter({
+      resources: {
+        pools: [{ key: "ki", label: "Ki Points", total: 5, used: 0, remaining: 5, recharge: "short-or-long" }],
+      },
+    } as Partial<Character>);
+    const option = classActionOption(
+      available({ key: "flurryOfBlows", name: "Flurry of Blows" }),
+      resolverFor("flurryOfBlows"),
+      c,
+      [],
+    );
+    expect(option).toMatchObject({
+      subtitle: "Spend 1 Ki Points",
+      badge: "5 / rest",
+    });
+  });
+
   // #1431. Names, never the served `description`: OptionCard's subtitle is one
   // truncated line and the served paragraphs run 75-278 chars.
   it("resolves regranted keys to the served names for the character's edition", () => {
@@ -523,7 +541,10 @@ describe("partitionClassActions", () => {
   });
 
   it("still swaps rage/endRage by the raging flag (unchanged behavior)", () => {
-    const availableActions = [action("rage", "bonusAction"), action("endRage", "bonusAction")];
+    // rage/endRage are row-driven now (#1686) — no ACTION_RESOLVERS entry, so
+    // the served action needs its own resolverKind ("toggle") for
+    // resolverFor's fallback to resolve it, same as secondWind above.
+    const availableActions = [action("rage", "bonusAction", "toggle"), action("endRage", "bonusAction", "toggle")];
     expect(partitionClassActions(availableActions, false).classBonusActions.map((a) => a.key)).toEqual(["rage"]);
     expect(partitionClassActions(availableActions, true).classBonusActions.map((a) => a.key)).toEqual(["endRage"]);
   });

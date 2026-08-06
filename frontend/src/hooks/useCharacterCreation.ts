@@ -9,6 +9,10 @@ import {
   deriveBackgroundBonuses,
   derivePreview,
   deriveSkillChoices,
+  deriveSpeciesBonuses,
+  deriveSpeciesCantripChoice,
+  deriveSpeciesOriginFeatChoice,
+  deriveSpeciesSkillChoice,
   resolveSelections,
 } from "@/lib/characterCreation";
 import type {
@@ -16,6 +20,10 @@ import type {
   CreationPreview,
   CreationSelections,
   CreationSkillChoices,
+  CreationSpeciesBonuses,
+  CreationSpeciesCantripChoice,
+  CreationSpeciesOriginFeatChoice,
+  CreationSpeciesSkillChoice,
 } from "@/lib/characterCreation";
 import { stepPosition } from "@/lib/ceremonySteps";
 import { creationMissing, creationStepMissing, creationSteps } from "@/lib/creationSteps";
@@ -42,6 +50,19 @@ export interface CharacterCreation {
   skills: CharacterCreationSkills;
   toolChoices: ToolProficiencyChoices;
   backgroundBonuses: CreationBackgroundBonuses;
+  /** #1681: 2014 species/subrace ability increases — inert (applicable:false)
+   *  for a 2024 character or an unmatched/fixed-only race name. */
+  speciesBonuses: CreationSpeciesBonuses;
+  /** #1689: species-granted skill choice (Half-Elf) — inert (applicable:false)
+   *  whenever the server serves no chooseSkills for this species+variant. */
+  speciesSkillChoice: CreationSpeciesSkillChoice & { toggle: (skill: SkillName) => void };
+  /** #1689: species-granted cantrip choice (High Elf) — inert (applicable:false)
+   *  whenever the server serves no chooseCantrip for this species+variant. */
+  speciesCantripChoice: CreationSpeciesCantripChoice;
+  /** #1690: species-granted Origin feat choice (2024 Human's Versatile) —
+   *  inert (applicable:false) whenever the server serves no chooseOriginFeat
+   *  for this species+variant. */
+  speciesOriginFeatChoice: CreationSpeciesOriginFeatChoice;
   catalog: Item[];
   /** #1616: the staged portrait image, uploaded after create. Component state,
    *  not draft state — a File JSON-serializes to {}, so it cannot ride the
@@ -106,10 +127,15 @@ export function useCharacterCreation(): CharacterCreation {
   const selections = resolveSelections(reference, draft);
   const skillChoices = deriveSkillChoices(draft, selections);
   const backgroundBonuses = deriveBackgroundBonuses(draft, selections);
+  const speciesBonuses = deriveSpeciesBonuses(draft, selections);
+  // #1689: species-granted creation choices, independent of the #1681
+  // ability-increase derivation above — a species may serve both specs at once.
+  const speciesSkillChoice = deriveSpeciesSkillChoice(draft, selections, [...skillChoices.granted, ...skillChoices.selected]);
+  const speciesCantripChoice = deriveSpeciesCantripChoice(draft, selections);
+  const speciesOriginFeatChoice = deriveSpeciesOriginFeatChoice(draft, selections);
   const toolChoices = useToolProficiencyChoices({
     draft,
     selectedClass: selections.class,
-    selectedRace: selections.race,
     selectedBackground: selections.background,
     update,
   });
@@ -119,6 +145,16 @@ export function useCharacterCreation(): CharacterCreation {
       update({ skillProficiencies: draft.skillProficiencies.filter((s) => s !== skill) });
     } else if (skillChoices.selected.length < skillChoices.max) {
       update({ skillProficiencies: [...draft.skillProficiencies, skill] });
+    }
+  }
+
+  // #1689: same add/remove-respecting-the-cap shape as toggleSkill above, over
+  // its own draft.speciesSkills field.
+  function toggleSpeciesSkill(skill: SkillName) {
+    if (speciesSkillChoice.selected.includes(skill)) {
+      update({ speciesSkills: draft.speciesSkills.filter((s) => s !== skill) });
+    } else if (speciesSkillChoice.selected.length < speciesSkillChoice.count) {
+      update({ speciesSkills: [...draft.speciesSkills, skill] });
     }
   }
 
@@ -221,6 +257,10 @@ export function useCharacterCreation(): CharacterCreation {
     skills: { ...skillChoices, toggle: toggleSkill },
     toolChoices,
     backgroundBonuses,
+    speciesBonuses,
+    speciesSkillChoice: { ...speciesSkillChoice, toggle: toggleSpeciesSkill },
+    speciesCantripChoice,
+    speciesOriginFeatChoice,
     catalog,
     portraitFile,
     setPortraitFile,

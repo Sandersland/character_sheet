@@ -42,7 +42,10 @@ const SPELL_CATALOG = [
 ];
 
 const referenceFixture: ReferenceData = {
-  races: [{ id: "race-human", name: "Human", speed: 30, toolProficiencies: [] }],
+  species: [{
+    id: "sp-human", name: "Human", slug: "human", speed: 30, abilityIncreases: [],
+    needsCastingAbility: false, chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false, variants: [],
+  }],
   classes: [
     {
       id: "class-bard",
@@ -142,12 +145,11 @@ async function passEntryGate(u: ReturnType<typeof userEvent.setup>) {
   await u.click(screen.getByRole("button", { name: /continue/i }));
 }
 
-// #1325's 2014 half of the entry gate, reached via campaign inheritance rather
-// than the picker: #1371 gates the "2014 rules" radio (aria-disabled), so
-// direct selection can no longer drive draft.rulesEdition to 2014 in the real
-// UI — the caller must mock fetchCampaigns to return a 2014 campaign and this
-// helper picks it, mirroring how e2e/helpers/creation.ts reaches 2014 (#1372
-// restores direct selection).
+// #1325's 2014 half of the entry gate, reached via campaign inheritance (both
+// this path and direct picker selection are available since #1372 — this
+// helper exercises inheritance specifically, mirroring how e2e/helpers/
+// creation.ts joins a 2014 campaign): the caller mocks fetchCampaigns to
+// return a 2014 campaign and this helper picks it.
 async function passEntryGate2014(u: ReturnType<typeof userEvent.setup>, campaignName: string) {
   await u.click(await screen.findByRole("radio", { name: campaignName }));
   await u.click(screen.getByRole("button", { name: /continue/i }));
@@ -167,7 +169,9 @@ async function fillIdentity(
 ) {
   await u.type(await screen.findByLabelText(/name/i), "Alric");
   await u.selectOptions(screen.getByLabelText(/alignment/i), "Lawful Good");
-  await u.selectOptions(screen.getByLabelText(/race/i), "Human");
+  // Human has no variants under this fixture — the two-step picker (#1680)
+  // renders no second panel, so selecting it alone completes the identity gate.
+  await u.selectOptions(screen.getByLabelText(/species/i), "Human");
   await u.selectOptions(screen.getByLabelText(/class/i), className);
   await u.selectOptions(screen.getByLabelText("Background"), background);
 }
@@ -209,7 +213,7 @@ describe("CharacterCreatePage (#1176 ceremony)", () => {
     expect(mockCreateCharacter).toHaveBeenCalledWith({
       name: "Alric",
       alignment: "Lawful Good",
-      race: "Human",
+      speciesId: "sp-human",
       background: "Sage",
       classes: [{ name: "Bard", subclass: null, subclassId: undefined }],
       abilityScores: {

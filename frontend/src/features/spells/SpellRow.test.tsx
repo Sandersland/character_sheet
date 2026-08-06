@@ -90,6 +90,27 @@ describe("SpellRow", () => {
     expect(screen.getByRole("button", { name: /Prepare Fireball/i })).toBeDisabled();
   });
 
+  // #1511 D3/D4: a known caster's leveled row renders the same static-dot
+  // shape as a cantrip/granted spell, with the served locked-rune label.
+  describe("known caster (#1511)", () => {
+    const knownBudget = { count: 8, limit: 8, atLimit: true, casterModel: "known" as const, alwaysAvailableLabel: "Known" };
+
+    it("renders a non-interactive locked rune for a leveled spell instead of a toggle", () => {
+      render(<ul><SpellRow {...defaultProps(mockSpell, { budget: knownBudget })} /></ul>);
+      expect(screen.queryByRole("button", { name: /Prepare|Unprepare/i })).not.toBeInTheDocument();
+      expect(screen.getByLabelText("Known")).toBeInTheDocument();
+    });
+
+    it("the detail card's CTA is disabled and reads the served label", async () => {
+      const user = userEvent.setup();
+      render(<ul><SpellRow {...defaultProps(mockSpell, { budget: knownBudget })} /></ul>);
+      await user.click(screen.getByRole("button", { name: "Open Fireball" }));
+      expect(
+        within(screen.getByRole("dialog")).getByRole("button", { name: "Known" }),
+      ).toBeDisabled();
+    });
+  });
+
   describe("detail card (view/manage only, #1162)", () => {
     it("opens the shared spell detail card when the name is clicked", async () => {
       const user = userEvent.setup();

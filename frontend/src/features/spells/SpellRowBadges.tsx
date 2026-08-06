@@ -27,6 +27,7 @@ export default function SpellRowBadges({ spell, derived, isConcentrating }: Spel
         ))}
       {spell.ritual && <Badge tone="gold">ritual</Badge>}
       {spell.source === "subclass" && <Badge tone="arcane">subclass</Badge>}
+      {spell.source === "species" && <Badge tone="arcane">species</Badge>}
       {item && (
         <SpellItemBadges item={item} atWill={atWill} chargeCost={chargeCost} itemExhausted={itemExhausted} />
       )}

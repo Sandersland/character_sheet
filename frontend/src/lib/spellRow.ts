@@ -25,18 +25,32 @@ export function deriveSpellRow(spell: Spell, availableSlots: number[]): SpellRow
   const atWill = item ? item.resource === "atWill" : false;
   const chargeCost = item?.resource === "charges" ? item.chargeCost ?? 1 : 1;
   const itemExhausted = Boolean(item) && !atWill && (item?.usesRemaining ?? 0) < chargeCost;
-  const isGranted = spell.source === "subclass" || spell.source === "item";
+  const isGranted = spell.source === "subclass" || spell.source === "species" || spell.source === "item";
   const schoolTone = SCHOOL_TONE[spell.school as keyof typeof SCHOOL_TONE] ?? "neutral";
   const noBudget = (!isCantrip && !item && availableSlots.length === 0) || itemExhausted;
   return { isCantrip, item, atWill, chargeCost, itemExhausted, isGranted, schoolTone, noBudget };
 }
 
 // Prepare-rune state: cantrips/granted spells are always-prepared (locked), the
-// rest toggle between prepared and known-unprepared.
+// rest toggle between prepared and known-unprepared — UNLESS the served
+// casterModel is "known" (#1511 D3, SRD 5.1's Bard/Sorcerer/Warlock/Ranger/
+// EK/AT): a known caster's leveled spells are castable the moment they're
+// learned, which is exactly what "locked" already renders, so a known model
+// widens this one condition rather than adding a fourth state. Cited against
+// SRD 5.2, which has no known/prepared split at all — every caster there is
+// "prepared", so `casterModel` absent/`"prepared"` leaves this unchanged.
 export type RuneState = "locked" | "prepared" | "unprepared";
 
-export function runeState(spell: Spell): RuneState {
-  if (spell.level === 0 || spell.source === "subclass" || spell.source === "item") return "locked";
+export function runeState(spell: Spell, casterModel?: "known" | "prepared" | null): RuneState {
+  if (
+    spell.level === 0 ||
+    spell.source === "subclass" ||
+    spell.source === "species" ||
+    spell.source === "item" ||
+    casterModel === "known"
+  ) {
+    return "locked";
+  }
   return spell.prepared ? "prepared" : "unprepared";
 }
 

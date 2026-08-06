@@ -3,6 +3,14 @@
 // auto-rolling feature. Structured effect fields (effectKind/effectDiceCount
 // etc.) mirror ItemWeaponDetail / ItemConsumableDetail so the frontend can roll
 // damage/healing at cast time using the same dice.ts engine.
+//
+// Every row below is SRD 5.2 (2024) text (renamed spells, narrowed
+// components) rather than "valid in both editions" — seedSpells defaults an
+// untagged entry's `edition` to EDITION_2024, not to Feat's NULL/shared
+// convention (#1710). A 2014 fork lives in a sibling spells-2014/*.ts file
+// instead of an `edition: "EDITION_2014"` override here.
+import type { SeedEdition } from "./edition.js";
+
 export type SpellSchoolSeed =
   | "abjuration" | "conjuration" | "divination" | "enchantment"
   | "evocation" | "illusion" | "necromancy" | "transmutation";
@@ -40,6 +48,10 @@ export interface CatalogSpell {
   // 13, not 3), the floor for "acFloor" (Barkskin 17).
   buffTarget?: "ac" | "acUnarmoredBase" | "acFloor";
   buffModifier?: number;
+  // Omitted here = EDITION_2024 (this file's own default, see the header
+  // comment) — NOT "shared", unlike Feat/Background/Subclass's `edition?`.
+  // Set explicitly only for a row that genuinely applies to both editions.
+  edition?: SeedEdition;
 }
 
 // SRD 5.2 (2024) renamed the proper-noun spells (#1132). Each entry renames the
@@ -1501,5 +1513,113 @@ export const SPELLS: CatalogSpell[] = [
     description: "You touch a creature and magically remove one of the following: one Exhaustion level; the Charmed or Petrified condition; one curse (including attunement to a cursed magic item); any reduction to one of the target's ability scores; or any reduction to its Hit Point maximum.",
     classes: ["bard", "cleric", "druid", "ranger"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "diamond dust worth 100+ GP, which the spell consumes" },
+  },
+  // #1683: the 2024 Elf/Gnome/Tiefling lineage spell tracks (SpeciesGrantedSpell
+  // rows, species-granted-spells-data.ts) reference these eight — none were in
+  // the prior curated subset.
+  {
+    name: "Dancing Lights",
+    level: 0,
+    school: "evocation",
+    castingTime: "1 action",
+    range: "120 ft",
+    duration: "Concentration, up to 1 minute",
+    description: "You create up to four torch-sized lights within range, making them appear as torches, lanterns, or glowing orbs that hover in the air, or you combine the four lights into one glowing, vaguely humanoid form of Medium size. As a bonus action you can move the lights up to 60 feet.",
+    concentration: true,
+    classes: ["bard", "sorcerer", "wizard"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "a bit of phosphorescent wood" },
+  },
+  {
+    name: "Darkness",
+    level: 2,
+    school: "evocation",
+    castingTime: "1 action",
+    range: "60 ft",
+    duration: "Concentration, up to 10 minutes",
+    description: "Magical darkness spreads from a point you choose within range to fill a 15-ft-radius sphere for the duration. The darkness spreads around corners; a creature with darkvision can't see through it.",
+    concentration: true,
+    classes: ["sorcerer", "warlock", "wizard"],
+    components: { verbal: true, somatic: false, material: true, materialDescription: "bat fur and a drop of pitch or piece of coal" },
+  },
+  {
+    name: "Longstrider",
+    level: 1,
+    school: "transmutation",
+    castingTime: "1 action",
+    range: "Touch",
+    duration: "1 hour",
+    description: "You touch a creature. The target's speed increases by 10 feet until the spell ends. At higher levels: you can target one additional creature for each slot level above 1st.",
+    classes: ["bard", "druid", "ranger", "wizard"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "a pinch of dirt" },
+  },
+  {
+    name: "Mending",
+    level: 0,
+    school: "transmutation",
+    castingTime: "1 minute",
+    range: "Touch",
+    duration: "Instantaneous",
+    description: "This spell repairs a single break or tear in an object you touch, such as a broken chain link, two halves of a broken key, a torn cloak, or a leaking wineskin, leaving no trace of the former damage. It can't restore magic to a physically repaired magic item.",
+    classes: ["bard", "cleric", "druid", "sorcerer", "wizard"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "two lodestones" },
+  },
+  {
+    name: "Ray of Sickness",
+    level: 1,
+    school: "necromancy",
+    castingTime: "1 action",
+    range: "60 ft",
+    duration: "Instantaneous",
+    description: "A ray of sickening greenish energy lashes out toward a creature within range. Make a ranged spell attack. On a hit, the target takes 2d8 poison damage and has the poisoned condition until the end of your next turn. At higher levels: +1d8 per slot level above 1st.",
+    classes: ["sorcerer", "wizard"],
+    components: { verbal: true, somatic: true, material: false },
+    effectKind: "damage",
+    effectDiceCount: 2,
+    effectDiceFaces: 8,
+    damageType: "poison",
+    attackType: "attack",
+    upcastDicePerLevel: 1,
+  },
+  {
+    name: "Hellish Rebuke",
+    level: 1,
+    school: "evocation",
+    castingTime: "1 reaction, which you take in response to taking damage from a creature within 60 ft that you can see",
+    range: "60 ft",
+    duration: "Instantaneous",
+    description: "The creature that damaged you is momentarily surrounded by green flames. It makes a Dexterity save, taking 2d10 fire damage on a failure, or half as much on a success. At higher levels: +1d10 per slot level above 1st.",
+    classes: ["warlock"],
+    components: { verbal: true, somatic: true, material: false },
+    effectKind: "damage",
+    effectDiceCount: 2,
+    effectDiceFaces: 10,
+    damageType: "fire",
+    attackType: "save",
+    saveAbility: "dexterity",
+    saveEffect: "half",
+    upcastDicePerLevel: 1,
+  },
+  {
+    name: "False Life",
+    level: 1,
+    school: "necromancy",
+    castingTime: "1 action",
+    range: "Self",
+    duration: "1 hour",
+    description: "You gain 2d4 + 4 temporary hit points. At higher levels: +5 temporary hit points per slot level above 1st.",
+    classes: ["sorcerer", "wizard"],
+    components: { verbal: true, somatic: false, material: true, materialDescription: "a small amount of alcohol or distilled spirits" },
+  },
+  {
+    name: "Ray of Enfeeblement",
+    level: 2,
+    school: "necromancy",
+    castingTime: "1 action",
+    range: "60 ft",
+    duration: "Concentration, up to 1 minute",
+    description: "A beam of enervating energy shoots from you toward a creature within range. The target makes a Constitution save. On a failure, it has disadvantage on Strength-based attack rolls and ability checks and subtracts 1d4 from its damage rolls until the spell ends; it repeats the save at the end of each of its turns, ending the effect on itself on a success.",
+    concentration: true,
+    classes: ["warlock", "wizard"],
+    components: { verbal: true, somatic: true, material: false },
   },
 ];

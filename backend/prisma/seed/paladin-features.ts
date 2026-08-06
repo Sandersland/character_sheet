@@ -186,6 +186,14 @@ const BASE_RAW: RawPaladinFeature[] = [
   // resource pool and becomes the base Channel Divinity option "Channel
   // Divinity: Divine Sense" below (a DIFFERENT name), gated at L3 rather than
   // L1.
+  // Neither row below sets resourceKey (#1685 stretch goal, declined): its
+  // total fits the `{ levelTimes: 5 }` shape, but each row's own description
+  // states the formula IN WORDS ("5 × your paladin level" / "five times your
+  // Paladin level") while lib/classes/paladin.ts's resourceFn description
+  // states the COMPUTED NUMBER — moving onto the row would change what a
+  // player actually reads, failing #1685's byte-identical AC; excluded
+  // alongside Bardic Inspiration (bard-features.ts) rather than migrated —
+  // see paladin.ts's own header for the full reasoning.
   {
     subclassSlug: null,
     name: "Lay on Hands",

@@ -9,6 +9,7 @@ import supertest from "supertest";
 
 import { app } from "@/test-support/app-server.js";
 import { authCookie } from "@/test-support/auth.js";
+import { seededSpeciesAnchor } from "@/test-support/species.js";
 
 const OWNER_ID = "owner-starting-equipment-background-content";
 let COOKIE: string;
@@ -23,11 +24,12 @@ afterAll(async () => {
   await prisma.character.deleteMany({ where: { id: { in: createdCharacterIds } } });
 });
 
-function baseBody(overrides: Record<string, unknown>) {
+async function baseBody(overrides: { rulesEdition: "EDITION_2014" | "EDITION_2024" } & Record<string, unknown>) {
+  const anchor = await seededSpeciesAnchor(overrides.rulesEdition);
   return {
     name: "Fixture",
     alignment: "True Neutral",
-    race: "Human",
+    ...anchor,
     abilityScores: {
       strength: 10,
       dexterity: 10,
@@ -48,7 +50,7 @@ describe("real background starting-equipment gold ADDS to the class package's go
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send(
-        baseBody({
+        await baseBody({
           name: "2024 Criminal Fighter",
           background: "Criminal",
           classes: [{ name: "Fighter" }],
@@ -86,7 +88,7 @@ describe("real background starting-equipment gold ADDS to the class package's go
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send(
-        baseBody({
+        await baseBody({
           name: "2024 Criminal Fighter Gold-Only",
           background: "Criminal",
           classes: [{ name: "Fighter" }],
@@ -110,7 +112,7 @@ describe("real Acolyte background package resolves per-edition, never one servin
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send(
-        baseBody({
+        await baseBody({
           name: "2014 Acolyte",
           background: "Acolyte",
           classes: [{ name: "Cleric" }],
@@ -148,7 +150,7 @@ describe("real Acolyte background package resolves per-edition, never one servin
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send(
-        baseBody({
+        await baseBody({
           name: "2024 Acolyte",
           background: "Acolyte",
           classes: [{ name: "Cleric" }],
@@ -197,7 +199,7 @@ describe("a background with no package still creates successfully (#1565)", () =
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send(
-        baseBody({
+        await baseBody({
           name: "Charlatan No Equipment",
           background: "Charlatan",
           classes: [{ name: "Rogue" }],
@@ -218,7 +220,7 @@ describe("a background with no package still creates successfully (#1565)", () =
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send(
-        baseBody({
+        await baseBody({
           name: "Charlatan Rejected",
           background: "Charlatan",
           classes: [{ name: "Rogue" }],
@@ -236,7 +238,7 @@ describe("a background with no package still creates successfully (#1565)", () =
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send(
-        baseBody({
+        await baseBody({
           name: "Homebrew Background",
           background: "A Wandering Tinker I Invented",
           classes: [{ name: "Rogue" }],
@@ -261,7 +263,7 @@ describe("PHB'14 Folk Hero background package (#1570)", () => {
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send(
-        baseBody({
+        await baseBody({
           name: "2014 Folk Hero",
           background: "Folk Hero",
           classes: [{ name: "Rogue" }],
@@ -290,7 +292,7 @@ describe("PHB'14 Folk Hero background package (#1570)", () => {
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send(
-        baseBody({
+        await baseBody({
           name: "Folk Hero Bad Pick",
           background: "Folk Hero",
           classes: [{ name: "Rogue" }],
@@ -313,7 +315,7 @@ describe("PHB'14 Folk Hero background package (#1570)", () => {
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send(
-        baseBody({
+        await baseBody({
           name: "2024 Folk Hero Attempt",
           background: "Folk Hero",
           classes: [{ name: "Rogue" }],
@@ -338,7 +340,7 @@ describe("backgroundStartingEquipment rejects mode:\"gold\" (#1565)", () => {
       .set("Cookie", COOKIE)
       .post("/api/characters")
       .send(
-        baseBody({
+        await baseBody({
           name: "Gold Mode Rejected",
           background: "Acolyte",
           classes: [{ name: "Cleric" }],

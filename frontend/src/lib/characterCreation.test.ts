@@ -3,8 +3,13 @@ import { describe, it, expect } from "vitest";
 import {
   buildCreatePayload,
   deriveBackgroundBonuses,
+  deriveCastingAbilityChoice,
   derivePreview,
   deriveSkillChoices,
+  deriveSpeciesBonuses,
+  deriveSpeciesCantripChoice,
+  deriveSpeciesOriginFeatChoice,
+  deriveSpeciesSkillChoice,
   resolveBackgroundEquipmentInput,
   resolveBackgroundName,
   resolveEquipmentInput,
@@ -12,7 +17,7 @@ import {
 } from "@/lib/characterCreation";
 import { emptyPackageState } from "@/lib/startingEquipment";
 import type { CharacterDraft } from "@/hooks/useCharacterDraft";
-import type { ClassOption, ClassStartingEquipment, ReferenceData } from "@/types/character";
+import type { ClassOption, ClassStartingEquipment, ReferenceData, SpeciesOption } from "@/types/character";
 
 function makeClass(overrides: Partial<ClassOption> = {}): ClassOption {
   return {
@@ -54,7 +59,10 @@ const CRIMINAL_PACKAGE: ClassStartingEquipment = {
 };
 
 const reference: ReferenceData = {
-  races: [{ id: "race-1", name: "Elf", speed: 30, toolProficiencies: [] }],
+  species: [{
+    id: "sp-elf", name: "Elf", slug: "elf", speed: 30, abilityIncreases: [],
+    needsCastingAbility: false, chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false, variants: [],
+  }],
   classes: [makeClass()],
   backgrounds: [
     { id: "bg-1", name: "Sage", skillProficiencies: ["perception"], toolProficiencies: [], abilityChoices: [], originFeat: null, startingEquipment: null },
@@ -79,7 +87,8 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
   return {
     name: "",
     alignment: "",
-    race: "",
+    speciesId: "",
+    variantId: "",
     className: "",
     subclass: "",
     subclassId: "",
@@ -105,6 +114,11 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
       charisma: 10,
     },
     backgroundAbilities: {},
+    speciesAbilities: {},
+    castingAbility: "",
+    speciesSkills: [],
+    speciesCantripId: "",
+    speciesOriginFeatId: "",
     skillProficiencies: [],
     toolChoices: [],
     cantripIds: [],
@@ -121,14 +135,383 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
 }
 
 describe("resolveSelections", () => {
-  it("matches by name and returns undefined for a null reference", () => {
-    const draft = makeDraft({ race: "Elf", className: "Rogue", background: "Sage" });
-    expect(resolveSelections(reference, draft).class?.name).toBe("Rogue");
+  it("matches species/variant by id and class/background by name; returns undefined for a null reference", () => {
+    const draft = makeDraft({ speciesId: "sp-elf", className: "Rogue", background: "Sage" });
+    const resolved = resolveSelections(reference, draft);
+    expect(resolved.class?.name).toBe("Rogue");
+    expect(resolved.species?.name).toBe("Elf");
     expect(resolveSelections(null, draft)).toEqual({
-      race: undefined,
+      species: undefined,
+      variant: undefined,
       class: undefined,
       background: undefined,
     });
+  });
+
+  it("resolves the variant by id, scoped to its own species", () => {
+    const referenceWithVariants: ReferenceData = {
+      ...reference,
+      species: [
+        {
+          id: "sp-dwarf",
+          name: "Dwarf",
+          slug: "dwarf",
+          speed: 25,
+          abilityIncreases: [],
+          needsCastingAbility: false,
+          chooseSkills: null,
+          chooseCantrip: null,
+          chooseOriginFeat: false,
+          variants: [{
+            id: "var-hill", name: "Hill Dwarf", slug: "hill", abilityIncreases: [], abilityIncreasesReplace: false,
+            needsCastingAbility: false, chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false,
+          }],
+        },
+      ],
+    };
+    const draft = makeDraft({ speciesId: "sp-dwarf", variantId: "var-hill" });
+    expect(resolveSelections(referenceWithVariants, draft).variant?.name).toBe("Hill Dwarf");
+  });
+});
+
+// #1679/#1681: SpeciesOption fixtures — a variant-bearing species (Dwarf-shape:
+// species-level fixed +2 CON, variant-level fixed +1 WIS) and a choose-bearing
+// one (Half-Elf-shape: fixed +2 CHA + choose 2 of {str,dex,con,int,wis} at +1).
+const DWARF_SPECIES: SpeciesOption = {
+  id: "sp-dwarf",
+  name: "Dwarf",
+  slug: "dwarf",
+  speed: 25,
+  abilityIncreases: [{ ability: "constitution", amount: 2 }],
+  needsCastingAbility: false,
+  chooseSkills: null,
+  chooseCantrip: null, chooseOriginFeat: false,
+  variants: [
+    {
+      id: "var-hill",
+      name: "Hill Dwarf",
+      slug: "hill",
+      abilityIncreases: [{ ability: "wisdom", amount: 1 }],
+      abilityIncreasesReplace: false,
+      needsCastingAbility: false,
+      chooseSkills: null,
+      chooseCantrip: null,
+      chooseOriginFeat: false,
+    },
+  ],
+};
+const HALF_ELF_SPECIES: SpeciesOption = {
+  id: "sp-half-elf",
+  name: "Half-Elf",
+  slug: "half-elf",
+  speed: 30,
+  abilityIncreases: [
+    { ability: "charisma", amount: 2 },
+    { choose: { count: 2, amount: 1, from: ["strength", "dexterity", "constitution", "intelligence", "wisdom"] } },
+  ],
+  needsCastingAbility: false,
+  // #1689: Skill Versatility — no `from` restriction (any of the 18 skills).
+  chooseSkills: { count: 2 },
+  chooseCantrip: null, chooseOriginFeat: false,
+  variants: [],
+};
+
+// #1689/#1756: Elf-shape species with a High Elf variant carrying a class-list
+// chooseCantrip (wizard, Intelligence-keyed) and an Astral Elf variant carrying
+// a named-spells chooseCantrip with NO fixed ability (needsCastingAbility:true).
+const ELF_SPECIES: SpeciesOption = {
+  id: "sp-elf2",
+  name: "Elf",
+  slug: "elf",
+  speed: 30,
+  abilityIncreases: [{ ability: "dexterity", amount: 2 }],
+  needsCastingAbility: false,
+  chooseSkills: null,
+  chooseCantrip: null, chooseOriginFeat: false,
+  variants: [
+    {
+      id: "var-high",
+      name: "High Elf",
+      slug: "high",
+      abilityIncreases: [{ ability: "intelligence", amount: 1 }],
+      abilityIncreasesReplace: false,
+      needsCastingAbility: false,
+      chooseSkills: null,
+      chooseCantrip: { list: "wizard", castingAbility: "intelligence" },
+      chooseOriginFeat: false,
+    },
+    {
+      id: "var-astral",
+      name: "Astral Elf",
+      slug: "astral",
+      abilityIncreases: [],
+      abilityIncreasesReplace: true,
+      needsCastingAbility: true,
+      chooseSkills: null,
+      chooseCantrip: { spells: ["Dancing Lights", "Light", "Sacred Flame"] },
+      chooseOriginFeat: false,
+    },
+  ],
+};
+// #1690: 2024 Human-shape species carrying BOTH a chooseSkills spec
+// (Skillful, unrestricted, count 1) and chooseOriginFeat (Versatile) —
+// matches the real seeded content's species-level shape (no variants).
+const HUMAN_SPECIES: SpeciesOption = {
+  id: "sp-human2024",
+  name: "Human",
+  slug: "human",
+  speed: 30,
+  abilityIncreases: [],
+  needsCastingAbility: false,
+  chooseSkills: { count: 1 },
+  chooseCantrip: null,
+  chooseOriginFeat: true,
+  variants: [],
+};
+const speciesReference: ReferenceData = { ...reference, species: [DWARF_SPECIES, HALF_ELF_SPECIES, ELF_SPECIES, HUMAN_SPECIES] };
+
+// #1758: Astral Elf — an Elf variant carrying a floating +2/+1-or-+1/+1/+1
+// spread that REPLACES the base Elf's +2 DEX (abilityIncreasesReplace), matching
+// the real seeded content (#1751).
+const ASTRAL_ELF_SPECIES: SpeciesOption = {
+  id: "sp-elf-astral", name: "Elf", slug: "elf", speed: 30,
+  abilityIncreases: [{ ability: "dexterity", amount: 2 }],
+  needsCastingAbility: false, chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false,
+  variants: [
+    {
+      id: "var-astral", name: "Astral Elf", slug: "astral",
+      abilityIncreases: [{ floating: 3 }],
+      abilityIncreasesReplace: true,
+      needsCastingAbility: false, chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false,
+    },
+  ],
+};
+const ASTRAL_ELF_REFERENCE: ReferenceData = { ...reference, species: [ASTRAL_ELF_SPECIES] };
+
+describe("deriveSpeciesBonuses (#1681)", () => {
+  it("is inert (applicable:false) when no species is selected", () => {
+    const draft = makeDraft();
+    const bonuses = deriveSpeciesBonuses(draft, resolveSelections(speciesReference, draft));
+    expect(bonuses).toEqual({ applicable: false, fixed: {}, choice: null, assignment: {}, complete: true });
+  });
+
+  it("a fixed-only species+variant merges both levels' increases and is always complete", () => {
+    const draft = makeDraft({ speciesId: "sp-dwarf", variantId: "var-hill" });
+    const bonuses = deriveSpeciesBonuses(draft, resolveSelections(speciesReference, draft));
+    expect(bonuses.applicable).toBe(true);
+    expect(bonuses.fixed).toEqual({ constitution: 2, wisdom: 1 });
+    expect(bonuses.choice).toBeNull();
+    expect(bonuses.complete).toBe(true);
+  });
+
+  it("a choose-bearing species excludes the fixed ability from the eligible list and starts incomplete", () => {
+    const draft = makeDraft({ speciesId: "sp-half-elf" });
+    const bonuses = deriveSpeciesBonuses(draft, resolveSelections(speciesReference, draft));
+    expect(bonuses.fixed).toEqual({ charisma: 2 });
+    expect(bonuses.choice).toEqual({
+      kind: "choose",
+      count: 2,
+      amount: 1,
+      abilities: ["strength", "dexterity", "constitution", "intelligence", "wisdom"],
+    });
+    expect(bonuses.complete).toBe(false);
+  });
+
+  // #1758 (repro): Astral Elf carries a FLOATING spread ({ floating: 3 }) on its
+  // variant AND replaces the base Elf's +2 DEX (abilityIncreasesReplace). The
+  // frontend must treat it as an unmade choice and stay INCOMPLETE until
+  // assigned — before the fix splitSpeciesIncreases dropped the floating form,
+  // so the Abilities step went green with nothing collected and the create 400d
+  // ("speciesAbilities required").
+  it("an Astral Elf floating spread is applicable but NOT complete until assigned (#1758)", () => {
+    const draft = makeDraft({ speciesId: "sp-elf-astral", variantId: "var-astral" });
+    const bonuses = deriveSpeciesBonuses(draft, resolveSelections(ASTRAL_ELF_REFERENCE, draft));
+    expect(bonuses.applicable).toBe(true);
+    expect(bonuses.complete).toBe(false);
+  });
+
+  // #1758: the replacing variant drops the base Elf's +2 DEX — the ONLY spec is
+  // the variant's floating pool, so `fixed` is empty (mirrors the backend's
+  // fetchMergedAbilityIncreases). Every eligible ability is choosable.
+  it("an Astral Elf drops the base species' fixed +2 DEX (abilityIncreasesReplace honored) (#1758)", () => {
+    const draft = makeDraft({ speciesId: "sp-elf-astral", variantId: "var-astral" });
+    const bonuses = deriveSpeciesBonuses(draft, resolveSelections(ASTRAL_ELF_REFERENCE, draft));
+    expect(bonuses.fixed).toEqual({});
+    expect(bonuses.choice).toEqual({
+      kind: "floating",
+      points: 3,
+      abilities: ["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"],
+    });
+  });
+
+  it("an Astral Elf is complete for a valid +2/+1 and for +1/+1/+1", () => {
+    const twoOne = makeDraft({ speciesId: "sp-elf-astral", variantId: "var-astral", speciesAbilities: { dexterity: 2, wisdom: 1 } });
+    expect(deriveSpeciesBonuses(twoOne, resolveSelections(ASTRAL_ELF_REFERENCE, twoOne)).complete).toBe(true);
+
+    const oneOneOne = makeDraft({ speciesId: "sp-elf-astral", variantId: "var-astral", speciesAbilities: { strength: 1, dexterity: 1, wisdom: 1 } });
+    expect(deriveSpeciesBonuses(oneOneOne, resolveSelections(ASTRAL_ELF_REFERENCE, oneOneOne)).complete).toBe(true);
+  });
+
+  it("an Astral Elf is INCOMPLETE for an illegal floating shape (+3 to one, or +1/+1 only, or +2/+2)", () => {
+    for (const speciesAbilities of [{ dexterity: 3 }, { dexterity: 1, wisdom: 1 }, { dexterity: 2, wisdom: 2 }] as const) {
+      const draft = makeDraft({ speciesId: "sp-elf-astral", variantId: "var-astral", speciesAbilities });
+      expect(deriveSpeciesBonuses(draft, resolveSelections(ASTRAL_ELF_REFERENCE, draft)).complete).toBe(false);
+    }
+  });
+
+  it("is complete once exactly `count` abilities are assigned at `amount` each", () => {
+    const draft = makeDraft({ speciesId: "sp-half-elf", speciesAbilities: { strength: 1, dexterity: 1 } });
+    const bonuses = deriveSpeciesBonuses(draft, resolveSelections(speciesReference, draft));
+    expect(bonuses.assignment).toEqual({ strength: 1, dexterity: 1 });
+    expect(bonuses.complete).toBe(true);
+  });
+
+  it("ignores a stale draft.speciesAbilities entry outside the eligible list (e.g. left over from a prior species)", () => {
+    const draft = makeDraft({ speciesId: "sp-half-elf", speciesAbilities: { charisma: 1, strength: 1 } });
+    const bonuses = deriveSpeciesBonuses(draft, resolveSelections(speciesReference, draft));
+    expect(bonuses.assignment).toEqual({ strength: 1 });
+    expect(bonuses.complete).toBe(false);
+  });
+});
+
+// #1683: DROW_VARIANT needs the choice (needsCastingAbility: true), the base
+// Elf species does not — mirrors DWARF_SPECIES/HALF_ELF_SPECIES's fixture role.
+const DROW_VARIANT_ELF: SpeciesOption = {
+  id: "sp-elf-2024",
+  name: "Elf",
+  slug: "elf",
+  speed: 30,
+  abilityIncreases: [],
+  needsCastingAbility: false,
+  chooseSkills: null,
+  chooseCantrip: null,
+  chooseOriginFeat: false,
+  variants: [
+    {
+      id: "var-drow", name: "Drow", slug: "drow", abilityIncreases: [], abilityIncreasesReplace: false,
+      needsCastingAbility: true, chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false,
+    },
+    {
+      id: "var-high", name: "High Elf", slug: "high", abilityIncreases: [], abilityIncreasesReplace: false,
+      needsCastingAbility: true, chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false,
+    },
+  ],
+};
+const castingAbilityReference: ReferenceData = { ...reference, species: [DROW_VARIANT_ELF, DWARF_SPECIES] };
+
+describe("deriveCastingAbilityChoice (#1683)", () => {
+  it("is inert (applicable:false, complete:true) when no species is selected", () => {
+    const draft = makeDraft();
+    const choice = deriveCastingAbilityChoice(draft, resolveSelections(castingAbilityReference, draft));
+    expect(choice).toEqual({ applicable: false, value: "", complete: true });
+  });
+
+  it("is inert for a variant whose needsCastingAbility is false (Dwarf's Hill Dwarf)", () => {
+    const draft = makeDraft({ speciesId: "sp-dwarf", variantId: "var-hill" });
+    const choice = deriveCastingAbilityChoice(draft, resolveSelections(castingAbilityReference, draft));
+    expect(choice.applicable).toBe(false);
+    expect(choice.complete).toBe(true);
+  });
+
+  it("is applicable and incomplete for a spell-granting variant with no choice made yet (Drow)", () => {
+    const draft = makeDraft({ speciesId: "sp-elf-2024", variantId: "var-drow" });
+    const choice = deriveCastingAbilityChoice(draft, resolveSelections(castingAbilityReference, draft));
+    expect(choice.applicable).toBe(true);
+    expect(choice.value).toBe("");
+    expect(choice.complete).toBe(false);
+  });
+
+  it("is complete once a value is chosen", () => {
+    const draft = makeDraft({ speciesId: "sp-elf-2024", variantId: "var-drow", castingAbility: "charisma" });
+    const choice = deriveCastingAbilityChoice(draft, resolveSelections(castingAbilityReference, draft));
+    expect(choice.value).toBe("charisma");
+    expect(choice.complete).toBe(true);
+  });
+});
+
+describe("deriveSpeciesSkillChoice (#1689, Half-Elf's Skill Versatility)", () => {
+  it("is inert (applicable:false) when no chooseSkills spec is served", () => {
+    const draft = makeDraft({ speciesId: "sp-dwarf", variantId: "var-hill" });
+    const choice = deriveSpeciesSkillChoice(draft, resolveSelections(speciesReference, draft), []);
+    expect(choice).toEqual({ applicable: false, count: 0, options: [], selected: [], complete: true });
+  });
+
+  it("offers every skill (no `from` restriction) minus whatever class/background already granted", () => {
+    const draft = makeDraft({ speciesId: "sp-half-elf" });
+    const choice = deriveSpeciesSkillChoice(draft, resolveSelections(speciesReference, draft), ["stealth", "athletics"]);
+    expect(choice.applicable).toBe(true);
+    expect(choice.count).toBe(2);
+    expect(choice.options.map((o) => o.key)).not.toContain("stealth");
+    expect(choice.options.map((o) => o.key)).not.toContain("athletics");
+    expect(choice.options.map((o) => o.key)).toContain("perception");
+    expect(choice.complete).toBe(false);
+  });
+
+  it("is complete once exactly `count` distinct skills are chosen", () => {
+    const draft = makeDraft({ speciesId: "sp-half-elf", speciesSkills: ["stealth", "perception"] });
+    const choice = deriveSpeciesSkillChoice(draft, resolveSelections(speciesReference, draft), []);
+    expect(choice.selected).toEqual(["stealth", "perception"]);
+    expect(choice.complete).toBe(true);
+  });
+
+  it("drops a stale draft.speciesSkills entry that now duplicates a class/background pick", () => {
+    const draft = makeDraft({ speciesId: "sp-half-elf", speciesSkills: ["stealth", "perception"] });
+    const choice = deriveSpeciesSkillChoice(draft, resolveSelections(speciesReference, draft), ["stealth"]);
+    expect(choice.selected).toEqual(["perception"]);
+    expect(choice.complete).toBe(false);
+  });
+});
+
+describe("deriveSpeciesCantripChoice (#1689, High Elf's Cantrip)", () => {
+  it("is inert (applicable:false) when no chooseCantrip spec is served", () => {
+    const draft = makeDraft({ speciesId: "sp-dwarf", variantId: "var-hill" });
+    const choice = deriveSpeciesCantripChoice(draft, resolveSelections(speciesReference, draft));
+    expect(choice.applicable).toBe(false);
+    expect(choice.complete).toBe(true);
+  });
+
+  it("resolves the variant-level chooseCantrip spec (wizard list, Intelligence) and is complete once a spell id is chosen", () => {
+    const draft = makeDraft({ speciesId: "sp-elf2", variantId: "var-high" });
+    const incomplete = deriveSpeciesCantripChoice(draft, resolveSelections(speciesReference, draft));
+    expect(incomplete.applicable).toBe(true);
+    expect(incomplete.list).toBe("wizard");
+    expect(incomplete.castingAbility).toBe("intelligence");
+    expect(incomplete.complete).toBe(false);
+
+    const completedDraft = makeDraft({ speciesId: "sp-elf2", variantId: "var-high", speciesCantripId: "spell-fire-bolt" });
+    const complete = deriveSpeciesCantripChoice(completedDraft, resolveSelections(speciesReference, completedDraft));
+    expect(complete.selectedId).toBe("spell-fire-bolt");
+    expect(complete.complete).toBe(true);
+  });
+
+  it("forwards Astral Fire's named spells list and its absent casting ability (#1756)", () => {
+    const draft = makeDraft({ speciesId: "sp-elf2", variantId: "var-astral" });
+    const choice = deriveSpeciesCantripChoice(draft, resolveSelections(speciesReference, draft));
+    expect(choice.applicable).toBe(true);
+    expect(choice.spells).toEqual(["Dancing Lights", "Light", "Sacred Flame"]);
+    expect(choice.list).toBeUndefined();
+    expect(choice.castingAbility).toBeUndefined();
+  });
+});
+
+describe("deriveSpeciesOriginFeatChoice (#1690, 2024 Human's Versatile)", () => {
+  it("is inert (applicable:false) when no chooseOriginFeat spec is served", () => {
+    const draft = makeDraft({ speciesId: "sp-dwarf", variantId: "var-hill" });
+    const choice = deriveSpeciesOriginFeatChoice(draft, resolveSelections(speciesReference, draft));
+    expect(choice.applicable).toBe(false);
+    expect(choice.complete).toBe(true);
+  });
+
+  it("resolves the species-level chooseOriginFeat spec and is complete once a feat id is chosen", () => {
+    const draft = makeDraft({ speciesId: "sp-human2024" });
+    const incomplete = deriveSpeciesOriginFeatChoice(draft, resolveSelections(speciesReference, draft));
+    expect(incomplete.applicable).toBe(true);
+    expect(incomplete.complete).toBe(false);
+
+    const completedDraft = makeDraft({ speciesId: "sp-human2024", speciesOriginFeatId: "feat-tough" });
+    const complete = deriveSpeciesOriginFeatChoice(completedDraft, resolveSelections(speciesReference, completedDraft));
+    expect(complete.selectedId).toBe("feat-tough");
+    expect(complete.complete).toBe(true);
   });
 });
 
@@ -208,7 +591,7 @@ describe("resolveBackgroundEquipmentInput", () => {
 describe("derivePreview", () => {
   it("computes AC, speed, and max HP from scores and hit die", () => {
     const draft = makeDraft({
-      race: "Elf",
+      speciesId: "sp-elf",
       className: "Rogue",
       abilityScores: {
         strength: 10,
@@ -226,7 +609,7 @@ describe("derivePreview", () => {
     expect(preview.maxHp).toBe(10);
   });
 
-  it("leaves speed and maxHp undefined without race/class", () => {
+  it("leaves speed and maxHp undefined without species/class", () => {
     const draft = makeDraft({});
     const preview = derivePreview(draft, resolveSelections(reference, draft));
     expect(preview.speed).toBeUndefined();
@@ -280,7 +663,7 @@ describe("deriveBackgroundBonuses (#1130)", () => {
 describe("derivePreview with background bonuses", () => {
   it("folds the spread into the effective HP/AC preview", () => {
     const draft = makeDraft({
-      race: "Elf",
+      speciesId: "sp-elf",
       className: "Rogue",
       background: "Criminal",
       backgroundAbilities: { constitution: 2, dexterity: 1 }, // CON 10→12 (+1), DEX 10→11 (+0)
@@ -309,11 +692,145 @@ describe("buildCreatePayload", () => {
     expect(buildCreatePayload(inert, sel2, deriveSkillChoices(inert, sel2), []).backgroundAbilities).toBeUndefined();
   });
 
+  it("sends speciesId/variantId and a completed speciesAbilities choice (#1681)", () => {
+    const draft = makeDraft({ name: "X", className: "Rogue", speciesId: "sp-half-elf", speciesAbilities: { strength: 1, dexterity: 1 } });
+    const selections = resolveSelections(speciesReference, draft);
+    const payload = buildCreatePayload(draft, selections, deriveSkillChoices(draft, selections), []);
+    expect(payload.speciesId).toBe("sp-half-elf");
+    expect(payload.variantId).toBeUndefined();
+    expect(payload.speciesAbilities).toEqual({ strength: 1, dexterity: 1 });
+  });
+
+  it("omits speciesAbilities for a fixed-only species and for an incomplete choice", () => {
+    const fixedOnly = makeDraft({ name: "X", className: "Rogue", speciesId: "sp-dwarf", variantId: "var-hill" });
+    const sel1 = resolveSelections(speciesReference, fixedOnly);
+    const payload1 = buildCreatePayload(fixedOnly, sel1, deriveSkillChoices(fixedOnly, sel1), []);
+    expect(payload1.speciesId).toBe("sp-dwarf");
+    expect(payload1.variantId).toBe("var-hill");
+    expect(payload1.speciesAbilities).toBeUndefined();
+
+    const incompleteChoice = makeDraft({ name: "X", className: "Rogue", speciesId: "sp-half-elf", speciesAbilities: { strength: 1 } });
+    const sel2 = resolveSelections(speciesReference, incompleteChoice);
+    expect(buildCreatePayload(incompleteChoice, sel2, deriveSkillChoices(incompleteChoice, sel2), []).speciesAbilities).toBeUndefined();
+  });
+
+  // #1758: an Astral Elf's completed floating spread rides speciesAbilities like
+  // any completed choice; an illegal shape sends nothing (the backend re-validates).
+  it("sends an Astral Elf's completed floating speciesAbilities and omits an illegal one (#1758)", () => {
+    const valid = makeDraft({ name: "X", className: "Rogue", speciesId: "sp-elf-astral", variantId: "var-astral", speciesAbilities: { dexterity: 2, wisdom: 1 } });
+    const sel1 = resolveSelections(ASTRAL_ELF_REFERENCE, valid);
+    expect(buildCreatePayload(valid, sel1, deriveSkillChoices(valid, sel1), []).speciesAbilities).toEqual({ dexterity: 2, wisdom: 1 });
+
+    const illegal = makeDraft({ name: "X", className: "Rogue", speciesId: "sp-elf-astral", variantId: "var-astral", speciesAbilities: { dexterity: 3 } });
+    const sel2 = resolveSelections(ASTRAL_ELF_REFERENCE, illegal);
+    expect(buildCreatePayload(illegal, sel2, deriveSkillChoices(illegal, sel2), []).speciesAbilities).toBeUndefined();
+  });
+
+  it("sends a completed castingAbility choice (#1683)", () => {
+    const draft = makeDraft({
+      name: "X", className: "Rogue", speciesId: "sp-elf-2024", variantId: "var-drow", castingAbility: "charisma",
+    });
+    const selections = resolveSelections(castingAbilityReference, draft);
+    const payload = buildCreatePayload(draft, selections, deriveSkillChoices(draft, selections), []);
+    expect(payload.castingAbility).toBe("charisma");
+  });
+
+  it("omits castingAbility for a non-spell-granting variant and for an incomplete choice", () => {
+    const noChoiceNeeded = makeDraft({ name: "X", className: "Rogue", speciesId: "sp-dwarf", variantId: "var-hill" });
+    const sel1 = resolveSelections(speciesReference, noChoiceNeeded);
+    expect(buildCreatePayload(noChoiceNeeded, sel1, deriveSkillChoices(noChoiceNeeded, sel1), []).castingAbility).toBeUndefined();
+
+    const incomplete = makeDraft({ name: "X", className: "Rogue", speciesId: "sp-elf-2024", variantId: "var-drow" });
+    const sel2 = resolveSelections(castingAbilityReference, incomplete);
+    expect(buildCreatePayload(incomplete, sel2, deriveSkillChoices(incomplete, sel2), []).castingAbility).toBeUndefined();
+  });
+
+  it("sends a completed speciesSkills choice (#1689, Half-Elf's Skill Versatility) alongside speciesAbilities", () => {
+    const draft = makeDraft({
+      name: "X",
+      className: "Rogue",
+      speciesId: "sp-half-elf",
+      speciesAbilities: { strength: 1, dexterity: 1 },
+      speciesSkills: ["stealth", "perception"],
+    });
+    const selections = resolveSelections(speciesReference, draft);
+    const payload = buildCreatePayload(draft, selections, deriveSkillChoices(draft, selections), []);
+    expect(payload.speciesSkills).toEqual(["stealth", "perception"]);
+  });
+
+  it("omits speciesSkills for a species with no chooseSkills spec and for an incomplete choice", () => {
+    const noSpec = makeDraft({ name: "X", className: "Rogue", speciesId: "sp-dwarf", variantId: "var-hill" });
+    const sel1 = resolveSelections(speciesReference, noSpec);
+    expect(buildCreatePayload(noSpec, sel1, deriveSkillChoices(noSpec, sel1), []).speciesSkills).toBeUndefined();
+
+    const incomplete = makeDraft({ name: "X", className: "Rogue", speciesId: "sp-half-elf", speciesSkills: ["stealth"] });
+    const sel2 = resolveSelections(speciesReference, incomplete);
+    expect(buildCreatePayload(incomplete, sel2, deriveSkillChoices(incomplete, sel2), []).speciesSkills).toBeUndefined();
+  });
+
+  it("sends a completed speciesCantripId choice (#1689, High Elf's Cantrip) and NO castingAbility (its ability is fixed)", () => {
+    const draft = makeDraft({ name: "X", className: "Fighter", speciesId: "sp-elf2", variantId: "var-high", speciesCantripId: "spell-fire-bolt" });
+    const selections = resolveSelections(speciesReference, draft);
+    const payload = buildCreatePayload(draft, selections, deriveSkillChoices(draft, selections), []);
+    expect(payload.speciesCantripId).toBe("spell-fire-bolt");
+    expect(payload.castingAbility).toBeUndefined();
+  });
+
+  it("sends both speciesCantripId and the chosen castingAbility for an Astral Elf draft (#1756)", () => {
+    const draft = makeDraft({
+      name: "X", className: "Fighter", speciesId: "sp-elf2", variantId: "var-astral",
+      speciesCantripId: "spell-light", castingAbility: "wisdom",
+    });
+    const selections = resolveSelections(speciesReference, draft);
+    const payload = buildCreatePayload(draft, selections, deriveSkillChoices(draft, selections), []);
+    expect(payload.speciesCantripId).toBe("spell-light");
+    expect(payload.castingAbility).toBe("wisdom");
+  });
+
+  it("omits speciesCantripId for a species with no chooseCantrip spec and when unset", () => {
+    const noSpec = makeDraft({ name: "X", className: "Fighter", speciesId: "sp-dwarf", variantId: "var-hill" });
+    const sel1 = resolveSelections(speciesReference, noSpec);
+    expect(buildCreatePayload(noSpec, sel1, deriveSkillChoices(noSpec, sel1), []).speciesCantripId).toBeUndefined();
+
+    const unset = makeDraft({ name: "X", className: "Fighter", speciesId: "sp-elf2", variantId: "var-high" });
+    const sel2 = resolveSelections(speciesReference, unset);
+    expect(buildCreatePayload(unset, sel2, deriveSkillChoices(unset, sel2), []).speciesCantripId).toBeUndefined();
+  });
+
+  it("sends a completed speciesOriginFeatId choice (#1690, 2024 Human's Versatile)", () => {
+    const draft = makeDraft({ name: "X", className: "Fighter", speciesId: "sp-human2024", speciesOriginFeatId: "feat-tough" });
+    const selections = resolveSelections(speciesReference, draft);
+    const payload = buildCreatePayload(draft, selections, deriveSkillChoices(draft, selections), []);
+    expect(payload.speciesOriginFeatId).toBe("feat-tough");
+  });
+
+  it("omits speciesOriginFeatId for a species with no chooseOriginFeat spec and when unset", () => {
+    const noSpec = makeDraft({ name: "X", className: "Fighter", speciesId: "sp-dwarf", variantId: "var-hill" });
+    const sel1 = resolveSelections(speciesReference, noSpec);
+    expect(buildCreatePayload(noSpec, sel1, deriveSkillChoices(noSpec, sel1), []).speciesOriginFeatId).toBeUndefined();
+
+    const unset = makeDraft({ name: "X", className: "Fighter", speciesId: "sp-human2024" });
+    const sel2 = resolveSelections(speciesReference, unset);
+    expect(buildCreatePayload(unset, sel2, deriveSkillChoices(unset, sel2), []).speciesOriginFeatId).toBeUndefined();
+  });
+
+  // speciesId is the required mechanical anchor (#1684) — sent as-is, with no
+  // `|| undefined` normalization (CreationCeremony's step validity gates
+  // submission before an empty draft value could ever reach here). variantId
+  // stays optional and IS normalized, mirroring subclassId's own "" → undefined shape.
+  it("omits variantId when the draft's own empty-string default is untouched (`|| undefined` normalization)", () => {
+    const draft = makeDraft({ name: "X", className: "Rogue" });
+    const selections = resolveSelections(speciesReference, draft);
+    const payload = buildCreatePayload(draft, selections, deriveSkillChoices(draft, selections), []);
+    expect(payload.speciesId).toBe("");
+    expect(payload.variantId).toBeUndefined();
+  });
+
   it("merges granted + selected skills and omits empty optionals", () => {
     const draft = makeDraft({
       name: " Lidda ",
       alignment: "Neutral Good",
-      race: "Elf",
+      speciesId: "sp-elf",
       className: "Rogue",
       background: "Sage",
       skillProficiencies: ["stealth"],
@@ -329,6 +846,55 @@ describe("buildCreatePayload", () => {
     expect("portraitUrl" in payload).toBe(false);
     expect(payload.startingEquipment).toBeUndefined();
     expect(payload.backgroundStartingEquipment).toBeUndefined();
+  });
+
+  // #1680/#1684: the two-step picker's real selection rides speciesId/variantId
+  // (ids, like subclassId) — the sole mechanical anchor since the flat `race`
+  // field was pruned.
+  it("sends speciesId/variantId", () => {
+    const variantReference: ReferenceData = {
+      ...reference,
+      species: [
+        {
+          id: "sp-dwarf",
+          name: "Dwarf",
+          slug: "dwarf",
+          speed: 25,
+          abilityIncreases: [],
+          needsCastingAbility: false,
+          chooseSkills: null,
+          chooseCantrip: null,
+          chooseOriginFeat: false,
+          variants: [{
+            id: "var-hill", name: "Hill Dwarf", slug: "hill", abilityIncreases: [], abilityIncreasesReplace: false,
+            needsCastingAbility: false, chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false,
+          }],
+        },
+      ],
+    };
+    const draft = makeDraft({
+      name: "Borin",
+      className: "Rogue",
+      background: "Sage",
+      speciesId: "sp-dwarf",
+      variantId: "var-hill",
+    });
+    const selections = resolveSelections(variantReference, draft);
+    const skills = deriveSkillChoices(draft, selections);
+    const payload = buildCreatePayload(draft, selections, skills, []);
+    expect(payload.speciesId).toBe("sp-dwarf");
+    expect(payload.variantId).toBe("var-hill");
+  });
+
+  // variantId is omitted (never an empty string) for a variantless species —
+  // mirrors subclassId's "" → undefined shape.
+  it("omits variantId for a variantless species", () => {
+    const draft = makeDraft({ name: "Alric", className: "Rogue", background: "Sage", speciesId: "sp-elf" });
+    const selections = resolveSelections(reference, draft);
+    const skills = deriveSkillChoices(draft, selections);
+    const payload = buildCreatePayload(draft, selections, skills, []);
+    expect(payload.speciesId).toBe("sp-elf");
+    expect(payload.variantId).toBeUndefined();
   });
 
   it("passes through non-empty tool choices", () => {
@@ -369,7 +935,12 @@ describe("creation spells (#1131)", () => {
     name: "Wizard",
     level1SpellPicks: { cantrips: 3, spells: 6, maxSpellLevel: 1, spellbookSize: 6 },
   });
-  const casterSelections = { race: undefined, class: caster, background: undefined };
+  const casterSelections = {
+    species: undefined,
+    variant: undefined,
+    class: caster,
+    background: undefined,
+  };
 
   it("buildCreatePayload includes spells for a caster", () => {
     const draft = makeDraft({ name: "Mo", className: "Wizard", cantripIds: ["c1"], spellIds: ["s1"] });

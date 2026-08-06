@@ -51,7 +51,46 @@ export const createCharacterSchema = z
     // URLs — the create UI stages a file and uploads it via portraitRouter
     // after create; .strict() 400s any client still sending a URL.
     experiencePoints: z.number().int().nonnegative().optional(),
-    race: z.string().min(1),
+    // Species catalog FK (#1679) — the mechanical anchor since #1684 pruned
+    // the flat `Race` model/legacy `race`-name path. Validated in
+    // resolveSpeciesSelection: variant must belong to this species, species
+    // edition must match the character's, and a variant-bearing species
+    // requires variantId iff the species has variant rows. variantId is
+    // REJECTED without a speciesId (never implies one).
+    speciesId: z.string().min(1),
+    variantId: z.string().optional(),
+    // 2014 species/subrace ability increases (#1681): the CHOSEN portion only
+    // (fixed increases are applied server-side with no request field, same
+    // as fixed tool profs above). Required iff the merged species+variant
+    // abilityIncreases spec has a choose/floating component; 400 under
+    // EDITION_2024 (mirrors backgroundAbilities' 2024-only gate below, in the
+    // other direction) and when the merged spec is fixed-only — see
+    // resolveSpeciesGrants in character-create.ts.
+    speciesAbilities: z.record(z.string(), z.number().int().positive()).optional(),
+    // 2024 lineage/legacy casting-ability choice (#1683): the Int/Wis/Cha
+    // ability a spell-granting lineage (Elf's Drow/High Elf/Wood Elf, Gnome's
+    // Forest/Rock, Tiefling's Abyssal/Chthonic/Infernal) uses, chosen "when
+    // you select the lineage" (PHB'24). Required iff the resolved species+
+    // variant's merged SpeciesGrantedSpell rows are non-empty; 400 otherwise
+    // (submitted with no species, or a species/variant that grants nothing)
+    // — see resolveCastingAbility in character-create.ts.
+    castingAbility: z.enum(["intelligence", "wisdom", "charisma"]).optional(),
+    // #1689: the species/variant's OWN creation choices (SpeciesTrait.choice) —
+    // distinct from skillProficiencies/spells below, which are the class/
+    // background pools. Required iff the resolved species+variant carries a
+    // matching choice-bearing trait; 400 otherwise — a 2014 species without
+    // one, or a 2024 species other than the Human/Elf choice traits #1690 added
+    // (the mechanism is edition-neutral). See resolveSpeciesChoiceGrants in
+    // character-create.ts.
+    speciesSkills: z.array(z.string()).optional(),
+    speciesCantripId: z.string().optional(),
+    // #1690: the species-granted Origin feat pick (2024 Human's Versatile) —
+    // sibling of speciesCantripId above, same "required iff the resolved
+    // species+variant carries the matching choice-bearing trait" rule.
+    // Validated as an Origin-category Feat and baked via the SAME slot-exempt
+    // snapshot AdvancementEntry path the background's own Origin feat uses
+    // (buildOriginEntry) — see resolveSpeciesOriginFeatGrant in character-create.ts.
+    speciesOriginFeatId: z.string().optional(),
     background: z.string().min(1),
     classes: z.array(classChoiceSchema).length(1),
     abilityScores: abilityScoresSchema,

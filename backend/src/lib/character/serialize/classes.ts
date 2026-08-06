@@ -5,18 +5,19 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 import {
   characterAdvancementSlots,
   characterFightingStyleFeatSlots,
-  deriveFeatBonuses,
-  deriveFeatProficiencies,
+  deriveImprovementBonuses,
+  deriveImprovementProficiencies,
 } from "@/lib/srd/srd.js";
 import { deriveEntryScopedResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
 import { featureRowsOf } from "@/lib/classes/feature-rows-select.js";
 import type { DerivedFeature } from "@/lib/classes/types.js";
+import type { FeatImprovement } from "@/lib/classes/resources-state.js";
 import { deriveEntryScopedActions, type AvailableAction } from "@/lib/classes/actions.js";
 import { deriveManeuverEffect } from "@/lib/classes/maneuver-effect.js";
 import { clampChoicesToCaps, normalizeResourcesMutable, splitAdvancementsBySlotCap, type AdvancementEntry } from "@/lib/classes/resources.js";
 import { effectiveEntryLevel, subclassActiveAt } from "@/lib/leveling/effective-levels.js";
 import { editionOf } from "@/lib/rules/edition.js";
-import { normalizeHitPoints } from "@/lib/combat/hitpoints.js";
+import { effectiveMaxHitPoints, normalizeHitPoints } from "@/lib/combat/hitpoints.js";
 import { reverseAdvancementEffects } from "@/lib/leveling/advancement.js";
 import type { CharacterWithRelations } from "@/lib/character/character-include.js";
 
@@ -37,7 +38,7 @@ export function buildResourcesView(
   level: number,
   abilityScores: Record<string, number>,
   proficiencyBonus: number,
-): { resources: object | undefined; maneuverSaveDC: number | undefined } {
+): { resources: object | undefined; maneuverSaveDC: number | undefined; classFeatureImprovements: FeatImprovement[] } {
   // The ONE production caller that supplies real ClassFeature rows (#1524):
   // characterInclude loaded entry.class.features (already subclassId:null
   // filtered) and entry.subclassRef.features — featuresFromRows/poolsFromRows
@@ -58,7 +59,12 @@ export function buildResourcesView(
     ? buildResourcesPayload(derivedRes, normalizeResourcesMutable(row.resources))
     : undefined;
 
-  return { resources, maneuverSaveDC: derivedRes?.maneuverSaveDC };
+  // Row-driven passive grants (#1691) — level/edition/subclass-active gated
+  // the SAME way `resources.features` already is (deriveEntryScopedResources'
+  // own per-entry loop); applyFeatLayer merges this with advancement-sourced
+  // improvements through the shared deriveImprovementBonuses/
+  // deriveImprovementProficiencies evaluator.
+  return { resources, maneuverSaveDC: derivedRes?.maneuverSaveDC, classFeatureImprovements: derivedRes?.improvements ?? [] };
 }
 
 // #1272/#1374: DerivedFeature.edition is a server-side selector (which of a
@@ -174,25 +180,52 @@ export function applyAdvancementClamp(
   return { effectiveScores, hitPoints: effectiveHitPoints, effectiveInitBonus, clampedAdvancements, advSlotTotal, usedSlots, fightingStyleSlotTotal, usedFightingStyleSlots };
 }
 
-// Feat improvement modifier layer: sum structured feat improvements over the
-// kept advancements (origin feats + slot-bounded entries). Because
-// clampedAdvancements already excludes over-cap feats, level-down behavior is
-// automatic — no separate reversal code needed.
-// perLevel bonuses (e.g. Tough) scale with hitDiceTotal (applied level).
+// Improvement modifier layer: sum structured improvements from the kept
+// advancements (origin feats + slot-bounded entries) TOGETHER WITH active
+// ClassFeature row grants (#1691) AND active SpeciesTrait row grants (#1682,
+// serialize/species.ts's buildSpeciesTraitsView) through the ONE
+// deriveImprovementBonuses/deriveImprovementProficiencies evaluator — the
+// merge point that makes a proficiency granted by any of the three sources
+// collapse to one Set entry (no separate dedup: see
+// deriveImprovementProficiencies' own header). RACE_PROFICIENCY_GRANTS
+// (retired #1682) used to be a fourth, name-keyed source outside this merge;
+// a species trait's weapon/armor grant now surfaces with source: "feat" in
+// the wire proficiency arrays, the SAME bucket a ClassFeature row grant
+// already uses (#1691 precedent) — not a new "species" bucket.
+// Because clampedAdvancements already excludes over-cap feats and
+// classFeatureImprovements/speciesTraitImprovements are already gated at
+// collection time (buildResourcesView via deriveEntryScopedResources;
+// buildSpeciesTraitsView via the character's own species/variant selection),
+// level-down behavior for every source is automatic — no separate reversal
+// code needed. perLevel bonuses (e.g. Tough, Dwarven Toughness) scale with
+// hitDiceTotal (applied level) for EVERY source.
 export function applyFeatLayer(
   clampedAdvancements: AdvancementEntry[],
+  classFeatureImprovements: FeatImprovement[],
+  speciesTraitImprovements: FeatImprovement[],
   hitDiceTotal: number,
   maxHp: number,
+  // #1321: exhaustion's PHB'14 p. 291 tier-4 halving is edition/level-gated,
+  // so this needs both to route through effectiveMaxHitPoints (the composition
+  // shared with buildHpOpContext/applyHealInTx — never a fourth inline copy).
+  exhaustionLevel: number,
+  edition: RulesEdition,
 ): {
-  featBonuses: ReturnType<typeof deriveFeatBonuses>;
+  featBonuses: ReturnType<typeof deriveImprovementBonuses>;
   effectiveMaxHp: number;
-  featProficiencies: ReturnType<typeof deriveFeatProficiencies>;
+  featProficiencies: ReturnType<typeof deriveImprovementProficiencies>;
 } {
-  const featBonuses = deriveFeatBonuses(clampedAdvancements, hitDiceTotal);
-  const effectiveMaxHp = maxHp + featBonuses.maxHp;
-  // Proficiency grants from feats (skills + saving throws). Merged with stored
-  // proficiencies by the caller using OR — existing proficiency is never removed.
-  const featProficiencies = deriveFeatProficiencies(clampedAdvancements);
+  const improvements = [
+    ...clampedAdvancements.flatMap((entry) => entry.improvements ?? []),
+    ...classFeatureImprovements,
+    ...speciesTraitImprovements,
+  ];
+  const featBonuses = deriveImprovementBonuses(improvements, hitDiceTotal);
+  const effectiveMaxHp = effectiveMaxHitPoints(maxHp, featBonuses.maxHp, exhaustionLevel, edition);
+  // Proficiency grants from feats + class feature rows (skills + saving
+  // throws + armor + weapons). Merged with stored proficiencies by the
+  // caller using OR — existing proficiency is never removed.
+  const featProficiencies = deriveImprovementProficiencies(improvements);
   return { featBonuses, effectiveMaxHp, featProficiencies };
 }
 

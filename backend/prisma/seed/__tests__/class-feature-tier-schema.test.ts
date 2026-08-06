@@ -97,3 +97,281 @@ describe("ClassFeature tier-array schemas reject a descending minLevel order (#1
     expect(result.success).toBe(true);
   });
 });
+
+// #1685/#416 C3: total may be a formula instead of a flat number. Driven
+// through classFeatureSeedSchema.safeParse for the same reason as the suite
+// above — the one surface that actually ships (prisma/seed/validate.ts's
+// assertSeedContentValid runs it at seed time, so a malformed formula fails
+// the seed, never a character's read path).
+describe("resourceTotals' `total` accepts the #1685 formula vocabulary and rejects malformed formulas", () => {
+  it('accepts "proficiencyBonus"', () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceTotals: [{ minLevel: 1, total: "proficiencyBonus" }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts { abilityMod, min }", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceTotals: [{ minLevel: 1, total: { abilityMod: "charisma", min: 1 } }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts { abilityMod } with no min", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceTotals: [{ minLevel: 1, total: { abilityMod: "wisdom" } }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts { levelTimes }", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceTotals: [{ minLevel: 1, total: { levelTimes: 5 } }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects an unrecognized formula string (e.g. a typo\'d "proficiencyBonus")', () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceTotals: [{ minLevel: 1, total: "proficiencyBonu" }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an unrecognized abilityMod name", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceTotals: [{ minLevel: 1, total: { abilityMod: "luck" } }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a non-positive levelTimes", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceTotals: [{ minLevel: 1, total: { levelTimes: 0 } }],
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+// #1686: effectBuffs is a NEW nullable/optional list on ClassFeature — a
+// "toggle" resolverKind row's while-active buff descriptors. Driven through
+// classFeatureSeedSchema.safeParse for the same reason as every suite above:
+// prisma/seed/validate.ts's assertSeedContentValid is the one surface that
+// actually ships.
+describe("effectBuffs (#1686) — the toggle-resolver buff-list vocabulary", () => {
+  it("accepts a minimal buff (flat number modifier, a known target)", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      effectBuffs: [{ key: "rage", target: "meleeDamage", modifier: 2, duration: "while-active" }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects an unknown target that isn't the buff's own key", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      effectBuffs: [{ key: "rage", target: "notARealTarget", modifier: 2, duration: "while-active" }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("admits the marker-buff form — target equal to the buff's own key — even though it names no known stat (Elemental Attunement's shape)", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      effectBuffs: [{ key: "elementalAttunement", target: "elementalAttunement", modifier: 0, duration: "while-active" }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts a skill-name target (any of the 18 skill keys)", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      effectBuffs: [{ key: "guidance", target: "athletics", modifier: 1, duration: "concentration" }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects an unrecognized duration", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      effectBuffs: [{ key: "rage", target: "meleeDamage", modifier: 2, duration: "forever" }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts a tiered modifier — ascending minLevel, last-match-wins — mirroring resourceTotals' own tier invariant", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      effectBuffs: [
+        {
+          key: "rage",
+          target: "meleeDamage",
+          modifier: [
+            { minLevel: 1, value: 2 },
+            { minLevel: 9, value: 3 },
+            { minLevel: 16, value: 4 },
+          ],
+          duration: "while-active",
+        },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a DESCENDING tiered modifier — the same ordering rule every other tier column enforces", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      effectBuffs: [
+        {
+          key: "rage",
+          target: "meleeDamage",
+          modifier: [
+            { minLevel: 16, value: 4 },
+            { minLevel: 1, value: 2 },
+          ],
+          duration: "while-active",
+        },
+      ],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts resistDamageTypes and rollEffects (Rage needs both)", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      effectBuffs: [
+        {
+          key: "rage",
+          target: "meleeDamage",
+          modifier: 2,
+          duration: "while-active",
+          resistDamageTypes: ["bludgeoning", "piercing", "slashing"],
+          rollEffects: [
+            { mode: "advantage", kind: "check", ability: "strength" },
+            { mode: "advantage", kind: "save", ability: "strength" },
+          ],
+        },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects an unrecognized rollEffects mode", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      effectBuffs: [
+        {
+          key: "rage",
+          target: "meleeDamage",
+          modifier: 2,
+          duration: "while-active",
+          rollEffects: [{ mode: "sneaky", kind: "check", ability: "strength" }],
+        },
+      ],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts an entry-level minLevel gate plus an endReminder/clearOn (#1688's equip-trigger vocabulary, a list)", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      effectBuffs: [
+        {
+          key: "bladesong",
+          target: "ac",
+          modifier: { abilityMod: "intelligence", min: 1 },
+          duration: "concentration",
+          minLevel: 14,
+          clearOn: ["equipMediumArmor", "equipHeavyArmor", "equipShield"],
+          endReminder: "Bladesong ends if you attack with a weapon other than a light one, or cast a spell other than an Illusion or Transmutation spell.",
+        },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a clearOn entry outside the closed CLEAR_ON_TRIGGERS vocabulary", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      effectBuffs: [
+        { key: "bladesong", target: "ac", modifier: 1, duration: "while-active", clearOn: ["concentrationEnds"] },
+      ],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a buff missing a required field (no `key`)", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      effectBuffs: [{ target: "meleeDamage", modifier: 2, duration: "while-active" }],
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+// #1688: activationRequires' closed vocabulary — an armor/shield literal or a
+// `requiresActiveBuff` object. Driven through classFeatureSeedSchema.safeParse
+// for the same reason as effectBuffs above: the production validation path
+// (prisma/seed/validate.ts) is what this pins, not an un-exported schema.
+describe("activationRequires (#1688) — the declarative activation-constraint vocabulary", () => {
+  it("accepts every armor/shield literal", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      activationRequires: ["noMediumArmor", "noHeavyArmor", "noShield", "noBodyArmor"],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts a requiresActiveBuff object naming another buff's key", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      activationRequires: [{ requiresActiveBuff: "bladesong" }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts a mix of armor literals and requiresActiveBuff in one list", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      activationRequires: ["noMediumArmor", "noShield", { requiresActiveBuff: "bladesong" }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects an unrecognized literal outside the closed vocabulary", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      activationRequires: ["noRobe"],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a requiresActiveBuff object with an empty key", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      activationRequires: [{ requiresActiveBuff: "" }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a requiresActiveBuff object carrying an unknown extra field (strict)", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      activationRequires: [{ requiresActiveBuff: "bladesong", extra: true }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("null/absent activationRequires is valid (the common case)", () => {
+    expect(classFeatureSeedSchema.safeParse({ ...baseRow, activationRequires: null }).success).toBe(true);
+    expect(classFeatureSeedSchema.safeParse({ ...baseRow }).success).toBe(true);
+  });
+});

@@ -47,21 +47,28 @@ function useLedgerResolvers(draft: LevelUpDraft, edition: RulesEdition): { resol
   );
   const maneuvers = useCatalogNames(maneuverFetcher);
   // Cantrips share the spell catalog, so either list gates the same fetch (#1157).
-  const spells = useCatalogNames(draft.spellsLearned?.length || draft.cantripsLearned?.length ? fetchSpells : undefined);
+  //
+  // The edition is threaded here for the wire contract, not as an admission gate:
+  // this site resolves an id→name for an ALREADY-COMMITTED pick, so no
+  // cross-edition row can be introduced through it (#1411) — same reasoning
+  // as the feat fetcher below. `?edition=` became REQUIRED on GET /api/spells
+  // in #1712, so fetchSpells joined maneuvers/feats on the memoised-fetcher
+  // side of the line below (it could no longer get away with a bare module ref).
+  const needsSpells = !!(draft.spellsLearned?.length || draft.cantripsLearned?.length);
+  const spellFetcher = useMemo(
+    () => (needsSpells ? () => fetchSpells(edition) : undefined),
+    [needsSpells, edition],
+  );
+  const spells = useCatalogNames(spellFetcher);
   // Any taken feat fetches the catalog — a custom feat resolves by its own name,
   // so this needs no second (featId) guard. A Fighting Style feat (#1137) resolves
   // through the same catalog.
   //
-  // The edition is threaded here for the wire contract, not as an admission gate:
-  // this site resolves an id→name for an ALREADY-COMMITTED pick, so no
-  // cross-edition row can be introduced through it (#1411).
-  //
   // Keyed on the BOOLEAN, never on draft.fightingStyleFeat's object identity, and
   // never an inline arrow: useCatalogNames's effect depends on [fetcher], so a
   // fresh identity every render means fetch → setMap → re-render → fetch, forever.
-  // Only fetchSpells still gets away with a bare module ref, because it alone
-  // takes no argument — every edition-scoped fetcher must be memoised, and
-  // #1412 moved maneuvers across that line.
+  // Every edition-scoped fetcher must be memoised — #1412 moved maneuvers across
+  // that line, #1712 moved spells.
   const needsFeats = draft.advancement?.type === "takeFeat" || !!draft.fightingStyleFeat;
   const featFetcher = useMemo(
     () => (needsFeats ? () => fetchFeats(edition) : undefined),
@@ -116,7 +123,20 @@ function ListRow({ row, resolving }: { row: LedgerRow; resolving: boolean }) {
 // distinguishing it from the plain before→after ledger rows since a free spell
 // grant is a bigger deal than a delta. One line per spell (school-tinted name +
 // "Level N · School"), never a run-together name list.
-function GrantedSpellsCard({ row }: { row: LedgerRow }) {
+// #1509 D5: the granted-spell footnote's noun follows the target's served
+// casterModel, not a hardcoded "prepared" — a 2014 known caster's granted
+// spell (e.g. a Pact Boon spell) is analogous to Pact of the Chain/Tome's
+// "doesn't count against your number of spells known" (PHB'14 p. 107), not
+// SRD 5.2's Always-Prepared Spells glossary text. `casterModel` here is the
+// PLAN's top-level echo (`plan.target.casterModel`), not the newSpells step's
+// meta — this card renders whether or not that step exists this level-up.
+function grantedSpellsFootnote(casterModel: "known" | "prepared" | null | undefined): string {
+  return casterModel === "known"
+    ? "Doesn't count against your number of spells known."
+    : "Always prepared — doesn't count against your spells known.";
+}
+
+function GrantedSpellsCard({ row, casterModel }: { row: LedgerRow; casterModel: "known" | "prepared" | null | undefined }) {
   return (
     <div className="mt-2 rounded-card border border-gold-300 bg-gradient-to-r from-gold-50 to-gold-100 p-4">
       <p className="flex items-center gap-1.5 font-display text-sm font-semibold text-gold-900">
@@ -133,15 +153,15 @@ function GrantedSpellsCard({ row }: { row: LedgerRow }) {
           </li>
         ))}
       </ul>
-      <p className="mt-2 text-xs text-gold-800">Always prepared — doesn't count against your spells known.</p>
+      <p className="mt-2 text-xs text-gold-800">{grantedSpellsFootnote(casterModel)}</p>
     </div>
   );
 }
 
-function LedgerRowView({ row, resolving }: { row: LedgerRow; resolving: boolean }) {
+function LedgerRowView({ row, resolving, casterModel }: { row: LedgerRow; resolving: boolean; casterModel: "known" | "prepared" | null | undefined }) {
   if (row.variant === "note") return <NoteRow row={row} />;
   if (row.variant === "list") return <ListRow row={row} resolving={resolving} />;
-  if (row.variant === "grantedSpells") return <GrantedSpellsCard row={row} />;
+  if (row.variant === "grantedSpells") return <GrantedSpellsCard row={row} casterModel={casterModel} />;
   return <DeltaRow row={row} />;
 }
 
@@ -163,7 +183,7 @@ export default function ReviewStep() {
 
       <div className="mt-5">
         {rows.map((row, i) => (
-          <LedgerRowView key={`${row.label}-${i}`} row={row} resolving={resolving} />
+          <LedgerRowView key={`${row.label}-${i}`} row={row} resolving={resolving} casterModel={plan.target.casterModel} />
         ))}
       </div>
     </div>

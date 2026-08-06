@@ -44,15 +44,20 @@
 // row's own name/level/description.
 //
 // RESOURCE POOL — Bardic Inspiration stays WHOLLY in lib/classes/bard.ts's
-// resourceFn, with TWO independent blockers (not one):
-// (1) Total is `Math.max(1, chaMod)` — a formula `resourceTotals` cannot
-// express (schema.prisma's own ClassFeature.resourceKey comment names Bardic
-// Inspiration as the canonical stay-in-TS case).
-// (2) Recharge is level-tiered: `longRest` below level 5, `short-or-long` from
-// level 5 (Font of Inspiration). `resourceRecharge` is a single scalar column
-// with no `resourceRechargeTiers` sibling — a row physically cannot carry a
-// recharge that changes mid-progression. This blocker is independent of (1)
-// and would still block a row-based pool even if the total were fixed.
+// resourceFn. Its total (`Math.max(1, chaMod)`) is now expressible as a
+// `{ abilityMod: "charisma", min: 1 }` formula tier (#1685's evaluator) —
+// see the four pools that DID migrate that way (Dark One's Own Luck,
+// Tireless, Nature's Veil, Moonlight Step) — but TWO other, independent
+// blockers remain, either one alone sufficient to keep this pool in TS:
+// (1) Recharge is level-tiered: `longRest` below level 5, `short-or-long`
+// from level 5 (Font of Inspiration). `resourceRecharge` is a single scalar
+// column with no `resourceRechargeTiers` sibling — a row physically cannot
+// carry a recharge that changes mid-progression.
+// (2) The pool's description is itself level-conditional — it names the
+// current die size and which rest currently recharges it inline (see
+// bard.ts's resourceFn literal). #1528's no-second-string rule means a row's
+// `description` is read verbatim; a per-level interpolated string can't be
+// authored as one static row.
 // No row below sets resourceKey/resourceLabel/resourceRecharge/resourceTotals
 // — not even the resourceKey-without-resourceTotals documentation form
 // Ranger/Warlock use for their own Wisdom/Charisma-modifier pools, since
@@ -68,6 +73,7 @@
 // parameter (CLAUDE.md's no-fork-when-they-agree rule) — its signature stays
 // `(level, abilityScores)`.
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
+import type { FeatImprovement } from "../../src/lib/classes/resources-state.js";
 import type { SeedEdition } from "./edition.js";
 import type { ClassFeatureSeedRow } from "./class-features.js";
 
@@ -90,6 +96,10 @@ interface RawBardFeature {
   // Attack), unlike Cleric, whose rows set neither.
   derivedStat?: string;
   derivedStatTiers?: { minLevel: number; value: number | string }[];
+  // A passive, always-on grant (#1691) — see ClassFeature.improvements' own
+  // schema.prisma comment. Only College of Valor's 2014 "Bonus Proficiencies"
+  // row sets this today.
+  improvements?: FeatImprovement[];
 }
 
 function expand(raw: RawBardFeature): ClassFeatureSeedRow[] {
@@ -103,6 +113,7 @@ function expand(raw: RawBardFeature): ClassFeatureSeedRow[] {
     edition,
     derivedStat: raw.derivedStat,
     derivedStatTiers: raw.derivedStatTiers,
+    improvements: raw.improvements,
   }));
 }
 
@@ -416,6 +427,14 @@ const COLLEGE_OF_VALOR_RAW: RawBardFeature[] = [
     level: 3,
     edition: "EDITION_2014",
     description: "You gain proficiency with medium armor, shields, and martial weapons.",
+    // #1691: PHB'14 p.56 grants these outright, no choice involved.
+    // 2014-row-only, matching this row's own edition — the 2024 successor
+    // (Martial Training, below) is its own row and authors its own grant.
+    improvements: [
+      { target: "armorProficiency", amount: 1, key: "medium" },
+      { target: "armorProficiency", amount: 1, key: "shield" },
+      { target: "weaponProficiency", amount: 1, key: "Martial Weapons" },
+    ],
   },
   // Bonus Proficiencies has NO EDITION_2024 row — renamed outright to Martial
   // Training below (a different name AND a scope change: it adds a

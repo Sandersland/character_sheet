@@ -6,31 +6,22 @@ import { abilityModifier } from "@/lib/srd/math.js";
 /** Armor categories that a character can be proficient with. */
 export type ArmorProficiencyCategory = "light" | "medium" | "heavy" | "shield";
 
-/** Static armor/weapon proficiency grants from a class or race. */
-export interface ProficiencyGrant {
-  armor: ArmorProficiencyCategory[];
-  /** May contain category labels ("Simple Weapons", "Martial Weapons") and/or
-   *  specific weapon names ("Longswords"). Mixed — display renders them verbatim. */
-  weapons: string[];
-}
-
-/**
- * Fixed weapon/armor proficiencies granted by race (PHB).
- * Keyed by race display name, matching raceSelection.name from the seed.
- * Races not listed (Human, Halfling, Gnome, Tiefling, etc.) grant nothing — omitted.
- */
-export const RACE_PROFICIENCY_GRANTS: Record<string, ProficiencyGrant> = {
-  // Dwarven weapon training; Mountain Dwarf additionally gets light + medium armor.
-  "Hill Dwarf":     { armor: [],                  weapons: ["Battleaxes", "Handaxes", "Light Hammers", "Warhammers"] },
-  "Mountain Dwarf": { armor: ["light", "medium"], weapons: ["Battleaxes", "Handaxes", "Light Hammers", "Warhammers"] },
-  // Elf weapon training varies by subrace.
-  "High Elf": { armor: [], weapons: ["Longswords", "Shortswords", "Shortbows", "Longbows"] },
-  "Wood Elf": { armor: [], weapons: ["Longswords", "Shortswords", "Shortbows", "Longbows"] },
-  Drow:       { armor: [], weapons: ["Rapiers", "Shortswords", "Hand Crossbows"] },
-  // Legacy generic key: back-compat for any character created before the race list
-  // was expanded to named subraces (Hill/Mountain/High/Wood/Drow).
-  Dwarf:      { armor: [], weapons: ["Battleaxes", "Handaxes", "Light Hammers", "Warhammers"] },
-};
+// RACE_PROFICIENCY_GRANTS (name-keyed Record<race name, {armor, weapons}>,
+// e.g. "Mountain Dwarf" -> light+medium armor) retired #1682: its content now
+// lives as seeded SpeciesTrait rows (Dwarven Combat Training/Dwarven Armor
+// Training/Elf Weapon Training/Drow Weapon Training, prisma/seed/species-
+// traits-data.ts), resolved via the character's OWN species/variant selection
+// (CharacterRace.speciesId/variantId, #1679) instead of a raceSelection.name
+// string match. buildMergedArmorProficiencies/buildMergedWeaponProficiencies
+// below no longer take a raceName parameter — a species trait's grant now
+// arrives pre-merged into `featArmor`/`featWeapons` (character-serialize.ts's
+// applyFeatLayer, which folds classFeatureImprovements AND
+// speciesTraitImprovements into the SAME deriveImprovementProficiencies call
+// class-feature-row grants already used, #1691 precedent) and is tagged
+// source: "feat" below, the SAME bucket a ClassFeature row grant already
+// uses — not a new "species" bucket. Output-identical for the proficiency
+// SET a Hill/Mountain Dwarf ends up with; see serialize-item-placement.test.ts
+// and species-trait-improvements-1682.test.ts for the byte-identity proof.
 
 /**
  * Returns true if the character is proficient with the given weapon based on

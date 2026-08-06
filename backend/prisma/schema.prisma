@@ -26,9 +26,9 @@ datasource db {
 // (Club -> "Club +1" with bonus damage) and a snapshot needs no merge logic
 // to read or write. itemId is kept only as a provenance pointer.
 model Character {
-  id          String  @id @default(uuid())
-  name        String
-  alignment   String
+  id        String @id @default(uuid())
+  name      String
+  alignment String
 
   // Uploaded-portrait blob key (#1615) — persisted content state, like
   // CampaignEntity.portraitKey, not derivable. The key itself NEVER goes on the
@@ -256,21 +256,21 @@ enum EntityVisibility {
 }
 
 model CampaignEntity {
-  id         String           @id @default(uuid())
-  campaignId String
-  campaign   Campaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  type       EntityType
-  name       String
-  aliases    String[]         @default([])
-  notes      String?
+  id          String           @id @default(uuid())
+  campaignId  String
+  campaign    Campaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  type        EntityType
+  name        String
+  aliases     String[]         @default([])
+  notes       String?
   // Uploaded-portrait blob key (#1617), like Character.portraitKey: the key
   // itself NEVER goes on the wire — toWireEntity derives the wire portraitUrl
   // (a relative /api/campaigns/:id/entities/:entityId/portrait path) at read
   // time, and it's mutated only by the entity portrait upload/delete endpoints.
   portraitKey String?
-  visibility EntityVisibility @default(REVEALED)
-  createdAt  DateTime         @default(now())
-  updatedAt  DateTime         @updatedAt
+  visibility  EntityVisibility @default(REVEALED)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
 
   refs          JournalEntryRef[]
   characterLink CampaignCharacterLink?
@@ -424,13 +424,133 @@ model AuthSession {
 // models below, so deleting/renaming a catalog row never breaks an existing
 // character sheet.
 
-model Race {
-  id                String   @id @default(uuid())
-  name              String   @unique
-  speed             Int
-  toolProficiencies String[] @default([])
+// --- Species catalog (#1679, epic #1518) ------------------------------------
+// Parent+variant catalog for the two-step species→variant creation choice
+// (2014 race→subrace, 2024 species→lineage/legacy/ancestry) — the SOLE
+// mechanical anchor since #1684 pruned the flat `Race` model and
+// `CharacterRace.raceId` (which served the legacy creation path through
+// #1679-#1683). `edition` is NOT NULL, unlike Subclass/Feat/Background's nullable `edition`:
+// no species is edition-neutral — rosters, ability increases, and trait text
+// all fork per edition (the ACTIONS/#1430 transcription rule), so a 2014 and
+// a 2024 Dwarf are two rows sharing a name, never one shared row. Children
+// (SpeciesVariant/SpeciesTrait/SpeciesGrantedSpell) carry NO edition column of
+// their own — they inherit it through speciesId, so a cross-edition check is
+// always a parent-edition comparison (see character-create.ts's
+// resolveSpeciesSelection).
+model Species {
+  id               String       @id @default(uuid())
+  name             String
+  slug             String
+  speed            Int
+  edition          RulesEdition
+  // AbilityIncreaseSpec[] — fixed | choose | floating (abilityIncreasesSchema,
+  // lib/srd/species-ability-increases.ts). [] for every EDITION_2024 row: 2024
+  // ability increases come from backgrounds only (#1572), never species (epic
+  // body, pinned by a negative test both directions). Read and baked into
+  // effective scores at creation by resolveSpeciesGrants (character-create.ts,
+  // #1681); the applied result is snapshotted onto CharacterRace.abilityBonuses.
+  abilityIncreases Json         @default("[]")
 
-  selections CharacterRace[]
+  variants      SpeciesVariant[]
+  traits        SpeciesTrait[]
+  grantedSpells SpeciesGrantedSpell[]
+  selections    CharacterRace[]
+
+  @@unique([name, edition])
+  @@unique([slug, edition])
+}
+
+// A species' second creation step: 2014 subrace, 2024 lineage/legacy/ancestry,
+// or — in BOTH editions — Dragonborn's Draconic Ancestry (epic review decision
+// 7: PHB'14 calls it a trait rather than a subrace, but the schema has exactly
+// one place for a species-level creation choice, and this is it). No `edition`
+// column — inherits the parent Species row's edition.
+model SpeciesVariant {
+  id               String  @id @default(uuid())
+  speciesId        String
+  species          Species @relation(fields: [speciesId], references: [id], onDelete: Cascade)
+  name             String
+  slug             String
+  // NULL = use the parent Species.speed (the common case). Set only when the
+  // book states a different value for this variant (PHB'14 Wood Elf 35 ft;
+  // no 2024 variant seeded this slice overrides speed).
+  speedOverride    Int?
+  // Same AbilityIncreaseSpec[] shape as Species.abilityIncreases, additive to
+  // the parent's at creation (PHB'14 Hill Dwarf +1 WIS on top of Dwarf's own
+  // +2 CON — the create phase merges both levels, #1681). [] for every 2024
+  // row and for every Dragonborn ancestry variant in either edition (draconic
+  // ancestry grants a damage type + resistance, never an ability increase).
+  abilityIncreases Json    @default("[]")
+  // When true, `abilityIncreases` REPLACES the parent Species' increases at
+  // creation instead of adding to them (fetchMergedAbilityIncreases). Only the
+  // Astral Elf sets this (#1751): a Spelljammer standalone race modelled as an
+  // Elf variant, it carries a Tasha's-era floating spread and must NOT inherit
+  // the base Elf's +2 DEX the way real subraces (High/Wood/Drow) do. Default
+  // false keeps every existing subrace additive.
+  abilityIncreasesReplace Boolean @default(false)
+
+  traits        SpeciesTrait[]
+  grantedSpells SpeciesGrantedSpell[]
+  selections    CharacterRace[]
+
+  @@unique([speciesId, name])
+  @@unique([speciesId, slug])
+}
+
+// Species trait content — table only in this slice; every row's actual prose
+// and mechanics are authored in #1682 (slice 4), including the Dragonborn
+// ancestry variants' breath weapon + resistance. speciesId is required (every
+// trait belongs to a species); variantId is NULL for a species-level trait
+// (the majority — Dwarven Resilience) and set for a variant-only one (Hill
+// Dwarf's Dwarven Toughness) — same base-required/child-optional shape as
+// ClassFeature's classId/subclassId.
+model SpeciesTrait {
+  id           String          @id @default(uuid())
+  speciesId    String
+  species      Species         @relation(fields: [speciesId], references: [id], onDelete: Cascade)
+  variantId    String?
+  variant      SpeciesVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  name         String
+  description  String
+  // FeatImprovement[] vocabulary (Feat.improvements, srd/feats.ts) reused
+  // verbatim so #1682's derivation layer needs no new shape, only a new source.
+  improvements Json            @default("[]")
+  // #1689: the player-CHOICE vocabulary a fixed FeatImprovement can't express
+  // ("choose two skills", "choose a cantrip") — speciesTraitChoiceSchema
+  // (lib/srd/species-trait-choices.ts). NULL for every announce-only or
+  // fixed-only trait (the vast majority); set on exactly the ONE trait row
+  // that carries the choice (Half-Elf's own Skill Versatility row, High Elf's
+  // own Cantrip row) so the choice stays tied to its citation + description —
+  // the same "identity lives on the trait row" shape #1682 established,
+  // rather than a second spec column on Species/SpeciesVariant. A single
+  // object, not an array like `improvements`: one trait row is always exactly
+  // one mechanic, never a bundle of choices.
+  choice       Json?
+
+  // Postgres does not auto-index FK columns; #1682 resolves traits by species
+  // (include: { traits: true }) and by variant, and a species prune cascades on
+  // speciesId — index both so neither becomes a full table scan (#1679 review).
+  @@index([speciesId])
+  @@index([variantId])
+}
+
+// A spell a species/variant grants for free — sibling of SubclassGrantedSpell
+// (2024 lineage spell tracks land in #1683/slice 6), deliberately NOT the same
+// table: a species grant's source is the species/variant, never a subclass.
+// Unlike SubclassGrantedSpell's nullable `edition` (a genuine shared-vs-forked
+// axis), this has no edition column at all — it inherits edition through
+// speciesId, the same as every other Species child. No rows seeded this slice.
+model SpeciesGrantedSpell {
+  id        String          @id @default(uuid())
+  speciesId String
+  species   Species         @relation(fields: [speciesId], references: [id], onDelete: Cascade)
+  variantId String?
+  variant   SpeciesVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  spellId   String
+  spell     Spell           @relation(fields: [spellId], references: [id], onDelete: Cascade)
+  gateLevel Int
+
+  @@index([speciesId])
 }
 
 model CharacterClass {
@@ -501,7 +621,7 @@ model CharacterClass {
   startingEquipmentPackages StartingEquipmentPackage[]
 }
 
-// Subclass catalog — Pattern A (like Race/CharacterClass). Each row is a
+// Subclass catalog — Pattern A (like Species/CharacterClass). Each row is a
 // named subclass belonging to one CharacterClass. The nullable FK on
 // CharacterClassEntry.subclassId points here; `onDelete: SetNull` keeps
 // existing entries intact if a catalog subclass is ever removed. Homebrew
@@ -550,11 +670,11 @@ model Subclass {
 // deriveGrantedSpells; never persisted onto the character. Homebrew subclasses
 // (once they own Subclass rows, #911) grant spells by adding rows here — no code.
 model SubclassGrantedSpell {
-  id             String   @id @default(uuid())
+  id             String        @id @default(uuid())
   subclassId     String
-  subclass       Subclass @relation(fields: [subclassId], references: [id], onDelete: Cascade)
+  subclass       Subclass      @relation(fields: [subclassId], references: [id], onDelete: Cascade)
   spellId        String
-  spell          Spell    @relation(fields: [spellId], references: [id], onDelete: Cascade)
+  spell          Spell         @relation(fields: [spellId], references: [id], onDelete: Cascade)
   // Character level at which the grant becomes active (the subclass grant level).
   // No default: real grants span levels 1–17 (Cleric 1/3/5/7/9, Paladin
   // 3/5/9/13/17), so every seed/write sets it explicitly (#913).
@@ -611,26 +731,34 @@ model ClassFeature {
   // ---- than re-migrating all 522 text rows a second time when #1528 lands.
 
   // Resource block — replaces the pool this feature declares in resourceFn.
-  // A row may set resourceKey and leave the totals NULL: a formula-computed
-  // pool (Bardic Inspiration = Cha mod, Lay on Hands = level x 5) keeps
-  // resourceFn until #416's C3 evaluator exists. `resourceRecharge` is also a
-  // single scalar, not a tier array — Bardic Inspiration's recharge changes
-  // mid-progression (longRest below level 5, short-or-long from level 5), a
-  // second independent reason no row can carry this pool even with a fixed
-  // total (#1224).
+  // `resourceRecharge` is a single scalar, not a tier array — Bardic
+  // Inspiration's recharge changes mid-progression (longRest below level 5,
+  // short-or-long from level 5), which is why it stays resourceFn-derived
+  // even though #1685's evaluator can now express its Cha-mod total
+  // (`{ abilityMod, min }`) directly on a row (#1224).
   resourceKey      String?
   resourceLabel    String?
   resourceRecharge String? // RechargeOn
-  resourceTotals   Json? // [{ minLevel, total }] — ASCENDING by minLevel, last-match-wins
+  resourceTotals   Json? // [{ minLevel, total }] — total: number | "proficiencyBonus" | { abilityMod, min? } | { levelTimes } (#1685) — ASCENDING by minLevel, last-match-wins
   resourceDieTiers Json? // [{ minLevel, die }]   — ASCENDING by minLevel, last-match-wins
 
   // Activation block — replaces this feature's DERIVED_ACTIONS row. No gate
   // columns: grantClass IS classId, grantSubclassSlugs IS subclassId,
   // grantLevel IS level — one row, one gate.
-  activationCost    String? // ActionCost: action | bonusAction | reaction | free | special
-  resolverKind      String? // ResolutionKind — served on the wire, retiring the frontend mirror
-  requiresUnarmored Boolean  @default(false)
-  regrants          String[] @default([])
+  activationCost     String? // ActionCost: action | bonusAction | reaction | free | special
+  resolverKind       String? // ResolutionKind — served on the wire, retiring the frontend mirror
+  requiresUnarmored  Boolean  @default(false)
+  regrants           String[] @default([])
+  // Declarative activation-time gates (#1688): a closed vocabulary — armor/
+  // shield literals ("noMediumArmor" | "noHeavyArmor" | "noShield" |
+  // "noBodyArmor") plus `{ requiresActiveBuff: <buffKey> }`, evaluated by
+  // unmetActivationRequirements at activation, server-side, inside
+  // applyRowDrivenActionInTx — never
+  // re-derived client-side. Bladesong (#1676) is the first `noMediumArmor`/
+  // `noHeavyArmor`/`noShield` consumer; Song of Defense's `requiresActiveBuff`
+  // and Elemental Attunement's burst/strike ops are the follow-ons. Validated
+  // seed-time (classFeatureSeedSchema).
+  activationRequires Json?
 
   // Cost block — GrantedAbility's columns verbatim (AbilityCostColumns is
   // exactly these four, all optional) so readAbilityCost reads them unchanged.
@@ -698,6 +826,40 @@ model ClassFeature {
   // Empty (the default) means "no such axis" for every row but Combat
   // Superiority.
   saveDcAbilities String[] @default([])
+
+  // A passive, always-on grant — proficiency or a flat numeric bonus — the
+  // row's prose promises but no other descriptor column can express (#1691;
+  // the proving case is Life Domain's 2014 "Bonus Proficiency" row, which
+  // said "you gain heavy armor proficiency" and granted nothing). Validated
+  // seed-time against the SAME FeatImprovement vocabulary/zod schema a taken
+  // feat's `improvements` snapshot uses (lib/srd/feats.ts's
+  // featImprovementSchema/FEAT_IMPROVEMENT_TARGETS) — reused, not forked, so
+  // a target added for feats is usable here with no second declaration.
+  // #1682's SpeciesTrait.improvements is the sibling of this column, reusing
+  // the same read-time evaluator (deriveImprovementBonuses/
+  // deriveImprovementProficiencies).
+  improvements Json?
+
+  // A row-declared list of while-active buffs a "toggle" resolverKind
+  // activates (#1686): [{ key, target, modifier, duration, minLevel?,
+  // clearOn?, endReminder?, resistDamageTypes?, rollEffects? }]. Distinct from
+  // buffTarget/buffModifier above (#900 C2b's single flat modifier, applied by
+  // a cast) — this column carries a LIST, each entry independently
+  // level-gated (minLevel) and able to carry resistance/roll-effect grants a
+  // single flat modifier can't express (Rage needs both). `modifier` is
+  // #1685's ResourceTotalFormula OR a tier array (ASCENDING minLevel,
+  // last-match-wins, same invariant as resourceTotals/derivedStatTiers) —
+  // evaluateBuffModifier (lib/classes/class-feature-rows.ts) is the one place
+  // this vocabulary is interpreted. Validated seed-time
+  // (classFeatureSeedSchema); `target` may equal the buff's own `key` for a
+  // marker buff with no numeric effect (Elemental Attunement's shape).
+  // `clearOn` (#1688) is a list of equip-time trigger keys (CLEAR_ON_TRIGGERS)
+  // copied onto the instantiated ActiveBuff and matched against the equip
+  // hook's own raised triggers (equipClearTriggers) — the metadata path Mage
+  // Armor's equip-driven true-end (#363) now rides too (buffTarget
+  // "acUnarmoredBase" -> clearOn ["equipBodyArmor"], set at cast time via
+  // BUFF_TARGET_CLEAR_ON).
+  effectBuffs Json?
 
   // NULLS NOT DISTINCT is hand-written in the migration (Prisma's DSL cannot
   // express it) — subclassId is nullable and base-class features are the
@@ -891,12 +1053,71 @@ model Background {
 // catalog entry's name at creation but is free to drift independently.
 
 model CharacterRace {
-  id          String    @id @default(uuid())
-  characterId String    @unique
-  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
-  raceId      String?
-  race        Race?     @relation(fields: [raceId], references: [id], onDelete: SetNull)
-  name        String
+  id                    String          @id @default(uuid())
+  characterId           String          @unique
+  character             Character       @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  // Display-name snapshot, defaulting from the resolved species/variant at
+  // creation (character-create.ts's raceSelectionCreateInput) but free to
+  // diverge — same "catalog default, no live reference" shape as the other
+  // per-character selection models (CharacterClass/CharacterBackground).
+  name                  String
+  // The mechanical anchor (#1679, epic #1518) since #1684 pruned the flat
+  // `Race` model — every API-created character has one (POST /api/characters
+  // requires speciesId), but the column stays nullable for the same reason
+  // CharacterBackground.backgroundId is: a homebrew/fixture row with no
+  // catalog anchor is still a legal CharacterRace. variantId is set only for
+  // a variant-bearing species — character-create.ts's resolveSpeciesSelection
+  // requires one whenever the chosen species has variant rows.
+  speciesId             String?
+  species               Species?        @relation(fields: [speciesId], references: [id], onDelete: SetNull)
+  variantId             String?
+  variant               SpeciesVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  // Drifting display snapshot of the chosen variant's name — same "defaults
+  // from the catalog, free to diverge" shape as `name` above. NULL when no
+  // variant was chosen (variantless species or a homebrew/fixture row with no
+  // speciesId).
+  variantName           String?
+  // Provenance snapshot of the ability increases actually APPLIED (owner-
+  // approved 2026-08-03), written by resolveSpeciesGrants (character-create.ts,
+  // #1681) — [] for a 2024 character or a species with no increases in its
+  // merged spec. Makes the bake auditable, unlike the background ability
+  // spread (#1130), which has no equivalent record. The scores themselves
+  // stay baked with no reversible delta — species is immutable post-creation
+  // (no species transaction endpoint, absent from PATCH), so there is
+  // nothing for a delta to ever reverse, and no LEVEL_GATED_RECONCILERS
+  // entry follows for the same reason: this state's legal maximum is fixed
+  // at creation, never revisited by level.
+  abilityBonuses        Json            @default("[]")
+  // #1683: the Int/Wis/Cha casting-ability choice a 2024 lineage/legacy makes
+  // WHEN GAINED (PHB'24 "choose the ability when you select the lineage") —
+  // snapshotted here, not on SpeciesGrantedSpell, because the row is shared
+  // catalog content and the choice is per-character. Plain string, not the
+  // AbilityName wire type (no Ability enum in this schema, same convention as
+  // SubclassGrantedSpell.castingAbility) — validated against the six lowercase
+  // names at read time (deriveGrantedCastingAbility's own fallback-to-wisdom
+  // guard covers a corrupt value). NULL for a 2014 character (no 2014 subrace
+  // has this choice), a species/variant with no spell grant, or before #1683's
+  // picker runs. Immutable post-creation — same reasoning as abilityBonuses
+  // above, no LEVEL_GATED_RECONCILERS entry.
+  castingAbility        String?
+  // #1689: provenance snapshot of the species-granted CREATION CHOICES applied
+  // — sibling of abilityBonuses above, same "audit-only, not the source of
+  // truth" role as variantName. The functional grant lives elsewhere
+  // (speciesSkills fold into the character's normal skillProficiencies;
+  // the cantrip lands in Character.spellcasting.spells, source:"species") —
+  // these two columns exist only so the choice is inspectable without
+  // re-deriving it from the mutable spellcasting blob. [] / null for a
+  // species with no choice-bearing trait, or every 2024 species this slice
+  // (the mechanism is edition-neutral; 2024 content is #1690's).
+  speciesSkills         String[]        @default([])
+  speciesCantripName    String?
+  // #1690: provenance snapshot of a species-granted Origin feat pick (Human's
+  // Versatile) — sibling of speciesCantripName above, same "audit-only" role.
+  // The functional grant lives on Character.resources.advancements as a
+  // slot-exempt AdvancementEntry (the SAME snapshot shape the background's
+  // Origin feat bakes via buildOriginEntry, #1130), never re-derived from
+  // this column. NULL for every species with no chooseOriginFeat trait.
+  speciesOriginFeatName String?
 }
 
 model CharacterBackground {
@@ -1158,8 +1379,9 @@ model Action {
   grantLevel    Int? // minimum character level for this action to appear
 
   // Optional scalar resource-spend hint — used by deriveActions to determine
-  // `enabled` (e.g. Rage costs 1 "rage"; Flurry costs 2 "ki"). No program,
-  // just two columns that let deriveActions check remaining > amount.
+  // `enabled` (e.g. Rage costs 1 "rage"; Flurry of Blows costs 1 "ki" or 1
+  // "focus" depending on edition, #1500). No program, just two columns that
+  // let deriveActions check remaining > amount.
   resourceKey    String? // matches DerivedResource.key, e.g. "rage"
   resourceAmount Int? // units required; null means no resource check needed
 
@@ -1205,11 +1427,12 @@ model GrantedAbility {
   actionSlot String?
   selfTempHp Boolean @default(false)
 
-  // Embedded AbilityCost (F2) — focus/superiority-die pool spend. kind "none" = free.
-  costKind    String? // "none" | "pool"
-  costPoolKey String? // e.g. "focus"
-  costBase    Int? // base pool cost
-  costPerStep Int? // additional units per scaling step
+  // Embedded AbilityCost (F2/F3) — focus/superiority-die pool spend, or a
+  // spell-slot spend. kind "none" = free.
+  costKind    String? // "none" | "pool" | "slot"
+  costPoolKey String? // e.g. "focus" — "pool" only
+  costBase    Int? // "pool": base pool cost. "slot" (#1687): minimum slot level (AbilityCost's minLevel) — reused rather than a dedicated costMinSlotLevel column since a row is never both kinds at once.
+  costPerStep Int? // additional units per scaling step — "pool" only
 
   // Embedded EffectSpec (F1) — same flat columns as Spell. saveAbility doubles
   // as the ability's DC save ability.
@@ -1229,6 +1452,19 @@ model GrantedAbility {
   // target while the granting concentration holds. null = not a buff.
   buffTarget   String?
   buffModifier Int?
+
+  // The row-declared while-active buff list (#1686) — see ClassFeature.effectBuffs'
+  // own comment for the shape/evaluator. No maneuver/GrantedAbility row
+  // populates this yet; added here so a future "toggle" GrantedAbility (e.g. a
+  // Battle Master maneuver with a while-active rider) needs no second migration.
+  effectBuffs Json?
+
+  // Declarative activation-time gates (#1688) — see ClassFeature.activationRequires'
+  // own comment for the vocabulary/evaluator. No maneuver row populates this
+  // yet (no maneuver has an armor/shield or requiresActiveBuff constraint);
+  // added here for schema symmetry so a future GrantedAbility with one needs
+  // no second migration.
+  activationRequires Json?
 
   // NULL = valid in both editions; a diverging maneuver / shadow art / channel
   // divinity / subclass-choice option forks into one row per edition sharing
@@ -1290,7 +1526,7 @@ model Feat {
 // polymorphic like items, so no detail table split is needed.
 model Spell {
   id            String      @id @default(uuid())
-  name          String      @unique
+  name          String
   level         Int // 0 = cantrip
   school        SpellSchool
   castingTime   String
@@ -1299,7 +1535,6 @@ model Spell {
   description   String
   concentration Boolean     @default(false)
   ritual        Boolean     @default(false)
-  classes       String[] // lowercase class names the spell appears on, e.g. ["wizard","sorcerer"]
 
   // Spell components for spellbook display + future component checks.
   // { verbal: bool, somatic: bool, material: bool, materialDescription?: string }
@@ -1332,10 +1567,59 @@ model Spell {
   cantripScaling     Boolean @default(false)
 
   // Subclasses that grant this spell for free (#898).
-  grantedBy SubclassGrantedSpell[]
+  grantedBy        SubclassGrantedSpell[]
+  // Species/variants that grant this spell for free (#1679's table; no rows yet).
+  speciesGrantedBy SpeciesGrantedSpell[]
+  // Class-membership join (#1711 F2 of epic #1517) — replaces the old
+  // `classes String[]` column. No `edition` filter needed on this side: a
+  // 2014-fork Spell row and its 2024 sibling are separate Spell rows (Shape
+  // 1, edition rides the parent row below), so each owns disjoint
+  // SpellClass rows already.
+  classMemberships SpellClass[]
+
+  // NULL = valid in both editions; a diverging spell forks into one row per
+  // edition sharing this name (#1710, foundation for epic #1517's 2014
+  // catalog). Mirrors Feat's `edition` above: NULLS NOT DISTINCT on the
+  // migration's unique index so two NULL-edition rows sharing a name are
+  // still rejected — see resolveEditionRow, the single place the exact/NULL
+  // fallback ordering is expressed. The existing ~109 seeded rows are SRD 5.2
+  // text and are tagged EDITION_2024, not NULL — they're edition-specific
+  // content (renamed spells, narrowed components), not rules that happen to
+  // agree, so seedSpells defaults an untagged spells.ts entry to 2024 rather
+  // than to the "shared" NULL Feat uses.
+  edition RulesEdition?
+
+  @@unique([name, edition])
 }
 
-// Baseline equipment catalog, same role as Race/CharacterClass above: seeded
+// Spell↔class membership join (#1711, F2 of epic #1517's 2014 catalog fork).
+// Replaces `Spell.classes String[]`: a single array column can't hold two
+// editions' class lists when they diverge (SRD 5.2 reassigned/renamed
+// spells), so membership moves to a queryable, homebrew-friendly join.
+//
+// No `edition` column — Shape 1 (settled here, referenced by #1495's
+// identical join question): edition rides the parent Spell row, so a
+// 2014-fork spell and its 2024 sibling are two separate Spell rows, each
+// with its own disjoint SpellClass rows. onDelete: Cascade so a content
+// slice's reseed pruning a stale Spell row never leaves an orphaned
+// membership row behind.
+model SpellClass {
+  id        String @id @default(uuid())
+  spellId   String
+  spell     Spell  @relation(fields: [spellId], references: [id], onDelete: Cascade)
+  className String // lowercase class name, e.g. "wizard"
+
+  @@unique([spellId, className])
+  // #1712 (folded in from #1711's review): className isn't the leading
+  // column of the unique(spellId, className) index above, so the ?class=
+  // route filter (classMemberships.some, spells.ts) can't use it — a
+  // dedicated index before the 2014 content slices (#1713-#1721) multiply
+  // the row count. See the hand-written migration's own comment for why this
+  // needed a manual migration.sql rather than `prisma migrate dev`.
+  @@index([className])
+}
+
+// Baseline equipment catalog, same role as Species/CharacterClass above: seeded
 // from a small SRD subset (prisma/seed.ts) and never referenced directly by
 // Character — only through InventoryItem.itemId, which is nullable, so
 // editing/removing a catalog row never breaks an existing character's
@@ -1720,6 +2004,7 @@ enum CharacterEventType {
   currencyAdjust
   // spellcasting
   castSpell
+  castAbilitySlot // row-driven {kind:"slot"} ability spend (#1687)
   expendSlot
   restoreSlot
   learnSpell
@@ -1760,6 +2045,7 @@ enum CharacterEventType {
   learnSubclassChoice
   forgetSubclassChoice
   subclassChoicesReconciled
+  castDiscipline
   // advancement (ASI + feats)
   abilityScoreImprovement
   featTaken

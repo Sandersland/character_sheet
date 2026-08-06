@@ -1,4 +1,9 @@
+import type { RulesEdition } from "@character-sheet/shared-types";
+
 import { Prisma } from "@/generated/prisma/client.js";
+import { exhaustionMaxHpPenalty } from "@/lib/srd/condition-data.js";
+import { characterAdvancementSlots } from "@/lib/srd/advancement-slots.js";
+import { normalizeResourcesMutable, splitAdvancementsBySlotCap, type AdvancementEntry } from "@/lib/classes/resources-state.js";
 
 // status → the 400 the central `errorHandler` maps (client op-validation error).
 export class InvalidHitPointOperationError extends Error {
@@ -48,6 +53,70 @@ export function normalizeHitDice(json: Prisma.JsonValue): HitDice {
 }
 
 // Pure helpers (no DB, fully unit-testable).
+
+/**
+ * The one composition every HP-max consumer must call (#1321) — consolidates
+ * the inline `maxHp + featBonus.maxHp` copies previously in applyFeatLayer,
+ * buildHpOpContext, and applyHealInTx (applyFeatLayer still exists — it now
+ * delegates to this function rather than computing effectiveMaxHp inline).
+ * Order is load-bearing
+ * (decision 2): the feat bonus (e.g. Tough) is added to `baseMax` BEFORE
+ * exhaustion's PHB'14 p. 291 tier-4 halving is subtracted — halving the raw
+ * base first and adding Tough after would be more generous and get the rule
+ * backwards. Floored at 1 (decision 3) so exhaustion can never zero out the
+ * maximum — this repo's existing max-HP ≥ 1 invariant (deriveCreatedCharacter,
+ * levelUpHpGain, normalizeHitPoints's `max ?? 1`). The floor lives HERE, not in
+ * exhaustionMaxHpPenalty, so that function stays a pure rule with no
+ * engineering invariant baked in.
+ */
+export function effectiveMaxHitPoints(
+  baseMax: number,
+  featMaxHpBonus: number,
+  exhaustionLevel: number,
+  edition: RulesEdition,
+): number {
+  const withFeat = baseMax + featMaxHpBonus;
+  const penalty = exhaustionMaxHpPenalty(exhaustionLevel, withFeat, edition);
+  return Math.max(1, withFeat - penalty);
+}
+
+// The minimal per-entry shape characterAdvancementSlots needs — same
+// structural shape as advancement-slots.ts's own (unexported) AdvancementGatedEntry.
+interface FeatSlotGatedEntry {
+  level: number;
+  class: { extraAsiLevels: readonly number[] } | null;
+}
+
+/**
+ * The in-cap advancements a character's stored `resources` carries at
+ * `derivedLevel` (Origin feats always kept; ASI/feat entries trimmed to the
+ * level-derived slot cap, #1130/#1073) — the shared "gather" every
+ * effectiveMaxHitPoints caller needs before deriveFeatBonuses(kept,
+ * hitDiceTotal).maxHp. Extracted (#1321) once five call sites
+ * (buildHpOpContext, applyHealInTx, applyConditionsOperations, applyAddClass,
+ * computeLevelDownState) started repeating the same
+ * normalizeResourcesMutable → characterAdvancementSlots →
+ * splitAdvancementsBySlotCap dance.
+ *
+ * `fightingStyleSlotTotal` is optional and forwarded verbatim to
+ * splitAdvancementsBySlotCap (whose own default is Infinity — every fs feat
+ * kept, matching this repo's non-reconcile "HP feat-bonus reads keep every fs
+ * feat" convention, resources-state.ts) so this stays an EXACT equivalent of
+ * the 3-arg split it replaces, not a narrower 2-arg-only substitute — a
+ * caller with a real fs cap in hand (mirroring reconcileAdvancements /
+ * applyAdvancementOpInTx) can pass it instead of silently under-counting a
+ * future fs feat that carries an HP-bonus improvement.
+ */
+export function inCapAdvancementsAt(
+  resources: Prisma.JsonValue,
+  classEntries: readonly FeatSlotGatedEntry[],
+  derivedLevel: number,
+  fightingStyleSlotTotal?: number,
+): AdvancementEntry[] {
+  const advState = normalizeResourcesMutable(resources);
+  const featSlotCap = characterAdvancementSlots(classEntries, derivedLevel);
+  return splitAdvancementsBySlotCap(advState.advancements, featSlotCap, fightingStyleSlotTotal).kept;
+}
 
 /**
  * Fixed average HP gain per level-up for a given hit die face count.

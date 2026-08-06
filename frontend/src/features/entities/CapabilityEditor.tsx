@@ -5,25 +5,28 @@ import { Plus } from "@/components/ui/icons";
 import CapabilityRow from "@/features/entities/CapabilityRow";
 import { NEW_PASSIVE } from "@/lib/capabilityDraft";
 import type { CatalogSpell, ItemCapability } from "@/types/character";
+import type { RulesEdition } from "@character-sheet/shared-types";
 
 interface CapabilityEditorProps {
   capabilities: ItemCapability[];
   onChange: (capabilities: ItemCapability[]) => void;
   /** True when the item is attunable by a spellcaster — gates wielder DC/attack (#528). */
   spellcasterAttunable?: boolean;
+  /** The campaign's edition (#1712) — GET /api/spells now requires one. */
+  edition: RulesEdition;
 }
 
 // DM authoring for an item's capabilities (#546). Each row is one capability of a
 // chosen kind (passiveBonus/castSpell/grant/charges); per-kind fields live in the
 // sibling *Fields subcomponents, draft normalization in capabilityDraft.
-export default function CapabilityEditor({ capabilities, onChange, spellcasterAttunable = false }: CapabilityEditorProps) {
+export default function CapabilityEditor({ capabilities, onChange, spellcasterAttunable = false, edition }: CapabilityEditorProps) {
   const [spells, setSpells] = useState<CatalogSpell[]>([]);
   const needSpells = capabilities.some((c) => c.kind === "castSpell");
   useEffect(() => {
     if (needSpells && spells.length === 0) {
-      fetchSpells().then(setSpells).catch(() => setSpells([]));
+      fetchSpells(edition).then(setSpells).catch(() => setSpells([]));
     }
-  }, [needSpells, spells.length]);
+  }, [needSpells, spells.length, edition]);
 
   function update(index: number, patch: Partial<ItemCapability>) {
     onChange(capabilities.map((c, i) => (i === index ? { ...c, ...patch } : c)));

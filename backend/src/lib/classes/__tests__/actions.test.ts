@@ -16,13 +16,14 @@ import {
   ACTION_EFFECT_FN,
   castSpecFromRow,
   REGRANTED_UNIVERSAL_KEYS,
-  rageMeleeDamageBonus,
+  toggleRowOps,
   type AvailableAction,
   type ResourcePool,
 } from "@/lib/classes/actions.js";
 import type { ClassFeatureRow } from "@/lib/classes/class-feature-rows.js";
 import { monk } from "@/lib/classes/monk.js";
 import { SUBCLASS_IDENTITY, type SubclassSlug } from "@/lib/classes/subclass-slug.js";
+import { testFeatureRowsFor } from "@/lib/classes/__tests__/test-feature-rows.fixture.js";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -65,9 +66,8 @@ describe("deriveActions — class gates", () => {
     expect(l2).not.toContain("actionSurge");
   });
 
-  it("Barbarian L1 gets rage, L2 adds recklessAttack", () => {
+  it("Barbarian L2 adds recklessAttack (rage/endRage are row-driven now, #1686 — see the dedicated describe block below)", () => {
     const l1 = keys(at("barbarian", undefined, 1, []));
-    expect(l1).toContain("rage");
     expect(l1).not.toContain("recklessAttack");
 
     const l2 = keys(at("barbarian", undefined, 2, []));
@@ -224,28 +224,21 @@ describe("deriveActions — case-insensitivity", () => {
     // left (#1528 — row-driven now); paladin/barbarian cover the same gate.
     // #1229: divineSense is EDITION_2014-only now, so this case-insensitivity
     // check passes the edition explicitly rather than relying on the
-    // (still-2024) default.
+    // (still-2024) default. Barbarian's own case here checks recklessAttack,
+    // not rage — rage is row-driven now (#1686) and bare `at()` (no
+    // featureRows carrier) can never see it; recklessAttack is untouched.
     expect(keys(at("Paladin", undefined, 1, [], true, "EDITION_2014"))).toContain("divineSense");
     expect(keys(at("PALADIN", undefined, 3, []))).toContain("channelDivinity");
-    expect(keys(at("Barbarian", undefined, 1, []))).toContain("rage");
+    expect(keys(at("Barbarian", undefined, 2, []))).toContain("recklessAttack");
   });
 });
 
 describe("deriveActions — resource gating", () => {
-  it("rage is enabled when remaining > 0", () => {
-    const actions = at("barbarian", undefined, 1, [pool("rage", 2)]);
-    const rage = actions.find((a) => a.key === "rage");
-    expect(rage?.enabled).toBe(true);
-    expect(rage?.disabledReason).toBeUndefined();
-  });
-
-  it("rage is disabled with 'No rage remaining' when remaining is 0", () => {
-    const actions = at("barbarian", undefined, 1, [pool("rage", 0)]);
-    const rage = actions.find((a) => a.key === "rage");
-    expect(rage?.enabled).toBe(false);
-    expect(rage?.disabledReason).toBe("No rage remaining");
-  });
-
+  // rage's own enable/disable-by-pool coverage moved to the "Rage —
+  // row-driven toggle (#1686)" describe block below (it's a row-driven
+  // action now, not a bare DERIVED_ACTIONS entry) — flurryOfBlows here
+  // already proves the SAME resolveEnablement mechanism against a
+  // DERIVED_ACTIONS row.
   it("flurryOfBlows needs 1 focus: disabled with 'No focus remaining' at 0 (#1217)", () => {
     const actions = at("monk", undefined, 2, [pool("focus", 0)]);
     const flurry = actions.find((a) => a.key === "flurryOfBlows");
@@ -303,10 +296,13 @@ describe("deriveActions — requiresUnarmored gate (Bonus Unarmed Strike, #1218)
   });
 
   it("actions with no requiresUnarmored flag ignore the unarmoredUnshielded param", () => {
-    // Rage carries no requiresUnarmored — armored/shielded is irrelevant to it.
-    const actions = at("barbarian", undefined, 1, [pool("rage", 1)], false);
-    const rage = actions.find((a) => a.key === "rage");
-    expect(rage?.enabled).toBe(true);
+    // flurryOfBlows carries no requiresUnarmored — armored/shielded is
+    // irrelevant to it (Rage, formerly this test's fixture, is row-driven
+    // now — #1686 — and carries no requiresUnarmored either, but bare
+    // `at()` can no longer see it at all).
+    const actions = at("monk", undefined, 2, [pool("focus", 1)], false);
+    const flurry = actions.find((a) => a.key === "flurryOfBlows");
+    expect(flurry?.enabled).toBe(true);
   });
 });
 
@@ -344,15 +340,61 @@ describe("ACTION_EFFECT_FN — single spendResource keys", () => {
   }
 });
 
-describe("ACTION_EFFECT_FN — Rage durable buff (#457)", () => {
-  it("rage applies a while-active meleeDamage buff (level bonus) and spends a rage", () => {
-    expect(ACTION_EFFECT_FN.rage({ rageDamageBonus: 3 })).toEqual([
+// Rage/endRage retired from DERIVED_ACTIONS/ACTION_EFFECT_FN (#1686) — now a
+// row-driven "toggle" (barbarian-features.ts), reached through
+// deriveEntryScopedActions (toggleActionsFromRow) + toggleRowOps, off the
+// SAME literal rows test-feature-rows.fixture.ts mirrors for barbarian-
+// features.ts (literal-fixture-parity.test.ts pins level/description parity;
+// this suite is the descriptor-column parity proof). Byte-identity with the
+// retired closures (modifier/resistDamageTypes/rollEffects/spend shape) is
+// also pinned end-to-end through the real HTTP route by
+// routes/character/__tests__/actions-rage.test.ts, unmodified by this
+// migration.
+describe("Rage — row-driven toggle (#1686, retired from ACTION_EFFECT_FN)", () => {
+  const rageRow = (edition: "EDITION_2014" | "EDITION_2024") =>
+    testFeatureRowsFor("barbarian", undefined).classRows.find((r) => r.name === "Rage" && r.edition === edition)!;
+
+  it("rage/endRage are absent from the bare DERIVED_ACTIONS table", () => {
+    const l1 = keys(at("barbarian", undefined, 1, []));
+    expect(l1).not.toContain("rage");
+    expect(l1).not.toContain("endRage");
+  });
+
+  it("Barbarian L1 gets a row-driven rage/endRage pair (bonusAction, resolverKind toggle)", () => {
+    const actions = deriveEntryScopedActions(
+      [{ name: "barbarian", subclass: undefined, level: 1 }],
+      1,
+      [{ key: "rage", remaining: 2 }],
+      true,
+      "EDITION_2024",
+      (e) => testFeatureRowsFor(e.name, e.subclass),
+    );
+    expect(actions.find((a) => a.key === "rage")).toMatchObject({ name: "Rage", cost: "bonusAction", resolverKind: "toggle", enabled: true });
+    expect(actions.find((a) => a.key === "endRage")).toMatchObject({ name: "End Rage", cost: "bonusAction", resolverKind: "toggle", enabled: true });
+  });
+
+  it("rage is disabled with 'No rage remaining' at 0, while endRage stays enabled — same disabledReason text the retired DERIVED_ACTIONS row produced", () => {
+    const actions = deriveEntryScopedActions(
+      [{ name: "barbarian", subclass: undefined, level: 1 }],
+      1,
+      [{ key: "rage", remaining: 0 }],
+      true,
+      "EDITION_2024",
+      (e) => testFeatureRowsFor(e.name, e.subclass),
+    );
+    expect(actions.find((a) => a.key === "rage")).toMatchObject({ enabled: false, disabledReason: "No rage remaining" });
+    expect(actions.find((a) => a.key === "endRage")).toMatchObject({ enabled: true });
+  });
+
+  it("activation applies a while-active meleeDamage buff carrying b/p/s resistance + advantage on Strength checks/saves — same shape the retired ACTION_EFFECT_FN.rage closure hand-rolled", () => {
+    const ops = toggleRowOps(rageRow("EDITION_2024"), { level: 1, abilityScores: {}, profBonus: 2 }, false);
+    expect(ops).toEqual([
       {
         type: "applyBuff",
         buff: {
           key: "rage",
           target: "meleeDamage",
-          modifier: 3,
+          modifier: 2,
           source: "Rage",
           duration: "while-active",
           resistDamageTypes: ["bludgeoning", "piercing", "slashing"],
@@ -366,29 +408,28 @@ describe("ACTION_EFFECT_FN — Rage durable buff (#457)", () => {
     ]);
   });
 
-  it("rage defaults the buff modifier to +2 when no bonus is supplied", () => {
-    const ops = ACTION_EFFECT_FN.rage({}) as Array<{ type: string; buff?: { modifier: number } }>;
-    expect(ops[0].buff?.modifier).toBe(2);
+  it("the melee-damage bonus scales +2 / +3 / +4 by the granting entry's level — the tiered effectBuffs modifier replacing the retired rageMeleeDamageBonus function", () => {
+    const modifierAt = (level: number) =>
+      (toggleRowOps(rageRow("EDITION_2024"), { level, abilityScores: {}, profBonus: 2 }, false)[0] as { buff: { modifier: number } }).buff.modifier;
+    expect(modifierAt(1)).toBe(2);
+    expect(modifierAt(8)).toBe(2);
+    expect(modifierAt(9)).toBe(3);
+    expect(modifierAt(15)).toBe(3);
+    expect(modifierAt(16)).toBe(4);
+    expect(modifierAt(20)).toBe(4);
   });
 
-  it("endRage clears the rage buff by key (manual + auto both route here)", () => {
-    expect(ACTION_EFFECT_FN.endRage({})).toEqual([
+  it("endRage clears the rage buff by key, same reason text as the retired ACTION_EFFECT_FN.endRage (manual + auto turn-hook both route here)", () => {
+    expect(toggleRowOps(rageRow("EDITION_2024"), { level: 1, abilityScores: {}, profBonus: 2 }, true)).toEqual([
       { type: "clearBuff", key: "rage", reason: "Rage ended" },
     ]);
   });
 
-  it("rageMeleeDamageBonus scales +2 / +3 / +4 by barbarian level", () => {
-    expect(rageMeleeDamageBonus(1)).toBe(2);
-    expect(rageMeleeDamageBonus(8)).toBe(2);
-    expect(rageMeleeDamageBonus(9)).toBe(3);
-    expect(rageMeleeDamageBonus(15)).toBe(3);
-    expect(rageMeleeDamageBonus(16)).toBe(4);
-    expect(rageMeleeDamageBonus(20)).toBe(4);
-  });
-
-  it("endRage is a barbarian bonus action from L1", () => {
-    expect(keys(at("barbarian", undefined, 1, []))).toContain("endRage");
-    expect(keys(at("fighter", undefined, 20, []))).not.toContain("endRage");
+  it("the 2014 Rage row carries the identical buff shape (edition-invariant mechanic)", () => {
+    const ops = toggleRowOps(rageRow("EDITION_2014"), { level: 9, abilityScores: {}, profBonus: 4 }, false);
+    const buff = (ops[0] as { buff: { modifier: number; resistDamageTypes?: string[] } }).buff;
+    expect(buff.modifier).toBe(3);
+    expect(buff.resistDamageTypes).toEqual(["bludgeoning", "piercing", "slashing"]);
   });
 });
 
@@ -639,14 +680,184 @@ describe("Monk Deflect Attacks / Deflect Energy (#1241)", () => {
     expect(fighter).not.toContain("deflectAttacks");
     expect(fighter).not.toContain("deflectAttacksRedirect");
   });
+
+  it("resolves damageTypeClause server-side (#1505) — B/P/S below L13, any damage type at L13+", () => {
+    const l3 = at("monk", undefined, 3, []).find((a) => a.key === "deflectAttacks");
+    expect(l3?.damageTypeClause).toBe("bludgeoning, piercing, or slashing damage");
+    const l13 = at("monk", undefined, 13, []).find((a) => a.key === "deflectAttacks");
+    expect(l13?.damageTypeClause).toBe("any damage type");
+  });
+
+  it("damageTypeClause resolves off the Monk entry's own level for a multiclass character (Monk 3 / Fighter 10)", () => {
+    const entries = [
+      { name: "monk", level: 3 },
+      { name: "fighter", level: 10 },
+    ];
+    const actions = deriveEntryScopedActions(entries, 13, [], true, "EDITION_2024");
+    expect(actions.find((a) => a.key === "deflectAttacks")?.damageTypeClause).toBe(
+      "bludgeoning, piercing, or slashing damage",
+    );
+  });
 });
 
-// #1499: the class-derivation layer's edition axis. Only the seven base-class
-// monk rows tagged EDITION_2024 fork; every other row (including
-// bonusUnarmedStrike, deliberately shared) is served to both editions.
-describe("DERIVED_ACTIONS edition axis — 2014 Monk gets none of the seven 2024-tagged rows (#1499)", () => {
-  const TAGGED_2024_ROWS = [
-    "flurryOfBlows",
+describe("Flurry of Blows strike count (#1505) — resolved server-side, never a client threshold", () => {
+  it("2024: count is 2 below Heightened Focus (monk L10) and 3 at L10+", () => {
+    expect(at("monk", undefined, 9, [pool("focus", 1)]).find((a) => a.key === "flurryOfBlows")?.count).toBe(2);
+    expect(at("monk", undefined, 10, [pool("focus", 1)]).find((a) => a.key === "flurryOfBlows")?.count).toBe(3);
+    expect(at("monk", undefined, 20, [pool("focus", 1)]).find((a) => a.key === "flurryOfBlows")?.count).toBe(3);
+  });
+
+  it("2014: count is a flat 2 at every level — no Heightened Focus upgrade exists", () => {
+    const l2 = at("monk", undefined, 2, [pool("ki", 1)], true, "EDITION_2014").find((a) => a.key === "flurryOfBlows");
+    const l10 = at("monk", undefined, 10, [pool("ki", 1)], true, "EDITION_2014").find((a) => a.key === "flurryOfBlows");
+    const l20 = at("monk", undefined, 20, [pool("ki", 1)], true, "EDITION_2014").find((a) => a.key === "flurryOfBlows");
+    expect(l2?.count).toBe(2);
+    expect(l10?.count).toBe(2);
+    expect(l20?.count).toBe(2);
+  });
+
+  it("count resolves off the Monk entry's own level for a multiclass 2024 character (Monk 10 / Fighter 5)", () => {
+    const entries = [
+      { name: "monk", level: 10 },
+      { name: "fighter", level: 5 },
+    ];
+    const actions = deriveEntryScopedActions(entries, 15, [pool("focus", 1)], true, "EDITION_2024");
+    expect(actions.find((a) => a.key === "flurryOfBlows")?.count).toBe(3);
+  });
+});
+
+describe("2014 Monk ki actions — Flurry of Blows / Patient Defense / Step of the Wind (#1500)", () => {
+  it("2014 monk L2 gets flurryOfBlows/patientDefenseKi/stepOfTheWindKi, each resourceKey ki amount 1 — and NOT the 2024 free/paid pair", () => {
+    const l2 = at("monk", undefined, 2, [pool("ki", 2)], true, "EDITION_2014");
+    const l2Keys = keys(l2);
+    expect(l2Keys).toContain("flurryOfBlows");
+    expect(l2Keys).toContain("patientDefenseKi");
+    expect(l2Keys).toContain("stepOfTheWindKi");
+    expect(l2Keys).not.toContain("patientDefense");
+    expect(l2Keys).not.toContain("patientDefenseFocus");
+    expect(l2Keys).not.toContain("stepOfTheWind");
+    expect(l2Keys).not.toContain("stepOfTheWindFocus");
+
+    for (const key of ["flurryOfBlows", "patientDefenseKi", "stepOfTheWindKi"]) {
+      const action = l2.find((a) => a.key === key);
+      expect(action, key).toBeDefined();
+      expect(action?.cost, key).toBe("bonusAction");
+    }
+  });
+
+  it("exactly one 2014 Patient Defense row and one 2014 Step of the Wind row — never two menu entries like 2024", () => {
+    const l2 = keys(at("monk", undefined, 2, [], true, "EDITION_2014"));
+    expect(l2.filter((k) => k === "patientDefenseKi")).toHaveLength(1);
+    expect(l2.filter((k) => k === "stepOfTheWindKi")).toHaveLength(1);
+  });
+
+  it("all three are gated on 1 remaining ki, like any other resource-gated action", () => {
+    const noKi = at("monk", undefined, 2, [pool("ki", 0)], true, "EDITION_2014");
+    for (const key of ["flurryOfBlows", "patientDefenseKi", "stepOfTheWindKi"]) {
+      const action = noKi.find((a) => a.key === key);
+      expect(action?.enabled, key).toBe(false);
+      expect(action?.disabledReason, key).toBe("No ki remaining");
+    }
+    const withKi = at("monk", undefined, 2, [pool("ki", 1)], true, "EDITION_2014");
+    for (const key of ["flurryOfBlows", "patientDefenseKi", "stepOfTheWindKi"]) {
+      expect(withKi.find((a) => a.key === key)?.enabled, key).toBe(true);
+    }
+  });
+
+  it("flurryOfBlows spends the EDITION-CORRECT pool via ctx.edition — ki for 2014, focus for 2024 (#1500)", () => {
+    expect(ACTION_EFFECT_FN.flurryOfBlows({ edition: "EDITION_2014" })).toEqual([
+      { type: "spendResource", key: "ki" },
+    ]);
+    expect(ACTION_EFFECT_FN.flurryOfBlows({ edition: "EDITION_2024" })).toEqual([
+      { type: "spendResource", key: "focus" },
+    ]);
+  });
+
+  it("patientDefenseKi/stepOfTheWindKi each spend exactly 1 ki", () => {
+    expect(ACTION_EFFECT_FN.patientDefenseKi({})).toEqual([{ type: "spendResource", key: "ki" }]);
+    expect(ACTION_EFFECT_FN.stepOfTheWindKi({})).toEqual([{ type: "spendResource", key: "ki" }]);
+  });
+
+  it("class gate: a non-monk gets none of the three keys", () => {
+    const fighter = keys(at("fighter", undefined, 20, [], true, "EDITION_2014"));
+    expect(fighter).not.toContain("flurryOfBlows");
+    expect(fighter).not.toContain("patientDefenseKi");
+    expect(fighter).not.toContain("stepOfTheWindKi");
+  });
+});
+
+describe("2014 Monk Deflect Missiles (#1500)", () => {
+  it("is granted at monk L3 as a reaction with no resourceKey (free reminder, base reduction costs nothing) — ranged only", () => {
+    expect(keys(at("monk", undefined, 2, [], true, "EDITION_2014"))).not.toContain("deflectMissiles");
+    const l3 = at("monk", undefined, 3, [], true, "EDITION_2014");
+    const deflect = l3.find((a) => a.key === "deflectMissiles");
+    expect(deflect).toBeDefined();
+    expect(deflect?.cost).toBe("reaction");
+    expect(deflect?.enabled).toBe(true);
+    expect(deflect?.reminder).toMatch(/ranged weapon attack/i);
+  });
+
+  it("is a pure reminder action — no server effect fn for the base reduction", () => {
+    expect(ACTION_EFFECT_FN.deflectMissiles).toBeUndefined();
+  });
+
+  it("deflectMissilesThrow is granted at monk L3, costs 1 ki, and spends it", () => {
+    const l3 = at("monk", undefined, 3, [pool("ki", 3)], true, "EDITION_2014");
+    const throwBack = l3.find((a) => a.key === "deflectMissilesThrow");
+    expect(throwBack).toBeDefined();
+    expect(throwBack?.cost).toBe("free");
+    expect(throwBack?.enabled).toBe(true);
+    expect(ACTION_EFFECT_FN.deflectMissilesThrow({})).toEqual([{ type: "spendResource", key: "ki" }]);
+  });
+
+  it("deflectMissilesThrow is disabled with no ki remaining", () => {
+    const throwBack = at("monk", undefined, 3, [pool("ki", 0)], true, "EDITION_2014").find(
+      (a) => a.key === "deflectMissilesThrow",
+    );
+    expect(throwBack?.enabled).toBe(false);
+  });
+
+  it("neither deflectAttacks/deflectAttacksRedirect (2024) is served to a 2014 monk, and vice versa", () => {
+    const monk2014 = keys(at("monk", undefined, 20, [pool("ki", 20)], true, "EDITION_2014"));
+    expect(monk2014).not.toContain("deflectAttacks");
+    expect(monk2014).not.toContain("deflectAttacksRedirect");
+    const monk2024 = keys(at("monk", undefined, 20, [pool("focus", 20)], true, "EDITION_2024"));
+    expect(monk2024).not.toContain("deflectMissiles");
+    expect(monk2024).not.toContain("deflectMissilesThrow");
+  });
+});
+
+describe("2014 Monk Empty Body (L18, #1500) — gating/reminder rows, no dedicated cast vertical yet", () => {
+  it("emptyBody (4 ki) and emptyBodyAstralProjection (8 ki) are granted at L18, not L17", () => {
+    expect(keys(at("monk", undefined, 17, [], true, "EDITION_2014"))).not.toContain("emptyBody");
+    const l18 = at("monk", undefined, 18, [pool("ki", 18)], true, "EDITION_2014");
+    const body = l18.find((a) => a.key === "emptyBody");
+    const astral = l18.find((a) => a.key === "emptyBodyAstralProjection");
+    expect(body?.enabled).toBe(true);
+    expect(astral?.enabled).toBe(true);
+  });
+
+  it("each is disabled below its own ki cost", () => {
+    const l18 = at("monk", undefined, 18, [pool("ki", 5)], true, "EDITION_2014");
+    expect(l18.find((a) => a.key === "emptyBody")?.enabled).toBe(true); // 5 >= 4
+    expect(l18.find((a) => a.key === "emptyBodyAstralProjection")?.enabled).toBe(false); // 5 < 8
+  });
+
+  it("neither has an ACTION_EFFECT_FN entry — reminder-only, like shadowArts/cloakOfShadows", () => {
+    expect(ACTION_EFFECT_FN.emptyBody).toBeUndefined();
+    expect(ACTION_EFFECT_FN.emptyBodyAstralProjection).toBeUndefined();
+  });
+});
+
+// #1499/#1500: the class-derivation layer's edition axis. Six base-class
+// monk rows are EDITION_2024-only (patientDefense/patientDefenseFocus/
+// stepOfTheWind/stepOfTheWindFocus/deflectAttacks/deflectAttacksRedirect —
+// no 2014 shape resembles the 2024 free/paid-pair or melee+ranged model);
+// flurryOfBlows is tagged for BOTH editions now under the SAME key (#1500,
+// mirrors Lay on Hands) rather than being 2024-exclusive; bonusUnarmedStrike
+// stays deliberately shared/untagged.
+describe("DERIVED_ACTIONS edition axis — 2014 Monk gets none of the six 2024-only rows (#1499/#1500)", () => {
+  const TAGGED_2024_ONLY_ROWS = [
     "patientDefense",
     "patientDefenseFocus",
     "stepOfTheWind",
@@ -655,28 +866,34 @@ describe("DERIVED_ACTIONS edition axis — 2014 Monk gets none of the seven 2024
     "deflectAttacksRedirect",
   ];
 
-  it("a level-20 EDITION_2014 monk has none of the seven tagged rows — the 2014 shapes are #1500's follow-up", () => {
+  it("a level-20 EDITION_2014 monk has none of the six 2024-only rows", () => {
     const l20 = keys(
       at("monk", undefined, 20, [pool("focus", 20), pool("wholenessOfBody", 5)], true, "EDITION_2014"),
     );
-    for (const key of TAGGED_2024_ROWS) {
+    for (const key of TAGGED_2024_ONLY_ROWS) {
       expect(l20).not.toContain(key);
     }
   });
 
-  it("the same 2014 monk still has bonusUnarmedStrike — the shared row is not swept up by the tagging pass", () => {
-    const l20 = keys(at("monk", undefined, 20, [], true, "EDITION_2014"));
+  it("the same 2014 monk still has bonusUnarmedStrike (shared) and its OWN flurryOfBlows/patientDefenseKi/stepOfTheWindKi rows (#1500)", () => {
+    const l20 = keys(at("monk", undefined, 20, [pool("ki", 20)], true, "EDITION_2014"));
     expect(l20).toContain("bonusUnarmedStrike");
+    expect(l20).toContain("flurryOfBlows");
+    expect(l20).toContain("patientDefenseKi");
+    expect(l20).toContain("stepOfTheWindKi");
   });
 
-  it("a level-20 EDITION_2024 monk is unaffected — has every one of the seven tagged rows", () => {
+  it("a level-20 EDITION_2024 monk is unaffected — has every one of the six 2024-only rows plus flurryOfBlows", () => {
     const l20 = keys(
       at("monk", undefined, 20, [pool("focus", 20), pool("wholenessOfBody", 5)], true, "EDITION_2024"),
     );
-    for (const key of TAGGED_2024_ROWS) {
+    for (const key of TAGGED_2024_ONLY_ROWS) {
       expect(l20).toContain(key);
     }
     expect(l20).toContain("bonusUnarmedStrike");
+    expect(l20).toContain("flurryOfBlows");
+    expect(l20).not.toContain("patientDefenseKi");
+    expect(l20).not.toContain("stepOfTheWindKi");
   });
 
   // Extends the #1431 synthetic-record test onto the edition axis: the SAME
@@ -689,15 +906,17 @@ describe("DERIVED_ACTIONS edition axis — 2014 Monk gets none of the seven 2024
     expect(matchesActionGate({ ...row, edition: "EDITION_2024" as const }, "monk", undefined, 20, "EDITION_2024")).toBe(true);
   });
 
-  it("actionGrantLevel filters on edition before find (#1499)", () => {
-    // flurryOfBlows is tagged EDITION_2024 only — a 2014 lookup finds nothing
-    // (no 2014-keyed row exists yet; #1500 adds one), while a 2024 lookup
-    // still resolves to its grantLevel.
+  it("actionGrantLevel resolves flurryOfBlows for BOTH editions now (#1500 — was EDITION_2014-undefined before this slice)", () => {
     expect(actionGrantLevel("flurryOfBlows", "EDITION_2024")).toBe(2);
-    expect(actionGrantLevel("flurryOfBlows", "EDITION_2014")).toBeUndefined();
+    expect(actionGrantLevel("flurryOfBlows", "EDITION_2014")).toBe(2);
     // bonusUnarmedStrike is untagged (shared) — resolves for both editions.
     expect(actionGrantLevel("bonusUnarmedStrike", "EDITION_2014")).toBe(1);
     expect(actionGrantLevel("bonusUnarmedStrike", "EDITION_2024")).toBe(1);
+    // patientDefenseKi/stepOfTheWindKi are EDITION_2014-only.
+    expect(actionGrantLevel("patientDefenseKi", "EDITION_2014")).toBe(2);
+    expect(actionGrantLevel("patientDefenseKi", "EDITION_2024")).toBeUndefined();
+    expect(actionGrantLevel("stepOfTheWindKi", "EDITION_2014")).toBe(2);
+    expect(actionGrantLevel("stepOfTheWindKi", "EDITION_2024")).toBeUndefined();
   });
 });
 
@@ -862,6 +1081,70 @@ describe("Warrior of the Open Hand — Wholeness of Body / Fleet Step (#1245)", 
   });
 });
 
+describe("Way of the Open Hand — 2014 Wholeness of Body / Tranquility (#1501)", () => {
+  const WAY_OPEN_HAND = "Way of the Open Hand";
+  const edition = "EDITION_2014" as const;
+
+  it("2014 monk gets wholenessOfBodyAction as an ACTION at L6, not at L5 — never the 2024 bonusAction key", () => {
+    expect(keys(at("monk", WAY_OPEN_HAND, 5, [], true, edition))).not.toContain("wholenessOfBodyAction");
+    const l6 = at("monk", WAY_OPEN_HAND, 6, [], true, edition);
+    const wholeness = l6.find((a) => a.key === "wholenessOfBodyAction");
+    expect(wholeness).toBeDefined();
+    expect(wholeness?.cost).toBe("action");
+    expect(keys(l6)).not.toContain("wholenessOfBody");
+  });
+
+  it("wholenessOfBodyAction is gated on the SAME wholenessOfBody pool as the 2024 key", () => {
+    const noUses = at("monk", WAY_OPEN_HAND, 6, [pool("wholenessOfBody", 0)], true, edition);
+    expect(noUses.find((a) => a.key === "wholenessOfBodyAction")?.enabled).toBe(false);
+    const withUses = at("monk", WAY_OPEN_HAND, 6, [pool("wholenessOfBody", 1)], true, edition);
+    expect(withUses.find((a) => a.key === "wholenessOfBodyAction")?.enabled).toBe(true);
+  });
+
+  it("ACTION_EFFECT_FN.wholenessOfBodyAction: with roll=18, spends 1 use and heals 18 (mirrors the 2024 handler's shape)", () => {
+    expect(ACTION_EFFECT_FN.wholenessOfBodyAction({ roll: 18 })).toEqual([
+      { type: "spendResource", key: "wholenessOfBody" },
+      { type: "heal", amount: 18 },
+    ]);
+  });
+
+  it("ACTION_EFFECT_FN.wholenessOfBodyAction: without a roll, spends the use but heals nothing", () => {
+    expect(ACTION_EFFECT_FN.wholenessOfBodyAction({})).toEqual([
+      { type: "spendResource", key: "wholenessOfBody" },
+    ]);
+  });
+
+  it("2014 monk gets tranquility as a free-cost reminder at L11, not at L10", () => {
+    expect(keys(at("monk", WAY_OPEN_HAND, 10, [], true, edition))).not.toContain("tranquility");
+    const l11 = at("monk", WAY_OPEN_HAND, 11, [], true, edition);
+    const tranquility = l11.find((a) => a.key === "tranquility");
+    expect(tranquility).toBeDefined();
+    expect(tranquility?.cost).toBe("free");
+    expect(tranquility?.enabled).toBe(true);
+    expect(tranquility?.reminder).toMatch(/sanctuary/i);
+  });
+
+  it("tranquility is a pure reminder — no server effect fn", () => {
+    expect(ACTION_EFFECT_FN.tranquility).toBeUndefined();
+  });
+
+  it("a 2024 monk never sees the 2014 keys, and vice versa", () => {
+    const openHand2024 = keys(at("monk", "Warrior of the Open Hand", 20, [pool("wholenessOfBody", 5)]));
+    expect(openHand2024).not.toContain("wholenessOfBodyAction");
+    expect(openHand2024).not.toContain("tranquility");
+
+    const wayOpenHand2014 = keys(at("monk", WAY_OPEN_HAND, 20, [pool("wholenessOfBody", 5)], true, edition));
+    expect(wayOpenHand2014).not.toContain("wholenessOfBody");
+    expect(wayOpenHand2014).not.toContain("fleetStep");
+  });
+
+  it("subclass gate: a non-Way-of-the-Open-Hand 2014 monk gets neither key", () => {
+    const shadow = keys(at("monk", "Warrior of Shadow", 17, [], true, edition));
+    expect(shadow).not.toContain("wholenessOfBodyAction");
+    expect(shadow).not.toContain("tranquility");
+  });
+});
+
 describe("Warrior of Mercy — Hand of Healing (#1248)", () => {
   const MERCY = "Warrior of Mercy";
 
@@ -1004,15 +1287,115 @@ describe("Warrior of Shadow — Shadow Arts / Cloak of Shadows catalog rows (#13
   });
 });
 
+// #1502: 2014 Way of Shadow (PHB'14 pp. 79-80 — not in SRD 5.1) reinstates the
+// four-spell 2-ki Shadow Arts menu, Shadow Step without the free unarmed
+// strike, Cloak of Shadows at L11 with no resource cost, and Opportunist at
+// L17 — under the SAME action keys as the 2024 Warrior of Shadow rows
+// (shadowArts/shadowStep/cloakOfShadows), disambiguated by `edition` +
+// `grantSubclassSlugs: ["monk-way-of-shadow"]`, never a second vocabulary.
+describe("Way of Shadow (2014) — Shadow Arts / Shadow Step / Cloak of Shadows / Opportunist (#1502)", () => {
+  const WAY: SubclassSlug = "monk-way-of-shadow";
+
+  it("gets shadowArts at L3, not L2, gated on 2 ki", () => {
+    expect(keys(deriveActions("monk", WAY, 2, [], true, "EDITION_2014"))).not.toContain("shadowArts");
+    const l3 = deriveActions("monk", WAY, 3, [pool("ki", 2)], true, "EDITION_2014");
+    const shadowArts = l3.find((a) => a.key === "shadowArts");
+    expect(shadowArts).toBeDefined();
+    expect(shadowArts?.cost).toBe("action");
+    expect(shadowArts?.enabled).toBe(true);
+    const short = deriveActions("monk", WAY, 3, [pool("ki", 1)], true, "EDITION_2014");
+    expect(short.find((a) => a.key === "shadowArts")?.enabled).toBe(false);
+  });
+
+  it("gets shadowStep at L6, not L5, free (no resourceKey), with no unarmed-strike clause", () => {
+    expect(keys(deriveActions("monk", WAY, 5, [], true, "EDITION_2014"))).not.toContain("shadowStep");
+    const l6 = deriveActions("monk", WAY, 6, [], true, "EDITION_2014");
+    const shadowStep = l6.find((a) => a.key === "shadowStep");
+    expect(shadowStep).toBeDefined();
+    expect(shadowStep?.cost).toBe("bonusAction");
+    expect(shadowStep?.enabled).toBe(true);
+    expect(shadowStep?.reminder).not.toMatch(/unarmed strike/i);
+  });
+
+  it("gets cloakOfShadows at L11, not L10, with no resource cost", () => {
+    expect(keys(deriveActions("monk", WAY, 10, [], true, "EDITION_2014"))).not.toContain("cloakOfShadows");
+    const l11 = deriveActions("monk", WAY, 11, [], true, "EDITION_2014");
+    const cloak = l11.find((a) => a.key === "cloakOfShadows");
+    expect(cloak).toBeDefined();
+    expect(cloak?.cost).toBe("action");
+    expect(cloak?.enabled).toBe(true);
+  });
+
+  it("gets opportunist at L17, not L16, as a reminder-only reaction", () => {
+    expect(keys(deriveActions("monk", WAY, 16, [], true, "EDITION_2014"))).not.toContain("opportunist");
+    const l17 = deriveActions("monk", WAY, 17, [], true, "EDITION_2014");
+    const opportunist = l17.find((a) => a.key === "opportunist");
+    expect(opportunist).toBeDefined();
+    expect(opportunist?.cost).toBe("reaction");
+    expect(opportunist?.enabled).toBe(true);
+  });
+
+  it("is a pure reminder action — no ACTION_EFFECT_FN entry (mirrors 2014's own shadowStep)", () => {
+    expect(ACTION_EFFECT_FN.opportunist).toBeUndefined();
+  });
+
+  it("none of the four rows leak to an EDITION_2024 request, even for the same slug", () => {
+    const asIf2024 = keys(deriveActions("monk", WAY, 20, [pool("ki", 5)], true, "EDITION_2024"));
+    expect(asIf2024).not.toContain("shadowArts");
+    expect(asIf2024).not.toContain("shadowStep");
+    expect(asIf2024).not.toContain("cloakOfShadows");
+    expect(asIf2024).not.toContain("opportunist");
+  });
+
+  it("subclass gate: the 2024 Warrior of Shadow slug never gets Opportunist, even under EDITION_2014", () => {
+    // opportunist has no 2024 counterpart at all, so it's the one key here
+    // that isolates the subclass gate cleanly (shadowArts/shadowStep/
+    // cloakOfShadows share their KEY NAME with the 2024 rows, so a same-slug
+    // mismatch on those is already covered by the edition-gate test above).
+    const warriorOfShadow2014 = keys(
+      deriveActions("monk", "monk-warrior-of-shadow", 20, [pool("ki", 5)], true, "EDITION_2014"),
+    );
+    expect(warriorOfShadow2014).not.toContain("opportunist");
+  });
+});
+
 describe("Warrior of the Elements — Elemental Attunement / Elemental Burst catalog rows (#1315)", () => {
   const ELEMENTS = "Warrior of the Elements";
 
+  // Elemental Attunement is row-driven now (#1686) — a bare `at()` call (no
+  // featureRows carrier) can never see it, since Monk's own module carries no
+  // DERIVED_ACTIONS entry for it any more. Mirrors monk.ts's real
+  // AuthoredFeature entry exactly (the row-driven counterpart of every other
+  // literal-class fixture row in test-feature-rows.fixture.ts).
+  const ELEMENTAL_ATTUNEMENT_ROW: ClassFeatureRow = {
+    name: "Elemental Attunement",
+    level: 3,
+    description: "test",
+    edition: "EDITION_2024",
+    resourceKey: "elementalAttunement",
+    activationCost: "free",
+    resolverKind: "toggle",
+    costKind: "pool",
+    costPoolKey: "focus",
+    costBase: 1,
+    effectBuffs: [{ key: "elementalAttunement", target: "elementalAttunement", modifier: 0, duration: "while-active" }],
+  };
+  const elementsAt = (level: number, pools: ResourcePool[]) =>
+    deriveEntryScopedActions(
+      [{ name: "monk", subclass: ELEMENTS, level }],
+      level,
+      pools,
+      true,
+      "EDITION_2024",
+      () => ({ classRows: [], subclassRows: [ELEMENTAL_ATTUNEMENT_ROW] }),
+    );
+
   it("gets elementalAttunement at L3, not L2, as a no-action (free) toggle", () => {
-    expect(keys(at("monk", ELEMENTS, 2, []))).not.toContain("elementalAttunement");
-    const l3 = at("monk", ELEMENTS, 3, [pool("focus", 1)]);
-    const attune = l3.find((a) => a.key === "elementalAttunement");
+    expect(elementsAt(2, []).some((a) => a.key === "elementalAttunement")).toBe(false);
+    const attune = elementsAt(3, [pool("focus", 1)]).find((a) => a.key === "elementalAttunement");
     expect(attune).toBeDefined();
     expect(attune?.cost).toBe("free");
+    expect(attune?.resolverKind).toBe("toggle");
   });
 
   it("gets elementalBurst at L6, not L5, as a Magic action", () => {
@@ -1023,13 +1406,15 @@ describe("Warrior of the Elements — Elemental Attunement / Elemental Burst cat
     expect(burst?.cost).toBe("action");
   });
 
-  it("elementalAttunement costs 1 focus, elementalBurst costs 2", () => {
-    const noFocus = at("monk", ELEMENTS, 6, [pool("focus", 0)]);
-    expect(noFocus.find((a) => a.key === "elementalAttunement")?.enabled).toBe(false);
-    expect(noFocus.find((a) => a.key === "elementalBurst")?.enabled).toBe(false);
-    const oneFocus = at("monk", ELEMENTS, 6, [pool("focus", 1)]);
-    expect(oneFocus.find((a) => a.key === "elementalAttunement")?.enabled).toBe(true);
-    expect(oneFocus.find((a) => a.key === "elementalBurst")?.enabled).toBe(false);
+  it("elementalAttunement costs 1 focus (row-driven gate)", () => {
+    expect(elementsAt(6, [pool("focus", 0)]).find((a) => a.key === "elementalAttunement")?.enabled).toBe(false);
+    expect(elementsAt(6, [pool("focus", 1)]).find((a) => a.key === "elementalAttunement")?.enabled).toBe(true);
+  });
+
+  it("elementalBurst costs 2 focus (DERIVED_ACTIONS gate)", () => {
+    expect(at("monk", ELEMENTS, 6, [pool("focus", 0)]).find((a) => a.key === "elementalBurst")?.enabled).toBe(false);
+    expect(at("monk", ELEMENTS, 6, [pool("focus", 1)]).find((a) => a.key === "elementalBurst")?.enabled).toBe(false);
+    expect(at("monk", ELEMENTS, 6, [pool("focus", 2)]).find((a) => a.key === "elementalBurst")?.enabled).toBe(true);
   });
 
   it("subclass gate: a non-Elements monk gets neither at any level", () => {
@@ -1135,8 +1520,9 @@ describe("subclass gate resolves via slug — FK preferred, exact name as fallba
   });
 
   it("the other three families still match their registry names exactly", () => {
+    // elementalAttunement is row-driven (#1686) — bare at() can't reach it;
+    // elementalBurst alone still proves the slug match for this subclass.
     const elements = keys(at("monk", "warrior of the elements", 6, [pool("focus", 2)]));
-    expect(elements).toContain("elementalAttunement");
     expect(elements).toContain("elementalBurst");
 
     const openHand = keys(at("monk", "warrior of the open hand", 11, [pool("wholenessOfBody", 1)]));
@@ -1158,16 +1544,40 @@ describe("subclass gate resolves via slug — FK preferred, exact name as fallba
   // maintained table). Still exercises the name-fallback path at runtime: for
   // each slug, resolve its accepted NAME via SUBCLASS_IDENTITY and call
   // through `at()`, so this is the same mechanism the FK path uses, minus the FK.
-  const MONK_SUBCLASS_GRANT_KEYS: Record<Extract<SubclassSlug, `monk-${string}`>, string[]> = {
-    "monk-warrior-of-shadow": ["shadowStep", "shadowArts", "cloakOfShadows"],
-    "monk-warrior-of-the-elements": ["elementalAttunement", "elementalBurst"],
-    "monk-warrior-of-the-open-hand": ["wholenessOfBody", "fleetStep"],
-    "monk-warrior-of-mercy": ["handOfHealing", "handOfHealingFlurry"],
+  // elementalAttunement is deliberately absent from the 2024 Warrior of the
+  // Elements/Warrior of Shadow/Warrior of the Open Hand lists here — it's
+  // row-driven (#1686) and unreachable through the bare at() this test uses;
+  // elementalBurst alone still proves the slug match for that subclass. The
+  // 2014 Way of the Four Elements elementalAttunement is a PLAIN
+  // DERIVED_ACTIONS reminder row (#1503, not row-driven), so it IS reachable
+  // and listed. Each entry carries its OWN `edition` (#1501/#1502/#1503):
+  // "monk-way-of-the-open-hand", "monk-way-of-shadow", and
+  // "monk-way-of-the-four-elements" are each EDITION_2014-only, so a blanket
+  // EDITION_2024 loop (the shape before these three slices) would wrongly
+  // report their rows unreachable — `at()`'s own default (EDITION_2024)
+  // would silently exclude them, the exact same-key-different-edition trap
+  // #1499 anticipated.
+  const MONK_SUBCLASS_GRANT_KEYS: Record<
+    Extract<SubclassSlug, `monk-${string}`>,
+    { edition: "EDITION_2014" | "EDITION_2024"; keys: string[] }
+  > = {
+    "monk-warrior-of-shadow": { edition: "EDITION_2024", keys: ["shadowStep", "shadowArts", "cloakOfShadows"] },
+    "monk-warrior-of-the-elements": { edition: "EDITION_2024", keys: ["elementalBurst"] },
+    "monk-warrior-of-the-open-hand": { edition: "EDITION_2024", keys: ["wholenessOfBody", "fleetStep"] },
+    "monk-warrior-of-mercy": { edition: "EDITION_2024", keys: ["handOfHealing", "handOfHealingFlurry"] },
+    "monk-way-of-the-four-elements": { edition: "EDITION_2014", keys: ["elementalAttunement", "castDiscipline"] },
+    "monk-way-of-the-open-hand": { edition: "EDITION_2014", keys: ["wholenessOfBodyAction", "tranquility"] },
+    "monk-way-of-shadow": { edition: "EDITION_2014", keys: ["shadowArts", "shadowStep", "cloakOfShadows", "opportunist"] },
   };
   it("every subclass-gated row is reachable from its accepted name (#1339, retargeted #1277)", () => {
-    for (const [slug, expectedKeys] of Object.entries(MONK_SUBCLASS_GRANT_KEYS) as [SubclassSlug, string[]][]) {
+    for (const [slug, { edition, keys: expectedKeys }] of Object.entries(MONK_SUBCLASS_GRANT_KEYS) as [
+      SubclassSlug,
+      { edition: "EDITION_2014" | "EDITION_2024"; keys: string[] },
+    ][]) {
       const name = SUBCLASS_IDENTITY[slug].nameKey;
-      const granted = keys(at("monk", name, 20, [pool("focus", 5), pool("wholenessOfBody", 5)]));
+      const granted = keys(
+        at("monk", name, 20, [pool("focus", 5), pool("wholenessOfBody", 5), pool("ki", 5)], true, edition),
+      );
       for (const key of expectedKeys) {
         expect(granted).toContain(key);
       }
@@ -1202,7 +1612,7 @@ describe("no two DERIVED_ACTIONS rows from different classes share a display nam
     cleric: [undefined, "life domain", "trickery domain"],
     druid: [undefined, "circle of the land", "circle of the moon"],
     fighter: [undefined, "battle master", "champion", "eldritch knight"],
-    monk: [undefined, "warrior of the open hand", "warrior of shadow", "warrior of the elements", "warrior of mercy"],
+    monk: [undefined, "warrior of the open hand", "way of the open hand", "warrior of shadow", "warrior of the elements", "warrior of mercy"],
     paladin: [undefined, "oath of devotion", "oath of the ancients", "oath of vengeance"],
     ranger: [undefined, "hunter", "beast master"],
     rogue: [undefined, "arcane trickster", "assassin", "thief"],

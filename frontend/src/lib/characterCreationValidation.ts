@@ -17,7 +17,23 @@ import type { EquipmentDraft } from "@/lib/startingEquipment";
 export interface CreationValidationInput {
   name: string;
   alignment: string;
-  race: string;
+  /** True once draft.speciesId is non-empty — a raw id-presence check (never
+   *  a catalog lookup), so this stays correct even a render before the
+   *  reference catalog has resolved (mirrors the subclass-required pattern:
+   *  levelUpSteps.ts's `subclassId != null` gate). */
+  speciesChosen: boolean;
+  /** True when the chosen species has variant rows (a catalog fact, so this
+   *  DOES need the resolved species — same shape as the equipment step's
+   *  `selections.class?.startingEquipment` dependency below). */
+  variantRequired: boolean;
+  variantChosen: boolean;
+  /** #1683: true when the resolved species+variant needs the Int/Wis/Cha
+   *  casting-ability choice (SpeciesVariantOption/SpeciesOption's served
+   *  needsCastingAbility, via deriveCastingAbilityChoice — a catalog fact,
+   *  same shape as variantRequired above). Optional — defaults to "not
+   *  required" so call sites that predate #1683 (and fixtures) need no change. */
+  castingAbilityRequired?: boolean;
+  castingAbilityChosen?: boolean;
   className: string;
   /** Resolved background name to submit (list selection or trimmed custom). */
   backgroundName: string;
@@ -64,7 +80,16 @@ export function missingRequirements(input: CreationValidationInput): string[] {
 
   if (input.name.trim().length === 0) missing.push("Name");
   if (input.alignment.length === 0) missing.push("Alignment");
-  if (input.race.length === 0) missing.push("Race");
+  if (!input.speciesChosen) missing.push("Species");
+  // A variant-bearing species (2014 Dwarf, etc.) cannot Continue without one;
+  // variantRequired is false for a variantless species (its catalog variants[]
+  // is empty), so this branch is simply skipped for them — the picker's absent
+  // second panel is the consequence of that, not the reason.
+  else if (input.variantRequired && !input.variantChosen) missing.push("Variant");
+  // #1683: only checked once a variant is settled (or none is required) — the
+  // choice lives on the CHOSEN variant, so there's nothing to answer until
+  // then; "Variant" stays the one blocking label in that case.
+  else if (input.castingAbilityRequired && !input.castingAbilityChosen) missing.push("Casting ability");
   if (input.className.length === 0) missing.push("Class");
   if (input.backgroundName.length === 0) missing.push("Background");
 

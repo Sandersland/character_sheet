@@ -14,8 +14,10 @@ import { CLERIC_FEATURES } from "../cleric-features.js";
 
 const BASE_ROWS = CLERIC_FEATURES.filter((r) => r.subclassSlug === null);
 
+// abilityScores/profBonus are unused — Channel Divinity's tier is a flat
+// number, never a #1685 formula.
 function poolAt(level: number, edition: "EDITION_2014" | "EDITION_2024") {
-  return poolsFromRows(BASE_ROWS, level, edition).find((p) => p.key === "channelDivinity");
+  return poolsFromRows(BASE_ROWS, level, {}, 0, edition).find((p) => p.key === "channelDivinity");
 }
 
 describe("Channel Divinity pool — exactly one row per edition declares resourceKey: \"channelDivinity\" (#1225)", () => {

@@ -47,7 +47,9 @@ import { readAbilityCost, type AbilityCost } from "@/lib/spellcasting/ability-co
 import { readEffectSpec, resolveEffectSpec, type EffectSpec } from "@/lib/combat/effects.js";
 import { effectiveEntryLevel } from "@/lib/leveling/effective-levels.js";
 import { resolveSubclassSlug, type SubclassSlug, type SubclassIdentityInput } from "./subclass-slug.js";
-import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "./class-feature-rows.js";
+import { effectBuffsFromRow, type ClassFeatureRow, type ClassFeatureRowsCarrier, type ResourceTotalContext } from "./class-feature-rows.js";
+import { monkPoolKey } from "./monk.js";
+import { DEFAULT_RULES_EDITION } from "@/lib/rules/edition.js";
 
 export type ActionCost = "action" | "bonusAction" | "reaction" | "free" | "special";
 
@@ -57,10 +59,10 @@ export class UnknownActionError extends Error {
   status = 400;
 }
 
-/** Rage's melee-damage bonus by barbarian level (+2 / +3 / +4). */
-export function rageMeleeDamageBonus(barbarianLevel: number): number {
-  return barbarianLevel >= 16 ? 4 : barbarianLevel >= 9 ? 3 : 2;
-}
+// rageMeleeDamageBonus retired (#1686) — the +2/+3/+4 progression now lives
+// as a tiered `modifier` on Rage's own effectBuffs entry
+// (barbarian-features.ts), evaluated by evaluateBuffModifier
+// (class-feature-rows.ts) instead of a hardcoded closure here.
 
 /** One class/level gate: this class grants the row from this class level up. */
 interface ActionClassGate {
@@ -119,6 +121,24 @@ interface DerivedActionRecord {
   // (Heightened Focus, monk L10, #1244) lets patientDefenseFocus/
   // stepOfTheWindFocus swap in their L10 rider text without a second row.
   reminder?: string | ((level: number) => string);
+  /**
+   * A resolved numeric fact about this action the client renders verbatim
+   * (#1505) — today only Flurry of Blows' strike count: flat 2 in SRD 5.1,
+   * 2 (3 at Heightened Focus, monk L10) in SRD 5.2. A function form mirrors
+   * `reminder`'s so the 2024 row can resolve its own level-gated value
+   * without a second row. Generic name (not `strikeCount`) because a future
+   * action needing "how many of X" can reuse the same field instead of
+   * inventing its own — the frontend must never recompute this from a level.
+   */
+  count?: number | ((level: number) => number);
+  /**
+   * Deflect Attacks' damage-type clause (#1505), resolved from the L13
+   * Deflect Energy threshold so the client never re-derives it: "bludgeoning,
+   * piercing, or slashing damage" below L13, "any damage type" at L13+. SRD
+   * 5.1's Deflect Missiles carries no such clause — only the deflectAttacks
+   * row below sets this.
+   */
+  damageTypeClause?: string | ((level: number) => string);
   // Martial Arts' blanket condition (Bonus Unarmed Strike, #1218): gates on
   // `unarmoredUnshielded` instead of/alongside a resource pool. Generic so any
   // future Martial-Arts-conditioned action can reuse the same gate.
@@ -176,6 +196,10 @@ export interface AvailableAction {
    *  universalActions for its edition-correct name; it never knows what a key
    *  means. */
   regrants?: string[];
+  /** Resolved numeric fact (#1505) — see DerivedActionRecord.count. */
+  count?: number;
+  /** Resolved damage-type clause (#1505) — see DerivedActionRecord.damageTypeClause. */
+  damageTypeClause?: string;
   /**
    * Which inline resolution tool the client renders for this action (#1528) —
    * served only for a row-driven action (`actionsFromRows` below); a
@@ -207,8 +231,10 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // Only class-specific (non-universal) actions go in availableActions.
 
   // Barbarian
-  { key: "rage", name: "Rage", cost: "bonusAction", grantClass: "barbarian", grantLevel: 1, resourceKey: "rage", resourceAmount: 1 },
-  { key: "endRage", name: "End Rage", cost: "bonusAction", grantClass: "barbarian", grantLevel: 1 },
+  // Rage/endRage retired from this table (#1686) — row-driven now
+  // (barbarian-features.ts's Rage rows, resolverKind "toggle"), synthesized
+  // by toggleActionsFromRow instead of a hand-authored pair here — mirrors
+  // Second Wind/Action Surge's own #1528 retirement.
   { key: "recklessAttack", name: "Reckless Attack", cost: "free", grantClass: "barbarian", grantLevel: 2 },
 
   // Bard
@@ -250,14 +276,50 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // this comment used to assert the 2024 reading as if it were universal
   // (corrected by #1499). The row stays SHARED across editions regardless:
   // both editions gate on the identical unarmored/no-shield condition, and the
-  // Attack-action difference is reminder TEXT, not a gate — `reminder` here is
-  // `(level) => string`, not edition-parameterized, so forking the wording is
-  // #1500's work, not this slice's. Distinct from Flurry of Blows (#1217, the
-  // two-strike Focus version, tagged EDITION_2024 below — SRD 5.1's Flurry
-  // costs 1 ki for two strikes into the "ki" pool (monkPoolKey), a different
-  // resource key from this row's "focus").
+  // Attack-action difference is reminder TEXT, not a gate. DEFERRED (#1500):
+  // forking this row's reminder is still not worth doing — the frontend's
+  // static ACTION_RESOLVERS.bonusUnarmedStrike.subtitle (dice-math text) wins
+  // over any served `reminder` in classActionOption's priority order
+  // (turnOptions.ts), so an edition-forked reminder here would never actually
+  // render; the substantive 2014 text lives on the Martial Arts ClassFeature
+  // row instead (monk-features.ts), which #1500 DID rewrite from SRD 5.1.
+  // Distinct from Flurry of Blows (#1217, the two-strike Focus version,
+  // tagged EDITION_2024 below, with a 2014 counterpart under monkPoolKey's
+  // "ki" pool authored alongside it, #1500).
   { key: "bonusUnarmedStrike", name: "Bonus Unarmed Strike", cost: "bonusAction", grantClass: "monk", grantLevel: 1, requiresUnarmored: true },
-  { key: "flurryOfBlows", name: "Flurry of Blows", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "focus", resourceAmount: 1, edition: "EDITION_2024" },
+  // `count` (#1505): resolved strike count the client renders verbatim,
+  // instead of re-deriving Heightened Focus from a level threshold
+  // (frontend/src/lib/attackMath.ts's retired flurryStrikeCount). 2 normally,
+  // 3 at Heightened Focus (monk L10, #1244).
+  {
+    key: "flurryOfBlows",
+    name: "Flurry of Blows",
+    cost: "bonusAction",
+    grantClass: "monk",
+    grantLevel: 2,
+    resourceKey: "focus",
+    resourceAmount: 1,
+    count: (level) => (level >= 10 ? 3 : 2),
+    edition: "EDITION_2024",
+  },
+  // 2014 (SRD 5.1 / PHB'14 p.77): flat 1-ki cost, no Heightened Focus
+  // three-strike upgrade (2024-only) — same key as the row above (mirrors
+  // Lay on Hands' same-key edition fork), safe to reuse because
+  // ACTION_EFFECT_FN.flurryOfBlows resolves its pool through ctx.edition
+  // (monkPoolKey) rather than a hardcoded key — see that entry below. `count`
+  // is a flat 2 at every level — SRD 5.1 has no three-strike upgrade at all.
+  {
+    key: "flurryOfBlows",
+    name: "Flurry of Blows",
+    cost: "bonusAction",
+    grantClass: "monk",
+    grantLevel: 2,
+    resourceKey: "ki",
+    resourceAmount: 1,
+    count: 2,
+    reminder: "Immediately after taking the Attack action, spend 1 ki to make two unarmed strikes as a bonus action.",
+    edition: "EDITION_2014",
+  },
   // Patient Defense / Step of the Wind (PHB'24 p.98, SRD 5.2, #1240) each grant
   // TWO menu entries — a free variant and a 1-Focus variant — rather than the
   // 2014 SRD's flat "always costs 1 ki" shape. Both compete for the same bonus
@@ -269,16 +331,15 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // temp-HP roll; stepOfTheWindFocus's reminder gains a narrated move-a-
   // willing-creature rider (no server state — this app has no ally/NPC
   // combatant model to move).
-  // These four rows' `regrants` (#1431) is data ONLY — deliberately unrendered,
-  // and the curated reminders above/below stay the card subtitle. All four are
-  // now tagged edition: "EDITION_2024" (#1499): SRD 5.1 Patient Defense buys
-  // DODGE for a flat 1 ki (no free variant), and SRD 5.1 Step of the Wind buys
-  // Disengage-or-Dash for a flat 1 ki the same way — neither 2014 shape is
-  // these two-menu-entries-per-feature rows, so serving them to a 2014 monk
-  // would be wrong, not merely unnamed. #1500 authors the 2014-keyed
-  // equivalents under monkPoolKey's "ki" pool. Naming the regrant on the card
-  // remains future work regardless of edition — Rogue's Cunning Action and
-  // Thief's Fast Hands are invariant in both editions and DO render theirs.
+  // These four rows' `regrants` (#1431) now render on the card too (#1505,
+  // ActionSheetBody's regrantNames-first precedence) — the curated reminders
+  // stay in the toast/drill-in, they just no longer win the subtitle over the
+  // resolved regrant names. All four are tagged edition: "EDITION_2024"
+  // (#1499): SRD 5.1 Patient Defense buys DODGE for a flat 1 ki (no free
+  // variant), and SRD 5.1 Step of the Wind buys Disengage-or-Dash for a flat
+  // 1 ki the same way — neither 2014 shape is these two-menu-entries-per-
+  // feature rows, so serving them to a 2014 monk would be wrong. #1500
+  // authors the 2014-keyed equivalents under monkPoolKey's "ki" pool, below.
   { key: "patientDefense", name: "Patient Defense", cost: "bonusAction", grantClass: "monk", grantLevel: 2, regrants: ["disengage"], reminder: "Disengage (free bonus action).", edition: "EDITION_2024" },
   {
     key: "patientDefenseFocus",
@@ -311,6 +372,36 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
         : "Disengage + Dash, jump distance doubled this turn (spend 1 Focus).",
     edition: "EDITION_2024",
   },
+  // 2014 (SRD 5.1 / PHB'14 p.77): ONE row apiece, not the 2024 free/paid
+  // pair — a flat 1-ki cost with no free variant. Distinct keys from the
+  // 2024 rows above (NOT `patientDefense`/`stepOfTheWind`): those exact keys
+  // are pinned `serverEffect: false` in the frontend's ACTION_RESOLVERS
+  // table (actionResolvers.ts) for the FREE 2024 variant, so a 2014 1-ki row
+  // reusing either key would render but silently never spend.
+  {
+    key: "patientDefenseKi",
+    name: "Patient Defense",
+    cost: "bonusAction",
+    grantClass: "monk",
+    grantLevel: 2,
+    resourceKey: "ki",
+    resourceAmount: 1,
+    regrants: ["dodge"],
+    reminder: "Spend 1 ki to take the Dodge action as a bonus action.",
+    edition: "EDITION_2014",
+  },
+  {
+    key: "stepOfTheWindKi",
+    name: "Step of the Wind",
+    cost: "bonusAction",
+    grantClass: "monk",
+    grantLevel: 2,
+    resourceKey: "ki",
+    resourceAmount: 1,
+    regrants: ["disengage", "dash"],
+    reminder: "Spend 1 ki to take the Disengage or Dash action as a bonus action; your jump distance is doubled for the turn.",
+    edition: "EDITION_2014",
+  },
   // Stunning Strike (L5) is NOT a selectable action — it's a post-hit rider
   // (spend + Con save + fail/success outcome), built as its own dedicated
   // vertical in stunning-strike.ts, exactly like Sneak Attack bypasses this
@@ -331,6 +422,9 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     grantLevel: 3,
     reminder:
       "Reaction: when hit by a melee or ranged attack dealing bludgeoning, piercing, or slashing damage (any damage type at L13, Deflect Energy), reduce the damage by 1d10 + Dex modifier + monk level.",
+    // Resolved for the toast (frontend/src/lib/deflectAttacks.ts, #1505) so
+    // the client never re-derives the L13 Deflect Energy threshold itself.
+    damageTypeClause: (level) => (level >= 13 ? "any damage type" : "bludgeoning, piercing, or slashing damage"),
     edition: "EDITION_2024",
   },
   // Redirect rider: only meaningful once a ranged hit is reduced to 0 — a "free"
@@ -340,28 +434,95 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // PHB'14's Deflect Missiles has no redirect rider at all.
   { key: "deflectAttacksRedirect", name: "Deflect Attacks — Redirect", cost: "free", grantClass: "monk", grantLevel: 3, resourceKey: "focus", resourceAmount: 1, edition: "EDITION_2024" },
 
-  // Every row below (Warrior of Shadow / Warrior of the Elements / Warrior of
-  // the Open Hand / Warrior of Mercy) is subclass-gated via grantSubclassSlugs
-  // and deliberately left UNTAGGED (#1499) even though all four subclasses are
-  // 2024-only content: SUBCLASS_SLUGS (subclass-slug.ts) contains no 2014 monk
-  // subclass, so matchesSubclassGate already excludes every one of these rows
-  // for a 2014 monk (no slug can ever resolve) — an edition tag would add no
-  // observable behaviour. Tagging wholenessOfBody in particular would also
-  // pre-decide a content question that belongs to #1500 (PHB'14 Way of the
-  // Open Hand has its own Wholeness of Body at a different level).
+  // Deflect Missiles (SRD 5.1 / PHB'14 p.77, #1500) — the 2014 counterpart to
+  // Deflect Attacks above: RANGED WEAPON ATTACKS ONLY (no melee), same base
+  // reduction formula, no resourceKey on the base row (free, narrated —
+  // mirrors deflectAttacks' own shape). The throw-back rider is a catch +
+  // ranged attack, not a save-forcing redirect, so it's a real 1-ki spend.
+  {
+    key: "deflectMissiles",
+    name: "Deflect Missiles",
+    cost: "reaction",
+    grantClass: "monk",
+    grantLevel: 3,
+    reminder:
+      "Reaction: when hit by a ranged weapon attack, reduce the damage by 1d10 + Dex modifier + monk level. If this reduces it to 0 and you have a free hand, catch the missile.",
+    edition: "EDITION_2014",
+  },
+  {
+    key: "deflectMissilesThrow",
+    name: "Deflect Missiles — Throw Back",
+    cost: "free",
+    grantClass: "monk",
+    grantLevel: 3,
+    resourceKey: "ki",
+    resourceAmount: 1,
+    reminder: "Spend 1 ki to make a ranged attack with the caught missile (range 20/60, always proficient) — 1d6 + Dex modifier bludgeoning on a hit.",
+    edition: "EDITION_2014",
+  },
+
+  // Empty Body (SRD 5.1 / PHB'14 p.79, L18, #1500) — two independent
+  // ki-spend options with no server effect beyond the spend itself (no
+  // buff/condition model for the astral-projection clause, and invisibility
+  // has no target model to persist against — mirrors Cloak of Shadows/Shadow
+  // Arts below: gating + reminder rows only, no dedicated cast vertical yet).
+  {
+    key: "emptyBody",
+    name: "Empty Body — Invisibility",
+    cost: "action",
+    grantClass: "monk",
+    grantLevel: 18,
+    resourceKey: "ki",
+    resourceAmount: 4,
+    reminder: "Spend 4 ki to become invisible for 1 minute, with resistance to all damage but force damage during that time.",
+    edition: "EDITION_2014",
+  },
+  {
+    key: "emptyBodyAstralProjection",
+    name: "Empty Body — Astral Projection",
+    cost: "action",
+    grantClass: "monk",
+    grantLevel: 18,
+    resourceKey: "ki",
+    resourceAmount: 8,
+    reminder: "Spend 8 ki to cast astral projection on yourself without a material component; you can't take other creatures with you.",
+    edition: "EDITION_2014",
+  },
+
+  // Every row below is subclass-gated via grantSubclassSlugs. Warrior of the
+  // Elements / Warrior of Mercy stay deliberately UNTAGGED (#1499):
+  // SUBCLASS_SLUGS still contains no 2014 slug for either, so
+  // matchesSubclassGate already excludes every one of their rows for a 2014
+  // monk — an edition tag would add no observable behaviour, pending #1503.
+  // Warrior of Shadow (#1502) and Warrior of the Open Hand (#1501) are BOTH
+  // now explicitly tagged EDITION_2024, for the same underlying reason:
+  // SUBCLASS_SLUGS gained a real 2014 sibling for each (monk-way-of-shadow,
+  // monk-way-of-the-open-hand), so slug-gating alone already isolates the
+  // 2024 rows below, but the edition tag is now load-bearing defence-in-depth
+  // rather than a no-op. The two siblings diverge on KEY REUSE, not just
+  // content: Way of Shadow's rows reuse the SAME keys as Warrior of Shadow
+  // (shadowArts/shadowStep/cloakOfShadows — see the 2014 block further down,
+  // disambiguated by edition + grantSubclassSlugs alone), while Way of the
+  // Open Hand's Wholeness of Body needs its OWN key
+  // ("wholenessOfBodyAction", not this block's "wholenessOfBody") because its
+  // shape differs enough that reusing the key would blur two client-side
+  // resolvers — see that row's own comment. Both retags are bound in the
+  // same commit as their Subclass row's own edition tag (subclasses.ts).
   // Warrior of Shadow reminder action (2024 rewrite, #1246) — no resourceKey, no
   // server effect; reminder is the deliverable. Improved Shadow Step (L11)
   // upgrades the SAME bonus action (ignore the dim/dark destination requirement
   // for 1 focus) rather than adding a competing catalog row — mirrors how
   // Heightened Focus upgrades patientDefenseFocus/stepOfTheWindFocus in place.
-  // Opportunist (2014 L17 reaction) is retired — replaced by Cloak of Shadows
-  // (shadow-arts.ts activateCloakOfShadows), a real resourceKey-gated cast, not
-  // a catalog reminder.
+  // Opportunist (2014 L17 reaction) is retired for THIS (2024) subclass —
+  // replaced by Cloak of Shadows (shadow-arts.ts activateCloakOfShadows), a
+  // real resourceKey-gated cast, not a catalog reminder. The 2014 Way of
+  // Shadow fork below reinstates Opportunist under its own slug (#1502).
   {
     key: "shadowStep",
     name: "Shadow Step",
     cost: "bonusAction",
     grantClass: "monk",
+    edition: "EDITION_2024",
     grantSubclassSlugs: ["monk-warrior-of-shadow"],
     grantLevel: 6,
     reminder: (level) =>
@@ -384,6 +545,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     name: "Shadow Arts (Darkness)",
     cost: "action",
     grantClass: "monk",
+    edition: "EDITION_2024",
     grantSubclassSlugs: ["monk-warrior-of-shadow"],
     grantLevel: 3,
     resourceKey: "focus",
@@ -395,6 +557,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     name: "Cloak of Shadows",
     cost: "action",
     grantClass: "monk",
+    edition: "EDITION_2024",
     grantSubclassSlugs: ["monk-warrior-of-shadow"],
     grantLevel: 17,
     resourceKey: "focus",
@@ -402,23 +565,69 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     reminder: "Magic action, entirely within dim light or darkness: spend 3 focus to become invisible and move through creatures/objects as difficult terrain for 1 minute (or until incapacitated, or you end your turn in bright light). Flurry of Blows costs no focus while it lasts.",
   },
 
-  // Warrior of the Elements (PHB'24 p.90 — not in SRD 5.2, which ships only
-  // Warrior of the Open Hand for monk) two Focus-spending session actions
-  // (#1315, migrated off a pair of DerivedClassInfo availability booleans) —
-  // the real ops live in warrior-of-elements.ts's own endpoint, so neither row
-  // gets an ACTION_EFFECT_FN entry. Elemental Attunement is explicitly "no
-  // action"; Elemental Burst is a Magic action.
+  // 2014 Way of Shadow (PHB'14 pp.79-80 — not in SRD 5.1, #1502): a
+  // materially different fork from the 2024 rewrite above, not a retab —
+  // Shadow Arts is a flat 4-spell 2-ki menu (Darkness/Darkvision/Pass without
+  // Trace/Silence, the exact per-spell menu resolved from the GrantedAbility
+  // catalog by shadow-arts.ts, not this row), Shadow Step grants no free
+  // unarmed strike, Cloak of Shadows moves to L11 with NO resource cost (no
+  // resourceKey at all — action only), and Opportunist returns at L17 as a
+  // pure reminder reaction (no 2024 equivalent). Same KEY NAMES as the 2024
+  // rows above (shadowArts/shadowStep/cloakOfShadows) — the edition tag plus
+  // grantSubclassSlugs disambiguates, never a second vocabulary; opportunist
+  // is the one 2014-only key with no 2024 counterpart.
   {
-    key: "elementalAttunement",
-    name: "Elemental Attunement",
-    cost: "free",
+    key: "shadowArts",
+    name: "Shadow Arts",
+    cost: "action",
     grantClass: "monk",
-    grantSubclassSlugs: ["monk-warrior-of-the-elements"],
+    edition: "EDITION_2014",
+    grantSubclassSlugs: ["monk-way-of-shadow"],
     grantLevel: 3,
-    resourceKey: "focus",
-    resourceAmount: 1,
-    reminder: "No action, start of your turn: spend 1 focus to imbue yourself with elemental energy for 10 minutes (or until incapacitated). Unarmed Strike reach +10 ft; once per hit, deal Acid/Cold/Fire/Lightning/Thunder damage instead of the normal type, forcing a Strength save (focus DC) to move the target up to 10 ft on a failure.",
+    resourceKey: "ki",
+    resourceAmount: 2,
+    reminder: "Spend 2 ki to cast darkness, darkvision, pass without trace, or silence, without material components (PHB'14 pp.79-80 — not in SRD 5.1).",
   },
+  {
+    key: "shadowStep",
+    name: "Shadow Step",
+    cost: "bonusAction",
+    grantClass: "monk",
+    edition: "EDITION_2014",
+    grantSubclassSlugs: ["monk-way-of-shadow"],
+    grantLevel: 6,
+    reminder: "While in dim light or darkness, teleport as a bonus action up to 60 ft to an unoccupied space you can see that is also in dim light or darkness; you then have advantage on the first melee attack you make before the end of the turn.",
+  },
+  {
+    key: "cloakOfShadows",
+    name: "Cloak of Shadows",
+    cost: "action",
+    grantClass: "monk",
+    edition: "EDITION_2014",
+    grantSubclassSlugs: ["monk-way-of-shadow"],
+    grantLevel: 11,
+    reminder: "While in dim light or darkness, use your action to become invisible; you remain invisible until you make an attack, cast a spell, or are in an area of bright light. No ki cost, no duration cap.",
+  },
+  {
+    key: "opportunist",
+    name: "Opportunist",
+    cost: "reaction",
+    grantClass: "monk",
+    edition: "EDITION_2014",
+    grantSubclassSlugs: ["monk-way-of-shadow"],
+    grantLevel: 17,
+    reminder: "When a creature within 5 ft of you is hit by an attack made by a creature other than you, use your reaction to make a melee attack against that creature.",
+  },
+
+  // Warrior of the Elements (PHB'24 p.90 — not in SRD 5.2, which ships only
+  // Warrior of the Open Hand for monk). Elemental Attunement retired from
+  // this table (#1686) — row-driven now (monk.ts's AuthoredFeature entry,
+  // resolverKind "toggle"), synthesizing its own "elementalAttunement"/
+  // "endElementalAttunement" pair via toggleActionsFromRow; the buff/spend
+  // ops route through the generic toggle dispatcher
+  // (routes/character/actions.ts), NOT warrior-of-elements.ts's own endpoint
+  // any more. Elemental Burst stays here and in that endpoint — it's a
+  // save-DC damage op, not a buff.
   {
     key: "elementalBurst",
     name: "Elemental Burst",
@@ -431,19 +640,71 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     reminder: "Magic action, 2 focus: 20-ft-radius sphere within 120 ft, chosen damage type. Each creature makes a Dexterity save (focus DC) — 3 Martial Arts dice on a failure, half as much on a success.",
   },
 
+  // Way of the Four Elements (2014-only, PHB'14 pp.78/80-81, #1503). Both
+  // rows tagged EDITION_2014 and gated to the 2014-only slug — pre-blessed
+  // safe to reuse the "elementalAttunement" key against the 2024 row above
+  // (actionGrantLevel filters by edition BEFORE matching by key, and the two
+  // rows' grantSubclassSlugs are disjoint slugs regardless — #1503's own
+  // execution-decision comment names this the FIRST same-key-different-
+  // edition collision this table has ever carried, #1499's own comment
+  // anticipated it). Elemental Attunement here is free/uncapped and carries
+  // no resourceKey — unlike 2024's Focus-fuelled buff toggle, PHB'14's
+  // version is a flat reminder action with no persisted state at all.
+  // castDiscipline is a discoverability/gate tile only — no ACTION_EFFECT_FN
+  // entry, same shape as shadowArts below: the real cast is one
+  // ABILITY_REGISTRY entry (lib/classes/disciplines.ts, "disciplines"),
+  // dispatched through POST /api/characters/:id/abilities/disciplines/
+  // transactions, not this table's generic action-execute path.
+  {
+    key: "elementalAttunement",
+    name: "Elemental Attunement",
+    cost: "action",
+    grantClass: "monk",
+    grantSubclassSlugs: ["monk-way-of-the-four-elements"],
+    grantLevel: 3,
+    edition: "EDITION_2014",
+    reminder:
+      "Briefly control elemental forces within 30 ft: create a harmless sensory effect; light or snuff a small flame; chill or warm up to 1 lb of nonliving material for 1 hour; or shape a small amount of nonliving earth, fire, water, or mist for 1 minute. Free — always known, no ki cost.",
+  },
+  {
+    key: "castDiscipline",
+    name: "Elemental Discipline",
+    cost: "action",
+    grantClass: "monk",
+    grantSubclassSlugs: ["monk-way-of-the-four-elements"],
+    grantLevel: 3,
+    edition: "EDITION_2014",
+    resourceKey: "ki",
+    resourceAmount: 1,
+    reminder: "Spend ki to cast a known elemental discipline (2-6 ki, capped by your monk level).",
+  },
+
   // Warrior of the Open Hand (#1245): Open Hand Technique (Flurry-hit rider)
   // and Quivering Palm (set/trigger) are post-hit riders with their own
   // dedicated verticals (open-hand-technique.ts / quivering-palm.ts), exactly
   // like Stunning Strike bypasses this catalog — neither is a selectable action.
   // Wholeness of Body IS a selectable action: a Bonus Action heal, spending the
   // #1228 wholenessOfBody pool (Martial Arts die + Wis mod, client-rolled).
-  { key: "wholenessOfBody", name: "Wholeness of Body", cost: "bonusAction", grantClass: "monk", grantSubclassSlugs: ["monk-warrior-of-the-open-hand"], grantLevel: 6, resourceKey: "wholenessOfBody", resourceAmount: 1 },
+  // Tagged EDITION_2024 (#1501) now that a real 2014 sibling exists below.
+  {
+    key: "wholenessOfBody",
+    name: "Wholeness of Body",
+    cost: "bonusAction",
+    grantClass: "monk",
+    grantSubclassSlugs: ["monk-warrior-of-the-open-hand"],
+    grantLevel: 6,
+    resourceKey: "wholenessOfBody",
+    resourceAmount: 1,
+    edition: "EDITION_2024",
+  },
   // Fleet Step (L11): not a discrete action — it lets you ALSO take Step of the
   // Wind after any OTHER bonus action, so it carries no resourceKey/slot (like
   // Reckless Attack/Metamagic's cost:"free" reminders) rather than competing
   // with Wholeness of Body/Flurry/Bonus Unarmed Strike for the same bonus
   // action. Full automation of "which bonus action did you just take" is heavy
   // for a one-line rider — the reminder is the deliverable (ticket #1245).
+  // Tagged EDITION_2024 (#1501) — 2014's Way of the Open Hand has Tranquility
+  // at L11 instead (below), not Fleet Step.
   {
     key: "fleetStep",
     name: "Fleet Step",
@@ -452,6 +713,48 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     grantSubclassSlugs: ["monk-warrior-of-the-open-hand"],
     grantLevel: 11,
     reminder: "When you take a bonus action other than Step of the Wind, you can also take Step of the Wind immediately afterward (no extra cost).",
+    edition: "EDITION_2024",
+  },
+
+  // Way of the Open Hand (SRD 5.1 / PHB'14 p.78, #1501) — 2014's counterpart,
+  // a SEPARATE subclass from Warrior of the Open Hand above (see
+  // subclass-slug.ts's SUBCLASS_IDENTITY). Open Hand Technique and Quivering
+  // Palm stay post-hit-rider/set-trigger verticals with no catalog row here,
+  // same as the 2024 subclass. Wholeness of Body needs its OWN key
+  // ("wholenessOfBodyAction", not the 2024 row's "wholenessOfBody") because
+  // its shape genuinely differs — an action, not a bonus action, healing a
+  // FLAT 3 x monk level with no die roll at all, vs. 2024's Martial Arts die
+  // + Wis mod — mirrors patientDefenseKi/stepOfTheWindKi's own same-feature-
+  // different-key precedent above. Both spend the same "wholenessOfBody"
+  // resource key and pool total (row-owned, monk-features.ts), so
+  // ACTION_EFFECT_FN.wholenessOfBodyAction is a thin duplicate of
+  // .wholenessOfBody's spend+client-rolled-heal shape, registered under the
+  // new key; the frontend resolver (actionResolvers.ts) computes the flat
+  // total from the MONK entry's own level (not total character level) —
+  // see that entry's own comment for why that's safe here specifically.
+  {
+    key: "wholenessOfBodyAction",
+    name: "Wholeness of Body",
+    cost: "action",
+    grantClass: "monk",
+    grantSubclassSlugs: ["monk-way-of-the-open-hand"],
+    grantLevel: 6,
+    resourceKey: "wholenessOfBody",
+    resourceAmount: 1,
+    edition: "EDITION_2014",
+  },
+  // Tranquility (L11): a passive gained at the end of a long rest (sanctuary
+  // until the next long rest), not a mid-turn action — reminder-only, like
+  // Fleet Step's own shape, with no resourceKey (nothing is spent to gain it).
+  {
+    key: "tranquility",
+    name: "Tranquility",
+    cost: "free",
+    grantClass: "monk",
+    grantSubclassSlugs: ["monk-way-of-the-open-hand"],
+    grantLevel: 11,
+    reminder: "At the end of a long rest, you gain the effect of sanctuary (DC = your ki save DC) until the start of your next long rest.",
+    edition: "EDITION_2014",
   },
   // Warrior of Mercy (#1248): Hand of Healing is a Magic-action heal spending
   // 1 Focus (mirrors Wholeness of Body's shape) plus a free Flurry-strike
@@ -630,6 +933,8 @@ export function deriveActions(
     .map((a): AvailableAction => {
       const { enabled, disabledReason } = resolveEnablement(a, poolMap, unarmoredUnshielded);
       const reminder = typeof a.reminder === "function" ? a.reminder(level) : a.reminder;
+      const count = typeof a.count === "function" ? a.count(level) : a.count;
+      const damageTypeClause = typeof a.damageTypeClause === "function" ? a.damageTypeClause(level) : a.damageTypeClause;
       return {
         key: a.key,
         name: a.name,
@@ -638,6 +943,8 @@ export function deriveActions(
         ...(disabledReason ? { disabledReason } : {}),
         ...(reminder ? { reminder } : {}),
         ...(a.regrants ? { regrants: [...a.regrants] } : {}),
+        ...(count !== undefined ? { count } : {}),
+        ...(damageTypeClause !== undefined ? { damageTypeClause } : {}),
       };
     });
 }
@@ -764,17 +1071,24 @@ function resolveEnablement(
 //    range server-side rather than recomputing (same pattern as castSpell.roll).
 //  - A roll made server-side with no client input (e.g. Heightened Focus's
 //    temp-HP roll) is precomputed by the route before dispatch and passed in
-//    via its own ctx field, same shape as `rageDamageBonus` below.
+//    via its own ctx field, same shape as `heightenedFocusTempHp` below.
 //  - Use ONLY existing op types (spendResource, adjustQuantity, heal, tempHp,
 //    applyBuff, clearBuff).
+//
+// A while-active BUFF-GRANTING feature (Rage was the last one here) does NOT
+// belong in this table any more (#1686): author it as a ClassFeature/
+// GrantedAbility row with resolverKind "toggle" + an `effectBuffs` list
+// instead (toggleActionsFromRow/toggleRowOps below) — Rage's own migration
+// (barbarian-features.ts) is the worked example, including the level-tiered
+// modifier and resistDamageTypes/rollEffects passthrough this table's
+// closures used to hand-roll. This table stays for actions with NO buff to
+// grant (spend/heal/tempHp/no-op).
 
 interface ActionContext {
   /** Arbitrary dice roll total supplied by the client (e.g. potion healing). */
   roll?: number;
   /** ID of the inventory item to consume (e.g. healing potion). */
   inventoryItemId?: string;
-  /** Level-derived Rage melee-damage bonus, computed by the route from barbarian level. */
-  rageDamageBonus?: number;
   /**
    * Heightened Focus (monk L10, PHB'24 p.98/SRD 5.2, #1244): temp HP for
    * Patient Defense's Focus variant, rolled server-side (two Martial Arts die
@@ -782,6 +1096,18 @@ interface ActionContext {
    * L10, so patientDefenseFocus simply omits the tempHp op.
    */
   heightenedFocusTempHp?: number;
+  /**
+   * The character's rules edition (#1500) — read by any effect fn whose spend
+   * targets an edition-forked pool key under the SAME action key (Flurry of
+   * Blows: "focus" for a 2024 monk, "ki" for a 2014 monk, via monkPoolKey).
+   * Every OTHER effect fn ignores this field. Optional (not required, unlike
+   * heightenedFocusTempHp) purely so the ~45 existing unit-test call sites
+   * exercising unrelated keys don't all need to start threading a field they
+   * never read; the real route (routes/character/actions.ts) always supplies
+   * it — flurryOfBlows below falls back to DEFAULT_RULES_EDITION only for a
+   * direct unit-test call that omits it.
+   */
+  edition?: RulesEdition;
 }
 
 type SpendResourceOp = { type: "spendResource"; key: string; amount?: number };
@@ -790,7 +1116,10 @@ type HealOp = { type: "heal"; amount: number };
 type TempHpOp = { type: "tempHp"; amount: number };
 type ApplyBuffOp = { type: "applyBuff"; buff: Omit<ActiveBuff, "id"> };
 type ClearBuffOp = { type: "clearBuff"; key: string; reason: string };
-type ActionOp = SpendResourceOp | AdjustQuantityOp | HealOp | TempHpOp | ApplyBuffOp | ClearBuffOp;
+// Exported so toggleRowOps below (the #1686 generic toggle handler) and the
+// routes/character/actions.ts dispatcher share this exact union instead of a
+// second, structurally-equal copy.
+export type ActionOp = SpendResourceOp | AdjustQuantityOp | HealOp | TempHpOp | ApplyBuffOp | ClearBuffOp;
 
 type EffectFn = (ctx: ActionContext) => ActionOp[];
 
@@ -822,28 +1151,10 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
   },
 
   // Barbarian
-  // Rage applies a durable while-active meleeDamage buff (auto-ends via the
-  // session turn-hook / long rest / 0 HP) and spends a rage use.
-  rage: (ctx) => [
-    {
-      type: "applyBuff",
-      buff: {
-        key: "rage",
-        target: "meleeDamage",
-        modifier: ctx.rageDamageBonus ?? 2,
-        source: "Rage",
-        duration: "while-active",
-        resistDamageTypes: ["bludgeoning", "piercing", "slashing"],
-        rollEffects: [
-          { mode: "advantage", kind: "check", ability: "strength" },
-          { mode: "advantage", kind: "save", ability: "strength" },
-        ],
-      },
-    },
-    { type: "spendResource", key: "rage" },
-  ],
-  // Manual end (bonus action) — the same clear the turn-hook fires automatically.
-  endRage: () => [{ type: "clearBuff", key: "rage", reason: "Rage ended" }],
+  // Rage/endRage retired from this table (#1686) — row-driven now
+  // (barbarian-features.ts's Rage rows carry resolverKind "toggle" + a
+  // tiered effectBuffs entry), dispatched through toggleRowOps
+  // (routes/character/actions.ts) instead of a hand-authored closure here.
   recklessAttack: () => [], // ephemeral — advantage/disadvantage is tracked by the table
 
   // Bard
@@ -866,13 +1177,18 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
   // bonusUnarmedStrike is economy-only, like `attack`/`twf` — no server state
   // to spend, the gate is already applied at derive time (requiresUnarmored).
   bonusUnarmedStrike: () => [],
-  // SRD 5.2 Focus: Flurry expends 1 Focus Point to make two Unarmed Strikes
-  // (#1217 — was miscoded at 2 Focus, a 2014-rules holdover).
-  flurryOfBlows: () => [{ type: "spendResource", key: "focus" }],
-  // patientDefense / stepOfTheWind (the FREE variants) have no ACTION_EFFECT_FN
-  // entry — like Shadow Step/Opportunist, they're economy-only (consume the
-  // bonus action, spend nothing); planActionClick never calls send() for a
-  // serverEffect:false resolver, so no dispatch entry is needed here.
+  // Flurry expends 1 ki/focus to make two Unarmed Strikes (#1217 — was
+  // miscoded at 2 Focus, a 2014-rules holdover). ONE function serves BOTH
+  // editions' `flurryOfBlows` DERIVED_ACTIONS row (#1500) — the pool key
+  // itself forks (monkPoolKey), so this resolves it from ctx.edition rather
+  // than hardcoding "focus" the way every OTHER monk spend below safely can
+  // (their action KEYS are edition-exclusive; this one key is shared).
+  flurryOfBlows: (ctx) => [{ type: "spendResource", key: monkPoolKey(ctx.edition ?? DEFAULT_RULES_EDITION) }],
+  // patientDefense / stepOfTheWind (the FREE 2024 variants) have no
+  // ACTION_EFFECT_FN entry — like Shadow Step/Opportunist, they're
+  // economy-only (consume the bonus action, spend nothing); planActionClick
+  // never calls send() for a serverEffect:false resolver, so no dispatch
+  // entry is needed here.
   patientDefenseFocus: (ctx) => {
     const ops: ActionOp[] = [{ type: "spendResource", key: "focus" }];
     // Heightened Focus (monk L10, #1244): the route pre-rolls two Martial Arts
@@ -887,6 +1203,15 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
   // no server state to apply — this app has no NPC/ally combatant model — so
   // it's surfaced only via the level-gated reminder text above, not here.
   stepOfTheWindFocus: () => [{ type: "spendResource", key: "focus" }],
+  // 2014 (SRD 5.1, #1500): flat 1-ki cost, no free variant, so each gets its
+  // own distinct key rather than reusing patientDefense/stepOfTheWind (those
+  // exact keys are pinned serverEffect:false in the frontend's
+  // ACTION_RESOLVERS table — see the DERIVED_ACTIONS comment above). Both
+  // action keys are 2014-exclusive (no 2024 row shares them), so hardcoding
+  // "ki" here is safe the same way deflectAttacksRedirect safely hardcodes
+  // "focus" below.
+  patientDefenseKi: () => [{ type: "spendResource", key: "ki" }],
+  stepOfTheWindKi: () => [{ type: "spendResource", key: "ki" }],
   // stunningStrike is not here — it's a post-hit rider in stunning-strike.ts (#1242).
   // Warrior of the Open Hand (#1245): Wholeness of Body mirrors layOnHands'
   // shape (spend the pool, heal the client-rolled amount) but spends a flat 1
@@ -899,8 +1224,20 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
     }
     return ops;
   },
-  // fleetStep has no entry here — it's a pure reminder (cost:"free") like
-  // recklessAttack/metamagic: no server state to spend.
+  // Way of the Open Hand's 2014 Wholeness of Body (#1501) — a thin duplicate
+  // of wholenessOfBody's own spend+client-rolled-heal shape, registered under
+  // its own key (see the DERIVED_ACTIONS comment above for why the key
+  // itself must differ even though the SPEND is identical).
+  // fallow-ignore-next-line code-duplication -- deliberately identical body to wholenessOfBody above; ACTION_EFFECT_FN is keyed by action key, not shared by reference, and the two keys must stay distinct (see the DERIVED_ACTIONS comment above)
+  wholenessOfBodyAction: (ctx) => {
+    const ops: ActionOp[] = [{ type: "spendResource", key: "wholenessOfBody" }];
+    if (ctx.roll !== undefined && ctx.roll > 0) {
+      ops.push({ type: "heal", amount: ctx.roll });
+    }
+    return ops;
+  },
+  // fleetStep/tranquility have no entry here — both are pure reminders
+  // (cost:"free") like recklessAttack/metamagic: no server state to spend.
   // Warrior of Mercy (#1248): Hand of Healing's rule text is "touch a
   // creature", but — like layOnHands/wholenessOfBody above — this app has no
   // cross-character heal path via the actions endpoint, so it applies to the
@@ -928,6 +1265,18 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
   // calls the transactions endpoint (nothing persisted). Only the redirect
   // below is real, persisted state.
   deflectAttacksRedirect: () => [{ type: "spendResource", key: "focus" }],
+  // deflectMissiles (2014 base reduction) has no entry here either, same
+  // reasoning — the client rolls 1d10 + Dex + monk level. The throw-back is
+  // the persisted 1-ki spend (its own damage roll is client-rolled and
+  // narrated only, mirroring wholenessOfBody's client-rolled heal — no
+  // target-combatant model to apply it to, #1242's disclosed simplification).
+  deflectMissilesThrow: () => [{ type: "spendResource", key: "ki" }],
+  // emptyBody / emptyBodyAstralProjection have no entry here — like
+  // shadowArts/cloakOfShadows below, they're gating + reminder rows only
+  // (resourceKey/resourceAmount drive the enabled/disabled display); no
+  // ACTION_RESOLVERS entry exists either, so neither renders a clickable
+  // card yet — a dedicated cast vertical is future work, disclosed rather
+  // than half-wired.
 
   // Paladin
   divineSense: () => [{ type: "spendResource", key: "divineSense" }],
@@ -1020,6 +1369,113 @@ function actionFromRow(
   return buildRowAction(row, level, enabled, disabledReason);
 }
 
+// The synthesized "end" action key for a toggle row's own activate key
+// (#1686) — "rage" -> "endRage", matching the pre-migration DERIVED_ACTIONS
+// endRage key byte-for-byte, which is load-bearing:
+// DURABLE_BUFF_END_CONDITIONS (frontend/src/lib/turnHooks.ts) hardcodes
+// "endRage" as the auto-end action it invokes, keyed by the "rage" buff —
+// this function must keep producing that exact string for Rage forever, not
+// merely today.
+export function endActionKey(activateKey: string): string {
+  return `end${activateKey.charAt(0).toUpperCase()}${activateKey.slice(1)}`;
+}
+
+/**
+ * A "toggle" row's own AvailableAction PAIR (#1686) — synthesizes an activate
+ * entry (key = row.resourceKey, the same "click key = identity" convention
+ * buildRowAction uses) and an end entry (key = endActionKey(activateKey))
+ * from ONE row, replacing a hand-authored DERIVED_ACTIONS pair (Rage/endRage).
+ * Enablement checks the row's own ABILITY COST (costPoolKey/costBase — "cost
+ * columns already exist"), not resourceKey/resourceAmount: resourceKey is
+ * this row's IDENTITY here, not necessarily the pool it draws from (Elemental
+ * Attunement's identity is "elementalAttunement" but its cost draws from the
+ * shared "focus" pool; they coincide only when a feature spends its OWN
+ * dedicated pool, Rage's case, where costPoolKey === resourceKey === "rage").
+ * The end action is always enabled — same as the retired endRage
+ * DERIVED_ACTIONS row (no server-tracked "is this active" gate); clearing an
+ * inactive buff is already a safe no-op (clearBuffByKeyInTx).
+ */
+function toggleActionsFromRow(
+  row: ClassFeatureRow,
+  level: number,
+  edition: RulesEdition,
+  poolMap: Map<string, number>,
+  unarmoredUnshielded: boolean,
+): AvailableAction[] {
+  if (row.edition !== edition || row.level > level || !row.activationCost || !row.resourceKey) return [];
+  const cost = readAbilityCost(row);
+  const record: EnablementInput = {
+    resourceKey: cost.kind === "pool" ? cost.key : undefined,
+    resourceAmount: cost.kind === "pool" ? cost.base : undefined,
+    requiresUnarmored: row.requiresUnarmored ?? false,
+  };
+  const { enabled, disabledReason } = resolveEnablement(record, poolMap, unarmoredUnshielded);
+  const activateKey = row.resourceKey;
+  return [
+    {
+      key: activateKey,
+      name: row.name,
+      cost: row.activationCost as ActionCost,
+      enabled,
+      ...(disabledReason ? { disabledReason } : {}),
+      resolverKind: "toggle",
+    },
+    {
+      key: endActionKey(activateKey),
+      name: `End ${row.name}`,
+      cost: row.activationCost as ActionCost,
+      enabled: true,
+      resolverKind: "toggle",
+    },
+  ];
+}
+
+/**
+ * The generic "toggle" effect handler (#1686): instantiates a row's
+ * `effectBuffs` as ActiveBuff ops on activation, or clears them by key on
+ * end — the row-driven counterpart to a hand-authored ACTION_EFFECT_FN pair
+ * (Rage's retired `rage`/`endRage` functions). `ctx.level` is the granting
+ * class entry's OWN effective level (mirrors the retired
+ * computeRageDamageBonus's barbarian-level lookup, never the character's
+ * total level) — the same level effectBuffsFromRow uses for both a buff
+ * entry's own `minLevel` gate and a tiered `modifier`'s evaluation.
+ * Activation also pays the row's own ability cost (costPoolKey/costBase —
+ * "cost columns already exist") via a spendResource op, omitting `amount`
+ * when it's 1 to match every existing hand-authored spend's byte shape
+ * (`{ type: "spendResource", key: "rage" }`, no `amount` field).
+ */
+export function toggleRowOps(row: ClassFeatureRow, ctx: ResourceTotalContext, isEnd: boolean): ActionOp[] {
+  const buffs = effectBuffsFromRow(row, ctx);
+  if (isEnd) {
+    return buffs.map((b) => ({ type: "clearBuff", key: b.key, reason: `${row.name} ended` }));
+  }
+  // Activation with no buff to apply would still spend the pool below — a
+  // silent drain. That only happens for a misauthored row (null/empty
+  // effectBuffs) or one whose every buff is gated above ctx.level; fail loud
+  // rather than charge the resource for nothing (#1686 review).
+  if (buffs.length === 0) {
+    throw new Error(`Toggle row "${row.name}" has no active effectBuffs at level ${ctx.level}`);
+  }
+  const ops: ActionOp[] = buffs.map((b) => ({
+    type: "applyBuff",
+    buff: {
+      key: b.key,
+      target: b.target,
+      modifier: b.modifier,
+      source: row.name,
+      duration: b.duration,
+      ...(b.clearOn ? { clearOn: b.clearOn } : {}),
+      ...(b.resistDamageTypes ? { resistDamageTypes: b.resistDamageTypes } : {}),
+      ...(b.rollEffects ? { rollEffects: b.rollEffects } : {}),
+    },
+  }));
+  const cost = readAbilityCost(row);
+  if (cost.kind === "pool") {
+    ops.push({ type: "spendResource", key: cost.key, ...(cost.base !== 1 ? { amount: cost.base } : {}) });
+  }
+  return ops;
+}
+
 /**
  * A dynamic subtitle for a row-driven heal (e.g. "Regain 1d10 + 3 HP") built
  * from the row's own effect columns rather than a second hand-authored
@@ -1050,6 +1506,14 @@ function actionsFromRows(
 ): AvailableAction[] {
   const actions: AvailableAction[] = [];
   for (const row of rows) {
+    // A "toggle" row synthesizes an activate/end PAIR (#1686), never a single
+    // actionFromRow entry — branched before that gate so a toggle row's
+    // resourceKey/activationCost never falls through to the cast-core/spend
+    // path below.
+    if (row.resolverKind === "toggle") {
+      actions.push(...toggleActionsFromRow(row, level, edition, poolMap, unarmoredUnshielded));
+      continue;
+    }
     const action = actionFromRow(row, level, edition, poolMap, unarmoredUnshielded);
     if (action) actions.push(action);
   }

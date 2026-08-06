@@ -78,13 +78,26 @@ describe("fetchSpells", () => {
       })
     );
 
-    await expect(fetchSpells()).resolves.toMatchObject([{ name: "Fireball", level: 3 }]);
+    await expect(fetchSpells("EDITION_2024")).resolves.toMatchObject([{ name: "Fireball", level: 3 }]);
+  });
+
+  // #1712: `?edition=` is now REQUIRED (the route 400s without it) — same pin
+  // shape as fetchFeats/fetchReference above.
+  it("always sends ?edition=, with class/maxLevel appended when given", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => [] });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchSpells("EDITION_2014");
+    await fetchSpells("EDITION_2024", { className: "wizard", maxLevel: 3 });
+
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/spells\?edition=EDITION_2014$/);
+    expect(fetchMock.mock.calls[1][0]).toMatch(/\/spells\?edition=EDITION_2024&class=wizard&maxLevel=3$/);
   });
 
   it("throws on a non-ok response", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500 }));
 
-    await expect(fetchSpells()).rejects.toThrow();
+    await expect(fetchSpells("EDITION_2024")).rejects.toThrow();
   });
 });
 

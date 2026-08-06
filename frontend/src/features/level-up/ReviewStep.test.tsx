@@ -268,6 +268,25 @@ describe("ReviewStep", () => {
     // School-ink class present on the spell names (school-tinted, not run-together plain text).
     expect(restoration.className).toContain("text-school-abjuration");
     expect(truth.className).toContain("text-school-enchantment");
+    // #1509 D5: no served casterModel on this fixture's plan.target → the
+    // "prepared" default (SRD 5.2 Always-Prepared Spells; also the 2014
+    // prepared-model classes' analogue).
+    expect(screen.getByText("Always prepared — doesn't count against your spells known.")).toBeInTheDocument();
+  });
+
+  it("renders the 2014 known-caster footnote when the plan serves casterModel: known (#1509)", () => {
+    renderReview(
+      { hp: { method: "average" } },
+      {
+        plan: {
+          ...plan,
+          target: { ...plan.target, casterModel: "known" },
+          grantedSpells: [{ name: "Find Familiar", level: 1, school: "conjuration" }],
+        },
+      },
+    );
+    expect(screen.getByText("Doesn't count against your number of spells known.")).toBeInTheDocument();
+    expect(screen.queryByText(/Always prepared/i)).not.toBeInTheDocument();
   });
 
   it("has no axe violations", async () => {

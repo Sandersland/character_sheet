@@ -14,8 +14,6 @@ export const SERVED_EDITIONS: EditionOption[] = [
     key: "EDITION_2014",
     label: "2014 rules",
     description: "The original 5th edition rulebooks, sometimes called \"classic\" 5e.",
-    unavailableReason:
-      "Not available yet — the 2014 feats, fighting styles, caster model and Monk rules haven't shipped, and a character's edition can't be changed later.",
   },
 ];
 

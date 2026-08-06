@@ -224,6 +224,50 @@ describe("buildLevelUpPlan — generic subclassChoice (#899)", () => {
   });
 });
 
+// #1503: Way of the Four Elements' fourElementsDisciplines choice is the
+// first choose-N whose swapCadence resolves "onLevelUp" — every OTHER
+// choose-N (Hunter's Prey above) has no canSwap at all (subclassChoiceSwapCadence
+// defaults "never"), so canSwap:true here is the meaningful new assertion.
+describe("buildLevelUpPlan — Way of the Four Elements disciplines (#1503)", () => {
+  it("2→3 grants 1 discipline pick, canSwap true (a new discipline is being learned)", () => {
+    const plan = buildLevelUpPlan(
+      char("monk", 2, null, "EDITION_2014"),
+      target("monk", 3, "way of the four elements"),
+    );
+    const choice = plan.find((s) => s.kind === "subclassChoice");
+    expect(choice?.count).toBe(1);
+    expect(choice?.meta).toMatchObject({ key: "fourElementsDisciplines", catalogSource: "discipline", canSwap: true });
+  });
+
+  it("5→6, 10→11, 16→17 each grant exactly 1 more pick (choice cap 1/2/3/4)", () => {
+    for (const [from, to] of [[5, 6], [10, 11], [16, 17]] as const) {
+      const plan = buildLevelUpPlan(
+        char("monk", from, "way of the four elements", "EDITION_2014"),
+        target("monk", to, "way of the four elements"),
+      );
+      const choice = plan.find((s) => s.kind === "subclassChoice");
+      expect(choice?.count, `L${from}->${to}`).toBe(1);
+      expect(choice?.meta?.canSwap, `L${from}->${to}`).toBe(true);
+    }
+  });
+
+  it("a level with no new discipline grants no subclassChoice step at all (no swap-only step, unlike newSpells)", () => {
+    const plan = buildLevelUpPlan(
+      char("monk", 3, "way of the four elements", "EDITION_2014"),
+      target("monk", 4, "way of the four elements"),
+    );
+    expect(kinds(plan)).not.toContain("subclassChoice");
+  });
+
+  it("2024 Warrior of the Elements has no subclassChoice step at all (no discipline menu in 2024)", () => {
+    const plan = buildLevelUpPlan(
+      char("monk", 2, null, "EDITION_2024"),
+      target("monk", 3, "warrior of the elements"),
+    );
+    expect(kinds(plan)).not.toContain("subclassChoice");
+  });
+});
+
 describe("buildLevelUpPlan — newSpells (2024 prepared model)", () => {
   it("Wizard 7→8 scribes 2 spells, after advancement, before review — no swap", () => {
     const plan = buildLevelUpPlan(char("wizard", 7), target("wizard", 8));
@@ -369,6 +413,75 @@ describe("buildLevelUpPlan — newSpells (2024 prepared model)", () => {
     const at = buildLevelUpPlan(char("rogue", 3, "arcane trickster"), target("rogue", 4, "arcane trickster")).find((s) => s.kind === "newSpells");
     expect(at?.count).toBe(1);
     expect(at?.meta?.canSwap).toBe(true);
+  });
+
+  it("meta.casterModel is 'known' on a 2014 Bard's step, 'prepared' on a 2024 Bard's", () => {
+    const bard2014 = buildLevelUpPlan(char("bard", 2, null, "EDITION_2014"), target("bard", 3)).find((s) => s.kind === "newSpells");
+    expect(bard2014?.meta?.casterModel).toBe("known");
+    const bard2024 = buildLevelUpPlan(char("bard", 2, null, "EDITION_2024"), target("bard", 3)).find((s) => s.kind === "newSpells");
+    expect(bard2024?.meta?.casterModel).toBe("prepared");
+  });
+});
+
+// #1509: the 2014 known-caster fork reaches the ceremony's plan — edition-correct
+// pick counts and the Ranger's onLevelUp swap. Bard/Sorcerer counts pin the exact
+// bug the issue describes (2024's delta served to a 2014 character); Cleric/
+// Paladin/Ranger pin swapCadenceFor's per-class 2014 forks.
+describe("buildLevelUpPlan — newSpells (2014 known-caster model, #1509)", () => {
+  it("Bard 4→5: SRD 5.1 grants 1 (8-7), not 2024's 2 (9-7)", () => {
+    const step14 = buildLevelUpPlan(char("bard", 4, null, "EDITION_2014"), target("bard", 5)).find((s) => s.kind === "newSpells");
+    expect(step14?.count).toBe(1);
+    const step24 = buildLevelUpPlan(char("bard", 4, null, "EDITION_2024"), target("bard", 5)).find((s) => s.kind === "newSpells");
+    expect(step24?.count).toBe(2);
+  });
+
+  it("Sorcerer 4→5: SRD 5.1 grants 1 (6-5), not 2024's 2 (9-7)", () => {
+    const step14 = buildLevelUpPlan(char("sorcerer", 4, null, "EDITION_2014"), target("sorcerer", 5)).find((s) => s.kind === "newSpells");
+    expect(step14?.count).toBe(1);
+    const step24 = buildLevelUpPlan(char("sorcerer", 4, null, "EDITION_2024"), target("sorcerer", 5)).find((s) => s.kind === "newSpells");
+    expect(step24?.count).toBe(2);
+  });
+
+  it("Wizard 4→5 stays 2 in both editions (edition-invariant flat scribe)", () => {
+    const step14 = buildLevelUpPlan(char("wizard", 4, null, "EDITION_2014"), target("wizard", 5)).find((s) => s.kind === "newSpells");
+    expect(step14?.count).toBe(2);
+    const step24 = buildLevelUpPlan(char("wizard", 4, null, "EDITION_2024"), target("wizard", 5)).find((s) => s.kind === "newSpells");
+    expect(step24?.count).toBe(2);
+  });
+
+  it("a 2014 Cleric 4→5 emits a newSpells step with count 0, no canSwap, no cantrips (re-prepares)", () => {
+    const step = buildLevelUpPlan(char("cleric", 4, null, "EDITION_2014"), target("cleric", 5)).find((s) => s.kind === "newSpells");
+    // Level 5 grows no cantrip column (breakpoints are 1/4/10) and re-prepares,
+    // so no newSpells step is emitted at all — matches the 2024 shape at a flat level.
+    expect(step).toBeUndefined();
+    // Invariance pin: the level-4 CANTRIP growth step still fires in both editions.
+    const cantripStep14 = buildLevelUpPlan(char("cleric", 3, null, "EDITION_2014"), target("cleric", 4)).find((s) => s.kind === "newSpells");
+    expect(cantripStep14?.count).toBe(0);
+    expect(cantripStep14?.meta?.cantrips).toBe(1);
+    expect(cantripStep14?.meta?.canSwap).toBeUndefined();
+    expect(cantripStep14?.meta?.casterModel).toBe("prepared");
+  });
+
+  it("a 2014 Ranger 1→2 emits newSpells with count 2 and canSwap true (SRD 5.1 onLevelUp); a 2024 Ranger 1→2 re-prepares — no step at all, same as the pre-existing Cleric/Druid/Paladin re-prepare shape", () => {
+    const step14 = buildLevelUpPlan(char("ranger", 1, null, "EDITION_2014"), target("ranger", 2)).find((s) => s.kind === "newSpells");
+    expect(step14?.count).toBe(2);
+    expect(step14?.meta?.canSwap).toBe(true);
+    expect(step14?.meta?.casterModel).toBe("known");
+
+    // 2024 Ranger's cadence is oneOnLongRest (#1507), grouped with the
+    // re-prepare classes' "0 after level 1" shape (see the 2024 describe block
+    // above) — the level-up ceremony offers it no pick and no swap.
+    expect(buildLevelUpPlan(char("ranger", 1, null, "EDITION_2024"), target("ranger", 2)).find((s) => s.kind === "newSpells")).toBeUndefined();
+  });
+
+  it("a fresh 2014 Ranger level-1 entry (multiclass-add) emits NO newSpells step at all", () => {
+    const step = buildLevelUpPlan(char("ranger", 0, null, "EDITION_2014"), target("ranger", 1)).find((s) => s.kind === "newSpells");
+    expect(step).toBeUndefined();
+  });
+
+  it("a 2014 Paladin 1→2 emits count 0 and no canSwap — no step at all (re-prepares, no cantrip column)", () => {
+    const step = buildLevelUpPlan(char("paladin", 1, null, "EDITION_2014"), target("paladin", 2)).find((s) => s.kind === "newSpells");
+    expect(step).toBeUndefined();
   });
 });
 

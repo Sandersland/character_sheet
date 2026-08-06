@@ -1,10 +1,11 @@
-// #1230 commit 3: Tireless's/Nature's Veil's total is the Wisdom modifier
-// (minimum of once) — the two Ranger pools that stay resourceFn-derived
-// (lib/classes/ranger.ts) because resourceTotals' tier table can't express a
-// formula. Proves the real end-to-end path (deriveResources, not a bare
-// poolsFromRows/resourceFn call) resolves the Wis-mod floor correctly, is
-// level- and edition-gated, and never double-emits either pool from both the
-// resourceFn and a row. Modelled on warlock-dark-ones-own-luck.test.ts.
+// #1230 commit 3, migrated onto their rows by #1685: Tireless's/Nature's
+// Veil's total is the Wisdom modifier (minimum of once) — now a
+// `{ abilityMod: "wisdom", min: 1 }` formula tier on each row
+// (ranger-features.ts), evaluated by evaluateResourceTotal
+// (class-feature-rows.ts); lib/classes/ranger.ts no longer has a resourceFn
+// for either. Proves the real end-to-end path (deriveResources, not a bare
+// poolsFromRows call) resolves the Wis-mod floor correctly and is level- and
+// edition-gated. Modelled on warlock-dark-ones-own-luck.test.ts.
 import { describe, expect, it } from "vitest";
 
 import { deriveResources } from "@/lib/classes/class-features.js";
@@ -78,5 +79,23 @@ describe("never double-emits: exactly one of each pool per edition/level, never 
     for (const key of ["tireless", "naturesVeil", "favoredEnemy"]) {
       expect(pools.filter((r) => r.key === key), key).toHaveLength(1);
     }
+  });
+});
+
+// #1685 KNOWN, ACCEPTED CONSEQUENCE: before this migration, mergePoolSources
+// (registry.ts) put Tireless/Nature's Veil FIRST (they arrived via
+// resourceFn) ahead of the row-sourced Favored Enemy. Now all three arrive
+// via poolsFromRows, in the rows' own level-ascending authoring order
+// (Favored Enemy L1, Tireless L10, Nature's Veil L14) — the array POSITION of
+// `resources` shifted (pinned by class-features-snapshot.test.ts's updated
+// snapshot); no pool's key/label/total/recharge/description changed. This
+// test asserts the set is unaffected by the reorder, independent of position.
+describe("#1685 order-change disclosure: reordering the base layer's resources array changes no pool's own values", () => {
+  it("the base pools at level 20 (favoredEnemy/tireless/naturesVeil) carry the same totals regardless of array position", () => {
+    const pools = poolsAt(18, 20, "EDITION_2024");
+    const byKey = Object.fromEntries(pools.map((p) => [p.key, p]));
+    expect(byKey.favoredEnemy?.total).toBe(6);
+    expect(byKey.tireless?.total).toBe(4);
+    expect(byKey.naturesVeil?.total).toBe(4);
   });
 });

@@ -17,6 +17,7 @@ import { advancingHitDie } from "./advancing-hit-die.js";
 import {
   InvalidHitPointOperationError,
   applyDeathSaveRoll,
+  effectiveMaxHitPoints,
   levelUpHpGain,
   resolveDamageAmount,
 } from "./hp-core.js";
@@ -146,12 +147,19 @@ function requireLevelUpRoll(op: LevelUpOperation, dieFaces: number): void {
   }
 }
 
-/** Apply the shared HP/hit-dice bump for a given die face count; returns the gain. */
+/**
+ * Apply the shared HP/hit-dice bump for a given die face count; returns the
+ * gain. #1321: at exhaustion 4+ (PHB'14 p. 291), raising the raw max by `gain`
+ * doesn't raise the EFFECTIVE max by the same amount (the halving grows too),
+ * so current must clamp to the recomputed effective max rather than gain the
+ * same `gain` current gets — never above it, never below what it already was.
+ */
 function bumpHpForLevelUp(ctx: HpOpContext, op: LevelUpOperation, dieFaces: number): number {
   const gain = levelUpHpGain(dieFaces, ctx.conMod, op.method, op.roll);
   ctx.hd.total += 1;
   ctx.hp.max += gain;
-  ctx.hp.current += gain;
+  const newEffMax = effectiveMaxHitPoints(ctx.hp.max, ctx.featMaxHpBonus, ctx.exhaustionLevel, ctx.row.rulesEdition);
+  ctx.hp.current = Math.min(ctx.hp.current + gain, newEffMax);
   return gain;
 }
 

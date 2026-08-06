@@ -47,13 +47,18 @@ import {
   type ResourcesMutableState,
   type ToolProfEntry,
 } from "@/lib/classes/resources.js";
-import { characterAdvancementSlots, characterFightingStyleFeatSlots, derivePreparedSpellLimit } from "@/lib/srd/srd.js";
+import { characterAdvancementSlots, characterFightingStyleFeatSlots, derivePreparedSpellLimit, deriveFeatBonuses } from "@/lib/srd/srd.js";
 import { deriveEntryScopedResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
 import { FEATURE_ROWS_ENTRY_SELECT, featureRowsOf } from "@/lib/classes/feature-rows-select.js";
 import { reverseAdvancementEffects } from "./advancement.js";
-import { normalizeHitPoints } from "@/lib/combat/hitpoints.js";
+import { effectiveMaxHitPoints, normalizeHitDice, normalizeHitPoints } from "@/lib/combat/hitpoints.js";
+import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
 import { clampPreparedToLimit, normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
-import { deriveGrantedSpells } from "@/lib/spellcasting/granted-spells.js";
+import {
+  deriveGrantedSpells,
+  speciesGrantedSpellSourceFromRaceSelection,
+  RACE_SELECTION_GRANT_SELECT,
+} from "@/lib/spellcasting/granted-spells.js";
 
 export interface ReconcileContext {
   tx: Prisma.TransactionClient;
@@ -118,12 +123,17 @@ async function reconcileSubclass(ctx: ReconcileContext): Promise<void> {
   }
 }
 
-// Defense-in-depth: subclass-granted spells are pure-derived at read time and
-// never persisted in the happy path, so this only fires if a source:"subclass"
-// entry ever leaks into the stored spells[]. It strips any leaked grant no longer
-// valid at the new level (re-derived on read anyway). Runs AFTER reconcileSubclass
-// so a cleared subclass yields an empty valid set. Reuses the spellcasting undo
-// branch in activity.ts (restores before.spellcasting) — no new EventType.
+// Defense-in-depth: subclass- AND species/lineage-granted spells (#1683) are
+// pure-derived at read time and never persisted in the happy path, so this
+// only fires if a `granted:`-id entry ever leaks into the stored spells[]
+// (deriveGrantedSpells' id scheme — the discriminator, not `source`: a
+// #1689 species-CHOICE entry also carries source:"species" but is the
+// legitimately persisted record, never `granted:`-prefixed — see
+// SpellEntry's own comment, spell-state.ts). It strips any leaked grant no
+// longer valid at the new level (re-derived on read anyway). Runs AFTER
+// reconcileSubclass so a cleared subclass yields an empty valid set. Reuses
+// the spellcasting undo branch in activity.ts (restores before.spellcasting)
+// — no new EventType.
 
 async function reconcileGrantedSpells(ctx: ReconcileContext): Promise<void> {
   const { tx, characterId, newDerivedLevel, edition, batchId } = ctx;
@@ -142,22 +152,39 @@ async function reconcileGrantedSpells(ctx: ReconcileContext): Promise<void> {
           subclassRef: { include: { grantedSpells: { orderBy: { gateLevel: "asc" }, include: { spell: true } } } },
         },
       },
+      // Species/lineage-granted spells (#1683) — same source-agnostic
+      // deriveGrantedSpells, fed through the shared RACE_SELECTION_GRANT_SELECT
+      // + speciesGrantedSpellSourceFromRaceSelection (granted-spells.ts),
+      // which the spellcasting transaction-op layer also uses — one query
+      // fragment + one adapter, not two copies.
+      raceSelection: { select: RACE_SELECTION_GRANT_SELECT },
     },
   });
   if (!row) return;
 
   const state = normalizeSpellcastingMutable(row.spellcasting);
-  if (!state.spells.some((s) => s.source === "subclass")) return; // normal case
+  // `granted:`-id check (isGranted below), not `source` alone — a #1689
+  // species-CHOICE entry (source:"species", random UUID id) must never be
+  // treated as a leaked derived grant.
+  if (!state.spells.some((s) => s.id.startsWith("granted:"))) return; // normal case
 
-  // Grants across every class entry, symmetric with the serialize read side —
-  // ctx.edition, the same authority the clamp-on-read resolves via editionOf.
-  const validIds = new Set(
-    row.classEntries
-      .flatMap((e) => deriveGrantedSpells(e.subclassRef, effectiveEntryLevel(e.level, row.classEntries.length, newDerivedLevel), edition))
-      .map((s) => s.id),
-  );
+  const speciesSource = speciesGrantedSpellSourceFromRaceSelection(row.raceSelection);
 
-  const kept = state.spells.filter((s) => s.source !== "subclass" || validIds.has(s.id));
+  // Grants across every class entry PLUS the species source, symmetric with
+  // the serialize read side — ctx.edition, the same authority the
+  // clamp-on-read resolves via editionOf. Species grants use the XP-derived
+  // level directly (no per-class effective-level split — a species pick
+  // isn't scoped to any one class entry).
+  const validIds = new Set([
+    ...row.classEntries.flatMap((e) => deriveGrantedSpells(e.subclassRef, effectiveEntryLevel(e.level, row.classEntries.length, newDerivedLevel), edition)).map((s) => s.id),
+    ...deriveGrantedSpells(speciesSource, newDerivedLevel, edition, "species").map((s) => s.id),
+  ]);
+
+  // Same `granted:`-id discriminator as the early-return check above —
+  // deliberately NOT `source`, for the #1689 species-choice reason documented
+  // on this function's own header comment.
+  const isGranted = (s: { id: string }) => s.id.startsWith("granted:");
+  const kept = state.spells.filter((s) => !isGranted(s) || validIds.has(s.id));
   if (kept.length === state.spells.length) return; // all leaked grants still valid
 
   const before = {
@@ -174,7 +201,7 @@ async function reconcileGrantedSpells(ctx: ReconcileContext): Promise<void> {
   // Drop concentration if it pointed at a stripped grant (leave Shadow Arts and
   // still-kept spells untouched).
   const removedIds = new Set(
-    state.spells.filter((s) => s.source === "subclass" && !validIds.has(s.id)).map((s) => s.id),
+    state.spells.filter((s) => isGranted(s) && !validIds.has(s.id)).map((s) => s.id),
   );
   if (state.concentratingOn && removedIds.has(state.concentratingOn.entryId)) {
     state.concentratingOn = null;
@@ -207,7 +234,7 @@ async function reconcileGrantedSpells(ctx: ReconcileContext): Promise<void> {
     characterId,
     category: "spellcasting",
     type: "forgetSpell",
-    summary: `${removedCount} subclass-granted spell${removedCount > 1 ? "s" : ""} removed — no longer granted at this level`,
+    summary: `${removedCount} granted spell${removedCount > 1 ? "s" : ""} removed — no longer granted at this level`,
     before,
     after,
     data: { removedCount },
@@ -518,7 +545,7 @@ async function reconcileSubclassChoices(ctx: ReconcileContext): Promise<void> {
 // abilityScores + hitPoints + initiativeBonus + resources in one shot.
 
 async function reconcileAdvancements(ctx: ReconcileContext): Promise<void> {
-  const { tx, characterId, newDerivedLevel, batchId } = ctx;
+  const { tx, characterId, newDerivedLevel, edition, batchId } = ctx;
 
   const row = await tx.character.findUnique({
     where: { id: characterId },
@@ -528,6 +555,10 @@ async function reconcileAdvancements(ctx: ReconcileContext): Promise<void> {
       hitPoints: true,
       hitDice: true,
       initiativeBonus: true,
+      // conditions (#1321): effectiveMaxHitPoints' exhaustion input — this
+      // reconciler is the registry-side twin of serializeCharacter's
+      // clamp-on-read and must resolve the ceiling through the SAME function.
+      conditions: true,
       classEntries: {
         orderBy: { position: "asc" as const },
         // All entries (level + the class relation) — both the ASI/feat-slot
@@ -556,6 +587,7 @@ async function reconcileAdvancements(ctx: ReconcileContext): Promise<void> {
 
   const scores = row.abilityScores as Record<string, number>;
   const hp = normalizeHitPoints(row.hitPoints);
+  const hd = normalizeHitDice(row.hitDice);
   const initBonus = row.initiativeBonus;
 
   // Snapshot before (for undo).
@@ -571,9 +603,19 @@ async function reconcileAdvancements(ctx: ReconcileContext): Promise<void> {
   const reversed = reverseAdvancementEffects(scores, hp, initBonus, toRemove);
   state.advancements = kept;
 
+  // #1321: reverseAdvancementEffects' own internal clamp is against the RAW
+  // max (harmless there — it's an intermediate value this function always
+  // re-clamps below); the persisted current must clamp against the EFFECTIVE
+  // max instead — the same shared function serializeCharacter's clamp-on-read
+  // resolves through (CLAUDE.md: reconciler and clamp-on-read must agree).
+  // `kept` is the POST-reconcile advancement list, matching applyFeatLayer's
+  // own use of the clamped (in-cap) slice.
+  const featMaxHpBonus = deriveFeatBonuses(kept, hd.total).maxHp;
+  const exhaustionLevel = normalizeConditionsMutable(row.conditions).exhaustion;
+  const newEffMax = effectiveMaxHitPoints(reversed.hitPoints.max, featMaxHpBonus, exhaustionLevel, edition);
   const newHp = {
     ...reversed.hitPoints,
-    current: Math.min(reversed.hitPoints.current, reversed.hitPoints.max),
+    current: Math.min(reversed.hitPoints.current, newEffMax),
   };
 
   await tx.character.update({
@@ -718,6 +760,15 @@ async function reconcileClassEntryLevels(ctx: ReconcileContext): Promise<void> {
 /**
  * Ordered list of reconcilers. Each runs sequentially in the XP transaction
  * (later reconcilers see earlier ones' results — maneuvers must follow subclass).
+ *
+ * No reconciler for #1681's 2014 species/subrace ability increases (baked into
+ * Character.abilityScores + CharacterRace.abilityBonuses at creation, in
+ * resolveSpeciesGrants): the legal maximum this state can reach is fixed the
+ * moment the character is created and never changes with level — species is
+ * immutable post-creation (no race transaction endpoint, `race` absent from
+ * PATCH), so there is no XP transaction where a species-derived score could
+ * ever drift out of bounds for this reconciler to repair. Same reasoning
+ * background's PHB'24 ability spread (#1130) already established.
  */
 const LEVEL_GATED_RECONCILERS: Reconciler[] = [
   reconcileClassEntryLevels,

@@ -3,10 +3,11 @@
 // onto a flat level-tiered resourceTotals on the EDITION_2024 row — read here
 // through the SAME poolsFromRows a real character's derivation calls
 // (registry.ts's deriveBaseLayer). Modelled on warlock-resource-pools.test.ts.
-// Also proves the positive half of C1: Tireless/Nature's Veil are NEVER
-// row-derived pools (their rows deliberately omit resourceTotals) — only
-// ranger.ts's resourceFn supplies their total, exercised by
-// ranger-wisdom-pools.test.ts.
+// Tireless/Nature's Veil (#1230 C1) were the resourceFn-only case this file
+// used to prove the NEGATIVE for; #1685 migrated both onto their rows as
+// `{ abilityMod: "wisdom", min: 1 }` formula tiers, so poolsFromRows resolves
+// them directly now too — see the describe block below. The end-to-end proof
+// through deriveResources stays in ranger-wisdom-pools.test.ts.
 import { describe, expect, it } from "vitest";
 
 import { poolsFromRows } from "@/lib/classes/class-feature-rows.js";
@@ -16,8 +17,10 @@ import { RANGER_FEATURES } from "../ranger-features.js";
 
 const BASE_ROWS = RANGER_FEATURES.filter((r) => r.subclassSlug === null);
 
-function poolAt(key: string, level: number, edition: "EDITION_2014" | "EDITION_2024") {
-  return poolsFromRows(BASE_ROWS, level, edition).find((p) => p.key === key);
+// abilityScores defaults to `{}`; the wisdom-modifier tests below (Tireless/
+// Nature's Veil, #1685) pass their own.
+function poolAt(key: string, level: number, edition: "EDITION_2014" | "EDITION_2024", abilityScores: Record<string, number> = {}) {
+  return poolsFromRows(BASE_ROWS, level, abilityScores, 0, edition).find((p) => p.key === key);
 }
 
 describe("Favored Enemy (#1230): 2/3/4/5/6 at L1/5/9/13/17, Long Rest recharge, 2024 only", () => {
@@ -63,18 +66,32 @@ describe("Favored Enemy (#1230): 2/3/4/5/6 at L1/5/9/13/17, Long Rest recharge, 
   });
 });
 
-describe("Tireless / Nature's Veil (#1230 C1): rows declare resourceKey but NEVER derive a pool via poolsFromRows — the positive proof they defer to resourceFn", () => {
-  it("tireless is undefined from poolsFromRows at every level, both editions", () => {
+describe("Tireless / Nature's Veil (#1230, migrated onto their rows by #1685): { abilityMod: \"wisdom\", min: 1 } formula tiers — poolsFromRows alone resolves both, no resourceFn left in ranger.ts", () => {
+  it("tireless: absent below level 10 and under EDITION_2014; present at level 10+ with the Wisdom-modifier total (floored at 1), longRest recharge", () => {
+    expect(poolAt("tireless", 9, "EDITION_2024", { wisdom: 18 })).toBeUndefined();
     for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {
-      expect(poolAt("tireless", 10, edition)).toBeUndefined();
-      expect(poolAt("tireless", 20, edition)).toBeUndefined();
+      if (edition === "EDITION_2014") {
+        expect(poolAt("tireless", 20, edition, { wisdom: 18 })).toBeUndefined();
+        continue;
+      }
+      const low = poolAt("tireless", 10, edition, { wisdom: 8 });
+      expect(low?.total).toBe(1); // Wis 8 -> -1 mod, floored to 1
+      expect(low?.recharge).toBe("longRest");
+      expect(poolAt("tireless", 10, edition, { wisdom: 18 })?.total).toBe(4); // Wis 18 -> +4 mod
     }
   });
 
-  it("naturesVeil is undefined from poolsFromRows at every level, both editions", () => {
+  it("naturesVeil: absent below level 14 and under EDITION_2014; present at level 14+ with the Wisdom-modifier total (floored at 1), longRest recharge", () => {
+    expect(poolAt("naturesVeil", 13, "EDITION_2024", { wisdom: 18 })).toBeUndefined();
     for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {
-      expect(poolAt("naturesVeil", 14, edition)).toBeUndefined();
-      expect(poolAt("naturesVeil", 20, edition)).toBeUndefined();
+      if (edition === "EDITION_2014") {
+        expect(poolAt("naturesVeil", 20, edition, { wisdom: 18 })).toBeUndefined();
+        continue;
+      }
+      const low = poolAt("naturesVeil", 14, edition, { wisdom: 8 });
+      expect(low?.total).toBe(1); // Wis 8 -> -1 mod, floored to 1
+      expect(low?.recharge).toBe("longRest");
+      expect(poolAt("naturesVeil", 14, edition, { wisdom: 18 })?.total).toBe(4); // Wis 18 -> +4 mod
     }
   });
 });

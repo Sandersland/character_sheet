@@ -1,11 +1,13 @@
 // Test-only helper (#1524): loads the REAL seeded ClassFeature rows
 // (#1522/#1523) for a (className, subclass) pair into the
 // `ClassFeatureRowsCarrier` shape `deriveResources` expects — the DB-backed
-// counterpart to test-feature-rows.fixture.ts's TS-sourced one. Shared by
-// feature-edition.test.ts (the real-content sweep) and
-// class-feature-parity.test.ts (the TS-vs-rows proof), both of which need the
-// SAME resolution: className -> CharacterClass row, subclass key -> its
-// SubclassDefinition.slug -> the matching Subclass row.
+// counterpart to test-feature-rows.fixture.ts's TS-sourced one. Used by
+// feature-edition.test.ts (the real-content sweep) and several per-class
+// content suites (e.g. wizard-2024-content.test.ts); also fed
+// class-feature-parity.test.ts's TS-vs-rows proof until #1675 retired that
+// suite (it went vacuous the moment Monk, its last un-skipped class, joined
+// LITERAL_ROW_CLASSES — literal-fixture-parity.test.ts, #1593, is the content-
+// drift proof now).
 import { prisma } from "@/lib/core/prisma.js";
 import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "@/lib/classes/class-feature-rows.js";
 import { resolveSubclassSlug } from "@/lib/classes/subclass-slug.js";

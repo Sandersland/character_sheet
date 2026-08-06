@@ -1,18 +1,7 @@
 import { Prisma } from "@/generated/prisma/client.js";
 import { logEvent } from "@/lib/activity/events.js";
-import { levelForExperience } from "@/lib/leveling/experience.js";
-import { characterAdvancementSlots, deriveFeatBonuses } from "@/lib/srd/srd.js";
-// Leaf module (no back-imports), NOT classes/resources.ts (#1243) — that file
-// now also composes applyHealInTx (Uncanny Metabolism's bonus heal), which
-// would close an import cycle back through this one.
-import { normalizeResourcesMutable, splitAdvancementsBySlotCap } from "@/lib/classes/resources-state.js";
-import {
-  InvalidHitPointOperationError,
-  normalizeHitPoints,
-  normalizeHitDice,
-  type HitPoints,
-  type HitDice,
-} from "./hp-core.js";
+import { InvalidHitPointOperationError, normalizeHitPoints, normalizeHitDice, type HitPoints, type HitDice } from "./hp-core.js";
+import { effectiveMaxHitPointsForRow } from "./conditions.js";
 import { applyConcentrationCheckInTx, type ConcentrationCheckResult } from "./concentration.js";
 
 /**
@@ -43,14 +32,19 @@ export async function applyHealInTx(
       abilityScores: true,
       experiencePoints: true,
       resources: true,
+      // conditions + rulesEdition (#1321): effectiveMaxHitPoints' exhaustion
+      // inputs — buildHpOpContext already selects both.
+      conditions: true,
+      rulesEdition: true,
       // All entries — the feat-slot cap sums entitlement per class level (#1073),
       // not just the primary (position 0). `class` (#1529): characterAdvancementSlots'
       // extraAsiLevels read — this is one of the reconciler/clamp-on-read pair's
       // seven query sites CLAUDE.md governs; it must resolve the SAME column as
-      // reconcileAdvancements' select.
+      // reconcileAdvancements' select. `fightingStyleFeatLevel` (#1321):
+      // effectiveMaxHitPointsForRow's fs-cap arg.
       classEntries: {
         orderBy: { position: "asc" as const },
-        select: { id: true, level: true, name: true, subclass: true, class: { select: { extraAsiLevels: true } } },
+        select: { id: true, level: true, name: true, subclass: true, class: { select: { extraAsiLevels: true, fightingStyleFeatLevel: true } } },
       },
     },
   });
@@ -58,15 +52,7 @@ export async function applyHealInTx(
     throw new InvalidHitPointOperationError(`Character not found: ${characterId}`);
   }
 
-  const hp = normalizeHitPoints(row.hitPoints);
-  const hd = normalizeHitDice(row.hitDice);
-
-  const advState = normalizeResourcesMutable(row.resources);
-  const featSlotCap = characterAdvancementSlots(row.classEntries, levelForExperience(row.experiencePoints));
-  // Origin feats are kept regardless of the slot cap (#1130).
-  const { kept: inCapAdvancements } = splitAdvancementsBySlotCap(advState.advancements, featSlotCap);
-  const featBonus = deriveFeatBonuses(inCapAdvancements, hd.total);
-  const effMax = hp.max + featBonus.maxHp;
+  const { hp, hd, effMax } = effectiveMaxHitPointsForRow(row);
 
   const beforeHp = { ...hp };
 

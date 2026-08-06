@@ -4,19 +4,25 @@ import { abilityModifier, hitDieFace } from "@/lib/srd/math.js";
 export interface ToolProficiencyEntry {
   name: string;
   /** Origin of the proficiency — used to distinguish creation-fixed entries
-   *  (never trimmed on level-down) from subclass-granted ones (reconciled). */
-  source: "background" | "class" | "race";
+   *  (never trimmed on level-down) from subclass-granted ones (reconciled).
+   *  No "race"/"species" source: the flat Race model never actually seeded a
+   *  toolProficiencies row (confirmed empty, #1684), and no species-granted
+   *  tool proficiency mechanism exists yet either — nothing produces one. */
+  source: "background" | "class";
 }
 
 export interface DeriveCharacterInput {
   abilityScores: Record<string, number>;
   skillProficiencies: string[];
-  /** Tool proficiencies granted by background / class / race at creation. */
+  /** Tool proficiencies granted by background / class at creation. */
   toolProficiencies?: ToolProficiencyEntry[];
 }
 
 export interface DeriveCharacterCatalog {
-  race: { speed: number };
+  // #1684: the pruned flat Race model's replacement anchor — the resolved
+  // species/variant's speed (variant speedOverride wins, else the species'
+  // own speed; character-create.ts's resolveSpeciesSelection computes it).
+  species: { speed: number };
   characterClass: { hitDie: string; savingThrows: string[] };
 }
 
@@ -48,7 +54,7 @@ export function deriveCreatedCharacter(
   const maxHitPoints = Math.max(1, hitDieFace(catalog.characterClass.hitDie) + constitutionModifier);
 
   return {
-    speed: catalog.race.speed,
+    speed: catalog.species.speed,
     hitDice: { total: 1, die: catalog.characterClass.hitDie, spent: 0 },
     hitPoints: { current: maxHitPoints, max: maxHitPoints, temp: 0, deathSaves: { successes: 0, failures: 0 } },
     initiativeBonus: dexterityModifier,

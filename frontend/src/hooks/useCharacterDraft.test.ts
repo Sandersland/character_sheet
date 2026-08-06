@@ -12,12 +12,12 @@ describe("useCharacterDraft", () => {
 
   it("persists updates to localStorage", () => {
     const { result } = renderHook(() => useCharacterDraft());
-    act(() => result.current.update({ name: "Aria", race: "Elf" }));
+    act(() => result.current.update({ name: "Aria", speciesId: "sp-elf" }));
 
     expect(result.current.draft.name).toBe("Aria");
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}");
     expect(stored.name).toBe("Aria");
-    expect(stored.race).toBe("Elf");
+    expect(stored.speciesId).toBe("sp-elf");
   });
 
   it("rehydrates an existing draft from localStorage", () => {
@@ -32,18 +32,18 @@ describe("useCharacterDraft", () => {
 
   it("clear() wipes the persisted draft and resets state to empty", () => {
     const { result } = renderHook(() => useCharacterDraft());
-    act(() => result.current.update({ name: "Aria", race: "Elf" }));
+    act(() => result.current.update({ name: "Aria", speciesId: "sp-elf" }));
     expect(localStorage.getItem(STORAGE_KEY)).not.toBeNull();
 
     act(() => result.current.clear());
 
     expect(result.current.draft.name).toBe("");
-    expect(result.current.draft.race).toBe("");
+    expect(result.current.draft.speciesId).toBe("");
     // After clear, the effect re-persists the now-empty draft; the important
     // guarantee is that no stale values survive.
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}");
     expect(stored.name).toBe("");
-    expect(stored.race).toBe("");
+    expect(stored.speciesId).toBe("");
   });
 
   it("rehydrates a legacy draft (no step) to the first step (#1176)", () => {

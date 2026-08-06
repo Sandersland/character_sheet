@@ -3,6 +3,7 @@ import {
   activateCloakOfShadowsOpSchema,
   attemptStunningStrikeOpSchema,
   castChannelDivinityOpSchema,
+  castDisciplineOpSchema,
   castManeuverOpSchema,
   castShadowArtOpSchema,
   dealHandOfHarmOpSchema,
@@ -19,6 +20,7 @@ import {
   applyChannelDivinityOperations,
   InvalidChannelDivinityOperationError,
 } from "./channel-divinity.js";
+import { applyDisciplineOperations, InvalidDisciplineOperationError } from "./disciplines.js";
 import { applyHandOfHarmOperations, InvalidHandOfHarmOperationError } from "./hand-of-harm.js";
 import {
   applyHandOfUltimateMercyOperations,
@@ -82,6 +84,19 @@ export const ABILITY_REGISTRY: Record<string, TransactionHandler> = {
       InvalidResourceOperationError,
       InvalidSpellcastingOperationError,
     ],
+  }),
+
+  // castDiscipline — Way of the Four Elements (2014-only, #1503): spend 2-6
+  // ki (per-cast cap by monk level) to cast a known elemental discipline —
+  // reshape a spell (Thunderwave/Burning Hands/Fireball/…) as the discipline's
+  // own effect. The client rolls a discipline's damage (mirrors castSpell);
+  // the server validates the ki spend and, for a concentrating discipline,
+  // establishes concentration. The known-discipline picker stays a GET on
+  // the generic /api/subclass-choices/discipline route (#899/#1412).
+  "disciplines": defineAbility({
+    schema: opBatch(castDisciplineOpSchema),
+    apply: (characterId, data) => applyDisciplineOperations(characterId, data.operations),
+    domainErrors: [InvalidDisciplineOperationError, InvalidResourceOperationError, InvalidSpellcastingOperationError],
   }),
 
   // Once per turn, spends 1 Focus (or a Flurry of Healing and Harm free use at
@@ -174,14 +189,16 @@ export const ABILITY_REGISTRY: Record<string, TransactionHandler> = {
   }),
 
   // Warrior of the Elements (2024) session actions:
-  //   toggleElementalAttunement — spend 1 Focus to imbue for 10 min (or clear it)
-  //   castElementalBurst        — spend 2 Focus, roll 3× Martial Arts die vs a Dex save
-  //   elementalStrike           — while attuned, swap the strike's damage type and
-  //                               force a Str save to move the target 10 ft
+  //   castElementalBurst — spend 2 Focus, roll 3× Martial Arts die vs a Dex save
+  //   elementalStrike    — while attuned, swap the strike's damage type and
+  //                        force a Str save to move the target 10 ft
+  // Elemental Attunement's own toggle (activate/end) moved OFF this endpoint
+  // (#1686) — it's a plain executeAction "elementalAttunement"/
+  // "endElementalAttunement" op on POST /actions/transactions now, row-driven
+  // off monk.ts's AuthoredFeature entry.
   // Returns the updated character plus a per-op `results` array for the toast.
   "warrior-of-elements": defineAbility({
     schema: opBatch(
-      z.object({ type: z.literal("toggleElementalAttunement"), active: z.boolean() }),
       z.object({
         type: z.literal("castElementalBurst"),
         damageType: elementalDamageTypeSchema,

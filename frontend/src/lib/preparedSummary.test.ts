@@ -14,6 +14,7 @@ describe("derivePreparedSummary", () => {
     expect(derivePreparedSummary(sc({ preparedSpellLimit: 12, preparedSpellCount: 11 }))).toEqual({
       count: 11,
       limit: 12,
+      label: "Prepared",
     });
   });
 
@@ -28,14 +29,23 @@ describe("derivePreparedSummary", () => {
         ] as Spellcasting["spells"],
       }),
     );
-    expect(summary).toEqual({ count: 2, limit: 6 });
+    expect(summary).toEqual({ count: 2, limit: 6, label: "Prepared" });
   });
 
-  it("returns null for a non-caster (limit null — every 2024 caster has a cap)", () => {
+  it("returns null for a non-caster (limit null — every caster now has a cap)", () => {
     expect(derivePreparedSummary(sc({ preparedSpellLimit: null, preparedSpellCount: 0 }))).toBeNull();
   });
 
   it("returns null when the cap has not been derived yet", () => {
     expect(derivePreparedSummary(sc({}))).toBeNull();
+  });
+
+  // #1511 D2/D4: a 2014 known caster's limit is non-null too — casterModel is
+  // what forks the mechanic, not this null check — and the label is served.
+  it("reads the served label for a known caster", () => {
+    const summary = derivePreparedSummary(
+      sc({ preparedSpellLimit: 8, preparedSpellCount: 8, casterModel: "known", preparedLabel: "Spells known" }),
+    );
+    expect(summary).toEqual({ count: 8, limit: 8, label: "Spells known" });
   });
 });

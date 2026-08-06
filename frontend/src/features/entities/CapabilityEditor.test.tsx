@@ -50,6 +50,7 @@ function Harness({ onChange }: { onChange?: (caps: ItemCapability[]) => void }) 
         onChange?.(next);
       }}
       spellcasterAttunable={false}
+      edition="EDITION_2024"
     />
   );
 }

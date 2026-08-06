@@ -75,7 +75,6 @@ test("visual: character sheet — light theme", async ({ page }) => {
   const id = await createCharacter(page.request, {
     name: uniqueName("Sheet Hero"),
     className: "Fighter",
-    race: "Human",
     background: "Soldier",
   });
 
@@ -97,7 +96,6 @@ test("visual: character sheet — dark theme", async ({ page }) => {
   const id = await createCharacter(page.request, {
     name: uniqueName("Sheet Hero"),
     className: "Fighter",
-    race: "Human",
     background: "Soldier",
   });
 
@@ -119,7 +117,6 @@ test("visual: inventory section and ledger modal", async ({ page }) => {
   const id = await createCharacter(page.request, {
     name: uniqueName("Pack Hero"),
     className: "Fighter",
-    race: "Human",
     background: "Soldier",
   });
 
@@ -181,7 +178,6 @@ test("visual: session / turn view", async ({ page }) => {
   const id = await createSessionCharacter(page.request, {
     name: uniqueName("Turn Fighter"),
     className: "Fighter",
-    race: "Human",
     background: "Soldier",
   });
 
@@ -221,7 +217,7 @@ test("visual: creation ceremony — steps", async ({ page }) => {
   // spread). A fixed name keeps the "Forging · …" kicker pixels stable.
   await page.getByLabel(/^Name/).fill("Aria Brightwood");
   await page.getByLabel(/^Alignment/).selectOption({ label: "True Neutral" });
-  await page.getByLabel(/^Race/).selectOption({ label: "Human" });
+  await page.getByLabel(/^Species/).selectOption({ label: "Human" });
   await page.getByLabel(/^Class/).selectOption({ label: "Fighter" });
   await page.getByLabel("Background").selectOption({ label: "Soldier" });
   await page.getByRole("button", { name: /Continue/ }).click();
@@ -244,7 +240,6 @@ test("visual: brand surfaces — dark, desktop", async ({ page }) => {
   const id = await createCharacter(page.request, {
     name: uniqueName("Brand Hero"),
     className: "Fighter",
-    race: "Human",
     background: "Soldier",
   });
 
@@ -280,7 +275,6 @@ test("visual: bottom nav — dark, mobile", async ({ page }) => {
   const id = await createCharacter(page.request, {
     name: uniqueName("Nav Hero"),
     className: "Fighter",
-    race: "Human",
     background: "Soldier",
   });
 

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
+import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 import { applySpellcastingOperations } from "@/lib/spellcasting/spellcasting.js";
 import { applyHitPointOperations } from "@/lib/combat/hitpoints.js";
 import { revertBatch } from "@/lib/activity/activity.js";
@@ -26,7 +27,6 @@ const SPELL = {
   effectDiceFaces: 12,
   damageType: "lightning",
   attackType: "attack",
-  classes: ["wizard"],
 };
 
 const BASE = {
@@ -80,7 +80,9 @@ describe("castItemSpell op (#528)", () => {
 
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
-    const spell = await prisma.spell.upsert({ where: { name: SPELL.name }, create: SPELL, update: SPELL });
+    // upsertEditionRow, not .upsert(): Spell's business key is now (name,
+    // edition) (#1710), and this fixture spell is edition-neutral.
+    const spell = await upsertEditionRow(prisma.spell, { name: SPELL.name, edition: null }, { ...SPELL, edition: null }, SPELL);
     spellId = spell.id;
   });
 

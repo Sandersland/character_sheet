@@ -393,9 +393,23 @@ const EXPECTED_EDITION_TAGGED_FEATURES = [
   // Breaker share no name, so neither counts), and Illusion's own 3 (Illusion
   // Savant, Illusory Self, Illusory Reality — Improved Minor Illusion/
   // Improved Illusions and Malleable Illusions/Phantasmal Creatures each
-  // share no name, so none of those four count) = 16 + 5 + 4 + 3 = 28.
+  // share no name, so none of those four count) = 16 + 5 + 4 + 3 = 28. Plus
+  // Bladesinger's own 4 (#1676, below) = 32.
   // Ritual Adept/Scholar/Memorize Spell/Epic Boon are NOT tagged (2024-only,
   // no 2014 twin to diverge from).
+  // Bladesinger's own 4 new triples (#1676): the SAME 4 base names fork under
+  // its new "bladesinging" context too — collectTaggedFeatureKeys always
+  // combines Wizard's classRows (the base 4) with THIS ONE subclass's own
+  // subclassRows, same reason evocation/abjuration/illusion each already
+  // repeat the 4 base names above. Bladesinger's OWN feature names (Training
+  // in War and Song, Bladesong, Extra Attack, Song of Defense) are NOT tagged
+  // here: every one is EDITION_2014-only with no 2024 successor authored at
+  // all (decision: no SCAG/PHB'24 Bladesinger content, epic #1281 out of
+  // scope) — one description under each name, not two, so none of them fork.
+  ["wizard", "bladesinging", "Spellcasting"],
+  ["wizard", "bladesinging", "Arcane Recovery"],
+  ["wizard", "bladesinging", "Spell Mastery"],
+  ["wizard", "bladesinging", "Signature Spells"],
   ["wizard", "undefined", "Spellcasting"],
   ["wizard", "undefined", "Arcane Recovery"],
   ["wizard", "undefined", "Spell Mastery"],
@@ -637,6 +651,57 @@ const EXPECTED_EDITION_TAGGED_FEATURES = [
   ["paladin", "oath of vengeance", "Relentless Avenger"],
   ["paladin", "oath of vengeance", "Soul of Vengeance"],
   ["paladin", "oath of vengeance", "Avenging Angel"],
+  // Monk's 16 new triples (#1500 base class + #1501 Open Hand's new context +
+  // #1502 Shadow's new context + #1503 Way of the Four Elements' new context
+  // — Warrior of the Elements/Warrior of Mercy stay an untouched
+  // transport-only twin for THIS ledger's purposes, since neither's own
+  // feature names fork): of the base class's 12 forked-or-unique-per-edition
+  // features, only "Martial Arts" and "Stunning Strike" keep the SAME NAME
+  // across both editions (SRD 5.1 and PHB'24 both call them that, with
+  // genuinely different text) — taggedNamesFor only flags a name carrying two
+  // DIFFERENT descriptions, so a rename is never tagged (mirrors Warlock's
+  // Expanded Spell List -> Fiend Spells, Cleric's Domain Spells -> Life/
+  // Trickery Domain Spells above): "Ki"/"Focus", "Deflect Missiles"/"Deflect
+  // Attacks", "Ki-Empowered Strikes"/"Empowered Strikes", "Diamond
+  // Soul"/"Disciplined Survivor" are each a single description under their
+  // own name, and the eleven wholly edition-exclusive names (Uncanny
+  // Metabolism/Heightened Focus/Self-Restoration/Perfect Focus/Superior
+  // Defense on the 2024 side; Stillness of Mind/Purity of Body/Tongue of the
+  // Sun and Moon/Timeless Body/Empty Body/Perfect Self on the 2014 side) have
+  // no counterpart to fork against at all. Both base names show up under
+  // EVERY subclass context Monk has (undefined/warrior of the open hand/way
+  // of the open hand/warrior of shadow/way of shadow/warrior of the
+  // elements/way of the four elements/warrior of mercy — collectTaggedFeatureKeys
+  // combines classRows, always ALL of them, with each context's own
+  // subclassRows) — 2 names x 8 contexts = 16. None of Way of the Open
+  // Hand's, Way of Shadow's, or Way of the Four Elements' OWN feature names
+  // are tagged here — #1501/#1502 each forked their 2014 sibling into a
+  // SEPARATE subclass rather than a same-slug fork, and #1503's Way of the
+  // Four Elements has no 2024 counterpart to fork against at all, so
+  // loadDbFeatureRows("monk", "way of …") only ever returns EDITION_2014
+  // rows: one description per name, not two (same "separate subclass, not a
+  // fork" shape as Barbarian's Totem Warrior or Warlock's The Archfey
+  // above). Warrior of the Open Hand's and Warrior of Shadow's own feature
+  // names are no longer tagged either (they used to be, pre-#1501/#1502,
+  // when one slug held both editions' text) — both slugs' rows are now
+  // EDITION_2024-only too, same as Warrior of the Elements' own rows since
+  // #1503's retag.
+  ["monk", "undefined", "Martial Arts"],
+  ["monk", "undefined", "Stunning Strike"],
+  ["monk", "warrior of the open hand", "Martial Arts"],
+  ["monk", "warrior of the open hand", "Stunning Strike"],
+  ["monk", "way of the open hand", "Martial Arts"],
+  ["monk", "way of the open hand", "Stunning Strike"],
+  ["monk", "warrior of shadow", "Martial Arts"],
+  ["monk", "warrior of shadow", "Stunning Strike"],
+  ["monk", "way of shadow", "Martial Arts"],
+  ["monk", "way of shadow", "Stunning Strike"],
+  ["monk", "warrior of the elements", "Martial Arts"],
+  ["monk", "warrior of the elements", "Stunning Strike"],
+  ["monk", "way of the four elements", "Martial Arts"],
+  ["monk", "way of the four elements", "Stunning Strike"],
+  ["monk", "warrior of mercy", "Martial Arts"],
+  ["monk", "warrior of mercy", "Stunning Strike"],
 ] as const;
 
 // A (class, subclass, name) is "tagged" if its two seeded rows carry

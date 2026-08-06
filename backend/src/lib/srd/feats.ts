@@ -1,27 +1,30 @@
+import { z } from "zod";
+
 import type { AdvancementEntry } from "@/lib/classes/resources.js";
+import type { FeatImprovement } from "@/lib/classes/resources-state.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
-import type { RulesEdition } from "@character-sheet/shared-types";
 
 /** PHB'24 feat categories (local union keeps srd/ a dependency leaf). */
 export type FeatCategory = "origin" | "general" | "fighting_style" | "epic_boon";
 
 /**
- * Whether a feat may be taken via an Ability Score Improvement slot at `level`
- * (PHB'24 pp. 87-88). Origin feats come from backgrounds and Fighting Style from
- * class features, so neither is ever offered here; General unlocks at level 4 and
- * Epic Boon at level 19 unless the feat overrides levelPrerequisite.
+ * Whether a feat may be taken via an Ability Score Improvement slot at `level`.
+ * Origin feats come from backgrounds and Fighting Style from class features, so
+ * neither is ever offered here; General unlocks at level 4 and Epic Boon at
+ * level 19 unless the feat overrides levelPrerequisite.
  *
- * Both editions resolve identically today: origin/general/fighting_style/epic_boon
- * is PHB'24 taxonomy and no 2014 Feat rows exist outside the already-forked Alert
- * pair, so there is nothing for a 2014 branch to decide yet. `edition` is threaded
- * now (last parameter, per subclassGateLevel) so #1310's 2014 feat catalog changes
- * this body instead of every call site — a unit test pins the two verdicts equal.
+ * Edition-invariant (#1310): PHB'24 pp. 87-88 draws this exact taxonomy, and
+ * PHB'14's every-feat-is-general-with-no-level-gate rule (p.165, earliest ASI
+ * at level 4 in any 2014 class) is faithfully encoded by 2014's Feat rows
+ * carrying `category: "general"` with a NULL levelPrerequisite — so the
+ * `general` branch's `?? 4` default already IS the 2014 rule, with no fork
+ * needed. `origin`/`fighting_style`/`epic_boon` rows are all EDITION_2024-tagged,
+ * so a 2014 character can never reach those branches at all. No `edition`
+ * parameter, per CLAUDE.md: "an edition-invariant rule takes no edition."
  */
 export function featOfferedForAsiSlot(
   feat: { category: FeatCategory; levelPrerequisite?: number | null },
   level: number,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- the #1310 fork seam; see JSDoc, both editions resolve identically until 2014 feats exist
-  edition: RulesEdition,
 ): boolean {
   switch (feat.category) {
     case "origin":
@@ -86,6 +89,89 @@ export const FEAT_IMPROVEMENT_TARGETS = [
   ...COMBAT_FEAT_IMPROVEMENT_TARGETS,
 ] as const;
 
+const KEYED_FEAT_IMPROVEMENT_TARGETS: readonly string[] = PROFICIENCY_FEAT_IMPROVEMENT_TARGETS;
+
+/**
+ * The ONE FeatImprovement zod schema (#1691) — validates a taken feat's
+ * `improvements` snapshot (POST .../advancement/transactions, routes/character/
+ * advancement.ts) AND a seeded ClassFeature row's `improvements` column
+ * (prisma/seed/class-features.ts's classFeatureSeedSchema) against the SAME
+ * FEAT_IMPROVEMENT_TARGETS vocabulary. Reused, never forked — a target added
+ * here is immediately valid for both a player-taken feat and a class/subclass
+ * passive row, and #1682's SpeciesTrait.improvements is a third reuse of it.
+ */
+export const featImprovementSchema = z
+  .object({
+    target: z.enum(FEAT_IMPROVEMENT_TARGETS),
+    amount: z.number().int(),
+    perLevel: z.boolean().optional(),
+    key: z.string().optional(),
+    scaling: z.literal("proficiencyBonus").optional(),
+  })
+  .refine((imp) => (KEYED_FEAT_IMPROVEMENT_TARGETS.includes(imp.target) ? !!imp.key : true), {
+    message: "FeatImprovement: 'key' is required for proficiency targets (skill, savingThrow, armor, weapon)",
+  });
+
+/**
+ * Sums numeric improvement bonuses over a flat list — the shared arithmetic
+ * deriveFeatBonuses (below, a taken feat's advancements) and the ClassFeature
+ * row layer (serialize/classes.ts's applyFeatLayer) both reduce to. Split out
+ * so every improvements[] source (feat snapshot, class/subclass feature row,
+ * #1682's future SpeciesTrait row) shares one evaluator instead of
+ * re-deriving the scaling rules per source.
+ */
+export function deriveImprovementBonuses(
+  improvements: FeatImprovement[],
+  appliedLevel: number,
+): Record<NumericFeatImprovementTarget, number> {
+  const totals: Record<NumericFeatImprovementTarget, number> = {
+    initiative: 0,
+    speed: 0,
+    armorClass: 0,
+    maxHp: 0,
+  };
+
+  for (const imp of improvements) {
+    const target = imp.target as NumericFeatImprovementTarget;
+    if (!(target in totals)) continue; // unknown / proficiency target — skip gracefully
+    // PHB'24: some bonuses (e.g. Alert's initiative) scale with proficiency bonus.
+    if (imp.scaling === "proficiencyBonus") {
+      totals[target] += imp.amount * proficiencyBonusForLevel(appliedLevel);
+    } else {
+      totals[target] += imp.perLevel ? imp.amount * appliedLevel : imp.amount;
+    }
+  }
+
+  return totals;
+}
+
+/**
+ * Collects proficiency grants over a flat improvements list — the
+ * deriveImprovementBonuses twin for the four keyed proficiency targets. Set
+ * membership IS the dedup: a proficiency named by two different sources
+ * (e.g. a feat AND a class feature row) collapses to one entry with no
+ * separate dedup step, which is what lets applyFeatLayer merge both sources
+ * through this ONE call rather than reconciling two result sets.
+ */
+export function deriveImprovementProficiencies(
+  improvements: FeatImprovement[],
+): { skills: Set<string>; savingThrows: Set<string>; armor: Set<string>; weapons: Set<string> } {
+  const skills = new Set<string>();
+  const savingThrows = new Set<string>();
+  const armor = new Set<string>();
+  const weapons = new Set<string>();
+
+  for (const imp of improvements) {
+    if (!imp.key) continue;
+    if (imp.target === "skillProficiency") skills.add(imp.key);
+    else if (imp.target === "savingThrowProficiency") savingThrows.add(imp.key);
+    else if (imp.target === "armorProficiency") armor.add(imp.key);
+    else if (imp.target === "weaponProficiency") weapons.add(imp.key);
+  }
+
+  return { skills, savingThrows, armor, weapons };
+}
+
 /**
  * Sums all numeric feat improvement bonuses across a set of advancements.
  * `appliedLevel` is hitDice.total (the number of explicit level-ups applied),
@@ -101,27 +187,7 @@ export function deriveFeatBonuses(
   advancements: AdvancementEntry[],
   appliedLevel: number,
 ): Record<NumericFeatImprovementTarget, number> {
-  const totals: Record<NumericFeatImprovementTarget, number> = {
-    initiative: 0,
-    speed: 0,
-    armorClass: 0,
-    maxHp: 0,
-  };
-
-  for (const entry of advancements) {
-    for (const imp of (entry.improvements ?? [])) {
-      const target = imp.target as NumericFeatImprovementTarget;
-      if (!(target in totals)) continue; // unknown / proficiency target — skip gracefully
-      // PHB'24: some bonuses (e.g. Alert's initiative) scale with proficiency bonus.
-      if (imp.scaling === "proficiencyBonus") {
-        totals[target] += imp.amount * proficiencyBonusForLevel(appliedLevel);
-      } else {
-        totals[target] += imp.perLevel ? imp.amount * appliedLevel : imp.amount;
-      }
-    }
-  }
-
-  return totals;
+  return deriveImprovementBonuses(advancements.flatMap((entry) => entry.improvements ?? []), appliedLevel);
 }
 
 /**
@@ -187,20 +253,5 @@ export function hasOffHandAbilityDamage(advancements: AdvancementEntry[]): boole
 export function deriveFeatProficiencies(
   advancements: AdvancementEntry[],
 ): { skills: Set<string>; savingThrows: Set<string>; armor: Set<string>; weapons: Set<string> } {
-  const skills = new Set<string>();
-  const savingThrows = new Set<string>();
-  const armor = new Set<string>();
-  const weapons = new Set<string>();
-
-  for (const entry of advancements) {
-    for (const imp of (entry.improvements ?? [])) {
-      if (!imp.key) continue;
-      if (imp.target === "skillProficiency") skills.add(imp.key);
-      else if (imp.target === "savingThrowProficiency") savingThrows.add(imp.key);
-      else if (imp.target === "armorProficiency") armor.add(imp.key);
-      else if (imp.target === "weaponProficiency") weapons.add(imp.key);
-    }
-  }
-
-  return { skills, savingThrows, armor, weapons };
+  return deriveImprovementProficiencies(advancements.flatMap((entry) => entry.improvements ?? []));
 }

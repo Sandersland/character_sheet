@@ -3,7 +3,7 @@
 // casting left this row entirely for the record view's "Cast a spell" door.
 import { useState } from "react";
 
-import { canPrepare, type PreparedBudget } from "@/lib/spellList";
+import { alwaysAvailableLabelOf, canPrepare, type PreparedBudget } from "@/lib/spellList";
 import { deriveSpellRow, runeState } from "@/lib/spellRow";
 import { effectPreview, componentsLabel } from "@/lib/spellMeta";
 import SpellDetailCard from "@/features/spells/SpellDetailCard";
@@ -34,9 +34,10 @@ function prepareCta(
   onPrepare: (spell: Spell) => void,
   onDone: () => void,
 ) {
-  const state = runeState(spell);
+  const state = runeState(spell, budget.casterModel);
   if (state === "locked") {
-    return { label: "Always prepared", disabled: true, onPress: () => {} };
+    // #1511 D4: served, not hardcoded — see SpellRowActions.
+    return { label: alwaysAvailableLabelOf(budget), disabled: true, onPress: () => {} };
   }
   const blocked = state === "unprepared" && !canPrepare(spell, budget);
   return {

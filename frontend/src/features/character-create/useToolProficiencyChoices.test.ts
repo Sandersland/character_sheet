@@ -3,13 +3,14 @@ import { renderHook } from "@testing-library/react";
 
 import { useToolProficiencyChoices } from "@/features/character-create/useToolProficiencyChoices";
 import type { CharacterDraft } from "@/hooks/useCharacterDraft";
-import type { BackgroundOption, ClassOption, RaceOption } from "@/types/character";
+import type { BackgroundOption, ClassOption } from "@/types/character";
 
 function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
   return {
     name: "",
     alignment: "",
-    race: "",
+    speciesId: "",
+    variantId: "",
     className: "",
     subclass: "",
     subclassId: "",
@@ -35,6 +36,11 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
       charisma: 10,
     },
     backgroundAbilities: {},
+    speciesAbilities: {},
+    castingAbility: "",
+    speciesSkills: [],
+    speciesCantripId: "",
+    speciesOriginFeatId: "",
     skillProficiencies: [],
     toolChoices: [],
     cantripIds: [],
@@ -72,7 +78,6 @@ function makeClass(overrides: Partial<ClassOption> = {}): ClassOption {
   };
 }
 
-const race: RaceOption = { id: "race-1", name: "Human", speed: 30, toolProficiencies: [] };
 const background: BackgroundOption = {
   id: "bg-1",
   name: "Sage",
@@ -86,7 +91,6 @@ const background: BackgroundOption = {
 function run(args: {
   draft: CharacterDraft;
   selectedClass?: ClassOption;
-  selectedRace?: RaceOption;
   selectedBackground?: BackgroundOption;
   update?: (patch: Partial<CharacterDraft>) => void;
 }) {
@@ -94,7 +98,6 @@ function run(args: {
     useToolProficiencyChoices({
       draft: args.draft,
       selectedClass: args.selectedClass,
-      selectedRace: args.selectedRace,
       selectedBackground: args.selectedBackground,
       update: args.update ?? vi.fn(),
     }),
@@ -102,12 +105,11 @@ function run(args: {
 }
 
 describe("useToolProficiencyChoices", () => {
-  it("dedups granted tool profs across background, class, and race", () => {
+  it("dedups granted tool profs across background and class", () => {
     const result = run({
       draft: makeDraft(),
       selectedClass: makeClass({ toolProficiencies: ["Thieves' Tools"] }),
-      selectedRace: { ...race, toolProficiencies: ["Thieves' Tools"] },
-      selectedBackground: { ...background, toolProficiencies: ["Herbalism Kit"] },
+      selectedBackground: { ...background, toolProficiencies: ["Herbalism Kit", "Thieves' Tools"] },
     });
     expect(result.grantedToolProfs).toEqual(["Herbalism Kit", "Thieves' Tools"]);
   });

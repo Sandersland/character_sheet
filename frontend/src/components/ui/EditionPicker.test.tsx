@@ -31,45 +31,13 @@ describe("EditionPicker (#1286)", () => {
     expect(radios[0]).toHaveAttribute("aria-checked", "false");
   });
 
-  it("marks 2014 unavailable: aria-disabled, out of the tab order, with a hover reason and an announced one (#1371)", () => {
-    render(<EditionPicker rows={SERVED_EDITIONS} value="EDITION_2024" onChange={() => {}} />);
-    const card = screen.getByRole("radio", { name: "2014 rules" });
-    expect(card).toHaveAttribute("aria-disabled", "true");
-    expect(card).toHaveAttribute("tabindex", "-1");
-    expect(card).toHaveAttribute("title", expect.stringContaining("Not available yet"));
-    expect(card).toHaveAccessibleDescription(/haven't shipped/);
-    expect(screen.getByText("Not available yet")).toBeInTheDocument();
-  });
-
-  // The unselectable subset is derived from the ROWS' unavailableReason (#1436),
-  // not from a module const — so a row served without one becomes selectable with
-  // no code change here, which is how #1372 ungates 2014.
-  it("makes a row selectable purely by the absence of unavailableReason", async () => {
-    const onChange = vi.fn();
-    const ungated2014 = { key: ROW_2014.key, label: ROW_2014.label, description: ROW_2014.description };
-    render(<EditionPicker rows={[ROW_2024, ungated2014]} value="EDITION_2024" onChange={onChange} />);
-
-    const card = screen.getByRole("radio", { name: "2014 rules" });
-    expect(card).not.toHaveAttribute("aria-disabled");
-    await userEvent.click(card);
-    expect(onChange).toHaveBeenCalledWith("EDITION_2014");
-  });
-
-  it("does not fire onChange when the unavailable 2014 card is clicked (#1371)", async () => {
+  // #1372 restores this to a positive assertion: 2014 fires onChange like any
+  // other row, since #1436's rows carry no unavailableReason for it any more.
+  it("fires onChange with the clicked edition", async () => {
     const onChange = vi.fn();
     render(<EditionPicker rows={SERVED_EDITIONS} value="EDITION_2024" onChange={onChange} />);
     await userEvent.click(screen.getByRole("radio", { name: "2014 rules" }));
-    expect(onChange).not.toHaveBeenCalled();
-  });
-
-  it("fires onChange with the clicked selectable edition", async () => {
-    const onChange = vi.fn();
-    // Rendered with an unselectable value to pin the defensive checkedIndex === -1
-    // path (2014 is filtered out of the roving index space, so its selection
-    // never maps to a valid index).
-    render(<EditionPicker rows={SERVED_EDITIONS} value="EDITION_2014" onChange={onChange} />);
-    await userEvent.click(screen.getByRole("radio", { name: "2024 rules" }));
-    expect(onChange).toHaveBeenCalledWith("EDITION_2024");
+    expect(onChange).toHaveBeenCalledWith("EDITION_2014");
   });
 
   it("never renders raw SRD citation text (2014/2024 in plain words only)", () => {
@@ -77,18 +45,19 @@ describe("EditionPicker (#1286)", () => {
     expect(screen.queryByText(/SRD/i)).not.toBeInTheDocument();
   });
 
-  it("arrow keys rove only over selectable editions and never select 2014 (#1371)", async () => {
+  // #1372 restores this to a positive assertion: ArrowRight roves over both
+  // rows and selects 2014, since neither is filtered out any more.
+  it("arrow keys rove over both editions and can select 2014", async () => {
     const onChange = vi.fn();
     render(<EditionPicker rows={SERVED_EDITIONS} value="EDITION_2024" onChange={onChange} />);
     const first = screen.getByRole("radio", { name: "2024 rules" });
     expect(first).toHaveAttribute("tabindex", "0");
     first.focus();
     await userEvent.keyboard("{ArrowRight}");
-    expect(onChange).not.toHaveBeenCalledWith("EDITION_2014");
-    expect(first).toHaveFocus();
+    expect(onChange).toHaveBeenCalledWith("EDITION_2014");
   });
 
-  it("has no axe violations with an unavailable edition present", async () => {
+  it("has no axe violations", async () => {
     const { container } = render(
       <EditionPicker rows={SERVED_EDITIONS} value="EDITION_2024" onChange={() => {}} />,
     );

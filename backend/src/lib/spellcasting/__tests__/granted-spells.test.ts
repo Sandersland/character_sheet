@@ -5,9 +5,11 @@ import {
   deriveGrantedCastingAbility,
   deriveItemSpells,
   grantedSpellsGained,
+  buildSpeciesGrantedSpellSource,
   type GrantedSpellSource,
   type GrantedSpellCatalogSpell,
   type ItemSpellSourceItem,
+  type SpeciesGrantSourceInput,
 } from "@/lib/spellcasting/granted-spells.js";
 
 // A catalog Spell row as loaded via `subclassRef.grantedSpells.spell`. Defaults to
@@ -285,5 +287,116 @@ describe("deriveGrantedCastingAbility", () => {
       grantedSpells: [{ gateLevel: 3, castingAbility: "luck", edition: null, spell: catalogSpell() }],
     };
     expect(deriveGrantedCastingAbility(garbage, "EDITION_2024")).toBe("wisdom");
+  });
+});
+
+// #1683: deriveGrantedSpells STAYS ONE FUNCTION serving both subclass and
+// species sources — sourceKind only changes the `source` literal it stamps
+// onto each derived SpellEntry, never a second derivation path.
+describe("deriveGrantedSpells sourceKind parameter (#1683)", () => {
+  it("defaults to source: \"subclass\" when sourceKind is omitted (existing call sites unchanged)", () => {
+    const [spell] = deriveGrantedSpells(warriorOfShadow, 3, "EDITION_2024");
+    expect(spell.source).toBe("subclass");
+  });
+
+  it("stamps source: \"species\" when sourceKind is \"species\", same derivation otherwise", () => {
+    const drow: GrantedSpellSource = {
+      name: "Drow",
+      grantedSpells: [
+        { gateLevel: 1, castingAbility: "charisma", edition: null, spell: catalogSpell({ name: "Dancing Lights" }) },
+        { gateLevel: 3, castingAbility: "charisma", edition: null, spell: catalogSpell({ name: "Faerie Fire", level: 1 }) },
+        { gateLevel: 5, castingAbility: "charisma", edition: null, spell: catalogSpell({ name: "Darkness", level: 2 }) },
+      ],
+    };
+    const at1 = deriveGrantedSpells(drow, 1, "EDITION_2024", "species");
+    expect(at1.map((s) => s.name)).toEqual(["Dancing Lights"]);
+    expect(at1[0].source).toBe("species");
+    expect(at1[0].prepared).toBe(true);
+
+    const at3 = deriveGrantedSpells(drow, 3, "EDITION_2024", "species");
+    expect(at3.map((s) => s.name)).toEqual(["Dancing Lights", "Faerie Fire"]);
+
+    const at5 = deriveGrantedSpells(drow, 5, "EDITION_2024", "species");
+    expect(at5.map((s) => s.name)).toEqual(["Dancing Lights", "Faerie Fire", "Darkness"]);
+
+    // Level-down (5 -> 2): Faerie Fire/Darkness drop out — no persistence, the
+    // exact same re-derive-on-read the subclass path already relies on.
+    const backDownAt2 = deriveGrantedSpells(drow, 2, "EDITION_2024", "species");
+    expect(backDownAt2.map((s) => s.name)).toEqual(["Dancing Lights"]);
+  });
+});
+
+describe("buildSpeciesGrantedSpellSource (#1683)", () => {
+  function grantRow(spellName: string, gateLevel: number, variantId: string | null = "variant-drow"): {
+    variantId: string | null;
+    gateLevel: number;
+    spell: GrantedSpellCatalogSpell;
+  } {
+    return { variantId, gateLevel, spell: catalogSpell({ name: spellName }) };
+  }
+
+  it("returns null for a null input (no species picked)", () => {
+    expect(buildSpeciesGrantedSpellSource(null)).toBeNull();
+  });
+
+  it("returns null when neither species-level nor variant-level rows exist (no lineage, or a non-spell-granting one)", () => {
+    const input: SpeciesGrantSourceInput = {
+      name: "Goliath",
+      castingAbility: null,
+      speciesGrantedSpells: [],
+      variantGrantedSpells: [],
+    };
+    expect(buildSpeciesGrantedSpellSource(input)).toBeNull();
+  });
+
+  it("merges species-level (variantId: null) rows with the picked variant's own rows, mirroring activeTraitRows", () => {
+    const input: SpeciesGrantSourceInput = {
+      name: "Drow",
+      castingAbility: "charisma",
+      // The Species -> SpeciesGrantedSpell back-relation is UNFILTERED (same
+      // Prisma relation gotcha activeTraitRows documents) — a genuine
+      // species-level row (variantId: null) is included, a row belonging to
+      // a DIFFERENT variant is excluded.
+      speciesGrantedSpells: [grantRow("Light", 1, null), grantRow("Druidcraft", 1, "variant-wood")],
+      variantGrantedSpells: [grantRow("Faerie Fire", 3, "variant-drow")],
+    };
+    const source = buildSpeciesGrantedSpellSource(input);
+    expect(source?.grantedSpells.map((g) => g.spell.name)).toEqual(["Light", "Faerie Fire"]);
+  });
+
+  it("stamps every row with the character's chosen castingAbility and edition: null (species children carry no edition column)", () => {
+    const input: SpeciesGrantSourceInput = {
+      name: "Drow",
+      castingAbility: "intelligence",
+      speciesGrantedSpells: [],
+      variantGrantedSpells: [grantRow("Dancing Lights", 1)],
+    };
+    const source = buildSpeciesGrantedSpellSource(input);
+    expect(source?.grantedSpells[0].castingAbility).toBe("intelligence");
+    expect(source?.grantedSpells[0].edition).toBeNull();
+  });
+
+  it("falls back to wisdom when castingAbility is null/unset (defense in depth — creation validation requires it whenever grants exist)", () => {
+    const input: SpeciesGrantSourceInput = {
+      name: "Drow",
+      castingAbility: null,
+      speciesGrantedSpells: [],
+      variantGrantedSpells: [grantRow("Dancing Lights", 1)],
+    };
+    const source = buildSpeciesGrantedSpellSource(input);
+    expect(source?.grantedSpells[0].castingAbility).toBe("wisdom");
+  });
+
+  it("the built source feeds deriveGrantedSpells with sourceKind \"species\" end to end", () => {
+    const input: SpeciesGrantSourceInput = {
+      name: "Drow",
+      castingAbility: "charisma",
+      speciesGrantedSpells: [],
+      variantGrantedSpells: [grantRow("Dancing Lights", 1), grantRow("Faerie Fire", 3), grantRow("Darkness", 5)],
+    };
+    const source = buildSpeciesGrantedSpellSource(input);
+    const granted = deriveGrantedSpells(source, 5, "EDITION_2024", "species");
+    expect(granted.map((g) => g.name)).toEqual(["Dancing Lights", "Faerie Fire", "Darkness"]);
+    expect(granted.every((g) => g.source === "species")).toBe(true);
   });
 });

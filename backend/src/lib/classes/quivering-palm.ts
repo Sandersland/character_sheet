@@ -1,8 +1,14 @@
-// Quivering Palm (Warrior of the Open Hand L17, SRD 5.2 / PHB'24 p.90) — a
-// two-step feature: SET on an Unarmed Strike hit (spend 4 focus to place
-// imperceptible vibrations lasting your monk level in days), then later, as a
-// Magic action, TRIGGER them to force a Constitution save (focus DC) for
-// 10d12 Force damage, half as much on a success.
+// Quivering Palm (Open Hand L17) — a two-step feature: SET on an Unarmed
+// Strike hit, then later TRIGGER the vibrations to force a Constitution
+// save. 2024 (Warrior of the Open Hand, SRD 5.2 / PHB'24 p.90): spend 4
+// focus to SET; a Magic action to TRIGGER, forcing a Constitution save
+// (focus DC) for 10d12 Force damage, half as much on a success. 2014 (Way of
+// the Open Hand, SRD 5.1 / PHB'14 p.79, #1501): spend 3 ki to SET; an action
+// to TRIGGER, and the outcome mapping is INVERTED — a failed save drops the
+// target to 0 hit points outright, a successful one takes the full 10d10
+// necrotic (never halved). Cost forks via quiveringPalmCost/monkPoolKey; the
+// damage-outcome fork lives in resolveQuiveringPalmDamage/
+// quiveringPalmSummary below.
 //
 // "Only one creature at a time" + the day-count duration aren't modeled as
 // real state — this app has no NPC combatant or calendar/downtime tracker (see
@@ -15,26 +21,37 @@
 //
 // Roll ownership (mirrors Stunning Strike): the Con save is a flat d20 with no
 // modifier — DC is exact, the roll is a deliberate simplification pending an
-// NPC stat-block model. The 10d12 damage is the monk's OWN supernatural
-// effect, so — like Second Wind/Lay on Hands/Deflect Attacks' redirect — the
-// client rolls it and sends the total; the server only decides full vs half
-// from its own save roll.
+// NPC stat-block model. The damage (10d12 Force / 10d10 necrotic) is the
+// monk's OWN supernatural effect, so — like Second Wind/Lay on Hands/Deflect
+// Attacks' redirect — the client rolls it and sends the total; the server
+// only decides the outcome from its own save roll. 2014's drop-to-0 outcome
+// needs no roll at all (see resolveQuiveringPalmDamage) — there is no target
+// combatant to actually zero out, so it is reported text only, same as
+// `appliedDamage` on the 2024 path.
 
+import type { RulesEdition } from "@character-sheet/shared-types";
 import type { QuiveringPalmOperation, TriggerQuiveringPalmOperation } from "@character-sheet/contracts";
 
 import { Prisma } from "@/generated/prisma/client.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { levelForExperience, proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
+import { editionOf } from "@/lib/rules/edition.js";
 import { runCharacterTransaction, type CharacterTxContext } from "@/lib/character/character-transaction.js";
 import { appendActiveBuffInTx, clearBuffByKeyInTx, normalizeActiveEffectsMutable } from "@/lib/combat/active-effects.js";
 import { applySpendResourceInTx } from "./resources.js";
-import { monkSaveDC } from "./monk.js";
-import { resolveSubclassSlug } from "./subclass-slug.js";
+import { monkSaveDC, monkPoolKey } from "./monk.js";
+import { resolveSubclassSlug, type SubclassSlug } from "./subclass-slug.js";
 
 export class InvalidQuiveringPalmOperationError extends Error {}
 
 export const QUIVERING_PALM_BUFF_KEY = "quiveringPalm";
-const QUIVERING_PALM_FOCUS_COST = 4;
+
+// Cost by edition (#1501): SRD 5.1 / PHB'14 p.79 spends 3 ki; SRD 5.2 /
+// PHB'24 p.90 spends 4 focus. The pool NAME forks through monkPoolKey; only
+// the AMOUNT needs its own switch here.
+function quiveringPalmCost(edition: RulesEdition): number {
+  return edition === "EDITION_2014" ? 3 : 4;
+}
 
 export type QuiveringPalmSaveOutcome = "fail" | "success";
 
@@ -55,20 +72,58 @@ export interface TriggerQuiveringPalmResult {
 
 export type QuiveringPalmResult = SetQuiveringPalmResult | TriggerQuiveringPalmResult;
 
-/** Fail (roll < DC) takes full damage; success halves it, rounded down (SRD 5.2 "half as much"). */
+/**
+ * 2024 (SRD 5.2 "half as much"): fail (roll < DC) takes full rolled damage;
+ * success halves it, rounded down.
+ *
+ * 2014 (SRD 5.1, #1501): the outcome mapping is INVERTED, not merely
+ * reworded — a FAILED save drops the target to 0 hit points outright
+ * (`rawDamage` is irrelevant, `appliedDamage` reads 0); a SUCCESSFUL save
+ * takes the full rolled damage (10d10 necrotic), never halved. Transcribed
+ * as SRD 5.1 actually states it — do not normalize this to 2024's
+ * fail-full/success-half shape.
+ */
 export function resolveQuiveringPalmDamage(
   roll: number,
   dc: number,
   rawDamage: number,
+  edition: RulesEdition,
 ): { outcome: QuiveringPalmSaveOutcome; appliedDamage: number } {
   const outcome: QuiveringPalmSaveOutcome = roll >= dc ? "success" : "fail";
+  if (edition === "EDITION_2014") {
+    return { outcome, appliedDamage: outcome === "fail" ? 0 : rawDamage };
+  }
   return { outcome, appliedDamage: outcome === "success" ? Math.floor(rawDamage / 2) : rawDamage };
+}
+
+// 2014's fail branch narrates a drop-to-0, not a damage number — this app has
+// no NPC/target combatant to actually zero out (CLAUDE.md's self-or-announce
+// non-negotiable; see this file's own header), so like `appliedDamage` on the
+// 2024 path, this is reported text only, never persisted state.
+function quiveringPalmSummary(
+  dc: number,
+  saveRoll: number,
+  outcome: QuiveringPalmSaveOutcome,
+  appliedDamage: number,
+  rawDamage: number,
+  edition: RulesEdition,
+): string {
+  const base = `Quivering Palm — Constitution save DC ${dc}, target rolled ${saveRoll}`;
+  if (edition === "EDITION_2014") {
+    return outcome === "fail"
+      ? `${base}: failed — dropped to 0 hit points.`
+      : `${base}: made it — ${appliedDamage} necrotic damage.`;
+  }
+  return outcome === "fail"
+    ? `${base}: failed — ${appliedDamage} Force damage.`
+    : `${base}: made it — ${appliedDamage} Force damage (half of ${rawDamage}).`;
 }
 
 const QUIVERING_PALM_SELECT = {
   experiencePoints: true,
   abilityScores: true,
   activeEffects: true,
+  rulesEdition: true,
   classEntries: {
     orderBy: { position: "asc" as const },
     select: { name: true, level: true, subclass: true, subclassRef: { select: { slug: true } } },
@@ -81,20 +136,27 @@ function monkEntry(row: QuiveringPalmRow) {
   return row.classEntries.find((c) => c.name.toLowerCase() === "monk");
 }
 
-// Resolved via slug (#1277: FK preferred, exact normalized name as fallback).
-// Was substring-matched on the words "open hand" — the same failure class
-// #1339 fixed at the DERIVED_ACTIONS gate.
-function isWarriorOfTheOpenHand(row: QuiveringPalmRow): boolean {
+// Both editions' Open Hand subclasses grant this feature — "Warrior of the
+// Open Hand" (SRD 5.2, EDITION_2024) and "Way of the Open Hand" (SRD 5.1,
+// EDITION_2014, #1501) are SEPARATE subclasses, not one forked across
+// editions, so a character can only ever resolve to one of the two slugs.
+// Resolved via slug (#1277: FK preferred, exact normalized name as
+// fallback). Was substring-matched on the words "open hand" — the same
+// failure class #1339 fixed at the DERIVED_ACTIONS gate.
+const OPEN_HAND_SLUGS: readonly SubclassSlug[] = ["monk-warrior-of-the-open-hand", "monk-way-of-the-open-hand"];
+
+function isOpenHandFamily(row: QuiveringPalmRow): boolean {
   const monk = monkEntry(row);
-  return !!monk && resolveSubclassSlug("monk", monk) === "monk-warrior-of-the-open-hand";
+  const slug = monk && resolveSubclassSlug("monk", monk);
+  return !!slug && OPEN_HAND_SLUGS.includes(slug);
 }
 
-/** Throws unless this is a level-17+ Warrior of the Open Hand; returns the monk level. */
+/** Throws unless this is a level-17+ Open Hand monk (either edition); returns the monk level. */
 function assertQuiveringPalmAvailable(row: QuiveringPalmRow): number {
   const monk = monkEntry(row);
-  if (!monk || monk.level < 17 || !isWarriorOfTheOpenHand(row)) {
+  if (!monk || monk.level < 17 || !isOpenHandFamily(row)) {
     throw new InvalidQuiveringPalmOperationError(
-      "Only a Warrior of the Open Hand monk (level 17+) has Quivering Palm",
+      "Only an Open Hand monk (level 17+) has Quivering Palm",
     );
   }
   return monk.level;
@@ -108,6 +170,7 @@ async function setQuiveringPalm(
   sessionId: string | null,
 ): Promise<SetQuiveringPalmResult> {
   const monkLevel = assertQuiveringPalmAvailable(row);
+  const edition = editionOf(row);
 
   const activeState = normalizeActiveEffectsMutable(row.activeEffects);
   if (activeState.buffs.some((b) => b.key === QUIVERING_PALM_BUFF_KEY)) {
@@ -117,7 +180,7 @@ async function setQuiveringPalm(
   await applySpendResourceInTx(
     tx,
     characterId,
-    { type: "spendResource", key: "focus", amount: QUIVERING_PALM_FOCUS_COST },
+    { type: "spendResource", key: monkPoolKey(edition), amount: quiveringPalmCost(edition) },
     batchId,
     sessionId,
   );
@@ -171,17 +234,14 @@ async function triggerQuiveringPalm(
   const profBonus = proficiencyBonusForLevel(level);
   const abilityScores = row.abilityScores as Record<string, number>;
   const dc = monkSaveDC(abilityScores, profBonus);
+  const edition = editionOf(row);
 
   const saveRoll = 1 + Math.floor(Math.random() * 20);
-  const { outcome, appliedDamage } = resolveQuiveringPalmDamage(saveRoll, dc, op.roll);
+  const { outcome, appliedDamage } = resolveQuiveringPalmDamage(saveRoll, dc, op.roll, edition);
 
   await clearBuffByKeyInTx(tx, characterId, QUIVERING_PALM_BUFF_KEY, batchId, sessionId, "Quivering Palm triggered");
 
-  const summary =
-    `Quivering Palm — Constitution save DC ${dc}, target rolled ${saveRoll}: ` +
-    (outcome === "fail"
-      ? `failed — ${appliedDamage} Force damage.`
-      : `made it — ${appliedDamage} Force damage (half of ${op.roll}).`);
+  const summary = quiveringPalmSummary(dc, saveRoll, outcome, appliedDamage, op.roll, edition);
 
   await logEvent(tx, {
     characterId,

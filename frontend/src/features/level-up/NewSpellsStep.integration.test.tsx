@@ -138,8 +138,11 @@ describe("NewSpellsStep in the ceremony", () => {
     await user.click(screen.getByRole("button", { name: /take average/i }));
     await user.click(screen.getByRole("button", { name: /continue/i }));
 
+    // #1509: this fixture's character is EDITION_2024, so a Sorcerer's served
+    // casterModel is "prepared" — matching the swap-only test above, which
+    // already asserted "prepared spell" text for this same class/edition.
     // Before the swap: one learn satisfies the count-1 step.
-    await user.click(await screen.findByRole("button", { name: /swap a known spell/i }));
+    await user.click(await screen.findByRole("button", { name: /swap a prepared spell/i }));
     await user.click(await screen.findByRole("button", { name: /OldKnown/ }));
     // Now the cap is 2 — pick both.
     await user.click(screen.getByRole("button", { name: "Add Shield" }));

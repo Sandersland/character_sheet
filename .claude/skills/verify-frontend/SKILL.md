@@ -1,6 +1,6 @@
 ---
 name: verify-frontend
-description: Run after making frontend changes to gate a PR. Runs frontend unit tests, the Playwright e2e suite, browser verification, and a design review in parallel, then reports a combined PASS/FAIL verdict. Use when frontend changes need verification before merging, or when another skill (e.g. parallel-issues) needs a UI gate.
+description: Run after making frontend changes to gate a PR. Runs frontend unit tests, the Playwright e2e suite, browser verification, and a design review in parallel, then reports a combined PASS/FAIL verdict. Use when frontend changes need verification before merging, or when another skill or workflow needs a UI gate.
 ---
 
 # verify-frontend

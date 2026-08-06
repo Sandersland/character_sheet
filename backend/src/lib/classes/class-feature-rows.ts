@@ -7,7 +7,26 @@
 // here ever touches the database.
 import type { RulesEdition } from "@character-sheet/shared-types";
 
+import { abilityModifier } from "@/lib/srd/math.js";
+import type { RollEffect } from "@/lib/srd/roll-effects.js";
+
+import type { FeatImprovement } from "./resources-state.js";
 import type { DerivedFeature, DerivedResource, RechargeOn } from "./types.js";
+
+/** The six abilities a `{ abilityMod }` formula tier (below) may name. */
+export type ResourceTotalAbility = "strength" | "dexterity" | "constitution" | "intelligence" | "wisdom" | "charisma";
+
+/**
+ * A tier's `total` (#1685/#416's C3 evaluator): either the pre-existing flat
+ * number, or a formula that reads the same inputs every `resourceFn` already
+ * received — `"proficiencyBonus"`, an ability modifier (`min` floors it, the
+ * `Math.max(1, mod)` shape Dark One's Own Luck/Tireless/Nature's Veil/
+ * Moonlight Step all share), or `level x N` (the Lay on Hands *shape* —
+ * Lay on Hands itself stays resourceFn; see paladin.ts's own header for why).
+ * evaluateResourceTotal below is the one place this vocabulary is
+ * interpreted.
+ */
+export type ResourceTotalFormula = number | "proficiencyBonus" | { abilityMod: ResourceTotalAbility; min?: number } | { levelTimes: number };
 
 /**
  * A tiered resource total — ASCENDING by minLevel, last-match-wins (#1522
@@ -20,13 +39,125 @@ import type { DerivedFeature, DerivedResource, RechargeOn } from "./types.js";
  */
 export interface ResourceTotalTier {
   minLevel: number;
-  total: number;
+  total: ResourceTotalFormula;
   shortRestRegain?: number;
+}
+
+/** The per-character inputs a formula `total` may read — identical to `ResourceFn`'s own (level, abilityScores, profBonus), minus `subclassKey`/`edition` (poolFromRow's row is already scoped to both). */
+export interface ResourceTotalContext {
+  level: number;
+  abilityScores: Record<string, number>;
+  profBonus: number;
+}
+
+/**
+ * Resolves one tier's `total` to a number — the ONE evaluator for the
+ * ResourceTotalFormula vocabulary, exported so #1686 (row-declared buff
+ * modifiers) can reuse it unchanged for `buffModifier` instead of growing a
+ * second copy: a new formula case belongs here, once, not at a second call
+ * site.
+ */
+export function evaluateResourceTotal(total: ResourceTotalFormula, ctx: ResourceTotalContext): number {
+  if (typeof total === "number") return total;
+  if (total === "proficiencyBonus") return ctx.profBonus;
+  if ("abilityMod" in total) {
+    // A missing score reads as 10 (modifier 0), matching resourceFn caller
+    // behavior; poolsFromRows always passes the full scores in practice.
+    const mod = abilityModifier(ctx.abilityScores[total.abilityMod] ?? 10);
+    return total.min !== undefined ? Math.max(total.min, mod) : mod;
+  }
+  return total.levelTimes * ctx.level;
+}
+
+/**
+ * Resolves a row-declared buff's `modifier` (#1686) — a plain
+ * ResourceTotalFormula reuses evaluateResourceTotal unchanged (Bladesong's
+ * `+INT (min 1)` AC shape); a tier array resolves the last tier whose
+ * minLevel <= ctx.level (ASCENDING, last-match-wins — same invariant as
+ * poolFromRow's own tierAt call), never a sum of every tier crossed. Below
+ * every tier's minLevel (or an empty array) resolves to 0, not undefined —
+ * a buff always applies SOME modifier once its own entry-level minLevel gate
+ * (EffectBuffRow.minLevel) has already admitted it. Corollary: a tier array
+ * whose first tier's minLevel exceeds ctx.level reads 0; if that isn't the
+ * intent, gate the whole entry with EffectBuffRow.minLevel rather than relying
+ * on the tier floor (#1686 review).
+ */
+export function evaluateBuffModifier(modifier: BuffModifierFormula, ctx: ResourceTotalContext): number {
+  if (!Array.isArray(modifier)) return evaluateResourceTotal(modifier, ctx);
+  return tierAt(modifier, ctx.level)?.value ?? 0;
 }
 
 export interface ResourceDieTier {
   minLevel: number;
   die: string;
+}
+
+/** One tier of a row-declared buff's `modifier` — ASCENDING by minLevel, last-match-wins (#1686), same invariant as ResourceTotalTier/DerivedStatTier. `value` (not `total`) mirrors DerivedStatTier's own naming, since this scales a MODIFIER, not a pool total — Rage's +2/+3/+4 damage bonus is the shape. */
+export interface BuffModifierTier {
+  minLevel: number;
+  value: number;
+}
+
+/**
+ * A row-declared while-active buff's `modifier` (#1686): either #1685's
+ * ResourceTotalFormula (a flat number, "proficiencyBonus", an ability
+ * modifier, or level x N) or a tier array — evaluateBuffModifier below is the
+ * one place this vocabulary is interpreted, reusing evaluateResourceTotal for
+ * the non-tiered half rather than a second copy of that formula's cases.
+ */
+export type BuffModifierFormula = ResourceTotalFormula | BuffModifierTier[];
+
+// Duration values re-declared here (not imported from lib/combat/active-effects.ts)
+// to keep this file's module graph clear of that file's own Prisma import —
+// class-feature-rows.test.ts's no-Prisma-import assertion only checks THIS
+// file's own import text, but the intent (a pure leaf, see ClassFeatureRow's
+// own header) would still break; ActiveBuff.duration must stay assignable
+// from this literal union, pinned by class-feature-effect-buffs.test.ts.
+export type EffectBuffDuration = "concentration" | "while-active" | "until-rest";
+
+/**
+ * Equip-time trigger keys `EffectBuffRow.clearOn` may name (#1688) — raised
+ * by the equip hook (`equipClearTriggers`, lib/inventory/inventory-placement.ts)
+ * when an item is donned, and matched against an active buff's own `clearOn`
+ * list by that same hook. "equipBodyArmor" fires for EVERY body-armor
+ * category (Mage Armor's RAW shape: "the spell ends if the target dons
+ * armor" — any category, #363); "equip<Category>Armor" fires only for that
+ * one category (Bladesong's shape: medium/heavy only, never light);
+ * "equipShield" fires for a shield placed in OFF_HAND. A row names the
+ * trigger set its own rule actually cares about.
+ */
+export const CLEAR_ON_TRIGGERS = ["equipLightArmor", "equipMediumArmor", "equipHeavyArmor", "equipBodyArmor", "equipShield"] as const;
+export type ClearOnTrigger = (typeof CLEAR_ON_TRIGGERS)[number];
+
+/**
+ * One row-declared while-active buff (#1686) — a ClassFeature/GrantedAbility
+ * row's `effectBuffs` entry, instantiated as an ActiveBuff op by the generic
+ * "toggle" resolver (lib/classes/actions.ts). `target` may equal this entry's
+ * own `key` for a marker buff with no numeric effect (`modifier: 0`) — state
+ * tracking only, e.g. Elemental Attunement's shape; the seed target validator
+ * (classFeatureSeedSchema) admits that form rather than rejecting it as an
+ * unknown target. `minLevel` gates whether this WHOLE ENTRY applies at the
+ * character's current level (Song of Victory's L14 extra entry riding the
+ * same L2 toggle) — distinct from a tiered `modifier`'s own minLevel axis,
+ * which scales the value WITHIN one always-present entry (Rage's damage
+ * bonus); a row can use either axis or both without them colliding. `clearOn`
+ * (#1688) is a LIST — Bladesong needs three triggers (medium armor, heavy
+ * armor, OR shield) to end the same entry, which a single string couldn't
+ * express. `endReminder` is display text only — DURABLE_BUFF_END_CONDITIONS
+ * (frontend/src/lib/turnHooks.ts) is where an actual auto-end PREDICATE
+ * lives, keyed by `key`, which is why a migrated buff's `key` must stay
+ * byte-stable with that table's own entries (Rage: "rage").
+ */
+export interface EffectBuffRow {
+  key: string;
+  target: string;
+  modifier: BuffModifierFormula;
+  duration: EffectBuffDuration;
+  minLevel?: number;
+  clearOn?: ClearOnTrigger[];
+  endReminder?: string;
+  resistDamageTypes?: string[];
+  rollEffects?: RollEffect[];
 }
 
 /**
@@ -56,6 +187,39 @@ export interface ResourceColumns {
 }
 
 /**
+ * Armor/shield literals `ActivationRequirement` may name (#1688) — evaluated
+ * against the character's CURRENTLY EQUIPPED state at activation time (not
+ * derive-time `requiresUnarmored`'s blanket condition, which only ever means
+ * "no armor AND no shield"; this vocabulary lets a row name medium/heavy
+ * specifically, e.g. Bladesong: no medium/heavy armor and no shield, but
+ * light armor is fine).
+ */
+export const ARMOR_ACTIVATION_REQUIREMENTS = ["noMediumArmor", "noHeavyArmor", "noShield", "noBodyArmor"] as const;
+export type ArmorActivationRequirement = (typeof ARMOR_ACTIVATION_REQUIREMENTS)[number];
+
+/**
+ * Gates activation on another buff (named by its `key`) currently being
+ * active (#1688) — Bladesinger's Song of Defense ("usable only while your
+ * Bladesong is active", #1676) is the first consumer; Elemental Attunement's
+ * burst/strike ops (warrior-of-elements.ts's hand-rolled `attunementActive`
+ * check) are the follow-on migration target for a later rung. Enforced for
+ * ANY row-driven activation (applyRowDrivenActionInTx), not only a "toggle"
+ * row's own activate half.
+ */
+export interface RequiresActiveBuffRequirement {
+  requiresActiveBuff: string;
+}
+
+/**
+ * The closed `activationRequires` vocabulary (#1688) — an armor/shield
+ * literal or a `requiresActiveBuff` object, evaluated by
+ * `unmetActivationRequirements` (lib/classes/activation-requires.ts), the ONE
+ * place this vocabulary is interpreted. Validated seed-time
+ * (classFeatureSeedSchema).
+ */
+export type ActivationRequirement = ArmorActivationRequirement | RequiresActiveBuffRequirement;
+
+/**
  * ClassFeature's activation-block columns — replaces a DERIVED_ACTIONS row
  * (#1528). No gate columns here: grantClass/grantSubclassSlugs/grantLevel are
  * the row's own classId/subclassId/level (one row, one gate).
@@ -65,6 +229,7 @@ export interface ActivationColumns {
   resolverKind?: string | null;
   requiresUnarmored?: boolean | null;
   regrants?: string[] | null;
+  activationRequires?: ActivationRequirement[] | null;
 }
 
 /**
@@ -122,6 +287,14 @@ export interface ClassFeatureRow extends ResourceColumns, ActivationColumns {
   // nullable String column can't name two fields. Empty/absent means "no
   // such axis" for every row but the one Battle Master row that sets it.
   saveDcAbilities?: string[] | null;
+  // A passive, always-on grant (#1691) — the SAME FeatImprovement vocabulary a
+  // taken feat's own `improvements` snapshot uses (resources-state.ts),
+  // reused rather than forked (see ClassFeature.improvements' own
+  // schema.prisma comment). Read by improvementsFromRows below.
+  improvements?: FeatImprovement[] | null;
+  // The row-declared while-active buff list a "toggle" resolverKind
+  // activates (#1686) — see EffectBuffRow's own comment for the shape.
+  effectBuffs?: EffectBuffRow[] | null;
 }
 
 /**
@@ -177,6 +350,59 @@ export function featuresFromRows(
     .map((row) => ({ name: row.name, level: row.level, description: row.description, source, edition: row.edition }));
 }
 
+/**
+ * Flat FeatImprovement[] from a class/subclass's active rows (#1691) — the
+ * ClassFeature twin of a taken feat's own `improvements` snapshot. Filters by
+ * edition + grant level exactly like featuresFromRows/poolsFromRows above, so
+ * a row's improvements apply only once its OWN gate is met — the proving case
+ * is Life Domain's 2014-only "Bonus Proficiency" row (heavy armor), which has
+ * no EDITION_2024 successor and so is correctly absent from a 2024 read.
+ * #1682's SpeciesTrait layer reads the same vocabulary off a different row
+ * family through the same deriveImprovementBonuses/deriveImprovementProficiencies
+ * evaluator (lib/srd/feats.ts) this feeds.
+ */
+export function improvementsFromRows(
+  rows: readonly ClassFeatureRow[],
+  level: number,
+  edition: RulesEdition,
+): FeatImprovement[] {
+  return rows
+    .filter((row) => row.edition === edition && row.level <= level)
+    .flatMap((row) => row.improvements ?? []);
+}
+
+/** An EffectBuffRow with its formula/tier `modifier` evaluated to a number — ready for appendActiveBuffInTx (#1686). */
+export interface ResolvedEffectBuff {
+  key: string;
+  target: string;
+  modifier: number;
+  duration: EffectBuffDuration;
+  clearOn?: ClearOnTrigger[];
+  resistDamageTypes?: string[];
+  rollEffects?: RollEffect[];
+}
+
+/**
+ * One row's own `effectBuffs`, filtered to entries whose per-entry `minLevel`
+ * (an availability gate on the WHOLE ENTRY — Song of Victory's L14 extra
+ * entry riding the same L2 toggle) is reached at `ctx.level`, with each entry's
+ * formula/tier `modifier` evaluated to a number (#1686) — the "toggle"
+ * resolver's one read of a row's buff list (lib/classes/actions.ts).
+ */
+export function effectBuffsFromRow(row: ClassFeatureRow, ctx: ResourceTotalContext): ResolvedEffectBuff[] {
+  return (row.effectBuffs ?? [])
+    .filter((buff) => buff.minLevel === undefined || ctx.level >= buff.minLevel)
+    .map((buff) => ({
+      key: buff.key,
+      target: buff.target,
+      modifier: evaluateBuffModifier(buff.modifier, ctx),
+      duration: buff.duration,
+      ...(buff.clearOn ? { clearOn: buff.clearOn } : {}),
+      ...(buff.resistDamageTypes ? { resistDamageTypes: buff.resistDamageTypes } : {}),
+      ...(buff.rollEffects ? { rollEffects: buff.rollEffects } : {}),
+    }));
+}
+
 // Last tier whose minLevel <= level (ascending, last-match-wins, #1522). Tiers
 // are authored in ascending order, so the first tier past `level` can never be
 // followed by an earlier-qualifying one — safe to stop scanning there.
@@ -195,15 +421,15 @@ function tierAt<T extends { minLevel: number }>(tiers: readonly T[] | null | und
  * `description` IS the feature's `description` (#1528: never a second
  * string) — the row-driven counterpart to a resourceFn pool literal.
  */
-function poolFromRow(row: ClassFeatureRow, level: number): DerivedResource | null {
+function poolFromRow(row: ClassFeatureRow, ctx: ResourceTotalContext): DerivedResource | null {
   if (!row.resourceKey) return null;
-  const totalTier = tierAt(row.resourceTotals, level);
+  const totalTier = tierAt(row.resourceTotals, ctx.level);
   if (!totalTier) return null;
-  const dieTier = tierAt(row.resourceDieTiers, level);
+  const dieTier = tierAt(row.resourceDieTiers, ctx.level);
   return {
     key: row.resourceKey,
     label: row.resourceLabel ?? row.name,
-    total: totalTier.total,
+    total: evaluateResourceTotal(totalTier.total, ctx),
     ...(dieTier ? { die: dieTier.die } : {}),
     recharge: (row.resourceRecharge as RechargeOn | null) ?? "none",
     ...(totalTier.shortRestRegain !== undefined ? { shortRestRegain: totalTier.shortRestRegain } : {}),
@@ -215,14 +441,23 @@ function poolFromRow(row: ClassFeatureRow, level: number): DerivedResource | nul
  * Every resource pool declared across a class/subclass's rows, at one
  * character level — the row-driven counterpart to a resourceFn call
  * (`deriveBaseLayer`/`deriveSubclassLayer`, registry.ts, Fighter-gated #1528).
- * Filters by edition + grant level exactly like featuresFromRows, then drops
- * any row with no resourceKey or whose first tier isn't reached yet.
+ * `abilityScores`/`profBonus` are the same two inputs `resourceFn` always
+ * received, now threaded through for a formula-shaped `total` (#1685) — every
+ * pre-existing flat-number caller is unaffected. Filters by edition + grant
+ * level exactly like featuresFromRows, then drops any row with no resourceKey
+ * or whose first tier isn't reached yet.
  */
-export function poolsFromRows(rows: readonly ClassFeatureRow[], level: number, edition: RulesEdition): DerivedResource[] {
+export function poolsFromRows(
+  rows: readonly ClassFeatureRow[],
+  level: number,
+  abilityScores: Record<string, number>,
+  profBonus: number,
+  edition: RulesEdition,
+): DerivedResource[] {
   const pools: DerivedResource[] = [];
   for (const row of rows) {
     if (row.edition !== edition || row.level > level) continue;
-    const pool = poolFromRow(row, level);
+    const pool = poolFromRow(row, { level, abilityScores, profBonus });
     if (pool) pools.push(pool);
   }
   return pools;

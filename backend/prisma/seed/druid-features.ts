@@ -20,10 +20,10 @@
 // EDITION_2014 row stays exactly as it always has — its pool computed by
 // lib/classes/druid.ts's resourceFn, which commit 3 leaves untouched.
 // Moonlight Step's pool (Circle of the Moon, 2024) is a Wisdom-modifier
-// formula and declares resourceKey but deliberately OMITS resourceTotals,
-// same shape as ranger-features.ts's Tireless/Nature's Veil — its total is
-// supplied by a small EDITION_2024-gated resourceFn on the subclass
-// definition itself (lib/classes/druid.ts).
+// formula, same shape as ranger-features.ts's Tireless/Nature's Veil — #1685
+// widened resourceTotals to express it directly as a
+// `{ abilityMod: "wisdom", min: 1 }` tier, retiring the small EDITION_2024
+// resourceFn that used to live on the subclass definition (lib/classes/druid.ts).
 //
 // class-features.ts concatenates DRUID_FEATURES onto the still-derived
 // classes' rows to build CLASS_FEATURES; see its LITERAL_ROW_CLASSES export
@@ -51,6 +51,7 @@
 // (druid-2014-snapshot.test.ts) — commit 2 only ever ADDS an
 // `edition: "EDITION_2014"` tag alongside new 2024 text; it never edits a
 // 2014 row's own name/level/description.
+import type { ResourceTotalFormula } from "../../src/lib/classes/class-feature-rows.js";
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { SeedEdition } from "./edition.js";
 import type { ClassFeatureSeedRow } from "./class-features.js";
@@ -71,15 +72,13 @@ interface RawDruidFeature {
   description: string;
   /** Omitted -> identical text seeded for both editions (see file header). */
   edition?: SeedEdition;
-  // Wild Shape's resource-pool descriptor columns (#1226 commit 3) — see this
-  // file's own header for why only the EDITION_2024 Wild Shape row sets
-  // resourceTotals, and the EDITION_2024 Moonlight Step row sets the other
-  // three but deliberately omits it (Wisdom-modifier formula, stays in
-  // druid.ts's subclass resourceFn).
+  // Resource-pool descriptor columns (#1226 commit 3, widened #1685) — see
+  // this file's own header for the two rows that set these (EDITION_2024
+  // Wild Shape and EDITION_2024 Moonlight Step).
   resourceKey?: string;
   resourceLabel?: string;
   resourceRecharge?: string;
-  resourceTotals?: { minLevel: number; total: number; shortRestRegain?: number }[];
+  resourceTotals?: { minLevel: number; total: ResourceTotalFormula; shortRestRegain?: number }[];
 }
 
 function expand(raw: RawDruidFeature): ClassFeatureSeedRow[] {
@@ -487,13 +486,14 @@ const CIRCLE_OF_THE_MOON_RAW: RawDruidFeature[] = [
     level: 10,
     edition: "EDITION_2024",
     // Mirror-sourced (M1/M2). NEW in 2024, replacing Elemental Wild Shape.
-    // #1226 commit 3 declares resourceKey WITHOUT resourceTotals on this row
-    // (a Wisdom-modifier formula) — the total is supplied by
-    // lib/classes/druid.ts's Circle of the Moon resourceFn, whose own
-    // description MUST agree with this row's text verbatim (#1528).
+    // #1226 commit 3 declared resourceKey WITHOUT resourceTotals on this row
+    // (a Wisdom-modifier formula, then still resourceFn-derived); #1685 now
+    // expresses the total directly as a `{ abilityMod: "wisdom", min: 1 }`
+    // tier, retiring lib/classes/druid.ts's Circle of the Moon resourceFn.
     resourceKey: "moonlightStep",
     resourceLabel: "Moonlight Step",
     resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 10, total: { abilityMod: "wisdom", min: 1 } }],
     description:
       "As a Bonus Action, you teleport up to 30 feet to an unoccupied space you can see, and you have Advantage on the next attack roll you make before the end of this turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest. You can also regain one expended use by expending a spell slot of level 2 or higher (no action required).",
   },

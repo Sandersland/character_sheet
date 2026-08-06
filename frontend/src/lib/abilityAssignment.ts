@@ -158,11 +158,27 @@ export function isPoolMethod(method: AbilityMethod): boolean {
   return method === "roll" || method === "standardArray";
 }
 
+/** Sums N partial ability→bump maps into one, adding (never overwriting) when
+ *  the same ability appears in more than one map — the background spread and
+ *  #1681's species increases can share an ability, though in practice they
+ *  never both apply (opposite-edition mechanics). */
+export function sumBonusMaps(
+  ...maps: Partial<Record<AbilityName, number>>[]
+): Partial<Record<AbilityName, number>> {
+  const sum: Partial<Record<AbilityName, number>> = {};
+  for (const map of maps) {
+    for (const [ability, amount] of Object.entries(map)) {
+      sum[ability as AbilityName] = (sum[ability as AbilityName] ?? 0) + (amount ?? 0);
+    }
+  }
+  return sum;
+}
+
 export interface AbilityRow {
   ability: AbilityName;
-  /** Base score before the background bonus; null for an unassigned pool row. */
+  /** Base score before the background/species bonus; null for an unassigned pool row. */
   base: number | null;
-  /** Background bonus applied to this ability (0 when none). */
+  /** Combined background + species (#1681) bonus applied to this ability (0 when none). */
   bonus: number;
   total: number | null;
   mod: number | null;

@@ -9,6 +9,9 @@ import CreationReviewStep from "@/features/character-create/CreationReviewStep";
 import CreationSpellsStep from "@/features/character-create/CreationSpellsStep";
 import IdentitySection from "@/features/character-create/IdentitySection";
 import SkillSection from "@/features/character-create/SkillSection";
+import SpeciesCantripSection from "@/features/character-create/SpeciesCantripSection";
+import SpeciesOriginFeatSection from "@/features/character-create/SpeciesOriginFeatSection";
+import SpeciesSkillSection from "@/features/character-create/SpeciesSkillSection";
 import StartingEquipmentSection from "@/features/character-create/StartingEquipmentSection";
 import ToolProficiencySection from "@/features/character-create/ToolProficiencySection";
 import { CeremonyCard, CeremonyStage, CeremonyFooter } from "@/features/ceremony/CeremonyShell";
@@ -45,6 +48,7 @@ function AbilitiesStepBody({ c }: StepBodyProps) {
       assignments={c.draft.abilityAssignments}
       scores={c.draft.abilityScores}
       bonuses={c.backgroundBonuses}
+      speciesBonuses={c.speciesBonuses}
       primaryAbility={c.selections.class?.primaryAbility ?? []}
       className={c.draft.className}
       update={c.update}
@@ -63,6 +67,17 @@ function SkillsStepBody({ c }: StepBodyProps) {
         selected={c.skills.selected}
         onToggle={c.skills.toggle}
       />
+      {/* #1689/#1690: Half-Elf's Skill Versatility / 2024 Human's Skillful /
+          2024 Elf's Keen Senses — renders only when the server serves a
+          chooseSkills spec for the chosen species+variant. */}
+      <SpeciesSkillSection choice={c.speciesSkillChoice} onToggle={c.speciesSkillChoice.toggle} />
+      {/* #1690: 2024 Human's Versatile — renders only when the server serves a
+          chooseOriginFeat spec for the chosen species+variant. */}
+      <SpeciesOriginFeatSection
+        choice={c.speciesOriginFeatChoice}
+        edition={c.draft.rulesEdition}
+        onChange={(speciesOriginFeatId) => c.update({ speciesOriginFeatId })}
+      />
       <ToolProficiencySection
         grantedToolProfs={c.toolChoices.grantedToolProfs}
         toolChoiceOptions={c.toolChoices.toolChoiceOptions}
@@ -76,15 +91,33 @@ function SkillsStepBody({ c }: StepBodyProps) {
 
 function SpellsStepBody({ c }: StepBodyProps) {
   const picks = c.selections.class?.level1SpellPicks;
-  if (!picks) return null;
+  // draft.rulesEdition is RulesEdition | null (unresolved until the entry
+  // gate, CreationCeremony's own early return above) — narrowed here so the
+  // spell-catalog fetches below can take a required RulesEdition (#1712).
+  // Unreachable in practice: this step never renders before the gate resolves it.
+  const { rulesEdition } = c.draft;
+  if (!rulesEdition) return null;
   return (
-    <CreationSpellsStep
-      className={c.draft.className}
-      counts={picks}
-      cantripIds={c.draft.cantripIds}
-      spellIds={c.draft.spellIds}
-      onChange={c.update}
-    />
+    <>
+      {picks && (
+        <CreationSpellsStep
+          className={c.draft.className}
+          counts={picks}
+          cantripIds={c.draft.cantripIds}
+          spellIds={c.draft.spellIds}
+          edition={rulesEdition}
+          onChange={c.update}
+        />
+      )}
+      {/* #1689: High Elf's Cantrip — renders only when the server serves a
+          chooseCantrip spec; independent of the class picks above, so this
+          is the ONLY content on the step for a non-caster High Elf. */}
+      <SpeciesCantripSection
+        choice={c.speciesCantripChoice}
+        edition={rulesEdition}
+        onChange={(speciesCantripId) => c.update({ speciesCantripId })}
+      />
+    </>
   );
 }
 

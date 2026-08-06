@@ -106,6 +106,7 @@
 // rows, since that model has no `edition` column and Subclass rows are
 // edition-shared (the schema gap Wizard's #1234 disclosed first).
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
+import type { FeatImprovement } from "../../src/lib/classes/resources-state.js";
 import type { SeedEdition } from "./edition.js";
 import type { ClassFeatureSeedRow } from "./class-features.js";
 
@@ -131,6 +132,10 @@ interface RawClericFeature {
   resourceLabel?: string;
   resourceRecharge?: string;
   resourceTotals?: { minLevel: number; total: number; shortRestRegain?: number }[];
+  // A passive, always-on grant (#1691) — see ClassFeature.improvements' own
+  // schema.prisma comment. Only Life Domain's 2014 "Bonus Proficiency" row
+  // sets this today.
+  improvements?: FeatImprovement[];
 }
 
 function expand(raw: RawClericFeature): ClassFeatureSeedRow[] {
@@ -146,6 +151,7 @@ function expand(raw: RawClericFeature): ClassFeatureSeedRow[] {
       resourceLabel: raw.resourceLabel,
       resourceRecharge: raw.resourceRecharge,
       resourceTotals: raw.resourceTotals,
+      improvements: raw.improvements,
     },
   ];
 }
@@ -386,6 +392,12 @@ const LIFE_DOMAIN_RAW: RawClericFeature[] = [
     level: 1,
     edition: "EDITION_2014",
     description: "You gain proficiency with heavy armor.",
+    // #1691: PHB'14 p.59 grants heavy armor proficiency outright, no choice
+    // involved — was prose-only (a live bug: the row said it but nothing
+    // granted it). 2014-row-only, matching this row's own edition: SRD 5.2
+    // Life Domain does NOT grant it (see the comment below — it folds into
+    // Divine Order's Protector option instead).
+    improvements: [{ target: "armorProficiency", amount: 1, key: "heavy" }],
   },
   // Bonus Proficiency has NO EDITION_2024 row — Heavy armor training is now
   // Divine Order's Protector option (base class, any Cleric), not a Life

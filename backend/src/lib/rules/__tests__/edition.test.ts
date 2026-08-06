@@ -15,7 +15,6 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_RULES_EDITION,
   EDITION_DESCRIPTIONS,
-  EDITION_UNAVAILABLE,
   RULES_EDITION_DISPLAY_ORDER,
   RULES_EDITION_LABELS,
   isRulesEdition,
@@ -46,11 +45,5 @@ describe("edition copy", () => {
     for (const text of [...Object.values(RULES_EDITION_LABELS), ...Object.values(EDITION_DESCRIPTIONS)]) {
       expect(text).not.toMatch(/SRD/i);
     }
-  });
-
-  it("gates 2014 only (#1371) — #1372 removes this entry, not a frontend one", () => {
-    expect(Object.keys(EDITION_UNAVAILABLE)).toEqual(["EDITION_2014"]);
-    expect(EDITION_UNAVAILABLE.EDITION_2014).toMatch(/Not available yet/);
-    expect(EDITION_UNAVAILABLE.EDITION_2024).toBeUndefined();
   });
 });

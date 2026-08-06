@@ -72,13 +72,3 @@ export const EDITION_DESCRIPTIONS: Record<RulesEdition, string> = {
   EDITION_2014: "The original 5th edition rulebooks, sometimes called \"classic\" 5e.",
 };
 
-// Deliberate-coupling latch (#1371): an edition present here is served with an
-// `unavailableReason` and renders as a visible-but-unselectable EditionPicker
-// card carrying that reason. Remove the EDITION_2014 entry only when #1372 (its
-// content-parity ungate) ships — the entry lives HERE since #1436, not in any
-// frontend module, and that issue also restores the tests this map's addition
-// inverted.
-export const EDITION_UNAVAILABLE: Partial<Record<RulesEdition, string>> = {
-  EDITION_2014:
-    "Not available yet — the 2014 feats, fighting styles, caster model and Monk rules haven't shipped, and a character's edition can't be changed later.",
-};

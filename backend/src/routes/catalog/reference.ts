@@ -18,6 +18,9 @@ import { prisma } from "@/lib/core/prisma.js";
 import { subclassGateLevel } from "@/lib/leveling/effective-levels.js";
 import { requireEditionOr400 } from "@/lib/http/parse-edition-param.js";
 import { resolveEditionCatalog, withEditionOrShared } from "@/lib/rules/catalog-edition.js";
+import { backgroundGrantsAbilitySpread, backgroundGrantsOriginFeat } from "@/lib/rules/background-grants.js";
+import type { AbilityIncreaseSpec } from "@/lib/srd/species-ability-increases.js";
+import { chooseCantripNeedsPlayerAbility, isChooseCantrip, isChooseOriginFeat, isChooseSkills, type SpeciesTraitChoice } from "@/lib/srd/species-trait-choices.js";
 
 export const referenceRouter = Router();
 
@@ -32,7 +35,38 @@ referenceRouter.get("/reference", async (req, res) => {
 
   // Sequential rather than Promise.all — see the matching comment in
   // charactersRouter's POST handler.
-  const races = await prisma.race.findMany({ orderBy: { name: "asc" } });
+  // Exact-match `edition` filter, not resolveEditionCatalog/withEditionOrShared:
+  // Species.edition is NOT NULL (no species is edition-neutral), so there is
+  // no shared/NULL row to fall back to — the same reasoning as
+  // StartingEquipmentPackage's own query above.
+  // grantedSpells (#1683): existence-only (select id) at both levels, purely
+  // to derive needsCastingAbility below — the actual grant rows are never
+  // served here (resolved live at read/creation time, never a catalog preview).
+  // #1689: `traits` rides along so chooseSkills/chooseCantrip can be resolved
+  // below — species.traits returns EVERY trait FK'd to this speciesId
+  // regardless of variantId (plain Prisma relation semantics, same caveat
+  // serialize/species.ts's activeTraitRows documents), hence `variantId`
+  // selected here so speciesLevelChoice can filter to this species' OWN rows;
+  // variant.traits is already scoped to that one variantId, no filter needed.
+  const rawSpecies = await prisma.species.findMany({
+    where: { edition },
+    orderBy: { name: "asc" },
+    include: {
+      traits: { select: { variantId: true, choice: true } },
+      variants: {
+        orderBy: { name: "asc" },
+        include: {
+          traits: { select: { choice: true } },
+          grantedSpells: { select: { id: true } },
+        },
+      },
+      // Species.grantedSpells is the UNFILTERED back-relation (every grant
+      // FK'd to this speciesId, spanning every variant — the same
+      // activeTraitRows gotcha) — variantId carried so the mapping below can
+      // narrow to species-level (variantId === null) only.
+      grantedSpells: { select: { id: true, variantId: true } },
+    },
+  });
   // Narrowed to at-most-two-per-key at the DB (withEditionOrShared), then
   // resolveEditionCatalog picks the one row per business key — same D3 shape
   // as originFeatRows/universalActionRows below. `edition` is present on the
@@ -87,8 +121,12 @@ referenceRouter.get("/reference", async (req, res) => {
   // resolveEditionCatalog here makes this preview agree with what a character
   // actually gets — buildOriginEntry re-resolves the same way against the
   // CREATING character's edition, so the two can no longer disagree (they did:
-  // a 2014 Criminal saw 2024 Alert text). The FK survives only as a name source
-  // until #1348 replaces it with originFeatName.
+  // a 2014 Criminal saw 2024 Alert text; #1504 later found the correct 2014
+  // answer isn't "the 2014 text" but "no Origin feat at all" — the name-lookup
+  // below still runs so `originFeatByName` stays populated for 2024, but the
+  // backgroundGrantsOriginFeat gate at the projection (below) is what actually
+  // decides whether a 2014 background serves it). The FK survives only as a
+  // name source until #1348 replaces it with originFeatName.
   //
   // Scope latch (#1336): backgrounds and each class's subclasses (below) are now
   // resolved per the requesting edition, same mechanism as originFeatRows and
@@ -97,12 +135,10 @@ referenceRouter.get("/reference", async (req, res) => {
   // resolveEditionCatalog's fallback, since StartingEquipmentPackage.edition is
   // non-nullable (#1534) — and, since #1535, that resolution reaches genuinely
   // different SRD 5.2 content, not a 2014 copy: a 2024 character gets the real
-  // PHB'24 package. Still deliberately unfiltered by this endpoint: `races`
-  // (species divergence is real — ability increases, roster membership — but
-  // not representable by an edition column alone, #1518); `classes` themselves
-  // (one CharacterClass row serves both editions by design, subclassGateLevel
-  // is the only field that forks, #1308). The spell catalog (`GET /api/spells`)
-  // is a separate endpoint with its own edition gap, #1517.
+  // PHB'24 package. `classes` themselves stay unfiltered too (one CharacterClass
+  // row serves both editions by design, subclassGateLevel is the only field
+  // that forks, #1308). The spell catalog (`GET /api/spells`) is a separate
+  // endpoint with its own edition gap, #1517.
   const originFeatNames = [
     ...new Set(backgrounds.map((b) => b.originFeat?.name).filter((n): n is string => n != null)),
   ];
@@ -176,22 +212,102 @@ referenceRouter.get("/reference", async (req, res) => {
     })(),
   }));
 
-  const racesWithTools = races.map((r) => ({
-    id: r.id,
-    name: r.name,
-    speed: r.speed,
-    toolProficiencies: r.toolProficiencies,
-  }));
+  // #1689: resolves chooseSkills/chooseCantrip off a row's own trait rows —
+  // mirrors character-create.ts's fetchSpeciesChoiceSpecs (the SAME "first
+  // match by discriminant" rule, kept in sync only by both reading through
+  // isChooseSkills/isChooseCantrip, not a duplicated inline check).
+  function traitChoices(traits: { choice: unknown }[]): SpeciesTraitChoice[] {
+    return traits.map((t) => t.choice as SpeciesTraitChoice | null).filter((c): c is SpeciesTraitChoice => c != null);
+  }
+  function chooseSkillsOf(traits: { choice: unknown }[]) {
+    return traitChoices(traits).find(isChooseSkills)?.chooseSkills ?? null;
+  }
+  function chooseCantripOf(traits: { choice: unknown }[]) {
+    return traitChoices(traits).find(isChooseCantrip)?.chooseCantrip ?? null;
+  }
+  // #1690: a bare boolean (not object-or-null like the two above) — matches
+  // chooseOriginFeatSchema's own `{chooseOriginFeat: true}` shape, which
+  // carries no further spec to resolve.
+  function chooseOriginFeatOf(traits: { choice: unknown }[]) {
+    return traitChoices(traits).some(isChooseOriginFeat);
+  }
+
+  // #1679: variants nested inside each species, exactly like
+  // classes[].subclasses above. abilityIncreases rides along as of #1681 (cast
+  // through the AbilityIncreaseSpec[] shape — a wire mirror only, the frontend
+  // ceremony never originates the rule, only renders this server-resolved
+  // spec) so the creation ceremony can preview + request the choice; the raw
+  // JSON column is [] for every EDITION_2024 row, matching resolveSpeciesGrants'
+  // edition gate. speedOverride is NOT served yet — no client needs it before
+  // the variant-speed picker lands (#1680/#1682). chooseSkills/chooseCantrip
+  // (#1689) and chooseOriginFeat (#1690) ride the same way — null/false for
+  // every row but the ones that carry the matching trait (Half-Elf's own
+  // chooseSkills, High Elf's own chooseCantrip, 2024 Human's own chooseSkills
+  // + chooseOriginFeat, 2024 Elf's own chooseSkills); see SpeciesOption's own
+  // JSDoc (reference.ts, frontend) for why all three fields are served at
+  // both levels.
+  const speciesWithVariants = rawSpecies.map((s) => {
+    const speciesTraits = s.traits.filter((t) => t.variantId === null);
+    const speciesCantrip = chooseCantripOf(speciesTraits);
+    return {
+      id: s.id,
+      name: s.name,
+      slug: s.slug,
+      speed: s.speed,
+      abilityIncreases: s.abilityIncreases as unknown as AbilityIncreaseSpec[],
+      // Whether picking this species/variant requires the Int/Wis/Cha choice:
+      // it grants a SpeciesGrantedSpell (#1683, a 2024 lineage) OR carries a
+      // chooseCantrip that leaves its ability open (#1756, Astral Fire) —
+      // chooseCantripNeedsPlayerAbility, the SAME predicate resolveCastingAbility
+      // gates on, so a served flag and an enforced requirement can't drift. A
+      // fixed-ability chooseCantrip (High Elf) is false: its ability is not the
+      // player's to pick. Species-level grantedSpells narrowed to variantId ===
+      // null (serialize/species.ts's activeTraitRows rule); never true this wave.
+      needsCastingAbility:
+        s.grantedSpells.some((g) => g.variantId === null) || chooseCantripNeedsPlayerAbility(speciesCantrip),
+      chooseSkills: chooseSkillsOf(speciesTraits),
+      chooseCantrip: speciesCantrip,
+      chooseOriginFeat: chooseOriginFeatOf(speciesTraits),
+      variants: s.variants.map((v) => {
+        const variantCantrip = chooseCantripOf(v.traits);
+        return {
+          id: v.id,
+          name: v.name,
+          slug: v.slug,
+          abilityIncreases: v.abilityIncreases as unknown as AbilityIncreaseSpec[],
+          // #1758: whether this variant's abilityIncreases REPLACE the parent
+          // species' rather than stacking (Astral Elf, #1751) — served so the
+          // creation ceremony merges the two levels the way fetchMergedAbilityIncreases
+          // does (character-create.ts, the authority), never re-deriving the rule.
+          // No species-level twin: replace only means anything against a PARENT, and
+          // a species has none — the Prisma column lives on SpeciesVariant alone.
+          abilityIncreasesReplace: v.abilityIncreasesReplace,
+          // Already scoped to this variant by Prisma (its own back-relation).
+          needsCastingAbility: v.grantedSpells.length > 0 || chooseCantripNeedsPlayerAbility(variantCantrip),
+          chooseSkills: chooseSkillsOf(v.traits),
+          chooseCantrip: variantCantrip,
+          chooseOriginFeat: chooseOriginFeatOf(v.traits),
+        };
+      }),
+    };
+  });
 
   const backgroundsWithTools = backgrounds.map((b) => ({
     id: b.id,
     name: b.name,
     skillProficiencies: b.skillProficiencies,
     toolProficiencies: b.toolProficiencies,
-    // PHB'24 ability spread + Origin feat; empty/null for spec-less legacy rows (#1130).
-    abilityChoices: b.abilityChoices,
-    // Resolved for the requested edition — see the originFeatByName comment above.
-    originFeat: b.originFeat ? (originFeatByName.get(b.originFeat.name) ?? null) : null,
+    // PHB'24 ability spread; empty for a spec-less legacy row (#1130) AND for
+    // every background under EDITION_2014 (#1572) — the spread is a PHB'24-only
+    // mechanic, so this must agree with resolveBackgroundGrants's 2014 rejection.
+    abilityChoices: backgroundGrantsAbilitySpread(edition) ? b.abilityChoices : [],
+    // Resolved for the requested edition — see the originFeatByName comment
+    // above. `null` for EVERY background under EDITION_2014 (#1504): Origin
+    // feats are a PHB'24-only mechanic, so this must agree with
+    // buildOriginEntry's 2014 no-grant, not just resolve to the 2014 catalog row.
+    originFeat: backgroundGrantsOriginFeat(edition) && b.originFeat
+      ? (originFeatByName.get(b.originFeat.name) ?? null)
+      : null,
     // #1565: null for a background with no seeded package under this edition
     // (see startingEquipmentByBackgroundId's comment) — never a placeholder
     // empty-groups package, so the picker can tell "no equipment choices"
@@ -231,7 +347,7 @@ referenceRouter.get("/reference", async (req, res) => {
     .sort((a, b) => a.name.localeCompare(b.name));
 
   res.json({
-    races: racesWithTools,
+    species: speciesWithVariants,
     classes,
     backgrounds: backgroundsWithTools,
     alignments: ALIGNMENTS,

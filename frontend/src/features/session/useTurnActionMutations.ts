@@ -63,7 +63,10 @@ export function useTurnActionMutations(characterId: string) {
   // dice animation, same as it already does for `batchId` (#758).
   async function sendAction(
     actionKey: string,
-    opts?: { roll?: number; inventoryItemId?: string },
+    // slotLevel (#1687): the chosen slot level for a row-driven
+    // `{costKind:"slot"}` ability — the executeAction counterpart to
+    // castSpell's slotLevel picker.
+    opts?: { roll?: number; inventoryItemId?: string; slotLevel?: number },
   ): Promise<Character & { batchId?: string; results?: ExecuteActionResult[] }> {
     return actionMutation.mutateAsync([{ type: "executeAction", actionKey, ...opts }]);
   }

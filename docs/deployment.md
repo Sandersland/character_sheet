@@ -105,7 +105,7 @@ docker compose exec -T db psql -U character_sheet -d character_sheet -c \
 #    CREATE TYPE "<Enum>_new" AS ENUM (...) list. e.g.:
 docker compose exec -T db psql -U character_sheet -d character_sheet -c \
   "SELECT type, count(*) FROM \"CharacterEvent\"
-    WHERE type::text IN ('learnDiscipline','castDiscipline') GROUP BY type;"
+    WHERE type::text IN ('learnDiscipline','disciplinesReconciled') GROUP BY type;"
 
 # 4. Remap them to a surviving value, or delete them — an explicit decision,
 #    recorded. Deleting a CharacterEvent cascades its CharacterEventField rows

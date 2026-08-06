@@ -34,6 +34,20 @@
 //                     campaign; #1250's e2e drives Deflect Attacks, Stunning
 //                     Strike, 3-strike Flurry (Heightened Focus, L10), Patient
 //                     Defense/Step of the Wind, and the Open Hand Technique rider.
+//   2014 Open Hand Monk — EDITION_2014, Monk L6, Way of the Open Hand, own
+//                     campaign; monk-2014.spec.ts drives Ki spend (Flurry/
+//                     Patient Defense/Step of the Wind's flat 1-ki shapes),
+//                     Deflect Missiles + the 1-ki throw-back, and Stunning
+//                     Strike.
+//   2014 Elements Monk — EDITION_2014, Monk L6, Way of the Four Elements, own
+//                     campaign, 2 known Elemental Disciplines (#1506);
+//                     monk-2014.spec.ts casts one with an upcast ki amount.
+//   2014 Monk of Shadow — EDITION_2014, Monk L13, Way of Shadow, own campaign;
+//                     monk-2014.spec.ts drives Shadow Step (the one 2014
+//                     Way-of-Shadow feature already wired into the generic
+//                     action-sheet resolver — shadowArts/cloakOfShadows/
+//                     opportunist have no frontend UI yet for the 2014 4-spell-
+//                     menu shape, see that spec's own header comment).
 //
 // Personas that need a live session each get a DEDICATED campaign: a campaign
 // allows only one active session at a time, so sharing one would make the
@@ -65,12 +79,33 @@ const LEVEL_6_XP = 14000;
 // L11 threshold — gates Monk Heightened Focus's 3-strike Flurry (granted at L10,
 // so any L11+ classLevel exercises it) plus subclass L11 features.
 const LEVEL_11_XP = 85000;
+// L13 threshold — the 2014 Monk of Shadow persona's target level: past Cloak of
+// Shadows (Way of Shadow L11) but below Opportunist (L17), same reasoning as
+// the ticket that specced it (#1506).
+const LEVEL_13_XP = 120000;
 
 interface Persona {
   name: string;
-  race: string;
+  // #1684: resolved to a speciesId at creation (resolveSpeciesId below) — the
+  // flat `race`-name create path is gone. Halfling (2024): no #1690 choice
+  // trait (unlike Human's Skillful/Versatile, which would need extra fields
+  // no persona here declares) and no maxHp-granting trait (unlike Dwarf's
+  // Toughness, which would throw off every persona's HP by species alone).
+  // The 2014 personas below use Human instead — Halfling carries 2 variant
+  // rows under EDITION_2014 (Lightfoot/Stout) and resolveSpeciesId has no
+  // variant support, while 2014 Human's six +1 fixed ability increases need
+  // no extra `speciesAbilities` choice (unlike 2014 Half-Elf's floating pick).
+  speciesName: string;
   background: string;
   className: string;
+  // A character's rulesEdition is write-once and defaults to EDITION_2024
+  // when omitted (character-schemas.ts) — every persona above this comment
+  // predates #1506 and stays implicitly 2024; only the three 2014 Monk
+  // personas below set it. Threaded into the create body (seedCharacterShell)
+  // and into ensureCampaign so a personaCampaignName's campaign is created
+  // under the SAME edition — campaignsRouter's attach handler 400s a
+  // cross-edition character/campaign pair (edition.ts's own docblock).
+  rulesEdition?: "EDITION_2014" | "EDITION_2024";
   experiencePoints?: number;
   // Target class-entry level via HP level-ups (per-class level tracks applied
   // HP level-ups, not XP-derived level). Requires enough XP to unlock it.
@@ -86,13 +121,18 @@ interface Persona {
   // caster persona must be created legal from #1131 on — omitting yields an empty
   // book, so realistic casters list their picks here.
   spells?: { cantripNames: string[]; spellNames: string[] };
+  // #1506: Way of the Four Elements' known-discipline picks, by catalog name —
+  // resolved via GET /api/disciplines and applied as learnSubclassChoice ops
+  // (resources/transactions) post-subclass. Count must match the subclass's
+  // level-derived discipline-slot cap (monk.ts's `choices` declaration).
+  disciplineNames?: string[];
 }
 
 const ROSTER: Persona[] = [
-  { name: "Smoke Fighter", race: "Human", background: "Soldier", className: "Fighter" },
+  { name: "Smoke Fighter", speciesName: "Halfling", background: "Soldier", className: "Fighter" },
   {
     name: "Wizard L5",
-    race: "Human",
+    speciesName: "Halfling",
     background: "Sage",
     className: "Wizard",
     experiencePoints: LEVEL_5_XP,
@@ -105,7 +145,7 @@ const ROSTER: Persona[] = [
   },
   {
     name: "Warlock L1",
-    race: "Human",
+    speciesName: "Halfling",
     background: "Sage",
     className: "Warlock",
     // Warlock level-1 loadout: 2 cantrips (incl. Eldritch Blast) + 2 spells.
@@ -118,7 +158,7 @@ const ROSTER: Persona[] = [
   },
   {
     name: "Battle Master",
-    race: "Human",
+    speciesName: "Halfling",
     background: "Soldier",
     className: "Fighter",
     experiencePoints: LEVEL_5_XP,
@@ -129,14 +169,14 @@ const ROSTER: Persona[] = [
   },
   {
     name: "Session Fighter",
-    race: "Human",
+    speciesName: "Halfling",
     background: "Soldier",
     className: "Fighter",
     campaignName: "E2E Solo — Session Fighter",
   },
   {
     name: "Monk L6",
-    race: "Human",
+    speciesName: "Halfling",
     background: "Soldier",
     className: "Monk",
     experiencePoints: LEVEL_6_XP,
@@ -145,7 +185,7 @@ const ROSTER: Persona[] = [
   },
   {
     name: "Elements Monk",
-    race: "Human",
+    speciesName: "Halfling",
     background: "Soldier",
     className: "Monk",
     experiencePoints: LEVEL_6_XP,
@@ -155,7 +195,7 @@ const ROSTER: Persona[] = [
   },
   {
     name: "Shadow Monk",
-    race: "Human",
+    speciesName: "Halfling",
     background: "Soldier",
     className: "Monk",
     experiencePoints: LEVEL_6_XP,
@@ -169,13 +209,61 @@ const ROSTER: Persona[] = [
     // Stunning Strike (L5), Flurry/Patient Defense/Step of the Wind, and the
     // Open Hand Technique rider (Addle/Push/Topple) in one persona.
     name: "Open Hand Monk L11",
-    race: "Human",
+    speciesName: "Halfling",
     background: "Soldier",
     className: "Monk",
     experiencePoints: LEVEL_11_XP,
     classLevel: 11,
     subclassName: "Warrior of the Open Hand",
     campaignName: "E2E Solo — Open Hand Monk",
+  },
+  {
+    // #1506: base 2014 Monk features (Ki, Flurry/Patient Defense/Step of the
+    // Wind's flat 1-ki shapes, Deflect Missiles + throw-back, Stunning Strike)
+    // all live at L6 — Way of the Open Hand's own subclass features (Open
+    // Hand Technique, Stunning-Strike rider) aren't exercised by
+    // monk-2014.spec.ts, only the BASE Monk kit under a 2014 subclass so the
+    // persona still round-trips a real Subclass row.
+    name: "2014 Open Hand Monk",
+    speciesName: "Human",
+    background: "Soldier",
+    className: "Monk",
+    rulesEdition: "EDITION_2014",
+    experiencePoints: LEVEL_6_XP,
+    classLevel: 6,
+    subclassName: "Way of the Open Hand",
+    campaignName: "E2E Solo — 2014 Open Hand Monk",
+  },
+  {
+    // #1506: Way of the Four Elements — 2 discipline slots at L6 (monk.ts's
+    // `choices.count`). Fangs of the Fire Snake and Sweeping Cinder Strike are
+    // both minLevel 3 and scalable (costPerStep set), so either can exercise
+    // an upcast cast; the spec picks Sweeping Cinder Strike (a save-DC damage
+    // discipline, Dexterity save vs the monk's ki save DC).
+    name: "2014 Elements Monk",
+    speciesName: "Human",
+    background: "Soldier",
+    className: "Monk",
+    rulesEdition: "EDITION_2014",
+    experiencePoints: LEVEL_6_XP,
+    classLevel: 6,
+    subclassName: "Way of the Four Elements",
+    disciplineNames: ["Fangs of the Fire Snake", "Sweeping Cinder Strike"],
+    campaignName: "E2E Solo — 2014 Elements Monk",
+  },
+  {
+    // #1506: L13 — past Cloak of Shadows (Way of Shadow L11, no ki cost) but
+    // below Opportunist (L17). Only Shadow Step is exercised by
+    // monk-2014.spec.ts (see the ROSTER docblock above for why).
+    name: "2014 Monk of Shadow",
+    speciesName: "Human",
+    background: "Soldier",
+    className: "Monk",
+    rulesEdition: "EDITION_2014",
+    experiencePoints: LEVEL_13_XP,
+    classLevel: 13,
+    subclassName: "Way of Shadow",
+    campaignName: "E2E Solo — 2014 Monk of Shadow",
   },
 ];
 
@@ -236,12 +324,36 @@ async function assertCatalogReady(cookie: string): Promise<void> {
 interface CharacterFingerprint {
   className: string;
   subclassName: string | undefined;
+  // #1506: edition is write-once and never re-derivable from anything else in
+  // this shape, so a drifted edition (a persona's `rulesEdition` changed
+  // without also renaming it) would otherwise never trigger a recreate —
+  // exactly the silent-stale failure the roster verify step exists to catch.
+  rulesEdition: string;
   experiencePoints: number;
   classLevel: number;
   campaignName: string | undefined;
   maneuverNames: string[];
   cantripNames: string[];
   spellNames: string[];
+  // #1506: Way of the Four Elements' known disciplines — SUBSET like
+  // maneuverNames/cantripNames/spellNames (a mid-session extra pick is not a
+  // staleness signal, only a MISSING declared one is).
+  disciplineNames: string[];
+}
+
+// A single declared name normalized to the 0-or-1-entry list shape
+// maneuverNames compares against (subset semantics — see diffFingerprints).
+function toNameList(name: string | undefined): string[] {
+  return name ? [name] : [];
+}
+
+// A declared name list, defaulted to empty when the persona doesn't declare
+// this axis at all (cantripNames/spellNames/disciplineNames all share this
+// shape) — split out of personaFingerprint (#1506) so each `??` lives in its
+// own single-branch function instead of stacking onto one object literal's
+// complexity budget.
+function namesOrEmpty(names: string[] | undefined): string[] {
+  return names ?? [];
 }
 
 // Pure. Normalizes the optionals to the same defaults characterFingerprint
@@ -251,20 +363,26 @@ function personaFingerprint(persona: Persona): CharacterFingerprint {
   return {
     className: persona.className,
     subclassName: persona.subclassName,
+    rulesEdition: persona.rulesEdition ?? "EDITION_2024",
     experiencePoints: persona.experiencePoints ?? 0,
     classLevel: persona.classLevel ?? 1,
     campaignName: persona.campaignName,
-    maneuverNames: persona.maneuverName ? [persona.maneuverName] : [],
-    cantripNames: persona.spells?.cantripNames ?? [],
-    spellNames: persona.spells?.spellNames ?? [],
+    maneuverNames: toNameList(persona.maneuverName),
+    cantripNames: namesOrEmpty(persona.spells?.cantripNames),
+    spellNames: namesOrEmpty(persona.spells?.spellNames),
+    disciplineNames: namesOrEmpty(persona.disciplineNames),
   };
 }
 
 interface CharacterDetail {
+  rulesEdition: string;
   experiencePoints: number;
   campaignId: string | null;
   classes: { name: string; level: number; subclass: string | null }[];
-  resources?: { maneuversKnown?: { name: string }[] } | null;
+  resources?: {
+    maneuversKnown?: { name: string }[];
+    choicesKnown?: Record<string, { name: string }[]>;
+  } | null;
   spellcasting?: { spells?: { name: string; level: number }[] } | null;
 }
 
@@ -284,41 +402,50 @@ function characterFingerprint(
   return {
     className: primary.name,
     subclassName: primary.subclass ?? undefined,
+    rulesEdition: character.rulesEdition,
     experiencePoints: character.experiencePoints,
     classLevel: primary.level,
     campaignName: character.campaignId ? campaignNameById.get(character.campaignId) : undefined,
     maneuverNames: (character.resources?.maneuversKnown ?? []).map((m) => m.name),
+    disciplineNames: (character.resources?.choicesKnown?.fourElementsDisciplines ?? []).map((d) => d.name),
     cantripNames: spells.filter((s) => s.level === 0).map((s) => s.name),
     spellNames: spells.filter((s) => s.level > 0).map((s) => s.name),
   };
 }
 
-// className/subclassName/experiencePoints/classLevel/campaignName are EXACT
-// (undefined === undefined counts as a match). maneuverNames/cantripNames/
-// spellNames are SUBSET — every declared pick must be present, extras are
-// ignored. Subset semantics are load-bearing for two live cases: a spec
-// appending to the Battle Master's maneuversKnown (see the docblock above),
-// and subclass/item-granted spells (mergeGrantedSpells) appended to
-// spellcasting.spells beyond what the roster declares — neither is a
-// staleness signal, only a MISSING declared pick is. Returns the names of the
-// mismatched fields (empty ⇒ no recreate needed).
+// className/subclassName/rulesEdition/experiencePoints/classLevel/campaignName
+// are EXACT (undefined === undefined counts as a match). maneuverNames/
+// cantripNames/spellNames/disciplineNames are SUBSET — every declared pick
+// must be present, extras are ignored. Subset semantics are load-bearing for
+// two live cases: a spec appending to the Battle Master's maneuversKnown (see
+// the docblock above), and subclass/item-granted spells (mergeGrantedSpells)
+// appended to spellcasting.spells beyond what the roster declares — neither
+// is a staleness signal, only a MISSING declared pick is. Returns the names
+// of the mismatched fields (empty ⇒ no recreate needed).
 function diffFingerprints(declared: CharacterFingerprint, actual: CharacterFingerprint): string[] {
   const mismatches: string[] = [];
-  for (const field of ["className", "subclassName", "experiencePoints", "classLevel", "campaignName"] as const) {
+  for (const field of ["className", "subclassName", "rulesEdition", "experiencePoints", "classLevel", "campaignName"] as const) {
     if (declared[field] !== actual[field]) mismatches.push(field);
   }
-  for (const field of ["maneuverNames", "cantripNames", "spellNames"] as const) {
+  for (const field of ["maneuverNames", "cantripNames", "spellNames", "disciplineNames"] as const) {
     const actualNames = new Set(actual[field]);
     if (declared[field].some((name) => !actualNames.has(name))) mismatches.push(field);
   }
   return mismatches;
 }
 
-// Resolve a Fighter subclass id by name from the reference catalog.
-async function subclassId(cookie: string, className: string, subclassName: string): Promise<string> {
-  // Every seeded persona here is EDITION_2024 (#1325) — every Subclass row is
-  // edition: null (shared) today, so this resolves identically either way.
-  const response = await api(cookie, "/api/reference?edition=EDITION_2024");
+// Resolve a subclass id by name from the reference catalog, scoped to the
+// SAME edition the persona is created under (#1506) — a 2014 persona's
+// subclass name (e.g. "Way of Shadow") only resolves against the 2014
+// catalog; the 2024 sibling ("Warrior of Shadow") is a DIFFERENT Subclass row
+// entirely, not a fallback.
+async function subclassId(
+  cookie: string,
+  className: string,
+  subclassName: string,
+  edition: "EDITION_2014" | "EDITION_2024" = "EDITION_2024",
+): Promise<string> {
+  const response = await api(cookie, `/api/reference?edition=${edition}`);
   if (!response.ok) throw new Error(`Failed to load reference: ${response.status}`);
   const { classes } = (await response.json()) as {
     classes: { name: string; subclasses: { id: string; name: string }[] }[];
@@ -341,7 +468,15 @@ async function maneuverId(cookie: string, name: string): Promise<string> {
 }
 
 // Find (by name) or create a campaign the persona can start sessions in.
-async function ensureCampaign(cookie: string, name: string): Promise<string> {
+// `edition` only matters on the CREATE branch (a found campaign keeps
+// whatever edition it already has) — campaignsRouter's attach handler 400s a
+// character/campaign edition mismatch (#1506), so a 2014 persona's own
+// campaign must be created EDITION_2014 too, never left at the column default.
+async function ensureCampaign(
+  cookie: string,
+  name: string,
+  edition: "EDITION_2014" | "EDITION_2024" = "EDITION_2024",
+): Promise<string> {
   const listResponse = await api(cookie, "/api/campaigns");
   if (!listResponse.ok) throw new Error(`Failed to list campaigns: ${listResponse.status}`);
   const existing = (await listResponse.json()) as { id: string; name: string }[];
@@ -350,7 +485,7 @@ async function ensureCampaign(cookie: string, name: string): Promise<string> {
 
   const createResponse = await api(cookie, "/api/campaigns", {
     method: "POST",
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, rulesEdition: edition }),
   });
   if (!createResponse.ok) throw new Error(`Failed to create campaign ${name}: ${createResponse.status}`);
   const { id } = (await createResponse.json()) as { id: string };
@@ -392,9 +527,30 @@ async function endActiveSessions(cookie: string, campaignId: string, campaignNam
   }
 }
 
+// #1684: resolve a species name → catalog id via GET /api/reference (the
+// mechanical anchor replacing the pruned flat `race`-name create field).
+// EDITION_2024 default; the 2014 Monk personas (#1506) pass EDITION_2014 —
+// each of those uses Human, a species with no variant/choice fields under
+// EITHER edition, so this stays the plain by-name lookup (no variantId
+// resolution) that every OTHER persona here also uses.
+async function resolveSpeciesId(
+  cookie: string,
+  name: string,
+  edition: "EDITION_2014" | "EDITION_2024" = "EDITION_2024",
+): Promise<string> {
+  const response = await api(cookie, `/api/reference?edition=${edition}`);
+  if (!response.ok) throw new Error(`Failed to load reference: ${response.status}`);
+  const { species } = (await response.json()) as { species: { id: string; name: string }[] };
+  const match = species.find((s) => s.name === name);
+  if (!match) throw new Error(`Species not found in catalog: ${name}`);
+  return match.id;
+}
+
 // Resolve spell names → catalog ids via GET /api/spells (#1131 create-body picks).
+// `?edition=` is REQUIRED since #1712 — EDITION_2024 always: no caster persona here
+// needs 2014 (unlike resolveSpeciesId, edition-parameterized by #1506).
 async function resolveSpellIds(cookie: string, names: string[]): Promise<string[]> {
-  const response = await api(cookie, "/api/spells");
+  const response = await api(cookie, "/api/spells?edition=EDITION_2024");
   if (!response.ok) throw new Error(`Failed to load spells: ${response.status}`);
   const catalog = (await response.json()) as { id: string; name: string }[];
   const byName = new Map(catalog.map((s) => [s.name, s.id]));
@@ -418,17 +574,25 @@ async function creationSpellPicks(cookie: string, persona: Persona): Promise<{ c
 // level-gated extra is layered on afterward through the same transaction
 // endpoints the app uses, so derived state (slots, subclass eligibility) is exact.
 async function seedCharacterShell(cookie: string, persona: Persona): Promise<string> {
-  const spells = await creationSpellPicks(cookie, persona);
+  const edition = persona.rulesEdition ?? "EDITION_2024";
+  const [speciesId, spells] = await Promise.all([
+    resolveSpeciesId(cookie, persona.speciesName, edition),
+    creationSpellPicks(cookie, persona),
+  ]);
   const response = await api(cookie, "/api/characters", {
     method: "POST",
     body: JSON.stringify({
       name: persona.name,
       alignment: "True Neutral",
-      race: persona.race,
+      speciesId,
       background: persona.background,
       classes: [{ name: persona.className }],
       abilityScores: ABILITY_SCORES,
       ...(spells ? { spells } : {}),
+      // Write-once (character-schemas.ts) — only sent when the persona
+      // declares one, so every pre-#1506 persona keeps hitting the server
+      // default (EDITION_2024) exactly as before.
+      ...(persona.rulesEdition ? { rulesEdition: persona.rulesEdition } : {}),
     }),
   });
   if (!response.ok) {
@@ -466,7 +630,7 @@ async function seedLevelUps(cookie: string, id: string, persona: Persona): Promi
 // grants it at L3, so the XP set above is a prerequisite).
 async function seedSubclass(cookie: string, id: string, persona: Persona): Promise<void> {
   if (!persona.subclassName) return;
-  const subclass = await subclassId(cookie, persona.className, persona.subclassName);
+  const subclass = await subclassId(cookie, persona.className, persona.subclassName, persona.rulesEdition);
   const res = await api(cookie, `/api/characters/${id}/class/transactions`, {
     method: "POST",
     body: JSON.stringify({ operations: [{ type: "setSubclass", subclassId: subclass }] }),
@@ -485,10 +649,40 @@ async function seedManeuver(cookie: string, id: string, persona: Persona): Promi
   if (!res.ok) throw new Error(`Failed to learn maneuver for ${persona.name}: ${res.status}`);
 }
 
+// Resolve a discipline id by name from the 2014-only catalog (GET /api/disciplines).
+async function disciplineId(cookie: string, name: string): Promise<string> {
+  const response = await api(cookie, "/api/disciplines?edition=EDITION_2014");
+  if (!response.ok) throw new Error(`Failed to load disciplines: ${response.status}`);
+  const catalog = (await response.json()) as { id: string; name: string }[];
+  const match = catalog.find((d) => d.name === name);
+  if (!match) throw new Error(`Discipline not found: ${name}`);
+  return match.id;
+}
+
+// Way of the Four Elements' known-discipline picks (#1506) — a generic
+// "choose N" subclass choice (resources.ts's learnSubclassChoice), same
+// mechanism Maneuvers/etc. use elsewhere, keyed "fourElementsDisciplines"
+// (monk.ts's own `choices` declaration). Requires the subclass to already be
+// set (createPersona's ordering), since the choice is only legal once the
+// character's own subclass grants it.
+async function seedDisciplines(cookie: string, id: string, persona: Persona): Promise<void> {
+  if (!persona.disciplineNames?.length) return;
+  for (const name of persona.disciplineNames) {
+    const optionId = await disciplineId(cookie, name);
+    const res = await api(cookie, `/api/characters/${id}/resources/transactions`, {
+      method: "POST",
+      body: JSON.stringify({
+        operations: [{ type: "learnSubclassChoice", choiceKey: "fourElementsDisciplines", optionId }],
+      }),
+    });
+    if (!res.ok) throw new Error(`Failed to learn discipline "${name}" for ${persona.name}: ${res.status}`);
+  }
+}
+
 // Attach to a dedicated campaign so the persona can start a live session.
 async function attachToCampaign(cookie: string, id: string, persona: Persona): Promise<void> {
   if (!persona.campaignName) return;
-  const campaignId = await ensureCampaign(cookie, persona.campaignName);
+  const campaignId = await ensureCampaign(cookie, persona.campaignName, persona.rulesEdition);
   const res = await api(cookie, `/api/campaigns/${campaignId}/characters`, {
     method: "POST",
     body: JSON.stringify({ characterId: id }),
@@ -497,13 +691,14 @@ async function attachToCampaign(cookie: string, id: string, persona: Persona): P
 }
 
 // Seed one persona: create the shell, then layer on each level-gated extra in
-// dependency order (XP before subclass, etc.). Each step no-ops when the
-// persona doesn't declare it.
+// dependency order (XP before subclass, disciplines after subclass, etc.).
+// Each step no-ops when the persona doesn't declare it.
 async function createPersona(cookie: string, persona: Persona): Promise<void> {
   const id = await seedCharacterShell(cookie, persona);
   await seedExperience(cookie, id, persona);
   await seedLevelUps(cookie, id, persona);
   await seedSubclass(cookie, id, persona);
+  await seedDisciplines(cookie, id, persona);
   await seedManeuver(cookie, id, persona);
   await attachToCampaign(cookie, id, persona);
 }

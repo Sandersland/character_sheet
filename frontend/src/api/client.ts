@@ -10,6 +10,7 @@ export * from "@/api/catalog";
 export * from "@/api/spells";
 export * from "@/api/inventory";
 export * from "@/api/abilities";
+export * from "@/api/disciplines";
 export * from "@/api/characters";
 export * from "@/api/leveling";
 export * from "@/api/campaign";

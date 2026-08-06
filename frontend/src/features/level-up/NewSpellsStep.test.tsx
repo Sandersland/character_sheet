@@ -147,10 +147,20 @@ describe("NewSpellsStep", () => {
     expect(screen.getByText(/spell list/i)).toBeInTheDocument();
   });
 
-  it("states the learn count and, when swaps are allowed, that the swap is separate (#1139)", async () => {
+  it("states the learn count and, when swaps are allowed, that the swap is separate (#1139) — 'prepared spell' when casterModel is absent (the majority default, #1509)", async () => {
     render(<Harness step={newSpellsStep(1, { maxSpellLevel: 2, canSwap: true })} character={casterWithBook(BOOK)} />);
     expect(await screen.findByText(/You learn 1 new spell\./i)).toBeInTheDocument();
-    expect(screen.getByText(/You may also swap one spell for another\./i)).toBeInTheDocument();
+    expect(screen.getByText(/You may also swap one prepared spell for another\./i)).toBeInTheDocument();
+  });
+
+  it("renders 'known spell' in the swap sentence when the step serves casterModel: known (#1509)", async () => {
+    render(
+      <Harness
+        step={newSpellsStep(1, { maxSpellLevel: 2, canSwap: true, casterModel: "known" })}
+        character={casterWithBook(BOOK)}
+      />,
+    );
+    expect(await screen.findByText(/You may also swap one known spell for another\./i)).toBeInTheDocument();
   });
 
   it("omits the swap sentence when the step cannot swap (#1139)", async () => {
@@ -220,7 +230,12 @@ const BOOK = [
   { id: "k-hex", name: "GrantedChant", level: 1, source: "subclass" as const }, // granted — excluded
   { id: "k-light", name: "CantripChant", level: 0 },                            // cantrip — excluded
 ];
-const swapStep = (count = 1): LevelUpStep => newSpellsStep(count, { maxSpellLevel: 2, canSwap: true });
+// Defaults casterModel to "known" — the pre-existing swap-panel copy ("Swap a
+// known spell") already modeled a known caster (a personal spellbook with
+// swap candidates); #1509 makes that noun served rather than hardcoded, so the
+// default here keeps this describe block's existing assertions accurate.
+const swapStep = (count = 1, casterModel: "known" | "prepared" | null = "known"): LevelUpStep =>
+  newSpellsStep(count, { maxSpellLevel: 2, canSwap: true, ...(casterModel ? { casterModel } : {}) });
 
 describe("NewSpellsStep — swap panel visibility (#1101)", () => {
   it("hides the swap panel when the step cannot swap", async () => {
@@ -240,6 +255,12 @@ describe("NewSpellsStep — swap panel visibility (#1101)", () => {
     // Granted + cantrip entries are never swap candidates.
     expect(screen.queryByRole("button", { name: /GrantedChant/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /CantripChant/ })).not.toBeInTheDocument();
+  });
+
+  it("labels the disclosure 'prepared spell' when the step serves casterModel: prepared (#1509)", async () => {
+    render(<Harness step={swapStep(1, "prepared")} character={casterWithBook(BOOK)} />);
+    expect(await screen.findByRole("button", { name: /swap a prepared spell/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /swap a known spell/i })).not.toBeInTheDocument();
   });
 });
 
@@ -277,8 +298,13 @@ describe("NewSpellsStep — swap selection (#1101)", () => {
     expect(screen.getByTestId("picks")).toHaveTextContent(JSON.stringify([{ type: "learnSpell", spellId: "Shield" }]));
   });
 
-  it("a swap-only level (count 0) shows the optional copy", async () => {
+  it("a swap-only level (count 0) shows the optional copy, worded per the served casterModel (#1509)", async () => {
     render(<Harness step={swapStep(0)} character={casterWithBook(BOOK)} />);
+    expect(await screen.findByText(/No new spells at this level, but you may swap one known spell/i)).toBeInTheDocument();
+  });
+
+  it("a swap-only level renders 'prepared spell' when casterModel is prepared", async () => {
+    render(<Harness step={swapStep(0, "prepared")} character={casterWithBook(BOOK)} />);
     expect(await screen.findByText(/No new spells at this level, but you may swap one prepared spell/i)).toBeInTheDocument();
   });
 

@@ -46,6 +46,7 @@ import {
   buildResourcesView,
 } from "./serialize/classes.js";
 import { buildSpellcastingView } from "./serialize/spellcasting.js";
+import { buildSpeciesTraitsView } from "./serialize/species.js";
 
 export { buildRollModifiers };
 
@@ -77,14 +78,20 @@ function stunningStrikeRider(
 
 type RiderClassEntry = SubclassIdentityInput & { name: string; level: number };
 
-// Warrior of the Open Hand's monk class entry, or undefined off-subclass —
-// shared by openHandTechniqueRider/quiveringPalmRider. Resolved via slug
-// (#1277: FK preferred, exact name as fallback) — was substring-matched on
-// the words "open hand", the same failure class #1339 fixed at the
-// DERIVED_ACTIONS gate.
+// Both editions' Open Hand subclasses grant Open Hand Technique/Quivering
+// Palm — "Warrior of the Open Hand" (SRD 5.2, EDITION_2024) and "Way of the
+// Open Hand" (SRD 5.1, EDITION_2014, #1501) are SEPARATE subclasses, not one
+// forked across editions, so a character resolves to at most one of the two.
+const OPEN_HAND_SLUGS = ["monk-warrior-of-the-open-hand", "monk-way-of-the-open-hand"];
+
+// The Open Hand monk's own class entry, or undefined off-subclass — shared by
+// openHandTechniqueRider/quiveringPalmRider. Resolved via slug (#1277: FK
+// preferred, exact name as fallback) — was substring-matched on the words
+// "open hand", the same failure class #1339 fixed at the DERIVED_ACTIONS gate.
 function openHandMonkEntry(classEntries: RiderClassEntry[]): RiderClassEntry | undefined {
   const monk = classEntries.find((c) => c.name.toLowerCase() === "monk");
-  return monk && resolveSubclassSlug("monk", monk) === "monk-warrior-of-the-open-hand" ? monk : undefined;
+  const slug = monk && resolveSubclassSlug("monk", monk);
+  return slug && OPEN_HAND_SLUGS.includes(slug) ? monk : undefined;
 }
 
 // Open Hand Technique (Warrior of the Open Hand L3, #1245): the focus save DC
@@ -262,34 +269,45 @@ export function serializeCharacter(rawRow: CharacterRow) {
     abilityScoresMap,
     progress.proficiencyBonus,
   );
-  const { resources, maneuverSaveDC } = buildResourcesView(
+  const { resources, maneuverSaveDC, classFeatureImprovements } = buildResourcesView(
     row,
     progress.level,
     abilityScoresMap,
     progress.proficiencyBonus,
   );
+  // Species-granted trait text + improvements (#1682), off the character's
+  // OWN species/variant selection (CharacterRace.speciesId/variantId, #1679)
+  // — see serialize/species.ts for why this needs no level/edition gating of
+  // its own (a species trait row is always active once the species is
+  // picked; edition forking already happened at the Species row level).
+  const speciesTraits = buildSpeciesTraitsView(row);
 
   // 3. Advancement clamp → effective scores/HP/initiative, then the feat layer
-  //    summed over the kept advancements (origin feats + slot-bounded entries).
+  //    summed over the kept advancements (origin feats + slot-bounded entries)
+  //    TOGETHER WITH active ClassFeature row grants (#1691's classFeatureImprovements)
+  //    AND active SpeciesTrait row grants (#1682's speciesTraits.improvements).
+  //    conditions (exhaustion) is hoisted above applyFeatLayer — #1321's
+  //    effectiveMaxHp composes the feat bonus with exhaustion's PHB'14 p. 291
+  //    tier-4 halving, so the feat layer needs the exhaustion level in hand.
+  const conditions = normalizeConditionsMutable(row.conditions);
   const { effectiveScores, hitPoints, effectiveInitBonus, clampedAdvancements, advSlotTotal, usedSlots, fightingStyleSlotTotal, usedFightingStyleSlots } =
     applyAdvancementClamp(row, progress.level, normalizedHitPoints);
   const { featBonuses, effectiveMaxHp, featProficiencies } = applyFeatLayer(
     clampedAdvancements,
+    classFeatureImprovements,
+    speciesTraits.improvements,
     hitDice.total,
     hitPoints.max,
+    conditions.exhaustion,
+    editionOf(row),
   );
 
   // 4. Proficiency grants, the per-target modifier channel (active cast buffs
   //    #438 + item passive bonuses #545), and item-granted traits (#529).
   // Pre-compute weapon proficiency grants so they can be reused both in the
   // inventory serialisation (attack-bonus derivation) and the wire response.
-  const weaponGrants = buildMergedWeaponProficiencies(
-    row.classEntries,
-    row.raceSelection?.name,
-    featProficiencies.weapons,
-  );
+  const weaponGrants = buildMergedWeaponProficiencies(row.classEntries, featProficiencies.weapons);
   const activeEffects = normalizeActiveEffectsMutable(row.activeEffects);
-  const conditions = normalizeConditionsMutable(row.conditions);
   const buffTargets = buildTargetModifiers(row, activeEffects);
   const { itemGrants, itemSkillProfs, itemSaveProfs } = buildItemGrantsView(row);
   // Archery Fighting Style feat (#1137): +2 to ranged attack rolls, summed from
@@ -299,11 +317,7 @@ export function serializeCharacter(rawRow: CharacterRow) {
   // per-inventory-row `proficient` flag has to read exactly the lists rendered
   // beside it (#1433) — passing the un-merged `weaponGrants` would re-warn on an
   // item-granted proficiency the wire array already shows.
-  const armorGrants = buildMergedArmorProficiencies(
-    row.classEntries,
-    row.raceSelection?.name,
-    featProficiencies.armor,
-  );
+  const armorGrants = buildMergedArmorProficiencies(row.classEntries, featProficiencies.armor);
   const itemMergedWeaponGrants = mergeItemWeaponProficiencies(
     weaponGrants,
     itemGrants.proficiencies.filter((p) => p.profType === "weapon"),
@@ -409,11 +423,12 @@ export function serializeCharacter(rawRow: CharacterRow) {
     ),
     skills: buildSkillsView(row, featProficiencies, itemSkillProfs, buffTargets),
     toolProficiencies: buildToolProficienciesView(row, resources, itemGrants),
-    // Armor/weapon proficiencies — derived fully at read time from class, race,
-    // and feat grants. No persistence needed: these are fixed by class/race and
-    // any feat-granted additions are already tracked in advancements. Deduped
-    // with precedence class > race > feat so a feat re-granting an existing
-    // class proficiency renders as a single class-sourced entry.
+    // Armor/weapon proficiencies — derived fully at read time from class,
+    // species-trait, and feat grants (species grants arrive feat-sourced since
+    // the #1682 RACE_PROFICIENCY_GRANTS retirement). No persistence needed:
+    // feat-granted additions are already tracked in advancements. Deduped with
+    // precedence class > feat so a feat re-granting an existing class
+    // proficiency renders as a single class-sourced entry.
     armorProficiencies: armorGrants,
     weaponProficiencies: itemMergedWeaponGrants,
     inventory,
@@ -498,6 +513,14 @@ export function serializeCharacter(rawRow: CharacterRow) {
     // Riders (#1316): sneakAttack/stunningStrike/openHandTechnique/
     // quiveringPalm/maneuvers, each present only when the character has it.
     ...riders,
+
+    // Species-granted information (#1682): name + cited trait text for the
+    // character's own species/variant selection, darkvision (when present)
+    // rendered like any other trait — announce-only per owner ruling, not a
+    // derived combat stat. [] for a legacy `race`-name-only character (no
+    // species picked, #1679's additive migration) — the section itself
+    // handles an empty list, never a crash.
+    speciesTraits: speciesTraits.traits,
 
     journal: buildJournalView(row),
 

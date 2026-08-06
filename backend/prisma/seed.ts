@@ -5,18 +5,24 @@ import { PrismaClient } from "../src/generated/prisma/client.js";
 // Pure catalog seed data (no side effects) — see prisma/seed/*.ts. This file is
 // the upsert entrypoint (it must stay at prisma/seed.ts per prisma.config.ts);
 // every data array below is imported from a per-domain module under seed/.
-import { RACES, CLASSES, BACKGROUNDS, ITEMS, type CatalogItem } from "./seed/catalog-data.js";
+import { CLASSES, BACKGROUNDS, ITEMS, type CatalogItem } from "./seed/catalog-data.js";
 import { ACTIONS } from "./seed/actions.js";
 import { MANEUVERS } from "./seed/maneuvers.js";
 import { SHADOW_ARTS } from "./seed/shadow-arts.js";
+import { DISCIPLINES } from "./seed/disciplines.js";
 import { CHANNEL_DIVINITIES } from "./seed/channel-divinity.js";
 import { SUBCLASS_CHOICE_OPTIONS } from "./seed/subclass-choices.js";
 import { FEATS } from "./seed/feats.js";
 import { SPELLS, SPELL_RENAMES, type CatalogSpell } from "./seed/spells.js";
+import { SPELLS_2014 } from "./seed/spells-2014/index.js";
 import { applySpellRenames } from "./seed/rename-spells.js";
+import { seedSpellClassesFor } from "./seed/seed-spell-classes.js";
 import { seedSubclassGrantedSpells } from "./seed/seed-granted-spells.js";
 import { seedClassFeatures } from "./seed/seed-class-features.js";
 import { seedSubclasses } from "./seed/seed-subclasses.js";
+import { seedSpecies } from "./seed/seed-species.js";
+import { seedSpeciesTraits } from "./seed/seed-species-traits.js";
+import { seedSpeciesGrantedSpells } from "./seed/seed-species-granted-spells.js";
 import { seedStartingEquipment } from "./seed/seed-starting-equipment.js";
 import { PACKS } from "./seed/packs.js";
 import { assertUniqueGrantedAbilityNames } from "./seed/guards.js";
@@ -58,12 +64,6 @@ function itemDetailUpsertFields(item: CatalogItem) {
       ? { upsert: { create: item.consumable, update: item.consumable } }
       : undefined,
   };
-}
-
-async function seedRaces(prisma: PrismaClient) {
-  for (const race of RACES) {
-    await prisma.race.upsert({ where: { name: race.name }, create: race, update: race });
-  }
 }
 
 // Returns className → id so subclasses can resolve their parent class.
@@ -160,13 +160,15 @@ async function seedManeuvers(prisma: PrismaClient) {
   }
 }
 
-// Seed the Shadow Arts catalog — upsert by (name, edition). Flat 1-focus, no scaling
-// (2024 rewrite, #1246: was flat 2-focus across a 4-spell menu; now a single
-// always-concentrating Darkness cast, so effectKind/buffTarget/buffModifier are
-// fixed nulls rather than per-row fields).
+// Seed the Shadow Arts catalog — upsert by (name, edition). No scaling on any
+// row (2024's single Darkness cast; 2014's flat-2-ki four-spell menu, #1502),
+// so effectKind/buffTarget/buffModifier stay fixed nulls rather than per-row
+// fields. costPoolKey/costBase are per-row (ki/2 for 2014, focus/1 for
+// 2024) — the one thing that genuinely forks; minLevel/alwaysKnown/costKind
+// stay hardcoded since every row, both editions, agrees on them.
 async function seedShadowArts(prisma: PrismaClient) {
   for (const art of SHADOW_ARTS) {
-    const edition = art.edition ?? null;
+    const edition = art.edition;
     const data = {
       name: art.name,
       edition,
@@ -175,8 +177,8 @@ async function seedShadowArts(prisma: PrismaClient) {
       minLevel: 3,
       alwaysKnown: true,
       costKind: "pool",
-      costPoolKey: "focus",
-      costBase: 1,
+      costPoolKey: art.costPoolKey,
+      costBase: art.costBase,
       costPerStep: null,
       effectKind: null,
       buffTarget: null,
@@ -184,9 +186,9 @@ async function seedShadowArts(prisma: PrismaClient) {
     };
     await upsertEditionRow(prisma.grantedAbility, { name: art.name, edition }, data, data);
   }
-  // Drop the retired 2014 rows (Silence/Pass without Trace/Darkvision) — same
-  // edition-partitioned staleCatalogRowsWhere seedFeats uses (#1306); source:
-  // "shadowArts" passed in as extraWhere so this never touches
+  // Drop stale catalog rows (e.g. an edition retag stranding its old row) —
+  // same edition-partitioned staleCatalogRowsWhere seedFeats uses (#1306);
+  // source: "shadowArts" passed in as extraWhere so this never touches
   // maneuvers/channelDivinity rows sharing the same table.
   //
   // Each row's OWN edition goes into the seeded list, not a flat null: an
@@ -195,11 +197,65 @@ async function seedShadowArts(prisma: PrismaClient) {
   // next reseed (proven in granted-ability-fork-reseed.test.ts).
   const staleWhere = staleCatalogRowsWhere(
     "name",
-    SHADOW_ARTS.map((a) => ({ identity: a.name, edition: a.edition ?? null })),
+    SHADOW_ARTS.map((a) => ({ identity: a.name, edition: a.edition })),
     { source: "shadowArts" },
   );
   const stale = await prisma.grantedAbility.findMany({ where: staleWhere, select: { name: true } });
   if (stale.length) console.log(`seedShadowArts: dropping stale catalog rows: ${stale.map((a) => a.name).join(", ")}`);
+  await prisma.grantedAbility.deleteMany({ where: staleWhere });
+}
+
+// Seed the Way of the Four Elements discipline catalog (2014-only, #1503) —
+// upsert by (name, edition). Unlike seedSubclassChoiceOptions below, each row
+// carries its own cost (Ki, "pool") and, where the discipline deals damage, an
+// EffectSpec — the cast handler (lib/classes/disciplines.ts) reads both.
+async function seedDisciplines(prisma: PrismaClient) {
+  for (const discipline of DISCIPLINES) {
+    const data = {
+      name: discipline.name,
+      edition: discipline.edition,
+      source: "discipline",
+      description: discipline.description,
+      minLevel: discipline.minLevel,
+      alwaysKnown: orElse(discipline.alwaysKnown, false),
+      costKind: discipline.costKind,
+      costPoolKey: orNull(discipline.costPoolKey),
+      costBase: orNull(discipline.costBase),
+      costPerStep: orNull(discipline.costPerStep),
+      effectKind: orNull(discipline.effectKind),
+      effectDiceCount: orNull(discipline.effectDiceCount),
+      effectDiceFaces: orNull(discipline.effectDiceFaces),
+      damageType: orNull(discipline.damageType),
+      attackType: orNull(discipline.attackType),
+      saveAbility: orNull(discipline.saveAbility),
+      saveEffect: orNull(discipline.saveEffect),
+    };
+    await upsertEditionRow(
+      prisma.grantedAbility,
+      { name: discipline.name, edition: discipline.edition },
+      data,
+      data,
+    );
+  }
+  // Every seeded row is EDITION_2014 (Way of the Four Elements has no 2024
+  // counterpart — 2024's Warrior of the Elements is a from-scratch rebuild,
+  // not a discipline menu), so the NULL and EDITION_2024 partitions both get
+  // `notIn: []`, matching every `source: "discipline"` row in them —
+  // deliberately: this is what sweeps the 17 orphaned pre-#1373-retirement
+  // rows (edition: NULL, a stale *Fangs of the Fire Snake* etc. snapshot)
+  // still sitting in a long-lived dev database (#1503's own decision comment,
+  // 2026-08-03). The same NULL-partition-empties-to-notIn-everything shape is
+  // a DATA-LOSS bug the other direction — see prune.ts's own header — but
+  // here, with an all-EDITION_2014 seeded list, it is the intended cleanup.
+  const staleWhere = staleCatalogRowsWhere(
+    "name",
+    DISCIPLINES.map((d) => ({ identity: d.name, edition: d.edition })),
+    { source: "discipline" },
+  );
+  const stale = await prisma.grantedAbility.findMany({ where: staleWhere, select: { name: true, edition: true } });
+  if (stale.length) {
+    console.log(`seedDisciplines: dropping stale catalog rows: ${stale.map((d) => `${d.name} (${d.edition ?? "shared"})`).join(", ")}`);
+  }
   await prisma.grantedAbility.deleteMany({ where: staleWhere });
 }
 
@@ -366,32 +422,54 @@ const SPELL_COLUMN_DEFAULTS = {
 // actually resets on re-seed (#1132): a bare partial update leaves an absent
 // optional column at its prior value (this stranded Barkskin at
 // concentration=true when SRD 5.2 dropped its concentration). Spread order —
-// defaults first — means any field the spell declares still wins.
+// defaults first — means any field the spell declares still wins. `classes`
+// is dropped here (#1711): it's no longer a Spell column — seedSpells writes
+// it to SpellClass separately, via seedSpellClassesFor, once the row's id is
+// known.
 function spellSeedData(spell: CatalogSpell) {
-  return { ...SPELL_COLUMN_DEFAULTS, ...spell };
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to exclude `classes` from `rest`; SpellClass owns membership (#1711)
+  const { classes, ...rest } = spell;
+  return { ...SPELL_COLUMN_DEFAULTS, ...rest };
+}
+
+// spells.ts entries default to EDITION_2024 (they're SRD 5.2 text, not
+// "valid in both editions" — see spells.ts's header); spells-2014/index.ts's
+// own default already tags every SPELLS_2014 row EDITION_2014, so this is a
+// no-op for those. One function, so seedSpells' upsert loop and its prune
+// below can never drift onto two different defaults (#1710).
+function resolvedSpellEdition(spell: Pick<CatalogSpell, "edition">): SeedEdition {
+  return spell.edition ?? "EDITION_2024";
 }
 
 // Seed spell catalog — apply in-place renames FIRST (so the upsert matches the
-// renamed row, not a stranded twin), upsert by unique name, then drop stale rows
-// (2024-removed spells like Toll the Dead). Learned SpellEntry snapshots are
-// unaffected by a catalog drop (no FK); a one-time resync script refreshes them.
+// renamed row, not a stranded twin), then upsertEditionRow by (name, edition)
+// so a same-name 2014/2024 fork lands as siblings rather than one overwriting
+// the other (#1710), then drop stale rows (2024-removed spells like Toll the
+// Dead, or an edition retag's orphaned twin — see the Feat/Action precedent
+// in catalog-edition.ts). Learned SpellEntry snapshots are unaffected by a
+// catalog drop (no FK); a one-time resync script refreshes them.
 async function seedSpells(prisma: PrismaClient) {
   await applySpellRenames(prisma, SPELL_RENAMES);
-  const seededNames = SPELLS.map((s) => s.name);
-  for (const spell of SPELLS) {
-    const data = spellSeedData(spell);
-    await prisma.spell.upsert({
-      where: { name: spell.name },
-      create: data,
-      update: data,
-    });
+  const allSpells: CatalogSpell[] = [...SPELLS, ...SPELLS_2014];
+  for (const spell of allSpells) {
+    const edition = resolvedSpellEdition(spell);
+    const data = { ...spellSeedData(spell), edition };
+    // upsertEditionRow, not .upsert(): the compound-key shorthand can't
+    // express a null edition, and every spell here resolves to a concrete
+    // one anyway (see resolvedSpellEdition) — used for consistency with
+    // every other editioned catalog seeder.
+    const row = await upsertEditionRow(prisma.spell, { name: spell.name, edition }, data, data);
+    // #1711: SpellClass rows carry no edition column (Shape 1) — this
+    // spell's own row already IS the edition fork, so its membership rows
+    // never need one.
+    await seedSpellClassesFor(prisma, row.id, spell.classes);
   }
-  const stale = await prisma.spell.findMany({
-    where: { name: { notIn: seededNames } },
-    select: { name: true },
-  });
-  if (stale.length) console.log(`seedSpells: dropping stale catalog rows: ${stale.map((s) => s.name).join(", ")}`);
-  await prisma.spell.deleteMany({ where: { name: { notIn: seededNames } } });
+  const staleWhere = staleCatalogRowsWhere("name", allSpells.map((s) => ({ identity: s.name, edition: resolvedSpellEdition(s) })));
+  const stale = await prisma.spell.findMany({ where: staleWhere, select: { name: true, edition: true } });
+  if (stale.length) {
+    console.log(`seedSpells: dropping stale catalog rows: ${stale.map((s) => `${s.name} (${s.edition ?? "shared"})`).join(", ")}`);
+  }
+  await prisma.spell.deleteMany({ where: staleWhere });
 }
 
 // Returns itemName → id so packs can resolve their contents.
@@ -446,8 +524,12 @@ async function main() {
     ...SHADOW_ARTS,
     ...CHANNEL_DIVINITIES,
     ...SUBCLASS_CHOICE_OPTIONS,
+    ...DISCIPLINES,
   ]);
-  await seedRaces(prisma);
+  await seedSpecies(prisma);
+  // #1682: trait content, resolved against the Species/SpeciesVariant rows
+  // seedSpecies just wrote — must run after it.
+  await seedSpeciesTraits(prisma);
   const classIds = await seedClasses(prisma);
   await seedSubclasses(prisma, classIds);
   // Feature rows FK both classes and subclasses seeded above (#1522/#1523).
@@ -455,12 +537,16 @@ async function main() {
   await seedActions(prisma);
   await seedManeuvers(prisma);
   await seedShadowArts(prisma);
+  await seedDisciplines(prisma);
   await seedChannelDivinities(prisma);
   await seedSubclassChoiceOptions(prisma);
   await seedFeats(prisma);
   await seedBackgrounds(prisma);
   await seedSpells(prisma);
   await seedSubclassGrantedSpells(prisma, classIds);
+  // #1683: 2024 lineage/legacy spell tracks — needs Species (seedSpecies,
+  // above) AND the Spell catalog (seedSpells, just above) both seeded.
+  await seedSpeciesGrantedSpells(prisma);
   const itemIdsByName = await seedItems(prisma);
   await seedPacks(prisma, itemIdsByName);
   // No reader yet (#1534) — StartingEquipmentPackage rows are inert until

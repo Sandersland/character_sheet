@@ -42,6 +42,7 @@ function makeView(overrides: Partial<ClassFeatureView> = {}): ClassFeatureView {
     hasShadowArts: false,
     hasChannelDivinity: false,
     hasCloakOfShadows: false,
+    hasFourElements: false,
     hasFeatures: false,
     hasFightingStyle: false,
     fightingStyleFeats: [],

@@ -30,6 +30,7 @@ export const EVENT_TYPE_LABELS: Partial<Record<string, string>> = {
   xpSet: "XP set",
   currencyAdjust: "currency",
   castSpell: "cast",
+  castAbilitySlot: "cast",
   expendSlot: "slot used",
   restoreSlot: "slot restored",
   learnSpell: "learned",

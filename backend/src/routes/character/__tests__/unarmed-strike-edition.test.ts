@@ -20,13 +20,13 @@ import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
+import { seededSpeciesAnchor } from "@/test-support/species.js";
 
 const OWNER_ID = "owner-unarmed-strike-edition";
 let COOKIE: string;
 
 const BASE = {
   alignment: "Lawful Neutral",
-  race: "Hill Dwarf",
   background: "Sage",
   classes: [{ name: "Monk" }],
   abilityScores: { strength: 10, dexterity: 16, constitution: 12, intelligence: 10, wisdom: 14, charisma: 8 },
@@ -42,10 +42,11 @@ async function createMonkAt(
   name: string,
   level: 1 | 17 | 20,
 ): Promise<string> {
+  const anchor = await seededSpeciesAnchor(rulesEdition);
   const res = await supertest(app)
     .post("/api/characters")
     .set("Cookie", COOKIE)
-    .send({ ...BASE, name, rulesEdition });
+    .send({ ...BASE, ...anchor, name, rulesEdition });
   expect(res.status).toBe(201);
   const id = res.body.id as string;
 
@@ -90,20 +91,21 @@ describe("unarmedStrike Martial Arts die forks on rulesEdition (#1499)", () => {
     expect(char2024.unarmedStrike.damage.faces).toBe(12);
   });
 
-  // #1499's seven EDITION_2024-tagged rows (flurryOfBlows, patientDefense,
+  // #1499/#1500's six EDITION_2024-ONLY rows (patientDefense,
   // patientDefenseFocus, stepOfTheWind, stepOfTheWindFocus, deflectAttacks,
-  // deflectAttacksRedirect — see actions.test.ts's TAGGED_2024_ROWS) must not
-  // reach a 2014 monk's wire payload, while the untagged, shared
-  // bonusUnarmedStrike row still does. Asserted here (not just in the pure
-  // actions.test.ts unit test) so the AC is direct against the composed
-  // GET response rather than inferred across two files.
-  it("L20 EDITION_2014 monk: availableActions has none of the seven 2024-tagged rows, still has bonusUnarmedStrike", async () => {
+  // deflectAttacksRedirect — see actions.test.ts's TAGGED_2024_ONLY_ROWS)
+  // must not reach a 2014 monk's wire payload, while the untagged, shared
+  // bonusUnarmedStrike row and the now-both-editions flurryOfBlows row still
+  // do (#1500), and the 2014-exclusive patientDefenseKi/stepOfTheWindKi rows
+  // ALSO reach it. Asserted here (not just in the pure actions.test.ts unit
+  // test) so the AC is direct against the composed GET response rather than
+  // inferred across two files.
+  it("L20 EDITION_2014 monk: availableActions has none of the six 2024-only rows, has bonusUnarmedStrike/flurryOfBlows/patientDefenseKi/stepOfTheWindKi", async () => {
     const id = await createMonkAt("EDITION_2014", "UnarmedEdition 2014-L20", 20);
     const char = (await get(id)).body;
     const keys = (char.availableActions as { key: string }[]).map((a) => a.key);
 
     for (const tagged of [
-      "flurryOfBlows",
       "patientDefense",
       "patientDefenseFocus",
       "stepOfTheWind",
@@ -114,5 +116,40 @@ describe("unarmedStrike Martial Arts die forks on rulesEdition (#1499)", () => {
       expect(keys).not.toContain(tagged);
     }
     expect(keys).toContain("bonusUnarmedStrike");
+    expect(keys).toContain("flurryOfBlows");
+    expect(keys).toContain("patientDefenseKi");
+    expect(keys).toContain("stepOfTheWindKi");
+  });
+});
+
+// #1500 AC — proven at the real derivation/wire layer (GET /api/characters/:id),
+// not just against the in-memory MONK_FEATURES seed array (monk-2014-snapshot.test.ts).
+describe("2014 Monk base-class feature list (#1500)", () => {
+  it("L1: Unarmored Defense + Martial Arts in features, no resource pool yet", async () => {
+    const id = await createMonkAt("EDITION_2014", "UnarmedEdition 2014-FeatureList-L1", 1);
+    const char = (await get(id)).body;
+    const names = (char.resources.features as { name: string }[]).map((f) => f.name);
+    expect(names).toContain("Unarmored Defense");
+    expect(names).toContain("Martial Arts");
+    expect(char.resources.pools).toEqual([]);
+  });
+
+  it("L20: contains every 2014-only name and excludes every 2024-only name (converse holds for a 2024 monk)", async () => {
+    const id2014 = await createMonkAt("EDITION_2014", "UnarmedEdition 2014-FeatureList-L20", 20);
+    const id2024 = await createMonkAt("EDITION_2024", "UnarmedEdition 2024-FeatureList-L20", 20);
+    const names2014 = ((await get(id2014)).body.resources.features as { name: string }[]).map((f) => f.name);
+    const names2024 = ((await get(id2024)).body.resources.features as { name: string }[]).map((f) => f.name);
+
+    const ONLY_2014 = ["Stillness of Mind", "Purity of Body", "Tongue of the Sun and Moon", "Diamond Soul", "Timeless Body", "Empty Body", "Perfect Self"];
+    const ONLY_2024 = ["Uncanny Metabolism", "Heightened Focus", "Self-Restoration", "Deflect Energy", "Perfect Focus", "Superior Defense", "Body and Mind"];
+
+    for (const name of ONLY_2014) {
+      expect(names2014, name).toContain(name);
+      expect(names2024, name).not.toContain(name);
+    }
+    for (const name of ONLY_2024) {
+      expect(names2024, name).toContain(name);
+      expect(names2014, name).not.toContain(name);
+    }
   });
 });

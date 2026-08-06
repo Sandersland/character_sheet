@@ -16,6 +16,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { characterInclude } from "@/lib/character/character-include.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
+import { seededSpeciesId } from "@/test-support/species.js";
 
 const OWNER_ID = "owner-1524-character-include";
 let COOKIE: string;
@@ -34,13 +35,14 @@ afterEach(async () => {
 });
 
 async function createFighter(name: string, subclassName: string | null): Promise<string> {
+  const speciesId = await seededSpeciesId();
   const res = await supertest(app)
     .post("/api/characters")
     .set("Cookie", COOKIE)
     .send({
       name,
       alignment: "True Neutral",
-      race: "Hill Dwarf",
+      speciesId,
       background: "Soldier",
       classes: [{ name: "Fighter" }],
       abilityScores: ABILITY_SCORES,
