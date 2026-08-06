@@ -35,7 +35,7 @@ export function PrivateToggle({
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        className="h-3.5 w-3.5 accent-garnet-600"
+        className="h-3.5 w-3.5 accent-garnet-soft-surface"
       />
       {label}
     </label>

@@ -223,7 +223,7 @@ export function AttackCounter({
           <span
             key={i}
             className={`inline-block h-2.5 w-2.5 rounded-full ${
-              i < used ? "bg-parchment-300" : "bg-garnet-600"
+              i < used ? "bg-parchment-300" : "bg-garnet-soft-surface"
             }`}
           />
         ))}

@@ -11,10 +11,11 @@ interface MeterBarProps {
 
 const TONE_FILL: Record<MeterTone, string> = {
   // Deliberately NOT garnet-surface (#994): a meter fill's contrast reference is
-  // its own parchment-200 track, not the page. garnet-600 clears 3.95:1 there;
-  // garnet-surface measures 2.65:1 and would fail SC 1.4.11 in dark. Needs its
-  // own meter-fill token — see #1403.
-  garnet: "bg-garnet-600",
+  // its own parchment-200 track, not the page. garnet-surface measures 2.65:1
+  // there and would fail SC 1.4.11 in dark. garnet-meter (#1403) is a dedicated
+  // non-inverting token frozen to today's garnet-600 values (3.95:1 dark /
+  // 3.56:1 light against the track) — see index.css's @theme comment.
+  garnet: "bg-garnet-meter",
   arcane: "bg-arcane-500",
   gold: "bg-gold-500",
   vitality: "bg-vitality-500",

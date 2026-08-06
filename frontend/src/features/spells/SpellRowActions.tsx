@@ -45,7 +45,7 @@ function PrepareRune({ spell, budget, busy, onPrepare }: Pick<SpellRowActionsPro
       }
       className={`h-5 w-5 shrink-0 rounded-full border transition-colors disabled:opacity-40 ${
         state === "prepared"
-          ? "border-garnet-700 bg-garnet-600 ring-2 ring-garnet-50"
+          ? "border-garnet-700 bg-garnet-soft-surface ring-2 ring-garnet-50"
           : `border-parchment-400 bg-parchment-50 hover:border-garnet-500 ${blocked ? "opacity-50" : ""}`
       }`}
     />

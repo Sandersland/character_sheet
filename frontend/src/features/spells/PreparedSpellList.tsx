@@ -16,7 +16,7 @@ function RosterRow({ spell, cantrip }: { spell: Spell; cantrip: boolean }) {
     <div className="flex items-center gap-2.5 border-b border-dotted border-parchment-300 py-1.5 last:border-b-0">
       <span
         aria-hidden="true"
-        className={`h-3 w-3 shrink-0 rounded-full ${cantrip ? "bg-arcane-500 ring-2 ring-arcane-100" : "bg-garnet-600 ring-2 ring-garnet-50"}`}
+        className={`h-3 w-3 shrink-0 rounded-full ${cantrip ? "bg-arcane-500 ring-2 ring-arcane-100" : "bg-garnet-soft-surface ring-2 ring-garnet-50"}`}
       />
       <span className="font-medium text-parchment-900">{spell.name}</span>
       <span className="ml-auto text-[10px] uppercase tracking-wide text-parchment-500">{tag}</span>

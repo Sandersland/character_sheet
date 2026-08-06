@@ -46,7 +46,7 @@ interface AttackStepCardProps {
 }
 
 const DOT_STYLE: Record<StepState, string> = {
-  done: "border-garnet-600 bg-garnet-600 text-parchment-50",
+  done: "border-garnet-600 bg-garnet-soft-surface text-garnet-on-surface",
   active: "border-garnet-600 bg-parchment-50 text-garnet-700",
   pending: "border-parchment-300 bg-parchment-50 text-parchment-400",
 };
@@ -102,7 +102,7 @@ export function AttackKickerPips({ attack }: { attack: AttackState | null }) {
           <span
             key={i}
             className={`inline-block h-2 w-2 rounded-full ${
-              i < attack.used ? "bg-parchment-300" : "bg-garnet-600"
+              i < attack.used ? "bg-parchment-300" : "bg-garnet-soft-surface"
             }`}
           />
         ))}
@@ -229,7 +229,7 @@ function RollToHitStep({
             disabled={attacksExhausted}
             onClick={onRollToHit}
             title={attacksExhausted ? "No attacks remaining" : undefined}
-            className="min-h-11 shrink-0 rounded-control bg-garnet-600 px-3 text-xs font-semibold text-parchment-50 transition-colors hover:bg-garnet-700 disabled:cursor-not-allowed disabled:opacity-40"
+            className="min-h-11 shrink-0 rounded-control bg-garnet-soft-surface px-3 text-xs font-semibold text-garnet-on-surface transition-colors hover:bg-garnet-soft-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
           >
             {attackOrdinalLabel(attack)}
           </button>
@@ -388,7 +388,7 @@ function ContinueOrSkip({
     <button
       type="button"
       onClick={onNext}
-      className="min-h-11 w-full rounded-control bg-garnet-600 px-3 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-700"
+      className="min-h-11 w-full rounded-control bg-garnet-soft-surface px-3 text-sm font-semibold text-garnet-on-surface transition-colors hover:bg-garnet-soft-surface-hover"
     >
       Next
     </button>

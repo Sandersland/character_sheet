@@ -102,7 +102,7 @@ describe("garnet brand-surface tokens (#994)", () => {
       // parchment-100 is the page background, parchment-50 is the Card surface
       // brand fills sit on — the two backgrounds a resting fill must read as a
       // shape against. parchment-200 (meter tracks) is deliberately excluded:
-      // MeterBar stays on garnet-600 (2.65:1 vs its own track) — see #994 follow-up.
+      // MeterBar has its own dedicated --color-garnet-meter token — see #1403.
       expect(ratio(tokens["garnet-surface"], tokens["parchment-100"])).toBeGreaterThanOrEqual(3);
       expect(ratio(tokens["garnet-surface"], tokens["parchment-50"])).toBeGreaterThanOrEqual(3);
     });
@@ -130,5 +130,75 @@ describe("garnet brand-surface tokens (#994)", () => {
   it("mutation: light surface -> the issue's original garnet-600 value breaks light-lock", () => {
     const mutated: Record<string, string> = { ...light, "garnet-surface": "#cf1124" };
     expect(mutated["garnet-surface"]).not.toBe(mutated["garnet-700"]);
+  });
+});
+
+describe("garnet-meter token (#1403)", () => {
+  it("both themes are byte-identical to today's garnet-600 (zero visual drift)", () => {
+    expect(light["garnet-meter"]).toBe(light["garnet-600"]);
+    expect(dark["garnet-meter"]).toBe(dark["garnet-600"]);
+  });
+
+  for (const [name, tokens] of Object.entries(THEMES)) {
+    it(`${name}: meter fill clears 3:1 (SC 1.4.11) against its own track (parchment-200)`, () => {
+      // The meter's contrast reference is its OWN track, never the page —
+      // garnet-surface (2.65:1 dark) fails this bar; garnet-meter is tuned
+      // against it directly. See index.css's @theme comment for the ratios.
+      expect(ratio(tokens["garnet-meter"], tokens["parchment-200"])).toBeGreaterThanOrEqual(3);
+    });
+  }
+
+  it("mutation: garnet-surface's dark value fails the meter's track bar", () => {
+    const mutated: Record<string, string> = { ...dark, "garnet-meter": dark["garnet-surface"] }; // #da2233, 2.65:1
+    expect(ratio(mutated["garnet-meter"], mutated["parchment-200"])).toBeLessThan(3);
+  });
+});
+
+describe("garnet-soft-surface tokens (#1404, family B)", () => {
+  it("light values are byte-identical to today's garnet-600/-700 (zero visual drift)", () => {
+    expect(light["garnet-soft-surface"]).toBe(light["garnet-600"]);
+    expect(light["garnet-soft-surface-hover"]).toBe(light["garnet-700"]);
+  });
+
+  it("light resting value stays distinct from garnet-surface (family A vs B two-intensity distinction)", () => {
+    // The whole point of NOT collapsing onto garnet-surface: family A rests at
+    // garnet-700, family B at garnet-600 — two different brand-intensity levels
+    // in light mode. If this ever passes with them equal, the token collapsed.
+    expect(light["garnet-soft-surface"]).not.toBe(light["garnet-surface"]);
+  });
+
+  it("dark deliberately converges with garnet-surface/-hover (documented in index.css)", () => {
+    // The legal band simultaneously clearing AA 4.5:1 (text) and SC 3:1 (page/
+    // card) is only ~11% of relative luminance wide (see the #994 @theme
+    // comment) — a second value squeezed into it would be visually
+    // indistinguishable, so soft-surface's dark value converges on purpose.
+    expect(dark["garnet-soft-surface"]).toBe(dark["garnet-surface"]);
+    expect(dark["garnet-soft-surface-hover"]).toBe(dark["garnet-surface-hover"]);
+  });
+
+  for (const [name, tokens] of Object.entries(THEMES)) {
+    it(`${name}: garnet-on-surface label clears 4.5:1 against soft-surface/-hover`, () => {
+      expect(ratio(tokens["garnet-on-surface"], tokens["garnet-soft-surface"])).toBeGreaterThanOrEqual(4.5);
+      expect(ratio(tokens["garnet-on-surface"], tokens["garnet-soft-surface-hover"])).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it(`${name}: soft-surface clears 3:1 (SC 1.4.11) against the page and the card`, () => {
+      expect(ratio(tokens["garnet-soft-surface"], tokens["parchment-100"])).toBeGreaterThanOrEqual(3);
+      expect(ratio(tokens["garnet-soft-surface"], tokens["parchment-50"])).toBeGreaterThanOrEqual(3);
+    });
+
+    it(`${name}: hover darkens relative to resting (never lightens)`, () => {
+      expect(relativeLuminance(tokens["garnet-soft-surface-hover"])).toBeLessThan(
+        relativeLuminance(tokens["garnet-soft-surface"]),
+      );
+    });
+  }
+
+  it("mutation: dark soft-surface -> today's inverted garnet-600 fails the label's AA text bar", () => {
+    // #ec5d68 (dark garnet-600) actually PASSES the page-boundary bar (it's a light
+    // salmon against a dark page) — the bug it produces is a label that no longer
+    // reads: on-surface's white label drops to 3.15:1 against it, under AA 4.5.
+    const mutated: Record<string, string> = { ...dark, "garnet-soft-surface": dark["garnet-600"] }; // #ec5d68
+    expect(ratio(mutated["garnet-on-surface"], mutated["garnet-soft-surface"])).toBeLessThan(4.5);
   });
 });
