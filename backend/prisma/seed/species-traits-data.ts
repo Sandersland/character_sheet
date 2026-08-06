@@ -12,14 +12,18 @@
 // — the variant rows themselves are seeded in #1679).
 //
 // Derived vs announce-only (owner ruling 2026-08-03, including darkvision —
-// visible information, not a derived combat stat): the ONLY targets the
-// existing FeatImprovement vocabulary (srd/feats.ts) can express for a
-// species trait are `maxHp` (perLevel), `armorProficiency`, and
-// `weaponProficiency` — there is no `resistance`/`advantageOnSave` target, so
-// every resistance/advantage/spell/Tool-like trait (Dwarven Resilience,
-// Fey Ancestry, Hellish Resistance, Gnome Cunning, …) stays announce-only
-// cited text (`improvements` omitted). This is not a content gap — extending
-// the vocabulary is out of this slice's scope (not requested by #1682).
+// visible information, not a derived combat stat): the targets the existing
+// FeatImprovement vocabulary (srd/feats.ts) can express for a species trait
+// are `maxHp` (perLevel), `armorProficiency`, `weaponProficiency`, and
+// `skillProficiency` (a FIXED skill grant is derivable — base 2014 Elf's Keen
+// Senses rides it, #1754; a skill CHOICE is instead a `choice` spec, e.g. the
+// 2024 Elf's Keen Senses, #1690). There is still no `resistance`/
+// `advantageOnSave` target, so every resistance/advantage/spell/Tool-like
+// trait (Dwarven Resilience, Fey Ancestry, Hellish Resistance, Gnome Cunning,
+// Trance, Mask of the Wild, Sunlight Sensitivity, …) stays announce-only cited
+// text (`improvements` omitted); Darkvision/Superior Darkvision stay
+// announce-only by owner ruling. This is not a content gap — extending the
+// vocabulary is out of scope.
 //
 // Choice-bearing traits: Half-Elf Skill Versatility and High Elf Cantrip carry
 // a real `choice` spec as of #1689 (speciesTraitChoiceSchema, lib/srd/
@@ -213,6 +217,17 @@ const ELF_2014: SpeciesTraitSeed[] = [
   {
     speciesSlug: "elf",
     speciesEdition: "EDITION_2014",
+    // Species-level (every 2014 elf variant inherits it, #1754). A FIXED
+    // Perception grant, so a real derived skillProficiency improvement, not
+    // announce-only text — the 2024 Elf's Keen Senses is instead a `choice`
+    // (Insight/Perception/Survival, #1690).
+    name: "Keen Senses",
+    description: "You have proficiency in the Perception skill. (SRD 5.1 p. 21)",
+    improvements: [{ target: "skillProficiency", amount: 1, key: "perception" }],
+  },
+  {
+    speciesSlug: "elf",
+    speciesEdition: "EDITION_2014",
     variantSlug: "high",
     name: "Elf Weapon Training",
     description: "You have proficiency with the longsword, shortsword, shortbow, and longbow. (SRD 5.1 p. 24)",
@@ -277,16 +292,15 @@ const ELF_2014: SpeciesTraitSeed[] = [
     ],
   },
   // Astral Elf (#1751) — Spelljammer: Astral Adventurer's Guide, non-SRD, so
-  // cited SJ:AAG (not SRD/PHB). All announce-only. Astral Fire's cantrip +
-  // casting-ability pick and Astral Trance's per-rest skill/tool pick are
-  // genuine choices, not creation-time FeatImprovements. Keen Senses (a fixed
-  // Perception proficiency) COULD be a `skillProficiency` improvement — that
-  // target exists (srd/feats.ts) — but is left announce-only to match the base
-  // Elf, whose own Keen Senses isn't seeded species-level either; deriving one
-  // without the other is out of scope here. Base Elf's Darkvision/Fey Ancestry
-  // are species-level and render for this variant too — not re-declared here;
-  // Astral Trance supersedes the base Trance the way Drow's Superior Darkvision
-  // supersedes base Darkvision.
+  // cited SJ:AAG (not SRD/PHB), announce-only. Astral Fire's cantrip +
+  // casting-ability pick and Astral Trance's per-rest skill/tool pick remain
+  // genuine choices, not creation-time FeatImprovements. Keen Senses is NOT
+  // re-declared here: the base Elf's own species-level Keen Senses is a fixed
+  // skillProficiency:perception grant (SRD 5.1 p. 21, #1754) that renders for
+  // this variant exactly the way base Darkvision/Fey Ancestry do
+  // (buildSpeciesTraitsView collects every species-level row), so an
+  // astral-specific row would ship a duplicate. Astral Trance supersedes the
+  // base Trance the way Drow's Superior Darkvision supersedes base Darkvision.
   {
     speciesSlug: "elf",
     speciesEdition: "EDITION_2014",
@@ -310,13 +324,6 @@ const ELF_2014: SpeciesTraitSeed[] = [
     name: "Astral Trance",
     description:
       "You don't need to sleep, and magic can't put you to sleep. You can finish a long rest in 4 hours if you spend those hours in a trancelike meditation, during which you remain conscious. Whenever you finish this trance, you gain proficiency in one skill and with one weapon or tool of your choice. This supersedes the base Elf Trance trait. (SJ:AAG p. 10)",
-  },
-  {
-    speciesSlug: "elf",
-    speciesEdition: "EDITION_2014",
-    variantSlug: "astral",
-    name: "Keen Senses",
-    description: "You have proficiency in the Perception skill. (SJ:AAG p. 10)",
   },
 ];
 

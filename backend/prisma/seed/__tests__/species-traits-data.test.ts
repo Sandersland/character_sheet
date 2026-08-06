@@ -44,8 +44,8 @@ describe("Astral Elf variant traits (#1751, Spelljammer / SJ:AAG — announce-on
     (t) => t.speciesSlug === "elf" && t.speciesEdition === "EDITION_2014" && t.variantSlug === "astral",
   );
 
-  it("seeds Astral Fire, Starlight Step, Astral Trance, and Keen Senses", () => {
-    expect(astralTraits.map((t) => t.name).sort()).toEqual(["Astral Fire", "Astral Trance", "Keen Senses", "Starlight Step"]);
+  it("seeds Astral Fire, Starlight Step, and Astral Trance", () => {
+    expect(astralTraits.map((t) => t.name).sort()).toEqual(["Astral Fire", "Astral Trance", "Starlight Step"]);
   });
 
   it("every Astral Elf trait is announce-only (no improvements) and cites SJ:AAG", () => {
@@ -54,6 +54,13 @@ describe("Astral Elf variant traits (#1751, Spelljammer / SJ:AAG — announce-on
       expect(trait.improvements ?? [], trait.name).toHaveLength(0);
       expect(trait.description, trait.name).toContain("SJ:AAG");
     }
+  });
+
+  it("carries no Astral-specific Keen Senses row — the fixed Perception grant is now the base species-level trait Astral inherits (#1754 dup guard)", () => {
+    const astralKeenSenses = SPECIES_TRAITS.filter(
+      (t) => t.speciesSlug === "elf" && t.variantSlug === "astral" && t.name === "Keen Senses",
+    );
+    expect(astralKeenSenses).toHaveLength(0);
   });
 });
 
@@ -68,11 +75,19 @@ describe("derived subset — the ONLY traits carrying `improvements` (issue #168
         "dwarf::EDITION_2014::hill::Dwarven Toughness",
         "dwarf::EDITION_2014::mountain::Dwarven Armor Training",
         "dwarf::EDITION_2024::base::Dwarven Toughness",
+        "elf::EDITION_2014::base::Keen Senses",
         "elf::EDITION_2014::drow::Drow Weapon Training",
         "elf::EDITION_2014::high::Elf Weapon Training",
         "elf::EDITION_2014::wood::Elf Weapon Training",
       ].sort(),
     );
+  });
+
+  it("base 2014 Elf's Keen Senses grants a fixed Perception skill proficiency, a derived skillProficiency improvement (SRD 5.1 p. 21, #1754)", () => {
+    const keenSenses = SPECIES_TRAITS.find(
+      (t) => t.speciesSlug === "elf" && t.speciesEdition === "EDITION_2014" && !t.variantSlug && t.name === "Keen Senses",
+    );
+    expect(keenSenses?.improvements).toEqual([{ target: "skillProficiency", amount: 1, key: "perception" }]);
   });
 
   it("Hill Dwarf's Dwarven Toughness is a perLevel maxHp improvement, +1", () => {

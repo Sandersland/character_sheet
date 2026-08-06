@@ -192,6 +192,44 @@ describe("SpeciesTrait.improvements (#1682) — level-down scales Dwarven Toughn
   });
 });
 
+describe("SpeciesTrait.improvements (#1754) — base 2014 Elf Keen Senses derives fixed Perception proficiency", () => {
+  it("a 2014 Wood Elf gains Perception as a derived skill proficiency and shows a Keen Senses trait", async () => {
+    const elf = await prisma.species.findFirstOrThrow({ where: { slug: "elf", edition: "EDITION_2014" }, include: { variants: true } });
+    const woodElf = elf.variants.find((v) => v.slug === "wood")!;
+
+    const id = await createCharacter({ rulesEdition: "EDITION_2014", speciesId: elf.id, variantId: woodElf.id });
+
+    const res = await get(id);
+    expect(res.status).toBe(200);
+    const perception = res.body.skills.find((s: { name: string }) => s.name === "perception");
+    expect(perception.proficient).toBe(true);
+    const traitNames = res.body.speciesTraits.map((t: { name: string }) => t.name);
+    expect(traitNames).toContain("Keen Senses");
+  });
+
+  it("an Astral Elf inherits the base species-level Keen Senses: Perception proficient, and exactly ONE Keen Senses trait (no duplicate)", async () => {
+    const elf = await prisma.species.findFirstOrThrow({ where: { slug: "elf", edition: "EDITION_2014" }, include: { variants: true } });
+    const astralElf = elf.variants.find((v) => v.slug === "astral")!;
+
+    // Astral Elf's floating +2/+1 replaces the base Elf's fixed increase (#1751),
+    // so a legal spread is required at creation — unrelated to the Keen Senses
+    // grant under test.
+    const id = await createCharacter({
+      rulesEdition: "EDITION_2014",
+      speciesId: elf.id,
+      variantId: astralElf.id,
+      speciesAbilities: { strength: 2, wisdom: 1 },
+    });
+
+    const res = await get(id);
+    expect(res.status).toBe(200);
+    const perception = res.body.skills.find((s: { name: string }) => s.name === "perception");
+    expect(perception.proficient).toBe(true);
+    const keenSenses = res.body.speciesTraits.filter((t: { name: string }) => t.name === "Keen Senses");
+    expect(keenSenses).toHaveLength(1);
+  });
+});
+
 describe("SpeciesTrait.improvements (#1682) — 2024 species shows edition-specific trait text (transcription-rule fork)", () => {
   it("a 2024 Dwarf's Darkvision/Dwarven Toughness text cites SRD 5.2/PHB'24, not SRD 5.1, even where the mechanic (Dwarven Toughness maxHp) agrees", async () => {
     const dwarf2024 = await prisma.species.findFirstOrThrow({ where: { slug: "dwarf", edition: "EDITION_2024" } });
