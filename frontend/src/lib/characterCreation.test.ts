@@ -215,8 +215,9 @@ const HALF_ELF_SPECIES: SpeciesOption = {
   variants: [],
 };
 
-// #1689: Elf-shape species with a High Elf variant carrying chooseCantrip —
-// the wizard list, Intelligence-keyed (matches the real seeded content).
+// #1689/#1756: Elf-shape species with a High Elf variant carrying a class-list
+// chooseCantrip (wizard, Intelligence-keyed) and an Astral Elf variant carrying
+// a named-spells chooseCantrip with NO fixed ability (needsCastingAbility:true).
 const ELF_SPECIES: SpeciesOption = {
   id: "sp-elf2",
   name: "Elf",
@@ -235,6 +236,16 @@ const ELF_SPECIES: SpeciesOption = {
       needsCastingAbility: false,
       chooseSkills: null,
       chooseCantrip: { list: "wizard", castingAbility: "intelligence" },
+      chooseOriginFeat: false,
+    },
+    {
+      id: "var-astral",
+      name: "Astral Elf",
+      slug: "astral",
+      abilityIncreases: [],
+      needsCastingAbility: true,
+      chooseSkills: null,
+      chooseCantrip: { spells: ["Dancing Lights", "Light", "Sacred Flame"] },
       chooseOriginFeat: false,
     },
   ],
@@ -407,6 +418,15 @@ describe("deriveSpeciesCantripChoice (#1689, High Elf's Cantrip)", () => {
     const complete = deriveSpeciesCantripChoice(completedDraft, resolveSelections(speciesReference, completedDraft));
     expect(complete.selectedId).toBe("spell-fire-bolt");
     expect(complete.complete).toBe(true);
+  });
+
+  it("forwards Astral Fire's named spells list and its absent casting ability (#1756)", () => {
+    const draft = makeDraft({ speciesId: "sp-elf2", variantId: "var-astral" });
+    const choice = deriveSpeciesCantripChoice(draft, resolveSelections(speciesReference, draft));
+    expect(choice.applicable).toBe(true);
+    expect(choice.spells).toEqual(["Dancing Lights", "Light", "Sacred Flame"]);
+    expect(choice.list).toBeUndefined();
+    expect(choice.castingAbility).toBeUndefined();
   });
 });
 
@@ -672,11 +692,23 @@ describe("buildCreatePayload", () => {
     expect(buildCreatePayload(incomplete, sel2, deriveSkillChoices(incomplete, sel2), []).speciesSkills).toBeUndefined();
   });
 
-  it("sends a completed speciesCantripId choice (#1689, High Elf's Cantrip)", () => {
+  it("sends a completed speciesCantripId choice (#1689, High Elf's Cantrip) and NO castingAbility (its ability is fixed)", () => {
     const draft = makeDraft({ name: "X", className: "Fighter", speciesId: "sp-elf2", variantId: "var-high", speciesCantripId: "spell-fire-bolt" });
     const selections = resolveSelections(speciesReference, draft);
     const payload = buildCreatePayload(draft, selections, deriveSkillChoices(draft, selections), []);
     expect(payload.speciesCantripId).toBe("spell-fire-bolt");
+    expect(payload.castingAbility).toBeUndefined();
+  });
+
+  it("sends both speciesCantripId and the chosen castingAbility for an Astral Elf draft (#1756)", () => {
+    const draft = makeDraft({
+      name: "X", className: "Fighter", speciesId: "sp-elf2", variantId: "var-astral",
+      speciesCantripId: "spell-light", castingAbility: "wisdom",
+    });
+    const selections = resolveSelections(speciesReference, draft);
+    const payload = buildCreatePayload(draft, selections, deriveSkillChoices(draft, selections), []);
+    expect(payload.speciesCantripId).toBe("spell-light");
+    expect(payload.castingAbility).toBe("wisdom");
   });
 
   it("omits speciesCantripId for a species with no chooseCantrip spec and when unset", () => {

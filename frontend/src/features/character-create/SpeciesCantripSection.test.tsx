@@ -89,6 +89,31 @@ describe("SpeciesCantripSection (#1689)", () => {
     expect(onChange).toHaveBeenCalledWith("");
   });
 
+  it("a spells-spec (#1756) fetches all cantrips and narrows to exactly its named options", async () => {
+    const catalog = [
+      spell({ id: "dl", name: "Dancing Lights" }),
+      spell({ id: "li", name: "Light" }),
+      spell({ id: "sf", name: "Sacred Flame" }),
+      spell({ id: "fb", name: "Fire Bolt" }),
+    ];
+    fetchMock.mockResolvedValue(catalog);
+    renderSection({ list: undefined, castingAbility: undefined, spells: ["Dancing Lights", "Light", "Sacred Flame"] });
+
+    // Every named option renders; the off-list cantrip (Fire Bolt) does not.
+    expect(await screen.findByRole("button", { name: "Open Dancing Lights" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open Light" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open Sacred Flame" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open Fire Bolt" })).not.toBeInTheDocument();
+    // No class list: the catalog is queried unfiltered by class (all cantrips).
+    expect(fetchMock).toHaveBeenCalledWith("EDITION_2024", { className: undefined, maxLevel: 0 });
+  });
+
+  it("names the player's chosen ability generically when the spec fixes none (#1756)", async () => {
+    fetchMock.mockResolvedValue([spell({ id: "li", name: "Light" })]);
+    renderSection({ list: undefined, castingAbility: undefined, spells: ["Light"] });
+    expect(await screen.findByText(/your chosen casting ability applies to it/)).toBeInTheDocument();
+  });
+
   it("surfaces a catalog load error", async () => {
     fetchMock.mockRejectedValue(new Error("boom"));
     renderSection();

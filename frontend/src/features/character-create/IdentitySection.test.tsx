@@ -109,6 +109,32 @@ const reference: ReferenceData = {
         },
       ],
     },
+    // #1756: a 2014 Elf-shaped species whose Astral Elf variant opens the
+    // casting-ability choice (chooseCantrip with no fixed ability →
+    // needsCastingAbility:true) while High Elf fixes it (needsCastingAbility:false).
+    {
+      id: "sp-elf-2014",
+      name: "Elf (2014)",
+      slug: "elf-2014",
+      speed: 30,
+      abilityIncreases: [],
+      needsCastingAbility: false,
+      chooseSkills: null,
+      chooseCantrip: null,
+      chooseOriginFeat: false,
+      variants: [
+        {
+          id: "var-astral", name: "Astral Elf", slug: "astral", abilityIncreases: [],
+          needsCastingAbility: true, chooseSkills: null,
+          chooseCantrip: { spells: ["Dancing Lights", "Light", "Sacred Flame"] }, chooseOriginFeat: false,
+        },
+        {
+          id: "var-high", name: "High Elf", slug: "high", abilityIncreases: [],
+          needsCastingAbility: false, chooseSkills: null,
+          chooseCantrip: { list: "wizard", castingAbility: "intelligence" }, chooseOriginFeat: false,
+        },
+      ],
+    },
   ],
   classes: [],
   backgrounds: [],
@@ -181,6 +207,16 @@ describe("IdentitySection — casting-ability picker (#1683)", () => {
 
   it("renders no picker for a non-spell-granting variant (Wood Elf)", () => {
     renderSection(makeDraft({ speciesId: "sp-elf-2024", variantId: "var-wood" }));
+    expect(screen.queryByRole("group", { name: /casting ability/i })).not.toBeInTheDocument();
+  });
+
+  it("renders the picker for a 2014 Astral Elf (open-ability chooseCantrip, #1756)", () => {
+    renderSection(makeDraft({ speciesId: "sp-elf-2014", variantId: "var-astral" }));
+    expect(screen.getByRole("group", { name: /casting ability/i })).toBeInTheDocument();
+  });
+
+  it("renders no picker for a 2014 High Elf (its cantrip ability is fixed, #1756)", () => {
+    renderSection(makeDraft({ speciesId: "sp-elf-2014", variantId: "var-high" }));
     expect(screen.queryByRole("group", { name: /casting ability/i })).not.toBeInTheDocument();
   });
 

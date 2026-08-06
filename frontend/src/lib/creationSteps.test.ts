@@ -218,9 +218,22 @@ const highElfSpecies: SpeciesOption = {
       chooseCantrip: { list: "wizard", castingAbility: "intelligence" },
       chooseOriginFeat: false,
     },
+    // #1756: Astral Elf — a named-spells chooseCantrip with NO fixed ability, so
+    // it ALSO gates the identity step on a casting-ability pick.
+    {
+      id: "var-astral",
+      name: "Astral Elf",
+      slug: "astral",
+      abilityIncreases: [],
+      needsCastingAbility: true,
+      chooseSkills: null,
+      chooseCantrip: { spells: ["Dancing Lights", "Light", "Sacred Flame"] },
+      chooseOriginFeat: false,
+    },
   ],
 };
 const highElfVariant = highElfSpecies.variants[0];
+const astralElfVariant = highElfSpecies.variants[1];
 
 // #1690: 2024 Human-shape species fixture carrying chooseOriginFeat — used by
 // the "skills" step's own missing-gate tests below, alongside halfElfSpecies.
@@ -385,6 +398,24 @@ describe("creationStepMissing", () => {
     expect(creationStepMissing("identity", withChoice, selection)).toEqual([]);
   });
 
+  // #1756: Astral Elf's open-ability chooseCantrip gates the identity step the
+  // same way a spell-granting lineage does — needsCastingAbility drives both.
+  it("identity blocks an Astral Elf draft with no castingAbility, and clears once one is chosen", () => {
+    const draft = makeDraft({
+      name: "A",
+      alignment: "Neutral Good",
+      speciesId: "sp-elf2",
+      variantId: "var-astral",
+      className: "Rogue",
+      background: "Sage",
+    });
+    const selection = sel({ class: rogue, species: highElfSpecies, variant: astralElfVariant });
+    expect(creationStepMissing("identity", draft, selection)).toEqual(["Casting ability"]);
+
+    const withChoice = makeDraft({ ...draft, castingAbility: "wisdom" });
+    expect(creationStepMissing("identity", withChoice, selection)).toEqual([]);
+  });
+
   it("identity never gates a non-spell-granting variant on a casting ability", () => {
     const draft = makeDraft({
       name: "A",
@@ -518,6 +549,17 @@ describe("creationStepMissing", () => {
     ]);
     const complete = makeDraft({ className: "Rogue", speciesId: "sp-elf2", variantId: "var-high", speciesCantripId: "spell-fire-bolt" });
     expect(creationStepMissing("spells", complete, sel({ class: rogue, species: highElfSpecies, variant: highElfVariant }))).toEqual([]);
+  });
+
+  // #1756: Astral Fire — same spells-step gate as High Elf, driven by the
+  // named-spells chooseCantrip spec rather than a class list.
+  it("spells gates an incomplete species cantrip choice (Astral Elf) until one is picked", () => {
+    const missing = makeDraft({ className: "Rogue", speciesId: "sp-elf2", variantId: "var-astral" });
+    expect(creationStepMissing("spells", missing, sel({ class: rogue, species: highElfSpecies, variant: astralElfVariant }))).toEqual([
+      "Species cantrip",
+    ]);
+    const complete = makeDraft({ className: "Rogue", speciesId: "sp-elf2", variantId: "var-astral", speciesCantripId: "spell-light" });
+    expect(creationStepMissing("spells", complete, sel({ class: rogue, species: highElfSpecies, variant: astralElfVariant }))).toEqual([]);
   });
 
   it("equipment gates a started-but-incomplete package", () => {
