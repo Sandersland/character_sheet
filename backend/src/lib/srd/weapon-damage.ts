@@ -114,6 +114,10 @@ interface OffHandDamageInput {
  * `Math.max(0, …)` is that "unless negative" clause: only a positive modifier
  * is dropped.
  *
+ * `keepAbilityModifier` is the caller-resolved eligibility check — as of #1640
+ * that's `hasOffHandAbilityDamage`'s composite of "style taken" AND "both
+ * equipped weapons are Light" (`bothWeaponsLight`), not the style alone.
+ *
  * Returns the input with `damageModifier` AND `abilityModifier` reduced by the
  * same amount, which is what keeps `deriveWeaponDamage`'s
  * `abilityModifier + meleeDamageBonus === damageModifier` invariant true through
@@ -127,10 +131,10 @@ interface OffHandDamageInput {
  */
 export function deriveOffHandDamage<T extends OffHandDamageInput>(
   damage: T,
-  hasTwoWeaponFightingStyle: boolean,
+  keepAbilityModifier: boolean,
 ): T {
   const abilityMod = damage.abilityModifier;
-  if (hasTwoWeaponFightingStyle || abilityMod === undefined) return damage;
+  if (keepAbilityModifier || abilityMod === undefined) return damage;
   const dropped = Math.max(0, abilityMod);
   return {
     ...damage,
