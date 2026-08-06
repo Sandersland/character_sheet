@@ -1,11 +1,11 @@
 ---
 name: issues
-description: Triage, refine, and label GitHub issues so each is either clearly ready to work or clearly flagged as needing decisions. Use when creating a new issue, refining or triaging the backlog, deciding whether issues are ready to assign, splitting an epic into sub-issues, or applying the readiness labels. Triggers include "refine the issues", "are these issues ready", "triage the backlog", "get the issues ready to work on", "file an issue for X". This is the management/triage counterpart to parallel-issues (which only builds issues already marked `ready`).
+description: Triage, refine, and label GitHub issues so each is either clearly ready to work or clearly flagged as needing decisions. Use when creating a new issue, refining or triaging the backlog, deciding whether issues are ready to assign, splitting an epic into sub-issues, or applying the readiness labels. Triggers include "refine the issues", "are these issues ready", "triage the backlog", "get the issues ready to work on", "file an issue for X". This skill owns triage and readiness labeling; building the `ready` issues is a separate step.
 ---
 
 # issues
 
-How we manage GitHub issues in this repo. The goal is that at any moment you can look at the backlog and know, per issue, whether it is **ready to work** or **still needs a decision** — no reading the whole body to find out. This skill owns *creating, refining, triaging, and labeling*. Building issues is a separate skill (`parallel-issues`), which only consumes issues already marked `ready`.
+How we manage GitHub issues in this repo. The goal is that at any moment you can look at the backlog and know, per issue, whether it is **ready to work** or **still needs a decision** — no reading the whole body to find out. This skill owns *creating, refining, triaging, and labeling*. Building issues is a separate step that only consumes issues already marked `ready` — typically one-PR-per-issue in git worktrees, in parallel via subagents/workflows when independent.
 
 Use `gh` for all issue operations.
 
@@ -15,11 +15,11 @@ Every open issue carries exactly one of these three labels at all times. They ar
 
 | Label | Color | Meaning |
 |---|---|---|
-| `ready` | `2EA043` (green) | Refined and assignable **right now** — clear scope, acceptance criteria, no open decisions. `parallel-issues` will only build these. |
+| `ready` | `2EA043` (green) | Refined and assignable **right now** — clear scope, acceptance criteria, no open decisions. Only these get built. |
 | `needs-refinement` | `D93F0B` (orange) | Has an open decision, ambiguity, or missing scope. Must be refined before it can be worked. Also covers discovery **spikes** (their deliverable is a proposal) and items **backlogged pending a decision**. |
 | `epic` | `6F42C1` (purple) | A tracking/parent issue. You don't "work" an epic — you work its sub-issues. The epic body lists them with build order. |
-| `in-staging` | `0E8A16` (dark green) | Built and shipped to `staging` via a PR (open or merged); waiting on promote-to-main, where `Closes #` fires. autodev's Submit applies this (swapping out `ready`) so unattended discovery never re-picks shipped work. Don't hand-apply during triage. |
-| `needs-interactive` | `8250DF` (violet) | Refined + correct, but its deliverables live under `.claude/` (skills, hooks, machines, prompts) — a **headless** worker can't write there, so autodev can't build it. Build it in an **interactive** session. Coexists with `ready` (it *is* ready, just not for autodev); autodev's ConfirmScope applies it instead of `needs-refinement` when it detects a `.claude/` deliverable. |
+| `in-staging` | `0E8A16` (dark green) | Built and shipped to `staging` via a PR (open or merged); waiting on promote-to-main, where `Closes #` fires. Apply it when a PR lands so backlog discovery never re-picks shipped work. |
+| `needs-interactive` | `8250DF` (violet) | Refined + correct, but its deliverables live under `.claude/` (skills, hooks, machines, prompts) — a **headless** subagent/workflow can't write there. Build it in an **interactive** session. Coexists with `ready` (it *is* ready, just not for a headless worker). |
 
 These coexist with the topical labels (`enhancement`, `ux`, `tech-debt`, `testing`, `bug`, `question`, …) — a `ready` issue is also usually `enhancement`, etc. A `question`-labeled issue is typically also `needs-refinement`.
 
@@ -30,7 +30,7 @@ gh label create ready            --color 2EA043 --description "Refined and ready
 gh label create needs-refinement --color D93F0B --description "Has open decisions/ambiguity — refine before working"
 gh label create epic             --color 6F42C1 --description "Tracking/parent issue — work its sub-issues, not the epic itself"
 gh label create in-staging       --color 0E8A16 --description "Shipped to staging via PR; closes on promote to main"
-gh label create needs-interactive --color 8250DF --description "Refined but deliverables are under .claude/ — build in an interactive session, not autodev"
+gh label create needs-interactive --color 8250DF --description "Refined but deliverables are under .claude/ — build in an interactive session, not a headless worker"
 ```
 
 ## Readiness lifecycle
@@ -79,6 +79,6 @@ When an issue is too large to assign as one unit:
 3. Rewrite the parent into a **tracker**: a checklist linking the sub-issues (`- [ ] #123 — …`), the build order, and the cross-cutting non-negotiables. Label the parent `epic`.
 4. Keep the parent's "current state / structural readiness" notes so context isn't lost.
 
-## Relationship to parallel-issues
+## Relationship to building
 
-`parallel-issues` is the build pipeline. It **only builds `ready` issues** — it refuses `epic` (points you at the children) and `needs-refinement` (must be refined here first). So the handoff is: refine + label here → hand the `ready` numbers to `parallel-issues`.
+Building is a separate step that **only consumes `ready` issues** — never `epic` (work its children) or `needs-refinement` (refine here first). So the handoff is: refine + label here → build the `ready` numbers one-PR-per-issue, in parallel via git worktrees + subagents/workflows when independent.
