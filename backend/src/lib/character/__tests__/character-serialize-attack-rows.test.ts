@@ -11,6 +11,7 @@ import { ensureTestOwner } from "@/test-support/owner.js";
 import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
 import { inventoryItemFixtureData } from "@/test-support/inventory-snapshot-fixture.js";
+import type { WeaponDetailInput } from "@/lib/inventory/item-detail-inputs.js";
 
 const OWNER_ID = "owner-serialize-attack-rows";
 
@@ -81,7 +82,7 @@ function meleeDamageBuffData(modifier: number | undefined) {
 }
 
 /** The weapon fixture's WeaponDetailInput, split out of weaponItemData to keep its complexity down. */
-function weaponDetailFixture(w: WeaponFixture) {
+function weaponDetailFixture(w: WeaponFixture): WeaponDetailInput {
   return {
     damageDiceCount: 1,
     damageDiceFaces: w.damageDiceFaces ?? 8,
