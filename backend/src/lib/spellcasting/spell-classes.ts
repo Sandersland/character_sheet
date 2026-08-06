@@ -74,31 +74,30 @@ export async function rejectCrossEditionSpellForks(
 
 /**
  * List-serving counterpart to rejectCrossEditionSpellForks, for GET
- * /api/spells (#1712) — same "shared until proven otherwise" posture, applied
- * to WHICH rows are offered rather than which submitted id is admitted.
+ * /api/spells (#1712) — resolves each distinct spell NAME to at most one row
+ * per requesting edition: the exact-edition row, else the shared
+ * (edition: null) row, else the name is not served to this edition at all.
+ * Same exact-then-shared rule resolveEditionCatalog (catalog-edition.ts)
+ * already applies to Feat/Subclass/Background.
  *
- * Groups candidates by name and prefers, in order: the exact-edition row, the
- * shared (edition: null) row, and — the one place this diverges from
- * resolveEditionCatalog (catalog-edition.ts) — the group's remaining row when
- * neither exists. That divergence is deliberate: resolveEditionCatalog's
- * plain exact-then-NULL rule is correct for Feat/Subclass/Background, whose
- * catalogs already have full coverage on both editions, so "no match" always
- * means a genuine edition-exclusive row. The spell catalog does NOT have that
- * coverage yet (epic #1517 mid-migration) — today's ~109 rows are ALL tagged
- * EDITION_2024 with no 2014 counterpart, so treating a bare tag mismatch as
- * "not in this edition's catalog" would empty the creation/level-up picker
- * for every 2014 caster and block character creation outright (caught by
- * creation.spec.ts's 2014 Warlock e2e test, which documents "level1SpellPicks
- * is edition-invariant, so a 2014 Warlock still walks it exactly like the
- * 2024 case" as existing, deliberate product behavior).
+ * #1712 originally added a THIRD fallback here — the group's one remaining
+ * row, regardless of ITS edition, when neither of the above existed —
+ * because the spell catalog was then mid-migration (epic #1517): every row
+ * was tagged EDITION_2024 with no 2014 counterpart yet, so a bare tag
+ * mismatch would have emptied the 2014 creation/level-up picker outright.
+ * #1713-#1721 finished that migration (2014 is now its own ~350-row PHB'14
+ * breadth against 2024's curated ~116, prisma/seed/spells.ts's own header),
+ * so the grace is retired (#1372/#1753): it had started leaking BOTH ways —
+ * a lone EDITION_2014 row (the bulk of that breadth) was also being served
+ * to a 2024 request, defeating the curated 2024 list entirely (every
+ * distinct name resolved for both editions). A handful of spells still
+ * missing their 2014 counterpart (#1742/#1746) are now genuinely absent from
+ * a 2014 request rather than silently borrowed from 2024 — tracked as
+ * content debt on those issues, not papered over here.
  *
- * This is inert once a genuine fork lands: a name with BOTH a 2014 and a
- * 2024 row still resolves to exactly the requesting edition's own row (the
- * exact-match branch wins before the fallback ever runs) — proven by
- * spells.test.ts's fork-disjointness suite. Only a name with a SINGLE,
- * single-edition-tagged row (today's whole real catalog) falls through to
- * the graceful branch and is served to both editions until #1713-#1721 give
- * it a real 2014 sibling.
+ * A genuine fork (name present under both editions) is unaffected either
+ * way: the exact-match branch always wins — proven by spells.test.ts's
+ * fork-disjointness suite.
  */
 export function resolveSpellCatalogForEdition<T extends { name: string; edition: RulesEdition | null }>(
   rows: T[],
@@ -114,7 +113,8 @@ export function resolveSpellCatalogForEdition<T extends { name: string; edition:
   for (const group of byName.values()) {
     const exact = group.find((row) => row.edition === edition);
     const shared = group.find((row) => row.edition === null);
-    resolved.push(exact ?? shared ?? group[0]);
+    const picked = exact ?? shared;
+    if (picked) resolved.push(picked);
   }
   return resolved;
 }

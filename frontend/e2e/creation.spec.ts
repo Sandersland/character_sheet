@@ -233,9 +233,9 @@ test("creation: a warlock picks cantrips + spells that show on the Magic tab", a
 // (shared), so "The Fiend" resolves under 2014 too, and resolveSubclass
 // accepts a subclass id whenever the edition-resolved gate is <= 1 (true here).
 //
-// #1371 gates the picker, so 2014 is reached by joining a 2014 campaign rather
-// than clicking the radio directly — otherwise Playwright 1.49's actionability
-// check treats aria-disabled="true" as not-enabled and .click() times out.
+// Reached via a 2014 campaign (rather than the direct "2014 rules" radio
+// #1372 also makes available) to exercise the inheritance path — a player
+// joining a 2014 table never sees the picker at all.
 test("creation: a 2014 warlock must choose its patron at creation", async ({ page }) => {
   const name = uniqueName("Old Ways Warlock");
   const campaignName = uniqueName("Old Ways Table");
@@ -358,8 +358,7 @@ test("creation: a 2014 Folk Hero picks artisan's tools from the full catalog", a
 // #1680: the two-step species→variant picker. A variant-bearing species
 // (2014 Dwarf: Hill/Mountain) cannot Continue without a variant chosen, and
 // the created sheet shows the VARIANT's name (Hill Dwarf), not just the bare
-// species — reached via a 2014 campaign like the other 2014 specs above
-// (#1371 gates direct edition selection until #1372 ships).
+// species — reached via a 2014 campaign like the other 2014 specs above.
 test("creation: a 2014 Dwarf must choose a variant (Hill Dwarf) before creation", async ({ page }) => {
   const name = uniqueName("Stonebeard");
   const campaignName = uniqueName("Old Ways Deephold");

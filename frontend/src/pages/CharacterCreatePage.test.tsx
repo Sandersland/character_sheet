@@ -145,12 +145,11 @@ async function passEntryGate(u: ReturnType<typeof userEvent.setup>) {
   await u.click(screen.getByRole("button", { name: /continue/i }));
 }
 
-// #1325's 2014 half of the entry gate, reached via campaign inheritance rather
-// than the picker: #1371 gates the "2014 rules" radio (aria-disabled), so
-// direct selection can no longer drive draft.rulesEdition to 2014 in the real
-// UI — the caller must mock fetchCampaigns to return a 2014 campaign and this
-// helper picks it, mirroring how e2e/helpers/creation.ts reaches 2014 (#1372
-// restores direct selection).
+// #1325's 2014 half of the entry gate, reached via campaign inheritance (both
+// this path and direct picker selection are available since #1372 — this
+// helper exercises inheritance specifically, mirroring how e2e/helpers/
+// creation.ts joins a 2014 campaign): the caller mocks fetchCampaigns to
+// return a 2014 campaign and this helper picks it.
 async function passEntryGate2014(u: ReturnType<typeof userEvent.setup>, campaignName: string) {
   await u.click(await screen.findByRole("radio", { name: campaignName }));
   await u.click(screen.getByRole("button", { name: /continue/i }));
