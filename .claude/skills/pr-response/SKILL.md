@@ -115,7 +115,7 @@ Per chunk:
    ```
 5. Commit: `fix(<domain>): <finding> (#<issue>)`. The issue/PR reference goes in the **commit message**, never in a code comment.
 
-> **House rules for any delegated agent.** A subagent does not inherit CLAUDE.md. If you fan out in step 3, paste the non-negotiables preamble (see `parallel-issues`' "house-rules preamble") into each brief, tailored to the chunk's surface — keep the comment-policy and `@/`-import rules in every brief.
+> **House rules for any delegated agent.** A subagent does not inherit CLAUDE.md. If you fan out in step 3, paste the CLAUDE.md non-negotiables into each brief, tailored to the chunk's surface — keep the comment-policy and `@/`-import rules in every brief.
 
 ### 6. Reply / resolve per finding as fixes land
 
@@ -143,4 +143,4 @@ A clean re-run makes the workflow **auto-dismiss** its own stale `CHANGES_REQUES
 
 One table: `finding → verdict (addressed / declined) → commit or thread link → new review status`. Leave the worktree up for inspection (tear down later with `./.claude/skills/worktree/worktree.sh rm <branch>`).
 
-> **Worktree reuse.** An open PR built via `parallel-issues` usually still has a live worktree — check `./.claude/skills/worktree/worktree.sh ls` for its head branch. Reuse it. If none exists, `./.claude/skills/worktree/worktree.sh create <head-branch> --up` is idempotent: it re-attaches the existing branch and boots an isolated stack. Wait for the backend to answer (`200`/`401` on `/api/characters`) before running in-container commands. Falling back to the main checkout works too, but then tooling runs on the host per `docs/testing.md`.
+> **Worktree reuse.** An open PR built in a worktree usually still has a live one — check `./.claude/skills/worktree/worktree.sh ls` for its head branch. Reuse it. If none exists, `./.claude/skills/worktree/worktree.sh create <head-branch> --up` is idempotent: it re-attaches the existing branch and boots an isolated stack. Wait for the backend to answer (`200`/`401` on `/api/characters`) before running in-container commands. Falling back to the main checkout works too, but then tooling runs on the host per `docs/testing.md`.

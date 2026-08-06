@@ -135,7 +135,7 @@ registry_del() {
 }
 
 # Slot assignment is read-registry -> pick-lowest-free -> write-registry; two
-# concurrent creates (e.g. parallel autodev runs) would race that window and
+# concurrent creates (e.g. parallel subagent runs) would race that window and
 # collide on a slot. mkdir is atomic, so it serves as the mutex — no flock on
 # stock macOS.
 SLOT_LOCK=""
