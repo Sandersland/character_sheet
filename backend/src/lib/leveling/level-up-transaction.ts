@@ -26,6 +26,7 @@ import {
   applyLevelUpHpInTx,
   normalizeHitDice,
 } from "@/lib/combat/hitpoints.js";
+import { effectiveMaxHitPointsForRow } from "@/lib/combat/conditions.js";
 import {
   validateLevelUpSubmission,
   InvalidLevelUpError,
@@ -85,6 +86,11 @@ const TARGET_ENTRY_SELECT = {
       // #1546 Part B-i: the class's OWN feature rows — see
       // FEATURE_ROWS_CLASS_FEATURES for why the filter is load-bearing.
       features: FEATURE_ROWS_CLASS_FEATURES,
+      // #1497: effectiveMaxHitPointsForRow's featSlotCap inputs (every class
+      // entry, not just the target) — the same two columns buildHpOpContext
+      // selects for its own row.classEntries.
+      extraAsiLevels: true,
+      fightingStyleFeatLevel: true,
     },
   },
   // #1546 Part B-i: the PERSISTED subclass's own feature rows. Absent
@@ -266,6 +272,14 @@ export async function resolveLevelUpContext(
     select: {
       abilityScores: true,
       hitDice: true,
+      // #1497: effectiveMaxHitPointsForRow's remaining inputs — the SAME
+      // composition buildHpOpContext resolves for the commit path — so the
+      // plan's hitPoints step can preview the post-level EFFECTIVE max rather
+      // than the client re-deriving exhaustion's PHB'14 p. 291 halving.
+      hitPoints: true,
+      resources: true,
+      conditions: true,
+      experiencePoints: true,
       spellcasting: true,
       rulesEdition: true,
       classEntries: { orderBy: { position: "asc" }, select: TARGET_ENTRY_SELECT },
@@ -273,6 +287,7 @@ export async function resolveLevelUpContext(
   });
   if (!character) throw new InvalidLevelUpError(`Character not found: ${characterId}`);
   const edition = editionOf(character);
+  const { hp: baselineHp, featMaxHpBonus, exhaustionLevel } = effectiveMaxHitPointsForRow(character);
 
   const isMulticlass = character.classEntries.length > 1;
   const hitDice = normalizeHitDice(character.hitDice);
@@ -303,6 +318,7 @@ export async function resolveLevelUpContext(
       // #1101: the known-spell list the validator checks a swap forget against.
       spellEntries: normalizeSpellcastingMutable(character.spellcasting).spells.map((s) => ({ id: s.id, level: s.level, source: s.source ?? null })),
       edition,
+      hpBaseline: { rawMax: baselineHp.max, featMaxHpBonus, exhaustionLevel },
     },
     targetEntry: {
       name: targetClassName,

@@ -7,7 +7,7 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 import { deriveResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
 import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "@/lib/classes/class-feature-rows.js";
 import { subclassChoiceSwapCadence } from "@/lib/classes/types.js";
-import { fixedAverageForDie, levelUpHpGain } from "@/lib/combat/hitpoints.js";
+import { effectiveMaxHitPoints, fixedAverageForDie, levelUpHpGain } from "@/lib/combat/hitpoints.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 import { abilityModifier, advancementSlotsForLevel, fightingStyleFeatSlots, hitDieFace } from "@/lib/srd/srd.js";
 import {
@@ -49,6 +49,17 @@ export interface LevelUpPlanCharacter {
   // has no row to read editionOf from, so the caller (resolveLevelUpContext)
   // resolves it once and carries it alongside abilityScores/classEntries.
   edition: RulesEdition;
+  // #1497: the CURRENT effectiveMaxHitPoints composition inputs (hp-core.ts) —
+  // resolveLevelUpContext resolves these once via effectiveMaxHitPointsForRow
+  // (mirroring buildHpOpContext), so hitPointsStep can preview the post-level
+  // EFFECTIVE max through the SAME function bumpHpForLevelUp (hp-ops.ts)
+  // commits with, rather than re-deriving exhaustion's PHB'14 p. 291 tier-4
+  // halving inline. `rawMax` is the STORED pre-halving max (hp.max, not the
+  // served already-halved character.hitPoints.max). Optional with an inert
+  // all-zero default (hitPointsStep) — matches extraAsiLevels/subclassLevel's
+  // own optional-with-fallback pattern above — so the many existing plan
+  // fixtures that never touch exhaustion don't need updating.
+  hpBaseline?: { rawMax: number; featMaxHpBonus: number; exhaustionLevel: number };
 }
 
 // The class entry AFTER this level-up. subclassLevel is passed in ALREADY
@@ -110,6 +121,9 @@ interface PlanContext {
   // Threaded to newSpellsStep's magicalSecretsSpellLists call — Magical Secrets
   // resolves differently per edition (#1440).
   edition: RulesEdition;
+  // hitPointsStep's effective-max preview inputs — see
+  // LevelUpPlanCharacter.hpBaseline's own comment.
+  hpBaseline?: { rawMax: number; featMaxHpBonus: number; exhaustionLevel: number };
 }
 
 // deriveResources at a given per-class level, holding the target subclass fixed.
@@ -163,11 +177,31 @@ function derivedAt(
 // Missing constitution defaults to 10, matching buildHpOpContext — a plan that
 // diverged there would preview NaN against a real committed number.
 //
-// No `edition` parameter: the fixed-average table (d6→4 … d12→7) and the floor
-// read identically in SRD 5.1 and SRD 5.2 (PHB'14 p. 15 / PHB'24 p. 36).
-function hitPointsStep({ target, abilityScores }: PlanContext): LevelUpStep {
+// No `edition` parameter on the gain numbers themselves: the fixed-average
+// table (d6→4 … d12→7) and the floor read identically in SRD 5.1 and SRD 5.2
+// (PHB'14 p. 15 / PHB'24 p. 36). `edition` IS threaded into
+// effectiveMaxHitPoints below, since THAT composition forks (exhaustion's
+// PHB'14 p. 291 tier-4 halving is 2014-only, condition-data.ts).
+//
+// #1497: `effectiveMaxAverage`/`effectiveMaxByRoll` are the post-level
+// EFFECTIVE max (the same number `character.hitPoints.max` serves) — routed
+// through effectiveMaxHitPoints, the SAME function bumpHpForLevelUp
+// (hp-ops.ts) commits with, over `hpBaseline.rawMax + gain` for each outcome.
+// This is NOT `currentMax + gain`: at exhaustion 4+ the halving grows with the
+// new max too, so that arithmetic silently disagreed with the commit whenever
+// the pre-halving max's parity flipped — the bug this field exists to close.
+// Serving it unconditionally (never just at exhaustion 4+) needs no edition/
+// exhaustion branch here: effectiveMaxHitPoints's own penalty is 0 off that
+// tier, so the general formula already reduces to `rawMax + gain` there.
+// `effectiveMaxByRoll` is indexed 1..faces (index 0 is inert/unused) so the
+// client can read `array[roll]` directly with no off-by-one arithmetic.
+function hitPointsStep({ target, abilityScores, hpBaseline, edition }: PlanContext): LevelUpStep {
   const faces = hitDieFace(target.hitDie);
   const conMod = abilityModifier(abilityScores.constitution ?? 10);
+  const baseline = hpBaseline ?? { rawMax: 0, featMaxHpBonus: 0, exhaustionLevel: 0 };
+  const effectiveMaxForGain = (gain: number) =>
+    effectiveMaxHitPoints(baseline.rawMax + gain, baseline.featMaxHpBonus, baseline.exhaustionLevel, edition);
+  const averageGain = levelUpHpGain(faces, conMod, "average");
   return {
     kind: "hitPoints",
     meta: {
@@ -175,9 +209,14 @@ function hitPointsStep({ target, abilityScores }: PlanContext): LevelUpStep {
       faces,
       conMod,
       fixedAverage: fixedAverageForDie(faces),
-      averageGain: levelUpHpGain(faces, conMod, "average"),
+      averageGain,
       minRoll: levelUpHpGain(faces, conMod, "roll", 1),
       maxRoll: levelUpHpGain(faces, conMod, "roll", faces),
+      effectiveMaxAverage: effectiveMaxForGain(averageGain),
+      effectiveMaxByRoll: [
+        0,
+        ...Array.from({ length: faces }, (_, i) => effectiveMaxForGain(levelUpHpGain(faces, conMod, "roll", i + 1))),
+      ],
     },
   };
 }
@@ -305,6 +344,7 @@ export function buildLevelUpPlan(character: LevelUpPlanCharacter, target: Target
     now: derivedAt(target, character.abilityScores, target.newLevel, character.edition),
     prev: derivedAt(target, character.abilityScores, target.newLevel - 1, character.edition),
     edition: character.edition,
+    hpBaseline: character.hpBaseline,
   };
 
   const candidates: (LevelUpStep | null)[] = [

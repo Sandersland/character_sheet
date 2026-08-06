@@ -11,20 +11,26 @@ import HpDiceReveal from "@/features/level-up/HpDiceReveal";
 import { useHpRoll } from "@/features/level-up/useHpRoll";
 import { useLevelUpStepContext } from "@/features/level-up/useLevelUpStepContext";
 import { abilityAbbr, abilityLabel, formatModifier } from "@/lib/abilities";
-import { hpGainForRoll, readHitPointsMeta } from "@/lib/hitDice";
-import type { LevelUpStep } from "@/types/character";
+import { effectiveMaxForRoll, hpGainForRoll, readHitPointsMeta } from "@/lib/hitDice";
+import type { HitPointsStepMeta, LevelUpStep } from "@/types/character";
 
-/** The "New maximum HP" preview line, split out to keep HitPointsStep's render flat. */
+/**
+ * The "New maximum HP" preview line, split out to keep HitPointsStep's render
+ * flat. Renders the SERVED post-level effective max (#1497,
+ * meta.effectiveMaxAverage/effectiveMaxByRoll) — never `currentMax + gain`,
+ * which disagrees with the committed max once 2014 exhaustion 4+ (PHB'14
+ * p. 291) halves it (the halving grows with the new max too).
+ */
 function HpGainPreview({
   method,
   roll,
-  gain,
+  meta,
   currentMax,
   conText,
 }: {
   method: "average" | "roll" | undefined;
   roll: number | null;
-  gain: number | null;
+  meta: HitPointsStepMeta;
   currentMax: number;
   conText: string;
 }) {
@@ -35,17 +41,17 @@ function HpGainPreview({
       <p className={`mt-4 text-center text-sm text-parchment-600 ${roll == null ? "invisible" : ""}`}>
         Rolled {roll} {conText} — New maximum HP{" "}
         <b className="font-display text-lg text-vitality-700">
-          {currentMax} → {currentMax + (gain ?? 0)}
+          {currentMax} → {roll != null ? effectiveMaxForRoll(meta, roll) : currentMax}
         </b>
       </p>
     );
   }
-  if (method === "average" && gain != null) {
+  if (method === "average") {
     return (
       <p className="mt-4 text-center text-sm text-parchment-600">
         New maximum HP{" "}
         <b className="font-display text-lg text-vitality-700">
-          {currentMax} → {currentMax + gain}
+          {currentMax} → {meta.effectiveMaxAverage}
         </b>
       </p>
     );
@@ -58,11 +64,7 @@ export default function HitPointsStep({ step }: { step: LevelUpStep }) {
   // Read once, not per use site: every card, the reveal's key and the preview
   // must agree on the same numbers within a render.
   const meta = readHitPointsMeta(step);
-  const { roll, method, gain, handleRoll, chooseAverage, chooseRoll } = useHpRoll(meta);
-  // #1497: `character.hitPoints.max` is already the exhaustion-halved
-  // EFFECTIVE max (#1321) when exhaustion 4+ applies, so `currentMax + gain`
-  // below is not exact — the halving arithmetic depends on the pre-halving
-  // max's parity, which would require re-deriving the rule client-side.
+  const { roll, method, handleRoll, chooseAverage, chooseRoll } = useHpRoll(meta);
   const currentMax = character.hitPoints.max;
   // Chrome, deliberately client-side: formatModifier/abilityAbbr are display
   // strings over a served number, not mechanics.
@@ -107,7 +109,7 @@ export default function HitPointsStep({ step }: { step: LevelUpStep }) {
         </div>
       )}
 
-      <HpGainPreview method={method} roll={roll} gain={gain} currentMax={currentMax} conText={conText} />
+      <HpGainPreview method={method} roll={roll} meta={meta} currentMax={currentMax} conText={conText} />
     </div>
   );
 }

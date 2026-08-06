@@ -92,6 +92,10 @@ describe("buildLevelUpPlan — hitPoints meta", () => {
       averageGain: 9,
       minRoll: 4,
       maxRoll: 13,
+      // No hpBaseline supplied → the inert all-zero default: effectiveMax is
+      // just rawMax(0) + each outcome's gain (#1497).
+      effectiveMaxAverage: 9,
+      effectiveMaxByRoll: [0, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
     });
   });
 
@@ -108,6 +112,73 @@ describe("buildLevelUpPlan — hitPoints meta", () => {
 
   it("treats a missing constitution score as 10, exactly as the commit path does", () => {
     expect(hitPointsMeta(undefined, "d8")).toMatchObject({ conMod: 0, fixedAverage: 5, averageGain: 5 });
+  });
+});
+
+// #1497: the post-level EFFECTIVE max (character.hitPoints.max's own
+// composition, effectiveMaxHitPoints/hp-core.ts) — served so neither
+// HitPointsStep nor buildLevelUpLedger has to add the level-up gain to the
+// already-halved served max (PHB'14 p. 291 exhaustion tier 4, #1321), which is
+// wrong once the halving itself grows with the new max.
+describe("buildLevelUpPlan — hitPoints meta — effective post-level max (#1497)", () => {
+  function effectiveMaxMeta(
+    hpBaseline: { rawMax: number; featMaxHpBonus: number; exhaustionLevel: number },
+    edition: "EDITION_2014" | "EDITION_2024",
+    hitDie = "d10",
+    constitution = 14,
+  ): Record<string, unknown> {
+    const abilityScores: Record<string, number> = { strength: 10, dexterity: 10, constitution, intelligence: 10, wisdom: 10, charisma: 10 };
+    const character: LevelUpPlanCharacter = {
+      abilityScores,
+      classEntries: [{ name: "fighter", level: 4, subclass: "champion" }],
+      edition,
+      hpBaseline,
+    };
+    const plan = buildLevelUpPlan(character, target("fighter", 5, "champion", undefined, hitDie));
+    const step = plan.find((s) => s.kind === "hitPoints");
+    if (!step?.meta) throw new Error("no hitPoints meta on the plan");
+    return step.meta;
+  }
+
+  // Con 14 → conMod +2; d10 average gain = floor(10/2)+1+2 = 8.
+  it("halves an ODD pre-halving max the same way the commit does (2014, exhaustion 4, rawMax 31)", () => {
+    const meta = effectiveMaxMeta({ rawMax: 31, featMaxHpBonus: 0, exhaustionLevel: 4 }, "EDITION_2014");
+    // newRawMax = 31 + 8 = 39; halved (round up subtracted) = 39 - 20 = 19.
+    expect(meta.effectiveMaxAverage).toBe(19);
+  });
+
+  it("halves an EVEN pre-halving max the same way the commit does (2014, exhaustion 4, rawMax 30)", () => {
+    const meta = effectiveMaxMeta({ rawMax: 30, featMaxHpBonus: 0, exhaustionLevel: 4 }, "EDITION_2014");
+    // newRawMax = 30 + 8 = 38; halved (round up subtracted) = 38 - 19 = 19.
+    expect(meta.effectiveMaxAverage).toBe(19);
+  });
+
+  it("serves a per-roll effective-max array, indexed 1..faces, each independently halved (2014, exhaustion 4, rawMax 31)", () => {
+    const meta = effectiveMaxMeta({ rawMax: 31, featMaxHpBonus: 0, exhaustionLevel: 4 }, "EDITION_2014", "d6", 14);
+    const byRoll = meta.effectiveMaxByRoll as number[];
+    expect(byRoll[0]).toBe(0); // inert placeholder — never a roll value.
+    // Con +2; roll r → gain max(1, r+2); newRawMax = 31 + gain; then halved.
+    for (let roll = 1; roll <= 6; roll++) {
+      const gain = Math.max(1, roll + 2);
+      const newRawMax = 31 + gain;
+      expect(byRoll[roll]).toBe(newRawMax - Math.ceil(newRawMax / 2));
+    }
+  });
+
+  it("a feat maxHp bonus is added before the exhaustion halving, same order as effectiveMaxHitPoints (2014, exhaustion 4)", () => {
+    const meta = effectiveMaxMeta({ rawMax: 30, featMaxHpBonus: 4, exhaustionLevel: 4 }, "EDITION_2014");
+    // newRawMax = 30 + 8 = 38; + feat 4 = 42; halved = 42 - 21 = 21.
+    expect(meta.effectiveMaxAverage).toBe(21);
+  });
+
+  it("matches plain rawMax + gain when exhaustion is below tier 4 (2014, exhaustion 3) — today's numbers, unchanged", () => {
+    const meta = effectiveMaxMeta({ rawMax: 31, featMaxHpBonus: 0, exhaustionLevel: 3 }, "EDITION_2014");
+    expect(meta.effectiveMaxAverage).toBe(31 + 8);
+  });
+
+  it("matches plain rawMax + gain under SRD 5.2, even at a nominal exhaustion 4 — no tier-4 HP rule in 2024 (#1321)", () => {
+    const meta = effectiveMaxMeta({ rawMax: 31, featMaxHpBonus: 0, exhaustionLevel: 4 }, "EDITION_2024");
+    expect(meta.effectiveMaxAverage).toBe(31 + 8);
   });
 });
 

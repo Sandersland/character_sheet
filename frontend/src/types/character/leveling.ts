@@ -157,6 +157,22 @@ export interface HitPointsStepMeta {
   averageGain: number;
   minRoll: number;
   maxRoll: number;
+  /**
+   * #1497: the post-level EFFECTIVE max under "average" — the same
+   * composition `character.hitPoints.max` serves (effectiveMaxHitPoints,
+   * backend hp-core.ts), routed through the advancing die's average gain. NOT
+   * `character.hitPoints.max + averageGain`: at 2014 exhaustion 4+ (PHB'14
+   * p. 291) the halving grows with the new max too, so that addition can
+   * disagree with what the level-up transaction actually commits — the
+   * client renders this served number instead of re-deriving the halving.
+   */
+  effectiveMaxAverage: number;
+  /**
+   * #1497: the post-level EFFECTIVE max per roll outcome, indexed 1..faces
+   * (index 0 is an inert placeholder, never a roll value) — read via
+   * `effectiveMaxForRoll` rather than `array[roll - 1]`.
+   */
+  effectiveMaxByRoll: number[];
 }
 
 /** GET /api/characters/:id/level-up/plan — the derived ceremony plan (#886). */

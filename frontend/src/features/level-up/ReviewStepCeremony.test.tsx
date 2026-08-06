@@ -33,8 +33,19 @@ const character = {
 } as unknown as Character;
 
 // The hitPoints step arrives with its numbers already resolved (#1380):
-// Fighter d10 at Con 14 (+2).
-const HP_META = { die: "d10", faces: 10, conMod: 2, fixedAverage: 6, averageGain: 8, minRoll: 3, maxRoll: 12 };
+// Fighter d10 at Con 14 (+2). #1497: effectiveMaxAverage is ALSO served —
+// character's max 40 + averageGain 8.
+const HP_META = {
+  die: "d10",
+  faces: 10,
+  conMod: 2,
+  fixedAverage: 6,
+  averageGain: 8,
+  minRoll: 3,
+  maxRoll: 12,
+  effectiveMaxAverage: 48,
+  effectiveMaxByRoll: [],
+};
 
 const plan: LevelUpPlanResponse = {
   target: { className: "fighter", subclass: "Champion", newLevel: 8, isPrimary: true },

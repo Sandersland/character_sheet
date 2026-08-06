@@ -233,8 +233,20 @@ describe("GET /api/characters/:id/level-up/plan", () => {
     expect(res.status).toBe(200);
     const step = (res.body.steps as { kind: string; meta?: Record<string, number | string> }[])
       .find((s) => s.kind === "hitPoints");
-    // Fighter d10, Con 14 → +2.
-    expect(step?.meta).toEqual({ die: "d10", faces: 10, conMod: 2, fixedAverage: 6, averageGain: 8, minRoll: 3, maxRoll: 12 });
+    // Fighter d10, Con 14 → +2. #1497: effectiveMaxAverage/effectiveMaxByRoll
+    // are ALSO served — unaffected here (2024, no exhaustion), so they're
+    // exactly the character's stored max (40) plus each outcome's gain.
+    expect(step?.meta).toEqual({
+      die: "d10",
+      faces: 10,
+      conMod: 2,
+      fixedAverage: 6,
+      averageGain: 8,
+      minRoll: 3,
+      maxRoll: 12,
+      effectiveMaxAverage: 48,
+      effectiveMaxByRoll: [0, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52],
+    });
   });
 
   it("serves the ADVANCING class's die for a multiclass target, not the character's persisted one", async () => {

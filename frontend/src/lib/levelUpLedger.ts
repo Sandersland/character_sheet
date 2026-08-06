@@ -3,7 +3,7 @@
 // injects catalog id→name lookups as `resolvers` so this never fetches.
 
 import { abilityLabel, abilityModifier, formatModifier } from "@/lib/abilities";
-import { hpGainForRoll, readHitPointsMeta } from "@/lib/hitDice";
+import { effectiveMaxForRoll, readHitPointsMeta } from "@/lib/hitDice";
 import type { LevelUpDraft } from "@/lib/levelUpSteps";
 import type {
   Character,
@@ -52,10 +52,14 @@ function resolvedName(
 // Both branches read the SERVED meta, which is why HP is still on the PRE-level
 // Con mod (the backend applies HP before the ASI, so a Con bump this same level
 // must not retroactively raise the gain) and why the die is the ADVANCING
-// class's rather than the persisted position-0 one (#1441).
-function hpGain(hp: NonNullable<LevelUpDraft["hp"]>, meta: HitPointsStepMeta): number {
-  if (hp.method === "roll") return hpGainForRoll(meta, hp.roll ?? 0);
-  return meta.averageGain;
+// class's rather than the persisted position-0 one (#1441). Reads the SERVED
+// effective max (#1497, meta.effectiveMaxAverage/effectiveMaxByRoll) rather
+// than adding the gain to `character.hitPoints.max` client-side — that
+// addition disagrees with the committed max once 2014 exhaustion 4+ (PHB'14
+// p. 291) halves it.
+function hpEffectiveMax(hp: NonNullable<LevelUpDraft["hp"]>, meta: HitPointsStepMeta): number {
+  if (hp.method === "roll") return effectiveMaxForRoll(meta, hp.roll ?? 0);
+  return meta.effectiveMaxAverage;
 }
 
 function abilityRow(ability: string, before: number, amount: number): LedgerRow {
@@ -172,14 +176,11 @@ export function buildLevelUpLedger(
     // `character.level` is the XP-derived level (already the post-up value while a
     // level-up is pending); the applied "before" is one below the target.
     { label: "Level", before: String(plan.target.newLevel - 1), after: String(plan.target.newLevel), variant: "delta" },
-    // #1497: `max` is already the exhaustion-halved EFFECTIVE max (#1321) when
-    // exhaustion 4+ applies, so `max + hpGain(...)` is not exact for that
-    // case — same gap as the Hit Dice row's `// #1075` below.
     draft.hp
       ? {
           label: "Maximum HP",
           before: String(max),
-          after: String(max + hpGain(draft.hp, hpMeta)),
+          after: String(hpEffectiveMax(draft.hp, hpMeta)),
           variant: "delta",
         }
       : null,

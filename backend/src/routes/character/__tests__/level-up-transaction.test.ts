@@ -28,6 +28,10 @@ async function post(characterId: string, body: object) {
     .send(body);
 }
 
+function getPlan(characterId: string) {
+  return supertest(app).get(`/api/characters/${characterId}/level-up/plan`).set("Cookie", COOKIE);
+}
+
 // The distinct batchId a single level-up request must group all its events under.
 async function distinctBatchIds(characterId: string): Promise<string[]> {
   const events = await prisma.characterEvent.findMany({ where: { characterId }, select: { batchId: true } });
@@ -193,6 +197,61 @@ describe("POST /api/characters/:id/level-up/transactions — Battle Master cerem
     // The subclass drifted onto the persisted primary entry (not just the response).
     const persisted = await prisma.characterClassEntry.findUniqueOrThrow({ where: { id: entry.id } });
     expect(persisted.subclass).toBe("Battle Master");
+  });
+});
+
+// #1497: at 2014 exhaustion 4+ (PHB'14 p. 291), `hitPoints.max` is already the
+// halved EFFECTIVE max — the GET /plan preview and the actual commit must
+// agree on the post-level max WITHOUT the client re-deriving the halving
+// (which depends on the pre-halving max's own parity, unrecoverable from the
+// served halved max alone). This drives both endpoints for real, over the
+// SAME character, and asserts they produce the identical number.
+describe("POST /api/characters/:id/level-up/transactions — 2014 exhaustion 4+ HP preview matches the commit (#1497)", () => {
+  const CHAR_ID = "lvtx-exhaustion4-hp";
+
+  beforeEach(async () => {
+    const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    await prisma.character.create({
+      data: {
+        ...BASE,
+        ownerId: OWNER_ID,
+        id: CHAR_ID,
+        name: "LevelUpTx Exhausted Fighter",
+        rulesEdition: "EDITION_2014",
+        experiencePoints: 6500, // level 5 threshold — not an ASI level, so `average` alone is valid
+        // Odd pre-halving max (31) — the parity the addition-based preview used
+        // to get wrong; Con 14 → +2 modifier.
+        hitPoints: { current: 31, max: 31, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 4, die: "d10", spent: 0 },
+        abilityScores: { strength: 16, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 10, charisma: 10 },
+        conditions: { active: [], exhaustion: 4 },
+        spellcasting: Prisma.JsonNull,
+        classEntries: {
+          create: [{ name: "fighter", subclass: null, classId: fighter.id, position: 0, level: 4 }],
+        },
+      },
+    });
+  });
+
+  it("the plan's effectiveMaxAverage equals the levelUp op's actual committed max — not `servedMax + gain`", async () => {
+    const plan = await getPlan(CHAR_ID);
+    expect(plan.status).toBe(200);
+    const hpStep = (plan.body.steps as { kind: string; meta?: Record<string, unknown> }[]).find((s) => s.kind === "hitPoints");
+    const effectiveMaxAverage = hpStep?.meta?.effectiveMaxAverage;
+    expect(typeof effectiveMaxAverage).toBe("number");
+
+    // The bug this closes: naively adding the gain to the ALREADY-HALVED served
+    // max (31 + 8 = 39) is NOT the real answer — the halving itself grows with
+    // the new (pre-halving) max, and that max's parity flips the rounding.
+    expect(effectiveMaxAverage).not.toBe(31 + 8);
+
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
+    const res = await post(CHAR_ID, { target: { kind: "existing", classEntryId: entry.id }, hp: { method: "average" } });
+    expect(res.status).toBe(200);
+    // newRawMax = 31 + (floor(10/2)+1+2) = 31 + 8 = 39; halved (round up
+    // subtracted, PHB'14 p. 7) = 39 - 20 = 19.
+    expect(res.body.hitPoints.max).toBe(19);
+    expect(res.body.hitPoints.max).toBe(effectiveMaxAverage);
   });
 });
 
