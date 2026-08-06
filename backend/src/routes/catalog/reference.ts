@@ -20,7 +20,7 @@ import { requireEditionOr400 } from "@/lib/http/parse-edition-param.js";
 import { resolveEditionCatalog, withEditionOrShared } from "@/lib/rules/catalog-edition.js";
 import { backgroundGrantsAbilitySpread, backgroundGrantsOriginFeat } from "@/lib/rules/background-grants.js";
 import type { AbilityIncreaseSpec } from "@/lib/srd/species-ability-increases.js";
-import { isChooseCantrip, isChooseOriginFeat, isChooseSkills, type SpeciesTraitChoice } from "@/lib/srd/species-trait-choices.js";
+import { chooseCantripNeedsPlayerAbility, isChooseCantrip, isChooseOriginFeat, isChooseSkills, type SpeciesTraitChoice } from "@/lib/srd/species-trait-choices.js";
 
 export const referenceRouter = Router();
 
@@ -246,33 +246,44 @@ referenceRouter.get("/reference", async (req, res) => {
   // + chooseOriginFeat, 2024 Elf's own chooseSkills); see SpeciesOption's own
   // JSDoc (reference.ts, frontend) for why all three fields are served at
   // both levels.
-  const speciesWithVariants = rawSpecies.map((s) => ({
-    id: s.id,
-    name: s.name,
-    slug: s.slug,
-    speed: s.speed,
-    abilityIncreases: s.abilityIncreases as unknown as AbilityIncreaseSpec[],
-    // #1683: whether picking THIS species alone (no variant chosen) grants a
-    // spell — narrowed from the unfiltered back-relation to variantId ===
-    // null, same rule serialize/species.ts's activeTraitRows documents.
-    // Never true this wave (every 2024 grant is variant-scoped), kept
-    // general so a future species-level grant needs no picker rewrite.
-    needsCastingAbility: s.grantedSpells.some((g) => g.variantId === null),
-    chooseSkills: chooseSkillsOf(s.traits.filter((t) => t.variantId === null)),
-    chooseCantrip: chooseCantripOf(s.traits.filter((t) => t.variantId === null)),
-    chooseOriginFeat: chooseOriginFeatOf(s.traits.filter((t) => t.variantId === null)),
-    variants: s.variants.map((v) => ({
-      id: v.id,
-      name: v.name,
-      slug: v.slug,
-      abilityIncreases: v.abilityIncreases as unknown as AbilityIncreaseSpec[],
-      // Already scoped to this variant by Prisma (its own back-relation).
-      needsCastingAbility: v.grantedSpells.length > 0,
-      chooseSkills: chooseSkillsOf(v.traits),
-      chooseCantrip: chooseCantripOf(v.traits),
-      chooseOriginFeat: chooseOriginFeatOf(v.traits),
-    })),
-  }));
+  const speciesWithVariants = rawSpecies.map((s) => {
+    const speciesTraits = s.traits.filter((t) => t.variantId === null);
+    const speciesCantrip = chooseCantripOf(speciesTraits);
+    return {
+      id: s.id,
+      name: s.name,
+      slug: s.slug,
+      speed: s.speed,
+      abilityIncreases: s.abilityIncreases as unknown as AbilityIncreaseSpec[],
+      // Whether picking this species/variant requires the Int/Wis/Cha choice:
+      // it grants a SpeciesGrantedSpell (#1683, a 2024 lineage) OR carries a
+      // chooseCantrip that leaves its ability open (#1756, Astral Fire) —
+      // chooseCantripNeedsPlayerAbility, the SAME predicate resolveCastingAbility
+      // gates on, so a served flag and an enforced requirement can't drift. A
+      // fixed-ability chooseCantrip (High Elf) is false: its ability is not the
+      // player's to pick. Species-level grantedSpells narrowed to variantId ===
+      // null (serialize/species.ts's activeTraitRows rule); never true this wave.
+      needsCastingAbility:
+        s.grantedSpells.some((g) => g.variantId === null) || chooseCantripNeedsPlayerAbility(speciesCantrip),
+      chooseSkills: chooseSkillsOf(speciesTraits),
+      chooseCantrip: speciesCantrip,
+      chooseOriginFeat: chooseOriginFeatOf(speciesTraits),
+      variants: s.variants.map((v) => {
+        const variantCantrip = chooseCantripOf(v.traits);
+        return {
+          id: v.id,
+          name: v.name,
+          slug: v.slug,
+          abilityIncreases: v.abilityIncreases as unknown as AbilityIncreaseSpec[],
+          // Already scoped to this variant by Prisma (its own back-relation).
+          needsCastingAbility: v.grantedSpells.length > 0 || chooseCantripNeedsPlayerAbility(variantCantrip),
+          chooseSkills: chooseSkillsOf(v.traits),
+          chooseCantrip: variantCantrip,
+          chooseOriginFeat: chooseOriginFeatOf(v.traits),
+        };
+      }),
+    };
+  });
 
   const backgroundsWithTools = backgrounds.map((b) => ({
     id: b.id,
