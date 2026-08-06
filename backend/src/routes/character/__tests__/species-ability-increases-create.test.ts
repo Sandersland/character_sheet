@@ -239,6 +239,11 @@ describe("POST /api/characters — Astral Elf replaces the base Elf's +2 DEX; re
   it("an Astral Elf gets ONLY the floating +2/+1 — the base Elf's +2 DEX is NOT applied", async () => {
     const elf = await elf2014();
     const astral = elf.variants.find((v) => v.slug === "astral")!;
+    // #1756: Astral Fire is now a wired chooseCantrip choice, so creation
+    // requires a cantrip + casting ability — supplied here (unrelated to the
+    // ability-increase behavior under test), same reason the Wood Elf
+    // regression below picks a variant without a choice-bearing trait.
+    const light = await prisma.spell.findFirstOrThrow({ where: { name: "Light", edition: "EDITION_2014" } });
 
     const res = await post({
       ...baseBody,
@@ -246,6 +251,8 @@ describe("POST /api/characters — Astral Elf replaces the base Elf's +2 DEX; re
       speciesId: elf.id,
       variantId: astral.id,
       speciesAbilities: { strength: 2, wisdom: 1 },
+      speciesCantripId: light.id,
+      castingAbility: "wisdom",
     });
 
     expect(res.status).toBe(201);

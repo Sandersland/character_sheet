@@ -211,14 +211,17 @@ describe("SpeciesTrait.improvements (#1754) — base 2014 Elf Keen Senses derive
     const elf = await prisma.species.findFirstOrThrow({ where: { slug: "elf", edition: "EDITION_2014" }, include: { variants: true } });
     const astralElf = elf.variants.find((v) => v.slug === "astral")!;
 
-    // Astral Elf's floating +2/+1 replaces the base Elf's fixed increase (#1751),
-    // so a legal spread is required at creation — unrelated to the Keen Senses
-    // grant under test.
+    // Astral Elf requires a legal floating +2/+1 spread (#1751) and, since #1756,
+    // an Astral Fire cantrip pick + casting ability — both are creation
+    // prerequisites unrelated to the Keen Senses grant under test.
+    const light = await prisma.spell.findFirstOrThrow({ where: { name: "Light", edition: "EDITION_2014" } });
     const id = await createCharacter({
       rulesEdition: "EDITION_2014",
       speciesId: elf.id,
       variantId: astralElf.id,
       speciesAbilities: { strength: 2, wisdom: 1 },
+      speciesCantripId: light.id,
+      castingAbility: "wisdom",
     });
 
     const res = await get(id);

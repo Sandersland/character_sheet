@@ -48,6 +48,7 @@ import {
   type ChooseIncrease,
 } from "@/lib/srd/species-ability-increases.js";
 import {
+  chooseCantripNeedsPlayerAbility,
   isChooseCantrip,
   isChooseOriginFeat,
   isChooseSkills,
@@ -368,22 +369,33 @@ async function speciesGrantsSpells(speciesId: string, variantId: string | null):
   return count > 0;
 }
 
-// Phase 1.7 — the #1683 casting-ability choice: required iff the resolved
-// species+variant grants at least one spell (speciesGrantsSpells above),
-// rejected otherwise (a species/variant that grants nothing — Dragonborn's
-// ancestry, Goliath's Giant Ancestry, every 2014 species this wave).
-// Immutable post-creation like every other species selection field (no
-// species transaction endpoint) — written straight through to
-// CharacterRace.castingAbility with no further validation here: the zod
-// schema already restricts it to the three ability names.
+// Phase 1.7 — the casting-ability choice: required iff the resolved
+// species+variant either grants a SpeciesGrantedSpell (#1683, a 2024 lineage/
+// legacy) OR carries a chooseCantrip that leaves its ability open
+// (chooseCantripNeedsPlayerAbility — Astral Fire, #1756). Rejected otherwise,
+// with two distinct messages: a chooseCantrip that FIXES its ability (High
+// Elf's Intelligence) must reject a submitted castingAbility differently from a
+// species that grants no spells at all (Dragonborn ancestry). Immutable
+// post-creation like every other species selection field — written straight
+// through to CharacterRace.castingAbility; the zod schema already restricts it
+// to the three ability names.
 async function resolveCastingAbility(
   input: CreateCharacterBody,
   speciesSelection: SpeciesSelection,
+  chooseCantrip: ChooseCantrip | null,
 ): Promise<PhaseResult<{ castingAbility: string | null }>> {
   const submitted = input.castingAbility;
   const grantsSpells = await speciesGrantsSpells(speciesSelection.speciesId, speciesSelection.variantId);
-  if (!grantsSpells) {
-    if (submitted) return { ok: false, status: 400, error: "castingAbility not allowed: this species/variant grants no spells" };
+  const needsAbility = grantsSpells || chooseCantripNeedsPlayerAbility(chooseCantrip);
+  if (!needsAbility) {
+    if (submitted) {
+      // A fixed-ability chooseCantrip (High Elf) vs. a genuinely spell-less
+      // species — same rejection, different diagnosis.
+      const error = chooseCantrip
+        ? "castingAbility not allowed: this species/variant's spellcasting ability is fixed"
+        : "castingAbility not allowed: this species/variant grants no spells";
+      return { ok: false, status: 400, error };
+    }
     return { ok: true, castingAbility: null };
   }
   if (!submitted) {
@@ -1506,16 +1518,38 @@ async function resolveCreationSpells(
   return { ok: true, spellEntries: entries };
 }
 
-// Phase 2c — species-granted cantrip (#1689, High Elf's Cantrip). Reuses the
-// SAME creationPickError the class's own creation picks validate against
-// (kind "cantrip", the spec's own class list, maxLevel unused for that kind)
-// so the two can never diverge on what counts as a legal cantrip pick. Marked
-// source:"species" + the spec's fixed castingAbility (Intelligence for High
-// Elf) — see SpellEntry's own comment for why that marker matters.
+// The `spells`-path validator for resolveSpeciesCantripGrant (Astral Fire,
+// #1756): the pick must be a level-0 cantrip whose NAME is one of the spec's
+// named options and not the wrong edition's fork. The sibling class-LIST path
+// (High Elf) still runs creationPickError; this exists because "on the wizard
+// list" and "one of these three named cantrips" are genuinely different rules.
+async function speciesCantripListError(
+  row: CreationSpellRow | undefined,
+  id: string,
+  spells: string[],
+  edition: RulesEdition,
+): Promise<Fail | null> {
+  if (!row) return { ok: false, status: 400, error: `Unknown spell id: ${id}` };
+  if (row.level !== 0) return { ok: false, status: 400, error: `${row.name} is not a cantrip` };
+  if (!spells.includes(row.name)) {
+    return { ok: false, status: 400, error: `speciesCantripId: ${row.name} is not one of this species' cantrip options` };
+  }
+  const forkError = await rejectCrossEditionSpellForks([row], edition);
+  return forkError ? { ok: false, status: 400, error: forkError } : null;
+}
+
+// Phase 2c — species-granted cantrip (#1689 High Elf, #1756 Astral Fire). Two
+// legal-pick rules by spec shape: a class LIST (High Elf) validates via the
+// SAME creationPickError the class's own picks use (so "legal cantrip" can't
+// diverge); a named SPELLS list (Astral Fire) validates via
+// speciesCantripListError above. Marked source:"species" + the ability the
+// player chose (Astral Fire) or the spec fixed (High Elf's Intelligence) — see
+// SpellEntry's own comment for why that marker matters.
 async function resolveSpeciesCantripGrant(
   input: CreateCharacterBody,
   spec: ChooseCantrip | null,
   existingEntries: SpellEntry[],
+  edition: RulesEdition,
 ): Promise<PhaseResult<{ entry: SpellEntry | null }>> {
   const { speciesCantripId } = input;
   if (!spec) {
@@ -1535,11 +1569,24 @@ async function resolveSpeciesCantripGrant(
     include: SPELL_CLASS_MEMBERSHIP_SELECT,
   });
   const row = raw ? { ...raw, classes: classesOf(raw) } : undefined;
-  const classDisplay = spec.list.charAt(0).toUpperCase() + spec.list.slice(1);
-  const error = creationPickError(row, speciesCantripId, "cantrip", spec.list, classDisplay, 0);
+  const error = await speciesCantripPickError(row, speciesCantripId, spec, edition);
   if (error) return error;
-  const entry: SpellEntry = { ...creationSpellEntry(row!), source: "species", castingAbility: spec.castingAbility };
+  const entry: SpellEntry = { ...creationSpellEntry(row!), source: "species", castingAbility: spec.castingAbility ?? input.castingAbility };
   return { ok: true, entry };
+}
+
+// Dispatches a species cantrip pick to its spec's legal-pick rule: a named
+// SPELLS set (Astral Fire) or a class LIST (High Elf). Split out of
+// resolveSpeciesCantripGrant so neither carries both rules' branches.
+async function speciesCantripPickError(
+  row: CreationSpellRow | undefined,
+  id: string,
+  spec: ChooseCantrip,
+  edition: RulesEdition,
+): Promise<Fail | null> {
+  if (spec.spells) return speciesCantripListError(row, id, spec.spells, edition);
+  const classDisplay = spec.list!.charAt(0).toUpperCase() + spec.list!.slice(1);
+  return creationPickError(row, id, "cantrip", spec.list!, classDisplay, 0);
 }
 
 // The "no chooseOriginFeat spec served" branch of resolveSpeciesOriginFeatGrant
@@ -1873,7 +1920,7 @@ export async function createCharacter(
   // speciesGrants (2014 ability increases) but resolved against the SAME
   // speciesSelection, so the two never disagree about which species/variant
   // was picked.
-  const castingAbilityResult = await resolveCastingAbility(input, selections.speciesSelection);
+  const castingAbilityResult = await resolveCastingAbility(input, selections.speciesSelection, selections.speciesChoiceSpecs.chooseCantrip);
   if (!castingAbilityResult.ok) return castingAbilityResult;
 
   const equipment = await materializeStartingEquipment(
@@ -1902,7 +1949,7 @@ export async function createCharacter(
   // species (Human, Hill Dwarf) never reaches this with a spec to satisfy,
   // and a species WITH a spec still needs it even when the class itself
   // casts no spells at all (a High Elf Fighter still gets its cantrip).
-  const speciesCantrip = await resolveSpeciesCantripGrant(input, selections.speciesChoiceSpecs.chooseCantrip, spells.spellEntries ?? []);
+  const speciesCantrip = await resolveSpeciesCantripGrant(input, selections.speciesChoiceSpecs.chooseCantrip, spells.spellEntries ?? [], selections.edition);
   if (!speciesCantrip.ok) return speciesCantrip;
   const spellEntries = speciesCantrip.entry ? [...(spells.spellEntries ?? []), speciesCantrip.entry] : spells.spellEntries;
 

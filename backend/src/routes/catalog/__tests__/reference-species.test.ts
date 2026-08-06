@@ -114,12 +114,22 @@ describe("GET /api/reference — species (#1679)", () => {
       }
     });
 
-    it("is false for every 2014 species/variant (no 2014 row grants a spell)", async () => {
+    it("is false for every 2014 species/variant EXCEPT Astral Elf, whose Astral Fire opens the ability choice (#1756)", async () => {
       const res = await getReference("EDITION_2014");
-      for (const species of res.body.species as { needsCastingAbility: boolean; variants: { needsCastingAbility: boolean }[] }[]) {
+      for (const species of res.body.species as { name: string; needsCastingAbility: boolean; variants: { name: string; needsCastingAbility: boolean }[] }[]) {
         expect(species.needsCastingAbility).toBe(false);
-        for (const variant of species.variants) expect(variant.needsCastingAbility).toBe(false);
+        for (const variant of species.variants) {
+          const expected = variant.name === "Astral Elf";
+          expect(variant.needsCastingAbility, `${species.name}/${variant.name}`).toBe(expected);
+        }
       }
+    });
+
+    it("is true for the 2014 Astral Elf variant (Astral Fire's player-chosen casting ability, #1756)", async () => {
+      const res = await getReference("EDITION_2014");
+      const elf = res.body.species.find((s: { name: string }) => s.name === "Elf");
+      const astral = elf.variants.find((v: { name: string }) => v.name === "Astral Elf");
+      expect(astral.needsCastingAbility).toBe(true);
     });
   });
 });
@@ -145,6 +155,14 @@ describe("GET /api/reference — species creation-choice specs (#1689)", () => {
     const woodElf = elf.variants.find((v: { name: string }) => v.name === "Wood Elf");
     expect(woodElf.chooseSkills).toBeNull();
     expect(woodElf.chooseCantrip).toBeNull();
+  });
+
+  it("Astral Elf's own VARIANT row serves chooseCantrip as an explicit spells list with no fixed ability (#1756)", async () => {
+    const res = await getReference("EDITION_2014");
+    const elf = res.body.species.find((s: { name: string }) => s.name === "Elf");
+    const astral = elf.variants.find((v: { name: string }) => v.name === "Astral Elf");
+    expect(astral.chooseCantrip).toEqual({ spells: ["Dancing Lights", "Light", "Sacred Flame"] });
+    expect(astral.chooseSkills).toBeNull();
   });
 
   it("a species/variant with no choice-bearing trait (Hill Dwarf) serves null for both fields", async () => {

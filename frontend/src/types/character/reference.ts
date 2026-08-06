@@ -57,11 +57,20 @@ export interface SpeciesSkillChoiceOption {
 }
 
 export interface SpeciesCantripChoiceOption {
-  /** Lowercase class name (matches the served `classes` entries' own case,
-   *  backend: SpellClass.className) — the list `GET /api/spells?class=` is
-   *  queried with. */
-  list: string;
-  castingAbility: AbilityName;
+  /** #1756: exactly one of `list`/`spells` is present. `list` is a lowercase
+   *  class name (matches the served `classes` entries' own case, backend:
+   *  SpellClass.className) — the whole class list `GET /api/spells?class=` is
+   *  queried with (High Elf's wizard list). */
+  list?: string;
+  /** #1756: an explicit set of cantrip NAMES the pick is narrowed to (Astral
+   *  Fire's Dancing Lights / Light / Sacred Flame) — mutually exclusive with
+   *  `list`. The picker fetches all cantrips and filters to these by name. */
+  spells?: string[];
+  /** Absent (#1756) = the player chooses Int/Wis/Cha via the identity step's
+   *  casting-ability control (SpeciesOption/SpeciesVariantOption.
+   *  needsCastingAbility is true); present pins a fixed ability (High Elf's
+   *  Intelligence). */
+  castingAbility?: AbilityName;
 }
 
 /** #1690: whether this row grants a choice of Origin feat (2024 Human's

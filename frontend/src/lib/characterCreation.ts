@@ -234,30 +234,39 @@ export interface CreationSpeciesCantripChoice {
   /** False renders no panel — same server-spec-driven shape as the skill
    *  choice above. */
   applicable: boolean;
-  /** Lowercase class name the cantrip must come from — forwarded to
-   *  `GET /api/spells?className=` unchanged, the SAME server-filtering seam
-   *  (#1377/#1572) the class's own creation-spells step already uses. */
-  list: string;
-  castingAbility: AbilityName;
+  /** #1756: lowercase class name the cantrip must come from (High Elf) —
+   *  forwarded to `GET /api/spells?className=` unchanged, the SAME
+   *  server-filtering seam (#1377/#1572) the class's own creation-spells step
+   *  uses. Mutually exclusive with `spells`. */
+  list?: string;
+  /** #1756: explicit cantrip NAMES the pick is narrowed to (Astral Fire) —
+   *  the picker fetches all cantrips and filters to these. */
+  spells?: string[];
+  /** #1756: undefined = the player picks the ability via the identity step's
+   *  Int/Wis/Cha control (Astral Fire); set = a fixed ability (High Elf's
+   *  Intelligence) named in this panel's copy. */
+  castingAbility?: AbilityName;
   selectedId: string;
   complete: boolean;
 }
 
-// Derives the species cantrip-choice state for the form (#1689, High Elf's
-// Cantrip). Unlike the skill choice above, this is independent of the
+// Derives the species cantrip-choice state for the form (#1689 High Elf, #1756
+// Astral Fire). Unlike the skill choice above, this is independent of the
 // character's own class — a non-caster class still needs the picker (a High
 // Elf Fighter gets the cantrip too), which is why `creationSteps` (#1689)
 // adds the spells step for THIS reason alone even when `level1SpellPicks` is
-// null.
+// null. Forwards the server-resolved spec verbatim (list/spells/castingAbility
+// are all narrowing display, never a client rule).
 export function deriveSpeciesCantripChoice(
   draft: CharacterDraft,
   selections: CreationSelections,
 ): CreationSpeciesCantripChoice {
   const spec: SpeciesCantripChoiceOption | null = selections.species?.chooseCantrip ?? selections.variant?.chooseCantrip ?? null;
-  if (!spec) return { applicable: false, list: "", castingAbility: "intelligence", selectedId: "", complete: true };
+  if (!spec) return { applicable: false, selectedId: "", complete: true };
   return {
     applicable: true,
     list: spec.list,
+    spells: spec.spells,
     castingAbility: spec.castingAbility,
     selectedId: draft.speciesCantripId,
     complete: draft.speciesCantripId.length > 0,

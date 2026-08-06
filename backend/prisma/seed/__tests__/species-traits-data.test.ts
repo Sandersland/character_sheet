@@ -39,7 +39,7 @@ describe("SPECIES_TRAITS — every row validates", () => {
   });
 });
 
-describe("Astral Elf variant traits (#1751, Spelljammer / SJ:AAG — announce-only)", () => {
+describe("Astral Elf variant traits (#1751, Spelljammer / SJ:AAG)", () => {
   const astralTraits = SPECIES_TRAITS.filter(
     (t) => t.speciesSlug === "elf" && t.speciesEdition === "EDITION_2014" && t.variantSlug === "astral",
   );
@@ -48,7 +48,7 @@ describe("Astral Elf variant traits (#1751, Spelljammer / SJ:AAG — announce-on
     expect(astralTraits.map((t) => t.name).sort()).toEqual(["Astral Fire", "Astral Trance", "Starlight Step"]);
   });
 
-  it("every Astral Elf trait is announce-only (no improvements) and cites SJ:AAG", () => {
+  it("every Astral Elf trait carries no improvements and cites SJ:AAG", () => {
     expect(astralTraits.length).toBeGreaterThan(0);
     for (const trait of astralTraits) {
       expect(trait.improvements ?? [], trait.name).toHaveLength(0);
@@ -61,6 +61,13 @@ describe("Astral Elf variant traits (#1751, Spelljammer / SJ:AAG — announce-on
       (t) => t.speciesSlug === "elf" && t.variantSlug === "astral" && t.name === "Keen Senses",
     );
     expect(astralKeenSenses).toHaveLength(0);
+  });
+
+  it("Astral Fire is the only Astral Elf trait carrying a choice (#1756), still with no improvements", () => {
+    const withChoice = astralTraits.filter((t) => t.choice !== undefined).map((t) => t.name);
+    expect(withChoice).toEqual(["Astral Fire"]);
+    const astralFire = astralTraits.find((t) => t.name === "Astral Fire");
+    expect(astralFire?.improvements ?? []).toHaveLength(0);
   });
 });
 
@@ -146,11 +153,12 @@ describe("Dragonborn Draconic Ancestry trait content — both editions (epic rev
   });
 });
 
-describe("choice-bearing traits (#1689/#1690) carry no improvements — the choice spec is the whole mechanic", () => {
-  it("Half-Elf Skill Versatility, High Elf Cantrip, 2024 Human Skillful/Versatile, and 2024 Elf Keen Senses carry no improvements", () => {
+describe("choice-bearing traits (#1689/#1690/#1756) carry no improvements — the choice spec is the whole mechanic", () => {
+  it("Half-Elf Skill Versatility, High Elf Cantrip, Astral Fire, 2024 Human Skillful/Versatile, and 2024 Elf Keen Senses carry no improvements", () => {
     const choiceBearing = [
       { speciesSlug: "half-elf", speciesEdition: "EDITION_2014" as const, name: "Skill Versatility" },
       { speciesSlug: "elf", speciesEdition: "EDITION_2014" as const, variantSlug: "high", name: "Cantrip" },
+      { speciesSlug: "elf", speciesEdition: "EDITION_2014" as const, variantSlug: "astral", name: "Astral Fire" },
       { speciesSlug: "human", speciesEdition: "EDITION_2024" as const, name: "Skillful" },
       { speciesSlug: "human", speciesEdition: "EDITION_2024" as const, name: "Versatile" },
       { speciesSlug: "elf", speciesEdition: "EDITION_2024" as const, name: "Keen Senses" },
@@ -165,7 +173,7 @@ describe("choice-bearing traits (#1689/#1690) carry no improvements — the choi
   });
 });
 
-describe("#1689/#1690: choice-spec vocabulary lands on exactly five rows", () => {
+describe("#1689/#1690/#1756: choice-spec vocabulary lands on exactly six rows", () => {
   it("Half-Elf's own Skill Versatility row carries chooseSkills: count 2, no `from` restriction (SRD 5.1 places none)", () => {
     const skillVersatility = SPECIES_TRAITS.find((t) => t.speciesSlug === "half-elf" && t.name === "Skill Versatility");
     expect(skillVersatility?.choice).toEqual({ chooseSkills: { count: 2 } });
@@ -174,6 +182,11 @@ describe("#1689/#1690: choice-spec vocabulary lands on exactly five rows", () =>
   it("High Elf's own Cantrip row carries chooseCantrip: the wizard list, Intelligence casting ability (SRD 5.1 p. 24)", () => {
     const cantrip = SPECIES_TRAITS.find((t) => t.speciesSlug === "elf" && t.variantSlug === "high" && t.name === "Cantrip");
     expect(cantrip?.choice).toEqual({ chooseCantrip: { list: "wizard", castingAbility: "intelligence" } });
+  });
+
+  it("Astral Elf's own Astral Fire row carries chooseCantrip: an explicit 3-cantrip list, no fixed casting ability (SJ:AAG p. 10, #1756)", () => {
+    const astralFire = SPECIES_TRAITS.find((t) => t.speciesSlug === "elf" && t.variantSlug === "astral" && t.name === "Astral Fire");
+    expect(astralFire?.choice).toEqual({ chooseCantrip: { spells: ["Dancing Lights", "Light", "Sacred Flame"] } });
   });
 
   it("2024 Human's own Skillful row carries chooseSkills: count 1, no `from` restriction (SRD 5.2 places none, #1690)", () => {
@@ -197,6 +210,7 @@ describe("#1689/#1690: choice-spec vocabulary lands on exactly five rows", () =>
     expect(names).toEqual(
       [
         "elf::EDITION_2014::high::Cantrip",
+        "elf::EDITION_2014::astral::Astral Fire",
         "half-elf::EDITION_2014::base::Skill Versatility",
         "human::EDITION_2024::base::Skillful",
         "human::EDITION_2024::base::Versatile",

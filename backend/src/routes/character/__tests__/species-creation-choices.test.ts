@@ -57,6 +57,21 @@ async function highElf() {
   return { elf, highElfVariant: elf.variants.find((v) => v.slug === "high")! };
 }
 
+async function astralElf() {
+  const elf = await prisma.species.findFirstOrThrow({
+    where: { slug: "elf", edition: "EDITION_2014" },
+    include: { variants: true },
+  });
+  return { elf, astralVariant: elf.variants.find((v) => v.slug === "astral")! };
+}
+
+// #1756: a 2014 cantrip from Astral Fire's explicit list (Dancing Lights /
+// Light / Sacred Flame). Pinned to EDITION_2014 for determinism, same reason
+// fireBolt/magicMissile above are.
+async function cantrip2014(name: string) {
+  return prisma.spell.findFirstOrThrow({ where: { name, edition: "EDITION_2014" } });
+}
+
 // #1714 forked Fire Bolt to EDITION_2014 (Sorcerer+Wizard, 2-list) — this
 // suite exercises BOTH a 2014 character (baseBody's default rulesEdition)
 // and, at the bottom, a 2024 one (explicit override), so a single
@@ -209,6 +224,93 @@ describe("POST /api/characters — High Elf Cantrip (#1689)", () => {
       ...baseBody,
       speciesId: elf.id,
       variantId: highElfVariant.id,
+    });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("POST /api/characters — Astral Fire (#1756)", () => {
+  // Astral Elf's floating +2/+1 spread (#1751) is required by the same request,
+  // orthogonal to the cantrip choice under test here.
+  const astralAbilities = { strength: 2, wisdom: 1 };
+
+  it("a listed cantrip + chosen ability 201s; the sheet shows it species-sourced and the ability lands on CharacterRace", async () => {
+    const { elf, astralVariant } = await astralElf();
+    const light = await cantrip2014("Light");
+
+    const res = await post({
+      ...baseBody,
+      speciesId: elf.id,
+      variantId: astralVariant.id,
+      speciesAbilities: astralAbilities,
+      speciesCantripId: light.id,
+      castingAbility: "wisdom",
+    });
+
+    expect(res.status).toBe(201);
+    createdCharacterIds.push(res.body.id);
+
+    const entry = (res.body.spellcasting.spells as Record<string, unknown>[]).find((s) => s.name === "Light");
+    expect(entry).toBeDefined();
+    expect(entry!.source).toBe("species");
+    expect(entry!.castingAbility).toBe("wisdom");
+
+    const raceRow = await prisma.characterRace.findUniqueOrThrow({ where: { characterId: res.body.id } });
+    expect(raceRow.speciesCantripName).toBe("Light");
+    expect(raceRow.castingAbility).toBe("wisdom");
+  });
+
+  it("400s an off-list cantrip (Fire Bolt, a real cantrip but not one of the three)", async () => {
+    const { elf, astralVariant } = await astralElf();
+    const fireBoltRow = await fireBolt();
+
+    const res = await post({
+      ...baseBody,
+      speciesId: elf.id,
+      variantId: astralVariant.id,
+      speciesAbilities: astralAbilities,
+      speciesCantripId: fireBoltRow.id,
+      castingAbility: "intelligence",
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/is not one of this species/);
+  });
+
+  it("400s when speciesCantripId is omitted (the cantrip choice is required)", async () => {
+    const { elf, astralVariant } = await astralElf();
+    const res = await post({
+      ...baseBody,
+      speciesId: elf.id,
+      variantId: astralVariant.id,
+      speciesAbilities: astralAbilities,
+      castingAbility: "wisdom",
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("400s a valid cantrip with no castingAbility (the ability choice is required for Astral Fire)", async () => {
+    const { elf, astralVariant } = await astralElf();
+    const light = await cantrip2014("Light");
+    const res = await post({
+      ...baseBody,
+      speciesId: elf.id,
+      variantId: astralVariant.id,
+      speciesAbilities: astralAbilities,
+      speciesCantripId: light.id,
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("400s an invalid castingAbility value (strength is not one of Int/Wis/Cha)", async () => {
+    const { elf, astralVariant } = await astralElf();
+    const light = await cantrip2014("Light");
+    const res = await post({
+      ...baseBody,
+      speciesId: elf.id,
+      variantId: astralVariant.id,
+      speciesAbilities: astralAbilities,
+      speciesCantripId: light.id,
+      castingAbility: "strength",
     });
     expect(res.status).toBe(400);
   });
