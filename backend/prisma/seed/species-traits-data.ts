@@ -434,8 +434,12 @@ const HALF_ORC_2014: SpeciesTraitSeed[] = [
   {
     speciesSlug: "half-orc",
     speciesEdition: "EDITION_2014",
+    // A fixed Intimidation grant, so a real derived skillProficiency
+    // improvement, not announce-only text (SRD 5.1 p. 26, #1762 — the same
+    // pattern as base 2014 Elf's Keen Senses, #1754).
     name: "Menacing",
     description: "You gain proficiency in the Intimidation skill. (SRD 5.1 p. 26)",
+    improvements: [{ target: "skillProficiency", amount: 1, key: "intimidation" }],
   },
   {
     speciesSlug: "half-orc",
