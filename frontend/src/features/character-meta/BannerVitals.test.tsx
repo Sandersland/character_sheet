@@ -66,6 +66,9 @@ const mockCharacter: Character = {
     damage: { count: 1, faces: 4, modifier: 1, damageType: "bludgeoning" },
   },
   attacksPerAction: 1,
+  // Served crit threshold (#1120). BannerVitals renders nothing crit-related,
+  // but the field is required on the wire — same rationale as attackRows below.
+  critRange: 20,
   // Served attack rows (#1434). BannerVitals renders none of them, but the field
   // is required on the wire, so the fixture carries the two always-present rows
   // rather than being weakened to `as unknown as Character`.

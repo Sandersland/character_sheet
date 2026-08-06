@@ -19,6 +19,7 @@ export * from "@/lib/srd/item-rarity.js";
 export * from "@/lib/srd/armor-class.js";
 export * from "@/lib/srd/movement.js";
 export * from "@/lib/srd/extra-attack.js";
+export * from "@/lib/srd/crit-range.js";
 export * from "@/lib/srd/announced-save-dc.js";
 export * from "@/lib/srd/encumbrance.js";
 export * from "@/lib/srd/spellcasting-tables.js";

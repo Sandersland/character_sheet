@@ -229,7 +229,7 @@ export interface TurnStateActions {
   /**
    * Override the to-hit total on tally row `rowId` after a Precision Attack die
    * is added (#809). Touches only `attack.total` — the kept-d20 face and
-   * nat-20/nat-1 flags (which decide crit/miss) stay put.
+   * criticalHit/nat-1 flags (which decide crit/miss, #1120) stay put.
    */
   setTallyAttackTotal: (rowId: string, total: number) => void;
   /** Fold an on-hit rider's total into tally row `rowId`'s damage slot. */
@@ -570,15 +570,15 @@ const addTallyDamageRiderState = (s: TurnState, rowId: string, amount: number): 
   );
 
 // Set a row's verdict directly (#811 — replaces the old unset→Hit→Miss cycle).
-// Nat-locked rows (nat 20 / nat 1) refuse: the die already decided. Switching
-// to miss drops the row's damage — a missed attack dealt none.
+// Die-locked rows (a crit-range hit, #1120, or nat 1) refuse: the die already
+// decided. Switching to miss drops the row's damage — a missed attack dealt none.
 function setTallyVerdictState(
   s: TurnState,
   index: number,
   verdict: TallyVerdict | undefined,
 ): TurnState {
   const target = s.attackTally[index];
-  if (!target || target.attack.nat20 || target.attack.nat1) return s;
+  if (!target || target.attack.criticalHit || target.attack.nat1) return s;
   return updateTallyRow(s, index, (row) => {
     const updated = { ...row };
     if (verdict === undefined) delete updated.verdict;

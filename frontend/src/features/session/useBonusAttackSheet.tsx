@@ -77,6 +77,7 @@ function useBonusAttackRoll({
     addTallyDamageRider: turnState.addTallyDamageRider,
     currentRow,
     source: "bonusAction",
+    critRange: character.critRange,
     ...(manualMode ? { manualMode } : {}),
   });
 

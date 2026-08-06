@@ -64,6 +64,18 @@ export function isNaturalTwenty(result: RollResult | null | undefined): boolean 
   return result ? keptD20(result)?.value === 20 : false;
 }
 
+/**
+ * Kept-die roll meets or exceeds a crit threshold (#1120) — nat 20 is just
+ * `isCriticalRoll(result, 20)`, not a separate rule; Champion's Improved/
+ * Superior Critical widen `critRange` to 19 or 18 server-side, and this is
+ * the ONE place the attack sheet compares a roll against it, never a
+ * hardcoded 20.
+ */
+export function isCriticalRoll(result: RollResult | null | undefined, critRange: number): boolean {
+  const face = result ? keptD20(result)?.value : undefined;
+  return face !== undefined && face >= critRange;
+}
+
 /** Kept-die natural 1 — a miss on an attack roll. */
 export function isNaturalOne(result: RollResult | null | undefined): boolean {
   return result ? keptD20(result)?.value === 1 : false;
