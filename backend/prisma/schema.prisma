@@ -481,6 +481,13 @@ model SpeciesVariant {
   // row and for every Dragonborn ancestry variant in either edition (draconic
   // ancestry grants a damage type + resistance, never an ability increase).
   abilityIncreases Json    @default("[]")
+  // When true, `abilityIncreases` REPLACES the parent Species' increases at
+  // creation instead of adding to them (fetchMergedAbilityIncreases). Only the
+  // Astral Elf sets this (#1751): a Spelljammer standalone race modelled as an
+  // Elf variant, it carries a Tasha's-era floating spread and must NOT inherit
+  // the base Elf's +2 DEX the way real subraces (High/Wood/Drow) do. Default
+  // false keeps every existing subrace additive.
+  abilityIncreasesReplace Boolean @default(false)
 
   traits        SpeciesTrait[]
   grantedSpells SpeciesGrantedSpell[]

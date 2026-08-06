@@ -946,13 +946,16 @@ async function fetchMergedAbilityIncreases(
   const variant = variantId
     ? await prisma.speciesVariant.findUniqueOrThrow({
         where: { id: variantId },
-        select: { abilityIncreases: true },
+        select: { abilityIncreases: true, abilityIncreasesReplace: true },
       })
     : null;
-  return [
-    ...(species.abilityIncreases as unknown as AbilityIncreaseSpec[]),
-    ...((variant?.abilityIncreases as unknown as AbilityIncreaseSpec[]) ?? []),
-  ];
+  const variantIncreases = (variant?.abilityIncreases as unknown as AbilityIncreaseSpec[]) ?? [];
+  // A replacing variant (Astral Elf, #1751) supplies the ENTIRE species ability
+  // increase — the base species' increases are dropped, not stacked, because it
+  // is a standalone race modelled as a variant, not a subrace of the base. Every
+  // real subrace leaves the flag false and stacks additively (the common case).
+  if (variant?.abilityIncreasesReplace) return variantIncreases;
+  return [...(species.abilityIncreases as unknown as AbilityIncreaseSpec[]), ...variantIncreases];
 }
 
 // Phase 1.6 — species grants (#1681): merge the species + variant abilityIncreases
