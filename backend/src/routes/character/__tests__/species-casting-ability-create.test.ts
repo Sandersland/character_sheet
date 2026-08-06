@@ -146,3 +146,51 @@ describe("POST /api/characters — 2024 lineage casting-ability choice (#1683)",
     expect(raceRow.castingAbility).toBeNull();
   });
 });
+
+// #1756 regression: High Elf's Cantrip pins its ability (Intelligence) in the
+// chooseCantrip spec, so a submitted castingAbility must be rejected with a
+// message DISTINCT from the "grants no spells" case — while the cantrip itself
+// still resolves Intelligence-keyed when no ability is submitted.
+describe("POST /api/characters — 2014 High Elf's fixed-ability cantrip (#1756)", () => {
+  async function highElf2014() {
+    const elf = await prisma.species.findFirstOrThrow({
+      where: { slug: "elf", edition: "EDITION_2014" },
+      include: { variants: true },
+    });
+    return { elf, highElfVariant: elf.variants.find((v) => v.slug === "high")! };
+  }
+
+  it("400s a submitted castingAbility with a fixed-ability message distinct from the no-spells case", async () => {
+    const { elf, highElfVariant } = await highElf2014();
+    const fireBolt = await prisma.spell.findFirstOrThrow({ where: { name: "Fire Bolt", edition: "EDITION_2014" } });
+    const res = await post({
+      ...baseBody,
+      rulesEdition: "EDITION_2014",
+      speciesId: elf.id,
+      variantId: highElfVariant.id,
+      speciesCantripId: fireBolt.id,
+      castingAbility: "wisdom",
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("castingAbility not allowed: this species/variant's spellcasting ability is fixed");
+  });
+
+  it("201s without a castingAbility and keys the granted cantrip off the spec's fixed Intelligence", async () => {
+    const { elf, highElfVariant } = await highElf2014();
+    const fireBolt = await prisma.spell.findFirstOrThrow({ where: { name: "Fire Bolt", edition: "EDITION_2014" } });
+    const res = await post({
+      ...baseBody,
+      rulesEdition: "EDITION_2014",
+      speciesId: elf.id,
+      variantId: highElfVariant.id,
+      speciesCantripId: fireBolt.id,
+    });
+    expect(res.status).toBe(201);
+    createdCharacterIds.push(res.body.id);
+    const entry = (res.body.spellcasting.spells as Record<string, unknown>[]).find((s) => s.name === "Fire Bolt");
+    expect(entry!.source).toBe("species");
+    expect(entry!.castingAbility).toBe("intelligence");
+    const raceRow = await prisma.characterRace.findUniqueOrThrow({ where: { characterId: res.body.id } });
+    expect(raceRow.speciesCantripName).toBe("Fire Bolt");
+  });
+});
