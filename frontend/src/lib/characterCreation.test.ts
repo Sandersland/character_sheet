@@ -163,7 +163,7 @@ describe("resolveSelections", () => {
           chooseCantrip: null,
           chooseOriginFeat: false,
           variants: [{
-            id: "var-hill", name: "Hill Dwarf", slug: "hill", abilityIncreases: [],
+            id: "var-hill", name: "Hill Dwarf", slug: "hill", abilityIncreases: [], abilityIncreasesReplace: false,
             needsCastingAbility: false, chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false,
           }],
         },
@@ -192,6 +192,7 @@ const DWARF_SPECIES: SpeciesOption = {
       name: "Hill Dwarf",
       slug: "hill",
       abilityIncreases: [{ ability: "wisdom", amount: 1 }],
+      abilityIncreasesReplace: false,
       needsCastingAbility: false,
       chooseSkills: null,
       chooseCantrip: null,
@@ -233,6 +234,7 @@ const ELF_SPECIES: SpeciesOption = {
       name: "High Elf",
       slug: "high",
       abilityIncreases: [{ ability: "intelligence", amount: 1 }],
+      abilityIncreasesReplace: false,
       needsCastingAbility: false,
       chooseSkills: null,
       chooseCantrip: { list: "wizard", castingAbility: "intelligence" },
@@ -243,6 +245,7 @@ const ELF_SPECIES: SpeciesOption = {
       name: "Astral Elf",
       slug: "astral",
       abilityIncreases: [],
+      abilityIncreasesReplace: true,
       needsCastingAbility: true,
       chooseSkills: null,
       chooseCantrip: { spells: ["Dancing Lights", "Light", "Sacred Flame"] },
@@ -267,6 +270,24 @@ const HUMAN_SPECIES: SpeciesOption = {
 };
 const speciesReference: ReferenceData = { ...reference, species: [DWARF_SPECIES, HALF_ELF_SPECIES, ELF_SPECIES, HUMAN_SPECIES] };
 
+// #1758: Astral Elf — an Elf variant carrying a floating +2/+1-or-+1/+1/+1
+// spread that REPLACES the base Elf's +2 DEX (abilityIncreasesReplace), matching
+// the real seeded content (#1751).
+const ASTRAL_ELF_SPECIES: SpeciesOption = {
+  id: "sp-elf-astral", name: "Elf", slug: "elf", speed: 30,
+  abilityIncreases: [{ ability: "dexterity", amount: 2 }],
+  needsCastingAbility: false, chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false,
+  variants: [
+    {
+      id: "var-astral", name: "Astral Elf", slug: "astral",
+      abilityIncreases: [{ floating: 3 }],
+      abilityIncreasesReplace: true,
+      needsCastingAbility: false, chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false,
+    },
+  ],
+};
+const ASTRAL_ELF_REFERENCE: ReferenceData = { ...reference, species: [ASTRAL_ELF_SPECIES] };
+
 describe("deriveSpeciesBonuses (#1681)", () => {
   it("is inert (applicable:false) when no species is selected", () => {
     const draft = makeDraft();
@@ -288,11 +309,54 @@ describe("deriveSpeciesBonuses (#1681)", () => {
     const bonuses = deriveSpeciesBonuses(draft, resolveSelections(speciesReference, draft));
     expect(bonuses.fixed).toEqual({ charisma: 2 });
     expect(bonuses.choice).toEqual({
+      kind: "choose",
       count: 2,
       amount: 1,
       abilities: ["strength", "dexterity", "constitution", "intelligence", "wisdom"],
     });
     expect(bonuses.complete).toBe(false);
+  });
+
+  // #1758 (repro): Astral Elf carries a FLOATING spread ({ floating: 3 }) on its
+  // variant AND replaces the base Elf's +2 DEX (abilityIncreasesReplace). The
+  // frontend must treat it as an unmade choice and stay INCOMPLETE until
+  // assigned — before the fix splitSpeciesIncreases dropped the floating form,
+  // so the Abilities step went green with nothing collected and the create 400d
+  // ("speciesAbilities required").
+  it("an Astral Elf floating spread is applicable but NOT complete until assigned (#1758)", () => {
+    const draft = makeDraft({ speciesId: "sp-elf-astral", variantId: "var-astral" });
+    const bonuses = deriveSpeciesBonuses(draft, resolveSelections(ASTRAL_ELF_REFERENCE, draft));
+    expect(bonuses.applicable).toBe(true);
+    expect(bonuses.complete).toBe(false);
+  });
+
+  // #1758: the replacing variant drops the base Elf's +2 DEX — the ONLY spec is
+  // the variant's floating pool, so `fixed` is empty (mirrors the backend's
+  // fetchMergedAbilityIncreases). Every eligible ability is choosable.
+  it("an Astral Elf drops the base species' fixed +2 DEX (abilityIncreasesReplace honored) (#1758)", () => {
+    const draft = makeDraft({ speciesId: "sp-elf-astral", variantId: "var-astral" });
+    const bonuses = deriveSpeciesBonuses(draft, resolveSelections(ASTRAL_ELF_REFERENCE, draft));
+    expect(bonuses.fixed).toEqual({});
+    expect(bonuses.choice).toEqual({
+      kind: "floating",
+      points: 3,
+      abilities: ["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"],
+    });
+  });
+
+  it("an Astral Elf is complete for a valid +2/+1 and for +1/+1/+1", () => {
+    const twoOne = makeDraft({ speciesId: "sp-elf-astral", variantId: "var-astral", speciesAbilities: { dexterity: 2, wisdom: 1 } });
+    expect(deriveSpeciesBonuses(twoOne, resolveSelections(ASTRAL_ELF_REFERENCE, twoOne)).complete).toBe(true);
+
+    const oneOneOne = makeDraft({ speciesId: "sp-elf-astral", variantId: "var-astral", speciesAbilities: { strength: 1, dexterity: 1, wisdom: 1 } });
+    expect(deriveSpeciesBonuses(oneOneOne, resolveSelections(ASTRAL_ELF_REFERENCE, oneOneOne)).complete).toBe(true);
+  });
+
+  it("an Astral Elf is INCOMPLETE for an illegal floating shape (+3 to one, or +1/+1 only, or +2/+2)", () => {
+    for (const speciesAbilities of [{ dexterity: 3 }, { dexterity: 1, wisdom: 1 }, { dexterity: 2, wisdom: 2 }] as const) {
+      const draft = makeDraft({ speciesId: "sp-elf-astral", variantId: "var-astral", speciesAbilities });
+      expect(deriveSpeciesBonuses(draft, resolveSelections(ASTRAL_ELF_REFERENCE, draft)).complete).toBe(false);
+    }
   });
 
   it("is complete once exactly `count` abilities are assigned at `amount` each", () => {
@@ -324,11 +388,11 @@ const DROW_VARIANT_ELF: SpeciesOption = {
   chooseOriginFeat: false,
   variants: [
     {
-      id: "var-drow", name: "Drow", slug: "drow", abilityIncreases: [],
+      id: "var-drow", name: "Drow", slug: "drow", abilityIncreases: [], abilityIncreasesReplace: false,
       needsCastingAbility: true, chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false,
     },
     {
-      id: "var-high", name: "High Elf", slug: "high", abilityIncreases: [],
+      id: "var-high", name: "High Elf", slug: "high", abilityIncreases: [], abilityIncreasesReplace: false,
       needsCastingAbility: true, chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false,
     },
   ],
@@ -650,6 +714,18 @@ describe("buildCreatePayload", () => {
     expect(buildCreatePayload(incompleteChoice, sel2, deriveSkillChoices(incompleteChoice, sel2), []).speciesAbilities).toBeUndefined();
   });
 
+  // #1758: an Astral Elf's completed floating spread rides speciesAbilities like
+  // any completed choice; an illegal shape sends nothing (the backend re-validates).
+  it("sends an Astral Elf's completed floating speciesAbilities and omits an illegal one (#1758)", () => {
+    const valid = makeDraft({ name: "X", className: "Rogue", speciesId: "sp-elf-astral", variantId: "var-astral", speciesAbilities: { dexterity: 2, wisdom: 1 } });
+    const sel1 = resolveSelections(ASTRAL_ELF_REFERENCE, valid);
+    expect(buildCreatePayload(valid, sel1, deriveSkillChoices(valid, sel1), []).speciesAbilities).toEqual({ dexterity: 2, wisdom: 1 });
+
+    const illegal = makeDraft({ name: "X", className: "Rogue", speciesId: "sp-elf-astral", variantId: "var-astral", speciesAbilities: { dexterity: 3 } });
+    const sel2 = resolveSelections(ASTRAL_ELF_REFERENCE, illegal);
+    expect(buildCreatePayload(illegal, sel2, deriveSkillChoices(illegal, sel2), []).speciesAbilities).toBeUndefined();
+  });
+
   it("sends a completed castingAbility choice (#1683)", () => {
     const draft = makeDraft({
       name: "X", className: "Rogue", speciesId: "sp-elf-2024", variantId: "var-drow", castingAbility: "charisma",
@@ -790,7 +866,7 @@ describe("buildCreatePayload", () => {
           chooseCantrip: null,
           chooseOriginFeat: false,
           variants: [{
-            id: "var-hill", name: "Hill Dwarf", slug: "hill", abilityIncreases: [],
+            id: "var-hill", name: "Hill Dwarf", slug: "hill", abilityIncreases: [], abilityIncreasesReplace: false,
             needsCastingAbility: false, chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false,
           }],
         },

@@ -277,9 +277,22 @@ function halfElfBonuses(assignment: Partial<Record<AbilityName, number>> = {}): 
   return {
     applicable: true,
     fixed: { charisma: 2 },
-    choice: { count: 2, amount: 1, abilities: ["strength", "dexterity", "constitution", "intelligence", "wisdom"] },
+    choice: { kind: "choose", count: 2, amount: 1, abilities: ["strength", "dexterity", "constitution", "intelligence", "wisdom"] },
     assignment,
     complete: Object.keys(assignment).length === 2,
+  };
+}
+
+// #1758: Astral Elf — a floating spread with no fixed increases (replace drops
+// the base +2 DEX), every ability eligible.
+const ALL_SIX_ABILITIES: AbilityName[] = ["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"];
+function astralElfBonuses(assignment: Partial<Record<AbilityName, number>> = {}): CreationSpeciesBonuses {
+  return {
+    applicable: true,
+    fixed: {},
+    choice: { kind: "floating", points: 3, abilities: ALL_SIX_ABILITIES },
+    assignment,
+    complete: false,
   };
 }
 
@@ -325,5 +338,40 @@ describe("AbilityAssignmentPanel — species bonuses (#1681)", () => {
     const { update } = renderPanel({ method: "manual", speciesBonuses: halfElfBonuses({ strength: 1, dexterity: 1 }) });
     await user.click(screen.getByRole("button", { name: "Strength" }));
     expect(update).toHaveBeenCalledWith({ speciesAbilities: { dexterity: 1 } });
+  });
+});
+
+describe("AbilityAssignmentPanel — floating species spread (#1758, Astral Elf)", () => {
+  it("renders the +2/+1 radios over every eligible ability and accepts a +2/+1 assignment", async () => {
+    const user = userEvent.setup();
+    const { update } = renderPanel({ method: "manual", speciesBonuses: astralElfBonuses({ dexterity: 2 }) });
+
+    // twoOne is the default mode — a +2 and +1 radio per ability, all six eligible.
+    expect((screen.getByRole("radio", { name: "+2 to Dexterity" }) as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByRole("radio", { name: "+2 to Charisma" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("radio", { name: "+1 to Wisdom" }));
+    expect(update).toHaveBeenCalledWith({ speciesAbilities: { dexterity: 2, wisdom: 1 } });
+  });
+
+  it("switches to +1/+1/+1 and accepts three distinct abilities, capped at three", async () => {
+    const user = userEvent.setup();
+    const { update } = renderPanel({ method: "manual", speciesBonuses: astralElfBonuses() });
+
+    await user.click(screen.getByRole("button", { name: "+1 / +1 / +1" }));
+    // Switching clears the pool.
+    expect(update).toHaveBeenCalledWith({ speciesAbilities: {} });
+  });
+
+  it("caps the +1/+1/+1 chips at three selections", () => {
+    // Three already chosen — a fourth is disabled.
+    renderPanel({ method: "manual", speciesBonuses: astralElfBonuses({ strength: 1, dexterity: 1, constitution: 1 }) });
+    expect(screen.getByRole("button", { name: "Intelligence" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Strength" })).toBeEnabled();
+  });
+
+  it("has no a11y violations with the floating spread rendered", async () => {
+    const { container } = renderPanel({ method: "manual", speciesBonuses: astralElfBonuses({ dexterity: 2, wisdom: 1 }) });
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

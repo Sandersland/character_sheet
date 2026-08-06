@@ -275,6 +275,13 @@ referenceRouter.get("/reference", async (req, res) => {
           name: v.name,
           slug: v.slug,
           abilityIncreases: v.abilityIncreases as unknown as AbilityIncreaseSpec[],
+          // #1758: whether this variant's abilityIncreases REPLACE the parent
+          // species' rather than stacking (Astral Elf, #1751) — served so the
+          // creation ceremony merges the two levels the way fetchMergedAbilityIncreases
+          // does (character-create.ts, the authority), never re-deriving the rule.
+          // No species-level twin: replace only means anything against a PARENT, and
+          // a species has none — the Prisma column lives on SpeciesVariant alone.
+          abilityIncreasesReplace: v.abilityIncreasesReplace,
           // Already scoped to this variant by Prisma (its own back-relation).
           needsCastingAbility: v.grantedSpells.length > 0 || chooseCantripNeedsPlayerAbility(variantCantrip),
           chooseSkills: chooseSkillsOf(v.traits),

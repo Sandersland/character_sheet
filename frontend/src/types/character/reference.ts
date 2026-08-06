@@ -91,6 +91,11 @@ export interface SpeciesVariantOption {
   /** Additive to the parent species' own abilityIncreases at creation (Hill
    *  Dwarf's +1 WIS on top of Dwarf's +2 CON) — [] for every 2024 row. */
   abilityIncreases: AbilityIncreaseSpec[];
+  /** #1758/#1751: when true, `abilityIncreases` REPLACE the parent species'
+   *  rather than stacking (Astral Elf drops the base Elf's +2 DEX). Mirrors the
+   *  backend's fetchMergedAbilityIncreases merge; false for every real subrace.
+   *  No SpeciesOption twin — replace only means something against a parent. */
+  abilityIncreasesReplace: boolean;
   /** #1683: true when picking this variant requires the Int/Wis/Cha
    *  casting-ability choice (a 2024 lineage/legacy that grants a spell —
    *  Elf's Drow/High Elf/Wood Elf, Gnome's Forest/Rock, Tiefling's Abyssal/
