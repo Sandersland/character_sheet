@@ -6,14 +6,15 @@ import { passEntryGate } from "./helpers/creation";
 import { createCharacter, gotoSheet, openSpellbook, uniqueName } from "./helpers/api";
 
 // #1722: exit slice of the 2014 spell catalog epic (#1517) — proves a 2014
-// caster's spell experience walks end to end on its own catalog. Two shapes
-// (#1510's caster split): Wizard's creation-time SPELLBOOK pick (a
+// caster's spell experience walks end to end on its OWN catalog, and that
+// 2024's stays curated rather than absorbing 2014's full breadth (#1753,
+// fixed alongside this spec — see resolveSpellCatalogForEdition's own
+// comment in spell-classes.ts for the fallback that used to leak both ways).
+// Two caster shapes (#1510's split): Wizard's creation-time SPELLBOOK pick (a
 // "known-ish" list) and a Cleric reached post-level-up through the sheet's
 // own "Learn a spell" panel (a "prepared" caster has no creation-time list at
 // all — level1SpellPicksFor serves `spells: 0` for a 2014 Cleric,
-// cantrips-only). The last test below pins what's actually correct today
-// (genuine-fork resolution) rather than the fuller "2024 stays curated"
-// claim in #1722's own acceptance line — see its comment and #1753.
+// cantrips-only).
 
 function continueStep(page: Page) {
   return page.getByRole("button", { name: /Continue/ }).click();
@@ -141,25 +142,21 @@ test("sheet: a 2014 Cleric's 'Learn a spell' panel, reached after leveling up, o
   await expect(page.getByText("Guiding Bolt")).toBeVisible();
   await page.getByRole("button", { name: "Learn", exact: true }).click();
 
+  // Dissonant Whispers: EDITION_2024-tagged only (no 2014 row of this name at
+  // all) — searching for it against a 2014 character's catalog comes back
+  // empty (#1753's fix), proving the panel never leaks the other edition's
+  // rows in.
+  await search.fill("Dissonant Whispers");
+  await expect(page.getByText("No spells match your filter.")).toBeVisible();
+
   expect(errors).toEqual([]);
 });
 
-// #1517's spell content slices (#1713-#1721) seeded ~352 EDITION_2014 rows
-// against the pre-existing ~116 curated EDITION_2024 rows — the breadth is
-// real at the DATA layer. What this test can honestly assert about the SERVED
-// catalog is narrower: resolveSpellCatalogForEdition (spell-classes.ts) still
-// falls back to a lone single-edition-tagged row SYMMETRICALLY (no direction
-// check on which edition `group[0]` is tagged), so today every distinct spell
-// name resolves for BOTH ?edition= requests — the "2024 stays curated" half of
-// #1722's own acceptance line does not hold yet. Filed as #1753 (found while
-// building this test) rather than fixed here: the function also backs
-// creation/level-up eligibility and homebrew scribing, and the correct fix is
-// directional (keep the 2024→2014 fallback that softens #1742's gap, drop the
-// 2014→2024 one), which is a product call worth its own review. What DOES
-// already work correctly, and is what this test pins, is genuine-fork
-// resolution: a name present under BOTH editions still resolves to exactly
-// its OWN edition's row and text, never the other one's.
-test("GET /api/spells resolves a genuine 2014/2024 fork to each edition's own text", async ({ page }) => {
+// #1517/#1753: 2014 is the full PHB'14 breadth, 2024 stays its curated list
+// (prisma/seed/spells.ts's own "a curated SRD subset" header) — asserted in
+// BOTH directions, plus genuine-fork resolution (a name present under both
+// editions still resolves to exactly its OWN edition's row and text).
+test("GET /api/spells is edition-scoped: 2014 is the full PHB'14 breadth, 2024 stays curated", async ({ page }) => {
   await login(page);
 
   const res2014 = await page.request.get("/api/spells?edition=EDITION_2014");
@@ -169,7 +166,24 @@ test("GET /api/spells resolves a genuine 2014/2024 fork to each edition's own te
 
   const spells2014 = (await res2014.json()) as { name: string; description: string }[];
   const spells2024 = (await res2024.json()) as { name: string; description: string }[];
+  const names2014 = new Set(spells2014.map((s) => s.name));
+  const names2024 = new Set(spells2024.map((s) => s.name));
 
+  // The breadth claim: 2014 is the full PHB'14 catalog, 2024 a smaller
+  // curated list — a durable relative fact, not a magic-number pin (both
+  // grow as content ships).
+  expect(names2014.size).toBeGreaterThan(names2024.size * 2);
+
+  // A 2014-only spell (no EDITION_2024 row of this name at all) is served to
+  // 2014 and absent from 2024.
+  expect(names2014.has("Find Familiar")).toBe(true);
+  expect(names2024.has("Find Familiar")).toBe(false);
+
+  // A 2024-only spell (no EDITION_2014 row) is the mirror image.
+  expect(names2024.has("Dissonant Whispers")).toBe(true);
+  expect(names2014.has("Dissonant Whispers")).toBe(false);
+
+  // A genuine fork still resolves to each edition's own row and text.
   const burningHands2014 = spells2014.find((s) => s.name === "Burning Hands");
   const burningHands2024 = spells2024.find((s) => s.name === "Burning Hands");
   expect(burningHands2014, "Burning Hands served under EDITION_2014").toBeTruthy();
@@ -177,8 +191,4 @@ test("GET /api/spells resolves a genuine 2014/2024 fork to each edition's own te
   expect(burningHands2014!.description).toMatch(/thumbs touching/);
   expect(burningHands2024!.description).not.toMatch(/thumbs touching/);
   expect(burningHands2014!.description).not.toBe(burningHands2024!.description);
-
-  // #1517's breadth did land at the data layer even though the serving gap
-  // above (#1753) means it isn't yet exclusive to 2014 requests.
-  expect(spells2014.length).toBeGreaterThan(300);
 });
