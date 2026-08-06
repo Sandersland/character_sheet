@@ -28,7 +28,15 @@
 # resolve their targets against; a query helper, not content),
 # seed-spell-classes.ts (#1711 — same split for spells.ts's per-spell
 # `classes` field: authors SpellClass rows for one just-upserted spell and
-# prunes any class dropped from its list, scoped to that spellId).
+# prunes any class dropped from its list, scoped to that spellId),
+# seed-spell-list-expansions.ts (#1631 — same split for subclass-spell-list-
+# expansions.ts: the edition-aware subclass resolve plus the id-scoped
+# stale-row prune, mirroring seed-granted-spells.ts's own role for its
+# sibling family SUBCLASS_GRANTED_SPELLS),
+# resolve-catalog-spell.ts (#1631 — the shared spell-name -> Spell.id
+# resolution seed-granted-spells.ts and seed-spell-list-expansions.ts both
+# resolve their own spellId against; a query helper, not content, mirroring
+# species-seed-lookup.ts's own role for its two callers).
 # validate.ts is NOT listed here on purpose — it's also logic, but it happens
 # to carry none of the three tokens (pure zod validation, no DB access), so it
 # passes the scan as a plain data module would; adding it to the exception
@@ -39,7 +47,7 @@
 # deleting a module or mistyping the glob turns this red, not silently green.
 set -eu
 
-LOGIC_EXCEPTIONS="prisma/seed/guards.ts prisma/seed/prune.ts prisma/seed/rename-spells.ts prisma/seed/seed-class-features.ts prisma/seed/seed-granted-spells.ts prisma/seed/seed-starting-equipment.ts prisma/seed/seed-subclasses.ts prisma/seed/seed-species.ts prisma/seed/seed-species-traits.ts prisma/seed/seed-species-granted-spells.ts prisma/seed/species-seed-lookup.ts prisma/seed/seed-spell-classes.ts"
+LOGIC_EXCEPTIONS="prisma/seed/guards.ts prisma/seed/prune.ts prisma/seed/rename-spells.ts prisma/seed/seed-class-features.ts prisma/seed/seed-granted-spells.ts prisma/seed/seed-starting-equipment.ts prisma/seed/seed-subclasses.ts prisma/seed/seed-species.ts prisma/seed/seed-species-traits.ts prisma/seed/seed-species-granted-spells.ts prisma/seed/species-seed-lookup.ts prisma/seed/seed-spell-classes.ts prisma/seed/seed-spell-list-expansions.ts prisma/seed/resolve-catalog-spell.ts"
 
 is_exception() {
   target="$1"

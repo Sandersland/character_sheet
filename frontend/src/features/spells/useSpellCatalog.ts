@@ -20,14 +20,15 @@ export function useSpellCatalog(edition: RulesEdition, filter?: SpellCatalogFilt
   // object identity every render (which would refetch in a loop).
   const className = filter?.className;
   const maxLevel = filter?.maxLevel;
+  const subclassId = filter?.subclassId;
 
   useEffect(() => {
     let mounted = true;
-    fetchSpells(edition, { className, maxLevel })
+    fetchSpells(edition, { className, maxLevel, subclassId })
       .then((spells) => { if (mounted) setCatalog(spells); })
       .catch(() => { if (mounted) setError("Couldn't load spell catalog."); });
     return () => { mounted = false; };
-  }, [edition, className, maxLevel]);
+  }, [edition, className, maxLevel, subclassId]);
 
   return { catalog, error, showSpinner };
 }

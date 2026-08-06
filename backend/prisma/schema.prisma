@@ -655,6 +655,9 @@ model Subclass {
   // Back-relation only — not a column, appears on no payload unless included
   // (#1522/#1523's ClassFeature foundation).
   features      ClassFeature[]
+  // Back-relation only, same role as grantedSpells (#1631) — the choosable-pool
+  // widening a picker resolves, not a sheet-facing payload field.
+  spellListExpansions SubclassSpellListExpansion[]
 
   @@unique([classId, name, edition], name: "classId_name")
   // The slug-form twin of classId_name: a lineage that forks across editions
@@ -693,6 +696,35 @@ model SubclassGrantedSpell {
   // lives in the migration (Prisma's DSL can't express it), same as
   // 20260726111922_catalog_edition_tagging's indexes.
   edition        RulesEdition?
+
+  @@unique([subclassId, spellId, edition])
+  @@index([subclassId])
+}
+
+// A spell a subclass adds to the CHOOSABLE class spell list (#1631) — sibling
+// of SubclassGrantedSpell but categorically distinct: this is not a free
+// grant, it widens what a known caster may PICK, still spending an ordinary
+// spells-known slot. PHB'14's Warlock patrons ("Add fiend spells to your
+// warlock list") are the shape: The Fiend/The Archfey/The Great Old One's
+// Expanded Spell List. Carries no gateLevel (the known-caster picker already
+// gates a choice by spell level vs. available slots) and no castingAbility
+// (the warlock learns the spell with its own casting ability, not a per-grant
+// one) — both deliberate omissions vs. SubclassGrantedSpell, owner decision
+// on #1631. Resolved live by the creation/level-up spell pickers, unioned
+// into the choosable pool; never persisted onto the character.
+model SubclassSpellListExpansion {
+  id         String        @id @default(uuid())
+  subclassId String
+  subclass   Subclass      @relation(fields: [subclassId], references: [id], onDelete: Cascade)
+  spellId    String
+  spell      Spell         @relation(fields: [spellId], references: [id], onDelete: Cascade)
+  // NULL = valid in both editions; a list that diverges forks into one row per
+  // edition — same NULL-as-shared convention as SubclassGrantedSpell.edition.
+  // An expansion list is a SET, so the read path is a set filter (edition-or-
+  // NULL admission), not resolveEditionRow's pick-one fallback. NULLS NOT
+  // DISTINCT lives in the migration (Prisma's DSL can't express it), same as
+  // SubclassGrantedSpell's own edition unique.
+  edition    RulesEdition?
 
   @@unique([subclassId, spellId, edition])
   @@index([subclassId])
@@ -1570,6 +1602,9 @@ model Spell {
   grantedBy        SubclassGrantedSpell[]
   // Species/variants that grant this spell for free (#1679's table; no rows yet).
   speciesGrantedBy SpeciesGrantedSpell[]
+  // Subclasses whose list-expansion adds this spell to the choosable pool
+  // (#1631) — a picker-only widening, never a free grant (see grantedBy above).
+  listExpandedBy   SubclassSpellListExpansion[]
   // Class-membership join (#1711 F2 of epic #1517) — replaces the old
   // `classes String[]` column. No `edition` filter needed on this side: a
   // 2014-fork Spell row and its 2024 sibling are separate Spell rows (Shape

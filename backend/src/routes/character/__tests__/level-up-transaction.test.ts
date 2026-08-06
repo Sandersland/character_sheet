@@ -1831,6 +1831,76 @@ describe("POST …/level-up/transactions — Warlock 3→4 cantrip + spell (#113
   });
 });
 
+// #1631: The Fiend's PHB'14 "Expanded Spell List" widens the CHOOSABLE pool a
+// known caster's leveled pick may come from, alongside the base Warlock list
+// (spellLists) — Burning Hands/Command are NOT on the base Warlock list but
+// ARE legal picks for a 2014 Fiend Warlock, still costing the ordinary
+// spells-known slot (never a free grant — granted-spells-domains.test.ts's
+// "receives NONE... for free" is the sibling proof of that half).
+describe("POST …/level-up/transactions — subclass spell-list expansion (#1631)", () => {
+  const CHAR_ID = "lvtx-1631-fiend-2";
+
+  beforeEach(async () => {
+    const warlock = await prisma.characterClass.findFirstOrThrow({ where: { name: "Warlock" } });
+    const theFiend = (await prisma.subclass.findFirstOrThrow({ where: { classId: warlock.id, name: "The Fiend" } })).id;
+    await prisma.character.create({
+      data: {
+        ...BASE,
+        ownerId: OWNER_ID,
+        id: CHAR_ID,
+        name: "LevelUpTx Fiend1631",
+        rulesEdition: "EDITION_2014",
+        experiencePoints: 300, // level 2 threshold; hitDice.total 1 → 1 pending
+        hitPoints: { current: 14, max: 14, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 1, die: "d8", spent: 0 },
+        abilityScores: { strength: 8, dexterity: 14, constitution: 14, intelligence: 10, wisdom: 10, charisma: 16 },
+        spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
+        classEntries: { create: [{ name: "warlock", subclass: "The Fiend", subclassId: theFiend, classId: warlock.id, position: 0, level: 1 }] },
+      },
+    });
+  });
+
+  it("a 2014 Fiend Warlock 1→2 may pick Burning Hands (off the base Warlock list) as its new known spell", async () => {
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
+    // Burning Hands is a genuine 2014/2024 fork — pin EDITION_2014 (the
+    // character's own edition), same rationale as the 2024 test below.
+    const burningHands = await prisma.spell.findFirstOrThrow({
+      where: { name: "Burning Hands", edition: "EDITION_2014", NOT: { classMemberships: { some: { className: "warlock" } } } },
+      select: { id: true, name: true },
+    });
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entry.id },
+      hp: { method: "average" },
+      spellsLearned: [{ type: "learnSpell", spellId: burningHands.id }],
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.spellcasting.spells.map((s: { name: string }) => s.name)).toContain(burningHands.name);
+  });
+
+  it("the same off-list pick is rejected 400 for a 2024 Fiend Warlock (no list-expansion mechanism — Fiend Spells is a grant, never a pick)", async () => {
+    await prisma.character.update({ where: { id: CHAR_ID }, data: { rulesEdition: "EDITION_2024" } });
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
+    // Burning Hands is a genuine 2014/2024 fork — pin EDITION_2024 (the
+    // character's own edition) so this exercises assertOnSpellList, not the
+    // unrelated cross-edition-fork rejection (#1712).
+    const burningHands = await prisma.spell.findFirstOrThrow({
+      where: { name: "Burning Hands", edition: "EDITION_2024", NOT: { classMemberships: { some: { className: "warlock" } } } },
+      select: { id: true },
+    });
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entry.id },
+      hp: { method: "average" },
+      spellsLearned: [{ type: "learnSpell", spellId: burningHands.id }],
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/spell list/i);
+  });
+});
+
 // #1712: cross-edition admission for the level-up learn path —
 // loadPickCatalogRows rejects a submitted spellId that's provably the WRONG
 // edition's fork of a name (a same-named row the character's OWN edition

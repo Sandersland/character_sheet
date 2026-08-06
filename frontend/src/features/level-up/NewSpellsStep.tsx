@@ -187,9 +187,9 @@ function LeveledSpellsSection({
   learnedSpellIds: ReadonlySet<string>;
   framed: boolean;
 }) {
-  const { count, maxSpellLevel, magicalSecrets, spellLists, canSwap, selectedIds, forgottenEntryId, toggle, toggleForget, casterModel } = selection;
+  const { count, maxSpellLevel, magicalSecrets, spellLists, canSwap, selectedIds, forgottenEntryId, toggle, toggleForget, casterModel, expandedSpellIds } = selection;
   const [search, setSearch] = useState("");
-  const eligible = eligibleNewSpells(catalog, { maxSpellLevel, spellLists });
+  const eligible = eligibleNewSpells(catalog, { maxSpellLevel, spellLists, expandedSpellIds });
   const filtered = filterCatalog(eligible, search, "");
   const swapCandidates = swappableKnownSpells(character.spellcasting?.spells ?? []);
   const learnCopy = learnSummary(count, canSwap, casterModel);

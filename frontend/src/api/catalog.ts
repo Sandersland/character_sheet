@@ -19,6 +19,11 @@ export async function fetchItems(): Promise<Item[]> {
 export interface SpellCatalogFilter {
   className?: string;
   maxLevel?: number;
+  // #1631: a chosen subclass's list-expansion (e.g. The Fiend's Expanded
+  // Spell List) widens `className`'s own membership filter with spells NOT
+  // on the class's own list. Ignored server-side when className is absent —
+  // see GET /api/spells's own comment.
+  subclassId?: string;
 }
 
 // Feeds the spellcasting section's "learn from catalog" picker.
@@ -35,6 +40,7 @@ export async function fetchSpells(edition: RulesEdition, filter: SpellCatalogFil
   const params = new URLSearchParams({ edition });
   if (filter.className !== undefined) params.set("class", filter.className);
   if (filter.maxLevel !== undefined) params.set("maxLevel", String(filter.maxLevel));
+  if (filter.subclassId !== undefined) params.set("subclassId", filter.subclassId);
   return request<CatalogSpell[]>(`/spells?${params.toString()}`, undefined, "Failed to fetch spell catalog");
 }
 

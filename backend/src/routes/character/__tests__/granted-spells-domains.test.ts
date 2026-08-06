@@ -43,6 +43,8 @@ let paladinClassId: string;
 let devotionId: string;
 let warlockClassId: string;
 let fiendId: string;
+let archfeyId: string;
+let greatOldOneId: string;
 
 async function requireClass(name: string): Promise<string> {
   const cls = await prisma.characterClass.findUnique({ where: { name }, select: { id: true } });
@@ -54,6 +56,14 @@ async function requireClass(name: string): Promise<string> {
 // express a null edition (#1306).
 async function requireSharedSubclass(classId: string, name: string): Promise<string> {
   const sub = await prisma.subclass.findFirst({ where: { classId, name, edition: null }, select: { id: true } });
+  if (!sub) throw new Error(`${name} subclass not seeded — run \`prisma db seed\` before tests`);
+  return sub.id;
+}
+
+// The Archfey/Great Old One shape (#1233): EDITION_2014-only Subclass rows,
+// not shared — requireSharedSubclass's `edition: null` would never match.
+async function require2014Subclass(classId: string, name: string): Promise<string> {
+  const sub = await prisma.subclass.findFirst({ where: { classId, name, edition: "EDITION_2014" }, select: { id: true } });
   if (!sub) throw new Error(`${name} subclass not seeded — run \`prisma db seed\` before tests`);
   return sub.id;
 }
@@ -71,6 +81,8 @@ beforeAll(async () => {
 
   warlockClassId = await requireClass("Warlock");
   fiendId = await requireSharedSubclass(warlockClassId, "The Fiend");
+  archfeyId = await require2014Subclass(warlockClassId, "The Archfey");
+  greatOldOneId = await require2014Subclass(warlockClassId, "The Great Old One");
 });
 
 afterEach(async () => {
@@ -273,7 +285,7 @@ describe("Trickery Domain granted spells (#913, #1626)", () => {
   });
 });
 
-describe("The Fiend granted spells (#913, #1626)", () => {
+describe("The Fiend granted spells (#913, #1626, #1631)", () => {
   async function createFiendWarlock(xp: number, edition: "EDITION_2014" | "EDITION_2024") {
     await createCaster(
       { className: "Warlock", classId: warlockClassId, subclassName: "The Fiend", subclassId: fiendId, savingThrowProficiencies: ["wisdom", "charisma"] },
@@ -282,32 +294,26 @@ describe("The Fiend granted spells (#913, #1626)", () => {
     );
   }
 
-  // PHB'14 "Expanded Spell List" — byte-identical list (character-level gates
-  // here are the deliberately-deferred 2024 shift, #1626 issue body "second
-  // axis") on the retagged EDITION_2014 row.
-  it("a 2014 Fiend Warlock surfaces the PHB'14 fiend list at warlock level 9", async () => {
+  // #1631: PHB'14's "Expanded Spell List" is list-EXPANSION ("Add fiend
+  // spells to your warlock list"), not a free grant — a 2014 Fiend Warlock
+  // must receive NONE of the ten patron spells for free. They now live on
+  // SubclassSpellListExpansion (picker-only, see spell-list-expansion tests
+  // below), not SubclassGrantedSpell — this is the negative assertion the
+  // issue's own AC requires, discriminating 2014 from 2024's real grant.
+  it("a 2014 Fiend Warlock receives NONE of the ten patron spells for free at warlock level 9", async () => {
     await createFiendWarlock(XP_LVL_9, "EDITION_2014");
-    const names = (await grantedSpells()).map((s) => s.name).sort();
-    expect(names).toEqual([
-      "Blindness/Deafness",
-      "Burning Hands",
-      "Command",
-      "Fire Shield",
-      "Fireball",
-      "Flame Strike",
-      "Hallow",
-      "Scorching Ray",
-      "Stinking Cloud",
-      "Wall of Fire",
-    ]);
+    const names = (await grantedSpells()).map((s) => s.name);
+    expect(names).toEqual([]);
   });
 
-  // SRD 5.2 pp.75-76 "Fiend Spells" — L3 swaps Blindness/Deafness for
+  // SRD 5.2 pp.75-76 "Fiend Spells" IS genuinely always-prepared (the real
+  // mechanism fork #1631 draws) — L3 swaps Blindness/Deafness for
   // Suggestion, L9 swaps Flame Strike for Geas and Hallow for Insect Plague
   // (#1626).
-  it("a 2024 Fiend Warlock surfaces the SRD 5.2 fiend list at warlock level 9, not the superseded 2014 names", async () => {
+  it("a 2024 Fiend Warlock still receives Fiend Spells as always-prepared grants at warlock level 9, not the 2014 names", async () => {
     await createFiendWarlock(XP_LVL_9, "EDITION_2024");
-    const names = (await grantedSpells()).map((s) => s.name).sort();
+    const granted = await grantedSpells();
+    const names = granted.map((s) => s.name).sort();
     expect(names).toEqual([
       "Burning Hands",
       "Command",
@@ -323,6 +329,36 @@ describe("The Fiend granted spells (#913, #1626)", () => {
     expect(names).not.toContain("Blindness/Deafness");
     expect(names).not.toContain("Flame Strike");
     expect(names).not.toContain("Hallow");
+    // Always-prepared, marked source:"subclass" — excluded from the prepared
+    // cap (does not count against the number of spells the warlock can
+    // prepare with Pact Magic).
+    expect(granted.every((s) => s.prepared === true && s.source === "subclass")).toBe(true);
+  });
+});
+
+// #1631: The Archfey/The Great Old One are the SAME list-expansion shape as
+// The Fiend above, minus a 2024 counterpart at all (#1233: both Subclass rows
+// are EDITION_2014-only, non-SRD PHB'24 reworks deliberately unauthored) — so
+// there is no "still granted in 2024" branch to test, only the negative.
+describe("The Archfey / The Great Old One granted spells (#1631)", () => {
+  it("a 2014 Archfey Warlock receives NONE of the ten patron spells for free at warlock level 9", async () => {
+    await createCaster(
+      { className: "Warlock", classId: warlockClassId, subclassName: "The Archfey", subclassId: archfeyId, savingThrowProficiencies: ["wisdom", "charisma"] },
+      XP_LVL_9,
+      "EDITION_2014",
+    );
+    const names = (await grantedSpells()).map((s) => s.name);
+    expect(names).toEqual([]);
+  });
+
+  it("a 2014 Great Old One Warlock receives NONE of the ten patron spells for free at warlock level 9", async () => {
+    await createCaster(
+      { className: "Warlock", classId: warlockClassId, subclassName: "The Great Old One", subclassId: greatOldOneId, savingThrowProficiencies: ["wisdom", "charisma"] },
+      XP_LVL_9,
+      "EDITION_2014",
+    );
+    const names = (await grantedSpells()).map((s) => s.name);
+    expect(names).toEqual([]);
   });
 });
 

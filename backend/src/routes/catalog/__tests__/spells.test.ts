@@ -206,6 +206,55 @@ describe("GET /api/spells — ?class= / ?maxLevel= filters (#1377)", () => {
   });
 });
 
+// #1631: a chosen subclass's list-expansion widens `?class=`'s own membership
+// filter — over the REAL seeded Fiend subclass + catalog spells, same "link
+// against live seed content" style as granted-spells-domains.test.ts.
+describe("GET /api/spells — ?subclassId= list-expansion widening (#1631)", () => {
+  it("a 2014 Fiend Warlock's ?subclassId= adds Burning Hands, off the base Warlock list", async () => {
+    const warlock = await prisma.characterClass.findUniqueOrThrow({ where: { name: "Warlock" }, select: { id: true } });
+    const fiend = await prisma.subclass.findFirstOrThrow({ where: { classId: warlock.id, name: "The Fiend" }, select: { id: true } });
+
+    const withoutSubclass = await get(`/api/spells?class=warlock&maxLevel=1`, "EDITION_2014");
+    expect(names(withoutSubclass.body)).not.toContain("Burning Hands");
+
+    const withSubclass = await get(`/api/spells?class=warlock&maxLevel=1&subclassId=${fiend.id}`, "EDITION_2014");
+    expect(withSubclass.status).toBe(200);
+    expect(names(withSubclass.body)).toContain("Burning Hands");
+    // Only WIDENS — every base-list spell the unwidened request served is
+    // still present.
+    for (const name of names(withoutSubclass.body)) expect(names(withSubclass.body)).toContain(name);
+  });
+
+  it("does not widen for a 2024 request — The Fiend's 2014 list-expansion never applies to a 2024 character", async () => {
+    const warlock = await prisma.characterClass.findUniqueOrThrow({ where: { name: "Warlock" }, select: { id: true } });
+    const fiend = await prisma.subclass.findFirstOrThrow({ where: { classId: warlock.id, name: "The Fiend" }, select: { id: true } });
+
+    const response = await get(`/api/spells?class=warlock&maxLevel=1&subclassId=${fiend.id}`, "EDITION_2024");
+    expect(response.status).toBe(200);
+    expect(names(response.body)).not.toContain("Burning Hands");
+  });
+
+  it("?subclassId= with no ?class= is a no-op (the unfiltered catalog already has everything)", async () => {
+    const warlock = await prisma.characterClass.findUniqueOrThrow({ where: { name: "Warlock" }, select: { id: true } });
+    const fiend = await prisma.subclass.findFirstOrThrow({ where: { classId: warlock.id, name: "The Fiend" }, select: { id: true } });
+
+    const withSubclassId = await get(`/api/spells?maxLevel=1&subclassId=${fiend.id}`, "EDITION_2014");
+    const bare = await get(`/api/spells?maxLevel=1`, "EDITION_2014");
+    expect(withSubclassId.status).toBe(200);
+    expect(withSubclassId.body).toEqual(bare.body);
+  });
+
+  it("an unknown subclassId is a no-op, not an error", async () => {
+    const response = await get(`/api/spells?class=warlock&maxLevel=1&subclassId=not-a-real-id`, "EDITION_2014");
+    expect(response.status).toBe(200);
+    expect(names(response.body)).not.toContain("Burning Hands");
+  });
+
+  it("400s a blank subclassId", async () => {
+    expect((await get("/api/spells?subclassId=")).status).toBe(400);
+  });
+});
+
 // #1711: membership is served entirely off the SpellClass join now — Spell
 // itself carries no `classes` column at all — so a membership row's own
 // lifecycle (add/remove), not any Spell field, is what the route reflects.

@@ -102,6 +102,7 @@ function SpellsStepBody({ c }: StepBodyProps) {
       {picks && (
         <CreationSpellsStep
           className={c.draft.className}
+          subclassId={c.draft.subclassId || undefined}
           counts={picks}
           cantripIds={c.draft.cantripIds}
           spellIds={c.draft.spellIds}
