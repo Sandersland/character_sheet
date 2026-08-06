@@ -277,12 +277,16 @@ const ELF_2014: SpeciesTraitSeed[] = [
     ],
   },
   // Astral Elf (#1751) — Spelljammer: Astral Adventurer's Guide, non-SRD, so
-  // cited SJ:AAG (not SRD/PHB). All announce-only: the cantrip pick + casting
-  // ability (Astral Fire) and the trance/Keen Senses proficiencies aren't in
-  // the FeatImprovement vocabulary, same deferral as High Elf's Cantrip and
-  // Drow Magic. Base Elf's Darkvision/Fey Ancestry are species-level and render
-  // for this variant too — not re-declared here; Astral Trance supersedes the
-  // base Trance the way Drow's Superior Darkvision supersedes base Darkvision.
+  // cited SJ:AAG (not SRD/PHB). All announce-only. Astral Fire's cantrip +
+  // casting-ability pick and Astral Trance's per-rest skill/tool pick are
+  // genuine choices, not creation-time FeatImprovements. Keen Senses (a fixed
+  // Perception proficiency) COULD be a `skillProficiency` improvement — that
+  // target exists (srd/feats.ts) — but is left announce-only to match the base
+  // Elf, whose own Keen Senses isn't seeded species-level either; deriving one
+  // without the other is out of scope here. Base Elf's Darkvision/Fey Ancestry
+  // are species-level and render for this variant too — not re-declared here;
+  // Astral Trance supersedes the base Trance the way Drow's Superior Darkvision
+  // supersedes base Darkvision.
   {
     speciesSlug: "elf",
     speciesEdition: "EDITION_2014",
