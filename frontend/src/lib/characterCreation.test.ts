@@ -245,6 +245,7 @@ const ELF_SPECIES: SpeciesOption = {
       name: "Astral Elf",
       slug: "astral",
       abilityIncreases: [],
+      abilityIncreasesReplace: true,
       needsCastingAbility: true,
       chooseSkills: null,
       chooseCantrip: { spells: ["Dancing Lights", "Light", "Sacred Flame"] },

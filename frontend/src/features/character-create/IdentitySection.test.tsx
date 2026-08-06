@@ -124,12 +124,12 @@ const reference: ReferenceData = {
       chooseOriginFeat: false,
       variants: [
         {
-          id: "var-astral", name: "Astral Elf", slug: "astral", abilityIncreases: [],
+          id: "var-astral", name: "Astral Elf", slug: "astral", abilityIncreases: [], abilityIncreasesReplace: true,
           needsCastingAbility: true, chooseSkills: null,
           chooseCantrip: { spells: ["Dancing Lights", "Light", "Sacred Flame"] }, chooseOriginFeat: false,
         },
         {
-          id: "var-high", name: "High Elf", slug: "high", abilityIncreases: [],
+          id: "var-high", name: "High Elf", slug: "high", abilityIncreases: [], abilityIncreasesReplace: false,
           needsCastingAbility: false, chooseSkills: null,
           chooseCantrip: { list: "wizard", castingAbility: "intelligence" }, chooseOriginFeat: false,
         },
