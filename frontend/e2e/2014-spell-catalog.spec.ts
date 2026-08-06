@@ -25,7 +25,10 @@ function continueStep(page: Page) {
 // presence proves the RESOLVED row, not just a name match, is edition-correct.
 const BURNING_HANDS_2014_PHRASE = /thumbs touching/;
 
-test("creation: a 2014 Wizard's spell picker offers only the 2014 catalog, with PHB'14 text", async ({ page }) => {
+// Exclusivity (2024-only spells absent from the 2014 picker) is proven at the API
+// level in the third test and in the UI by the Cleric test below; this one proves the
+// 2014 breadth is offered end-to-end and resolves to PHB'14 text.
+test("creation: a 2014 Wizard's spell picker offers the 2014 catalog, with PHB'14 text", async ({ page }) => {
   const name = uniqueName("Old Ways Scholar");
 
   await login(page);
