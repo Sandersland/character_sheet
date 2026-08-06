@@ -44,12 +44,30 @@ describe("2014 roster (PHB'14, full subrace list, Variant Human excluded)", () =
     expect(dwarf?.speed).toBe(25);
   });
 
-  it("carries the full PHB'14 subrace list for Dwarf/Elf/Halfling/Gnome", () => {
+  it("carries the full PHB'14 subrace list for Dwarf/Elf/Halfling/Gnome (Elf also carries the Astral Elf variant, #1751)", () => {
     const variantNames = (name: string) => roster2014.find((s) => s.name === name)?.variants?.map((v) => v.name).sort();
     expect(variantNames("Dwarf")).toEqual(["Hill Dwarf", "Mountain Dwarf"]);
-    expect(variantNames("Elf")).toEqual(["Drow", "High Elf", "Wood Elf"]);
+    expect(variantNames("Elf")).toEqual(["Astral Elf", "Drow", "High Elf", "Wood Elf"]);
     expect(variantNames("Halfling")).toEqual(["Lightfoot Halfling", "Stout Halfling"]);
     expect(variantNames("Gnome")).toEqual(["Forest Gnome", "Rock Gnome"]);
+  });
+
+  // #1751: Astral Elf (Spelljammer, non-PHB) uses a Tasha's-era floating spread
+  // AND is the one variant that REPLACES rather than adds to its base species'
+  // ability increase — an Astral Elf gets ONLY the floating +2/+1, never the
+  // base Elf's +2 DEX (which every real subrace does stack on).
+  it("Astral Elf carries a single floating-3 spread and the abilityIncreasesReplace flag", () => {
+    const elf = roster2014.find((s) => s.name === "Elf");
+    const astral = elf?.variants?.find((v) => v.slug === "astral");
+    expect(astral?.abilityIncreases).toEqual([{ floating: 3 }]);
+    expect(astral?.abilityIncreasesReplace).toBe(true);
+  });
+
+  it("only the Astral Elf sets abilityIncreasesReplace — every real subrace stays additive", () => {
+    const replacingVariants = roster2014
+      .flatMap((s) => (s.variants ?? []).map((v) => ({ species: s.name, ...v })))
+      .filter((v) => v.abilityIncreasesReplace);
+    expect(replacingVariants.map((v) => `${v.species} > ${v.name}`)).toEqual(["Elf > Astral Elf"]);
   });
 
   it("excludes Variant Human (epic review decision 9 — wave 2)", () => {

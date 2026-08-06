@@ -50,6 +50,7 @@ function variantRow(speciesId: string, variant: SpeciesVariantSeed) {
     slug: variant.slug,
     speedOverride: variant.speedOverride ?? null,
     abilityIncreases: variant.abilityIncreases ?? [],
+    abilityIncreasesReplace: variant.abilityIncreasesReplace ?? false,
   };
 }
 

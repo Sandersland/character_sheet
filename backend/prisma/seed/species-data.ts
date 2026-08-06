@@ -36,6 +36,11 @@ export interface SpeciesVariantSeed {
   slug: string;
   speedOverride?: number;
   abilityIncreases?: AbilityIncreaseSpec[];
+  // When true, abilityIncreases REPLACES the parent species' increases instead
+  // of stacking on them at creation (#1751 — Astral Elf; see the schema comment
+  // on SpeciesVariant.abilityIncreasesReplace). Omit (= additive) for every
+  // real subrace.
+  abilityIncreasesReplace?: boolean;
 }
 
 export interface SpeciesSeed {
@@ -59,6 +64,7 @@ const speciesVariantSeedSchema = z
     slug: z.string().min(1),
     speedOverride: z.number().int().positive().optional(),
     abilityIncreases: abilityIncreasesSchema.optional(),
+    abilityIncreasesReplace: z.boolean().optional(),
   })
   .strict();
 
@@ -123,6 +129,18 @@ const SPECIES_2014: SpeciesSeed[] = [
         abilityIncreases: [{ ability: "wisdom", amount: 1 }],
       },
       { name: "Drow", slug: "drow", abilityIncreases: [{ ability: "charisma", amount: 1 }] },
+      // Astral Elf (Spelljammer: Astral Adventurer's Guide, non-SRD/non-PHB) —
+      // #1751. A standalone race modelled as an Elf variant so it nests in the
+      // species→variant picker, but its ability increase is the Tasha's-era
+      // floating "+2/+1 or +1/+1/+1" pool ({ floating: 3 }), which REPLACES the
+      // base Elf's +2 DEX rather than stacking (abilityIncreasesReplace) — an
+      // Astral Elf is not a PHB elf subrace and does not get +2 DEX.
+      {
+        name: "Astral Elf",
+        slug: "astral",
+        abilityIncreases: [{ floating: 3 }],
+        abilityIncreasesReplace: true,
+      },
     ],
   },
   {

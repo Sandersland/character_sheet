@@ -223,6 +223,77 @@ describe("POST /api/characters — 2014 choose-from-list increases (Half-Elf, #1
   });
 });
 
+// #1751: Astral Elf is a variant that REPLACES its base species' ability
+// increase rather than adding to it. Every other Elf subrace (High/Wood/Drow)
+// stacks its +1 on top of the base Elf's +2 DEX; Astral Elf does not — its
+// Tasha's-era floating spread IS the whole increase. Guards fetchMergedAbility-
+// Increases' abilityIncreasesReplace branch behaviorally, both directions.
+describe("POST /api/characters — Astral Elf replaces the base Elf's +2 DEX; real subraces still stack (#1751)", () => {
+  async function elf2014() {
+    return prisma.species.findFirstOrThrow({
+      where: { slug: "elf", edition: "EDITION_2014" },
+      include: { variants: true },
+    });
+  }
+
+  it("an Astral Elf gets ONLY the floating +2/+1 — the base Elf's +2 DEX is NOT applied", async () => {
+    const elf = await elf2014();
+    const astral = elf.variants.find((v) => v.slug === "astral")!;
+
+    const res = await post({
+      ...baseBody,
+      rulesEdition: "EDITION_2014",
+      speciesId: elf.id,
+      variantId: astral.id,
+      speciesAbilities: { strength: 2, wisdom: 1 },
+    });
+
+    expect(res.status).toBe(201);
+    createdCharacterIds.push(res.body.id);
+    // STR 12→14, WIS 10→11 (the chosen floating spread); DEX stays 12 — the base
+    // Elf's +2 DEX is replaced, not added.
+    expect(res.body.abilityScores).toEqual({ ...BASE_SCORES, strength: 14, wisdom: 11 });
+
+    const raceRow = await prisma.characterRace.findUniqueOrThrow({ where: { characterId: res.body.id } });
+    expect(raceRow.abilityBonuses).toEqual(
+      expect.arrayContaining([
+        { ability: "strength", amount: 2 },
+        { ability: "wisdom", amount: 1 },
+      ]),
+    );
+    expect(raceRow.abilityBonuses).toHaveLength(2);
+  });
+
+  it("regression: a Wood Elf still stacks +1 WIS on the base Elf's +2 DEX (additive, not replaced)", async () => {
+    // Wood Elf (not High Elf) because it carries no choice-bearing trait — High
+    // Elf's Cantrip is a wired #1689 choice that would 400 for a missing
+    // speciesCantripId, unrelated to the additive-vs-replace behavior under test.
+    const elf = await elf2014();
+    const woodElf = elf.variants.find((v) => v.slug === "wood")!;
+
+    const res = await post({
+      ...baseBody,
+      rulesEdition: "EDITION_2014",
+      speciesId: elf.id,
+      variantId: woodElf.id,
+    });
+
+    expect(res.status).toBe(201);
+    createdCharacterIds.push(res.body.id);
+    // DEX 12→14 (base Elf +2) AND WIS 10→11 (Wood Elf variant +1) — both applied.
+    expect(res.body.abilityScores).toEqual({ ...BASE_SCORES, dexterity: 14, wisdom: 11 });
+
+    const raceRow = await prisma.characterRace.findUniqueOrThrow({ where: { characterId: res.body.id } });
+    expect(raceRow.abilityBonuses).toEqual(
+      expect.arrayContaining([
+        { ability: "dexterity", amount: 2 },
+        { ability: "wisdom", amount: 1 },
+      ]),
+    );
+    expect(raceRow.abilityBonuses).toHaveLength(2);
+  });
+});
+
 describe("POST /api/characters — 2024 gets nothing from species, both directions (#1681)", () => {
   it("400s a submitted speciesAbilities under EDITION_2024", async () => {
     const dwarf2024 = await prisma.species.findFirstOrThrow({ where: { slug: "dwarf", edition: "EDITION_2024" } });

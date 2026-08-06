@@ -276,6 +276,48 @@ const ELF_2014: SpeciesTraitSeed[] = [
       { target: "weaponProficiency", amount: 1, key: "Hand Crossbows" },
     ],
   },
+  // Astral Elf (#1751) — Spelljammer: Astral Adventurer's Guide, non-SRD, so
+  // cited SJ:AAG (not SRD/PHB). All announce-only. Astral Fire's cantrip +
+  // casting-ability pick and Astral Trance's per-rest skill/tool pick are
+  // genuine choices, not creation-time FeatImprovements. Keen Senses (a fixed
+  // Perception proficiency) COULD be a `skillProficiency` improvement — that
+  // target exists (srd/feats.ts) — but is left announce-only to match the base
+  // Elf, whose own Keen Senses isn't seeded species-level either; deriving one
+  // without the other is out of scope here. Base Elf's Darkvision/Fey Ancestry
+  // are species-level and render for this variant too — not re-declared here;
+  // Astral Trance supersedes the base Trance the way Drow's Superior Darkvision
+  // supersedes base Darkvision.
+  {
+    speciesSlug: "elf",
+    speciesEdition: "EDITION_2014",
+    variantSlug: "astral",
+    name: "Astral Fire",
+    description:
+      "You know one cantrip of your choice from Dancing Lights, Light, or Sacred Flame. Intelligence, Wisdom, or Charisma is your spellcasting ability for it (choose when you select this species). (SJ:AAG p. 10) — choice mechanics deferred, as with High Elf Cantrip.",
+  },
+  {
+    speciesSlug: "elf",
+    speciesEdition: "EDITION_2014",
+    variantSlug: "astral",
+    name: "Starlight Step",
+    description:
+      "As a bonus action, you can magically teleport up to 30 feet to an unoccupied space you can see. You can use this trait a number of times equal to your proficiency bonus, and you regain all expended uses when you finish a long rest. (SJ:AAG p. 10)",
+  },
+  {
+    speciesSlug: "elf",
+    speciesEdition: "EDITION_2014",
+    variantSlug: "astral",
+    name: "Astral Trance",
+    description:
+      "You don't need to sleep, and magic can't put you to sleep. You can finish a long rest in 4 hours if you spend those hours in a trancelike meditation, during which you remain conscious. Whenever you finish this trance, you gain proficiency in one skill and with one weapon or tool of your choice. This supersedes the base Elf Trance trait. (SJ:AAG p. 10)",
+  },
+  {
+    speciesSlug: "elf",
+    speciesEdition: "EDITION_2014",
+    variantSlug: "astral",
+    name: "Keen Senses",
+    description: "You have proficiency in the Perception skill. (SJ:AAG p. 10)",
+  },
 ];
 
 const HALFLING_2014: SpeciesTraitSeed[] = [

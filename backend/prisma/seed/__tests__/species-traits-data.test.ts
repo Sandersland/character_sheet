@@ -32,9 +32,27 @@ describe("SPECIES_TRAITS — every row validates", () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 
-  it("every description cites an edition source (SRD/PHB)", () => {
+  it("every description cites a source (SRD/PHB, or SJ:AAG for the non-SRD Astral Elf, #1751)", () => {
     for (const trait of SPECIES_TRAITS) {
-      expect(trait.description, trait.name).toMatch(/SRD 5\.[12]|PHB'(14|24)/);
+      expect(trait.description, trait.name).toMatch(/SRD 5\.[12]|PHB'(14|24)|SJ:AAG/);
+    }
+  });
+});
+
+describe("Astral Elf variant traits (#1751, Spelljammer / SJ:AAG — announce-only)", () => {
+  const astralTraits = SPECIES_TRAITS.filter(
+    (t) => t.speciesSlug === "elf" && t.speciesEdition === "EDITION_2014" && t.variantSlug === "astral",
+  );
+
+  it("seeds Astral Fire, Starlight Step, Astral Trance, and Keen Senses", () => {
+    expect(astralTraits.map((t) => t.name).sort()).toEqual(["Astral Fire", "Astral Trance", "Keen Senses", "Starlight Step"]);
+  });
+
+  it("every Astral Elf trait is announce-only (no improvements) and cites SJ:AAG", () => {
+    expect(astralTraits.length).toBeGreaterThan(0);
+    for (const trait of astralTraits) {
+      expect(trait.improvements ?? [], trait.name).toHaveLength(0);
+      expect(trait.description, trait.name).toContain("SJ:AAG");
     }
   });
 });
