@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 
 import { prisma } from "@/lib/core/prisma.js";
-import { resolvePreferences, type UserPreferences } from "@/lib/preferences/preferences.js";
+import { resolvePreferences, type ResolvedPreferences } from "@/lib/preferences/preferences.js";
 
 // Opaque server-side sessions — the method-agnostic identity layer. Any auth
 // method (OAuth today, password/magic-link later) mints a session the same way.
@@ -21,7 +21,7 @@ export interface SessionUser {
   imageUrl: string | null;
   // null = this account has never stored preferences (#1178) — see
   // resolvePreferences for why that's a distinct state from "stored defaults".
-  preferences: UserPreferences | null;
+  preferences: ResolvedPreferences | null;
 }
 
 // Mint a new session. The token is the AuthSession primary key (the schema

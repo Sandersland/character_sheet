@@ -41,7 +41,7 @@ RUN npm ci --workspace backend
 # raised to the tree's real export count whenever a family is added, or a barrel
 # that loads only the old subset passes for the wrong reason.
 RUN npm run build --workspace @character-sheet/contracts \
- && node --input-type=module -e "import('@character-sheet/contracts').then(m => { const s = Object.keys(m).filter(k => k.endsWith('Schema')); if (s.length < 32 || s.some(k => typeof m[k]?.parse !== 'function')) { console.error('contracts barrel failed to load:', s.length, 'schemas'); process.exit(1); } console.log('contracts:', s.length, 'schemas loaded'); })"
+ && node --input-type=module -e "import('@character-sheet/contracts').then(m => { const s = Object.keys(m).filter(k => k.endsWith('Schema')); if (s.length < 53 || s.some(k => typeof m[k]?.parse !== 'function')) { console.error('contracts barrel failed to load:', s.length, 'schemas'); process.exit(1); } console.log('contracts:', s.length, 'schemas loaded'); })"
 COPY backend/ backend/
 WORKDIR /app/backend
 # prisma.config.ts resolves env("DATABASE_URL") when the CLI loads it, so a

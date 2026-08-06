@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { z } from "zod";
+import { patchSessionSchema, type PatchSessionInput } from "@character-sheet/contracts";
 
 import type { CampaignRole } from "@/generated/prisma/client.js";
 import { serializeActivityEvent } from "@/lib/activity/activity.js";
@@ -202,17 +202,10 @@ sessionsRouter.get("/campaigns/:campaignId/sessions", async (req, res) => {
   );
 });
 
-const patchSessionSchema = z
-  .object({
-    title: z.string().min(1).nullable().optional(),
-    arcId: z.string().min(1).nullable().optional(),
-  })
-  .strict()
-  .refine((v) => v.title !== undefined || v.arcId !== undefined, {
-    message: "Provide at least one of title or arcId",
-  });
-
-type PatchSessionData = z.infer<typeof patchSessionSchema>;
+// patchSessionSchema lives in @character-sheet/contracts (#1394); its
+// exported type is z.input (this package's locked policy, #1395) — the
+// whole-object `.refine()` here doesn't itself diverge input from output.
+type PatchSessionData = PatchSessionInput;
 
 // A status + message a helper hands back for the route to send, or null to proceed.
 type PatchDenial = { status: number; error: string };

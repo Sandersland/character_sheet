@@ -1,10 +1,10 @@
+import { preferencesSchema } from "@character-sheet/contracts";
 import { describe, expect, it } from "vitest";
 
 import {
   DEFAULT_PREFERENCES,
   mergePreferencesPatch,
   preferencesPatchSchema,
-  preferencesSchema,
   resolvePreferences,
 } from "@/lib/preferences/preferences.js";
 

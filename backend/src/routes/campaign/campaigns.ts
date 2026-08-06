@@ -1,10 +1,15 @@
 import crypto from "node:crypto";
 
 import { Router } from "express";
-import { z } from "zod";
+import {
+  attachCharacterSchema,
+  createCampaignSchema,
+  joinCampaignSchema,
+} from "@character-sheet/contracts";
 
 import { assertCampaignMembership, assertCharacterAccess } from "@/lib/auth/access.js";
 import { attachCharacterUpdate } from "@/lib/campaign/campaign-attach.js";
+import { parseBodyOr400 } from "@/lib/http/parse-body.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
@@ -15,18 +20,15 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 // Shared-campaign backbone (#246). Plain-REST (like journal.ts): no audit log,
 // no transaction-op pattern. Membership is identity state, access is gated via
 // assertCampaignMembership. Mounted after requireAuth, so req.user is always set.
+//
+// createCampaignSchema/joinCampaignSchema/attachCharacterSchema live in
+// @character-sheet/contracts (#1394) — rulesEdition is optional there (the
+// Prisma column default applies when omitted); the picker at campaign
+// creation is #1286, the column has carried it since #1285. Never patchable
+// after creation: there is no PATCH /campaigns/:id route, so "frozen once
+// set" holds by simple absence of a mutation path.
 
 export const campaignsRouter = Router();
-
-// rulesEdition is optional (the Prisma column default applies when omitted) —
-// the picker at campaign creation is #1286; the column has carried it since
-// #1285. Never patchable after creation: there is no PATCH /campaigns/:id
-// route, so "frozen once set" holds by simple absence of a mutation path.
-const createCampaignSchema = z
-  .object({ name: z.string().min(1), rulesEdition: z.enum(["EDITION_2014", "EDITION_2024"]).optional() })
-  .strict();
-const joinCampaignSchema = z.object({ inviteCode: z.string().min(1) }).strict();
-const attachCharacterSchema = z.object({ characterId: z.string().min(1) }).strict();
 
 // Same opaque-token recipe as session.ts.
 function generateInviteCode(): string {
@@ -56,21 +58,16 @@ const campaignInclude = {
  * Create a campaign + the creator's OWNER membership in one transaction.
  */
 campaignsRouter.post("/campaigns", async (req, res) => {
-  const parseResult = createCampaignSchema.safeParse(req.body);
-  if (!parseResult.success) {
-    res
-      .status(400)
-      .json({ error: "Invalid request body", details: parseResult.error.flatten() });
-    return;
-  }
+  const data = parseBodyOr400(createCampaignSchema, req.body, res);
+  if (data === undefined) return;
 
   const userId = req.user!.id;
   const campaign = await prisma.campaign.create({
     data: {
-      name: parseResult.data.name,
+      name: data.name,
       // Omitted when absent so the column's own @default(EDITION_2024) applies
       // (one literal, not duplicated here).
-      ...(parseResult.data.rulesEdition ? { rulesEdition: parseResult.data.rulesEdition } : {}),
+      ...(data.rulesEdition ? { rulesEdition: data.rulesEdition } : {}),
       ownerId: userId,
       inviteCode: generateInviteCode(),
       members: { create: { userId, role: "OWNER" } },
@@ -129,16 +126,11 @@ campaignsRouter.get("/campaigns/:id", async (req, res) => {
  * Resolve a campaign by invite code and join as PLAYER (idempotent on @@unique).
  */
 campaignsRouter.post("/campaigns/join", async (req, res) => {
-  const parseResult = joinCampaignSchema.safeParse(req.body);
-  if (!parseResult.success) {
-    res
-      .status(400)
-      .json({ error: "Invalid request body", details: parseResult.error.flatten() });
-    return;
-  }
+  const data = parseBodyOr400(joinCampaignSchema, req.body, res);
+  if (data === undefined) return;
 
   const campaign = await prisma.campaign.findUnique({
-    where: { inviteCode: parseResult.data.inviteCode },
+    where: { inviteCode: data.inviteCode },
     select: { id: true },
   });
   if (!campaign) {
@@ -166,16 +158,11 @@ campaignsRouter.post("/campaigns/join", async (req, res) => {
  * serialized character so the frontend can swap state in one assignment.
  */
 campaignsRouter.post("/campaigns/:id/characters", async (req, res) => {
-  const parseResult = attachCharacterSchema.safeParse(req.body);
-  if (!parseResult.success) {
-    res
-      .status(400)
-      .json({ error: "Invalid request body", details: parseResult.error.flatten() });
-    return;
-  }
+  const data = parseBodyOr400(attachCharacterSchema, req.body, res);
+  if (data === undefined) return;
 
   const userId = req.user!.id;
-  const characterId = parseResult.data.characterId;
+  const characterId = data.characterId;
   const campaignId = req.params.id;
   await assertCharacterAccess(prisma, userId, characterId, "edit");
   await assertCampaignMembership(prisma, userId, campaignId, "view");

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
+import { ENTITY_TYPES, createEntitySchema, updateEntitySchema } from "@character-sheet/contracts";
 
 import { assertCampaignMembership, assertCampaignOwner } from "@/lib/auth/access.js";
 import { NotFoundError } from "@/lib/auth/errors.js";
@@ -34,32 +35,10 @@ import { PORTRAIT_CONTENT_TYPE, reencodePortrait } from "@/lib/storage/portrait-
 
 export const entitiesRouter = Router();
 
-const ENTITY_TYPES = ["NPC", "LOCATION", "FACTION", "ITEM", "PC", "OTHER"] as const;
-
-const VISIBILITIES = ["HIDDEN", "REVEALED"] as const;
-
-const createEntitySchema = z
-  .object({
-    type: z.enum(ENTITY_TYPES),
-    name: z.string().min(1),
-    aliases: z.array(z.string()).optional(),
-    notes: z.string().optional(),
-    // Owner-only (#379): a non-owner supplying this is rejected at the route.
-    visibility: z.enum(VISIBILITIES).optional(),
-  })
-  .strict();
-
-const updateEntitySchema = z
-  .object({
-    type: z.enum(ENTITY_TYPES),
-    name: z.string().min(1),
-    aliases: z.array(z.string()),
-    notes: z.string().nullable(),
-    // Owner-only (#379); presence in a non-owner PATCH is rejected at the route.
-    visibility: z.enum(VISIBILITIES),
-  })
-  .partial()
-  .strict();
+// ENTITY_TYPES/VISIBILITIES and createEntitySchema/updateEntitySchema live in
+// @character-sheet/contracts (#1394) — this file's own non-schema uses below
+// (parseEntityType, the wire-type union) read the same tuples rather than a
+// second local copy.
 
 // Wire serializer (#1617): strips the storage key — server-internal, never on
 // the wire — and derives the versioned portrait URL from it, mirroring
