@@ -11,12 +11,14 @@ import {
   deriveUnarmedDamageDie,
   deriveUnarmedStrike,
   deriveUnarmoredMovement,
+  draconicResilienceBase,
   type BodyArmorCategory,
 } from "@/lib/srd/srd.js";
 import { exhaustionSpeedPenalty } from "@/lib/srd/condition-data.js";
 import type { AdvancementEntry } from "@/lib/classes/resources.js";
 import type { CharacterWithRelations } from "@/lib/character/character-include.js";
 import { editionOf } from "@/lib/rules/edition.js";
+import { resolveSubclassSlug } from "@/lib/classes/subclass-slug.js";
 import type { TargetModifierMap } from "./effects.js";
 
 // The best equipped body armor snapshot (or null when unarmored) in the shape
@@ -53,10 +55,27 @@ export function selectEquippedBodyArmor(
   return { bestArmor, hasShield };
 }
 
+// Draconic Resilience (Draconic Bloodline L1, #1122): the character's Sorcerer
+// class entry resolved onto the subclass slug vocabulary (#1277) — FK-preferred,
+// exact-name fallback, same resolution openHandMonkEntry uses for Open Hand.
+// No level gate here: sorcerer.ts's `grantLevel: 1` already gates when the
+// subclass itself becomes choosable, and the AC clause carries no separate one.
+function draconicResilienceOverride(
+  classEntries: CharacterWithRelations["classEntries"],
+  edition: RulesEdition,
+): { label: string; value: number } | undefined {
+  const sorcerer = classEntries.find((e) => e.name.toLowerCase() === "sorcerer");
+  if (!sorcerer) return undefined;
+  return resolveSubclassSlug("sorcerer", sorcerer) === "sorcerer-draconic-bloodline"
+    ? draconicResilienceBase(edition)
+    : undefined;
+}
+
 // AC assembly: labeled addends whose exact sum is armorClass (single source of
 // the base formula in srd/srd.ts). Layered in order: base parts (armor/Dex/shield/
-// Unarmored Defense/Mage Armor best-of) → Defense Fighting Style feat → feat AC →
-// per-source "ac" buffs → the acFloor (Barkskin) reconciling part last.
+// Unarmored Defense/Mage Armor/Draconic Resilience best-of) → Defense Fighting
+// Style feat → feat AC → per-source "ac" buffs → the acFloor (Barkskin)
+// reconciling part last.
 // The branchiness is inherent to the 5e AC layering (each optional source is a
 // conditional addend), not accidental complexity.
 // fallow-ignore-next-line complexity -- inherent 5e AC layering (one conditional addend per source), not accidental complexity
@@ -68,6 +87,7 @@ export function buildArmorClassView(
   clampedAdvancements: AdvancementEntry[],
   featBonuses: ReturnType<typeof deriveFeatBonuses>,
   buffTargets: TargetModifierMap,
+  edition: RulesEdition,
 ): { armorClass: number; armorClassBreakdown: ReturnType<typeof deriveArmorClassParts> } {
   const dexMod = abilityModifier(effectiveScores.dexterity ?? 10);
   // Feeds Unarmored Defense (Barbarian/Monk) when no body armor is equipped.
@@ -83,8 +103,9 @@ export function buildArmorClassView(
     (best, c) => (best && best.value >= c.modifier ? best : { label: c.source, value: c.modifier }),
     undefined,
   );
+  const draconicResilience = draconicResilienceOverride(row.classEntries, edition);
   // Labeled AC addends; armorClass below is their exact sum (single source in srd/srd.ts).
-  const acParts = deriveArmorClassParts(bestArmor, hasShield, dexMod, unarmoredDefense, mageArmor);
+  const acParts = deriveArmorClassParts(bestArmor, hasShield, dexMod, unarmoredDefense, mageArmor, draconicResilience);
   // Defense Fighting Style feat only applies while wearing body armor (SRD 5.2, #1137).
   if (bestArmor !== null) {
     for (const part of deriveArmoredArmorClassParts(clampedAdvancements)) acParts.push(part);

@@ -100,6 +100,72 @@ describe("SHARED_SPELLS_2014 — saveEffect matches its own description text (fi
   });
 });
 
+// #1746: an audit of every pre-#1717 2014 slice for the same dropped-tail bug
+// PR #1745's review found in Heroism (dnd5eapi's higher_level JSON can be
+// empty despite the real SRD 5.1 text carrying an "At Higher Levels" clause).
+// Ground truth below was cross-checked against 5etools' PHB spell dataset
+// (its entriesHigherLevel field, hand-transcribed from the book) and spot-
+// verified against dnd5e.wikidot.com (an SRD 5.1 mirror) for Animal
+// Friendship, the one row this slice's audit found missing its clause; every
+// other one of this slice's 132 leveled rows was checked and genuinely has
+// no upcast clause in the real SRD text.
+describe("SHARED_SPELLS_2014 — no dropped 'At Higher Levels' tail text (dnd5eapi JSON-vs-real-SRD-text gap, #1746)", () => {
+  const HAS_AT_HIGHER_LEVELS_TEXT = new Set([
+    "Charm Person",
+    "Cure Wounds",
+    "Fog Cloud",
+    "Healing Word",
+    "Longstrider",
+    "Sleep",
+    "Thunderwave",
+    "Witch Bolt",
+    "Animal Friendship",
+    "Animal Messenger",
+    "Blindness/Deafness",
+    "Enhance Ability",
+    "Hold Person",
+    "Invisibility",
+    "Shatter",
+    "Cloud of Daggers",
+    "Bestow Curse",
+    "Counterspell",
+    "Dispel Magic",
+    "Fly",
+    "Glyph of Warding",
+    "Magic Circle",
+    "Major Image",
+    "Banishment",
+    "Blight",
+    "Confusion",
+    "Ice Storm",
+    "Wall of Fire",
+    "Animate Objects",
+    "Dominate Person",
+    "Geas",
+    "Hold Monster",
+    "Insect Plague",
+    "Mass Cure Wounds",
+    "Planar Binding",
+    "Circle of Death",
+    "Create Undead",
+    "Mass Suggestion",
+    "Etherealness",
+    "Dominate Monster",
+  ]);
+
+  it("every row verified to have real SRD 'At Higher Levels' text actually carries it in its description", () => {
+    const missing = [...HAS_AT_HIGHER_LEVELS_TEXT].filter((name) => !/At Higher Levels\./.test(find(name).description));
+    expect(missing, "a row with verified upcast text is missing its 'At Higher Levels' sentence").toEqual([]);
+  });
+
+  it("no OTHER row in this slice claims 'At Higher Levels' text it wasn't verified to have (catches an accidental copy-paste in the other direction)", () => {
+    const unexpected = SHARED_SPELLS_2014.filter(
+      (s) => !HAS_AT_HIGHER_LEVELS_TEXT.has(s.name) && /At Higher Levels\./.test(s.description),
+    ).map((s) => s.name);
+    expect(unexpected).toEqual([]);
+  });
+});
+
 function find(name: string): CatalogSpell {
   const s = SHARED_SPELLS_2014.find((sp) => sp.name === name);
   if (!s) throw new Error(`SHARED_SPELLS_2014 has no "${name}"`);
@@ -107,7 +173,7 @@ function find(name: string): CatalogSpell {
 }
 
 // Spot-checks on the widest fan-outs and the trickiest edge cases this slice
-// hand-authored — not exhaustive (137 rows), but enough to catch a transcription
+// hand-authored — not exhaustive (144 rows), but enough to catch a transcription
 // or transform regression on the spells most likely to be touched again.
 describe("SHARED_SPELLS_2014 — value spot-checks", () => {
   it("Detect Magic: PHB'14's widest fan-out, all 7 casters that get it (no Warlock in 2014)", () => {
@@ -275,5 +341,97 @@ describe("SHARED_SPELLS_2014 — value spot-checks", () => {
     expect(s.attackType).toBe("save");
     expect(s.saveAbility).toBe("wisdom");
     expect(s.effectKind).toBeUndefined();
+  });
+
+  // #1742: Protection from Energy was never actually missing (5 classes
+  // correctly fanned) — the row just had a stray title-cased "From" that
+  // dnd5eapi's own casing doesn't carry ("Protection from Energy" per
+  // dnd5eapi.co/api/2014/spells/protection-from-energy and PHB'14 p. 270).
+  // Regression guard for the miscapitalization, not a content change.
+  it("Protection from Energy: lowercase 'from' (not the stray 'From' this row previously carried)", () => {
+    expect(find("Protection from Energy").name).toBe("Protection from Energy");
+    expect(SHARED_SPELLS_2014.find((s) => s.name === "Protection From Energy")).toBeUndefined();
+  });
+
+  // #1742 closes the non-SRD-3+-list audit its own issue body opened (epic
+  // #1517): dnd5eapi/open5e's SRD 5.1 dataset is SRD-only, so #1713's own
+  // dnd5eapi-intersection approach was structurally blind to any PHB'14 spell
+  // on 3+ of the 8 class lists that isn't SRD content — Witch Bolt/Friends/
+  // Cloud of Daggers/Crown of Madness (#1718/#1719) were the first four found
+  // this way; this slice's own audit (5etools' gendata-spell-source-lookup.json
+  // class-access data, cross-checked against dnd5e.wikidot.com and 5etools'
+  // raw spells-phb.json/spells-xphb.json) found these four more. All eight
+  // are hand-transcribed, cited per-row above.
+  it("Feign Death: PHB'14 p. 240, ritual, 3rd-level necromancy, Bard/Cleric/Druid/Wizard 4-list, all-damage resistance except psychic, no attackType/effectKind (status effect, not a save/damage roll)", () => {
+    const s = find("Feign Death");
+    expect(s.level).toBe(3);
+    expect(s.school).toBe("necromancy");
+    expect(s.ritual).toBe(true);
+    expect(s.castingTime).toBe("1 action");
+    expect(s.range).toBe("Touch");
+    expect(s.duration).toBe("1 hour");
+    expect(s.classes).toEqual(["wizard", "cleric", "druid", "bard"]);
+    expect(s.components).toEqual({ verbal: true, somatic: true, material: true, materialDescription: "a pinch of graveyard dirt" });
+    expect(s.attackType).toBeUndefined();
+    expect(s.effectKind).toBeUndefined();
+    expect(s.description).toMatch(/blinded/i);
+    expect(s.description).toMatch(/incapacitated/i);
+    expect(s.description).toMatch(/resistance to all damage except psychic damage/i);
+  });
+
+  // Phantasmal Force is 2nd-level Illusion in BOTH PHB'14 and the 2024 PHB —
+  // cross-checked against 5etools' raw spells-phb.json/spells-xphb.json (both
+  // report level 2) and dnd5e.wikidot.com/spell:phantasmal-force. #1742's own
+  // issue body claimed a 1st-to-2nd level change across editions; that claim
+  // doesn't hold up against either source and is NOT reproduced here — the
+  // repo's existing 2024 row (spells.ts) already carries level 2 too, so
+  // there is no edition fork on level, only on the per-round damage die
+  // (1d6 in 2014 vs. 2024's 2d8, matching this repo's own SPELLS row).
+  it("Phantasmal Force: PHB'14 p. 264, 2nd-level illusion (same level as 2024 — NOT a 1st-level PHB'14 spell), Bard/Sorcerer/Wizard 3-list, INT save gates the illusion, no effectKind (the 1d6/round damage is conditional on the target believing a harmful illusion, not the spell's unconditional primary effect)", () => {
+    const s = find("Phantasmal Force");
+    expect(s.level).toBe(2);
+    expect(s.school).toBe("illusion");
+    expect(s.concentration).toBe(true);
+    expect(s.castingTime).toBe("1 action");
+    expect(s.range).toBe("60 feet");
+    expect(s.duration).toBe("Concentration, up to 1 minute");
+    expect(s.classes).toEqual(["wizard", "bard", "sorcerer"]);
+    expect(s.components).toEqual({ verbal: true, somatic: true, material: true, materialDescription: "a bit of fleece" });
+    expect(s.attackType).toBe("save");
+    expect(s.saveAbility).toBe("intelligence");
+    expect(s.effectKind).toBeUndefined();
+    expect(s.description).toMatch(/1d6 psychic damage/);
+    expect(s.description).not.toMatch(/2d8/);
+  });
+
+  it("Arcane Gate: PHB'14 p. 214, 6th-level conjuration, Sorcerer/Warlock/Wizard 3-list, linked teleportation portals, no attackType/effectKind (pure utility)", () => {
+    const s = find("Arcane Gate");
+    expect(s.level).toBe(6);
+    expect(s.school).toBe("conjuration");
+    expect(s.concentration).toBe(true);
+    expect(s.castingTime).toBe("1 action");
+    expect(s.range).toBe("500 feet");
+    expect(s.duration).toBe("Concentration, up to 10 minutes");
+    expect(s.classes).toEqual(["wizard", "sorcerer", "warlock"]);
+    expect(s.components).toEqual({ verbal: true, somatic: true, material: false });
+    expect(s.attackType).toBeUndefined();
+    expect(s.effectKind).toBeUndefined();
+    expect(s.description).toMatch(/two.*portals|portals.*two/i);
+  });
+
+  it("Blade Ward: PHB'14 p. 218, abjuration cantrip, Bard/Sorcerer/Warlock/Wizard 4-list, self-only resistance to weapon damage, no effectKind (a resistance grant, not a dice roll — matches Protection from Energy's own shape)", () => {
+    const s = find("Blade Ward");
+    expect(s.level).toBe(0);
+    expect(s.school).toBe("abjuration");
+    expect(s.castingTime).toBe("1 action");
+    expect(s.range).toBe("Self");
+    expect(s.duration).toBe("1 round");
+    expect(s.classes).toEqual(["wizard", "bard", "sorcerer", "warlock"]);
+    expect(s.components).toEqual({ verbal: true, somatic: true, material: false });
+    expect(s.concentration).toBeUndefined();
+    expect(s.attackType).toBeUndefined();
+    expect(s.effectKind).toBeUndefined();
+    expect(s.cantripScaling).toBeUndefined();
+    expect(s.description).toMatch(/resistance to bludgeoning, piercing, and slashing damage/i);
   });
 });

@@ -83,15 +83,17 @@ describe("BARD_SPELLS_2014 — row-ownership rule (epic #1517)", () => {
 });
 
 describe("BARD_SPELLS_2014 — full PHB'14 Bard membership is complete across all four authoring slices", () => {
-  // The full PHB'14 Bard spell list (114 spells: dnd5eapi.co's
+  // The full PHB'14 Bard spell list (117 spells: dnd5eapi.co's
   // /api/2014/classes/bard/spells enumerates 111; #1719 (Warlock)'s own
   // manual sweep for spells absent from dnd5eapi found 3 more genuine
   // PHB'14 Bard spells missing from every slice until it added them to
   // shared.ts — Cloud of Daggers, Crown of Madness, and Friends, each a
-  // Bard/Sorcerer/Warlock/Wizard 4-list spell) partitioned by which slice
-  // authors the row. Every name below must carry "bard" in its classes[]
-  // wherever it's actually authored — this test is the permanent guard that
-  // the "already fanned" claim in this file's header holds.
+  // Bard/Sorcerer/Warlock/Wizard 4-list spell; #1742's own non-SRD-3+-list
+  // audit found 3 MORE — Feign Death, Phantasmal Force, and Blade Ward)
+  // partitioned by which slice authors the row. Every name below must carry
+  // "bard" in its classes[] wherever it's actually authored — this test is
+  // the permanent guard that the "already fanned" claim in this file's
+  // header holds.
   const WIZARD_OWNED_BARD_SPELLS = [
     "Hideous Laughter",
     "Identify",
@@ -134,7 +136,7 @@ describe("BARD_SPELLS_2014 — full PHB'14 Bard membership is complete across al
     expect(missing, "a Druid-owned Bard spell missing its bard membership tag in druid.ts").toEqual([]);
   });
 
-  it("SHARED_SPELLS_2014's bard-tagged row count plus the three owner slices' bard-tagged counts plus this slice's own 5 rows equals the full 114-spell PHB'14 Bard list", () => {
+  it("SHARED_SPELLS_2014's bard-tagged row count plus the three owner slices' bard-tagged counts plus this slice's own 5 rows equals the full 117-spell PHB'14 Bard list", () => {
     const sharedBardCount = SHARED_SPELLS_2014.filter((s) => s.classes.includes("bard")).length;
     const total =
       sharedBardCount +
@@ -142,7 +144,7 @@ describe("BARD_SPELLS_2014 — full PHB'14 Bard membership is complete across al
       CLERIC_OWNED_BARD_SPELLS.length +
       DRUID_OWNED_BARD_SPELLS.length +
       BARD_SPELLS_2014.length;
-    expect(total).toBe(114);
+    expect(total).toBe(117);
   });
 });
 

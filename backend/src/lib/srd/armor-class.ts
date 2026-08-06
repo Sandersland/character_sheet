@@ -1,3 +1,5 @@
+import type { RulesEdition } from "@character-sheet/shared-types";
+
 import type { ArmorCategory } from "@/lib/inventory/item-detail-inputs.js";
 
 // Body armor excludes shields (handled via hasShield, never passed as body armor).
@@ -11,14 +13,31 @@ type UnarmoredDefense = { classNames: string[]; conMod: number; wisMod: number }
 
 const sumParts = (parts: ArmorClassPart[]) => parts.reduce((total, p) => total + p.value, 0);
 
+// Draconic Resilience (Draconic Bloodline L1, PHB'14 p.106, #1122): "When you
+// aren't wearing armor, your AC equals 13 + your Dexterity modifier." No
+// shield restriction — bestUnarmoredParts still stacks the shield part on top.
+// SRD 5.2 forks this to 10 + Dex + Cha at Sorcerer L3 (PHB'24 p.978), a
+// different addend shape (an extra ability part, not just a base swap) that
+// is out of scope here (#1122) — `undefined` withholds the override rather
+// than guessing at that shape. Edition last, mirroring subclassGateLevel
+// (#1499), so the 2024 fork slots in later without reshaping callers.
+export function draconicResilienceBase(edition: RulesEdition): { label: string; value: number } | undefined {
+  return edition === "EDITION_2014" ? { label: "Draconic Resilience", value: 13 } : undefined;
+}
+
 // Candidate part-lists for the unarmored formulas; the highest total wins (ties keep base).
-// `unarmoredBaseOverride` (Mage Armor, #363) adds a `override + Dex` candidate — a
-// spell-granted unarmored base that competes best-of with 10+Dex and Unarmored Defense.
+// `unarmoredBaseOverride` (Mage Armor, #363) and `draconicResilience` (#1122) both add an
+// `override + Dex` candidate — kept as separate slots (not merged into one) because their
+// sources are independent and both can be active on the same character at once: a buff
+// (unarmoredBaseOverride, read off active effects) and a permanent subclass feature
+// (draconicResilience, read off the class/subclass selection). Either, neither, or both
+// compete best-of with 10+Dex and Unarmored Defense.
 function bestUnarmoredParts(
   hasShield: boolean,
   dexMod: number,
   ud?: UnarmoredDefense,
   unarmoredBaseOverride?: { label: string; value: number },
+  draconicResilience?: { label: string; value: number },
 ): ArmorClassPart[] {
   const dexPart = dexMod !== 0 ? [{ label: "Dex", value: dexMod }] : [];
   const shieldPart = hasShield ? [{ label: "Shield", value: 2 }] : [];
@@ -26,6 +45,13 @@ function bestUnarmoredParts(
   if (unarmoredBaseOverride) {
     candidates.push([
       { label: unarmoredBaseOverride.label, value: unarmoredBaseOverride.value },
+      ...dexPart,
+      ...shieldPart,
+    ]);
+  }
+  if (draconicResilience) {
+    candidates.push([
+      { label: draconicResilience.label, value: draconicResilience.value },
       ...dexPart,
       ...shieldPart,
     ]);
@@ -62,8 +88,11 @@ export function deriveArmorClassParts(
   // applied only while unarmored — donning body armor suppresses it here and the
   // equip hook true-ends the buff.
   unarmoredBaseOverride?: { label: string; value: number },
+  // Draconic Resilience (#1122): a subclass-granted unarmored base (13+Dex,
+  // draconicResilienceBase), likewise suppressed the moment body armor is worn.
+  draconicResilience?: { label: string; value: number },
 ): ArmorClassPart[] {
-  if (armor === null) return bestUnarmoredParts(hasShield, dexMod, unarmoredDefense, unarmoredBaseOverride);
+  if (armor === null) return bestUnarmoredParts(hasShield, dexMod, unarmoredDefense, unarmoredBaseOverride, draconicResilience);
   const parts: ArmorClassPart[] = [{ label: armor.name ?? "Armor", value: armor.baseArmorClass }];
   if (armor.armorCategory !== "heavy") {
     const cap = armor.armorCategory === "medium" ? (armor.dexModifierMax ?? 2) : null;
@@ -82,6 +111,7 @@ export function deriveArmorClass(
   dexMod: number,
   unarmoredDefense?: UnarmoredDefense,
   unarmoredBaseOverride?: { label: string; value: number },
+  draconicResilience?: { label: string; value: number },
 ): number {
-  return sumParts(deriveArmorClassParts(armor, hasShield, dexMod, unarmoredDefense, unarmoredBaseOverride));
+  return sumParts(deriveArmorClassParts(armor, hasShield, dexMod, unarmoredDefense, unarmoredBaseOverride, draconicResilience));
 }

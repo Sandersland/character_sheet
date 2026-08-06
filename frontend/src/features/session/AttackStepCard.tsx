@@ -1,7 +1,7 @@
 // The single attack card (#811): one numbered step rail — Roll to hit → Call it
 // → Damage — replacing the separate AttackFormCard + WeaponDamageCard pair.
 // Verdict flow: rolling damage is an implicit hit; "it Missed" / "Crit!" sit on
-// the to-hit result line; nat 20 / nat 1 lock the call. A miss resets the card
+// the to-hit result line; a crit-range hit (#1120) / nat 1 lock the call. A miss resets the card
 // for the next attack; a hit keeps it expanded with a full-width continue
 // button. The quiet Skip link is the ungated path that leaves a row unresolved.
 // Each step's branching lives in its own subcomponent; AttackStepCard is
@@ -258,7 +258,10 @@ function CallItStep({
   onCallMiss: () => void;
   onCallCrit: () => void;
 }) {
-  if (row.attack.nat20) return <VerdictChip tone="crit">Critical hit! — nat 20</VerdictChip>;
+  // #1120: the rolled face, not a hardcoded "nat 20" — a Champion's widened
+  // crit range auto-locks on a 19 or 18 too, and the die-forced chip must say
+  // the number that actually rolled.
+  if (row.attack.criticalHit) return <VerdictChip tone="crit">Critical hit! — nat {row.attack.keptFace}</VerdictChip>;
   if (row.attack.nat1) return <VerdictChip tone="miss">Miss — nat 1</VerdictChip>;
   if (isUnresolvedRow(row)) {
     return (

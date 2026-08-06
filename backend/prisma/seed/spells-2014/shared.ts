@@ -4,14 +4,19 @@
 // (foundation slice 1/3 of epic #1517) created the empty array + wiring;
 // this slice (#1713) fills it in.
 //
-// Source: every row below except four is verbatim SRD 5.1 text (dnd5eapi.co's
+// Source: every row below except eight is verbatim SRD 5.1 text (dnd5eapi.co's
 // 2014 spell set — see `/api/2014/spells/<slug>`), cited SRD 5.1 as a whole
 // rather than per-row since all 136 of those rows share that one source. The
-// four exceptions — Witch Bolt (#1718), and Friends, Cloud of Daggers, and
-// Crown of Madness (#1719) — are hand-transcribed and cited per-row, each
-// cross-checked word-for-word against a second source (dnd5e.wikidot.com):
-// dnd5eapi/open5e's SRD 5.1 dataset doesn't include any of the four at all.
-// A handful of
+// eight exceptions — Witch Bolt (#1718); Friends, Cloud of Daggers, and Crown
+// of Madness (#1719); and Phantasmal Force, Feign Death, Arcane Gate, and
+// Blade Ward (#1742, closing the non-SRD-3+-list audit epic #1517 left open)
+// — are hand-transcribed and cited per-row, each cross-checked word-for-word
+// against a second source (dnd5e.wikidot.com) and, for the #1742 four,
+// 5etools' own gendata-spell-source-lookup.json class-access data plus its
+// raw spells-phb.json/spells-xphb.json (the same authoritative-lookup
+// approach the Ranger slice, #1721, established for real PHB'14 spells
+// dnd5eapi omits): dnd5eapi/open5e's SRD 5.1 dataset doesn't include any of
+// the eight at all. A handful of
 // the SRD rows fix a scraping artifact from that source, not a rules choice:
 // dnd5eapi genericizes PHB'14's "the DM" to "the GM" (restored here — this
 // repo's own term, see feats.ts's "the DM"), a few entries had a stray-space typo
@@ -194,6 +199,27 @@ export const SHARED_SPELLS_2014: CatalogSpell[] = [
     classes: ["wizard", "bard", "sorcerer", "warlock"],
     components: { verbal: false, somatic: true, material: true, materialDescription: "a small amount of makeup applied to the face as this spell is cast" },
   },
+  // PHB'14 p. 218. Not in dnd5eapi/open5e's SRD 5.1 dataset (same gap class
+  // as Witch Bolt, #1718) — Bard/Sorcerer/Warlock/Wizard is a 4-list spell
+  // so it belongs here per the row-ownership rule, but was missing from
+  // every slice authored so far — a real gap #1742's own non-SRD-3+-list
+  // audit found. Verified against dnd5e.wikidot.com/spell:blade-ward and
+  // 5etools' spells-phb.json (level 0, school "A" = abjuration, self range,
+  // 1-round duration, V/S only). A pure resistance grant with no dice to
+  // roll, so it carries no effectKind — same shape as this file's own
+  // Protection from Energy.
+  {
+    name: "Blade Ward",
+    level: 0,
+    school: "abjuration",
+    castingTime: "1 action",
+    range: "Self",
+    duration: "1 round",
+    description:
+      "You extend your hand and trace a sigil of warding in the air. Until the end of your next turn, you have resistance to bludgeoning, piercing, and slashing damage dealt by weapon attacks.",
+    classes: ["wizard", "bard", "sorcerer", "warlock"],
+    components: { verbal: true, somatic: true, material: false },
+  },
   // ── Level 1 ───────────────────────────────────────────────────────────────
   {
     name: "Animal Friendship",
@@ -202,7 +228,7 @@ export const SHARED_SPELLS_2014: CatalogSpell[] = [
     castingTime: "1 action",
     range: "30 feet",
     duration: "24 hours",
-    description: "This spell lets you convince a beast that you mean it no harm. Choose a beast that you can see within range. It must see and hear you. If the beast's Intelligence is 4 or higher, the spell fails. Otherwise, the beast must succeed on a wisdom saving throw or be charmed by you for the spell's duration. If you or one of your companions harms the target, the spells ends.",
+    description: "This spell lets you convince a beast that you mean it no harm. Choose a beast that you can see within range. It must see and hear you. If the beast's Intelligence is 4 or higher, the spell fails. Otherwise, the beast must succeed on a wisdom saving throw or be charmed by you for the spell's duration. If you or one of your companions harms the target, the spells ends. At Higher Levels. When you cast this spell using a spell slot of 2nd level or higher, you can affect one additional beast for each slot level above 1st.",
     classes: ["druid", "bard", "ranger"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "a morsel of food" },
     attackType: "save",
@@ -826,6 +852,37 @@ export const SHARED_SPELLS_2014: CatalogSpell[] = [
     attackType: "save",
     saveAbility: "wisdom",
   },
+  // PHB'14 p. 264. Not in dnd5eapi/open5e's SRD 5.1 dataset (same gap class
+  // as Witch Bolt, #1718) — Bard/Sorcerer/Wizard is a 3-list spell so it
+  // belongs here per the row-ownership rule, but was missing from every
+  // slice authored so far (flagged as a real gap in wizard.ts's own header,
+  // left unfixed there to avoid touching a sibling slice's file) — closed
+  // by #1742. Verified against dnd5e.wikidot.com/spell:phantasmal-force and
+  // 5etools' spells-phb.json/spells-xphb.json, both of which report level 2
+  // for BOTH editions — #1742's own issue body claimed a 1st-to-2nd level
+  // change across editions that does not hold up against either source, so
+  // it is NOT reproduced here (the repo's existing 2024 row, spells.ts,
+  // already carries level 2 too). The per-round damage DOES fork by edition
+  // (1d6 psychic in 2014 vs. 2024's 2d8) and is conditional on the target
+  // believing a harmful illusion, not the spell's unconditional primary
+  // effect (matches Dream's optional-damage precedent in this file's own
+  // header) — so it carries attackType/saveAbility for the INT save that
+  // gates the illusion taking hold, but no effectKind.
+  {
+    name: "Phantasmal Force",
+    level: 2,
+    school: "illusion",
+    castingTime: "1 action",
+    range: "60 feet",
+    duration: "Concentration, up to 1 minute",
+    description:
+      "You craft an illusion that takes root in the mind of a creature that you can see within range. The target must make an Intelligence saving throw. On a failed save, you create a phantasmal object, creature, or other visible phenomenon of your choice that is no larger than a 10-foot cube and that is perceivable only to the target for the duration. This spell has no effect on undead or constructs. The phantasm includes sound, temperature, and other stimuli, also evident only to the creature. The target can use its action to examine the phantasm with an Intelligence (Investigation) check against your spell save DC. If the check succeeds, the target realizes that the phantasm is an illusion, and the spell ends. While a target is affected by the spell, the target treats the phantasm as if it were real. The target rationalizes any illogical outcomes from interacting with the phantasm. An affected target is so convinced of the phantasm's reality that it can even take damage from the illusion. Each round on your turn, the phantasm can deal 1d6 psychic damage to the target if it is in the phantasm's area or within 5 feet of the phantasm, provided that the illusion is of a creature or hazard that could logically deal damage.",
+    concentration: true,
+    classes: ["wizard", "bard", "sorcerer"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "a bit of fleece" },
+    attackType: "save",
+    saveAbility: "intelligence",
+  },
   // ── Level 3 ───────────────────────────────────────────────────────────────
   {
     name: "Bestow Curse",
@@ -1008,7 +1065,7 @@ export const SHARED_SPELLS_2014: CatalogSpell[] = [
     components: { verbal: true, somatic: true, material: false },
   },
   {
-    name: "Protection From Energy",
+    name: "Protection from Energy",
     level: 3,
     school: "abjuration",
     castingTime: "1 action",
@@ -1112,6 +1169,30 @@ export const SHARED_SPELLS_2014: CatalogSpell[] = [
     ritual: true,
     classes: ["cleric", "druid", "sorcerer", "ranger"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "a piece of cork" },
+  },
+  // PHB'14 p. 240. Not in dnd5eapi/open5e's SRD 5.1 dataset (same gap class
+  // as Witch Bolt, #1718) — Bard/Cleric/Druid/Wizard is a 4-list spell so it
+  // belongs here per the row-ownership rule, but was missing from every
+  // slice authored so far (wizard.ts's own header flagged it as "Bard/
+  // Cleric/Wizard," a real gap left unfixed there to avoid touching a
+  // sibling slice's file — that class list was itself incomplete, missing
+  // Druid) — closed by #1742. Verified against dnd5e.wikidot.com/spell:feign-
+  // death and 5etools' spells-phb.json, which both confirm the full 4-class
+  // list (Bard, Cleric, Druid, Wizard) and every field below. A status
+  // effect with no save and no damage roll, so it carries no attackType/
+  // effectKind.
+  {
+    name: "Feign Death",
+    level: 3,
+    school: "necromancy",
+    castingTime: "1 action",
+    range: "Touch",
+    duration: "1 hour",
+    description:
+      "You touch a willing creature and put it into a cataleptic state that is indistinguishable from death. For the spell's duration, or until you use an action to touch the target and dismiss the spell, the target appears dead to all outward inspection and to spells used to determine the target's status. The target is blinded and incapacitated, and its speed drops to 0. The target has resistance to all damage except psychic damage. If the target is diseased or poisoned when you cast the spell, or becomes diseased or poisoned while under the spell's effect, the disease and poison have no effect until the spell ends.",
+    ritual: true,
+    classes: ["wizard", "cleric", "druid", "bard"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "a pinch of graveyard dirt" },
   },
   // ── Level 4 ───────────────────────────────────────────────────────────────
   {
@@ -1608,6 +1689,27 @@ export const SHARED_SPELLS_2014: CatalogSpell[] = [
     description: "This spell gives the willing creature you touch the ability to see things as they actually are. For the duration, the creature has truesight, notices secret doors hidden by magic, and can see into the Ethereal Plane, all out to a range of 120 feet.",
     classes: ["wizard", "cleric", "bard", "sorcerer", "warlock"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "an ointment for the eyes that costs 25gp; is made from mushroom powder, saffron, and fat; and is consumed by the spell" },
+  },
+  // PHB'14 p. 214. Not in dnd5eapi/open5e's SRD 5.1 dataset (same gap class
+  // as Witch Bolt, #1718) — Sorcerer/Warlock/Wizard is a 3-list spell so it
+  // belongs here per the row-ownership rule, but was missing from every
+  // slice authored so far — a real gap #1742's own non-SRD-3+-list audit
+  // found (5etools' gendata-spell-source-lookup.json base-class-access data,
+  // cross-checked against dnd5e.wikidot.com/spell:arcane-gate and 5etools'
+  // spells-phb.json). A pure utility teleportation-portal spell with no
+  // save/attack roll, so it carries no attackType/effectKind.
+  {
+    name: "Arcane Gate",
+    level: 6,
+    school: "conjuration",
+    castingTime: "1 action",
+    range: "500 feet",
+    duration: "Concentration, up to 10 minutes",
+    description:
+      "You create linked teleportation portals that remain open for the duration. Choose two points on the ground that you can see, one point within 10 feet of you and one point within 500 feet of you. A circular portal, 10 feet in diameter, opens over each point. If the portal would open in the space occupied by a creature, the spell fails, and the casting is lost. The portals are two-dimensional glowing rings filled with mist, hovering inches from the ground and perpendicular to it at the points you choose. A ring is visible only from one side (your choice), which is the side that functions as a portal. Any creature or object entering the portal exits from the other portal as if the two were adjacent to each other; passing through a portal from the nonportal side has no effect. The mist that fills each portal is opaque and blocks vision through it. On your turn, you can rotate the rings as a bonus action so that the active side faces in a different direction.",
+    concentration: true,
+    classes: ["wizard", "sorcerer", "warlock"],
+    components: { verbal: true, somatic: true, material: false },
   },
   // ── Level 7 ───────────────────────────────────────────────────────────────
   {

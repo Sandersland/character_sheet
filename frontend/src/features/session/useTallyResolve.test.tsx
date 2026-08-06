@@ -77,7 +77,7 @@ describe("useTallyResolve.rollDamageFor — #1354 swingId correlation", () => {
       source: "action",
       formId: "unarmed",
       formName: "Unarmed Strike",
-      attack: { total: 12, keptFace: 10, nat20: false, nat1: false },
+      attack: { total: 12, keptFace: 10, nat20: false, nat1: false, criticalHit: false },
       swingId: "swing-abc",
     };
 

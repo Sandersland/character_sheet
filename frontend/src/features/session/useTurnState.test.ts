@@ -612,7 +612,9 @@ describe("attack tally", () => {
 
   function recorded(overrides: Partial<{ formId: string; formName: string; total: number; keptFace: number; nat20: boolean; nat1: boolean }> = {}) {
     const { formId = "w1", formName = "Longsword", total = 17, keptFace = 14, nat20 = false, nat1 = false } = overrides;
-    return { formId, formName, attack: { total, keptFace, nat20, nat1 } };
+    // criticalHit mirrors nat20 here — this fixture's fixed critRange-of-20
+    // callers never diverge the two (#1120).
+    return { formId, formName, attack: { total, keptFace, nat20, nat1, criticalHit: nat20 } };
   }
 
   it("recordAttack with a payload appends a tally row", () => {
@@ -749,6 +751,24 @@ describe("attack tally", () => {
     expect(result.current.attackTally[0].verdict).toBe("crit"); // unchanged
   });
 
+  // A Champion widened-range crit diverges nat20 from criticalHit: a natural 19
+  // crits at crit range 19 with nat20=false. The verdict lock must key off
+  // criticalHit, not nat20 (#1120) — recorded() mirrors the two, so a regression
+  // restoring nat20 in setTallyVerdictState would pass every other test here.
+  it("setTallyVerdict is refused on a Champion widened-range crit (nat20=false, criticalHit=true)", () => {
+    const { result } = inAttack();
+    act(() => {
+      result.current.recordAttack({
+        formId: "w1",
+        formName: "Longsword",
+        attack: { total: 19, keptFace: 19, nat20: false, nat1: false, criticalHit: true },
+      });
+    });
+    expect(result.current.attackTally[0].verdict).toBe("crit"); // auto-locked by criticalHit, not nat20
+    act(() => { result.current.setTallyVerdict(0, "miss"); });
+    expect(result.current.attackTally[0].verdict).toBe("crit"); // unchanged — lock keys off criticalHit
+  });
+
   it("switching a row to miss drops its damage (#811)", () => {
     const { result } = inAttack();
     act(() => { result.current.recordAttack(recorded()); });
@@ -856,8 +876,8 @@ describe("attack tally", () => {
 // tally; entering each mode clears only its own rows, endTurn clears both.
 
 describe("per-source tally clearing (#813)", () => {
-  const OFF = { formId: "off", formName: "Dagger (off-hand)", attack: { total: 14, keptFace: 9, nat20: false, nat1: false } };
-  const MAIN = { formId: "w1", formName: "Longsword", attack: { total: 17, keptFace: 14, nat20: false, nat1: false } };
+  const OFF = { formId: "off", formName: "Dagger (off-hand)", attack: { total: 14, keptFace: 9, nat20: false, nat1: false, criticalHit: false } };
+  const MAIN = { formId: "w1", formName: "Longsword", attack: { total: 17, keptFace: 14, nat20: false, nat1: false, criticalHit: false } };
 
   function turnWithBoth() {
     const hook = renderHook(() => useTurnState(makeCharacter({ attacksPerAction: 1 }), SESSION_ID));
@@ -943,7 +963,7 @@ describe("bonus action and TWF", () => {
       result.current.recordTwfAttack({
         formId: "off",
         formName: "Dagger (off-hand)",
-        attack: { total: 14, keptFace: 9, nat20: false, nat1: false },
+        attack: { total: 14, keptFace: 9, nat20: false, nat1: false, criticalHit: false },
       });
     });
     expect(result.current.attackTally).toHaveLength(1);
@@ -968,7 +988,7 @@ describe("bonus action and TWF", () => {
       result.current.recordTwfAttack({
         formId: "off",
         formName: "Dagger (off-hand)",
-        attack: { total: 14, keptFace: 9, nat20: false, nat1: false },
+        attack: { total: 14, keptFace: 9, nat20: false, nat1: false, criticalHit: false },
       });
     });
     expect(result.current.attackTally).toHaveLength(1);
@@ -1043,14 +1063,14 @@ describe("Flurry of Blows (#1217)", () => {
       result.current.recordFlurryAttack({
         formId: "unarmed",
         formName: "Unarmed Strike",
-        attack: { total: 14, keptFace: 9, nat20: false, nat1: false },
+        attack: { total: 14, keptFace: 9, nat20: false, nat1: false, criticalHit: false },
       });
     });
     act(() => {
       result.current.recordFlurryAttack({
         formId: "unarmed",
         formName: "Unarmed Strike",
-        attack: { total: 11, keptFace: 6, nat20: false, nat1: false },
+        attack: { total: 11, keptFace: 6, nat20: false, nat1: false, criticalHit: false },
       });
     });
     expect(result.current.attackTally).toHaveLength(2);
@@ -1064,7 +1084,7 @@ describe("Flurry of Blows (#1217)", () => {
     const strike = {
       formId: "unarmed",
       formName: "Unarmed Strike",
-      attack: { total: 14, keptFace: 9, nat20: false, nat1: false },
+      attack: { total: 14, keptFace: 9, nat20: false, nat1: false, criticalHit: false },
     };
     act(() => { result.current.recordFlurryAttack(strike); });
     act(() => { result.current.recordFlurryAttack(strike); });
@@ -1120,14 +1140,14 @@ describe("Flurry of Blows (#1217)", () => {
       result.current.recordFlurryAttack({
         formId: "unarmed",
         formName: "Unarmed Strike",
-        attack: { total: 14, keptFace: 9, nat20: false, nat1: false },
+        attack: { total: 14, keptFace: 9, nat20: false, nat1: false, criticalHit: false },
       });
     });
     act(() => {
       result.current.recordFlurryAttack({
         formId: "unarmed",
         formName: "Unarmed Strike",
-        attack: { total: 11, keptFace: 6, nat20: false, nat1: false },
+        attack: { total: 11, keptFace: 6, nat20: false, nat1: false, criticalHit: false },
       });
     });
     expect(result.current.attackTally).toHaveLength(2);
@@ -1517,7 +1537,7 @@ describe("localStorage persistence", () => {
 
   it("backfills id + source on a pre-#813 tally row (top-level + undo entries)", () => {
     // Pre-#813 rows carry no `id`/`source` (only `action` existed then).
-    const legacyRow = { formId: "w1", formName: "Longsword", attack: { total: 17, keptFace: 14, nat20: false, nat1: false }, verdict: "hit", damage: 9 };
+    const legacyRow = { formId: "w1", formName: "Longsword", attack: { total: 17, keptFace: 14, nat20: false, nat1: false, criticalHit: false }, verdict: "hit", damage: 9 };
     const stale = {
       inCombat: true,
       round: 2,
