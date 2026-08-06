@@ -222,6 +222,39 @@ describe("DRUID_SPELLS_2014 — scraping-artifact guards (same shapes spells-201
   });
 });
 
+// #1746: an audit of every pre-#1717 2014 slice for the same dropped-tail bug
+// PR #1745's review found in Heroism (dnd5eapi's higher_level JSON can be
+// empty despite the real SRD 5.1 text carrying an "At Higher Levels" clause).
+// Ground truth below was cross-checked against 5etools' PHB spell dataset
+// (its entriesHigherLevel field, hand-transcribed from the book): every one
+// of this slice's 29 leveled rows was checked, and none was found missing a
+// genuine upcast clause.
+describe("DRUID_SPELLS_2014 — no dropped 'At Higher Levels' tail text (dnd5eapi JSON-vs-real-SRD-text gap, #1746)", () => {
+  const HAS_AT_HIGHER_LEVELS_TEXT = new Set([
+    "Flame Blade",
+    "Heat Metal",
+    "Moonbeam",
+    "Call Lightning",
+    "Conjure Animals",
+    "Conjure Woodland Beings",
+    "Dominate Beast",
+    "Conjure Fey",
+    "Wall of Thorns",
+  ]);
+
+  it("every row verified to have real SRD 'At Higher Levels' text actually carries it in its description", () => {
+    const missing = [...HAS_AT_HIGHER_LEVELS_TEXT].filter((name) => !/At Higher Levels\./.test(find(name).description));
+    expect(missing, "a row with verified upcast text is missing its 'At Higher Levels' sentence").toEqual([]);
+  });
+
+  it("no OTHER row in this slice claims 'At Higher Levels' text it wasn't verified to have (catches an accidental copy-paste in the other direction)", () => {
+    const unexpected = DRUID_SPELLS_2014.filter(
+      (s) => !HAS_AT_HIGHER_LEVELS_TEXT.has(s.name) && /At Higher Levels\./.test(s.description),
+    ).map((s) => s.name);
+    expect(unexpected).toEqual([]);
+  });
+});
+
 function find(name: string): CatalogSpell {
   const s = DRUID_SPELLS_2014.find((sp) => sp.name === name);
   if (!s) throw new Error(`DRUID_SPELLS_2014 has no "${name}"`);
