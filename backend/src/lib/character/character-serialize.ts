@@ -4,6 +4,7 @@ import {
   carriedWeight,
   carryingCapacity,
   deriveAttacksPerAction,
+  deriveCritRange,
   deriveRangedAttackRollBonus,
   exhaustionEffectText,
 } from "@/lib/srd/srd.js";
@@ -504,6 +505,12 @@ export function serializeCharacter(rawRow: CharacterRow) {
     // featureRowsOf is the SAME "class"/"subclassRef" -> carrier extractor
     // buildResourcesView/buildAvailableActionsView already use.
     attacksPerAction: deriveAttacksPerAction(row.classEntries, editionOf(row), featureRowsOf),
+    // Weapon-attack crit range (#1120): default 20, widened by Champion's
+    // Improved/Superior Critical — edition-invariant (SRD 5.1 p.25 / SRD 5.2
+    // p.49 agree on level AND threshold), so deriveCritRange itself takes no
+    // `edition` parameter; `editionOf(row)` here is only the row filter every
+    // derivedStat reader already takes.
+    critRange: deriveCritRange(row.classEntries, editionOf(row), featureRowsOf),
     // A two-handed weapon in MAIN_HAND locks OFF_HAND (#1433) — a property of the
     // whole loadout, hence one top-level boolean rather than a per-row flag. NOT
     // the same rule as `offHandBusy` (an internal of buildInventoryContext):

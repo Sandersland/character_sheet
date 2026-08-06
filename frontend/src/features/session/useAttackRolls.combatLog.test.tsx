@@ -4,7 +4,7 @@
 // combat-log UI slice (#1237) is built against.
 import type { ReactNode } from "react";
 import { describe, it, expect, vi } from "vitest";
-import { renderHook } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 
 import { RollProvider } from "@/features/dice/RollContext";
 import { useAttackRolls } from "@/features/session/useAttackRolls";
@@ -51,6 +51,7 @@ function setup(
   roll: ReturnType<typeof rollReturning>,
   logRollSafe = vi.fn(),
   currentRow: AttackTallyRow | null = null,
+  critRange?: number,
 ) {
   const wrapper = ({ children }: { children: ReactNode }) => (
     <RollProvider characterId="c1" sessionId="s1" rollModifiers={[]}>
@@ -67,6 +68,7 @@ function setup(
         setTallyAttackTotal: vi.fn(),
         addTallyDamageRider: vi.fn(),
         currentRow,
+        ...(critRange !== undefined ? { critRange } : {}),
       }),
     { wrapper },
   );
@@ -157,7 +159,7 @@ describe("useAttackRolls — #1235 combat-log fields on the attack event", () =>
       source: "action",
       formId: longsword.id,
       formName: longsword.name,
-      attack: { total: 15, keptFace: 12, nat20: false, nat1: false },
+      attack: { total: 15, keptFace: 12, nat20: false, nat1: false, criticalHit: false },
     };
     const { result, logRollSafe } = setup(rollReturning(10), vi.fn(), row);
     result.current.viewFor(longsword).onDamage();
@@ -172,7 +174,7 @@ describe("useAttackRolls — #1235 combat-log fields on the attack event", () =>
       source: "action",
       formId: longsword.id,
       formName: longsword.name,
-      attack: { total: 20, keptFace: 20, nat20: true, nat1: false },
+      attack: { total: 20, keptFace: 20, nat20: true, nat1: false, criticalHit: true },
       verdict: "crit",
     };
     const { result, logRollSafe } = setup(rollReturning(10), vi.fn(), row);
@@ -222,5 +224,55 @@ describe("useAttackRolls — #1235 combat-log fields on the attack event", () =>
     const secondAttackExtra = logRollSafe.mock.calls[1][5];
     const riderExtra = logRollSafe.mock.calls[2][5];
     expect(riderExtra.swingId).toBe(secondAttackExtra.swingId);
+  });
+});
+
+// #1120: the crit DECISION reads the character's served critRange instead of
+// a hardcoded nat 20 — Champion's Improved/Superior Critical widen it to 19,
+// then 18. useAttackRolls defaults critRange to 20 (every pre-#1120 caller's
+// behavior) when the prop is omitted.
+describe("useAttackRolls — #1120 crit-range consumption", () => {
+  it("a natural 19 does NOT crit at the default range (20, no critRange passed)", () => {
+    const { result, logRollSafe } = setup(rollReturning(19));
+    result.current.viewFor(longsword).onAttack();
+
+    const extra = logRollSafe.mock.calls[0][5];
+    expect(extra).toMatchObject({ nat20: false, crit: false, verdict: undefined });
+  });
+
+  it("a natural 19 crits and auto-verdicts once critRange widens to 19 (Champion L3)", () => {
+    const { result, logRollSafe } = setup(rollReturning(19), vi.fn(), null, 19);
+    result.current.viewFor(longsword).onAttack();
+
+    const extra = logRollSafe.mock.calls[0][5];
+    // nat20 stays literal (false) — only `crit`/`verdict` read the widened range.
+    expect(extra).toMatchObject({ nat20: false, crit: true, verdict: "crit" });
+  });
+
+  it("a natural 18 crits once critRange widens to 18 (Champion L15, Superior Critical); a natural 17 does not", () => {
+    const eighteen = setup(rollReturning(18), vi.fn(), null, 18);
+    eighteen.result.current.viewFor(longsword).onAttack();
+    expect(eighteen.logRollSafe.mock.calls[0][5]).toMatchObject({ crit: true, verdict: "crit" });
+
+    const seventeen = setup(rollReturning(17), vi.fn(), null, 18);
+    seventeen.result.current.viewFor(longsword).onAttack();
+    expect(seventeen.logRollSafe.mock.calls[0][5]).toMatchObject({ crit: false, verdict: undefined });
+  });
+
+  it("a plain nat 20 still crits regardless of critRange (20 always qualifies)", () => {
+    const { result, logRollSafe } = setup(rollReturning(20), vi.fn(), null, 18);
+    result.current.viewFor(longsword).onAttack();
+
+    const extra = logRollSafe.mock.calls[0][5];
+    expect(extra).toMatchObject({ nat20: true, crit: true, verdict: "crit" });
+  });
+
+  it("damage doubles on a widened-range crit (isRowCrit reads critRange directly, #813 tally-less path)", () => {
+    const { result } = setup(rollReturning(19), vi.fn(), null, 19);
+    act(() => {
+      result.current.viewFor(longsword).onAttack();
+    });
+
+    expect(result.current.viewFor(longsword).isCrit).toBe(true);
   });
 });

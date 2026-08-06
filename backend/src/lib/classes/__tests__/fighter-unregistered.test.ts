@@ -74,12 +74,12 @@ describe("Champion, Battle Master and Eldritch Knight all still resolve their OW
     }
   });
 
-  // Only Champion and Battle Master have their own subclass-scoped resource
-  // pool (Champion's crit-range work is a #1120 gap, not a pool; Eldritch
-  // Knight's spellcasting is deferred to #1531 and carries no resourceKey row
-  // at all) — asserted separately from the features check above so an absent
-  // Eldritch Knight pool reads as "expected" rather than failing a shared
-  // assertion.
+  // Only Battle Master has its own subclass-scoped resource pool (Champion's
+  // crit-range bonus, #1120, is a derivedStat on its Improved Critical row,
+  // not a pool; Eldritch Knight's spellcasting is deferred to #1531 and
+  // carries no resourceKey row at all) — asserted separately from the
+  // features check above so an absent Eldritch Knight pool reads as
+  // "expected" rather than failing a shared assertion.
   it("battle master: its superiority-dice pool resolves in both editions", async () => {
     const featureRows = await loadDbFeatureRows("fighter", "battle master");
     for (const edition of EDITIONS) {
@@ -90,7 +90,7 @@ describe("Champion, Battle Master and Eldritch Knight all still resolve their OW
     }
   });
 
-  it("champion: carries its own subclass-scoped features but declares no resource pool of its own (its crit-range bonus is a #1120 gap, not a pool)", async () => {
+  it("champion: carries its own subclass-scoped features but declares no resource pool of its own (its crit-range bonus, #1120, is a derivedStat on Improved Critical, not a pool)", async () => {
     const featureRows = await loadDbFeatureRows("fighter", "champion");
     for (const edition of EDITIONS) {
       const info = deriveResources("fighter", "champion", LEVEL, ABILITY_SCORES, proficiencyBonusForLevel(LEVEL), featureRows, edition);

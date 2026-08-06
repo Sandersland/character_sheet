@@ -140,6 +140,7 @@ export default function InlineAttackPicker({
     currentRow,
     source: "action",
     manualMode: attackMode,
+    critRange: character.critRange,
   });
 
   const forms = buildAttackForms(character);

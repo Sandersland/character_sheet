@@ -16,21 +16,22 @@
 // shape class-features.ts's own expandFeatureRow/collectRawFeatures already
 // establishes in this same directory.
 //
-// SCOPE (#1227) then #1528 then #1530: #1227 authored Fighter's FEATURE TEXT
-// only, with every descriptor column left NULL (resource pools stayed in
-// fighter.ts's resourceFn, every activation in classes/actions.ts's
+// SCOPE (#1227) then #1528 then #1530 then #1120: #1227 authored Fighter's
+// FEATURE TEXT only, with every descriptor column left NULL (resource pools
+// stayed in fighter.ts's resourceFn, every activation in classes/actions.ts's
 // DERIVED_ACTIONS). #1528 populated the base class's resource+activation+
 // cost+effect columns for Second Wind/Action Surge/Indomitable (the pilot's
 // proof-of-authoring) and retired the matching resourceFn/DERIVED_ACTIONS
 // entries — see fighter.ts's own header. #1530 populated the base class's L5
 // Extra Attack row's derivedStat/derivedStatTiers (see that row's own comment
-// below). Every OTHER row below (Champion/Battle Master/Eldritch Knight, and
-// Fighting Style/Weapon Mastery on the base) still leaves its descriptor
-// columns NULL: some because the feature has no such axis (a passive, e.g.
-// Improved Critical), some because it isn't done yet (Champion's crit range
-// needs a derivedStat axis this issue doesn't add — filed separately;
-// Tactical Mind's conditional-refund wrinkle has no AbilityCost shape yet) —
-// see each row's own comment for which.
+// below). #1120 populated Champion's Improved Critical row with the
+// critRange derivedStat. Every OTHER row below (Battle Master/Eldritch
+// Knight, and Fighting Style/Weapon Mastery on the base, Champion's own
+// Remarkable Athlete/Additional Fighting Style/Heroic Warrior/Survivor) still
+// leaves its descriptor columns NULL: some because the feature has no such
+// axis (a passive), some because it isn't done yet (Tactical Mind's
+// conditional-refund wrinkle has no AbilityCost shape yet) — see each row's
+// own comment for which.
 //
 // EDITION RULE: `edition` omitted -> expand() seeds ONE row per edition with
 // IDENTICAL text (the 2014-is-a-transcription invariant; today that's only
@@ -443,14 +444,25 @@ const FIGHTER_BASE_RAW: RawFighterFeature[] = [
 ];
 
 // ---- Champion — SRD 5.1 p. 25 (2014) / SRD 5.2 p. 49 (2024) ---------------
-// Every row below leaves every descriptor column NULL — Champion has no
-// resource pool and no clickable action at any of its levels. Improved
-// Critical / Superior Critical are NOT DONE YET (a crit-range derivedStat
-// axis doesn't exist — filed as its own issue, earned by this content, see
-// the Improved Critical row's comment); Remarkable Athlete / Additional
-// Fighting Style / Heroic Warrior / Survivor have NO SUCH AXIS (passive text
-// with no roll/pool/action this app computes).
+// Remarkable Athlete / Additional Fighting Style / Heroic Warrior / Survivor
+// have NO SUCH AXIS (passive text with no roll/pool/action this app
+// computes) and leave every descriptor column NULL. Improved Critical /
+// Superior Critical are #1120: crit range is edition-invariant (identical
+// level AND threshold in both editions, verified against both source docs),
+// so both rows carry the SAME derivedStat/derivedStatTiers regardless of
+// `edition` — only their TEXT forks (2024 additionally covers Unarmed
+// Strikes). Both tiers ride the "Improved Critical" row's own
+// derivedStatTiers (minLevel 3 -> 19, minLevel 15 -> 18); "Superior Critical"
+// stays text-only, the same shape "Improved Combat Superiority (d10)/(d12)"
+// use below for their own die-size bump — a second row on this axis would
+// need deriveCritRange to take a cross-row MIN rather than
+// deriveAttacksPerAction's MAX, which one row's own last-match-wins tier
+// array already resolves without any cross-row aggregation.
 const CHAMPION_SLUG = slug("fighter-champion");
+const CRIT_RANGE_TIERS = [
+  { minLevel: 3, value: 19 },
+  { minLevel: 15, value: 18 },
+];
 const CHAMPION_RAW: RawFighterFeature[] = [
   {
     subclassSlug: CHAMPION_SLUG,
@@ -458,6 +470,8 @@ const CHAMPION_RAW: RawFighterFeature[] = [
     level: 3,
     edition: "EDITION_2014",
     description: "Your weapon attacks score a critical hit on a roll of 19 or 20.",
+    derivedStat: "critRange",
+    derivedStatTiers: CRIT_RANGE_TIERS,
   },
   {
     subclassSlug: CHAMPION_SLUG,
@@ -465,9 +479,11 @@ const CHAMPION_RAW: RawFighterFeature[] = [
     level: 3,
     edition: "EDITION_2024",
     // SRD 5.2 p. 49: extends the crit range to Unarmed Strikes too. Crit
-    // RANGE itself is an edition-invariant derivedStat axis (#1120); this row
-    // is the text a 2024 Champion's sheet shows.
+    // RANGE itself is an edition-invariant derivedStat axis (#1120) — text
+    // forks, mechanics don't.
     description: "Your weapon attacks and Unarmed Strikes score a critical hit on a roll of 19 or 20.",
+    derivedStat: "critRange",
+    derivedStatTiers: CRIT_RANGE_TIERS,
   },
   {
     subclassSlug: CHAMPION_SLUG,

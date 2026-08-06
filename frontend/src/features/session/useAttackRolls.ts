@@ -4,14 +4,16 @@
 // branching are scored — and testable — as their own unit (#778).
 //
 // Crit authority (#811): the current tally row's VERDICT is the only crit
-// source — nat-20 auto-verdicts at record time, "Crit!" sets it manually. The
-// old `manualCrit` checkbox state is gone; damage doubling reads the verdict.
+// source — a crit-range hit auto-verdicts at record time (#1120: the kept d20
+// vs. the character's served `critRange`, not a hardcoded nat 20), "Crit!"
+// sets it manually. The old `manualCrit` checkbox state is gone; damage
+// doubling reads the verdict.
 
 import { useRef, useState } from "react";
 
 import { critDamageSpec } from "@/lib/attackMath";
 import { autoVerdict, isCritRow } from "@/lib/attackTallySummary";
-import { isNaturalOne, isNaturalTwenty, keptD20 } from "@/lib/dice";
+import { isCriticalRoll, isNaturalOne, isNaturalTwenty, keptD20 } from "@/lib/dice";
 import { randomId } from "@/lib/ids";
 import { resolveRollMode, rollModeChip } from "@/lib/rollMode";
 import { useRoll } from "@/features/dice/RollContext";
@@ -51,6 +53,7 @@ export function useAttackRolls({
   currentRow,
   source = "action",
   manualMode = "normal",
+  critRange = 20,
 }: {
   roll: ReturnType<typeof useRoll>["roll"];
   logRollSafe: ReturnType<typeof useRollLogger>;
@@ -64,6 +67,8 @@ export function useAttackRolls({
   source?: TallyRowSource;
   /** The attack sheet's own ADV/DIS choice (#958) — merged with state grants. */
   manualMode?: RollMode;
+  /** Server-derived weapon-attack crit threshold (#1120) — defaults to 20 (every existing call site's prior, hardcoded behavior) so a caller with no Champion character never has to pass this. */
+  critRange?: number;
 }) {
   // State-driven advantage/disadvantage on attack rolls (#486, e.g. Poisoned)
   // merged with the sheet's own ADV/DIS control (#958); resolved once per attack.
@@ -92,11 +97,12 @@ export function useAttackRolls({
   const swingIdRef = useRef<Record<string, string>>({});
 
   // A row rolls crit damage when it IS the current tally row and that row's
-  // verdict is crit (nat-20 auto or manual "Crit!"). The direct nat-20 check
-  // covers tally-less surfaces (the off-hand sheet passes currentRow: null
-  // until #813) — for tallied rows it's redundant with the auto-verdict.
+  // verdict is crit (crit-range auto or manual "Crit!"). The direct
+  // crit-range check covers tally-less surfaces (the off-hand sheet passes
+  // currentRow: null until #813) — for tallied rows it's redundant with the
+  // auto-verdict.
   function isRowCrit(rowId: string): boolean {
-    if (isNaturalTwenty(lastAttackRolls[rowId])) return true;
+    if (isCriticalRoll(lastAttackRolls[rowId], critRange)) return true;
     return currentRow !== null && currentRow.formId === rowId && isCritRow(currentRow);
   }
 
@@ -116,20 +122,24 @@ export function useAttackRolls({
       keptFace: keptD20(result)?.value ?? null,
       nat20: isNaturalTwenty(result),
       nat1: isNaturalOne(result),
+      // #1120: the crit DECISION reads the character's served critRange, not
+      // a hardcoded 20 — nat20 above stays literal (display-only "nat 20"
+      // text/badge).
+      criticalHit: isCriticalRoll(result, critRange),
     };
     // Fresh id per attack (#1235) — the damage roll below reads it back via entry.id.
     const swingId = randomId();
     swingIdRef.current[entry.id] = swingId;
     logRollSafe("attack", entry.logSource, result, attackSpec, undefined, {
       swingId,
-      // Only the die-forced verdict is known synchronously — nat20/nat1 auto-
-      // verdict (attackTallySummary's own rule). A middling roll stays
+      // Only the die-forced verdict is known synchronously — criticalHit/nat1
+      // auto-verdict (attackTallySummary's own rule). A middling roll stays
       // unresolved here; it's the tally's "Call it" step, not a re-log, that
       // later decides it (rolls are logged once and never mutated).
       verdict: autoVerdict(attack),
       nat20: attack.nat20,
       nat1: attack.nat1,
-      crit: attack.nat20,
+      crit: attack.criticalHit,
       // Both, deliberately: `sources` lists what applied, but the NET mode after
       // advantage/disadvantage cancellation is a rule (resolveRollMode). Logging
       // only the sources would force every reader to re-derive it (#1235).
