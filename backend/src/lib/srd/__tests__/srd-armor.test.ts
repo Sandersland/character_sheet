@@ -250,7 +250,9 @@ describe("Draconic Resilience unarmored base override (#1122)", () => {
   });
 
   it("competes best-of with a simultaneous Mage Armor override", () => {
-    // Same 13+Dex shape, so they tie — either label wins, but the value is unaffected.
+    // Same 13+Dex shape, so the totals tie (unarmoredBaseOverride wins the label
+    // deterministically as the first-pushed candidate) — this asserts the value,
+    // which is unaffected by which of the two tied candidates the label comes from.
     const parts = deriveArmorClassParts(null, false, 2, undefined, { label: "Mage Armor", value: 13 }, draconicResilience);
     expect(parts.reduce((t, p) => t + p.value, 0)).toBe(15);
   });
