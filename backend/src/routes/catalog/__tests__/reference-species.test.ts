@@ -79,6 +79,23 @@ describe("GET /api/reference — species (#1679)", () => {
     expect(dwarf2024.abilityIncreases).toEqual([]);
   });
 
+  // #1758: the frontend merges species+variant increases the way
+  // fetchMergedAbilityIncreases does, so it needs the replace flag on the wire.
+  it("serves abilityIncreasesReplace on variants — true for the Astral Elf, false for real subraces (#1758)", async () => {
+    const res = await getReference("EDITION_2014");
+    const elf = res.body.species.find((s: { name: string }) => s.name === "Elf");
+    const astral = elf.variants.find((v: { name: string }) => v.name === "Astral Elf");
+    expect(astral.abilityIncreasesReplace).toBe(true);
+    expect(astral.abilityIncreases).toEqual([{ floating: 3 }]);
+
+    const highElf = elf.variants.find((v: { name: string }) => v.name === "High Elf");
+    expect(highElf.abilityIncreasesReplace).toBe(false);
+
+    const dwarf = res.body.species.find((s: { name: string }) => s.name === "Dwarf");
+    const hillDwarf = dwarf.variants.find((v: { name: string }) => v.name === "Hill Dwarf");
+    expect(hillDwarf.abilityIncreasesReplace).toBe(false);
+  });
+
   it("Dragonborn carries its 10 draconic ancestry variants in both editions", async () => {
     const res2014 = await getReference("EDITION_2014");
     const res2024 = await getReference("EDITION_2024");
