@@ -45,12 +45,13 @@
 //     source (dnd5e.wikidot.com) beyond the primary source used
 //     (5e-spellbook.app, which publishes 2014-vs-2024 diffed spell text).
 //
-// Net: 6 rows owned here (2 SRD + 4 hand-transcribed), 72 total PHB'14
-// Warlock spells across all authoring files (53 + 6 + 1 + 2 + 6 + 4 = 72,
-// the shared 53 counted above plus Witch Bolt/Cloud of Daggers/Crown of
-// Madness/Friends = 57 shared rows total — see
-// spells-2014-warlock-data.test.ts for the permanent membership-completeness
-// guard).
+// Net: 6 rows owned here (2 SRD + 4 hand-transcribed), 74 total PHB'14
+// Warlock spells across all authoring files (59 + 6 + 1 + 2 + 6 = 74: the
+// shared 53 counted above, plus Witch Bolt/Cloud of Daggers/Crown of
+// Madness/Friends (57), plus Blade Ward and Arcane Gate — both
+// warlock-tagged, added to shared.ts by #1742's own non-SRD-3+-list audit —
+// = 59 shared rows total — see spells-2014-warlock-data.test.ts for the
+// permanent membership-completeness guard).
 import type { CatalogSpell } from "../spells.js";
 
 export const WARLOCK_SPELLS_2014: CatalogSpell[] = [

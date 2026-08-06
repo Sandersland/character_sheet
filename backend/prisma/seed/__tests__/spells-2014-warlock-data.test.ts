@@ -91,17 +91,19 @@ describe("WARLOCK_SPELLS_2014 — row-ownership rule (epic #1517)", () => {
 });
 
 describe("WARLOCK_SPELLS_2014 — full PHB'14 Warlock membership is complete across all authoring slices", () => {
-  // The full PHB'14 Warlock spell list (72 spells: dnd5eapi.co's
+  // The full PHB'14 Warlock spell list (74 spells: dnd5eapi.co's
   // /api/2014/classes/warlock/spells enumerates 64; Witch Bolt, Cloud of
   // Daggers, Crown of Madness, and Friends are 4 more real PHB'14 Warlock
   // spells this slice's manual sweep found absent from that SRD-based
   // dataset entirely — Witch Bolt already added to shared.ts by #1718, the
   // other 3 added to shared.ts by this slice; Hex, Armor of Agathys, Arms of
   // Hadar, and Hunger of Hadar are 4 more absent-from-SRD spells, all
-  // Warlock-only, authored in this file) partitioned by which slice authors
-  // the row. Every name below must carry "warlock" in its classes[]
-  // wherever it's actually authored — this test is the permanent guard that
-  // the "already fanned" claim in warlock.ts's header holds.
+  // Warlock-only, authored in this file; #1742's own non-SRD-3+-list audit
+  // found 2 MORE — Blade Ward and Arcane Gate — bumping the total from 72
+  // to 74) partitioned by which slice authors the row. Every name below
+  // must carry "warlock" in its classes[] wherever it's actually authored —
+  // this test is the permanent guard that the "already fanned" claim in
+  // warlock.ts's header holds.
   const WIZARD_OWNED_WARLOCK_SPELLS = [
     "Ray of Enfeeblement",
     "Vampiric Touch",
@@ -142,7 +144,7 @@ describe("WARLOCK_SPELLS_2014 — full PHB'14 Warlock membership is complete acr
     expect(SORCERER_SPELLS_2014).toEqual([]);
   });
 
-  it("SHARED_SPELLS_2014's warlock-tagged row count plus the three owner slices' warlock-tagged counts plus this slice's own 6 rows equals the full 72-spell PHB'14 Warlock list", () => {
+  it("SHARED_SPELLS_2014's warlock-tagged row count plus the three owner slices' warlock-tagged counts plus this slice's own 6 rows equals the full 74-spell PHB'14 Warlock list", () => {
     const sharedWarlockCount = SHARED_SPELLS_2014.filter((s) => s.classes.includes("warlock")).length;
     const total =
       sharedWarlockCount +
@@ -150,7 +152,7 @@ describe("WARLOCK_SPELLS_2014 — full PHB'14 Warlock membership is complete acr
       DRUID_OWNED_WARLOCK_SPELLS.length +
       BARD_OWNED_WARLOCK_SPELLS.length +
       WARLOCK_SPELLS_2014.length;
-    expect(total).toBe(72);
+    expect(total).toBe(74);
   });
 
   it("no PHB'14 2024-only Warlock addition (e.g. Command, Booming Blade, Toll the Dead under Warlock) is offered anywhere in the 2014 tables — this slice's membership check only counts genuine 2014 Warlock-owned spells", () => {
