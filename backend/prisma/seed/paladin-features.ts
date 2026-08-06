@@ -102,13 +102,12 @@
 //
 // TEXT-ONLY (mechanics not wired up, same disclosed shape as every prior
 // retab wave): Blessed Warrior's swappable-cantrip choice, Paladin's Smite's
-// free cast, Faithful Steed's free cast, Epic Boon's feat grant, and every
-// oath's always-prepared spell list. The last of these can't become
-// SubclassGrantedSpell rows either: that model has no `edition` column and
-// Subclass rows are edition-shared (the schema gap Wizard's #1234 disclosed
-// first) — a 2024 Devotion Paladin is still GRANTED Sanctuary/Lesser
-// Restoration even after this file's own feature text says Shield of
-// Faith/Aid. Disclosed here, not fixed — follow-up filed, not expanded into.
+// free cast, Faithful Steed's free cast, and Epic Boon's feat grant. Each
+// oath's always-prepared spell list IS wired up, as per-edition
+// SubclassGrantedSpell rows in subclass-granted-spells.ts (#1625's edition
+// column; #1626 retagged the 2014/2024 divergences) — this file's oath-spell
+// feature text is the authority those rows are cross-checked against, not
+// their mechanism.
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { SeedEdition } from "./edition.js";
 import type { ClassFeatureSeedRow } from "./class-features.js";
