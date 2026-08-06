@@ -233,6 +233,21 @@ describe("SpeciesTrait.improvements (#1754) — base 2014 Elf Keen Senses derive
   });
 });
 
+describe("SpeciesTrait.improvements (#1762) — 2014 Half-Orc Menacing derives fixed Intimidation proficiency", () => {
+  it("a 2014 Half-Orc gains Intimidation as a derived skill proficiency and shows a Menacing trait", async () => {
+    const halfOrc = await prisma.species.findFirstOrThrow({ where: { slug: "half-orc", edition: "EDITION_2014" } });
+
+    const id = await createCharacter({ rulesEdition: "EDITION_2014", speciesId: halfOrc.id });
+
+    const res = await get(id);
+    expect(res.status).toBe(200);
+    const intimidation = res.body.skills.find((s: { name: string }) => s.name === "intimidation");
+    expect(intimidation.proficient).toBe(true);
+    const traitNames = res.body.speciesTraits.map((t: { name: string }) => t.name);
+    expect(traitNames).toContain("Menacing");
+  });
+});
+
 describe("SpeciesTrait.improvements (#1682) — 2024 species shows edition-specific trait text (transcription-rule fork)", () => {
   it("a 2024 Dwarf's Darkvision/Dwarven Toughness text cites SRD 5.2/PHB'24, not SRD 5.1, even where the mechanic (Dwarven Toughness maxHp) agrees", async () => {
     const dwarf2024 = await prisma.species.findFirstOrThrow({ where: { slug: "dwarf", edition: "EDITION_2024" } });
