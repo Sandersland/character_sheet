@@ -145,11 +145,11 @@ const dwarfSpecies: SpeciesOption = {
   chooseCantrip: null, chooseOriginFeat: false,
   variants: [
     {
-      id: "var-hill", name: "Hill Dwarf", slug: "hill", abilityIncreases: [],
+      id: "var-hill", name: "Hill Dwarf", slug: "hill", abilityIncreases: [], abilityIncreasesReplace: false,
       needsCastingAbility: false, chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false,
     },
     {
-      id: "var-mountain", name: "Mountain Dwarf", slug: "mountain", abilityIncreases: [],
+      id: "var-mountain", name: "Mountain Dwarf", slug: "mountain", abilityIncreases: [], abilityIncreasesReplace: false,
       needsCastingAbility: false, chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false,
     },
   ],
@@ -172,7 +172,7 @@ const drowLineageElf: SpeciesOption = {
   chooseCantrip: null,
   chooseOriginFeat: false,
   variants: [{
-    id: "var-drow", name: "Drow", slug: "drow", abilityIncreases: [],
+    id: "var-drow", name: "Drow", slug: "drow", abilityIncreases: [], abilityIncreasesReplace: false,
     needsCastingAbility: true, chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false,
   }],
 };
@@ -196,6 +196,29 @@ const halfElfSpecies: SpeciesOption = {
   variants: [],
 };
 
+// #1758: Astral Elf-shape species — a variant carrying a floating spread that
+// REPLACES the base Elf's +2 DEX. Gates the abilities step until assigned, the
+// same as Half-Elf's choose above.
+const astralElfSpecies: SpeciesOption = {
+  id: "sp-elf-astral",
+  name: "Elf",
+  slug: "elf",
+  speed: 30,
+  abilityIncreases: [{ ability: "dexterity", amount: 2 }],
+  needsCastingAbility: false,
+  chooseSkills: null,
+  chooseCantrip: null,
+  chooseOriginFeat: false,
+  variants: [
+    {
+      id: "var-astral", name: "Astral Elf", slug: "astral",
+      abilityIncreases: [{ floating: 3 }],
+      abilityIncreasesReplace: true,
+      needsCastingAbility: false, chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false,
+    },
+  ],
+};
+
 // #1689: Elf-shape species with a High Elf variant carrying chooseCantrip —
 // used by the "spells" step's own inclusion + missing-gate tests below.
 const highElfSpecies: SpeciesOption = {
@@ -213,6 +236,7 @@ const highElfSpecies: SpeciesOption = {
       name: "High Elf",
       slug: "high",
       abilityIncreases: [],
+      abilityIncreasesReplace: false,
       needsCastingAbility: false,
       chooseSkills: null,
       chooseCantrip: { list: "wizard", castingAbility: "intelligence" },
@@ -454,6 +478,19 @@ describe("creationStepMissing", () => {
 
     // A fixed-only (or unmatched) species never gates abilities.
     expect(creationStepMissing("abilities", makeDraft(), sel())).toEqual([]);
+  });
+
+  it("abilities gates an Astral Elf floating spread until validly assigned (#1758)", () => {
+    const selection = sel({ species: astralElfSpecies, variant: astralElfSpecies.variants[0] });
+    const unassigned = makeDraft({ speciesId: "sp-elf-astral", variantId: "var-astral" });
+    expect(creationStepMissing("abilities", unassigned, selection)).toEqual(["Species ability scores"]);
+
+    // An illegal shape (+1/+1 only) still gates.
+    const illegal = makeDraft({ speciesId: "sp-elf-astral", variantId: "var-astral", speciesAbilities: { dexterity: 1, wisdom: 1 } });
+    expect(creationStepMissing("abilities", illegal, selection)).toEqual(["Species ability scores"]);
+
+    const assigned = makeDraft({ speciesId: "sp-elf-astral", variantId: "var-astral", speciesAbilities: { dexterity: 2, wisdom: 1 } });
+    expect(creationStepMissing("abilities", assigned, selection)).toEqual([]);
   });
 
   it("abilities gates an unrolled roll pool", () => {

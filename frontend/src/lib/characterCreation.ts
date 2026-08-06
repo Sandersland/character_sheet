@@ -94,6 +94,16 @@ export function deriveBackgroundBonuses(
   };
 }
 
+/** The interactive species ability-increase choice, one of two shapes (#1758):
+ *  - `choose`: pick exactly `count` distinct abilities, +`amount` each
+ *    (Half-Elf's "+1 to two of your choice").
+ *  - `floating`: assign a `points` pool as +2/+1 (two abilities) or +1/+1/+1
+ *    (three) across distinct abilities (Astral Elf's Tasha's-era spread).
+ *  `abilities` is the eligible set in both — every ability not already fixed. */
+export type SpeciesAbilityChoice =
+  | { kind: "choose"; count: number; amount: number; abilities: AbilityName[] }
+  | { kind: "floating"; points: number; abilities: AbilityName[] };
+
 export interface CreationSpeciesBonuses {
   /** True when the matched species+variant's merged spec carries a fixed
    *  increase, a choice, or both. False renders no panel — 2024 always false
@@ -102,44 +112,64 @@ export interface CreationSpeciesBonuses {
   /** Fixed increases, auto-applied server-side — already summed across
    *  species + variant (Hill Dwarf: {constitution: 2, wisdom: 1}). */
   fixed: Partial<Record<AbilityName, number>>;
-  /** The choose-from-list requirement (Half-Elf's "+1 to two of your
-   *  choice"), or null when the merged spec has none. Only the FIRST choose
-   *  spec is interactively supported — no #1681 wave-1 content seeds more
-   *  than one; a floating spec (Astral Elf shape) is likewise not yet
-   *  interactive here, since no real PHB'14 roster row uses one this wave. */
-  choice: { count: number; amount: number; abilities: AbilityName[] } | null;
+  /** The interactive requirement (choose or floating), or null when the merged
+   *  spec has neither. Only the FIRST such spec is supported — no roster row
+   *  seeds more than one, and choose wins over floating if a future row ever
+   *  carries both (mirrors backend resolveChosenIncreases' priority). */
+  choice: SpeciesAbilityChoice | null;
   /** Current assignment, restricted to the choice's eligible abilities. */
   assignment: Partial<Record<AbilityName, number>>;
   /** True when there's no choice to make, or the assignment satisfies it. */
   complete: boolean;
 }
 
+// A legal floating spread is +2/+1 (two abilities) or +1/+1/+1 (three) — the
+// SAME shape isValidSpread checks for the background spread. Mirrors the
+// backend floatingSpreadShapeValid (lib/rules/background-grants.ts) purely to
+// drive the form; the create endpoint re-validates (#1758).
+function isValidFloatingSpread(assignment: Partial<Record<AbilityName, number>>): boolean {
+  return isValidSpread(Object.values(assignment));
+}
+
 // Splits a merged species+variant abilityIncreases spec array into its fixed
-// spread (summed per ability) and its first choose spec (eligible abilities
-// narrowed to exclude anything already fixed — mirrors resolveSpeciesGrants'
-// server-side fixedAbilities exclusion in character-create.ts).
+// spread (summed per ability) and its first interactive spec — a choose
+// (Half-Elf) or a floating pool (Astral Elf, #1758). Eligible abilities are
+// narrowed to exclude anything already fixed, and choose wins over floating,
+// both mirroring resolveSpeciesGrants/resolveChosenIncreases in
+// character-create.ts.
 function splitSpeciesIncreases(specs: AbilityIncreaseSpec[]): {
   fixed: Partial<Record<AbilityName, number>>;
-  choice: { count: number; amount: number; abilities: AbilityName[] } | null;
+  choice: SpeciesAbilityChoice | null;
 } {
   const fixed: Partial<Record<AbilityName, number>> = {};
   const chooseSpecs: NonNullable<Extract<AbilityIncreaseSpec, { choose: unknown }>>["choose"][] = [];
+  const floatingSpecs: number[] = [];
   for (const spec of specs) {
     if ("ability" in spec) {
       fixed[spec.ability] = (fixed[spec.ability] ?? 0) + spec.amount;
     } else if ("choose" in spec) {
       chooseSpecs.push(spec.choose);
+    } else {
+      floatingSpecs.push(spec.floating);
     }
   }
-  const first = chooseSpecs[0];
-  const choice = first
-    ? {
-        count: first.count,
-        amount: first.amount,
-        abilities: (first.from ?? [...ABILITY_ORDER]).filter((a) => fixed[a] === undefined),
-      }
-    : null;
+  const eligible = (from?: AbilityName[]) => (from ?? [...ABILITY_ORDER]).filter((a) => fixed[a] === undefined);
+  const firstChoose = chooseSpecs[0];
+  let choice: SpeciesAbilityChoice | null = null;
+  if (firstChoose) {
+    choice = { kind: "choose", count: firstChoose.count, amount: firstChoose.amount, abilities: eligible(firstChoose.from) };
+  } else if (floatingSpecs.length > 0) {
+    choice = { kind: "floating", points: floatingSpecs[0], abilities: eligible() };
+  }
   return { fixed, choice };
+}
+
+// True when the assignment satisfies the choice — a floating spread must be a
+// legal +2/+1-or-+1/+1/+1 shape, a choose must be exactly `count` distinct
+// abilities at `amount` each. Distinctness is free (a Record's keys are unique).
+function speciesChoiceComplete(choice: SpeciesAbilityChoice, assignment: Partial<Record<AbilityName, number>>): boolean {
+  if (choice.kind === "floating") return isValidFloatingSpread(assignment);
+  return Object.keys(assignment).length === choice.count && Object.values(assignment).every((v) => v === choice.amount);
 }
 
 // Derives the species ability-increase state for the form: the auto-applied
@@ -150,15 +180,18 @@ export function deriveSpeciesBonuses(
   draft: CharacterDraft,
   selections: CreationSelections,
 ): CreationSpeciesBonuses {
-  const specs = [
-    ...(selections.species?.abilityIncreases ?? []),
-    ...(selections.variant?.abilityIncreases ?? []),
-  ];
+  // #1758: a replacing variant (Astral Elf) supplies the ENTIRE spec — the base
+  // species' increases are dropped, not stacked — mirroring the backend's
+  // fetchMergedAbilityIncreases; every real subrace leaves the flag false and
+  // stacks additively.
+  const variantIncreases = selections.variant?.abilityIncreases ?? [];
+  const specs = selections.variant?.abilityIncreasesReplace
+    ? variantIncreases
+    : [...(selections.species?.abilityIncreases ?? []), ...variantIncreases];
   const { fixed, choice } = splitSpeciesIncreases(specs);
   const applicable = Object.keys(fixed).length > 0 || choice !== null;
   const assignment = choice ? pickAssignment(draft.speciesAbilities, choice.abilities) : {};
-  const complete =
-    !choice || (Object.keys(assignment).length === choice.count && Object.values(assignment).every((v) => v === choice.amount));
+  const complete = !choice || speciesChoiceComplete(choice, assignment);
   return { applicable, fixed, choice, assignment, complete };
 }
 

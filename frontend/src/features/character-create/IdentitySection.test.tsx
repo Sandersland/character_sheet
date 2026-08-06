@@ -73,11 +73,11 @@ const reference: ReferenceData = {
       chooseCantrip: null, chooseOriginFeat: false,
       variants: [
         {
-          id: "var-hill", name: "Hill Dwarf", slug: "hill", abilityIncreases: [],
+          id: "var-hill", name: "Hill Dwarf", slug: "hill", abilityIncreases: [], abilityIncreasesReplace: false,
           needsCastingAbility: false, chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false,
         },
         {
-          id: "var-mountain", name: "Mountain Dwarf", slug: "mountain", abilityIncreases: [],
+          id: "var-mountain", name: "Mountain Dwarf", slug: "mountain", abilityIncreases: [], abilityIncreasesReplace: false,
           needsCastingAbility: false, chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false,
         },
       ],
@@ -100,11 +100,11 @@ const reference: ReferenceData = {
       chooseOriginFeat: false,
       variants: [
         {
-          id: "var-drow", name: "Drow", slug: "drow", abilityIncreases: [],
+          id: "var-drow", name: "Drow", slug: "drow", abilityIncreases: [], abilityIncreasesReplace: false,
           needsCastingAbility: true, chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false,
         },
         {
-          id: "var-wood", name: "Wood Elf", slug: "wood", abilityIncreases: [],
+          id: "var-wood", name: "Wood Elf", slug: "wood", abilityIncreases: [], abilityIncreasesReplace: false,
           needsCastingAbility: false, chooseSkills: null, chooseCantrip: null, chooseOriginFeat: false,
         },
       ],
