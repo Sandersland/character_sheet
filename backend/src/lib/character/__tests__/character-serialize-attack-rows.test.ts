@@ -54,6 +54,7 @@ type WeaponFixture = {
   damageType?: string;
   finesse?: boolean;
   versatile?: boolean;
+  light?: boolean;
   requiresAttunement?: boolean;
   attuned?: boolean;
   riderDice?: { count: number; faces: number; damageType?: string };
@@ -79,6 +80,36 @@ function meleeDamageBuffData(modifier: number | undefined) {
   };
 }
 
+/** The weapon fixture's WeaponDetailInput, split out of weaponItemData to keep its complexity down. */
+function weaponDetailFixture(w: WeaponFixture) {
+  return {
+    damageDiceCount: 1,
+    damageDiceFaces: w.damageDiceFaces ?? 8,
+    damageModifier: 0,
+    damageType: w.damageType ?? "slashing",
+    finesse: w.finesse ?? false,
+    light: w.light ?? false,
+    ...(w.versatile ? { versatileDiceCount: 1, versatileDiceFaces: 10 } : {}),
+    weaponClass: "martial",
+    weaponRange: "melee",
+  };
+}
+
+/** The single on-hit damage-rider capability a fixture's `riderDice` describes, or none. */
+function riderCapabilities(riderDice: WeaponFixture["riderDice"]) {
+  if (!riderDice) return [];
+  return [
+    {
+      kind: "passiveBonus",
+      target: "damage",
+      op: "add",
+      valueDiceCount: riderDice.count,
+      valueDiceFaces: riderDice.faces,
+      valueDamageType: riderDice.damageType,
+    },
+  ];
+}
+
 /** One weapon fixture's InventoryItem create data, position-ordered. */
 function weaponItemData(characterId: string, position: number, w: WeaponFixture) {
   return inventoryItemFixtureData({
@@ -89,28 +120,8 @@ function weaponItemData(characterId: string, position: number, w: WeaponFixture)
     equippedSlot: w.equippedSlot ?? "MAIN_HAND",
     requiresAttunement: w.requiresAttunement ?? false,
     attuned: w.attuned ?? false,
-    weapon: {
-      damageDiceCount: 1,
-      damageDiceFaces: w.damageDiceFaces ?? 8,
-      damageModifier: 0,
-      damageType: w.damageType ?? "slashing",
-      finesse: w.finesse ?? false,
-      ...(w.versatile ? { versatileDiceCount: 1, versatileDiceFaces: 10 } : {}),
-      weaponClass: "martial",
-      weaponRange: "melee",
-    },
-    capabilities: w.riderDice
-      ? [
-          {
-            kind: "passiveBonus",
-            target: "damage",
-            op: "add",
-            valueDiceCount: w.riderDice.count,
-            valueDiceFaces: w.riderDice.faces,
-            valueDamageType: w.riderDice.damageType,
-          },
-        ]
-      : [],
+    weapon: weaponDetailFixture(w),
+    capabilities: riderCapabilities(w.riderDice),
   });
 }
 
@@ -285,12 +296,12 @@ describe("serializeCharacter attackRows — off-hand row (Two-Weapon Fighting)",
     expect(offHand.damageSpec.modifier).not.toBe(mainHand.damageSpec.modifier - 4);
   });
 
-  it("keeps the ability modifier with the Two-Weapon Fighting style, matching the main hand", async () => {
-    // Same-ability pair (two finesse Shortswords) so "equals the main-hand row's
-    // modifier" is a meaningful assertion rather than a coincidence.
+  it("keeps the ability modifier with the Two-Weapon Fighting style AND a light pair, matching the main hand", async () => {
+    // Same-ability pair (two finesse light Shortswords) so "equals the main-hand
+    // row's modifier" is a meaningful assertion rather than a coincidence.
     const pair: WeaponFixture[] = [
-      { name: "Shortsword", equippedSlot: "MAIN_HAND", damageDiceFaces: 6, damageType: "piercing", finesse: true },
-      { name: "Shortsword", equippedSlot: "OFF_HAND", damageDiceFaces: 6, damageType: "piercing", finesse: true },
+      { name: "Shortsword", equippedSlot: "MAIN_HAND", damageDiceFaces: 6, damageType: "piercing", finesse: true, light: true },
+      { name: "Shortsword", equippedSlot: "OFF_HAND", damageDiceFaces: 6, damageType: "piercing", finesse: true, light: true },
     ];
 
     const withStyle = await serialize(await createFighter(pair, { resources: TWF_STYLE }));
@@ -303,6 +314,21 @@ describe("serializeCharacter attackRows — off-hand row (Two-Weapon Fighting)",
     const withoutStyle = await serialize(await createFighter(pair));
     expect(offHandRow(withoutStyle)!.damageSpec.modifier).toBe(0);
     expect(offHandRow(withoutStyle)!.damageComponents).toEqual({ abilityMod: 0, meleeDamageBonus: 0, ability: "strength" });
+  });
+
+  // #1640: hasOffHandAbilityDamage used to gate on the style's marker ALONE — a
+  // non-Light pair with the style still kept the full ability modifier. Both
+  // editions require a light weapon in each hand (PHB'14 p. 195 + p. 72 / SRD 5.2),
+  // and the style does not waive it (#1496).
+  it("drops the ability modifier with the Two-Weapon Fighting style but a NON-light pair (#1640)", async () => {
+    const nonLightPair: WeaponFixture[] = [
+      { name: "Longsword", equippedSlot: "MAIN_HAND", damageDiceFaces: 8, damageType: "slashing", light: false },
+      { name: "Longsword", equippedSlot: "OFF_HAND", damageDiceFaces: 8, damageType: "slashing", light: false },
+    ];
+
+    const withStyle = await serialize(await createFighter(nonLightPair, { resources: TWF_STYLE }));
+    expect(offHandRow(withStyle)!.damageSpec.modifier).toBe(0);
+    expect(offHandRow(withStyle)!.damageComponents).toEqual({ abilityMod: 0, meleeDamageBonus: 0, ability: "strength" });
   });
 
   it("keeps a negative ability modifier without the style — only a positive one is dropped", async () => {

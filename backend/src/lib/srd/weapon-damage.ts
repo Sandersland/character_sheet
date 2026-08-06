@@ -140,6 +140,24 @@ export function deriveOffHandDamage<T extends OffHandDamageInput>(
 }
 
 /**
+ * Whether both weapons in a two-weapon-fighting pair have the Light property —
+ * PHB'14 p. 195's Two-Weapon Fighting combat rule requires "a light melee
+ * weapon … in one hand … a different light melee weapon … in the other hand",
+ * a condition the p. 72 fighting style inherits by reference rather than
+ * restating; SRD 5.2 / PHB'24 states the same condition inline ("while
+ * wielding a weapon that has the Light property in each hand"). The editions
+ * agree, so this takes no `edition` parameter (#1640).
+ *
+ * Mirrors the frontend's `canTwoWeaponFight` (turnRules.ts, post-#1496) —
+ * both weapons of the pair, not just one, must be Light. There are never more
+ * than two equipped weapons (weapon placement is MAIN_HAND/OFF_HAND only), so
+ * `every` over the full array is exactly the two-weapon check.
+ */
+export function bothWeaponsLight(weapons: ReadonlyArray<{ light: boolean }>): boolean {
+  return weapons.length >= 2 && weapons.every((w) => w.light);
+}
+
+/**
  * Returns the unarmed-strike damage die face count for the given advancements.
  * Default is 1 (1 + STR mod, minimum 1 per 5e PHB). Tavern Brawler raises it to
  * d4 via a `{ target: "unarmedDamageDie", amount: 4 }` improvement. When multiple

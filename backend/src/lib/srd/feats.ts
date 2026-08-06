@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { AdvancementEntry } from "@/lib/classes/resources.js";
 import type { FeatImprovement } from "@/lib/classes/resources-state.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
+import { bothWeaponsLight } from "@/lib/srd/weapon-damage.js";
 
 /** PHB'24 feat categories (local union keeps srd/ a dependency leaf). */
 export type FeatCategory = "origin" | "general" | "fighting_style" | "epic_boon";
@@ -227,17 +228,27 @@ export function deriveRangedAttackRollBonus(advancements: AdvancementEntry[]): n
 }
 
 /**
- * Whether the Two-Weapon Fighting fighting style is taken (#1137 turned fighting
- * styles into feats, so its `offhandAbilityDamage` improvement is the marker) —
- * the flag `deriveOffHandDamage` reads to keep the governing ability modifier in
- * the off-hand attack's damage. A presence check, not a sum: the improvement's
- * `amount` carries no meaning. Callers pass the already-clamped slice so an
- * over-cap style feat is excluded automatically.
+ * Whether the off-hand attack keeps its governing ability modifier — the flag
+ * `deriveOffHandDamage` reads. Two conditions, both required:
+ *   1. The Two-Weapon Fighting fighting style is taken (#1137 turned fighting
+ *      styles into feats, so its `offhandAbilityDamage` improvement is the
+ *      marker; a presence check, not a sum — the improvement's `amount`
+ *      carries no meaning). Callers pass the already-clamped slice so an
+ *      over-cap style feat is excluded automatically.
+ *   2. Both equipped weapons have the Light property (`bothWeaponsLight`) —
+ *      PHB'14 p. 195 / p. 72 and SRD 5.2 agree the style's damage bonus never
+ *      waives the two-Light-weapons requirement (#1496, #1640). Without it, a
+ *      non-Light pair wrongly kept the full ability modifier on the served
+ *      off-hand row.
  */
-export function hasOffHandAbilityDamage(advancements: AdvancementEntry[]): boolean {
-  return advancements.some((entry) =>
+export function hasOffHandAbilityDamage(
+  advancements: AdvancementEntry[],
+  weapons: ReadonlyArray<{ light: boolean }>,
+): boolean {
+  const styleTaken = advancements.some((entry) =>
     (entry.improvements ?? []).some((imp) => imp.target === "offhandAbilityDamage"),
   );
+  return styleTaken && bothWeaponsLight(weapons);
 }
 
 /**

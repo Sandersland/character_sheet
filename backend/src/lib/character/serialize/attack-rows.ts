@@ -87,10 +87,12 @@ function weaponRow(item: EquippedWeapon): AttackRow {
  * Row presence is not action availability: a row is emitted whenever two weapons
  * are equipped, exactly as before. Whether the swing may be taken this turn is the
  * two-Light-weapons rule, identical in SRD 5.1 / PHB'14 p. 72 and SRD 5.2, and the
- * Two-Weapon Fighting style does NOT waive it (#1496) — it grants damage only, which
- * is exactly what `deriveOffHandDamage` below applies. The feature that would lift
- * the requirement is the Dual Wielder feat, unseeded here. Eligibility still belongs
- * to the gated action row (#1435) — no `light` logic here.
+ * Two-Weapon Fighting style does NOT waive it (#1496) — it grants damage only. That
+ * SAME two-Light-weapons condition also gates whether the served damage keeps the
+ * ability modifier: `hasOffHandAbilityDamage` (#1640) consults `weapons` for it, so
+ * the DAMAGE VALUE this row serves is already Light-correct. Turn-availability
+ * (whether the swing may be taken at all) still belongs to the gated action row
+ * (#1435) — this file only serves the numbers.
  *
  * `damageSpec.modifier` and `damageComponents` both come from the one
  * `deriveOffHandDamage` result, which is what keeps
@@ -102,7 +104,10 @@ function offHandRow(
 ): AttackRow | undefined {
   if (weapons.length < 2) return undefined;
   const item = weapons.find((w) => w.equippedSlot === "OFF_HAND") ?? weapons[1];
-  const damage = deriveOffHandDamage(item.weapon.damage, hasOffHandAbilityDamage(advancements));
+  const damage = deriveOffHandDamage(
+    item.weapon.damage,
+    hasOffHandAbilityDamage(advancements, weapons.map((w) => ({ light: w.weapon.light }))),
+  );
   const row = weaponRow(item);
   return {
     ...row,

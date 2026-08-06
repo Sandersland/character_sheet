@@ -17,6 +17,10 @@ const twoWeaponFightingStyle = [
   { id: "fs1", slot: "fightingStyle", featName: "Two-Weapon Fighting", improvements: [{ target: "offhandAbilityDamage", amount: 1 }] },
 ] as unknown as AdvancementEntry[];
 
+const lightPair = [{ light: true }, { light: true }];
+const nonLightPair = [{ light: false }, { light: false }];
+const mixedPair = [{ light: true }, { light: false }];
+
 describe("deriveOffHandDamage (PHB'14 p. 195 / SRD 5.2 Light property)", () => {
   it("drops the governing ability modifier without the Two-Weapon Fighting style", () => {
     // STR 16 → +3, folded into damageModifier by deriveWeaponDamage.
@@ -88,20 +92,41 @@ describe("deriveOffHandDamage (PHB'14 p. 195 / SRD 5.2 Light property)", () => {
   });
 });
 
-describe("hasOffHandAbilityDamage", () => {
-  it("is true only when an advancement carries the offhandAbilityDamage marker", () => {
-    expect(hasOffHandAbilityDamage([])).toBe(false);
-    expect(hasOffHandAbilityDamage(twoWeaponFightingStyle)).toBe(true);
+describe("hasOffHandAbilityDamage (PHB'14 p. 195 + p. 72 / SRD 5.2 Light property — #1640)", () => {
+  it("is false with no advancement, regardless of the weapons", () => {
+    expect(hasOffHandAbilityDamage([], lightPair)).toBe(false);
+    expect(hasOffHandAbilityDamage([], nonLightPair)).toBe(false);
   });
 
   it("ignores other fighting-style improvements", () => {
     const archery = [
       { id: "fs1", slot: "fightingStyle", improvements: [{ target: "rangedAttackRoll", amount: 2 }] },
     ] as unknown as AdvancementEntry[];
-    expect(hasOffHandAbilityDamage(archery)).toBe(false);
+    expect(hasOffHandAbilityDamage(archery, lightPair)).toBe(false);
   });
 
   it("tolerates an advancement with no improvements array", () => {
-    expect(hasOffHandAbilityDamage([{ id: "asi1", slot: "asi" }] as unknown as AdvancementEntry[])).toBe(false);
+    expect(
+      hasOffHandAbilityDamage([{ id: "asi1", slot: "asi" }] as unknown as AdvancementEntry[], lightPair),
+    ).toBe(false);
+  });
+
+  it("is true with the style AND a light weapon in each hand", () => {
+    expect(hasOffHandAbilityDamage(twoWeaponFightingStyle, lightPair)).toBe(true);
+  });
+
+  // The bug (#1640): the style improvement alone used to be enough — the Light
+  // property of the equipped weapons was never consulted.
+  it("is false with the style but a NON-light pair — the style does not waive the Light requirement", () => {
+    expect(hasOffHandAbilityDamage(twoWeaponFightingStyle, nonLightPair)).toBe(false);
+  });
+
+  it("is false with the style when only one of the two weapons is light", () => {
+    expect(hasOffHandAbilityDamage(twoWeaponFightingStyle, mixedPair)).toBe(false);
+  });
+
+  it("is false with the style and fewer than two weapons", () => {
+    expect(hasOffHandAbilityDamage(twoWeaponFightingStyle, [{ light: true }])).toBe(false);
+    expect(hasOffHandAbilityDamage(twoWeaponFightingStyle, [])).toBe(false);
   });
 });
