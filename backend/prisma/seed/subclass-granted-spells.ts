@@ -12,10 +12,17 @@
 // (#1128), so the former level-1 rows now fire at 3 pending the content resweep (#1133).
 //
 // Per-row `edition` (#1625): omitted = shared (NULL column, served to both
-// editions); a list that diverges forks into one row per edition. The Paladin
-// oath / Cleric domain / Warlock patron lists below are still the 2014 texts
-// on shared rows — re-authoring the four diverging 2024 lists is #1626's
-// content pass, deliberately not this mechanism change.
+// editions); a list that diverges forks into one row per edition. #1626
+// retags the 13 rows below whose 2024 text (cleric-features.ts/
+// paladin-features.ts/warlock-features.ts, the authority for each list) names
+// a different spell than the 2014 row transcribed here: the existing row
+// keeps its spell and gateLevel and becomes EDITION_2014-only, and a NEW
+// EDITION_2024 row carries the replacement at the same (already 2024-shifted,
+// #1128) gate — the 2014 gate levels are themselves wrong (#1626's "second
+// axis"), deliberately deferred to #1372's ungate wave. Every other row in
+// these three lists is unchanged between editions and stays shared. Oath of
+// the Ancients/Oath of Vengeance need no change at all (verified against
+// their own mirror-sourced 2024 rows).
 import { z } from "zod";
 
 import type { SeedEdition } from "./edition.js";
@@ -99,8 +106,18 @@ export const SUBCLASS_GRANTED_SPELLS: SubclassGrantedSpellSeed[] = [
 
   // Oath of Devotion (Paladin) — CHA, gated 3/5/9/13/17.
   { className: "Paladin", subclassName: "Oath of Devotion", spellName: "Protection from Evil and Good", gateLevel: 3, castingAbility: "charisma" },
-  { className: "Paladin", subclassName: "Oath of Devotion", spellName: "Sanctuary", gateLevel: 3, castingAbility: "charisma" },
-  { className: "Paladin", subclassName: "Oath of Devotion", spellName: "Lesser Restoration", gateLevel: 5, castingAbility: "charisma" },
+  // #1626: PHB'14 p.87 row, retagged 2014-only — SRD 5.2 swaps this for
+  // Shield of Faith (see the EDITION_2024 row below).
+  { className: "Paladin", subclassName: "Oath of Devotion", spellName: "Sanctuary", gateLevel: 3, castingAbility: "charisma", edition: "EDITION_2014" },
+  // #1626: SRD 5.2 pp.49-50 "Oath of Devotion Spells" — Shield of Faith
+  // replaces Sanctuary at L3 (paladin-features.ts is the authority).
+  { className: "Paladin", subclassName: "Oath of Devotion", spellName: "Shield of Faith", gateLevel: 3, castingAbility: "charisma", edition: "EDITION_2024" },
+  // #1626: PHB'14 p.87 row, retagged 2014-only — SRD 5.2 swaps this for Aid
+  // (see the EDITION_2024 row below).
+  { className: "Paladin", subclassName: "Oath of Devotion", spellName: "Lesser Restoration", gateLevel: 5, castingAbility: "charisma", edition: "EDITION_2014" },
+  // #1626: SRD 5.2 pp.49-50 "Oath of Devotion Spells" — Aid replaces Lesser
+  // Restoration at L5 (paladin-features.ts is the authority).
+  { className: "Paladin", subclassName: "Oath of Devotion", spellName: "Aid", gateLevel: 5, castingAbility: "charisma", edition: "EDITION_2024" },
   { className: "Paladin", subclassName: "Oath of Devotion", spellName: "Zone of Truth", gateLevel: 5, castingAbility: "charisma" },
   { className: "Paladin", subclassName: "Oath of Devotion", spellName: "Beacon of Hope", gateLevel: 9, castingAbility: "charisma" },
   { className: "Paladin", subclassName: "Oath of Devotion", spellName: "Dispel Magic", gateLevel: 9, castingAbility: "charisma" },
@@ -137,37 +154,93 @@ export const SUBCLASS_GRANTED_SPELLS: SubclassGrantedSpellSeed[] = [
   { className: "Cleric", subclassName: "Life Domain", spellName: "Bless", gateLevel: 3, castingAbility: "wisdom" },
   { className: "Cleric", subclassName: "Life Domain", spellName: "Cure Wounds", gateLevel: 3, castingAbility: "wisdom" },
   { className: "Cleric", subclassName: "Life Domain", spellName: "Lesser Restoration", gateLevel: 3, castingAbility: "wisdom" },
-  { className: "Cleric", subclassName: "Life Domain", spellName: "Spiritual Weapon", gateLevel: 3, castingAbility: "wisdom" },
-  { className: "Cleric", subclassName: "Life Domain", spellName: "Beacon of Hope", gateLevel: 5, castingAbility: "wisdom" },
+  // #1626: PHB'14 p.59 row, retagged 2014-only — SRD 5.2 p.40 swaps this for
+  // Aid (see the EDITION_2024 row below).
+  { className: "Cleric", subclassName: "Life Domain", spellName: "Spiritual Weapon", gateLevel: 3, castingAbility: "wisdom", edition: "EDITION_2014" },
+  // #1626: SRD 5.2 p.40 "Life Domain Spells", transcribed verbatim
+  // (cleric-features.ts is the authority) — Aid replaces Spiritual Weapon at L3.
+  { className: "Cleric", subclassName: "Life Domain", spellName: "Aid", gateLevel: 3, castingAbility: "wisdom", edition: "EDITION_2024" },
+  // #1626: PHB'14 p.59 row, retagged 2014-only — SRD 5.2 p.40 swaps this for
+  // Mass Healing Word (see the EDITION_2024 row below).
+  { className: "Cleric", subclassName: "Life Domain", spellName: "Beacon of Hope", gateLevel: 5, castingAbility: "wisdom", edition: "EDITION_2014" },
+  // #1626: SRD 5.2 p.40 "Life Domain Spells" — Mass Healing Word replaces
+  // Beacon of Hope at L5.
+  { className: "Cleric", subclassName: "Life Domain", spellName: "Mass Healing Word", gateLevel: 5, castingAbility: "wisdom", edition: "EDITION_2024" },
   { className: "Cleric", subclassName: "Life Domain", spellName: "Revivify", gateLevel: 5, castingAbility: "wisdom" },
   { className: "Cleric", subclassName: "Life Domain", spellName: "Death Ward", gateLevel: 7, castingAbility: "wisdom" },
-  { className: "Cleric", subclassName: "Life Domain", spellName: "Guardian of Faith", gateLevel: 7, castingAbility: "wisdom" },
+  // #1626: PHB'14 p.59 row, retagged 2014-only — SRD 5.2 p.40 swaps this for
+  // Aura of Life (see the EDITION_2024 row below).
+  { className: "Cleric", subclassName: "Life Domain", spellName: "Guardian of Faith", gateLevel: 7, castingAbility: "wisdom", edition: "EDITION_2014" },
+  // #1626: SRD 5.2 p.40 "Life Domain Spells" — Aura of Life replaces Guardian
+  // of Faith at L7.
+  { className: "Cleric", subclassName: "Life Domain", spellName: "Aura of Life", gateLevel: 7, castingAbility: "wisdom", edition: "EDITION_2024" },
   { className: "Cleric", subclassName: "Life Domain", spellName: "Mass Cure Wounds", gateLevel: 9, castingAbility: "wisdom" },
-  { className: "Cleric", subclassName: "Life Domain", spellName: "Raise Dead", gateLevel: 9, castingAbility: "wisdom" },
+  // #1626: PHB'14 p.59 row, retagged 2014-only — SRD 5.2 p.40 swaps this for
+  // Greater Restoration (see the EDITION_2024 row below).
+  { className: "Cleric", subclassName: "Life Domain", spellName: "Raise Dead", gateLevel: 9, castingAbility: "wisdom", edition: "EDITION_2014" },
+  // #1626: SRD 5.2 p.40 "Life Domain Spells" — Greater Restoration replaces
+  // Raise Dead at L9.
+  { className: "Cleric", subclassName: "Life Domain", spellName: "Greater Restoration", gateLevel: 9, castingAbility: "wisdom", edition: "EDITION_2024" },
 
   // Trickery Domain (Cleric) — WIS, gated 3/3/5/7/9 (#1128).
   { className: "Cleric", subclassName: "Trickery Domain", spellName: "Charm Person", gateLevel: 3, castingAbility: "wisdom" },
   { className: "Cleric", subclassName: "Trickery Domain", spellName: "Disguise Self", gateLevel: 3, castingAbility: "wisdom" },
-  { className: "Cleric", subclassName: "Trickery Domain", spellName: "Mirror Image", gateLevel: 3, castingAbility: "wisdom" },
+  // #1626: PHB'14 p.63 row, retagged 2014-only — the mirror-sourced SRD 5.2
+  // list swaps this for Invisibility (see the EDITION_2024 row below).
+  { className: "Cleric", subclassName: "Trickery Domain", spellName: "Mirror Image", gateLevel: 3, castingAbility: "wisdom", edition: "EDITION_2014" },
+  // #1626: mirror-sourced 2024 "Trickery Domain Spells" (owner decision
+  // #1225, cleric-features.ts is the authority) — Invisibility replaces
+  // Mirror Image at L3.
+  { className: "Cleric", subclassName: "Trickery Domain", spellName: "Invisibility", gateLevel: 3, castingAbility: "wisdom", edition: "EDITION_2024" },
   { className: "Cleric", subclassName: "Trickery Domain", spellName: "Pass without Trace", gateLevel: 3, castingAbility: "wisdom" },
-  { className: "Cleric", subclassName: "Trickery Domain", spellName: "Blink", gateLevel: 5, castingAbility: "wisdom" },
-  { className: "Cleric", subclassName: "Trickery Domain", spellName: "Dispel Magic", gateLevel: 5, castingAbility: "wisdom" },
+  // #1626: PHB'14 p.63 row, retagged 2014-only — swapped for Hypnotic Pattern
+  // in the 2024 list (see the EDITION_2024 row below).
+  { className: "Cleric", subclassName: "Trickery Domain", spellName: "Blink", gateLevel: 5, castingAbility: "wisdom", edition: "EDITION_2014" },
+  // #1626: mirror-sourced 2024 "Trickery Domain Spells" — Hypnotic Pattern
+  // replaces Blink at L5.
+  { className: "Cleric", subclassName: "Trickery Domain", spellName: "Hypnotic Pattern", gateLevel: 5, castingAbility: "wisdom", edition: "EDITION_2024" },
+  // #1626: PHB'14 p.63 row, retagged 2014-only — swapped for Nondetection in
+  // the 2024 list (see the EDITION_2024 row below).
+  { className: "Cleric", subclassName: "Trickery Domain", spellName: "Dispel Magic", gateLevel: 5, castingAbility: "wisdom", edition: "EDITION_2014" },
+  // #1626: mirror-sourced 2024 "Trickery Domain Spells" — Nondetection
+  // replaces Dispel Magic at L5.
+  { className: "Cleric", subclassName: "Trickery Domain", spellName: "Nondetection", gateLevel: 5, castingAbility: "wisdom", edition: "EDITION_2024" },
   { className: "Cleric", subclassName: "Trickery Domain", spellName: "Dimension Door", gateLevel: 7, castingAbility: "wisdom" },
-  { className: "Cleric", subclassName: "Trickery Domain", spellName: "Polymorph", gateLevel: 7, castingAbility: "wisdom" },
+  // #1626: PHB'14 p.63 row, retagged 2014-only — swapped for Confusion in the
+  // 2024 list (see the EDITION_2024 row below).
+  { className: "Cleric", subclassName: "Trickery Domain", spellName: "Polymorph", gateLevel: 7, castingAbility: "wisdom", edition: "EDITION_2014" },
+  // #1626: mirror-sourced 2024 "Trickery Domain Spells" — Confusion replaces
+  // Polymorph at L7.
+  { className: "Cleric", subclassName: "Trickery Domain", spellName: "Confusion", gateLevel: 7, castingAbility: "wisdom", edition: "EDITION_2024" },
   { className: "Cleric", subclassName: "Trickery Domain", spellName: "Dominate Person", gateLevel: 9, castingAbility: "wisdom" },
   { className: "Cleric", subclassName: "Trickery Domain", spellName: "Modify Memory", gateLevel: 9, castingAbility: "wisdom" },
 
   // The Fiend (Warlock) — CHA, gated 3/3/5/7/9 (#1128).
   { className: "Warlock", subclassName: "The Fiend", spellName: "Burning Hands", gateLevel: 3, castingAbility: "charisma" },
   { className: "Warlock", subclassName: "The Fiend", spellName: "Command", gateLevel: 3, castingAbility: "charisma" },
-  { className: "Warlock", subclassName: "The Fiend", spellName: "Blindness/Deafness", gateLevel: 3, castingAbility: "charisma" },
+  // #1626: PHB'14 "Expanded Spell List" row, retagged 2014-only — SRD 5.2
+  // pp.75-76 "Fiend Spells" swaps this for Suggestion (see the EDITION_2024
+  // row below).
+  { className: "Warlock", subclassName: "The Fiend", spellName: "Blindness/Deafness", gateLevel: 3, castingAbility: "charisma", edition: "EDITION_2014" },
+  // #1626: SRD 5.2 pp.75-76 "Fiend Spells", transcribed from the PDF's own
+  // table (warlock-features.ts is the authority) — Suggestion replaces
+  // Blindness/Deafness at L3.
+  { className: "Warlock", subclassName: "The Fiend", spellName: "Suggestion", gateLevel: 3, castingAbility: "charisma", edition: "EDITION_2024" },
   { className: "Warlock", subclassName: "The Fiend", spellName: "Scorching Ray", gateLevel: 3, castingAbility: "charisma" },
   { className: "Warlock", subclassName: "The Fiend", spellName: "Fireball", gateLevel: 5, castingAbility: "charisma" },
   { className: "Warlock", subclassName: "The Fiend", spellName: "Stinking Cloud", gateLevel: 5, castingAbility: "charisma" },
   { className: "Warlock", subclassName: "The Fiend", spellName: "Fire Shield", gateLevel: 7, castingAbility: "charisma" },
   { className: "Warlock", subclassName: "The Fiend", spellName: "Wall of Fire", gateLevel: 7, castingAbility: "charisma" },
-  { className: "Warlock", subclassName: "The Fiend", spellName: "Flame Strike", gateLevel: 9, castingAbility: "charisma" },
-  { className: "Warlock", subclassName: "The Fiend", spellName: "Hallow", gateLevel: 9, castingAbility: "charisma" },
+  // #1626: PHB'14 "Expanded Spell List" row, retagged 2014-only — SRD 5.2
+  // swaps this for Geas (see the EDITION_2024 row below).
+  { className: "Warlock", subclassName: "The Fiend", spellName: "Flame Strike", gateLevel: 9, castingAbility: "charisma", edition: "EDITION_2014" },
+  // #1626: SRD 5.2 pp.75-76 "Fiend Spells" — Geas replaces Flame Strike at L9.
+  { className: "Warlock", subclassName: "The Fiend", spellName: "Geas", gateLevel: 9, castingAbility: "charisma", edition: "EDITION_2024" },
+  // #1626: PHB'14 "Expanded Spell List" row, retagged 2014-only — SRD 5.2
+  // swaps this for Insect Plague (see the EDITION_2024 row below).
+  { className: "Warlock", subclassName: "The Fiend", spellName: "Hallow", gateLevel: 9, castingAbility: "charisma", edition: "EDITION_2014" },
+  // #1626: SRD 5.2 pp.75-76 "Fiend Spells" — Insect Plague replaces Hallow at L9.
+  { className: "Warlock", subclassName: "The Fiend", spellName: "Insect Plague", gateLevel: 9, castingAbility: "charisma", edition: "EDITION_2024" },
 
   // The Archfey (Warlock) — CHA, gated 3/3/5/7/9 (#1128).
   { className: "Warlock", subclassName: "The Archfey", spellName: "Faerie Fire", gateLevel: 3, castingAbility: "charisma" },
