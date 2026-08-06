@@ -18,6 +18,7 @@ import { SPELLS_2014 } from "./seed/spells-2014/index.js";
 import { applySpellRenames } from "./seed/rename-spells.js";
 import { seedSpellClassesFor } from "./seed/seed-spell-classes.js";
 import { seedSubclassGrantedSpells } from "./seed/seed-granted-spells.js";
+import { seedSubclassSpellListExpansions } from "./seed/seed-spell-list-expansions.js";
 import { seedClassFeatures } from "./seed/seed-class-features.js";
 import { seedSubclasses } from "./seed/seed-subclasses.js";
 import { seedSpecies } from "./seed/seed-species.js";
@@ -544,6 +545,9 @@ async function main() {
   await seedBackgrounds(prisma);
   await seedSpells(prisma);
   await seedSubclassGrantedSpells(prisma, classIds);
+  // #1631: the SubclassGrantedSpell sibling family — same ordering
+  // constraint (subclasses AND spells must already be seeded).
+  await seedSubclassSpellListExpansions(prisma, classIds);
   // #1683: 2024 lineage/legacy spell tracks — needs Species (seedSpecies,
   // above) AND the Spell catalog (seedSpells, just above) both seeded.
   await seedSpeciesGrantedSpells(prisma);

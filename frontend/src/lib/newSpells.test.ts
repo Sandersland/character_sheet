@@ -39,7 +39,7 @@ describe("readNewSpellsMeta", () => {
     };
     expect(readNewSpellsMeta(step)).toEqual({
       count: 2, maxSpellLevel: 5, magicalSecrets: true, canSwap: false, cantrips: 0,
-      spellLists: ["bard", "wizard"], cantripLists: ["bard"], casterModel: null,
+      spellLists: ["bard", "wizard"], cantripLists: ["bard"], casterModel: null, expandedSpellIds: [],
     });
   });
 
@@ -47,8 +47,13 @@ describe("readNewSpellsMeta", () => {
     const step: LevelUpStep = { kind: "newSpells", count: 1 };
     expect(readNewSpellsMeta(step)).toEqual({
       count: 1, maxSpellLevel: 0, magicalSecrets: false, canSwap: false, cantrips: 0,
-      spellLists: null, cantripLists: null, casterModel: null,
+      spellLists: null, cantripLists: null, casterModel: null, expandedSpellIds: [],
     });
+  });
+
+  it("reads expandedSpellIds from meta (#1631)", () => {
+    const step: LevelUpStep = { kind: "newSpells", count: 1, meta: { expandedSpellIds: ["burning-hands-id"] } };
+    expect(readNewSpellsMeta(step).expandedSpellIds).toEqual(["burning-hands-id"]);
   });
 
   it("reads canSwap from meta (#1101)", () => {
@@ -189,6 +194,24 @@ describe("eligibleNewSpells (#1440: takes the served spellLists, not className/m
 
   it("handles a null catalog", () => {
     expect(eligibleNewSpells(null, { maxSpellLevel: 2, spellLists: ["wizard"] })).toEqual([]);
+  });
+
+  // #1631: expandedSpellIds admits a spell off every served class list —
+  // chaosBolt is sorcerer-only (off the served ["wizard"] list) but IS admitted
+  // when its id is in the served expansion set, still subject to the ceiling.
+  it("admits an off-list spell whose id is in the served expandedSpellIds (#1631)", () => {
+    const eligible = eligibleNewSpells(CATALOG, { maxSpellLevel: 2, spellLists: ["wizard"], expandedSpellIds: ["chaosBolt"] });
+    expect(eligible.map((s) => s.id)).toEqual(["shield", "mistyStep", "chaosBolt"]);
+  });
+
+  it("expandedSpellIds never bypasses the level ceiling", () => {
+    const eligible = eligibleNewSpells(CATALOG, { maxSpellLevel: 1, spellLists: ["wizard"], expandedSpellIds: ["fireball"] });
+    expect(eligible.map((s) => s.id)).not.toContain("fireball");
+  });
+
+  it("omitted expandedSpellIds behaves exactly as before (#1440 regression guard)", () => {
+    const eligible = eligibleNewSpells(CATALOG, { maxSpellLevel: 2, spellLists: ["wizard"] });
+    expect(eligible.map((s) => s.id)).toEqual(["shield", "mistyStep"]);
   });
 });
 

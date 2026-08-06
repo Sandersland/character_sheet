@@ -13,16 +13,23 @@
 //
 // Per-row `edition` (#1625): omitted = shared (NULL column, served to both
 // editions); a list that diverges forks into one row per edition. #1626
-// retags the 13 rows below whose 2024 text (cleric-features.ts/
-// paladin-features.ts/warlock-features.ts, the authority for each list) names
+// retags the Cleric domain / Paladin oath rows below whose 2024 text
+// (cleric-features.ts/paladin-features.ts, the authority for each list) names
 // a different spell than the 2014 row transcribed here: the existing row
 // keeps its spell and gateLevel and becomes EDITION_2014-only, and a NEW
 // EDITION_2024 row carries the replacement at the same (already 2024-shifted,
 // #1128) gate — the 2014 gate levels are themselves wrong (#1626's "second
-// axis"), deliberately deferred to #1372's ungate wave. Every other row in
-// these three lists is unchanged between editions and stays shared. Oath of
-// the Ancients/Oath of Vengeance need no change at all (verified against
-// their own mirror-sourced 2024 rows).
+// axis"), deliberately deferred to #1372's ungate wave. Every other Cleric/
+// Paladin row is unchanged between editions and stays shared. Oath of the
+// Ancients/Oath of Vengeance need no change at all (verified against their
+// own mirror-sourced 2024 rows). #1631 moved The Fiend's/Archfey's/Great Old
+// One's Warlock "Expanded Spell List" rows onto SubclassSpellListExpansion
+// entirely — see that seed module's own header: unlike Cleric/Paladin's
+// always-prepared domain/oath spells, PHB'14's Warlock patron spells are a
+// list-EXPANSION (choosable, still costs a known-spell pick), not a grant, so
+// they never belonged in THIS family even before #1626 forked their diverging
+// rows. The Fiend's SRD 5.2 "Fiend Spells" (below, EDITION_2024) IS genuinely
+// always-prepared — that mechanism fork is real, not just the list.
 import { z } from "zod";
 
 import type { SeedEdition } from "./edition.js";
@@ -215,54 +222,36 @@ export const SUBCLASS_GRANTED_SPELLS: SubclassGrantedSpellSeed[] = [
   { className: "Cleric", subclassName: "Trickery Domain", spellName: "Dominate Person", gateLevel: 9, castingAbility: "wisdom" },
   { className: "Cleric", subclassName: "Trickery Domain", spellName: "Modify Memory", gateLevel: 9, castingAbility: "wisdom" },
 
-  // The Fiend (Warlock) — CHA, gated 3/3/5/7/9 (#1128).
-  { className: "Warlock", subclassName: "The Fiend", spellName: "Burning Hands", gateLevel: 3, castingAbility: "charisma" },
-  { className: "Warlock", subclassName: "The Fiend", spellName: "Command", gateLevel: 3, castingAbility: "charisma" },
-  // #1626: PHB'14 "Expanded Spell List" row, retagged 2014-only — SRD 5.2
-  // pp.75-76 "Fiend Spells" swaps this for Suggestion (see the EDITION_2024
-  // row below).
-  { className: "Warlock", subclassName: "The Fiend", spellName: "Blindness/Deafness", gateLevel: 3, castingAbility: "charisma", edition: "EDITION_2014" },
+  // The Fiend (Warlock) — CHA, gated 3/3/5/7/9 (#1128). #1631: 2014's
+  // "Expanded Spell List" is a list-EXPANSION, not a free grant (PHB'14 "Add
+  // fiend spells to your warlock list") — every one of these 10 spells that
+  // ALSO serves 2014 now lives on SubclassSpellListExpansion (EDITION_2014)
+  // instead, since The Fiend's Subclass row is edition-SHARED and a NULL
+  // SubclassGrantedSpell row here would grant it free to a 2014 character
+  // too. All 10 rows below are therefore EDITION_2024-only: SRD 5.2 renamed
+  // the feature "Fiend Spells" and made it genuinely always-prepared
+  // (warlock-features.ts is the authority for both lists' contents).
+  { className: "Warlock", subclassName: "The Fiend", spellName: "Burning Hands", gateLevel: 3, castingAbility: "charisma", edition: "EDITION_2024" },
+  { className: "Warlock", subclassName: "The Fiend", spellName: "Command", gateLevel: 3, castingAbility: "charisma", edition: "EDITION_2024" },
   // #1626: SRD 5.2 pp.75-76 "Fiend Spells", transcribed from the PDF's own
-  // table (warlock-features.ts is the authority) — Suggestion replaces
-  // Blindness/Deafness at L3.
+  // table — Suggestion replaces the 2014 list's Blindness/Deafness at L3.
   { className: "Warlock", subclassName: "The Fiend", spellName: "Suggestion", gateLevel: 3, castingAbility: "charisma", edition: "EDITION_2024" },
-  { className: "Warlock", subclassName: "The Fiend", spellName: "Scorching Ray", gateLevel: 3, castingAbility: "charisma" },
-  { className: "Warlock", subclassName: "The Fiend", spellName: "Fireball", gateLevel: 5, castingAbility: "charisma" },
-  { className: "Warlock", subclassName: "The Fiend", spellName: "Stinking Cloud", gateLevel: 5, castingAbility: "charisma" },
-  { className: "Warlock", subclassName: "The Fiend", spellName: "Fire Shield", gateLevel: 7, castingAbility: "charisma" },
-  { className: "Warlock", subclassName: "The Fiend", spellName: "Wall of Fire", gateLevel: 7, castingAbility: "charisma" },
-  // #1626: PHB'14 "Expanded Spell List" row, retagged 2014-only — SRD 5.2
-  // swaps this for Geas (see the EDITION_2024 row below).
-  { className: "Warlock", subclassName: "The Fiend", spellName: "Flame Strike", gateLevel: 9, castingAbility: "charisma", edition: "EDITION_2014" },
-  // #1626: SRD 5.2 pp.75-76 "Fiend Spells" — Geas replaces Flame Strike at L9.
+  { className: "Warlock", subclassName: "The Fiend", spellName: "Scorching Ray", gateLevel: 3, castingAbility: "charisma", edition: "EDITION_2024" },
+  { className: "Warlock", subclassName: "The Fiend", spellName: "Fireball", gateLevel: 5, castingAbility: "charisma", edition: "EDITION_2024" },
+  { className: "Warlock", subclassName: "The Fiend", spellName: "Stinking Cloud", gateLevel: 5, castingAbility: "charisma", edition: "EDITION_2024" },
+  { className: "Warlock", subclassName: "The Fiend", spellName: "Fire Shield", gateLevel: 7, castingAbility: "charisma", edition: "EDITION_2024" },
+  { className: "Warlock", subclassName: "The Fiend", spellName: "Wall of Fire", gateLevel: 7, castingAbility: "charisma", edition: "EDITION_2024" },
+  // #1626: SRD 5.2 pp.75-76 "Fiend Spells" — Geas replaces the 2014 list's
+  // Flame Strike at L9.
   { className: "Warlock", subclassName: "The Fiend", spellName: "Geas", gateLevel: 9, castingAbility: "charisma", edition: "EDITION_2024" },
-  // #1626: PHB'14 "Expanded Spell List" row, retagged 2014-only — SRD 5.2
-  // swaps this for Insect Plague (see the EDITION_2024 row below).
-  { className: "Warlock", subclassName: "The Fiend", spellName: "Hallow", gateLevel: 9, castingAbility: "charisma", edition: "EDITION_2014" },
-  // #1626: SRD 5.2 pp.75-76 "Fiend Spells" — Insect Plague replaces Hallow at L9.
+  // #1626: SRD 5.2 pp.75-76 "Fiend Spells" — Insect Plague replaces the 2014
+  // list's Hallow at L9.
   { className: "Warlock", subclassName: "The Fiend", spellName: "Insect Plague", gateLevel: 9, castingAbility: "charisma", edition: "EDITION_2024" },
 
-  // The Archfey (Warlock) — CHA, gated 3/3/5/7/9 (#1128).
-  { className: "Warlock", subclassName: "The Archfey", spellName: "Faerie Fire", gateLevel: 3, castingAbility: "charisma" },
-  { className: "Warlock", subclassName: "The Archfey", spellName: "Sleep", gateLevel: 3, castingAbility: "charisma" },
-  { className: "Warlock", subclassName: "The Archfey", spellName: "Calm Emotions", gateLevel: 3, castingAbility: "charisma" },
-  { className: "Warlock", subclassName: "The Archfey", spellName: "Phantasmal Force", gateLevel: 3, castingAbility: "charisma" },
-  { className: "Warlock", subclassName: "The Archfey", spellName: "Blink", gateLevel: 5, castingAbility: "charisma" },
-  { className: "Warlock", subclassName: "The Archfey", spellName: "Plant Growth", gateLevel: 5, castingAbility: "charisma" },
-  { className: "Warlock", subclassName: "The Archfey", spellName: "Dominate Beast", gateLevel: 7, castingAbility: "charisma" },
-  { className: "Warlock", subclassName: "The Archfey", spellName: "Greater Invisibility", gateLevel: 7, castingAbility: "charisma" },
-  { className: "Warlock", subclassName: "The Archfey", spellName: "Dominate Person", gateLevel: 9, castingAbility: "charisma" },
-  { className: "Warlock", subclassName: "The Archfey", spellName: "Seeming", gateLevel: 9, castingAbility: "charisma" },
-
-  // The Great Old One (Warlock) — CHA, gated 3/3/5/7/9 (#1128).
-  { className: "Warlock", subclassName: "The Great Old One", spellName: "Dissonant Whispers", gateLevel: 3, castingAbility: "charisma" },
-  { className: "Warlock", subclassName: "The Great Old One", spellName: "Hideous Laughter", gateLevel: 3, castingAbility: "charisma" },
-  { className: "Warlock", subclassName: "The Great Old One", spellName: "Detect Thoughts", gateLevel: 3, castingAbility: "charisma" },
-  { className: "Warlock", subclassName: "The Great Old One", spellName: "Phantasmal Force", gateLevel: 3, castingAbility: "charisma" },
-  { className: "Warlock", subclassName: "The Great Old One", spellName: "Clairvoyance", gateLevel: 5, castingAbility: "charisma" },
-  { className: "Warlock", subclassName: "The Great Old One", spellName: "Sending", gateLevel: 5, castingAbility: "charisma" },
-  { className: "Warlock", subclassName: "The Great Old One", spellName: "Dominate Beast", gateLevel: 7, castingAbility: "charisma" },
-  { className: "Warlock", subclassName: "The Great Old One", spellName: "Black Tentacles", gateLevel: 7, castingAbility: "charisma" },
-  { className: "Warlock", subclassName: "The Great Old One", spellName: "Dominate Person", gateLevel: 9, castingAbility: "charisma" },
-  { className: "Warlock", subclassName: "The Great Old One", spellName: "Telekinesis", gateLevel: 9, castingAbility: "charisma" },
+  // #1631: The Archfey's and The Great Old One's entire PHB'14 "Expanded
+  // Spell List" moved to SubclassSpellListExpansion (EDITION_2014) — see that
+  // seed module. Both Subclass rows are EDITION_2014-only already (#1233), so
+  // every row here would have been 2014-only regardless; this is the SAME
+  // "list-expansion, not a free grant" correction as The Fiend above, not an
+  // edition change.
 ];

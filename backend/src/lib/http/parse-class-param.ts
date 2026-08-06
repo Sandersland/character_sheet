@@ -26,3 +26,26 @@ export function parseClassFilterOr400(
   }
   return { ok: true, className: raw.trim().toLowerCase() };
 }
+
+/**
+ * Parse the OPTIONAL `?subclassId=` query param for the spell catalog (#1631)
+ * — a chosen subclass's SubclassSpellListExpansion widens the choosable pool
+ * beyond `?class=`'s own membership check (PHB'14 Warlock patrons). Same
+ * shape/rationale as parseClassFilterOr400: absent is success (no widening,
+ * the majority case). Unlike `?class=`, an unknown/mismatched id is NOT an
+ * error here either — the route's own widening query legitimately answers
+ * "no extra spells" for an id that doesn't resolve, same posture
+ * parseClassFilterOr400 takes for an unknown class name.
+ */
+export function parseSubclassIdParam(
+  req: Pick<Request, "query">,
+  res: Response,
+): { ok: true; subclassId?: string } | { ok: false } {
+  const raw = req.query.subclassId;
+  if (raw === undefined) return { ok: true };
+  if (typeof raw !== "string" || raw.trim() === "") {
+    res.status(400).json({ error: "Invalid subclassId: must be a non-empty id" });
+    return { ok: false };
+  }
+  return { ok: true, subclassId: raw.trim() };
+}

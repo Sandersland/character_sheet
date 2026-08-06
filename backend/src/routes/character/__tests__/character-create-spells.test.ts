@@ -197,6 +197,60 @@ describe("POST /api/characters — creation spell/cantrip picks (#1131)", () => 
   });
 });
 
+// #1631: The Fiend's PHB'14 "Expanded Spell List" is list-EXPANSION, not a
+// free grant — a 2014 Warlock picks its patron at creation (subclassLevel 1),
+// so a Fiend Warlock's level-1 known-spell picks may already include a patron
+// spell that is NOT on the base Warlock list (Burning Hands/Command).
+describe("POST /api/characters — subclass spell-list expansion at creation (#1631)", () => {
+  async function requireSubclassId(className: string, subclassName: string, edition: "EDITION_2014" | "EDITION_2024" | null): Promise<string> {
+    const cls = await prisma.characterClass.findUniqueOrThrow({ where: { name: className }, select: { id: true } });
+    const sub = await prisma.subclass.findFirstOrThrow({ where: { classId: cls.id, name: subclassName, edition }, select: { id: true } });
+    return sub.id;
+  }
+
+  it("a 2014 Fiend Warlock may pick Burning Hands (off the base Warlock list, on the patron's expansion) as a known spell", async () => {
+    const fiendId = await requireSubclassId("Warlock", "The Fiend", null);
+    const burningHands = await prisma.spell.findFirstOrThrow({
+      where: { name: "Burning Hands", edition: "EDITION_2014", NOT: { classMemberships: { some: { className: "warlock" } } } },
+      select: { id: true },
+    });
+    const cantripIds = await catalogSpellIds("warlock", 0, "EDITION_2014", 2);
+    const [ownListSpellId] = await catalogSpellIds("warlock", 1, "EDITION_2014", 1);
+
+    const res = await create({
+      ...BASE,
+      name: "CreateSpells1631 Fiend",
+      classes: [{ name: "Warlock", subclassId: fiendId }],
+      rulesEdition: "EDITION_2014",
+      spells: { cantripIds, spellIds: [ownListSpellId, burningHands.id] },
+    });
+
+    expect(res.status).toBe(201);
+    const spellIds = (res.body.spellcasting.spells as Array<{ spellId?: string }>).map((s) => s.spellId);
+    expect(spellIds).toContain(burningHands.id);
+  });
+
+  it("a 2014 Warlock with NO subclass chosen still rejects the same off-list spell", async () => {
+    const burningHands = await prisma.spell.findFirstOrThrow({
+      where: { name: "Burning Hands", edition: "EDITION_2014", NOT: { classMemberships: { some: { className: "warlock" } } } },
+      select: { id: true },
+    });
+    const cantripIds = await catalogSpellIds("warlock", 0, "EDITION_2014", 2);
+    const [ownListSpellId] = await catalogSpellIds("warlock", 1, "EDITION_2014", 1);
+
+    const res = await create({
+      ...BASE,
+      name: "CreateSpells1631 NoSubclass",
+      classes: [{ name: "Warlock" }],
+      rulesEdition: "EDITION_2014",
+      spells: { cantripIds, spellIds: [ownListSpellId, burningHands.id] },
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/spell list/i);
+  });
+});
+
 // #1510: the SRD 5.1 creation-pick counts, enforced by creationSpellCountError
 // via level1SpellPicksFor — same catalog, same route, edition threaded on the
 // create body. All default-edition (2024) tests above stay unchanged/untouched.

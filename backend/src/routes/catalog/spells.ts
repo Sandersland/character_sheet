@@ -1,10 +1,11 @@
 import { Router } from "express";
 
-import { parseClassFilterOr400 } from "@/lib/http/parse-class-param.js";
+import { parseClassFilterOr400, parseSubclassIdParam } from "@/lib/http/parse-class-param.js";
 import { parseMaxSpellLevelOr400 } from "@/lib/http/parse-max-spell-level-param.js";
 import { requireEditionOr400 } from "@/lib/http/parse-edition-param.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { classesOf, resolveSpellCatalogForEdition, SPELL_CLASS_MEMBERSHIP_SELECT } from "@/lib/spellcasting/spell-classes.js";
+import { loadSubclassSpellListExpansionIds } from "@/lib/spellcasting/spell-list-expansion.js";
 
 export const spellsRouter = Router();
 
@@ -57,6 +58,15 @@ export const spellsRouter = Router();
  * still flattens back to `classes: string[]` via classesOf, so
  * frontend/src/lib/newSpells.ts and spellList.ts consume the response
  * unchanged.
+ *
+ * `?subclassId=` (#1631) is a THIRD optional filter, applied alongside
+ * `?class=`: a chosen subclass's SubclassSpellListExpansion widens the pool
+ * with spells NOT on the class's own list (PHB'14 Warlock patrons — "Add
+ * fiend spells to your warlock list"). Only ever WIDENS, never narrows —
+ * absent or a subclass with no expansion rows is a no-op, matching
+ * `?class=`'s own "no match still 200s with an empty/unwidened list" posture.
+ * Ignored when `?class=` is absent (the unfiltered catalog already contains
+ * everything a widening could add).
  */
 spellsRouter.get("/spells", async (req, res) => {
   const edition = requireEditionOr400(req, res);
@@ -66,6 +76,8 @@ spellsRouter.get("/spells", async (req, res) => {
   if (!classFilter.ok) return;
   const levelFilter = parseMaxSpellLevelOr400(req, res);
   if (!levelFilter.ok) return;
+  const subclassFilter = parseSubclassIdParam(req, res);
+  if (!subclassFilter.ok) return;
 
   const rows = await prisma.spell.findMany({
     where: levelFilter.maxLevel === undefined ? {} : { level: { lte: levelFilter.maxLevel } },
@@ -73,7 +85,12 @@ spellsRouter.get("/spells", async (req, res) => {
     orderBy: [{ level: "asc" }, { name: "asc" }],
   });
   const resolved = resolveSpellCatalogForEdition(rows, edition);
-  const spells = classFilter.className ? resolved.filter((row) => classesOf(row).includes(classFilter.className!)) : resolved;
+  const expandedSpellIds = classFilter.className
+    ? new Set(await loadSubclassSpellListExpansionIds(subclassFilter.subclassId, edition))
+    : new Set<string>();
+  const spells = classFilter.className
+    ? resolved.filter((row) => classesOf(row).includes(classFilter.className!) || expandedSpellIds.has(row.id))
+    : resolved;
 
   res.json(
     spells.map((row) => ({

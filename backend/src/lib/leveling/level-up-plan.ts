@@ -87,6 +87,16 @@ export interface TargetClassEntry {
   // hasn't actually committed to that subclass.
   classFeatureRows?: ClassFeatureRow[];
   subclassFeatureRows?: ClassFeatureRow[];
+  // #1631: the EFFECTIVE subclass's SubclassSpellListExpansion spellIds
+  // (already edition-admitted by the caller, loadSubclassSpellListExpansionIds)
+  // — a pure planner has no DB relation to read these itself, same rationale
+  // as classFeatureRows/subclassFeatureRows above. "Effective" mirrors
+  // subclassFeatureRows' own persisted/picked resolution: the caller uses the
+  // not-yet-committed pick when this same level-up sets a new subclass, else
+  // the persisted one. Folded into newSpellsStep's meta.expandedSpellIds,
+  // widening the choosable pool a leveled pick may come from (never a free
+  // grant — that's SubclassGrantedSpell's role) alongside spellLists.
+  subclassSpellListExpansionIds?: string[];
 }
 
 // The target plus its derived resources at N and N-1 — the context each step reads.
@@ -245,6 +255,14 @@ function subclassChoiceSteps({ now, prev, edition }: PlanContext): LevelUpStep[]
 // Warlock/Ranger (+ EK/AT in either edition), "prepared" for every SRD 5.2
 // caster and every 2014 re-prepare class — so level-up-submission.ts's swap
 // messages and the frontend never re-derive it from className/edition.
+// #1631: split out of newSpellsStep purely to keep that function's own
+// cyclomatic count from crossing the CI health gate (mirrors this file's own
+// split reasoning elsewhere, e.g. subclassChoiceSteps). Never applies to
+// cantripLists (no seeded expansion list grants a cantrip today).
+function expandedSpellIdsMeta(target: TargetClassEntry): { expandedSpellIds: string[] } | Record<string, never> {
+  return target.subclassSpellListExpansionIds?.length ? { expandedSpellIds: target.subclassSpellListExpansionIds } : {};
+}
+
 function newSpellsStep({ target, edition }: PlanContext): LevelUpStep | null {
   const count = levelUpSpellPicks(target.name, target.newLevel, target.subclass, edition);
   const cantrips = levelUpCantripPicks(target.name, target.newLevel, target.subclass);
@@ -265,6 +283,7 @@ function newSpellsStep({ target, edition }: PlanContext): LevelUpStep | null {
       ...(canSwap ? { canSwap: true } : {}),
       ...(cantrips > 0 ? { cantrips } : {}),
       ...(casterModel ? { casterModel } : {}),
+      ...expandedSpellIdsMeta(target),
     },
   };
 }

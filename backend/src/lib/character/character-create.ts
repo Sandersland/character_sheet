@@ -32,6 +32,7 @@ import {
 import { creationSpellEntry } from "@/lib/spellcasting/spellcasting.js";
 import { clampPreparedToLimit, type SpellEntry } from "@/lib/spellcasting/spell-state.js";
 import { classesOf, rejectCrossEditionSpellForks, SPELL_CLASS_MEMBERSHIP_SELECT } from "@/lib/spellcasting/spell-classes.js";
+import { loadSubclassSpellListExpansionIds } from "@/lib/spellcasting/spell-list-expansion.js";
 import { subclassGateLevel } from "@/lib/leveling/effective-levels.js";
 import { DEFAULT_RULES_EDITION } from "@/lib/rules/edition.js";
 import { crossEditionRejection, resolveEditionRow, withEditionOrShared } from "@/lib/rules/catalog-edition.js";
@@ -1416,6 +1417,11 @@ type CreationSpellRow = NonNullable<Awaited<ReturnType<typeof prisma.spell.findF
 
 // Validate one chosen catalog row against the class list and its expected level
 // band (cantrip = level 0; leveled = 1..maxLevel). Null when the pick is legal.
+// `expandedSpellIds` (#1631) admits a row NOT on the class's own list when the
+// chosen subclass's SubclassSpellListExpansion adds it (PHB'14 Warlock
+// patrons) — still subject to the cantrip/level-band checks above, since a
+// list-expansion never widens the LEVEL a known caster can learn, only which
+// names are legal at that level.
 function creationPickError(
   row: CreationSpellRow | undefined,
   id: string,
@@ -1423,6 +1429,7 @@ function creationPickError(
   className: string,
   classDisplay: string,
   maxLevel: number,
+  expandedSpellIds: Set<string> = new Set(),
 ): Fail | null {
   if (!row) return { ok: false, status: 400, error: `Unknown spell id: ${id}` };
   if (kind === "cantrip" && row.level !== 0) {
@@ -1431,7 +1438,7 @@ function creationPickError(
   if (kind === "spell" && (row.level < 1 || row.level > maxLevel)) {
     return { ok: false, status: 400, error: `${row.name} is not a spell ${classDisplay} can learn at level 1 (max spell level: ${maxLevel})` };
   }
-  if (!row.classes.includes(className)) {
+  if (!row.classes.includes(className) && !expandedSpellIds.has(id)) {
     return { ok: false, status: 400, error: `${row.name} is not on the ${classDisplay} spell list` };
   }
   return null;
@@ -1505,12 +1512,17 @@ async function resolveCreationSpells(
   if (forkError) return { ok: false, status: 400, error: forkError };
   const byId = new Map(rows.map((r) => [r.id, { ...r, classes: classesOf(r) }]));
   const maxLevel = maxSpellLevelForClass(className, 1, subclass, edition);
+  // #1631: a subclass chosen at level 1 (a 2014 Warlock's patron) may already
+  // widen the choosable pool at creation — e.g. a 2014 Fiend Warlock's level-1
+  // spells-known pick may be Burning Hands or Command, neither on the base
+  // Warlock list.
+  const expandedSpellIds = new Set(await loadSubclassSpellListExpansionIds(selections.subclassId, edition));
 
   const entries: SpellEntry[] = [];
   for (const [ids, kind] of [[spells.cantripIds, "cantrip"], [spells.spellIds, "spell"]] as const) {
     for (const id of ids) {
       const row = byId.get(id);
-      const error = creationPickError(row, id, kind, className, classDisplay, maxLevel);
+      const error = creationPickError(row, id, kind, className, classDisplay, maxLevel, expandedSpellIds);
       if (error) return error;
       entries.push(creationSpellEntry(row!));
     }

@@ -61,6 +61,7 @@ function buildSpellGroups(
 
 export default function CreationSpellsStep({
   className,
+  subclassId,
   counts,
   cantripIds,
   spellIds,
@@ -68,13 +69,18 @@ export default function CreationSpellsStep({
   onChange,
 }: {
   className: string;
+  // #1631: the chosen subclass's own catalog id (e.g. a 2014 Warlock's
+  // patron, picked at creation since its subclassLevel is 1) — widens the
+  // server-served pool with that subclass's list-expansion. Empty/absent for
+  // a class with no subclass choice yet (subclassLevel > 1) or a non-caster.
+  subclassId?: string;
   counts: CreationSpellCounts;
   cantripIds: string[];
   spellIds: string[];
   edition: RulesEdition;
   onChange: (patch: Partial<CharacterDraft>) => void;
 }) {
-  const { catalog, error, showSpinner } = useSpellCatalog(edition, { className, maxLevel: counts.maxSpellLevel });
+  const { catalog, error, showSpinner } = useSpellCatalog(edition, { className, maxLevel: counts.maxSpellLevel, subclassId });
 
   const options = splitCreationCatalog(catalog);
   const groups = buildSpellGroups(counts, options, cantripIds, spellIds, onChange);
