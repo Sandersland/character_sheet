@@ -751,6 +751,24 @@ describe("attack tally", () => {
     expect(result.current.attackTally[0].verdict).toBe("crit"); // unchanged
   });
 
+  // A Champion widened-range crit diverges nat20 from criticalHit: a natural 19
+  // crits at crit range 19 with nat20=false. The verdict lock must key off
+  // criticalHit, not nat20 (#1120) — recorded() mirrors the two, so a regression
+  // restoring nat20 in setTallyVerdictState would pass every other test here.
+  it("setTallyVerdict is refused on a Champion widened-range crit (nat20=false, criticalHit=true)", () => {
+    const { result } = inAttack();
+    act(() => {
+      result.current.recordAttack({
+        formId: "w1",
+        formName: "Longsword",
+        attack: { total: 19, keptFace: 19, nat20: false, nat1: false, criticalHit: true },
+      });
+    });
+    expect(result.current.attackTally[0].verdict).toBe("crit"); // auto-locked by criticalHit, not nat20
+    act(() => { result.current.setTallyVerdict(0, "miss"); });
+    expect(result.current.attackTally[0].verdict).toBe("crit"); // unchanged — lock keys off criticalHit
+  });
+
   it("switching a row to miss drops its damage (#811)", () => {
     const { result } = inAttack();
     act(() => { result.current.recordAttack(recorded()); });
