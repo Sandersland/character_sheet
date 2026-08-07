@@ -131,7 +131,7 @@ test("creation: guided ceremony lands on the sheet with the chosen class", async
 // Landing on the sheet IS the assertion — it can only happen if the Equipment
 // step was completable, which requires the bound pick to have offered the
 // SAME gaming set chosen on the Skills & Tools step.
-test("creation: a Noble's background gaming-set pick is satisfiable from a granted tool", async ({ page }) => {
+test("creation: a Noble's CHOSEN gaming set is offered back by the bound equipment pick", async ({ page }) => {
   const name = uniqueName("Highborn");
 
   await login(page);
