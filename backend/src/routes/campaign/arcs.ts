@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { z } from "zod";
+import { createArcSchema, updateArcSchema } from "@character-sheet/contracts";
 
 import type { CampaignArc } from "@/generated/prisma/client.js";
 import { assertCampaignMembership, assertCampaignOwner } from "@/lib/auth/access.js";
@@ -14,18 +14,11 @@ import { prisma } from "@/lib/core/prisma.js";
 // ordering column; a create appends (position = current count) and a patch may
 // reorder by setting it directly. Deleting an arc SetNulls its sessions' arcId
 // (schema relation), so sessions and their journal entries always survive.
+// createArcSchema/updateArcSchema live in @character-sheet/contracts (#1394).
 
 export const arcsRouter = Router();
 
 const OWNER_ONLY = "Only the campaign owner may manage campaign arcs";
-
-const createArcSchema = z.object({ name: z.string().min(1) }).strict();
-const updateArcSchema = z
-  .object({ name: z.string().min(1).optional(), position: z.number().int().min(0).optional() })
-  .strict()
-  .refine((v) => v.name !== undefined || v.position !== undefined, {
-    message: "Provide at least one of name or position",
-  });
 
 function serializeArc(row: CampaignArc) {
   return {
