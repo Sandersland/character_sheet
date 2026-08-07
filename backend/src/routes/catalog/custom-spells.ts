@@ -1,4 +1,4 @@
-import type { Response } from "express";
+import type { Request, Response } from "express";
 import { Router } from "express";
 import { customSpellSchema, type CustomSpellInput } from "@character-sheet/contracts";
 
@@ -113,9 +113,9 @@ function serializeCustomSpell(row: Spell, classes: string[]) {
   };
 }
 
-// Shared by POST and PATCH: the two DB-dependent/coherence checks
-// customSpellSchema itself can't express (see spell-ops.ts's own comment).
-// Writes the 400 itself on a violation; returns false so the caller bails.
+// The two DB-dependent/coherence checks customSpellSchema itself can't
+// express (see spell-ops.ts's own comment). Writes the 400 itself on a
+// violation; returns false so the caller bails.
 async function validateOrReject(data: CustomSpellInput, res: Response): Promise<boolean> {
   const coherenceError = validateCustomSpellCoherence(data);
   if (coherenceError) {
@@ -130,25 +130,37 @@ async function validateOrReject(data: CustomSpellInput, res: Response): Promise<
   return true;
 }
 
-function normalizedClasses(classes: string[]): string[] {
-  return [...new Set(classes.map((c) => c.toLowerCase()))];
+// Shared by POST and PATCH: parse the body against customSpellSchema, then
+// run validateOrReject. Both write a 400 themselves on failure; returns
+// undefined so the caller bails the same way parseBodyOr400 alone would.
+async function parseAndValidate(req: Request, res: Response): Promise<CustomSpellInput | undefined> {
+  const data = parseBodyOr400(customSpellSchema, req.body, res);
+  if (data === undefined) return undefined;
+  if (!(await validateOrReject(data, res))) return undefined;
+  return data;
 }
 
 /**
  * POST /api/spells/custom
  * Create a homebrew spell. `ownerId` = the caller, `edition` = "EDITION_2014"
- * (epic #1782's locked spec — homebrew is 2014-only for this slice).
+ * (epic #1782's locked spec — homebrew is 2014-only for this slice). The spell
+ * row and its SpellClass rows commit atomically ($transaction): a mid-write
+ * failure must never leave a spell with wrong/missing class memberships.
  */
 customSpellsRouter.post("/spells/custom", async (req, res) => {
-  const data = parseBodyOr400(customSpellSchema, req.body, res);
+  const data = await parseAndValidate(req, res);
   if (data === undefined) return;
-  if (!(await validateOrReject(data, res))) return;
 
-  const spell = await prisma.spell.create({
-    data: { ...customSpellWriteData(data), edition: "EDITION_2014", ownerId: req.user!.id },
+  const { spell, classes } = await prisma.$transaction(async (tx) => {
+    const created = await tx.spell.create({
+      data: { ...customSpellWriteData(data), edition: "EDITION_2014", ownerId: req.user!.id },
+    });
+    // reconcileSpellClasses normalizes classNames (lowercase, dedupe) — the
+    // ONLY place that happens; its returned list is what the response below
+    // echoes back, rather than a second normalization pass on data.classes.
+    const classes = await reconcileSpellClasses(tx, created.id, data.classes);
+    return { spell: created, classes };
   });
-  const classes = normalizedClasses(data.classes);
-  await reconcileSpellClasses(prisma, spell.id, classes);
 
   res.status(201).json(serializeCustomSpell(spell, classes));
 });
@@ -157,21 +169,22 @@ customSpellsRouter.post("/spells/custom", async (req, res) => {
  * PATCH /api/spells/custom/:id
  * Full-field replace of an owned homebrew spell. 404 if the spell doesn't
  * exist, 403 if it exists but isn't the caller's (including any seeded
- * ownerId: null row).
+ * ownerId: null row). Same atomic-write guarantee as POST above.
  */
 customSpellsRouter.patch("/spells/custom/:id", async (req, res) => {
   await assertSpellOwnership(prisma, req.user!.id, req.params.id);
 
-  const data = parseBodyOr400(customSpellSchema, req.body, res);
+  const data = await parseAndValidate(req, res);
   if (data === undefined) return;
-  if (!(await validateOrReject(data, res))) return;
 
-  const spell = await prisma.spell.update({
-    where: { id: req.params.id },
-    data: customSpellWriteData(data),
+  const { spell, classes } = await prisma.$transaction(async (tx) => {
+    const updated = await tx.spell.update({
+      where: { id: req.params.id },
+      data: customSpellWriteData(data),
+    });
+    const classes = await reconcileSpellClasses(tx, updated.id, data.classes);
+    return { spell: updated, classes };
   });
-  const classes = normalizedClasses(data.classes);
-  await reconcileSpellClasses(prisma, spell.id, classes);
 
   res.json(serializeCustomSpell(spell, classes));
 });

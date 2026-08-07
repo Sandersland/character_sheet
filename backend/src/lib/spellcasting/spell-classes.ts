@@ -31,18 +31,23 @@ export function classesOf(spell: { classMemberships: { className: string }[] }):
  * Reconciles a spell's SpellClass rows to exactly `classNames` (lowercased,
  * deduped) — upsert each, then prune any row not in the list. The single
  * implementation for both write paths: custom-spells.ts's POST/PATCH routes
- * (#1785, epic #1782 2/5) call it directly with the src/ singleton;
+ * (#1785, epic #1782 2/5) call it directly with the src/ singleton (inside
+ * their own $transaction, so the spell row and its SpellClass rows commit or
+ * roll back together — `db` is a parameter, never the module's own `prisma`
+ * import, specifically so a caller can pass its transaction client here);
  * prisma/seed/seed-spell-classes.ts's seedSpellClassesFor is a thin wrapper
  * passing seed.ts's OWN PrismaClient instance (a separate adapter-bound
- * client the seed script's transaction/connection lifecycle owns, never this
- * module's singleton) — `db` is a parameter rather than the imported
- * singleton for exactly that reuse.
+ * client the seed script's own lifecycle owns).
+ *
+ * This is the ONLY place classNames gets lowercased/deduped (both callers
+ * pass their raw input straight through) — returns the normalized list so a
+ * caller building a response payload never has to re-derive it.
  */
 export async function reconcileSpellClasses(
   db: SpellClassDb,
   spellId: string,
   classNames: string[],
-): Promise<void> {
+): Promise<string[]> {
   const normalized = [...new Set(classNames.map((c) => c.toLowerCase()))];
   for (const className of normalized) {
     await db.spellClass.upsert({
@@ -54,6 +59,7 @@ export async function reconcileSpellClasses(
   await db.spellClass.deleteMany({
     where: { spellId, className: { notIn: normalized } },
   });
+  return normalized;
 }
 
 /**

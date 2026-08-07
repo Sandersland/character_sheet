@@ -25,5 +25,5 @@ export async function seedSpellClassesFor(
   spellId: string,
   classNames: string[],
 ): Promise<void> {
-  return reconcileSpellClasses(prisma, spellId, classNames);
+  await reconcileSpellClasses(prisma, spellId, classNames);
 }
