@@ -67,6 +67,17 @@ export const spellsRouter = Router();
  * `?class=`'s own "no match still 200s with an empty/unwidened list" posture.
  * Ignored when `?class=` is absent (the unfiltered catalog already contains
  * everything a widening could add).
+ *
+ * The `ownerId` filter (#1786, epic #1782 3/5) admits `null` (every seeded
+ * row) plus the requesting user's OWN id — never another user's homebrew.
+ * `OR`, not `{ in: [null, req.user.id] }`: Prisma rejects a literal `null`
+ * inside `in` at the type level (same restriction withEditionOrShared's own
+ * comment documents for `edition`). This is the only widening the route
+ * itself does; homebrew rows then flow through the exact same resolution/
+ * class/level pipeline below as seeded ones (resolveSpellCatalogForEdition's
+ * grouping key already accounts for ownerId — see that function's own
+ * comment for the same-name collision case). `spellsRouter` is mounted
+ * `"authed"` in routes/manifest.ts, so `req.user` is always populated here.
  */
 spellsRouter.get("/spells", async (req, res) => {
   const edition = requireEditionOr400(req, res);
@@ -80,7 +91,10 @@ spellsRouter.get("/spells", async (req, res) => {
   if (!subclassFilter.ok) return;
 
   const rows = await prisma.spell.findMany({
-    where: levelFilter.maxLevel === undefined ? {} : { level: { lte: levelFilter.maxLevel } },
+    where: {
+      OR: [{ ownerId: null }, { ownerId: req.user!.id }],
+      ...(levelFilter.maxLevel === undefined ? {} : { level: { lte: levelFilter.maxLevel } }),
+    },
     include: SPELL_CLASS_MEMBERSHIP_SELECT,
     orderBy: [{ level: "asc" }, { name: "asc" }],
   });
