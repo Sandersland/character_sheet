@@ -42,24 +42,32 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await prisma.spell.deleteMany({ where: { ownerId: { in: [OWNER, OUTSIDER] } } });
+  // Deleting the CatalogEntry cascades the Spell row (ON DELETE CASCADE,
+  // #1796) — the reverse cascade doesn't exist (the supertype stays closed),
+  // so a plain `spell.deleteMany` alone would orphan the entry.
+  await prisma.catalogEntry.deleteMany({ where: { ownerUserId: { in: [OWNER, OUTSIDER] } } });
   await prisma.user.deleteMany({ where: { id: { in: [OWNER, OUTSIDER] } } });
 });
 
 describe("POST /api/spells/custom", () => {
-  it("creates a spell with ownerId/edition forced + SpellClass rows written", async () => {
+  it("creates a spell with a USER-scope CatalogEntry + edition forced + SpellClass rows written (#1796)", async () => {
     const res = await agent(cookieOwner).post("/api/spells/custom").send(VALID_SPELL);
     expect(res.status).toBe(201);
     expect(res.body).toMatchObject({
-      ownerId: OWNER,
       edition: "EDITION_2014",
       name: "Test Bolt",
       classes: ["wizard"],
+      catalog: { scope: "USER", isFork: false, forkedFromId: null },
     });
 
     const row = await prisma.spell.findUniqueOrThrow({ where: { id: res.body.id } });
-    expect(row.ownerId).toBe(OWNER);
+    expect(row.catalogEntryId).toBe(res.body.catalog.entryId);
     expect(row.edition).toBe("EDITION_2014");
+
+    const entry = await prisma.catalogEntry.findUniqueOrThrow({ where: { id: row.catalogEntryId } });
+    expect(entry.ownerUserId).toBe(OWNER);
+    expect(entry.scope).toBe("USER");
+    expect(entry.kind).toBe("SPELL");
 
     const memberships = await prisma.spellClass.findMany({ where: { spellId: res.body.id } });
     expect(memberships.map((m) => m.className)).toEqual(["wizard"]);

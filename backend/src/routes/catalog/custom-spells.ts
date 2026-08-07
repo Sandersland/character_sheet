@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import { Router } from "express";
 import { customSpellSchema, type CustomSpellInput } from "@character-sheet/contracts";
 
-import { Prisma, type Spell } from "@/generated/prisma/client.js";
+import { Prisma, type CatalogEntry, type Spell } from "@/generated/prisma/client.js";
 import { assertSpellOwnership } from "@/lib/auth/access.js";
 import { parseBodyOr400 } from "@/lib/http/parse-body.js";
 import { prisma } from "@/lib/core/prisma.js";
@@ -25,7 +25,16 @@ import {
 // of a merge-then-validate path that would need to re-fetch the existing row
 // anyway to check the merged result.
 //
-// `ownerId`/`edition` are never accepted from the client — customSpellSchema
+// Ownership moved off Spell.ownerId onto the CatalogEntry entitlement
+// supertype (#1796, epic #1795 1/6): POST creates a `scope: "USER"`
+// CatalogEntry alongside the Spell row in the same transaction; PATCH keeps
+// the entry's `name` in sync with a rename (its business key includes name);
+// DELETE deletes the CatalogEntry, which cascades the Spell (and its
+// SpellClass rows, via Spell's own cascade) rather than deleting the Spell
+// directly — Spell.catalogEntryId carries no reverse cascade (the supertype
+// stays closed, see schema.prisma's own comment).
+//
+// `ownerUserId`/`edition` are never accepted from the client — customSpellSchema
 // carries neither field and is `.strict()`, so a client attempting to set
 // them 400s at the parse step rather than being silently ignored. GET
 // /api/spells is untouched here (#1786's job) — this router owns only the
@@ -93,10 +102,9 @@ function customSpellWriteData(data: CustomSpellInput) {
   };
 }
 
-function serializeCustomSpell(row: Spell, classes: string[]) {
+function serializeCustomSpell(row: Spell, classes: string[], entry: CatalogEntry) {
   return {
     id: row.id,
-    ownerId: row.ownerId,
     edition: row.edition,
     name: row.name,
     level: row.level,
@@ -109,6 +117,10 @@ function serializeCustomSpell(row: Spell, classes: string[]) {
     ritual: row.ritual,
     components: row.components,
     classes,
+    // SpellWire.catalog shape (#1796, shared-types/src/catalog.ts) — a
+    // homebrew row created/edited through this route is never a fork today
+    // (forking is a later slice), so isFork/forkedFromId are always false/null.
+    catalog: { entryId: entry.id, scope: entry.scope, isFork: entry.forkedFromId !== null, forkedFromId: entry.forkedFromId },
     ...undefinedEffectFields(row),
   };
 }
@@ -142,61 +154,74 @@ async function parseAndValidate(req: Request, res: Response): Promise<CustomSpel
 
 /**
  * POST /api/spells/custom
- * Create a homebrew spell. `ownerId` = the caller, `edition` = "EDITION_2014"
- * (epic #1782's locked spec — homebrew is 2014-only for this slice). The spell
- * row and its SpellClass rows commit atomically ($transaction): a mid-write
- * failure must never leave a spell with wrong/missing class memberships.
+ * Create a homebrew spell. Creates a `scope: "USER"` CatalogEntry (#1796) for
+ * the caller alongside it, `edition` = "EDITION_2014" (epic #1782's locked
+ * spec — homebrew is 2014-only for this slice). The entry, spell row, and its
+ * SpellClass rows commit atomically ($transaction): a mid-write failure must
+ * never leave a spell with wrong/missing class memberships or no entitlement
+ * row at all.
  */
 customSpellsRouter.post("/spells/custom", async (req, res) => {
   const data = await parseAndValidate(req, res);
   if (data === undefined) return;
 
-  const { spell, classes } = await prisma.$transaction(async (tx) => {
+  const { spell, classes, entry } = await prisma.$transaction(async (tx) => {
+    const entry = await tx.catalogEntry.create({
+      data: { kind: "SPELL", scope: "USER", ownerUserId: req.user!.id, name: data.name, edition: "EDITION_2014" },
+    });
     const created = await tx.spell.create({
-      data: { ...customSpellWriteData(data), edition: "EDITION_2014", ownerId: req.user!.id },
+      data: { ...customSpellWriteData(data), edition: "EDITION_2014", catalogEntryId: entry.id },
     });
     // reconcileSpellClasses normalizes classNames (lowercase, dedupe) — the
     // ONLY place that happens; its returned list is what the response below
     // echoes back, rather than a second normalization pass on data.classes.
     const classes = await reconcileSpellClasses(tx, created.id, data.classes);
-    return { spell: created, classes };
+    return { spell: created, classes, entry };
   });
 
-  res.status(201).json(serializeCustomSpell(spell, classes));
+  res.status(201).json(serializeCustomSpell(spell, classes, entry));
 });
 
 /**
  * PATCH /api/spells/custom/:id
  * Full-field replace of an owned homebrew spell. 404 if the spell doesn't
  * exist, 403 if it exists but isn't the caller's (including any seeded
- * ownerId: null row). Same atomic-write guarantee as POST above.
+ * GLOBAL row). Same atomic-write guarantee as POST above. Also renames the
+ * linked CatalogEntry (its business key includes `name`) so a rename can't
+ * leave the entry pointing at stale content.
  */
 customSpellsRouter.patch("/spells/custom/:id", async (req, res) => {
-  await assertSpellOwnership(prisma, req.user!.id, req.params.id);
+  const owned = await assertSpellOwnership(prisma, req.user!.id, req.params.id);
 
   const data = await parseAndValidate(req, res);
   if (data === undefined) return;
 
-  const { spell, classes } = await prisma.$transaction(async (tx) => {
+  const { spell, classes, entry } = await prisma.$transaction(async (tx) => {
+    const entry = await tx.catalogEntry.update({
+      where: { id: owned.catalogEntryId },
+      data: { name: data.name },
+    });
     const updated = await tx.spell.update({
       where: { id: req.params.id },
       data: customSpellWriteData(data),
     });
     const classes = await reconcileSpellClasses(tx, updated.id, data.classes);
-    return { spell: updated, classes };
+    return { spell: updated, classes, entry };
   });
 
-  res.json(serializeCustomSpell(spell, classes));
+  res.json(serializeCustomSpell(spell, classes, entry));
 });
 
 /**
  * DELETE /api/spells/custom/:id
- * Cascade-deletes its SpellClass rows (schema relation, onDelete: Cascade).
+ * Deletes the linked CatalogEntry, which cascades the Spell row (and its
+ * SpellClass rows, via Spell's own cascade) — Spell.catalogEntryId carries no
+ * reverse cascade, so deleting the Spell directly would orphan the entry.
  * Same 404/403 ownership check as PATCH.
  */
 customSpellsRouter.delete("/spells/custom/:id", async (req, res) => {
-  await assertSpellOwnership(prisma, req.user!.id, req.params.id);
+  const owned = await assertSpellOwnership(prisma, req.user!.id, req.params.id);
 
-  await prisma.spell.delete({ where: { id: req.params.id } });
+  await prisma.catalogEntry.delete({ where: { id: owned.catalogEntryId } });
   res.status(204).end();
 });

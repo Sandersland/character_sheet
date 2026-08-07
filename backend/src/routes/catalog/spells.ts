@@ -21,13 +21,12 @@ export const spellsRouter = Router();
 // the manage view's "Edit" prefill is the first caller that actually reads
 // it back, and without it a saved "half damage on save" choice would
 // silently vanish from the form on every edit.
+//
+// `ownerId` is NOT in this list any more (#1796 dropped the Spell column it
+// read from) — it's computed separately in the route handler below, off the
+// CatalogEntry a row's `catalogEntryId` resolves to, and passed into
+// serializeCatalogSpellRow explicitly.
 const UNDEFINED_DEFAULTED_FIELD_NAMES = [
-  // Present only on the caller's own homebrew (#1788) — every other row's
-  // ownerId is already filtered to null (seeded) or the caller's own id by
-  // the route's own `where` above, so this is the client's only signal for
-  // "mine, offer edit/delete" vs. seeded content; it never leaks another
-  // user's id.
-  "ownerId",
   "effectKind",
   "effectDiceCount",
   "effectDiceFaces",
@@ -53,11 +52,22 @@ function undefinedDefaultedFields(row: Spell): UndefinedDefaultedFields {
   return out as UndefinedDefaultedFields;
 }
 
-type CatalogSpellRow = Spell & { classMemberships: { className: string }[] };
+// `ownerId` is derived off the CatalogEntry a row's `catalogEntryId` resolves
+// to (#1796 dropped the Spell column it used to read from), attached by the
+// route handler below BEFORE resolution/serialization — resolveSpellCatalogForEdition
+// still groups on it (see that function's own comment), so it has to exist on
+// the row by the time these run, not just at response time.
+type CatalogSpellRow = Spell & { classMemberships: { className: string }[]; ownerId: string | null };
 
+// Present only on the caller's own homebrew (#1788) — every other row's
+// ownerId is already resolved to null (seeded/GLOBAL) or the caller's own id
+// (their USER-scope row) by the route handler's catalogEntry lookup, so this
+// is the client's only signal for "mine, offer edit/delete" vs. seeded
+// content; it never leaks another user's id.
 function serializeCatalogSpellRow(row: CatalogSpellRow) {
   return {
     id: row.id,
+    ownerId: row.ownerId ?? undefined,
     name: row.name,
     level: row.level,
     school: row.school,
@@ -132,16 +142,21 @@ function serializeCatalogSpellRow(row: CatalogSpellRow) {
  * Ignored when `?class=` is absent (the unfiltered catalog already contains
  * everything a widening could add).
  *
- * The `ownerId` filter (#1786, epic #1782 3/5) admits `null` (every seeded
- * row) plus the requesting user's OWN id — never another user's homebrew.
- * `OR`, not `{ in: [null, req.user.id] }`: Prisma rejects a literal `null`
- * inside `in` at the type level (same restriction withEditionOrShared's own
- * comment documents for `edition`). This is the only widening the route
- * itself does; homebrew rows then flow through the exact same resolution/
- * class/level pipeline below as seeded ones (resolveSpellCatalogForEdition's
- * grouping key already accounts for ownerId — see that function's own
- * comment for the same-name collision case). `spellsRouter` is mounted
- * `"authed"` in routes/manifest.ts, so `req.user` is always populated here.
+ * The visibility filter (#1786, epic #1782 3/5; re-sourced off CatalogEntry
+ * by #1796, epic #1795 1/6 — TEMPORARY, replaced by the read resolver in a
+ * later slice) admits every GLOBAL entry plus the requesting user's own
+ * USER-scope entries — never another user's homebrew. Two queries rather
+ * than a nested Prisma filter: Spell.catalogEntryId carries no Prisma
+ * relation (the supertype stays closed, see schema.prisma's own comment on
+ * that column), so the visible catalogEntryId set has to be resolved first
+ * and handed to a plain `catalogEntryId: { in: [...] }` filter. Each row is
+ * then tagged with its resolved `ownerId` (null for GLOBAL, the caller's own
+ * id for USER — never anyone else's, since the set was already scoped) before
+ * flowing through the exact same resolution/class/level pipeline as before
+ * (resolveSpellCatalogForEdition's grouping key still accounts for it — see
+ * that function's own comment for the same-name collision case).
+ * `spellsRouter` is mounted `"authed"` in routes/manifest.ts, so `req.user`
+ * is always populated here.
  */
 spellsRouter.get("/spells", async (req, res) => {
   const edition = requireEditionOr400(req, res);
@@ -154,15 +169,22 @@ spellsRouter.get("/spells", async (req, res) => {
   const subclassFilter = parseSubclassIdParam(req, res);
   if (!subclassFilter.ok) return;
 
+  const visibleEntries = await prisma.catalogEntry.findMany({
+    where: { kind: "SPELL", OR: [{ scope: "GLOBAL" }, { scope: "USER", ownerUserId: req.user!.id }] },
+    select: { id: true, ownerUserId: true },
+  });
+  const ownerIdByCatalogEntryId = new Map(visibleEntries.map((e) => [e.id, e.ownerUserId]));
+
   const rows = await prisma.spell.findMany({
     where: {
-      OR: [{ ownerId: null }, { ownerId: req.user!.id }],
+      catalogEntryId: { in: [...ownerIdByCatalogEntryId.keys()] },
       ...(levelFilter.maxLevel === undefined ? {} : { level: { lte: levelFilter.maxLevel } }),
     },
     include: SPELL_CLASS_MEMBERSHIP_SELECT,
     orderBy: [{ level: "asc" }, { name: "asc" }],
   });
-  const resolved = resolveSpellCatalogForEdition(rows, edition);
+  const owned = rows.map((row) => ({ ...row, ownerId: ownerIdByCatalogEntryId.get(row.catalogEntryId) ?? null }));
+  const resolved = resolveSpellCatalogForEdition(owned, edition);
   const expandedSpellIds = classFilter.className
     ? new Set(await loadSubclassSpellListExpansionIds(subclassFilter.subclassId, edition))
     : new Set<string>();
