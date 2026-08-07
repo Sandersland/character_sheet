@@ -90,8 +90,12 @@ test("creation: guided ceremony lands on the sheet with the chosen class", async
   // Skills & Tools step — the 2024 Human's own Skillful (one skill) and
   // Versatile (one Origin feat) picks gate Continue (#1690); Stealth is
   // outside Fighter's skillChoices, and Tough is a different Origin feat
-  // from Soldier's own Savage Attacker grant above.
+  // from Soldier's own Savage Attacker grant above. #1779: Soldier's Gaming
+  // Set is now a background CHOICE (not a fixed grant), so it gates Continue
+  // here too — pick Dice Set, which chooseEquipmentOptionA's bound pick below
+  // must then offer back on the Equipment step.
   await chooseHumanSpeciesTraits(page, "Stealth", "Tough");
+  await page.getByRole("checkbox", { name: "Dice Set" }).check();
   await continueStep(page);
 
   // Equipment step — the 2024 Fighter package's option (A) (chain mail etc.),
@@ -113,16 +117,20 @@ test("creation: guided ceremony lands on the sheet with the chosen class", async
   expect(errors).toEqual([]);
 });
 
-// #1570: Noble's PHB'24 option (A) carries "Gaming Set (same as above)" — a
-// boundToToolChoice pick over the gaming-set proficiency the BACKGROUND itself
-// grants, not one the player chose. That is precisely the shape that shipped
-// broken in #1565 (the picker filtered on chosen tools only, so the dropdown
-// was empty and Continue stayed disabled forever), and no unit test catches it:
-// the draft is React-controlled, so only the rendered step is wrong.
+// #1570/#1779: Noble's PHB'24 option (A) carries "Gaming Set (same as above)" —
+// a boundToToolChoice pick over the gaming-set proficiency the character's own
+// Skills & Tools step picks (#1779: Noble grants a CHOICE of gaming set, not a
+// fixed one — see BACKGROUNDS' Noble row, catalog-data.ts). Before #1779 this
+// covered a DIFFERENT shape that shipped broken in #1565 (the picker filtered
+// on chosen tools only, so a background GRANT's dropdown was empty and
+// Continue stayed disabled forever); #1779 moved Soldier/Noble off that grant
+// entirely, but the bound-pick mechanism this spec exercises is the same one,
+// and no unit test catches it: the draft is React-controlled, so only the
+// rendered step is wrong.
 //
 // Landing on the sheet IS the assertion — it can only happen if the Equipment
 // step was completable, which requires the bound pick to have offered the
-// granted gaming set.
+// SAME gaming set chosen on the Skills & Tools step.
 test("creation: a Noble's background gaming-set pick is satisfiable from a granted tool", async ({ page }) => {
   const name = uniqueName("Highborn");
 
@@ -146,12 +154,16 @@ test("creation: a Noble's background gaming-set pick is satisfiable from a grant
 
   // Skills & Tools step — the 2024 Human's own Skillful/Versatile picks gate
   // Continue (#1690); Survival is outside Rogue's skillChoices, and Tough is
-  // a different Origin feat from Noble's own Skilled grant.
+  // a different Origin feat from Noble's own Skilled grant. #1779: Noble's
+  // Gaming Set is a background CHOICE — pick Playing Card Set (deliberately
+  // NOT Dice Set, so this spec can't pass by accident if the bound pick below
+  // silently fell back to a hardcoded name instead of the real selection).
   await chooseHumanSpeciesTraits(page, "Survival", "Tough");
+  await page.getByRole("checkbox", { name: "Playing Card Set" }).check();
   await continueStep(page);
 
   // Equipment step — two cards now (Rogue's package and Noble's own), and the
-  // background card's open pick must offer the granted Dice Set.
+  // background card's bound pick must offer the CHOSEN Playing Card Set.
   await chooseEquipmentOptionA(page);
   await continueStep(page);
 
