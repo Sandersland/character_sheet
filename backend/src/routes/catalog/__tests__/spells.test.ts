@@ -774,6 +774,16 @@ describe("GET /api/spells — user homebrew (#1786)", () => {
 // what the interim's response never carried (SpellWire.catalog, locked in
 // slice 1 but left unpopulated here until now).
 describe("GET /api/spells — resolver wiring: catalog metadata + fork-shadowing (#1798)", () => {
+  // Missing cleanup here left "Test Firebolt Catalog"/"Test Guidance Catalog"
+  // in the shared vitest-worker database for the rest of the suite (every
+  // other describe block in this file re-seeds and re-cleans the same pair,
+  // but this was the one block that didn't) — a whole-table-scan test running
+  // later on the same worker (catalog-seed.integration.test.ts, #1796) saw
+  // them and failed on a foreign row it never created.
+  afterAll(async () => {
+    await prisma.catalogEntry.deleteMany({ where: { name: { in: [DAMAGE_SPELL.name, UTILITY_SPELL.name] }, kind: "SPELL" } });
+  });
+
   it("every row carries catalog.{entryId,scope,isFork,forkedFromId}", async () => {
     await seedFixtures();
     const response = await get("/api/spells");
