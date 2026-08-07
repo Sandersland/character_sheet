@@ -24,6 +24,13 @@ export interface SpellCatalogFilter {
   // on the class's own list. Ignored server-side when className is absent —
   // see GET /api/spells's own comment.
   subclassId?: string;
+  // #1811, epic #1795 9/9: the character the picker is learning FOR. Present,
+  // the server resolves visibility for that character's own campaign — a
+  // spell shared/granted into it, or a DM's CAMPAIGN override, reaches the
+  // picker (see spells.ts's resolveCharacterViewer). Absent, behavior is
+  // unchanged (GLOBAL + the caller's own USER entries) — the creation
+  // ceremony has no character yet and stays on that path.
+  characterId?: string;
 }
 
 // Feeds the spellcasting section's "learn from catalog" picker.
@@ -41,6 +48,7 @@ export async function fetchSpells(edition: RulesEdition, filter: SpellCatalogFil
   if (filter.className !== undefined) params.set("class", filter.className);
   if (filter.maxLevel !== undefined) params.set("maxLevel", String(filter.maxLevel));
   if (filter.subclassId !== undefined) params.set("subclassId", filter.subclassId);
+  if (filter.characterId !== undefined) params.set("characterId", filter.characterId);
   return request<CatalogSpell[]>(`/spells?${params.toString()}`, undefined, "Failed to fetch spell catalog");
 }
 
