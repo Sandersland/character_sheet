@@ -16,6 +16,13 @@ import { prisma } from "@/lib/core/prisma.js";
 // (kind, scope, ownerUserId, ownerCampaignId, name, edition) unique
 // constraint. Returns the id either way; callers pass it as `catalogEntryId`
 // on their own `prisma.spell.create` call.
+//
+// `forkedFromId` (#1797, epic #1795 2/6): optional so entitlement.ts's
+// resolver tests can build a fork lineage (USER/CAMPAIGN entry forked from a
+// GLOBAL/shared origin) without a second bespoke fixture helper. Not part of
+// the lookup `where` — the unique key already pins one row per
+// (kind, scope, owner, name, edition), so a lineage never needs it to
+// disambiguate.
 export async function makeCatalogEntry(overrides: {
   name?: string;
   edition?: RulesEdition;
@@ -23,6 +30,7 @@ export async function makeCatalogEntry(overrides: {
   scope?: CatalogScope;
   ownerUserId?: string;
   ownerCampaignId?: string;
+  forkedFromId?: string;
 } = {}): Promise<string> {
   const {
     name = `Catalog Entry Fixture ${randomUUID()}`,
@@ -31,10 +39,11 @@ export async function makeCatalogEntry(overrides: {
     scope = "GLOBAL",
     ownerUserId = null,
     ownerCampaignId = null,
+    forkedFromId = null,
   } = overrides;
   const where = { kind, scope, name, edition, ownerUserId, ownerCampaignId };
   const existing = await prisma.catalogEntry.findFirst({ where, select: { id: true } });
   if (existing) return existing.id;
-  const entry = await prisma.catalogEntry.create({ data: where, select: { id: true } });
+  const entry = await prisma.catalogEntry.create({ data: { ...where, forkedFromId }, select: { id: true } });
   return entry.id;
 }
