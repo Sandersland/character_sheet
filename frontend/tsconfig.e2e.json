@@ -1,0 +1,11 @@
+{
+  // Type-checks e2e alongside src (#1482). frontend/tsconfig.json's
+  // `include: ["src"]` never sees e2e/**, so Playwright transpiles the e2e
+  // helpers and specs without type-checking — a wrong shape there surfaces as
+  // a runtime locator timeout in an unrelated spec instead of a compile error.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": ["e2e"]
+}

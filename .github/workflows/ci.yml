@@ -251,6 +251,14 @@ jobs:
       - name: Backend typecheck (incl. prisma/seed)
         run: npm run typecheck --workspace backend
 
+      # `npm run build` (tsc && vite build) never type-checks frontend/e2e/**
+      # — frontend/tsconfig.json's `include` is src-only, and Playwright
+      # transpiles those files without type-checking (#1482). This is the CI
+      # leg of frontend's `typecheck` script (tsconfig.e2e.json), which also
+      # type-checks src again — harmless, tsc is fast and idempotent here.
+      - name: Frontend typecheck (incl. e2e)
+        run: npm run typecheck --workspace frontend
+
       # zod is a real backend/contracts dependency, but the frontend must only
       # ever `import type` from @character-sheet/contracts — a stray value
       # import would ship zod's runtime to every player (#1370). Runs right
