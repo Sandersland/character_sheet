@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
+import type { SpellSchool } from "@/generated/prisma/client.js";
 import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
@@ -84,10 +85,10 @@ async function createCampaignForkFixture(name: string): Promise<string> {
   const entry = await prisma.catalogEntry.create({
     data: { kind: "SPELL", scope: "CAMPAIGN", ownerCampaignId: CAMPAIGN_ID, name, edition: "EDITION_2014" },
   });
-  const { classes: _classes, ...spellColumns } = VALID_SPELL;
+  const { classes: _classes, school, ...spellColumns } = VALID_SPELL;
   void _classes;
   const spell = await prisma.spell.create({
-    data: { ...spellColumns, name, edition: "EDITION_2014", catalogEntryId: entry.id },
+    data: { ...spellColumns, school: school as SpellSchool, name, edition: "EDITION_2014", catalogEntryId: entry.id },
   });
   return spell.id;
 }
