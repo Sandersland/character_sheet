@@ -28,14 +28,18 @@ export function useSpellCatalog(edition: RulesEdition, filter?: SpellCatalogFilt
   const className = filter?.className;
   const maxLevel = filter?.maxLevel;
   const subclassId = filter?.subclassId;
+  // #1811, epic #1795 9/9: the viewing character, forwarded so the server
+  // resolves granted/CAMPAIGN entries for that character's campaign — see
+  // SpellCatalogFilter's own comment (api/catalog.ts).
+  const characterId = filter?.characterId;
 
   useEffect(() => {
     let mounted = true;
-    fetchSpells(edition, { className, maxLevel, subclassId })
+    fetchSpells(edition, { className, maxLevel, subclassId, characterId })
       .then((spells) => { if (mounted) setCatalog(spells); })
       .catch(() => { if (mounted) setError("Couldn't load spell catalog."); });
     return () => { mounted = false; };
-  }, [edition, className, maxLevel, subclassId, refreshKey]);
+  }, [edition, className, maxLevel, subclassId, characterId, refreshKey]);
 
   return { catalog, error, showSpinner };
 }

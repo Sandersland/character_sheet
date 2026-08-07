@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -814,5 +816,198 @@ describe("GET /api/spells — resolver wiring: catalog metadata + fork-shadowing
     } finally {
       await prisma.catalogEntry.delete({ where: { id: forkEntryId } });
     }
+  });
+});
+
+// #1811, epic #1795 9/9: `?characterId=` gives the learn picker CAMPAIGN
+// context — with no characterId every test above stays exactly as it was
+// (GLOBAL + own USER only); with one, visibility resolves through the SAME
+// resolver (entitlement.ts) for `{ userId: caller, campaignId: <character's
+// campaign>, edition: <character's own edition> }` instead of `campaignId:
+// null`, so a spell shared/granted into the character's campaign — or a DM's
+// CAMPAIGN override — reaches a fellow member's picker.
+describe("GET /api/spells — ?characterId= campaign-aware picker (#1811)", () => {
+  const DM_ID = "owner-spells-picker-dm";
+  const MEMBER_A_ID = "owner-spells-picker-member-a";
+  const MEMBER_B_ID = "owner-spells-picker-member-b";
+  const OUTSIDER_ID = "owner-spells-picker-outsider";
+
+  let cookieA: string;
+  let cookieB: string;
+  let cookieOutsider: string;
+  let campaignId: string;
+  let charMemberA: string;
+  let charMemberB: string;
+  let charOutsider: string;
+
+  const createdCatalogEntryIds: string[] = [];
+
+  async function makeCharacter(ownerId: string, campaignId: string | null): Promise<string> {
+    const character = await prisma.character.create({
+      data: {
+        name: `Picker Test Char ${randomUUID()}`,
+        alignment: "True Neutral",
+        ownerId,
+        campaignId,
+        rulesEdition: "EDITION_2014",
+        initiativeBonus: 0,
+        speed: 30,
+        hitPoints: { current: 10, max: 10, temp: 0 },
+        hitDice: { total: 1, die: "d8" },
+        abilityScores: { strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 },
+        savingThrowProficiencies: [],
+        skills: [],
+        toolProficiencies: [],
+        currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
+      },
+      select: { id: true },
+    });
+    return character.id;
+  }
+
+  // Bare-minimum Spell row for a CatalogEntry — mirrors createHomebrew above,
+  // parameterized over scope/owner so this block can seed USER and CAMPAIGN
+  // rows (and forks of either) without a bespoke helper per scope.
+  async function makeSpell(overrides: {
+    name: string;
+    scope: "USER" | "CAMPAIGN";
+    ownerUserId?: string;
+    ownerCampaignId?: string;
+    forkedFromId?: string;
+    description?: string;
+  }): Promise<{ id: string; catalogEntryId: string }> {
+    const catalogEntryId = await makeCatalogEntry({
+      name: overrides.name,
+      edition: "EDITION_2014",
+      scope: overrides.scope,
+      ownerUserId: overrides.ownerUserId,
+      ownerCampaignId: overrides.ownerCampaignId,
+      forkedFromId: overrides.forkedFromId,
+    });
+    createdCatalogEntryIds.push(catalogEntryId);
+    const spell = await prisma.spell.create({
+      data: {
+        name: overrides.name,
+        level: 1,
+        school: "evocation",
+        castingTime: "1 action",
+        range: "30 feet",
+        duration: "Instantaneous",
+        description: overrides.description ?? "A picker-test spell.",
+        edition: "EDITION_2014",
+        catalogEntryId,
+      },
+    });
+    return { id: spell.id, catalogEntryId };
+  }
+
+  beforeAll(async () => {
+    await ensureTestOwner(DM_ID);
+    await ensureTestOwner(MEMBER_A_ID);
+    await ensureTestOwner(MEMBER_B_ID);
+    await ensureTestOwner(OUTSIDER_ID);
+    // No DM cookie: these tests never authenticate as the DM — DM_ID exists
+    // only as the campaign's ownerId and the CAMPAIGN-scope fixture rows'
+    // ownerCampaignId, both written directly via prisma (a real DM override
+    // would go through fork.ts, already covered by fork.test.ts).
+    cookieA = await authCookie(MEMBER_A_ID);
+    cookieB = await authCookie(MEMBER_B_ID);
+    cookieOutsider = await authCookie(OUTSIDER_ID);
+
+    const campaign = await prisma.campaign.create({
+      data: { name: "Picker Test Campaign", ownerId: DM_ID, inviteCode: randomUUID() },
+      select: { id: true },
+    });
+    campaignId = campaign.id;
+
+    charMemberA = await makeCharacter(MEMBER_A_ID, campaignId);
+    charMemberB = await makeCharacter(MEMBER_B_ID, campaignId);
+    charOutsider = await makeCharacter(OUTSIDER_ID, null);
+  });
+
+  afterAll(async () => {
+    await prisma.catalogEntry.deleteMany({ where: { id: { in: createdCatalogEntryIds } } });
+    await prisma.character.deleteMany({ where: { id: { in: [charMemberA, charMemberB, charOutsider] } } });
+    await prisma.campaign.deleteMany({ where: { id: campaignId } });
+    await prisma.user.deleteMany({ where: { id: { in: [DM_ID, MEMBER_A_ID, MEMBER_B_ID, OUTSIDER_ID] } } });
+  });
+
+  it("a USER spell granted into campaign C appears for a different member's character in C, not for a character outside C", async () => {
+    const name = "Test Picker Granted Bolt";
+    const { catalogEntryId } = await makeSpell({ name, scope: "USER", ownerUserId: MEMBER_A_ID });
+    await prisma.catalogGrant.create({ data: { catalogEntryId, campaignId } });
+
+    const resB = await supertest.agent(app).set("Cookie", cookieB)
+      .get(`/api/spells?edition=EDITION_2014&characterId=${charMemberB}`);
+    expect(resB.status).toBe(200);
+    expect(names(resB.body)).toContain(name);
+
+    const resOutsider = await supertest.agent(app).set("Cookie", cookieOutsider)
+      .get(`/api/spells?edition=EDITION_2014&characterId=${charOutsider}`);
+    expect(resOutsider.status).toBe(200);
+    expect(names(resOutsider.body)).not.toContain(name);
+  });
+
+  it("a DM's CAMPAIGN homebrew appears in members' pickers for characters in that campaign", async () => {
+    const name = "Test Picker DM Campaign Spell";
+    await makeSpell({ name, scope: "CAMPAIGN", ownerCampaignId: campaignId });
+
+    const resA = await supertest.agent(app).set("Cookie", cookieA)
+      .get(`/api/spells?edition=EDITION_2014&characterId=${charMemberA}`);
+    expect(resA.status).toBe(200);
+    expect(names(resA.body)).toContain(name);
+
+    const resOutsider = await supertest.agent(app).set("Cookie", cookieOutsider)
+      .get(`/api/spells?edition=EDITION_2014&characterId=${charOutsider}`);
+    expect(resOutsider.status).toBe(200);
+    expect(names(resOutsider.body)).not.toContain(name);
+  });
+
+  it("fork shadowing still applies in the picker — a DM's CAMPAIGN fork shadows a granted USER origin for a non-owning member", async () => {
+    const name = "Test Picker Shadowed Bolt";
+    const origin = await makeSpell({
+      name,
+      scope: "USER",
+      ownerUserId: MEMBER_A_ID,
+      description: "The origin author's version.",
+    });
+    await prisma.catalogGrant.create({ data: { catalogEntryId: origin.catalogEntryId, campaignId } });
+    const fork = await makeSpell({
+      name,
+      scope: "CAMPAIGN",
+      ownerCampaignId: campaignId,
+      forkedFromId: origin.catalogEntryId,
+      description: "The DM's overriding version.",
+    });
+
+    const res = await supertest.agent(app).set("Cookie", cookieB)
+      .get(`/api/spells?edition=EDITION_2014&characterId=${charMemberB}`);
+    expect(res.status).toBe(200);
+    const matches = res.body.filter((s: { name: string }) => s.name === name);
+    expect(matches).toHaveLength(1);
+    expect(matches[0].id).toBe(fork.id);
+    expect(matches[0].description).toBe("The DM's overriding version.");
+  });
+
+  it("with no ?characterId= the response is unchanged — a campaign-granted spell stays invisible even to a campaign member", async () => {
+    const name = "Test Picker No Character Param Bolt";
+    const { catalogEntryId } = await makeSpell({ name, scope: "USER", ownerUserId: MEMBER_A_ID });
+    await prisma.catalogGrant.create({ data: { catalogEntryId, campaignId } });
+
+    const res = await supertest.agent(app).set("Cookie", cookieB).get("/api/spells?edition=EDITION_2014");
+    expect(res.status).toBe(200);
+    expect(names(res.body)).not.toContain(name);
+  });
+
+  it("403s when ?characterId= names a character the caller does not own", async () => {
+    const res = await supertest.agent(app).set("Cookie", cookieB)
+      .get(`/api/spells?edition=EDITION_2014&characterId=${charMemberA}`);
+    expect(res.status).toBe(403);
+  });
+
+  it("404s when ?characterId= names a character that does not exist", async () => {
+    const res = await supertest.agent(app).set("Cookie", cookieB)
+      .get(`/api/spells?edition=EDITION_2014&characterId=${randomUUID()}`);
+    expect(res.status).toBe(404);
   });
 });
