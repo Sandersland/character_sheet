@@ -24,7 +24,12 @@ interface ShareSpellSheetProps {
   onClose: () => void;
 }
 
-type RowState = "idle" | "busy" | "shared";
+// Four states, not three: "busy" alone can't tell a claude-review finding's
+// exact bug — an in-flight unshare needs its OWN busy state ("unsharing"),
+// distinct from an in-flight share ("sharing"), so the button on the
+// "already shared" side reads "Unsharing…" instead of falling through to
+// the share-side button's "Sharing…"/"Share" label.
+type RowState = "idle" | "sharing" | "shared" | "unsharing";
 
 export default function ShareSpellSheet({ spell, onClose }: ShareSpellSheetProps) {
   const { campaigns, error: loadError } = useCallerCampaigns();
@@ -35,7 +40,7 @@ export default function ShareSpellSheet({ spell, onClose }: ShareSpellSheetProps
 
   async function handleShare(campaignId: string) {
     if (!entryId) return;
-    setRowState((s) => ({ ...s, [campaignId]: "busy" }));
+    setRowState((s) => ({ ...s, [campaignId]: "sharing" }));
     setRowError((s) => ({ ...s, [campaignId]: "" }));
     try {
       await shareCatalogEntry(entryId, campaignId);
@@ -48,7 +53,7 @@ export default function ShareSpellSheet({ spell, onClose }: ShareSpellSheetProps
 
   async function handleUnshare(campaignId: string) {
     if (!entryId) return;
-    setRowState((s) => ({ ...s, [campaignId]: "busy" }));
+    setRowState((s) => ({ ...s, [campaignId]: "unsharing" }));
     setRowError((s) => ({ ...s, [campaignId]: "" }));
     try {
       await unshareCatalogEntry(entryId, campaignId);
@@ -70,6 +75,7 @@ export default function ShareSpellSheet({ spell, onClose }: ShareSpellSheetProps
         <ul className="flex flex-col gap-2">
           {campaigns.map((campaign) => {
             const state = rowState[campaign.id] ?? "idle";
+            const isShared = state === "shared" || state === "unsharing";
             return (
               <li
                 key={campaign.id}
@@ -79,24 +85,25 @@ export default function ShareSpellSheet({ spell, onClose }: ShareSpellSheetProps
                   <p className="truncate text-sm font-medium text-parchment-900">{campaign.name}</p>
                   {rowError[campaign.id] && <p className="text-xs text-garnet-700">{rowError[campaign.id]}</p>}
                 </div>
-                {state === "shared" ? (
+                {isShared ? (
                   <button
                     type="button"
+                    disabled={state === "unsharing"}
                     onClick={() => handleUnshare(campaign.id)}
                     aria-label={`Unshare from ${campaign.name}`}
-                    className="shrink-0 rounded-full border border-parchment-300 bg-parchment-100 px-3 py-1.5 text-xs font-semibold text-parchment-700 hover:bg-parchment-200"
+                    className="shrink-0 rounded-full border border-parchment-300 bg-parchment-100 px-3 py-1.5 text-xs font-semibold text-parchment-700 hover:bg-parchment-200 disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    Shared ✓ — Unshare
+                    {state === "unsharing" ? "Unsharing…" : "Shared ✓ — Unshare"}
                   </button>
                 ) : (
                   <button
                     type="button"
-                    disabled={state === "busy"}
+                    disabled={state === "sharing"}
                     onClick={() => handleShare(campaign.id)}
                     aria-label={`Share into ${campaign.name}`}
                     className="shrink-0 rounded-full border border-garnet-700 bg-parchment-50 px-3 py-1.5 text-xs font-semibold text-garnet-700 disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    {state === "busy" ? "Sharing…" : "Share"}
+                    {state === "sharing" ? "Sharing…" : "Share"}
                   </button>
                 )}
               </li>

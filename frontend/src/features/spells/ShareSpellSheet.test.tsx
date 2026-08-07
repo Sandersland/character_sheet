@@ -83,6 +83,37 @@ describe("ShareSpellSheet", () => {
     expect(await screen.findByRole("button", { name: "Share into The Sunless Citadel" })).toBeInTheDocument();
   });
 
+  // claude-review finding: rowState went straight to "busy" for BOTH share
+  // and unshare, so an in-flight unshare fell through to the share-side
+  // button's own busy label ("Sharing…") instead of an unshare-appropriate
+  // one. Pinned via a controllable promise so the in-flight moment is
+  // observable before the DELETE resolves.
+  it("shows 'Unsharing…' (not 'Sharing…') while a revoke is in flight", async () => {
+    vi.mocked(client.fetchCampaigns).mockResolvedValue([CAMPAIGN_A]);
+    vi.mocked(client.shareCatalogEntry).mockResolvedValue({ id: "g1", catalogEntryId: "entry-1", campaignId: "camp-a" });
+    let resolveUnshare!: () => void;
+    vi.mocked(client.unshareCatalogEntry).mockImplementation(
+      () => new Promise<void>((resolve) => { resolveUnshare = resolve; }),
+    );
+    const user = userEvent.setup();
+
+    render(<ShareSpellSheet spell={SPELL} onClose={() => {}} />);
+
+    await user.click(await screen.findByRole("button", { name: "Share into The Sunless Citadel" }));
+    await user.click(await screen.findByRole("button", { name: "Unshare from The Sunless Citadel" }));
+
+    // Still the "Unshare" side (same aria-label) — the label/disabled state is
+    // what must change, not which button this is.
+    const button = screen.getByRole("button", { name: "Unshare from The Sunless Citadel" });
+    expect(button).toBeDisabled();
+    expect(button).toHaveTextContent("Unsharing…");
+
+    resolveUnshare();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Share into The Sunless Citadel" })).toBeInTheDocument(),
+    );
+  });
+
   // Deliberately the OPPOSITE revert direction from the grant-rejection case
   // below: handleShare's catch reverts to "idle" (the server never got a
   // grant), but handleUnshare's catch reverts to "shared" (the server still

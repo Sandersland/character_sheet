@@ -15,9 +15,14 @@ interface CampaignOverrideSectionProps {
 }
 
 export default function CampaignOverrideSection({ entryId, campaigns, loadError, onForked }: CampaignOverrideSectionProps) {
+  // Checked FIRST, ahead of the loading/error guards below: a spell with no
+  // catalog metadata can never be forked regardless of how the campaign
+  // fetch resolves, so there's nothing to show a spinner (or an error) FOR —
+  // rendering either first would flash loading/error state for an outcome
+  // that was always going to be "nothing here."
+  if (!entryId) return null;
   if (loadError) return <p className="text-xs text-garnet-700">{loadError}</p>;
   if (campaigns === null) return <Spinner />;
-  if (!entryId) return null;
 
   const dmCampaigns = campaigns.filter((c) => c.role === "OWNER");
   if (dmCampaigns.length === 0) return null;

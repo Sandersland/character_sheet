@@ -43,6 +43,28 @@ describe("CampaignOverrideSection", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  // claude-review finding: the `!entryId` guard used to run AFTER the
+  // loading/error guards, so a spell with no catalog metadata still flashed
+  // a Spinner during the campaign-fetch window even though the outcome was
+  // always going to be "nothing here" — pinned here with campaigns still
+  // `null` (the in-flight state) rather than resolved, since that's exactly
+  // the window the old ordering leaked a spinner into.
+  it("renders nothing (not a spinner) when entryId is absent, even while campaigns are still loading", () => {
+    const { container } = render(
+      <CampaignOverrideSection entryId={undefined} campaigns={null} loadError={null} onForked={() => {}} />,
+    );
+    expect(container).toBeEmptyDOMElement();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  // Same reasoning as above but for the load-error branch.
+  it("renders nothing (not the load error) when entryId is absent, even if the campaign fetch failed", () => {
+    const { container } = render(
+      <CampaignOverrideSection entryId={undefined} campaigns={null} loadError="Couldn't load your campaigns." onForked={() => {}} />,
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it("lists only campaigns the caller DMs", () => {
     render(<CampaignOverrideSection entryId="e1" campaigns={[DM_CAMPAIGN, PLAYER_CAMPAIGN]} loadError={null} onForked={() => {}} />);
     expect(screen.getByText("The Sunless Citadel")).toBeInTheDocument();

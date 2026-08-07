@@ -65,9 +65,12 @@ export default function ForkSpellSheet({ spell, onForked, onClose }: ForkSpellSh
     <BottomSheet title={`Fork "${spell.name}"`} subtitle="Make your own editable copy" onClose={onClose}>
       <div className="flex flex-col gap-4">
         <div>
+          {/* `!entryId` mirrors handleMakeMyVersion's own early return — without it
+              a spell served with no catalog metadata would show a fully-enabled
+              button whose click is silently a no-op. */}
           <button
             type="button"
-            disabled={userForkState !== "idle"}
+            disabled={!entryId || userForkState !== "idle"}
             onClick={handleMakeMyVersion}
             className="w-full rounded-control bg-arcane-700 py-2.5 text-center text-sm font-semibold text-parchment-50 hover:bg-arcane-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
