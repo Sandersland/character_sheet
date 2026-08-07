@@ -31,12 +31,17 @@ export async function applySpellRenames(prisma: PrismaClient, renames: SpellRena
       console.log(`applySpellRenames: "${to}" already exists — skipping rename of "${from}"`);
       continue;
     }
-    await prisma.spell.update({ where: { id: source.id }, data: { name: to } });
-    // The linked CatalogEntry (#1796) carries its own `name`, part of its
-    // business key — a rename that touched only Spell.name would leave the
-    // entry pointing at the pre-rename name forever, silently stale for any
-    // later slice (grant/fork UI) that reads the entry's own name.
-    await prisma.catalogEntry.update({ where: { id: source.catalogEntryId }, data: { name: to } });
+    // Same atomic-write guarantee as custom-spells.ts's POST/PATCH
+    // ($transaction): the linked CatalogEntry (#1796) carries its own `name`,
+    // part of its business key, so the Spell rename and the entry rename
+    // must commit together — a crash between two separate top-level writes
+    // would rename the Spell but leave the entry pointing at the pre-rename
+    // name forever, silently stale for any later slice (grant/fork UI) that
+    // reads the entry's own name.
+    await prisma.$transaction(async (tx) => {
+      await tx.spell.update({ where: { id: source.id }, data: { name: to } });
+      await tx.catalogEntry.update({ where: { id: source.catalogEntryId }, data: { name: to } });
+    });
     console.log(`applySpellRenames: renamed "${from}" → "${to}"`);
   }
 }
