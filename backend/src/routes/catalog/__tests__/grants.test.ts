@@ -116,6 +116,13 @@ describe("POST /api/catalog/entries/:entryId/grants", () => {
       .send({ campaignId: campaignA });
     expect(res.status).toBe(400);
   });
+
+  it("404s a bogus entryId", async () => {
+    const res = await agent(cookieOwner)
+      .post("/api/catalog/entries/does-not-exist/grants")
+      .send({ campaignId: campaignA });
+    expect(res.status).toBe(404);
+  });
 });
 
 describe("DELETE /api/catalog/entries/:entryId/grants/:campaignId", () => {
@@ -143,5 +150,10 @@ describe("DELETE /api/catalog/entries/:entryId/grants/:campaignId", () => {
       where: { catalogEntryId_campaignId: { catalogEntryId: entry, campaignId: campaignA } },
     });
     expect(row).not.toBeNull();
+  });
+
+  it("404s a bogus entryId", async () => {
+    const res = await agent(cookieOwner).delete(`/api/catalog/entries/does-not-exist/grants/${campaignA}`);
+    expect(res.status).toBe(404);
   });
 });

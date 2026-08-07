@@ -24,11 +24,11 @@ function serializeGrant(grant: CatalogGrant): GrantWire {
   return { id: grant.id, catalogEntryId: grant.catalogEntryId, campaignId: grant.campaignId };
 }
 
-// Shared by POST and DELETE: 404 if the entry doesn't exist, 403 if it exists
-// but isn't owned by the caller. Scope is NOT checked here — GLOBAL/CAMPAIGN
-// entries have no ownerUserId, so an ownership check alone would always 403
-// them before the POST handler's own scope check gets a chance to 400 (see
-// its own comment).
+// Used only by DELETE: 404 if the entry doesn't exist, 403 if it exists but
+// isn't owned by the caller. POST does its own inline lookup instead of
+// calling this — it needs the scope check to run BEFORE the ownership check
+// (see its own comment), which this helper's ownership-first order doesn't
+// support.
 async function assertGrantEntryOwnership(
   entryId: string,
   userId: string,

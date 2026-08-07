@@ -27,6 +27,7 @@ import { entitiesRouter } from "@/routes/campaign/entities.js";
 import { sessionsRouter } from "@/routes/session/sessions.js";
 import { experienceRouter } from "@/routes/character/experience.js";
 import { featsRouter } from "@/routes/catalog/feats.js";
+import { grantsRouter } from "@/routes/catalog/grants.js";
 import { healthRouter } from "@/routes/platform/health.js";
 import { hitPointsRouter } from "@/routes/character/hitpoints.js";
 import { inventoryRouter } from "@/routes/character/inventory.js";
@@ -89,6 +90,13 @@ const ROUTER_ENTRIES: RouterEntry[] = [
     probe: { method: "post", path: "/api/spells/custom" },
   },
   { name: "featsRouter", router: featsRouter, probe: { method: "get", path: "/api/feats" } },
+  // No GET on grantsRouter — POST .../grants and DELETE .../grants/:campaignId
+  // (#1799); POST alone is enough to prove requireAuth gates this router.
+  {
+    name: "grantsRouter",
+    router: grantsRouter,
+    probe: { method: "post", path: `/api/catalog/entries/${FAKE_ID}/grants` },
+  },
   { name: "editionsRouter", router: editionsRouter, probe: { method: "get", path: "/api/editions" } },
   // No GET on hitPointsRouter — only POST "/".
   {
