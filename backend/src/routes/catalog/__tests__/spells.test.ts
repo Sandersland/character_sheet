@@ -533,15 +533,20 @@ describe("GET /api/spells — user homebrew (#1786)", () => {
   });
 
   // #1788, epic #1782 5/5: the manage UI's only signal for "mine, offer
-  // edit/delete" — a seeded row must never carry an ownerId, even undefined
-  // rather than null, since the manage list filters on truthiness.
-  it("serves ownerId on the caller's own homebrew row, and omits it on seeded rows", async () => {
+  // edit/delete" — ownerId must be present on the caller's own row AND never
+  // present-but-someone-else's on any other row this response serves.
+  it("serves ownerId on the caller's own homebrew row, and never a different owner's id on any row", async () => {
     const res = await getAs(cookieA, "/api/spells", "EDITION_2014");
     const homebrewRow = res.body.find((s: { name: string }) => s.name === HOMEBREW_NAME);
     expect(homebrewRow.ownerId).toBe(OWNER_A);
 
-    const seededRow = res.body.find((s: { ownerId?: string }) => s.ownerId === undefined);
-    expect(seededRow).toBeDefined();
+    // Finding one row that lacks ownerId (seeded) proves nothing about
+    // whether some OTHER row carries a different owner's id — assert the
+    // cross-user-leak invariant directly across every row served, not just
+    // the fixture's own row.
+    const ownedRows = res.body.filter((s: { ownerId?: string }) => s.ownerId !== undefined);
+    expect(ownedRows.length).toBeGreaterThan(0);
+    expect(ownedRows.every((s: { ownerId?: string }) => s.ownerId === OWNER_A)).toBe(true);
   });
 
   // #1788, epic #1782 5/5: saveEffect was written by customSpellSchema since

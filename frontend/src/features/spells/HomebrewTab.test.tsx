@@ -84,6 +84,26 @@ describe("HomebrewTab manage list", () => {
     expect(screen.queryByText("Fireball")).not.toBeInTheDocument();
   });
 
+  // #1788, epic #1782 5/5: before the first GET /api/spells resolves,
+  // catalog is null — the list must show the loading spinner, not flash "you
+  // haven't authored any" (owned would be [] either way, since `catalog ??
+  // []` can't tell "empty" from "not loaded yet").
+  it("shows a spinner instead of the empty state while the catalog is still loading", () => {
+    render(
+      <HomebrewTab
+        edition="EDITION_2014"
+        catalog={null}
+        showSpinner
+        onCreated={noop}
+        onChanged={noop}
+        onClose={noop}
+      />,
+    );
+
+    expect(screen.getByRole("status")).toBeInTheDocument();
+    expect(screen.queryByText(/haven't authored any homebrew spells/i)).not.toBeInTheDocument();
+  });
+
   it("shows an empty state when the caller has no homebrew spells yet", () => {
     render(
       <HomebrewTab edition="EDITION_2014" catalog={[SEEDED_SPELL]} onCreated={noop} onChanged={noop} onClose={noop} />,
@@ -160,6 +180,33 @@ describe("HomebrewTab manage list", () => {
 
     await waitFor(() => expect(client.deleteCustomSpell).toHaveBeenCalledWith("own-1"));
     await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
+  });
+
+  // #1788, epic #1782 5/5: a rejected delete must surface the error AND
+  // reset the row out of confirm mode — not leave "Delete {name}? / Confirm
+  // / Cancel" showing underneath the error banner.
+  it("shows an error and resets the row's confirm state when deleteCustomSpell rejects", async () => {
+    vi.mocked(client.deleteCustomSpell).mockRejectedValue(new Error("Delete failed."));
+    const onChanged = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <HomebrewTab
+        edition="EDITION_2014"
+        catalog={[SEEDED_SPELL, OWN_SPELL]}
+        onCreated={noop}
+        onChanged={onChanged}
+        onClose={noop}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Delete Ember Bolt" }));
+    await user.click(screen.getByRole("button", { name: "Confirm deleting Ember Bolt" }));
+
+    expect(await screen.findByText("Delete failed.")).toBeInTheDocument();
+    expect(screen.queryByText("Delete Ember Bolt?")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete Ember Bolt" })).toBeInTheDocument();
+    expect(screen.getByText("Ember Bolt")).toBeInTheDocument();
+    expect(onChanged).not.toHaveBeenCalled();
   });
 
   it("cancelling the delete confirmation does not call deleteCustomSpell", async () => {

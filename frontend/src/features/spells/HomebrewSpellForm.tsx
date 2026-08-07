@@ -140,6 +140,7 @@ export default function HomebrewSpellForm({ edition, editing, onSaved, onClose }
         </div>
 
         <div className="sm:col-span-2">
+          {/* Non-null: BLANK_HOMEBREW_SPELL and toHomebrewSpellInput both always set `components`. */}
           <HomebrewSpellComponentsFields
             components={draft.components!}
             onChange={(components) => update({ components })}

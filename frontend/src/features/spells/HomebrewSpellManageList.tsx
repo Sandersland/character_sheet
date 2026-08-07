@@ -9,7 +9,7 @@ interface HomebrewSpellManageListProps {
   spells: CatalogSpell[];
   busyId: string | null;
   onEdit: (spell: CatalogSpell) => void;
-  onDelete: (spell: CatalogSpell) => void;
+  onDelete: (spell: CatalogSpell) => Promise<void>;
 }
 
 export default function HomebrewSpellManageList({ spells, busyId, onEdit, onDelete }: HomebrewSpellManageListProps) {

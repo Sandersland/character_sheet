@@ -1,10 +1,13 @@
 // AddSpellPanel's "Homebrew" tab content (#1787/#1788, epic #1782 4/5-5/5):
 // the create form, plus below it the caller's own homebrew spells with
-// edit/delete (HomebrewSpellManageList). `catalog` is the SAME already-
-// fetched GET /api/spells result AddSpellPanel passes to SpellCatalogTab —
-// this tab derives its list from it (ownedHomebrewSpells) rather than
-// running a second fetch, so create/edit/delete all share one refetch
-// trigger (catalogRefreshKey in AddSpellPanel).
+// edit/delete (HomebrewSpellManageList). `catalog`/`catalogError`/
+// `showSpinner` are the SAME already-fetched GET /api/spells result
+// AddSpellPanel passes to SpellCatalogTab — this tab derives its list from
+// `catalog` (ownedHomebrewSpells) rather than running a second fetch, so
+// create/edit/delete all share one refetch trigger (catalogRefreshKey in
+// AddSpellPanel), and mirrors SpellCatalogTab's own loading/error branches
+// so the manage list doesn't flash its empty state before the first fetch
+// resolves.
 //
 // Edit mode swaps the create-form-plus-list view for HomebrewSpellForm
 // itself in `editing` mode: only one form is ever mounted at a time, so the
@@ -12,6 +15,7 @@
 import { useState } from "react";
 
 import { deleteCustomSpell } from "@/api/client";
+import Spinner from "@/components/ui/Spinner";
 import HomebrewSpellForm from "@/features/spells/HomebrewSpellForm";
 import HomebrewSpellManageList from "@/features/spells/HomebrewSpellManageList";
 import { ownedHomebrewSpells, toHomebrewSpellInput } from "@/lib/homebrewSpell";
@@ -21,6 +25,8 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 interface HomebrewTabProps {
   edition: RulesEdition;
   catalog: CatalogSpell[] | null;
+  catalogError?: string | null;
+  showSpinner?: boolean;
   /** A new spell was created — caller switches to the catalog tab + refetches. */
   onCreated: () => void;
   /** An existing spell was edited or deleted — caller refetches, staying on this tab. */
@@ -28,21 +34,34 @@ interface HomebrewTabProps {
   onClose: () => void;
 }
 
-export default function HomebrewTab({ edition, catalog, onCreated, onChanged, onClose }: HomebrewTabProps) {
+export default function HomebrewTab({
+  edition,
+  catalog,
+  catalogError = null,
+  showSpinner = false,
+  onCreated,
+  onChanged,
+  onClose,
+}: HomebrewTabProps) {
   const [editing, setEditing] = useState<CatalogSpell | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const owned = ownedHomebrewSpells(catalog ?? []);
 
-  async function handleDelete(spell: CatalogSpell) {
+  // Rethrows after recording the message: HomebrewSpellManageRow awaits this
+  // itself so a rejection resets ITS OWN `confirming` state — otherwise a
+  // failed delete leaves the row stuck showing "Delete {name}? / Confirm /
+  // Cancel" underneath this error banner.
+  async function handleDelete(spell: CatalogSpell): Promise<void> {
     setBusyId(spell.id);
-    setError(null);
+    setDeleteError(null);
     try {
       await deleteCustomSpell(spell.id);
       onChanged();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete spell.");
+      setDeleteError(err instanceof Error ? err.message : "Failed to delete spell.");
+      throw err;
     } finally {
       setBusyId(null);
     }
@@ -70,8 +89,12 @@ export default function HomebrewTab({ edition, catalog, onCreated, onChanged, on
 
       <div>
         <p className="mb-2 text-[9px] font-bold uppercase tracking-[0.2em] text-parchment-500">Your homebrew spells</p>
-        {error && <p className="mb-2 text-xs text-garnet-700">{error}</p>}
-        <HomebrewSpellManageList spells={owned} busyId={busyId} onEdit={setEditing} onDelete={handleDelete} />
+        {deleteError && <p className="mb-2 text-xs text-garnet-700">{deleteError}</p>}
+        {catalogError && <p className="mb-2 text-xs text-garnet-700">{catalogError}</p>}
+        {catalog === null && !catalogError && showSpinner && <Spinner />}
+        {catalog !== null && (
+          <HomebrewSpellManageList spells={owned} busyId={busyId} onEdit={setEditing} onDelete={handleDelete} />
+        )}
       </div>
     </div>
   );

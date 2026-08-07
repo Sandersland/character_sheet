@@ -1,6 +1,9 @@
 // A single "Your homebrew spells" row (#1788, epic #1782 5/5): Edit/Delete
 // controls, with delete a two-step inline confirm — same
-// confirm-then-cancel-row shape as ItemDetailFooter's Drop control.
+// confirm-then-cancel-row shape as ItemDetailFooter's Drop control. Awaits
+// `onDelete` itself (rather than firing-and-forgetting) so a rejected delete
+// resets `confirming` here instead of leaving the row stuck showing BOTH the
+// confirm prompt and HomebrewTab's error banner.
 import { useState } from "react";
 
 import { catalogMetaLine } from "@/lib/addSpell";
@@ -10,11 +13,19 @@ interface HomebrewSpellManageRowProps {
   spell: CatalogSpell;
   busy: boolean;
   onEdit: (spell: CatalogSpell) => void;
-  onDelete: (spell: CatalogSpell) => void;
+  onDelete: (spell: CatalogSpell) => Promise<void>;
 }
 
 export default function HomebrewSpellManageRow({ spell, busy, onEdit, onDelete }: HomebrewSpellManageRowProps) {
   const [confirming, setConfirming] = useState(false);
+
+  async function handleConfirmDelete() {
+    try {
+      await onDelete(spell);
+    } catch {
+      setConfirming(false);
+    }
+  }
 
   if (confirming) {
     return (
@@ -24,7 +35,7 @@ export default function HomebrewSpellManageRow({ spell, busy, onEdit, onDelete }
           <button
             type="button"
             disabled={busy}
-            onClick={() => onDelete(spell)}
+            onClick={handleConfirmDelete}
             aria-label={`Confirm deleting ${spell.name}`}
             className="font-semibold text-garnet-700 hover:underline disabled:opacity-40"
           >

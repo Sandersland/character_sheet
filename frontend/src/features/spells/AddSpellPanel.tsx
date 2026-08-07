@@ -102,6 +102,8 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds,
         <HomebrewTab
           edition={edition}
           catalog={catalog}
+          catalogError={error}
+          showSpinner={showSpinner}
           onCreated={handleHomebrewCreated}
           onChanged={handleHomebrewChanged}
           onClose={onClose}
