@@ -41,6 +41,7 @@ import { subclassChoicesRouter } from "@/routes/character/subclass-choices.js";
 import { channelDivinityRouter } from "@/routes/character/channel-divinity.js";
 import { referenceRouter } from "@/routes/catalog/reference.js";
 import { resourcesRouter } from "@/routes/character/resources.js";
+import { customSpellsRouter } from "@/routes/catalog/custom-spells.js";
 import { spellsRouter } from "@/routes/catalog/spells.js";
 import { spellcastingRouter } from "@/routes/character/spellcasting.js";
 
@@ -81,6 +82,12 @@ const ROUTER_ENTRIES: RouterEntry[] = [
   { name: "referenceRouter", router: referenceRouter, probe: { method: "get", path: "/api/reference" } },
   { name: "itemsRouter", router: itemsRouter, probe: { method: "get", path: "/api/items" } },
   { name: "spellsRouter", router: spellsRouter, probe: { method: "get", path: "/api/spells" } },
+  // No GET on customSpellsRouter — only POST/PATCH/DELETE (#1785).
+  {
+    name: "customSpellsRouter",
+    router: customSpellsRouter,
+    probe: { method: "post", path: "/api/spells/custom" },
+  },
   { name: "featsRouter", router: featsRouter, probe: { method: "get", path: "/api/feats" } },
   { name: "editionsRouter", router: editionsRouter, probe: { method: "get", path: "/api/editions" } },
   // No GET on hitPointsRouter — only POST "/".
