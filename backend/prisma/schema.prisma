@@ -1634,7 +1634,14 @@ model Spell {
   ownerId String?
   owner   User?   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
-  @@unique([name, edition])
+  // ownerId joins the business key so per-user homebrew names don't collide
+  // with each other OR with a seeded spell of the same name — only widened
+  // (never narrowed) from the (name, edition) key above, and NULLS NOT
+  // DISTINCT is preserved so seeded (ownerId: null) rows still enforce
+  // global name+edition uniqueness among themselves. Hand-edited into the
+  // migration.sql (Prisma's DSL can't express NULLS NOT DISTINCT) — see that
+  // migration's comment.
+  @@unique([name, edition, ownerId])
   @@index([ownerId])
 }
 

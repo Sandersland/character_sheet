@@ -49,8 +49,10 @@ describe("Spell.ownerId (#1784)", () => {
   it("cascade-deletes only the deleted user's owned Spell rows, leaving system rows (ownerId: null) untouched", async () => {
     const ownerId = `spell-owner-${randomUUID()}`;
     await ensureTestOwner(ownerId);
+    MADE_USERS.push(ownerId);
 
     const owned = await prisma.spell.create({ data: spellFixture({ ownerId }) });
+    MADE_SPELLS.push(owned.id);
     const system = await prisma.spell.create({ data: spellFixture({ ownerId: null }) });
     MADE_SPELLS.push(system.id);
 
@@ -58,5 +60,42 @@ describe("Spell.ownerId (#1784)", () => {
 
     expect(await prisma.spell.findUnique({ where: { id: owned.id } })).toBeNull();
     expect(await prisma.spell.findUnique({ where: { id: system.id } })).not.toBeNull();
+  });
+
+  // Regression for the widened @@unique([name, edition, ownerId]) (review
+  // finding on #1789): with ownerId excluded from the key, two users
+  // couldn't each homebrew a same-named spell, and a homebrew spell couldn't
+  // share a name with a seeded one. NULLS NOT DISTINCT still means seeded
+  // (ownerId: null) rows enforce global (name, edition) uniqueness among
+  // themselves.
+  it("lets two different users homebrew the same name+edition, but still rejects a second null-owner row with that name+edition", async () => {
+    const ownerA = `spell-owner-${randomUUID()}`;
+    const ownerB = `spell-owner-${randomUUID()}`;
+    await ensureTestOwner(ownerA);
+    MADE_USERS.push(ownerA);
+    await ensureTestOwner(ownerB);
+    MADE_USERS.push(ownerB);
+
+    const sharedName = `Owner Fixture Shared ${randomUUID()}`;
+
+    const fromA = await prisma.spell.create({
+      data: spellFixture({ name: sharedName, edition: "EDITION_2024", ownerId: ownerA }),
+    });
+    MADE_SPELLS.push(fromA.id);
+    const fromB = await prisma.spell.create({
+      data: spellFixture({ name: sharedName, edition: "EDITION_2024", ownerId: ownerB }),
+    });
+    MADE_SPELLS.push(fromB.id);
+
+    expect(fromA.id).not.toBe(fromB.id);
+
+    const firstSystem = await prisma.spell.create({
+      data: spellFixture({ name: sharedName, edition: "EDITION_2024", ownerId: null }),
+    });
+    MADE_SPELLS.push(firstSystem.id);
+
+    await expect(
+      prisma.spell.create({ data: spellFixture({ name: sharedName, edition: "EDITION_2024", ownerId: null }) }),
+    ).rejects.toMatchObject({ code: "P2002" });
   });
 });
