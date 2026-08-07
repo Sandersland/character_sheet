@@ -16,7 +16,7 @@ const CHAR_ID = "test-entry-scoped-pools-1";
 
 async function serialize(id: string) {
   const row = await prisma.character.findUniqueOrThrow({ where: { id }, include: characterInclude });
-  return serializeCharacter(row) as {
+  return (await serializeCharacter(row)) as {
     resources?: { pools: { key: string; total: number; used: number; remaining: number }[] };
   };
 }

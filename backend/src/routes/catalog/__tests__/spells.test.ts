@@ -696,7 +696,12 @@ describe("GET /api/spells — user homebrew (#1786)", () => {
       description: "A shared system spell.",
       cantripScaling: false,
     };
-    const systemCatalogEntryId = await makeCatalogEntry({ name: SYSTEM_NAME, edition: "EDITION_2024" });
+    // The CatalogEntry's own edition must match the request (#1798, epic
+    // #1795 3/6): the resolver filters GLOBAL visibility by
+    // CatalogEntry.edition, unlike the retired interim filter it replaces —
+    // the Spell row itself stays edition: null (SharedSpell semantics,
+    // untouched by this slice).
+    const systemCatalogEntryId = await makeCatalogEntry({ name: SYSTEM_NAME, edition: "EDITION_2014" });
     await upsertEditionRow(
       prisma.spell,
       { name: SYSTEM_NAME, edition: null },
@@ -759,6 +764,45 @@ describe("GET /api/spells — user homebrew (#1786)", () => {
       expect(matches.map((s: { id: string }) => s.id).sort()).toEqual([seeded.id, homebrew.id].sort());
     } finally {
       await prisma.catalogEntry.deleteMany({ where: { name: COLLISION_NAME, kind: "SPELL" } });
+    }
+  });
+});
+
+// #1798, epic #1795 3/6: the resolver (entitlement.ts) now drives this route
+// in place of the interim two-query owner filter — these two behaviors are
+// exactly what the interim never had (no fork/shadow awareness at all) and
+// what the interim's response never carried (SpellWire.catalog, locked in
+// slice 1 but left unpopulated here until now).
+describe("GET /api/spells — resolver wiring: catalog metadata + fork-shadowing (#1798)", () => {
+  it("every row carries catalog.{entryId,scope,isFork,forkedFromId}", async () => {
+    await seedFixtures();
+    const response = await get("/api/spells");
+    const damage = response.body.find((s: { name: string }) => s.name === DAMAGE_SPELL.name);
+    expect(damage.catalog).toMatchObject({ scope: "GLOBAL", isFork: false, forkedFromId: null });
+    expect(damage.catalog.entryId).toBeTypeOf("string");
+  });
+
+  it("the caller's own USER fork of a GLOBAL spell shadows the origin — only the fork is served, not both", async () => {
+    const seeded = await prisma.spell.findFirstOrThrow({ where: { edition: "EDITION_2014" }, orderBy: { name: "asc" } });
+
+    const forkRes = await supertest.agent(app).set("Cookie", COOKIE)
+      .post(`/api/catalog/entries/${seeded.catalogEntryId}/fork`)
+      .send({ scope: "USER" });
+    expect(forkRes.status).toBe(201);
+    const forkEntryId = forkRes.body.entryId as string;
+
+    try {
+      const response = await get("/api/spells", "EDITION_2014");
+      const matches = response.body.filter((s: { name: string }) => s.name === seeded.name);
+      expect(matches).toHaveLength(1);
+      expect(matches[0].catalog).toMatchObject({
+        scope: "USER",
+        isFork: true,
+        forkedFromId: seeded.catalogEntryId,
+        entryId: forkEntryId,
+      });
+    } finally {
+      await prisma.catalogEntry.delete({ where: { id: forkEntryId } });
     }
   });
 });

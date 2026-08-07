@@ -466,6 +466,6 @@ actionsRouter.post<{ id: string }>(
     // batchId is additive alongside the serialized character so the client
     // can revert this exact batch on turn undo (#758); `results` is the
     // #1528 wire-contract addition (was `Promise<void>`/no per-op result).
-    res.json({ ...serializeCharacter(row), batchId, results });
+    res.json({ ...(await serializeCharacter(row)), batchId, results });
   }
 );
