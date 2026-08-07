@@ -17,6 +17,7 @@ import { entitiesRouter } from "@/routes/campaign/entities.js";
 import { sessionsRouter } from "@/routes/session/sessions.js";
 import { experienceRouter } from "@/routes/character/experience.js";
 import { featsRouter } from "@/routes/catalog/feats.js";
+import { forkRouter } from "@/routes/catalog/fork.js";
 import { grantsRouter } from "@/routes/catalog/grants.js";
 import { healthRouter } from "@/routes/platform/health.js";
 import { hitPointsRouter } from "@/routes/character/hitpoints.js";
@@ -69,6 +70,7 @@ export const routeManifest: RouteMount[] = [
   { router: customSpellsRouter, mount: "/api", scope: "authed" },
   { router: featsRouter, mount: "/api", scope: "authed" },
   { router: grantsRouter, mount: "/api", scope: "authed" },
+  { router: forkRouter, mount: "/api", scope: "authed" },
   // Edition-independent by construction (#1436): the only catalog route that
   // takes no `?edition=`, because it is what the client reads to CHOOSE one.
   { router: editionsRouter, mount: "/api", scope: "authed" },
