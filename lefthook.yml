@@ -136,7 +136,9 @@ pre-push:
         (see docs/development.md "Prisma workflow").
     typecheck-frontend:
       root: "frontend/"
-      run: npx tsc --noEmit
+      # npm run typecheck (not a bare tsc) so this also runs tsconfig.e2e.json
+      # (#1482) — the program that actually type-checks frontend/e2e/*.ts.
+      run: npm run typecheck
     test-frontend:
       root: "frontend/"
       run: npm run test
