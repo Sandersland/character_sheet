@@ -2,7 +2,7 @@ import { Router } from "express";
 import { catalogGrantSchema } from "@character-sheet/contracts";
 import type { GrantWire } from "@character-sheet/shared-types";
 
-import type { CatalogGrant } from "@/generated/prisma/client.js";
+import { Prisma, type CatalogGrant } from "@/generated/prisma/client.js";
 import { AuthorizationError, NotFoundError } from "@/lib/auth/errors.js";
 import { assertCampaignMembership } from "@/lib/auth/access.js";
 import { parseBodyOr400 } from "@/lib/http/parse-body.js";
@@ -52,8 +52,13 @@ async function assertGrantEntryOwnership(
  * belongs to. Scope is checked BEFORE ownership: a GLOBAL/CAMPAIGN entry's
  * ownerUserId is always null, so gating on scope first is what lets a caller
  * ever reach the intended 400 instead of always seeing 403. Idempotent on the
- * (catalogEntryId, campaignId) unique key: a second identical grant 200s the
- * existing row rather than hitting the unique constraint.
+ * (catalogEntryId, campaignId) unique key via create-then-catch (matching
+ * campaignMembership.upsert's role elsewhere in this codebase, e.g.
+ * campaigns.ts's own POST /campaigns/join): a find-then-create TOCTOU window
+ * would let two concurrent identical POSTs both read no existing row and both
+ * insert, so the loser's write hits the unique constraint — caught here as
+ * P2002 and turned into a 200 of the winner's row rather than the 500 the
+ * terminal error handler would otherwise map an uncaught P2002 to.
  */
 grantsRouter.post("/catalog/entries/:entryId/grants", async (req, res) => {
   const data = parseBodyOr400(catalogGrantSchema, req.body, res);
@@ -76,18 +81,21 @@ grantsRouter.post("/catalog/entries/:entryId/grants", async (req, res) => {
 
   await assertCampaignMembership(prisma, req.user!.id, data.campaignId, "edit");
 
-  const existing = await prisma.catalogGrant.findUnique({
-    where: { catalogEntryId_campaignId: { catalogEntryId: entry.id, campaignId: data.campaignId } },
-  });
-  if (existing) {
-    res.status(200).json(serializeGrant(existing));
-    return;
+  try {
+    const grant = await prisma.catalogGrant.create({
+      data: { catalogEntryId: entry.id, campaignId: data.campaignId },
+    });
+    res.status(201).json(serializeGrant(grant));
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      const existing = await prisma.catalogGrant.findUniqueOrThrow({
+        where: { catalogEntryId_campaignId: { catalogEntryId: entry.id, campaignId: data.campaignId } },
+      });
+      res.status(200).json(serializeGrant(existing));
+      return;
+    }
+    throw err;
   }
-
-  const grant = await prisma.catalogGrant.create({
-    data: { catalogEntryId: entry.id, campaignId: data.campaignId },
-  });
-  res.status(201).json(serializeGrant(grant));
 });
 
 /**
