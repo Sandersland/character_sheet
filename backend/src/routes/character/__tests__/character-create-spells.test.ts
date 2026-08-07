@@ -6,6 +6,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
 import { seededSpeciesAnchor } from "@/test-support/species.js";
+import { makeCatalogEntry } from "@/test-support/catalog-entry.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 
 // #1131: the creation spell/cantrip picker. A level-1 caster (Warlock: 2 cantrips
@@ -458,8 +459,23 @@ describe("POST /api/characters — cross-edition spell-fork rejection (#1712)", 
       duration: "Instantaneous", description: "The PHB'14 text.", concentration: false, ritual: false, cantripScaling: true,
     };
     const row2024 = { ...row2014, description: "The SRD 5.2 text." };
-    const fork2014 = await upsertEditionRow(prisma.spell, { name: FORK_NAME, edition: "EDITION_2014" }, { ...row2014, edition: "EDITION_2014" }, row2014);
-    const fork2024 = await upsertEditionRow(prisma.spell, { name: FORK_NAME, edition: "EDITION_2024" }, { ...row2024, edition: "EDITION_2024" }, row2024);
+    // catalogEntryId (#1796) is resolved first, per edition fork — required,
+    // no default, and each fork is its own distinct CatalogEntry (business
+    // key includes edition).
+    const catalogEntryId2014 = await makeCatalogEntry({ name: FORK_NAME, edition: "EDITION_2014" });
+    const catalogEntryId2024 = await makeCatalogEntry({ name: FORK_NAME, edition: "EDITION_2024" });
+    const fork2014 = await upsertEditionRow(
+      prisma.spell,
+      { name: FORK_NAME, edition: "EDITION_2014" },
+      { ...row2014, edition: "EDITION_2014", catalogEntryId: catalogEntryId2014 },
+      row2014,
+    );
+    const fork2024 = await upsertEditionRow(
+      prisma.spell,
+      { name: FORK_NAME, edition: "EDITION_2024" },
+      { ...row2024, edition: "EDITION_2024", catalogEntryId: catalogEntryId2024 },
+      row2024,
+    );
     for (const spellId of [fork2014.id, fork2024.id]) {
       await prisma.spellClass.upsert({
         where: { spellId_className: { spellId, className: "warlock" } },
@@ -484,7 +500,10 @@ describe("POST /api/characters — cross-edition spell-fork rejection (#1712)", 
   }
 
   afterAll(async () => {
-    await prisma.spell.deleteMany({ where: { name: FORK_NAME } });
+    // Deleting the CatalogEntry cascades the Spell row (ON DELETE CASCADE,
+    // #1796) — the reverse cascade doesn't exist (the supertype stays
+    // closed), so a plain `spell.deleteMany` alone would orphan the entry.
+    await prisma.catalogEntry.deleteMany({ where: { name: FORK_NAME, kind: "SPELL" } });
   });
 
   it("rejects a 2024 creation submitting the 2014 fork's id, naming the spell", async () => {

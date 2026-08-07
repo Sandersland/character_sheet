@@ -7,6 +7,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
+import { makeCatalogEntry } from "@/test-support/catalog-entry.js";
 
 const OWNER_ID = "owner-level-up-tx";
 let COOKIE: string;
@@ -613,7 +614,15 @@ describe("POST …/level-up/transactions — Bard Magical Secrets eligibility ga
     // either one consistently, even though this test happened to pass before
     // this pin was added).
     const fireBolt = await prisma.spell.findFirstOrThrow({ where: { name: "Fire Bolt", edition: "EDITION_2014" }, select: { id: true } });
-    const ensnaringStrike = await prisma.spell.findFirstOrThrow({ where: { name: "Ensnaring Strike" }, select: { id: true } });
+    // Same determinism pin as fireBolt above (Ensnaring Strike also forked
+    // 2014/2024, #1714) — an unordered findFirstOrThrow across same-named
+    // rows is never guaranteed to return either one consistently, and #1796's
+    // migration rewrote every Spell row (backfilling catalogEntryId), which
+    // is exactly the kind of physical-order shift this class of bug depends on.
+    const ensnaringStrike = await prisma.spell.findFirstOrThrow({
+      where: { name: "Ensnaring Strike", edition: "EDITION_2014" },
+      select: { id: true },
+    });
     // #1509: SRD 5.1's Bard 9→10 Spells Known delta is 2, not 2024's 1 — see the sibling test above.
     // `lte: 5` + `orderBy`: same reasoning as the sibling test above — a bare
     // `level: { gt: 0 }` can land on one of the 2014 shared bucket's level
@@ -1993,7 +2002,10 @@ describe("POST …/level-up/transactions — cross-edition spell-fork rejection 
   });
 
   afterEach(async () => {
-    await prisma.spell.deleteMany({ where: { name: FORK_NAME } });
+    // Deleting the CatalogEntry cascades the Spell row (ON DELETE CASCADE,
+    // #1796) — the reverse cascade doesn't exist (the supertype stays
+    // closed), so a plain `spell.deleteMany` alone would orphan the entry.
+    await prisma.catalogEntry.deleteMany({ where: { name: FORK_NAME, kind: "SPELL" } });
   });
 
   async function seedFork() {
@@ -2002,8 +2014,23 @@ describe("POST …/level-up/transactions — cross-edition spell-fork rejection 
       duration: "Instantaneous", description: "The PHB'14 text.", concentration: false, ritual: false, cantripScaling: true,
     };
     const row2024 = { ...row2014, description: "The SRD 5.2 text." };
-    const fork2014 = await upsertEditionRow(prisma.spell, { name: FORK_NAME, edition: "EDITION_2014" }, { ...row2014, edition: "EDITION_2014" }, row2014);
-    const fork2024 = await upsertEditionRow(prisma.spell, { name: FORK_NAME, edition: "EDITION_2024" }, { ...row2024, edition: "EDITION_2024" }, row2024);
+    // catalogEntryId (#1796) is resolved first, per edition fork — required,
+    // no default, and each fork is its own distinct CatalogEntry (business
+    // key includes edition).
+    const catalogEntryId2014 = await makeCatalogEntry({ name: FORK_NAME, edition: "EDITION_2014" });
+    const catalogEntryId2024 = await makeCatalogEntry({ name: FORK_NAME, edition: "EDITION_2024" });
+    const fork2014 = await upsertEditionRow(
+      prisma.spell,
+      { name: FORK_NAME, edition: "EDITION_2014" },
+      { ...row2014, edition: "EDITION_2014", catalogEntryId: catalogEntryId2014 },
+      row2014,
+    );
+    const fork2024 = await upsertEditionRow(
+      prisma.spell,
+      { name: FORK_NAME, edition: "EDITION_2024" },
+      { ...row2024, edition: "EDITION_2024", catalogEntryId: catalogEntryId2024 },
+      row2024,
+    );
     for (const spellId of [fork2014.id, fork2024.id]) {
       await prisma.spellClass.upsert({
         where: { spellId_className: { spellId, className: "warlock" } },
