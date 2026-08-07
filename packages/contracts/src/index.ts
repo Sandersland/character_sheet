@@ -40,4 +40,5 @@ export * from "./item-vocabulary.js";
 export * from "./journal-ops.js";
 export * from "./preferences-ops.js";
 export * from "./session-ops.js";
+export * from "./spell-ops.js";
 export * from "./xp-ops.js";

@@ -71,6 +71,30 @@ export async function assertCampaignMembership(
   return { campaignId, role: membership.role };
 }
 
+// The spell-ownership chokepoint (#1785, epic #1782 2/5), mirroring
+// assertCharacterAccess: 404 if the spell doesn't exist, 403 if it exists but
+// isn't owned by the caller. A seeded catalog row (ownerId: null) always
+// 403s too — `null !== userId` for every real caller — which is correct: a
+// system spell is nobody's to edit or delete.
+export async function assertSpellOwnership(
+  db: Db,
+  userId: string,
+  spellId: string,
+): Promise<{ id: string; ownerId: string | null }> {
+  const spell = await db.spell.findUnique({
+    where: { id: spellId },
+    select: { id: true, ownerId: true },
+  });
+
+  if (!spell) {
+    throw new NotFoundError("Spell not found");
+  }
+  if (spell.ownerId !== userId) {
+    throw new AuthorizationError("You do not have access to this spell");
+  }
+  return spell;
+}
+
 // Owner-only campaign gate (#591): asserts membership first (404 missing / 403
 // non-member), then requires the OWNER role — throwing AuthorizationError (403)
 // with the caller-supplied action message for a member who isn't the owner.

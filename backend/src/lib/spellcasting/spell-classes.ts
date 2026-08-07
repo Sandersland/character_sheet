@@ -1,7 +1,13 @@
+import type { Prisma, PrismaClient } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { resolveEditionRow } from "@/lib/rules/catalog-edition.js";
 import { RULES_EDITION_LABELS } from "@/lib/rules/edition.js";
 import type { RulesEdition } from "@character-sheet/shared-types";
+
+// Accepts either the shared client or prisma/seed.ts's own PrismaClient
+// instance (a different adapter-bound instance, never the src/ singleton) —
+// same reasoning as lib/auth/access.ts's `Db` alias.
+type SpellClassDb = PrismaClient | Prisma.TransactionClient;
 
 /**
  * Shared read-side shape for the Spell↔SpellClass join (#1711, F2 of epic
@@ -19,6 +25,35 @@ export const SPELL_CLASS_MEMBERSHIP_SELECT = {
 /** Flattens a row's `classMemberships` relation to the served `classes: string[]` shape. */
 export function classesOf(spell: { classMemberships: { className: string }[] }): string[] {
   return spell.classMemberships.map((m) => m.className);
+}
+
+/**
+ * Reconciles a spell's SpellClass rows to exactly `classNames` (lowercased,
+ * deduped) — upsert each, then prune any row not in the list. The single
+ * implementation for both write paths: custom-spells.ts's POST/PATCH routes
+ * (#1785, epic #1782 2/5) call it directly with the src/ singleton;
+ * prisma/seed/seed-spell-classes.ts's seedSpellClassesFor is a thin wrapper
+ * passing seed.ts's OWN PrismaClient instance (a separate adapter-bound
+ * client the seed script's transaction/connection lifecycle owns, never this
+ * module's singleton) — `db` is a parameter rather than the imported
+ * singleton for exactly that reuse.
+ */
+export async function reconcileSpellClasses(
+  db: SpellClassDb,
+  spellId: string,
+  classNames: string[],
+): Promise<void> {
+  const normalized = [...new Set(classNames.map((c) => c.toLowerCase()))];
+  for (const className of normalized) {
+    await db.spellClass.upsert({
+      where: { spellId_className: { spellId, className } },
+      create: { spellId, className },
+      update: {},
+    });
+  }
+  await db.spellClass.deleteMany({
+    where: { spellId, className: { notIn: normalized } },
+  });
 }
 
 /**
