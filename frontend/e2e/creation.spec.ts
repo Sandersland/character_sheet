@@ -197,14 +197,16 @@ test("creation: a warlock picks cantrips + spells that show on the Magic tab", a
   await chooseHumanSpeciesTraits(page, "Perception", "Tough");
   await continueStep(page);
 
-  // Spells step (#1160): a level-1 warlock picks 2 cantrips + 2 spells through the
-  // guided picker — a quiet row opens the big detail card with the full text, and
-  // Learn there or the row pill adds the spell.
+  // Spells step (#1160/#1778): a level-1 warlock picks 2 cantrips + 2 spells
+  // through the guided picker, one tab at a time — a quiet row opens the big
+  // detail card with the full text, and Learn there or the row pill adds the
+  // spell. Cantrips is the default (first) tab; a segment click swaps to Spells.
   await expect(page.getByRole("heading", { name: "Learn your magic" })).toBeVisible();
   await page.getByRole("button", { name: "Open Eldritch Blast" }).click();
   await expect(page.getByText(/hurl a beam of crackling energy/)).toBeVisible();
   await page.getByRole("button", { name: /Learn Eldritch Blast/ }).click();
   await page.getByRole("button", { name: "Add Poison Spray" }).click();
+  await page.getByRole("radio", { name: /Spells/ }).click();
   await page.getByRole("button", { name: "Add Charm Person" }).click();
   // Hideous Laughter is warlock-legal under SRD 5.2; Dissonant Whispers is now
   // bard-only (#1132) and no longer offered in the warlock picker.
@@ -281,6 +283,7 @@ test("creation: a 2014 warlock must choose its patron at creation", async ({ pag
   await page.getByRole("button", { name: "Open Eldritch Blast" }).click();
   await page.getByRole("button", { name: /Learn Eldritch Blast/ }).click();
   await page.getByRole("button", { name: "Add Poison Spray" }).click();
+  await page.getByRole("radio", { name: /Spells/ }).click();
   await page.getByRole("button", { name: "Add Charm Person" }).click();
   await page.getByRole("button", { name: "Add Protection from Evil and Good" }).click();
   await continueStep(page);

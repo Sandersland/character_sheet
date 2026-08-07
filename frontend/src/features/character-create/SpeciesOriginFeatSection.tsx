@@ -99,8 +99,8 @@ function OriginFeatCatalogBody({
 }
 
 // The `applicable` guard lives in the PARENT (below), not here — same "hooks
-// run unconditionally, fetch only once mounted" shape as
-// SpeciesCantripSection's own split.
+// run unconditionally, fetch only once mounted" shape as CreationSpellsStep's
+// SpeciesCantripGate (#1778).
 function SpeciesOriginFeatPicker({
   choice,
   edition,

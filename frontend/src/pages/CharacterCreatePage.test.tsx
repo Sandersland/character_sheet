@@ -198,8 +198,10 @@ describe("CharacterCreatePage (#1176 ceremony)", () => {
     await u.click(screen.getByRole("checkbox", { name: "Drum" }));
     await continueStep(u); // → Spells
 
-    // Spells step (#1160): add straight from the row pills.
+    // Spells step (#1160/#1778): Cantrips and Spells are separate tabs now —
+    // add from the default (Cantrips) tab, then switch to Spells for the rest.
     await u.click(await screen.findByRole("button", { name: "Add Vicious Mockery" }));
+    await u.click(screen.getByRole("radio", { name: /Spells/ }));
     await u.click(screen.getByRole("button", { name: "Add Charm Person" }));
     await continueStep(u); // → Equipment
     await continueStep(u); // → Review
