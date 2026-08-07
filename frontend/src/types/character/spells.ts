@@ -83,6 +83,10 @@ export interface Spell {
  */
 export interface CatalogSpell {
   id: string;       // catalog Spell.id (used as learnSpell.spellId)
+  // Present only on the caller's own homebrew (#1788, epic #1782 5/5) — the
+  // manage UI's only signal to distinguish an editable/deletable row from a
+  // seeded one; seeded rows never carry it.
+  ownerId?: string;
   name: string;
   level: number;
   school: SpellSchool;

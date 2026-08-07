@@ -1,5 +1,6 @@
 import { Router } from "express";
 
+import type { Spell } from "@/generated/prisma/client.js";
 import { parseClassFilterOr400, parseSubclassIdParam } from "@/lib/http/parse-class-param.js";
 import { parseMaxSpellLevelOr400 } from "@/lib/http/parse-max-spell-level-param.js";
 import { requireEditionOr400 } from "@/lib/http/parse-edition-param.js";
@@ -8,6 +9,69 @@ import { classesOf, resolveSpellCatalogForEdition, SPELL_CLASS_MEMBERSHIP_SELECT
 import { loadSubclassSpellListExpansionIds } from "@/lib/spellcasting/spell-list-expansion.js";
 
 export const spellsRouter = Router();
+
+// The nullable-on-Spell columns this route defaults to `undefined` on serve
+// (never `null`, matching every other catalog route's wire shape) — named
+// once and walked in a loop rather than one hand-written `?? undefined` per
+// field, same shape custom-spells.ts's own EFFECT_FIELD_NAMES uses and for
+// the same reason (see that file's comment): eight-plus individual `??`
+// sites in one function is what crosses the complexity/CRAP ceiling.
+// `saveEffect` (#1788, epic #1782 5/5) was missing here even though
+// customSpellSchema/HomebrewSpellDamageFields have carried it since #1787 —
+// the manage view's "Edit" prefill is the first caller that actually reads
+// it back, and without it a saved "half damage on save" choice would
+// silently vanish from the form on every edit.
+const UNDEFINED_DEFAULTED_FIELD_NAMES = [
+  // Present only on the caller's own homebrew (#1788) — every other row's
+  // ownerId is already filtered to null (seeded) or the caller's own id by
+  // the route's own `where` above, so this is the client's only signal for
+  // "mine, offer edit/delete" vs. seeded content; it never leaks another
+  // user's id.
+  "ownerId",
+  "effectKind",
+  "effectDiceCount",
+  "effectDiceFaces",
+  "effectModifier",
+  "damageType",
+  "attackType",
+  "saveAbility",
+  "saveEffect",
+  "upcastDicePerLevel",
+] as const satisfies readonly (keyof Spell)[];
+type UndefinedDefaultedFieldName = (typeof UNDEFINED_DEFAULTED_FIELD_NAMES)[number];
+type UndefinedDefaultedFields = { [K in UndefinedDefaultedFieldName]: Spell[K] | undefined };
+
+function undefinedDefaultedFields(row: Spell): UndefinedDefaultedFields {
+  const out = {} as Record<UndefinedDefaultedFieldName, unknown>;
+  for (const name of UNDEFINED_DEFAULTED_FIELD_NAMES) {
+    out[name] = row[name] ?? undefined;
+  }
+  // Every value above came straight from Spell's own typed columns (or
+  // undefined) — the single controlled cast back to the per-field union
+  // UndefinedDefaultedFields declares, same rationale as custom-spells.ts's
+  // own nullableEffectFields/undefinedEffectFields casts.
+  return out as UndefinedDefaultedFields;
+}
+
+type CatalogSpellRow = Spell & { classMemberships: { className: string }[] };
+
+function serializeCatalogSpellRow(row: CatalogSpellRow) {
+  return {
+    id: row.id,
+    name: row.name,
+    level: row.level,
+    school: row.school,
+    castingTime: row.castingTime,
+    range: row.range,
+    duration: row.duration,
+    description: row.description,
+    concentration: row.concentration,
+    ritual: row.ritual,
+    classes: classesOf(row),
+    cantripScaling: row.cantripScaling,
+    ...undefinedDefaultedFields(row),
+  };
+}
 
 /**
  * Feeds the spellcasting section's "learn from catalog" picker — same role
@@ -106,28 +170,5 @@ spellsRouter.get("/spells", async (req, res) => {
     ? resolved.filter((row) => classesOf(row).includes(classFilter.className!) || expandedSpellIds.has(row.id))
     : resolved;
 
-  res.json(
-    spells.map((row) => ({
-      id: row.id,
-      name: row.name,
-      level: row.level,
-      school: row.school,
-      castingTime: row.castingTime,
-      range: row.range,
-      duration: row.duration,
-      description: row.description,
-      concentration: row.concentration,
-      ritual: row.ritual,
-      classes: classesOf(row),
-      effectKind: row.effectKind ?? undefined,
-      effectDiceCount: row.effectDiceCount ?? undefined,
-      effectDiceFaces: row.effectDiceFaces ?? undefined,
-      effectModifier: row.effectModifier ?? undefined,
-      damageType: row.damageType ?? undefined,
-      attackType: row.attackType ?? undefined,
-      saveAbility: row.saveAbility ?? undefined,
-      upcastDicePerLevel: row.upcastDicePerLevel ?? undefined,
-      cantripScaling: row.cantripScaling,
-    }))
-  );
+  res.json(spells.map(serializeCatalogSpellRow));
 });

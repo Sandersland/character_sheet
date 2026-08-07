@@ -1,0 +1,183 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+
+import HomebrewTab from "@/features/spells/HomebrewTab";
+import * as client from "@/api/client";
+import type { CatalogSpell, ReferenceData } from "@/types/character";
+
+vi.mock("@/api/client", () => ({
+  createCustomSpell: vi.fn(),
+  updateCustomSpell: vi.fn(),
+  deleteCustomSpell: vi.fn(),
+  fetchReference: vi.fn(),
+}));
+
+const noop = () => {};
+
+const REFERENCE: ReferenceData = {
+  species: [],
+  classes: [],
+  backgrounds: [],
+  alignments: [],
+  artisanTools: [],
+  conditions: [],
+  universalActions: [],
+  itemRarities: [],
+};
+
+const SEEDED_SPELL: CatalogSpell = {
+  id: "seeded-1",
+  name: "Fireball",
+  level: 3,
+  school: "evocation",
+  castingTime: "1 action",
+  range: "150 feet",
+  duration: "Instantaneous",
+  description: "A seeded spell.",
+  concentration: false,
+  ritual: false,
+  classes: [],
+  cantripScaling: false,
+};
+
+const OWN_SPELL: CatalogSpell = {
+  id: "own-1",
+  ownerId: "u1",
+  name: "Ember Bolt",
+  level: 1,
+  school: "evocation",
+  castingTime: "1 action",
+  range: "60 feet",
+  duration: "Instantaneous",
+  description: "A homebrew bolt of embers.",
+  concentration: false,
+  ritual: false,
+  classes: ["wizard"],
+  cantripScaling: false,
+};
+
+// #1788, epic #1782 5/5: HomebrewTab is the manage-view — same tab
+// AddSpellPanel mounts for the "Homebrew" tab, given the shared GET
+// /api/spells result as a `catalog` prop (see AddSpellPanel's own comment
+// for why the fetch is lifted there rather than run again here).
+describe("HomebrewTab manage list", () => {
+  beforeEach(() => {
+    vi.mocked(client.fetchReference).mockResolvedValue(REFERENCE);
+    vi.mocked(client.createCustomSpell).mockReset();
+    vi.mocked(client.updateCustomSpell).mockReset();
+    vi.mocked(client.deleteCustomSpell).mockReset();
+  });
+
+  it("lists the user's own homebrew spells, excluding seeded ones", () => {
+    render(
+      <HomebrewTab
+        edition="EDITION_2014"
+        catalog={[SEEDED_SPELL, OWN_SPELL]}
+        onCreated={noop}
+        onChanged={noop}
+        onClose={noop}
+      />,
+    );
+
+    expect(screen.getByText("Ember Bolt")).toBeInTheDocument();
+    expect(screen.queryByText("Fireball")).not.toBeInTheDocument();
+  });
+
+  it("shows an empty state when the caller has no homebrew spells yet", () => {
+    render(
+      <HomebrewTab edition="EDITION_2014" catalog={[SEEDED_SPELL]} onCreated={noop} onChanged={noop} onClose={noop} />,
+    );
+
+    expect(screen.getByText(/haven't authored any homebrew spells/i)).toBeInTheDocument();
+  });
+
+  it("clicking Edit opens the form prefilled; submitting calls updateCustomSpell and refreshes the list", async () => {
+    vi.mocked(client.updateCustomSpell).mockResolvedValue({
+      id: OWN_SPELL.id,
+      ownerId: "u1",
+      edition: "EDITION_2014",
+      name: "Ember Blast",
+      level: OWN_SPELL.level,
+      school: OWN_SPELL.school,
+      castingTime: OWN_SPELL.castingTime,
+      range: OWN_SPELL.range,
+      duration: OWN_SPELL.duration,
+      description: OWN_SPELL.description,
+      concentration: OWN_SPELL.concentration,
+      ritual: OWN_SPELL.ritual,
+      classes: OWN_SPELL.classes,
+    });
+    const onChanged = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <HomebrewTab
+        edition="EDITION_2014"
+        catalog={[SEEDED_SPELL, OWN_SPELL]}
+        onCreated={noop}
+        onChanged={onChanged}
+        onClose={noop}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Edit Ember Bolt" }));
+
+    const nameInput = screen.getByLabelText(/spell name/i);
+    expect(nameInput).toHaveValue("Ember Bolt");
+    expect(screen.getByLabelText(/description/i)).toHaveValue("A homebrew bolt of embers.");
+
+    await user.clear(nameInput);
+    await user.type(nameInput, "Ember Blast");
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => expect(client.updateCustomSpell).toHaveBeenCalledTimes(1));
+    expect(client.updateCustomSpell).toHaveBeenCalledWith("own-1", expect.objectContaining({ name: "Ember Blast" }));
+    await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
+
+    // Edit closes back to the list view, not left showing the form.
+    expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
+  });
+
+  it("delete asks for confirmation before calling deleteCustomSpell, then refreshes the list", async () => {
+    vi.mocked(client.deleteCustomSpell).mockResolvedValue(undefined);
+    const onChanged = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <HomebrewTab
+        edition="EDITION_2014"
+        catalog={[SEEDED_SPELL, OWN_SPELL]}
+        onCreated={noop}
+        onChanged={onChanged}
+        onClose={noop}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Delete Ember Bolt" }));
+    expect(client.deleteCustomSpell).not.toHaveBeenCalled();
+    expect(screen.getByText("Delete Ember Bolt?")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Confirm deleting Ember Bolt" }));
+
+    await waitFor(() => expect(client.deleteCustomSpell).toHaveBeenCalledWith("own-1"));
+    await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
+  });
+
+  it("cancelling the delete confirmation does not call deleteCustomSpell", async () => {
+    const user = userEvent.setup();
+    render(
+      <HomebrewTab
+        edition="EDITION_2014"
+        catalog={[SEEDED_SPELL, OWN_SPELL]}
+        onCreated={noop}
+        onChanged={noop}
+        onClose={noop}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Delete Ember Bolt" }));
+    await user.click(screen.getByRole("button", { name: "Cancel deleting Ember Bolt" }));
+
+    expect(client.deleteCustomSpell).not.toHaveBeenCalled();
+    expect(screen.getByText("Ember Bolt")).toBeInTheDocument();
+  });
+});

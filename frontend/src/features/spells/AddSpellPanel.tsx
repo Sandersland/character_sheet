@@ -1,14 +1,21 @@
 // AddSpellPanel — inline expand-in-place panel for learning a new spell.
 // Three tabs: catalog picker (SpellCatalogTab), inline custom-spell form
 // (CustomSpellForm — a per-character spell, never saved as its own catalog
-// row), and homebrew authoring (HomebrewSpellForm — a user-owned catalog
-// Spell row, reusable across all of the caller's characters, #1787). Not a
-// modal — the overlay primitive is reserved for read-only review surfaces.
+// row), and homebrew authoring + management (HomebrewTab — a user-owned
+// catalog Spell row, reusable across all of the caller's characters, create
+// #1787, edit/delete #1788). Not a modal — the overlay primitive is reserved
+// for read-only review surfaces.
+//
+// The GET /api/spells fetch is owned HERE, not by SpellCatalogTab, so the
+// catalog tab's picker and the homebrew tab's manage list share one result
+// and one refetch trigger (catalogRefreshKey) instead of racing two
+// independent fetches.
 import { useState } from "react";
 
 import CustomSpellForm from "@/features/spells/CustomSpellForm";
-import HomebrewSpellForm from "@/features/spells/HomebrewSpellForm";
+import HomebrewTab from "@/features/spells/HomebrewTab";
 import SpellCatalogTab from "@/features/spells/SpellCatalogTab";
+import { useSpellCatalog } from "@/features/spells/useSpellCatalog";
 import type { CatalogSpell, LearnSpellOperation } from "@/types/character";
 import type { RulesEdition } from "@character-sheet/shared-types";
 
@@ -27,9 +34,11 @@ type Tab = keyof typeof TAB_LABELS;
 
 export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds, edition }: AddSpellPanelProps) {
   const [tab, setTab] = useState<Tab>("catalog");
-  // Bumped after a homebrew spell is created (#1787) so SpellCatalogTab's
-  // useSpellCatalog refetches and the new spell shows up without a remount.
+  // Bumped after a homebrew spell is created/edited/deleted (#1787/#1788) so
+  // the shared useSpellCatalog fetch below refetches and both the catalog
+  // picker and the homebrew manage list see the change without a remount.
   const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
+  const { catalog, error, showSpinner } = useSpellCatalog(edition, undefined, catalogRefreshKey);
 
   function handleCatalogLearn(spell: CatalogSpell) {
     onLearn({ type: "learnSpell", spellId: spell.id });
@@ -38,6 +47,10 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds,
   function handleHomebrewCreated() {
     setCatalogRefreshKey((k) => k + 1);
     setTab("catalog");
+  }
+
+  function handleHomebrewChanged() {
+    setCatalogRefreshKey((k) => k + 1);
   }
 
   return (
@@ -78,14 +91,21 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds,
         <SpellCatalogTab
           busy={busy}
           learnedSpellIds={learnedSpellIds}
-          edition={edition}
           onLearn={handleCatalogLearn}
-          refreshKey={catalogRefreshKey}
+          catalog={catalog}
+          error={error}
+          showSpinner={showSpinner}
         />
       )}
       {tab === "custom" && <CustomSpellForm busy={busy} onLearn={onLearn} onClose={onClose} />}
       {tab === "homebrew" && (
-        <HomebrewSpellForm edition={edition} onCreated={handleHomebrewCreated} onClose={onClose} />
+        <HomebrewTab
+          edition={edition}
+          catalog={catalog}
+          onCreated={handleHomebrewCreated}
+          onChanged={handleHomebrewChanged}
+          onClose={onClose}
+        />
       )}
     </div>
   );

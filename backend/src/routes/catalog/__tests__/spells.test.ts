@@ -532,6 +532,53 @@ describe("GET /api/spells — user homebrew (#1786)", () => {
     expect(names(res.body)).toContain(HOMEBREW_NAME);
   });
 
+  // #1788, epic #1782 5/5: the manage UI's only signal for "mine, offer
+  // edit/delete" — a seeded row must never carry an ownerId, even undefined
+  // rather than null, since the manage list filters on truthiness.
+  it("serves ownerId on the caller's own homebrew row, and omits it on seeded rows", async () => {
+    const res = await getAs(cookieA, "/api/spells", "EDITION_2014");
+    const homebrewRow = res.body.find((s: { name: string }) => s.name === HOMEBREW_NAME);
+    expect(homebrewRow.ownerId).toBe(OWNER_A);
+
+    const seededRow = res.body.find((s: { ownerId?: string }) => s.ownerId === undefined);
+    expect(seededRow).toBeDefined();
+  });
+
+  // #1788, epic #1782 5/5: saveEffect was written by customSpellSchema since
+  // #1787 but never served back here — the manage view's "Edit" prefill is
+  // the first caller that needs it round-tripped, so a "half damage on save"
+  // choice doesn't silently vanish when a homebrew spell is edited.
+  it("serves saveEffect on a homebrew row that has one set", async () => {
+    const spell = await prisma.spell.create({
+      data: {
+        name: "Test Homebrew Save Effect Bolt",
+        level: 2,
+        school: "evocation",
+        castingTime: "1 action",
+        range: "60 feet",
+        duration: "Instantaneous",
+        description: "A homebrew test spell with a save effect.",
+        edition: "EDITION_2014",
+        ownerId: OWNER_A,
+        effectKind: "damage",
+        effectDiceCount: 2,
+        effectDiceFaces: 6,
+        damageType: "fire",
+        attackType: "save",
+        saveAbility: "dexterity",
+        saveEffect: "half",
+      },
+    });
+
+    try {
+      const res = await getAs(cookieA, "/api/spells", "EDITION_2014");
+      const row = res.body.find((s: { id: string }) => s.id === spell.id);
+      expect(row.saveEffect).toBe("half");
+    } finally {
+      await prisma.spell.delete({ where: { id: spell.id } });
+    }
+  });
+
   it("does NOT leak to a different user (cross-user isolation)", async () => {
     const res = await getAs(cookieB, "/api/spells", "EDITION_2014");
     expect(res.status).toBe(200);
