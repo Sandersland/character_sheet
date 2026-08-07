@@ -27,6 +27,7 @@ import { entitiesRouter } from "@/routes/campaign/entities.js";
 import { sessionsRouter } from "@/routes/session/sessions.js";
 import { experienceRouter } from "@/routes/character/experience.js";
 import { featsRouter } from "@/routes/catalog/feats.js";
+import { forkRouter } from "@/routes/catalog/fork.js";
 import { healthRouter } from "@/routes/platform/health.js";
 import { hitPointsRouter } from "@/routes/character/hitpoints.js";
 import { inventoryRouter } from "@/routes/character/inventory.js";
@@ -89,6 +90,12 @@ const ROUTER_ENTRIES: RouterEntry[] = [
     probe: { method: "post", path: "/api/spells/custom" },
   },
   { name: "featsRouter", router: featsRouter, probe: { method: "get", path: "/api/feats" } },
+  // No GET on forkRouter — only POST "/:entryId/fork" (#1800).
+  {
+    name: "forkRouter",
+    router: forkRouter,
+    probe: { method: "post", path: `/api/catalog/entries/${FAKE_ID}/fork` },
+  },
   { name: "editionsRouter", router: editionsRouter, probe: { method: "get", path: "/api/editions" } },
   // No GET on hitPointsRouter — only POST "/".
   {
