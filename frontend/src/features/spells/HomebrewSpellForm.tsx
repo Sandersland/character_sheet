@@ -19,7 +19,7 @@ import SpellSchoolSelect from "@/features/spells/SpellSchoolSelect";
 import { useReferenceData } from "@/hooks/useReferenceData";
 import { INPUT_CLS, LABEL_CLS } from "@/lib/addSpell";
 import { BLANK_HOMEBREW_SPELL, buildHomebrewSpellPayload, validateHomebrewSpellDraft } from "@/lib/homebrewSpell";
-import type { HomebrewSpellInput } from "@/types/character";
+import type { HomebrewSpell, HomebrewSpellInput } from "@/types/character";
 import type { RulesEdition } from "@character-sheet/shared-types";
 
 interface HomebrewSpellFormProps {
@@ -28,8 +28,12 @@ interface HomebrewSpellFormProps {
    *  list, #1788): prefills the draft from the served row and submits via
    *  PATCH instead of POST. Absent for the plain creation flow. */
   editing?: { id: string; draft: HomebrewSpellInput };
-  /** Called after a successful create/update — the caller refetches/shows the catalog picker. */
-  onSaved: () => void;
+  /** Called with the created/updated row after a successful create/update —
+   *  the caller refetches/shows the catalog picker. #1808: passing the row
+   *  back (not just a bare signal) is what lets AddSpellPanel re-sync a DM's
+   *  CAMPAIGN-scope fork into its own locally-tracked catalog override after
+   *  an edit (see HomebrewTab's own comment). */
+  onSaved: (spell: HomebrewSpell) => void;
   onClose: () => void;
 }
 
@@ -54,13 +58,14 @@ export default function HomebrewSpellForm({ edition, editing, onSaved, onClose }
     try {
       const payload = buildHomebrewSpellPayload(draft, hasEffect);
       if (editing) {
-        await updateCustomSpell(editing.id, payload);
+        const spell = await updateCustomSpell(editing.id, payload);
+        onSaved(spell);
       } else {
-        await createCustomSpell(payload);
+        const spell = await createCustomSpell(payload);
         setDraft(BLANK_HOMEBREW_SPELL);
         setHasEffect(false);
+        onSaved(spell);
       }
-      onSaved();
     } catch (err) {
       setError(err instanceof Error ? err.message : `Failed to ${editing ? "update" : "create"} spell.`);
     } finally {

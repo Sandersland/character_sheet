@@ -16,7 +16,8 @@ import CustomSpellForm from "@/features/spells/CustomSpellForm";
 import HomebrewTab from "@/features/spells/HomebrewTab";
 import SpellCatalogTab from "@/features/spells/SpellCatalogTab";
 import { useSpellCatalog } from "@/features/spells/useSpellCatalog";
-import type { CatalogSpell, LearnSpellOperation } from "@/types/character";
+import { toCatalogSpell } from "@/lib/homebrewSpell";
+import type { CatalogSpell, HomebrewSpell, LearnSpellOperation } from "@/types/character";
 import type { RulesEdition } from "@character-sheet/shared-types";
 
 interface AddSpellPanelProps {
@@ -40,25 +41,59 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds,
   const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
   const { catalog, error, showSpinner } = useSpellCatalog(edition, undefined, catalogRefreshKey);
 
+  // A DM's CAMPAIGN-scope fork, locally tracked (#1808, epic #1795 8/8):
+  // GET /api/spells never serves a CAMPAIGN-scope row (spellsRouter's own
+  // comment — this picker has no campaign context), so the refetch above can
+  // never re-supply one. Keyed by catalog id so create/edit upserts and
+  // delete removes stay simple. Fed ONLY to HomebrewTab below, not
+  // SpellCatalogTab — the catalog picker's own "Fork" affordance is a
+  // separate concern (isForkable) this map must not interfere with.
+  const [campaignForkOverrides, setCampaignForkOverrides] = useState<Record<string, CatalogSpell>>({});
+
+  const homebrewCatalog =
+    catalog === null
+      ? null
+      : [...catalog, ...Object.values(campaignForkOverrides).filter((s) => !catalog.some((c) => c.id === s.id))];
+
   function handleCatalogLearn(spell: CatalogSpell) {
     onLearn({ type: "learnSpell", spellId: spell.id });
   }
 
   function handleHomebrewCreated() {
+    // customSpellsRouter's POST always creates a USER-scope row (#1785) —
+    // never CAMPAIGN — so there is nothing to add to campaignForkOverrides here.
     setCatalogRefreshKey((k) => k + 1);
     setTab("catalog");
   }
 
-  function handleHomebrewChanged() {
+  function upsertCampaignForkOverride(spell: CatalogSpell) {
+    if (spell.catalog?.scope !== "CAMPAIGN") return;
+    setCampaignForkOverrides((prev) => ({ ...prev, [spell.id]: spell }));
+  }
+
+  function handleHomebrewEdited(spell: HomebrewSpell) {
     setCatalogRefreshKey((k) => k + 1);
+    upsertCampaignForkOverride(toCatalogSpell(spell));
+  }
+
+  function handleHomebrewDeleted(spell: CatalogSpell) {
+    setCatalogRefreshKey((k) => k + 1);
+    setCampaignForkOverrides((prev) => {
+      if (!(spell.id in prev)) return prev;
+      const { [spell.id]: _removed, ...rest } = prev;
+      void _removed;
+      return rest;
+    });
   }
 
   // A fork (#1801, epic #1795 6/6) creates a new catalog entry the same way a
   // homebrew create does — bump the same shared refetch trigger so both the
-  // catalog tab and the homebrew manage list (a USER fork lands there too)
-  // pick it up.
-  function handleForked() {
+  // catalog tab and the homebrew manage list (a USER fork lands there too via
+  // the refetch) pick it up. A CAMPAIGN-scope fork ALSO needs the local
+  // override above (#1808) since the refetch alone can't ever surface it.
+  function handleForked(result: { entryId: string; spell: CatalogSpell }) {
     setCatalogRefreshKey((k) => k + 1);
+    upsertCampaignForkOverride(result.spell);
   }
 
   return (
@@ -110,11 +145,12 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds,
       {tab === "homebrew" && (
         <HomebrewTab
           edition={edition}
-          catalog={catalog}
+          catalog={homebrewCatalog}
           catalogError={error}
           showSpinner={showSpinner}
           onCreated={handleHomebrewCreated}
-          onChanged={handleHomebrewChanged}
+          onEdited={handleHomebrewEdited}
+          onDeleted={handleHomebrewDeleted}
           onClose={onClose}
         />
       )}

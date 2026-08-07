@@ -5,10 +5,12 @@
 // resets `confirming` here instead of leaving the row stuck showing BOTH the
 // confirm prompt and HomebrewTab's error banner.
 //
-// "Share" (#1799/#1801, epic #1795 4/6+6/6) opens ShareSpellSheet — every
-// homebrew row here is scope USER (this list's own filter, addSpell.ts's
-// ownedHomebrewSpells), so every row is grantable. A "Forked" badge surfaces
-// when the row is itself a USER fork of some other entry (isForkedSpell).
+// "Share" (#1799/#1801, epic #1795 4/6+6/6) opens ShareSpellSheet, offered
+// only for a USER-scope row: grants.ts's POST …/grants 400s any other scope
+// ("Only USER-scope catalog entries can be granted"), and since #1808 (epic
+// #1795 8/8) this list also carries a DM's CAMPAIGN-scope forks (already
+// campaign-wide by construction — nothing to share). A "Forked" badge
+// surfaces when the row is itself a fork of some other entry (isForkedSpell).
 import { useState } from "react";
 
 import Badge from "@/components/ui/Badge";
@@ -74,7 +76,7 @@ export default function HomebrewSpellManageRow({ spell, busy, onEdit, onDelete }
         <p className="text-xs text-parchment-600">{catalogMetaLine(spell)}</p>
       </div>
       <div className="flex shrink-0 items-center gap-3 text-xs font-semibold">
-        {spell.catalog && (
+        {spell.catalog?.scope === "USER" && (
           <button
             type="button"
             disabled={busy}

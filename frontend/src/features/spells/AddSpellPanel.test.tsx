@@ -5,12 +5,14 @@ import userEvent from "@testing-library/user-event";
 import AddSpellPanel from "@/features/spells/AddSpellPanel";
 import * as client from "@/api/client";
 import { axe } from "@/test/axe";
-import type { CatalogSpell, ReferenceData } from "@/types/character";
+import type { Campaign, CatalogSpell, ReferenceData } from "@/types/character";
 
 vi.mock("@/api/client", () => ({
   fetchSpells: vi.fn(),
   fetchReference: vi.fn(),
   createCustomSpell: vi.fn(),
+  fetchCampaigns: vi.fn(),
+  forkCatalogEntry: vi.fn(),
 }));
 
 const noop = () => {};
@@ -114,5 +116,96 @@ describe("AddSpellPanel homebrew tab integration", () => {
     // Back on the catalog tab, with the second (post-create) fetchSpells page showing the new spell.
     expect(await screen.findByText("Test Bolt")).toBeInTheDocument();
     expect(client.fetchSpells).toHaveBeenCalledTimes(2);
+  });
+});
+
+// #1808, epic #1795 8/8: GET /api/spells never serves a CAMPAIGN-scope row
+// (spellsRouter's own comment — this picker has no campaign context), so a
+// DM's freshly-created CAMPAIGN fork would otherwise vanish the instant
+// ForkSpellSheet's onForked bumps catalogRefreshKey and fetchSpells refetches
+// WITHOUT it. This is the end-to-end proof that AddSpellPanel keeps the fork
+// manageable anyway (locally-tracked override, not a server refetch).
+describe("AddSpellPanel — DM's CAMPAIGN-scope fork stays manageable (#1808)", () => {
+  const SEEDED_SPELL: CatalogSpell = {
+    id: "seeded-1",
+    name: "Fireball",
+    level: 3,
+    school: "evocation",
+    castingTime: "1 action",
+    range: "150 feet",
+    duration: "Instantaneous",
+    description: "A seeded spell.",
+    concentration: false,
+    ritual: false,
+    classes: [],
+    cantripScaling: false,
+    catalog: { entryId: "entry-fireball", scope: "GLOBAL", isFork: false, forkedFromId: null },
+  };
+
+  const DM_CAMPAIGN: Campaign = {
+    id: "camp-a",
+    name: "The Sunless Citadel",
+    ownerId: "u1",
+    rulesEdition: "EDITION_2014",
+    rulesEditionLabel: "2014",
+    inviteCode: "ABC123",
+    createdAt: "2024-01-01T00:00:00.000Z",
+    members: [],
+    role: "OWNER",
+  };
+
+  beforeEach(() => {
+    vi.mocked(client.fetchReference).mockResolvedValue(REFERENCE);
+    vi.mocked(client.fetchCampaigns).mockReset();
+    vi.mocked(client.forkCatalogEntry).mockReset();
+    // Every fetchSpells call (initial + the post-fork refetch alike) omits
+    // the CAMPAIGN fork — the real server never serves one through this route.
+    vi.mocked(client.fetchSpells).mockReset().mockResolvedValue([SEEDED_SPELL]);
+  });
+
+  it("shows Edit/Delete on the Homebrew tab for a DM's CAMPAIGN override, surviving the post-fork refetch", async () => {
+    vi.mocked(client.fetchCampaigns).mockResolvedValue([DM_CAMPAIGN]);
+    vi.mocked(client.forkCatalogEntry).mockResolvedValue({
+      entryId: "entry-campaign-fork",
+      spell: {
+        ...SEEDED_SPELL,
+        id: "fork-1",
+        catalog: { entryId: "entry-campaign-fork", scope: "CAMPAIGN", isFork: true, forkedFromId: "entry-fireball" },
+      },
+    });
+
+    const user = userEvent.setup();
+    render(
+      <AddSpellPanel onLearn={noop} onClose={noop} busy={false} learnedSpellIds={new Set()} edition="EDITION_2014" />,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Fork Fireball" }));
+    await user.click(await screen.findByRole("button", { name: "Override for The Sunless Citadel" }));
+    await waitFor(() => expect(client.forkCatalogEntry).toHaveBeenCalledTimes(1));
+
+    await user.click(screen.getByRole("button", { name: "Homebrew" }));
+
+    expect(await screen.findByText("Fireball")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit Fireball" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete Fireball" })).toBeInTheDocument();
+    // Not shareable — see HomebrewSpellManageRow's own comment.
+    expect(screen.queryByRole("button", { name: "Share Fireball" })).not.toBeInTheDocument();
+  });
+
+  it("a caller who DMs no campaign never gets the override option at all", async () => {
+    vi.mocked(client.fetchCampaigns).mockResolvedValue([]);
+
+    const user = userEvent.setup();
+    render(
+      <AddSpellPanel onLearn={noop} onClose={noop} busy={false} learnedSpellIds={new Set()} edition="EDITION_2014" />,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Fork Fireball" }));
+
+    expect(await screen.findByRole("button", { name: "Make my version" })).toBeInTheDocument();
+    expect(screen.queryByText(/override for a campaign you run/i)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Homebrew" }));
+    expect(screen.getByText(/haven't authored any homebrew spells/i)).toBeInTheDocument();
   });
 });

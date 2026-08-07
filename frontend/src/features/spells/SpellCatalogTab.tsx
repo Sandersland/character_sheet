@@ -21,8 +21,12 @@ interface SpellCatalogTabProps {
   catalog: CatalogSpell[] | null;
   error: string | null;
   showSpinner: boolean;
-  /** A fork was created — caller refetches the catalog (#1801). */
-  onForked: () => void;
+  /** A fork was created — caller refetches the catalog (#1801). Reports the
+   *  fork result (not just a bare signal, #1808): a CAMPAIGN-scope result is
+   *  never re-servable by that refetch (GET /api/spells has no campaign
+   *  context — spellsRouter's own comment), so AddSpellPanel needs the row
+   *  itself to keep it manageable. */
+  onForked: (result: { entryId: string; spell: CatalogSpell }) => void;
 }
 
 export default function SpellCatalogTab({
@@ -85,9 +89,9 @@ export default function SpellCatalogTab({
       {forking && (
         <ForkSpellSheet
           spell={forking}
-          onForked={() => {
+          onForked={(result) => {
             setForking(null);
-            onForked();
+            onForked(result);
           }}
           onClose={() => setForking(null)}
         />

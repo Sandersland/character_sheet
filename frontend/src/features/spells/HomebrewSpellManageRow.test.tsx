@@ -68,4 +68,21 @@ describe("HomebrewSpellManageRow", () => {
 
     expect(screen.queryByRole("button", { name: "Share Ember Bolt" })).not.toBeInTheDocument();
   });
+
+  // #1808, epic #1795 8/8: a DM's CAMPAIGN-scope fork is now manageable here
+  // (Edit/Delete), but NOT shareable — POST …/grants 400s any non-USER-scope
+  // entry (grants.ts's own "Only USER-scope catalog entries can be granted"),
+  // so offering Share on one would be a dead-end button.
+  it("offers Edit/Delete but omits Share for a DM's CAMPAIGN-scope fork", () => {
+    const campaignFork: CatalogSpell = {
+      ...OWN_SPELL,
+      ownerId: undefined,
+      catalog: { entryId: "entry-3", scope: "CAMPAIGN", isFork: true, forkedFromId: "entry-origin" },
+    };
+    render(<HomebrewSpellManageRow spell={campaignFork} busy={false} onEdit={() => {}} onDelete={async () => {}} />);
+
+    expect(screen.getByRole("button", { name: "Edit Ember Bolt" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete Ember Bolt" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Share Ember Bolt" })).not.toBeInTheDocument();
+  });
 });

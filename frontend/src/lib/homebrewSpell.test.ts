@@ -4,10 +4,11 @@ import {
   BLANK_HOMEBREW_SPELL,
   buildHomebrewSpellPayload,
   ownedHomebrewSpells,
+  toCatalogSpell,
   toHomebrewSpellInput,
   validateHomebrewSpellDraft,
 } from "@/lib/homebrewSpell";
-import type { CatalogSpell, HomebrewSpellInput } from "@/types/character";
+import type { CatalogSpell, HomebrewSpell, HomebrewSpellInput } from "@/types/character";
 
 describe("buildHomebrewSpellPayload", () => {
   it("trims text fields and carries the core fields + classes", () => {
@@ -198,6 +199,58 @@ describe("ownedHomebrewSpells", () => {
 
   it("returns an empty list when the catalog has no homebrew", () => {
     expect(ownedHomebrewSpells([catalogSpell({ ownerId: undefined })])).toEqual([]);
+  });
+
+  // #1808, epic #1795 8/8: a DM's CAMPAIGN-scope fork has no ownerId (its
+  // CatalogEntry.ownerUserId is null, scope CAMPAIGN, #1796) but IS
+  // manageable by the caller — any CAMPAIGN row present in `catalog` at all
+  // is, by construction, one the current caller forked (AddSpellPanel only
+  // ever merges the caller's own fork results in; GET /api/spells never
+  // serves CAMPAIGN-scope rows itself, see spellsRouter's own comment).
+  it("keeps a CAMPAIGN-scope row even with no ownerId", () => {
+    const campaignFork = catalogSpell({
+      id: "campaign-fork",
+      ownerId: undefined,
+      catalog: { entryId: "entry-1", scope: "CAMPAIGN", isFork: true, forkedFromId: "entry-origin" },
+    });
+    expect(ownedHomebrewSpells([campaignFork])).toEqual([campaignFork]);
+  });
+
+  it("still drops a GLOBAL row with no ownerId", () => {
+    const seededGlobal = catalogSpell({
+      id: "seeded",
+      ownerId: undefined,
+      catalog: { entryId: "entry-2", scope: "GLOBAL", isFork: false, forkedFromId: null },
+    });
+    expect(ownedHomebrewSpells([seededGlobal])).toEqual([]);
+  });
+});
+
+describe("toCatalogSpell", () => {
+  it("maps a POST/PATCH /api/spells/custom response into the GET /api/spells row shape", () => {
+    const homebrew: HomebrewSpell = {
+      id: "s1",
+      ownerId: "u1",
+      edition: "EDITION_2014",
+      catalog: { entryId: "entry-1", scope: "CAMPAIGN", isFork: true, forkedFromId: "entry-origin" },
+      name: "DM's Bolt",
+      level: 1,
+      school: "evocation",
+      castingTime: "1 action",
+      range: "60 feet",
+      duration: "Instantaneous",
+      description: "A DM-forked bolt.",
+      concentration: false,
+      ritual: false,
+      classes: ["wizard"],
+      effectKind: "damage",
+      effectDiceCount: 9,
+      effectDiceFaces: 12,
+      damageType: "force",
+      attackType: "attack",
+    };
+
+    expect(toCatalogSpell(homebrew)).toEqual({ ...homebrew, cantripScaling: false });
   });
 });
 
