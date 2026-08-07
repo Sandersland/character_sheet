@@ -71,15 +71,21 @@ export async function assertCampaignMembership(
   return { campaignId, role: membership.role };
 }
 
-// The spell-ownership chokepoint (#1785, epic #1782 2/5), mirroring
-// assertCharacterAccess: 404 if the spell doesn't exist, 403 if it exists but
-// isn't owned by the caller. Ownership now resolves through the CatalogEntry
-// entitlement supertype (#1796, epic #1795 1/6) rather than a Spell.ownerId
-// column (dropped by that migration) — a two-step lookup since Spell.
-// catalogEntryId carries no Prisma relation (the supertype stays closed, see
-// schema.prisma's own comment). A seeded GLOBAL row (ownerUserId: null)
-// always 403s too — `null !== userId` for every real caller — which is
-// correct: a system spell is nobody's to edit or delete. Returns
+// The spell-ownership chokepoint (#1785, epic #1782 2/5; extended #1808,
+// epic #1795 8/8), mirroring assertCharacterAccess: 404 if the spell doesn't
+// exist, 403 if it exists but the caller has neither editable path to it.
+// Ownership resolves through the CatalogEntry entitlement supertype (#1796,
+// epic #1795 1/6) rather than a Spell.ownerId column (dropped by that
+// migration) — a two-step lookup since Spell.catalogEntryId carries no
+// Prisma relation (the supertype stays closed, see schema.prisma's own
+// comment). Two admitted paths, mirroring resolveVisibleEntries'
+// precedenceRank (lib/catalog/entitlement.ts) without re-deriving it: a
+// USER-scope entry the caller owns outright (ownerUserId match), or a
+// CAMPAIGN-scope entry whose campaign the caller DMs — delegated to
+// assertCampaignOwner (#1808) rather than a second inline DM check, so the
+// "campaign owner" rule stays the one place it's expressed. A seeded GLOBAL
+// row (both owner columns null) always 403s — neither path can ever match it
+// — which is correct: a system spell is nobody's to edit or delete. Returns
 // catalogEntryId (not the CatalogEntry row itself) so a caller that needs to
 // mutate/delete the entry can do so without a second fetch.
 export async function assertSpellOwnership(
@@ -97,12 +103,16 @@ export async function assertSpellOwnership(
 
   const entry = await db.catalogEntry.findUnique({
     where: { id: spell.catalogEntryId },
-    select: { ownerUserId: true },
+    select: { scope: true, ownerUserId: true, ownerCampaignId: true },
   });
-  if (!entry || entry.ownerUserId !== userId) {
-    throw new AuthorizationError("You do not have access to this spell");
+  if (entry?.scope === "USER" && entry.ownerUserId === userId) {
+    return spell;
   }
-  return spell;
+  if (entry?.scope === "CAMPAIGN" && entry.ownerCampaignId) {
+    await assertCampaignOwner(db, userId, entry.ownerCampaignId, "edit", "You do not have access to this spell");
+    return spell;
+  }
+  throw new AuthorizationError("You do not have access to this spell");
 }
 
 // Owner-only campaign gate (#591): asserts membership first (404 missing / 403

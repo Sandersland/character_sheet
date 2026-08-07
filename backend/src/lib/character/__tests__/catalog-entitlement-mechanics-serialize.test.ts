@@ -8,12 +8,11 @@
 // character fixture (same pattern as the sibling file) so this file only
 // exercises serializeCharacter itself.
 //
-// A DM's CAMPAIGN-scope fork has no HTTP mechanics-edit route yet (PATCH
-// /api/spells/custom/:id's assertSpellOwnership only recognizes
-// ownerUserId, not ownerCampaignId — a gap outside this slice's scope), so
-// "the DM changed the dice" is simulated with a direct prisma.spell.update
-// on the forked Spell row; a USER-scope fork the forker owns IS reachable
-// through the real PATCH route and is exercised through it below.
+// A DM's CAMPAIGN-scope fork edit now goes through the real PATCH
+// /api/spells/custom/:id route (#1808, epic #1795 8/8 closed the gap this
+// comment used to describe — assertSpellOwnership's second admitted path,
+// lib/auth/access.ts): "the DM changed the dice" below is a real PATCH call,
+// same as the USER-scope fork case that already exercised the route.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -180,13 +179,55 @@ describe("serializeCharacter — catalog fork MECHANICS override (#1806, epic #1
       .send({ scope: "CAMPAIGN", campaignId });
     expect(fork.status).toBe(201);
     const forkEntryId = fork.body.entryId as string;
-    const forkSpellId = fork.body.spell.id as string;
+    const forkedSpell = fork.body.spell as {
+      id: string;
+      name: string;
+      level: number;
+      school: string;
+      castingTime: string;
+      range: string;
+      duration: string;
+      description: string;
+      concentration: boolean;
+      ritual: boolean;
+      classes: string[];
+      effectKind?: string;
+      effectDiceCount?: number;
+      effectDiceFaces?: number;
+      effectModifier?: number;
+      damageType?: string;
+      attackType?: string;
+      saveAbility?: string;
+      saveEffect?: string;
+      upcastDicePerLevel?: number;
+    };
     const newDice = { effectDiceCount: seededDice.effectDiceCount + 5, effectDiceFaces: 20 };
 
     try {
-      // Simulates "the DM changed the damage dice" — see the file banner for
-      // why this is a direct write rather than the (not-yet-built) HTTP route.
-      await prisma.spell.update({ where: { id: forkSpellId }, data: newDice });
+      // The DM edits the fork's dice through the real PATCH route (#1808,
+      // epic #1795 8/8) — assertSpellOwnership's CAMPAIGN-DM path.
+      const patch = await agent(cookieDm).patch(`/api/spells/custom/${forkedSpell.id}`).send({
+        name: forkedSpell.name,
+        level: forkedSpell.level,
+        school: forkedSpell.school,
+        castingTime: forkedSpell.castingTime,
+        range: forkedSpell.range,
+        duration: forkedSpell.duration,
+        description: forkedSpell.description,
+        concentration: forkedSpell.concentration,
+        ritual: forkedSpell.ritual,
+        classes: forkedSpell.classes,
+        effectKind: forkedSpell.effectKind,
+        effectDiceCount: newDice.effectDiceCount,
+        effectDiceFaces: newDice.effectDiceFaces,
+        effectModifier: forkedSpell.effectModifier,
+        damageType: forkedSpell.damageType,
+        attackType: forkedSpell.attackType,
+        saveAbility: forkedSpell.saveAbility,
+        saveEffect: forkedSpell.saveEffect,
+        upcastDicePerLevel: forkedSpell.upcastDicePerLevel,
+      });
+      expect(patch.status).toBe(200);
 
       const after = (await serializeSpells(characterAId)).find((s) => s.id === learnedEntryId);
       expect(after).toBeDefined();
