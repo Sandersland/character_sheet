@@ -22,6 +22,7 @@ const PLAYER = "owner-catalog-serialize-player"; // learns spells; owns the fixt
 
 let cookieOwner: string;
 let cookieDm: string;
+let cookiePlayer: string;
 let campaignId: string;
 let ownerEntryId: string;
 let ownerSpellId: string;
@@ -68,7 +69,7 @@ beforeAll(async () => {
   await ensureTestOwner(PLAYER);
   cookieOwner = await authCookie(OWNER);
   cookieDm = await authCookie(DM);
-  await authCookie(PLAYER);
+  cookiePlayer = await authCookie(PLAYER);
 
   // OWNER authors a homebrew spell — USER scope, EDITION_2014-locked
   // (custom-spells.ts's own comment: epic #1782's locked spec).
@@ -159,6 +160,48 @@ describe("serializeCharacter — catalog entitlement wiring (#1798, epic #1795 3
       expect(after!.catalog).toEqual({ entryId: forkEntryId, scope: "CAMPAIGN", isFork: true, forkedFromId: seededEntryId });
     } finally {
       await prisma.catalogEntry.delete({ where: { id: forkEntryId } });
+    }
+  });
+
+  // Regression (review finding on #1798): attachSpellCatalogMeta used to fall
+  // back to matching a shadowed entry BY NAME when its own id lost precedence
+  // to a fork. That name-based map was built from EVERY winning entry in the
+  // whole visible candidate set (not just the character's learned spells),
+  // so an unrelated, differently-lineaged same-named entry — visible but
+  // never learned — could collide in it, arbitrated only by unordered
+  // findMany row order, and silently serve the WRONG meta for the learned
+  // (shadowed) spell, defeating the DM's override. The fix moved lineage
+  // entirely into the resolver (resolveSpellEntitlementMetaForCharacter),
+  // which maps every visible candidate id — winner or shadowed — straight to
+  // its OWN lineage's winner; a same-named entry from an unrelated lineage
+  // never enters the lookup at all any more.
+  it("an unrelated same-named USER homebrew does not defeat a DM's CAMPAIGN fork of an already-learned spell", async () => {
+    // PLAYER's own homebrew, sharing the learned seeded spell's NAME but a
+    // completely separate lineage (no forkedFrom) — visible (not learned) is
+    // enough to have populated the old buggy name map.
+    const collidingHomebrew = await agent(cookiePlayer)
+      .post("/api/spells/custom")
+      .send({ ...HOMEBREW_SPELL, name: seededSpellName });
+    expect(collidingHomebrew.status).toBe(201);
+    const collidingEntryId = collidingHomebrew.body.catalog.entryId as string;
+
+    const fork = await agent(cookieDm)
+      .post(`/api/catalog/entries/${seededEntryId}/fork`)
+      .send({ scope: "CAMPAIGN", campaignId });
+    expect(fork.status).toBe(201);
+    const forkEntryId = fork.body.entryId as string;
+
+    try {
+      // PLAYER never learned the homebrew, so exactly one served entry
+      // shares this name — the character's own already-learned spell, which
+      // must resolve to the DM's fork, never the unrelated homebrew.
+      const spell = spellsOf(await serialize()).find((s) => s.name === seededSpellName);
+      expect(spell).toBeDefined();
+      expect(spell!.catalog).toEqual({ entryId: forkEntryId, scope: "CAMPAIGN", isFork: true, forkedFromId: seededEntryId });
+      expect(spell!.catalog?.entryId).not.toBe(collidingEntryId);
+    } finally {
+      await prisma.catalogEntry.delete({ where: { id: forkEntryId } });
+      await prisma.catalogEntry.delete({ where: { id: collidingEntryId } });
     }
   });
 });

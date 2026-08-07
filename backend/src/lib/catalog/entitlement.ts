@@ -5,7 +5,7 @@
 // may re-implement this filtering or the precedence order (CLAUDE.md
 // "level-gated state reconciles through one registry" sibling rule, applied
 // here to catalog visibility instead of level gates).
-import type { CatalogKind, RulesEdition } from "@character-sheet/shared-types";
+import type { CatalogKind, CatalogMeta, RulesEdition } from "@character-sheet/shared-types";
 
 import { Prisma } from "@/generated/prisma/client.js";
 import type { CharacterWithRelations } from "@/lib/character/character-include.js";
@@ -67,21 +67,16 @@ async function fetchCandidates(kind: CatalogKind, viewer: CatalogViewer): Promis
 }
 
 /**
- * Resolve the highest-precedence entry per fork lineage within an
- * already-visible candidate set. Lineage is found by walking each entry's
- * `forkedFromId` chain to the highest ancestor STILL PRESENT among the
- * candidates — an ancestor outside the viewer's scope (or nulled by the
- * schema's `onDelete: SetNull` when the origin is deleted) leaves nothing to
- * group with, so the entry resolves on its own rather than crashing or
- * silently dropping. A `seen` guard makes a pathological cyclic chain resolve
- * (not hang) rather than assuming the data can't do that.
- *
- * Within a tied `precedenceRank` — only possible when the viewer owns more
- * than one entry in the same lineage (their own origin AND their own fork of
- * it) — the fork wins over the root: forking is the deliberate override, so
- * a self-fork must still shadow its own origin.
+ * Group an already-visible candidate set into fork lineages. Lineage is
+ * found by walking each entry's `forkedFromId` chain to the highest ancestor
+ * STILL PRESENT among the candidates — an ancestor outside the viewer's
+ * scope (or nulled by the schema's `onDelete: SetNull` when the origin is
+ * deleted) leaves nothing to group with, so the entry resolves on its own
+ * rather than crashing or silently dropping. A `seen` guard makes a
+ * pathological cyclic chain resolve (not hang) rather than assuming the data
+ * can't do that.
  */
-function pickShadowWinners(candidates: CandidateEntry[], viewer: CatalogViewer): CandidateEntry[] {
+function groupLineages(candidates: CandidateEntry[]): CandidateEntry[][] {
   const byId = new Map(candidates.map((entry) => [entry.id, entry]));
 
   function lineageRoot(entry: CandidateEntry): string {
@@ -103,25 +98,72 @@ function pickShadowWinners(candidates: CandidateEntry[], viewer: CatalogViewer):
     if (lineage) lineage.push(entry);
     else lineages.set(root, [entry]);
   }
+  return [...lineages.values()];
+}
 
-  const winners: CandidateEntry[] = [];
-  for (const lineage of lineages.values()) {
-    let winner = lineage[0];
-    for (const candidate of lineage.slice(1)) {
-      const rankDelta = precedenceRank(candidate, viewer) - precedenceRank(winner, viewer);
-      const outranks =
-        rankDelta !== 0 ? rankDelta > 0 : candidate.forkedFromId !== null && winner.forkedFromId === null;
-      if (outranks) winner = candidate;
-    }
-    winners.push(winner);
+/**
+ * The highest-precedence entry within one fork lineage. Within a tied
+ * `precedenceRank` — only possible when the viewer owns more than one entry
+ * in the same lineage (their own origin AND their own fork of it) — the fork
+ * wins over the root: forking is the deliberate override, so a self-fork
+ * must still shadow its own origin.
+ */
+function pickLineageWinner(lineage: CandidateEntry[], viewer: CatalogViewer): CandidateEntry {
+  let winner = lineage[0];
+  for (const candidate of lineage.slice(1)) {
+    const rankDelta = precedenceRank(candidate, viewer) - precedenceRank(winner, viewer);
+    const outranks =
+      rankDelta !== 0 ? rankDelta > 0 : candidate.forkedFromId !== null && winner.forkedFromId === null;
+    if (outranks) winner = candidate;
   }
-  return winners;
+  return winner;
 }
 
 /** Resolve the visible, shadow-resolved CatalogEntry ids for one (kind, viewer). */
 export async function resolveVisibleEntryIds(kind: CatalogKind, viewer: CatalogViewer): Promise<string[]> {
   const candidates = await fetchCandidates(kind, viewer);
-  return pickShadowWinners(candidates, viewer).map((entry) => entry.id);
+  return groupLineages(candidates).map((lineage) => pickLineageWinner(lineage, viewer).id);
+}
+
+function toCatalogMeta(entry: CandidateEntry): CatalogMeta {
+  return { entryId: entry.id, scope: entry.scope, isFork: entry.forkedFromId !== null, forkedFromId: entry.forkedFromId };
+}
+
+/**
+ * Resolve, for EVERY visible candidate entry id (winners and shadowed
+ * lineage members alike), the `CatalogMeta` of its lineage's WINNER — the
+ * one place a call site can map "an entry id I already hold a reference to"
+ * onto "what's actually entitled to be shown for it today" without
+ * re-walking `forkedFromId` chains or re-deriving precedence itself (CLAUDE.md
+ * "one shared function"). This is what lets a call site holding a stale
+ * pre-shadow entry id (e.g. a character's learned-spell snapshot, taken
+ * before a DM later forked the origin) resolve straight to the shadowing
+ * fork's metadata by id, with no name-based fallback and no risk of a
+ * same-named-but-unrelated lineage colliding with it.
+ *
+ * Not exported: SPELL is the only kind today, so
+ * resolveSpellEntitlementMetaForCharacter (below) is the only caller —
+ * exported once a second kind needs its own viewer-typed wrapper.
+ */
+async function resolveEntitlementMeta(
+  kind: CatalogKind,
+  viewer: CatalogViewer,
+): Promise<Map<string, CatalogMeta>> {
+  const candidates = await fetchCandidates(kind, viewer);
+  const meta = new Map<string, CatalogMeta>();
+  for (const lineage of groupLineages(candidates)) {
+    const winnerMeta = toCatalogMeta(pickLineageWinner(lineage, viewer));
+    for (const entry of lineage) meta.set(entry.id, winnerMeta);
+  }
+  return meta;
+}
+
+function viewerForCharacter(character: CharacterWithRelations): CatalogViewer {
+  return {
+    userId: character.ownerId,
+    campaignId: character.campaignId,
+    edition: editionOf(character),
+  };
 }
 
 /**
@@ -130,10 +172,12 @@ export async function resolveVisibleEntryIds(kind: CatalogKind, viewer: CatalogV
  * hand-rolled off `rulesEdition` directly (CLAUDE.md).
  */
 export async function resolveSpellEntryIdsForCharacter(character: CharacterWithRelations): Promise<string[]> {
-  const viewer: CatalogViewer = {
-    userId: character.ownerId,
-    campaignId: character.campaignId,
-    edition: editionOf(character),
-  };
-  return resolveVisibleEntryIds("SPELL", viewer);
+  return resolveVisibleEntryIds("SPELL", viewerForCharacter(character));
+}
+
+/** Same convenience wrapper as resolveSpellEntryIdsForCharacter, for resolveEntitlementMeta. */
+export async function resolveSpellEntitlementMetaForCharacter(
+  character: CharacterWithRelations,
+): Promise<Map<string, CatalogMeta>> {
+  return resolveEntitlementMeta("SPELL", viewerForCharacter(character));
 }
