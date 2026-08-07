@@ -2,9 +2,14 @@
 // state; the catalog fetch itself is lifted to AddSpellPanel (#1788, epic
 // #1782 5/5) so the sibling Homebrew tab's manage list can derive from the
 // SAME GET /api/spells result instead of running a second fetch.
+//
+// Also owns the ForkSpellSheet's open/closed state (#1801, epic #1795 6/6):
+// only one row can be forking at a time, so the sheet lives here rather than
+// per-row in SpellCatalogRow.
 import { useState } from "react";
 
 import Spinner from "@/components/ui/Spinner";
+import ForkSpellSheet from "@/features/spells/ForkSpellSheet";
 import SpellCatalogRow from "@/features/spells/SpellCatalogRow";
 import { INPUT_CLS, LEVEL_OPTIONS, filterCatalog } from "@/lib/addSpell";
 import type { CatalogSpell } from "@/types/character";
@@ -16,6 +21,8 @@ interface SpellCatalogTabProps {
   catalog: CatalogSpell[] | null;
   error: string | null;
   showSpinner: boolean;
+  /** A fork was created — caller refetches the catalog (#1801). */
+  onForked: () => void;
 }
 
 export default function SpellCatalogTab({
@@ -25,9 +32,11 @@ export default function SpellCatalogTab({
   catalog,
   error,
   showSpinner,
+  onForked,
 }: SpellCatalogTabProps) {
   const [search, setSearch] = useState("");
   const [levelFilter, setLevelFilter] = useState("");
+  const [forking, setForking] = useState<CatalogSpell | null>(null);
 
   const filtered = filterCatalog(catalog, search, levelFilter);
 
@@ -68,9 +77,21 @@ export default function SpellCatalogTab({
             alreadyKnown={learnedSpellIds.has(spell.id)}
             busy={busy}
             onLearn={onLearn}
+            onFork={setForking}
           />
         ))}
       </ul>
+
+      {forking && (
+        <ForkSpellSheet
+          spell={forking}
+          onForked={() => {
+            setForking(null);
+            onForked();
+          }}
+          onClose={() => setForking(null)}
+        />
+      )}
     </div>
   );
 }

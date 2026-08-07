@@ -53,6 +53,14 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds,
     setCatalogRefreshKey((k) => k + 1);
   }
 
+  // A fork (#1801, epic #1795 6/6) creates a new catalog entry the same way a
+  // homebrew create does — bump the same shared refetch trigger so both the
+  // catalog tab and the homebrew manage list (a USER fork lands there too)
+  // pick it up.
+  function handleForked() {
+    setCatalogRefreshKey((k) => k + 1);
+  }
+
   return (
     <div className="mt-3 rounded-card border border-arcane-200 bg-gradient-to-b from-parchment-50 to-arcane-50 p-4">
       <div className="mb-3 flex items-center justify-between">
@@ -95,6 +103,7 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds,
           catalog={catalog}
           error={error}
           showSpinner={showSpinner}
+          onForked={handleForked}
         />
       )}
       {tab === "custom" && <CustomSpellForm busy={busy} onLearn={onLearn} onClose={onClose} />}
