@@ -19,6 +19,8 @@ const INERT_HP_META: HitPointsStepMeta = {
   averageGain: 0,
   minRoll: 0,
   maxRoll: 0,
+  effectiveMaxAverage: 0,
+  effectiveMaxByRoll: [],
 };
 
 /**
@@ -29,10 +31,15 @@ const INERT_HP_META: HitPointsStepMeta = {
 export function readHitPointsMeta(step: LevelUpStep | undefined): HitPointsStepMeta {
   const meta = step?.meta;
   if (!meta) return INERT_HP_META;
-  // `die` is excluded from the key type deliberately: it is the one non-numeric
-  // field, and num("die") would quietly read 0 instead of failing to compile.
-  const num = (key: Exclude<keyof HitPointsStepMeta, "die">): number =>
+  // `die`/`effectiveMaxByRoll` are excluded from the key type deliberately:
+  // `die` is the one string field, and `effectiveMaxByRoll` is the one array
+  // field — num(either) would quietly read 0 instead of failing to compile.
+  const num = (key: Exclude<keyof HitPointsStepMeta, "die" | "effectiveMaxByRoll">): number =>
     typeof meta[key] === "number" ? meta[key] : 0;
+  const effectiveMaxByRoll =
+    Array.isArray(meta.effectiveMaxByRoll) && meta.effectiveMaxByRoll.every((v) => typeof v === "number")
+      ? (meta.effectiveMaxByRoll as number[])
+      : [];
   return {
     die: typeof meta.die === "string" ? meta.die : "",
     faces: num("faces"),
@@ -41,6 +48,8 @@ export function readHitPointsMeta(step: LevelUpStep | undefined): HitPointsStepM
     averageGain: num("averageGain"),
     minRoll: num("minRoll"),
     maxRoll: num("maxRoll"),
+    effectiveMaxAverage: num("effectiveMaxAverage"),
+    effectiveMaxByRoll,
   };
 }
 
@@ -56,4 +65,16 @@ export function readHitPointsMeta(step: LevelUpStep | undefined): HitPointsStepM
  */
 export function hpGainForRoll(meta: HitPointsStepMeta, roll: number): number {
   return Math.max(meta.minRoll, roll + meta.conMod);
+}
+
+/**
+ * Served post-level EFFECTIVE max for a die the player rolled (#1497). Reads
+ * `effectiveMaxByRoll[roll]` directly (the array is indexed 1..faces, index 0
+ * inert) rather than computing `currentMax + hpGainForRoll(...)` — that
+ * addition is wrong once 2014 exhaustion 4+ (PHB'14 p. 291) halves the max,
+ * because the halving depends on the pre-halving max's parity, which isn't
+ * recoverable from the already-halved served max alone.
+ */
+export function effectiveMaxForRoll(meta: HitPointsStepMeta, roll: number): number {
+  return meta.effectiveMaxByRoll[roll] ?? 0;
 }
