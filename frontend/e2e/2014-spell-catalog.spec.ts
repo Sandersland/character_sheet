@@ -57,10 +57,14 @@ test("creation: a 2014 Wizard's spell picker offers the 2014 catalog, with PHB'1
   // Skillful/Versatile SpeciesTrait picks (#1690 is a 2024-only mechanic).
   await continueStep(page);
 
-  // Spells step (#1131/#1513): a level-1 Wizard fills a 6-spell spellbook plus
-  // 3 cantrips, server-filtered to class=wizard AND this creation draft's own
-  // 2014 edition (CreationSpellsStep -> useSpellCatalog(edition, {className})).
+  // Spells step (#1131/#1513/#1778): a level-1 Wizard fills a 6-spell
+  // spellbook plus 3 cantrips, server-filtered to class=wizard AND this
+  // creation draft's own 2014 edition
+  // (CreationSpellsStep -> useSpellCatalog(edition, {className})). Cantrips
+  // and Spellbook are separate tabs — Cantrips is the default (first), so the
+  // spellbook picks below start with a segment click.
   await expect(page.getByRole("heading", { name: "Learn your magic" })).toBeVisible();
+  await page.getByRole("radio", { name: /Spellbook/ }).click();
 
   // Burning Hands: open the detail card and assert the PHB'14 text, not merely
   // that a row with this name exists — proves resolveSpellCatalogForEdition
@@ -79,6 +83,7 @@ test("creation: a 2014 Wizard's spell picker offers the 2014 catalog, with PHB'1
   await page.getByRole("button", { name: "Add Thunderwave" }).click();
 
   // Cantrips group (3 for a level-1 Wizard, both editions).
+  await page.getByRole("radio", { name: /Cantrips/ }).click();
   await page.getByRole("button", { name: "Add Fire Bolt" }).click();
   await page.getByRole("button", { name: "Add Mage Hand" }).click();
   await page.getByRole("button", { name: "Add Prestidigitation" }).click();

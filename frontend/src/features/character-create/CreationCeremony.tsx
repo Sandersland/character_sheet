@@ -9,7 +9,6 @@ import CreationReviewStep from "@/features/character-create/CreationReviewStep";
 import CreationSpellsStep from "@/features/character-create/CreationSpellsStep";
 import IdentitySection from "@/features/character-create/IdentitySection";
 import SkillSection from "@/features/character-create/SkillSection";
-import SpeciesCantripSection from "@/features/character-create/SpeciesCantripSection";
 import SpeciesOriginFeatSection from "@/features/character-create/SpeciesOriginFeatSection";
 import SpeciesSkillSection from "@/features/character-create/SpeciesSkillSection";
 import StartingEquipmentSection from "@/features/character-create/StartingEquipmentSection";
@@ -97,28 +96,22 @@ function SpellsStepBody({ c }: StepBodyProps) {
   // Unreachable in practice: this step never renders before the gate resolves it.
   const { rulesEdition } = c.draft;
   if (!rulesEdition) return null;
+  // #1778: one merged host — species cantrip (#1689, when the server serves a
+  // chooseCantrip spec) and the class's own cantrips/spells share ONE tabbed
+  // picker now, so a non-caster High Elf's species cantrip is still reachable
+  // even though `picks` is undefined for it.
   return (
-    <>
-      {picks && (
-        <CreationSpellsStep
-          className={c.draft.className}
-          subclassId={c.draft.subclassId || undefined}
-          counts={picks}
-          cantripIds={c.draft.cantripIds}
-          spellIds={c.draft.spellIds}
-          edition={rulesEdition}
-          onChange={c.update}
-        />
-      )}
-      {/* #1689: High Elf's Cantrip — renders only when the server serves a
-          chooseCantrip spec; independent of the class picks above, so this
-          is the ONLY content on the step for a non-caster High Elf. */}
-      <SpeciesCantripSection
-        choice={c.speciesCantripChoice}
-        edition={rulesEdition}
-        onChange={(speciesCantripId) => c.update({ speciesCantripId })}
-      />
-    </>
+    <CreationSpellsStep
+      className={c.draft.className}
+      subclassId={c.draft.subclassId || undefined}
+      counts={picks ?? undefined}
+      cantripIds={c.draft.cantripIds}
+      spellIds={c.draft.spellIds}
+      speciesCantripChoice={c.speciesCantripChoice}
+      edition={rulesEdition}
+      onChange={c.update}
+      onSpeciesCantripChange={(speciesCantripId) => c.update({ speciesCantripId })}
+    />
   );
 }
 
