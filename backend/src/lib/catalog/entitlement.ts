@@ -15,7 +15,11 @@ import { editionOf } from "@/lib/rules/edition.js";
 /** The identity a catalog visibility/shadowing query is resolved against. */
 export type CatalogViewer = { userId: string; campaignId: string | null; edition: RulesEdition };
 
-type CandidateEntry = {
+// Exported so a call site that needs the resolved WINNER rows themselves
+// (not just ids) — e.g. GET /api/spells building its own ownerId/catalog
+// wire fields — can consume resolveVisibleEntries' output directly instead
+// of re-querying CatalogEntry for fields this resolver already fetched.
+export type CandidateEntry = {
   id: string;
   scope: "GLOBAL" | "USER" | "CAMPAIGN";
   ownerUserId: string | null;
@@ -119,10 +123,23 @@ function pickLineageWinner(lineage: CandidateEntry[], viewer: CatalogViewer): Ca
   return winner;
 }
 
+/**
+ * Resolve the visible, shadow-resolved CatalogEntry ROWS for one
+ * (kind, viewer) — one winner per fork lineage. The row shape a call site
+ * needing more than the id (e.g. GET /api/spells' own scope/ownerUserId/
+ * forkedFromId wire fields) can consume directly, rather than re-querying
+ * CatalogEntry for fields this resolver's own fetchCandidates already
+ * fetched (CLAUDE.md "one shared function" — no second query re-deriving
+ * what this one already resolved).
+ */
+export async function resolveVisibleEntries(kind: CatalogKind, viewer: CatalogViewer): Promise<CandidateEntry[]> {
+  const candidates = await fetchCandidates(kind, viewer);
+  return groupLineages(candidates).map((lineage) => pickLineageWinner(lineage, viewer));
+}
+
 /** Resolve the visible, shadow-resolved CatalogEntry ids for one (kind, viewer). */
 export async function resolveVisibleEntryIds(kind: CatalogKind, viewer: CatalogViewer): Promise<string[]> {
-  const candidates = await fetchCandidates(kind, viewer);
-  return groupLineages(candidates).map((lineage) => pickLineageWinner(lineage, viewer).id);
+  return (await resolveVisibleEntries(kind, viewer)).map((entry) => entry.id);
 }
 
 function toCatalogMeta(entry: CandidateEntry): CatalogMeta {

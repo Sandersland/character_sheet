@@ -125,7 +125,7 @@ async function serializeForCharacter(characterId: string) {
     where: { id: characterId },
     include: characterInclude,
   });
-  return serializeCharacter(updated);
+  return await serializeCharacter(updated);
 }
 
 /**

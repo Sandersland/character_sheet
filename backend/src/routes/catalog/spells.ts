@@ -7,7 +7,7 @@ import { parseClassFilterOr400, parseSubclassIdParam } from "@/lib/http/parse-cl
 import { parseMaxSpellLevelOr400 } from "@/lib/http/parse-max-spell-level-param.js";
 import { requireEditionOr400 } from "@/lib/http/parse-edition-param.js";
 import { prisma } from "@/lib/core/prisma.js";
-import { resolveVisibleEntryIds } from "@/lib/catalog/entitlement.js";
+import { resolveVisibleEntries } from "@/lib/catalog/entitlement.js";
 import { classesOf, resolveSpellCatalogForEdition, SPELL_CLASS_MEMBERSHIP_SELECT } from "@/lib/spellcasting/spell-classes.js";
 import { loadSubclassSpellListExpansionIds } from "@/lib/spellcasting/spell-list-expansion.js";
 
@@ -153,25 +153,27 @@ function serializeCatalogSpellRow(row: CatalogSpellRow) {
  * The visibility filter (#1786, epic #1782 3/5; re-sourced off CatalogEntry
  * by #1796, epic #1795 1/6; wired to the resolver by #1798, epic #1795 3/6 —
  * REPLACES the interim two-query owner filter this route carried until now)
- * is `resolveVisibleEntryIds("SPELL", viewer)` (lib/catalog/entitlement.ts):
+ * is `resolveVisibleEntries("SPELL", viewer)` (lib/catalog/entitlement.ts):
  * every GLOBAL entry of the caller's edition, the caller's own USER-scope
  * entries, and — for a fork lineage — only the highest-precedence entry
  * (never re-implemented here, see that module's own comment). This route has
  * no campaign context (no character in play, just an authenticated caller),
  * so `viewer.campaignId` is null — a CAMPAIGN-scope entry or a USER entry
  * granted into a campaign is a serializeCharacter concern (#1798's other
- * read path), not this picker's. Spell.catalogEntryId carries no Prisma
- * relation (the supertype stays closed, see schema.prisma's own comment on
- * that column), so the visible id set is resolved first and handed to a
- * plain `catalogEntryId: { in: [...] }` filter. Each row is then tagged with
- * its resolved `ownerId` (null for GLOBAL, the caller's own id for USER —
- * never anyone else's, since the set was already scoped) AND its `catalog`
- * metadata (SpellWire.catalog, locked in slice 1) before flowing through the
- * exact same resolution/class/level pipeline as before
- * (resolveSpellCatalogForEdition's grouping key still accounts for `ownerId`
- * — see that function's own comment for the same-name collision case).
- * `spellsRouter` is mounted `"authed"` in routes/manifest.ts, so `req.user`
- * is always populated here.
+ * read path), not this picker's. The resolver's own rows (id/scope/
+ * ownerUserId/forkedFromId) are consumed directly for `ownerId`/`catalog`
+ * below — no second CatalogEntry query re-fetching fields it already has.
+ * Spell.catalogEntryId carries no Prisma relation (the supertype stays
+ * closed, see schema.prisma's own comment on that column), so the visible id
+ * set is what's handed to a plain `catalogEntryId: { in: [...] }` filter.
+ * Each row is then tagged with its resolved `ownerId` (null for GLOBAL, the
+ * caller's own id for USER — never anyone else's, since the set was already
+ * scoped) AND its `catalog` metadata (SpellWire.catalog, locked in slice 1)
+ * before flowing through the exact same resolution/class/level pipeline as
+ * before (resolveSpellCatalogForEdition's grouping key still accounts for
+ * `ownerId` — see that function's own comment for the same-name collision
+ * case). `spellsRouter` is mounted `"authed"` in routes/manifest.ts, so
+ * `req.user` is always populated here.
  */
 spellsRouter.get("/spells", async (req, res) => {
   const edition = requireEditionOr400(req, res);
@@ -184,14 +186,10 @@ spellsRouter.get("/spells", async (req, res) => {
   const subclassFilter = parseSubclassIdParam(req, res);
   if (!subclassFilter.ok) return;
 
-  const visibleEntryIds = await resolveVisibleEntryIds("SPELL", {
+  const visibleEntries = await resolveVisibleEntries("SPELL", {
     userId: req.user!.id,
     campaignId: null,
     edition,
-  });
-  const visibleEntries = await prisma.catalogEntry.findMany({
-    where: { id: { in: visibleEntryIds } },
-    select: { id: true, scope: true, ownerUserId: true, forkedFromId: true },
   });
   const catalogByEntryId = new Map(
     visibleEntries.map((e) => [
@@ -202,7 +200,7 @@ spellsRouter.get("/spells", async (req, res) => {
 
   const rows = await prisma.spell.findMany({
     where: {
-      catalogEntryId: { in: visibleEntryIds },
+      catalogEntryId: { in: visibleEntries.map((e) => e.id) },
       ...(levelFilter.maxLevel === undefined ? {} : { level: { lte: levelFilter.maxLevel } }),
     },
     include: SPELL_CLASS_MEMBERSHIP_SELECT,
