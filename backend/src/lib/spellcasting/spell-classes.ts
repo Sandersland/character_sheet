@@ -139,16 +139,29 @@ export async function rejectCrossEditionSpellForks(
  * A genuine fork (name present under both editions) is unaffected either
  * way: the exact-match branch always wins — proven by spells.test.ts's
  * fork-disjointness suite.
+ *
+ * Grouping key is `(name, ownerId)`, not bare `name` (#1786, epic #1782 3/5):
+ * a user's homebrew spell (non-null ownerId) can legally share a NAME with a
+ * seeded spell (null ownerId) — they're distinct rows, both tagged
+ * EDITION_2014, and neither should shadow the other the way a genuine 2014/
+ * 2024 fork's two rows are MEANT to collapse to one. Widening the key to
+ * include ownerId puts every homebrew row in its own singleton group (the
+ * `(name, edition, ownerId)` unique constraint guarantees at most one), so it
+ * always survives resolution and is served ALONGSIDE the seeded row of the
+ * same name rather than replacing it — same "must not drop one for the
+ * other" outcome resolveEditionCatalog's own `keyOf` widening documents for
+ * Subclass's compound key.
  */
-export function resolveSpellCatalogForEdition<T extends { name: string; edition: RulesEdition | null }>(
+export function resolveSpellCatalogForEdition<T extends { name: string; edition: RulesEdition | null; ownerId: string | null }>(
   rows: T[],
   edition: RulesEdition,
 ): T[] {
   const byName = new Map<string, T[]>();
   for (const row of rows) {
-    const group = byName.get(row.name);
+    const key = `${row.name}::${row.ownerId ?? ""}`;
+    const group = byName.get(key);
     if (group) group.push(row);
-    else byName.set(row.name, [row]);
+    else byName.set(key, [row]);
   }
   const resolved: T[] = [];
   for (const group of byName.values()) {

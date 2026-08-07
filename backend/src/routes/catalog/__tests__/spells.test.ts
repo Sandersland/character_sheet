@@ -4,6 +4,7 @@ import supertest from "supertest";
 import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
+import { ensureTestOwner } from "@/test-support/owner.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 
 const OWNER_ID = "owner-spells";
@@ -83,6 +84,13 @@ async function seedFixtures() {
 function get(path: string, edition: string = "EDITION_2024") {
   const sep = path.includes("?") ? "&" : "?";
   return supertest.agent(app).set("Cookie", COOKIE).get(`${path}${sep}edition=${edition}`);
+}
+
+// Homebrew tests (#1786) need to vary WHICH user's cookie is attached — get()
+// above always uses the module-level OWNER_ID cookie.
+function getAs(cookie: string, path: string, edition: string = "EDITION_2014") {
+  const sep = path.includes("?") ? "&" : "?";
+  return supertest.agent(app).set("Cookie", cookie).get(`${path}${sep}edition=${edition}`);
 }
 
 function names(body: { name: string }[]): string[] {
@@ -463,6 +471,147 @@ describe("GET /api/spells — genuine edition fork resolves to one row per editi
       expect(clericMatch?.id).toBe(fork2014.id);
     } finally {
       await prisma.spell.deleteMany({ where: { name: DIVERGENT_NAME } });
+    }
+  });
+});
+
+// #1786, epic #1782 3/5: a user's own homebrew (Spell.ownerId, #1784) flows
+// through the same route as seeded spells, scoped so only its owner ever
+// sees it — the cross-user isolation test is the load-bearing one here.
+describe("GET /api/spells — user homebrew (#1786)", () => {
+  const OWNER_A = "owner-spells-homebrew-a";
+  const OWNER_B = "owner-spells-homebrew-b";
+  let cookieA: string;
+  let cookieB: string;
+
+  const HOMEBREW_NAME = "Test Homebrew Bolt";
+
+  async function createHomebrew(
+    ownerId: string,
+    overrides: { name?: string; level?: number; classes?: string[] } = {},
+  ) {
+    const { classes = [], name = HOMEBREW_NAME, level = 1 } = overrides;
+    const spell = await prisma.spell.create({
+      data: {
+        name,
+        level,
+        school: "evocation",
+        castingTime: "1 action",
+        range: "30 feet",
+        duration: "Instantaneous",
+        description: "A homebrew test spell.",
+        edition: "EDITION_2014",
+        ownerId,
+      },
+    });
+    await seedSpellClasses(spell.id, classes);
+    return spell;
+  }
+
+  // Created once here, not inside the first `it` below: the isolation test
+  // (B must NOT see it) and the edition test (2024 must NOT see it) both
+  // assert `.not.toContain`, which would pass VACUOUSLY — for the wrong
+  // reason — if this fixture didn't already exist independent of test
+  // order/`.only`. All three tests below share this one row.
+  beforeAll(async () => {
+    await ensureTestOwner(OWNER_A);
+    await ensureTestOwner(OWNER_B);
+    cookieA = await authCookie(OWNER_A);
+    cookieB = await authCookie(OWNER_B);
+    await createHomebrew(OWNER_A);
+  });
+
+  afterAll(async () => {
+    await prisma.spell.deleteMany({ where: { ownerId: { in: [OWNER_A, OWNER_B] } } });
+    await prisma.user.deleteMany({ where: { id: { in: [OWNER_A, OWNER_B] } } });
+  });
+
+  it("a user's own homebrew appears in their own EDITION_2014 catalog", async () => {
+    const res = await getAs(cookieA, "/api/spells", "EDITION_2014");
+    expect(res.status).toBe(200);
+    expect(names(res.body)).toContain(HOMEBREW_NAME);
+  });
+
+  it("does NOT leak to a different user (cross-user isolation)", async () => {
+    const res = await getAs(cookieB, "/api/spells", "EDITION_2014");
+    expect(res.status).toBe(200);
+    expect(names(res.body)).not.toContain(HOMEBREW_NAME);
+  });
+
+  it("a lone-tagged EDITION_2014 homebrew spell does not appear in an EDITION_2024 request", async () => {
+    const res = await getAs(cookieA, "/api/spells", "EDITION_2024");
+    expect(res.status).toBe(200);
+    expect(names(res.body)).not.toContain(HOMEBREW_NAME);
+  });
+
+  it("system (null-owner) spells still appear for every user, homebrew or not", async () => {
+    const SYSTEM_NAME = "Test System Spell For Homebrew Suite";
+    const systemRow = {
+      name: SYSTEM_NAME,
+      level: 1,
+      school: "evocation" as const,
+      castingTime: "1 action",
+      range: "30 feet",
+      duration: "Instantaneous",
+      description: "A shared system spell.",
+      cantripScaling: false,
+    };
+    await upsertEditionRow(prisma.spell, { name: SYSTEM_NAME, edition: null }, { ...systemRow, edition: null }, systemRow);
+
+    try {
+      const resA = await getAs(cookieA, "/api/spells", "EDITION_2014");
+      const resB = await getAs(cookieB, "/api/spells", "EDITION_2014");
+      expect(names(resA.body)).toContain(SYSTEM_NAME);
+      expect(names(resB.body)).toContain(SYSTEM_NAME);
+    } finally {
+      await prisma.spell.deleteMany({ where: { name: SYSTEM_NAME } });
+    }
+  });
+
+  it("?class= and ?maxLevel= apply to homebrew rows identically to seeded rows", async () => {
+    const FILTERED_NAME = "Test Homebrew Filtered Spell";
+    await createHomebrew(OWNER_A, { name: FILTERED_NAME, level: 3, classes: ["wizard"] });
+
+    try {
+      const wizardMatch = await getAs(cookieA, "/api/spells?class=wizard&maxLevel=3", "EDITION_2014");
+      expect(names(wizardMatch.body)).toContain(FILTERED_NAME);
+
+      const wrongClass = await getAs(cookieA, "/api/spells?class=cleric&maxLevel=3", "EDITION_2014");
+      expect(names(wrongClass.body)).not.toContain(FILTERED_NAME);
+
+      const belowLevel = await getAs(cookieA, "/api/spells?class=wizard&maxLevel=2", "EDITION_2014");
+      expect(names(belowLevel.body)).not.toContain(FILTERED_NAME);
+    } finally {
+      await prisma.spell.deleteMany({ where: { name: FILTERED_NAME } });
+    }
+  });
+
+  it("a homebrew spell sharing a NAME with a seeded spell does not shadow or get shadowed", async () => {
+    const COLLISION_NAME = "Test Collision Catalog Spell";
+    const seededRow = {
+      name: COLLISION_NAME,
+      level: 2,
+      school: "evocation" as const,
+      castingTime: "1 action",
+      range: "60 feet",
+      duration: "Instantaneous",
+      description: "The seeded version.",
+      cantripScaling: false,
+    };
+    const seeded = await upsertEditionRow(
+      prisma.spell,
+      { name: COLLISION_NAME, edition: "EDITION_2014" },
+      { ...seededRow, edition: "EDITION_2014" },
+      seededRow,
+    );
+    const homebrew = await createHomebrew(OWNER_A, { name: COLLISION_NAME });
+
+    try {
+      const res = await getAs(cookieA, "/api/spells", "EDITION_2014");
+      const matches = res.body.filter((s: { name: string }) => s.name === COLLISION_NAME);
+      expect(matches.map((s: { id: string }) => s.id).sort()).toEqual([seeded.id, homebrew.id].sort());
+    } finally {
+      await prisma.spell.deleteMany({ where: { name: COLLISION_NAME } });
     }
   });
 });
