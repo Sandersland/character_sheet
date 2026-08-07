@@ -20,6 +20,13 @@ export type {
   SpellcastingOperation,
 } from "@character-sheet/shared-types";
 
+// Request body for POST/PATCH /api/spells/custom (#1787, epic #1782 4/5) —
+// creating/editing a user-owned homebrew catalog spell (Spell.ownerId).
+// Aliased on import: CustomSpellInput above already names the per-character
+// inline-custom-spell payload (learnSpell.custom, no catalog row, no reuse
+// across characters) — a different, narrower shape than this one.
+export type { CustomSpellInput as HomebrewSpellInput } from "@character-sheet/contracts";
+
 /**
  * A spell entry in the character's spellcasting JSON (per-character mutable
  * state). `id` is the per-character entry UUID (operation target); `spellId`
@@ -105,6 +112,42 @@ export interface SpellSlots {
   level: number;
   total: number;
   used: number;
+}
+
+/**
+ * Response shape for POST/PATCH /api/spells/custom — a user-owned homebrew
+ * spell row (Spell.ownerId non-null, reusable across all of that user's
+ * characters). Not derived from a contracts schema (the route has no
+ * response schema, only customSpellSchema for the request): this mirrors
+ * custom-spells.ts's serializeCustomSpell, one field-for-field. Once served
+ * back through `GET /api/spells` (#1786) a homebrew row folds into the plain
+ * CatalogSpell shape, so this type is only for the direct create/edit
+ * response, not the picker.
+ */
+export interface HomebrewSpell {
+  id: string;
+  ownerId: string;
+  edition: string;
+  name: string;
+  level: number;
+  school: SpellSchool;
+  castingTime: string;
+  range: string;
+  duration: string;
+  description: string;
+  concentration: boolean;
+  ritual: boolean;
+  components?: SpellComponents | null;
+  classes: string[];
+  effectKind?: "damage" | "heal";
+  effectDiceCount?: number;
+  effectDiceFaces?: number;
+  effectModifier?: number;
+  damageType?: string;
+  attackType?: "attack" | "save";
+  saveAbility?: string;
+  saveEffect?: "half" | "none";
+  upcastDicePerLevel?: number;
 }
 
 // Spellcasting operation types (CustomSpellInput, the per-op interfaces, and the

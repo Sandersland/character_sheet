@@ -12,7 +12,14 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 // character's edition (or the creation draft's chosen one) in hand, so
 // threading it through here is what keeps the picker from ever offering a
 // cross-edition row.
-export function useSpellCatalog(edition: RulesEdition, filter?: SpellCatalogFilter) {
+//
+// `refreshKey` (#1787) is an opt-in manual-refetch trigger, same `unknown`
+// escape-hatch shape as SessionLog's own prop: GET /api/spells is not on
+// TanStack Query here (unlike GET /api/reference's useReferenceData), so
+// there is no query key to invalidate — a caller that just wrote a new
+// homebrew spell (AddSpellPanel, after createCustomSpell) bumps a counter to
+// force this effect to re-run instead.
+export function useSpellCatalog(edition: RulesEdition, filter?: SpellCatalogFilter, refreshKey?: unknown) {
   const [catalog, setCatalog] = useState<CatalogSpell[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const showSpinner = useDelayedFlag(catalog === null && !error);
@@ -28,7 +35,7 @@ export function useSpellCatalog(edition: RulesEdition, filter?: SpellCatalogFilt
       .then((spells) => { if (mounted) setCatalog(spells); })
       .catch(() => { if (mounted) setError("Couldn't load spell catalog."); });
     return () => { mounted = false; };
-  }, [edition, className, maxLevel, subclassId]);
+  }, [edition, className, maxLevel, subclassId, refreshKey]);
 
   return { catalog, error, showSpinner };
 }
