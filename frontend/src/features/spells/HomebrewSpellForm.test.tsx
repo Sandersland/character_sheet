@@ -4,10 +4,11 @@ import userEvent from "@testing-library/user-event";
 
 import HomebrewSpellForm from "@/features/spells/HomebrewSpellForm";
 import * as client from "@/api/client";
-import type { ClassOption, ReferenceData } from "@/types/character";
+import type { ClassOption, HomebrewSpellInput, ReferenceData } from "@/types/character";
 
 vi.mock("@/api/client", () => ({
   createCustomSpell: vi.fn(),
+  updateCustomSpell: vi.fn(),
   fetchReference: vi.fn(),
 }));
 
@@ -50,11 +51,12 @@ describe("HomebrewSpellForm", () => {
   beforeEach(() => {
     vi.mocked(client.fetchReference).mockResolvedValue(REFERENCE);
     vi.mocked(client.createCustomSpell).mockReset();
+    vi.mocked(client.updateCustomSpell).mockReset();
   });
 
   it("renders the core fields", async () => {
     const user = userEvent.setup();
-    render(<HomebrewSpellForm edition="EDITION_2014" onCreated={noop} onClose={noop} />);
+    render(<HomebrewSpellForm edition="EDITION_2014" onSaved={noop} onClose={noop} />);
 
     expect(screen.getByLabelText(/spell name/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/^level$/i)).toBeInTheDocument();
@@ -78,7 +80,7 @@ describe("HomebrewSpellForm", () => {
 
   it("shows save ability only when the effect is damage with attack type 'save'", async () => {
     const user = userEvent.setup();
-    render(<HomebrewSpellForm edition="EDITION_2014" onCreated={noop} onClose={noop} />);
+    render(<HomebrewSpellForm edition="EDITION_2014" onSaved={noop} onClose={noop} />);
 
     expect(screen.queryByLabelText(/save ability/i)).not.toBeInTheDocument();
 
@@ -97,7 +99,7 @@ describe("HomebrewSpellForm", () => {
 
   it("blocks submit and shows an inline error when dice fields are missing for an enabled effect", async () => {
     const user = userEvent.setup();
-    render(<HomebrewSpellForm edition="EDITION_2014" onCreated={noop} onClose={noop} />);
+    render(<HomebrewSpellForm edition="EDITION_2014" onSaved={noop} onClose={noop} />);
 
     await user.type(screen.getByLabelText(/spell name/i), "Zap");
     await user.type(screen.getByLabelText(/description/i), "A zap.");
@@ -110,7 +112,7 @@ describe("HomebrewSpellForm", () => {
     expect(client.createCustomSpell).not.toHaveBeenCalled();
   });
 
-  it("submits the correctly-shaped payload and calls onCreated", async () => {
+  it("submits the correctly-shaped payload and calls onSaved", async () => {
     vi.mocked(client.createCustomSpell).mockResolvedValue({
       id: "s1",
       ownerId: "u1",
@@ -126,9 +128,9 @@ describe("HomebrewSpellForm", () => {
       ritual: false,
       classes: ["Wizard"],
     });
-    const onCreated = vi.fn();
+    const onSaved = vi.fn();
     const user = userEvent.setup();
-    render(<HomebrewSpellForm edition="EDITION_2014" onCreated={onCreated} onClose={noop} />);
+    render(<HomebrewSpellForm edition="EDITION_2014" onSaved={onSaved} onClose={noop} />);
 
     await user.type(screen.getByLabelText(/spell name/i), "Bolt");
     await user.type(screen.getByLabelText(/description/i), "A bolt.");
@@ -161,7 +163,7 @@ describe("HomebrewSpellForm", () => {
         saveAbility: "dexterity",
       }),
     );
-    await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
   });
 
   it("omits upcastDicePerLevel from the payload when left blank", async () => {
@@ -181,7 +183,7 @@ describe("HomebrewSpellForm", () => {
       classes: [],
     });
     const user = userEvent.setup();
-    render(<HomebrewSpellForm edition="EDITION_2014" onCreated={noop} onClose={noop} />);
+    render(<HomebrewSpellForm edition="EDITION_2014" onSaved={noop} onClose={noop} />);
 
     await user.type(screen.getByLabelText(/spell name/i), "Zap");
     await user.type(screen.getByLabelText(/description/i), "A zap.");
@@ -195,5 +197,87 @@ describe("HomebrewSpellForm", () => {
     await waitFor(() => expect(client.createCustomSpell).toHaveBeenCalledTimes(1));
     const payload = vi.mocked(client.createCustomSpell).mock.calls[0][0];
     expect(payload.upcastDicePerLevel).toBeUndefined();
+  });
+});
+
+// #1788, epic #1782 5/5: HomebrewTab's manage list reuses this same form in
+// edit mode — prefilled from the served row, submitting via PATCH.
+describe("HomebrewSpellForm editing an existing homebrew spell", () => {
+  beforeEach(() => {
+    vi.mocked(client.fetchReference).mockResolvedValue(REFERENCE);
+    vi.mocked(client.createCustomSpell).mockReset();
+    vi.mocked(client.updateCustomSpell).mockReset();
+  });
+
+  const EXISTING_DRAFT: HomebrewSpellInput = {
+    name: "Old Bolt",
+    level: 2,
+    school: "evocation",
+    castingTime: "1 action",
+    range: "60 feet",
+    duration: "Instantaneous",
+    description: "The old description.",
+    concentration: false,
+    ritual: false,
+    components: { verbal: true, somatic: false, material: false },
+    classes: ["wizard"],
+    effectKind: "damage",
+    effectDiceCount: 4,
+    effectDiceFaces: 6,
+    damageType: "fire",
+    attackType: "attack",
+  };
+
+  it("prefills the draft and labels the submit button 'Save changes'", async () => {
+    render(
+      <HomebrewSpellForm
+        edition="EDITION_2014"
+        editing={{ id: "s1", draft: EXISTING_DRAFT }}
+        onSaved={noop}
+        onClose={noop}
+      />,
+    );
+
+    expect(screen.getByLabelText(/spell name/i)).toHaveValue("Old Bolt");
+    expect(screen.getByLabelText(/description/i)).toHaveValue("The old description.");
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /create homebrew spell/i })).not.toBeInTheDocument();
+  });
+
+  it("submits edits via updateCustomSpell with the existing id, and calls onSaved", async () => {
+    vi.mocked(client.updateCustomSpell).mockResolvedValue({
+      id: "s1",
+      ownerId: "u1",
+      edition: "EDITION_2014",
+      ...EXISTING_DRAFT,
+      name: "New Bolt",
+      classes: ["wizard"],
+      concentration: false,
+      ritual: false,
+    });
+    const onSaved = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <HomebrewSpellForm
+        edition="EDITION_2014"
+        editing={{ id: "s1", draft: EXISTING_DRAFT }}
+        onSaved={onSaved}
+        onClose={noop}
+      />,
+    );
+
+    const nameInput = screen.getByLabelText(/spell name/i);
+    await user.clear(nameInput);
+    await user.type(nameInput, "New Bolt");
+
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => expect(client.updateCustomSpell).toHaveBeenCalledTimes(1));
+    expect(client.updateCustomSpell).toHaveBeenCalledWith(
+      "s1",
+      expect.objectContaining({ name: "New Bolt", effectKind: "damage", damageType: "fire" }),
+    );
+    expect(client.createCustomSpell).not.toHaveBeenCalled();
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
   });
 });

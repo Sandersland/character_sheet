@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { BLANK_HOMEBREW_SPELL, buildHomebrewSpellPayload, validateHomebrewSpellDraft } from "@/lib/homebrewSpell";
-import type { HomebrewSpellInput } from "@/types/character";
+import {
+  BLANK_HOMEBREW_SPELL,
+  buildHomebrewSpellPayload,
+  ownedHomebrewSpells,
+  toHomebrewSpellInput,
+  validateHomebrewSpellDraft,
+} from "@/lib/homebrewSpell";
+import type { CatalogSpell, HomebrewSpellInput } from "@/types/character";
 
 describe("buildHomebrewSpellPayload", () => {
   it("trims text fields and carries the core fields + classes", () => {
@@ -162,5 +168,82 @@ describe("validateHomebrewSpellDraft", () => {
 
   it("ignores effect fields entirely when hasEffect is false", () => {
     expect(validateHomebrewSpellDraft({ ...base, effectKind: "damage" }, false)).toBeNull();
+  });
+});
+
+function catalogSpell(over: Partial<CatalogSpell> = {}): CatalogSpell {
+  return {
+    id: "s1",
+    name: "Test Bolt",
+    level: 1,
+    school: "evocation",
+    castingTime: "1 action",
+    range: "60 feet",
+    duration: "Instantaneous",
+    description: "A bolt of test energy.",
+    concentration: false,
+    ritual: false,
+    classes: ["wizard"],
+    cantripScaling: false,
+    ...over,
+  };
+}
+
+describe("ownedHomebrewSpells", () => {
+  it("keeps only rows with an ownerId, dropping seeded rows", () => {
+    const seeded = catalogSpell({ id: "seeded", ownerId: undefined });
+    const homebrew = catalogSpell({ id: "own", ownerId: "u1" });
+    expect(ownedHomebrewSpells([seeded, homebrew])).toEqual([homebrew]);
+  });
+
+  it("returns an empty list when the catalog has no homebrew", () => {
+    expect(ownedHomebrewSpells([catalogSpell({ ownerId: undefined })])).toEqual([]);
+  });
+});
+
+describe("toHomebrewSpellInput", () => {
+  it("maps a served CatalogSpell into an editable draft", () => {
+    const spell = catalogSpell({
+      ownerId: "u1",
+      name: "Ember Bolt",
+      level: 2,
+      components: { verbal: true, somatic: true, material: false },
+      classes: ["wizard", "sorcerer"],
+      effectKind: "damage",
+      effectDiceCount: 3,
+      effectDiceFaces: 6,
+      damageType: "fire",
+      attackType: "save",
+      saveAbility: "dexterity",
+      saveEffect: "half",
+    });
+
+    expect(toHomebrewSpellInput(spell)).toEqual({
+      name: "Ember Bolt",
+      level: 2,
+      school: "evocation",
+      castingTime: "1 action",
+      range: "60 feet",
+      duration: "Instantaneous",
+      description: "A bolt of test energy.",
+      concentration: false,
+      ritual: false,
+      components: { verbal: true, somatic: true, material: false },
+      classes: ["wizard", "sorcerer"],
+      effectKind: "damage",
+      effectDiceCount: 3,
+      effectDiceFaces: 6,
+      effectModifier: undefined,
+      damageType: "fire",
+      attackType: "save",
+      saveAbility: "dexterity",
+      saveEffect: "half",
+      upcastDicePerLevel: undefined,
+    });
+  });
+
+  it("defaults components to all-false-but-verbal when the row has none", () => {
+    const spell = catalogSpell({ ownerId: "u1", components: undefined });
+    expect(toHomebrewSpellInput(spell).components).toEqual({ verbal: true, somatic: false, material: false });
   });
 });

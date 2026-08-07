@@ -1,10 +1,11 @@
-// Pure draft/payload/validation logic for the homebrew-spell creation form
-// (#1787, epic #1782 4/5). No JSX — HomebrewSpellForm and its subcomponents
-// are the only consumers. This is a CLIENT-SIDE UX mirror of
-// validateCustomSpellCoherence: the backend remains the source of truth (it
-// re-validates on every POST/PATCH), this only lets the form show an inline
-// error / disable submit before round-tripping.
-import type { HomebrewSpellInput } from "@/types/character";
+// Pure draft/payload/validation logic for the homebrew-spell creation and
+// management forms (#1787/#1788, epic #1782 4/5-5/5). No JSX —
+// HomebrewSpellForm, HomebrewTab, and their subcomponents are the only
+// consumers. This is a CLIENT-SIDE UX mirror of validateCustomSpellCoherence:
+// the backend remains the source of truth (it re-validates on every
+// POST/PATCH), this only lets the form show an inline error / disable submit
+// before round-tripping.
+import type { CatalogSpell, HomebrewSpellInput } from "@/types/character";
 
 export const BLANK_HOMEBREW_SPELL: HomebrewSpellInput = {
   name: "",
@@ -90,4 +91,50 @@ export function validateHomebrewSpellDraft(draft: HomebrewSpellInput, hasEffect:
     }
   }
   return null;
+}
+
+// The manage view's own filter (#1788, epic #1782 5/5): GET /api/spells
+// already scopes ownerId to `{ null, caller }` server-side (#1786), so any
+// row with ownerId set here IS the caller's own — no separate "mine" endpoint
+// or current-user id needed on the frontend.
+export function ownedHomebrewSpells(catalog: CatalogSpell[]): CatalogSpell[] {
+  return catalog.filter((spell) => spell.ownerId !== undefined);
+}
+
+// Maps a served CatalogSpell (GET /api/spells row) back into the editable
+// draft shape HomebrewSpellForm consumes, for the manage view's "Edit" action.
+// Unlike BLANK_HOMEBREW_SPELL, `components` here CAN be legitimately absent —
+// a homebrew row created outside this form (or before components was
+// required) may have skipped it — so this fallback is a real data-shape
+// guard, unlike HomebrewSpellForm's own `draft.components!` (unreachable
+// there: the form's own draft lifecycle always sets it).
+//
+// Only ever called on an already-`ownedHomebrewSpells`-filtered row, i.e. one
+// this exact form wrote through customSpellSchema: effectKind is therefore
+// never "buff" (CatalogSpell's broader union also covers seeded rows, which
+// this form cannot produce) and saveAbility is always one of
+// customSpellSchema's SAVE_ABILITIES — narrowing casts, not escape hatches.
+export function toHomebrewSpellInput(spell: CatalogSpell): HomebrewSpellInput {
+  return {
+    name: spell.name,
+    level: spell.level,
+    school: spell.school,
+    castingTime: spell.castingTime,
+    range: spell.range,
+    duration: spell.duration,
+    description: spell.description,
+    concentration: spell.concentration,
+    ritual: spell.ritual,
+    components: spell.components ?? { verbal: true, somatic: false, material: false },
+    classes: spell.classes,
+    effectKind: spell.effectKind === "buff" ? undefined : spell.effectKind,
+    effectDiceCount: spell.effectDiceCount,
+    effectDiceFaces: spell.effectDiceFaces,
+    effectModifier: spell.effectModifier,
+    damageType: spell.damageType,
+    attackType: spell.attackType,
+    saveAbility: spell.saveAbility as HomebrewSpellInput["saveAbility"],
+    saveEffect: spell.saveEffect ?? undefined,
+    upcastDicePerLevel: spell.upcastDicePerLevel,
+  };
 }

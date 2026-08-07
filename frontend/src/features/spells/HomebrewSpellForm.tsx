@@ -1,14 +1,15 @@
-// Homebrew-spell creation form (#1787, epic #1782 4/5): authors a user-owned
-// catalog Spell row (POST /api/spells/custom) that becomes reusable across
-// all of the caller's characters and is served back by GET /api/spells
-// (#1786, resolveSpellCatalogForEdition). Distinct from CustomSpellForm's
+// Homebrew-spell creation + edit form (#1787/#1788, epic #1782 4/5-5/5):
+// authors or updates a user-owned catalog Spell row (POST/PATCH
+// /api/spells/custom) that becomes reusable across all of the caller's
+// characters and is served back by GET /api/spells (#1786,
+// resolveSpellCatalogForEdition). Distinct from CustomSpellForm's
 // per-character inline spell (learnSpell.custom): that one is never
 // persisted as its own catalog row and never reappears in the picker. The
 // level/school selects and the effect-toggle wrapper are shared with
 // CustomSpellForm via SpellLevelSelect/SpellSchoolSelect/SpellEffectToggle.
 import { useState } from "react";
 
-import { createCustomSpell } from "@/api/client";
+import { createCustomSpell, updateCustomSpell } from "@/api/client";
 import HomebrewSpellClassFields from "@/features/spells/HomebrewSpellClassFields";
 import HomebrewSpellComponentsFields from "@/features/spells/HomebrewSpellComponentsFields";
 import HomebrewSpellEffectFields from "@/features/spells/HomebrewSpellEffectFields";
@@ -21,22 +22,20 @@ import { BLANK_HOMEBREW_SPELL, buildHomebrewSpellPayload, validateHomebrewSpellD
 import type { HomebrewSpellInput } from "@/types/character";
 import type { RulesEdition } from "@character-sheet/shared-types";
 
-const DEFAULT_COMPONENTS: NonNullable<HomebrewSpellInput["components"]> = {
-  verbal: true,
-  somatic: false,
-  material: false,
-};
-
 interface HomebrewSpellFormProps {
   edition: RulesEdition;
-  /** Called after a successful create — the caller refetches/shows the catalog picker. */
-  onCreated: () => void;
+  /** Present when editing an existing homebrew spell (HomebrewTab's manage
+   *  list, #1788): prefills the draft from the served row and submits via
+   *  PATCH instead of POST. Absent for the plain creation flow. */
+  editing?: { id: string; draft: HomebrewSpellInput };
+  /** Called after a successful create/update — the caller refetches/shows the catalog picker. */
+  onSaved: () => void;
   onClose: () => void;
 }
 
-export default function HomebrewSpellForm({ edition, onCreated, onClose }: HomebrewSpellFormProps) {
-  const [draft, setDraft] = useState<HomebrewSpellInput>(BLANK_HOMEBREW_SPELL);
-  const [hasEffect, setHasEffect] = useState(false);
+export default function HomebrewSpellForm({ edition, editing, onSaved, onClose }: HomebrewSpellFormProps) {
+  const [draft, setDraft] = useState<HomebrewSpellInput>(editing?.draft ?? BLANK_HOMEBREW_SPELL);
+  const [hasEffect, setHasEffect] = useState(!!editing?.draft.effectKind);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { reference } = useReferenceData(edition);
@@ -53,12 +52,17 @@ export default function HomebrewSpellForm({ edition, onCreated, onClose }: Homeb
     setError(null);
     setBusy(true);
     try {
-      await createCustomSpell(buildHomebrewSpellPayload(draft, hasEffect));
-      setDraft(BLANK_HOMEBREW_SPELL);
-      setHasEffect(false);
-      onCreated();
+      const payload = buildHomebrewSpellPayload(draft, hasEffect);
+      if (editing) {
+        await updateCustomSpell(editing.id, payload);
+      } else {
+        await createCustomSpell(payload);
+        setDraft(BLANK_HOMEBREW_SPELL);
+        setHasEffect(false);
+      }
+      onSaved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create spell.");
+      setError(err instanceof Error ? err.message : `Failed to ${editing ? "update" : "create"} spell.`);
     } finally {
       setBusy(false);
     }
@@ -136,8 +140,9 @@ export default function HomebrewSpellForm({ edition, onCreated, onClose }: Homeb
         </div>
 
         <div className="sm:col-span-2">
+          {/* Non-null: BLANK_HOMEBREW_SPELL and toHomebrewSpellInput both always set `components`. */}
           <HomebrewSpellComponentsFields
-            components={draft.components ?? DEFAULT_COMPONENTS}
+            components={draft.components!}
             onChange={(components) => update({ components })}
           />
         </div>
@@ -184,7 +189,7 @@ export default function HomebrewSpellForm({ edition, onCreated, onClose }: Homeb
           disabled={busy || !draft.name.trim()}
           className="rounded-control bg-arcane-700 px-3 py-1.5 text-xs font-semibold text-parchment-50 hover:bg-arcane-800 disabled:opacity-40"
         >
-          {busy ? "Saving…" : "Create homebrew spell"}
+          {busy ? "Saving…" : editing ? "Save changes" : "Create homebrew spell"}
         </button>
       </div>
     </form>

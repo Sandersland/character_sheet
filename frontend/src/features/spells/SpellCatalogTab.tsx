@@ -1,25 +1,31 @@
-// Catalog tab: filter strip + scrollable results list. Owns search/level state.
+// Catalog tab: filter strip + scrollable results list. Owns search/level
+// state; the catalog fetch itself is lifted to AddSpellPanel (#1788, epic
+// #1782 5/5) so the sibling Homebrew tab's manage list can derive from the
+// SAME GET /api/spells result instead of running a second fetch.
 import { useState } from "react";
 
 import Spinner from "@/components/ui/Spinner";
 import SpellCatalogRow from "@/features/spells/SpellCatalogRow";
-import { useSpellCatalog } from "@/features/spells/useSpellCatalog";
 import { INPUT_CLS, LEVEL_OPTIONS, filterCatalog } from "@/lib/addSpell";
 import type { CatalogSpell } from "@/types/character";
-import type { RulesEdition } from "@character-sheet/shared-types";
 
 interface SpellCatalogTabProps {
   busy: boolean;
   learnedSpellIds: Set<string>;
-  edition: RulesEdition;
   onLearn: (spell: CatalogSpell) => void;
-  /** Bump to force a refetch (#1787) — e.g. after creating a homebrew spell
-   *  from the sibling tab, so it shows up here without remounting the panel. */
-  refreshKey?: unknown;
+  catalog: CatalogSpell[] | null;
+  error: string | null;
+  showSpinner: boolean;
 }
 
-export default function SpellCatalogTab({ busy, learnedSpellIds, edition, onLearn, refreshKey }: SpellCatalogTabProps) {
-  const { catalog, error, showSpinner } = useSpellCatalog(edition, undefined, refreshKey);
+export default function SpellCatalogTab({
+  busy,
+  learnedSpellIds,
+  onLearn,
+  catalog,
+  error,
+  showSpinner,
+}: SpellCatalogTabProps) {
   const [search, setSearch] = useState("");
   const [levelFilter, setLevelFilter] = useState("");
 
