@@ -35,6 +35,11 @@ const CANDIDATE_SELECT = {
   forkedFromId: true,
 } satisfies Prisma.CatalogEntrySelect;
 
+// Shared identity for the "no CAMPAIGN candidates, skip the query" fast path
+// below and in spells.ts — a fresh `new Set()` per call would work identically
+// but this reads as the deliberate constant it is.
+export const EMPTY_CAMPAIGN_ID_SET: ReadonlySet<string> = new Set();
+
 // Precedence within a fork lineage keys on the entry's ROLE for THIS viewer,
 // not its abstract scope (#1797): the viewer's own USER fork outranks a
 // CAMPAIGN fork in their campaign, which outranks the lineage origin —
@@ -142,8 +147,51 @@ export async function resolveVisibleEntryIds(kind: CatalogKind, viewer: CatalogV
   return (await resolveVisibleEntries(kind, viewer)).map((entry) => entry.id);
 }
 
-function toCatalogMeta(entry: CandidateEntry): CatalogMeta {
-  return { entryId: entry.id, scope: entry.scope, isFork: entry.forkedFromId !== null, forkedFromId: entry.forkedFromId };
+/**
+ * Every campaign id `userId` DMs (role OWNER), one batched query — the
+ * building block for `CatalogMeta.editable` (#1808 leak-fix, epic #1795 8/9
+ * combined-state review). A caller with N CAMPAIGN-scope rows in one response
+ * calls this ONCE and checks the returned Set per row, rather than a
+ * per-row `assertCampaignOwner`-shaped query (CLAUDE.md "avoid per-row
+ * queries", and the literal ask that closed out #1808's review).
+ */
+export async function resolveDmCampaignIds(userId: string): Promise<Set<string>> {
+  const memberships = await prisma.campaignMembership.findMany({
+    where: { userId, role: "OWNER" },
+    select: { campaignId: true },
+  });
+  return new Set(memberships.map((m) => m.campaignId));
+}
+
+/**
+ * Pure predicate mirroring assertSpellOwnership's own rule
+ * (lib/auth/access.ts): true iff `viewerUserId` could edit/delete this entry
+ * through PATCH/DELETE /api/spells/custom/:id. A USER-scope entry is
+ * editable only by its owner; a CAMPAIGN-scope entry only by that campaign's
+ * DM (`dmCampaignIds`, resolveDmCampaignIds above); GLOBAL is never
+ * editable. Kept as ONE function so a rule change to either side (this
+ * predicate or assertSpellOwnership) is a visible two-call-site diff, not a
+ * silent drift between "what the wire says is editable" and "what the write
+ * path actually allows."
+ */
+export function isCatalogEntryEditable(
+  entry: { scope: CandidateEntry["scope"]; ownerUserId: string | null; ownerCampaignId: string | null },
+  viewerUserId: string,
+  dmCampaignIds: ReadonlySet<string>,
+): boolean {
+  if (entry.scope === "USER") return entry.ownerUserId === viewerUserId;
+  if (entry.scope === "CAMPAIGN") return entry.ownerCampaignId !== null && dmCampaignIds.has(entry.ownerCampaignId);
+  return false;
+}
+
+function toCatalogMeta(entry: CandidateEntry, viewerUserId: string, dmCampaignIds: ReadonlySet<string>): CatalogMeta {
+  return {
+    entryId: entry.id,
+    scope: entry.scope,
+    isFork: entry.forkedFromId !== null,
+    forkedFromId: entry.forkedFromId,
+    editable: isCatalogEntryEditable(entry, viewerUserId, dmCampaignIds),
+  };
 }
 
 /**
@@ -167,9 +215,16 @@ async function resolveEntitlementMeta(
   viewer: CatalogViewer,
 ): Promise<Map<string, CatalogMeta>> {
   const candidates = await fetchCandidates(kind, viewer);
+  // Skip the query entirely when there's nothing CAMPAIGN-scope to resolve
+  // (the common case: no character in play, or one outside any campaign) —
+  // resolveDmCampaignIds is only ever consulted for a CAMPAIGN-scope
+  // candidate, never a per-row cost.
+  const dmCampaignIds = candidates.some((entry) => entry.scope === "CAMPAIGN")
+    ? await resolveDmCampaignIds(viewer.userId)
+    : EMPTY_CAMPAIGN_ID_SET;
   const meta = new Map<string, CatalogMeta>();
   for (const lineage of groupLineages(candidates)) {
-    const winnerMeta = toCatalogMeta(pickLineageWinner(lineage, viewer));
+    const winnerMeta = toCatalogMeta(pickLineageWinner(lineage, viewer), viewer.userId, dmCampaignIds);
     for (const entry of lineage) meta.set(entry.id, winnerMeta);
   }
   return meta;

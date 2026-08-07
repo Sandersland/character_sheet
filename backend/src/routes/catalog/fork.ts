@@ -99,7 +99,14 @@ function serializeForkedSpell(entry: CatalogEntry, spell: Spell, classes: string
     classes,
     cantripScaling: spell.cantripScaling,
     ...undefinedDefaultedFields(spell),
-    catalog: { entryId: entry.id, scope: entry.scope, isFork: true, forkedFromId: entry.forkedFromId },
+    // `editable` is always true here (#1808 leak-fix, epic #1795 8/9
+    // combined-state review): resolveForkTarget above already gated the
+    // target — USER always admits the forker as owner, CAMPAIGN only via
+    // assertCampaignOwner — so the entry this function serializes is, by
+    // construction, one the forker can edit. Same rule
+    // isCatalogEntryEditable expresses (lib/catalog/entitlement.ts), already
+    // enforced by this route's own auth step; no second query to re-derive it.
+    catalog: { entryId: entry.id, scope: entry.scope, isFork: true, forkedFromId: entry.forkedFromId, editable: true },
   };
 }
 

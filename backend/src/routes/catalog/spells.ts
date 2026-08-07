@@ -8,7 +8,7 @@ import { parseMaxSpellLevelOr400 } from "@/lib/http/parse-max-spell-level-param.
 import { requireEditionOr400 } from "@/lib/http/parse-edition-param.js";
 import { assertCharacterAccess } from "@/lib/auth/access.js";
 import { prisma } from "@/lib/core/prisma.js";
-import { resolveVisibleEntries, type CatalogViewer } from "@/lib/catalog/entitlement.js";
+import { EMPTY_CAMPAIGN_ID_SET, isCatalogEntryEditable, resolveDmCampaignIds, resolveVisibleEntries, type CatalogViewer } from "@/lib/catalog/entitlement.js";
 import { editionOf } from "@/lib/rules/edition.js";
 import { classesOf, resolveSpellCatalogForEdition, SPELL_CLASS_MEMBERSHIP_SELECT } from "@/lib/spellcasting/spell-classes.js";
 import { loadSubclassSpellListExpansionIds } from "@/lib/spellcasting/spell-list-expansion.js";
@@ -143,10 +143,25 @@ async function loadResolvedSpells(
   subclassId: string | undefined,
 ): Promise<CatalogSpellRow[]> {
   const visibleEntries = await resolveVisibleEntries("SPELL", viewer);
+  // Batched once per response, not per row (#1808 leak-fix review) — and
+  // skipped entirely when nothing CAMPAIGN-scope is even in play, same fast
+  // path resolveEntitlementMeta's own comment documents.
+  const dmCampaignIds = visibleEntries.some((e) => e.scope === "CAMPAIGN")
+    ? await resolveDmCampaignIds(viewer.userId)
+    : EMPTY_CAMPAIGN_ID_SET;
   const catalogByEntryId = new Map(
     visibleEntries.map((e) => [
       e.id,
-      { ownerId: e.ownerUserId, catalog: { entryId: e.id, scope: e.scope, isFork: e.forkedFromId !== null, forkedFromId: e.forkedFromId } },
+      {
+        ownerId: e.ownerUserId,
+        catalog: {
+          entryId: e.id,
+          scope: e.scope,
+          isFork: e.forkedFromId !== null,
+          forkedFromId: e.forkedFromId,
+          editable: isCatalogEntryEditable(e, viewer.userId, dmCampaignIds),
+        },
+      },
     ]),
   );
 

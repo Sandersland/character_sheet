@@ -48,7 +48,7 @@ interface SerializedMechanicsSpell {
   description: string;
   effectDiceCount?: number;
   effectDiceFaces?: number;
-  catalog?: { entryId: string; scope: string; isFork: boolean; forkedFromId: string | null };
+  catalog?: { entryId: string; scope: string; isFork: boolean; forkedFromId: string | null; editable: boolean };
 }
 
 async function serializeSpells(characterId: string): Promise<SerializedMechanicsSpell[]> {
@@ -238,7 +238,10 @@ describe("serializeCharacter — catalog fork MECHANICS override (#1806, epic #1
       expect(after!.id).toBe(learnedEntryId);
       expect(after!.spellId).toBe(seededSpellId);
       expect(after!.name).toBe(seededSpellName);
-      expect(after!.catalog).toEqual({ entryId: forkEntryId, scope: "CAMPAIGN", isFork: true, forkedFromId: seededEntryId });
+      // characterA is MEMBER_A's, not the DM's — editable: false (#1808
+      // leak-fix, epic #1795 8/9): a non-DM member must never be told they
+      // can edit the DM's CAMPAIGN fork.
+      expect(after!.catalog).toEqual({ entryId: forkEntryId, scope: "CAMPAIGN", isFork: true, forkedFromId: seededEntryId, editable: false });
     } finally {
       await prisma.catalogEntry.delete({ where: { id: forkEntryId } });
     }
@@ -246,7 +249,7 @@ describe("serializeCharacter — catalog fork MECHANICS override (#1806, epic #1
     const reverted = (await serializeSpells(characterAId)).find((s) => s.id === learnedEntryId);
     expect(reverted!.effectDiceCount).toBe(seededDice.effectDiceCount);
     expect(reverted!.effectDiceFaces).toBe(seededDice.effectDiceFaces);
-    expect(reverted!.catalog).toEqual({ entryId: seededEntryId, scope: "GLOBAL", isFork: false, forkedFromId: null });
+    expect(reverted!.catalog).toEqual({ entryId: seededEntryId, scope: "GLOBAL", isFork: false, forkedFromId: null, editable: false });
   });
 
   it("a player's own USER fork overrides their view by description; a fellow member with no fork sees the DM's CAMPAIGN fork instead", async () => {
@@ -314,12 +317,14 @@ describe("serializeCharacter — catalog fork MECHANICS override (#1806, epic #1
       const bSpells = await serializeSpells(characterBId);
       const bSpell = bSpells.find((s) => s.spellId === seededSpellId);
       expect(bSpell!.description).toBe(playerDescription);
-      expect(bSpell!.catalog).toEqual({ entryId: userForkEntryId, scope: "USER", isFork: true, forkedFromId: seededEntryId });
+      // characterB is MEMBER_B's own USER fork — editable: true.
+      expect(bSpell!.catalog).toEqual({ entryId: userForkEntryId, scope: "USER", isFork: true, forkedFromId: seededEntryId, editable: true });
 
       const aSpells = await serializeSpells(characterAId);
       const aSpell = aSpells.find((s) => s.spellId === seededSpellId);
       expect(aSpell!.description).toBe(campaignDescription);
-      expect(aSpell!.catalog).toEqual({ entryId: campaignForkEntryId, scope: "CAMPAIGN", isFork: true, forkedFromId: seededEntryId });
+      // characterA is MEMBER_A's, not the DM's — editable: false.
+      expect(aSpell!.catalog).toEqual({ entryId: campaignForkEntryId, scope: "CAMPAIGN", isFork: true, forkedFromId: seededEntryId, editable: false });
     } finally {
       await prisma.catalogEntry.delete({ where: { id: userForkEntryId } });
       await prisma.catalogEntry.delete({ where: { id: campaignForkEntryId } });

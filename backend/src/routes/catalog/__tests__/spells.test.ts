@@ -1010,4 +1010,73 @@ describe("GET /api/spells — ?characterId= campaign-aware picker (#1811)", () =
       .get(`/api/spells?edition=EDITION_2014&characterId=${randomUUID()}`);
     expect(res.status).toBe(404);
   });
+
+  // #1808 leak-fix, epic #1795 8/9 combined-state review: #1811 (this block)
+  // started serving a CAMPAIGN row to every campaign member, not just its
+  // DM — `catalog.editable` (isCatalogEntryEditable, lib/catalog/
+  // entitlement.ts) is what the client now gates Edit/Delete on instead of
+  // `scope === "CAMPAIGN"` alone. The outer beforeAll deliberately never
+  // makes DM_ID a real CampaignMembership row (this file's own comment
+  // there), so this block builds its own DM membership + character.
+  describe("catalog.editable authorization signal", () => {
+    let cookieDm: string;
+    let charDm: string;
+
+    beforeAll(async () => {
+      cookieDm = await authCookie(DM_ID);
+      await prisma.campaignMembership.upsert({
+        where: { campaignId_userId: { campaignId, userId: DM_ID } },
+        create: { campaignId, userId: DM_ID, role: "OWNER" },
+        update: { role: "OWNER" },
+      });
+      charDm = await makeCharacter(DM_ID, campaignId);
+    });
+
+    afterAll(async () => {
+      await prisma.character.deleteMany({ where: { id: charDm } });
+      await prisma.campaignMembership.deleteMany({ where: { campaignId, userId: DM_ID } });
+    });
+
+    it("a DM's own CAMPAIGN fork is editable for the DM, not for a fellow (non-DM) member", async () => {
+      const name = "Test Picker Editable DM Fork";
+      await makeSpell({ name, scope: "CAMPAIGN", ownerCampaignId: campaignId });
+
+      const resDm = await supertest.agent(app).set("Cookie", cookieDm)
+        .get(`/api/spells?edition=EDITION_2014&characterId=${charDm}`);
+      expect(resDm.status).toBe(200);
+      const dmRow = resDm.body.find((s: { name: string }) => s.name === name);
+      expect(dmRow?.catalog?.editable).toBe(true);
+
+      const resA = await supertest.agent(app).set("Cookie", cookieA)
+        .get(`/api/spells?edition=EDITION_2014&characterId=${charMemberA}`);
+      expect(resA.status).toBe(200);
+      const memberRow = resA.body.find((s: { name: string }) => s.name === name);
+      expect(memberRow?.catalog?.editable).toBe(false);
+    });
+
+    it("a USER-scope entry granted into the campaign is editable only for its own author", async () => {
+      const name = "Test Picker Editable USER Row";
+      const { catalogEntryId } = await makeSpell({ name, scope: "USER", ownerUserId: MEMBER_A_ID });
+      await prisma.catalogGrant.create({ data: { catalogEntryId, campaignId } });
+
+      const resA = await supertest.agent(app).set("Cookie", cookieA)
+        .get(`/api/spells?edition=EDITION_2014&characterId=${charMemberA}`);
+      const aRow = resA.body.find((s: { name: string }) => s.name === name);
+      expect(aRow?.catalog?.editable).toBe(true);
+
+      const resB = await supertest.agent(app).set("Cookie", cookieB)
+        .get(`/api/spells?edition=EDITION_2014&characterId=${charMemberB}`);
+      const bRow = resB.body.find((s: { name: string }) => s.name === name);
+      expect(bRow?.catalog?.editable).toBe(false);
+    });
+
+    it("a GLOBAL entry is never editable, even for a campaign's DM", async () => {
+      const resDm = await supertest.agent(app).set("Cookie", cookieDm)
+        .get(`/api/spells?edition=EDITION_2014&characterId=${charDm}`);
+      expect(resDm.status).toBe(200);
+      const globalRow = resDm.body.find((s: { catalog?: { scope: string } }) => s.catalog?.scope === "GLOBAL");
+      expect(globalRow).toBeDefined();
+      expect(globalRow.catalog.editable).toBe(false);
+    });
+  });
 });

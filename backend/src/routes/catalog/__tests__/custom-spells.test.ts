@@ -101,7 +101,7 @@ describe("POST /api/spells/custom", () => {
       edition: "EDITION_2014",
       name: "Test Bolt",
       classes: ["wizard"],
-      catalog: { scope: "USER", isFork: false, forkedFromId: null },
+      catalog: { scope: "USER", isFork: false, forkedFromId: null, editable: true },
     });
 
     const row = await prisma.spell.findUniqueOrThrow({ where: { id: res.body.id } });

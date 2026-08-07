@@ -88,7 +88,7 @@ describe("POST /api/catalog/entries/:entryId/fork", () => {
     expect(res.status).toBe(201);
     expect(res.body.entryId).toBeTypeOf("string");
     expect(res.body.entryId).not.toBe(globalEntryId);
-    expect(res.body.spell).toMatchObject({ catalog: { scope: "USER", isFork: true, forkedFromId: globalEntryId } });
+    expect(res.body.spell).toMatchObject({ catalog: { scope: "USER", isFork: true, forkedFromId: globalEntryId, editable: true } });
 
     const entry = await prisma.catalogEntry.findUniqueOrThrow({ where: { id: res.body.entryId } });
     expect(entry.scope).toBe("USER");
