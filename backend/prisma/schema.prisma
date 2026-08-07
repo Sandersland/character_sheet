@@ -137,6 +137,9 @@ model User {
   accounts   AuthAccount[]
   sessions   AuthSession[]
   characters Character[]
+  // Homebrew spells this user owns (#1784, epic #1782 1/5). Mirrors
+  // `characters` — cascade-deleted with the user via Spell.owner.
+  spells     Spell[]
 
   // Shared campaigns (#246): ones this user owns + memberships in any campaign.
   ownedCampaigns      Campaign[]           @relation("CampaignOwner")
@@ -1624,7 +1627,15 @@ model Spell {
   // than to the "shared" NULL Feat uses.
   edition RulesEdition?
 
+  // Homebrew ownership (#1784, epic #1782 1/5). NULL = system/seeded row;
+  // non-null = a user's homebrew spell. onDelete: Cascade mirrors
+  // Character.ownerId — deleting a user removes their homebrew spells but
+  // never touches ownerId: null system rows.
+  ownerId String?
+  owner   User?   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
   @@unique([name, edition])
+  @@index([ownerId])
 }
 
 // Spell↔class membership join (#1711, F2 of epic #1517's 2014 catalog fork).
