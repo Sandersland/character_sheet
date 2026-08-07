@@ -73,23 +73,33 @@ export async function assertCampaignMembership(
 
 // The spell-ownership chokepoint (#1785, epic #1782 2/5), mirroring
 // assertCharacterAccess: 404 if the spell doesn't exist, 403 if it exists but
-// isn't owned by the caller. A seeded catalog row (ownerId: null) always
-// 403s too — `null !== userId` for every real caller — which is correct: a
-// system spell is nobody's to edit or delete.
+// isn't owned by the caller. Ownership now resolves through the CatalogEntry
+// entitlement supertype (#1796, epic #1795 1/6) rather than a Spell.ownerId
+// column (dropped by that migration) — a two-step lookup since Spell.
+// catalogEntryId carries no Prisma relation (the supertype stays closed, see
+// schema.prisma's own comment). A seeded GLOBAL row (ownerUserId: null)
+// always 403s too — `null !== userId` for every real caller — which is
+// correct: a system spell is nobody's to edit or delete. Returns
+// catalogEntryId (not the CatalogEntry row itself) so a caller that needs to
+// mutate/delete the entry can do so without a second fetch.
 export async function assertSpellOwnership(
   db: Db,
   userId: string,
   spellId: string,
-): Promise<{ id: string; ownerId: string | null }> {
+): Promise<{ id: string; catalogEntryId: string }> {
   const spell = await db.spell.findUnique({
     where: { id: spellId },
-    select: { id: true, ownerId: true },
+    select: { id: true, catalogEntryId: true },
   });
-
   if (!spell) {
     throw new NotFoundError("Spell not found");
   }
-  if (spell.ownerId !== userId) {
+
+  const entry = await db.catalogEntry.findUnique({
+    where: { id: spell.catalogEntryId },
+    select: { ownerUserId: true },
+  });
+  if (!entry || entry.ownerUserId !== userId) {
     throw new AuthorizationError("You do not have access to this spell");
   }
   return spell;

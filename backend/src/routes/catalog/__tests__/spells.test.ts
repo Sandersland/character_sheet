@@ -5,6 +5,7 @@ import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
+import { makeCatalogEntry } from "@/test-support/catalog-entry.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 
 const OWNER_ID = "owner-spells";
@@ -69,9 +70,24 @@ async function seedSpellClasses(spellId: string, classNames: string[]) {
 
 // upsertEditionRow, not .upsert(): Spell's business key is now (name,
 // edition) (#1710), and these fixture spells are edition-neutral.
+// catalogEntryId (#1796) is resolved first via makeCatalogEntry (find-then-
+// create, so a second call across tests reuses rather than colliding) —
+// required, no default.
 async function seedFixtures() {
-  const damage = await upsertEditionRow(prisma.spell, { name: DAMAGE_SPELL.name, edition: null }, { ...DAMAGE_SPELL, edition: null }, DAMAGE_SPELL);
-  const utility = await upsertEditionRow(prisma.spell, { name: UTILITY_SPELL.name, edition: null }, { ...UTILITY_SPELL, edition: null }, UTILITY_SPELL);
+  const damageCatalogEntryId = await makeCatalogEntry({ name: DAMAGE_SPELL.name });
+  const damage = await upsertEditionRow(
+    prisma.spell,
+    { name: DAMAGE_SPELL.name, edition: null },
+    { ...DAMAGE_SPELL, edition: null, catalogEntryId: damageCatalogEntryId },
+    DAMAGE_SPELL,
+  );
+  const utilityCatalogEntryId = await makeCatalogEntry({ name: UTILITY_SPELL.name });
+  const utility = await upsertEditionRow(
+    prisma.spell,
+    { name: UTILITY_SPELL.name, edition: null },
+    { ...UTILITY_SPELL, edition: null, catalogEntryId: utilityCatalogEntryId },
+    UTILITY_SPELL,
+  );
   await seedSpellClasses(damage.id, DAMAGE_SPELL_CLASSES);
   await seedSpellClasses(utility.id, UTILITY_SPELL_CLASSES);
 }
@@ -99,7 +115,10 @@ function names(body: { name: string }[]): string[] {
 
 describe("GET /api/spells", () => {
   afterAll(async () => {
-    await prisma.spell.deleteMany({ where: { name: { in: [DAMAGE_SPELL.name, UTILITY_SPELL.name] } } });
+    // Deleting the CatalogEntry cascades the Spell row (ON DELETE CASCADE,
+    // #1796) — the reverse cascade doesn't exist (the supertype stays
+    // closed), so a plain `spell.deleteMany` alone would orphan the entry.
+    await prisma.catalogEntry.deleteMany({ where: { name: { in: [DAMAGE_SPELL.name, UTILITY_SPELL.name] }, kind: "SPELL" } });
   });
 
   it("returns the spell catalog ordered by level then name, mapping effect fields", async () => {
@@ -268,11 +287,20 @@ describe("GET /api/spells — ?subclassId= list-expansion widening (#1631)", () 
 // lifecycle (add/remove), not any Spell field, is what the route reflects.
 describe("GET /api/spells — class membership served from the SpellClass join (#1711)", () => {
   afterAll(async () => {
-    await prisma.spell.deleteMany({ where: { name: DAMAGE_SPELL.name } });
+    // Deleting the CatalogEntry cascades the Spell row (ON DELETE CASCADE,
+    // #1796) — the reverse cascade doesn't exist (the supertype stays
+    // closed), so a plain `spell.deleteMany` alone would orphan the entry.
+    await prisma.catalogEntry.deleteMany({ where: { name: DAMAGE_SPELL.name, kind: "SPELL" } });
   });
 
   it("a class only reaches the response after its SpellClass row exists, and stops after it's removed", async () => {
-    const damage = await upsertEditionRow(prisma.spell, { name: DAMAGE_SPELL.name, edition: null }, { ...DAMAGE_SPELL, edition: null }, DAMAGE_SPELL);
+    const catalogEntryId = await makeCatalogEntry({ name: DAMAGE_SPELL.name });
+    const damage = await upsertEditionRow(
+      prisma.spell,
+      { name: DAMAGE_SPELL.name, edition: null },
+      { ...DAMAGE_SPELL, edition: null, catalogEntryId },
+      DAMAGE_SPELL,
+    );
 
     const beforeAdd = await get("/api/spells?class=ranger");
     expect(names(beforeAdd.body)).not.toContain(DAMAGE_SPELL.name);
@@ -289,7 +317,13 @@ describe("GET /api/spells — class membership served from the SpellClass join (
   });
 
   it("cascades: deleting the Spell row drops its SpellClass rows too (onDelete: Cascade)", async () => {
-    const damage = await upsertEditionRow(prisma.spell, { name: DAMAGE_SPELL.name, edition: null }, { ...DAMAGE_SPELL, edition: null }, DAMAGE_SPELL);
+    const catalogEntryId = await makeCatalogEntry({ name: DAMAGE_SPELL.name });
+    const damage = await upsertEditionRow(
+      prisma.spell,
+      { name: DAMAGE_SPELL.name, edition: null },
+      { ...DAMAGE_SPELL, edition: null, catalogEntryId },
+      DAMAGE_SPELL,
+    );
     await prisma.spellClass.create({ data: { spellId: damage.id, className: "wizard" } });
 
     await prisma.spell.delete({ where: { id: damage.id } });
@@ -353,16 +387,31 @@ describe("GET /api/spells — genuine edition fork resolves to one row per editi
   }
 
   afterAll(async () => {
-    await prisma.spell.deleteMany({
-      where: { name: { in: [FORK_NAME, LATE_FORK_NAME, LONE_2024_NAME] } },
+    // Deleting the CatalogEntry cascades the Spell row (ON DELETE CASCADE,
+    // #1796) — the reverse cascade doesn't exist (the supertype stays
+    // closed), so a plain `spell.deleteMany` alone would orphan the entry.
+    await prisma.catalogEntry.deleteMany({
+      where: { name: { in: [FORK_NAME, LATE_FORK_NAME, LONE_2024_NAME] }, kind: "SPELL" },
     });
   });
 
   it("a name with both a 2014 and a 2024 row resolves to exactly the requesting edition's own row", async () => {
     const row2014 = forkRow(FORK_NAME, "The PHB'14 text.");
     const row2024 = forkRow(FORK_NAME, "The SRD 5.2 text.");
-    const fork2014 = await upsertEditionRow(prisma.spell, { name: FORK_NAME, edition: "EDITION_2014" }, { ...row2014, edition: "EDITION_2014" }, row2014);
-    const fork2024 = await upsertEditionRow(prisma.spell, { name: FORK_NAME, edition: "EDITION_2024" }, { ...row2024, edition: "EDITION_2024" }, row2024);
+    const catalogEntryId2014 = await makeCatalogEntry({ name: FORK_NAME, edition: "EDITION_2014" });
+    const catalogEntryId2024 = await makeCatalogEntry({ name: FORK_NAME, edition: "EDITION_2024" });
+    const fork2014 = await upsertEditionRow(
+      prisma.spell,
+      { name: FORK_NAME, edition: "EDITION_2014" },
+      { ...row2014, edition: "EDITION_2014", catalogEntryId: catalogEntryId2014 },
+      row2014,
+    );
+    const fork2024 = await upsertEditionRow(
+      prisma.spell,
+      { name: FORK_NAME, edition: "EDITION_2024" },
+      { ...row2024, edition: "EDITION_2024", catalogEntryId: catalogEntryId2024 },
+      row2024,
+    );
 
     const res2014 = await get("/api/spells", "EDITION_2014");
     const matches2014 = res2014.body.filter((s: { name: string }) => s.name === FORK_NAME);
@@ -379,7 +428,13 @@ describe("GET /api/spells — genuine edition fork resolves to one row per editi
 
   it("a lone EDITION_2024-tagged row never reaches a 2014 request, with or without a sibling", async () => {
     const row2024 = forkRow(LATE_FORK_NAME, "The SRD 5.2 text.");
-    await upsertEditionRow(prisma.spell, { name: LATE_FORK_NAME, edition: "EDITION_2024" }, { ...row2024, edition: "EDITION_2024" }, row2024);
+    const lateCatalogEntryId2024 = await makeCatalogEntry({ name: LATE_FORK_NAME, edition: "EDITION_2024" });
+    await upsertEditionRow(
+      prisma.spell,
+      { name: LATE_FORK_NAME, edition: "EDITION_2024" },
+      { ...row2024, edition: "EDITION_2024", catalogEntryId: lateCatalogEntryId2024 },
+      row2024,
+    );
 
     // No 2014 sibling yet: the lone 2024 row is absent from a 2014 request
     // (#1372/#1753 — no more "serve it anyway" grace)...
@@ -393,7 +448,13 @@ describe("GET /api/spells — genuine edition fork resolves to one row per editi
     // wins — same end state, reached without ever passing through the
     // retired fallback.
     const row2014 = forkRow(LATE_FORK_NAME, "The PHB'14 text.");
-    const fork2014 = await upsertEditionRow(prisma.spell, { name: LATE_FORK_NAME, edition: "EDITION_2014" }, { ...row2014, edition: "EDITION_2014" }, row2014);
+    const lateCatalogEntryId2014 = await makeCatalogEntry({ name: LATE_FORK_NAME, edition: "EDITION_2014" });
+    const fork2014 = await upsertEditionRow(
+      prisma.spell,
+      { name: LATE_FORK_NAME, edition: "EDITION_2014" },
+      { ...row2014, edition: "EDITION_2014", catalogEntryId: lateCatalogEntryId2014 },
+      row2014,
+    );
     const after = await get("/api/spells", "EDITION_2014");
     const matches = after.body.filter((s: { name: string }) => s.name === LATE_FORK_NAME);
     expect(matches).toHaveLength(1);
@@ -402,7 +463,13 @@ describe("GET /api/spells — genuine edition fork resolves to one row per editi
 
   it("a lone EDITION_2024-tagged row with no sibling reaches only its own edition (2024's curated list stays curated)", async () => {
     const row2024 = forkRow(LONE_2024_NAME, "Ordinary 2024-tagged content, no 2014 fork.");
-    const lone = await upsertEditionRow(prisma.spell, { name: LONE_2024_NAME, edition: "EDITION_2024" }, { ...row2024, edition: "EDITION_2024" }, row2024);
+    const loneCatalogEntryId = await makeCatalogEntry({ name: LONE_2024_NAME, edition: "EDITION_2024" });
+    const lone = await upsertEditionRow(
+      prisma.spell,
+      { name: LONE_2024_NAME, edition: "EDITION_2024" },
+      { ...row2024, edition: "EDITION_2024", catalogEntryId: loneCatalogEntryId },
+      row2024,
+    );
 
     const res2024 = await get("/api/spells", "EDITION_2024");
     const matches2024 = res2024.body.filter((s: { name: string }) => s.name === LONE_2024_NAME);
@@ -420,7 +487,13 @@ describe("GET /api/spells — genuine edition fork resolves to one row per editi
   it("a lone EDITION_2014-tagged row with no sibling reaches only its own edition, never a 2024 request", async () => {
     const LONE_2014_NAME = "Test Lone 2014-Tagged Catalog Spell";
     const row2014 = forkRow(LONE_2014_NAME, "PHB'14-only content, no 2024 counterpart.");
-    const lone = await upsertEditionRow(prisma.spell, { name: LONE_2014_NAME, edition: "EDITION_2014" }, { ...row2014, edition: "EDITION_2014" }, row2014);
+    const loneCatalogEntryId = await makeCatalogEntry({ name: LONE_2014_NAME, edition: "EDITION_2014" });
+    const lone = await upsertEditionRow(
+      prisma.spell,
+      { name: LONE_2014_NAME, edition: "EDITION_2014" },
+      { ...row2014, edition: "EDITION_2014", catalogEntryId: loneCatalogEntryId },
+      row2014,
+    );
 
     try {
       const res2014 = await get("/api/spells", "EDITION_2014");
@@ -431,7 +504,10 @@ describe("GET /api/spells — genuine edition fork resolves to one row per editi
       const res2024 = await get("/api/spells", "EDITION_2024");
       expect(names(res2024.body)).not.toContain(LONE_2014_NAME);
     } finally {
-      await prisma.spell.deleteMany({ where: { name: LONE_2014_NAME } });
+      // Deleting the CatalogEntry cascades the Spell row (ON DELETE CASCADE,
+      // #1796) — the reverse cascade doesn't exist, so a plain
+      // `spell.deleteMany` alone would orphan the entry.
+      await prisma.catalogEntry.deleteMany({ where: { name: LONE_2014_NAME, kind: "SPELL" } });
     }
   });
 
@@ -444,16 +520,18 @@ describe("GET /api/spells — genuine edition fork resolves to one row per editi
     const DIVERGENT_NAME = "Test Divergent Class List Spell";
     const row2014 = forkRow(DIVERGENT_NAME, "The PHB'14 text (cleric + paladin only).");
     const row2024 = forkRow(DIVERGENT_NAME, "The SRD 5.2 text (cleric + paladin + bard).");
+    const catalogEntryId2014 = await makeCatalogEntry({ name: DIVERGENT_NAME, edition: "EDITION_2014" });
+    const catalogEntryId2024 = await makeCatalogEntry({ name: DIVERGENT_NAME, edition: "EDITION_2024" });
     const fork2014 = await upsertEditionRow(
       prisma.spell,
       { name: DIVERGENT_NAME, edition: "EDITION_2014" },
-      { ...row2014, edition: "EDITION_2014" },
+      { ...row2014, edition: "EDITION_2014", catalogEntryId: catalogEntryId2014 },
       row2014,
     );
     const fork2024 = await upsertEditionRow(
       prisma.spell,
       { name: DIVERGENT_NAME, edition: "EDITION_2024" },
-      { ...row2024, edition: "EDITION_2024" },
+      { ...row2024, edition: "EDITION_2024", catalogEntryId: catalogEntryId2024 },
       row2024,
     );
     await seedSpellClasses(fork2014.id, ["cleric", "paladin"]);
@@ -470,14 +548,18 @@ describe("GET /api/spells — genuine edition fork resolves to one row per editi
       const clericMatch = cleric2014.body.find((s: { name: string }) => s.name === DIVERGENT_NAME);
       expect(clericMatch?.id).toBe(fork2014.id);
     } finally {
-      await prisma.spell.deleteMany({ where: { name: DIVERGENT_NAME } });
+      // Deleting the CatalogEntry cascades the Spell row (ON DELETE CASCADE,
+      // #1796) — the reverse cascade doesn't exist, so a plain
+      // `spell.deleteMany` alone would orphan the entry.
+      await prisma.catalogEntry.deleteMany({ where: { name: DIVERGENT_NAME, kind: "SPELL" } });
     }
   });
 });
 
-// #1786, epic #1782 3/5: a user's own homebrew (Spell.ownerId, #1784) flows
-// through the same route as seeded spells, scoped so only its owner ever
-// sees it — the cross-user isolation test is the load-bearing one here.
+// #1786, epic #1782 3/5: a user's own homebrew — a `scope: "USER"`
+// CatalogEntry (#1796 replaced Spell.ownerId with the entitlement supertype)
+// — flows through the same route as seeded spells, scoped so only its owner
+// ever sees it — the cross-user isolation test is the load-bearing one here.
 describe("GET /api/spells — user homebrew (#1786)", () => {
   const OWNER_A = "owner-spells-homebrew-a";
   const OWNER_B = "owner-spells-homebrew-b";
@@ -491,6 +573,7 @@ describe("GET /api/spells — user homebrew (#1786)", () => {
     overrides: { name?: string; level?: number; classes?: string[] } = {},
   ) {
     const { classes = [], name = HOMEBREW_NAME, level = 1 } = overrides;
+    const catalogEntryId = await makeCatalogEntry({ name, edition: "EDITION_2014", scope: "USER", ownerUserId: ownerId });
     const spell = await prisma.spell.create({
       data: {
         name,
@@ -501,7 +584,7 @@ describe("GET /api/spells — user homebrew (#1786)", () => {
         duration: "Instantaneous",
         description: "A homebrew test spell.",
         edition: "EDITION_2014",
-        ownerId,
+        catalogEntryId,
       },
     });
     await seedSpellClasses(spell.id, classes);
@@ -522,7 +605,10 @@ describe("GET /api/spells — user homebrew (#1786)", () => {
   });
 
   afterAll(async () => {
-    await prisma.spell.deleteMany({ where: { ownerId: { in: [OWNER_A, OWNER_B] } } });
+    // Deleting the CatalogEntry cascades the Spell row (ON DELETE CASCADE,
+    // #1796); deleting the User cascades their remaining USER-scope entries
+    // too, so this is belt-and-suspenders — but explicit, not relied on.
+    await prisma.catalogEntry.deleteMany({ where: { ownerUserId: { in: [OWNER_A, OWNER_B] } } });
     await prisma.user.deleteMany({ where: { id: { in: [OWNER_A, OWNER_B] } } });
   });
 
@@ -554,9 +640,11 @@ describe("GET /api/spells — user homebrew (#1786)", () => {
   // the first caller that needs it round-tripped, so a "half damage on save"
   // choice doesn't silently vanish when a homebrew spell is edited.
   it("serves saveEffect on a homebrew row that has one set", async () => {
+    const name = "Test Homebrew Save Effect Bolt";
+    const catalogEntryId = await makeCatalogEntry({ name, edition: "EDITION_2014", scope: "USER", ownerUserId: OWNER_A });
     const spell = await prisma.spell.create({
       data: {
-        name: "Test Homebrew Save Effect Bolt",
+        name,
         level: 2,
         school: "evocation",
         castingTime: "1 action",
@@ -564,7 +652,7 @@ describe("GET /api/spells — user homebrew (#1786)", () => {
         duration: "Instantaneous",
         description: "A homebrew test spell with a save effect.",
         edition: "EDITION_2014",
-        ownerId: OWNER_A,
+        catalogEntryId,
         effectKind: "damage",
         effectDiceCount: 2,
         effectDiceFaces: 6,
@@ -580,7 +668,7 @@ describe("GET /api/spells — user homebrew (#1786)", () => {
       const row = res.body.find((s: { id: string }) => s.id === spell.id);
       expect(row.saveEffect).toBe("half");
     } finally {
-      await prisma.spell.delete({ where: { id: spell.id } });
+      await prisma.catalogEntry.delete({ where: { id: catalogEntryId } });
     }
   });
 
@@ -608,7 +696,13 @@ describe("GET /api/spells — user homebrew (#1786)", () => {
       description: "A shared system spell.",
       cantripScaling: false,
     };
-    await upsertEditionRow(prisma.spell, { name: SYSTEM_NAME, edition: null }, { ...systemRow, edition: null }, systemRow);
+    const systemCatalogEntryId = await makeCatalogEntry({ name: SYSTEM_NAME, edition: "EDITION_2024" });
+    await upsertEditionRow(
+      prisma.spell,
+      { name: SYSTEM_NAME, edition: null },
+      { ...systemRow, edition: null, catalogEntryId: systemCatalogEntryId },
+      systemRow,
+    );
 
     try {
       const resA = await getAs(cookieA, "/api/spells", "EDITION_2014");
@@ -616,7 +710,7 @@ describe("GET /api/spells — user homebrew (#1786)", () => {
       expect(names(resA.body)).toContain(SYSTEM_NAME);
       expect(names(resB.body)).toContain(SYSTEM_NAME);
     } finally {
-      await prisma.spell.deleteMany({ where: { name: SYSTEM_NAME } });
+      await prisma.catalogEntry.deleteMany({ where: { name: SYSTEM_NAME, kind: "SPELL" } });
     }
   });
 
@@ -634,7 +728,7 @@ describe("GET /api/spells — user homebrew (#1786)", () => {
       const belowLevel = await getAs(cookieA, "/api/spells?class=wizard&maxLevel=2", "EDITION_2014");
       expect(names(belowLevel.body)).not.toContain(FILTERED_NAME);
     } finally {
-      await prisma.spell.deleteMany({ where: { name: FILTERED_NAME } });
+      await prisma.catalogEntry.deleteMany({ where: { name: FILTERED_NAME, kind: "SPELL" } });
     }
   });
 
@@ -650,10 +744,11 @@ describe("GET /api/spells — user homebrew (#1786)", () => {
       description: "The seeded version.",
       cantripScaling: false,
     };
+    const seededCatalogEntryId = await makeCatalogEntry({ name: COLLISION_NAME, edition: "EDITION_2014" });
     const seeded = await upsertEditionRow(
       prisma.spell,
       { name: COLLISION_NAME, edition: "EDITION_2014" },
-      { ...seededRow, edition: "EDITION_2014" },
+      { ...seededRow, edition: "EDITION_2014", catalogEntryId: seededCatalogEntryId },
       seededRow,
     );
     const homebrew = await createHomebrew(OWNER_A, { name: COLLISION_NAME });
@@ -663,7 +758,7 @@ describe("GET /api/spells — user homebrew (#1786)", () => {
       const matches = res.body.filter((s: { name: string }) => s.name === COLLISION_NAME);
       expect(matches.map((s: { id: string }) => s.id).sort()).toEqual([seeded.id, homebrew.id].sort());
     } finally {
-      await prisma.spell.deleteMany({ where: { name: COLLISION_NAME } });
+      await prisma.catalogEntry.deleteMany({ where: { name: COLLISION_NAME, kind: "SPELL" } });
     }
   });
 });

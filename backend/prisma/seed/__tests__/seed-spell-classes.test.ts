@@ -6,17 +6,19 @@
 import { afterAll, describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/core/prisma.js";
+import { makeCatalogEntry } from "@/test-support/catalog-entry.js";
 
 import { seedSpellClassesFor } from "../seed-spell-classes.js";
 
 const SPELL_NAME = "Zzz SpellClass Probe (#1711)";
 
-async function makeSpell() {
+async function makeSpell(name: string = SPELL_NAME) {
+  const catalogEntryId = await makeCatalogEntry({ name });
   return prisma.spell.create({
     data: {
-      name: SPELL_NAME, level: 1, school: "evocation", castingTime: "1 action",
+      name, level: 1, school: "evocation", castingTime: "1 action",
       range: "30 ft", duration: "Instantaneous", description: "probe",
-      edition: null,
+      edition: null, catalogEntryId,
     },
   });
 }
@@ -48,12 +50,7 @@ describe("seedSpellClassesFor (#1711)", () => {
 
   it("prunes a class dropped from the list while keeping the rest, scoped to this spellId only", async () => {
     const spell = await makeSpell();
-    const other = await prisma.spell.create({
-      data: {
-        name: `${SPELL_NAME} sibling`, level: 1, school: "evocation", castingTime: "1 action",
-        range: "30 ft", duration: "Instantaneous", description: "probe sibling", edition: null,
-      },
-    });
+    const other = await makeSpell(`${SPELL_NAME} sibling`);
     await seedSpellClassesFor(prisma, spell.id, ["wizard", "sorcerer"]);
     await seedSpellClassesFor(prisma, other.id, ["wizard"]);
 
