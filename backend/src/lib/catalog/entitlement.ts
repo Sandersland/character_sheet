@@ -7,7 +7,7 @@
 // here to catalog visibility instead of level gates).
 import type { CatalogKind, CatalogMeta, RulesEdition } from "@character-sheet/shared-types";
 
-import { Prisma } from "@/generated/prisma/client.js";
+import { Prisma, type Spell } from "@/generated/prisma/client.js";
 import type { CharacterWithRelations } from "@/lib/character/character-include.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { editionOf } from "@/lib/rules/edition.js";
@@ -175,6 +175,46 @@ async function resolveEntitlementMeta(
   return meta;
 }
 
+/**
+ * Resolve, for every visible candidate SPELL entry id, the winning lineage's
+ * `Spell` MECHANICS row (#1806, epic #1795 7/7) — a read-time-only sibling of
+ * resolveEntitlementMeta above, keyed the SAME way (every lineage member's id
+ * maps to its lineage's winner, not just the winner's own id), reusing the
+ * SAME fetchCandidates/groupLineages/pickLineageWinner computation rather
+ * than a second precedence path. What lets serialize's spell-catalog overlay
+ * (character/serialize/spell-catalog.ts) look up "the mechanics a stale
+ * pre-shadow spellId's own entry id resolves to today" by one hop, exactly
+ * like resolveEntitlementMeta's metaByEntryId map does for CatalogMeta.
+ *
+ * Not generalized across CatalogKind (unlike resolveEntitlementMeta): `Spell`
+ * is a kind-specific mechanics table with no generic analog yet — SPELL is
+ * the only kind, so this stays a direct, un-dispatched query rather than
+ * forkContent's kind-switch shape.
+ */
+async function resolveSpellMechanicsWinners(viewer: CatalogViewer): Promise<Map<string, Spell>> {
+  const candidates = await fetchCandidates("SPELL", viewer);
+  const lineageWinners = groupLineages(candidates).map((lineage) => ({
+    lineage,
+    winner: pickLineageWinner(lineage, viewer),
+  }));
+  const winnerSpells = await prisma.spell.findMany({
+    where: { catalogEntryId: { in: lineageWinners.map(({ winner }) => winner.id) } },
+  });
+  const spellByEntryId = new Map(winnerSpells.map((spell) => [spell.catalogEntryId, spell]));
+
+  const mechanicsByEntryId = new Map<string, Spell>();
+  for (const { lineage, winner } of lineageWinners) {
+    const winnerSpell = spellByEntryId.get(winner.id);
+    // Spell.catalogEntryId is required+unique (#1796) — a winner CatalogEntry
+    // with no Spell row would be the same data-integrity violation
+    // forkContent's own comment calls out, never a state a real lineage can
+    // reach; skip defensively rather than throw mid-serialize.
+    if (!winnerSpell) continue;
+    for (const entry of lineage) mechanicsByEntryId.set(entry.id, winnerSpell);
+  }
+  return mechanicsByEntryId;
+}
+
 function viewerForCharacter(character: CharacterWithRelations): CatalogViewer {
   return {
     userId: character.ownerId,
@@ -197,4 +237,11 @@ export async function resolveSpellEntitlementMetaForCharacter(
   character: CharacterWithRelations,
 ): Promise<Map<string, CatalogMeta>> {
   return resolveEntitlementMeta("SPELL", viewerForCharacter(character));
+}
+
+/** Same convenience wrapper as resolveSpellEntryIdsForCharacter, for resolveSpellMechanicsWinners. */
+export async function resolveSpellMechanicsOverridesForCharacter(
+  character: CharacterWithRelations,
+): Promise<Map<string, Spell>> {
+  return resolveSpellMechanicsWinners(viewerForCharacter(character));
 }
