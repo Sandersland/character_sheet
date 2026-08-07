@@ -1,4 +1,8 @@
-// Damage-type / attack-vs-save fields, shown when the custom effect is damage.
+// Damage-type / attack-vs-save fields, shown when the custom effect is
+// damage. The attack-type select is shared with HomebrewSpellDamageFields
+// (#1787) via SpellAttackTypeSelect — identical markup in both was flagged
+// as duplication.
+import SpellAttackTypeSelect from "@/features/spells/SpellAttackTypeSelect";
 import { INPUT_CLS, LABEL_CLS } from "@/lib/addSpell";
 import type { CustomSpellInput } from "@/types/character";
 
@@ -14,14 +18,7 @@ export default function CustomSpellDamageFields({ custom, update }: CustomSpellD
         <span className={LABEL_CLS}>Damage type</span>
         <input className={INPUT_CLS} value={custom.damageType ?? ""} onChange={(e) => update({ damageType: e.target.value || undefined })} placeholder="fire" />
       </label>
-      <label className="block">
-        <span className={LABEL_CLS}>Attack type</span>
-        <select className={INPUT_CLS} value={custom.attackType ?? ""} onChange={(e) => update({ attackType: (e.target.value as "attack" | "save") || undefined })}>
-          <option value="">— none —</option>
-          <option value="attack">Spell attack</option>
-          <option value="save">Saving throw</option>
-        </select>
-      </label>
+      <SpellAttackTypeSelect value={custom.attackType} onChange={(attackType) => update({ attackType })} />
       {custom.attackType === "save" && (
         <label className="block">
           <span className={LABEL_CLS}>Save ability</span>

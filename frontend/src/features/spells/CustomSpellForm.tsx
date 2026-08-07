@@ -1,9 +1,15 @@
-// Custom-spell authoring form. Owns the draft + effect-toggle state.
+// Custom-spell authoring form. Owns the draft + effect-toggle state. The
+// level/school selects and the effect-toggle wrapper are shared with
+// HomebrewSpellForm (#1787) via SpellLevelSelect/SpellSchoolSelect/
+// SpellEffectToggle — identical markup in both was flagged as duplication.
 import { useState } from "react";
 
 import CustomSpellEffectFields from "@/features/spells/CustomSpellEffectFields";
-import { BLANK_CUSTOM, INPUT_CLS, LABEL_CLS, SPELL_SCHOOLS, buildCustomSpellPayload } from "@/lib/addSpell";
-import type { CustomSpellInput, LearnSpellOperation, SpellSchool } from "@/types/character";
+import SpellEffectToggle from "@/features/spells/SpellEffectToggle";
+import SpellLevelSelect from "@/features/spells/SpellLevelSelect";
+import SpellSchoolSelect from "@/features/spells/SpellSchoolSelect";
+import { BLANK_CUSTOM, INPUT_CLS, LABEL_CLS, buildCustomSpellPayload } from "@/lib/addSpell";
+import type { CustomSpellInput, LearnSpellOperation } from "@/types/character";
 
 interface CustomSpellFormProps {
   busy: boolean;
@@ -38,30 +44,9 @@ export default function CustomSpellForm({ busy, onLearn, onClose }: CustomSpellF
           />
         </div>
 
-        <div>
-          <label className={LABEL_CLS} htmlFor="custom-level">Level</label>
-          <select
-            id="custom-level"
-            className={INPUT_CLS}
-            value={custom.level}
-            onChange={(e) => update({ level: Number(e.target.value) })}
-          >
-            <option value={0}>Cantrip</option>
-            {[1,2,3,4,5,6,7,8,9].map((l) => <option key={l} value={l}>Level {l}</option>)}
-          </select>
-        </div>
+        <SpellLevelSelect id="custom-level" value={custom.level} onChange={(level) => update({ level })} />
 
-        <div>
-          <label className={LABEL_CLS} htmlFor="custom-school">School</label>
-          <select
-            id="custom-school"
-            className={INPUT_CLS}
-            value={custom.school}
-            onChange={(e) => update({ school: e.target.value as SpellSchool })}
-          >
-            {SPELL_SCHOOLS.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-        </div>
+        <SpellSchoolSelect id="custom-school" value={custom.school} onChange={(school) => update({ school })} />
 
         <div>
           <label className={LABEL_CLS} htmlFor="custom-casting-time">Casting time</label>
@@ -128,17 +113,9 @@ export default function CustomSpellForm({ busy, onLearn, onClose }: CustomSpellF
         </div>
       </div>
 
-      <div className="rounded-control border border-arcane-200 p-3">
-        <label className="mb-2 flex items-center gap-2 text-xs font-semibold text-arcane-800">
-          <input
-            type="checkbox"
-            checked={hasEffect}
-            onChange={(e) => setHasEffect(e.target.checked)}
-          />
-          Enable auto-rolling on cast
-        </label>
-        {hasEffect && <CustomSpellEffectFields custom={custom} update={update} />}
-      </div>
+      <SpellEffectToggle hasEffect={hasEffect} onToggle={setHasEffect}>
+        <CustomSpellEffectFields custom={custom} update={update} />
+      </SpellEffectToggle>
 
       <div className="flex justify-end gap-2">
         <button type="button" onClick={onClose} className="rounded-control px-3 py-1.5 text-xs font-semibold text-parchment-600 hover:text-parchment-900">

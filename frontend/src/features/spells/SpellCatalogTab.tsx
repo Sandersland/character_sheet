@@ -13,10 +13,13 @@ interface SpellCatalogTabProps {
   learnedSpellIds: Set<string>;
   edition: RulesEdition;
   onLearn: (spell: CatalogSpell) => void;
+  /** Bump to force a refetch (#1787) — e.g. after creating a homebrew spell
+   *  from the sibling tab, so it shows up here without remounting the panel. */
+  refreshKey?: unknown;
 }
 
-export default function SpellCatalogTab({ busy, learnedSpellIds, edition, onLearn }: SpellCatalogTabProps) {
-  const { catalog, error, showSpinner } = useSpellCatalog(edition);
+export default function SpellCatalogTab({ busy, learnedSpellIds, edition, onLearn, refreshKey }: SpellCatalogTabProps) {
+  const { catalog, error, showSpinner } = useSpellCatalog(edition, undefined, refreshKey);
   const [search, setSearch] = useState("");
   const [levelFilter, setLevelFilter] = useState("");
 
