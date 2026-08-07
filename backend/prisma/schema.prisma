@@ -137,13 +137,15 @@ model User {
   accounts   AuthAccount[]
   sessions   AuthSession[]
   characters Character[]
-  // Homebrew spells this user owns (#1784, epic #1782 1/5). Mirrors
-  // `characters` — cascade-deleted with the user via Spell.owner.
-  spells     Spell[]
 
   // Shared campaigns (#246): ones this user owns + memberships in any campaign.
   ownedCampaigns      Campaign[]           @relation("CampaignOwner")
   campaignMemberships CampaignMembership[]
+
+  // USER-scope catalog entries this user owns (#1796, epic #1795 1/6) —
+  // homebrew content across every kind, not just Spell. Mirrors `characters`
+  // — cascade-deleted with the user (CatalogEntry.ownerUser onDelete: Cascade).
+  catalogEntries CatalogEntry[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -185,6 +187,10 @@ model Campaign {
   // Named parts/arcs the journal groups sessions under (#863). Campaign-level
   // (one shared story spine), DM-curated.
   arcs                 CampaignArc[]
+  // CAMPAIGN-scope catalog entries this campaign owns (DM homebrew, #1796)
+  // and GLOBAL/USER entries granted into this campaign for its players to see.
+  catalogEntries       CatalogEntry[]
+  catalogGrants        CatalogGrant[]
 }
 
 // A named part/arc of a campaign's story (#863): the journal page groups
@@ -469,21 +475,21 @@ model Species {
 // one place for a species-level creation choice, and this is it). No `edition`
 // column — inherits the parent Species row's edition.
 model SpeciesVariant {
-  id               String  @id @default(uuid())
-  speciesId        String
-  species          Species @relation(fields: [speciesId], references: [id], onDelete: Cascade)
-  name             String
-  slug             String
+  id                      String  @id @default(uuid())
+  speciesId               String
+  species                 Species @relation(fields: [speciesId], references: [id], onDelete: Cascade)
+  name                    String
+  slug                    String
   // NULL = use the parent Species.speed (the common case). Set only when the
   // book states a different value for this variant (PHB'14 Wood Elf 35 ft;
   // no 2024 variant seeded this slice overrides speed).
-  speedOverride    Int?
+  speedOverride           Int?
   // Same AbilityIncreaseSpec[] shape as Species.abilityIncreases, additive to
   // the parent's at creation (PHB'14 Hill Dwarf +1 WIS on top of Dwarf's own
   // +2 CON — the create phase merges both levels, #1681). [] for every 2024
   // row and for every Dragonborn ancestry variant in either edition (draconic
   // ancestry grants a damage type + resistance, never an ability increase).
-  abilityIncreases Json    @default("[]")
+  abilityIncreases        Json    @default("[]")
   // When true, `abilityIncreases` REPLACES the parent Species' increases at
   // creation instead of adding to them (fetchMergedAbilityIncreases). Only the
   // Astral Elf sets this (#1751): a Spelljammer standalone race modelled as an
@@ -653,11 +659,11 @@ model Subclass {
   // the single place the exact/NULL fallback ordering is expressed.
   edition     RulesEdition?
 
-  selections    CharacterClassEntry[]
-  grantedSpells SubclassGrantedSpell[]
+  selections          CharacterClassEntry[]
+  grantedSpells       SubclassGrantedSpell[]
   // Back-relation only — not a column, appears on no payload unless included
   // (#1522/#1523's ClassFeature foundation).
-  features      ClassFeature[]
+  features            ClassFeature[]
   // Back-relation only, same role as grantedSpells (#1631) — the choosable-pool
   // widening a picker resolves, not a sheet-facing payload field.
   spellListExpansions SubclassSpellListExpansion[]
@@ -1560,6 +1566,90 @@ model Feat {
   @@unique([name, edition])
 }
 
+// Entitlement supertype (#1796, epic #1795 1/6). One row per piece of
+// catalog content regardless of `kind`, carrying WHO owns it and WHO may see
+// it — the concern every per-kind table (Spell today; Item eventually) used
+// to duplicate for itself (Spell.ownerId, #1784). Deliberately carries NO
+// back-relation to any per-kind table (no `spell Spell?` field here): a
+// generic supertype that named its own subtypes would defeat the point of
+// being generic the moment a second kind (Item) joins it. The per-kind table
+// points UP at its CatalogEntry via a bare scalar instead (see Spell.
+// catalogEntryId's own comment).
+enum CatalogKind {
+  SPELL
+}
+
+// GLOBAL = seeded system content, visible to everyone. USER = a player's
+// homebrew, visible only to them (until granted into a campaign, #1795 later
+// slices). CAMPAIGN = a DM's homebrew, scoped to their campaign.
+enum CatalogScope {
+  GLOBAL
+  USER
+  CAMPAIGN
+}
+
+model CatalogEntry {
+  id    String       @id @default(uuid())
+  kind  CatalogKind
+  scope CatalogScope
+
+  // Exactly one of ownerUserId/ownerCampaignId is set, matching `scope`
+  // (GLOBAL: neither) — a CHECK constraint enforces this; Prisma's DSL can't
+  // express a cross-column conditional, so it's hand-written into the
+  // migration (see that file's own comment, same shape as Item's
+  // scope/scopeKey agreement CHECK).
+  ownerUserId String?
+  ownerUser   User?   @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  ownerCampaignId String?
+  ownerCampaign   Campaign? @relation(fields: [ownerCampaignId], references: [id], onDelete: Cascade)
+
+  name    String
+  edition RulesEdition
+
+  // Fork provenance (#1795 later slices: forking a GLOBAL/granted entry into
+  // your own USER/CAMPAIGN scope to customize it). SetNull, not Cascade: the
+  // origin being deleted must not take every fork of it down too — a fork
+  // stands on its own copy of the content the moment it exists.
+  forkedFromId String?
+  forkedFrom   CatalogEntry?  @relation("Fork", fields: [forkedFromId], references: [id], onDelete: SetNull)
+  forks        CatalogEntry[] @relation("Fork")
+
+  grants CatalogGrant[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Business-key uniqueness: NULLS NOT DISTINCT so two GLOBAL (both owner
+  // arms null) rows can't share a (kind, name, edition), matching Spell's
+  // pre-#1796 (name, edition, ownerId) key. Hand-written into the migration
+  // — same Prisma-DSL limitation as Spell's own former unique index (Prisma
+  // 7.8 rejects the `nullsNotDistinct` attribute).
+  @@unique([kind, scope, ownerUserId, ownerCampaignId, name, edition])
+  @@index([kind, scope])
+  @@index([ownerUserId])
+  @@index([ownerCampaignId])
+  @@index([forkedFromId])
+}
+
+// A CAMPAIGN's or DM's grant of a USER/GLOBAL catalog entry into a specific
+// campaign, so its players can see content that isn't theirs or the system's
+// (#1795 later slices resolve the read path through this join). One entry
+// may be granted into many campaigns; one campaign may hold many grants —
+// hence the plain join table rather than a column on CatalogEntry.
+model CatalogGrant {
+  id String @id @default(uuid())
+
+  catalogEntryId String
+  catalogEntry   CatalogEntry @relation(fields: [catalogEntryId], references: [id], onDelete: Cascade)
+
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([catalogEntryId, campaignId])
+  @@index([campaignId])
+}
+
 // Baseline spell catalog — same catalog-table role as Item above. Seeded from
 // a curated SRD subset (prisma/seed.ts). Never referenced by a direct FK on
 // Character; provenance lives in the per-character spellcasting JSON blob's
@@ -1635,22 +1725,17 @@ model Spell {
   // than to the "shared" NULL Feat uses.
   edition RulesEdition?
 
-  // Homebrew ownership (#1784, epic #1782 1/5). NULL = system/seeded row;
-  // non-null = a user's homebrew spell. onDelete: Cascade mirrors
-  // Character.ownerId — deleting a user removes their homebrew spells but
-  // never touches ownerId: null system rows.
-  ownerId String?
-  owner   User?   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-
-  // ownerId joins the business key so per-user homebrew names don't collide
-  // with each other OR with a seeded spell of the same name — only widened
-  // (never narrowed) from the (name, edition) key above, and NULLS NOT
-  // DISTINCT is preserved so seeded (ownerId: null) rows still enforce
-  // global name+edition uniqueness among themselves. Hand-edited into the
-  // migration.sql (Prisma's DSL can't express NULLS NOT DISTINCT) — see that
-  // migration's comment.
-  @@unique([name, edition, ownerId])
-  @@index([ownerId])
+  // Entitlement supertype (#1796, epic #1795 1/6): every Spell row — seeded
+  // OR homebrew — is 1:1 with exactly one CatalogEntry, which is what now
+  // carries ownership/scope (replacing the #1784 Spell.ownerId column this
+  // migration drops). A bare scalar, deliberately with NO Prisma relation
+  // field here: CatalogEntry carries no back-relation to Spell either (see
+  // that model's own comment), which is what keeps the supertype closed to
+  // future kinds (Item, …) instead of hard-coupling it to Spell specifically.
+  // The FK constraint (ON DELETE CASCADE) is hand-written into the migration
+  // — Prisma only emits one from an actual `@relation`, and this column
+  // deliberately has none.
+  catalogEntryId String @unique
 }
 
 // Spell↔class membership join (#1711, F2 of epic #1517's 2014 catalog fork).
