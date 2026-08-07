@@ -1,12 +1,11 @@
 // Homebrew-spell creation form (#1787, epic #1782 4/5): authors a user-owned
 // catalog Spell row (POST /api/spells/custom) that becomes reusable across
 // all of the caller's characters and is served back by GET /api/spells
-// (#1786, resolveSpellCatalogForEdition). Distinct from CustomSpellForm.tsx's
+// (#1786, resolveSpellCatalogForEdition). Distinct from CustomSpellForm's
 // per-character inline spell (learnSpell.custom): that one is never
 // persisted as its own catalog row and never reappears in the picker. The
 // level/school selects and the effect-toggle wrapper are shared with
-// CustomSpellForm via SpellLevelSelect/SpellSchoolSelect/SpellEffectToggle —
-// identical markup in both was flagged as duplication.
+// CustomSpellForm via SpellLevelSelect/SpellSchoolSelect/SpellEffectToggle.
 import { useState } from "react";
 
 import { createCustomSpell } from "@/api/client";

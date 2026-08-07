@@ -89,6 +89,20 @@ describe("buildHomebrewSpellPayload", () => {
     expect(save.saveAbility).toBe("dexterity");
     expect(save.saveEffect).toBe("half");
   });
+
+  it("includes upcastDicePerLevel when set, omits it when blank", () => {
+    const withUpcast = buildHomebrewSpellPayload(
+      { ...BLANK_HOMEBREW_SPELL, name: "Bolt", effectKind: "heal", effectDiceCount: 2, effectDiceFaces: 4, upcastDicePerLevel: 1 },
+      true,
+    );
+    expect(withUpcast.upcastDicePerLevel).toBe(1);
+
+    const withoutUpcast = buildHomebrewSpellPayload(
+      { ...BLANK_HOMEBREW_SPELL, name: "Bolt", effectKind: "heal", effectDiceCount: 2, effectDiceFaces: 4 },
+      true,
+    );
+    expect(withoutUpcast.upcastDicePerLevel).toBeUndefined();
+  });
 });
 
 describe("validateHomebrewSpellDraft", () => {

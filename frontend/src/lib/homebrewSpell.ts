@@ -1,10 +1,9 @@
 // Pure draft/payload/validation logic for the homebrew-spell creation form
-// (#1787, epic #1782 4/5). No JSX — HomebrewSpellForm.tsx and its
-// subcomponents are the only consumers. This is a CLIENT-SIDE UX mirror of
-// validateCustomSpellCoherence (backend/src/lib/spellcasting/custom-spell-validation.ts):
-// the backend remains the source of truth (it re-validates on every
-// POST/PATCH), this only lets the form show an inline error / disable
-// submit before round-tripping.
+// (#1787, epic #1782 4/5). No JSX — HomebrewSpellForm and its subcomponents
+// are the only consumers. This is a CLIENT-SIDE UX mirror of
+// validateCustomSpellCoherence: the backend remains the source of truth (it
+// re-validates on every POST/PATCH), this only lets the form show an inline
+// error / disable submit before round-tripping.
 import type { HomebrewSpellInput } from "@/types/character";
 
 export const BLANK_HOMEBREW_SPELL: HomebrewSpellInput = {
@@ -24,7 +23,7 @@ export const BLANK_HOMEBREW_SPELL: HomebrewSpellInput = {
 // Builds the POST/PATCH /api/spells/custom body from the form's draft state.
 // Effect fields ride along only when the "enable auto-rolling" toggle is on
 // AND a kind is chosen (mirrors buildCustomSpellPayload's own two-gate
-// shape, lib/addSpell.ts) — damage-only fields (damageType/attackType) are
+// shape) — damage-only fields (damageType/attackType) are
 // scoped to effectKind "damage", and save fields (saveAbility/saveEffect) to
 // attackType "save", so a "heal" or "attack" submission can never carry a
 // field the backend's validateCustomSpellCoherence would reject.

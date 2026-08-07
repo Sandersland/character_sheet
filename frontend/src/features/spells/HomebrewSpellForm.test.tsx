@@ -53,6 +53,7 @@ describe("HomebrewSpellForm", () => {
   });
 
   it("renders the core fields", async () => {
+    const user = userEvent.setup();
     render(<HomebrewSpellForm edition="EDITION_2014" onCreated={noop} onClose={noop} />);
 
     expect(screen.getByLabelText(/spell name/i)).toBeInTheDocument();
@@ -70,6 +71,9 @@ describe("HomebrewSpellForm", () => {
 
     await waitFor(() => expect(screen.getByText("Wizard")).toBeInTheDocument());
     expect(screen.getByText("Cleric")).toBeInTheDocument();
+
+    await user.click(screen.getByLabelText(/enable auto-rolling on cast/i));
+    expect(screen.getByLabelText(/upcast dice.level/i)).toBeInTheDocument();
   });
 
   it("shows save ability only when the effect is damage with attack type 'save'", async () => {
@@ -137,6 +141,7 @@ describe("HomebrewSpellForm", () => {
     await user.selectOptions(screen.getByLabelText(/effect type/i), "damage");
     await user.type(screen.getByLabelText(/dice count/i), "8");
     await user.type(screen.getByLabelText(/dice faces/i), "6");
+    await user.type(screen.getByLabelText(/upcast dice.level/i), "1");
     await user.selectOptions(screen.getByLabelText(/attack type/i), "save");
     await user.selectOptions(screen.getByLabelText(/save ability/i), "dexterity");
 
@@ -151,10 +156,44 @@ describe("HomebrewSpellForm", () => {
         effectKind: "damage",
         effectDiceCount: 8,
         effectDiceFaces: 6,
+        upcastDicePerLevel: 1,
         attackType: "save",
         saveAbility: "dexterity",
       }),
     );
     await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
+  });
+
+  it("omits upcastDicePerLevel from the payload when left blank", async () => {
+    vi.mocked(client.createCustomSpell).mockResolvedValue({
+      id: "s1",
+      ownerId: "u1",
+      edition: "EDITION_2014",
+      name: "Zap",
+      level: 0,
+      school: "evocation",
+      castingTime: "1 action",
+      range: "60 feet",
+      duration: "Instantaneous",
+      description: "A zap.",
+      concentration: false,
+      ritual: false,
+      classes: [],
+    });
+    const user = userEvent.setup();
+    render(<HomebrewSpellForm edition="EDITION_2014" onCreated={noop} onClose={noop} />);
+
+    await user.type(screen.getByLabelText(/spell name/i), "Zap");
+    await user.type(screen.getByLabelText(/description/i), "A zap.");
+    await user.click(screen.getByLabelText(/enable auto-rolling on cast/i));
+    await user.selectOptions(screen.getByLabelText(/effect type/i), "heal");
+    await user.type(screen.getByLabelText(/dice count/i), "2");
+    await user.type(screen.getByLabelText(/dice faces/i), "4");
+
+    await user.click(screen.getByRole("button", { name: /create homebrew spell/i }));
+
+    await waitFor(() => expect(client.createCustomSpell).toHaveBeenCalledTimes(1));
+    const payload = vi.mocked(client.createCustomSpell).mock.calls[0][0];
+    expect(payload.upcastDicePerLevel).toBeUndefined();
   });
 });
