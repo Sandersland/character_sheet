@@ -11,6 +11,17 @@
 // #1795 8/8) this list also carries a DM's CAMPAIGN-scope forks (already
 // campaign-wide by construction — nothing to share). A "Forked" badge
 // surfaces when the row is itself a fork of some other entry (isForkedSpell).
+//
+// Edit/Delete are gated on `catalog.editable` (#1808 leak-fix, epic #1795
+// 8/9 combined-state review), not just "this row reached the manage list at
+// all": since #1811 (epic #1795 9/9) the campaign-aware picker can serve a
+// CAMPAIGN row to a non-DM member too (ownedHomebrewSpells' own list-level
+// filter already excludes those — this is the same check again at the row,
+// defense in depth, not a second source of truth: both read the ONE
+// server-computed field). `catalog === undefined` (an older/no-metadata
+// fixture) defaults to editable — that shape only ever reaches this
+// component via ownerId-based ownership, which is real ownership regardless
+// of whether catalog metadata rode along.
 import { useState } from "react";
 
 import Badge from "@/components/ui/Badge";
@@ -29,6 +40,7 @@ interface HomebrewSpellManageRowProps {
 export default function HomebrewSpellManageRow({ spell, busy, onEdit, onDelete }: HomebrewSpellManageRowProps) {
   const [confirming, setConfirming] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const editable = spell.catalog === undefined || spell.catalog.editable;
 
   async function handleConfirmDelete() {
     try {
@@ -87,24 +99,28 @@ export default function HomebrewSpellManageRow({ spell, busy, onEdit, onDelete }
             Share
           </button>
         )}
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => onEdit(spell)}
-          aria-label={`Edit ${spell.name}`}
-          className="text-parchment-700 hover:underline disabled:opacity-40"
-        >
-          Edit
-        </button>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => setConfirming(true)}
-          aria-label={`Delete ${spell.name}`}
-          className="text-garnet-700 hover:underline disabled:opacity-40"
-        >
-          Delete
-        </button>
+        {editable && (
+          <>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => onEdit(spell)}
+              aria-label={`Edit ${spell.name}`}
+              className="text-parchment-700 hover:underline disabled:opacity-40"
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => setConfirming(true)}
+              aria-label={`Delete ${spell.name}`}
+              className="text-garnet-700 hover:underline disabled:opacity-40"
+            >
+              Delete
+            </button>
+          </>
+        )}
       </div>
       {sharing && <ShareSpellSheet spell={spell} onClose={() => setSharing(false)} />}
     </li>

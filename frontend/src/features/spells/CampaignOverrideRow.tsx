@@ -6,14 +6,14 @@
 import { useState } from "react";
 
 import { forkCatalogEntry } from "@/api/client";
-import type { Campaign, CatalogSpell } from "@/types/character";
+import type { Campaign } from "@/types/character";
 
 type OverrideState = "idle" | "busy" | "done";
 
 interface CampaignOverrideRowProps {
   campaign: Campaign;
   entryId: string;
-  onForked: (result: { entryId: string; spell: CatalogSpell }) => void;
+  onForked: () => void;
 }
 
 export default function CampaignOverrideRow({ campaign, entryId, onForked }: CampaignOverrideRowProps) {
@@ -24,9 +24,9 @@ export default function CampaignOverrideRow({ campaign, entryId, onForked }: Cam
     setState("busy");
     setError(null);
     try {
-      const result = await forkCatalogEntry(entryId, { scope: "CAMPAIGN", campaignId: campaign.id });
+      await forkCatalogEntry(entryId, { scope: "CAMPAIGN", campaignId: campaign.id });
       setState("done");
-      onForked(result);
+      onForked();
     } catch (err) {
       setState("idle");
       setError(err instanceof Error ? err.message : "Failed to override for this campaign.");

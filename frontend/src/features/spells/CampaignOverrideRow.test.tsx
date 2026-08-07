@@ -35,7 +35,7 @@ const FORKED_SPELL: CatalogSpell = {
   ritual: false,
   classes: [],
   cantripScaling: false,
-  catalog: { entryId: "entry-2", scope: "CAMPAIGN", isFork: true, forkedFromId: "entry-1" },
+  catalog: { entryId: "entry-2", scope: "CAMPAIGN", isFork: true, forkedFromId: "entry-1", editable: true },
 };
 
 describe("CampaignOverrideRow", () => {
@@ -55,7 +55,7 @@ describe("CampaignOverrideRow", () => {
     await waitFor(() =>
       expect(client.forkCatalogEntry).toHaveBeenCalledWith("entry-1", { scope: "CAMPAIGN", campaignId: "camp-a" }),
     );
-    expect(onForked).toHaveBeenCalledWith({ entryId: "entry-2", spell: FORKED_SPELL });
+    expect(onForked).toHaveBeenCalledTimes(1);
     // The button's aria-label is fixed ("Override for …") across every state — its
     // TEXT flips to "Overridden ✓" and it disables, but the accessible name doesn't
     // change, so the done check queries by the stable label and asserts on content.

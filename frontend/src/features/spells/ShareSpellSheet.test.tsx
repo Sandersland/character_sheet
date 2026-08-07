@@ -26,7 +26,7 @@ const SPELL: CatalogSpell = {
   ritual: false,
   classes: [],
   cantripScaling: false,
-  catalog: { entryId: "entry-1", scope: "USER", isFork: false, forkedFromId: null },
+  catalog: { entryId: "entry-1", scope: "USER", isFork: false, forkedFromId: null, editable: true },
 };
 
 const CAMPAIGN_A: Campaign = {

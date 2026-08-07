@@ -151,13 +151,15 @@ describe("AddSpellPanel homebrew tab integration", () => {
   });
 });
 
-// #1808, epic #1795 8/8: GET /api/spells never serves a CAMPAIGN-scope row
-// (spellsRouter's own comment — this picker has no campaign context), so a
-// DM's freshly-created CAMPAIGN fork would otherwise vanish the instant
-// ForkSpellSheet's onForked bumps catalogRefreshKey and fetchSpells refetches
-// WITHOUT it. This is the end-to-end proof that AddSpellPanel keeps the fork
-// manageable anyway (locally-tracked override, not a server refetch).
-describe("AddSpellPanel — DM's CAMPAIGN-scope fork stays manageable (#1808)", () => {
+// #1808 (epic #1795 8/8) + #1811 (9/9), reconciled by the #1808-leak-fix
+// combined-state review (epic #1795 8/9): #1811's campaign-aware picker
+// (`characterId` threaded into GET /api/spells) now re-supplies a DM's
+// CAMPAIGN fork on the ordinary post-fork refetch — the #1808-era local-
+// override workaround this describe block used to test is gone (see git
+// history). `catalog.editable` (server-computed) is what the Homebrew tab
+// now gates Edit/Delete on, so these tests drive that signal through
+// fetchSpells' mock instead of a fork flow.
+describe("AddSpellPanel — Homebrew tab gates Edit/Delete on catalog.editable (#1808/#1811)", () => {
   const SEEDED_SPELL: CatalogSpell = {
     id: "seeded-1",
     name: "Fireball",
@@ -171,7 +173,7 @@ describe("AddSpellPanel — DM's CAMPAIGN-scope fork stays manageable (#1808)", 
     ritual: false,
     classes: [],
     cantripScaling: false,
-    catalog: { entryId: "entry-fireball", scope: "GLOBAL", isFork: false, forkedFromId: null },
+    catalog: { entryId: "entry-fireball", scope: "GLOBAL", isFork: false, forkedFromId: null, editable: false },
   };
 
   const DM_CAMPAIGN: Campaign = {
@@ -190,30 +192,38 @@ describe("AddSpellPanel — DM's CAMPAIGN-scope fork stays manageable (#1808)", 
     vi.mocked(client.fetchReference).mockResolvedValue(REFERENCE);
     vi.mocked(client.fetchCampaigns).mockReset();
     vi.mocked(client.forkCatalogEntry).mockReset();
-    // Every fetchSpells call (initial + the post-fork refetch alike) omits
-    // the CAMPAIGN fork — the real server never serves one through this route.
-    vi.mocked(client.fetchSpells).mockReset().mockResolvedValue([SEEDED_SPELL]);
+    vi.mocked(client.fetchSpells).mockReset();
   });
 
-  it("shows Edit/Delete on the Homebrew tab for a DM's CAMPAIGN override, surviving the post-fork refetch", async () => {
+  it("shows Edit/Delete on the Homebrew tab once the post-fork refetch re-supplies the DM's own CAMPAIGN fork (editable: true)", async () => {
+    const forkedRow: CatalogSpell = {
+      ...SEEDED_SPELL,
+      id: "fork-1",
+      catalog: { entryId: "entry-campaign-fork", scope: "CAMPAIGN", isFork: true, forkedFromId: "entry-fireball", editable: true },
+    };
+    // First call is the initial load (no fork yet); every call after the
+    // fork (the picker's own refetch, real #1811 campaign-aware behavior)
+    // includes it, editable: true for the DM who owns it.
+    vi.mocked(client.fetchSpells).mockResolvedValueOnce([SEEDED_SPELL]).mockResolvedValue([SEEDED_SPELL, forkedRow]);
     vi.mocked(client.fetchCampaigns).mockResolvedValue([DM_CAMPAIGN]);
-    vi.mocked(client.forkCatalogEntry).mockResolvedValue({
-      entryId: "entry-campaign-fork",
-      spell: {
-        ...SEEDED_SPELL,
-        id: "fork-1",
-        catalog: { entryId: "entry-campaign-fork", scope: "CAMPAIGN", isFork: true, forkedFromId: "entry-fireball" },
-      },
-    });
+    vi.mocked(client.forkCatalogEntry).mockResolvedValue({ entryId: "entry-campaign-fork", spell: forkedRow });
 
     const user = userEvent.setup();
     render(
-      <AddSpellPanel onLearn={noop} onClose={noop} busy={false} learnedSpellIds={new Set()} edition="EDITION_2014" />,
+      <AddSpellPanel
+        onLearn={noop}
+        onClose={noop}
+        busy={false}
+        learnedSpellIds={new Set()}
+        edition="EDITION_2014"
+        characterId="char-1"
+      />,
     );
 
     await user.click(await screen.findByRole("button", { name: "Fork Fireball" }));
     await user.click(await screen.findByRole("button", { name: "Override for The Sunless Citadel" }));
     await waitFor(() => expect(client.forkCatalogEntry).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(client.fetchSpells).toHaveBeenCalledTimes(2));
 
     await user.click(screen.getByRole("button", { name: "Homebrew" }));
 
@@ -224,12 +234,51 @@ describe("AddSpellPanel — DM's CAMPAIGN-scope fork stays manageable (#1808)", 
     expect(screen.queryByRole("button", { name: "Share Fireball" })).not.toBeInTheDocument();
   });
 
+  // The leak an Opus review of the combined state caught: a non-DM member's
+  // picker gets the SAME CAMPAIGN row too (#1811), just with editable: false
+  // — it must never surface as manageable in THEIR Homebrew tab.
+  it("excludes a fellow (non-DM) member's non-editable CAMPAIGN row from the Homebrew tab entirely", async () => {
+    const notMyFork: CatalogSpell = {
+      ...SEEDED_SPELL,
+      id: "fork-1",
+      catalog: { entryId: "entry-campaign-fork", scope: "CAMPAIGN", isFork: true, forkedFromId: "entry-fireball", editable: false },
+    };
+    vi.mocked(client.fetchSpells).mockResolvedValue([SEEDED_SPELL, notMyFork]);
+
+    const user = userEvent.setup();
+    render(
+      <AddSpellPanel
+        onLearn={noop}
+        onClose={noop}
+        busy={false}
+        learnedSpellIds={new Set()}
+        edition="EDITION_2014"
+        characterId="char-2"
+      />,
+    );
+
+    // Both rows are named "Fireball" (the fork copies its origin's name) —
+    // wait for the fetch itself rather than a name that now matches twice.
+    await waitFor(() => expect(client.fetchSpells).toHaveBeenCalled());
+    await user.click(screen.getByRole("button", { name: "Homebrew" }));
+
+    expect(screen.getByText(/haven't authored any homebrew spells/i)).toBeInTheDocument();
+  });
+
   it("a caller who DMs no campaign never gets the override option at all", async () => {
+    vi.mocked(client.fetchSpells).mockResolvedValue([SEEDED_SPELL]);
     vi.mocked(client.fetchCampaigns).mockResolvedValue([]);
 
     const user = userEvent.setup();
     render(
-      <AddSpellPanel onLearn={noop} onClose={noop} busy={false} learnedSpellIds={new Set()} edition="EDITION_2014" />,
+      <AddSpellPanel
+        onLearn={noop}
+        onClose={noop}
+        busy={false}
+        learnedSpellIds={new Set()}
+        edition="EDITION_2014"
+        characterId="char-3"
+      />,
     );
 
     await user.click(await screen.findByRole("button", { name: "Fork Fireball" }));

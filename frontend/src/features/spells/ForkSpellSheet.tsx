@@ -28,7 +28,7 @@ interface ForkSpellSheetProps {
   spell: CatalogSpell;
   /** A fork succeeded — caller refetches the catalog so the new entry (and, for
    *  a USER fork, its "My homebrew" badge) shows up without a manual reload. */
-  onForked: (result: { entryId: string; spell: CatalogSpell }) => void;
+  onForked: () => void;
   onClose: () => void;
 }
 
@@ -52,9 +52,9 @@ export default function ForkSpellSheet({ spell, onForked, onClose }: ForkSpellSh
     setUserForkState("busy");
     setUserForkError(null);
     try {
-      const result = await forkCatalogEntry(entryId, { scope: "USER" });
+      await forkCatalogEntry(entryId, { scope: "USER" });
       setUserForkState("done");
-      onForked(result);
+      onForked();
     } catch (err) {
       setUserForkState("idle");
       setUserForkError(err instanceof Error ? err.message : "Failed to create your version.");

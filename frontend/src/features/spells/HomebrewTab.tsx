@@ -13,14 +13,12 @@
 // itself in `editing` mode: only one form is ever mounted at a time, so the
 // static field ids (#homebrew-name etc.) never collide.
 //
-// onCreated/onEdited/onDeleted (#1808, epic #1795 8/8 — replacing a single
-// arg-less onChanged) each report the affected row: GET /api/spells never
-// serves a CAMPAIGN-scope entry (spellsRouter's own comment — this picker
-// has no campaign context), so AddSpellPanel's post-refetch `catalog` prop
-// can never re-supply a DM's CAMPAIGN fork on its own. Reporting the saved/
-// deleted row is what lets AddSpellPanel keep its own locally-tracked
-// override in sync (upsert on create/edit, remove on delete) instead of that
-// fork silently vanishing from the manage list the moment its owner touches it.
+// onCreated/onEdited/onDeleted are bare refetch signals — AddSpellPanel just
+// bumps its shared catalogRefreshKey on any of them; #1811's campaign-aware
+// picker (`characterId` threaded into GET /api/spells) is what makes that
+// refetch re-supply a DM's CAMPAIGN fork now, so no row payload needs to
+// travel through these callbacks (a #1808-era local-override workaround,
+// removed once #1811 made it redundant — see git history for that shape).
 import { useState } from "react";
 
 import { deleteCustomSpell } from "@/api/client";
@@ -28,7 +26,7 @@ import Spinner from "@/components/ui/Spinner";
 import HomebrewSpellForm from "@/features/spells/HomebrewSpellForm";
 import HomebrewSpellManageList from "@/features/spells/HomebrewSpellManageList";
 import { ownedHomebrewSpells, toHomebrewSpellInput } from "@/lib/homebrewSpell";
-import type { CatalogSpell, HomebrewSpell } from "@/types/character";
+import type { CatalogSpell } from "@/types/character";
 import type { RulesEdition } from "@character-sheet/shared-types";
 
 interface HomebrewTabProps {
@@ -37,11 +35,11 @@ interface HomebrewTabProps {
   catalogError?: string | null;
   showSpinner?: boolean;
   /** A new spell was created — caller switches to the catalog tab + refetches. */
-  onCreated: (spell: HomebrewSpell) => void;
+  onCreated: () => void;
   /** An existing spell was edited — caller refetches, staying on this tab. */
-  onEdited: (spell: HomebrewSpell) => void;
+  onEdited: () => void;
   /** An existing spell was deleted — caller refetches, staying on this tab. */
-  onDeleted: (spell: CatalogSpell) => void;
+  onDeleted: () => void;
   onClose: () => void;
 }
 
@@ -70,7 +68,7 @@ export default function HomebrewTab({
     setDeleteError(null);
     try {
       await deleteCustomSpell(spell.id);
-      onDeleted(spell);
+      onDeleted();
     } catch (err) {
       setDeleteError(err instanceof Error ? err.message : "Failed to delete spell.");
       throw err;
@@ -79,9 +77,9 @@ export default function HomebrewTab({
     }
   }
 
-  function handleSaved(spell: HomebrewSpell) {
+  function handleSaved() {
     setEditing(null);
-    onEdited(spell);
+    onEdited();
   }
 
   if (editing) {

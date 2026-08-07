@@ -24,7 +24,7 @@ const SEEDED_SPELL: CatalogSpell = {
   ritual: false,
   classes: [],
   cantripScaling: false,
-  catalog: { entryId: "entry-fireball", scope: "GLOBAL", isFork: false, forkedFromId: null },
+  catalog: { entryId: "entry-fireball", scope: "GLOBAL", isFork: false, forkedFromId: null, editable: false },
 };
 
 const CAMPAIGN_DM: Campaign = {
@@ -43,7 +43,7 @@ const CAMPAIGN_PLAYER: Campaign = { ...CAMPAIGN_DM, id: "camp-b", name: "Curse o
 
 const FORK_RESULT = {
   entryId: "entry-2",
-  spell: { ...SEEDED_SPELL, id: "s2", catalog: { entryId: "entry-2", scope: "USER" as const, isFork: true, forkedFromId: "entry-fireball" } },
+  spell: { ...SEEDED_SPELL, id: "s2", catalog: { entryId: "entry-2", scope: "USER" as const, isFork: true, forkedFromId: "entry-fireball", editable: true } },
 };
 
 describe("ForkSpellSheet", () => {
@@ -63,7 +63,7 @@ describe("ForkSpellSheet", () => {
     await user.click(screen.getByRole("button", { name: "Make my version" }));
 
     await waitFor(() => expect(client.forkCatalogEntry).toHaveBeenCalledWith("entry-fireball", { scope: "USER" }));
-    expect(onForked).toHaveBeenCalledWith(FORK_RESULT);
+    expect(onForked).toHaveBeenCalledTimes(1);
     expect(await screen.findByRole("button", { name: /your version was created/i })).toBeDisabled();
   });
 
@@ -80,7 +80,7 @@ describe("ForkSpellSheet", () => {
     vi.mocked(client.fetchCampaigns).mockResolvedValue([CAMPAIGN_DM]);
     vi.mocked(client.forkCatalogEntry).mockResolvedValue({
       entryId: "entry-3",
-      spell: { ...SEEDED_SPELL, id: "s3", catalog: { entryId: "entry-3", scope: "CAMPAIGN", isFork: true, forkedFromId: "entry-fireball" } },
+      spell: { ...SEEDED_SPELL, id: "s3", catalog: { entryId: "entry-3", scope: "CAMPAIGN", isFork: true, forkedFromId: "entry-fireball", editable: true } },
     });
     const onForked = vi.fn();
     const user = userEvent.setup();

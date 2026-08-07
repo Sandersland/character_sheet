@@ -18,7 +18,7 @@ const SEEDED_SPELL: CatalogSpell = {
   ritual: false,
   classes: [],
   cantripScaling: false,
-  catalog: { entryId: "entry-fireball", scope: "GLOBAL", isFork: false, forkedFromId: null },
+  catalog: { entryId: "entry-fireball", scope: "GLOBAL", isFork: false, forkedFromId: null, editable: false },
 };
 
 describe("SpellCatalogRow", () => {
@@ -37,23 +37,23 @@ describe("SpellCatalogRow", () => {
   });
 
   it("omits Fork for the caller's own row (ownerId set) — Edit/Delete lives in the Homebrew tab instead", () => {
-    const own: CatalogSpell = { ...SEEDED_SPELL, ownerId: "u1", catalog: { entryId: "e1", scope: "USER", isFork: false, forkedFromId: null } };
+    const own: CatalogSpell = { ...SEEDED_SPELL, ownerId: "u1", catalog: { entryId: "e1", scope: "USER", isFork: false, forkedFromId: null, editable: true } };
     render(<SpellCatalogRow spell={own} alreadyKnown={false} busy={false} onLearn={() => {}} onFork={() => {}} />);
     expect(screen.queryByRole("button", { name: `Fork ${own.name}` })).not.toBeInTheDocument();
   });
 
   it("badges a granted USER row 'Shared homebrew' and a CAMPAIGN row 'Campaign homebrew'", () => {
-    const shared: CatalogSpell = { ...SEEDED_SPELL, catalog: { entryId: "e1", scope: "USER", isFork: false, forkedFromId: null } };
+    const shared: CatalogSpell = { ...SEEDED_SPELL, catalog: { entryId: "e1", scope: "USER", isFork: false, forkedFromId: null, editable: false } };
     const { rerender } = render(<SpellCatalogRow spell={shared} alreadyKnown={false} busy={false} onLearn={() => {}} />);
     expect(screen.getByText("Shared homebrew")).toBeInTheDocument();
 
-    const campaignSpell: CatalogSpell = { ...SEEDED_SPELL, catalog: { entryId: "e1", scope: "CAMPAIGN", isFork: false, forkedFromId: null } };
+    const campaignSpell: CatalogSpell = { ...SEEDED_SPELL, catalog: { entryId: "e1", scope: "CAMPAIGN", isFork: false, forkedFromId: null, editable: false } };
     rerender(<SpellCatalogRow spell={campaignSpell} alreadyKnown={false} busy={false} onLearn={() => {}} />);
     expect(screen.getByText("Campaign homebrew")).toBeInTheDocument();
   });
 
   it("badges a fork 'Forked'", () => {
-    const forked: CatalogSpell = { ...SEEDED_SPELL, catalog: { entryId: "e1", scope: "USER", isFork: true, forkedFromId: "entry-fireball" } };
+    const forked: CatalogSpell = { ...SEEDED_SPELL, catalog: { entryId: "e1", scope: "USER", isFork: true, forkedFromId: "entry-fireball", editable: false } };
     render(<SpellCatalogRow spell={forked} alreadyKnown={false} busy={false} onLearn={() => {}} />);
     expect(screen.getByText("Forked")).toBeInTheDocument();
   });

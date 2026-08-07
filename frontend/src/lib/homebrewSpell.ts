@@ -5,7 +5,7 @@
 // the backend remains the source of truth (it re-validates on every
 // POST/PATCH), this only lets the form show an inline error / disable submit
 // before round-tripping.
-import type { CatalogSpell, HomebrewSpell, HomebrewSpellInput } from "@/types/character";
+import type { CatalogSpell, HomebrewSpellInput } from "@/types/character";
 
 export const BLANK_HOMEBREW_SPELL: HomebrewSpellInput = {
   name: "",
@@ -94,31 +94,22 @@ export function validateHomebrewSpellDraft(draft: HomebrewSpellInput, hasEffect:
 }
 
 // The manage view's own filter (#1788, epic #1782 5/5; widened #1808, epic
-// #1795 8/8): GET /api/spells already scopes ownerId to `{ null, caller }`
-// server-side (#1786), so any row with ownerId set here IS the caller's own —
-// no separate "mine" endpoint or current-user id needed on the frontend. A
-// CAMPAIGN-scope row (a DM's fork) has NO ownerId (CatalogEntry.ownerUserId
-// is null for that scope, #1796) but is manageable too: GET /api/spells never
-// serves CAMPAIGN-scope rows at all (spellsRouter's own comment — this
-// picker route has no campaign context), so the ONLY way a CAMPAIGN row ever
-// reaches `catalog` here is AddSpellPanel merging in the caller's OWN just-
-// forked result (assertCampaignOwner already gated who could create it) —
-// scope alone is therefore a safe "mine" signal for this one scope, unlike
-// USER/GLOBAL where it isn't.
+// #1795 8/8; corrected #1808-leak-fix, epic #1795 8/9 combined-state review):
+// GET /api/spells already scopes ownerId to `{ null, caller }` server-side
+// (#1786), so any row with ownerId set here IS the caller's own — no separate
+// "mine" endpoint or current-user id needed on the frontend. A CAMPAIGN-scope
+// row (a DM's fork) has NO ownerId (CatalogEntry.ownerUserId is null for that
+// scope, #1796) but IS manageable BY ITS DM — gated on `catalog.editable`
+// (server-computed, isCatalogEntryEditable — lib/catalog/entitlement.ts),
+// never on scope alone: once #1811 (epic #1795 9/9) started serving a
+// CAMPAIGN row to every campaign member (not just its DM) for the campaign-
+// aware picker, `scope === "CAMPAIGN"` alone would have wrongly offered
+// Edit/Delete to a non-DM member on a fork they can't touch (that 403s on
+// click) — the exact leak an Opus review of the combined state caught.
 export function ownedHomebrewSpells(catalog: CatalogSpell[]): CatalogSpell[] {
-  return catalog.filter((spell) => spell.ownerId !== undefined || spell.catalog?.scope === "CAMPAIGN");
-}
-
-// Maps a POST/PATCH /api/spells/custom response (HomebrewSpell) back into
-// the GET /api/spells row shape (CatalogSpell) so AddSpellPanel can merge a
-// DM's freshly-created/edited CAMPAIGN fork into its locally-held catalog
-// list (#1808 — see ownedHomebrewSpells' own comment for why that merge is
-// needed at all). `cantripScaling` is the one CatalogSpell field a homebrew
-// row never carries — custom-spells.ts's own serializeCustomSpell omits it,
-// since a homebrew spell is never a cantrip-scaling row — so it's always
-// false here, never read off the response.
-export function toCatalogSpell(spell: HomebrewSpell): CatalogSpell {
-  return { ...spell, cantripScaling: false };
+  return catalog.filter(
+    (spell) => spell.ownerId !== undefined || (spell.catalog?.scope === "CAMPAIGN" && spell.catalog.editable),
+  );
 }
 
 // Maps a served CatalogSpell (GET /api/spells row) back into the editable
