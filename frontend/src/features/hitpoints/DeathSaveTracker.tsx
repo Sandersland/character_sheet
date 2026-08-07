@@ -24,7 +24,7 @@ function DeathSavePips({
               i < count
                 ? tone === "success"
                   ? "border-arcane-600 bg-arcane-500"
-                  : "border-garnet-700 bg-garnet-600"
+                  : "border-garnet-700 bg-garnet-soft-surface"
                 : "border-parchment-400 bg-parchment-100"
             }`}
           />

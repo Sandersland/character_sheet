@@ -38,7 +38,7 @@ function ResumeAttackButton({ attack, onResume }: { attack: AttackState; onResum
     <button
       type="button"
       onClick={onResume}
-      className="mt-2 w-full rounded-control border border-garnet-300 bg-garnet-600 px-3 py-1.5 text-xs font-semibold text-parchment-50 transition-colors hover:bg-garnet-700"
+      className="mt-2 w-full rounded-control border border-garnet-300 bg-garnet-soft-surface px-3 py-1.5 text-xs font-semibold text-garnet-on-surface transition-colors hover:bg-garnet-soft-surface-hover"
     >
       Resume attack — {attack.total - attack.used} of {attack.total} remaining
     </button>

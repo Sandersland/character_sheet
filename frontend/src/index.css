@@ -83,6 +83,32 @@
      there. */
   --color-garnet-on-surface-dim: #ffbdbd;
 
+  /* Meter-fill role (#1403, descoped from #994). MeterBar's contrast reference
+     is its own bg-parchment-200 TRACK, not the page — a different bar than the
+     brand-surface tokens above were tuned for, so garnet-surface's 2.65:1 there
+     fails while today's garnet-600 clears 3.95:1 (dark) / 3.56:1 (light). Both
+     values here are today's garnet-600 verbatim (byte-identical, zero visual
+     change) — copied onto a dedicated non-inverting token so the meter fill no
+     longer rides the ramp implicitly and can't be silently broken by a future
+     ramp retune. */
+  --color-garnet-meter: #cf1124;
+  /* Soft-surface role (#1404, family B: resting garnet-600 + hover:garnet-700,
+     descoped from #994's family A garnet-700/800/900 sweep). Same inverting-fill
+     bug as family A, but family A and B read as two brand-intensity levels in
+     light mode (A rests at garnet-700, B at garnet-600) — collapsing onto
+     garnet-surface would flatten that. Light values are today's garnet-600/700
+     verbatim, so light mode stays byte-identical.
+     Dark converges onto garnet-surface's exact values (#da2233 resting /
+     #b81326 hover): the legal band for a value simultaneously clearing 4.5:1
+     against --color-garnet-on-surface and 3:1 against the dark page/card is
+     only ~11% of relative luminance wide (see the #994 comment above), and a
+     second shade squeezed into that band reads visually identical anyway — not
+     worth the fragility of a second near-boundary value. Kept as an
+     independent token (not a garnet-surface alias) so the two roles can
+     diverge later without a rename. */
+  --color-garnet-soft-surface: #cf1124;
+  --color-garnet-soft-surface-hover: #ab091e;
+
   /* Accent — arcane teal, for magic/spell affordances (swatches.json: teal-*) */
   --color-arcane-50: #effcf6;
   --color-arcane-100: #c6f7e2;
@@ -352,6 +378,14 @@
   --color-garnet-surface-hover: #b81326;
   --color-garnet-surface-deep: #8c1220;
   --color-garnet-on-surface-dim: #faf9f7;
+  /* #1403 — today's dark garnet-600, clears 3.95:1 against the dark meter
+     track (--color-parchment-200 #363023); see the @theme comment for the
+     full rationale and the light-mode value. */
+  --color-garnet-meter: #ec5d68;
+  /* #1404 — deliberately converges with --color-garnet-surface/-hover above;
+     see the @theme comment for the measured ratios and why. */
+  --color-garnet-soft-surface: #da2233;
+  --color-garnet-soft-surface-hover: #b81326;
 
   --color-arcane-50: #02312a;
   --color-arcane-100: #064a3e;

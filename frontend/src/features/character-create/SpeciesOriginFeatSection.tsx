@@ -41,7 +41,7 @@ function OriginFeatRow({ feat, selected, onSelect }: { feat: CatalogFeat; select
         aria-pressed={selected}
         onClick={onSelect}
         className={`shrink-0 rounded px-2.5 py-1 text-xs font-semibold ${
-          selected ? "bg-garnet-600 text-white" : "bg-gold-400 text-ink hover:bg-gold-500"
+          selected ? "bg-garnet-soft-surface text-garnet-on-surface" : "bg-gold-400 text-ink hover:bg-gold-500"
         }`}
       >
         {selected ? "Selected" : "Select"}

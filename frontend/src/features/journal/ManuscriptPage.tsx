@@ -487,7 +487,7 @@ function ChapterComposer({
               type="checkbox"
               checked={isPrivate}
               onChange={(e) => setIsPrivate(e.target.checked)}
-              className="h-3.5 w-3.5 accent-garnet-600"
+              className="h-3.5 w-3.5 accent-garnet-soft-surface"
             />
             Private
           </label>
