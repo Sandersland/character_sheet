@@ -88,7 +88,7 @@ sessionsRouter.post(
       where: { id: characterId },
       include: characterInclude,
     });
-    res.status(201).json({ session, character: serializeCharacter(updated) });
+    res.status(201).json({ session, character: await serializeCharacter(updated) });
   },
 );
 
@@ -373,7 +373,7 @@ sessionsRouter.post("/characters/:id/sessions", async (req, res) => {
     where: { id: req.params.id },
     include: characterInclude,
   });
-  res.status(201).json({ session, character: serializeCharacter(updated) });
+  res.status(201).json({ session, character: await serializeCharacter(updated) });
 });
 
 /**

@@ -245,5 +245,5 @@ campaignsRouter.post("/campaigns/:id/characters", async (req, res) => {
     where: { id: characterId },
     include: characterInclude,
   });
-  res.json(serializeCharacter(updated));
+  res.json(await serializeCharacter(updated));
 });

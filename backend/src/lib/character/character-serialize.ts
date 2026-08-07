@@ -47,7 +47,9 @@ import {
   buildResourcesView,
 } from "./serialize/classes.js";
 import { buildSpellcastingView } from "./serialize/spellcasting.js";
+import { attachSpellCatalogMeta } from "./serialize/spell-catalog.js";
 import { buildSpeciesTraitsView } from "./serialize/species.js";
+import type { SpellEntry } from "@/lib/spellcasting/spell-state.js";
 
 export { buildRollModifiers };
 
@@ -248,7 +250,23 @@ function buildCampaignPreferencesView(row: CharacterWithRelations) {
   };
 }
 
-export function serializeCharacter(rawRow: CharacterRow) {
+// Attach catalog entitlement metadata (#1798, epic #1795 3/6) to whichever
+// spellcasting view buildSpellcastingView produced — every shape it can
+// return (caster, granted-only, multiclass, the legacy blob) carries a
+// `spells` array under the same key, so this reads/replaces that one field
+// generically rather than re-deriving per view shape.
+async function decorateSpellcastingCatalog(
+  row: CharacterWithRelations,
+  spellcasting: object | undefined,
+): Promise<object | undefined> {
+  if (spellcasting === undefined) return undefined;
+  const raw = (spellcasting as { spells?: unknown }).spells;
+  if (!Array.isArray(raw)) return spellcasting;
+  const decorated = await attachSpellCatalogMeta(row, raw as SpellEntry[]);
+  return { ...spellcasting, spells: decorated };
+}
+
+export async function serializeCharacter(rawRow: CharacterRow) {
   // Reconstructs weaponDetail/armorDetail/consumableDetail/capabilities from
   // `snapshot` (#1649) — every builder below is unchanged from before the
   // mirror tables were dropped, because this is the only place the shape shifts.
@@ -263,13 +281,14 @@ export function serializeCharacter(rawRow: CharacterRow) {
 
   // 2. Spellcasting + resources views — each clamps stored mutable state to
   //    its level-derived caps (clamp-on-read mirrors of LEVEL_GATED_RECONCILERS).
-  const spellcasting = buildSpellcastingView(
+  const spellcastingBase = buildSpellcastingView(
     row,
     primaryClass,
     progress.level,
     abilityScoresMap,
     progress.proficiencyBonus,
   );
+  const spellcasting = await decorateSpellcastingCatalog(row, spellcastingBase);
   const { resources, maneuverSaveDC, classFeatureImprovements } = buildResourcesView(
     row,
     progress.level,
