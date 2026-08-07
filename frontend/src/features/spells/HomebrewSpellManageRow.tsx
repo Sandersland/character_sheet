@@ -4,9 +4,17 @@
 // `onDelete` itself (rather than firing-and-forgetting) so a rejected delete
 // resets `confirming` here instead of leaving the row stuck showing BOTH the
 // confirm prompt and HomebrewTab's error banner.
+//
+// "Share" (#1799/#1801, epic #1795 4/6+6/6) opens ShareSpellSheet — every
+// homebrew row here is scope USER (this list's own filter, addSpell.ts's
+// ownedHomebrewSpells), so every row is grantable. A "Forked" badge surfaces
+// when the row is itself a USER fork of some other entry (isForkedSpell).
 import { useState } from "react";
 
+import Badge from "@/components/ui/Badge";
+import ShareSpellSheet from "@/features/spells/ShareSpellSheet";
 import { catalogMetaLine } from "@/lib/addSpell";
+import { isForkedSpell } from "@/lib/catalogProvenance";
 import type { CatalogSpell } from "@/types/character";
 
 interface HomebrewSpellManageRowProps {
@@ -18,6 +26,7 @@ interface HomebrewSpellManageRowProps {
 
 export default function HomebrewSpellManageRow({ spell, busy, onEdit, onDelete }: HomebrewSpellManageRowProps) {
   const [confirming, setConfirming] = useState(false);
+  const [sharing, setSharing] = useState(false);
 
   async function handleConfirmDelete() {
     try {
@@ -58,10 +67,24 @@ export default function HomebrewSpellManageRow({ spell, busy, onEdit, onDelete }
   return (
     <li className="flex items-center justify-between gap-3 border-b border-arcane-100 py-2 last:border-0">
       <div className="min-w-0">
-        <p className="truncate text-sm font-medium text-parchment-900">{spell.name}</p>
+        <p className="flex items-center gap-1.5 truncate text-sm font-medium text-parchment-900">
+          {spell.name}
+          {isForkedSpell(spell) && <Badge tone="arcane">Forked</Badge>}
+        </p>
         <p className="text-xs text-parchment-600">{catalogMetaLine(spell)}</p>
       </div>
       <div className="flex shrink-0 items-center gap-3 text-xs font-semibold">
+        {spell.catalog && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => setSharing(true)}
+            aria-label={`Share ${spell.name}`}
+            className="text-arcane-700 hover:underline disabled:opacity-40"
+          >
+            Share
+          </button>
+        )}
         <button
           type="button"
           disabled={busy}
@@ -81,6 +104,7 @@ export default function HomebrewSpellManageRow({ spell, busy, onEdit, onDelete }
           Delete
         </button>
       </div>
+      {sharing && <ShareSpellSheet spell={spell} onClose={() => setSharing(false)} />}
     </li>
   );
 }
