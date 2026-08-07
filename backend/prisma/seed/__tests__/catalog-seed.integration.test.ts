@@ -6,16 +6,57 @@
 // Runs against every real seeded Spell row, not a sample: a shape-only spot
 // check would miss a single stray spell a future content slice adds without
 // wiring its CatalogEntry correctly.
+//
+// Scoped to the seed's own identity set, not a blind `spell.findMany()`
+// (flaked on multiple unrelated PRs, e.g. "Test Firebolt Catalog"
+// entry.edition mismatch: expected 'EDITION_2024' to be null): the vitest
+// worker's Postgres database is shared across every test FILE in the run,
+// not isolated per file (vitest.global-setup.ts clones one database per
+// WORKER, #1269) — item-scope.integration.test.ts's header documents the
+// same constraint. A whole-table scan races long-lived fixtures like
+// spells.test.ts's "Test Firebolt Catalog" (created in a `beforeAll`, torn
+// down only in that describe block's own `afterAll`), which is a false
+// failure, not a real seed bug. `[...SPELLS, ...SPELLS_2014]` is exactly the
+// set seedSpells (prisma/seed.ts) iterates to upsert Spell rows — the same
+// class-table-columns.test.ts pattern (scope to the known seeded identity
+// set, e.g. `CLASSES.map(c => c.name)`) applied to Spell's forked (name,
+// edition) key instead of a bare name. This still fails on a genuine seed
+// bug: any of these exact rows missing/misconfigured on the real catalog
+// still fails the assertions below — it only stops crediting a foreign
+// test's transient row as if it were seed output.
 import { describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/core/prisma.js";
 
+import { SPELLS } from "../spells.js";
+import { SPELLS_2014 } from "../spells-2014/index.js";
+
+// Mirrors prisma/seed.ts's own (unexported) resolvedSpellEdition: seed.ts
+// self-invokes `main()` at module load (see spell-fork-reseed.test.ts's
+// header), so a test cannot import it directly — coupling latch: if
+// resolvedSpellEdition's default ever changes, update this too.
+//
+// Deduped by (name, edition): upsertEditionRow means two identical entries
+// (a content typo, not a linkage bug this test is about) would collapse to
+// one Spell row, and the count assertion below shouldn't couple itself to
+// "SPELLS/SPELLS_2014 contain no duplicate rows" — that's a different
+// invariant, already caught by assertSeedContentValid at seed time.
+const SEEDED_SPELL_IDENTITY = [
+  ...new Map(
+    [...SPELLS, ...SPELLS_2014].map((s) => {
+      const edition = s.edition ?? "EDITION_2024";
+      return [`${s.name}::${edition}`, { name: s.name, edition }] as const;
+    }),
+  ).values(),
+];
+
 describe("seedSpells' CatalogEntry linkage (#1796)", () => {
   it("gives every seeded Spell a GLOBAL/SPELL CatalogEntry, linked 1:1 with matching name/edition, no orphans", async () => {
     const spells = await prisma.spell.findMany({
+      where: { OR: SEEDED_SPELL_IDENTITY },
       select: { id: true, name: true, edition: true, catalogEntryId: true },
     });
-    expect(spells.length).toBeGreaterThan(0);
+    expect(spells.length).toBe(SEEDED_SPELL_IDENTITY.length);
 
     const entries = await prisma.catalogEntry.findMany({
       where: { id: { in: spells.map((s) => s.catalogEntryId) } },
