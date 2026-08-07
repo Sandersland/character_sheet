@@ -2,7 +2,7 @@
  * Spellcasting wire types: spell entries, catalog spells, slots, and spellcasting operations.
  */
 
-import type { EffectRoll, EffectSpec, SpellComponents, SpellSchool } from "@character-sheet/shared-types";
+import type { CatalogMeta, EffectRoll, EffectSpec, SpellComponents, SpellSchool } from "@character-sheet/shared-types";
 
 import type { ItemSpellMeta } from "./inventory";
 
@@ -87,6 +87,12 @@ export interface CatalogSpell {
   // manage UI's only signal to distinguish an editable/deletable row from a
   // seeded one; seeded rows never carry it.
   ownerId?: string;
+  // Entitlement metadata (#1796/#1798, epic #1795 1/6+3/6) — scope/fork
+  // provenance for the share (#1799) and fork (#1800) UI. Optional (not
+  // `SpellWire.catalog`'s own required shape) so the many existing inline
+  // CatalogSpell test fixtures across the frontend — built before this field
+  // existed — don't all need updating; a real served row always carries it.
+  catalog?: CatalogMeta;
   name: string;
   level: number;
   school: SpellSchool;
@@ -132,6 +138,8 @@ export interface HomebrewSpell {
   id: string;
   ownerId: string;
   edition: string;
+  // See CatalogSpell.catalog's own comment — same optional-for-fixtures shape.
+  catalog?: CatalogMeta;
   name: string;
   level: number;
   school: SpellSchool;
