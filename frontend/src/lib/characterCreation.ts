@@ -468,7 +468,11 @@ export function buildCreatePayload(
   draft: CharacterDraft,
   selections: CreationSelections,
   skills: CreationSkillChoices,
-  selectedToolChoices: string[]
+  selectedToolChoices: string[],
+  // #1779: the background's own pick, independent of selectedToolChoices
+  // above (the class's) — defaulted so every pre-#1779 call site (none of
+  // which knows about a background pick) still compiles unchanged.
+  selectedBackgroundToolChoices: string[] = []
 ): CreateCharacterInput {
   const backgroundBonuses = deriveBackgroundBonuses(draft, selections);
   const speciesBonuses = deriveSpeciesBonuses(draft, selections);
@@ -511,6 +515,8 @@ export function buildCreatePayload(
     backgroundAbilities: backgroundBonuses.complete ? backgroundBonuses.assignment : undefined,
     skillProficiencies: classBackgroundSkills,
     toolChoices: selectedToolChoices.length > 0 ? selectedToolChoices : undefined,
+    backgroundToolChoices:
+      selectedBackgroundToolChoices.length > 0 ? selectedBackgroundToolChoices : undefined,
     startingEquipment: resolveEquipmentInput(draft, selections.class) ?? undefined,
     backgroundStartingEquipment: resolveBackgroundEquipmentInput(draft, selections.background) ?? undefined,
     ...creationSpellsField(selections, draft),

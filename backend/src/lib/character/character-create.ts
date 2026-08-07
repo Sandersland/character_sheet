@@ -514,34 +514,115 @@ function validateSkillChoices(
   return validateSpeciesSkillChoice(requestedSpeciesSkills, speciesSkillSpec, skillProficiencies);
 }
 
-// Validate the player's tool selections against the class toolChoices pool.
-// Fixed grants come from background/class and are applied server-side.
-function validateToolChoices(
-  playerToolChoices: string[],
-  characterClass: ResolvedClass
+// Validate the player's tool selections against a pool + cap — shared by the
+// class's own toolChoices/toolChoiceCount and the background's (#1779:
+// Background mirrors CharacterClass's columns exactly, so one function
+// serves both rather than two inline copies of the same rule). `poolLabel`
+// only changes the error text, so a 400 names which pool rejected the pick.
+// Fixed grants (background/class toolProficiencies) are applied server-side
+// and never validated here — this only covers player PICKS.
+function validateToolChoicePicks(
+  playerPicks: string[],
+  pool: string[],
+  cap: number,
+  poolLabel: "class" | "background"
 ): Fail | null {
-  if (playerToolChoices.length === 0) return null;
+  if (playerPicks.length === 0) return null;
 
-  const allowedToolChoices = new Set(characterClass.toolChoices);
-  const invalidToolChoices = playerToolChoices.filter((t) => !allowedToolChoices.has(t));
-  if (invalidToolChoices.length > 0) {
+  const allowedPicks = new Set(pool);
+  const invalidPicks = playerPicks.filter((t) => !allowedPicks.has(t));
+  if (invalidPicks.length > 0) {
     return {
       ok: false,
       status: 400,
-      error: `Invalid tool choices: ${invalidToolChoices.join(", ")}. Must be from the class's toolChoices list.`,
+      error: `Invalid tool choices: ${invalidPicks.join(", ")}. Must be from the ${poolLabel}'s toolChoices list.`,
     };
   }
-  if (!playerToolChoices.every((t) => isKnownTool(t))) {
-    return { ok: false, status: 400, error: "Unknown tool name in toolChoices" };
+  if (!playerPicks.every((t) => isKnownTool(t))) {
+    return { ok: false, status: 400, error: `Unknown tool name in ${poolLabel} toolChoices` };
   }
-  if (playerToolChoices.length > characterClass.toolChoiceCount) {
+  if (playerPicks.length > cap) {
     return {
       ok: false,
       status: 400,
-      error: `Too many tool choices (max ${characterClass.toolChoiceCount})`,
+      error: `Too many ${poolLabel} tool choices (max ${cap})`,
     };
   }
   return null;
+}
+
+type ToolPicks = { playerToolChoices: string[]; playerBackgroundToolChoices: string[] };
+
+// Pure extraction of the request's two independent tool-choice picks (#1779:
+// class's own toolChoices pool, and the background's own) — split out purely
+// so the validate/assemble steps below stay under the repo's complexity gate.
+function extractToolPicks(input: CreateCharacterBody): ToolPicks {
+  return {
+    playerToolChoices: input.toolChoices ?? [],
+    playerBackgroundToolChoices: input.backgroundToolChoices ?? [],
+  };
+}
+
+// Validates BOTH tool-choice pools (class + background, #1779) — split out
+// of resolveToolProficiencies purely to keep ITS OWN cyclomatic/cognitive
+// complexity under the repo's health gate — same reasoning as
+// validateVariantSelection/resolveSpeciesCatalogRow elsewhere in this file.
+// #1779: backgroundToolChoices is the SAME mechanism as the class's, one
+// level down — Background carries its own toolChoices/toolChoiceCount pair,
+// an independent pick/cap from the class's (PHB'14/PHB'24 Soldier/Noble's
+// "one type of gaming set"), so it gets its own validation call rather than
+// sharing the class pool.
+function validateToolPicks(
+  picks: ToolPicks,
+  characterClass: ResolvedClass,
+  background: ResolvedBackground,
+): Fail | null {
+  const classError = validateToolChoicePicks(
+    picks.playerToolChoices,
+    characterClass.toolChoices,
+    characterClass.toolChoiceCount,
+    "class"
+  );
+  if (classError) return classError;
+  return validateToolChoicePicks(
+    picks.playerBackgroundToolChoices,
+    background?.toolChoices ?? [],
+    background?.toolChoiceCount ?? 0,
+    "background"
+  );
+}
+
+// Assembles creation-fixed tool proficiencies from the two fixed sources
+// (background/class toolProficiencies) plus the two VALIDATED picks — no
+// species/race source exists: the flat Race model never seeded a
+// toolProficiencies row (confirmed empty, #1684) and no species-granted
+// tool-proficiency mechanism exists yet either. Player PICKS count as their
+// own pool's source: class toolChoices as "class", background toolChoices
+// (#1779) as "background" — matching the fixed-grant source they stand in for.
+function assembleCreationToolProfs(
+  characterClass: ResolvedClass,
+  background: ResolvedBackground,
+  picks: ToolPicks,
+): CreationToolProf[] {
+  return [
+    ...(background?.toolProficiencies ?? []).map((name) => ({ name, source: "background" as const })),
+    ...(characterClass.toolProficiencies ?? []).map((name) => ({ name, source: "class" as const })),
+    ...picks.playerToolChoices.map((name) => ({ name, source: "class" as const })),
+    ...picks.playerBackgroundToolChoices.map((name) => ({ name, source: "background" as const })),
+  ];
+}
+
+// Orchestrates the three steps above. Split out of resolveProficiencies
+// purely to keep ITS OWN complexity under the repo's health gate.
+function resolveToolProficiencies(
+  input: CreateCharacterBody,
+  characterClass: ResolvedClass,
+  background: ResolvedBackground,
+): PhaseResult<{ creationToolProfs: CreationToolProf[] }> {
+  const picks = extractToolPicks(input);
+  const toolError = validateToolPicks(picks, characterClass, background);
+  if (toolError) return toolError;
+  return { ok: true, creationToolProfs: assembleCreationToolProfs(characterClass, background, picks) };
 }
 
 // Validate player skill + tool selections against the class/background pools
@@ -557,29 +638,19 @@ function resolveProficiencies(
   const skillResult = validateSkillChoices(skillProficiencies, characterClass, background, speciesSkillSpec, input.speciesSkills);
   if ("ok" in skillResult) return skillResult;
 
-  // toolChoices in the request are the player's selections from the class
-  // toolChoices pool (e.g. 3 instruments for Bard).
-  const playerToolChoices = input.toolChoices ?? [];
-  const toolError = validateToolChoices(playerToolChoices, characterClass);
-  if (toolError) return toolError;
-
-  // Assemble creation-fixed tool proficiencies from the two fixed sources —
-  // no species/race source exists: the flat Race model never seeded a
-  // toolProficiencies row (confirmed empty, #1684) and no species-granted
-  // tool-proficiency mechanism exists yet either. toolChoices (player picks)
-  // count as a "class" source.
-  const creationToolProfs: CreationToolProf[] = [
-    ...(background?.toolProficiencies ?? []).map((name) => ({ name, source: "background" as const })),
-    ...(characterClass.toolProficiencies ?? []).map((name) => ({ name, source: "class" as const })),
-    ...playerToolChoices.map((name) => ({ name, source: "class" as const })),
-  ];
+  const toolResult = resolveToolProficiencies(input, characterClass, background);
+  if (!toolResult.ok) return toolResult;
 
   // #1689: species-chosen skills fold into the SAME persisted proficiency
   // list class/background picks use (deriveCreatedCharacter's skills[].proficient
   // is a plain `.includes(name)` membership check) — no separate "source" is
   // tracked in this array; that provenance lives on CharacterRace.speciesSkills
   // instead (persistCreatedCharacter), read straight off validated input.
-  return { ok: true, skillProficiencies: [...skillProficiencies, ...skillResult.speciesSkills], creationToolProfs };
+  return {
+    ok: true,
+    skillProficiencies: [...skillProficiencies, ...skillResult.speciesSkills],
+    creationToolProfs: toolResult.creationToolProfs,
+  };
 }
 
 // The two request-shape guards that must pass before any DB lookup (bad

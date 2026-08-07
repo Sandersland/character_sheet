@@ -72,8 +72,13 @@ export interface CharacterDraft {
    *  spec served. */
   speciesOriginFeatId: string;
   skillProficiencies: SkillName[];
-  /** Tool proficiency names chosen by the player at character creation. */
+  /** Tool proficiency names chosen by the player at character creation
+   *  (from the CLASS's own toolChoices pool). */
   toolChoices: string[];
+  /** #1779: tool proficiency names chosen by the player from the
+   *  BACKGROUND's own toolChoices pool — a separate pick/cap from
+   *  toolChoices above (PHB'14/PHB'24 Soldier/Noble's "one type of gaming set"). */
+  backgroundToolChoices: string[];
   /** #1131: chosen level-1 cantrip catalog ids (casters only). */
   cantripIds: string[];
   /** #1131/#1510: chosen level-1 spell catalog ids (casters only) — prepared
@@ -126,6 +131,7 @@ const EMPTY_DRAFT: CharacterDraft = {
   speciesOriginFeatId: "",
   skillProficiencies: [],
   toolChoices: [],
+  backgroundToolChoices: [],
   cantripIds: [],
   spellIds: [],
   equipmentDraft: null,

@@ -206,7 +206,8 @@ export function useCharacterCreation(): CharacterCreation {
           draft,
           selections,
           skillChoices,
-          toolChoices.selectedToolChoices
+          toolChoices.classChoices.selected,
+          toolChoices.backgroundChoices.selected
         );
         const created = await createCharacter(payload);
         id = created.id;

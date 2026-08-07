@@ -79,10 +79,8 @@ function SkillsStepBody({ c }: StepBodyProps) {
       />
       <ToolProficiencySection
         grantedToolProfs={c.toolChoices.grantedToolProfs}
-        toolChoiceOptions={c.toolChoices.toolChoiceOptions}
-        maxToolChoices={c.toolChoices.maxToolChoices}
-        selectedToolChoices={c.toolChoices.selectedToolChoices}
-        toggleToolChoice={c.toolChoices.toggleToolChoice}
+        classChoices={c.toolChoices.classChoices}
+        backgroundChoices={c.toolChoices.backgroundChoices}
       />
     </>
   );
@@ -122,13 +120,18 @@ function EquipmentStepBody({ c }: StepBodyProps) {
   // but Acolyte and Folk Hero), so this is often absent.
   const backgroundEquipment = c.selections.background?.startingEquipment;
   // GRANTED tools as well as chosen ones — the same union the server's
-  // creationToolProfs assembles (background + class + race grants, plus the
-  // player's class picks). A boundToToolChoice pick filtered on chosen tools
-  // alone offered NOTHING for a 2024 Soldier, whose Gaming Set arrives as a
-  // background grant rather than a pick: an empty dropdown the step could
-  // never satisfy, so Continue stayed disabled forever (#1565). The picker
-  // must admit exactly what boundToolChoiceError admits, no less.
-  const boundToolCandidates = [...c.toolChoices.grantedToolProfs, ...c.toolChoices.selectedToolChoices];
+  // creationToolProfs assembles (background + class grants, plus the
+  // player's class AND background picks, #1779). A boundToToolChoice pick
+  // filtered on chosen tools alone offered NOTHING for a 2024 Soldier before
+  // #1565's grantedToolProfs fix; #1779 moved Soldier's Gaming Set from a
+  // grant to a background CHOICE, so backgroundChoices.selected must ride
+  // along too or the same empty-dropdown bug returns. The picker must admit
+  // exactly what boundToolChoiceError admits, no less.
+  const boundToolCandidates = [
+    ...c.toolChoices.grantedToolProfs,
+    ...c.toolChoices.classChoices.selected,
+    ...c.toolChoices.backgroundChoices.selected,
+  ];
   return (
     <>
       {!startingEquipment && (

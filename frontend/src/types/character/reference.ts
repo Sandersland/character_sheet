@@ -197,6 +197,13 @@ export interface BackgroundOption {
   name: string;
   skillProficiencies: SkillName[];
   toolProficiencies: string[];
+  /** #1779: tool names the player may choose from at creation — mirrors
+   *  ClassOption.toolChoices, but this pool/cap is the BACKGROUND's own,
+   *  independent of the class's (PHB'14/PHB'24 Soldier/Noble's "one type of
+   *  gaming set"). Edition-invariant, unlike abilityChoices/originFeat below. */
+  toolChoices: string[];
+  /** Number of background tool choices the player may make. */
+  toolChoiceCount: number;
   /** The three abilities the +2/+1 (or 1/1/1) spread draws from; empty for spec-less legacy rows. */
   abilityChoices: AbilityName[];
   /** The Origin feat granted at creation; null for spec-less legacy rows. */
@@ -333,6 +340,9 @@ export interface CreateCharacterInput {
   skillProficiencies?: SkillName[];
   /** Tool names chosen by the player (from class toolChoices). */
   toolChoices?: string[];
+  /** #1779: tool names chosen by the player from the BACKGROUND's own
+   *  toolChoices pool — a separate pick/cap from toolChoices above. */
+  backgroundToolChoices?: string[];
   startingEquipment?: StartingEquipmentInput;
   /** #1565: the background's OWN equipment package selections, resolved by
    *  (backgroundId, edition) alongside `startingEquipment` above. A background

@@ -383,6 +383,29 @@ async function resolveOriginFeatId(prisma: PrismaClient, bg: (typeof BACKGROUNDS
   return feat.id;
 }
 
+// Pure defaulting for BACKGROUNDS' toolChoices/toolChoiceCount pair (#1779,
+// mirrors CharacterClass's own seeding) — split out of
+// normalizedBackgroundFields purely to keep ITS OWN complexity under the
+// repo's health gate.
+function normalizedToolChoiceFields(background: (typeof BACKGROUNDS)[number]) {
+  return {
+    toolChoices: background.toolChoices ?? [],
+    toolChoiceCount: background.toolChoiceCount ?? 0,
+  };
+}
+
+// Pure defaulting for BACKGROUNDS' optional array/count fields — split out
+// of backgroundSeedData purely to keep ITS OWN complexity under the repo's
+// health gate (the async origin-feat lookup below already carries its own).
+function normalizedBackgroundFields(background: (typeof BACKGROUNDS)[number]) {
+  return {
+    skillProficiencies: background.skillProficiencies,
+    toolProficiencies: background.toolProficiencies ?? [],
+    ...normalizedToolChoiceFields(background),
+    abilityChoices: background.abilityChoices ?? [],
+  };
+}
+
 // Split out of seedBackgrounds to keep that loop's own complexity low — pure
 // field defaulting plus the one async origin-feat lookup.
 async function backgroundSeedData(
@@ -392,9 +415,7 @@ async function backgroundSeedData(
 ) {
   return {
     name: background.name,
-    skillProficiencies: background.skillProficiencies,
-    toolProficiencies: background.toolProficiencies ?? [],
-    abilityChoices: background.abilityChoices ?? [],
+    ...normalizedBackgroundFields(background),
     originFeatId: await resolveOriginFeatId(prisma, background),
     edition,
   };

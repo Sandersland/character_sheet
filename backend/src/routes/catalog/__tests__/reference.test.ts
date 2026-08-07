@@ -58,6 +58,24 @@ describe("GET /api/reference", () => {
     expect(criminal.abilityChoices).toEqual(["dexterity", "constitution", "intelligence"]);
     expect(criminal.skillProficiencies).toEqual(["sleightOfHand", "stealth"]);
     expect(criminal.originFeat).toMatchObject({ name: "Alert", category: "origin" });
+    // #1779: no phantom tool choice on a background with only a fixed grant.
+    expect(criminal.toolChoices).toEqual([]);
+    expect(criminal.toolChoiceCount).toBe(0);
+
+    // #1779: Soldier/Noble grant a Gaming Set CHOICE (PHB'14/PHB'24), not a
+    // pre-granted "Dice Set" — toolProficiencies is empty and toolChoices
+    // carries all four SRD gaming sets with a count of 1.
+    const soldier2024 = response.body.backgrounds.find((b: { name: string }) => b.name === "Soldier");
+    expect(soldier2024.toolProficiencies).toEqual([]);
+    expect(soldier2024.toolChoices).toEqual(
+      expect.arrayContaining(["Dice Set", "Dragonchess Set", "Playing Card Set", "Three-Dragon Ante Set"]),
+    );
+    expect(soldier2024.toolChoices).toHaveLength(4);
+    expect(soldier2024.toolChoiceCount).toBe(1);
+
+    const noble2024 = response.body.backgrounds.find((b: { name: string }) => b.name === "Noble");
+    expect(noble2024.toolProficiencies).toEqual([]);
+    expect(noble2024.toolChoiceCount).toBe(1);
 
     // Folk Hero is absent from the 2024 list entirely (#1570) — PHB'24 has no
     // Folk Hero, and offering it here is what silently cost a 2024 character
@@ -87,6 +105,11 @@ describe("GET /api/reference", () => {
     expect(soldier).toBeDefined();
     expect(soldier.abilityChoices).toEqual([]);
     expect(soldier.originFeat).toBeNull();
+    // #1779: unlike abilityChoices/originFeat above, the tool CHOICE is
+    // edition-invariant — PHB'14 Soldier grants the same "one type of gaming
+    // set" choice as PHB'24, so this is NOT suppressed under EDITION_2014.
+    expect(soldier.toolChoiceCount).toBe(1);
+    expect(soldier.toolChoices).toHaveLength(4);
   });
 
   // #1131: each class carries its level-1 creation pick counts (or null for a
@@ -593,6 +616,8 @@ describe("GET /api/reference", () => {
           "originFeat",
           "skillProficiencies",
           "startingEquipment",
+          "toolChoiceCount",
+          "toolChoices",
           "toolProficiencies",
         ]);
       }
