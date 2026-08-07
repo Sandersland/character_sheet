@@ -486,18 +486,6 @@ describe("GET /api/spells — user homebrew (#1786)", () => {
 
   const HOMEBREW_NAME = "Test Homebrew Bolt";
 
-  beforeAll(async () => {
-    await ensureTestOwner(OWNER_A);
-    await ensureTestOwner(OWNER_B);
-    cookieA = await authCookie(OWNER_A);
-    cookieB = await authCookie(OWNER_B);
-  });
-
-  afterAll(async () => {
-    await prisma.spell.deleteMany({ where: { ownerId: { in: [OWNER_A, OWNER_B] } } });
-    await prisma.user.deleteMany({ where: { id: { in: [OWNER_A, OWNER_B] } } });
-  });
-
   async function createHomebrew(
     ownerId: string,
     overrides: { name?: string; level?: number; classes?: string[] } = {},
@@ -520,9 +508,25 @@ describe("GET /api/spells — user homebrew (#1786)", () => {
     return spell;
   }
 
-  it("a user's own homebrew appears in their own EDITION_2014 catalog", async () => {
+  // Created once here, not inside the first `it` below: the isolation test
+  // (B must NOT see it) and the edition test (2024 must NOT see it) both
+  // assert `.not.toContain`, which would pass VACUOUSLY — for the wrong
+  // reason — if this fixture didn't already exist independent of test
+  // order/`.only`. All three tests below share this one row.
+  beforeAll(async () => {
+    await ensureTestOwner(OWNER_A);
+    await ensureTestOwner(OWNER_B);
+    cookieA = await authCookie(OWNER_A);
+    cookieB = await authCookie(OWNER_B);
     await createHomebrew(OWNER_A);
+  });
 
+  afterAll(async () => {
+    await prisma.spell.deleteMany({ where: { ownerId: { in: [OWNER_A, OWNER_B] } } });
+    await prisma.user.deleteMany({ where: { id: { in: [OWNER_A, OWNER_B] } } });
+  });
+
+  it("a user's own homebrew appears in their own EDITION_2014 catalog", async () => {
     const res = await getAs(cookieA, "/api/spells", "EDITION_2014");
     expect(res.status).toBe(200);
     expect(names(res.body)).toContain(HOMEBREW_NAME);
