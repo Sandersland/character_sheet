@@ -83,6 +83,29 @@ describe("ShareSpellSheet", () => {
     expect(await screen.findByRole("button", { name: "Share into The Sunless Citadel" })).toBeInTheDocument();
   });
 
+  // Deliberately the OPPOSITE revert direction from the grant-rejection case
+  // below: handleShare's catch reverts to "idle" (the server never got a
+  // grant), but handleUnshare's catch reverts to "shared" (the server still
+  // holds the grant the DELETE failed to clear) — ShareSpellSheet.tsx's own
+  // handleUnshare comment. A revert to "idle" here would tell the player the
+  // spell is no longer shared when the campaign can still see it.
+  it("reverts to 'Shared ✓ — Unshare' (not 'Share') when the revoke call rejects", async () => {
+    vi.mocked(client.fetchCampaigns).mockResolvedValue([CAMPAIGN_A]);
+    vi.mocked(client.shareCatalogEntry).mockResolvedValue({ id: "g1", catalogEntryId: "entry-1", campaignId: "camp-a" });
+    vi.mocked(client.unshareCatalogEntry).mockRejectedValue(new Error("You do not have access to this catalog entry"));
+    const user = userEvent.setup();
+
+    render(<ShareSpellSheet spell={SPELL} onClose={() => {}} />);
+
+    await user.click(await screen.findByRole("button", { name: "Share into The Sunless Citadel" }));
+    await user.click(await screen.findByRole("button", { name: "Unshare from The Sunless Citadel" }));
+
+    expect(await screen.findByText("You do not have access to this catalog entry")).toBeInTheDocument();
+    // Still shared, not reset to shareable: the button is the "Unshare" one, not "Share".
+    expect(screen.getByRole("button", { name: "Unshare from The Sunless Citadel" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Share into The Sunless Citadel" })).not.toBeInTheDocument();
+  });
+
   it("shows a row error and stays shareable when the grant call rejects", async () => {
     vi.mocked(client.fetchCampaigns).mockResolvedValue([CAMPAIGN_A]);
     vi.mocked(client.shareCatalogEntry).mockRejectedValue(new Error("You do not have access to this campaign"));

@@ -7,9 +7,15 @@
 //
 // Unlike a grant, a fork is NOT idempotent — every successful POST creates a
 // brand-new CatalogEntry (forkContent's own deep copy, #1800's file banner).
-// "Make my version" is therefore a one-shot: once it succeeds it flips to a
-// disabled "done" state instead of staying clickable, so a second click
-// can't mint a second, throwaway fork of the same origin.
+// "Make my version" is therefore a one-shot WITHIN THIS SHEET INSTANCE: once
+// it succeeds it flips to a disabled "done" state instead of staying
+// clickable, so this open sheet can't be clicked twice for a second,
+// throwaway fork. That's a courtesy, not a guarantee — onForked's refetch
+// unmounts this sheet and re-renders the row, so re-opening Fork on the same
+// (now-shadowed) origin and forking again is still possible, and would mint
+// a second USER entry. Deduping a lineage down to one visible winner either
+// way is the backend resolver's job (pickLineageWinner, lib/catalog/
+// entitlement.ts), not something this UI enforces.
 import { useState } from "react";
 
 import { forkCatalogEntry } from "@/api/client";
