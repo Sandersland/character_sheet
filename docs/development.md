@@ -7,6 +7,8 @@ Read this when you need commands, the Prisma workflow, worktree stacks, or the a
 ```bash
 npm ci                                       # once per clone
 cp .env.example backend/.env                 # DATABASE_URL + the dev-login/rate-limit defaults
+cp frontend/.env.development.example frontend/.env.development   # VITE_API_URL=/api (dev server)
+cp frontend/.env.production.example frontend/.env.production     # same, for build/preview + e2e
 docker compose up -d db                      # Postgres :5432
 cd backend && npx prisma generate && npx prisma migrate deploy && npx prisma db seed && cd ..
 npm run dev                                  # backend :4000 + frontend :5173
@@ -22,6 +24,8 @@ The seed is **catalog-only** (no users/characters); use `npm run seed:verify` fo
 `typecheck` (`tsc --noEmit`) catches the shape-drift class that lint/test miss — vitest transpiles without type-checking. Run it after touching code, before declaring done.
 
 Nothing loads `backend/.env` implicitly — Prisma 7 dropped it and `tsx` never did it. The backend `dev`/`seed:verify` scripts pass `--env-file-if-exists`, `prisma.config.ts` loads it itself, and Vite reads `frontend/.env` through `loadEnv`; drop any of them and host dev breaks while CI keeps working, because CI injects the variables directly (#1463). Vite also pins `strictPort`, so a busy port fails loudly instead of silently serving on the next one.
+
+`VITE_API_URL` lives apart from `frontend/.env`, in the mode-scoped `frontend/.env.development` / `frontend/.env.production` copied above — vitest runs as mode `test` and would otherwise inherit an absolute `VITE_API_URL`, which breaks two leveling tests that `new URL()` what the api layer builds. Without those two files the browser falls back to `http.ts`'s absolute default and can't reach the backend from inside the Playwright e2e container, which dials the host via `host.docker.internal`, not `localhost` (#1479). Worktrees get the same two files from `worktree.sh write_env`.
 
 ## Guardrails (lefthook)
 
