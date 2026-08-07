@@ -17,6 +17,12 @@ import type { CharacterWithRelations } from "@/lib/character/character-include.j
 const OWNER_USER_ID = `entitlement-owner-${randomUUID()}`;
 const MEMBER_USER_ID = `entitlement-member-${randomUUID()}`;
 const OUTSIDER_USER_ID = `entitlement-outsider-${randomUUID()}`;
+// Distinct from OWNER_USER_ID on purpose (#1797 regression pin): the origin's
+// owner and the USER-fork's owner must be two different people, or the
+// origin would ALSO rank as "the viewer's own USER row" and the precedence
+// case would stop exercising the bug (a USER-scope origin outranking a
+// CAMPAIGN fork for a non-owning member).
+const ORIGIN_OWNER_USER_ID = `entitlement-origin-owner-${randomUUID()}`;
 
 let campaignId: string;
 let otherCampaignId: string;
@@ -36,6 +42,7 @@ beforeAll(async () => {
   await ensureTestOwner(OWNER_USER_ID);
   await ensureTestOwner(MEMBER_USER_ID);
   await ensureTestOwner(OUTSIDER_USER_ID);
+  await ensureTestOwner(ORIGIN_OWNER_USER_ID);
 
   const campaign = await prisma.campaign.create({
     data: { name: "Entitlement Fixture Campaign", ownerId: OWNER_USER_ID, inviteCode: randomUUID() },
@@ -57,7 +64,9 @@ afterAll(async () => {
   // deletes below.
   await prisma.catalogEntry.deleteMany({ where: { id: { in: createdCatalogEntryIds } } });
   await prisma.campaign.deleteMany({ where: { id: { in: [campaignId, otherCampaignId] } } });
-  await prisma.user.deleteMany({ where: { id: { in: [OWNER_USER_ID, MEMBER_USER_ID, OUTSIDER_USER_ID] } } });
+  await prisma.user.deleteMany({
+    where: { id: { in: [OWNER_USER_ID, MEMBER_USER_ID, OUTSIDER_USER_ID, ORIGIN_OWNER_USER_ID] } },
+  });
 });
 
 describe("resolveVisibleEntryIds (#1797)", () => {
@@ -131,49 +140,90 @@ describe("resolveVisibleEntryIds (#1797)", () => {
   });
 
   describe("the full precedence case: origin O, DM CAMPAIGN fork D, player USER fork P", () => {
-    it("resolves USER fork > CAMPAIGN fork > origin per viewer, and never shadows GLOBAL out of scope", async () => {
-      const origin = await fixtureEntry({ scope: "GLOBAL" });
-      const campaignFork = await fixtureEntry({ scope: "CAMPAIGN", ownerCampaignId: campaignId, forkedFromId: origin });
-      const userFork = await fixtureEntry({ scope: "USER", ownerUserId: OWNER_USER_ID, forkedFromId: origin });
+    // Parameterized over the origin's OWN scope (#1797 regression pin): a
+    // GLOBAL seed and a shared USER row granted into the campaign must
+    // resolve through the exact same in-campaign precedence. Ranking by
+    // abstract scope (USER > CAMPAIGN > GLOBAL) passed the GLOBAL case by
+    // accident — a USER-scope origin has no reason to outrank a CAMPAIGN
+    // fork of it for a non-owning member, but scope-only ranking did exactly
+    // that (the confirmed bug: the DM's override silently lost to the
+    // player's shared/granted origin). `originAlwaysVisible` captures the one
+    // real behavioral difference between the two origin kinds: GLOBAL is
+    // visible everywhere for its edition, so an outsider entirely outside the
+    // campaign still resolves it; a granted USER origin is only visible
+    // inside the campaign it was granted into, so that same outsider sees
+    // nothing from the lineage at all.
+    const originVariants: Array<{
+      label: string;
+      makeOrigin: () => Promise<string>;
+      originAlwaysVisible: boolean;
+    }> = [
+      {
+        label: "a GLOBAL origin",
+        makeOrigin: () => fixtureEntry({ scope: "GLOBAL" }),
+        originAlwaysVisible: true,
+      },
+      {
+        label: "a shared USER origin granted into the campaign",
+        makeOrigin: async () => {
+          const id = await fixtureEntry({ scope: "USER", ownerUserId: ORIGIN_OWNER_USER_ID });
+          await prisma.catalogGrant.create({ data: { catalogEntryId: id, campaignId } });
+          return id;
+        },
+        originAlwaysVisible: false,
+      },
+    ];
 
-      // Owner's own character, in the campaign: their USER fork wins over
-      // both the DM's CAMPAIGN fork and the origin.
-      const ownerInCampaign = await resolveVisibleEntryIds("SPELL", viewer({ userId: OWNER_USER_ID, campaignId }));
-      expect(ownerInCampaign).toContain(userFork);
-      expect(ownerInCampaign).not.toContain(campaignFork);
-      expect(ownerInCampaign).not.toContain(origin);
+    it.each(originVariants)(
+      "resolves USER fork > CAMPAIGN fork > origin per viewer, for $label",
+      async ({ makeOrigin, originAlwaysVisible }) => {
+        const origin = await makeOrigin();
+        const campaignFork = await fixtureEntry({ scope: "CAMPAIGN", ownerCampaignId: campaignId, forkedFromId: origin });
+        const userFork = await fixtureEntry({ scope: "USER", ownerUserId: OWNER_USER_ID, forkedFromId: origin });
 
-      // A different campaign member sees the DM's CAMPAIGN fork, not the
-      // origin and not the other player's private USER fork.
-      const otherMemberInCampaign = await resolveVisibleEntryIds(
-        "SPELL",
-        viewer({ userId: MEMBER_USER_ID, campaignId }),
-      );
-      expect(otherMemberInCampaign).toContain(campaignFork);
-      expect(otherMemberInCampaign).not.toContain(origin);
-      expect(otherMemberInCampaign).not.toContain(userFork);
+        // Owner's own character, in the campaign: their USER fork wins over
+        // both the DM's CAMPAIGN fork and the origin.
+        const ownerInCampaign = await resolveVisibleEntryIds("SPELL", viewer({ userId: OWNER_USER_ID, campaignId }));
+        expect(ownerInCampaign).toContain(userFork);
+        expect(ownerInCampaign).not.toContain(campaignFork);
+        expect(ownerInCampaign).not.toContain(origin);
 
-      // Outside the campaign, the fork's own owner still resolves their USER
-      // fork (it travels with them) — the CAMPAIGN fork is invisible there.
-      const ownerOutsideCampaign = await resolveVisibleEntryIds(
-        "SPELL",
-        viewer({ userId: OWNER_USER_ID, campaignId: null }),
-      );
-      expect(ownerOutsideCampaign).toContain(userFork);
-      expect(ownerOutsideCampaign).not.toContain(campaignFork);
-      expect(ownerOutsideCampaign).not.toContain(origin);
+        // A different campaign member sees the DM's CAMPAIGN fork, not the
+        // origin and not the other player's private USER fork — this is the
+        // exact case the scope-only ranking got backwards for a USER origin.
+        const otherMemberInCampaign = await resolveVisibleEntryIds(
+          "SPELL",
+          viewer({ userId: MEMBER_USER_ID, campaignId }),
+        );
+        expect(otherMemberInCampaign).toContain(campaignFork);
+        expect(otherMemberInCampaign).not.toContain(origin);
+        expect(otherMemberInCampaign).not.toContain(userFork);
 
-      // Outside the campaign, anyone else falls all the way back to the
-      // GLOBAL origin — it is never shadowed away for a viewer outside the
-      // fork's scope.
-      const outsiderOutsideCampaign = await resolveVisibleEntryIds(
-        "SPELL",
-        viewer({ userId: OUTSIDER_USER_ID, campaignId: null }),
-      );
-      expect(outsiderOutsideCampaign).toContain(origin);
-      expect(outsiderOutsideCampaign).not.toContain(userFork);
-      expect(outsiderOutsideCampaign).not.toContain(campaignFork);
-    });
+        // Outside the campaign, the fork's own owner still resolves their
+        // USER fork (it travels with them) — the CAMPAIGN fork is invisible
+        // there, and so is a granted (not owned) origin.
+        const ownerOutsideCampaign = await resolveVisibleEntryIds(
+          "SPELL",
+          viewer({ userId: OWNER_USER_ID, campaignId: null }),
+        );
+        expect(ownerOutsideCampaign).toContain(userFork);
+        expect(ownerOutsideCampaign).not.toContain(campaignFork);
+        expect(ownerOutsideCampaign).not.toContain(origin);
+
+        // Outside the campaign, an outsider with no fork of their own either
+        // falls back to the GLOBAL origin (never shadowed away for a viewer
+        // outside the fork's scope) or sees nothing at all when the origin
+        // itself is scoped to the campaign (a granted USER row).
+        const outsiderOutsideCampaign = await resolveVisibleEntryIds(
+          "SPELL",
+          viewer({ userId: OUTSIDER_USER_ID, campaignId: null }),
+        );
+        if (originAlwaysVisible) expect(outsiderOutsideCampaign).toContain(origin);
+        else expect(outsiderOutsideCampaign).not.toContain(origin);
+        expect(outsiderOutsideCampaign).not.toContain(userFork);
+        expect(outsiderOutsideCampaign).not.toContain(campaignFork);
+      },
+    );
   });
 
   it("a fork whose origin was deleted resolves independently, without crashing", async () => {

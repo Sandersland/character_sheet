@@ -31,11 +31,18 @@ const CANDIDATE_SELECT = {
   forkedFromId: true,
 } satisfies Prisma.CatalogEntrySelect;
 
-// USER fork > CAMPAIGN fork > origin/GLOBAL (#1797) — the ranking half of the
-// precedence rule. GLOBAL and an unforked USER/CAMPAIGN "origin" row share
-// the bottom rank on purpose: nothing outranks a fork simply for being a
-// fork's ancestor, only a *higher-scoped fork* does.
-const SCOPE_RANK: Record<CandidateEntry["scope"], number> = { USER: 3, CAMPAIGN: 2, GLOBAL: 1 };
+// Precedence within a fork lineage keys on the entry's ROLE for THIS viewer,
+// not its abstract scope (#1797): the viewer's own USER fork outranks a
+// CAMPAIGN fork in their campaign, which outranks the lineage origin —
+// whether that origin is a shared USER row or a GLOBAL seed. Ranking on
+// scope alone is wrong: a USER-scope origin (e.g. a player's homebrew
+// granted into a campaign) would then outrank a DM's CAMPAIGN fork of it for
+// every OTHER member, silently defeating the DM's override.
+function precedenceRank(entry: CandidateEntry, viewer: CatalogViewer): number {
+  if (entry.scope === "USER" && entry.ownerUserId === viewer.userId) return 3;
+  if (entry.scope === "CAMPAIGN" && entry.ownerCampaignId === viewer.campaignId) return 2;
+  return 1;
+}
 
 /**
  * Visible candidate set for one (kind, viewer): every GLOBAL row for the
@@ -69,11 +76,10 @@ async function fetchCandidates(kind: CatalogKind, viewer: CatalogViewer): Promis
  * silently dropping. A `seen` guard makes a pathological cyclic chain resolve
  * (not hang) rather than assuming the data can't do that.
  *
- * Within a tied scope rank — two forks of one lineage both visible to the
- * same viewer (e.g. the viewer's own USER fork AND a different member's USER
- * fork granted into the same campaign) — the viewer's own copy wins. #1797's
- * checklist doesn't exercise this tie directly, but the schema allows the
- * shape and a winner must be deterministic.
+ * Within a tied `precedenceRank` — only possible when the viewer owns more
+ * than one entry in the same lineage (their own origin AND their own fork of
+ * it) — the fork wins over the root: forking is the deliberate override, so
+ * a self-fork must still shadow its own origin.
  */
 function pickShadowWinners(candidates: CandidateEntry[], viewer: CatalogViewer): CandidateEntry[] {
   const byId = new Map(candidates.map((entry) => [entry.id, entry]));
@@ -90,12 +96,6 @@ function pickShadowWinners(candidates: CandidateEntry[], viewer: CatalogViewer):
     return current.id;
   }
 
-  function isViewersOwn(entry: CandidateEntry): boolean {
-    if (entry.scope === "USER") return entry.ownerUserId === viewer.userId;
-    if (entry.scope === "CAMPAIGN") return entry.ownerCampaignId === viewer.campaignId;
-    return false;
-  }
-
   const lineages = new Map<string, CandidateEntry[]>();
   for (const entry of candidates) {
     const root = lineageRoot(entry);
@@ -108,8 +108,9 @@ function pickShadowWinners(candidates: CandidateEntry[], viewer: CatalogViewer):
   for (const lineage of lineages.values()) {
     let winner = lineage[0];
     for (const candidate of lineage.slice(1)) {
-      const rankDelta = SCOPE_RANK[candidate.scope] - SCOPE_RANK[winner.scope];
-      const outranks = rankDelta !== 0 ? rankDelta > 0 : isViewersOwn(candidate) && !isViewersOwn(winner);
+      const rankDelta = precedenceRank(candidate, viewer) - precedenceRank(winner, viewer);
+      const outranks =
+        rankDelta !== 0 ? rankDelta > 0 : candidate.forkedFromId !== null && winner.forkedFromId === null;
       if (outranks) winner = candidate;
     }
     winners.push(winner);
