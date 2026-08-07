@@ -75,13 +75,71 @@ describe("HomebrewTab manage list", () => {
         edition="EDITION_2014"
         catalog={[SEEDED_SPELL, OWN_SPELL]}
         onCreated={noop}
-        onChanged={noop}
+        onEdited={noop}
+        onDeleted={noop}
         onClose={noop}
       />,
     );
 
     expect(screen.getByText("Ember Bolt")).toBeInTheDocument();
     expect(screen.queryByText("Fireball")).not.toBeInTheDocument();
+  });
+
+  // #1808, epic #1795 8/8 (gate corrected #1808-leak-fix, epic #1795 8/9):
+  // a DM's CAMPAIGN-scope fork carries no ownerId (CatalogEntry.ownerUserId
+  // is null for that scope) but IS manageable BY ITS DM — gated on the
+  // server-computed catalog.editable, ownedHomebrewSpells' own filter
+  // (lib/homebrewSpell.ts).
+  it("lists a DM's own (editable) CAMPAIGN-scope fork alongside owned USER homebrew, with Edit/Delete", () => {
+    const campaignFork: CatalogSpell = {
+      ...OWN_SPELL,
+      id: "campaign-fork-1",
+      ownerId: undefined,
+      name: "Campaign Override Bolt",
+      catalog: { entryId: "entry-3", scope: "CAMPAIGN", isFork: true, forkedFromId: "entry-origin", editable: true },
+    };
+    render(
+      <HomebrewTab
+        edition="EDITION_2014"
+        catalog={[SEEDED_SPELL, campaignFork]}
+        onCreated={noop}
+        onEdited={noop}
+        onDeleted={noop}
+        onClose={noop}
+      />,
+    );
+
+    expect(screen.getByText("Campaign Override Bolt")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit Campaign Override Bolt" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete Campaign Override Bolt" })).toBeInTheDocument();
+  });
+
+  // The leak an Opus review of the combined #1808+#1811 state caught: #1811's
+  // campaign-aware picker serves a DM's CAMPAIGN fork to every campaign
+  // member, not just its DM. A non-DM member's own catalog carries the SAME
+  // row with editable: false — it must never surface in THEIR manage list at
+  // all (not just have Edit/Delete hidden on it — the row itself is absent).
+  it("excludes a CAMPAIGN-scope row from the manage list entirely when catalog.editable is false (a non-DM member)", () => {
+    const notMyFork: CatalogSpell = {
+      ...OWN_SPELL,
+      id: "campaign-fork-2",
+      ownerId: undefined,
+      name: "DM's Other Campaign Bolt",
+      catalog: { entryId: "entry-4", scope: "CAMPAIGN", isFork: true, forkedFromId: "entry-origin", editable: false },
+    };
+    render(
+      <HomebrewTab
+        edition="EDITION_2014"
+        catalog={[SEEDED_SPELL, notMyFork]}
+        onCreated={noop}
+        onEdited={noop}
+        onDeleted={noop}
+        onClose={noop}
+      />,
+    );
+
+    expect(screen.queryByText("DM's Other Campaign Bolt")).not.toBeInTheDocument();
+    expect(screen.getByText(/haven't authored any homebrew spells/i)).toBeInTheDocument();
   });
 
   // #1788, epic #1782 5/5: before the first GET /api/spells resolves,
@@ -95,7 +153,8 @@ describe("HomebrewTab manage list", () => {
         catalog={null}
         showSpinner
         onCreated={noop}
-        onChanged={noop}
+        onEdited={noop}
+        onDeleted={noop}
         onClose={noop}
       />,
     );
@@ -106,7 +165,14 @@ describe("HomebrewTab manage list", () => {
 
   it("shows an empty state when the caller has no homebrew spells yet", () => {
     render(
-      <HomebrewTab edition="EDITION_2014" catalog={[SEEDED_SPELL]} onCreated={noop} onChanged={noop} onClose={noop} />,
+      <HomebrewTab
+        edition="EDITION_2014"
+        catalog={[SEEDED_SPELL]}
+        onCreated={noop}
+        onEdited={noop}
+        onDeleted={noop}
+        onClose={noop}
+      />,
     );
 
     expect(screen.getByText(/haven't authored any homebrew spells/i)).toBeInTheDocument();
@@ -128,14 +194,15 @@ describe("HomebrewTab manage list", () => {
       ritual: OWN_SPELL.ritual,
       classes: OWN_SPELL.classes,
     });
-    const onChanged = vi.fn();
+    const onEdited = vi.fn();
     const user = userEvent.setup();
     render(
       <HomebrewTab
         edition="EDITION_2014"
         catalog={[SEEDED_SPELL, OWN_SPELL]}
         onCreated={noop}
-        onChanged={onChanged}
+        onEdited={onEdited}
+        onDeleted={noop}
         onClose={noop}
       />,
     );
@@ -152,7 +219,7 @@ describe("HomebrewTab manage list", () => {
 
     await waitFor(() => expect(client.updateCustomSpell).toHaveBeenCalledTimes(1));
     expect(client.updateCustomSpell).toHaveBeenCalledWith("own-1", expect.objectContaining({ name: "Ember Blast" }));
-    await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(onEdited).toHaveBeenCalledTimes(1));
 
     // Edit closes back to the list view, not left showing the form.
     expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
@@ -160,14 +227,15 @@ describe("HomebrewTab manage list", () => {
 
   it("delete asks for confirmation before calling deleteCustomSpell, then refreshes the list", async () => {
     vi.mocked(client.deleteCustomSpell).mockResolvedValue(undefined);
-    const onChanged = vi.fn();
+    const onDeleted = vi.fn();
     const user = userEvent.setup();
     render(
       <HomebrewTab
         edition="EDITION_2014"
         catalog={[SEEDED_SPELL, OWN_SPELL]}
         onCreated={noop}
-        onChanged={onChanged}
+        onEdited={noop}
+        onDeleted={onDeleted}
         onClose={noop}
       />,
     );
@@ -179,7 +247,7 @@ describe("HomebrewTab manage list", () => {
     await user.click(screen.getByRole("button", { name: "Confirm deleting Ember Bolt" }));
 
     await waitFor(() => expect(client.deleteCustomSpell).toHaveBeenCalledWith("own-1"));
-    await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(onDeleted).toHaveBeenCalledTimes(1));
   });
 
   // #1788, epic #1782 5/5: a rejected delete must surface the error AND
@@ -187,14 +255,15 @@ describe("HomebrewTab manage list", () => {
   // / Cancel" showing underneath the error banner.
   it("shows an error and resets the row's confirm state when deleteCustomSpell rejects", async () => {
     vi.mocked(client.deleteCustomSpell).mockRejectedValue(new Error("Delete failed."));
-    const onChanged = vi.fn();
+    const onDeleted = vi.fn();
     const user = userEvent.setup();
     render(
       <HomebrewTab
         edition="EDITION_2014"
         catalog={[SEEDED_SPELL, OWN_SPELL]}
         onCreated={noop}
-        onChanged={onChanged}
+        onEdited={noop}
+        onDeleted={onDeleted}
         onClose={noop}
       />,
     );
@@ -206,7 +275,7 @@ describe("HomebrewTab manage list", () => {
     expect(screen.queryByText("Delete Ember Bolt?")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Delete Ember Bolt" })).toBeInTheDocument();
     expect(screen.getByText("Ember Bolt")).toBeInTheDocument();
-    expect(onChanged).not.toHaveBeenCalled();
+    expect(onDeleted).not.toHaveBeenCalled();
   });
 
   it("cancelling the delete confirmation does not call deleteCustomSpell", async () => {
@@ -216,7 +285,8 @@ describe("HomebrewTab manage list", () => {
         edition="EDITION_2014"
         catalog={[SEEDED_SPELL, OWN_SPELL]}
         onCreated={noop}
-        onChanged={noop}
+        onEdited={noop}
+        onDeleted={noop}
         onClose={noop}
       />,
     );

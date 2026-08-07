@@ -5,13 +5,13 @@
 // table for sees only "Make my version".
 import CampaignOverrideRow from "@/features/spells/CampaignOverrideRow";
 import Spinner from "@/components/ui/Spinner";
-import type { Campaign, CatalogSpell } from "@/types/character";
+import type { Campaign } from "@/types/character";
 
 interface CampaignOverrideSectionProps {
   entryId: string | undefined;
   campaigns: Campaign[] | null;
   loadError: string | null;
-  onForked: (result: { entryId: string; spell: CatalogSpell }) => void;
+  onForked: () => void;
 }
 
 export default function CampaignOverrideSection({ entryId, campaigns, loadError, onForked }: CampaignOverrideSectionProps) {

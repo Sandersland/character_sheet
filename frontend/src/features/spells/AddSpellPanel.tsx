@@ -61,7 +61,8 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds,
 
   // A fork (#1801, epic #1795 6/6) creates a new catalog entry the same way a
   // homebrew create does — bump the same shared refetch trigger so both the
-  // catalog tab and the homebrew manage list (a USER fork lands there too)
+  // catalog tab and the homebrew manage list (a USER fork lands there too, and
+  // — since #1811's campaign-aware picker — a CAMPAIGN fork too, for its DM)
   // pick it up.
   function handleForked() {
     setCatalogRefreshKey((k) => k + 1);
@@ -120,7 +121,8 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds,
           catalogError={error}
           showSpinner={showSpinner}
           onCreated={handleHomebrewCreated}
-          onChanged={handleHomebrewChanged}
+          onEdited={handleHomebrewChanged}
+          onDeleted={handleHomebrewChanged}
           onClose={onClose}
         />
       )}

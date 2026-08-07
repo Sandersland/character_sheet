@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { assertCampaignOwner, assertCharacterAccess } from "@/lib/auth/access.js";
+import { assertCampaignOwner, assertCharacterAccess, assertSpellOwnership } from "@/lib/auth/access.js";
 import { AuthorizationError, NotFoundError } from "@/lib/auth/errors.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
@@ -138,5 +138,118 @@ describe("assertCampaignOwner", () => {
       assertCampaignOwner(tx, CAMPAIGN_OWNER, CAMPAIGN_ID, "view", DENY),
     );
     expect(row.role).toBe("OWNER");
+  });
+});
+
+// A DM's CAMPAIGN-scope fork (#1808, epic #1795 8/8): assertSpellOwnership
+// now accepts a second path alongside the original USER-owner check — a
+// CAMPAIGN-scope entry whose campaign the caller DMs, reusing
+// assertCampaignOwner rather than re-deriving the DM check inline.
+const SPELL_DM = "owner-spell-dm";
+const SPELL_MEMBER = "owner-spell-member";
+const SPELL_OUTSIDER = "owner-spell-outsider";
+const SPELL_USER_OWNER = "owner-spell-user-owner";
+const SPELL_CAMPAIGN_ID = "test-spell-ownership-campaign-1";
+
+const SPELL_FIXTURE = {
+  name: "Access Test Bolt",
+  level: 1,
+  school: "evocation" as const,
+  castingTime: "1 action",
+  range: "60 feet",
+  duration: "Instantaneous",
+  description: "A bolt of test energy.",
+};
+
+describe("assertSpellOwnership", () => {
+  let userEntryId: string;
+  let userSpellId: string;
+  let campaignEntryId: string;
+  let campaignSpellId: string;
+  let globalEntryId: string;
+  let globalSpellId: string;
+
+  beforeAll(async () => {
+    await ensureTestOwner(SPELL_DM);
+    await ensureTestOwner(SPELL_MEMBER);
+    await ensureTestOwner(SPELL_OUTSIDER);
+    await ensureTestOwner(SPELL_USER_OWNER);
+
+    await prisma.campaign.deleteMany({ where: { id: SPELL_CAMPAIGN_ID } });
+    await prisma.campaign.create({
+      data: {
+        id: SPELL_CAMPAIGN_ID,
+        name: "Spell Ownership Fixture",
+        ownerId: SPELL_DM,
+        inviteCode: `spell-ownership-${Date.now()}`,
+        members: {
+          create: [
+            { userId: SPELL_DM, role: "OWNER" },
+            { userId: SPELL_MEMBER, role: "PLAYER" },
+          ],
+        },
+      },
+    });
+
+    const userEntry = await prisma.catalogEntry.create({
+      data: { kind: "SPELL", scope: "USER", ownerUserId: SPELL_USER_OWNER, name: SPELL_FIXTURE.name, edition: "EDITION_2014" },
+    });
+    userEntryId = userEntry.id;
+    userSpellId = (await prisma.spell.create({ data: { ...SPELL_FIXTURE, edition: "EDITION_2014", catalogEntryId: userEntryId } })).id;
+
+    const campaignEntry = await prisma.catalogEntry.create({
+      data: { kind: "SPELL", scope: "CAMPAIGN", ownerCampaignId: SPELL_CAMPAIGN_ID, name: SPELL_FIXTURE.name, edition: "EDITION_2014" },
+    });
+    campaignEntryId = campaignEntry.id;
+    campaignSpellId = (await prisma.spell.create({ data: { ...SPELL_FIXTURE, edition: "EDITION_2014", catalogEntryId: campaignEntryId } })).id;
+
+    const globalEntry = await prisma.catalogEntry.create({
+      data: { kind: "SPELL", scope: "GLOBAL", name: SPELL_FIXTURE.name, edition: "EDITION_2014" },
+    });
+    globalEntryId = globalEntry.id;
+    globalSpellId = (await prisma.spell.create({ data: { ...SPELL_FIXTURE, edition: "EDITION_2014", catalogEntryId: globalEntryId } })).id;
+  });
+
+  afterAll(async () => {
+    await prisma.catalogEntry.deleteMany({ where: { id: { in: [userEntryId, campaignEntryId, globalEntryId] } } });
+    await prisma.campaign.deleteMany({ where: { id: SPELL_CAMPAIGN_ID } });
+    await prisma.user.deleteMany({ where: { id: { in: [SPELL_DM, SPELL_MEMBER, SPELL_OUTSIDER, SPELL_USER_OWNER] } } });
+  });
+
+  it("returns the spell for a USER entry's owner", async () => {
+    const row = await assertSpellOwnership(prisma, SPELL_USER_OWNER, userSpellId);
+    expect(row).toEqual({ id: userSpellId, catalogEntryId: userEntryId });
+  });
+
+  it("403s a different user's attempt on a USER entry", async () => {
+    await expect(assertSpellOwnership(prisma, SPELL_OUTSIDER, userSpellId)).rejects.toMatchObject({ status: 403 });
+  });
+
+  it("returns the spell for a CAMPAIGN entry's DM", async () => {
+    const row = await assertSpellOwnership(prisma, SPELL_DM, campaignSpellId);
+    expect(row).toEqual({ id: campaignSpellId, catalogEntryId: campaignEntryId });
+  });
+
+  it("403s a non-DM member's attempt on a CAMPAIGN entry", async () => {
+    await expect(assertSpellOwnership(prisma, SPELL_MEMBER, campaignSpellId)).rejects.toMatchObject({ status: 403 });
+    await expect(assertSpellOwnership(prisma, SPELL_MEMBER, campaignSpellId)).rejects.toBeInstanceOf(AuthorizationError);
+  });
+
+  it("403s a non-member's attempt on a CAMPAIGN entry", async () => {
+    await expect(assertSpellOwnership(prisma, SPELL_OUTSIDER, campaignSpellId)).rejects.toMatchObject({ status: 403 });
+  });
+
+  it("403s any caller on a GLOBAL entry, including the entry's own campaign DM", async () => {
+    await expect(assertSpellOwnership(prisma, SPELL_DM, globalSpellId)).rejects.toMatchObject({ status: 403 });
+    await expect(assertSpellOwnership(prisma, SPELL_OUTSIDER, globalSpellId)).rejects.toMatchObject({ status: 403 });
+  });
+
+  it("throws a 404 for a missing spell", async () => {
+    await expect(assertSpellOwnership(prisma, SPELL_DM, "does-not-exist")).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("works inside a $transaction client", async () => {
+    const row = await prisma.$transaction((tx) => assertSpellOwnership(tx, SPELL_DM, campaignSpellId));
+    expect(row.id).toBe(campaignSpellId);
   });
 });

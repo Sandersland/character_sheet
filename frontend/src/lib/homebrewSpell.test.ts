@@ -199,6 +199,42 @@ describe("ownedHomebrewSpells", () => {
   it("returns an empty list when the catalog has no homebrew", () => {
     expect(ownedHomebrewSpells([catalogSpell({ ownerId: undefined })])).toEqual([]);
   });
+
+  // #1808 leak-fix, epic #1795 8/9 combined-state review: a DM's CAMPAIGN-
+  // scope fork has no ownerId (its CatalogEntry.ownerUserId is null, scope
+  // CAMPAIGN, #1796) but IS manageable BY ITS DM — gated on the server-
+  // computed `catalog.editable` (isCatalogEntryEditable, lib/catalog/
+  // entitlement.ts), never on scope alone: #1811's campaign-aware picker
+  // serves a CAMPAIGN row to every campaign member, not just its DM.
+  it("keeps a CAMPAIGN-scope row with no ownerId when catalog.editable is true (the DM's own fork)", () => {
+    const campaignFork = catalogSpell({
+      id: "campaign-fork",
+      ownerId: undefined,
+      catalog: { entryId: "entry-1", scope: "CAMPAIGN", isFork: true, forkedFromId: "entry-origin", editable: true },
+    });
+    expect(ownedHomebrewSpells([campaignFork])).toEqual([campaignFork]);
+  });
+
+  // The leak this gate exists to close: a non-DM member's picker also gets
+  // this row (#1811) but with editable: false — it must never enter the
+  // caller's OWN manage list, or the Edit/Delete buttons it feeds would 403.
+  it("drops a CAMPAIGN-scope row when catalog.editable is false (a fellow, non-DM member)", () => {
+    const notMyFork = catalogSpell({
+      id: "campaign-fork",
+      ownerId: undefined,
+      catalog: { entryId: "entry-1", scope: "CAMPAIGN", isFork: true, forkedFromId: "entry-origin", editable: false },
+    });
+    expect(ownedHomebrewSpells([notMyFork])).toEqual([]);
+  });
+
+  it("still drops a GLOBAL row with no ownerId", () => {
+    const seededGlobal = catalogSpell({
+      id: "seeded",
+      ownerId: undefined,
+      catalog: { entryId: "entry-2", scope: "GLOBAL", isFork: false, forkedFromId: null, editable: false },
+    });
+    expect(ownedHomebrewSpells([seededGlobal])).toEqual([]);
+  });
 });
 
 describe("toHomebrewSpellInput", () => {

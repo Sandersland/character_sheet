@@ -51,7 +51,7 @@ const HOMEBREW_SPELL = {
 
 interface SerializedCatalogSpell {
   name: string;
-  catalog?: { entryId: string; scope: string; isFork: boolean; forkedFromId: string | null };
+  catalog?: { entryId: string; scope: string; isFork: boolean; forkedFromId: string | null; editable: boolean };
 }
 
 async function serialize() {
@@ -140,13 +140,15 @@ describe("serializeCharacter — catalog entitlement wiring (#1798, epic #1795 3
   it("a spell granted into the character's campaign appears on the sheet, carrying catalog.{scope,isFork,forkedFromId}", async () => {
     const spell = spellsOf(await serialize()).find((s) => s.name === HOMEBREW_SPELL.name);
     expect(spell).toBeDefined();
-    expect(spell!.catalog).toEqual({ entryId: ownerEntryId, scope: "USER", isFork: false, forkedFromId: null });
+    // PLAYER (the viewing character's owner) is neither OWNER's homebrew nor
+    // any campaign's DM — editable: false (#1808 leak-fix, epic #1795 8/9).
+    expect(spell!.catalog).toEqual({ entryId: ownerEntryId, scope: "USER", isFork: false, forkedFromId: null, editable: false });
   });
 
   it("a DM's CAMPAIGN fork of an already-learned spell shadows the original for campaign members", async () => {
     // Sanity: before forking, the learned seeded spell carries GLOBAL metadata.
     const before = spellsOf(await serialize()).find((s) => s.name === seededSpellName);
-    expect(before!.catalog).toEqual({ entryId: seededEntryId, scope: "GLOBAL", isFork: false, forkedFromId: null });
+    expect(before!.catalog).toEqual({ entryId: seededEntryId, scope: "GLOBAL", isFork: false, forkedFromId: null, editable: false });
 
     const fork = await agent(cookieDm)
       .post(`/api/catalog/entries/${seededEntryId}/fork`)
@@ -157,7 +159,8 @@ describe("serializeCharacter — catalog entitlement wiring (#1798, epic #1795 3
     try {
       const after = spellsOf(await serialize()).find((s) => s.name === seededSpellName);
       expect(after).toBeDefined();
-      expect(after!.catalog).toEqual({ entryId: forkEntryId, scope: "CAMPAIGN", isFork: true, forkedFromId: seededEntryId });
+      // PLAYER views this, not the DM — editable: false.
+      expect(after!.catalog).toEqual({ entryId: forkEntryId, scope: "CAMPAIGN", isFork: true, forkedFromId: seededEntryId, editable: false });
     } finally {
       await prisma.catalogEntry.delete({ where: { id: forkEntryId } });
     }
@@ -197,7 +200,7 @@ describe("serializeCharacter — catalog entitlement wiring (#1798, epic #1795 3
       // must resolve to the DM's fork, never the unrelated homebrew.
       const spell = spellsOf(await serialize()).find((s) => s.name === seededSpellName);
       expect(spell).toBeDefined();
-      expect(spell!.catalog).toEqual({ entryId: forkEntryId, scope: "CAMPAIGN", isFork: true, forkedFromId: seededEntryId });
+      expect(spell!.catalog).toEqual({ entryId: forkEntryId, scope: "CAMPAIGN", isFork: true, forkedFromId: seededEntryId, editable: false });
       expect(spell!.catalog?.entryId).not.toBe(collidingEntryId);
     } finally {
       await prisma.catalogEntry.delete({ where: { id: forkEntryId } });

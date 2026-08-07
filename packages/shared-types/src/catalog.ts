@@ -15,12 +15,29 @@ export type CatalogKind = "SPELL";
  */
 export type CatalogScope = "GLOBAL" | "USER" | "CAMPAIGN";
 
-/** The entitlement metadata every catalog-content wire row now carries. */
+/**
+ * The entitlement metadata every catalog-content wire row now carries.
+ *
+ * `editable` (#1808 leak-fix, epic #1795 8/9 combined-state review): true iff
+ * the VIEWER receiving this row can edit/delete the underlying CatalogEntry —
+ * mirrors assertSpellOwnership's own rule (backend/src/lib/auth/access.ts):
+ * `scope === "USER" && ownerUserId === viewer`, or `scope === "CAMPAIGN" &&
+ * viewer is that campaign's DM`; always false for GLOBAL. Server-computed,
+ * never re-derived client-side (CLAUDE.md "rules logic is backend-owned") —
+ * once #1811 (epic #1795 9/9) started serving a CAMPAIGN row to every
+ * campaign member (not just its DM), `scope === "CAMPAIGN"` alone stopped
+ * being a safe "mine, offer edit/delete" signal on the client; this flag is
+ * the replacement. Every builder of a CatalogMeta object (GET /api/spells,
+ * serializeCharacter's spell-catalog overlay, the custom-spells and fork
+ * routes) must set it correctly — see backend/src/lib/catalog/entitlement.ts's
+ * isCatalogEntryEditable, the one shared predicate for this field.
+ */
 export interface CatalogMeta {
   entryId: string;
   scope: CatalogScope;
   isFork: boolean;
   forkedFromId: string | null;
+  editable: boolean;
 }
 
 /** A `POST …/grants` / `GET` response row for a CatalogGrant. */

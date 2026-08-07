@@ -117,10 +117,16 @@ function serializeCustomSpell(row: Spell, classes: string[], entry: CatalogEntry
     ritual: row.ritual,
     components: row.components,
     classes,
-    // SpellWire.catalog shape (#1796, shared-types/src/catalog.ts) — a
-    // homebrew row created/edited through this route is never a fork today
-    // (forking is a later slice), so isFork/forkedFromId are always false/null.
-    catalog: { entryId: entry.id, scope: entry.scope, isFork: entry.forkedFromId !== null, forkedFromId: entry.forkedFromId },
+    // SpellWire.catalog shape (#1796, shared-types/src/catalog.ts). `editable`
+    // is always true here (#1808 leak-fix, epic #1795 8/9 combined-state
+    // review) — POST always creates a fresh USER-scope row the caller owns,
+    // and PATCH only ever reaches this line after assertSpellOwnership (POST
+    // /PATCH /api/spells/custom/:id's own gate) already verified the SAME
+    // rule isCatalogEntryEditable expresses (lib/catalog/entitlement.ts): a
+    // request that failed that check never gets here to serialize a response.
+    // No query needed to recompute a fact this route's own auth step already
+    // established.
+    catalog: { entryId: entry.id, scope: entry.scope, isFork: entry.forkedFromId !== null, forkedFromId: entry.forkedFromId, editable: true },
     ...undefinedEffectFields(row),
   };
 }
@@ -184,11 +190,13 @@ customSpellsRouter.post("/spells/custom", async (req, res) => {
 
 /**
  * PATCH /api/spells/custom/:id
- * Full-field replace of an owned homebrew spell. 404 if the spell doesn't
- * exist, 403 if it exists but isn't the caller's (including any seeded
- * GLOBAL row). Same atomic-write guarantee as POST above. Also renames the
- * linked CatalogEntry (its business key includes `name`) so a rename can't
- * leave the entry pointing at stale content.
+ * Full-field replace of an owned homebrew spell OR a CAMPAIGN-scope fork the
+ * caller DMs (#1808, epic #1795 8/8). 404 if the spell doesn't exist, 403 if
+ * it exists but the caller has neither editable path to it (including any
+ * seeded GLOBAL row — assertSpellOwnership's own comment). Same atomic-write
+ * guarantee as POST above. Also renames the linked CatalogEntry (its business
+ * key includes `name`) so a rename can't leave the entry pointing at stale
+ * content.
  */
 customSpellsRouter.patch("/spells/custom/:id", async (req, res) => {
   const owned = await assertSpellOwnership(prisma, req.user!.id, req.params.id);
@@ -217,7 +225,8 @@ customSpellsRouter.patch("/spells/custom/:id", async (req, res) => {
  * Deletes the linked CatalogEntry, which cascades the Spell row (and its
  * SpellClass rows, via Spell's own cascade) — Spell.catalogEntryId carries no
  * reverse cascade, so deleting the Spell directly would orphan the entry.
- * Same 404/403 ownership check as PATCH.
+ * Same 404/403 ownership check as PATCH (owned USER row, or a CAMPAIGN-scope
+ * fork the caller DMs, #1808).
  */
 customSpellsRouter.delete("/spells/custom/:id", async (req, res) => {
   const owned = await assertSpellOwnership(prisma, req.user!.id, req.params.id);
