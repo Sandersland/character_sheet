@@ -81,6 +81,7 @@ export default function SpellsSection({
             busy={busy}
             learnedSpellIds={derived.learnedSpellIds}
             edition={character.rulesEdition}
+            characterId={character.id}
           />
         )}
 

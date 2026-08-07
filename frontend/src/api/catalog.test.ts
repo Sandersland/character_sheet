@@ -99,6 +99,22 @@ describe("fetchSpells", () => {
 
     await expect(fetchSpells("EDITION_2024")).rejects.toThrow();
   });
+
+  // #1811, epic #1795 9/9: the campaign-aware learn picker threads the
+  // viewing character through so GET /api/spells can resolve granted +
+  // CAMPAIGN entries for that character's campaign (see spells.ts's own
+  // resolveCharacterViewer). Omitted entirely when absent — the creation
+  // ceremony and other non-character callers stay on the pre-#1811 shape.
+  it("appends ?characterId= when given, omits it when absent", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => [] });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchSpells("EDITION_2014", { characterId: "char-1" });
+    await fetchSpells("EDITION_2014");
+
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/spells\?edition=EDITION_2014&characterId=char-1$/);
+    expect(fetchMock.mock.calls[1][0]).toMatch(/\/spells\?edition=EDITION_2014$/);
+  });
 });
 
 describe("fetchFeats", () => {

@@ -42,6 +42,7 @@ describe("AddSpellPanel accessibility", () => {
         busy={false}
         learnedSpellIds={new Set()}
         edition="EDITION_2024"
+        characterId="char-1"
       />
     );
 
@@ -49,6 +50,36 @@ describe("AddSpellPanel accessibility", () => {
     expect(screen.getByLabelText("Filter by level")).toBeInTheDocument();
 
     expect(await axe(container)).toHaveNoViolations();
+  });
+});
+
+// #1811, epic #1795 9/9: the picker must pass the viewing character through
+// to GET /api/spells (via fetchSpells' `characterId` filter, api/catalog.ts)
+// so a fellow campaign member's granted/shared spell reaches this picker —
+// the actual gap #1811 closes, not just plumbing for its own sake.
+describe("AddSpellPanel campaign-aware picker (#1811)", () => {
+  beforeEach(() => {
+    vi.mocked(client.fetchSpells).mockReset();
+    vi.mocked(client.fetchReference).mockResolvedValue(REFERENCE);
+  });
+
+  it("fetches the catalog with the characterId prop so campaign-shared spells resolve", async () => {
+    vi.mocked(client.fetchSpells).mockResolvedValue([]);
+
+    render(
+      <AddSpellPanel
+        onLearn={noop}
+        onClose={noop}
+        busy={false}
+        learnedSpellIds={new Set()}
+        edition="EDITION_2024"
+        characterId="char-42"
+      />
+    );
+
+    await waitFor(() =>
+      expect(client.fetchSpells).toHaveBeenCalledWith("EDITION_2024", { characterId: "char-42" })
+    );
   });
 });
 
@@ -103,6 +134,7 @@ describe("AddSpellPanel homebrew tab integration", () => {
         busy={false}
         learnedSpellIds={new Set()}
         edition="EDITION_2014"
+        characterId="char-1"
       />
     );
 

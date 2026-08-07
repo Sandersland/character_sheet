@@ -1,13 +1,15 @@
 import { Router } from "express";
 
-import type { CatalogMeta } from "@character-sheet/shared-types";
+import type { CatalogMeta, RulesEdition } from "@character-sheet/shared-types";
 
 import type { Spell } from "@/generated/prisma/client.js";
-import { parseClassFilterOr400, parseSubclassIdParam } from "@/lib/http/parse-class-param.js";
+import { parseCharacterIdParam, parseClassFilterOr400, parseSubclassIdParam } from "@/lib/http/parse-class-param.js";
 import { parseMaxSpellLevelOr400 } from "@/lib/http/parse-max-spell-level-param.js";
 import { requireEditionOr400 } from "@/lib/http/parse-edition-param.js";
+import { assertCharacterAccess } from "@/lib/auth/access.js";
 import { prisma } from "@/lib/core/prisma.js";
-import { resolveVisibleEntries } from "@/lib/catalog/entitlement.js";
+import { resolveVisibleEntries, type CatalogViewer } from "@/lib/catalog/entitlement.js";
+import { editionOf } from "@/lib/rules/edition.js";
 import { classesOf, resolveSpellCatalogForEdition, SPELL_CLASS_MEMBERSHIP_SELECT } from "@/lib/spellcasting/spell-classes.js";
 import { loadSubclassSpellListExpansionIds } from "@/lib/spellcasting/spell-list-expansion.js";
 
@@ -92,6 +94,86 @@ function serializeCatalogSpellRow(row: CatalogSpellRow) {
 }
 
 /**
+ * Resolve the CatalogViewer for `?characterId=` (#1811, epic #1795 9/9).
+ * Ownership gates through `assertCharacterAccess` — the one chokepoint every
+ * character-scoped route authorizes through (lib/auth/access.ts) — so a
+ * characterId naming someone else's character 404s/403s exactly like every
+ * other character-scoped read, never a picker-specific auth path. The
+ * viewer's `edition` is the CHARACTER's own, via `editionOf` (CLAUDE.md:
+ * never hand-roll off `rulesEdition` directly) — NOT the request's
+ * `?edition=` value, which continues to gate the fork-resolution/class-filter
+ * pipeline below unchanged; visibility itself must key off the real
+ * character, not whatever edition the request happens to also carry.
+ */
+async function resolveCharacterViewer(userId: string, characterId: string): Promise<CatalogViewer> {
+  await assertCharacterAccess(prisma, userId, characterId, "view");
+  const character = await prisma.character.findUniqueOrThrow({
+    where: { id: characterId },
+    select: { campaignId: true, rulesEdition: true },
+  });
+  return { userId, campaignId: character.campaignId, edition: editionOf(character) };
+}
+
+// Dispatches on `?characterId=`'s presence — pulled out of the route handler
+// (alongside resolveCharacterViewer/loadResolvedSpells below) purely to keep
+// the handler itself at a low enough cyclomatic/CRAP score for the fallow
+// pre-commit gate (CLAUDE.md's cyclo 16 / CRAP 25 ceiling); no behavior
+// lives here beyond the branch itself.
+async function resolveViewer(
+  userId: string,
+  edition: RulesEdition,
+  characterId: string | undefined,
+): Promise<CatalogViewer> {
+  if (characterId === undefined) return { userId, campaignId: null, edition };
+  return resolveCharacterViewer(userId, characterId);
+}
+
+/**
+ * The visible-entries → Spell rows → edition/class resolution pipeline,
+ * pulled out of the route handler for the same CRAP-ceiling reason
+ * resolveViewer above documents. Takes the already-parsed filters so it
+ * carries no query-parsing of its own; returns the fully resolved row set the
+ * handler serializes.
+ */
+async function loadResolvedSpells(
+  viewer: CatalogViewer,
+  edition: RulesEdition,
+  maxLevel: number | undefined,
+  className: string | undefined,
+  subclassId: string | undefined,
+): Promise<CatalogSpellRow[]> {
+  const visibleEntries = await resolveVisibleEntries("SPELL", viewer);
+  const catalogByEntryId = new Map(
+    visibleEntries.map((e) => [
+      e.id,
+      { ownerId: e.ownerUserId, catalog: { entryId: e.id, scope: e.scope, isFork: e.forkedFromId !== null, forkedFromId: e.forkedFromId } },
+    ]),
+  );
+
+  const rows = await prisma.spell.findMany({
+    where: {
+      catalogEntryId: { in: visibleEntries.map((e) => e.id) },
+      ...(maxLevel === undefined ? {} : { level: { lte: maxLevel } }),
+    },
+    include: SPELL_CLASS_MEMBERSHIP_SELECT,
+    orderBy: [{ level: "asc" }, { name: "asc" }],
+  });
+  const owned = rows.map((row) => {
+    const meta = catalogByEntryId.get(row.catalogEntryId);
+    // Every row's catalogEntryId came from the `visibleEntryIds` filter above,
+    // so a miss here would mean the resolver and this route's own follow-up
+    // query disagree — never a legitimate runtime state.
+    if (!meta) throw new Error(`Spell ${row.id} resolved to an untracked catalog entry ${row.catalogEntryId}`);
+    return { ...row, ownerId: meta.ownerId, catalog: meta.catalog };
+  });
+  const resolved = resolveSpellCatalogForEdition(owned, edition);
+  if (!className) return resolved;
+
+  const expandedSpellIds = new Set(await loadSubclassSpellListExpansionIds(subclassId, edition));
+  return resolved.filter((row) => classesOf(row).includes(className) || expandedSpellIds.has(row.id));
+}
+
+/**
  * Feeds the spellcasting section's "learn from catalog" picker — same role
  * as GET /api/items feeds the inventory editor. Ordered by level then name
  * so the UI can group by level without sorting client-side.
@@ -156,11 +238,17 @@ function serializeCatalogSpellRow(row: CatalogSpellRow) {
  * is `resolveVisibleEntries("SPELL", viewer)` (lib/catalog/entitlement.ts):
  * every GLOBAL entry of the caller's edition, the caller's own USER-scope
  * entries, and — for a fork lineage — only the highest-precedence entry
- * (never re-implemented here, see that module's own comment). This route has
- * no campaign context (no character in play, just an authenticated caller),
- * so `viewer.campaignId` is null — a CAMPAIGN-scope entry or a USER entry
- * granted into a campaign is a serializeCharacter concern (#1798's other
- * read path), not this picker's. The resolver's own rows (id/scope/
+ * (never re-implemented here, see that module's own comment). With no
+ * `?characterId=` this route has no campaign context (no character in play,
+ * just an authenticated caller), so `viewer.campaignId` is null — same
+ * behavior as before #1811. With `?characterId=` (#1811, epic #1795 9/9,
+ * `resolveCharacterViewer` above), `viewer.campaignId` is that character's
+ * own `campaignId`, so a CAMPAIGN-scope entry or a USER entry granted into
+ * the character's campaign reaches the picker too — the same visibility a
+ * fellow campaign member's granted/shared spell already gets in
+ * serializeCharacter (#1798's other read path), now also in the "learn a new
+ * spell" picker, not just on an already-known spell's re-resolved mechanics.
+ * The resolver's own rows (id/scope/
  * ownerUserId/forkedFromId) are consumed directly for `ownerId`/`catalog`
  * below — no second CatalogEntry query re-fetching fields it already has.
  * Spell.catalogEntryId carries no Prisma relation (the supertype stays
@@ -185,42 +273,17 @@ spellsRouter.get("/spells", async (req, res) => {
   if (!levelFilter.ok) return;
   const subclassFilter = parseSubclassIdParam(req, res);
   if (!subclassFilter.ok) return;
+  const characterFilter = parseCharacterIdParam(req, res);
+  if (!characterFilter.ok) return;
 
-  const visibleEntries = await resolveVisibleEntries("SPELL", {
-    userId: req.user!.id,
-    campaignId: null,
+  const viewer = await resolveViewer(req.user!.id, edition, characterFilter.characterId);
+  const spells = await loadResolvedSpells(
+    viewer,
     edition,
-  });
-  const catalogByEntryId = new Map(
-    visibleEntries.map((e) => [
-      e.id,
-      { ownerId: e.ownerUserId, catalog: { entryId: e.id, scope: e.scope, isFork: e.forkedFromId !== null, forkedFromId: e.forkedFromId } },
-    ]),
+    levelFilter.maxLevel,
+    classFilter.className,
+    subclassFilter.subclassId,
   );
-
-  const rows = await prisma.spell.findMany({
-    where: {
-      catalogEntryId: { in: visibleEntries.map((e) => e.id) },
-      ...(levelFilter.maxLevel === undefined ? {} : { level: { lte: levelFilter.maxLevel } }),
-    },
-    include: SPELL_CLASS_MEMBERSHIP_SELECT,
-    orderBy: [{ level: "asc" }, { name: "asc" }],
-  });
-  const owned = rows.map((row) => {
-    const meta = catalogByEntryId.get(row.catalogEntryId);
-    // Every row's catalogEntryId came from the `visibleEntryIds` filter above,
-    // so a miss here would mean the resolver and this route's own follow-up
-    // query disagree — never a legitimate runtime state.
-    if (!meta) throw new Error(`Spell ${row.id} resolved to an untracked catalog entry ${row.catalogEntryId}`);
-    return { ...row, ownerId: meta.ownerId, catalog: meta.catalog };
-  });
-  const resolved = resolveSpellCatalogForEdition(owned, edition);
-  const expandedSpellIds = classFilter.className
-    ? new Set(await loadSubclassSpellListExpansionIds(subclassFilter.subclassId, edition))
-    : new Set<string>();
-  const spells = classFilter.className
-    ? resolved.filter((row) => classesOf(row).includes(classFilter.className!) || expandedSpellIds.has(row.id))
-    : resolved;
 
   res.json(spells.map(serializeCatalogSpellRow));
 });
