@@ -105,6 +105,27 @@ describe("BACKGROUNDS catalog", () => {
     expect(folkHero?.abilityChoices ?? []).toEqual([]);
     expect(folkHero?.originFeatName).toBeUndefined();
   });
+
+  // #1779: PHB'14 and PHB'24 both grant Soldier/Noble "one type of Gaming
+  // Set" as a CHOICE, not the fixed Dice Set previously flattened onto these
+  // rows — toolProficiencies must be empty (nothing pre-granted) and
+  // toolChoices must carry every SRD gaming set with a count of 1.
+  const GAMING_SETS = ["Dice Set", "Dragonchess Set", "Playing Card Set", "Three-Dragon Ante Set"];
+  it.each(["Soldier", "Noble"])('gives %s a Gaming Set CHOICE, not a pre-granted "Dice Set"', (name) => {
+    const bg = BACKGROUNDS.find((b) => b.name === name);
+    expect(bg).toBeDefined();
+    expect(bg?.toolProficiencies ?? []).toEqual([]);
+    expect(bg?.toolChoices).toEqual(expect.arrayContaining(GAMING_SETS));
+    expect(bg?.toolChoices).toHaveLength(GAMING_SETS.length);
+    expect(bg?.toolChoiceCount).toBe(1);
+  });
+
+  it('leaves Criminal a fixed "Thieves\' Tools" grant with no phantom choice', () => {
+    const criminal = BACKGROUNDS.find((b) => b.name === "Criminal");
+    expect(criminal?.toolProficiencies).toEqual(["Thieves' Tools"]);
+    expect(criminal?.toolChoices ?? []).toEqual([]);
+    expect(criminal?.toolChoiceCount ?? 0).toBe(0);
+  });
 });
 
 describe("ITEMS catalog", () => {

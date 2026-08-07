@@ -43,6 +43,7 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
     speciesOriginFeatId: "",
     skillProficiencies: [],
     toolChoices: [],
+    backgroundToolChoices: [],
     cantripIds: [],
     spellIds: [],
     equipmentDraft: null,
@@ -78,15 +79,22 @@ function makeClass(overrides: Partial<ClassOption> = {}): ClassOption {
   };
 }
 
-const background: BackgroundOption = {
-  id: "bg-1",
-  name: "Sage",
-  skillProficiencies: [],
-  toolProficiencies: [],
-  abilityChoices: [],
-  originFeat: null,
-  startingEquipment: null,
-};
+function makeBackground(overrides: Partial<BackgroundOption> = {}): BackgroundOption {
+  return {
+    id: "bg-1",
+    name: "Sage",
+    skillProficiencies: [],
+    toolProficiencies: [],
+    toolChoices: [],
+    toolChoiceCount: 0,
+    abilityChoices: [],
+    originFeat: null,
+    startingEquipment: null,
+    ...overrides,
+  };
+}
+
+const background = makeBackground();
 
 function run(args: {
   draft: CharacterDraft;
@@ -123,7 +131,7 @@ describe("useToolProficiencyChoices", () => {
     expect(result.grantedToolProfs).toEqual([]);
   });
 
-  it("filters granted tools out of the choosable options", () => {
+  it("filters granted tools out of the class choosable options", () => {
     const result = run({
       draft: makeDraft(),
       selectedClass: makeClass({
@@ -132,11 +140,11 @@ describe("useToolProficiencyChoices", () => {
       }),
       selectedBackground: { ...background, toolProficiencies: ["Lute"] },
     });
-    expect(result.toolChoiceOptions).toEqual(["Drum", "Flute"]);
-    expect(result.maxToolChoices).toBe(2);
+    expect(result.classChoices.options).toEqual(["Drum", "Flute"]);
+    expect(result.classChoices.max).toBe(2);
   });
 
-  it("does not add a choice past maxToolChoices", () => {
+  it("does not add a class choice past its max", () => {
     const update = vi.fn();
     const result = run({
       draft: makeDraft({ toolChoices: ["Lute", "Drum"] }),
@@ -146,11 +154,11 @@ describe("useToolProficiencyChoices", () => {
       }),
       update,
     });
-    result.toggleToolChoice("Flute");
+    result.classChoices.toggle("Flute");
     expect(update).not.toHaveBeenCalled();
   });
 
-  it("removes an already-selected choice on toggle even at the cap", () => {
+  it("removes an already-selected class choice on toggle even at the cap", () => {
     const update = vi.fn();
     const result = run({
       draft: makeDraft({ toolChoices: ["Lute", "Drum"] }),
@@ -160,7 +168,80 @@ describe("useToolProficiencyChoices", () => {
       }),
       update,
     });
-    result.toggleToolChoice("Lute");
+    result.classChoices.toggle("Lute");
     expect(update).toHaveBeenCalledWith({ toolChoices: ["Drum"] });
+  });
+
+  // #1779: a background with its own toolChoices/toolChoiceCount (2024
+  // Soldier's Gaming Set) surfaces an INDEPENDENT choice group — its own
+  // options/cap, untouched by the class's pool/cap.
+  it("surfaces a background choice group independent of the class group", () => {
+    const result = run({
+      draft: makeDraft(),
+      selectedClass: makeClass({ toolChoices: ["Lute", "Drum"], toolChoiceCount: 1 }),
+      selectedBackground: makeBackground({
+        toolChoices: ["Dice Set", "Playing Card Set"],
+        toolChoiceCount: 1,
+      }),
+    });
+    expect(result.backgroundChoices.options).toEqual(["Dice Set", "Playing Card Set"]);
+    expect(result.backgroundChoices.max).toBe(1);
+    // The class group is completely unaffected by the background's own pool.
+    expect(result.classChoices.options).toEqual(["Lute", "Drum"]);
+    expect(result.classChoices.max).toBe(1);
+  });
+
+  it("a fixed-tool background (no toolChoices/toolChoiceCount) surfaces no background choice", () => {
+    const result = run({
+      draft: makeDraft(),
+      selectedClass: makeClass(),
+      selectedBackground: makeBackground({ toolProficiencies: ["Thieves' Tools"] }),
+    });
+    expect(result.backgroundChoices.options).toEqual([]);
+    expect(result.backgroundChoices.max).toBe(0);
+    expect(result.grantedToolProfs).toEqual(["Thieves' Tools"]);
+  });
+
+  it("does not add a background choice past its own max, independent of the class's toggle", () => {
+    const update = vi.fn();
+    const result = run({
+      draft: makeDraft({ backgroundToolChoices: ["Dice Set"] }),
+      selectedClass: makeClass({ toolChoices: ["Lute"], toolChoiceCount: 1 }),
+      selectedBackground: makeBackground({
+        toolChoices: ["Dice Set", "Playing Card Set"],
+        toolChoiceCount: 1,
+      }),
+      update,
+    });
+    result.backgroundChoices.toggle("Playing Card Set");
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("toggling a background choice updates backgroundToolChoices, not toolChoices", () => {
+    const update = vi.fn();
+    const result = run({
+      draft: makeDraft(),
+      selectedClass: makeClass({ toolChoices: ["Lute"], toolChoiceCount: 1 }),
+      selectedBackground: makeBackground({
+        toolChoices: ["Dice Set", "Playing Card Set"],
+        toolChoiceCount: 1,
+      }),
+      update,
+    });
+    result.backgroundChoices.toggle("Dice Set");
+    expect(update).toHaveBeenCalledWith({ backgroundToolChoices: ["Dice Set"] });
+  });
+
+  it("excludes background choice options when using a custom background", () => {
+    const result = run({
+      draft: makeDraft({ useCustomBackground: true }),
+      selectedClass: makeClass(),
+      selectedBackground: makeBackground({
+        toolChoices: ["Dice Set", "Playing Card Set"],
+        toolChoiceCount: 1,
+      }),
+    });
+    expect(result.backgroundChoices.options).toEqual([]);
+    expect(result.backgroundChoices.max).toBe(0);
   });
 });

@@ -1059,6 +1059,14 @@ model Background {
   name               String
   skillProficiencies String[]
   toolProficiencies  String[]      @default([])
+  // Tool proficiency CHOICE — mirrors CharacterClass.toolChoices/
+  // toolChoiceCount exactly (#1779): a background can grant a choice (PHB'14
+  // and PHB'24 Soldier/Noble's "one type of gaming set") as well as a fixed
+  // tool. Edition-invariant columns — both editions' backgrounds feed the
+  // same pair; only the seeded content per row differs. No page cited: same
+  // "unpaged over invented" rule as starting-equipment.ts's Charlatan/Noble.
+  toolChoices        String[]      @default([])
+  toolChoiceCount    Int           @default(0)
   // PHB'24: each background grants +3 ability points across these three abilities
   // (2+1 or 1+1+1) plus one Origin feat. Empty/null for spec-less 2014 legacy rows.
   abilityChoices     String[]      @default([])

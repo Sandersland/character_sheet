@@ -103,6 +103,13 @@ export const createCharacterSchema = z
     /** Tool names chosen by the player at creation (class choices only —
      *  fixed grants from background/class/race are applied server-side). */
     toolChoices: z.array(z.string()).optional(),
+    /** #1779: tool names chosen by the player at creation from the
+     *  BACKGROUND's own toolChoices pool (PHB'14/PHB'24 Soldier/Noble's "one
+     *  type of gaming set") — a SEPARATE pick with its own cap from
+     *  toolChoices above (Background mirrors CharacterClass's toolChoices/
+     *  toolChoiceCount columns exactly); fixed grants stay in
+     *  background.toolProficiencies, applied server-side with no request field. */
+    backgroundToolChoices: z.array(z.string()).optional(),
     startingEquipment: startingEquipmentSchema.optional(),
     // #1565: the background's OWN equipment package, resolved by
     // (backgroundId, edition) alongside the class one above — a background

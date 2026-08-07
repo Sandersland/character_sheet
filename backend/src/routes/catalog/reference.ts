@@ -297,6 +297,11 @@ referenceRouter.get("/reference", async (req, res) => {
     name: b.name,
     skillProficiencies: b.skillProficiencies,
     toolProficiencies: b.toolProficiencies,
+    // #1779: edition-invariant, unlike abilityChoices/originFeat below — both
+    // editions' backgrounds resolve this the same way (mirrors ClassOption's
+    // own toolChoices/toolChoiceCount, never gated on `edition`).
+    toolChoices: b.toolChoices,
+    toolChoiceCount: b.toolChoiceCount,
     // PHB'24 ability spread; empty for a spec-less legacy row (#1130) AND for
     // every background under EDITION_2014 (#1572) — the spread is a PHB'24-only
     // mechanic, so this must agree with resolveBackgroundGrants's 2014 rejection.

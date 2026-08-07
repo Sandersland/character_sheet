@@ -65,12 +65,14 @@ const reference: ReferenceData = {
   }],
   classes: [makeClass()],
   backgrounds: [
-    { id: "bg-1", name: "Sage", skillProficiencies: ["perception"], toolProficiencies: [], abilityChoices: [], originFeat: null, startingEquipment: null },
+    { id: "bg-1", name: "Sage", skillProficiencies: ["perception"], toolProficiencies: [], toolChoices: [], toolChoiceCount: 0, abilityChoices: [], originFeat: null, startingEquipment: null },
     {
       id: "bg-crim",
       name: "Criminal",
       skillProficiencies: ["stealth"],
       toolProficiencies: ["Thieves' Tools"],
+      toolChoices: [],
+      toolChoiceCount: 0,
       abilityChoices: ["dexterity", "constitution", "intelligence"],
       originFeat: { id: "feat-alert", name: "Alert", description: "Bonus to initiative.", category: "origin" },
       startingEquipment: CRIMINAL_PACKAGE,
@@ -121,6 +123,7 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
     speciesOriginFeatId: "",
     skillProficiencies: [],
     toolChoices: [],
+    backgroundToolChoices: [],
     cantripIds: [],
     spellIds: [],
     equipmentDraft: null,
@@ -903,6 +906,26 @@ describe("buildCreatePayload", () => {
     const skills = deriveSkillChoices(draft, selections);
     const payload = buildCreatePayload(draft, selections, skills, ["Thieves' Tools"]);
     expect(payload.toolChoices).toEqual(["Thieves' Tools"]);
+  });
+
+  // #1779: backgroundToolChoices is a SEPARATE field from toolChoices (the
+  // class's own pick) — both can be sent in the same request, and each is
+  // independently omitted when empty (never a phantom [] on the wire).
+  it("omits backgroundToolChoices when no background pick was made", () => {
+    const draft = makeDraft({ name: "X", className: "Rogue" });
+    const selections = resolveSelections(reference, draft);
+    const skills = deriveSkillChoices(draft, selections);
+    const payload = buildCreatePayload(draft, selections, skills, []);
+    expect(payload.backgroundToolChoices).toBeUndefined();
+  });
+
+  it("passes through a background tool pick alongside a class one, on separate fields", () => {
+    const draft = makeDraft({ name: "X", className: "Rogue" });
+    const selections = resolveSelections(reference, draft);
+    const skills = deriveSkillChoices(draft, selections);
+    const payload = buildCreatePayload(draft, selections, skills, ["Thieves' Tools"], ["Dice Set"]);
+    expect(payload.toolChoices).toEqual(["Thieves' Tools"]);
+    expect(payload.backgroundToolChoices).toEqual(["Dice Set"]);
   });
 
   // #1565: the background's own package selections ride a SEPARATE field,
