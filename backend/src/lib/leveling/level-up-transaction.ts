@@ -467,10 +467,9 @@ function classListPhrase(spellLists: string[]): string {
 }
 
 // #1440: the served ceiling (meta.maxSpellLevel) applies to every leveled pick.
-function assertWithinCeiling(row: SpellPickRow | undefined, maxSpellLevel: number): void {
-  const level = row?.level;
-  if (level !== undefined && level > maxSpellLevel) {
-    throw new InvalidLevelUpError(`${row?.name ?? "That spell"} exceeds the highest spell level you can learn (${maxSpellLevel}).`);
+function assertWithinCeiling(row: SpellPickRow, maxSpellLevel: number): void {
+  if (row.level > maxSpellLevel) {
+    throw new InvalidLevelUpError(`${row.name} exceeds the highest spell level you can learn (${maxSpellLevel}).`);
   }
 }
 

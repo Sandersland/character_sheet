@@ -3,8 +3,10 @@
 // management (HomebrewTab — a user-owned catalog Spell row, reusable across all
 // of the caller's characters, create #1787, edit/delete #1788). The legacy
 // per-character inline "Custom spell" tab (CustomSpellForm) was retired in
-// #1817 — homebrew supersedes it; the learnSpell `custom` op stays on the wire
-// so pre-existing inline custom spells still serialize/cast. Not a modal — the
+// #1817 — homebrew supersedes it. Characters that already hold inline custom
+// spells keep working: those are stored SpellEntry rows in the character's
+// spellcasting JSON, and castSpell/forgetSpell target them by entryId — the
+// removed learnSpell.custom write path is not involved. Not a modal — the
 // overlay primitive is reserved for read-only review surfaces.
 //
 // The GET /api/spells fetch is owned HERE, not by SpellCatalogTab, so the

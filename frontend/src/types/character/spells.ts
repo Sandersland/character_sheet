@@ -21,10 +21,9 @@ export type {
 
 // Request body for POST/PATCH /api/spells/custom (#1787, epic #1782 4/5) —
 // creating/editing a user-owned homebrew catalog spell (Spell.ownerId).
-// Aliased on import: contracts' own name for this payload is CustomSpellInput
-// — kept distinct here from the per-character inline learnSpell.custom shape
-// (a narrower payload, no catalog row; its authoring UI was retired in #1817
-// but the op stays on the wire so existing inline spells serialize/cast).
+// Aliased on import: contracts calls this payload CustomSpellInput; re-exported
+// under a caller-friendly name so components import HomebrewSpellInput from the
+// @/types barrel rather than reaching into @character-sheet/contracts directly.
 export type { CustomSpellInput as HomebrewSpellInput } from "@character-sheet/contracts";
 
 /**
@@ -162,7 +161,7 @@ export interface HomebrewSpell {
   upcastDicePerLevel?: number;
 }
 
-// Spellcasting operation types (CustomSpellInput, the per-op interfaces, and the
+// Spellcasting operation types (the per-op interfaces and the
 // SpellcastingOperation union) are imported from shared-types and re-exported at
 // the top of this file (#820) — sent as `{ operations: SpellcastingOperation[] }`
 // to POST /api/characters/:id/spellcasting/transactions.
