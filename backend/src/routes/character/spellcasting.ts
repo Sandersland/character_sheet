@@ -9,39 +9,6 @@ import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
 
 export const spellcastingRouter = Router({ mergeParams: true });
 
-const customSpellSchema = z.object({
-  name: z.string().min(1),
-  level: z.number().int().min(0).max(9),
-  school: z.enum([
-    "abjuration", "conjuration", "divination", "enchantment",
-    "evocation", "illusion", "necromancy", "transmutation",
-  ]),
-  castingTime: z.string().min(1),
-  range: z.string().min(1),
-  duration: z.string().min(1),
-  description: z.string().min(1),
-  concentration: z.boolean().optional(),
-  ritual: z.boolean().optional(),
-  components: z
-    .object({
-      verbal: z.boolean(),
-      somatic: z.boolean(),
-      material: z.boolean(),
-      materialDescription: z.string().optional(),
-    })
-    .optional(),
-  saveEffect: z.enum(["half", "none"]).optional(),
-  effectKind: z.enum(["damage", "heal"]).optional(),
-  effectDiceCount: z.number().int().positive().optional(),
-  effectDiceFaces: z.number().int().positive().optional(),
-  effectModifier: z.number().int().optional(),
-  damageType: z.string().optional(),
-  attackType: z.enum(["attack", "save"]).optional(),
-  saveAbility: z.string().optional(),
-  upcastDicePerLevel: z.number().int().positive().optional(),
-  cantripScaling: z.boolean().optional(),
-});
-
 const castSpellOpSchema = z.object({
   type: z.literal("castSpell"),
   entryId: z.string().min(1),
@@ -90,15 +57,10 @@ const arcaneRecoveryOpSchema = z.object({
     .min(1),
 });
 
-export const learnSpellOpSchema = z
-  .object({
-    type: z.literal("learnSpell"),
-    spellId: z.string().optional(),
-    custom: customSpellSchema.optional(),
-  })
-  .refine((op) => Boolean(op.spellId) !== Boolean(op.custom), {
-    message: "Provide exactly one of spellId or custom",
-  });
+export const learnSpellOpSchema = z.object({
+  type: z.literal("learnSpell"),
+  spellId: z.string().min(1),
+});
 
 export const forgetSpellOpSchema = z.object({
   type: z.literal("forgetSpell"),
@@ -160,7 +122,7 @@ const transactionsRequestSchema = z.object({
  *   castSpell  — cast a known spell, expend its slot (if leveled), log the roll
  *   expendSlot — bare slot expenditure (no spell association)
  *   restoreSlot — restore one expended slot (undo mis-click)
- *   learnSpell — add a spell from catalog (spellId) or custom payload
+ *   learnSpell — add a catalog spell by spellId
  *   forgetSpell — remove a spell from the spellbook by entryId
  *   prepareSpell / unprepareSpell — toggle preparation on a non-cantrip
  *

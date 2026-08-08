@@ -23,8 +23,8 @@ export const BLANK_HOMEBREW_SPELL: HomebrewSpellInput = {
 
 // Builds the POST/PATCH /api/spells/custom body from the form's draft state.
 // Effect fields ride along only when the "enable auto-rolling" toggle is on
-// AND a kind is chosen (mirrors buildCustomSpellPayload's own two-gate
-// shape) — damage-only fields (damageType/attackType) are
+// AND a kind is chosen (a two-gate shape) — damage-only fields
+// (damageType/attackType) are
 // scoped to effectKind "damage", and save fields (saveAbility/saveEffect) to
 // attackType "save", so a "heal" or "attack" submission can never carry a
 // field the backend's validateCustomSpellCoherence would reject.

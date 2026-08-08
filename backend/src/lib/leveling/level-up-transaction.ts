@@ -389,14 +389,13 @@ type SpellPickRow = { id: string; name: string; level: number; classes: string[]
 
 // One catalog read validates every id list before the tx opens (the count
 // check in validateLevelUpSubmission can't see spell levels/classes). Returns
-// the row lookup plus a level resolver that also covers op.custom (a
-// DM-authored custom pick carries its own level, with no catalog row).
+// the row lookup plus a level resolver keyed on each pick's catalog id.
 async function loadPickCatalogRows(
   cantripOps: LearnSpellOperation[],
   spellOps: LearnSpellOperation[],
   edition: RulesEdition,
 ): Promise<{ rowById: Map<string, SpellPickRow>; levelOf: (op: LearnSpellOperation) => number | undefined }> {
-  const ids = [...cantripOps, ...spellOps].map((o) => o.spellId).filter((id): id is string => Boolean(id));
+  const ids = [...cantripOps, ...spellOps].map((o) => o.spellId);
   const rows = ids.length
     ? await prisma.spell.findMany({
         where: { id: { in: ids } },
@@ -414,8 +413,7 @@ async function loadPickCatalogRows(
   // eligibility checks below (assertOnSpellList, assertCantripEligibility)
   // never see the join shape — one seam resolves membership, not two.
   const rowById = new Map(rows.map((r) => [r.id, { id: r.id, name: r.name, level: r.level, classes: classesOf(r) }]));
-  const levelOf = (op: LearnSpellOperation): number | undefined =>
-    op.spellId ? rowById.get(op.spellId)?.level : op.custom?.level;
+  const levelOf = (op: LearnSpellOperation): number | undefined => rowById.get(op.spellId)?.level;
   return { rowById, levelOf };
 }
 
@@ -428,7 +426,8 @@ function assertCantripVsLeveledPlacement(
   levelOf: (op: LearnSpellOperation) => number | undefined,
 ): void {
   for (const op of cantripOps) {
-    if (levelOf(op) !== undefined && levelOf(op) !== 0) {
+    const level = levelOf(op);
+    if (level !== undefined && level !== 0) {
       throw new InvalidLevelUpError("Only cantrips (level 0) may be chosen as new cantrips.");
     }
   }
@@ -468,31 +467,21 @@ function classListPhrase(spellLists: string[]): string {
   return `the ${joined} spell lists`;
 }
 
-// A leveled pick's effective level: the catalog row's, or op.custom's own
-// (a DM-authored custom pick carries no catalog row).
-function pickLevel(op: LearnSpellOperation, row: SpellPickRow | undefined): number | undefined {
-  return row?.level ?? op.custom?.level;
-}
-
-// #1440: the served ceiling (meta.maxSpellLevel) applies to every leveled pick,
-// including op.custom (a DM-authored spell has no catalog `classes` array, so
-// it's exempt from assertOnSpellList below, but not from this).
-function assertWithinCeiling(op: LearnSpellOperation, row: SpellPickRow | undefined, maxSpellLevel: number): void {
-  const level = pickLevel(op, row);
-  if (level !== undefined && level > maxSpellLevel) {
-    throw new InvalidLevelUpError(`${row?.name ?? "That spell"} exceeds the highest spell level you can learn (${maxSpellLevel}).`);
+// #1440: the served ceiling (meta.maxSpellLevel) applies to every leveled pick.
+function assertWithinCeiling(row: SpellPickRow, maxSpellLevel: number): void {
+  if (row.level > maxSpellLevel) {
+    throw new InvalidLevelUpError(`${row.name} exceeds the highest spell level you can learn (${maxSpellLevel}).`);
   }
 }
 
 // #1440: unless spellLists is unrestricted, a catalog leveled pick must be on
 // one of the served class lists. `null` means unrestricted — branch on
-// `=== null`, never truthiness, since `[]` is truthy. op.custom has no
-// `row`/`classes` and is exempt (checked only by assertWithinCeiling above).
+// `=== null`, never truthiness, since `[]` is truthy.
 // `expandedSpellIds` (#1631) admits a row NOT on the class's own list when
 // the subclass's list-expansion adds it (PHB'14 Warlock patrons) — the SAME
-// widening creationPickError (character-create.ts) applies at creation.
-function assertOnSpellList(row: SpellPickRow | undefined, spellLists: string[] | null, expandedSpellIds: string[]): void {
-  if (row && spellLists !== null && !row.classes.some((c) => spellLists.includes(c)) && !expandedSpellIds.includes(row.id)) {
+// widening creationPickError applies at creation.
+function assertOnSpellList(row: SpellPickRow, spellLists: string[] | null, expandedSpellIds: string[]): void {
+  if (spellLists !== null && !row.classes.some((c) => spellLists.includes(c)) && !expandedSpellIds.includes(row.id)) {
     throw new InvalidLevelUpError(`${row.name} is not on ${classListPhrase(spellLists)}.`);
   }
 }
@@ -509,9 +498,9 @@ function assertLeveledSpellEligibility(
   expandedSpellIds: string[],
 ): void {
   for (const op of spellOps) {
-    const row = op.spellId ? rowById.get(op.spellId) : undefined;
-    if (op.spellId && !row) continue; // unknown id — fall through to applyLearnSpellOp's not-found error
-    assertWithinCeiling(op, row, maxSpellLevel);
+    const row = rowById.get(op.spellId);
+    if (!row) continue; // unknown id — fall through to applyLearnSpellOp's not-found error
+    assertWithinCeiling(row, maxSpellLevel);
     assertOnSpellList(row, spellLists, expandedSpellIds);
   }
 }
@@ -535,9 +524,9 @@ function assertCantripEligibility(
   lowerClass: string,
 ): void {
   for (const op of cantripOps) {
-    const row = op.spellId ? rowById.get(op.spellId) : undefined;
-    if (op.spellId && !row) continue; // unknown id — fall through to applyLearnSpellOp's not-found error
-    if (row && cantripLists !== null && !row.classes.some((c) => cantripLists.includes(c))) {
+    const row = rowById.get(op.spellId);
+    if (!row) continue; // unknown id — fall through to applyLearnSpellOp's not-found error
+    if (cantripLists !== null && !row.classes.some((c) => cantripLists.includes(c))) {
       throw new InvalidLevelUpError(`${row.name} is not on the ${lowerClass} cantrip list.`);
     }
   }
@@ -577,9 +566,7 @@ function resolveNewSpellsGate(steps: LevelUpStep[]): NewSpellsGate | null {
 
 // Orchestrates the #1440 eligibility gate: read the catalog once, apply the
 // pre-existing cantrip/leveled placement check, then gate leveled picks on the
-// served ceiling + spellLists and cantrip picks on cantripLists. op.custom picks
-// are exempt from the class-list checks (a DM-authored spell has no catalog
-// `classes` array) but are still subject to the ceiling.
+// served ceiling + spellLists and cantrip picks on cantripLists.
 async function assertPickSpellEligibility(
   submission: LevelUpSubmission,
   steps: LevelUpStep[],

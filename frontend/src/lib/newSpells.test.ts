@@ -238,7 +238,7 @@ describe("selectedSpellIds", () => {
   it("extracts catalog spellIds, tolerating undefined", () => {
     expect(selectedSpellIds(undefined)).toEqual([]);
     expect(
-      selectedSpellIds([{ type: "learnSpell", spellId: "shield" }, { type: "learnSpell", custom: undefined, spellId: "mistyStep" }]),
+      selectedSpellIds([{ type: "learnSpell", spellId: "shield" }, { type: "learnSpell", spellId: "mistyStep" }]),
     ).toEqual(["shield", "mistyStep"]);
   });
 });

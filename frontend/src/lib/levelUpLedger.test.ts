@@ -195,28 +195,6 @@ describe("buildLevelUpLedger", () => {
     expect(rowFor(rows, "New Spells")).toBeUndefined();
   });
 
-  it("falls back to a custom cantrip's name (#1157)", () => {
-    const draft: LevelUpDraft = {
-      hp: { method: "average" },
-      cantripsLearned: [
-        {
-          type: "learnSpell",
-          custom: {
-            name: "Homebrew Cantrip",
-            level: 0,
-            school: "evocation",
-            castingTime: "1 action",
-            range: "30 feet",
-            duration: "Instantaneous",
-            description: "",
-          },
-        },
-      ],
-    };
-    const rows = buildLevelUpLedger(makeCharacter(), draft, makePlan(), resolvers);
-    expect(rowFor(rows, "New Cantrips")).toMatchObject({ items: ["Homebrew Cantrip"] });
-  });
-
   it("orders New Cantrips above New Spells when both are present (#1157)", () => {
     const draft: LevelUpDraft = {
       hp: { method: "average" },

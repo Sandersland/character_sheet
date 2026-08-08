@@ -357,41 +357,10 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
     expect(spells.some((s) => s.spellId === cureWounds.id)).toBe(true);
   });
 
-  it("learnSpell with a custom payload creates a spell without a spellId", async () => {
+  it("400s on learnSpell with no spellId (#1817: catalog id is required)", async () => {
     const res = await supertest.agent(app).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
-      .send({
-        operations: [{
-          type: "learnSpell",
-          custom: {
-            name: "Homebrew Zap",
-            level: 1,
-            school: "evocation",
-            castingTime: "1 action",
-            range: "30 ft",
-            duration: "Instantaneous",
-            description: "Zap something.",
-          },
-        }],
-      });
-
-    expect(res.status).toBe(200);
-    const spells = res.body.spellcasting.spells as Array<{ name: string; spellId?: string }>;
-    const learned = spells.find((s) => s.name === "Homebrew Zap");
-    expect(learned).toBeDefined();
-    expect(learned!.spellId).toBeUndefined();
-  });
-
-  it("400s on learnSpell when both spellId and custom are provided", async () => {
-    const res = await supertest.agent(app).set("Cookie", COOKIE)
-      .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
-      .send({
-        operations: [{
-          type: "learnSpell",
-          spellId: catalogSpellId,
-          custom: { name: "Overlap", level: 0, school: "evocation", castingTime: "1 action", range: "Self", duration: "Instantaneous", description: "Oops." },
-        }],
-      });
+      .send({ operations: [{ type: "learnSpell" }] });
     expect(res.status).toBe(400);
   });
 
