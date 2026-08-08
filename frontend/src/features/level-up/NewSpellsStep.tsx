@@ -113,11 +113,13 @@ function SpellFetchStatus({ catalog, error, showSpinner }: { catalog: CatalogSpe
 // pool are searched and filtered independently). An empty eligible list
 // (`spells`, pre-search) is a resolver bug — e.g. the Eldritch Knight case:
 // "Choose N of N" against zero rows — distinct copy from an ordinary search
-// that filtered a non-empty list to zero. Suppressed until the catalog loads
-// (catalog === null) so a mid-fetch empty pool never reads as misconfigured;
-// SpellFetchStatus owns the loading/error message in that window.
-function SpellPoolStatus({ catalog, spells, filtered }: { catalog: CatalogSpell[] | null; spells: CatalogSpell[]; filtered: CatalogSpell[] }) {
-  if (catalog === null) return null;
+// that filtered a non-empty list to zero. Suppressed while the fetch is not in
+// a trusted-loaded state — `catalog === null` (initial load) OR `error`
+// (useSpellCatalog leaves a STALE catalog in place on a failed re-fetch, so
+// error is the authoritative "don't read the pool" signal) — so an empty pool
+// never reads as misconfigured on top of SpellFetchStatus's single error line.
+function SpellPoolStatus({ catalog, error, spells, filtered }: { catalog: CatalogSpell[] | null; error: string | null; spells: CatalogSpell[]; filtered: CatalogSpell[] }) {
+  if (catalog === null || error) return null;
   if (spells.length === 0) {
     return (
       <p className="mt-3 py-2 text-center text-xs text-garnet-700">
@@ -136,9 +138,10 @@ function SpellPoolStatus({ catalog, spells, filtered }: { catalog: CatalogSpell[
 // Extracted so NewSpellsStep stays under the complexity gate once the #1101 swap
 // panel is layered on top.
 function SpellResults({
-  catalog, spells, filtered, learnedSpellIds, selectedIds, cap, onToggle,
+  catalog, error, spells, filtered, learnedSpellIds, selectedIds, cap, onToggle,
 }: {
   catalog: CatalogSpell[] | null;
+  error: string | null;
   spells: CatalogSpell[];
   filtered: CatalogSpell[];
   learnedSpellIds: ReadonlySet<string>;
@@ -148,7 +151,7 @@ function SpellResults({
 }) {
   return (
     <>
-      <SpellPoolStatus catalog={catalog} spells={spells} filtered={filtered} />
+      <SpellPoolStatus catalog={catalog} error={error} spells={spells} filtered={filtered} />
       <SpellRowList
         spells={spells}
         filtered={filtered}
@@ -169,10 +172,11 @@ function SpellResults({
 // its eligible list was empty. The shared fetch error/spinner is owned by
 // SpellFetchStatus at the step level, not repeated here.
 function CantripSection({
-  cantrips, catalog, spells, filtered, learnedSpellIds, selectedIds, onToggle, search, setSearch,
+  cantrips, catalog, error, spells, filtered, learnedSpellIds, selectedIds, onToggle, search, setSearch,
 }: {
   cantrips: number;
   catalog: CatalogSpell[] | null;
+  error: string | null;
   spells: CatalogSpell[];
   filtered: CatalogSpell[];
   learnedSpellIds: ReadonlySet<string>;
@@ -196,6 +200,7 @@ function CantripSection({
       />
       <SpellResults
         catalog={catalog}
+        error={error}
         spells={spells}
         filtered={filtered}
         learnedSpellIds={learnedSpellIds}
@@ -211,11 +216,12 @@ function CantripSection({
 // note, search + results. Split from NewSpellsStep so the cantrip subsection can
 // sit above it without pushing the parent past the complexity gate.
 function LeveledSpellsSection({
-  selection, character, catalog, learnedSpellIds, framed,
+  selection, character, catalog, error, learnedSpellIds, framed,
 }: {
   selection: NewSpellsSelection;
   character: Character;
   catalog: CatalogSpell[] | null;
+  error: string | null;
   learnedSpellIds: ReadonlySet<string>;
   framed: boolean;
 }) {
@@ -256,6 +262,7 @@ function LeveledSpellsSection({
       />
       <SpellResults
         catalog={catalog}
+        error={error}
         spells={eligible}
         filtered={filtered}
         learnedSpellIds={learnedSpellIds}
@@ -288,6 +295,7 @@ export default function NewSpellsStep({ step }: { step: LevelUpStep }) {
         <CantripSection
           cantrips={selection.cantrips}
           catalog={catalog}
+          error={error}
           spells={eligibleCantrips}
           filtered={filteredCantrips}
           learnedSpellIds={learnedSpellIds}
@@ -303,6 +311,7 @@ export default function NewSpellsStep({ step }: { step: LevelUpStep }) {
           selection={selection}
           character={character}
           catalog={catalog}
+          error={error}
           learnedSpellIds={learnedSpellIds}
           framed={selection.cantrips > 0}
         />
