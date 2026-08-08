@@ -32,30 +32,6 @@ export interface SpellComponents {
   materialDescription?: string;
 }
 
-/** Custom spell input for `learnSpell` without a catalog entry. */
-export interface CustomSpellInput {
-  name: string;
-  level: number;
-  school: SpellSchool;
-  castingTime: string;
-  range: string;
-  duration: string;
-  description: string;
-  concentration?: boolean;
-  ritual?: boolean;
-  components?: SpellComponents;
-  saveEffect?: "half" | "none";
-  effectKind?: "damage" | "heal";
-  effectDiceCount?: number;
-  effectDiceFaces?: number;
-  effectModifier?: number;
-  damageType?: string;
-  attackType?: "attack" | "save";
-  saveAbility?: string;
-  upcastDicePerLevel?: number;
-  cantripScaling?: boolean;
-}
-
 // Where an applied spell effect lands: the caster, or a consenting ally's sheet
 // (#462). Structurally identical to the backend's CastTarget alias, so the
 // dispatcher forwards `apply.target` to castAbilityInTx unchanged.
@@ -104,11 +80,10 @@ export interface ArcaneRecoveryOperation {
   slots: { level: number; count: number }[];
 }
 
-/** Learn a spell from the catalog (spellId) or add a custom one. Exactly one of spellId/custom. */
+/** Learn a spell from the catalog by its catalog id. */
 export interface LearnSpellOperation {
   type: "learnSpell";
-  spellId?: string;
-  custom?: CustomSpellInput;
+  spellId: string;
 }
 
 /** Remove a learned spell by its per-character entry id. */

@@ -61,7 +61,6 @@ import type {
   CastItemSpellOperation,
   CastSpellOperation,
   ConvertSorceryPointsOperation,
-  CustomSpellInput,
   DismissBuffOperation,
   ExpendSlotOperation,
   ForgetSpellOperation,
@@ -283,34 +282,6 @@ export function creationSpellEntry(catalogSpell: Spell): SpellEntry {
   return { ...catalogSpellToEntry(catalogSpell), prepared: true };
 }
 
-// Build a learned SpellEntry from custom DM-authored input.
-function customSpellToEntry(custom: CustomSpellInput): SpellEntry {
-  return {
-    id: randomUUID(),
-    name: custom.name,
-    level: custom.level,
-    school: custom.school,
-    prepared: false,
-    castingTime: custom.castingTime,
-    range: custom.range,
-    duration: custom.duration,
-    description: custom.description,
-    concentration: custom.concentration,
-    ritual: custom.ritual,
-    components: custom.components,
-    saveEffect: custom.saveEffect,
-    effectKind: custom.effectKind,
-    effectDiceCount: custom.effectDiceCount,
-    effectDiceFaces: custom.effectDiceFaces,
-    effectModifier: custom.effectModifier,
-    damageType: custom.damageType,
-    attackType: custom.attackType,
-    saveAbility: custom.saveAbility,
-    upcastDicePerLevel: custom.upcastDicePerLevel,
-    cantripScaling: custom.cantripScaling,
-  };
-}
-
 // Reject a duplicate, look up the catalog row, and snapshot it into an entry.
 async function resolveCatalogSpellEntry(
   tx: Prisma.TransactionClient,
@@ -329,28 +300,19 @@ async function resolveCatalogSpellEntry(
 
 // #1440: deliberately NOT class- or spell-level-gated. This op is the
 // manual/homebrew scribing surface (scroll-scribing, DM grants via
-// SpellCatalogTab/AddSpellPanel, name+level filters only) — the same op also
-// accepts a fully DM-authored `op.custom` spell with no catalog row at all, so a
-// class gate here would be inconsistent with that path and would break
-// scroll-scribing/DM-grant flows. The level-up ceremony's own eligibility gate
-// (class list + spell-level ceiling) lives in `assertPickSpellEligibility`,
-// which validates against the server-built plan step before this op ever runs.
+// SpellCatalogTab/AddSpellPanel, name+level filters only), so a class gate here
+// would break those flows. The level-up ceremony's own eligibility gate (class
+// list + spell-level ceiling) lives in `assertPickSpellEligibility`, which
+// validates against the server-built plan step before this op ever runs.
 //
 // #1507 D7: a 2014 "known" caster's chosen spell is castable the moment it's
 // learned — SRD 5.1 has no separate preparation step for Bard/Sorcerer/
 // Warlock/Ranger/EK/AT, so `ctx.casterModel === "known"` births the entry
-// `prepared: true` here (catalog and custom paths alike). Cantrips are
-// unaffected either way — always castable, never toggled.
+// `prepared: true` here. Cantrips are unaffected either way — always castable,
+// never toggled.
 async function applyLearnSpellOp(ctx: SpellOpContext, op: LearnSpellOperation): Promise<OpOutcome> {
   const { tx, state } = ctx;
-  if (Boolean(op.spellId) === Boolean(op.custom)) {
-    throw new InvalidSpellcastingOperationError(
-      "learnSpell: provide exactly one of spellId or custom"
-    );
-  }
-  const newEntry = op.spellId
-    ? await resolveCatalogSpellEntry(tx, state, op.spellId)
-    : customSpellToEntry(op.custom!);
+  const newEntry = await resolveCatalogSpellEntry(tx, state, op.spellId);
   if (ctx.casterModel === "known") newEntry.prepared = true;
   state.spells.push(newEntry);
   return {
