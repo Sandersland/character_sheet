@@ -22,6 +22,10 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 
 interface HomebrewSpellFormProps {
   edition: RulesEdition;
+  /** The character being authored for — the server derives the new spell's
+   *  edition from it on create (#1819). Unused on the PATCH (editing) path,
+   *  where edition is write-once on the existing row. */
+  characterId: string;
   /** Present when editing an existing homebrew spell (HomebrewTab's manage
    *  list, #1788): prefills the draft from the served row and submits via
    *  PATCH instead of POST. Absent for the plain creation flow. */
@@ -31,7 +35,7 @@ interface HomebrewSpellFormProps {
   onClose: () => void;
 }
 
-export default function HomebrewSpellForm({ edition, editing, onSaved, onClose }: HomebrewSpellFormProps) {
+export default function HomebrewSpellForm({ edition, characterId, editing, onSaved, onClose }: HomebrewSpellFormProps) {
   const [draft, setDraft] = useState<HomebrewSpellInput>(editing?.draft ?? BLANK_HOMEBREW_SPELL);
   const [hasEffect, setHasEffect] = useState(!!editing?.draft.effectKind);
   const [busy, setBusy] = useState(false);
@@ -54,7 +58,7 @@ export default function HomebrewSpellForm({ edition, editing, onSaved, onClose }
       if (editing) {
         await updateCustomSpell(editing.id, payload);
       } else {
-        await createCustomSpell(payload);
+        await createCustomSpell(payload, characterId);
         setDraft(BLANK_HOMEBREW_SPELL);
         setHasEffect(false);
       }
