@@ -4,6 +4,7 @@ import supertest from "supertest";
 import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
+import { createTestCharacter } from "@/test-support/character.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 
 // POST /api/catalog/entries/:entryId/fork (#1800, epic #1795 5/6): a viewer
@@ -25,6 +26,9 @@ let cookiePlayer: string;
 let campaignId: string;
 let globalEntryId: string;
 let privateEntryId: string;
+// #1819: OWNER's authoring character — the create endpoint derives a homebrew
+// spell's edition from it. 2014 so these fixtures stay EDITION_2014.
+let ownerCharId: string;
 
 const agent = (cookie: string) => supertest.agent(app).set("Cookie", cookie);
 
@@ -63,7 +67,8 @@ beforeAll(async () => {
   if (!seeded) throw new Error("expected at least one seeded EDITION_2014 spell fixture");
   globalEntryId = seeded.catalogEntryId;
 
-  const createdPrivate = await agent(cookieOwner).post("/api/spells/custom").send(VALID_SPELL);
+  ownerCharId = await createTestCharacter(OWNER, { edition: "EDITION_2014", name: "Fork Route Author" });
+  const createdPrivate = await agent(cookieOwner).post(`/api/spells/custom?characterId=${ownerCharId}`).send(VALID_SPELL);
   expect(createdPrivate.status).toBe(201);
   privateEntryId = createdPrivate.body.catalog.entryId;
 
@@ -145,7 +150,7 @@ describe("POST /api/catalog/entries/:entryId/fork", () => {
   // owner) — must now succeed.
   it("lets a campaign member fork a USER-scope entry granted into their campaign", async () => {
     const created = await agent(cookieOwner)
-      .post("/api/spells/custom")
+      .post(`/api/spells/custom?characterId=${ownerCharId}`)
       .send({ ...VALID_SPELL, name: "Fork Route Grantable Spell" });
     expect(created.status).toBe(201);
     const grantableEntryId = created.body.catalog.entryId as string;
@@ -172,7 +177,7 @@ describe("POST /api/catalog/entries/:entryId/fork", () => {
   // campaign's membership.
   it("still 403s a non-member forking a USER-scope entry granted into a campaign they're not in", async () => {
     const created = await agent(cookieOwner)
-      .post("/api/spells/custom")
+      .post(`/api/spells/custom?characterId=${ownerCharId}`)
       .send({ ...VALID_SPELL, name: "Fork Route Grantable Spell For Outsider" });
     expect(created.status).toBe(201);
     const grantableEntryId = created.body.catalog.entryId as string;

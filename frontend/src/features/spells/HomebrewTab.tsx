@@ -31,6 +31,9 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 
 interface HomebrewTabProps {
   edition: RulesEdition;
+  /** The character being authored for — forwarded to the create form so the
+   *  server can derive the new spell's edition from it (#1819). */
+  characterId: string;
   catalog: CatalogSpell[] | null;
   catalogError?: string | null;
   showSpinner?: boolean;
@@ -45,6 +48,7 @@ interface HomebrewTabProps {
 
 export default function HomebrewTab({
   edition,
+  characterId,
   catalog,
   catalogError = null,
   showSpinner = false,
@@ -86,6 +90,7 @@ export default function HomebrewTab({
     return (
       <HomebrewSpellForm
         edition={edition}
+        characterId={characterId}
         editing={{ id: editing.id, draft: toHomebrewSpellInput(editing) }}
         onSaved={handleSaved}
         onClose={() => setEditing(null)}
@@ -95,7 +100,7 @@ export default function HomebrewTab({
 
   return (
     <div className="flex flex-col gap-4">
-      <HomebrewSpellForm edition={edition} onSaved={onCreated} onClose={onClose} />
+      <HomebrewSpellForm edition={edition} characterId={characterId} onSaved={onCreated} onClose={onClose} />
 
       <div>
         <p className="mb-2 text-[9px] font-bold uppercase tracking-[0.2em] text-parchment-500">Your homebrew spells</p>

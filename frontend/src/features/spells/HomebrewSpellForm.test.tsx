@@ -56,7 +56,7 @@ describe("HomebrewSpellForm", () => {
 
   it("renders the core fields", async () => {
     const user = userEvent.setup();
-    render(<HomebrewSpellForm edition="EDITION_2014" onSaved={noop} onClose={noop} />);
+    render(<HomebrewSpellForm edition="EDITION_2014" characterId="char-1" onSaved={noop} onClose={noop} />);
 
     expect(screen.getByLabelText(/spell name/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/^level$/i)).toBeInTheDocument();
@@ -80,7 +80,7 @@ describe("HomebrewSpellForm", () => {
 
   it("shows save ability only when the effect is damage with attack type 'save'", async () => {
     const user = userEvent.setup();
-    render(<HomebrewSpellForm edition="EDITION_2014" onSaved={noop} onClose={noop} />);
+    render(<HomebrewSpellForm edition="EDITION_2014" characterId="char-1" onSaved={noop} onClose={noop} />);
 
     expect(screen.queryByLabelText(/save ability/i)).not.toBeInTheDocument();
 
@@ -99,7 +99,7 @@ describe("HomebrewSpellForm", () => {
 
   it("blocks submit and shows an inline error when dice fields are missing for an enabled effect", async () => {
     const user = userEvent.setup();
-    render(<HomebrewSpellForm edition="EDITION_2014" onSaved={noop} onClose={noop} />);
+    render(<HomebrewSpellForm edition="EDITION_2014" characterId="char-1" onSaved={noop} onClose={noop} />);
 
     await user.type(screen.getByLabelText(/spell name/i), "Zap");
     await user.type(screen.getByLabelText(/description/i), "A zap.");
@@ -130,7 +130,7 @@ describe("HomebrewSpellForm", () => {
     });
     const onSaved = vi.fn();
     const user = userEvent.setup();
-    render(<HomebrewSpellForm edition="EDITION_2014" onSaved={onSaved} onClose={noop} />);
+    render(<HomebrewSpellForm edition="EDITION_2014" characterId="char-1" onSaved={onSaved} onClose={noop} />);
 
     await user.type(screen.getByLabelText(/spell name/i), "Bolt");
     await user.type(screen.getByLabelText(/description/i), "A bolt.");
@@ -162,6 +162,7 @@ describe("HomebrewSpellForm", () => {
         attackType: "save",
         saveAbility: "dexterity",
       }),
+      "char-1",
     );
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
   });
@@ -183,7 +184,7 @@ describe("HomebrewSpellForm", () => {
       classes: [],
     });
     const user = userEvent.setup();
-    render(<HomebrewSpellForm edition="EDITION_2014" onSaved={noop} onClose={noop} />);
+    render(<HomebrewSpellForm edition="EDITION_2014" characterId="char-1" onSaved={noop} onClose={noop} />);
 
     await user.type(screen.getByLabelText(/spell name/i), "Zap");
     await user.type(screen.getByLabelText(/description/i), "A zap.");
@@ -232,6 +233,7 @@ describe("HomebrewSpellForm editing an existing homebrew spell", () => {
     render(
       <HomebrewSpellForm
         edition="EDITION_2014"
+        characterId="char-1"
         editing={{ id: "s1", draft: EXISTING_DRAFT }}
         onSaved={noop}
         onClose={noop}
@@ -260,6 +262,7 @@ describe("HomebrewSpellForm editing an existing homebrew spell", () => {
     render(
       <HomebrewSpellForm
         edition="EDITION_2014"
+        characterId="char-1"
         editing={{ id: "s1", draft: EXISTING_DRAFT }}
         onSaved={onSaved}
         onClose={noop}
