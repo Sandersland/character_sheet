@@ -10,7 +10,7 @@
 import Segmented from "@/components/ui/Segmented";
 import AttackResultLine from "@/features/session/AttackResultLine";
 import DamageRiderList from "@/features/session/DamageRiderList";
-import { CritButton, RailStep as Step, VerdictChip } from "@/features/session/railPrimitives";
+import { AttackFormSummaryCore, CritButton, RailStep as Step, VerdictChip } from "@/features/session/railPrimitives";
 import { stepRail, type StepRailModel } from "@/lib/attackStepRail";
 import { isUnresolvedRow } from "@/lib/attackTallySummary";
 import type { AttackEntryView } from "@/features/session/useAttackRolls";
@@ -73,8 +73,9 @@ function attackOrdinalLabel(attack: AttackState | null): string {
   return `Roll to hit — attack ${attack.used + 1} of ${attack.total}`;
 }
 
-/** Selected-form summary: name + magical badge, to-hit/damage labels, and the
- *  state-driven roll-mode chip (#486) — colored by the resolved mode. */
+/** Selected-form summary: name + magical badge, to-hit/damage labels (shared
+ *  core, #1832 fallow-flagged clone extraction), plus the state-driven
+ *  roll-mode chip (#486) — colored by the resolved mode. */
 function SelectedFormSummary({
   selected,
   chip,
@@ -88,21 +89,7 @@ function SelectedFormSummary({
     mode === "advantage" ? "text-gold-600" : mode === "disadvantage" ? "text-garnet-600" : "text-parchment-500";
   return (
     <span className="min-w-0 flex-1">
-      <span className="flex items-center gap-1.5 truncate text-sm font-semibold text-parchment-900">
-        {selected.name}
-        {selected.magical && (
-          <span
-            title="Counts as magical for overcoming resistance to nonmagical damage"
-            className="rounded-control bg-gold-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gold-800"
-          >
-            Magical
-          </span>
-        )}
-      </span>
-      <span className="block truncate text-xs text-parchment-600">
-        {selected.attackLabel} to hit · {selected.damageLabel}
-        {selected.note && <span className="ml-1 italic">{selected.note}</span>}
-      </span>
+      <AttackFormSummaryCore selected={selected} />
       {chip && (
         <span
           data-testid="attack-roll-mode-chip"
