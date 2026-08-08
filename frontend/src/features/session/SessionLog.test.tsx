@@ -24,8 +24,8 @@ function makeEvent(overrides: Partial<CharacterEvent>): CharacterEvent {
   return {
     id: "evt-1",
     category: "combat",
-    type: "attackRoll",
-    summary: "Longsword: 17 (1d20 + 5)",
+    type: "resolveAction",
+    summary: "Resolved Longsword (action)",
     actor: "player",
     reverted: false,
     createdAt: "2026-06-27T00:00:00.000Z",
@@ -47,52 +47,44 @@ function findRow(substring: string): Promise<HTMLElement> {
 }
 
 describe("SessionLog (#1237 chat feed)", () => {
-  it("renders a swing as one sentence with the total emphasized and the weapon name bold", async () => {
+  it("renders a resolution as one sentence with the total emphasized and the weapon name bold", async () => {
     renderWith([
       makeEvent({
-        id: "dmg",
-        type: "damageRoll",
-        category: "roll",
-        summary: "Shortsword: 8 piercing",
-        data: { kind: "damage", source: "Shortsword", total: 8, damageType: "piercing", specLabel: "1d6 + 4", faces: [4], swingId: "s1", verdict: "hit" },
-      }),
-      makeEvent({
-        id: "atk",
-        type: "attackRoll",
-        category: "roll",
-        summary: "Shortsword: 17",
-        data: { kind: "attack", source: "Shortsword", total: 17, specLabel: "1d20 + 5", faces: [12], swingId: "s1", verdict: "hit" },
+        id: "swing",
+        type: "resolveAction",
+        category: "combat",
+        summary: "Resolved Shortsword (action)",
+        data: {
+          actionId: "swing",
+          source: "Shortsword",
+          cost: { kind: "action" },
+          toHit: { faces: [12], kept: 12, nat20: false, bonus: 5, total: 17, verdict: "hit" },
+          effect: { spec: "1d6 + 4", faces: [4], total: 8, type: "piercing", kind: "damage", crit: false },
+        },
       }),
     ]);
 
     const row = await findRow("Shortsword — hit for");
     expect(row.textContent).toContain("8");
     expect(row.textContent).toContain("piercing");
-    // Only one line — attack + damage merged into a single swing (the scroll
-    // sentinel li is aria-hidden and excluded from the listitem role query).
+    // Only one line — a resolveAction event is already one consolidated
+    // resolution (the scroll sentinel li is aria-hidden and excluded from
+    // the listitem role query).
     expect(screen.getAllByRole("listitem")).toHaveLength(1);
   });
 
-  it("expands a roll line's drill-in on click, showing the decomposed attack + damage math", async () => {
+  it("expands a roll line's drill-in on click, showing the Attack + Damage breakdown", async () => {
     renderWith([
       makeEvent({
-        id: "dmg",
-        type: "damageRoll",
-        category: "roll",
+        id: "swing",
+        type: "resolveAction",
+        category: "combat",
         data: {
-          kind: "damage", source: "Shortsword", total: 8, damageType: "piercing",
-          specLabel: "1d6 + 4", faces: [4], swingId: "s1", verdict: "hit",
-          damageComponents: { abilityMod: 4, meleeDamageBonus: 0 },
-        },
-      }),
-      makeEvent({
-        id: "atk",
-        type: "attackRoll",
-        category: "roll",
-        data: {
-          kind: "attack", source: "Shortsword", total: 17, specLabel: "1d20 + 5",
-          faces: [12], swingId: "s1", verdict: "hit",
-          attackComponents: { abilityMod: 4, proficiencyBonus: 3, rangedBonus: 0, attackRollBonus: 0 },
+          actionId: "swing",
+          source: "Shortsword",
+          cost: { kind: "action" },
+          toHit: { faces: [12], kept: 12, nat20: false, bonus: 5, total: 17, verdict: "hit" },
+          effect: { spec: "1d6 + 4", faces: [4], total: 8, type: "piercing", kind: "damage", crit: false },
         },
       }),
     ]);
@@ -100,19 +92,24 @@ describe("SessionLog (#1237 chat feed)", () => {
     const row = await findRow("Shortsword — hit for");
     // A closed <details>'s children stay in the DOM (just CSS-hidden) — assert
     // via visibility, not presence, that the drill-in starts collapsed.
-    const proficiency = within(row).getByText(/Proficiency/);
-    expect(proficiency).not.toBeVisible();
+    const attackLabel = within(row).getByText(/Attack/);
+    expect(attackLabel).not.toBeVisible();
     fireEvent.click(row.querySelector("summary")!);
-    expect(proficiency).toBeVisible();
+    expect(attackLabel).toBeVisible();
   });
 
   it("renders a miss as an italic, muted line with no damage", async () => {
     renderWith([
       makeEvent({
-        id: "atk",
-        type: "attackRoll",
-        category: "roll",
-        data: { kind: "attack", source: "Shortsword", total: 9, specLabel: "1d20 + 3", faces: [5], swingId: "s2", verdict: "miss" },
+        id: "swing",
+        type: "resolveAction",
+        category: "combat",
+        data: {
+          actionId: "swing",
+          source: "Shortsword",
+          cost: { kind: "action" },
+          toHit: { faces: [5], kept: 5, nat20: false, bonus: 3, total: 9, verdict: "miss" },
+        },
       }),
     ]);
 

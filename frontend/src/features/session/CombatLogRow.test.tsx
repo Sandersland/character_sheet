@@ -20,9 +20,9 @@ beforeEach(() => {
 function makeEvent(overrides: Partial<CharacterEvent>): CharacterEvent {
   return {
     id: "evt-1",
-    category: "roll",
-    type: "attackRoll",
-    summary: "Shortsword: 17 (1d20 + 5)",
+    category: "combat",
+    type: "resolveAction",
+    summary: "Resolved Shortsword (action)",
     actor: "player",
     reverted: false,
     createdAt: "2026-06-27T00:00:00.000Z",
@@ -30,22 +30,23 @@ function makeEvent(overrides: Partial<CharacterEvent>): CharacterEvent {
   };
 }
 
-// #1237 §4: the badge must count rendered FEED ROWS (a merged attack+damage
-// swing is ONE row from TWO events), not raw events — this is what a revert to
-// `data.events.length` breaks. Both assertions below fail under that mutation.
+// #1237 §4: the badge must count rendered FEED ROWS, not raw events — this is
+// what a revert to `data.events.length` breaks. Both assertions below fail
+// under that mutation. A resolveAction event was always one event (#1827
+// model B), so the "merged swing" case is now just "one event, one row".
 describe("CombatLogRow live count (#1237 §4 — count parity with the rendered feed)", () => {
-  it("counts a merged attack+damage swing as ONE event, not two", async () => {
+  it("counts a resolution as ONE event", async () => {
     mockFetchSession.mockResolvedValue({
       events: [
         makeEvent({
-          id: "dmg",
-          type: "damageRoll",
-          data: { kind: "damage", source: "Shortsword", total: 8, damageType: "piercing", specLabel: "1d6 + 4", faces: [4], swingId: "s1", verdict: "hit" },
-        }),
-        makeEvent({
-          id: "atk",
-          type: "attackRoll",
-          data: { kind: "attack", source: "Shortsword", total: 17, specLabel: "1d20 + 5", faces: [12], swingId: "s1", verdict: "hit" },
+          id: "swing",
+          data: {
+            actionId: "swing",
+            source: "Shortsword",
+            cost: { kind: "action" },
+            toHit: { faces: [12], kept: 12, nat20: false, bonus: 5, total: 17, verdict: "hit" },
+            effect: { spec: "1d6 + 4", faces: [4], total: 8, type: "piercing", kind: "damage", crit: false },
+          },
         }),
       ],
     } as never);
@@ -60,7 +61,12 @@ describe("CombatLogRow live count (#1237 §4 — count parity with the rendered 
     const misses = Array.from({ length: 5 }, (_, i) =>
       makeEvent({
         id: `miss-${i}`,
-        data: { kind: "attack", source: "Dagger", total: 9 - i, specLabel: "1d20 + 2", faces: [7 - i], swingId: `miss-${i}`, verdict: "miss" },
+        data: {
+          actionId: `miss-${i}`,
+          source: "Dagger",
+          cost: { kind: "action" },
+          toHit: { faces: [7 - i], kept: 7 - i, nat20: false, bonus: 2, total: 9 - i, verdict: "miss" },
+        },
       }),
     );
     mockFetchSession.mockResolvedValue({ events: misses } as never);
