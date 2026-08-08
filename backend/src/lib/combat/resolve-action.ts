@@ -116,6 +116,9 @@ export async function applyResolveActionOperations(
           toHit: op.toHit ?? null,
           save: op.save ?? null,
           effect: op.effect ?? null,
+          // Always an array (never undefined) so the feed never has to
+          // distinguish "no riders" from "old event predates riders" (#1843).
+          riders: op.riders ?? [],
           slotLevel: op.slotLevel ?? null,
         },
         batchId,

@@ -3,14 +3,20 @@
 // Mirrors backend/src/lib/combat/resolve-action-ops.ts's
 // `resolveActionOperationSchema` exactly: the persisted event is written
 // straight from the validated op (`actionId`, `source`, `cost`, `toHit`,
-// `save`, `effect`, `slotLevel`), so this type is the op schema's shape minus
-// the `type: "resolveAction"` literal the op carries and the route validates.
+// `save`, `effect`, `riders`, `slotLevel`), so this type is the op schema's
+// shape minus the `type: "resolveAction"` literal the op carries and the
+// route validates.
 //
 // ONE `effect` roll per resolution — no `instances[]` array (settled
 // 2026-08-08, per #1828 review). Magic Missile's three darts are one
 // `count: 3` spec; `effect.faces` is every die actually rolled, so the
 // drill-in reads the per-dart breakdown straight off `faces` without a
-// dedicated instances model.
+// dedicated instances model. `riders` (#1843) is the ADDITIVE exception to
+// "one effect": a weapon's typed elemental rider (Flame Tongue +2d6 fire,
+// Divine Smite radiant, Hunter's Mark, sneak attack) is a genuinely different
+// SECOND damage type stacked on the primary `effect`, not another same-type
+// instance — `riders` defaults to empty/omitted, never a reversal of the
+// no-`instances[]` decision above.
 
 import type { RollEventAttackComponents, RollEventDamageComponents } from "./roll-event.js";
 
@@ -72,6 +78,14 @@ export interface ResolveActionEventData {
   toHit?: ResolveActionEventToHit | null;
   save?: ResolveActionEventSave | null;
   effect?: ResolveActionEventEffect | null;
+  /**
+   * Typed damage riders (#1843) stacked ON TOP of the primary `effect` —
+   * each its own damage TYPE (not another same-type instance, see the module
+   * banner). Absent/empty for the common no-rider swing; a renderer sums
+   * `effect` + every `riders[]` term into one consolidated sentence and gives
+   * each term its own drill-in line.
+   */
+  riders?: ResolveActionEventEffect[];
   /** Present only for a leveled spell cast/upcast — absent for a cantrip or weapon swing. */
   slotLevel?: number | null;
 }

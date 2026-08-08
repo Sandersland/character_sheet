@@ -13,6 +13,12 @@
  * `effect` roll per resolution — no `instances[]` array. Magic Missile's three
  * darts are one `count: 3` spec; the persisted roll's `faces` breakdown is
  * what a future drill-in reads, not a per-dart entry.
+ *
+ * `riders` (#1843) is the additive exception: a weapon's typed elemental
+ * rider (Flame Tongue +2d6 fire, Divine Smite radiant, Hunter's Mark, sneak
+ * attack) is a genuinely different SECOND damage type on top of `effect`, not
+ * another same-type instance — reuses `resolveActionEffectSchema` per element,
+ * so a rider is validated exactly like the primary effect.
  */
 import { z } from "zod";
 
@@ -104,6 +110,9 @@ export const resolveActionOperationSchema = z.object({
   toHit: resolveActionToHitSchema.nullable().optional(),
   save: resolveActionSaveSchema.nullable().optional(),
   effect: resolveActionEffectSchema.nullable().optional(),
+  // Typed damage riders (#1843) — zero or more, each validated as its own
+  // effect. Omitted/empty for the common no-rider swing.
+  riders: z.array(resolveActionEffectSchema).optional(),
   // Present only for a leveled spell cast (or upcast) — expends one slot of
   // this level via the same payer castSpell uses. Absent for a cantrip or a
   // weapon swing, which have no character state to spend.

@@ -194,18 +194,41 @@ function dcSuffix(dc: number | undefined | null): string {
   return dc != null ? ` (DC ${dc})` : "";
 }
 
-function damageWordSegment(damageType: string | undefined, trailingWord: boolean): LogSegment {
-  const text = damageType ? (trailingWord ? `${damageType} damage.` : `${damageType}.`) : trailingWord ? "damage." : ".";
-  return { text, damageType };
+// The bare type word for one damage/heal term, colored by damage type — no
+// trailing punctuation of its own (effectTailSegments appends the single
+// shared "damage."/"." ending once, after the LAST term). `damageType`
+// undefined/empty degrades to an empty word (old/malformed persisted rows —
+// the schema requires a non-empty `type`, so this is unreachable through the
+// validated write path, kept defensive like the rest of this file's #1237 §5
+// guards).
+function typeWordSegment(damageType: string | undefined): LogSegment {
+  return { text: damageType ?? "", damageType };
 }
 
-// The trailing "N type damage."/"N type." words after an effect's total is
-// already appended to the sentence — shared by the attack-hit, save, and
-// auto-hit resolution builders below so each stays a flat, low-branching
-// function. A heal has no damage-type word, just " HP.".
-function effectTailSegments(effect: ResolveActionEventEffect, trailingWord: boolean): LogSegment[] {
+// The trailing "N type[ + N type…][ damage]." — sums the primary `effect`
+// with every typed rider (#1843: Flame Tongue +2d6 fire, Divine Smite
+// radiant, Hunter's Mark, sneak attack) into ONE consolidated sentence tail
+// instead of a second feed row (#1822 regression fix): each term after the
+// first is prefixed " + <total> ", and the single shared "damage."/"." ending
+// attaches once, to the LAST term — identical output to the pre-riders
+// single-term case when `riders` is empty. Shared by the attack-hit, save,
+// and auto-hit resolution builders below. A heal never carries a rider
+// (riders are dice-valued weapon on-hit damage only) so keeps its own fixed
+// " HP." ending untouched.
+function effectTailSegments(
+  effect: ResolveActionEventEffect,
+  riders: ResolveActionEventEffect[],
+  trailingWord: boolean,
+): LogSegment[] {
   if (effect.kind === "heal") return [{ text: " HP." }];
-  return [{ text: " " }, damageWordSegment(effect.type, trailingWord)];
+  const segments: LogSegment[] = [];
+  [effect, ...riders].forEach((term, i) => {
+    segments.push({ text: i === 0 ? " " : " + " });
+    if (i > 0) segments.push({ text: `${term.total}`, bold: true }, { text: " " });
+    segments.push(typeWordSegment(term.type));
+  });
+  segments[segments.length - 1].text += trailingWord ? " damage." : ".";
+  return segments;
 }
 
 // The leading "1d20 (...)" token for a resolution's to-hit roll. Plain
@@ -319,6 +342,18 @@ function buildEffectDrillRow(effect: ResolveActionEventEffect): DrillInRow {
   };
 }
 
+function capitalize(word: string): string {
+  return word.length === 0 ? word : word[0].toUpperCase() + word.slice(1);
+}
+
+// A rider's own drill-in line (#1843) — same formula/total reconciliation as
+// the primary effect (buildEffectDrillRow), labeled by its OWN damage type
+// ("Fire") rather than the generic "Damage" so a multi-term drill-in reads as
+// separate typed rolls, not two identically-labeled "Damage" rows.
+function buildRiderDrillRow(effect: ResolveActionEventEffect): DrillInRow {
+  return { ...buildEffectDrillRow(effect), label: capitalize(effect.type) };
+}
+
 // A saving throw is announced to the DM, not rolled by the caster (no enemy/
 // target model, self-or-announce, CLAUDE.md) — so its drill-in carries no dice
 // formula, just the DC the DM rolls against.
@@ -357,7 +392,16 @@ function buildBareToHitRow(e: CharacterEvent, toHit: ResolveActionEventToHit, so
 // Attack-roll resolution (weapon swing, Fire Bolt): to-hit die, then effect
 // on anything but a miss. Forward-compat (#1237): a future "→ Goblin hit"
 // continuation just appends one more LogSegment — no restructuring needed.
-function buildAttackResolutionRow(e: CharacterEvent, data: ResolveActionEventData, source: string, round: number | undefined): FeedRow {
+// `riders` (#1843) sums into the SAME sentence/drill-in as the primary
+// effect — a Flame Tongue swing is still exactly one row (#1822 regression
+// fix) and the rider is undoable only as part of this one event (#1823).
+function buildAttackResolutionRow(
+  e: CharacterEvent,
+  data: ResolveActionEventData,
+  source: string,
+  riders: ResolveActionEventEffect[],
+  round: number | undefined,
+): FeedRow {
   const toHit = data.toHit!;
   if (toHit.verdict === "miss") return buildMissResolutionRow(e, toHit, source, round);
   if (!data.effect) return buildBareToHitRow(e, toHit, source, round);
@@ -372,7 +416,7 @@ function buildAttackResolutionRow(e: CharacterEvent, data: ResolveActionEventDat
         { text: "critical hit!", tone: "harm" },
         { text: " " },
         { text: `${effect.total}`, bold: true },
-        ...effectTailSegments(effect, true),
+        ...effectTailSegments(effect, riders, true),
       ]
     : isHeal
       ? [
@@ -385,7 +429,7 @@ function buildAttackResolutionRow(e: CharacterEvent, data: ResolveActionEventDat
           { text: source, bold: true },
           { text: " — hit for " },
           { text: `${effect.total}`, bold: true },
-          ...effectTailSegments(effect, false),
+          ...effectTailSegments(effect, riders, false),
         ];
 
   return {
@@ -394,13 +438,20 @@ function buildAttackResolutionRow(e: CharacterEvent, data: ResolveActionEventDat
     tone: isHeal ? "heal" : "default",
     runKind: "resolveAction",
     segments,
-    drillIn: [buildToHitDrillRow(toHit), buildEffectDrillRow(effect)],
+    drillIn: [buildToHitDrillRow(toHit), buildEffectDrillRow(effect), ...riders.map(buildRiderDrillRow)],
   };
 }
 
 // Saving-throw resolution (Sacred Flame): DC announced, no roll of the
-// caster's own — effect (if any) follows the DC in one sentence.
-function buildSaveResolutionRow(e: CharacterEvent, data: ResolveActionEventData, source: string, round: number | undefined): FeedRow {
+// caster's own — effect (if any), plus any typed rider (#1843), follows the
+// DC in one sentence.
+function buildSaveResolutionRow(
+  e: CharacterEvent,
+  data: ResolveActionEventData,
+  source: string,
+  riders: ResolveActionEventEffect[],
+  round: number | undefined,
+): FeedRow {
   const save = data.save!;
   const effect = data.effect;
   const segments: LogSegment[] = [
@@ -408,13 +459,13 @@ function buildSaveResolutionRow(e: CharacterEvent, data: ResolveActionEventData,
     { text: ` — DC ${save.dc} ${abilityLabel(save.ability)} save` },
   ];
   if (effect) {
-    segments.push({ text: ", " }, { text: `${effect.total}`, bold: true }, ...effectTailSegments(effect, false));
+    segments.push({ text: ", " }, { text: `${effect.total}`, bold: true }, ...effectTailSegments(effect, riders, false));
   } else {
     segments.push({ text: "." });
   }
 
   const drillIn: DrillInRow[] = [buildSaveDrillRow(save)];
-  if (effect) drillIn.push(buildEffectDrillRow(effect));
+  if (effect) drillIn.push(buildEffectDrillRow(effect), ...riders.map(buildRiderDrillRow));
 
   return { id: e.id, round, tone: "default", runKind: "resolveAction", segments, drillIn };
 }
@@ -423,12 +474,24 @@ function buildSaveResolutionRow(e: CharacterEvent, data: ResolveActionEventData,
 // a save: the effect lands unconditionally. Multi-die effects (Magic
 // Missile's 3 darts) are ONE `effect` roll whose `faces` already carries the
 // per-dart breakdown — buildEffectDrillRow reads it with no instances model.
-function buildEffectOnlyResolutionRow(e: CharacterEvent, data: ResolveActionEventData, source: string, round: number | undefined): FeedRow {
+// `riders` (#1843) sums in the same way the attack-roll shape does.
+function buildEffectOnlyResolutionRow(
+  e: CharacterEvent,
+  data: ResolveActionEventData,
+  source: string,
+  riders: ResolveActionEventEffect[],
+  round: number | undefined,
+): FeedRow {
   const effect = data.effect!;
   const isHeal = effect.kind === "heal";
   const segments: LogSegment[] = isHeal
     ? [{ text: source, bold: true }, { text: " — healed " }, { text: `${effect.total}`, bold: true }, { text: " HP." }]
-    : [{ text: source, bold: true }, { text: " — " }, { text: `${effect.total}`, bold: true }, ...effectTailSegments(effect, true)];
+    : [
+        { text: source, bold: true },
+        { text: " — " },
+        { text: `${effect.total}`, bold: true },
+        ...effectTailSegments(effect, riders, true),
+      ];
 
   return {
     id: e.id,
@@ -436,7 +499,7 @@ function buildEffectOnlyResolutionRow(e: CharacterEvent, data: ResolveActionEven
     tone: isHeal ? "heal" : "default",
     runKind: "resolveAction",
     segments,
-    drillIn: [buildEffectDrillRow(effect)],
+    drillIn: [buildEffectDrillRow(effect), ...riders.map(buildRiderDrillRow)],
   };
 }
 
@@ -455,14 +518,17 @@ function buildNoRollResolutionRow(e: CharacterEvent, source: string, round: numb
 // mutually exclusive-ish by design (see ResolveActionEventData): a weapon
 // swing or attack-roll spell sets toHit, a saving-throw spell sets save, an
 // auto-hit or heal-only spell sets only effect, and a no-roll utility spell
-// (Druidcraft) sets none of the three.
+// (Druidcraft) sets none of the three. `riders` (#1843) rides along
+// regardless of shape — every shape builder sums it into its own sentence/
+// drill-in the same way.
 function buildResolveActionRow(e: CharacterEvent, round: number | undefined): FeedRow {
   const data = (e.data ?? {}) as ResolveActionEventData;
   const source = data.source || e.summary;
+  const riders = data.riders ?? [];
 
-  if (data.toHit) return buildAttackResolutionRow(e, data, source, round);
-  if (data.save) return buildSaveResolutionRow(e, data, source, round);
-  if (data.effect) return buildEffectOnlyResolutionRow(e, data, source, round);
+  if (data.toHit) return buildAttackResolutionRow(e, data, source, riders, round);
+  if (data.save) return buildSaveResolutionRow(e, data, source, riders, round);
+  if (data.effect) return buildEffectOnlyResolutionRow(e, data, source, riders, round);
   return buildNoRollResolutionRow(e, source, round);
 }
 

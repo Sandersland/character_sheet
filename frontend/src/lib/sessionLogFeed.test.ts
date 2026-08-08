@@ -317,6 +317,112 @@ describe("buildFeedItems resolveAction effect drill-in reconciliation (MUST-fix 
   });
 });
 
+describe("buildFeedItems resolveAction typed damage riders (#1843 — additive riders[] sibling to effect)", () => {
+  it("sums the primary effect + one rider into ONE row: 'hit for 8 slashing + 5 fire.'", () => {
+    const events = [
+      resolveEvent("swing", {
+        source: "Flame Tongue",
+        toHit: { faces: [12], kept: 12, nat20: false, bonus: 5, total: 17, verdict: "hit" },
+        effect: { spec: "1d6 + 4", faces: [4], total: 8, type: "slashing", kind: "damage", crit: false },
+        riders: [{ spec: "2d6", faces: [2, 3], total: 5, type: "fire", kind: "damage", crit: false }],
+      }),
+    ];
+    const rows = buildFeedItems(events).map(rowOf);
+    expect(rows).toHaveLength(1);
+    expect(text(rows[0])).toBe("Flame Tongue — hit for 8 slashing + 5 fire.");
+  });
+
+  it("gives each term its own drill-in line: Attack, then Damage (primary), then the rider's own type-labeled line", () => {
+    const events = [
+      resolveEvent("swing", {
+        source: "Flame Tongue",
+        toHit: { faces: [12], kept: 12, nat20: false, bonus: 5, total: 17, verdict: "hit" },
+        effect: { spec: "1d6 + 4", faces: [4], total: 8, type: "slashing", kind: "damage", crit: false },
+        riders: [{ spec: "2d6", faces: [2, 3], total: 5, type: "fire", kind: "damage", crit: false }],
+      }),
+    ];
+    const rows = buildFeedItems(events).map(rowOf);
+    expect(rows[0].drillIn).toHaveLength(3);
+    expect(rows[0].drillIn![0]).toMatchObject({ label: "Attack", total: "17" });
+    expect(rows[0].drillIn![1]).toMatchObject({ label: "Damage", total: "8 slashing" });
+    expect(rows[0].drillIn![2]).toMatchObject({ label: "Fire", total: "5 fire" });
+    expect(sumFormula(rows[0].drillIn![2].formula)).toBe(5);
+  });
+
+  it("sums multiple typed riders in swing order", () => {
+    const events = [
+      resolveEvent("swing", {
+        source: "Frost Brand",
+        toHit: { faces: [12], kept: 12, nat20: false, bonus: 5, total: 17, verdict: "hit" },
+        effect: { spec: "1d8", faces: [6], total: 6, type: "slashing", kind: "damage", crit: false },
+        riders: [
+          { spec: "1d6", faces: [4], total: 4, type: "cold", kind: "damage", crit: false },
+          { spec: "1d4", faces: [3], total: 3, type: "force", kind: "damage", crit: false },
+        ],
+      }),
+    ];
+    const rows = buildFeedItems(events).map(rowOf);
+    expect(text(rows[0])).toBe("Frost Brand — hit for 6 slashing + 4 cold + 3 force.");
+    expect(rows[0].drillIn).toHaveLength(4);
+    expect(rows[0].drillIn![2]).toMatchObject({ label: "Cold" });
+    expect(rows[0].drillIn![3]).toMatchObject({ label: "Force" });
+  });
+
+  it("appends ' damage.' once, after the LAST term, on a critical hit with a rider", () => {
+    const events = [
+      resolveEvent("swing", {
+        source: "Flame Tongue",
+        toHit: { faces: [20], kept: 20, nat20: true, bonus: 5, total: 25, verdict: "crit" },
+        effect: { spec: "2d6 + 4", faces: [4, 5], total: 13, type: "slashing", kind: "damage", crit: true },
+        riders: [{ spec: "4d6", faces: [2, 3, 4, 5], total: 14, type: "fire", kind: "damage", crit: true }],
+      }),
+    ];
+    const rows = buildFeedItems(events).map(rowOf);
+    expect(text(rows[0])).toBe("Flame Tongue — critical hit! 13 slashing + 14 fire damage.");
+  });
+
+  it("sums a rider into a save-shaped resolution's sentence and drill-in too", () => {
+    const events = [
+      resolveEvent("cast", {
+        source: "Green-Flame Blade",
+        save: { dc: 13, ability: "dexterity" },
+        effect: { spec: "1d8", faces: [6], total: 6, type: "slashing", kind: "damage", crit: false },
+        riders: [{ spec: "1d8", faces: [5], total: 5, type: "fire", kind: "damage", crit: false }],
+      }),
+    ];
+    const rows = buildFeedItems(events).map(rowOf);
+    expect(text(rows[0])).toBe("Green-Flame Blade — DC 13 Dexterity save, 6 slashing + 5 fire.");
+    expect(rows[0].drillIn).toHaveLength(3);
+    expect(rows[0].drillIn![2]).toMatchObject({ label: "Fire" });
+  });
+
+  it("still counts as ONE feed row, not two (#1822 regression guard)", () => {
+    const events = [
+      resolveEvent("swing", {
+        source: "Flame Tongue",
+        toHit: { faces: [12], kept: 12, nat20: false, bonus: 5, total: 17, verdict: "hit" },
+        effect: { spec: "1d6 + 4", faces: [4], total: 8, type: "slashing", kind: "damage", crit: false },
+        riders: [{ spec: "2d6", faces: [2, 3], total: 5, type: "fire", kind: "damage", crit: false }],
+      }),
+    ];
+    expect(feedItemRowCount(buildFeedItems(events))).toBe(1);
+  });
+
+  it("Magic Missile (same-type count>=1 effect, no riders) still renders unaffected", () => {
+    const events = [
+      resolveEvent("cast", {
+        source: "Magic Missile",
+        effect: { spec: "3d4+3", faces: [2, 3, 4], total: 12, type: "force", kind: "damage", crit: false },
+        slotLevel: 1,
+      }),
+    ];
+    const rows = buildFeedItems(events).map(rowOf);
+    expect(rows).toHaveLength(1);
+    expect(text(rows[0])).toBe("Magic Missile — 12 force damage.");
+    expect(rows[0].drillIn).toHaveLength(1);
+  });
+});
+
 describe("buildFeedItems resolveAction heal shape", () => {
   it("renders a healing sentence toned 'heal'", () => {
     const events = [
