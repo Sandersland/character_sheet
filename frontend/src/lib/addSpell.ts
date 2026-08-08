@@ -1,6 +1,6 @@
-// Pure catalog-filtering + custom-spell payload logic for AddSpellPanel.
+// Pure catalog-filtering + shared field styling for the spell panels.
 import { levelLabel } from "@/lib/spellMeta";
-import type { CatalogSpell, CustomSpellInput, SpellSchool } from "@/types/character";
+import type { CatalogSpell, SpellSchool } from "@/types/character";
 
 export const LEVEL_OPTIONS = [
   { value: "", label: "All levels" },
@@ -24,16 +24,6 @@ export const SPELL_SCHOOLS: SpellSchool[] = [
 export const INPUT_CLS =
   "w-full rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-arcane-500 focus:outline-none";
 export const LABEL_CLS = "block text-xs font-semibold text-parchment-700";
-
-export const BLANK_CUSTOM: CustomSpellInput = {
-  name: "",
-  level: 0,
-  school: "evocation",
-  castingTime: "1 action",
-  range: "60 ft",
-  duration: "Instantaneous",
-  description: "",
-};
 
 // Catalog search + level filter (name or school substring, exact level match).
 export function filterCatalog(
@@ -74,31 +64,4 @@ export function catalogEffectLine(spell: {
   const noun = spell.effectKind === "heal" ? "Healing" : `${spell.damageType ?? ""} damage`;
   const mod = spell.effectModifier ? ` + ${spell.effectModifier}` : "";
   return `${noun} — ${spell.effectDiceCount}d${spell.effectDiceFaces}${mod}`;
-}
-
-// Build the learnSpell custom payload; effect fields ride along only when opted in.
-export function buildCustomSpellPayload(custom: CustomSpellInput, hasEffect: boolean): CustomSpellInput {
-  const payload: CustomSpellInput = {
-    name: custom.name.trim(),
-    level: custom.level,
-    school: custom.school,
-    castingTime: custom.castingTime,
-    range: custom.range,
-    duration: custom.duration,
-    description: custom.description,
-    concentration: custom.concentration,
-    ritual: custom.ritual,
-  };
-  if (hasEffect && custom.effectKind) {
-    payload.effectKind = custom.effectKind;
-    payload.effectDiceCount = custom.effectDiceCount;
-    payload.effectDiceFaces = custom.effectDiceFaces;
-    payload.effectModifier = custom.effectModifier;
-    payload.damageType = custom.damageType;
-    payload.attackType = custom.attackType;
-    payload.saveAbility = custom.saveAbility;
-    payload.upcastDicePerLevel = custom.upcastDicePerLevel;
-    payload.cantripScaling = custom.cantripScaling;
-  }
-  return payload;
 }

@@ -3,10 +3,11 @@ import { Router } from "express";
 import { customSpellSchema, type CustomSpellInput } from "@character-sheet/contracts";
 
 import { Prisma, type CatalogEntry, type Spell } from "@/generated/prisma/client.js";
-import { assertSpellOwnership } from "@/lib/auth/access.js";
+import { assertCharacterAccess, assertSpellOwnership } from "@/lib/auth/access.js";
 import { NotFoundError } from "@/lib/auth/errors.js";
 import { parseBodyOr400 } from "@/lib/http/parse-body.js";
 import { prisma } from "@/lib/core/prisma.js";
+import { editionOf, type RulesEdition } from "@/lib/rules/edition.js";
 import { reconcileSpellClasses } from "@/lib/spellcasting/spell-classes.js";
 import { nullableSpellEffectFields, undefinedSpellEffectFields } from "@/lib/spellcasting/spell-effect-fields.js";
 import {
@@ -120,25 +121,57 @@ async function parseAndValidate(req: Request, res: Response): Promise<CustomSpel
   return data;
 }
 
+// #1819: a homebrew spell is edition-scoped content, so its edition must come
+// from an authority the server trusts — the character the panel is authoring
+// for, read through editionOf (CLAUDE.md: the edition of the character in front
+// of you, never a global or a client-supplied field). Mirrors GET /api/spells'
+// resolveCharacterViewer: assertCharacterAccess is the same ownership chokepoint
+// (a characterId the caller can't reach 403s/404s here exactly as it does
+// there). Writes its own 400 when characterId is absent; returns undefined so
+// the caller bails like parseAndValidate.
+async function resolveAuthoringEdition(req: Request, res: Response): Promise<RulesEdition | undefined> {
+  const characterId = req.query.characterId;
+  if (typeof characterId !== "string" || characterId.trim().length === 0) {
+    res.status(400).json({ error: "characterId is required to determine the spell's rules edition" });
+    return undefined;
+  }
+  // "edit", not "view": authoring homebrew uses the character as the edition
+  // authority, so it should require control of that character — not the mere
+  // view access #116 sharing will grant read collaborators.
+  await assertCharacterAccess(prisma, req.user!.id, characterId, "edit");
+  const character = await prisma.character.findUniqueOrThrow({
+    where: { id: characterId },
+    select: { rulesEdition: true },
+  });
+  return editionOf(character);
+}
+
 /**
- * POST /api/spells/custom
+ * POST /api/spells/custom?characterId=<id>
  * Create a homebrew spell. Creates a `scope: "USER"` CatalogEntry (#1796) for
- * the caller alongside it, `edition` = "EDITION_2014" (epic #1782's locked
- * spec — homebrew is 2014-only for this slice). The entry, spell row, and its
- * SpellClass rows commit atomically ($transaction): a mid-write failure must
- * never leave a spell with wrong/missing class memberships or no entitlement
- * row at all.
+ * the caller alongside it. `edition` is server-derived from the authoring
+ * character named by `?characterId=` (#1819, via resolveAuthoringEdition) — so
+ * a 2024 character's homebrew is EDITION_2024 and resolves back into that
+ * character's own picker/spellbook — never accepted from the request body. The
+ * entry, spell row, and its SpellClass rows commit atomically ($transaction): a
+ * mid-write failure must never leave a spell with wrong/missing class
+ * memberships or no entitlement row at all.
  */
 customSpellsRouter.post("/spells/custom", async (req, res) => {
+  // Auth gate first: resolve+access-check the authoring character before any
+  // body-validation DB work (validateCustomSpellClasses' findMany), so a
+  // missing/unowned characterId never triggers that query.
+  const edition = await resolveAuthoringEdition(req, res);
+  if (edition === undefined) return;
   const data = await parseAndValidate(req, res);
   if (data === undefined) return;
 
   const { spell, classes, entry } = await prisma.$transaction(async (tx) => {
     const entry = await tx.catalogEntry.create({
-      data: { kind: "SPELL", scope: "USER", ownerUserId: req.user!.id, name: data.name, edition: "EDITION_2014" },
+      data: { kind: "SPELL", scope: "USER", ownerUserId: req.user!.id, name: data.name, edition },
     });
     const created = await tx.spell.create({
-      data: { ...customSpellWriteData(data), edition: "EDITION_2014", catalogEntryId: entry.id },
+      data: { ...customSpellWriteData(data), edition, catalogEntryId: entry.id },
     });
     // reconcileSpellClasses normalizes classNames (lowercase, dedupe) — the
     // ONLY place that happens; its returned list is what the response below

@@ -28,6 +28,31 @@ const REFERENCE: ReferenceData = {
   itemRarities: [],
 };
 
+// #1817: the panel exposes exactly two tabs.
+describe("AddSpellPanel tab set (#1817)", () => {
+  beforeEach(() => {
+    vi.mocked(client.fetchSpells).mockResolvedValue([]);
+    vi.mocked(client.fetchReference).mockResolvedValue(REFERENCE);
+  });
+
+  it("shows only From catalog + Homebrew, with no legacy Custom spell tab", async () => {
+    render(
+      <AddSpellPanel
+        onLearn={noop}
+        onClose={noop}
+        busy={false}
+        learnedSpellIds={new Set()}
+        edition="EDITION_2024"
+        characterId="char-1"
+      />
+    );
+
+    expect(await screen.findByRole("button", { name: "From catalog" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Homebrew" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Custom spell" })).not.toBeInTheDocument();
+  });
+});
+
 describe("AddSpellPanel accessibility", () => {
   beforeEach(() => {
     vi.mocked(client.fetchSpells).mockResolvedValue([]);
@@ -143,7 +168,10 @@ describe("AddSpellPanel homebrew tab integration", () => {
     await user.type(screen.getByLabelText(/description/i), "A bolt of test energy.");
     await user.click(screen.getByRole("button", { name: /create homebrew spell/i }));
 
-    await waitFor(() => expect(client.createCustomSpell).toHaveBeenCalledTimes(1));
+    // #1819: the authoring character must reach createCustomSpell as the 2nd
+    // arg — a broken characterId thread anywhere in AddSpellPanel → HomebrewTab
+    // → HomebrewSpellForm would pass undefined and go uncaught otherwise.
+    await waitFor(() => expect(client.createCustomSpell).toHaveBeenCalledWith(expect.anything(), "char-1"));
 
     // Back on the catalog tab, with the second (post-create) fetchSpells page showing the new spell.
     expect(await screen.findByText("Test Bolt")).toBeInTheDocument();

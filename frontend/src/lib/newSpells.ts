@@ -170,7 +170,7 @@ export function toggleLearnSpell(
   return [...current, { type: "learnSpell", spellId }];
 }
 
-/** Catalog spellIds currently selected (custom ops carry no spellId). */
+/** The catalog spellIds a set of learnSpell ops selects. */
 export function selectedSpellIds(ops: LearnSpellOperation[] | undefined): string[] {
-  return (ops ?? []).flatMap((op) => (op.spellId ? [op.spellId] : []));
+  return (ops ?? []).map((op) => op.spellId);
 }

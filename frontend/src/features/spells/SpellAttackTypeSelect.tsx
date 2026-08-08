@@ -1,7 +1,5 @@
-// Shared spell-attack-vs-saving-throw dropdown — used by CustomSpellDamageFields
-// (per-character inline spell) and HomebrewSpellDamageFields (catalog homebrew
-// spell, #1787). Identical markup in both was flagged as duplication; this is
-// the single source now.
+// Shared spell-attack-vs-saving-throw dropdown — used by HomebrewSpellDamageFields
+// (catalog homebrew spell, #1787).
 import { INPUT_CLS, LABEL_CLS } from "@/lib/addSpell";
 
 interface SpellAttackTypeSelectProps {

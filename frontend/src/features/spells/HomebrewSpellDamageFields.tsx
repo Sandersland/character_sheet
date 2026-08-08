@@ -1,7 +1,6 @@
 // Damage-type / attack-vs-save / save-ability fields for the homebrew-spell
 // form, shown only when the effect kind is "damage" (#1787). Split out of
-// HomebrewSpellEffectFields (mirrors CustomSpellDamageFields' own split off
-// CustomSpellEffectFields) to keep the parent's branch count down.
+// HomebrewSpellEffectFields to keep the parent's branch count down.
 // Conditional nesting mirrors validateCustomSpellCoherence: saveAbility/
 // saveEffect render only for attackType "save", so the fields a submission
 // could carry always match what buildHomebrewSpellPayload actually sends.

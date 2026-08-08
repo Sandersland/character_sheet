@@ -124,7 +124,7 @@ afterAll(async () => {
 describe("serializeCharacter — catalog fork MECHANICS override (#1806, epic #1795 7/7)", () => {
   it("a non-forked learned spell keeps its stored snapshot even after the origin catalog row later changes", async () => {
     const homebrew = await agent(cookieMemberA)
-      .post("/api/spells/custom")
+      .post(`/api/spells/custom?characterId=${characterAId}`)
       .send({
         name: "Mechanics Serialize Untouched Bolt",
         level: 1,

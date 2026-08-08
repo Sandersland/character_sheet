@@ -78,6 +78,7 @@ describe("HomebrewTab manage list", () => {
     render(
       <HomebrewTab
         edition="EDITION_2014"
+        characterId="char-1"
         catalog={[SEEDED_SPELL, OWN_SPELL]}
         onCreated={noop}
         onEdited={noop}
@@ -106,6 +107,7 @@ describe("HomebrewTab manage list", () => {
     render(
       <HomebrewTab
         edition="EDITION_2014"
+        characterId="char-1"
         catalog={[SEEDED_SPELL, campaignFork]}
         onCreated={noop}
         onEdited={noop}
@@ -135,6 +137,7 @@ describe("HomebrewTab manage list", () => {
     render(
       <HomebrewTab
         edition="EDITION_2014"
+        characterId="char-1"
         catalog={[SEEDED_SPELL, notMyFork]}
         onCreated={noop}
         onEdited={noop}
@@ -155,6 +158,7 @@ describe("HomebrewTab manage list", () => {
     render(
       <HomebrewTab
         edition="EDITION_2014"
+        characterId="char-1"
         catalog={null}
         showSpinner
         onCreated={noop}
@@ -172,6 +176,7 @@ describe("HomebrewTab manage list", () => {
     render(
       <HomebrewTab
         edition="EDITION_2014"
+        characterId="char-1"
         catalog={[SEEDED_SPELL]}
         onCreated={noop}
         onEdited={noop}
@@ -204,6 +209,7 @@ describe("HomebrewTab manage list", () => {
     render(
       <HomebrewTab
         edition="EDITION_2014"
+        characterId="char-1"
         catalog={[SEEDED_SPELL, OWN_SPELL]}
         onCreated={noop}
         onEdited={onEdited}
@@ -237,6 +243,7 @@ describe("HomebrewTab manage list", () => {
     render(
       <HomebrewTab
         edition="EDITION_2014"
+        characterId="char-1"
         catalog={[SEEDED_SPELL, OWN_SPELL]}
         onCreated={noop}
         onEdited={noop}
@@ -265,6 +272,7 @@ describe("HomebrewTab manage list", () => {
     render(
       <HomebrewTab
         edition="EDITION_2014"
+        characterId="char-1"
         catalog={[SEEDED_SPELL, OWN_SPELL]}
         onCreated={noop}
         onEdited={noop}
@@ -288,6 +296,7 @@ describe("HomebrewTab manage list", () => {
     render(
       <HomebrewTab
         edition="EDITION_2014"
+        characterId="char-1"
         catalog={[SEEDED_SPELL, OWN_SPELL]}
         onCreated={noop}
         onEdited={noop}

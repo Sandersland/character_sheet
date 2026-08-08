@@ -1,8 +1,6 @@
 import { describe, it, expect } from "vitest";
 
 import {
-  BLANK_CUSTOM,
-  buildCustomSpellPayload,
   catalogEffectLine,
   catalogMetaLine,
   filterCatalog,
@@ -88,46 +86,5 @@ describe("catalogEffectLine", () => {
 
   it("returns null when the effect has no dice (Mage Armor-style buffs)", () => {
     expect(catalogEffectLine(catalogSpell({ effectKind: "damage" }))).toBeNull();
-  });
-});
-
-describe("buildCustomSpellPayload", () => {
-  it("trims the name and carries the core fields", () => {
-    const payload = buildCustomSpellPayload({ ...BLANK_CUSTOM, name: "  Zap  " }, false);
-    expect(payload.name).toBe("Zap");
-    expect(payload.level).toBe(0);
-    expect(payload.effectKind).toBeUndefined();
-  });
-
-  it("omits effect fields when hasEffect is false even if set", () => {
-    const payload = buildCustomSpellPayload(
-      { ...BLANK_CUSTOM, name: "Zap", effectKind: "damage", effectDiceCount: 4 },
-      false,
-    );
-    expect(payload.effectKind).toBeUndefined();
-    expect(payload.effectDiceCount).toBeUndefined();
-  });
-
-  it("omits effect fields when hasEffect is true but no effectKind chosen", () => {
-    const payload = buildCustomSpellPayload({ ...BLANK_CUSTOM, name: "Zap", effectDiceCount: 4 }, true);
-    expect(payload.effectKind).toBeUndefined();
-    expect(payload.effectDiceCount).toBeUndefined();
-  });
-
-  it("includes effect fields when hasEffect is true and a kind is chosen", () => {
-    const payload = buildCustomSpellPayload(
-      {
-        ...BLANK_CUSTOM,
-        name: "Zap",
-        effectKind: "damage",
-        effectDiceCount: 8,
-        effectDiceFaces: 6,
-        damageType: "fire",
-      },
-      true,
-    );
-    expect(payload.effectKind).toBe("damage");
-    expect(payload.effectDiceCount).toBe(8);
-    expect(payload.damageType).toBe("fire");
   });
 });

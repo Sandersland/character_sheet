@@ -11,6 +11,7 @@ import supertest from "supertest";
 import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
+import { createTestCharacter } from "@/test-support/character.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
@@ -71,9 +72,10 @@ beforeAll(async () => {
   cookieDm = await authCookie(DM);
   cookiePlayer = await authCookie(PLAYER);
 
-  // OWNER authors a homebrew spell — USER scope, EDITION_2014-locked
-  // (custom-spells.ts's own comment: epic #1782's locked spec).
-  const created = await agent(cookieOwner).post("/api/spells/custom").send(HOMEBREW_SPELL);
+  // OWNER authors a homebrew spell — USER scope; edition (EDITION_2014) is
+  // derived from the authoring character named in the query (#1819).
+  const ownerAuthorCharId = await createTestCharacter(OWNER, { edition: "EDITION_2014", name: "Catalog Serialize Author" });
+  const created = await agent(cookieOwner).post(`/api/spells/custom?characterId=${ownerAuthorCharId}`).send(HOMEBREW_SPELL);
   expect(created.status).toBe(201);
   ownerEntryId = created.body.catalog.entryId;
   ownerSpellId = created.body.id;
@@ -183,7 +185,7 @@ describe("serializeCharacter — catalog entitlement wiring (#1798, epic #1795 3
     // completely separate lineage (no forkedFrom) — visible (not learned) is
     // enough to have populated the old buggy name map.
     const collidingHomebrew = await agent(cookiePlayer)
-      .post("/api/spells/custom")
+      .post(`/api/spells/custom?characterId=${characterId}`)
       .send({ ...HOMEBREW_SPELL, name: seededSpellName });
     expect(collidingHomebrew.status).toBe(201);
     const collidingEntryId = collidingHomebrew.body.catalog.entryId as string;

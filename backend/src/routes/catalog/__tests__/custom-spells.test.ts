@@ -5,6 +5,7 @@ import { Prisma, type SpellSchool } from "@/generated/prisma/client.js";
 import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
+import { createTestCharacter } from "@/test-support/character.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import * as spellClassesModule from "@/lib/spellcasting/spell-classes.js";
 
@@ -17,6 +18,14 @@ const OUTSIDER = "owner-custom-spells-outsider";
 const CAMPAIGN_DM = "owner-custom-spells-dm";
 const CAMPAIGN_MEMBER = "owner-custom-spells-member";
 const CAMPAIGN_ID = "test-custom-spells-campaign-1";
+// #1819: the create endpoint derives the spell's edition from the authoring
+// character (never a hardcoded default), so every create names one. OWNER owns
+// both; CHAR_2014 keeps the pre-#1819 EDITION_2014 assertions valid, CHAR_2024
+// exercises the derive-2024 path. CHAR_OUTSIDER (OUTSIDER's) drives the
+// no-access rejection.
+const CHAR_2014 = "test-custom-spells-char-2014";
+const CHAR_2024 = "test-custom-spells-char-2024";
+const CHAR_OUTSIDER = "test-custom-spells-char-outsider";
 
 let cookieOwner: string;
 let cookieOutsider: string;
@@ -66,6 +75,11 @@ beforeAll(async () => {
       },
     },
   });
+
+  await prisma.character.deleteMany({ where: { id: { in: [CHAR_2014, CHAR_2024, CHAR_OUTSIDER] } } });
+  await createTestCharacter(OWNER, { id: CHAR_2014, edition: "EDITION_2014", name: "Homebrew Author 2014" });
+  await createTestCharacter(OWNER, { id: CHAR_2024, edition: "EDITION_2024", name: "Homebrew Author 2024" });
+  await createTestCharacter(OUTSIDER, { id: CHAR_OUTSIDER, edition: "EDITION_2024", name: "Not Yours" });
 });
 
 afterAll(async () => {
@@ -75,6 +89,7 @@ afterAll(async () => {
   await prisma.catalogEntry.deleteMany({ where: { ownerUserId: { in: [OWNER, OUTSIDER] } } });
   await prisma.catalogEntry.deleteMany({ where: { ownerCampaignId: CAMPAIGN_ID } });
   await prisma.campaign.deleteMany({ where: { id: CAMPAIGN_ID } });
+  // Deleting the users cascades their characters (Character.owner onDelete: Cascade).
   await prisma.user.deleteMany({ where: { id: { in: [OWNER, OUTSIDER, CAMPAIGN_DM, CAMPAIGN_MEMBER] } } });
 });
 
@@ -95,8 +110,37 @@ async function createCampaignForkFixture(name: string): Promise<string> {
 }
 
 describe("POST /api/spells/custom", () => {
+  // #1819: edition is server-derived from the authoring character, never a
+  // hardcoded default — a 2024 character's homebrew must be EDITION_2024 so it
+  // resolves into that character's own catalog picker/spellbook.
+  it("derives EDITION_2024 from a 2024 authoring character (#1819)", async () => {
+    const res = await agent(cookieOwner)
+      .post(`/api/spells/custom?characterId=${CHAR_2024}`)
+      .send({ ...VALID_SPELL, name: "Arcane Zap 2024" });
+    expect(res.status).toBe(201);
+    expect(res.body.edition).toBe("EDITION_2024");
+
+    const row = await prisma.spell.findUniqueOrThrow({ where: { id: res.body.id } });
+    expect(row.edition).toBe("EDITION_2024");
+    const entry = await prisma.catalogEntry.findUniqueOrThrow({ where: { id: row.catalogEntryId } });
+    expect(entry.edition).toBe("EDITION_2024");
+  });
+
+  it("400s when characterId is missing (no edition authority) (#1819)", async () => {
+    const res = await agent(cookieOwner).post("/api/spells/custom").send({ ...VALID_SPELL, name: "No Author" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/characterId/i);
+  });
+
+  it("rejects a characterId the caller doesn't own (#1819)", async () => {
+    const res = await agent(cookieOwner)
+      .post(`/api/spells/custom?characterId=${CHAR_OUTSIDER}`)
+      .send({ ...VALID_SPELL, name: "Borrowed Edition" });
+    expect(res.status).toBe(403);
+  });
+
   it("creates a spell with a USER-scope CatalogEntry + edition forced + SpellClass rows written (#1796)", async () => {
-    const res = await agent(cookieOwner).post("/api/spells/custom").send(VALID_SPELL);
+    const res = await agent(cookieOwner).post(`/api/spells/custom?characterId=${CHAR_2014}`).send(VALID_SPELL);
     expect(res.status).toBe(201);
     expect(res.body).toMatchObject({
       edition: "EDITION_2014",
@@ -120,14 +164,14 @@ describe("POST /api/spells/custom", () => {
 
   it("ignores a client-supplied ownerId/edition (strict schema 400s instead)", async () => {
     const res = await agent(cookieOwner)
-      .post("/api/spells/custom")
+      .post(`/api/spells/custom?characterId=${CHAR_2014}`)
       .send({ ...VALID_SPELL, name: "Sneaky Spell", ownerId: OUTSIDER, edition: "EDITION_2024" });
     expect(res.status).toBe(400);
   });
 
   it("400s a level outside 0-9", async () => {
     const res = await agent(cookieOwner)
-      .post("/api/spells/custom")
+      .post(`/api/spells/custom?characterId=${CHAR_2014}`)
       .send({ ...VALID_SPELL, name: "Out Of Range", level: 10 });
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/level/i);
@@ -138,7 +182,7 @@ describe("POST /api/spells/custom", () => {
     void effectDiceCount;
     void effectDiceFaces;
     const res = await agent(cookieOwner)
-      .post("/api/spells/custom")
+      .post(`/api/spells/custom?characterId=${CHAR_2014}`)
       .send({ ...rest, name: "Half Baked" });
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/effectDiceCount/);
@@ -148,7 +192,7 @@ describe("POST /api/spells/custom", () => {
     const { attackType, ...rest } = VALID_SPELL;
     void attackType;
     const res = await agent(cookieOwner)
-      .post("/api/spells/custom")
+      .post(`/api/spells/custom?characterId=${CHAR_2014}`)
       .send({ ...rest, name: "Missing Save", attackType: "save" });
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/saveAbility/);
@@ -156,7 +200,7 @@ describe("POST /api/spells/custom", () => {
 
   it("400s attackType attack with a save field set", async () => {
     const res = await agent(cookieOwner)
-      .post("/api/spells/custom")
+      .post(`/api/spells/custom?characterId=${CHAR_2014}`)
       .send({ ...VALID_SPELL, name: "Contradiction", attackType: "attack", saveAbility: "dexterity" });
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/attackType is "attack"/);
@@ -164,14 +208,14 @@ describe("POST /api/spells/custom", () => {
 
   it("400s an unknown class name", async () => {
     const res = await agent(cookieOwner)
-      .post("/api/spells/custom")
+      .post(`/api/spells/custom?characterId=${CHAR_2014}`)
       .send({ ...VALID_SPELL, name: "Bad Class", classes: ["not-a-real-class"] });
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/Unknown class/);
   });
 
   it("creates a spell with no effect fields (utility spell) and no classes", async () => {
-    const res = await agent(cookieOwner).post("/api/spells/custom").send({
+    const res = await agent(cookieOwner).post(`/api/spells/custom?characterId=${CHAR_2014}`).send({
       name: "Test Detect Nonsense",
       level: 0,
       school: "divination",
@@ -190,7 +234,7 @@ describe("POST /api/spells/custom", () => {
 describe("PATCH /api/spells/custom/:id", () => {
   it("lets the owner edit their spell, reconciling SpellClass rows", async () => {
     const created = await agent(cookieOwner)
-      .post("/api/spells/custom")
+      .post(`/api/spells/custom?characterId=${CHAR_2014}`)
       .send({ ...VALID_SPELL, name: "Patchable Spell", classes: ["wizard"] });
     const id = created.body.id as string;
 
@@ -214,7 +258,7 @@ describe("PATCH /api/spells/custom/:id", () => {
 
   it("403s a different user's edit attempt", async () => {
     const created = await agent(cookieOwner)
-      .post("/api/spells/custom")
+      .post(`/api/spells/custom?characterId=${CHAR_2014}`)
       .send({ ...VALID_SPELL, name: "Owned By Owner" });
     const id = created.body.id as string;
 
@@ -226,7 +270,7 @@ describe("PATCH /api/spells/custom/:id", () => {
 
   it("400s an incoherent edit the same way create does", async () => {
     const created = await agent(cookieOwner)
-      .post("/api/spells/custom")
+      .post(`/api/spells/custom?characterId=${CHAR_2014}`)
       .send({ ...VALID_SPELL, name: "Edit Coherence Check" });
     const id = created.body.id as string;
 
@@ -292,7 +336,7 @@ describe("PATCH /api/spells/custom/:id", () => {
   // mapped to a clean 404, never an uncaught 500.
   it("404s instead of 500ing on a mid-transaction record-not-found race (P2025)", async () => {
     const created = await agent(cookieOwner)
-      .post("/api/spells/custom")
+      .post(`/api/spells/custom?characterId=${CHAR_2014}`)
       .send({ ...VALID_SPELL, name: "Racy Patch Target" });
     expect(created.status).toBe(201);
     const id = created.body.id as string;
@@ -323,7 +367,7 @@ describe("PATCH /api/spells/custom/:id", () => {
 describe("DELETE /api/spells/custom/:id", () => {
   it("lets the owner delete their spell, cascading its SpellClass rows", async () => {
     const created = await agent(cookieOwner)
-      .post("/api/spells/custom")
+      .post(`/api/spells/custom?characterId=${CHAR_2014}`)
       .send({ ...VALID_SPELL, name: "Deletable Spell" });
     const id = created.body.id as string;
 
@@ -341,7 +385,7 @@ describe("DELETE /api/spells/custom/:id", () => {
 
   it("403s a different user's delete attempt", async () => {
     const created = await agent(cookieOwner)
-      .post("/api/spells/custom")
+      .post(`/api/spells/custom?characterId=${CHAR_2014}`)
       .send({ ...VALID_SPELL, name: "Protected Spell" });
     const id = created.body.id as string;
 

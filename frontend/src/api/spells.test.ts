@@ -65,10 +65,12 @@ describe("createCustomSpell", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await createCustomSpell(HOMEBREW_INPUT);
+    const result = await createCustomSpell(HOMEBREW_INPUT, "char-1");
 
+    // #1819: the authoring character rides in the query so the server derives
+    // the new spell's edition from it.
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining("/spells/custom"),
+      expect.stringContaining("/spells/custom?characterId=char-1"),
       expect.objectContaining({ method: "POST", body: JSON.stringify(HOMEBREW_INPUT) })
     );
     expect(result).toMatchObject({ id: "s1", ownerId: "u1" });
@@ -80,7 +82,7 @@ describe("createCustomSpell", () => {
       vi.fn().mockResolvedValue({ ok: false, status: 400, json: async () => ({ error: "level must be between 0 and 9" }) })
     );
 
-    await expect(createCustomSpell(HOMEBREW_INPUT)).rejects.toThrow("level must be between 0 and 9");
+    await expect(createCustomSpell(HOMEBREW_INPUT, "char-1")).rejects.toThrow("level must be between 0 and 9");
   });
 });
 

@@ -1,7 +1,5 @@
-// Shared 0-9 spell-level dropdown ("Cantrip" for 0) — used by CustomSpellForm
-// (per-character inline spell) and HomebrewSpellForm (catalog homebrew spell,
-// #1787). Identical markup in both was flagged as duplication; this is the
-// single source now.
+// Shared 0-9 spell-level dropdown ("Cantrip" for 0) — used by HomebrewSpellForm
+// (catalog homebrew spell, #1787).
 import { INPUT_CLS, LABEL_CLS } from "@/lib/addSpell";
 
 interface SpellLevelSelectProps {

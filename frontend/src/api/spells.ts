@@ -19,8 +19,15 @@ export async function applySpellcastingTransactions(
 // custom-spells.ts's own file banner). PATCH is a full-field replace, not a
 // partial merge — same customSpellSchema-derived body as POST.
 
-export async function createCustomSpell(input: HomebrewSpellInput): Promise<HomebrewSpell> {
-  return request<HomebrewSpell>("/spells/custom", jsonBody(input), "Failed to create custom spell");
+// `characterId` names the character the homebrew is being authored for; the
+// server derives the new spell's rules edition from it (#1819). Edition is
+// never sent in the body — the server is the authority (custom-spells.ts).
+export async function createCustomSpell(input: HomebrewSpellInput, characterId: string): Promise<HomebrewSpell> {
+  return request<HomebrewSpell>(
+    `/spells/custom?characterId=${encodeURIComponent(characterId)}`,
+    jsonBody(input),
+    "Failed to create custom spell",
+  );
 }
 
 export async function updateCustomSpell(id: string, input: HomebrewSpellInput): Promise<HomebrewSpell> {
