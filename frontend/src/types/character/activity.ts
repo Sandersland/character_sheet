@@ -37,8 +37,9 @@ export type CharacterEventType =
   | "equipped" | "unequipped"                                  // inventory (equip)
   | "sessionStarted" | "sessionEnded"                          // session lifecycle
   | "combatStarted" | "combatEnded" | "combatRoundAdvanced"   // combat lifecycle
+  | "resolveAction"                                            // combat action resolution (#1829/#1830)
   | "conditionApplied" | "conditionRemoved" | "exhaustionSet" // conditions
-  | "attackRoll" | "damageRoll"                               // roll (attack/damage)
+  | "attackRoll" | "damageRoll"                               // roll (attack/damage, legacy — rendering retired #1830)
   | "checkRoll" | "saveRoll" | "initiativeRoll"               // roll (check/save/initiative)
   | "revert";                                                  // meta
 
