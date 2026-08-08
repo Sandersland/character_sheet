@@ -26,11 +26,13 @@ export interface NewSpellsSelection {
   cantripLists: string[] | null;
   /** #1509 D5: the served known-vs-prepared noun for this step's swap copy. */
   casterModel: "known" | "prepared" | null;
+  /** #1631: leveled-pick ids the subclass's list-expansion admits, alongside spellLists. */
+  expandedSpellIds: string[];
 }
 
 export function useNewSpellsSelection(step: LevelUpStep): NewSpellsSelection {
   const { draft, setDraft } = useLevelUpStepContext();
-  const { count, maxSpellLevel, magicalSecrets, canSwap, cantrips, spellLists, cantripLists, casterModel } = readNewSpellsMeta(step);
+  const { count, maxSpellLevel, magicalSecrets, canSwap, cantrips, spellLists, cantripLists, casterModel, expandedSpellIds } = readNewSpellsMeta(step);
   const selectedIds = selectedSpellIds(draft.spellsLearned);
   const cantripSelectedIds = selectedSpellIds(draft.cantripsLearned);
   const forgottenEntryId = draft.spellsForgotten?.[0]?.entryId ?? null;
@@ -59,6 +61,6 @@ export function useNewSpellsSelection(step: LevelUpStep): NewSpellsSelection {
     count, maxSpellLevel, magicalSecrets, canSwap,
     selectedIds, forgottenEntryId, toggle, toggleForget,
     cantrips, cantripSelectedIds, toggleCantrip,
-    spellLists, cantripLists, casterModel,
+    spellLists, cantripLists, casterModel, expandedSpellIds,
   };
 }

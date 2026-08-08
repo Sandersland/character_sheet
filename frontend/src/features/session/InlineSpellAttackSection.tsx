@@ -84,6 +84,10 @@ export default function InlineSpellAttackSection({
       keptFace: keptD20(result)?.value ?? null,
       nat20: isNaturalTwenty(result),
       nat1: isNaturalOne(result),
+      // #1120: Champion's crit-range widening is "weapon attacks and Unarmed
+      // Strikes" only (SRD 5.1/5.2) — a spell attack never qualifies, so this
+      // stays the literal nat20 rule, never the character's served critRange.
+      criticalHit: isNaturalTwenty(result),
     };
     // Fresh id per attack (#1235/#1360) — rollDamage reads it back via spell.id.
     const swingId = randomId();

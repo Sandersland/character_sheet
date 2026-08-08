@@ -61,7 +61,7 @@ export default function SpellTargetToggle({ target, locked, disabled, healing, a
               onClick={() => onSelect("other")}
               className={`${PILL} ${
                 target === "other"
-                  ? "bg-garnet-600 text-parchment-50"
+                  ? "bg-garnet-soft-surface text-garnet-on-surface"
                   : "bg-parchment-100 text-parchment-600 hover:bg-parchment-200"
               }`}
             >

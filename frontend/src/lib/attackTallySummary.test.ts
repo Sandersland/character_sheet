@@ -12,7 +12,7 @@ import {
 } from "@/lib/attackTallySummary";
 
 function roll(overrides: Partial<TallyAttackRoll> = {}): TallyAttackRoll {
-  return { total: 17, keptFace: 14, nat20: false, nat1: false, ...overrides };
+  return { total: 17, keptFace: 14, nat20: false, nat1: false, criticalHit: false, ...overrides };
 }
 
 function row(overrides: Partial<AttackTallyRow> = {}): AttackTallyRow {
@@ -20,8 +20,8 @@ function row(overrides: Partial<AttackTallyRow> = {}): AttackTallyRow {
 }
 
 describe("autoVerdict", () => {
-  it("nat 20 → crit", () => {
-    expect(autoVerdict(roll({ nat20: true }))).toBe("crit");
+  it("a crit-range hit → crit (a plain nat 20 is the default-range case, #1120)", () => {
+    expect(autoVerdict(roll({ nat20: true, criticalHit: true }))).toBe("crit");
   });
 
   it("nat 1 → miss", () => {
@@ -31,11 +31,27 @@ describe("autoVerdict", () => {
   it("any other roll → undefined (manual)", () => {
     expect(autoVerdict(roll())).toBeUndefined();
   });
+
+  // #1120: a literal nat 20 with criticalHit unset must NOT auto-crit — this
+  // shape is unreachable through useAttackRolls today (nat20 always implies
+  // criticalHit there, since 20 >= any critRange), but autoVerdict itself
+  // must key off criticalHit, not nat20, or a future critRange > 20 caller
+  // would silently regress to the old nat20-only rule.
+  it("nat20 alone (criticalHit false) does not auto-crit", () => {
+    expect(autoVerdict(roll({ nat20: true, criticalHit: false }))).toBeUndefined();
+  });
+
+  // The Champion case this issue exists for: a natural 19 that met a widened
+  // critRange (server-computed into criticalHit) auto-crits even though
+  // nat20 is false.
+  it("a natural 19 within a widened crit range (Champion L3) auto-crits", () => {
+    expect(autoVerdict(roll({ keptFace: 19, nat20: false, criticalHit: true }))).toBe("crit");
+  });
 });
 
 describe("verdict predicates", () => {
-  it("isVerdictLocked is true for a nat 20 or nat 1 row, false otherwise", () => {
-    expect(isVerdictLocked(row({ attack: roll({ nat20: true }) }))).toBe(true);
+  it("isVerdictLocked is true for a crit-range hit or nat 1 row, false otherwise", () => {
+    expect(isVerdictLocked(row({ attack: roll({ nat20: true, criticalHit: true }) }))).toBe(true);
     expect(isVerdictLocked(row({ attack: roll({ nat1: true }) }))).toBe(true);
     expect(isVerdictLocked(row())).toBe(false);
   });
@@ -46,10 +62,14 @@ describe("verdict predicates", () => {
     expect(isMissRow(row())).toBe(false); // unset → treated as a hit
   });
 
-  it("isCritRow for an explicit crit verdict OR a nat 20", () => {
+  it("isCritRow for an explicit crit verdict OR a crit-range hit", () => {
     expect(isCritRow(row({ verdict: "crit" }))).toBe(true);
-    expect(isCritRow(row({ attack: roll({ nat20: true }) }))).toBe(true);
+    expect(isCritRow(row({ attack: roll({ nat20: true, criticalHit: true }) }))).toBe(true);
     expect(isCritRow(row())).toBe(false);
+  });
+
+  it("isCritRow is true on a Champion's widened-range hit (nat 19) with no nat20", () => {
+    expect(isCritRow(row({ attack: roll({ keptFace: 19, criticalHit: true }) }))).toBe(true);
   });
 });
 

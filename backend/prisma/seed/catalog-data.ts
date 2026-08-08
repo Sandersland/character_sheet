@@ -281,6 +281,12 @@ export interface BackgroundSeed {
   name: string;
   skillProficiencies: string[];
   toolProficiencies?: string[];
+  // #1779: mirrors ClassSeed's toolChoices/toolChoiceCount — a background
+  // tool CHOICE (PHB'14/PHB'24 Soldier/Noble's "one type of gaming set"),
+  // distinct from the fixed toolProficiencies grant above. Omitted = no
+  // choice, same convention as toolProficiencies.
+  toolChoices?: string[];
+  toolChoiceCount?: number;
   abilityChoices?: string[];
   originFeatName?: string;
   // Omitted = shared (NULL column, valid in both editions, #1306). Only Folk
@@ -295,9 +301,18 @@ export const BACKGROUNDS: BackgroundSeed[] = [
   { name: "Sage",      skillProficiencies: ["arcana", "history"],
     abilityChoices: ["constitution", "intelligence", "wisdom"],
     originFeatName: "Magic Initiate", toolProficiencies: ["Calligrapher's Supplies"] },
+  // Soldier/Noble's tool line is "one type of Gaming Set" in BOTH PHB'14 and
+  // PHB'24 — a CHOICE, not the fixed Dice Set previously flattened here
+  // (#1779). toolChoices lists all four PHB gaming-set names (Dice/
+  // Dragonchess/Playing Card/Three-Dragon Ante — the same four TOOLS seeds,
+  // #1565), toolChoiceCount: 1. The equipment package's "Gaming Set (same as
+  // above)" open pick (starting-equipment.ts's SOLDIER_2024/NOBLE_2024,
+  // boundToToolChoice: true) already assumed this choice existed.
   { name: "Soldier",   skillProficiencies: ["athletics", "intimidation"],
     abilityChoices: ["strength", "dexterity", "constitution"],
-    originFeatName: "Savage Attacker", toolProficiencies: ["Dice Set"] },
+    originFeatName: "Savage Attacker",
+    toolChoices: ["Dice Set", "Dragonchess Set", "Playing Card Set", "Three-Dragon Ante Set"],
+    toolChoiceCount: 1 },
   { name: "Charlatan", skillProficiencies: ["deception", "sleightOfHand"],
     abilityChoices: ["dexterity", "constitution", "charisma"],
     originFeatName: "Skilled", toolProficiencies: ["Forgery Kit"] },
@@ -316,9 +331,13 @@ export const BACKGROUNDS: BackgroundSeed[] = [
   // feat. Retagged in place by a migration — a delete-and-recreate would strand
   // every character holding it (CharacterBackground.backgroundId is SetNull).
   { name: "Folk Hero", skillProficiencies: ["animalHandling", "survival"], edition: "EDITION_2014" },
+  // Same "one type of Gaming Set" choice as Soldier above (#1779) — see that
+  // row's comment for the citation and the four toolChoices names.
   { name: "Noble",     skillProficiencies: ["history", "persuasion"],
     abilityChoices: ["strength", "intelligence", "charisma"],
-    originFeatName: "Skilled", toolProficiencies: ["Dice Set"] },
+    originFeatName: "Skilled",
+    toolChoices: ["Dice Set", "Dragonchess Set", "Playing Card Set", "Three-Dragon Ante Set"],
+    toolChoiceCount: 1 },
 ];
 
 function coins(gp: number, sp = 0, cp = 0) {

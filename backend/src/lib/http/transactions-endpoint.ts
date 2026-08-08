@@ -11,7 +11,11 @@ import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
 
 type DomainErrorClass = new (...args: never[]) => Error;
-type SerializedCharacter = ReturnType<typeof serializeCharacter>;
+// Awaited<>, not a bare ReturnType: serializeCharacter is async (#1798, epic
+// #1795 3/6 — it now resolves catalog entitlement for spells) but every
+// `respond` implementation across the ABILITY_REGISTRY domains receives the
+// already-resolved character below, so their own signatures stay unchanged.
+type SerializedCharacter = Awaited<ReturnType<typeof serializeCharacter>>;
 
 /**
  * The per-domain half of a transactions endpoint, independent of how it is
@@ -76,7 +80,7 @@ export async function runTransaction<Schema extends z.ZodTypeAny, Result>(
     where: { id: req.params.id },
     include: characterInclude,
   });
-  const character = serializeCharacter(updated!);
+  const character = await serializeCharacter(updated!);
   res.json(respond ? respond(character, result) : character);
 }
 

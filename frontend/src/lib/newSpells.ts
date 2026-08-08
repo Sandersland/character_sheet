@@ -34,6 +34,15 @@ export interface NewSpellsMeta {
    * edition on the client.
    */
   casterModel: "known" | "prepared" | null;
+  /**
+   * #1631: leveled-pick ids a subclass's list-expansion admits, alongside
+   * spellLists (PHB'14 Warlock patrons — "Add fiend spells to your warlock
+   * list") — a spell NOT on the class's own list but pickable anyway, still
+   * costing the ordinary spells-known slot. Empty when the subclass has no
+   * expansion rows (the majority case). Never applies to cantripLists (no
+   * seeded expansion list grants a cantrip today).
+   */
+  expandedSpellIds: string[];
 }
 
 /** Safe reads of the newSpells step: count, the derived ceiling, secrets, swap, cantrip count, the served lists, and the caster model. */
@@ -50,6 +59,7 @@ export function readNewSpellsMeta(step: LevelUpStep): NewSpellsMeta {
     spellLists: (step.meta?.spellLists as string[] | null | undefined) ?? null,
     cantripLists: (step.meta?.cantripLists as string[] | null | undefined) ?? null,
     casterModel: casterModel === "known" || casterModel === "prepared" ? casterModel : null,
+    expandedSpellIds: (step.meta?.expandedSpellIds as string[] | undefined) ?? [],
   };
 }
 
@@ -84,16 +94,19 @@ export function toggleForgetSpell(
 /**
  * Catalog spells learnable at this level: a leveled spell (cantrips excluded) at
  * or below the ceiling, on ONE of the served `spellLists` — `null` admits any
- * class (PHB'14 unrestricted Bard Magical Secrets). This is a DISPLAY FILTER over
- * a server-authoritative list computed by `magicalSecretsSpellLists` (backend)
- * and enforced by `assertPickSpellEligibility`; it never originates the rule.
+ * class (PHB'14 unrestricted Bard Magical Secrets) — OR on the served
+ * `expandedSpellIds` (#1631: a subclass's list-expansion, e.g. The Fiend's
+ * Expanded Spell List). This is a DISPLAY FILTER over a server-authoritative
+ * list computed by `magicalSecretsSpellLists`/`loadSubclassSpellListExpansionIds`
+ * (backend) and enforced by `assertPickSpellEligibility`; it never originates
+ * the rule.
  */
 export function eligibleNewSpells(
   catalog: CatalogSpell[] | null,
-  opts: { maxSpellLevel: number; spellLists: string[] | null },
+  opts: { maxSpellLevel: number; spellLists: string[] | null; expandedSpellIds?: string[] },
 ): CatalogSpell[] {
   const onList = (s: CatalogSpell) =>
-    opts.spellLists === null || s.classes.some((c) => opts.spellLists!.includes(c));
+    opts.spellLists === null || s.classes.some((c) => opts.spellLists!.includes(c)) || (opts.expandedSpellIds?.includes(s.id) ?? false);
   return (catalog ?? []).filter((s) => s.level >= 1 && s.level <= opts.maxSpellLevel && onList(s));
 }
 

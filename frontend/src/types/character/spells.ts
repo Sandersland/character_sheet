@@ -2,7 +2,7 @@
  * Spellcasting wire types: spell entries, catalog spells, slots, and spellcasting operations.
  */
 
-import type { EffectRoll, EffectSpec, SpellComponents, SpellSchool } from "@character-sheet/shared-types";
+import type { CatalogMeta, EffectRoll, EffectSpec, SpellComponents, SpellSchool } from "@character-sheet/shared-types";
 
 import type { ItemSpellMeta } from "./inventory";
 
@@ -19,6 +19,13 @@ export type {
   LearnSpellOperation,
   SpellcastingOperation,
 } from "@character-sheet/shared-types";
+
+// Request body for POST/PATCH /api/spells/custom (#1787, epic #1782 4/5) —
+// creating/editing a user-owned homebrew catalog spell (Spell.ownerId).
+// Aliased on import: CustomSpellInput above already names the per-character
+// inline-custom-spell payload (learnSpell.custom, no catalog row, no reuse
+// across characters) — a different, narrower shape than this one.
+export type { CustomSpellInput as HomebrewSpellInput } from "@character-sheet/contracts";
 
 /**
  * A spell entry in the character's spellcasting JSON (per-character mutable
@@ -76,6 +83,16 @@ export interface Spell {
  */
 export interface CatalogSpell {
   id: string;       // catalog Spell.id (used as learnSpell.spellId)
+  // Present only on the caller's own homebrew (#1788, epic #1782 5/5) — the
+  // manage UI's only signal to distinguish an editable/deletable row from a
+  // seeded one; seeded rows never carry it.
+  ownerId?: string;
+  // Entitlement metadata (#1796/#1798, epic #1795 1/6+3/6) — scope/fork
+  // provenance for the share (#1799) and fork (#1800) UI. Optional (not
+  // `SpellWire.catalog`'s own required shape) so the many existing inline
+  // CatalogSpell test fixtures across the frontend — built before this field
+  // existed — don't all need updating; a real served row always carries it.
+  catalog?: CatalogMeta;
   name: string;
   level: number;
   school: SpellSchool;
@@ -105,6 +122,44 @@ export interface SpellSlots {
   level: number;
   total: number;
   used: number;
+}
+
+/**
+ * Response shape for POST/PATCH /api/spells/custom — a user-owned homebrew
+ * spell row (Spell.ownerId non-null, reusable across all of that user's
+ * characters). Not derived from a contracts schema (the route has no
+ * response schema, only customSpellSchema for the request): this mirrors
+ * custom-spells.ts's serializeCustomSpell, one field-for-field. Once served
+ * back through `GET /api/spells` (#1786) a homebrew row folds into the plain
+ * CatalogSpell shape, so this type is only for the direct create/edit
+ * response, not the picker.
+ */
+export interface HomebrewSpell {
+  id: string;
+  ownerId: string;
+  edition: string;
+  // See CatalogSpell.catalog's own comment — same optional-for-fixtures shape.
+  catalog?: CatalogMeta;
+  name: string;
+  level: number;
+  school: SpellSchool;
+  castingTime: string;
+  range: string;
+  duration: string;
+  description: string;
+  concentration: boolean;
+  ritual: boolean;
+  components?: SpellComponents | null;
+  classes: string[];
+  effectKind?: "damage" | "heal";
+  effectDiceCount?: number;
+  effectDiceFaces?: number;
+  effectModifier?: number;
+  damageType?: string;
+  attackType?: "attack" | "save";
+  saveAbility?: string;
+  saveEffect?: "half" | "none";
+  upcastDicePerLevel?: number;
 }
 
 // Spellcasting operation types (CustomSpellInput, the per-op interfaces, and the

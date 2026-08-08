@@ -369,6 +369,11 @@ function isPopulatedRow(row: RowKey): boolean {
 // #1546 Part B adds Fighter's Battle Master rows: Combat Superiority
 // (maneuverChoiceCount) and Student of War (toolProfChoiceCount) — both
 // subclass-scoped, keyed the same tuple way as Bard's College of Valor row.
+// #1120 adds Fighter's Champion row: Improved Critical (critRange) — both
+// tiers (19 at L3, 18 at L15) ride this ONE row, "Superior Critical" stays
+// text-only (see fighter-features.ts's own comment on why a second row on
+// this axis would need a cross-row MIN deriveAttacksPerAction's shape
+// doesn't have).
 const DERIVED_STAT_ROW_KEYS = new Set([
   "Fighter::null::Extra Attack",
   "Barbarian::null::Extra Attack",
@@ -380,6 +385,8 @@ const DERIVED_STAT_ROW_KEYS = new Set([
   "Fighter::fighter-battle-master::Student of War",
   // #1676: Bladesinger's L6 Extra Attack, EDITION_2014 only.
   "Wizard::wizard-bladesinging::Extra Attack",
+  // #1120: Champion's crit-range axis (critRange), both editions.
+  "Fighter::fighter-champion::Improved Critical",
 ]);
 
 function isDerivedStatRow(row: RowKey): boolean {

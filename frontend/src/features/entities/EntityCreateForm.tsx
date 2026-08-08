@@ -134,7 +134,7 @@ export default function EntityCreateForm({ campaignId, isOwner, onClose }: Entit
           type="button"
           disabled={busy || (!createdEntity && name.trim() === "")}
           onClick={handleCreate}
-          className="rounded-control bg-garnet-600 px-3 py-1.5 text-xs font-semibold text-parchment-50 hover:bg-garnet-700 disabled:opacity-40"
+          className="rounded-control bg-garnet-soft-surface px-3 py-1.5 text-xs font-semibold text-garnet-on-surface hover:bg-garnet-soft-surface-hover disabled:opacity-40"
         >
           {busy ? "Creating…" : createdEntity ? "Retry upload" : "Create entity"}
         </button>

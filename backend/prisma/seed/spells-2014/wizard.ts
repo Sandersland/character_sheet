@@ -48,15 +48,17 @@
 // Containment" option instead (already authored below, dnd5eapi-derived) —
 // there is no standalone spell for it.
 //
-// Feign Death (Bard/Cleric/Wizard) is another PHB'14-only spell Wizard also
-// gets that sits on a 3+ class list, so authoring it is shared.ts's job, not
-// this slice's; it is NOT included here and remains missing from shared.ts
-// (a real gap, flagged for follow-up, left unfixed to avoid touching a
-// sibling slice's file). Witch Bolt (Sorcerer/Warlock/Wizard) had the same
-// gap when this comment was first written, but #1718 (Sorcerer) added it to
-// shared.ts since it blocked that slice's own acceptance criteria. Protection
-// from Energy (Cleric/Druid/Ranger/Sorcerer/Wizard, 5-list) is NOT a gap —
-// already present in shared.ts with all five classes tagged.
+// Feign Death is another PHB'14-only spell Wizard also gets that sits on a
+// 3+ class list (Bard/Cleric/Druid/Wizard — this comment originally said
+// Bard/Cleric/Wizard, itself an incomplete list that #1742 corrected), so
+// authoring it is shared.ts's job, not this slice's; it was NOT included
+// here and was missing from shared.ts until #1742 closed the gap. Witch Bolt
+// (Sorcerer/Warlock/Wizard) had the same gap when this comment was first
+// written, but #1718 (Sorcerer) added it to shared.ts since it blocked that
+// slice's own acceptance criteria. Protection from Energy
+// (Cleric/Druid/Ranger/Sorcerer/Wizard, 5-list) was NEVER a gap — already
+// present in shared.ts with all five classes tagged, just under a stray
+// title-cased "Protection From Energy" that #1742 also fixed.
 //
 // A rules-accuracy pass found 4 more effect-field bugs (Flaming Sphere,
 // Scorching Ray, Weird, Fire Shield — each detailed inline at its own row)

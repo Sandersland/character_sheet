@@ -199,6 +199,13 @@ export interface Character {
   /** Weapon attacks per Attack action (Extra Attack), max across multiclass. */
   attacksPerAction: number;
 
+  /** Server-resolved (#1120): the natural-d20 threshold a weapon attack crits
+   *  on — 20 by default, widened by Champion's Improved/Superior Critical
+   *  (19, then 18). Edition-invariant on the backend, so this field carries
+   *  no edition branch on the wire either; the attack sheet compares a kept
+   *  d20 against it instead of a hardcoded 20. */
+  critRange: number;
+
   /** Server-resolved (#1433): a two-handed weapon in MAIN_HAND locks OFF_HAND, so
    *  nothing may occupy it. A property of the whole loadout, hence one boolean
    *  rather than a per-item flag. Distinct from the backend-internal "off-hand

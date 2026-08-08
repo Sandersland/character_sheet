@@ -41,7 +41,7 @@ function OriginFeatRow({ feat, selected, onSelect }: { feat: CatalogFeat; select
         aria-pressed={selected}
         onClick={onSelect}
         className={`shrink-0 rounded px-2.5 py-1 text-xs font-semibold ${
-          selected ? "bg-garnet-600 text-white" : "bg-gold-400 text-ink hover:bg-gold-500"
+          selected ? "bg-garnet-soft-surface text-garnet-on-surface" : "bg-gold-400 text-ink hover:bg-gold-500"
         }`}
       >
         {selected ? "Selected" : "Select"}
@@ -99,8 +99,8 @@ function OriginFeatCatalogBody({
 }
 
 // The `applicable` guard lives in the PARENT (below), not here — same "hooks
-// run unconditionally, fetch only once mounted" shape as
-// SpeciesCantripSection's own split.
+// run unconditionally, fetch only once mounted" shape as CreationSpellsStep's
+// SpeciesCantripGate (#1778).
 function SpeciesOriginFeatPicker({
   choice,
   edition,

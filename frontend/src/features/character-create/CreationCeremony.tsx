@@ -9,7 +9,6 @@ import CreationReviewStep from "@/features/character-create/CreationReviewStep";
 import CreationSpellsStep from "@/features/character-create/CreationSpellsStep";
 import IdentitySection from "@/features/character-create/IdentitySection";
 import SkillSection from "@/features/character-create/SkillSection";
-import SpeciesCantripSection from "@/features/character-create/SpeciesCantripSection";
 import SpeciesOriginFeatSection from "@/features/character-create/SpeciesOriginFeatSection";
 import SpeciesSkillSection from "@/features/character-create/SpeciesSkillSection";
 import StartingEquipmentSection from "@/features/character-create/StartingEquipmentSection";
@@ -80,10 +79,8 @@ function SkillsStepBody({ c }: StepBodyProps) {
       />
       <ToolProficiencySection
         grantedToolProfs={c.toolChoices.grantedToolProfs}
-        toolChoiceOptions={c.toolChoices.toolChoiceOptions}
-        maxToolChoices={c.toolChoices.maxToolChoices}
-        selectedToolChoices={c.toolChoices.selectedToolChoices}
-        toggleToolChoice={c.toolChoices.toggleToolChoice}
+        classChoices={c.toolChoices.classChoices}
+        backgroundChoices={c.toolChoices.backgroundChoices}
       />
     </>
   );
@@ -97,27 +94,22 @@ function SpellsStepBody({ c }: StepBodyProps) {
   // Unreachable in practice: this step never renders before the gate resolves it.
   const { rulesEdition } = c.draft;
   if (!rulesEdition) return null;
+  // #1778: one merged host — species cantrip (#1689, when the server serves a
+  // chooseCantrip spec) and the class's own cantrips/spells share ONE tabbed
+  // picker now, so a non-caster High Elf's species cantrip is still reachable
+  // even though `picks` is undefined for it.
   return (
-    <>
-      {picks && (
-        <CreationSpellsStep
-          className={c.draft.className}
-          counts={picks}
-          cantripIds={c.draft.cantripIds}
-          spellIds={c.draft.spellIds}
-          edition={rulesEdition}
-          onChange={c.update}
-        />
-      )}
-      {/* #1689: High Elf's Cantrip — renders only when the server serves a
-          chooseCantrip spec; independent of the class picks above, so this
-          is the ONLY content on the step for a non-caster High Elf. */}
-      <SpeciesCantripSection
-        choice={c.speciesCantripChoice}
-        edition={rulesEdition}
-        onChange={(speciesCantripId) => c.update({ speciesCantripId })}
-      />
-    </>
+    <CreationSpellsStep
+      className={c.draft.className}
+      subclassId={c.draft.subclassId || undefined}
+      counts={picks ?? undefined}
+      cantripIds={c.draft.cantripIds}
+      spellIds={c.draft.spellIds}
+      speciesCantripChoice={c.speciesCantripChoice}
+      edition={rulesEdition}
+      onChange={c.update}
+      onSpeciesCantripChange={(speciesCantripId) => c.update({ speciesCantripId })}
+    />
   );
 }
 
@@ -128,13 +120,18 @@ function EquipmentStepBody({ c }: StepBodyProps) {
   // but Acolyte and Folk Hero), so this is often absent.
   const backgroundEquipment = c.selections.background?.startingEquipment;
   // GRANTED tools as well as chosen ones — the same union the server's
-  // creationToolProfs assembles (background + class + race grants, plus the
-  // player's class picks). A boundToToolChoice pick filtered on chosen tools
-  // alone offered NOTHING for a 2024 Soldier, whose Gaming Set arrives as a
-  // background grant rather than a pick: an empty dropdown the step could
-  // never satisfy, so Continue stayed disabled forever (#1565). The picker
-  // must admit exactly what boundToolChoiceError admits, no less.
-  const boundToolCandidates = [...c.toolChoices.grantedToolProfs, ...c.toolChoices.selectedToolChoices];
+  // creationToolProfs assembles (background + class grants, plus the
+  // player's class AND background picks, #1779). A boundToToolChoice pick
+  // filtered on chosen tools alone offered NOTHING for a 2024 Soldier before
+  // #1565's grantedToolProfs fix; #1779 moved Soldier's Gaming Set from a
+  // grant to a background CHOICE, so backgroundChoices.selected must ride
+  // along too or the same empty-dropdown bug returns. The picker must admit
+  // exactly what boundToolChoiceError admits, no less.
+  const boundToolCandidates = [
+    ...c.toolChoices.grantedToolProfs,
+    ...c.toolChoices.classChoices.selected,
+    ...c.toolChoices.backgroundChoices.selected,
+  ];
   return (
     <>
       {!startingEquipment && (

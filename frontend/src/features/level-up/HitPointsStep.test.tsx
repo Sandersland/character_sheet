@@ -39,18 +39,53 @@ vi.mock("@/features/dice/DiceRoller", () => ({
 
 // The step's numbers arrive resolved on the wire (#1380) — these fixtures are
 // what the backend planner serves, not something the component re-derives.
+// #1497: effectiveMaxAverage/effectiveMaxByRoll are ALSO served — every test in
+// this file uses baseCharacter's max 52, unaffected by exhaustion (below tier
+// 4/2024), so these are exactly 52 + each outcome's gain, matching what
+// effectiveMaxHitPoints itself reduces to off that tier — see
+// level-up-plan.test.ts for the exhaustion-4+ halving coverage.
 const D10_CON_0: LevelUpStep = {
   kind: "hitPoints",
-  meta: { die: "d10", faces: 10, conMod: 0, fixedAverage: 6, averageGain: 6, minRoll: 1, maxRoll: 10 },
+  meta: {
+    die: "d10",
+    faces: 10,
+    conMod: 0,
+    fixedAverage: 6,
+    averageGain: 6,
+    minRoll: 1,
+    maxRoll: 10,
+    effectiveMaxAverage: 58,
+    effectiveMaxByRoll: [0, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62],
+  },
 };
 const D6_CON_0: LevelUpStep = {
   kind: "hitPoints",
-  meta: { die: "d6", faces: 6, conMod: 0, fixedAverage: 4, averageGain: 4, minRoll: 1, maxRoll: 6 },
+  meta: {
+    die: "d6",
+    faces: 6,
+    conMod: 0,
+    fixedAverage: 4,
+    averageGain: 4,
+    minRoll: 1,
+    maxRoll: 6,
+    effectiveMaxAverage: 56,
+    effectiveMaxByRoll: [0, 53, 54, 55, 56, 57, 58],
+  },
 };
 // Con 1 → −5: every gain is pinned to the max(1, …) level-up floor.
 const D6_CON_MINUS_5: LevelUpStep = {
   kind: "hitPoints",
-  meta: { die: "d6", faces: 6, conMod: -5, fixedAverage: 4, averageGain: 1, minRoll: 1, maxRoll: 1 },
+  meta: {
+    die: "d6",
+    faces: 6,
+    conMod: -5,
+    fixedAverage: 4,
+    averageGain: 1,
+    minRoll: 1,
+    maxRoll: 1,
+    effectiveMaxAverage: 53,
+    effectiveMaxByRoll: [0, 53, 53, 53, 53, 53, 53],
+  },
 };
 
 const baseCharacter = {
@@ -206,6 +241,36 @@ describe("HitPointsStep", () => {
 
     expect(await screen.findByText(/52\s*→\s*58/)).toBeInTheDocument();
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  // #1497: at 2014 exhaustion 4+ (PHB'14 p. 291), `character.hitPoints.max` is
+  // already the halved EFFECTIVE max, so `currentMax + gain` (15 + 8 = 23) is
+  // NOT what the level-up transaction actually commits — the server-computed
+  // effectiveMaxAverage (19, halving the post-level raw max's own parity) is.
+  // This step renders the served number, never that addition.
+  it("renders the served effective max, not currentMax + gain, once exhaustion 4+ has halved the served max", async () => {
+    const exhaustedStep: LevelUpStep = {
+      kind: "hitPoints",
+      meta: {
+        die: "d10",
+        faces: 10,
+        conMod: 2,
+        fixedAverage: 6,
+        averageGain: 8,
+        minRoll: 3,
+        maxRoll: 12,
+        effectiveMaxAverage: 19,
+        effectiveMaxByRoll: [0, 14, 15, 16, 16, 17, 17, 18, 18, 19, 19],
+      },
+    };
+    const exhaustedCharacter = {
+      ...baseCharacter,
+      hitPoints: { current: 15, max: 15, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+    } as unknown as Character;
+    renderStep({ draft: { hp: { method: "average" } }, character: exhaustedCharacter, step: exhaustedStep });
+
+    expect(await screen.findByText(/15\s*→\s*19/)).toBeInTheDocument();
+    expect(screen.queryByText(/15\s*→\s*23/)).not.toBeInTheDocument();
   });
 
   // The preview used to add conMod unclamped while the ledger and the server

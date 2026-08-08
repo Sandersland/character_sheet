@@ -90,8 +90,12 @@ test("creation: guided ceremony lands on the sheet with the chosen class", async
   // Skills & Tools step — the 2024 Human's own Skillful (one skill) and
   // Versatile (one Origin feat) picks gate Continue (#1690); Stealth is
   // outside Fighter's skillChoices, and Tough is a different Origin feat
-  // from Soldier's own Savage Attacker grant above.
+  // from Soldier's own Savage Attacker grant above. #1779: Soldier's Gaming
+  // Set is now a background CHOICE (not a fixed grant), so it gates Continue
+  // here too — pick Dice Set, which chooseEquipmentOptionA's bound pick below
+  // must then offer back on the Equipment step.
   await chooseHumanSpeciesTraits(page, "Stealth", "Tough");
+  await page.getByRole("checkbox", { name: "Dice Set" }).check();
   await continueStep(page);
 
   // Equipment step — the 2024 Fighter package's option (A) (chain mail etc.),
@@ -113,17 +117,21 @@ test("creation: guided ceremony lands on the sheet with the chosen class", async
   expect(errors).toEqual([]);
 });
 
-// #1570: Noble's PHB'24 option (A) carries "Gaming Set (same as above)" — a
-// boundToToolChoice pick over the gaming-set proficiency the BACKGROUND itself
-// grants, not one the player chose. That is precisely the shape that shipped
-// broken in #1565 (the picker filtered on chosen tools only, so the dropdown
-// was empty and Continue stayed disabled forever), and no unit test catches it:
-// the draft is React-controlled, so only the rendered step is wrong.
+// #1570/#1779: Noble's PHB'24 option (A) carries "Gaming Set (same as above)" —
+// a boundToToolChoice pick over the gaming-set proficiency the character's own
+// Skills & Tools step picks (#1779: Noble grants a CHOICE of gaming set, not a
+// fixed one — see BACKGROUNDS' Noble row, catalog-data.ts). Before #1779 this
+// covered a DIFFERENT shape that shipped broken in #1565 (the picker filtered
+// on chosen tools only, so a background GRANT's dropdown was empty and
+// Continue stayed disabled forever); #1779 moved Soldier/Noble off that grant
+// entirely, but the bound-pick mechanism this spec exercises is the same one,
+// and no unit test catches it: the draft is React-controlled, so only the
+// rendered step is wrong.
 //
 // Landing on the sheet IS the assertion — it can only happen if the Equipment
 // step was completable, which requires the bound pick to have offered the
-// granted gaming set.
-test("creation: a Noble's background gaming-set pick is satisfiable from a granted tool", async ({ page }) => {
+// SAME gaming set chosen on the Skills & Tools step.
+test("creation: a Noble's CHOSEN gaming set is offered back by the bound equipment pick", async ({ page }) => {
   const name = uniqueName("Highborn");
 
   await login(page);
@@ -146,12 +154,16 @@ test("creation: a Noble's background gaming-set pick is satisfiable from a grant
 
   // Skills & Tools step — the 2024 Human's own Skillful/Versatile picks gate
   // Continue (#1690); Survival is outside Rogue's skillChoices, and Tough is
-  // a different Origin feat from Noble's own Skilled grant.
+  // a different Origin feat from Noble's own Skilled grant. #1779: Noble's
+  // Gaming Set is a background CHOICE — pick Playing Card Set (deliberately
+  // NOT Dice Set, so this spec can't pass by accident if the bound pick below
+  // silently fell back to a hardcoded name instead of the real selection).
   await chooseHumanSpeciesTraits(page, "Survival", "Tough");
+  await page.getByRole("checkbox", { name: "Playing Card Set" }).check();
   await continueStep(page);
 
   // Equipment step — two cards now (Rogue's package and Noble's own), and the
-  // background card's open pick must offer the granted Dice Set.
+  // background card's bound pick must offer the CHOSEN Playing Card Set.
   await chooseEquipmentOptionA(page);
   await continueStep(page);
 
@@ -197,14 +209,16 @@ test("creation: a warlock picks cantrips + spells that show on the Magic tab", a
   await chooseHumanSpeciesTraits(page, "Perception", "Tough");
   await continueStep(page);
 
-  // Spells step (#1160): a level-1 warlock picks 2 cantrips + 2 spells through the
-  // guided picker — a quiet row opens the big detail card with the full text, and
-  // Learn there or the row pill adds the spell.
+  // Spells step (#1160/#1778): a level-1 warlock picks 2 cantrips + 2 spells
+  // through the guided picker, one tab at a time — a quiet row opens the big
+  // detail card with the full text, and Learn there or the row pill adds the
+  // spell. Cantrips is the default (first) tab; a segment click swaps to Spells.
   await expect(page.getByRole("heading", { name: "Learn your magic" })).toBeVisible();
   await page.getByRole("button", { name: "Open Eldritch Blast" }).click();
   await expect(page.getByText(/hurl a beam of crackling energy/)).toBeVisible();
   await page.getByRole("button", { name: /Learn Eldritch Blast/ }).click();
   await page.getByRole("button", { name: "Add Poison Spray" }).click();
+  await page.getByRole("radio", { name: /Spells/ }).click();
   await page.getByRole("button", { name: "Add Charm Person" }).click();
   // Hideous Laughter is warlock-legal under SRD 5.2; Dissonant Whispers is now
   // bard-only (#1132) and no longer offered in the warlock picker.
@@ -281,6 +295,7 @@ test("creation: a 2014 warlock must choose its patron at creation", async ({ pag
   await page.getByRole("button", { name: "Open Eldritch Blast" }).click();
   await page.getByRole("button", { name: /Learn Eldritch Blast/ }).click();
   await page.getByRole("button", { name: "Add Poison Spray" }).click();
+  await page.getByRole("radio", { name: /Spells/ }).click();
   await page.getByRole("button", { name: "Add Charm Person" }).click();
   await page.getByRole("button", { name: "Add Protection from Evil and Good" }).click();
   await continueStep(page);

@@ -203,6 +203,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
     ],
     "exhaustion": 2,
   },
+  "critRange": 20,
   "currency": {
     "cp": 1,
     "gp": 3,
@@ -902,6 +903,7 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
     "active": [],
     "exhaustion": 0,
   },
+  "critRange": 20,
   "currency": {
     "cp": 0,
     "gp": 0,

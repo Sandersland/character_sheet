@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   formatRollBreakdown,
   formatRollSpec,
+  isCriticalRoll,
   isNaturalOne,
   isNaturalTwenty,
   keptD20,
@@ -361,6 +362,40 @@ describe("keptD20 / isNaturalTwenty / isNaturalOne", () => {
   it("treats null/undefined results as no crit and no miss", () => {
     expect(isNaturalTwenty(null)).toBe(false);
     expect(isNaturalOne(undefined)).toBe(false);
+  });
+});
+
+describe("isCriticalRoll (#1120 — Champion's widened crit range)", () => {
+  it("a plain nat 20 crits at the default range (20)", () => {
+    const result = summarizeRoll([20], { count: 1, faces: 20, modifier: 5 });
+    expect(isCriticalRoll(result, 20)).toBe(true);
+  });
+
+  it("a 19 does NOT crit at the default range (20)", () => {
+    const result = summarizeRoll([19], { count: 1, faces: 20 });
+    expect(isCriticalRoll(result, 20)).toBe(false);
+  });
+
+  it("a 19 DOES crit once critRange widens to 19 (Champion L3, Improved Critical)", () => {
+    const result = summarizeRoll([19], { count: 1, faces: 20 });
+    expect(isCriticalRoll(result, 19)).toBe(true);
+  });
+
+  it("18, 19, and 20 all crit once critRange widens to 18 (Champion L15, Superior Critical); 17 does not", () => {
+    expect(isCriticalRoll(summarizeRoll([18], { count: 1, faces: 20 }), 18)).toBe(true);
+    expect(isCriticalRoll(summarizeRoll([19], { count: 1, faces: 20 }), 18)).toBe(true);
+    expect(isCriticalRoll(summarizeRoll([20], { count: 1, faces: 20 }), 18)).toBe(true);
+    expect(isCriticalRoll(summarizeRoll([17], { count: 1, faces: 20 }), 18)).toBe(false);
+  });
+
+  it("a widened-range roll on the DROPPED die (disadvantage) is not a crit", () => {
+    const result = summarizeRoll([19, 3], { count: 1, faces: 20, mode: "disadvantage" });
+    expect(isCriticalRoll(result, 19)).toBe(false);
+  });
+
+  it("treats null/undefined results as no crit, regardless of critRange", () => {
+    expect(isCriticalRoll(null, 19)).toBe(false);
+    expect(isCriticalRoll(undefined, 18)).toBe(false);
   });
 });
 

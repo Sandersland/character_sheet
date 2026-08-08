@@ -6,40 +6,9 @@
 // re-run from a test).
 import type { PrismaClient } from "../../src/generated/prisma/client.js";
 import { resolveEditionRow, upsertEditionRow } from "../../src/lib/rules/catalog-edition.js";
+import { resolveCatalogSpellId } from "./resolve-catalog-spell.js";
 import { SUBCLASS_GRANTED_SPELLS, type SubclassGrantedSpellSeed } from "./subclass-granted-spells.js";
 import type { SeedEdition } from "./edition.js";
-
-interface GrantedSpellRow {
-  id: string;
-  edition: SeedEdition | null;
-}
-
-// Falls back to the sole candidate when resolveEditionRow finds neither an
-// exact-edition nor a shared/NULL row — e.g. a grant tagged EDITION_2014
-// naming a spell that (today, before any 2014 spell content exists) has only
-// an EDITION_2024 row. A grant's own edition describes when the SUBCLASS
-// variant applies, not a guarantee the spell it grants has forked too. Split
-// out for the same complexity budget as sharedGrantCandidate below.
-function soleSpellCandidate(candidates: GrantedSpellRow[]): GrantedSpellRow | undefined {
-  return candidates.length === 1 ? candidates[0] : undefined;
-}
-
-// Resolve the catalog Spell a grant points at (#1710: Spell.name stopped being
-// globally unique). spellId is a concrete FK snapshotted here at seed time,
-// not re-resolved per-character: a grant tagged with its own edition prefers
-// THAT edition's spell row when one exists (resolveEditionRow's usual
-// exact-then-shared fallback), an untagged (shared) grant is pinned to
-// EDITION_2024 (the same "no live character to resolve against yet" default
-// resolveOriginFeatId uses), and either falls back to the sole candidate
-// above when neither matches.
-async function resolveGrantedSpellId(prisma: PrismaClient, spellName: string, grantEdition: SeedEdition | null): Promise<string> {
-  const candidates: GrantedSpellRow[] = (await prisma.spell.findMany({ where: { name: spellName }, select: { id: true, edition: true } })).map(
-    (c) => ({ id: c.id, edition: c.edition as SeedEdition | null }),
-  );
-  const spell = resolveEditionRow(candidates, grantEdition ?? "EDITION_2024") ?? soleSpellCandidate(candidates);
-  if (!spell) throw new Error(`Seed error: granted spell "${spellName}" not in the Spell catalog`);
-  return spell.id;
-}
 
 interface GrantSubclassRow {
   id: string;
@@ -115,7 +84,7 @@ async function upsertGrantedSpell(
     g,
   );
   const edition = g.edition ?? null;
-  const spellId = await resolveGrantedSpellId(prisma, g.spellName, edition);
+  const spellId = await resolveCatalogSpellId(prisma, g.spellName, edition, "granted");
   // upsertEditionRow, not .upsert(): the compound-key shorthand can't express
   // a null edition (which most grant rows have).
   const row = await upsertEditionRow(

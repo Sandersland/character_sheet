@@ -12,6 +12,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
+import { makeCatalogEntry } from "@/test-support/catalog-entry.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 
 const OWNER_ID = "owner-spellcasting";
@@ -158,7 +159,10 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
   const WIZARD_CATALOG_NAME = "Spellcasting Route Test Wizard";
 
   afterAll(async () => {
-    await prisma.spell.deleteMany({ where: { name: { in: [TEST_SPELL.name, TEST_CANTRIP.name] } } });
+    // Deleting the CatalogEntry cascades the Spell row (ON DELETE CASCADE,
+    // #1796) — the reverse cascade doesn't exist (the supertype stays
+    // closed), so a plain `spell.deleteMany` alone would orphan the entry.
+    await prisma.catalogEntry.deleteMany({ where: { name: { in: [TEST_SPELL.name, TEST_CANTRIP.name] }, kind: "SPELL" } });
     await prisma.characterClass.deleteMany({ where: { name: WIZARD_CATALOG_NAME } });
   });
 
@@ -182,18 +186,22 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
 
     // Upsert catalog spells for learnSpell-from-catalog tests. upsertEditionRow,
     // not .upsert(): Spell's business key is now (name, edition) (#1710), and
-    // these fixture spells are edition-neutral.
+    // these fixture spells are edition-neutral. makeCatalogEntry (#1796) is
+    // find-then-create, safe to call every beforeEach against a fixture only
+    // afterAll cleans up.
+    const catalogEntryIdSpell = await makeCatalogEntry({ name: TEST_SPELL.name });
     const catalogSpell = await upsertEditionRow(
       prisma.spell,
       { name: TEST_SPELL.name, edition: null },
-      { ...TEST_SPELL, edition: null },
+      { ...TEST_SPELL, edition: null, catalogEntryId: catalogEntryIdSpell },
       TEST_SPELL,
     );
     catalogSpellId = catalogSpell.id;
+    const catalogEntryIdCantrip = await makeCatalogEntry({ name: TEST_CANTRIP.name });
     await upsertEditionRow(
       prisma.spell,
       { name: TEST_CANTRIP.name, edition: null },
-      { ...TEST_CANTRIP, edition: null },
+      { ...TEST_CANTRIP, edition: null, catalogEntryId: catalogEntryIdCantrip },
       TEST_CANTRIP,
     );
 

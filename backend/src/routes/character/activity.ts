@@ -67,5 +67,5 @@ activityRouter.post<{ id: string; batchId: string }>("/events/:batchId/revert", 
     where: { id: req.params.id },
     include: characterInclude,
   });
-  res.json(serializeCharacter(updated!));
+  res.json(await serializeCharacter(updated!));
 });

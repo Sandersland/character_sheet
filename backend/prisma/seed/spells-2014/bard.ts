@@ -17,7 +17,9 @@
 //     later found 3 MORE genuine PHB'14 Bard spells missing entirely (Cloud
 //     of Daggers, Crown of Madness, Friends — all Bard/Sorcerer/Warlock/
 //     Wizard 4-list) and added them to shared.ts, bumping Bard's real total
-//     from 111 to 114; see spells-2014-bard-data.test.ts for the updated
+//     from 111 to 114. #1742's own non-SRD-3+-list audit later found 3 MORE
+//     (Feign Death, Phantasmal Force, Blade Ward), bumping the total again
+//     from 114 to 117; see spells-2014-bard-data.test.ts for the updated
 //     count guard.
 //   - 13 are Wizard-owned 2-list spells Bard also gets (Hideous Laughter,
 //     Identify, Magic Mouth, Leomund's Tiny Hut, Otto's Irresistible Dance,

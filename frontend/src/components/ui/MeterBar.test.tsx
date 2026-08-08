@@ -49,7 +49,7 @@ describe("MeterBar", () => {
 
   it("applies garnet fill class by default", () => {
     const { container } = render(<MeterBar current={5} max={10} />);
-    expect(getFill(container)).toHaveClass("bg-garnet-600");
+    expect(getFill(container)).toHaveClass("bg-garnet-meter");
   });
 
   it("applies arcane fill class for arcane tone", () => {

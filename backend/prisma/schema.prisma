@@ -142,6 +142,11 @@ model User {
   ownedCampaigns      Campaign[]           @relation("CampaignOwner")
   campaignMemberships CampaignMembership[]
 
+  // USER-scope catalog entries this user owns (#1796, epic #1795 1/6) —
+  // homebrew content across every kind, not just Spell. Mirrors `characters`
+  // — cascade-deleted with the user (CatalogEntry.ownerUser onDelete: Cascade).
+  catalogEntries CatalogEntry[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -182,6 +187,10 @@ model Campaign {
   // Named parts/arcs the journal groups sessions under (#863). Campaign-level
   // (one shared story spine), DM-curated.
   arcs                 CampaignArc[]
+  // CAMPAIGN-scope catalog entries this campaign owns (DM homebrew, #1796)
+  // and GLOBAL/USER entries granted into this campaign for its players to see.
+  catalogEntries       CatalogEntry[]
+  catalogGrants        CatalogGrant[]
 }
 
 // A named part/arc of a campaign's story (#863): the journal page groups
@@ -466,21 +475,21 @@ model Species {
 // one place for a species-level creation choice, and this is it). No `edition`
 // column — inherits the parent Species row's edition.
 model SpeciesVariant {
-  id               String  @id @default(uuid())
-  speciesId        String
-  species          Species @relation(fields: [speciesId], references: [id], onDelete: Cascade)
-  name             String
-  slug             String
+  id                      String  @id @default(uuid())
+  speciesId               String
+  species                 Species @relation(fields: [speciesId], references: [id], onDelete: Cascade)
+  name                    String
+  slug                    String
   // NULL = use the parent Species.speed (the common case). Set only when the
   // book states a different value for this variant (PHB'14 Wood Elf 35 ft;
   // no 2024 variant seeded this slice overrides speed).
-  speedOverride    Int?
+  speedOverride           Int?
   // Same AbilityIncreaseSpec[] shape as Species.abilityIncreases, additive to
   // the parent's at creation (PHB'14 Hill Dwarf +1 WIS on top of Dwarf's own
   // +2 CON — the create phase merges both levels, #1681). [] for every 2024
   // row and for every Dragonborn ancestry variant in either edition (draconic
   // ancestry grants a damage type + resistance, never an ability increase).
-  abilityIncreases Json    @default("[]")
+  abilityIncreases        Json    @default("[]")
   // When true, `abilityIncreases` REPLACES the parent Species' increases at
   // creation instead of adding to them (fetchMergedAbilityIncreases). Only the
   // Astral Elf sets this (#1751): a Spelljammer standalone race modelled as an
@@ -650,11 +659,14 @@ model Subclass {
   // the single place the exact/NULL fallback ordering is expressed.
   edition     RulesEdition?
 
-  selections    CharacterClassEntry[]
-  grantedSpells SubclassGrantedSpell[]
+  selections          CharacterClassEntry[]
+  grantedSpells       SubclassGrantedSpell[]
   // Back-relation only — not a column, appears on no payload unless included
   // (#1522/#1523's ClassFeature foundation).
-  features      ClassFeature[]
+  features            ClassFeature[]
+  // Back-relation only, same role as grantedSpells (#1631) — the choosable-pool
+  // widening a picker resolves, not a sheet-facing payload field.
+  spellListExpansions SubclassSpellListExpansion[]
 
   @@unique([classId, name, edition], name: "classId_name")
   // The slug-form twin of classId_name: a lineage that forks across editions
@@ -693,6 +705,35 @@ model SubclassGrantedSpell {
   // lives in the migration (Prisma's DSL can't express it), same as
   // 20260726111922_catalog_edition_tagging's indexes.
   edition        RulesEdition?
+
+  @@unique([subclassId, spellId, edition])
+  @@index([subclassId])
+}
+
+// A spell a subclass adds to the CHOOSABLE class spell list (#1631) — sibling
+// of SubclassGrantedSpell but categorically distinct: this is not a free
+// grant, it widens what a known caster may PICK, still spending an ordinary
+// spells-known slot. PHB'14's Warlock patrons ("Add fiend spells to your
+// warlock list") are the shape: The Fiend/The Archfey/The Great Old One's
+// Expanded Spell List. Carries no gateLevel (the known-caster picker already
+// gates a choice by spell level vs. available slots) and no castingAbility
+// (the warlock learns the spell with its own casting ability, not a per-grant
+// one) — both deliberate omissions vs. SubclassGrantedSpell, owner decision
+// on #1631. Resolved live by the creation/level-up spell pickers, unioned
+// into the choosable pool; never persisted onto the character.
+model SubclassSpellListExpansion {
+  id         String        @id @default(uuid())
+  subclassId String
+  subclass   Subclass      @relation(fields: [subclassId], references: [id], onDelete: Cascade)
+  spellId    String
+  spell      Spell         @relation(fields: [spellId], references: [id], onDelete: Cascade)
+  // NULL = valid in both editions; a list that diverges forks into one row per
+  // edition — same NULL-as-shared convention as SubclassGrantedSpell.edition.
+  // An expansion list is a SET, so the read path is a set filter (edition-or-
+  // NULL admission), not resolveEditionRow's pick-one fallback. NULLS NOT
+  // DISTINCT lives in the migration (Prisma's DSL can't express it), same as
+  // SubclassGrantedSpell's own edition unique.
+  edition    RulesEdition?
 
   @@unique([subclassId, spellId, edition])
   @@index([subclassId])
@@ -1027,6 +1068,14 @@ model Background {
   name               String
   skillProficiencies String[]
   toolProficiencies  String[]      @default([])
+  // Tool proficiency CHOICE — mirrors CharacterClass.toolChoices/
+  // toolChoiceCount exactly (#1779): a background can grant a choice (PHB'14
+  // and PHB'24 Soldier/Noble's "one type of gaming set") as well as a fixed
+  // tool. Edition-invariant columns — both editions' backgrounds feed the
+  // same pair; only the seeded content per row differs. No page cited: same
+  // "unpaged over invented" rule as starting-equipment.ts's Charlatan/Noble.
+  toolChoices        String[]      @default([])
+  toolChoiceCount    Int           @default(0)
   // PHB'24: each background grants +3 ability points across these three abilities
   // (2+1 or 1+1+1) plus one Origin feat. Empty/null for spec-less 2014 legacy rows.
   abilityChoices     String[]      @default([])
@@ -1517,6 +1566,90 @@ model Feat {
   @@unique([name, edition])
 }
 
+// Entitlement supertype (#1796, epic #1795 1/6). One row per piece of
+// catalog content regardless of `kind`, carrying WHO owns it and WHO may see
+// it — the concern every per-kind table (Spell today; Item eventually) used
+// to duplicate for itself (Spell.ownerId, #1784). Deliberately carries NO
+// back-relation to any per-kind table (no `spell Spell?` field here): a
+// generic supertype that named its own subtypes would defeat the point of
+// being generic the moment a second kind (Item) joins it. The per-kind table
+// points UP at its CatalogEntry via a bare scalar instead (see Spell.
+// catalogEntryId's own comment).
+enum CatalogKind {
+  SPELL
+}
+
+// GLOBAL = seeded system content, visible to everyone. USER = a player's
+// homebrew, visible only to them (until granted into a campaign, #1795 later
+// slices). CAMPAIGN = a DM's homebrew, scoped to their campaign.
+enum CatalogScope {
+  GLOBAL
+  USER
+  CAMPAIGN
+}
+
+model CatalogEntry {
+  id    String       @id @default(uuid())
+  kind  CatalogKind
+  scope CatalogScope
+
+  // Exactly one of ownerUserId/ownerCampaignId is set, matching `scope`
+  // (GLOBAL: neither) — a CHECK constraint enforces this; Prisma's DSL can't
+  // express a cross-column conditional, so it's hand-written into the
+  // migration (see that file's own comment, same shape as Item's
+  // scope/scopeKey agreement CHECK).
+  ownerUserId String?
+  ownerUser   User?   @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  ownerCampaignId String?
+  ownerCampaign   Campaign? @relation(fields: [ownerCampaignId], references: [id], onDelete: Cascade)
+
+  name    String
+  edition RulesEdition
+
+  // Fork provenance (#1795 later slices: forking a GLOBAL/granted entry into
+  // your own USER/CAMPAIGN scope to customize it). SetNull, not Cascade: the
+  // origin being deleted must not take every fork of it down too — a fork
+  // stands on its own copy of the content the moment it exists.
+  forkedFromId String?
+  forkedFrom   CatalogEntry?  @relation("Fork", fields: [forkedFromId], references: [id], onDelete: SetNull)
+  forks        CatalogEntry[] @relation("Fork")
+
+  grants CatalogGrant[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Business-key uniqueness: NULLS NOT DISTINCT so two GLOBAL (both owner
+  // arms null) rows can't share a (kind, name, edition), matching Spell's
+  // pre-#1796 (name, edition, ownerId) key. Hand-written into the migration
+  // — same Prisma-DSL limitation as Spell's own former unique index (Prisma
+  // 7.8 rejects the `nullsNotDistinct` attribute).
+  @@unique([kind, scope, ownerUserId, ownerCampaignId, name, edition])
+  @@index([kind, scope])
+  @@index([ownerUserId])
+  @@index([ownerCampaignId])
+  @@index([forkedFromId])
+}
+
+// A CAMPAIGN's or DM's grant of a USER/GLOBAL catalog entry into a specific
+// campaign, so its players can see content that isn't theirs or the system's
+// (#1795 later slices resolve the read path through this join). One entry
+// may be granted into many campaigns; one campaign may hold many grants —
+// hence the plain join table rather than a column on CatalogEntry.
+model CatalogGrant {
+  id String @id @default(uuid())
+
+  catalogEntryId String
+  catalogEntry   CatalogEntry @relation(fields: [catalogEntryId], references: [id], onDelete: Cascade)
+
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([catalogEntryId, campaignId])
+  @@index([campaignId])
+}
+
 // Baseline spell catalog — same catalog-table role as Item above. Seeded from
 // a curated SRD subset (prisma/seed.ts). Never referenced by a direct FK on
 // Character; provenance lives in the per-character spellcasting JSON blob's
@@ -1570,6 +1703,9 @@ model Spell {
   grantedBy        SubclassGrantedSpell[]
   // Species/variants that grant this spell for free (#1679's table; no rows yet).
   speciesGrantedBy SpeciesGrantedSpell[]
+  // Subclasses whose list-expansion adds this spell to the choosable pool
+  // (#1631) — a picker-only widening, never a free grant (see grantedBy above).
+  listExpandedBy   SubclassSpellListExpansion[]
   // Class-membership join (#1711 F2 of epic #1517) — replaces the old
   // `classes String[]` column. No `edition` filter needed on this side: a
   // 2014-fork Spell row and its 2024 sibling are separate Spell rows (Shape
@@ -1589,7 +1725,17 @@ model Spell {
   // than to the "shared" NULL Feat uses.
   edition RulesEdition?
 
-  @@unique([name, edition])
+  // Entitlement supertype (#1796, epic #1795 1/6): every Spell row — seeded
+  // OR homebrew — is 1:1 with exactly one CatalogEntry, which is what now
+  // carries ownership/scope (replacing the #1784 Spell.ownerId column this
+  // migration drops). A bare scalar, deliberately with NO Prisma relation
+  // field here: CatalogEntry carries no back-relation to Spell either (see
+  // that model's own comment), which is what keeps the supertype closed to
+  // future kinds (Item, …) instead of hard-coupling it to Spell specifically.
+  // The FK constraint (ON DELETE CASCADE) is hand-written into the migration
+  // — Prisma only emits one from an actual `@relation`, and this column
+  // deliberately has none.
+  catalogEntryId String @unique
 }
 
 // Spell↔class membership join (#1711, F2 of epic #1517's 2014 catalog fork).

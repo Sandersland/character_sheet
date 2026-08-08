@@ -71,7 +71,7 @@ export default function SubclassStep() {
                   <span
                     aria-hidden
                     className={`h-3.5 w-3.5 shrink-0 rounded-full border ${
-                      selected ? "border-garnet-600 bg-garnet-600" : "border-parchment-400"
+                      selected ? "border-garnet-600 bg-garnet-soft-surface" : "border-parchment-400"
                     }`}
                   />
                 </span>

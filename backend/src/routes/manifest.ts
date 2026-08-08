@@ -17,6 +17,8 @@ import { entitiesRouter } from "@/routes/campaign/entities.js";
 import { sessionsRouter } from "@/routes/session/sessions.js";
 import { experienceRouter } from "@/routes/character/experience.js";
 import { featsRouter } from "@/routes/catalog/feats.js";
+import { forkRouter } from "@/routes/catalog/fork.js";
+import { grantsRouter } from "@/routes/catalog/grants.js";
 import { healthRouter } from "@/routes/platform/health.js";
 import { hitPointsRouter } from "@/routes/character/hitpoints.js";
 import { inventoryRouter } from "@/routes/character/inventory.js";
@@ -31,6 +33,7 @@ import { subclassChoicesRouter } from "@/routes/character/subclass-choices.js";
 import { channelDivinityRouter } from "@/routes/character/channel-divinity.js";
 import { referenceRouter } from "@/routes/catalog/reference.js";
 import { resourcesRouter } from "@/routes/character/resources.js";
+import { customSpellsRouter } from "@/routes/catalog/custom-spells.js";
 import { spellsRouter } from "@/routes/catalog/spells.js";
 import { spellcastingRouter } from "@/routes/character/spellcasting.js";
 
@@ -61,7 +64,13 @@ export const routeManifest: RouteMount[] = [
   { router: referenceRouter, mount: "/api", scope: "authed" },
   { router: itemsRouter, mount: "/api", scope: "authed" },
   { router: spellsRouter, mount: "/api", scope: "authed" },
+  // Owns /spells/custom — mounted after spellsRouter (registration order is
+  // load-bearing per this file's own docstring) so the fixed "custom" segment
+  // never shadows spellsRouter's own paths, though today they're disjoint.
+  { router: customSpellsRouter, mount: "/api", scope: "authed" },
   { router: featsRouter, mount: "/api", scope: "authed" },
+  { router: grantsRouter, mount: "/api", scope: "authed" },
+  { router: forkRouter, mount: "/api", scope: "authed" },
   // Edition-independent by construction (#1436): the only catalog route that
   // takes no `?edition=`, because it is what the client reads to CHOOSE one.
   { router: editionsRouter, mount: "/api", scope: "authed" },

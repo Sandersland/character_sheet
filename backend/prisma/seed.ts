@@ -18,6 +18,7 @@ import { SPELLS_2014 } from "./seed/spells-2014/index.js";
 import { applySpellRenames } from "./seed/rename-spells.js";
 import { seedSpellClassesFor } from "./seed/seed-spell-classes.js";
 import { seedSubclassGrantedSpells } from "./seed/seed-granted-spells.js";
+import { seedSubclassSpellListExpansions } from "./seed/seed-spell-list-expansions.js";
 import { seedClassFeatures } from "./seed/seed-class-features.js";
 import { seedSubclasses } from "./seed/seed-subclasses.js";
 import { seedSpecies } from "./seed/seed-species.js";
@@ -382,6 +383,29 @@ async function resolveOriginFeatId(prisma: PrismaClient, bg: (typeof BACKGROUNDS
   return feat.id;
 }
 
+// Pure defaulting for BACKGROUNDS' toolChoices/toolChoiceCount pair (#1779,
+// mirrors CharacterClass's own seeding) — split out of
+// normalizedBackgroundFields purely to keep ITS OWN complexity under the
+// repo's health gate.
+function normalizedToolChoiceFields(background: (typeof BACKGROUNDS)[number]) {
+  return {
+    toolChoices: background.toolChoices ?? [],
+    toolChoiceCount: background.toolChoiceCount ?? 0,
+  };
+}
+
+// Pure defaulting for BACKGROUNDS' optional array/count fields — split out
+// of backgroundSeedData purely to keep ITS OWN complexity under the repo's
+// health gate (the async origin-feat lookup below already carries its own).
+function normalizedBackgroundFields(background: (typeof BACKGROUNDS)[number]) {
+  return {
+    skillProficiencies: background.skillProficiencies,
+    toolProficiencies: background.toolProficiencies ?? [],
+    ...normalizedToolChoiceFields(background),
+    abilityChoices: background.abilityChoices ?? [],
+  };
+}
+
 // Split out of seedBackgrounds to keep that loop's own complexity low — pure
 // field defaulting plus the one async origin-feat lookup.
 async function backgroundSeedData(
@@ -391,9 +415,7 @@ async function backgroundSeedData(
 ) {
   return {
     name: background.name,
-    skillProficiencies: background.skillProficiencies,
-    toolProficiencies: background.toolProficiencies ?? [],
-    abilityChoices: background.abilityChoices ?? [],
+    ...normalizedBackgroundFields(background),
     originFeatId: await resolveOriginFeatId(prisma, background),
     edition,
   };
@@ -441,6 +463,26 @@ function resolvedSpellEdition(spell: Pick<CatalogSpell, "edition">): SeedEdition
   return spell.edition ?? "EDITION_2024";
 }
 
+// Upsert-by-find the GLOBAL CatalogEntry (#1796, epic #1795 1/6) backing a
+// seeded spell — its (kind, scope, name, edition) already IS the business
+// key CatalogEntry's own hand-written unique index enforces (see that
+// migration's comment), so find-then-create is find-then-write like
+// upsertEditionRow above, not a true `.upsert()` (Prisma's compound-key
+// shorthand can't express a null owner arm any more cleanly than it can a
+// null edition — same restriction upsertEditionRow's own comment documents).
+async function upsertGlobalSpellCatalogEntry(prisma: PrismaClient, name: string, edition: SeedEdition): Promise<string> {
+  const existing = await prisma.catalogEntry.findFirst({
+    where: { kind: "SPELL", scope: "GLOBAL", name, edition },
+    select: { id: true },
+  });
+  if (existing) return existing.id;
+  const created = await prisma.catalogEntry.create({
+    data: { kind: "SPELL", scope: "GLOBAL", name, edition },
+    select: { id: true },
+  });
+  return created.id;
+}
+
 // Seed spell catalog — apply in-place renames FIRST (so the upsert matches the
 // renamed row, not a stranded twin), then upsertEditionRow by (name, edition)
 // so a same-name 2014/2024 fork lands as siblings rather than one overwriting
@@ -453,7 +495,11 @@ async function seedSpells(prisma: PrismaClient) {
   const allSpells: CatalogSpell[] = [...SPELLS, ...SPELLS_2014];
   for (const spell of allSpells) {
     const edition = resolvedSpellEdition(spell);
-    const data = { ...spellSeedData(spell), edition };
+    // Every seeded spell is 1:1 with its own GLOBAL CatalogEntry (#1796) —
+    // resolved BEFORE the Spell upsert since catalogEntryId is a required,
+    // uniquely-constrained column with no default.
+    const catalogEntryId = await upsertGlobalSpellCatalogEntry(prisma, spell.name, edition);
+    const data = { ...spellSeedData(spell), edition, catalogEntryId };
     // upsertEditionRow, not .upsert(): the compound-key shorthand can't
     // express a null edition, and every spell here resolves to a concrete
     // one anyway (see resolvedSpellEdition) — used for consistency with
@@ -465,11 +511,20 @@ async function seedSpells(prisma: PrismaClient) {
     await seedSpellClassesFor(prisma, row.id, spell.classes);
   }
   const staleWhere = staleCatalogRowsWhere("name", allSpells.map((s) => ({ identity: s.name, edition: resolvedSpellEdition(s) })));
-  const stale = await prisma.spell.findMany({ where: staleWhere, select: { name: true, edition: true } });
+  const stale = await prisma.spell.findMany({ where: staleWhere, select: { id: true, name: true, edition: true, catalogEntryId: true } });
   if (stale.length) {
     console.log(`seedSpells: dropping stale catalog rows: ${stale.map((s) => `${s.name} (${s.edition ?? "shared"})`).join(", ")}`);
   }
   await prisma.spell.deleteMany({ where: staleWhere });
+  // Spell.catalogEntryId carries no Prisma relation (the supertype stays
+  // closed, see schema.prisma's own comment), so dropping a stale Spell row
+  // above does NOT cascade to its CatalogEntry the way the reverse direction
+  // does — swept explicitly here or a stale spell's GLOBAL entry would
+  // linger and (once the resolver reads CatalogEntry, #1795 later slices)
+  // serve as a phantom entitlement for content nobody can see any more.
+  if (stale.length) {
+    await prisma.catalogEntry.deleteMany({ where: { id: { in: stale.map((s) => s.catalogEntryId) } } });
+  }
 }
 
 // Returns itemName → id so packs can resolve their contents.
@@ -544,6 +599,9 @@ async function main() {
   await seedBackgrounds(prisma);
   await seedSpells(prisma);
   await seedSubclassGrantedSpells(prisma, classIds);
+  // #1631: the SubclassGrantedSpell sibling family — same ordering
+  // constraint (subclasses AND spells must already be seeded).
+  await seedSubclassSpellListExpansions(prisma, classIds);
   // #1683: 2024 lineage/legacy spell tracks — needs Species (seedSpecies,
   // above) AND the Spell catalog (seedSpells, just above) both seeded.
   await seedSpeciesGrantedSpells(prisma);

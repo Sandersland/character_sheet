@@ -29,7 +29,7 @@ export default function HpChoiceCard({
       aria-pressed={selected}
       className={`${CHOICE_BASE} ${selected ? CHOICE_SEL : ""}`}
     >
-      <span className={`${PICK} ${selected ? "border-garnet-700 bg-garnet-600" : "border-parchment-300"}`} />
+      <span className={`${PICK} ${selected ? "border-garnet-700 bg-garnet-soft-surface" : "border-parchment-300"}`} />
       <div className={CH}>{label}</div>
       <div className={`${CBIG} ${selected ? "text-garnet-700" : "text-parchment-900"}`}>{value}</div>
       <div className={CNOTE}>{note}</div>

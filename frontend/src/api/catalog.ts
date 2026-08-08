@@ -1,6 +1,6 @@
 import type { CatalogFeat, CatalogSpell, EditionsResponse, Item, ReferenceData } from "@/types/character";
-import type { RulesEdition } from "@character-sheet/shared-types";
-import { request } from "@/api/http";
+import type { GrantWire, RulesEdition } from "@character-sheet/shared-types";
+import { jsonBody, request, send } from "@/api/http";
 
 // A query param (not a header, #1325): there is no Cache-Control anywhere in
 // backend/src and Express's default weak ETag is on, so a header could let
@@ -19,6 +19,18 @@ export async function fetchItems(): Promise<Item[]> {
 export interface SpellCatalogFilter {
   className?: string;
   maxLevel?: number;
+  // #1631: a chosen subclass's list-expansion (e.g. The Fiend's Expanded
+  // Spell List) widens `className`'s own membership filter with spells NOT
+  // on the class's own list. Ignored server-side when className is absent —
+  // see GET /api/spells's own comment.
+  subclassId?: string;
+  // #1811, epic #1795 9/9: the character the picker is learning FOR. Present,
+  // the server resolves visibility for that character's own campaign — a
+  // spell shared/granted into it, or a DM's CAMPAIGN override, reaches the
+  // picker (see spells.ts's resolveCharacterViewer). Absent, behavior is
+  // unchanged (GLOBAL + the caller's own USER entries) — the creation
+  // ceremony has no character yet and stays on that path.
+  characterId?: string;
 }
 
 // Feeds the spellcasting section's "learn from catalog" picker.
@@ -35,6 +47,8 @@ export async function fetchSpells(edition: RulesEdition, filter: SpellCatalogFil
   const params = new URLSearchParams({ edition });
   if (filter.className !== undefined) params.set("class", filter.className);
   if (filter.maxLevel !== undefined) params.set("maxLevel", String(filter.maxLevel));
+  if (filter.subclassId !== undefined) params.set("subclassId", filter.subclassId);
+  if (filter.characterId !== undefined) params.set("characterId", filter.characterId);
   return request<CatalogSpell[]>(`/spells?${params.toString()}`, undefined, "Failed to fetch spell catalog");
 }
 
@@ -58,4 +72,45 @@ export async function fetchFeats(edition: RulesEdition, asiLevel?: number): Prom
 // would make the edition picker depend on the answer it exists to produce.
 export async function fetchEditions(): Promise<EditionsResponse> {
   return request<EditionsResponse>("/editions", undefined, "Failed to fetch rules editions");
+}
+
+// Grant CRUD (#1799, epic #1795 4/6): the owner of a USER-scope catalog entry
+// (a homebrew spell) shares/unshares it into a campaign they belong to.
+// Ownership-scoped plain REST against grants.ts, same idempotent-POST /
+// deleteMany-DELETE shape that route documents — a second identical POST is
+// a 200, not a 409/500, and DELETE 204s even if the grant is already gone, so
+// neither call site here needs to know the entry's CURRENT grant state up
+// front (there is no GET …/grants list endpoint — see ShareSpellSheet's own
+// comment for how the UI copes with that).
+export async function shareCatalogEntry(entryId: string, campaignId: string): Promise<GrantWire> {
+  return request<GrantWire>(
+    `/catalog/entries/${entryId}/grants`,
+    jsonBody({ campaignId }),
+    "Failed to share spell into campaign",
+  );
+}
+
+export async function unshareCatalogEntry(entryId: string, campaignId: string): Promise<void> {
+  await send(
+    `/catalog/entries/${entryId}/grants/${campaignId}`,
+    { method: "DELETE" },
+    "Failed to unshare spell from campaign",
+  );
+}
+
+/** POST …/fork request body (#1800, epic #1795 5/6) — mirrors catalogForkSchema's own shape. */
+export type CatalogForkTarget = { scope: "USER" } | { scope: "CAMPAIGN"; campaignId: string };
+
+// Fork (#1800, epic #1795 5/6): a self-contained deep copy of a visible
+// catalog entry into the caller's own USER stash ("make my version"), or —
+// for a campaign's DM only — into that campaign's CAMPAIGN scope ("override
+// for campaign"). The response's `spell` is the SAME served shape GET
+// /api/spells rows carry (CatalogSpell), so the caller can add it straight to
+// a locally-held catalog list without a refetch.
+export async function forkCatalogEntry(entryId: string, target: CatalogForkTarget): Promise<{ entryId: string; spell: CatalogSpell }> {
+  return request<{ entryId: string; spell: CatalogSpell }>(
+    `/catalog/entries/${entryId}/fork`,
+    jsonBody(target),
+    "Failed to fork spell",
+  );
 }

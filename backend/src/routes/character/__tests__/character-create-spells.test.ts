@@ -6,6 +6,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
 import { seededSpeciesAnchor } from "@/test-support/species.js";
+import { makeCatalogEntry } from "@/test-support/catalog-entry.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 
 // #1131: the creation spell/cantrip picker. A level-1 caster (Warlock: 2 cantrips
@@ -194,6 +195,60 @@ describe("POST /api/characters — creation spell/cantrip picks (#1131)", () => 
     expect(res.status).toBe(201);
     const book = (res.body.spellcasting?.spells ?? []) as unknown[];
     expect(book).toHaveLength(0);
+  });
+});
+
+// #1631: The Fiend's PHB'14 "Expanded Spell List" is list-EXPANSION, not a
+// free grant — a 2014 Warlock picks its patron at creation (subclassLevel 1),
+// so a Fiend Warlock's level-1 known-spell picks may already include a patron
+// spell that is NOT on the base Warlock list (Burning Hands/Command).
+describe("POST /api/characters — subclass spell-list expansion at creation (#1631)", () => {
+  async function requireSubclassId(className: string, subclassName: string, edition: "EDITION_2014" | "EDITION_2024" | null): Promise<string> {
+    const cls = await prisma.characterClass.findUniqueOrThrow({ where: { name: className }, select: { id: true } });
+    const sub = await prisma.subclass.findFirstOrThrow({ where: { classId: cls.id, name: subclassName, edition }, select: { id: true } });
+    return sub.id;
+  }
+
+  it("a 2014 Fiend Warlock may pick Burning Hands (off the base Warlock list, on the patron's expansion) as a known spell", async () => {
+    const fiendId = await requireSubclassId("Warlock", "The Fiend", null);
+    const burningHands = await prisma.spell.findFirstOrThrow({
+      where: { name: "Burning Hands", edition: "EDITION_2014", NOT: { classMemberships: { some: { className: "warlock" } } } },
+      select: { id: true },
+    });
+    const cantripIds = await catalogSpellIds("warlock", 0, "EDITION_2014", 2);
+    const [ownListSpellId] = await catalogSpellIds("warlock", 1, "EDITION_2014", 1);
+
+    const res = await create({
+      ...BASE,
+      name: "CreateSpells1631 Fiend",
+      classes: [{ name: "Warlock", subclassId: fiendId }],
+      rulesEdition: "EDITION_2014",
+      spells: { cantripIds, spellIds: [ownListSpellId, burningHands.id] },
+    });
+
+    expect(res.status).toBe(201);
+    const spellIds = (res.body.spellcasting.spells as Array<{ spellId?: string }>).map((s) => s.spellId);
+    expect(spellIds).toContain(burningHands.id);
+  });
+
+  it("a 2014 Warlock with NO subclass chosen still rejects the same off-list spell", async () => {
+    const burningHands = await prisma.spell.findFirstOrThrow({
+      where: { name: "Burning Hands", edition: "EDITION_2014", NOT: { classMemberships: { some: { className: "warlock" } } } },
+      select: { id: true },
+    });
+    const cantripIds = await catalogSpellIds("warlock", 0, "EDITION_2014", 2);
+    const [ownListSpellId] = await catalogSpellIds("warlock", 1, "EDITION_2014", 1);
+
+    const res = await create({
+      ...BASE,
+      name: "CreateSpells1631 NoSubclass",
+      classes: [{ name: "Warlock" }],
+      rulesEdition: "EDITION_2014",
+      spells: { cantripIds, spellIds: [ownListSpellId, burningHands.id] },
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/spell list/i);
   });
 });
 
@@ -404,8 +459,23 @@ describe("POST /api/characters — cross-edition spell-fork rejection (#1712)", 
       duration: "Instantaneous", description: "The PHB'14 text.", concentration: false, ritual: false, cantripScaling: true,
     };
     const row2024 = { ...row2014, description: "The SRD 5.2 text." };
-    const fork2014 = await upsertEditionRow(prisma.spell, { name: FORK_NAME, edition: "EDITION_2014" }, { ...row2014, edition: "EDITION_2014" }, row2014);
-    const fork2024 = await upsertEditionRow(prisma.spell, { name: FORK_NAME, edition: "EDITION_2024" }, { ...row2024, edition: "EDITION_2024" }, row2024);
+    // catalogEntryId (#1796) is resolved first, per edition fork — required,
+    // no default, and each fork is its own distinct CatalogEntry (business
+    // key includes edition).
+    const catalogEntryId2014 = await makeCatalogEntry({ name: FORK_NAME, edition: "EDITION_2014" });
+    const catalogEntryId2024 = await makeCatalogEntry({ name: FORK_NAME, edition: "EDITION_2024" });
+    const fork2014 = await upsertEditionRow(
+      prisma.spell,
+      { name: FORK_NAME, edition: "EDITION_2014" },
+      { ...row2014, edition: "EDITION_2014", catalogEntryId: catalogEntryId2014 },
+      row2014,
+    );
+    const fork2024 = await upsertEditionRow(
+      prisma.spell,
+      { name: FORK_NAME, edition: "EDITION_2024" },
+      { ...row2024, edition: "EDITION_2024", catalogEntryId: catalogEntryId2024 },
+      row2024,
+    );
     for (const spellId of [fork2014.id, fork2024.id]) {
       await prisma.spellClass.upsert({
         where: { spellId_className: { spellId, className: "warlock" } },
@@ -430,7 +500,10 @@ describe("POST /api/characters — cross-edition spell-fork rejection (#1712)", 
   }
 
   afterAll(async () => {
-    await prisma.spell.deleteMany({ where: { name: FORK_NAME } });
+    // Deleting the CatalogEntry cascades the Spell row (ON DELETE CASCADE,
+    // #1796) — the reverse cascade doesn't exist (the supertype stays
+    // closed), so a plain `spell.deleteMany` alone would orphan the entry.
+    await prisma.catalogEntry.deleteMany({ where: { name: FORK_NAME, kind: "SPELL" } });
   });
 
   it("rejects a 2024 creation submitting the 2014 fork's id, naming the spell", async () => {

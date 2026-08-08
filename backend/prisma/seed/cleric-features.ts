@@ -100,11 +100,12 @@
 // seed-class-features.ts for the precedent): Divine Order's Protector/
 // Thaumaturge choice, Blessed Strikes'/Improved Blessed Strikes' Divine
 // Strike/Potent Spellcasting choice, Divine Spark's heal-or-damage Channel
-// Divinity option, Epic Boon's feat grant, Divine Intervention's cast-
-// without-a-slot behavior, and both domains' always-prepared spell grants
-// (Life/Trickery Domain Spells) — the latter can't be SubclassGrantedSpell
-// rows, since that model has no `edition` column and Subclass rows are
-// edition-shared (the schema gap Wizard's #1234 disclosed first).
+// Divinity option, Epic Boon's feat grant, and Divine Intervention's cast-
+// without-a-slot behavior. Both domains' always-prepared spell grants (Life/
+// Trickery Domain Spells) ARE wired up, as per-edition SubclassGrantedSpell
+// rows in subclass-granted-spells.ts (#1625's edition column; #1626 retagged
+// the 2014/2024 divergences) — this file's domain-spell feature text is the
+// authority those rows are cross-checked against, not their mechanism.
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { FeatImprovement } from "../../src/lib/classes/resources-state.js";
 import type { SeedEdition } from "./edition.js";

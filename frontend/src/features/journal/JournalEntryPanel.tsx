@@ -187,7 +187,7 @@ function PanelFooter({
       <button
         type="submit"
         disabled={!canSubmit}
-        className="rounded-control bg-garnet-600 px-3 py-1.5 text-xs font-semibold text-parchment-50 hover:bg-garnet-700 disabled:opacity-40"
+        className="rounded-control bg-garnet-soft-surface px-3 py-1.5 text-xs font-semibold text-garnet-on-surface hover:bg-garnet-soft-surface-hover disabled:opacity-40"
       >
         {submitLabel}
       </button>
@@ -229,7 +229,7 @@ function PrivateToggle({
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        className="h-3.5 w-3.5 accent-garnet-600"
+        className="h-3.5 w-3.5 accent-garnet-soft-surface"
       />
       Private (only you can see this {noun})
     </label>

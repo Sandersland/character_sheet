@@ -85,12 +85,14 @@ const referenceFixture: ReferenceData = {
     },
   ],
   backgrounds: [
-    { id: "bg-sage", name: "Sage", skillProficiencies: ["history"], toolProficiencies: [], abilityChoices: [], originFeat: null, startingEquipment: null },
+    { id: "bg-sage", name: "Sage", skillProficiencies: ["history"], toolProficiencies: [], toolChoices: [], toolChoiceCount: 0, abilityChoices: [], originFeat: null, startingEquipment: null },
     {
       id: "bg-crim",
       name: "Criminal",
       skillProficiencies: ["stealth"],
       toolProficiencies: ["Thieves' Tools"],
+      toolChoices: [],
+      toolChoiceCount: 0,
       abilityChoices: ["dexterity", "constitution", "intelligence"],
       originFeat: { id: "feat-alert", name: "Alert", description: "You gain a bonus to Initiative.", category: "origin" },
       startingEquipment: null,
@@ -99,7 +101,11 @@ const referenceFixture: ReferenceData = {
       id: "bg-soldier",
       name: "Soldier",
       skillProficiencies: ["athletics"],
-      toolProficiencies: ["Dice Set"],
+      toolProficiencies: [],
+      // #1779: Soldier's real tool line is a Gaming Set CHOICE, not a fixed
+      // grant — mirrored here so this fixture matches the seeded shape.
+      toolChoices: ["Dice Set", "Dragonchess Set", "Playing Card Set", "Three-Dragon Ante Set"],
+      toolChoiceCount: 1,
       abilityChoices: ["strength", "dexterity", "constitution"],
       originFeat: { id: "feat-savage", name: "Savage Attacker", description: "Reroll weapon damage.", category: "origin" },
       startingEquipment: null,
@@ -198,8 +204,10 @@ describe("CharacterCreatePage (#1176 ceremony)", () => {
     await u.click(screen.getByRole("checkbox", { name: "Drum" }));
     await continueStep(u); // → Spells
 
-    // Spells step (#1160): add straight from the row pills.
+    // Spells step (#1160/#1778): Cantrips and Spells are separate tabs now —
+    // add from the default (Cantrips) tab, then switch to Spells for the rest.
     await u.click(await screen.findByRole("button", { name: "Add Vicious Mockery" }));
+    await u.click(screen.getByRole("radio", { name: /Spells/ }));
     await u.click(screen.getByRole("button", { name: "Add Charm Person" }));
     await continueStep(u); // → Equipment
     await continueStep(u); // → Review

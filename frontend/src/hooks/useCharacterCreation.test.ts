@@ -62,7 +62,7 @@ const reference: ReferenceData = {
     }),
   ],
   backgrounds: [
-    { id: "bg-1", name: "Sage", skillProficiencies: ["perception"], toolProficiencies: [], abilityChoices: [], originFeat: null, startingEquipment: null },
+    { id: "bg-1", name: "Sage", skillProficiencies: ["perception"], toolProficiencies: [], toolChoices: [], toolChoiceCount: 0, abilityChoices: [], originFeat: null, startingEquipment: null },
   ],
   alignments: ["Neutral Good"],
   artisanTools: [],
@@ -109,6 +109,7 @@ function seedDraft(overrides: Partial<CharacterDraft>) {
     speciesOriginFeatId: "",
     skillProficiencies: [],
     toolChoices: [],
+    backgroundToolChoices: [],
     cantripIds: [],
     spellIds: [],
     equipmentDraft: null,

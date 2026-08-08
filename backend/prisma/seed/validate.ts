@@ -9,14 +9,16 @@
 // SEED_FAMILIES is a registry, not a hardcoded list of calls — adding a
 // family is one entry here, demonstrated by the second member (SUBCLASS_
 // GRANTED_SPELLS) landing alongside the first, not merely asserted, the third
-// (CLASS_FEATURES, #1523) landing the same way, and the fourth
-// (STARTING_EQUIPMENT_PACKAGES, #1533) too. Deliberately in scope for only
-// these four today; the other seed families already carry structural
-// coverage via seed-data.test.ts and are a named follow-up.
+// (CLASS_FEATURES, #1523) landing the same way, the fourth
+// (STARTING_EQUIPMENT_PACKAGES, #1533), and SUBCLASS_SPELL_LIST_EXPANSIONS
+// (#1631, SUBCLASS_GRANTED_SPELLS' sibling family) too. The other seed
+// families already carry structural coverage via seed-data.test.ts and are a
+// named follow-up.
 import { z } from "zod";
 
 import { SUBCLASSES, subclassSeedSchema } from "./subclasses.js";
 import { SUBCLASS_GRANTED_SPELLS, subclassGrantedSpellSeedSchema } from "./subclass-granted-spells.js";
+import { SUBCLASS_SPELL_LIST_EXPANSIONS, subclassSpellListExpansionSeedSchema } from "./subclass-spell-list-expansions.js";
 import { CLASS_FEATURES, classFeatureSeedSchema } from "./class-features.js";
 import {
   STARTING_EQUIPMENT_PACKAGES,
@@ -40,6 +42,7 @@ interface SeedFamily {
 const SEED_FAMILIES: Record<string, SeedFamily> = {
   SUBCLASSES: { schema: subclassSeedSchema, rows: SUBCLASSES },
   SUBCLASS_GRANTED_SPELLS: { schema: subclassGrantedSpellSeedSchema, rows: SUBCLASS_GRANTED_SPELLS },
+  SUBCLASS_SPELL_LIST_EXPANSIONS: { schema: subclassSpellListExpansionSeedSchema, rows: SUBCLASS_SPELL_LIST_EXPANSIONS },
   CLASS_FEATURES: { schema: classFeatureSeedSchema, rows: CLASS_FEATURES },
   STARTING_EQUIPMENT_PACKAGES: { schema: startingEquipmentSeedSchema, rows: STARTING_EQUIPMENT_PACKAGES },
   // #1565 — the background twin, validated by the same tree shape

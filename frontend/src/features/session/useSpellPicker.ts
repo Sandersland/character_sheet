@@ -366,6 +366,9 @@ export function useSpellPicker(opts: UseSpellPickerOptions): UseSpellPicker {
       keptFace: keptD20(result)?.value ?? null,
       nat20: isNaturalTwenty(result),
       nat1: isNaturalOne(result),
+      // #1120: a spell attack is never a weapon attack or Unarmed Strike, so
+      // Champion's crit-range widening never applies here — literal nat20.
+      criticalHit: isNaturalTwenty(result),
     };
     // Fresh id per attack roll (#1235/#1360) — rollAndLogCast reads it back
     // via spell.id when the cast follows. Note: no crit-doubling here — the

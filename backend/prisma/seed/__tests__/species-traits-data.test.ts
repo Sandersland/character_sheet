@@ -86,6 +86,7 @@ describe("derived subset — the ONLY traits carrying `improvements` (issue #168
         "elf::EDITION_2014::drow::Drow Weapon Training",
         "elf::EDITION_2014::high::Elf Weapon Training",
         "elf::EDITION_2014::wood::Elf Weapon Training",
+        "half-orc::EDITION_2014::base::Menacing",
       ].sort(),
     );
   });
@@ -95,6 +96,13 @@ describe("derived subset — the ONLY traits carrying `improvements` (issue #168
       (t) => t.speciesSlug === "elf" && t.speciesEdition === "EDITION_2014" && !t.variantSlug && t.name === "Keen Senses",
     );
     expect(keenSenses?.improvements).toEqual([{ target: "skillProficiency", amount: 1, key: "perception" }]);
+  });
+
+  it("2014 Half-Orc's Menacing grants a fixed Intimidation skill proficiency, a derived skillProficiency improvement (SRD 5.1 p. 26, #1762)", () => {
+    const menacing = SPECIES_TRAITS.find(
+      (t) => t.speciesSlug === "half-orc" && t.speciesEdition === "EDITION_2014" && !t.variantSlug && t.name === "Menacing",
+    );
+    expect(menacing?.improvements).toEqual([{ target: "skillProficiency", amount: 1, key: "intimidation" }]);
   });
 
   it("Hill Dwarf's Dwarven Toughness is a perLevel maxHp improvement, +1", () => {

@@ -1,7 +1,7 @@
 // The single attack card (#811): one numbered step rail — Roll to hit → Call it
 // → Damage — replacing the separate AttackFormCard + WeaponDamageCard pair.
 // Verdict flow: rolling damage is an implicit hit; "it Missed" / "Crit!" sit on
-// the to-hit result line; nat 20 / nat 1 lock the call. A miss resets the card
+// the to-hit result line; a crit-range hit (#1120) / nat 1 lock the call. A miss resets the card
 // for the next attack; a hit keeps it expanded with a full-width continue
 // button. The quiet Skip link is the ungated path that leaves a row unresolved.
 // Each step's branching lives in its own subcomponent; AttackStepCard is
@@ -46,7 +46,7 @@ interface AttackStepCardProps {
 }
 
 const DOT_STYLE: Record<StepState, string> = {
-  done: "border-garnet-600 bg-garnet-600 text-parchment-50",
+  done: "border-garnet-600 bg-garnet-soft-surface text-garnet-on-surface",
   active: "border-garnet-600 bg-parchment-50 text-garnet-700",
   pending: "border-parchment-300 bg-parchment-50 text-parchment-400",
 };
@@ -102,7 +102,7 @@ export function AttackKickerPips({ attack }: { attack: AttackState | null }) {
           <span
             key={i}
             className={`inline-block h-2 w-2 rounded-full ${
-              i < attack.used ? "bg-parchment-300" : "bg-garnet-600"
+              i < attack.used ? "bg-parchment-300" : "bg-garnet-soft-surface"
             }`}
           />
         ))}
@@ -229,7 +229,7 @@ function RollToHitStep({
             disabled={attacksExhausted}
             onClick={onRollToHit}
             title={attacksExhausted ? "No attacks remaining" : undefined}
-            className="min-h-11 shrink-0 rounded-control bg-garnet-600 px-3 text-xs font-semibold text-parchment-50 transition-colors hover:bg-garnet-700 disabled:cursor-not-allowed disabled:opacity-40"
+            className="min-h-11 shrink-0 rounded-control bg-garnet-soft-surface px-3 text-xs font-semibold text-garnet-on-surface transition-colors hover:bg-garnet-soft-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
           >
             {attackOrdinalLabel(attack)}
           </button>
@@ -258,7 +258,10 @@ function CallItStep({
   onCallMiss: () => void;
   onCallCrit: () => void;
 }) {
-  if (row.attack.nat20) return <VerdictChip tone="crit">Critical hit! — nat 20</VerdictChip>;
+  // #1120: the rolled face, not a hardcoded "nat 20" — a Champion's widened
+  // crit range auto-locks on a 19 or 18 too, and the die-forced chip must say
+  // the number that actually rolled.
+  if (row.attack.criticalHit) return <VerdictChip tone="crit">Critical hit! — nat {row.attack.keptFace}</VerdictChip>;
   if (row.attack.nat1) return <VerdictChip tone="miss">Miss — nat 1</VerdictChip>;
   if (isUnresolvedRow(row)) {
     return (
@@ -385,7 +388,7 @@ function ContinueOrSkip({
     <button
       type="button"
       onClick={onNext}
-      className="min-h-11 w-full rounded-control bg-garnet-600 px-3 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-700"
+      className="min-h-11 w-full rounded-control bg-garnet-soft-surface px-3 text-sm font-semibold text-garnet-on-surface transition-colors hover:bg-garnet-soft-surface-hover"
     >
       Next
     </button>

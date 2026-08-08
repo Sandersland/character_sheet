@@ -28,6 +28,7 @@ import { FEATS } from "../feats.js";
 import { SPELLS, SPELL_RENAMES, type CatalogSpell } from "../spells.js";
 import { PACKS } from "../packs.js";
 import { SUBCLASS_GRANTED_SPELLS } from "../subclass-granted-spells.js";
+import { SUBCLASS_SPELL_LIST_EXPANSIONS } from "../subclass-spell-list-expansions.js";
 import { FEAT_IMPROVEMENT_TARGETS } from "@/lib/srd/feats.js";
 import { cantripsKnownAtLevel, preparedSpellCountAt } from "@/lib/srd/srd.js";
 import { subclassGateLevel } from "@/lib/leveling/effective-levels.js";
@@ -95,6 +96,64 @@ describe("SUBCLASS_GRANTED_SPELLS — referential integrity", () => {
       }
       expect(new Set(editions).size, `${key}: duplicate rows for one edition`).toBe(editions.length);
     }
+  });
+});
+
+describe("SUBCLASS_SPELL_LIST_EXPANSIONS — referential integrity (#1631)", () => {
+  it("every row references a seeded spell and a seeded subclass", () => {
+    const spellNames = new Set(SPELLS.map((s) => s.name));
+    const subclassKeys = new Set(SUBCLASSES.map((s) => `${s.className}::${s.name}`));
+    for (const e of SUBCLASS_SPELL_LIST_EXPANSIONS) {
+      expect(spellNames.has(e.spellName), `unseeded spell: ${e.spellName}`).toBe(true);
+      expect(
+        subclassKeys.has(`${e.className}::${e.subclassName}`),
+        `unseeded subclass: ${e.className}::${e.subclassName}`,
+      ).toBe(true);
+    }
+  });
+
+  // The Fiend/Archfey/Great Old One's ten-spell PHB'14 "Expanded Spell List"
+  // each, exactly as transcribed in warlock-features.ts's FIEND_RAW/
+  // ARCHFEY_RAW/GREAT_OLD_ONE_RAW EDITION_2014 rows.
+  it("each of the three 2014 patrons carries its exact ten-spell list", () => {
+    const listFor = (subclassName: string) =>
+      SUBCLASS_SPELL_LIST_EXPANSIONS.filter((e) => e.className === "Warlock" && e.subclassName === subclassName)
+        .map((e) => e.spellName)
+        .sort();
+    expect(listFor("The Fiend")).toEqual(
+      ["Blindness/Deafness", "Burning Hands", "Command", "Fire Shield", "Fireball", "Flame Strike", "Hallow", "Scorching Ray", "Stinking Cloud", "Wall of Fire"].sort(),
+    );
+    expect(listFor("The Archfey")).toEqual(
+      ["Blink", "Calm Emotions", "Dominate Beast", "Dominate Person", "Faerie Fire", "Greater Invisibility", "Phantasmal Force", "Plant Growth", "Seeming", "Sleep"].sort(),
+    );
+    expect(listFor("The Great Old One")).toEqual(
+      ["Black Tentacles", "Clairvoyance", "Detect Thoughts", "Dissonant Whispers", "Dominate Beast", "Dominate Person", "Hideous Laughter", "Phantasmal Force", "Sending", "Telekinesis"].sort(),
+    );
+  });
+
+  // #1631's owner decision: 2014's list-expansion and 2024's always-prepared
+  // Fiend Spells are different mechanisms over overlapping-but-not-identical
+  // lists, so The Fiend's rows here are all EDITION_2014 — never shared with
+  // its SubclassGrantedSpell twin (subclass-granted-spells.ts), which is the
+  // "one shared row XOR per-edition rows" guard applied ACROSS the two
+  // families rather than within one, since a spell present in BOTH lists
+  // (e.g. Burning Hands) must resolve through exactly one mechanism per
+  // character, never both.
+  it("every row is tagged EDITION_2014 — no row is shared with a SubclassGrantedSpell twin", () => {
+    const untagged = SUBCLASS_SPELL_LIST_EXPANSIONS.filter((e) => e.edition !== "EDITION_2014").map(
+      (e) => `${e.subclassName}::${e.spellName}::${e.edition ?? "shared"}`,
+    );
+    expect(untagged, "every #1631 patron row must be EDITION_2014").toEqual([]);
+  });
+
+  it("no (subclass, spell) pair appears in both SUBCLASS_SPELL_LIST_EXPANSIONS and SUBCLASS_GRANTED_SPELLS for the SAME edition", () => {
+    const expansionKeys = new Set(
+      SUBCLASS_SPELL_LIST_EXPANSIONS.map((e) => `${e.className}::${e.subclassName}::${e.spellName}::${e.edition ?? "shared"}`),
+    );
+    const collisions = SUBCLASS_GRANTED_SPELLS.filter((g) =>
+      expansionKeys.has(`${g.className}::${g.subclassName}::${g.spellName}::${g.edition ?? "shared"}`),
+    );
+    expect(collisions, "a (subclass, spell, edition) triple must resolve through exactly one mechanism").toEqual([]);
   });
 });
 

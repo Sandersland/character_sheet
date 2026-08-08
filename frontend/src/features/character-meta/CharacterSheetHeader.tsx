@@ -275,7 +275,7 @@ function DesktopBanner({
 const BANNER_CHIP =
   "rounded-control border border-parchment-300 px-3 py-1.5 text-xs font-semibold text-parchment-800 transition-colors hover:bg-parchment-100 disabled:opacity-50";
 const BANNER_CHIP_SOLID =
-  "rounded-control bg-garnet-600 px-3 py-1.5 text-xs font-semibold text-parchment-50 transition-colors hover:bg-garnet-700 disabled:opacity-50";
+  "rounded-control bg-garnet-soft-surface px-3 py-1.5 text-xs font-semibold text-garnet-on-surface transition-colors hover:bg-garnet-soft-surface-hover disabled:opacity-50";
 const BANNER_LINK =
   "text-xs font-semibold text-garnet-700 transition-colors hover:text-garnet-900 disabled:opacity-50";
 const BANNER_KEBAB =
@@ -365,7 +365,7 @@ function BannerActions({
   return (
     <div className="flex flex-wrap items-center justify-end gap-3">
       {isLive && (
-        <span className="rounded-full bg-garnet-600 px-3 py-1 text-xs font-bold text-parchment-50">
+        <span className="rounded-full bg-garnet-soft-surface px-3 py-1 text-xs font-bold text-garnet-on-surface">
           {liveRound != null ? `Live · Round ${liveRound}` : "Live"}
         </span>
       )}

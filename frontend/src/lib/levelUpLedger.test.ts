@@ -26,12 +26,39 @@ function makeCharacter(over?: Partial<Character>): Character {
 // The served hitPoints meta the ledger now reads its HP numbers from (#1380):
 // the ADVANCING class's d10 at the pre-level Con 15 (+2). Deliberately not the
 // d6 `makeCharacter` persists, so a regression back to the aggregate die shows.
-const HP_META = { die: "d10", faces: 10, conMod: 2, fixedAverage: 6, averageGain: 8, minRoll: 3, maxRoll: 12 };
+//
+// #1497: effectiveMaxAverage/effectiveMaxByRoll are ALSO served, and — unlike
+// every other HP_META field — they depend on the character's OWN pre-level
+// max (rawMax), so this suite builds them per-test via hpMetaFor rather than
+// one shared constant: a test whose character carries a different max needs a
+// different effectiveMax, exactly mirroring how the real backend plan and the
+// real served character are resolved off the SAME row.
+function hpMetaFor(rawMax: number) {
+  const conMod = 2;
+  const faces = 10;
+  const gainFor = (roll: number) => Math.max(1, roll + conMod);
+  return {
+    die: "d10",
+    faces,
+    conMod,
+    fixedAverage: 6,
+    averageGain: 8,
+    minRoll: 3,
+    maxRoll: 12,
+    effectiveMaxAverage: rawMax + 8,
+    effectiveMaxByRoll: [0, ...Array.from({ length: faces }, (_, i) => rawMax + gainFor(i + 1))],
+  };
+}
+const HP_META = hpMetaFor(52);
 
-function makePlan(steps: LevelUpStep[] = [], subclass: string | null = "Champion"): LevelUpPlanResponse {
+function makePlan(
+  steps: LevelUpStep[] = [],
+  subclass: string | null = "Champion",
+  hpMeta: LevelUpStep["meta"] = HP_META,
+): LevelUpPlanResponse {
   return {
     target: { className: "Fighter", subclass, newLevel: 8, isPrimary: true },
-    steps: [{ kind: "hitPoints", meta: HP_META }, ...steps],
+    steps: [{ kind: "hitPoints", meta: hpMeta }, ...steps],
     grantedSpells: [],
   };
 }
@@ -267,29 +294,69 @@ describe("buildLevelUpLedger", () => {
       hitPoints: { max: 30 },
       hitDice: { total: 5, die: "d6" },
     } as unknown as Partial<Character>);
-    const rows = buildLevelUpLedger(character, { hp: { method: "average" } }, makePlan(), resolvers);
+    const rows = buildLevelUpLedger(character, { hp: { method: "average" } }, makePlan([], "Champion", hpMetaFor(30)), resolvers);
     // Con 15 → +2; d10 average = floor(10/2)+1+2 = 8; max 30 → 38 (not 36, the d6 answer).
     expect(rowFor(rows, "Maximum HP")).toMatchObject({ before: "30", after: "38" });
   });
 
   it("reads its HP numbers off the same plan step HitPointsStep renders — Review and the HP step cannot disagree", () => {
-    const plan = makePlan();
+    const plan = makePlan([], "Champion", hpMetaFor(30));
     // readHitPointsMeta is exactly the call HitPointsStep makes on this same
     // step, so a divergence would have to be the server disagreeing with itself.
+    // #1497: the "after" value is the served effectiveMaxAverage directly —
+    // neither screen adds the gain to the character's own max anymore.
     const meta = readHitPointsMeta(plan.steps.find((s) => s.kind === "hitPoints"));
     const character = makeCharacter({
       hitPoints: { max: 30 },
       hitDice: { total: 5, die: "d6" },
     } as unknown as Partial<Character>);
     const rows = buildLevelUpLedger(character, { hp: { method: "average" } }, plan, resolvers);
-    expect(rowFor(rows, "Maximum HP")).toMatchObject({ before: "30", after: String(30 + meta.averageGain) });
+    expect(rowFor(rows, "Maximum HP")).toMatchObject({ before: "30", after: String(meta.effectiveMaxAverage) });
+  });
+
+  // #1497: at 2014 exhaustion 4+ (PHB'14 p. 291), `character.hitPoints.max` is
+  // already the halved EFFECTIVE max (15), so `max + averageGain` (15 + 8 = 23)
+  // is NOT what the level-up transaction actually commits — the served
+  // effectiveMaxAverage (19, halving the post-level RAW max's own parity) is.
+  it("renders the served effective max, not before + gain, once exhaustion 4+ has halved the served max", () => {
+    const plan: LevelUpPlanResponse = {
+      ...makePlan([], "Champion", {
+        die: "d10",
+        faces: 10,
+        conMod: 2,
+        fixedAverage: 6,
+        averageGain: 8,
+        minRoll: 3,
+        maxRoll: 12,
+        effectiveMaxAverage: 19,
+        effectiveMaxByRoll: [0, 14, 15, 16, 16, 17, 17, 18, 18, 19, 19],
+      }),
+    };
+    const character = makeCharacter({ hitPoints: { max: 15 } } as unknown as Partial<Character>);
+    const rows = buildLevelUpLedger(character, { hp: { method: "average" } }, plan, resolvers);
+    expect(rowFor(rows, "Maximum HP")).toMatchObject({ before: "15", after: "19" });
   });
 
   it("floors a negative-Con roll at the served minRoll, matching the HP step and the server", () => {
     const plan: LevelUpPlanResponse = {
       ...makePlan(),
       // d6 at Con 1 (−5): every outcome is pinned to the max(1, …) level-up floor.
-      steps: [{ kind: "hitPoints", meta: { die: "d6", faces: 6, conMod: -5, fixedAverage: 4, averageGain: 1, minRoll: 1, maxRoll: 1 } }],
+      steps: [
+        {
+          kind: "hitPoints",
+          meta: {
+            die: "d6",
+            faces: 6,
+            conMod: -5,
+            fixedAverage: 4,
+            averageGain: 1,
+            minRoll: 1,
+            maxRoll: 1,
+            effectiveMaxAverage: 53,
+            effectiveMaxByRoll: [0, 53, 53, 53, 53, 53, 53],
+          },
+        },
+      ],
     };
     const rows = buildLevelUpLedger(makeCharacter(), { hp: { method: "roll", roll: 1 } }, plan, resolvers);
     expect(rowFor(rows, "Maximum HP")).toMatchObject({ before: "52", after: "53" });

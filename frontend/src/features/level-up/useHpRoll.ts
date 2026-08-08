@@ -10,14 +10,11 @@ import { useEffect, useState } from "react";
 
 import { useLevelUpStepContext } from "@/features/level-up/useLevelUpStepContext";
 import type { RollResult } from "@/lib/dice";
-import { hpGainForRoll } from "@/lib/hitDice";
 import type { HitPointsStepMeta } from "@/types/character";
 
 export interface HpRoll {
   roll: number | null;
   method: "average" | "roll" | undefined;
-  /** New-max HP gain for the current choice, or null when nothing is chosen yet. */
-  gain: number | null;
   handleRoll: (result: RollResult) => void;
   chooseAverage: () => void;
   chooseRoll: () => void;
@@ -29,8 +26,6 @@ export function useHpRoll(meta: HitPointsStepMeta): HpRoll {
   useEffect(() => setRoll(null), [meta.faces]);
 
   const method = draft.hp?.method;
-  const gain =
-    method === "average" ? meta.averageGain : method === "roll" && roll != null ? hpGainForRoll(meta, roll) : null;
 
   function handleRoll(result: RollResult) {
     const value = result.dice[0]?.value ?? 1;
@@ -41,7 +36,6 @@ export function useHpRoll(meta: HitPointsStepMeta): HpRoll {
   return {
     roll,
     method,
-    gain,
     handleRoll,
     chooseAverage: () => setDraft((d) => ({ ...d, hp: { method: "average" } })),
     chooseRoll: () => setDraft((d) => ({ ...d, hp: roll != null ? { method: "roll", roll } : { method: "roll" } })),

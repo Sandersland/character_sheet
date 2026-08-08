@@ -114,6 +114,10 @@ interface OffHandDamageInput {
  * `Math.max(0, …)` is that "unless negative" clause: only a positive modifier
  * is dropped.
  *
+ * `keepAbilityModifier` is the caller-resolved eligibility check — as of #1640
+ * that's `hasOffHandAbilityDamage`'s composite of "style taken" AND "both
+ * equipped weapons are Light" (`bothWeaponsLight`), not the style alone.
+ *
  * Returns the input with `damageModifier` AND `abilityModifier` reduced by the
  * same amount, which is what keeps `deriveWeaponDamage`'s
  * `abilityModifier + meleeDamageBonus === damageModifier` invariant true through
@@ -127,16 +131,34 @@ interface OffHandDamageInput {
  */
 export function deriveOffHandDamage<T extends OffHandDamageInput>(
   damage: T,
-  hasTwoWeaponFightingStyle: boolean,
+  keepAbilityModifier: boolean,
 ): T {
   const abilityMod = damage.abilityModifier;
-  if (hasTwoWeaponFightingStyle || abilityMod === undefined) return damage;
+  if (keepAbilityModifier || abilityMod === undefined) return damage;
   const dropped = Math.max(0, abilityMod);
   return {
     ...damage,
     damageModifier: damage.damageModifier - dropped,
     abilityModifier: abilityMod - dropped,
   };
+}
+
+/**
+ * Whether both weapons in a two-weapon-fighting pair have the Light property —
+ * PHB'14 p. 195's Two-Weapon Fighting combat rule requires "a light melee
+ * weapon … in one hand … a different light melee weapon … in the other hand",
+ * a condition the p. 72 fighting style inherits by reference rather than
+ * restating; SRD 5.2 / PHB'24 states the same condition inline ("while
+ * wielding a weapon that has the Light property in each hand"). The editions
+ * agree, so this takes no `edition` parameter (#1640).
+ *
+ * Mirrors the frontend's `canTwoWeaponFight` (turnRules.ts, post-#1496) —
+ * both weapons of the pair, not just one, must be Light. There are never more
+ * than two equipped weapons (weapon placement is MAIN_HAND/OFF_HAND only), so
+ * `every` over the full array is exactly the two-weapon check.
+ */
+export function bothWeaponsLight(weapons: ReadonlyArray<{ light: boolean }>): boolean {
+  return weapons.length >= 2 && weapons.every((w) => w.light);
 }
 
 /**

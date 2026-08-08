@@ -36,8 +36,14 @@ const character = {
 
 // The HP row's numbers ride on the plan's own hitPoints step (#1380): the
 // ADVANCING class's d10 at Con 15 (+2), which is what the backend planner
-// resolves and serves.
-const HP_META = { die: "d10", faces: 10, conMod: 2, fixedAverage: 6, averageGain: 8, minRoll: 3, maxRoll: 12 };
+// resolves and serves. #1497: effectiveMaxAverage is ALSO served and depends
+// on the character's own pre-level max, so it's built per-test via
+// hpMetaFor(rawMax) rather than one shared constant (mirrors
+// levelUpLedger.test.ts's own hpMetaFor).
+function hpMetaFor(rawMax: number) {
+  return { die: "d10", faces: 10, conMod: 2, fixedAverage: 6, averageGain: 8, minRoll: 3, maxRoll: 12, effectiveMaxAverage: rawMax + 8, effectiveMaxByRoll: [] };
+}
+const HP_META = hpMetaFor(52);
 
 const plan: LevelUpPlanResponse = {
   target: { className: "Fighter", subclass: "Champion", newLevel: 8, isPrimary: true },
@@ -71,7 +77,8 @@ describe("ReviewStep", () => {
       hitPoints: { max: 30 },
       hitDice: { total: 5, die: "d6" },
     } as unknown as Character;
-    renderReview({ hp: { method: "average" } }, { character: wizard });
+    const wizardPlan: LevelUpPlanResponse = { ...plan, steps: [{ kind: "hitPoints", meta: hpMetaFor(30) }] };
+    renderReview({ hp: { method: "average" } }, { character: wizard, plan: wizardPlan });
     // Con 15 → +2; d10 average (Fighter, the advancing class) = 8; max 30 → 38.
     // No first-paint flash of the stale d6 answer any more: the die arrives with
     // the plan rather than resolving asynchronously from the reference catalog.

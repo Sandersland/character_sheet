@@ -1,7 +1,13 @@
+import type { Prisma, PrismaClient } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { resolveEditionRow } from "@/lib/rules/catalog-edition.js";
 import { RULES_EDITION_LABELS } from "@/lib/rules/edition.js";
 import type { RulesEdition } from "@character-sheet/shared-types";
+
+// Accepts either the shared client or prisma/seed.ts's own PrismaClient
+// instance (a different adapter-bound instance, never the src/ singleton) —
+// same reasoning as lib/auth/access.ts's `Db` alias.
+type SpellClassDb = PrismaClient | Prisma.TransactionClient;
 
 /**
  * Shared read-side shape for the Spell↔SpellClass join (#1711, F2 of epic
@@ -19,6 +25,41 @@ export const SPELL_CLASS_MEMBERSHIP_SELECT = {
 /** Flattens a row's `classMemberships` relation to the served `classes: string[]` shape. */
 export function classesOf(spell: { classMemberships: { className: string }[] }): string[] {
   return spell.classMemberships.map((m) => m.className);
+}
+
+/**
+ * Reconciles a spell's SpellClass rows to exactly `classNames` (lowercased,
+ * deduped) — upsert each, then prune any row not in the list. The single
+ * implementation for both write paths: custom-spells.ts's POST/PATCH routes
+ * (#1785, epic #1782 2/5) call it directly with the src/ singleton (inside
+ * their own $transaction, so the spell row and its SpellClass rows commit or
+ * roll back together — `db` is a parameter, never the module's own `prisma`
+ * import, specifically so a caller can pass its transaction client here);
+ * prisma/seed/seed-spell-classes.ts's seedSpellClassesFor is a thin wrapper
+ * passing seed.ts's OWN PrismaClient instance (a separate adapter-bound
+ * client the seed script's own lifecycle owns).
+ *
+ * This is the ONLY place classNames gets lowercased/deduped (both callers
+ * pass their raw input straight through) — returns the normalized list so a
+ * caller building a response payload never has to re-derive it.
+ */
+export async function reconcileSpellClasses(
+  db: SpellClassDb,
+  spellId: string,
+  classNames: string[],
+): Promise<string[]> {
+  const normalized = [...new Set(classNames.map((c) => c.toLowerCase()))];
+  for (const className of normalized) {
+    await db.spellClass.upsert({
+      where: { spellId_className: { spellId, className } },
+      create: { spellId, className },
+      update: {},
+    });
+  }
+  await db.spellClass.deleteMany({
+    where: { spellId, className: { notIn: normalized } },
+  });
+  return normalized;
 }
 
 /**
@@ -98,16 +139,35 @@ export async function rejectCrossEditionSpellForks(
  * A genuine fork (name present under both editions) is unaffected either
  * way: the exact-match branch always wins — proven by spells.test.ts's
  * fork-disjointness suite.
+ *
+ * Grouping key is `(name, catalogOwnerUserId)`, not bare `name` (#1786, epic
+ * #1782 3/5): a user's homebrew spell (non-null catalogOwnerUserId) can
+ * legally share a NAME with a seeded spell (null catalogOwnerUserId) —
+ * they're distinct rows, both tagged EDITION_2014, and neither should shadow
+ * the other the way a genuine 2014/2024 fork's two rows are MEANT to
+ * collapse to one. Widening the key to include catalogOwnerUserId puts every
+ * homebrew row in its own singleton group (the
+ * `(name, edition, ownerUserId)` unique constraint on CatalogEntry
+ * guarantees at most one per owner), so it always survives resolution and is
+ * served ALONGSIDE the seeded row of the same name rather than replacing it
+ * — same "must not drop one for the other" outcome resolveEditionCatalog's
+ * own `keyOf` widening documents for Subclass's compound key.
+ *
+ * `catalogOwnerUserId` is the entry's RAW `CatalogEntry.ownerUserId`
+ * (grouping input only, never the wire's own leak-safe `ownerId` field —
+ * #1815 review finding 2: those two must never be the same field, or
+ * whichever fix nulls `ownerId` for a row the viewer doesn't own would also
+ * silently merge that row's group with the seeded one of the same name).
  */
-export function resolveSpellCatalogForEdition<T extends { name: string; edition: RulesEdition | null }>(
-  rows: T[],
-  edition: RulesEdition,
-): T[] {
+export function resolveSpellCatalogForEdition<
+  T extends { name: string; edition: RulesEdition | null; catalogOwnerUserId: string | null },
+>(rows: T[], edition: RulesEdition): T[] {
   const byName = new Map<string, T[]>();
   for (const row of rows) {
-    const group = byName.get(row.name);
+    const key = `${row.name}::${row.catalogOwnerUserId ?? ""}`;
+    const group = byName.get(key);
     if (group) group.push(row);
-    else byName.set(row.name, [row]);
+    else byName.set(key, [row]);
   }
   const resolved: T[] = [];
   for (const group of byName.values()) {

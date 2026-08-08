@@ -7,6 +7,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
+import { makeCatalogEntry } from "@/test-support/catalog-entry.js";
 
 const OWNER_ID = "owner-level-up-tx";
 let COOKIE: string;
@@ -26,6 +27,10 @@ async function post(characterId: string, body: object) {
     .post(`/api/characters/${characterId}/level-up/transactions`)
     .set("Cookie", COOKIE)
     .send(body);
+}
+
+function getPlan(characterId: string) {
+  return supertest(app).get(`/api/characters/${characterId}/level-up/plan`).set("Cookie", COOKIE);
 }
 
 // The distinct batchId a single level-up request must group all its events under.
@@ -193,6 +198,61 @@ describe("POST /api/characters/:id/level-up/transactions — Battle Master cerem
     // The subclass drifted onto the persisted primary entry (not just the response).
     const persisted = await prisma.characterClassEntry.findUniqueOrThrow({ where: { id: entry.id } });
     expect(persisted.subclass).toBe("Battle Master");
+  });
+});
+
+// #1497: at 2014 exhaustion 4+ (PHB'14 p. 291), `hitPoints.max` is already the
+// halved EFFECTIVE max — the GET /plan preview and the actual commit must
+// agree on the post-level max WITHOUT the client re-deriving the halving
+// (which depends on the pre-halving max's own parity, unrecoverable from the
+// served halved max alone). This drives both endpoints for real, over the
+// SAME character, and asserts they produce the identical number.
+describe("POST /api/characters/:id/level-up/transactions — 2014 exhaustion 4+ HP preview matches the commit (#1497)", () => {
+  const CHAR_ID = "lvtx-exhaustion4-hp";
+
+  beforeEach(async () => {
+    const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    await prisma.character.create({
+      data: {
+        ...BASE,
+        ownerId: OWNER_ID,
+        id: CHAR_ID,
+        name: "LevelUpTx Exhausted Fighter",
+        rulesEdition: "EDITION_2014",
+        experiencePoints: 6500, // level 5 threshold — not an ASI level, so `average` alone is valid
+        // Odd pre-halving max (31) — the parity the addition-based preview used
+        // to get wrong; Con 14 → +2 modifier.
+        hitPoints: { current: 31, max: 31, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 4, die: "d10", spent: 0 },
+        abilityScores: { strength: 16, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 10, charisma: 10 },
+        conditions: { active: [], exhaustion: 4 },
+        spellcasting: Prisma.JsonNull,
+        classEntries: {
+          create: [{ name: "fighter", subclass: null, classId: fighter.id, position: 0, level: 4 }],
+        },
+      },
+    });
+  });
+
+  it("the plan's effectiveMaxAverage equals the levelUp op's actual committed max — not `servedMax + gain`", async () => {
+    const plan = await getPlan(CHAR_ID);
+    expect(plan.status).toBe(200);
+    const hpStep = (plan.body.steps as { kind: string; meta?: Record<string, unknown> }[]).find((s) => s.kind === "hitPoints");
+    const effectiveMaxAverage = hpStep?.meta?.effectiveMaxAverage;
+    expect(typeof effectiveMaxAverage).toBe("number");
+
+    // The bug this closes: naively adding the gain to the ALREADY-HALVED served
+    // max (31 + 8 = 39) is NOT the real answer — the halving itself grows with
+    // the new (pre-halving) max, and that max's parity flips the rounding.
+    expect(effectiveMaxAverage).not.toBe(31 + 8);
+
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
+    const res = await post(CHAR_ID, { target: { kind: "existing", classEntryId: entry.id }, hp: { method: "average" } });
+    expect(res.status).toBe(200);
+    // newRawMax = 31 + (floor(10/2)+1+2) = 31 + 8 = 39; halved (round up
+    // subtracted, PHB'14 p. 7) = 39 - 20 = 19.
+    expect(res.body.hitPoints.max).toBe(19);
+    expect(res.body.hitPoints.max).toBe(effectiveMaxAverage);
   });
 });
 
@@ -554,7 +614,15 @@ describe("POST …/level-up/transactions — Bard Magical Secrets eligibility ga
     // either one consistently, even though this test happened to pass before
     // this pin was added).
     const fireBolt = await prisma.spell.findFirstOrThrow({ where: { name: "Fire Bolt", edition: "EDITION_2014" }, select: { id: true } });
-    const ensnaringStrike = await prisma.spell.findFirstOrThrow({ where: { name: "Ensnaring Strike" }, select: { id: true } });
+    // Same determinism pin as fireBolt above (Ensnaring Strike also forked
+    // 2014/2024, #1714) — an unordered findFirstOrThrow across same-named
+    // rows is never guaranteed to return either one consistently, and #1796's
+    // migration rewrote every Spell row (backfilling catalogEntryId), which
+    // is exactly the kind of physical-order shift this class of bug depends on.
+    const ensnaringStrike = await prisma.spell.findFirstOrThrow({
+      where: { name: "Ensnaring Strike", edition: "EDITION_2014" },
+      select: { id: true },
+    });
     // #1509: SRD 5.1's Bard 9→10 Spells Known delta is 2, not 2024's 1 — see the sibling test above.
     // `lte: 5` + `orderBy`: same reasoning as the sibling test above — a bare
     // `level: { gt: 0 }` can land on one of the 2014 shared bucket's level
@@ -1831,6 +1899,76 @@ describe("POST …/level-up/transactions — Warlock 3→4 cantrip + spell (#113
   });
 });
 
+// #1631: The Fiend's PHB'14 "Expanded Spell List" widens the CHOOSABLE pool a
+// known caster's leveled pick may come from, alongside the base Warlock list
+// (spellLists) — Burning Hands/Command are NOT on the base Warlock list but
+// ARE legal picks for a 2014 Fiend Warlock, still costing the ordinary
+// spells-known slot (never a free grant — granted-spells-domains.test.ts's
+// "receives NONE... for free" is the sibling proof of that half).
+describe("POST …/level-up/transactions — subclass spell-list expansion (#1631)", () => {
+  const CHAR_ID = "lvtx-1631-fiend-2";
+
+  beforeEach(async () => {
+    const warlock = await prisma.characterClass.findFirstOrThrow({ where: { name: "Warlock" } });
+    const theFiend = (await prisma.subclass.findFirstOrThrow({ where: { classId: warlock.id, name: "The Fiend" } })).id;
+    await prisma.character.create({
+      data: {
+        ...BASE,
+        ownerId: OWNER_ID,
+        id: CHAR_ID,
+        name: "LevelUpTx Fiend1631",
+        rulesEdition: "EDITION_2014",
+        experiencePoints: 300, // level 2 threshold; hitDice.total 1 → 1 pending
+        hitPoints: { current: 14, max: 14, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 1, die: "d8", spent: 0 },
+        abilityScores: { strength: 8, dexterity: 14, constitution: 14, intelligence: 10, wisdom: 10, charisma: 16 },
+        spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
+        classEntries: { create: [{ name: "warlock", subclass: "The Fiend", subclassId: theFiend, classId: warlock.id, position: 0, level: 1 }] },
+      },
+    });
+  });
+
+  it("a 2014 Fiend Warlock 1→2 may pick Burning Hands (off the base Warlock list) as its new known spell", async () => {
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
+    // Burning Hands is a genuine 2014/2024 fork — pin EDITION_2014 (the
+    // character's own edition), same rationale as the 2024 test below.
+    const burningHands = await prisma.spell.findFirstOrThrow({
+      where: { name: "Burning Hands", edition: "EDITION_2014", NOT: { classMemberships: { some: { className: "warlock" } } } },
+      select: { id: true, name: true },
+    });
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entry.id },
+      hp: { method: "average" },
+      spellsLearned: [{ type: "learnSpell", spellId: burningHands.id }],
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.spellcasting.spells.map((s: { name: string }) => s.name)).toContain(burningHands.name);
+  });
+
+  it("the same off-list pick is rejected 400 for a 2024 Fiend Warlock (no list-expansion mechanism — Fiend Spells is a grant, never a pick)", async () => {
+    await prisma.character.update({ where: { id: CHAR_ID }, data: { rulesEdition: "EDITION_2024" } });
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
+    // Burning Hands is a genuine 2014/2024 fork — pin EDITION_2024 (the
+    // character's own edition) so this exercises assertOnSpellList, not the
+    // unrelated cross-edition-fork rejection (#1712).
+    const burningHands = await prisma.spell.findFirstOrThrow({
+      where: { name: "Burning Hands", edition: "EDITION_2024", NOT: { classMemberships: { some: { className: "warlock" } } } },
+      select: { id: true },
+    });
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entry.id },
+      hp: { method: "average" },
+      spellsLearned: [{ type: "learnSpell", spellId: burningHands.id }],
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/spell list/i);
+  });
+});
+
 // #1712: cross-edition admission for the level-up learn path —
 // loadPickCatalogRows rejects a submitted spellId that's provably the WRONG
 // edition's fork of a name (a same-named row the character's OWN edition
@@ -1864,7 +2002,10 @@ describe("POST …/level-up/transactions — cross-edition spell-fork rejection 
   });
 
   afterEach(async () => {
-    await prisma.spell.deleteMany({ where: { name: FORK_NAME } });
+    // Deleting the CatalogEntry cascades the Spell row (ON DELETE CASCADE,
+    // #1796) — the reverse cascade doesn't exist (the supertype stays
+    // closed), so a plain `spell.deleteMany` alone would orphan the entry.
+    await prisma.catalogEntry.deleteMany({ where: { name: FORK_NAME, kind: "SPELL" } });
   });
 
   async function seedFork() {
@@ -1873,8 +2014,23 @@ describe("POST …/level-up/transactions — cross-edition spell-fork rejection 
       duration: "Instantaneous", description: "The PHB'14 text.", concentration: false, ritual: false, cantripScaling: true,
     };
     const row2024 = { ...row2014, description: "The SRD 5.2 text." };
-    const fork2014 = await upsertEditionRow(prisma.spell, { name: FORK_NAME, edition: "EDITION_2014" }, { ...row2014, edition: "EDITION_2014" }, row2014);
-    const fork2024 = await upsertEditionRow(prisma.spell, { name: FORK_NAME, edition: "EDITION_2024" }, { ...row2024, edition: "EDITION_2024" }, row2024);
+    // catalogEntryId (#1796) is resolved first, per edition fork — required,
+    // no default, and each fork is its own distinct CatalogEntry (business
+    // key includes edition).
+    const catalogEntryId2014 = await makeCatalogEntry({ name: FORK_NAME, edition: "EDITION_2014" });
+    const catalogEntryId2024 = await makeCatalogEntry({ name: FORK_NAME, edition: "EDITION_2024" });
+    const fork2014 = await upsertEditionRow(
+      prisma.spell,
+      { name: FORK_NAME, edition: "EDITION_2014" },
+      { ...row2014, edition: "EDITION_2014", catalogEntryId: catalogEntryId2014 },
+      row2014,
+    );
+    const fork2024 = await upsertEditionRow(
+      prisma.spell,
+      { name: FORK_NAME, edition: "EDITION_2024" },
+      { ...row2024, edition: "EDITION_2024", catalogEntryId: catalogEntryId2024 },
+      row2024,
+    );
     for (const spellId of [fork2014.id, fork2024.id]) {
       await prisma.spellClass.upsert({
         where: { spellId_className: { spellId, className: "warlock" } },
