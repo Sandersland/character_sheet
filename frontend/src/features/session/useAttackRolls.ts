@@ -12,8 +12,8 @@
 import { useRef, useState } from "react";
 
 import { critDamageSpec } from "@/lib/attackMath";
-import { autoVerdict, isCritRow } from "@/lib/attackTallySummary";
-import { isCriticalRoll, isNaturalOne, isNaturalTwenty, keptD20 } from "@/lib/dice";
+import { autoVerdict, isCritRow, toHitSnapshot } from "@/lib/attackTallySummary";
+import { isCriticalRoll } from "@/lib/dice";
 import { randomId } from "@/lib/ids";
 import { resolveRollMode, rollModeChip } from "@/lib/rollMode";
 import { useRoll } from "@/features/dice/RollContext";
@@ -117,16 +117,11 @@ export function useAttackRolls({
       mode: resolvedAttack.mode,
     };
     const result = roll(attackSpec, entry.attackRollLabel);
-    const attack = {
-      total: result.total,
-      keptFace: keptD20(result)?.value ?? null,
-      nat20: isNaturalTwenty(result),
-      nat1: isNaturalOne(result),
-      // #1120: the crit DECISION reads the character's served critRange, not
-      // a hardcoded 20 — nat20 above stays literal (display-only "nat 20"
-      // text/badge).
-      criticalHit: isCriticalRoll(result, critRange),
-    };
+    // #1120: the crit DECISION reads the character's served critRange, not a
+    // hardcoded 20 — nat20 stays literal (display-only "nat 20" text/badge).
+    // toHitSnapshot is the one shared "roll → TallyAttackRoll" step (also used
+    // by useResolution, #1831).
+    const attack = toHitSnapshot(result, critRange);
     // Fresh id per attack (#1235) — the damage roll below reads it back via entry.id.
     const swingId = randomId();
     swingIdRef.current[entry.id] = swingId;
