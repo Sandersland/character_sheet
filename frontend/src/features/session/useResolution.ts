@@ -69,6 +69,12 @@ interface ToHitState {
   result: RollResult;
   attack: TallyAttackRoll;
   verdict: TallyVerdict | undefined;
+  /** The resolved roll-mode flat modifier (e.g. exhaustion) folded into
+   *  `result.total` at roll time — `buildToHitEvent` adds it into the
+   *  persisted `bonus` so `kept + bonus === total` (`ResolveActionEventToHit.bonus`'s
+   *  documented contract: "the resolved flat total added to the die"),
+   *  which the descriptor's own `bonus` alone doesn't cover. */
+  modifier: number;
 }
 
 /** Everything `ResolutionRail` needs to render one of the four shapes, plus
@@ -166,7 +172,11 @@ function buildToHitEvent(state: ToHitState, descriptor: NonNullable<TurnResoluti
     faces: state.result.dice.map((d) => d.value),
     kept: keptD20(state.result)?.value ?? state.result.total,
     nat20: state.attack.nat20,
-    bonus: descriptor.bonus,
+    // `descriptor.bonus` alone omits the roll-mode flat modifier (exhaustion,
+    // #1136) that was folded into the actual die roll — adding `state.modifier`
+    // keeps `bonus` the true resolved flat total added to the die, per
+    // ResolveActionEventToHit's contract (kept + bonus === total).
+    bonus: descriptor.bonus + state.modifier,
     total: state.result.total,
     verdict,
     ...(descriptor.components ? { components: descriptor.components } : {}),
@@ -229,16 +239,21 @@ export function useResolution({
     };
     const result = roll(spec, `${resolution.source} attack`);
     const attack = toHitSnapshot(result, resolution.toHit.critRange);
-    setToHitState({ result, attack, verdict: autoVerdict(attack) });
+    setToHitState({ result, attack, verdict: autoVerdict(attack), modifier: resolvedAttack.modifier });
   }
 
   function onCallMiss() {
     if (disabled || completed || !toHitState || toHitState.verdict !== undefined) return;
-    if (isDieLocked(toHitState.attack)) return;
     setToHitState({ ...toHitState, verdict: "miss" });
   }
 
+  // Root guards (#1845's off-hand path will drive this hook directly, not
+  // through the #1832 adapter wrapper that only guarded the crit call there):
+  // can't upgrade to crit over already-rolled, non-doubled damage, and can't
+  // upgrade a called miss either.
   function onCallCrit() {
+    if (effectRoll) return;
+    if (toHitState?.verdict === "miss") return;
     if (disabled || completed || !toHitState) return;
     if (isDieLocked(toHitState.attack) && toHitState.verdict !== "crit") return;
     setToHitState({ ...toHitState, verdict: "crit" });
@@ -262,13 +277,16 @@ export function useResolution({
 
   function onComplete() {
     if (disabled || completed || !readyToComplete) return;
-    spendSlot(resolution.cost, turnState);
+    // `commit` runs BEFORE the spend/complete side effects — a throwing
+    // commit must not permanently consume the action-economy slot or lock
+    // out a retry (the caller can catch and let the player try again).
     commit({
       actionId: actionIdRef.current,
       toHit: resolution.toHit && toHitState ? buildToHitEvent(toHitState, resolution.toHit) : null,
       save: resolution.save ?? null,
       effect: resolution.effect && effectRoll ? buildEffectEvent(effectRoll, resolution.effect, isCrit) : null,
     });
+    spendSlot(resolution.cost, turnState);
     setCompleted(true);
   }
 

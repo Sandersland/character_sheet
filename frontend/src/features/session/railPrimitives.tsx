@@ -99,12 +99,21 @@ export function AttackFormSummaryCore({ selected }: { selected: AttackEntry }) {
 }
 
 /** The small garnet "Crit!" call/upgrade button. */
-export function CritButton({ onCallCrit, tall = false }: { onCallCrit: () => void; tall?: boolean }) {
+export function CritButton({
+  onCallCrit,
+  tall = false,
+  disabled = false,
+}: {
+  onCallCrit: () => void;
+  tall?: boolean;
+  disabled?: boolean;
+}) {
   return (
     <button
       type="button"
       onClick={onCallCrit}
-      className={`rounded-control border border-garnet-200 bg-garnet-50 font-semibold text-garnet-800 transition-colors hover:bg-garnet-100 ${
+      disabled={disabled}
+      className={`rounded-control border border-garnet-200 bg-garnet-50 font-semibold text-garnet-800 transition-colors hover:bg-garnet-100 disabled:cursor-not-allowed disabled:opacity-40 ${
         tall ? "min-h-11 flex-1 px-3 text-xs" : "px-2 py-1 text-xs"
       }`}
     >
