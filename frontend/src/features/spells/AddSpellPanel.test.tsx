@@ -28,9 +28,8 @@ const REFERENCE: ReferenceData = {
   itemRarities: [],
 };
 
-// #1817: the legacy per-character "Custom spell" tab (CustomSpellForm) is
-// retired — Homebrew (a reusable, deletable catalog row) supersedes it. The
-// panel must show exactly two tabs.
+// #1817: the panel exposes exactly two tabs — From catalog + Homebrew — with
+// no inline per-character custom-spell authoring surface.
 describe("AddSpellPanel tab set (#1817)", () => {
   beforeEach(() => {
     vi.mocked(client.fetchSpells).mockResolvedValue([]);

@@ -1,13 +1,12 @@
 // AddSpellPanel — inline expand-in-place panel for learning a new spell.
 // Two tabs: catalog picker (SpellCatalogTab) and homebrew authoring +
 // management (HomebrewTab — a user-owned catalog Spell row, reusable across all
-// of the caller's characters, create #1787, edit/delete #1788). The legacy
-// per-character inline "Custom spell" tab (CustomSpellForm) was retired in
-// #1817 — homebrew supersedes it. Characters that already hold inline custom
-// spells keep working: those are stored SpellEntry rows in the character's
-// spellcasting JSON, and castSpell/forgetSpell target them by entryId — the
-// removed learnSpell.custom write path is not involved. Not a modal — the
-// overlay primitive is reserved for read-only review surfaces.
+// of the caller's characters, create #1787, edit/delete #1788). There is no
+// inline per-character "custom spell" authoring surface (#1817). Characters
+// that already hold inline custom spells keep working: those are stored
+// SpellEntry rows in the character's spellcasting JSON, and castSpell/
+// forgetSpell target them by entryId — no learnSpell.custom write path exists.
+// Not a modal — the overlay primitive is reserved for read-only review surfaces.
 //
 // The GET /api/spells fetch is owned HERE, not by SpellCatalogTab, so the
 // catalog tab's picker and the homebrew tab's manage list share one result
