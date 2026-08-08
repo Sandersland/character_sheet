@@ -170,6 +170,56 @@ describe("NewSpellsStep", () => {
   });
 });
 
+// #1826: an EMPTY eligible list (a resolver bug, e.g. the Eldritch Knight
+// case) must read as distinctly different from a search that just matched
+// nothing — the latter is normal, the former blocks the ceremony silently.
+describe("NewSpellsStep — empty eligible list vs. search miss (#1826)", () => {
+  it("shows a misconfiguration message when the served spell list has no eligible spells", async () => {
+    // spellLists: ["druid"] — none of the CATALOG entries are on the druid list.
+    render(
+      <Harness
+        step={newSpellsStep(2, { maxSpellLevel: 2, spellLists: ["druid"], cantripLists: ["wizard"] })}
+        character={caster()}
+      />,
+    );
+    expect(await screen.findByText(/no spells are available to choose here/i)).toBeInTheDocument();
+    expect(screen.getByText(/configuration problem/i)).toBeInTheDocument();
+    expect(screen.queryByText("No spells match your filter.")).not.toBeInTheDocument();
+  });
+
+  it("still shows the ordinary search-miss copy when a NON-empty eligible list is searched to zero", async () => {
+    const user = userEvent.setup();
+    render(<Harness step={newSpellsStep()} character={caster()} />);
+    await screen.findByText("Shield");
+    await user.type(screen.getByLabelText("Search spells"), "zzzznomatch");
+
+    expect(await screen.findByText("No spells match your filter.")).toBeInTheDocument();
+    expect(screen.queryByText(/configuration problem/i)).not.toBeInTheDocument();
+  });
+
+  it("shows the misconfiguration message for a required cantrip pick with an empty eligible list", async () => {
+    // cantripLists: ["druid"] — Firebolt is wizard-only, so no eligible cantrips.
+    render(
+      <Harness
+        step={newSpellsStep(1, { maxSpellLevel: 2, spellLists: ["wizard"], cantrips: 1, cantripLists: ["druid"] })}
+        character={caster()}
+      />,
+    );
+    expect(await screen.findByText(/Choose 1 cantrip/)).toBeInTheDocument();
+    expect(await screen.findByText(/no spells are available to choose here/i)).toBeInTheDocument();
+  });
+
+  it("still shows the ordinary search-miss copy for a non-empty cantrip list searched to zero", async () => {
+    const user = userEvent.setup();
+    render(<Harness step={newSpellsStep(1, { maxSpellLevel: 2, spellLists: ["wizard"], cantrips: 1, cantripLists: ["wizard"] })} character={caster()} />);
+    await screen.findByRole("button", { name: "Add Firebolt" });
+    await user.type(screen.getByLabelText("Search cantrips"), "zzzznomatch");
+
+    expect(await screen.findByText("No spells match your filter.")).toBeInTheDocument();
+    expect(screen.queryByText(/configuration problem/i)).not.toBeInTheDocument();
+  });
+});
+
 describe("NewSpellsStep — cantrip picks (#1131)", () => {
   it("shows a cantrip section alongside the leveled picker and records a cantrip pick", async () => {
     const user = userEvent.setup();

@@ -153,6 +153,24 @@ describe("CreationSpellsStep", () => {
     expect(screen.getByText("A beam of crackling energy.")).toBeInTheDocument();
   });
 
+  // #1826: a successful-but-empty class fetch (e.g. the EK/AT resolver bug)
+  // must read as distinctly different from a search that matched nothing —
+  // CatalogStatus only guarded spinner + fetch error before this.
+  it("shows a misconfiguration message when the class fetch succeeds with an empty catalog", async () => {
+    fetchMock.mockResolvedValue([]);
+    renderStep();
+    expect(await screen.findByText(/no spells are available to choose here/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Couldn't load spell catalog/)).not.toBeInTheDocument();
+  });
+
+  it("still shows the ordinary search-miss copy when a populated catalog is searched to zero", async () => {
+    renderStep();
+    await screen.findByRole("button", { name: "Open Eldritch Blast" });
+    await userEvent.type(screen.getByRole("searchbox"), "zzzznomatch");
+    expect(await screen.findByText("No spells match your search.")).toBeInTheDocument();
+    expect(screen.queryByText(/configuration problem/i)).not.toBeInTheDocument();
+  });
+
   it("surfaces a catalog load error", async () => {
     fetchMock.mockRejectedValue(new Error("boom"));
     renderStep();
@@ -282,6 +300,18 @@ describe("CreationSpellsStep", () => {
       expect(screen.queryByRole("radio")).not.toBeInTheDocument();
       // No class fetch at all for a non-caster.
       expect(fetchMock).not.toHaveBeenCalledWith("EDITION_2024", { className: "warlock", maxLevel: 1 });
+    });
+
+    // #1826: same guard on the species tab — an empty-but-successful species
+    // catalog (e.g. a `spells` spec that narrows to zero eligible names) must
+    // not read as a search miss.
+    it("shows a misconfiguration message when the species catalog succeeds with an empty pool", async () => {
+      fetchMock.mockImplementation((_edition, filter) =>
+        Promise.resolve(filter?.maxLevel === 0 ? [] : CATALOG),
+      );
+      renderStep({ speciesCantripChoice: APPLICABLE_SPECIES_CHOICE, counts: undefined });
+      expect(await screen.findByText(/no spells are available to choose here/i)).toBeInTheDocument();
+      expect(screen.queryByText(/Couldn't load spell catalog/)).not.toBeInTheDocument();
     });
 
     it("surfaces a species catalog load error", async () => {

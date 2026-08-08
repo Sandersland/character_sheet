@@ -99,7 +99,36 @@ function SpellRowList({
   );
 }
 
-// The catalog result region: error/spinner/empty status plus the tri-state rows.
+// The four mutually exclusive loaded states — spinner, fetch error, an empty
+// eligible list (`spells`, pre-search — a resolver bug, e.g. the Eldritch
+// Knight case: "Choose N of N" against zero rows with no explanation), and a
+// search that filtered a non-empty list to zero (the ordinary case). Split
+// out of SpellResults so its own branching doesn't retrip the complexity gate.
+function SpellStatusMessage({
+  catalog, error, showSpinner, spells, filtered,
+}: {
+  catalog: CatalogSpell[] | null;
+  error: string | null;
+  showSpinner: boolean;
+  spells: CatalogSpell[];
+  filtered: CatalogSpell[];
+}) {
+  if (error) return <p className="mt-2 text-xs text-garnet-700">{error}</p>;
+  if (catalog === null) return showSpinner ? <Spinner /> : null;
+  if (spells.length === 0) {
+    return (
+      <p className="mt-3 py-2 text-center text-xs text-garnet-700">
+        No spells are available to choose here — this may be a configuration problem.
+      </p>
+    );
+  }
+  if (filtered.length === 0) {
+    return <p className="mt-3 py-2 text-center text-xs text-parchment-600">No spells match your filter.</p>;
+  }
+  return null;
+}
+
+// The catalog result region: status message plus the tri-state rows.
 // Extracted so NewSpellsStep stays under the complexity gate once the #1101 swap
 // panel is layered on top.
 function SpellResults({
@@ -117,11 +146,7 @@ function SpellResults({
 }) {
   return (
     <>
-      {error && <p className="mt-2 text-xs text-garnet-700">{error}</p>}
-      {catalog === null && !error && showSpinner && <Spinner />}
-      {catalog !== null && filtered.length === 0 && (
-        <p className="mt-3 py-2 text-center text-xs text-parchment-600">No spells match your filter.</p>
-      )}
+      <SpellStatusMessage catalog={catalog} error={error} showSpinner={showSpinner} spells={spells} filtered={filtered} />
       <SpellRowList
         spells={spells}
         filtered={filtered}
@@ -135,11 +160,18 @@ function SpellResults({
 }
 
 // #1131: the cantrip subsection shown above the leveled picker when the level
-// grants new cantrips. Its own search + hard cap, disjoint from the spell learns.
+// grants new cantrips. Its own search + hard cap, disjoint from the spell
+// learns. #1826: routes through SpellResults (not SpellRowList directly) so a
+// required cantrip pick gets the same spinner/empty-eligible/search-miss
+// states as the leveled picker below it — this section previously showed
+// nothing at all when its eligible list was empty.
 function CantripSection({
-  cantrips, spells, filtered, learnedSpellIds, selectedIds, onToggle, search, setSearch,
+  cantrips, catalog, error, showSpinner, spells, filtered, learnedSpellIds, selectedIds, onToggle, search, setSearch,
 }: {
   cantrips: number;
+  catalog: CatalogSpell[] | null;
+  error: string | null;
+  showSpinner: boolean;
   spells: CatalogSpell[];
   filtered: CatalogSpell[];
   learnedSpellIds: ReadonlySet<string>;
@@ -161,7 +193,10 @@ function CantripSection({
         onChange={(e) => setSearch(e.target.value)}
         className={`${INPUT_CLS} mt-2`}
       />
-      <SpellRowList
+      <SpellResults
+        catalog={catalog}
+        error={error}
+        showSpinner={showSpinner}
         spells={spells}
         filtered={filtered}
         learnedSpellIds={learnedSpellIds}
@@ -254,6 +289,9 @@ export default function NewSpellsStep({ step }: { step: LevelUpStep }) {
       {selection.cantrips > 0 && (
         <CantripSection
           cantrips={selection.cantrips}
+          catalog={catalog}
+          error={error}
+          showSpinner={showSpinner}
           spells={eligibleCantrips}
           filtered={filteredCantrips}
           learnedSpellIds={learnedSpellIds}
