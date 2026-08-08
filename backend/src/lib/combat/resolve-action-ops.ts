@@ -19,6 +19,16 @@
  * attack) is a genuinely different SECOND damage type on top of `effect`, not
  * another same-type instance — reuses `resolveActionEffectSchema` per element,
  * so a rider is validated exactly like the primary effect.
+ *
+ * `entryId`/`apply` (#1833, spell adapter): present only for a spell
+ * resolution — a weapon swing has no spellcasting entry and omits both. When
+ * `entryId` is set, the handler routes the op's `slotLevel`/`apply` through
+ * the SAME `castAbilityInTx` sequence the old `castSpell` op uses (via
+ * `castSpellForResolutionInTx`), so concentration (set + displaced-prior
+ * drop), a buff spell's self-buff (Mage Armor), and a self/ally heal apply
+ * all still happen — not just the slot spend the pre-#1833 handler paid.
+ * `apply` mirrors `castSpellOpSchema`'s own shape exactly (routes/character/
+ * spellcasting.ts) so the two never drift on what a cast can apply.
  */
 import { z } from "zod";
 
@@ -117,6 +127,23 @@ export const resolveActionOperationSchema = z.object({
   // this level via the same payer castSpell uses. Absent for a cantrip or a
   // weapon swing, which have no character state to spend.
   slotLevel: z.number().int().min(1).max(9).optional(),
+  // The character's own spellcasting entry id — present only for a spell
+  // resolution (#1833). Its presence, not `slotLevel`'s, is what routes the
+  // op through castSpellForResolutionInTx: a cantrip cast has no slotLevel
+  // but still needs entryId so concentration/buff side effects apply.
+  entryId: z.string().min(1).optional(),
+  // Where a cast's rolled effect lands: the caster's own HP, or a consenting
+  // ally's sheet (heal only, #462) — mirrors castSpellOpSchema's own `apply`
+  // (routes/character/spellcasting.ts) exactly. Never set for a damage
+  // resolution: there is no target/enemy model (self-or-announce, CLAUDE.md),
+  // so a damage spell's effect is announced only, never auto-applied.
+  apply: z
+    .object({
+      target: z.union([z.literal("self"), z.object({ characterId: z.string().min(1) })]),
+      kind: z.enum(["heal", "damage"]),
+      amount: z.number().int().positive(),
+    })
+    .optional(),
 });
 
 export type ResolveActionOperation = z.infer<typeof resolveActionOperationSchema>;

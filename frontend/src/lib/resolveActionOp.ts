@@ -30,6 +30,14 @@ export interface BuildResolveActionOpOptions {
   slotLevel?: number;
   /** Typed damage riders (#1843) — omitted from the wire op entirely when empty. */
   riders?: ResolveActionEventEffect[];
+  /**
+   * The character's own spellcasting entry id (#1833) — present only for a
+   * spell resolution; a weapon swing omits it. See ResolveActionEventData's
+   * own comment (shared-types) for what its presence triggers server-side.
+   */
+  entryId?: string;
+  /** Self/ally heal apply (#1833/#462) — see ResolveActionEventData's own comment. */
+  apply?: { target: "self" | { characterId: string }; kind: "heal" | "damage"; amount: number };
 }
 
 export function buildResolveActionOp(
@@ -37,7 +45,7 @@ export function buildResolveActionOp(
   rolls: ResolutionRolls,
   options: BuildResolveActionOpOptions = {},
 ): ResolveActionOperation {
-  const { slotLevel, riders } = options;
+  const { slotLevel, riders, entryId, apply } = options;
   return {
     type: "resolveAction",
     actionId: rolls.actionId,
@@ -51,5 +59,7 @@ export function buildResolveActionOp(
     effect: rolls.effect,
     ...(riders && riders.length > 0 ? { riders } : {}),
     ...(slotLevel !== undefined ? { slotLevel } : {}),
+    ...(entryId !== undefined ? { entryId } : {}),
+    ...(apply !== undefined ? { apply } : {}),
   };
 }

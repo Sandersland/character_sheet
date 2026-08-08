@@ -221,9 +221,9 @@ export interface BonusSpellOption {
 
 /**
  * Castable bonus-action spells for the Bonus Action sheet. Mirrors
- * useSpellPicker's filtering argument-for-argument (same pure predicates,
- * castingTimeFilter "1 bonus action") so the card list and the picker that
- * opens from it can never disagree.
+ * InlineSpellPicker's own deriveSpellList filtering argument-for-argument
+ * (same pure spellPicker.ts predicates, castingTimeFilter "1 bonus action")
+ * so the card list and the picker that opens from it can never disagree.
  */
 export function bonusSpellOptions(
   character: Character,

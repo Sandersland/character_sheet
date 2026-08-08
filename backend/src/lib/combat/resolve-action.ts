@@ -28,12 +28,13 @@ import {
   InvalidSpellcastingOperationError,
   payAbilityCostInTx,
 } from "@/lib/spellcasting/ability-cost.js";
-import { loadSlotPayContext } from "@/lib/spellcasting/spellcasting.js";
+import { castSpellForResolutionInTx, loadSlotPayContext } from "@/lib/spellcasting/spellcasting.js";
 import { snapshotSpellcasting } from "@/lib/spellcasting/spell-state.js";
 import {
   resolveActionOperationSchema,
   type ResolveActionOperation,
 } from "./resolve-action-ops.js";
+import type { CastSpellOperation } from "@character-sheet/shared-types";
 
 export { resolveActionOperationSchema, type ResolveActionOperation };
 
@@ -44,7 +45,11 @@ export class InvalidResolveActionOperationError extends Error {
 
 // Pays the op's `slotLevel` (if any) against the character's own slot/arcanum
 // state and returns the before/after spellcasting snapshot for the event —
-// or null before/after when the op has no slot cost (cantrip/weapon).
+// or null before/after when the op has no slot cost (cantrip/weapon). This is
+// the pre-#1833 bare-slot-spend path, kept for a weapon/generic op that omits
+// `entryId` — an entryId-bearing op (a spell resolution) instead runs
+// payActionCostAndSideEffectsInTx's other branch below, which pays the SAME
+// cost through the SAME payer but also carries concentration/buff/self-apply.
 async function payResolveActionCost(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -81,6 +86,50 @@ async function payResolveActionCost(
   return { before, after };
 }
 
+// The universal cost + side-effects router for BOTH branches a resolveAction
+// op can take (#1848 review — the pre-rename `applySpellCastSideEffects`
+// named only the second, spell-shaped branch, misleading a reader tracing a
+// WEAPON op's failure through applyResolveActionOperations): a weapon or
+// cantrip-with-no-entryId op (`op.entryId == null`) delegates to
+// payResolveActionCost's bare slot-spend; an entryId-bearing spell op
+// (#1833) routes the op's slotLevel/apply through the SAME castAbilityInTx
+// sequence the old castSpell op uses (castSpellForResolutionInTx), so
+// concentration (set + displaced-prior drop), a buff spell's self-buff
+// (Mage Armor), and a self/ally heal/damage apply all still happen — not
+// just the slot spend payResolveActionCost pays alone. `roll` feeds
+// castAbilityInTx's own eventData/apply-amount plumbing; the resolveAction
+// event logged by the caller carries the actual rail data (toHit/save/
+// effect/riders) separately, so `roll`'s own eventData never surfaces on
+// the wire.
+async function payActionCostAndSideEffectsInTx(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  batchId: string,
+  sessionId: string | null,
+  casterUserId: string,
+  op: ResolveActionOperation,
+): Promise<{ before: Record<string, unknown> | null; after: Record<string, unknown> | null }> {
+  if (op.entryId == null) {
+    return payResolveActionCost(tx, characterId, batchId, sessionId, op);
+  }
+  const castOp: CastSpellOperation = {
+    type: "castSpell",
+    entryId: op.entryId,
+    ...(op.slotLevel !== undefined ? { slotLevel: op.slotLevel } : {}),
+    roll: op.effect?.total ?? 0,
+    ...(op.apply ? { apply: op.apply } : {}),
+  };
+  const { before, after } = await castSpellForResolutionInTx(
+    tx,
+    characterId,
+    batchId,
+    sessionId,
+    casterUserId,
+    castOp,
+  );
+  return { before, after };
+}
+
 function summaryFor(op: ResolveActionOperation): string {
   const costWord = op.cost.attacks && op.cost.attacks > 1 ? `${op.cost.attacks} attacks` : op.cost.kind;
   return `Resolved ${op.source} (${costWord})`;
@@ -91,16 +140,23 @@ function summaryFor(op: ResolveActionOperation): string {
  * applySpellcastingOperations/applyHitPointOperations: one batchId, one
  * $transaction, one CharacterEvent per op (category "combat", type
  * "resolveAction") — the single audit row a resolution's undo reverses.
+ *
+ * `casterUserId` (#1833) is the authenticated caller — unused by a weapon/
+ * cantrip-with-no-apply resolution, but required to route a spell's self/ally
+ * heal apply (party-target healing #462 needs the caster's identity to check
+ * campaign membership), the same parameter applySpellcastingOperations
+ * already threads through for the pre-existing castSpell op.
  */
 export async function applyResolveActionOperations(
   characterId: string,
   operations: ResolveActionOperation[],
+  casterUserId: string,
 ): Promise<void> {
   await runCharacterTransaction(characterId, operations, {
     select: { id: true },
     notFound: (id) => new InvalidResolveActionOperationError(`Character not found: ${id}`),
     applyOp: async ({ tx, op, characterId: id, batchId, sessionId }) => {
-      const { before, after } = await payResolveActionCost(tx, id, batchId, sessionId, op);
+      const { before, after } = await payActionCostAndSideEffectsInTx(tx, id, batchId, sessionId, casterUserId, op);
 
       await logEvent(tx, {
         characterId: id,
@@ -120,6 +176,13 @@ export async function applyResolveActionOperations(
           // distinguish "no riders" from "old event predates riders" (#1843).
           riders: op.riders ?? [],
           slotLevel: op.slotLevel ?? null,
+          // The spellcasting entry this resolution cast, when it's a spell
+          // (#1833) — audit-trail provenance only; the feed doesn't need it
+          // to render (source/toHit/save/effect/riders already say what
+          // happened), and undo doesn't read it either (the concentration/
+          // buff/apply side effects it triggered already logged their own
+          // events with their own before/after under this same batch).
+          entryId: op.entryId ?? null,
         },
         batchId,
         sessionId,

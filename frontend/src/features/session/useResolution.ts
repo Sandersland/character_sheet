@@ -51,6 +51,27 @@ export type ResolutionTurnState = Pick<
 >;
 
 /**
+ * The three `consume*` handlers, deliberately inert — the shared shim every
+ * adapter's own economy-availability-only `ResolutionTurnState` spreads in
+ * when the REAL spend happens somewhere other than `useResolution`'s own
+ * `spendSlot()` call: InlineAttackPicker's `attackResolutionTurnState`
+ * (Extra Attack already spent the action via `enterAttackMode`, before the
+ * sheet even opens) and InlineSpellPicker's `spellResolutionTurnState` (the
+ * spend is the caller's slot-kind-aware `onCommitSlot`, fired from
+ * `handleCommit` once the mutation actually succeeds). One shared constant
+ * so a future fourth `ResolutionTurnState` consume method can't be added to
+ * one shim and silently missed on the other (#1848 review).
+ */
+export const INERT_RESOLUTION_CONSUMERS: Pick<
+  ResolutionTurnState,
+  "consumeAction" | "consumeBonusAction" | "consumeReaction"
+> = {
+  consumeAction: () => {},
+  consumeBonusAction: () => {},
+  consumeReaction: () => {},
+};
+
+/**
  * The payload `commit` receives — the op-shaped rolls (reusing the
  * `resolveAction` wire types verbatim, #1829) plus the one `actionId` tagging
  * them. `save` is never rolled (no target model — DC/ability are just echoed

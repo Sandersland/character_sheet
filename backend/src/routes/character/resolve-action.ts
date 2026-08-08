@@ -32,6 +32,6 @@ const transactionsRequestSchema = z.object({
 makeTransactionsEndpoint({
   router: resolveActionRouter,
   schema: transactionsRequestSchema,
-  apply: (characterId, data) => applyResolveActionOperations(characterId, data.operations),
+  apply: (characterId, data, userId) => applyResolveActionOperations(characterId, data.operations, userId),
   domainErrors: [InvalidResolveActionOperationError, InvalidSpellcastingOperationError],
 });

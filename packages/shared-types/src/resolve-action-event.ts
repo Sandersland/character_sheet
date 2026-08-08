@@ -88,4 +88,23 @@ export interface ResolveActionEventData {
   riders?: ResolveActionEventEffect[];
   /** Present only for a leveled spell cast/upcast — absent for a cantrip or weapon swing. */
   slotLevel?: number | null;
+  /**
+   * The character's own spellcasting entry id (#1833, spell adapter) —
+   * present only for a spell resolution; a weapon swing omits it. Its
+   * presence, not `slotLevel`'s, is what the backend keys off to run the
+   * spell's full side-effect sequence (concentration set/displace, a buff
+   * spell's self-buff, slot/arcanum spend via the same payer castSpell
+   * uses) through `castAbilityInTx` — a cantrip cast has no `slotLevel` but
+   * still needs `entryId` for that sequence to run at all.
+   */
+  entryId?: string;
+  /**
+   * Where a cast's rolled effect lands: the caster's own HP, or a consenting
+   * ally's sheet (heal only, #462) — mirrors `CastSpellOperation.apply`
+   * (spellcasting.ts) exactly, since the backend forwards it there
+   * unchanged. Never set for a damage resolution: there is no target/enemy
+   * model (self-or-announce, CLAUDE.md) — a damage spell's effect is
+   * announced only, never auto-applied.
+   */
+  apply?: { target: "self" | { characterId: string }; kind: "heal" | "damage"; amount: number };
 }

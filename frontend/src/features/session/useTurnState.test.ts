@@ -1350,7 +1350,7 @@ describe("spell commits", () => {
 });
 
 // #1164: the turn card's "Spells cast" tally — a cast's receipt, appended by
-// useSpellPicker's onCastSettled once a cast resolves.
+// InlineSpellPicker's onCastSettled once a cast resolves.
 describe("cast tally", () => {
   function inActiveTurn() {
     const hook = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));

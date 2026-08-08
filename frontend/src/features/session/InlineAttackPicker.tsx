@@ -2,9 +2,11 @@
 // weapons now drive `useResolution`/`ResolutionRail` (#1831) instead of the
 // bespoke `useAttackRolls`/`AttackStepCard` pair — an "Attacking with" form
 // selector, the shared numbered step-rail (Roll to hit → Call it → Damage),
-// the "This action" tally strip, a collapsed Battle Master maneuvers
-// disclosure, and attack cantrips (#734/#786). At md+ the sheet widens
-// (~42rem) and the counter + tally + maneuvers + cantrips move into a right
+// the "This action" tally strip, and a collapsed Battle Master maneuvers
+// disclosure. Weapons-only as of #1833: attack cantrips (#734/#786) left this
+// sheet for the Cast-a-Spell picker (InlineSpellPicker) — Attack and Cast a
+// Spell are the mutually-exclusive Action choices they are in 5e. At md+ the
+// sheet widens (~42rem) and the counter + tally + maneuvers move into a right
 // rail beside the step card so the step column never scrolls — placement
 // switches via useIsBelowMd (single mount per widget, like BottomSheet's own
 // breakpoint gating).
@@ -45,7 +47,7 @@ import type { AttackTallyRow } from "@/lib/attackTallySummary";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import { useAttackTallyBridge } from "@/features/session/useAttackTallyBridge";
 import { useManeuverDie } from "@/features/session/useManeuverDie";
-import { useResolution } from "@/features/session/useResolution";
+import { INERT_RESOLUTION_CONSUMERS, useResolution } from "@/features/session/useResolution";
 import type { ResolutionRolls, ResolutionTurnState, ResolutionView } from "@/features/session/useResolution";
 import type { ResolveActionEventEffect } from "@character-sheet/shared-types";
 import ResolutionRail from "@/features/session/ResolutionRail";
@@ -59,7 +61,6 @@ import ManeuversDisclosure from "@/features/session/ManeuversDisclosure";
 import SneakAttackSection from "@/features/session/SneakAttackSection";
 import StunningStrikeSection from "@/features/session/StunningStrikeSection";
 import QuiveringPalmSection from "@/features/session/QuiveringPalmSection";
-import InlineSpellAttackSection from "@/features/session/InlineSpellAttackSection";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { Character } from "@/types/character";
@@ -221,15 +222,17 @@ function DamageRidersPanel({
 // (onRollEffect/onCallCrit/onComplete, not just onRollToHit) — deriving it
 // from `used` would self-disable the swing's own remaining steps the instant
 // it started. `completedSwings` only advances in handleCommit, once a swing
-// is actually done.
+// is actually done. `consume*` is the shared INERT_RESOLUTION_CONSUMERS
+// (useResolution.ts, #1848 review) — InlineSpellPicker's own
+// spellResolutionTurnState spreads the SAME constant rather than a second
+// verbatim-copied trio, so a future ResolutionTurnState consume method can't
+// be added to one shim and missed on the other.
 function attackResolutionTurnState(attackTotal: number, completedSwings: number): ResolutionTurnState {
   return {
     actionsRemaining: attackTotal - completedSwings,
     bonusActionUsed: true,
     reactionUsed: true,
-    consumeAction: () => {},
-    consumeBonusAction: () => {},
-    consumeReaction: () => {},
+    ...INERT_RESOLUTION_CONSUMERS,
   };
 }
 
@@ -342,8 +345,6 @@ function riderTotalsOf(effects: Record<string, ResolveActionEventEffect>): Recor
 
 interface InlineAttackPickerProps {
   turnState: TurnState & TurnStateActions;
-  /** Active session id — spell attack cantrips still log through it (#1833 migrates them). */
-  sessionId: string;
   onClose: () => void;
   /**
    * Called when the player cancels before rolling any attacks — refunds the
@@ -356,7 +357,6 @@ interface InlineAttackPickerProps {
 
 export default function InlineAttackPicker({
   turnState,
-  sessionId,
   onClose,
   onCancel,
   onLogChanged,
@@ -478,13 +478,6 @@ export default function InlineAttackPicker({
   const quiveringPalm = (
     <QuiveringPalmSection turnState={turnState} currentRow={currentRow} />
   );
-  const spellAttacks = (
-    <InlineSpellAttackSection
-      sessionId={sessionId}
-      turnState={turnState}
-      onLogChanged={onLogChanged}
-    />
-  );
   const damageRiders = (
     <DamageRidersPanel
       resolutionView={resolutionView}
@@ -534,8 +527,10 @@ export default function InlineAttackPicker({
   );
 
   // Mobile: one column in journey order. md+: the step card keeps the left
-  // column and the counter/tally/maneuvers/cantrips form the right rail
-  // (final-spec frame 12) so the step column never scrolls.
+  // column and the counter/tally/maneuvers form the right rail (final-spec
+  // frame 12) so the step column never scrolls. Cantrips left this sheet in
+  // #1833 — the Attack sheet is weapons-only; Attack and Cast a Spell are the
+  // mutually-exclusive Action choices they are in 5e.
   if (isMobile) {
     return (
       <div className="flex flex-col gap-2">
@@ -546,7 +541,6 @@ export default function InlineAttackPicker({
         {sneakAttack}
         {stunningStrike}
         {quiveringPalm}
-        {spellAttacks}
         {footer}
       </div>
     );
@@ -566,7 +560,6 @@ export default function InlineAttackPicker({
         {sneakAttack}
         {stunningStrike}
         {quiveringPalm}
-        {spellAttacks}
       </div>
     </div>
   );

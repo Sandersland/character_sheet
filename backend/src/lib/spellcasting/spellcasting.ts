@@ -998,6 +998,69 @@ export async function castAbilityWithSlotInTx(
   return outcome;
 }
 
+// Shared "load row → build op context" preamble both applySpellcastingOpInTx
+// and castSpellForResolutionInTx run before dispatching an op (fallow
+// dup:534687ad) — the one not-found error is a client-facing domain error in
+// both callers, so it's safe to centralize here too.
+async function loadSpellOpContext(
+  ids: { tx: Prisma.TransactionClient; characterId: string; batchId: string; sessionId: string | null; casterUserId: string },
+): Promise<{ ctx: SpellOpContext; state: SpellcastingMutableState; beforeState: SpellStateSnapshot }> {
+  const row = await ids.tx.character.findUnique({ where: { id: ids.characterId }, select: SPELLCASTING_SELECT });
+  if (!row) {
+    throw new InvalidSpellcastingOperationError(`Character not found: ${ids.characterId}`);
+  }
+  return buildSpellcastingOp(ids, row);
+}
+
+/**
+ * Runs a `castSpell` op's full side-effect sequence (pay slot/arcanum cost,
+ * concentration set/displace, self-buff append, self/ally apply —
+ * castAbilityInTx) and persists the resulting spell state, but returns the
+ * outcome + before/after snapshot INSTEAD OF logging a "castSpell" event
+ * (#1833, epic #1827 slice 6). `applyCastSpellOp`'s callees each log their
+ * OWN event under the caller's batchId (concentrationDropped, an
+ * appendActiveBuffInTx effects event, an applyHealInTx hitPoints event) —
+ * `resolveAction` (lib/combat/resolve-action.ts) is the caller, and logs its
+ * OWN consolidated combat-rail event (toHit/save/effect/riders) under that
+ * SAME batchId instead of a second "Cast X: N damage" row, so LIFO undo
+ * reverts every sub-effect together as one batch (activity.ts's
+ * revertBatch iterates every event sharing a batchId — no special-casing
+ * needed here). Mirrors applySpellcastingOpInTx's own load → dispatch →
+ * persist sequence; the one difference is the caller owns logging.
+ */
+export async function castSpellForResolutionInTx(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  batchId: string,
+  sessionId: string | null,
+  casterUserId: string,
+  op: CastSpellOperation,
+): Promise<{ outcome: OpOutcome; before: SpellStateSnapshot; after: SpellStateSnapshot }> {
+  const { ctx, state, beforeState } = await loadSpellOpContext({ tx, characterId, batchId, sessionId, casterUserId });
+  // Deliberately calls applyCastSpellOp directly, NOT dispatchSpellOp
+  // (#1848 review) — two reasons, not an oversight:
+  //   1. This function only ever handles op.type "castSpell" (its own
+  //      parameter is typed CastSpellOperation, not the general
+  //      SpellcastingOperation union dispatchSpellOp dispatches over) — going
+  //      through dispatchSpellOp would need a redundant cast/widen here with
+  //      no dispatch actually happening (there is exactly one handler this
+  //      call could ever reach).
+  //   2. dispatchSpellOp's return type is nullable (a no-op op like
+  //      learnSpell/prepareSpell can return null); applyCastSpellOp's is not
+  //      (a cast always produces a real OpOutcome). Routing through the
+  //      dispatcher would force a null-check here that can never actually
+  //      fire, for a case this function structurally cannot hit.
+  // The tradeoff this accepts: a future cross-cutting wrapper around
+  // dispatchSpellOp (metrics, pre/post hooks) would need to ALSO wrap
+  // applyCastSpellOp directly (or wrap SPELL_OP_HANDLERS itself, the actual
+  // single choke point both this and dispatchSpellOp read from) to cover the
+  // resolveAction path — noted here so that wrapper's author finds this
+  // comment instead of silently missing the spell-resolution entry point.
+  const outcome = await applyCastSpellOp(ctx, op);
+  await persistSpellState(tx, characterId, state);
+  return { outcome, before: beforeState, after: cloneSpellState(state) };
+}
+
 /**
  * Applies a batch of spellcasting operations atomically in one Prisma
  * transaction. Mirrors applyInventoryOperations / applyHitPointOperations:
@@ -1198,18 +1261,7 @@ export async function applySpellcastingOpInTx(
   sessionId: string | null,
   casterUserId: string,
 ): Promise<void> {
-  const row = await tx.character.findUnique({
-    where: { id: characterId },
-    select: SPELLCASTING_SELECT,
-  });
-  if (!row) {
-    throw new InvalidSpellcastingOperationError(`Character not found: ${characterId}`);
-  }
-
-  const { ctx, state, beforeState } = buildSpellcastingOp(
-    { tx, characterId, batchId, sessionId, casterUserId },
-    row,
-  );
+  const { ctx, state, beforeState } = await loadSpellOpContext({ tx, characterId, batchId, sessionId, casterUserId });
 
   const outcome = await dispatchSpellOp(ctx, op);
   if (outcome === null) return;
