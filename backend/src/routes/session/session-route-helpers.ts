@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { z } from "zod";
 
 import type { RollKind, RollMode } from "@/lib/session/sessions.js";
+import { attackComponentsSchema, damageComponentsSchema } from "@/lib/session/roll-components.js";
 import type {
   RollEventAttackComponents,
   RollEventDamageComponents,
@@ -60,26 +61,9 @@ const modeSourceSchema = z
 // sources; 20 is generous headroom while still bounding event-log size.
 const modeSourcesSchema = z.array(modeSourceSchema).max(20);
 
-const attackComponentsSchema = z
-  .object({
-    abilityMod: z.number().finite(),
-    proficiencyBonus: z.number().finite(),
-    rangedBonus: z.number().finite(),
-    attackRollBonus: z.number().finite(),
-    // The ability abilityMod is drawn from (#1361) — same shape as
-    // modeSourceSchema's `ability` (no enum: an ability key, not validated
-    // against the ability list, matching that field's existing treatment).
-    ability: z.string().optional(),
-  })
-  .strict();
-
-const damageComponentsSchema = z
-  .object({
-    abilityMod: z.number().finite(),
-    meleeDamageBonus: z.number().finite(),
-    ability: z.string().optional(),
-  })
-  .strict();
+// attackComponentsSchema/damageComponentsSchema now live in
+// lib/session/roll-components.ts (#1829/#1830) — shared with resolveAction's
+// op schema, which can't reach into routes/ for it.
 
 // An absent optional field is valid and stays absent; a present one must parse.
 // Returning undefined for BOTH "absent" and "invalid" is safe only because

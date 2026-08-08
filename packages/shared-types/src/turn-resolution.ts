@@ -15,6 +15,7 @@
 // only the descriptor's DATA contract, not a not-yet-built op union.
 
 import type { AttackRollSpec } from "./attack-row.js";
+import type { RollEventAttackComponents, RollEventDamageComponents } from "./roll-event.js";
 
 /** Action-economy slot a resolution spends — the three slots the turn hub tracks. */
 export type TurnResolutionCostKind = "action" | "bonusAction" | "reaction";
@@ -39,6 +40,15 @@ export interface TurnResolutionCost {
 export interface TurnResolutionToHit {
   bonus: number;
   critRange: number;
+  /**
+   * Decomposed to-hit addends (ability mod / proficiency / ranged / flat
+   * bonus) — served alongside `bonus` so the resolver (#1831) can echo them
+   * into a `resolveAction` event's `toHit.components` unchanged (#1829/#1830),
+   * the same breakdown a roll-log event's `attackComponents` already carries.
+   * Optional: only weapon rows serve it today (deriveWeaponAttackComponents);
+   * a spell's attack bonus is currently a flat served number.
+   */
+  components?: RollEventAttackComponents;
 }
 
 /** Saving-throw parameters announced to the DM — present for a save-shaped spell. */
@@ -58,6 +68,13 @@ export interface TurnResolutionEffect {
   kind: "damage" | "heal";
   /** Damage type — absent for a heal. */
   damageType?: string;
+  /**
+   * Decomposed damage addends (ability mod + melee damage bonus) — same
+   * echo-through-unchanged treatment as `TurnResolutionToHit.components`;
+   * absent for a spell effect (only a weapon's damage row serves it today via
+   * deriveWeaponDamage) and always absent for a heal.
+   */
+  components?: RollEventDamageComponents;
 }
 
 /**

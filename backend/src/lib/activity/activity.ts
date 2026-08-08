@@ -357,6 +357,29 @@ async function revertClassEvent(ctx: RevertContext): Promise<void> {
   return revertSubclassChange(ctx);
 }
 
+// resolveAction (#1829): the only combat-category event that carries a
+// `before` snapshot — combatStarted/combatEnded/combatRoundAdvanced carry
+// none, so they never reach this handler (reverseEvent's `if (!before)
+// return` guard runs first). A resolution's cost is either a spent spell
+// slot (spellcasting) or, in a future slice, a class resource pool — restore
+// whichever column its before snapshot carries, identical in shape to
+// revertSpellcastingEvent/revertResourcesEvent. A cantrip/weapon resolution
+// snapshots neither column, so this is a no-op for it — the batch is still
+// marked reverted by applyBatchReversal regardless.
+async function revertCombatEvent(ctx: RevertContext): Promise<void> {
+  const { tx, characterId, before } = ctx;
+  const beforeSpellcasting = before.spellcasting as Record<string, unknown> | undefined;
+  const beforeResources = before.resources as Record<string, unknown> | undefined;
+  const updateData: Record<string, unknown> = {};
+  if (beforeSpellcasting !== undefined) updateData.spellcasting = beforeSpellcasting;
+  if (beforeResources !== undefined) updateData.resources = beforeResources;
+  if (Object.keys(updateData).length === 0) return;
+  await tx.character.update({
+    where: { id: characterId },
+    data: updateData as Prisma.CharacterUpdateInput,
+  });
+}
+
 async function revertAdvancementEvent(ctx: RevertContext): Promise<void> {
   const { tx, characterId, before } = ctx;
   // Restore ability scores, hit points, initiative, and resources from
@@ -375,10 +398,13 @@ async function revertAdvancementEvent(ctx: RevertContext): Promise<void> {
 }
 
 /**
- * Per-category revert dispatch. Categories with no handler (roll, session,
- * combat — and inventory, which is dispatched before the `before` guard) are
+ * Per-category revert dispatch. Categories with no handler (roll, session —
+ * and inventory, which is dispatched before the `before` guard) are
  * intentionally absent: reverseEvent no-ops for them, matching prior behavior.
- * `hitPoints` and `experience` share one handler.
+ * `hitPoints` and `experience` share one handler. `combat`'s handler
+ * (revertCombatEvent, #1829) only ever fires for a resolveAction event —
+ * combatStarted/combatEnded/combatRoundAdvanced carry no `before` snapshot,
+ * so they never reach it.
  */
 const REVERT_HANDLERS: Partial<Record<CharacterEventCategory, RevertHandler>> = {
   hitPoints: revertHitPointsEvent,
@@ -390,6 +416,7 @@ const REVERT_HANDLERS: Partial<Record<CharacterEventCategory, RevertHandler>> = 
   effects: revertEffectsEvent,
   class: revertClassEvent,
   advancement: revertAdvancementEvent,
+  combat: revertCombatEvent,
 };
 
 // Restore one event's `before` sub-state. Inventory is shape-driven and runs
