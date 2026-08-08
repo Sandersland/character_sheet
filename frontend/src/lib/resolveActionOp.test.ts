@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { buildResolveActionOp } from "@/lib/resolveActionOp";
 import type { ResolutionRolls } from "@/features/session/useResolution";
-import type { TurnResolution } from "@character-sheet/shared-types";
+import type { ResolveActionEventEffect, TurnResolution } from "@character-sheet/shared-types";
 
 const TO_HIT = { faces: [15], kept: 15, nat20: false, bonus: 5, total: 20, verdict: "hit" as const };
 const EFFECT = { spec: "1d8+3", faces: [6], total: 9, type: "piercing", kind: "damage" as const, crit: false };
@@ -57,7 +57,52 @@ describe("buildResolveActionOp", () => {
   it("carries an explicit slotLevel for a leveled spell, omitting it otherwise", () => {
     const resolution: TurnResolution = { source: "Magic Missile", cost: { kind: "action" } };
 
-    expect(buildResolveActionOp(resolution, rolls(), 1)).toMatchObject({ slotLevel: 1 });
+    expect(buildResolveActionOp(resolution, rolls(), { slotLevel: 1 })).toMatchObject({ slotLevel: 1 });
     expect(buildResolveActionOp(resolution, rolls())).not.toHaveProperty("slotLevel");
+  });
+
+  // #1843: typed damage riders — additive riders[] sibling to effect.
+  describe("riders (#1843)", () => {
+    const FIRE_RIDER: ResolveActionEventEffect = {
+      spec: "2d6",
+      faces: [3, 4],
+      total: 7,
+      type: "fire",
+      kind: "damage",
+      crit: false,
+    };
+
+    it("carries riders[] verbatim when the options supply any", () => {
+      const resolution: TurnResolution = { source: "Flame Tongue", cost: { kind: "action" } };
+
+      const op = buildResolveActionOp(resolution, rolls(), { riders: [FIRE_RIDER] });
+
+      expect(op.riders).toEqual([FIRE_RIDER]);
+    });
+
+    it("omits riders entirely when the options carry an empty array", () => {
+      const resolution: TurnResolution = { source: "Longsword", cost: { kind: "action" } };
+
+      const op = buildResolveActionOp(resolution, rolls(), { riders: [] });
+
+      expect(op).not.toHaveProperty("riders");
+    });
+
+    it("omits riders entirely when the options omit them (default swing)", () => {
+      const resolution: TurnResolution = { source: "Longsword", cost: { kind: "action" } };
+
+      const op = buildResolveActionOp(resolution, rolls());
+
+      expect(op).not.toHaveProperty("riders");
+    });
+
+    it("carries riders alongside an explicit slotLevel — the two options are independent", () => {
+      const resolution: TurnResolution = { source: "Green-Flame Blade", cost: { kind: "action" } };
+
+      const op = buildResolveActionOp(resolution, rolls(), { riders: [FIRE_RIDER], slotLevel: 1 });
+
+      expect(op.riders).toEqual([FIRE_RIDER]);
+      expect(op.slotLevel).toBe(1);
+    });
   });
 });

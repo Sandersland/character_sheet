@@ -29,6 +29,7 @@ import { useIsBelowMd } from "@/hooks/useIsBelowMd";
 import { applyResolveActionOperations, type ResolveActionOperation } from "@/api/client";
 import { useRoll } from "@/features/dice/RollContext";
 import RollModeChoice from "@/features/dice/RollModeChoice";
+import { formatRollSpec } from "@/lib/dice";
 import type { RollMode } from "@/lib/dice";
 import {
   attacksExhausted as computeAttacksExhausted,
@@ -44,9 +45,9 @@ import type { AttackTallyRow } from "@/lib/attackTallySummary";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import { useAttackTallyBridge } from "@/features/session/useAttackTallyBridge";
 import { useManeuverDie } from "@/features/session/useManeuverDie";
-import { useRollLogger } from "@/features/session/useRollLogger";
 import { useResolution } from "@/features/session/useResolution";
 import type { ResolutionRolls, ResolutionTurnState, ResolutionView } from "@/features/session/useResolution";
+import type { ResolveActionEventEffect } from "@character-sheet/shared-types";
 import ResolutionRail from "@/features/session/ResolutionRail";
 import { AttackKickerPips } from "@/features/session/AttackStepCard";
 import { AttackFormSummaryCore } from "@/features/session/railPrimitives";
@@ -298,8 +299,8 @@ function buildManeuverView(
   };
 }
 
-// Bundles the picker's own local UI state — the ADV/DIS choice (#958), rider
-// roll totals, the armed form, and the completed-swings counter — into ONE
+// Bundles the picker's own local UI state — the ADV/DIS choice (#958), rolled
+// rider effects, the armed form, and the completed-swings counter — into ONE
 // useState instead of four (fallow flagged InlineAttackPicker's own
 // complexity, #1832 review: every hook call this component makes directly
 // adds cognitive weight). `completedSwings`' lazy initializer mirrors its
@@ -307,21 +308,36 @@ function buildManeuverView(
 // sheet mid Extra Attack (Resume) doesn't grant back already-recorded
 // swings — a sheet closed mid-swing (to-hit rolled, never completed) leaves
 // its row unresolved in the tally, same as the pre-#1832 "Skip" affordance did.
+//
+// `riderEffects` (#1843) is keyed by rider id (overwrite-on-reroll, same as
+// the pre-#1843 riderTotals map) and is the single source of truth for BOTH
+// the DamageRiderList display total AND the riders[] array merged into the
+// swing's resolveAction op at commit — `clearRiders` resets it after every
+// commit so a rider rolled on swing 1 of an Extra Attack sequence never rides
+// along into swing 2's op.
 function usePickerLocalState(initialSelectedId: string, turnState: TurnState) {
   const [state, setState] = useState(() => ({
     attackMode: "normal" as RollMode,
-    riderTotals: {} as Record<string, number>,
+    riderEffects: {} as Record<string, ResolveActionEventEffect>,
     selectedId: initialSelectedId,
     completedSwings: turnState.attack?.used ?? 0,
   }));
   return {
     ...state,
     setAttackMode: (attackMode: RollMode) => setState((s) => ({ ...s, attackMode })),
-    setRiderTotal: (riderId: string, total: number) =>
-      setState((s) => ({ ...s, riderTotals: { ...s.riderTotals, [riderId]: total } })),
+    setRiderEffect: (riderId: string, effect: ResolveActionEventEffect) =>
+      setState((s) => ({ ...s, riderEffects: { ...s.riderEffects, [riderId]: effect } })),
+    clearRiders: () => setState((s) => ({ ...s, riderEffects: {} })),
     setSelectedId: (selectedId: string) => setState((s) => ({ ...s, selectedId })),
     recordSwingComplete: () => setState((s) => ({ ...s, completedSwings: s.completedSwings + 1 })),
   };
+}
+
+// Display-only projection of `riderEffects` for DamageRiderList's own
+// `riderTotals` prop (unchanged contract) — one source of truth (riderEffects)
+// instead of two states that could drift.
+function riderTotalsOf(effects: Record<string, ResolveActionEventEffect>): Record<string, number> {
+  return Object.fromEntries(Object.entries(effects).map(([id, effect]) => [id, effect.total]));
 }
 
 interface InlineAttackPickerProps {
@@ -376,9 +392,18 @@ export default function InlineAttackPicker({
   // SneakAttack/StunningStrike/QuiveringPalm/ManeuversDisclosure all need
   // `currentRow` DURING the swing, not just after it commits, mirroring the
   // pre-#1832 useAttackRolls timing.
+  //
+  // Riders (#1843): a rider rolled before "it Missed" is called (the panel
+  // stays visible until the verdict settles — DamageRidersPanel's own gate)
+  // is dropped rather than attached to a miss's op, matching `effect: null`
+  // on a miss — a typed rider makes no sense on a swing that didn't land.
+  // `clearRiders` always fires so a swing's rider state never bleeds into
+  // the NEXT Extra Attack swing, rolled or not.
   function handleCommit(rolls: ResolutionRolls) {
-    resolveActionMutation.mutate(buildResolveActionOp(resolution, rolls));
+    const riders = rolls.toHit?.verdict === "miss" ? [] : Object.values(local.riderEffects);
+    resolveActionMutation.mutate(buildResolveActionOp(resolution, rolls, { riders }));
     local.recordSwingComplete();
+    local.clearRiders();
   }
 
   const { view: rawResolutionView, reset } = useResolution({
@@ -399,17 +424,26 @@ export default function InlineAttackPicker({
   );
 
   const { roll } = useRoll();
-  const logRollSafe = useRollLogger(character.id, sessionId, onLogChanged);
 
-  // On-hit dice riders (Flame Tongue +2d6 fire, #1235) stay on the roll-log
-  // path — resolveAction's single `effect` can't carry a second typed damage
-  // term (no `instances[]`, per the epic's settled multi-instance decision),
-  // so a rider is its own roll-log event, same as before this migration.
+  // On-hit dice riders (Flame Tongue +2d6 fire, #1235) route into the SAME
+  // resolveAction event as the swing's own effect (#1843) — riders[] is an
+  // additive sibling to effect (a genuinely different damage TYPE, not
+  // another same-type instance), so this no longer writes its own roll-log
+  // event (retired #1822/#1823 regression: a rider used to render as an
+  // orphaned second feed row that undo couldn't reach). The rolled term is
+  // held in local.riderEffects (overwrite-on-reroll, same as the pre-#1843
+  // riderTotals map) and merged into the op at handleCommit.
   function handleDamageRider(rider: DamageRider) {
     const spec = resolutionView.isCrit ? critDamageSpec(rider.spec) : rider.spec;
     const result = roll(spec, rider.rollLabel);
-    logRollSafe("damage", rider.logSource, result, spec, rider.damageType);
-    local.setRiderTotal(rider.id, result.total);
+    local.setRiderEffect(rider.id, {
+      spec: formatRollSpec(result.spec),
+      faces: result.dice.map((d) => d.value),
+      total: result.total,
+      type: rider.damageType ?? armedEntry.damageType,
+      kind: "damage",
+      crit: resolutionView.isCrit,
+    });
     if (currentRow) turnState.addTallyDamageRider(currentRow.id, result.total);
   }
 
@@ -455,7 +489,7 @@ export default function InlineAttackPicker({
     <DamageRidersPanel
       resolutionView={resolutionView}
       armedEntry={armedEntry}
-      riderTotals={local.riderTotals}
+      riderTotals={riderTotalsOf(local.riderEffects)}
       onDamageRider={handleDamageRider}
     />
   );

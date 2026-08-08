@@ -1,14 +1,24 @@
-// buildResolveActionOp (epic #1827 Slice 5, #1832) — turns a completed
-// ResolutionRolls payload (useResolution's commit callback, #1831) plus its
-// driving TurnResolution descriptor into the wire-shaped ResolveActionOperation.
-// The one cross-domain translation every adapter (weapon here, spell in
-// #1833) needs: TurnResolutionCostKind spells "bonusAction" the way
-// useTurnState/TurnResolution do, but ResolveActionEventCost (the persisted
-// event / op shape, #1829) spells it "bonus" — #1831 review comment 1.
+// buildResolveActionOp (epic #1827 Slice 5, #1832; riders #1843) — turns a
+// completed ResolutionRolls payload (useResolution's commit callback, #1831)
+// plus its driving TurnResolution descriptor into the wire-shaped
+// ResolveActionOperation. The one cross-domain translation every adapter
+// (weapon here, spell in #1833) needs: TurnResolutionCostKind spells
+// "bonusAction" the way useTurnState/TurnResolution do, but
+// ResolveActionEventCost (the persisted event / op shape, #1829) spells it
+// "bonus" — #1831 review comment 1.
+//
+// `riders` (#1843) is NOT threaded through TurnResolution/useResolution: a
+// dice-valued on-hit rider (Flame Tongue +2d6 fire) is read off the armed
+// weapon's OWN `AttackEntry.damageRiders` (attackMath.ts), rolled by its own
+// UI list (DamageRiderList) outside the rail's step machinery — useResolution
+// drives none of that today, so extending its step model to roll riders too
+// would be scope creep this slice doesn't need. The adapter (InlineAttackPicker,
+// #1832/#1843) accumulates each rolled rider into its own local state and
+// passes the finished array in here at commit time, alongside `slotLevel`.
 
 import type { ResolveActionOperation } from "@/api/client";
 import type { ResolutionRolls } from "@/features/session/useResolution";
-import type { ResolveActionEventCost, TurnResolution } from "@character-sheet/shared-types";
+import type { ResolveActionEventCost, ResolveActionEventEffect, TurnResolution } from "@character-sheet/shared-types";
 
 const COST_KIND: Record<TurnResolution["cost"]["kind"], ResolveActionEventCost["kind"]> = {
   action: "action",
@@ -16,11 +26,18 @@ const COST_KIND: Record<TurnResolution["cost"]["kind"], ResolveActionEventCost["
   reaction: "reaction",
 };
 
+export interface BuildResolveActionOpOptions {
+  slotLevel?: number;
+  /** Typed damage riders (#1843) — omitted from the wire op entirely when empty. */
+  riders?: ResolveActionEventEffect[];
+}
+
 export function buildResolveActionOp(
   resolution: TurnResolution,
   rolls: ResolutionRolls,
-  slotLevel?: number,
+  options: BuildResolveActionOpOptions = {},
 ): ResolveActionOperation {
+  const { slotLevel, riders } = options;
   return {
     type: "resolveAction",
     actionId: rolls.actionId,
@@ -32,6 +49,7 @@ export function buildResolveActionOp(
     toHit: rolls.toHit,
     save: rolls.save,
     effect: rolls.effect,
+    ...(riders && riders.length > 0 ? { riders } : {}),
     ...(slotLevel !== undefined ? { slotLevel } : {}),
   };
 }

@@ -74,6 +74,21 @@ function leveledCastOp(actionId = "action-2") {
   };
 }
 
+// A weapon swing carrying one typed elemental rider (Flame Tongue +2d6 fire,
+// #1843) — the primary `effect` is the weapon's own slashing damage, `riders`
+// is the additive second typed term.
+function riderSwingOp(actionId = "action-4") {
+  return {
+    type: "resolveAction" as const,
+    actionId,
+    source: "Flame Tongue",
+    cost: { kind: "action" as const },
+    toHit: { faces: [15], kept: 15, nat20: false, bonus: 5, total: 20, verdict: "hit" as const },
+    effect: { spec: "1d8+3", faces: [6], total: 9, type: "slashing", kind: "damage" as const, crit: false },
+    riders: [{ spec: "2d6", faces: [4, 5], total: 9, type: "fire", kind: "damage" as const, crit: false }],
+  };
+}
+
 // A no-roll utility cantrip (Prestidigitation) — every roll field is null and
 // there is no slotLevel, so this exercises the all-nullable resolution shape.
 function noRollOp(actionId = "action-3") {
@@ -294,6 +309,62 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     // A level-1 wizard has exactly 2 L1 slots — the third cast must fail.
     const res = await post([leveledCastOp("a3")]);
     expect(res.status).toBe(400);
+  });
+
+  // ── typed damage riders (#1843: additive riders[] sibling to effect) ────
+
+  it("stores riders[] verbatim on the event, alongside the primary effect", async () => {
+    const res = await post([riderSwingOp()]);
+    expect(res.status).toBe(200);
+
+    const events = (await activity(FIXTURE_ID)).body as Array<{ type: string; data: Record<string, unknown> }>;
+    const resolveEvent = events.find((e) => e.type === "resolveAction");
+    expect(resolveEvent?.data.effect).toMatchObject({ type: "slashing", total: 9 });
+    expect(resolveEvent?.data.riders).toEqual([
+      { spec: "2d6", faces: [4, 5], total: 9, type: "fire", kind: "damage", crit: false },
+    ]);
+  });
+
+  it("defaults riders to an empty array when the op omits it", async () => {
+    const res = await post([weaponOp()]);
+    expect(res.status).toBe(200);
+
+    const events = (await activity(FIXTURE_ID)).body as Array<{ type: string; data: Record<string, unknown> }>;
+    const resolveEvent = events.find((e) => e.type === "resolveAction");
+    expect(resolveEvent?.data.riders).toEqual([]);
+  });
+
+  it("400s on a malformed rider element (missing required type)", async () => {
+    const op = riderSwingOp();
+    const badRider = { ...op.riders[0] } as Record<string, unknown>;
+    delete badRider.type;
+    const res = await post([{ ...op, riders: [badRider] }]);
+    expect(res.status).toBe(400);
+  });
+
+  it("a rider swing writes exactly ONE resolveAction event — no orphaned rider row (#1822/#1823 regression fix)", async () => {
+    const res = await post([riderSwingOp()]);
+    expect(res.status).toBe(200);
+
+    const events = (await activity(FIXTURE_ID)).body as Array<{ type: string; batchId?: string }>;
+    const resolveEvents = events.filter((e) => e.type === "resolveAction");
+    expect(resolveEvents).toHaveLength(1);
+    const sameBatch = events.filter((e) => e.batchId === resolveEvents[0].batchId);
+    expect(sameBatch).toHaveLength(1);
+  });
+
+  it("undo of a rider swing reverts the whole event — the rider is not separately undoable", async () => {
+    await post([riderSwingOp()]);
+    const beforeUndo = (await activity(FIXTURE_ID)).body as Array<{ type: string; batchId?: string }>;
+    const batchId = beforeUndo.find((e) => e.type === "resolveAction")?.batchId;
+    expect(batchId).toBeTruthy();
+
+    const revertRes = await revert(FIXTURE_ID, batchId as string);
+    expect(revertRes.status).toBe(200);
+
+    const afterUndo = (await activity(FIXTURE_ID)).body as Array<{ type: string; reverted: boolean }>;
+    const resolveEvent = afterUndo.find((e) => e.type === "resolveAction");
+    expect(resolveEvent?.reverted).toBe(true);
   });
 
   // ── no-roll resolution (all-nullable path, e.g. Prestidigitation) ────────
