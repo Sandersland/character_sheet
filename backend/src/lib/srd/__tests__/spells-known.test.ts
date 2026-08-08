@@ -11,6 +11,7 @@ import {
   preparedSpellCountAt,
   maxSpellLevelForClass,
   magicalSecretsSpellLists,
+  spellListsFor,
   level1SpellPicksFor,
 } from "@/lib/srd/spellcasting-tables.js";
 
@@ -262,6 +263,68 @@ describe("magicalSecretsSpellLists — Bard Magical Secrets, edition-forked", ()
     expect(magicalSecretsSpellLists("Warlock", 20, null, "EDITION_2024")).toEqual({
       spells: ["warlock"],
       cantrips: ["warlock"],
+    });
+  });
+});
+
+// #1825: spellListsFor is the single resolver "which spell list(s) may this
+// character pick from" — it owns the plain single-class default, the EK/AT →
+// wizard redirect, AND Bard Magical Secrets (magicalSecretsSpellLists folds
+// into it, kept as a delegate above so its own describe block stays green
+// unchanged). The live bug: the class's own default branch used to assume the
+// spell-list key equals the lowercased class name, which for a third-caster
+// subclass (Eldritch Knight / Arcane Trickster) is "fighter"/"rogue" — no
+// catalog spell is ever on those lists, so the New Spells step served an
+// empty picker. EK/AT actually draw from the WIZARD list — PHB'14 p. 75
+// (Eldritch Knight) / p. 98 (Arcane Trickster), byte-identical in PHB'24.
+describe("spellListsFor — the single class+subclass+edition spell-list resolver (#1825)", () => {
+  it("redirects Eldritch Knight to the wizard list on both facets, in both editions", () => {
+    for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {
+      expect(spellListsFor("fighter", 3, "eldritch knight", edition)).toEqual({
+        spells: ["wizard"],
+        cantrips: ["wizard"],
+      });
+    }
+  });
+
+  it("redirects Arcane Trickster to the wizard list on both facets, in both editions", () => {
+    for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {
+      expect(spellListsFor("rogue", 3, "arcane trickster", edition)).toEqual({
+        spells: ["wizard"],
+        cantrips: ["wizard"],
+      });
+    }
+  });
+
+  it("matches the subclass name case-insensitively, and the redirect holds at every level", () => {
+    expect(spellListsFor("fighter", 12, "Eldritch Knight", "EDITION_2024")).toEqual({
+      spells: ["wizard"],
+      cantrips: ["wizard"],
+    });
+  });
+
+  it("a plain class with no third-caster subclass keeps its own list, unchanged", () => {
+    expect(spellListsFor("wizard", 5, null, "EDITION_2024")).toEqual({ spells: ["wizard"], cantrips: ["wizard"] });
+    expect(spellListsFor("fighter", 5, "champion", "EDITION_2024")).toEqual({ spells: ["fighter"], cantrips: ["fighter"] });
+  });
+
+  it("folds in Bard Magical Secrets with the edition-forked concrete outputs", () => {
+    // Below the level-10 gate: the plain Bard list on both facets, both editions.
+    expect(spellListsFor("bard", 9, null, "EDITION_2014")).toEqual({ spells: ["bard"], cantrips: ["bard"] });
+    expect(spellListsFor("bard", 9, null, "EDITION_2024")).toEqual({ spells: ["bard"], cantrips: ["bard"] });
+    // 2014 (PHB'14 p. 54): unrestricted on both facets from level 10.
+    expect(spellListsFor("bard", 10, null, "EDITION_2014")).toEqual({ spells: null, cantrips: null });
+    expect(spellListsFor("bard", 20, null, "EDITION_2014")).toEqual({ spells: null, cantrips: null });
+    // 2024 (SRD 5.2 / PHB'24 p. 53): spells widen to Bard/Cleric/Druid/Wizard,
+    // cantrips do NOT (the Prepared Spells trigger is level 1+ only).
+    expect(spellListsFor("bard", 10, null, "EDITION_2024")).toEqual({ spells: ["bard", "cleric", "druid", "wizard"], cantrips: ["bard"] });
+    expect(spellListsFor("bard", 14, null, "EDITION_2024")).toEqual({ spells: ["bard", "cleric", "druid", "wizard"], cantrips: ["bard"] });
+  });
+
+  it("magicalSecretsSpellLists now delegates to spellListsFor, so EK/AT are fixed through the old call name too", () => {
+    expect(magicalSecretsSpellLists("fighter", 3, "Eldritch Knight", "EDITION_2024")).toEqual({
+      spells: ["wizard"],
+      cantrips: ["wizard"],
     });
   });
 });

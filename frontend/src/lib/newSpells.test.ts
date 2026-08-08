@@ -118,7 +118,7 @@ describe("spellListsLabel (#1440)", () => {
     expect(spellListsLabel(null)).toBe("any class's");
   });
 
-  // Not reachable via magicalSecretsSpellLists today (it always returns at
+  // Not reachable via spellListsFor today (it always returns at
   // least [key]) — a defensive guard against a future caller passing [].
   it("renders an empty list as an empty string, not ', or undefined'", () => {
     expect(spellListsLabel([])).toBe("");

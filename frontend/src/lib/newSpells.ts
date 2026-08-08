@@ -2,7 +2,7 @@
 // meta, filters the catalog to the spells this level can scribe, and toggles the
 // draft's learnSpell ops under a hard cap. The spell-level ceiling and the class
 // lists (#1440: spellLists/cantripLists, Magical Secrets-aware and edition-forked
-// via magicalSecretsSpellLists) are both derived on the backend and ride in
+// via spellListsFor) are both derived on the backend and ride in
 // step.meta — never re-encoded here. This module is a display filter over a
 // server-authoritative decision; the real enforcement is
 // assertPickSpellEligibility on the transaction endpoint.
@@ -18,7 +18,7 @@ export interface NewSpellsMeta {
   cantrips: number;
   /**
    * #1440: class lists a leveled pick may come from, served by
-   * magicalSecretsSpellLists (backend). `null` = unrestricted (PHB'14 Bard "from
+   * spellListsFor (backend). `null` = unrestricted (PHB'14 Bard "from
    * any class"). Branch on `=== null`, never truthiness — `[]` is truthy.
    */
   spellLists: string[] | null;
@@ -97,7 +97,7 @@ export function toggleForgetSpell(
  * class (PHB'14 unrestricted Bard Magical Secrets) — OR on the served
  * `expandedSpellIds` (#1631: a subclass's list-expansion, e.g. The Fiend's
  * Expanded Spell List). This is a DISPLAY FILTER over a server-authoritative
- * list computed by `magicalSecretsSpellLists`/`loadSubclassSpellListExpansionIds`
+ * list computed by `spellListsFor`/`loadSubclassSpellListExpansionIds`
  * (backend) and enforced by `assertPickSpellEligibility`; it never originates
  * the rule.
  */
@@ -147,7 +147,7 @@ const capitalize = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1)
 export function spellListsLabel(lists: string[] | null): string {
   if (lists === null) return "any class's";
   const names = lists.map(capitalize);
-  // Defensive, not reachable today: magicalSecretsSpellLists (backend) always
+  // Defensive, not reachable today: spellListsFor (backend) always
   // returns at least [key] for a served list, never [] — but the signature
   // accepts any string[], so a future caller (or test) hitting this shouldn't
   // silently get ", or undefined".

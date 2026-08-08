@@ -1,7 +1,7 @@
 // New Spells ceremony body (#890): scribe the level's new spells into the book,
 // gated to the plan's count, spell-level ceiling, and class list (#1440: served
 // via step.meta.spellLists/cantripLists, edition-correct by construction since
-// they come from the backend's magicalSecretsSpellLists). Eligibility + the hard
+// they come from the backend's spellListsFor). Eligibility + the hard
 // cap live in lib/newSpells and useNewSpellsSelection; this component only wires
 // the catalog fetch, search, and the tri-state rows. Rows + the full-description
 // detail card (#1158) are the same shared SpellPickerRow/SpellDetailCard the

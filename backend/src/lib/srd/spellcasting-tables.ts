@@ -764,8 +764,10 @@ export function bardMagicalSecretsAt(className: string, level: number): boolean 
   return className.toLowerCase() === "bard" && level >= 10;
 }
 
-/** Class lists a Magical Secrets-eligible level-up pick may come from, per facet. `null` = unrestricted. */
-export interface MagicalSecretsLists {
+/** Class lists a spell pick may come from, per facet. `null` = unrestricted.
+ * Named for the resolver (spellListsFor), not Magical Secrets — it also carries
+ * the third-caster (EK/AT → wizard) redirect, which is not a Secrets rule (#1825). */
+export interface SpellPickLists {
   /** Class lists a leveled pick may come from; null = unrestricted (PHB'14 "from any class"). */
   spells: string[] | null;
   /** Class lists a cantrip pick may come from; null = unrestricted (PHB'14 "…or a cantrip"). */
@@ -773,53 +775,84 @@ export interface MagicalSecretsLists {
 }
 
 /**
- * Bard Magical Secrets, edition-forked. Governs BOTH the leveled-spell and the
- * cantrip facet of a level-up pick — one rule, `edition` last (`subclassGateLevel`
- * pattern) — because the two editions disagree on whether it broadens cantrips.
+ * The single resolver for "which spell list(s) may this character pick
+ * from" (#1825) — every caller (the level-up gate, the catalog picker route)
+ * must resolve through this one function so they can never diverge. Owns
+ * three rules, checked in order:
  *
- * SRD 5.2 / PHB'24 p. 53, *Magical Secrets* (Bard, level 10): "Whenever you reach
- * a Bard level (including this level) and the Prepared Spells number in the Bard
- * Features table increases, you can choose any of your new prepared spells from
- * the Bard, Cleric, Druid, and Wizard spell lists" — a standing broadening from
- * level 10 up (`>= 10`, not `=== 10`), hence `spells` widens but `cantrips` does
- * not: the trigger is the Prepared Spells number, which only covers level 1+
- * spells — the Cantrips column is a separate table untouched by this feature.
+ * 1. Third-caster subclasses (Eldritch Knight / Arcane Trickster) draw from
+ *    the WIZARD list, not their base class's own list — PHB'14 p. 75
+ *    (Eldritch Knight) / p. 98 (Arcane Trickster), byte-identical in PHB'24.
+ *    This is the #1825 fix: the old default branch assumed the spell-list key
+ *    equals the lowercased class name, which for Fighter/Rogue is
+ *    "fighter"/"rogue" — no catalog spell is ever on those lists, so the New
+ *    Spells step served an empty picker for a level-3 Eldritch Knight/Arcane
+ *    Trickster. Keyed off THIRD_CASTER_SUBCLASSES (same map every other
+ *    third-caster check in this module uses) rather than the subclass's
+ *    catalog slug: every function here already resolves third-caster status
+ *    off the free-text `subclass` name, so keying this one function off the
+ *    slug instead would be a second, divergent identity check for the same
+ *    subclass at neighboring call sites — the coupling this module already
+ *    has to a display-name key, not a new one #1825 introduces.
+ * 2. Bard Magical Secrets, edition-forked (folds in the former
+ *    `magicalSecretsSpellLists`, now a delegate below for callers/tests still
+ *    naming it) — governs BOTH the leveled-spell and the cantrip facet of a
+ *    level-up pick, because the two editions disagree on whether it broadens
+ *    cantrips.
  *
- * PHB'14 p. 54, *Magical Secrets* (Bard, 10th/14th/18th level): "Choose two
- * spells from any class, including this one. A spell you choose must be of a
- * level you can cast, as shown on the Bard table, or a cantrip." Both facets are
- * therefore unrestricted (`null`) under 2014.
+ *    SRD 5.2 / PHB'24 p. 53, *Magical Secrets* (Bard, level 10): "Whenever you
+ *    reach a Bard level (including this level) and the Prepared Spells number
+ *    in the Bard Features table increases, you can choose any of your new
+ *    prepared spells from the Bard, Cleric, Druid, and Wizard spell lists" —
+ *    a standing broadening from level 10 up (`>= 10`, not `=== 10`), hence
+ *    `spells` widens but `cantrips` does not: the trigger is the Prepared
+ *    Spells number, which only covers level 1+ spells — the Cantrips column
+ *    is a separate table untouched by this feature.
  *
- * Recorded limitation: PHB'14 grants this as *two of* the picks at 10th/14th/
- * 18th, drawn from one shared two-pick budget (a cantrip taken this way comes
- * out of the same budget as a leveled spell). This codebase models
- * `spellsLearned`/`cantripsLearned` as separate buckets sized by the 2024 tables
- * (`levelUpSpellPicks`/`levelUpCantripPicks`/`CANTRIP_BREAKPOINTS`), which are not
- * forked per edition — epic #1281 owns that fork. With no single budget to draw
- * from, the closest available mapping is: at a qualifying 2014 Bard level,
- * neither facet is class-restricted. This is not full PHB'14 fidelity.
+ *    PHB'14 p. 54, *Magical Secrets* (Bard, 10th/14th/18th level): "Choose two
+ *    spells from any class, including this one. A spell you choose must be of
+ *    a level you can cast, as shown on the Bard table, or a cantrip." Both
+ *    facets are therefore unrestricted (`null`) under 2014.
+ *
+ *    Recorded limitation: PHB'14 grants this as *two of* the picks at
+ *    10th/14th/18th, drawn from one shared two-pick budget (a cantrip taken
+ *    this way comes out of the same budget as a leveled spell). This codebase
+ *    models `spellsLearned`/`cantripsLearned` as separate buckets sized by the
+ *    2024 tables (`levelUpSpellPicks`/`levelUpCantripPicks`/
+ *    `CANTRIP_BREAKPOINTS`), which are not forked per edition — epic #1281
+ *    owns that fork. With no single budget to draw from, the closest
+ *    available mapping is: at a qualifying 2014 Bard level, neither facet is
+ *    class-restricted. This is not full PHB'14 fidelity.
+ * 3. Every other class/level: its own list on both facets (`[key]`).
  *
  * Also known: class membership lives in the SpellClass join, keyed off the
  * parent Spell row rather than carrying its own edition column (#1711) —
  * today's seeded catalog is 2024-only; the 2014 by-class content slices
  * (#1713-#1721) are what populate 2014-tagged Spell/SpellClass rows.
  *
- * `subclass` is currently unused but is the deliberate seam for PHB'24 College of
- * Lore *Magical Discoveries* (level 6, a Cleric/Druid/Wizard cantrip OR a spell
- * you have slots for) and PHB'14 *Additional Magical Secrets* (6th level, any
- * class) — both are content debt for #1281, not implemented here.
+ * `subclass` is ALSO the deliberate seam for PHB'24 College of Lore *Magical
+ * Discoveries* (level 6, a Cleric/Druid/Wizard cantrip OR a spell you have
+ * slots for) and PHB'14 *Additional Magical Secrets* (6th level, any class) —
+ * both remain content debt for #1281, not implemented here.
  */
-export function magicalSecretsSpellLists(
+export function spellListsFor(
   className: string,
   level: number,
   subclass: string | null | undefined,
   edition: RulesEdition,
-): MagicalSecretsLists {
+): SpellPickLists {
+  if (THIRD_CASTER_SUBCLASSES[(subclass ?? "").toLowerCase()]) return { spells: ["wizard"], cantrips: ["wizard"] };
+
   const key = className.toLowerCase();
   if (key !== "bard" || level < 10) return { spells: [key], cantrips: [key] };
   if (edition === "EDITION_2014") return { spells: null, cantrips: null };
   return { spells: ["bard", "cleric", "druid", "wizard"], cantrips: ["bard"] };
 }
+
+/** @deprecated Renamed to spellListsFor (#1825), which also fixes the EK/AT
+ * redirect this name's own bug report was filed against — kept only so an
+ * existing caller/test naming this symbol keeps compiling. */
+export const magicalSecretsSpellLists = spellListsFor;
 
 /**
  * Highest spell level a class can cast/scribe at `level` — the ceiling on spells

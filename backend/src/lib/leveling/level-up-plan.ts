@@ -15,8 +15,8 @@ import {
   casterModelFor,
   levelUpCantripPicks,
   levelUpSpellPicks,
-  magicalSecretsSpellLists,
   maxSpellLevelForClass,
+  spellListsFor,
   swapCadenceFor,
 } from "@/lib/srd/spellcasting-tables.js";
 
@@ -118,8 +118,8 @@ interface PlanContext {
   abilityScores: Record<string, number>;
   now: DerivedClassInfo | null;
   prev: DerivedClassInfo | null;
-  // Threaded to newSpellsStep's magicalSecretsSpellLists call — Magical Secrets
-  // resolves differently per edition (#1440).
+  // Threaded to newSpellsStep's spellListsFor call — Magical Secrets resolves
+  // differently per edition (#1440).
   edition: RulesEdition;
   // hitPointsStep's effective-max preview inputs — see
   // LevelUpPlanCharacter.hpBaseline's own comment.
@@ -294,6 +294,10 @@ function subclassChoiceSteps({ now, prev, edition }: PlanContext): LevelUpStep[]
 // Warlock/Ranger (+ EK/AT in either edition), "prepared" for every SRD 5.2
 // caster and every 2014 re-prepare class — so level-up-submission.ts's swap
 // messages and the frontend never re-derive it from className/edition.
+// spellLists/cantripLists (#1825) resolve through spellListsFor — the same
+// resolver GET /api/spells (routes/catalog/spells.ts) uses — so the EK/AT →
+// wizard redirect and Bard Magical Secrets can never diverge between the
+// level-up gate and the catalog picker.
 // #1631: split out of newSpellsStep purely to keep that function's own
 // cyclomatic count from crossing the CI health gate (mirrors this file's own
 // split reasoning elsewhere, e.g. subclassChoiceSteps). Never applies to
@@ -309,7 +313,7 @@ function newSpellsStep({ target, edition }: PlanContext): LevelUpStep | null {
   if (count <= 0 && cantrips <= 0 && !canSwap) return null;
   const magicalSecrets = bardMagicalSecretsAt(target.name, target.newLevel);
   const maxSpellLevel = maxSpellLevelForClass(target.name, target.newLevel, target.subclass, edition);
-  const lists = magicalSecretsSpellLists(target.name, target.newLevel, target.subclass, edition);
+  const lists = spellListsFor(target.name, target.newLevel, target.subclass, edition);
   const casterModel = casterModelFor(target.name, target.subclass, edition);
   return {
     kind: "newSpells",

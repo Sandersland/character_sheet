@@ -201,6 +201,67 @@ describe("POST /api/characters/:id/level-up/transactions — Battle Master cerem
   });
 });
 
+// #1825 Finding 1: an Eldritch Knight's cantripLists is ["wizard"], not its
+// base "fighter" list, so a rejected cantrip must name the WIZARD cantrip list
+// (via classListPhrase), never the base class the old message hardcoded.
+describe("POST /api/characters/:id/level-up/transactions — Eldritch Knight ceremony (Fighter 2→3)", () => {
+  const CHAR_ID = "lvtx-eldritch-knight-3";
+
+  beforeEach(async () => {
+    const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    await prisma.character.create({
+      data: {
+        ...BASE,
+        ownerId: OWNER_ID,
+        id: CHAR_ID,
+        name: "LevelUpTx Eldritch Knight",
+        experiencePoints: 900, // level 3 threshold
+        hitPoints: { current: 18, max: 18, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 2, die: "d10", spent: 0 },
+        abilityScores: { strength: 16, dexterity: 12, constitution: 14, intelligence: 13, wisdom: 10, charisma: 10 },
+        spellcasting: Prisma.JsonNull,
+        classEntries: {
+          create: [{ name: "fighter", subclass: null, classId: fighter.id, position: 0, level: 2 }],
+        },
+      },
+    });
+  });
+
+  it("rejects a non-wizard cantrip naming the WIZARD cantrip list, not the base fighter class", async () => {
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
+    const eldritchKnight = await prisma.subclass.findFirstOrThrow({ where: { name: "Eldritch Knight" }, select: { id: true } });
+    const wizardCantrip = await prisma.spell.findFirstOrThrow({
+      where: { level: 0, edition: "EDITION_2024", classMemberships: { some: { className: "wizard" } } },
+      select: { id: true },
+    });
+    // A cleric cantrip that is NOT on the wizard list — the ineligible pick.
+    const clericCantrip = await prisma.spell.findFirstOrThrow({
+      where: { level: 0, edition: "EDITION_2024", classMemberships: { some: { className: "cleric" }, none: { className: "wizard" } } },
+      select: { id: true, name: true },
+    });
+    const wizardSpells = await prisma.spell.findMany({
+      where: { level: 1, edition: "EDITION_2024", classMemberships: { some: { className: "wizard" } } },
+      orderBy: { name: "asc" },
+      take: 3,
+      select: { id: true },
+    });
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entry.id },
+      hp: { method: "average" },
+      subclassId: eldritchKnight.id,
+      cantripsLearned: [
+        { type: "learnSpell", spellId: wizardCantrip.id },
+        { type: "learnSpell", spellId: clericCantrip.id },
+      ],
+      spellsLearned: wizardSpells.map((s) => ({ type: "learnSpell", spellId: s.id })),
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe(`${clericCantrip.name} is not on the Wizard cantrip list.`);
+  });
+});
+
 // #1497: at 2014 exhaustion 4+ (PHB'14 p. 291), `hitPoints.max` is already the
 // halved EFFECTIVE max — the GET /plan preview and the actual commit must
 // agree on the post-level max WITHOUT the client re-deriving the halving
