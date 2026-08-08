@@ -820,10 +820,13 @@ describe("buildFeedItems loot summary (#382, preserved)", () => {
 });
 
 describe("buildFeedItems legacy roll events (#1830 — rendering retired, no dual-read)", () => {
-  // useAttackRolls/InlineSpellAttackSection still emit these until the
-  // adapter slices (#1832/#1833) migrate them — this slice removes their
-  // special-cased rendering, so they fall back to the plain summary row like
-  // any other unhandled event type. No merged-swing behavior survives.
+  // Historical fixture only: useBonusAttackSheet's off-hand/flurry path
+  // (#1845, out of #1827's scope) is the sole remaining attackRoll/damageRoll
+  // writer now that the weapon (#1832) and spell (#1833) adapters both moved
+  // onto resolveAction — this slice removed the feed's special-cased
+  // rendering for the old events, so any that still exist fall back to the
+  // plain summary row like any other unhandled event type. No merged-swing
+  // behavior survives.
   it("falls back to the stored summary for a legacy attackRoll/damageRoll event", () => {
     const rows = buildFeedItems([
       makeEvent({

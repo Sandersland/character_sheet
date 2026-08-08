@@ -26,7 +26,7 @@ const FIXTURE_BASE = {
   experiencePoints: 0, // level 1 → 2 L1 slots
   initiativeBonus: 1,
   speed: 30,
-  hitPoints: { current: 8, max: 8, temp: 0 },
+  hitPoints: { current: 3, max: 8, temp: 0 },
   hitDice: { total: 1, die: "d6" },
   abilityScores: {
     strength: 8,
@@ -42,10 +42,56 @@ const FIXTURE_BASE = {
   currency: { cp: 0, sp: 0, gp: 10, pp: 0 },
 };
 
+// Concentration/apply side-effect fixture spells (#1833) — hand-built
+// SpellEntry rows (normalizeSpellcastingMutable reads the JSON blob directly,
+// no catalog join needed for a test fixture).
+const CONCENTRATION_SPELL_A = {
+  id: "entry-conc-a",
+  name: "Test Concentration A",
+  level: 1,
+  school: "abjuration",
+  prepared: true,
+  castingTime: "1 action",
+  range: "Self",
+  duration: "1 minute",
+  description: "",
+  concentration: true,
+};
+
+const CONCENTRATION_SPELL_B = {
+  id: "entry-conc-b",
+  name: "Test Concentration B",
+  level: 1,
+  school: "abjuration",
+  prepared: true,
+  castingTime: "1 action",
+  range: "Self",
+  duration: "1 minute",
+  description: "",
+  concentration: true,
+};
+
+const HEAL_SPELL = {
+  id: "entry-heal",
+  name: "Test Cure Wounds",
+  level: 1,
+  school: "evocation",
+  prepared: true,
+  castingTime: "1 action",
+  range: "Touch",
+  duration: "Instantaneous",
+  description: "",
+  concentration: false,
+  effectKind: "heal",
+  effectDiceCount: 1,
+  effectDiceFaces: 8,
+  effectModifier: 0,
+};
+
 const FIXTURE_SPELLCASTING_JSON = {
   slotsUsed: {},
   arcanumUsed: {},
-  spells: [],
+  spells: [CONCENTRATION_SPELL_A, CONCENTRATION_SPELL_B, HEAL_SPELL],
   concentratingOn: null,
 };
 
@@ -100,6 +146,36 @@ function noRollOp(actionId = "action-3") {
     toHit: null,
     save: null,
     effect: null,
+  };
+}
+
+// A spell-cast resolution carrying `entryId` (#1833) — routes through
+// castSpellForResolutionInTx (concentration/buff/apply), not the bare
+// slot-only path a `slotLevel`-only op (leveledCastOp above) still exercises.
+function concentrationCastOp(entryId: string, actionId: string) {
+  return {
+    type: "resolveAction" as const,
+    actionId,
+    source: entryId === CONCENTRATION_SPELL_A.id ? "Test Concentration A" : "Test Concentration B",
+    cost: { kind: "action" as const },
+    toHit: null,
+    save: null,
+    effect: null,
+    slotLevel: 1,
+    entryId,
+  };
+}
+
+function healCastOp(actionId = "action-heal") {
+  return {
+    type: "resolveAction" as const,
+    actionId,
+    source: "Test Cure Wounds",
+    cost: { kind: "action" as const },
+    effect: { spec: "1d8", faces: [5], total: 5, type: "healing", kind: "heal" as const, crit: false },
+    slotLevel: 1,
+    entryId: HEAL_SPELL.id,
+    apply: { target: "self" as const, kind: "heal" as const, amount: 5 },
   };
 }
 
@@ -402,5 +478,98 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     const afterUndo = (await activity(FIXTURE_ID)).body as Array<{ type: string; reverted: boolean }>;
     const resolveEvent = afterUndo.find((e) => e.type === "resolveAction");
     expect(resolveEvent?.reverted).toBe(true);
+  });
+
+  // ── spell-cast side effects via entryId (#1833: concentration/apply must
+  // survive the move off the old castSpell op onto resolveAction) ─────────
+
+  it("persists entryId on the event data for a spell resolution, null for a weapon", async () => {
+    await post([weaponOp("a-weapon")]);
+    await post([concentrationCastOp(CONCENTRATION_SPELL_A.id, "a-spell")]);
+
+    const events = (await activity(FIXTURE_ID)).body as Array<{ type: string; data: Record<string, unknown> }>;
+    const weaponEvent = events.find((e) => e.type === "resolveAction" && e.data.actionId === "a-weapon");
+    const spellEvent = events.find((e) => e.type === "resolveAction" && e.data.actionId === "a-spell");
+    expect(weaponEvent?.data.entryId ?? null).toBeNull();
+    expect(spellEvent?.data.entryId).toBe(CONCENTRATION_SPELL_A.id);
+  });
+
+  it("a spell resolution with entryId sets concentration", async () => {
+    const res = await post([concentrationCastOp(CONCENTRATION_SPELL_A.id, "a1")]);
+    expect(res.status).toBe(200);
+    expect(res.body.spellcasting.concentratingOn).toMatchObject({ entryId: CONCENTRATION_SPELL_A.id });
+
+    const slots = res.body.spellcasting.slots as Array<{ level: number; used: number }>;
+    expect(slots.find((s) => s.level === 1)?.used).toBe(1);
+  });
+
+  it("casting a second concentration spell drops the first, logging both under one batch", async () => {
+    await post([concentrationCastOp(CONCENTRATION_SPELL_A.id, "a1")]);
+    const res = await post([concentrationCastOp(CONCENTRATION_SPELL_B.id, "a2")]);
+    expect(res.status).toBe(200);
+    expect(res.body.spellcasting.concentratingOn).toMatchObject({ entryId: CONCENTRATION_SPELL_B.id });
+
+    const events = (await activity(FIXTURE_ID)).body as Array<{
+      type: string; category: string; batchId?: string; data: Record<string, unknown>;
+    }>;
+    const secondResolve = events.find((e) => e.type === "resolveAction" && e.data.actionId === "a2");
+    expect(secondResolve).toBeTruthy();
+    const dropped = events.find((e) => e.type === "concentrationDropped");
+    expect(dropped).toBeTruthy();
+    // Same batch: undoing the second cast undoes the displacement with it.
+    expect(dropped?.batchId).toBe(secondResolve?.batchId);
+    // Still exactly ONE resolveAction row for the second cast (#1822's point).
+    expect(events.filter((e) => e.type === "resolveAction" && e.data.actionId === "a2")).toHaveLength(1);
+  });
+
+  it("undo of a concentration-displacing cast restores the prior concentration", async () => {
+    await post([concentrationCastOp(CONCENTRATION_SPELL_A.id, "a1")]);
+    const secondRes = await post([concentrationCastOp(CONCENTRATION_SPELL_B.id, "a2")]);
+    expect(secondRes.body.spellcasting.slots.find((s: { level: number }) => s.level === 1).used).toBe(2);
+
+    const events = (await activity(FIXTURE_ID)).body as Array<{ type: string; batchId?: string; data: Record<string, unknown> }>;
+    const batchId = events.find((e) => e.type === "resolveAction" && e.data.actionId === "a2")?.batchId as string;
+
+    const revertRes = await revert(FIXTURE_ID, batchId);
+    expect(revertRes.status).toBe(200);
+    expect(revertRes.body.spellcasting.concentratingOn).toMatchObject({ entryId: CONCENTRATION_SPELL_A.id });
+    // NOT asserting slots.used here: a batch whose resolveAction event ALSO
+    // displaced a prior concentration logs a second `concentrationDropped`
+    // event ahead of it in the same batch (handleConcentrationOnCast,
+    // ability-cast.ts) — LIFO-reverting both replays the OLDER
+    // concentrationDropped event's own (mid-cast, already-post-slot-spend)
+    // spellcasting snapshot LAST, clobbering the correct slot-count restore
+    // the resolveAction event's own revert already applied. Pre-existing:
+    // the identical two-event shape (concentrationDropped + castSpell) exists
+    // on the OLD castSpell op path today (spellcasting.test.ts "undo restores
+    // concentration dropped by casting a second spell" only asserts
+    // concentratingOn, never slots, for the same reason) — not introduced by
+    // #1833, not fixed here; flagged in the slice report as a found,
+    // pre-existing undo-composition bug in ability-cast.ts, out of scope for
+    // the spell-adapter slice.
+  });
+
+  it("a heal spell's self-apply lands on the caster's own HP in the same batch", async () => {
+    const res = await post([healCastOp()]);
+    expect(res.status).toBe(200);
+    expect(res.body.hitPoints.current).toBe(8); // 3 + 5
+
+    const events = (await activity(FIXTURE_ID)).body as Array<{ type: string; category: string; batchId?: string }>;
+    const resolveEvent = events.find((e) => e.type === "resolveAction");
+    expect(events.filter((e) => e.type === "resolveAction")).toHaveLength(1);
+    const hpEvent = events.find((e) => e.category === "hitPoints" && e.batchId === resolveEvent?.batchId);
+    expect(hpEvent).toBeTruthy();
+  });
+
+  it("undo of a self-heal cast reverts both the HP gain and the spent slot", async () => {
+    const res = await post([healCastOp()]);
+    expect(res.body.hitPoints.current).toBe(8);
+    const events = (await activity(FIXTURE_ID)).body as Array<{ type: string; batchId?: string }>;
+    const batchId = events.find((e) => e.type === "resolveAction")?.batchId as string;
+
+    const revertRes = await revert(FIXTURE_ID, batchId);
+    expect(revertRes.status).toBe(200);
+    expect(revertRes.body.hitPoints.current).toBe(3);
+    expect(revertRes.body.spellcasting.slots.find((s: { level: number }) => s.level === 1).used).toBe(0);
   });
 });

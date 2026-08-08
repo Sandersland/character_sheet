@@ -253,3 +253,36 @@ describe("ResolutionRail — auto-hit shape", () => {
     expect(screen.getByRole("button", { name: "Roll damage" })).toBeInTheDocument();
   });
 });
+
+// #1831 review: a kind:"heal" effect must render "Roll healing"/"Healing",
+// never "Roll damage"/"Damage" — keyed off view.effect?.kind, not a
+// shape-specific component.
+describe("ResolutionRail — heal shape (#1831 review)", () => {
+  it("labels the numbered step 'Healing' and the button 'Roll healing'", () => {
+    render(
+      <ResolutionRail
+        view={baseView({
+          steps: [{ kind: "damage", state: "active" }],
+          effect: { spec: { count: 1, faces: 8, modifier: 4 }, kind: "heal" },
+        })}
+      />,
+    );
+    expect(screen.getByText("Healing")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Roll healing" })).toBeInTheDocument();
+    expect(screen.queryByText("Damage")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Roll damage" })).not.toBeInTheDocument();
+  });
+
+  it("a damage effect keeps the pre-existing 'Damage'/'Roll damage' labels", () => {
+    render(
+      <ResolutionRail
+        view={baseView({
+          steps: [{ kind: "damage", state: "active" }],
+          effect: { spec: { count: 1, faces: 8, modifier: 3 }, kind: "damage", damageType: "slashing" },
+        })}
+      />,
+    );
+    expect(screen.getByText("Damage")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Roll damage" })).toBeInTheDocument();
+  });
+});

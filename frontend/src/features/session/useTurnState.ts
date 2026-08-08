@@ -60,7 +60,7 @@ function nextRowId(): string {
   return `tally-${Date.now().toString(36)}-${rowIdSeq}`;
 }
 
-/** Payload useSpellPicker appends to the cast tally once a cast settles (#1164). */
+/** Payload InlineSpellPicker appends to the cast tally once a cast settles (#1164). */
 export interface RecordedSpellCast {
   spellName: string;
   /** Slot level cast at (0 = cantrip). */
@@ -129,7 +129,7 @@ export interface TurnState {
   attackTally: AttackTallyRow[];
   /**
    * Turn-card "Spells cast" tally (#1164): one row per settled cast this turn,
-   * appended by useSpellPicker's `onCastSettled`. Cleared by endTurn/startTurn
+   * appended by InlineSpellPicker's `onCastSettled`. Cleared by endTurn/startTurn
    * and by the banner's dismiss, mirroring attackTally's lifecycle — but NOT
    * part of the undo snapshot: a cast already committed server-side, so `undo`
    * (which reverts only local economy spend) leaves its receipt in place.

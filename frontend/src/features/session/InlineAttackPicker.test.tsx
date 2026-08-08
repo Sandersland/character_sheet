@@ -108,7 +108,6 @@ function renderPicker(character: Character, onLogChanged = vi.fn(), opts: Render
     <RollProvider>
       <InlineAttackPicker
         turnState={opts.turnState ?? turnState}
-        sessionId="sess-1"
         onClose={onClose}
         onCancel={onCancel}
         onLogChanged={onLogChanged}
@@ -169,7 +168,7 @@ describe("InlineAttackPicker — attack form selector (#786)", () => {
 
   it("keeps a visibly checked form when the selected weapon leaves the inventory", async () => {
     const user = userEvent.setup();
-    const shared = { turnState, sessionId: "sess-1", onClose: vi.fn(), onCancel: vi.fn(), onLogChanged: vi.fn() };
+    const shared = { turnState, onClose: vi.fn(), onCancel: vi.fn(), onLogChanged: vi.fn() };
     const initialCharacter = makeCharacter({
       attackRows: [weaponRow("Longsword", "inv-1"), weaponRow("Dagger", "inv-2")],
     });
@@ -301,7 +300,6 @@ function LiveHarness({ character }: { character: Character }) {
     <RollProvider>
       <InlineAttackPicker
         turnState={liveTurnState}
-        sessionId="sess-crit"
         onClose={vi.fn()}
         onCancel={vi.fn()}
         onLogChanged={vi.fn()}
@@ -481,7 +479,6 @@ describe("InlineAttackPicker — Extra Attack loop (#1832)", () => {
           <RollProvider>
             <InlineAttackPicker
               turnState={live}
-              sessionId="sess-spend"
               onClose={vi.fn()}
               onCancel={vi.fn()}
               onLogChanged={vi.fn()}

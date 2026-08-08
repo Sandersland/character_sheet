@@ -104,14 +104,12 @@ function LoadoutResolutionSheet({
 }
 
 function AttackResolutionSheet({
-  sessionId,
   turnState,
   closeResolution,
   setShowActionMenu,
   onLogChanged,
 }: Pick<
   TurnResolutionSheetsProps,
-  | "sessionId"
   | "turnState"
   | "closeResolution"
   | "setShowActionMenu"
@@ -130,7 +128,6 @@ function AttackResolutionSheet({
     <BottomSheet title="Attack" subtitle={attackKicker(turnState.attack)} wide onClose={closeAttackSheet}>
       <InlineAttackPicker
         turnState={turnState}
-        sessionId={sessionId}
         onClose={closeAttackSheet}
         onCancel={() => {
           turnState.cancelAttack();

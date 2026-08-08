@@ -18,12 +18,23 @@ import { abilityLabel } from "@/lib/abilities";
 import type { ResolutionStep, ResolutionStepKind } from "@/lib/resolutionSteps";
 import type { ResolutionView } from "@/features/session/useResolution";
 
-const STEP_LABEL: Record<ResolutionStepKind, string> = {
+const STEP_LABEL: Record<Exclude<ResolutionStepKind, "damage">, string> = {
   toHit: "Roll to hit",
   callIt: "Call it",
   announceSave: "Announce the save",
-  damage: "Damage",
 };
+
+// The "damage" step's own label is keyed off view.effect?.kind (#1831
+// review): a heal-shaped resolution (Cure Wounds) reads "Healing"/"Roll
+// healing", never "Damage"/"Roll damage" — a flat STEP_LABEL entry can't
+// branch on the view, so this is a function, not a table lookup.
+function damageStepLabel(view: ResolutionView): string {
+  return view.effect?.kind === "heal" ? "Healing" : "Damage";
+}
+
+function stepLabel(kind: ResolutionStepKind, view: ResolutionView): string {
+  return kind === "damage" ? damageStepLabel(view) : STEP_LABEL[kind];
+}
 
 function ToHitStepContent({ view }: { view: ResolutionView }) {
   return (
@@ -99,8 +110,13 @@ function AnnounceSaveStepContent({ view }: { view: ResolutionView }) {
   );
 }
 
-function damageButtonLabel(crit: boolean): string {
-  return crit ? "Roll crit damage" : "Roll damage";
+// crit doubling only ever applies to a damage roll (never a heal — see
+// useResolution's isCrit/critDamageSpec, which a heal-shaped resolution has
+// no toHit die to ever set), but this still branches on view.effect?.kind
+// first so "Roll healing" never momentarily reads "Roll crit healing".
+function damageButtonLabel(view: ResolutionView): string {
+  if (view.effect?.kind === "heal") return "Roll healing";
+  return view.isCrit ? "Roll crit damage" : "Roll damage";
 }
 
 function DamageStepContent({ view }: { view: ResolutionView }) {
@@ -122,7 +138,7 @@ function DamageStepContent({ view }: { view: ResolutionView }) {
                 : "border-parchment-300 bg-parchment-100 text-parchment-700 hover:bg-parchment-200"
             }`}
           >
-            {damageButtonLabel(view.isCrit)}
+            {damageButtonLabel(view)}
           </button>
         )}
       </div>
@@ -179,7 +195,7 @@ export default function ResolutionRail({ view }: { view: ResolutionView }) {
               key={step.kind}
               number={i + 1}
               state={step.state}
-              label={STEP_LABEL[step.kind]}
+              label={stepLabel(step.kind, view)}
               last={i === view.steps.length - 1}
             >
               {stepContent(step, view)}

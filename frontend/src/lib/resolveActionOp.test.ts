@@ -105,4 +105,22 @@ describe("buildResolveActionOp", () => {
       expect(op.slotLevel).toBe(1);
     });
   });
+
+  // #1833: entryId/apply — the spell adapter's side-effect-preserving fields.
+  describe("entryId/apply (#1833)", () => {
+    it("carries entryId when the options supply it — omits it otherwise", () => {
+      const resolution: TurnResolution = { source: "Cure Wounds", cost: { kind: "action" } };
+
+      expect(buildResolveActionOp(resolution, rolls(), { entryId: "entry-1" })).toMatchObject({ entryId: "entry-1" });
+      expect(buildResolveActionOp(resolution, rolls())).not.toHaveProperty("entryId");
+    });
+
+    it("carries a self/ally apply payload verbatim — omits it when absent", () => {
+      const resolution: TurnResolution = { source: "Cure Wounds", cost: { kind: "action" } };
+      const apply = { target: "self" as const, kind: "heal" as const, amount: 8 };
+
+      expect(buildResolveActionOp(resolution, rolls(), { entryId: "entry-1", apply })).toMatchObject({ apply });
+      expect(buildResolveActionOp(resolution, rolls(), { entryId: "entry-1" })).not.toHaveProperty("apply");
+    });
+  });
 });
