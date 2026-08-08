@@ -699,6 +699,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
     "spellSaveDC": 14,
     "spells": [
       {
+        "castCost": "action",
         "castingTime": "1 action",
         "description": "Boom.",
         "duration": "Instantaneous",
@@ -727,6 +728,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
         "school": "evocation",
       },
       {
+        "castCost": "action",
         "castingTime": "1 action",
         "description": "AC 13 + Dex.",
         "duration": "8 hours",

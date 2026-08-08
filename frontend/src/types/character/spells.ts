@@ -2,7 +2,14 @@
  * Spellcasting wire types: spell entries, catalog spells, slots, and spellcasting operations.
  */
 
-import type { CatalogMeta, EffectRoll, EffectSpec, SpellComponents, SpellSchool } from "@character-sheet/shared-types";
+import type {
+  CatalogMeta,
+  EffectRoll,
+  EffectSpec,
+  SpellCastCostKind,
+  SpellComponents,
+  SpellSchool,
+} from "@character-sheet/shared-types";
 
 import type { ItemSpellMeta } from "./inventory";
 
@@ -72,6 +79,11 @@ export interface Spell {
   // a non-caster ability row or a locally-constructed test Spell has neither.
   effect?: EffectSpec;
   effectRolls?: EffectRoll[];
+  // Epic #1827 Slice 1 (#1828): the spell's `castingTime` classified into an
+  // action-economy category server-side (deriveSpellCastCost) — a
+  // TurnResolution's `cost.kind` reads this rather than re-parsing
+  // `castingTime` text client-side.
+  castCost?: SpellCastCostKind;
 }
 
 /**
