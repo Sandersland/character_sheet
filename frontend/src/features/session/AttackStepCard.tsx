@@ -10,7 +10,8 @@
 import Segmented from "@/components/ui/Segmented";
 import AttackResultLine from "@/features/session/AttackResultLine";
 import DamageRiderList from "@/features/session/DamageRiderList";
-import { stepRail, type StepRailModel, type StepState } from "@/lib/attackStepRail";
+import { CritButton, RailStep as Step, VerdictChip } from "@/features/session/railPrimitives";
+import { stepRail, type StepRailModel } from "@/lib/attackStepRail";
 import { isUnresolvedRow } from "@/lib/attackTallySummary";
 import type { AttackEntryView } from "@/features/session/useAttackRolls";
 import type { AttackState } from "@/features/session/useTurnState";
@@ -45,53 +46,6 @@ interface AttackStepCardProps {
   showKicker: boolean;
 }
 
-const DOT_STYLE: Record<StepState, string> = {
-  done: "border-garnet-600 bg-garnet-soft-surface text-garnet-on-surface",
-  active: "border-garnet-600 bg-parchment-50 text-garnet-700",
-  pending: "border-parchment-300 bg-parchment-50 text-parchment-400",
-};
-
-const LABEL_STYLE: Record<StepState, string> = {
-  done: "text-parchment-600",
-  active: "text-parchment-900",
-  pending: "text-parchment-400",
-};
-
-/** One rail step: numbered dot + connector, label, and the step's content. */
-function Step({
-  number,
-  state,
-  label,
-  last = false,
-  children,
-}: {
-  number: number;
-  state: StepState;
-  label: string;
-  last?: boolean;
-  children?: React.ReactNode;
-}) {
-  return (
-    <div className="flex gap-3">
-      <div className="flex flex-col items-center">
-        <span
-          aria-hidden
-          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-[11px] font-semibold ${DOT_STYLE[state]}`}
-        >
-          {state === "done" ? "✓" : number}
-        </span>
-        {!last && <span aria-hidden className="w-px flex-1 bg-parchment-300" />}
-      </div>
-      <div className={`min-w-0 flex-1 ${last ? "" : "pb-3"}`}>
-        <p className={`text-[11px] font-semibold uppercase tracking-wide ${LABEL_STYLE[state]}`}>
-          {label}
-        </p>
-        {children}
-      </div>
-    </div>
-  );
-}
-
 /** "Attacks · N of M remaining" kicker with spent/remaining pips (total > 1 only). */
 export function AttackKickerPips({ attack }: { attack: AttackState | null }) {
   if (!attack || attack.total <= 1) return null;
@@ -117,36 +71,6 @@ export function AttackKickerPips({ attack }: { attack: AttackState | null }) {
 function attackOrdinalLabel(attack: AttackState | null): string {
   if (!attack || attack.total <= 1 || attack.used === 0) return "Roll to hit";
   return `Roll to hit — attack ${attack.used + 1} of ${attack.total}`;
-}
-
-/** Small verdict chip (nat-locked calls, ✓ Hit, Crit!, Miss). */
-function VerdictChip({ tone, children }: { tone: "crit" | "miss" | "hit"; children: React.ReactNode }) {
-  const cls =
-    tone === "crit"
-      ? "bg-garnet-100 text-garnet-800"
-      : tone === "hit"
-        ? "bg-arcane-100 text-arcane-800"
-        : "bg-parchment-200 text-parchment-600";
-  return (
-    <span className={`inline-block rounded-control px-2 py-1 text-xs font-semibold ${cls}`}>
-      {children}
-    </span>
-  );
-}
-
-/** The small garnet "Crit!" call/upgrade button. */
-function CritButton({ onCallCrit, tall = false }: { onCallCrit: () => void; tall?: boolean }) {
-  return (
-    <button
-      type="button"
-      onClick={onCallCrit}
-      className={`rounded-control border border-garnet-200 bg-garnet-50 font-semibold text-garnet-800 transition-colors hover:bg-garnet-100 ${
-        tall ? "min-h-11 flex-1 px-3 text-xs" : "px-2 py-1 text-xs"
-      }`}
-    >
-      Crit!
-    </button>
-  );
 }
 
 /** Selected-form summary: name + magical badge, to-hit/damage labels, and the

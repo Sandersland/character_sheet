@@ -3,6 +3,9 @@
 // → miss, #1120), and the "Turn summary" banner lines. No JSX — rendered by
 // AttackTallyStrip and TurnSummaryBanner, recorded by useTurnState.
 
+import { isCriticalRoll, isNaturalOne, isNaturalTwenty, keptD20 } from "@/lib/dice";
+import type { RollResult } from "@/lib/dice";
+
 export type TallyVerdict = "hit" | "miss" | "crit";
 
 /** Which economy slot a tally row came from — the Attack action or the TWF bonus action (#813). */
@@ -32,6 +35,20 @@ export interface AttackTallyRow {
   verdict?: TallyVerdict;
   /** Correlates this row's roll events (attack/damage/rider) as one swing (#1235). */
   swingId?: string;
+}
+
+// A kept-d20 result → the tally's roll snapshot (#1120: the crit DECISION
+// reads the character's served critRange, never a hardcoded 20). Shared by
+// useAttackRolls' handleAttack and useResolution (#1831) so the "roll → build
+// a TallyAttackRoll" step has exactly one implementation.
+export function toHitSnapshot(result: RollResult, critRange: number): TallyAttackRoll {
+  return {
+    total: result.total,
+    keptFace: keptD20(result)?.value ?? null,
+    nat20: isNaturalTwenty(result),
+    nat1: isNaturalOne(result),
+    criticalHit: isCriticalRoll(result, critRange),
+  };
 }
 
 // Verdict forced by the die: crit range met → crit (auto hit), nat 1 → miss.
