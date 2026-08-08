@@ -131,11 +131,14 @@ async function parseAndValidate(req: Request, res: Response): Promise<CustomSpel
 // the caller bails like parseAndValidate.
 async function resolveAuthoringEdition(req: Request, res: Response): Promise<RulesEdition | undefined> {
   const characterId = req.query.characterId;
-  if (typeof characterId !== "string" || characterId.length === 0) {
+  if (typeof characterId !== "string" || characterId.trim().length === 0) {
     res.status(400).json({ error: "characterId is required to determine the spell's rules edition" });
     return undefined;
   }
-  await assertCharacterAccess(prisma, req.user!.id, characterId, "view");
+  // "edit", not "view": authoring homebrew uses the character as the edition
+  // authority, so it should require control of that character — not the mere
+  // view access #116 sharing will grant read collaborators.
+  await assertCharacterAccess(prisma, req.user!.id, characterId, "edit");
   const character = await prisma.character.findUniqueOrThrow({
     where: { id: characterId },
     select: { rulesEdition: true },

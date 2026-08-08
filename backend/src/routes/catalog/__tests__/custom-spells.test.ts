@@ -88,8 +88,8 @@ afterAll(async () => {
   // so a plain `spell.deleteMany` alone would orphan the entry.
   await prisma.catalogEntry.deleteMany({ where: { ownerUserId: { in: [OWNER, OUTSIDER] } } });
   await prisma.catalogEntry.deleteMany({ where: { ownerCampaignId: CAMPAIGN_ID } });
-  await prisma.character.deleteMany({ where: { id: { in: [CHAR_2014, CHAR_2024, CHAR_OUTSIDER] } } });
   await prisma.campaign.deleteMany({ where: { id: CAMPAIGN_ID } });
+  // Deleting the users cascades their characters (Character.owner onDelete: Cascade).
   await prisma.user.deleteMany({ where: { id: { in: [OWNER, OUTSIDER, CAMPAIGN_DM, CAMPAIGN_MEMBER] } } });
 });
 
