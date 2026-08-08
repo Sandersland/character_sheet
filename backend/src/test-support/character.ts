@@ -22,11 +22,14 @@ const BASE_CHARACTER = {
 // no separate character cleanup.
 export async function createTestCharacter(
   ownerId: string,
-  opts: { edition?: RulesEdition; name?: string; campaignId?: string } = {},
+  opts: { id?: string; edition?: RulesEdition; name?: string; campaignId?: string } = {},
 ): Promise<string> {
   const character = await prisma.character.create({
     data: {
       ...BASE_CHARACTER,
+      // `id: undefined` lets Prisma fall back to the uuid default — pass it only
+      // when a test needs a stable fixture id.
+      id: opts.id,
       name: opts.name ?? "Test Author Character",
       ownerId,
       rulesEdition: opts.edition ?? "EDITION_2024",

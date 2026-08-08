@@ -155,10 +155,13 @@ async function resolveAuthoringEdition(req: Request, res: Response): Promise<Rul
  * memberships or no entitlement row at all.
  */
 customSpellsRouter.post("/spells/custom", async (req, res) => {
-  const data = await parseAndValidate(req, res);
-  if (data === undefined) return;
+  // Auth gate first: resolve+access-check the authoring character before any
+  // body-validation DB work (validateCustomSpellClasses' findMany), so a
+  // missing/unowned characterId never triggers that query.
   const edition = await resolveAuthoringEdition(req, res);
   if (edition === undefined) return;
+  const data = await parseAndValidate(req, res);
+  if (data === undefined) return;
 
   const { spell, classes, entry } = await prisma.$transaction(async (tx) => {
     const entry = await tx.catalogEntry.create({

@@ -168,7 +168,10 @@ describe("AddSpellPanel homebrew tab integration", () => {
     await user.type(screen.getByLabelText(/description/i), "A bolt of test energy.");
     await user.click(screen.getByRole("button", { name: /create homebrew spell/i }));
 
-    await waitFor(() => expect(client.createCustomSpell).toHaveBeenCalledTimes(1));
+    // #1819: the authoring character must reach createCustomSpell as the 2nd
+    // arg — a broken characterId thread anywhere in AddSpellPanel → HomebrewTab
+    // → HomebrewSpellForm would pass undefined and go uncaught otherwise.
+    await waitFor(() => expect(client.createCustomSpell).toHaveBeenCalledWith(expect.anything(), "char-1"));
 
     // Back on the catalog tab, with the second (post-create) fetchSpells page showing the new spell.
     expect(await screen.findByText("Test Bolt")).toBeInTheDocument();

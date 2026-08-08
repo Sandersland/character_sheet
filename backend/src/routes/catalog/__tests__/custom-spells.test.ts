@@ -5,6 +5,7 @@ import { Prisma, type SpellSchool } from "@/generated/prisma/client.js";
 import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
+import { createTestCharacter } from "@/test-support/character.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import * as spellClassesModule from "@/lib/spellcasting/spell-classes.js";
 
@@ -25,20 +26,6 @@ const CAMPAIGN_ID = "test-custom-spells-campaign-1";
 const CHAR_2014 = "test-custom-spells-char-2014";
 const CHAR_2024 = "test-custom-spells-char-2024";
 const CHAR_OUTSIDER = "test-custom-spells-char-outsider";
-
-const BASE_CHAR = {
-  alignment: "Neutral",
-  experiencePoints: 0,
-  initiativeBonus: 0,
-  speed: 30,
-  hitPoints: { current: 10, max: 10, temp: 0 },
-  hitDice: { total: 1, die: "d8" },
-  abilityScores: { strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 },
-  savingThrowProficiencies: [],
-  skills: [],
-  toolProficiencies: [],
-  currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
-};
 
 let cookieOwner: string;
 let cookieOutsider: string;
@@ -90,15 +77,9 @@ beforeAll(async () => {
   });
 
   await prisma.character.deleteMany({ where: { id: { in: [CHAR_2014, CHAR_2024, CHAR_OUTSIDER] } } });
-  await prisma.character.create({
-    data: { ...BASE_CHAR, id: CHAR_2014, name: "Homebrew Author 2014", ownerId: OWNER, rulesEdition: "EDITION_2014" },
-  });
-  await prisma.character.create({
-    data: { ...BASE_CHAR, id: CHAR_2024, name: "Homebrew Author 2024", ownerId: OWNER, rulesEdition: "EDITION_2024" },
-  });
-  await prisma.character.create({
-    data: { ...BASE_CHAR, id: CHAR_OUTSIDER, name: "Not Yours", ownerId: OUTSIDER, rulesEdition: "EDITION_2024" },
-  });
+  await createTestCharacter(OWNER, { id: CHAR_2014, edition: "EDITION_2014", name: "Homebrew Author 2014" });
+  await createTestCharacter(OWNER, { id: CHAR_2024, edition: "EDITION_2024", name: "Homebrew Author 2024" });
+  await createTestCharacter(OUTSIDER, { id: CHAR_OUTSIDER, edition: "EDITION_2024", name: "Not Yours" });
 });
 
 afterAll(async () => {
