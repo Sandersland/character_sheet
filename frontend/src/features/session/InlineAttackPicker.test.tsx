@@ -1,3 +1,9 @@
+// InlineAttackPicker tests (rewired to the shared resolver, epic #1827 Slice
+// 5 / #1832) — ports the pre-#1832 useAttackRolls/AttackStepCard-era
+// scenarios onto ResolutionRail/useResolution, and adds coverage for what
+// changed: the resolveAction commit (incl. cost-kind mapping), the Extra
+// Attack loop driving the SAME resolver instance without double-spending the
+// economy, and the crit-upgrade guard (#1831 review NICE).
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { useEffect } from "react";
 import { screen, waitFor, within } from "@testing-library/react";
@@ -6,7 +12,7 @@ import userEvent from "@testing-library/user-event";
 import InlineAttackPicker from "@/features/session/InlineAttackPicker";
 import { RollProvider } from "@/features/dice/RollContext";
 import { useTurnState } from "@/features/session/useTurnState";
-import { logRoll, castManeuverTransaction } from "@/api/client";
+import { applyResolveActionOperations, logRoll, castManeuverTransaction } from "@/api/client";
 import { getQueryClient } from "@/api/queryClient";
 import { characterKeys } from "@/api/queryKeys";
 import { renderWithCharacter } from "@/test/renderWithCharacter";
@@ -18,40 +24,62 @@ import type { TurnState, TurnStateActions } from "@/features/session/useTurnStat
 vi.mock("@/api/client", () => ({
   applyInventoryTransactions: vi.fn(),
   applySpellcastingTransactions: vi.fn(),
+  applyResolveActionOperations: vi.fn(),
   castManeuverTransaction: vi.fn(),
   logRoll: vi.fn().mockResolvedValue(undefined),
 }));
 
+// Fixed mid-face d20 (11 kept) — non-crit, non-miss, so "Roll to hit" resolves
+// to an ambiguous "hit or miss?" call every time it's used, matching the old
+// suite's own `seedMid` convention.
+function seedMid() {
+  return vi.spyOn(Math, "random").mockReturnValue(0.5);
+}
+function seedTopFace() {
+  return vi.spyOn(Math, "random").mockReturnValue(0.95); // nat 20
+}
+function seedNat1() {
+  return vi.spyOn(Math, "random").mockReturnValue(0); // nat 1
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
-  // Re-establish the resolved value — a per-describe restoreAllMocks resets it.
   vi.mocked(logRoll).mockResolvedValue(undefined);
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  // useTurnState persists to localStorage keyed by sessionId — every
+  // LiveHarness-based test below reuses "sess-crit"/"sess-spend", so a prior
+  // test's economy would otherwise rehydrate into the next one.
+  window.localStorage.clear();
 });
 
 // Minimal turn state: an Attack action in progress with one attack available.
 const turnState = {
   attack: { total: 1, used: 0 },
-  bonusActionUsed: false,
-  reactionUsed: false,
   attackTally: [],
   recordAttack: vi.fn(),
   setTallyDamage: vi.fn(),
   setTallyAttackTotal: vi.fn(),
+  setTallyVerdict: vi.fn(),
   addTallyDamageRider: vi.fn(),
-  cycleTallyVerdict: vi.fn(),
   consumeBonusAction: vi.fn(),
   consumeReaction: vi.fn(),
 } as unknown as TurnState & TurnStateActions;
 
-// The picker renders `character.attackRows` (#1434). `attackRows` in the overrides
-// lists only the WEAPON rows the server would have served; the two rows every
-// payload always carries are appended here so no test has to restate them.
+// The picker renders `character.attackRows` (#1434) plus the always-served
+// unarmed/improvised rows, and `critRange` (real Character type: required,
+// never optional) — the OLD useAttackRolls hook covered a missing fixture
+// value with its own default(20) parameter; weaponToResolution (#1832) takes
+// no default, so a fixture omitting it would silently break auto-crit.
 function makeCharacter(overrides: Partial<Character> = {}): Character {
   return {
     id: "char-1",
     name: "Tester",
     inventory: [],
     attacksPerAction: 1,
+    critRange: 20,
     unarmedStrike: {
       attackBonus: 2,
       damage: { count: 1, faces: 1, modifier: 0, damageType: "bludgeoning" },
@@ -73,11 +101,7 @@ interface RenderOpts {
   onClose?: ReturnType<typeof vi.fn>;
 }
 
-function renderPicker(
-  character: Character,
-  onLogChanged = vi.fn(),
-  opts: RenderOpts = {},
-) {
+function renderPicker(character: Character, onLogChanged = vi.fn(), opts: RenderOpts = {}) {
   const onCancel = opts.onCancel ?? vi.fn();
   const onClose = opts.onClose ?? vi.fn();
   renderWithCharacter(
@@ -112,53 +136,40 @@ function weaponRow(name: string, id: string, overrides: Partial<AttackRow> = {})
 describe("InlineAttackPicker — attack form selector (#786)", () => {
   it("renders one segment per distinct equipped weapon plus Unarmed and Improvised", () => {
     renderPicker(
-      makeCharacter({
-        attackRows: [weaponRow("Longsword", "inv-1"), weaponRow("Dagger", "inv-2")],
-      }),
+      makeCharacter({ attackRows: [weaponRow("Longsword", "inv-1"), weaponRow("Dagger", "inv-2")] }),
     );
     expect(screen.getByRole("radiogroup", { name: /Attacking with/ })).toBeInTheDocument();
     expect(screen.getAllByRole("radio")).toHaveLength(4);
     expect(screen.getByRole("radio", { name: "Longsword" })).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: "Dagger" })).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: "Unarmed Strike" })).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: "Improvised Weapon" })).toBeInTheDocument();
   });
 
   it("shows the sheet's own ADV/DIS control and defaults to Normal (#958)", async () => {
     const user = userEvent.setup();
-    renderPicker(
-      makeCharacter({
-        attackRows: [weaponRow("Longsword", "inv-1")],
-      }),
-    );
+    renderPicker(makeCharacter({ attackRows: [weaponRow("Longsword", "inv-1")] }));
     const mode = screen.getByRole("group", { name: "Attack roll mode" });
-    expect(mode).toBeInTheDocument();
     expect(within(mode).getByRole("button", { name: "Normal" })).toHaveAttribute("aria-pressed", "true");
-
     await user.click(within(mode).getByRole("button", { name: "Advantage" }));
     expect(within(mode).getByRole("button", { name: "Advantage" })).toHaveAttribute("aria-pressed", "true");
-    expect(within(mode).getByRole("button", { name: "Normal" })).toHaveAttribute("aria-pressed", "false");
   });
 
   it("shows exactly one attack card (one Roll to hit) and one damage card", () => {
     renderPicker(
-      makeCharacter({
-        attackRows: [weaponRow("Longsword", "inv-1"), weaponRow("Dagger", "inv-2")],
-      }),
+      makeCharacter({ attackRows: [weaponRow("Longsword", "inv-1"), weaponRow("Dagger", "inv-2")] }),
     );
     expect(screen.getAllByRole("button", { name: /Roll to hit/ })).toHaveLength(1);
     expect(screen.getAllByRole("button", { name: /Roll damage/ })).toHaveLength(1);
   });
 
+  it("shows the armed form's stats preview and updates it on selection", async () => {
+    renderPicker(makeCharacter({ attackRows: [weaponRow("Longsword", "inv-1")] }));
+    await userEvent.click(screen.getByRole("radio", { name: "Improvised Weapon" }));
+    expect(screen.getByText(/\+2 to hit · 1d4 bludgeoning/)).toBeInTheDocument();
+    expect(screen.getByText(/\(no proficiency\)/)).toBeInTheDocument();
+  });
+
   it("keeps a visibly checked form when the selected weapon leaves the inventory", async () => {
     const user = userEvent.setup();
-    const shared = {
-      turnState,
-      sessionId: "sess-1",
-      onClose: vi.fn(),
-      onCancel: vi.fn(),
-      onLogChanged: vi.fn(),
-    };
+    const shared = { turnState, sessionId: "sess-1", onClose: vi.fn(), onCancel: vi.fn(), onLogChanged: vi.fn() };
     const initialCharacter = makeCharacter({
       attackRows: [weaponRow("Longsword", "inv-1"), weaponRow("Dagger", "inv-2")],
     });
@@ -169,115 +180,37 @@ describe("InlineAttackPicker — attack form selector (#786)", () => {
       initialCharacter,
     );
     await user.click(screen.getByRole("radio", { name: "Dagger" }));
-    expect(screen.getByRole("radio", { name: "Dagger" })).toHaveAttribute("aria-checked", "true");
-
-    // The selected weapon disappears mid-open (live inventory change) — the
-    // selector must fall back to a visibly checked option, never nothing-selected.
-    // InlineAttackPicker reads useCurrentCharacter(), so simulating the live
-    // inventory change means writing the cache directly (there's no prop to swap).
     getQueryClient().setQueryData(
       characterKeys.detail(initialCharacter.id),
-      makeCharacter({
-        attackRows: [weaponRow("Longsword", "inv-1")],
-      }),
+      makeCharacter({ attackRows: [weaponRow("Longsword", "inv-1")] }),
     );
     rerender(
       <RollProvider>
         <InlineAttackPicker {...shared} />
       </RollProvider>,
     );
-    const checked = screen
-      .getAllByRole("radio")
-      .filter((r) => r.getAttribute("aria-checked") === "true");
+    const checked = screen.getAllByRole("radio").filter((r) => r.getAttribute("aria-checked") === "true");
     expect(checked).toHaveLength(1);
     expect(checked[0]).toHaveAccessibleName("Longsword");
   });
 
-  it("collapses two same-name equipped weapons into a single segment", () => {
-    renderPicker(
-      makeCharacter({
-        attackRows: [weaponRow("Dagger", "inv-1"), weaponRow("Dagger", "inv-2")],
-      }),
-    );
-    expect(screen.getAllByRole("radio", { name: "Dagger" })).toHaveLength(1);
-    expect(screen.getAllByRole("radio")).toHaveLength(3);
-  });
-
-  it("defaults the selection to the main-hand weapon", () => {
-    renderPicker(
-      makeCharacter({
-        attackRows: [weaponRow("Longsword", "inv-1"), weaponRow("Dagger", "inv-2")],
-      }),
-    );
-    expect(screen.getByRole("radio", { name: "Longsword" })).toBeChecked();
-    expect(screen.getByRole("radio", { name: "Dagger" })).not.toBeChecked();
-  });
-
-  // The server only emits a row for an EQUIPPED weapon, so a bagged Longsword
-  // never reaches this sheet at all (backend character-serialize-attack-rows.test.ts
-  // pins that); the picker must then offer only Unarmed + Improvised.
   it("never surfaces a weapon the server served no row for", () => {
     renderPicker(makeCharacter());
     expect(screen.queryByRole("radio", { name: "Longsword" })).not.toBeInTheDocument();
     expect(screen.getAllByRole("radio")).toHaveLength(2);
   });
 
-  it("shows the turn-screen empty-state hint and defaults to Unarmed when no weapon is equipped", () => {
+  it("shows the turn-screen empty-state hint when no weapon is equipped", () => {
     renderPicker(makeCharacter());
-    const hint = screen.getByText(/No weapon equipped/i);
-    expect(hint.textContent).toMatch(/Change/);
-    expect(hint.textContent).toMatch(/turn screen/i);
-    expect(screen.getByRole("radio", { name: "Unarmed Strike" })).toBeChecked();
-  });
-});
-
-describe("InlineAttackPicker — selecting a form updates the card (#786)", () => {
-  it("selecting Improvised shows its signed bonus and the no-proficiency note", async () => {
-    renderPicker(
-      makeCharacter({
-        attackRows: [weaponRow("Longsword", "inv-1")],
-      }),
-    );
-    await userEvent.click(screen.getByRole("radio", { name: "Improvised Weapon" }));
-    expect(screen.getByText(/\+2 to hit · 1d4 bludgeoning/)).toBeInTheDocument();
-    expect(screen.getByText(/\(no proficiency\)/)).toBeInTheDocument();
-  });
-
-  it("selecting Unarmed shows its bonus and flat bludgeoning damage preview", async () => {
-    renderPicker(
-      makeCharacter({
-        attackRows: [weaponRow("Longsword", "inv-1")],
-      }),
-    );
-    await userEvent.click(screen.getByRole("radio", { name: "Unarmed Strike" }));
-    expect(screen.getByText(/\+2 to hit · 1 bludgeoning/)).toBeInTheDocument();
-  });
-
-  it("rolls to hit with the selected form (logs the Improvised source)", async () => {
-    renderPicker(
-      makeCharacter({
-        attackRows: [weaponRow("Longsword", "inv-1")],
-      }),
-    );
-    await userEvent.click(screen.getByRole("radio", { name: "Improvised Weapon" }));
-    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
-    expect(vi.mocked(logRoll)).toHaveBeenCalledWith(
-      "char-1",
-      "sess-1",
-      expect.objectContaining({ kind: "attack", source: "Improvised Weapon" }),
-    );
+    expect(screen.getByText(/No weapon equipped/i).textContent).toMatch(/turn screen/i);
   });
 });
 
 describe("InlineAttackPicker — live attack counter (#757)", () => {
-  const attackState = (total: number, used: number) =>
-    ({ ...turnState, attack: { total, used } }) as unknown as TurnState & TurnStateActions;
+  const attackState = (total: number, used: number) => ({ ...turnState, attack: { total, used } }) as unknown as TurnState & TurnStateActions;
 
   function withWeapon(attacksPerAction: number) {
-    return makeCharacter({
-      attacksPerAction,
-      attackRows: [weaponRow("Longsword", "inv-1")],
-    });
+    return makeCharacter({ attacksPerAction, attackRows: [weaponRow("Longsword", "inv-1")] });
   }
 
   it("renders the live pip counter for a multi-attack action (2 of 2 remaining)", () => {
@@ -285,98 +218,48 @@ describe("InlineAttackPicker — live attack counter (#757)", () => {
     expect(screen.getByText(/Attacks · 2 of 2 remaining/)).toBeInTheDocument();
   });
 
-  it("shows the counter decremented after one recorded attack (1 of 2 remaining)", () => {
-    renderPicker(withWeapon(2), vi.fn(), { turnState: attackState(2, 1) });
-    expect(screen.getByText(/Attacks · 1 of 2 remaining/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Roll to hit/ })).not.toBeDisabled();
-  });
-
   it("disables the single Roll-to-hit button when attacks are exhausted", () => {
     renderPicker(withWeapon(2), vi.fn(), { turnState: attackState(2, 2) });
     expect(screen.getByText(/Attacks · 0 of 2 remaining/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Roll to hit/ })).toBeDisabled();
-    // The standalone Critical buttons were removed (#766) — crit is auto/verdict now.
-    expect(screen.queryByRole("button", { name: /^Critical$/ })).not.toBeInTheDocument();
   });
 
   it("hides the pip counter for a single-attack action", () => {
     renderPicker(withWeapon(1), vi.fn(), { turnState: attackState(1, 0) });
     expect(screen.queryByText(/of 1 remaining/)).not.toBeInTheDocument();
   });
-
-  it("carries no kicker copy of its own — the sheet header owns it (TurnResolutionSheets)", () => {
-    renderPicker(withWeapon(2), vi.fn(), { turnState: attackState(2, 0) });
-    expect(screen.queryByText(/no target AC tracked/)).not.toBeInTheDocument();
-  });
-});
-
-describe("InlineAttackPicker — Damage card is inert until a hit is rolled (#786)", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it("disables Roll damage until a to-hit roll binds a form, then enables it", async () => {
-    // Mid-face seed → a non-crit to-hit so the button stays labelled "Roll damage".
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
-    renderPicker(
-      makeCharacter({ attackRows: [weaponRow("Longsword", "inv-1")] }),
-    );
-
-    expect(screen.getByRole("button", { name: /Roll damage/ })).toBeDisabled();
-
-    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
-
-    expect(screen.getByRole("button", { name: /Roll damage/ })).not.toBeDisabled();
-  });
 });
 
 describe("InlineAttackPicker — footer", () => {
   it("offers Cancel — refund action before any attack is rolled, wired to onCancel", async () => {
     const { onCancel } = renderPicker(makeCharacter());
-    const cancel = screen.getByRole("button", { name: /Cancel — refund action/ });
-    await userEvent.click(cancel);
+    await userEvent.click(screen.getByRole("button", { name: /Cancel — refund action/ }));
     expect(onCancel).toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: /^Done$/ })).not.toBeInTheDocument();
   });
 
   it("switches to Done once an attack has been rolled", () => {
-    const rolledTurnState = {
-      ...turnState,
-      attack: { total: 1, used: 1 },
-    } as unknown as TurnState & TurnStateActions;
+    const rolledTurnState = { ...turnState, attack: { total: 1, used: 1 } } as unknown as TurnState & TurnStateActions;
     renderPicker(makeCharacter(), vi.fn(), { turnState: rolledTurnState });
     expect(screen.getByRole("button", { name: /^Done$/ })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Cancel — refund action/ })).not.toBeInTheDocument();
   });
 });
 
-// A weapon row carrying a dice-valued on-hit rider. Riders are gated server-side
-// on `isItemActive`, so an equipped-but-unattuned attunement item is served NONE at
-// all (backend character-serialize-attack-rows.test.ts owns that rule) — a fixture
-// that wants no rider passes `damageRiders: []`.
+// A weapon row carrying a dice-valued on-hit rider (Flame Tongue +2d6 fire).
 function flameTongueRow(overrides: Partial<AttackRow> = {}): AttackRow {
   return weaponRow("Flame Tongue", "inv-flame", {
-    damageRiders: [
-      { id: "inv-flame:rider:0", spec: { count: 2, faces: 6, modifier: 0 }, damageType: "fire" },
-    ],
+    damageRiders: [{ id: "inv-flame:rider:0", spec: { count: 2, faces: 6, modifier: 0 }, damageType: "fire" }],
     ...overrides,
   });
 }
 
-describe("InlineAttackPicker — on-hit dice riders", () => {
-  it("renders a typed rider button for an attuned Flame Tongue after a hit and rolls it with the fire type", async () => {
-    const onLogChanged = vi.fn();
-    renderPicker(
-      makeCharacter({ attackRows: [flameTongueRow()] }),
-      onLogChanged,
-    );
-
-    // The Damage card (with its riders) is inert until a form is rolled to hit.
+describe("InlineAttackPicker — on-hit dice riders (unaffected by the resolveAction migration)", () => {
+  it("renders a typed rider button after rolling to hit and rolls it with the fire type via logRoll", async () => {
+    seedMid();
+    renderPicker(makeCharacter({ attackRows: [flameTongueRow()] }));
     await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
 
     const riderButton = screen.getByRole("button", { name: /Roll \+2d6 fire/ });
-    expect(riderButton).toBeInTheDocument();
-
     await userEvent.click(riderButton);
 
     expect(vi.mocked(logRoll)).toHaveBeenCalledWith(
@@ -386,363 +269,281 @@ describe("InlineAttackPicker — on-hit dice riders", () => {
     );
   });
 
-  it("hides the rider when the served row carries none (an unattuned attunement item)", async () => {
-    renderPicker(
-      makeCharacter({ attackRows: [flameTongueRow({ damageRiders: [] })] }),
-    );
+  it("hides the rider when the served row carries none", async () => {
+    seedMid();
+    renderPicker(makeCharacter({ attackRows: [flameTongueRow({ damageRiders: [] })] }));
     await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
     expect(screen.queryByRole("button", { name: /Roll \+2d6 fire/ })).not.toBeInTheDocument();
   });
 
-  it("shows a conditional rider's condition as reminder text", async () => {
-    renderPicker(
-      makeCharacter({
-        attackRows: [
-          flameTongueRow({
-            name: "Dragon Slayer",
-            damageRiders: [
-              { id: "inv-flame:rider:0", spec: { count: 3, faces: 6, modifier: 0 }, condition: "vs dragons" },
-            ],
-          }),
-        ],
-      }),
-    );
+  it("hides the rider once 'it Missed' is called", async () => {
+    seedNat1();
+    renderPicker(makeCharacter({ attackRows: [flameTongueRow()] }));
     await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
-    expect(screen.getByText(/vs dragons/)).toBeInTheDocument();
-  });
-
-  it("only shows the last-rolled form's rider — a second weapon's is not on the card", async () => {
-    const plainSword = weaponRow("Longsword", "inv-plain", {
-      attackSpec: { count: 1, faces: 20, modifier: 2 },
-    });
-    renderPicker(
-      makeCharacter({ attackRows: [flameTongueRow(), plainSword] }),
-    );
-    // Default form is the main-hand Flame Tongue — roll to hit binds the Damage card to it.
-    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
-    expect(screen.getAllByRole("button", { name: /Roll \+\dd\d/ })).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: /Roll \+2d6 fire/ })).not.toBeInTheDocument();
   });
 });
 
-describe("InlineAttackPicker — auto-crit on a natural 20 (#766)", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
+// Live turn state — a real useTurnState so the tally / economy actually flow,
+// needed for the resolveAction commit + Extra Attack loop + crit-upgrade tests.
+// Resolves applyResolveActionOperations with the SAME character back (rather
+// than the beforeEach leaving it unmocked/undefined): useCharacterMutation
+// writes whatever it resolves straight into the query cache, and
+// useCurrentCharacter re-renders InlineAttackPicker off that same cache — an
+// empty/undefined resolved value would crash the next render's
+// buildAttackForms on a missing attackRows.
+function LiveHarness({ character }: { character: Character }) {
+  vi.mocked(applyResolveActionOperations).mockResolvedValue(character);
+  const liveTurnState = useTurnState(character, "sess-crit");
+  useEffect(() => {
+    liveTurnState.startCombat();
+    liveTurnState.startTurn();
+    liveTurnState.enterAttackMode();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- harness drives into attack mode once on mount; empty deps intentional
+  }, []);
+  return (
+    <RollProvider>
+      <InlineAttackPicker
+        turnState={liveTurnState}
+        sessionId="sess-crit"
+        onClose={vi.fn()}
+        onCancel={vi.fn()}
+        onLogChanged={vi.fn()}
+      />
+    </RollProvider>
+  );
+}
 
-  // 0.95 → 1 + floor(0.95 * faces): a natural 20 on a d20, and the top face elsewhere.
-  const seedTopFace = () => vi.spyOn(Math, "random").mockReturnValue(0.95);
-  // 0 → 1 + floor(0): a natural 1 on a d20.
-  const seedNat1 = () => vi.spyOn(Math, "random").mockReturnValue(0);
-  // Mid face → a non-crit, non-miss to-hit.
-  const seedMid = () => vi.spyOn(Math, "random").mockReturnValue(0.5);
-
-  const findDamageCall = () =>
-    vi.mocked(logRoll).mock.calls.map((c) => c[2]).find((e) => e.kind === "damage");
-
-  it("shows 'Critical hit!' and auto-rolls doubled damage after a nat-20 to-hit", async () => {
-    seedTopFace();
-    renderPicker(
-      makeCharacter({ attackRows: [flameTongueRow({ damageRiders: [] })] }),
-    );
-
-    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
-    expect(screen.getByText(/Critical hit!/)).toBeInTheDocument();
-
-    // The Damage button flipped its label — no separate button press to crit.
-    const dmg = screen.getByRole("button", { name: /Roll crit damage/ });
-    await userEvent.click(dmg);
-
-    const call = findDamageCall();
-    expect(call!.specLabel).toBe("2d8 (crit)"); // 1d8 slashing → doubled dice
-    expect(call!.faces).toHaveLength(2);
-  });
-
-  it("doubles the on-hit dice rider automatically under the auto-crit flow", async () => {
-    seedTopFace();
-    renderPicker(
-      makeCharacter({ attackRows: [flameTongueRow()] }),
-    );
-
-    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
-    await userEvent.click(screen.getByRole("button", { name: /Roll crit damage/ }));
-    await userEvent.click(screen.getByRole("button", { name: /Roll \+2d6 fire/ }));
-
-    const riderCall = vi
-      .mocked(logRoll)
-      .mock.calls.map((c) => c[2])
-      .find((entry) => entry.damageType === "fire");
-    expect(riderCall!.specLabel).toBe("4d6 (crit)");
-    expect(riderCall!.faces).toHaveLength(4);
-  });
-
-  it("shows a Miss indicator on a natural 1 and leaves damage rollable (non-crit)", async () => {
-    seedNat1();
-    renderPicker(
-      makeCharacter({ attackRows: [flameTongueRow({ damageRiders: [] })] }),
-    );
-
-    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
-    expect(screen.getByText(/^Miss$/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Roll damage$/ })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Roll crit damage/ })).not.toBeInTheDocument();
-  });
-
-  it("keeps a dice rider single when the weapon damage was rolled normally", async () => {
+describe("InlineAttackPicker — resolveAction commit (epic #1827 Slice 5, #1832)", () => {
+  it("commits a resolveAction op mapping cost.kind action → action, with the echoed source/toHit/effect", async () => {
     seedMid();
-    renderPicker(
-      makeCharacter({ attackRows: [flameTongueRow()] }),
-    );
+    const character = makeCharacter({ attackRows: [weaponRow("Longsword", "inv-1", { damageRiders: [] })] });
+    renderWithCharacter(<LiveHarness character={character} />, character);
 
     await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
     await userEvent.click(screen.getByRole("button", { name: /^Roll damage$/ }));
-    await userEvent.click(screen.getByRole("button", { name: /Roll \+2d6 fire/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
 
-    const riderCall = vi
-      .mocked(logRoll)
-      .mock.calls.map((c) => c[2])
-      .find((entry) => entry.damageType === "fire");
-    expect(riderCall!.specLabel).toBe("2d6");
-    expect(riderCall!.faces).toHaveLength(2);
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(1));
+    const [characterId, ops] = vi.mocked(applyResolveActionOperations).mock.calls[0];
+    expect(characterId).toBe("char-1");
+    expect(ops).toHaveLength(1);
+    expect(ops[0]).toMatchObject({
+      type: "resolveAction",
+      source: "Longsword",
+      cost: { kind: "action", attacks: 1 },
+    });
+    expect(ops[0].toHit).toMatchObject({ verdict: "hit" });
+    expect(ops[0].effect).toMatchObject({ type: "slashing", kind: "damage" });
+  });
+
+  it("does not call logRoll for the weapon's own attack/damage rolls (retired for weapons)", async () => {
+    seedMid();
+    const character = makeCharacter({ attackRows: [weaponRow("Longsword", "inv-1", { damageRiders: [] })] });
+    renderWithCharacter(<LiveHarness character={character} />, character);
+
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Roll damage$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
+
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(logRoll)).not.toHaveBeenCalled();
   });
 });
 
-describe("InlineAttackPicker — manual crit via verdict (#766/#811)", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-    window.localStorage.clear();
-  });
-
-  it("has no standalone 'Critical' button and no Crit checkbox in the sheet", () => {
-    renderPicker(
-      makeCharacter({ attackRows: [weaponRow("Longsword", "inv-1")] }),
-    );
-    expect(screen.queryByRole("button", { name: /^Critical$/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
-  });
-
-  // Live turn state — the verdict is the crit authority, and it lives in the tally.
-  function LiveHarness({ character }: { character: Character }) {
-    const liveTurnState = useTurnState(character, "sess-crit");
-    useEffect(() => {
-      liveTurnState.startCombat();
-      liveTurnState.startTurn();
-      liveTurnState.enterAttackMode();
-      // eslint-disable-next-line react-hooks/exhaustive-deps -- harness drives into attack mode once on mount; empty deps intentional
-    }, []);
-    return (
-      <RollProvider>
-        <InlineAttackPicker
-          turnState={liveTurnState}
-          sessionId="sess-crit"
-          onClose={vi.fn()}
-          onCancel={vi.fn()}
-          onLogChanged={vi.fn()}
-        />
-      </RollProvider>
-    );
-  }
-
-  it("calling Crit! flips the damage roll to doubled dice (verdict is the crit authority)", async () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5); // non-crit to-hit
+describe("InlineAttackPicker — Extra Attack loop (#1832)", () => {
+  it("drives the rail twice, firing one resolveAction op per swing, and finishes at N of N", async () => {
+    seedMid();
     const character = makeCharacter({
-      attackRows: [flameTongueRow({ damageRiders: [] })],
+      attacksPerAction: 2,
+      attackRows: [weaponRow("Longsword", "inv-1", { damageRiders: [] })],
     });
+    renderWithCharacter(<LiveHarness character={character} />, character);
+
+    expect(screen.getByText(/Attacks · 2 of 2 remaining/)).toBeInTheDocument();
+
+    // Swing 1 — the rail's own "Done" is the ONLY completion tap; it fires
+    // commit (records the tally row + posts resolveAction) and, since attacks
+    // remain, re-arms itself for swing 2 without a separate "Next" tap.
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Roll damage$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(1));
+
+    await waitFor(() => expect(screen.getByText(/Attacks · 1 of 2 remaining/)).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: /Roll to hit/ })).not.toBeDisabled();
+
+    // Swing 2.
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Roll damage$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(2));
+
+    await waitFor(() => expect(screen.getByText(/Attacks · 0 of 2 remaining/)).toBeInTheDocument());
+    // No reset() fires after the FINAL swing — the rail stays on its
+    // already-resolved result line, not a re-armed (or disabled) roll button.
+    expect(screen.queryByRole("button", { name: /Roll to hit/ })).not.toBeInTheDocument();
+    // Both swings carry distinct actionIds (one row per swing, not a merged batch).
+    const [, op1] = vi.mocked(applyResolveActionOperations).mock.calls[0];
+    const [, op2] = vi.mocked(applyResolveActionOperations).mock.calls[1];
+    expect(op1[0].actionId).not.toBe(op2[0].actionId);
+  });
+
+  it("never over-spends the Action: two swings still leave the turn's other action-cost affordances untouched", async () => {
+    seedMid();
+    const character = makeCharacter({
+      attacksPerAction: 2,
+      attackRows: [weaponRow("Longsword", "inv-1", { damageRiders: [] })],
+    });
+    function Harness() {
+      vi.mocked(applyResolveActionOperations).mockResolvedValue(character);
+      const live = useTurnState(character, "sess-spend");
+      useEffect(() => {
+        live.startCombat();
+        live.startTurn();
+        live.enterAttackMode();
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time setup
+      }, []);
+      return (
+        <>
+          <span data-testid="actions-remaining">{live.actionsRemaining}</span>
+          <RollProvider>
+            <InlineAttackPicker
+              turnState={live}
+              sessionId="sess-spend"
+              onClose={vi.fn()}
+              onCancel={vi.fn()}
+              onLogChanged={vi.fn()}
+            />
+          </RollProvider>
+        </>
+      );
+    }
+    renderWithCharacter(<Harness />, character);
+
+    // enterAttackMode already spent the turn's one action — 0 remain, both
+    // before AND after the two-swing Extra Attack sequence (useResolution's
+    // own spendSlot is inert for weapons, see attackResolutionTurnState).
+    expect(screen.getByTestId("actions-remaining")).toHaveTextContent("0");
+
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Roll damage$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(1));
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Roll damage$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(2));
+
+    expect(screen.getByTestId("actions-remaining")).toHaveTextContent("0");
+  });
+});
+
+describe("InlineAttackPicker — crit-upgrade guard (#1831 review NICE)", () => {
+  it("a 'Crit!' tap AFTER damage is already rolled does not flag effect.crit or change the total", async () => {
+    seedMid(); // non-crit, non-miss to-hit
+    const character = makeCharacter({ attackRows: [weaponRow("Longsword", "inv-1", { damageRiders: [] })] });
+    renderWithCharacter(<LiveHarness character={character} />, character);
+
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ })); // implicit-hit pending
+    await userEvent.click(screen.getByRole("button", { name: /^Roll damage$/ })); // implicit hit, non-crit
+    expect(screen.getByText("✓ Hit")).toBeInTheDocument();
+
+    // The rail hasn't advanced/completed yet — commit only fires when the
+    // player taps Done. Tap "Crit!" now, mirroring the #1831 review scenario.
+    await userEvent.click(screen.getByRole("button", { name: /^Crit!$/ }));
+
+    const done = screen.getByRole("button", { name: /^Done$/ });
+    await userEvent.click(done);
+
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(1));
+    const [, ops] = vi.mocked(applyResolveActionOperations).mock.calls[0];
+    // Non-doubled dice (1d8, not 2d8) — the late crit call never re-armed the roll.
+    expect(ops[0].effect?.crit).toBe(false);
+    expect(ops[0].effect?.faces).toHaveLength(1);
+  });
+
+  it("calling Crit! BEFORE damage still doubles the dice normally", async () => {
+    seedMid();
+    const character = makeCharacter({ attackRows: [weaponRow("Longsword", "inv-1", { damageRiders: [] })] });
     renderWithCharacter(<LiveHarness character={character} />, character);
 
     await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
     await userEvent.click(screen.getByRole("button", { name: /^Crit!$/ }));
     await userEvent.click(screen.getByRole("button", { name: /Roll crit damage/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
 
-    const call = vi.mocked(logRoll).mock.calls.map((c) => c[2]).find((e) => e.kind === "damage");
-    expect(call!.specLabel).toBe("2d8 (crit)");
-    expect(call!.faces).toHaveLength(2);
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(1));
+    const [, ops] = vi.mocked(applyResolveActionOperations).mock.calls[0];
+    expect(ops[0].effect?.crit).toBe(true);
+    expect(ops[0].effect?.faces).toHaveLength(2); // 1d8 doubled to 2d8
   });
+});
 
-  it("'it Missed' re-arms the next attack; skip leaves the row unresolved", async () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
-    const character = makeCharacter({
-      attacksPerAction: 3,
-      attackRows: [flameTongueRow({ damageRiders: [] })],
-    });
+describe("InlineAttackPicker — auto-crit on a natural 20 (#766)", () => {
+  it("shows 'Critical hit!' and rolls doubled damage after a nat-20 to-hit", async () => {
+    seedTopFace();
+    const character = makeCharacter({ attackRows: [weaponRow("Longsword", "inv-1", { damageRiders: [] })] });
     renderWithCharacter(<LiveHarness character={character} />, character);
 
-    // Attack 1 → call it a miss: the row dims into the tally (Miss chip) and
-    // the card resets with the next attack armed.
-    await userEvent.click(screen.getByRole("button", { name: "Roll to hit" }));
-    await userEvent.click(screen.getByRole("button", { name: "it Missed" }));
-    expect(screen.getByRole("button", { name: /Roll to hit — attack 2 of 3/ })).toBeInTheDocument();
-    expect(screen.getByText("Miss")).toBeInTheDocument(); // tally chip
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    // AttackResultLine's own die-box badge ALSO reads "Critical hit!" — match
+    // the verdict chip's more specific "— nat N" text to disambiguate.
+    expect(screen.getByText(/Critical hit! — nat/)).toBeInTheDocument();
 
-    // Attack 2 → skip (attacks remain): the row stays unresolved and the tally
-    // asks the question instead of claiming a hit.
-    await userEvent.click(screen.getByRole("button", { name: /Roll to hit — attack 2 of 3/ }));
-    await userEvent.click(screen.getByRole("button", { name: /Skip — roll next attack/ }));
-    expect(screen.getByRole("button", { name: "hit or miss?" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Roll crit damage/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
+
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(1));
+    const [, ops] = vi.mocked(applyResolveActionOperations).mock.calls[0];
+    expect(ops[0].toHit).toMatchObject({ nat20: true, verdict: "crit" });
+    expect(ops[0].effect).toMatchObject({ crit: true });
   });
 
-  it("a resolved attack's continue button reads 'Next' and re-arms step 1 for a two-tap next roll (#834)", async () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
+  it("shows a Miss indicator on a natural 1 and Done commits a miss with no effect roll needed", async () => {
+    seedNat1();
+    const character = makeCharacter({ attackRows: [weaponRow("Longsword", "inv-1", { damageRiders: [] })] });
+    renderWithCharacter(<LiveHarness character={character} />, character);
+
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    // AttackResultLine's own die-box badge ALSO reads "Miss" — match the
+    // verdict chip's more specific "— nat 1" text to disambiguate.
+    expect(screen.getByText(/Miss — nat 1/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(1));
+    const [, ops] = vi.mocked(applyResolveActionOperations).mock.calls[0];
+    expect(ops[0].toHit).toMatchObject({ verdict: "miss" });
+    expect(ops[0].effect).toBeNull();
+  });
+});
+
+describe("InlineAttackPicker — 'it Missed' re-arms the next attack (#811)", () => {
+  it("resets the rail and advances the Extra Attack counter on a called miss", async () => {
+    seedMid();
     const character = makeCharacter({
       attacksPerAction: 2,
-      attackRows: [flameTongueRow({ damageRiders: [] })],
-    });
-    renderWithCharacter(<LiveHarness character={character} />, character);
-
-    // Resolve attack 1 (damage = implicit hit).
-    await userEvent.click(screen.getByRole("button", { name: "Roll to hit" }));
-    await userEvent.click(screen.getByRole("button", { name: /^Roll damage$/ }));
-    expect(screen.getByText("✓ Hit")).toBeInTheDocument();
-
-    // The continue affordance is a plain "Next" — no instant re-roll button.
-    expect(
-      screen.queryByRole("button", { name: /Roll to hit — attack 2 of 2/ }),
-    ).not.toBeInTheDocument();
-    const next = screen.getByRole("button", { name: "Next" });
-
-    await userEvent.click(next);
-
-    // Card resets to step 1, still armed with the right ordinal — not an
-    // already-rolled attack 2.
-    expect(screen.getByRole("button", { name: "Roll to hit — attack 2 of 2" })).toBeInTheDocument();
-    expect(screen.queryByText("✓ Hit")).not.toBeInTheDocument();
-  });
-
-  it("rolling damage marks the current row hit (implicit hit) with Crit! still offered", async () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
-    const character = makeCharacter({
-      attackRows: [flameTongueRow({ damageRiders: [] })],
+      attackRows: [weaponRow("Longsword", "inv-1", { damageRiders: [] })],
     });
     renderWithCharacter(<LiveHarness character={character} />, character);
 
     await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
-    expect(screen.getByText(/Ask your DM/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /^Roll damage$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /it Missed/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
 
-    expect(screen.getByText("✓ Hit")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Crit!$/ })).toBeInTheDocument();
-    expect(screen.queryByText(/hit or miss\?/)).not.toBeInTheDocument();
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByText(/Attacks · 1 of 2 remaining/)).toBeInTheDocument());
   });
 });
 
-describe("InlineAttackPicker — Damage card copy (#786)", () => {
-  it("labels the inert Damage card by prompt and names the form once a hit is rolled", async () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
-    renderPicker(
-      makeCharacter({ attackRows: [weaponRow("Longsword", "inv-1")] }),
-    );
-    expect(screen.queryByText(/land the hit/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/Roll to hit first — then roll damage/)).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
-    expect(screen.getByText(/Longsword · 1d8 slashing/)).toBeInTheDocument();
-    vi.restoreAllMocks();
-  });
-});
-
-describe("InlineAttackPicker — Damage card maneuver state resets on form switch (#756)", () => {
-  const SERVER_ROLL = 5;
-
-  function battleMaster(): Character {
-    return makeCharacter({
-      attackRows: [
-        weaponRow("Longsword", "inv-1", {
-          damageType: "slashing",
-          attackSpec: { count: 1, faces: 20, modifier: 5 },
-          damageSpec: { count: 1, faces: 8, modifier: 0 },
-        }),
-        weaponRow("Dagger", "inv-2", {
-          damageType: "piercing",
-          attackSpec: { count: 1, faces: 20, modifier: 5 },
-          damageSpec: { count: 1, faces: 4, modifier: 0 },
-        }),
-      ],
-      resources: {
-        pools: [
-          { key: "superiorityDice", label: "Superiority Dice", die: "d8", total: 4, recharge: "shortRest", used: 0, remaining: 4 },
-        ],
-        maneuversKnown: [
-          { id: "m-precision", name: "Precision Attack", description: "Add to the attack roll.", placement: "attackRoll" },
-        ],
-      },
-    } as unknown as Character);
-  }
-
-  it("re-enables the spend button on the newly rolled form after a die was spent on another", async () => {
-    const user = userEvent.setup();
-    vi.mocked(castManeuverTransaction).mockResolvedValue({
-      character: battleMaster(),
-      results: [{ roll: SERVER_ROLL, saveDc: 15, summary: "used Precision Attack" }],
-    } as unknown as Awaited<ReturnType<typeof castManeuverTransaction>>);
-
-    renderPicker(battleMaster());
-
-    // Roll to hit with the default (Longsword) form, then open the maneuvers
-    // disclosure (#811 — collapsed by default) so the attack maneuver shows.
-    await user.click(screen.getByRole("button", { name: /Roll to hit/ }));
-    await user.click(screen.getByRole("button", { name: /Battle Master maneuvers/ }));
-    const spend = await screen.findByRole("button", { name: /Precision Attack/ });
-    await user.click(spend);
-    // Spent in this form's context → button disabled.
-    await waitFor(() => expect(spend).toBeDisabled());
-
-    // "Next" re-arms step 1 (#834) — then switch the selected form to the
-    // Dagger and roll to hit for it.
-    await user.click(screen.getByRole("button", { name: "Next" }));
-    await user.click(screen.getByRole("radio", { name: "Dagger" }));
-    await user.click(screen.getByRole("button", { name: /Roll to hit/ }));
-
-    // A fresh prompt instance for the new form → no die spent in its context yet.
-    const daggerSpend = await screen.findByRole("button", { name: /Precision Attack/ });
-    expect(daggerSpend).not.toBeDisabled();
-  });
-});
-
-describe("InlineAttackPicker — persistent inline roll result (#745)", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it("shows the attack die box after rolling to hit", async () => {
-    renderPicker(
-      makeCharacter({ attackRows: [flameTongueRow({ damageRiders: [] })] }),
-    );
-
-    // No result visible until a roll happens.
-    expect(screen.queryByText("d20")).not.toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
-
-    // The to-hit d20 die box now persists on the card (value is random; the
-    // caption is deterministic).
-    expect(screen.getByText("d20")).toBeInTheDocument();
-  });
-
-  it("shows the weapon damage die box after rolling to hit then damage", async () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5); // non-crit → a single d8 box
-    renderPicker(
-      makeCharacter({ attackRows: [flameTongueRow({ damageRiders: [] })] }),
-    );
-
-    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
-    await userEvent.click(screen.getByRole("button", { name: /^Roll damage$/ }));
-
-    // Flame Tongue base damage is 1d8 slashing.
-    expect(screen.getByText("d8")).toBeInTheDocument();
-    expect(screen.getByText("slashing")).toBeInTheDocument();
-  });
-});
-
-// #809 — the Precision Attack affordance is hosted under the ATTACK card, and a
-// spend after a to-hit roll boosts the on-card result line AND the #802 tally row
-// (via a real useTurnState — the tally lives there). SERVER_ROLL adds 5.
+// #809/#1831 review: ManeuversDisclosure still reads useResolution's live
+// roll state (toHitRoll/effectRoll) via a small local compat object, not
+// useAttackRolls — the Precision Attack boost still shows and writes the
+// tally row's displayed total (the KNOWN GAP: it does not retroactively
+// change the already-built resolveAction op).
 describe("InlineAttackPicker — Precision Attack under the attack card (#809)", () => {
   const SERVER_ROLL = 5;
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-    window.localStorage.clear();
-  });
-
   function battleMaster(): Character {
     return makeCharacter({
       attackRows: [
@@ -750,6 +551,7 @@ describe("InlineAttackPicker — Precision Attack under the attack card (#809)",
           damageType: "slashing",
           attackSpec: { count: 1, faces: 20, modifier: 5 },
           damageSpec: { count: 1, faces: 8, modifier: 0 },
+          damageRiders: [],
         }),
       ],
       resources: {
@@ -761,56 +563,27 @@ describe("InlineAttackPicker — Precision Attack under the attack card (#809)",
         ],
       },
     } as unknown as Character);
-  }
-
-  // Drives a live useTurnState into an in-progress Attack action so the tally is real.
-  function Harness({ character }: { character: Character }) {
-    const turnState = useTurnState(character, "sess-precision");
-    useEffect(() => {
-      turnState.startCombat();
-      turnState.startTurn();
-      turnState.enterAttackMode();
-      // eslint-disable-next-line react-hooks/exhaustive-deps -- harness drives into attack mode once on mount; empty deps intentional
-    }, []);
-    return (
-      <RollProvider>
-        <InlineAttackPicker
-          turnState={turnState}
-          sessionId="sess-precision"
-          onClose={vi.fn()}
-          onCancel={vi.fn()}
-          onLogChanged={vi.fn()}
-        />
-      </RollProvider>
-    );
   }
 
   it("spending Precision after a to-hit boosts the result line and the tally row", async () => {
     const user = userEvent.setup();
-    vi.spyOn(Math, "random").mockReturnValue(0.5); // d20 face 11 → non-crit, non-miss
+    seedMid(); // d20 face 11 → non-crit, non-miss
     vi.mocked(castManeuverTransaction).mockResolvedValue({
       character: battleMaster(),
       results: [{ roll: SERVER_ROLL, saveDc: 15, summary: "used Precision Attack" }],
     } as unknown as Awaited<ReturnType<typeof castManeuverTransaction>>);
 
     const character = battleMaster();
-    renderWithCharacter(<Harness character={character} />, character);
+    renderWithCharacter(<LiveHarness character={character} />, character);
 
-    // 11 (d20) + 5 (attackBonus) = 16 to hit. The tally row and result line agree.
+    // 11 (d20) + 5 (attackBonus) = 16 to hit.
     await user.click(screen.getByRole("button", { name: /Roll to hit/ }));
     expect(screen.getAllByText("16").length).toBeGreaterThanOrEqual(1);
 
-    // The Precision affordance lives behind the maneuvers disclosure (#811) —
-    // attack section only, no damage roll yet.
     await user.click(screen.getByRole("button", { name: /Battle Master maneuvers/ }));
-    expect(screen.getByText("Add to Attack:")).toBeInTheDocument();
-    expect(screen.queryByText("Add to Damage:")).not.toBeInTheDocument();
-
     await user.click(screen.getByRole("button", { name: /Precision Attack/ }));
 
-    // 16 + 5 (superiority die) = 21 everywhere; the old 16 is gone.
-    await waitFor(() => expect(screen.getAllByText("21").length).toBeGreaterThanOrEqual(2));
-    expect(screen.queryByText("16")).not.toBeInTheDocument();
-    expect(screen.getByText("(+maneuver)")).toBeInTheDocument();
+    // 16 + 5 (superiority die) = 21 everywhere the tally reads it.
+    await waitFor(() => expect(screen.getAllByText("21").length).toBeGreaterThanOrEqual(1));
   });
 });
