@@ -32,6 +32,22 @@ export interface SpellPickerProps {
 
 const NO_KNOWN: ReadonlySet<string> = new Set();
 
+// #1826: an empty eligible pool (a group present but its `options` empty, before
+// any search) is a resolver bug, not a search miss — distinct copy so it never
+// reads as "try a different search" when nothing was ever pickable here. A
+// non-empty pool searched to zero keeps the neutral copy.
+function PickerStatusMessage({ anyEligible, anyResults }: { anyEligible: boolean; anyResults: boolean }) {
+  if (!anyEligible) {
+    return (
+      <p className="py-6 text-center text-sm text-garnet-700">
+        No spells are available to choose here — this may be a configuration problem.
+      </p>
+    );
+  }
+  if (!anyResults) return <p className="py-6 text-center text-sm text-parchment-500">No spells match your search.</p>;
+  return null;
+}
+
 export default function SpellPicker({ groups, knownSpellIds = NO_KNOWN, headline, ctaVerb = "Learn" }: SpellPickerProps) {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState<{ spellId: string; groupKey: string } | null>(null);
@@ -40,10 +56,10 @@ export default function SpellPicker({ groups, knownSpellIds = NO_KNOWN, headline
     headline ?? budgetHeadline(groups.map((g) => ({ label: g.label, selected: g.selectedIds.length, cap: g.cap })));
   const rendered = groups.map((g) => ({ group: g, filtered: filterCatalog(g.options, search, "") }));
   const anyResults = rendered.some((r) => r.filtered.length > 0);
-  // #1826: an empty eligible pool (every group's `options`, before any search)
-  // is a resolver bug, not a search miss — distinct copy so it never reads as
-  // "try a different search" when nothing was ever pickable here.
-  const anyEligible = groups.some((g) => g.options.length > 0);
+  // No groups AT ALL is a benign "nothing to pick" shape (a homebrew class, a
+  // {cantrips:0,spells:0} response), so it keeps the neutral search-miss copy
+  // rather than crying misconfiguration — see PickerStatusMessage.
+  const anyEligible = groups.length === 0 || groups.some((g) => g.options.length > 0);
 
   const openGroup = open ? groups.find((g) => g.key === open.groupKey) : undefined;
   const openSpell = openGroup?.options.find((s) => s.id === open?.spellId);
@@ -73,14 +89,7 @@ export default function SpellPicker({ groups, knownSpellIds = NO_KNOWN, headline
         className={`${INPUT_CLS} shrink-0`}
       />
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pb-1">
-        {!anyEligible && (
-          <p className="py-6 text-center text-sm text-garnet-700">
-            No spells are available to choose here — this may be a configuration problem.
-          </p>
-        )}
-        {anyEligible && !anyResults && (
-          <p className="py-6 text-center text-sm text-parchment-500">No spells match your search.</p>
-        )}
+        <PickerStatusMessage anyEligible={anyEligible} anyResults={anyResults} />
         {rendered.map(
           ({ group, filtered }) =>
             filtered.length > 0 && (

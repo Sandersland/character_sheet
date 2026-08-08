@@ -99,22 +99,25 @@ function SpellRowList({
   );
 }
 
-// The four mutually exclusive loaded states — spinner, fetch error, an empty
-// eligible list (`spells`, pre-search — a resolver bug, e.g. the Eldritch
-// Knight case: "Choose N of N" against zero rows with no explanation), and a
-// search that filtered a non-empty list to zero (the ordinary case). Split
-// out of SpellResults so its own branching doesn't retrip the complexity gate.
-function SpellStatusMessage({
-  catalog, error, showSpinner, spells, filtered,
-}: {
-  catalog: CatalogSpell[] | null;
-  error: string | null;
-  showSpinner: boolean;
-  spells: CatalogSpell[];
-  filtered: CatalogSpell[];
-}) {
+// The SHARED fetch state of the one useSpellCatalog call — error or spinner.
+// Rendered ONCE at the step level (not per section), because a level granting
+// both cantrips and leveled spells drives both from the same fetch: showing it
+// inside each section stacked the message twice on a fetch failure/load.
+function SpellFetchStatus({ catalog, error, showSpinner }: { catalog: CatalogSpell[] | null; error: string | null; showSpinner: boolean }) {
   if (error) return <p className="mt-2 text-xs text-garnet-700">{error}</p>;
   if (catalog === null) return showSpinner ? <Spinner /> : null;
+  return null;
+}
+
+// The PER-POOL state, disjoint per section (a level's cantrip pool and leveled
+// pool are searched and filtered independently). An empty eligible list
+// (`spells`, pre-search) is a resolver bug — e.g. the Eldritch Knight case:
+// "Choose N of N" against zero rows — distinct copy from an ordinary search
+// that filtered a non-empty list to zero. Suppressed until the catalog loads
+// (catalog === null) so a mid-fetch empty pool never reads as misconfigured;
+// SpellFetchStatus owns the loading/error message in that window.
+function SpellPoolStatus({ catalog, spells, filtered }: { catalog: CatalogSpell[] | null; spells: CatalogSpell[]; filtered: CatalogSpell[] }) {
+  if (catalog === null) return null;
   if (spells.length === 0) {
     return (
       <p className="mt-3 py-2 text-center text-xs text-garnet-700">
@@ -128,15 +131,14 @@ function SpellStatusMessage({
   return null;
 }
 
-// The catalog result region: status message plus the tri-state rows.
+// The catalog result region: per-pool status plus the tri-state rows. The
+// shared fetch error/spinner is rendered once above, by SpellFetchStatus.
 // Extracted so NewSpellsStep stays under the complexity gate once the #1101 swap
 // panel is layered on top.
 function SpellResults({
-  catalog, error, showSpinner, spells, filtered, learnedSpellIds, selectedIds, cap, onToggle,
+  catalog, spells, filtered, learnedSpellIds, selectedIds, cap, onToggle,
 }: {
   catalog: CatalogSpell[] | null;
-  error: string | null;
-  showSpinner: boolean;
   spells: CatalogSpell[];
   filtered: CatalogSpell[];
   learnedSpellIds: ReadonlySet<string>;
@@ -146,7 +148,7 @@ function SpellResults({
 }) {
   return (
     <>
-      <SpellStatusMessage catalog={catalog} error={error} showSpinner={showSpinner} spells={spells} filtered={filtered} />
+      <SpellPoolStatus catalog={catalog} spells={spells} filtered={filtered} />
       <SpellRowList
         spells={spells}
         filtered={filtered}
@@ -162,16 +164,15 @@ function SpellResults({
 // #1131: the cantrip subsection shown above the leveled picker when the level
 // grants new cantrips. Its own search + hard cap, disjoint from the spell
 // learns. #1826: routes through SpellResults (not SpellRowList directly) so a
-// required cantrip pick gets the same spinner/empty-eligible/search-miss
-// states as the leveled picker below it — this section previously showed
-// nothing at all when its eligible list was empty.
+// required cantrip pick gets the same empty-eligible/search-miss states as the
+// leveled picker below it — this section previously showed nothing at all when
+// its eligible list was empty. The shared fetch error/spinner is owned by
+// SpellFetchStatus at the step level, not repeated here.
 function CantripSection({
-  cantrips, catalog, error, showSpinner, spells, filtered, learnedSpellIds, selectedIds, onToggle, search, setSearch,
+  cantrips, catalog, spells, filtered, learnedSpellIds, selectedIds, onToggle, search, setSearch,
 }: {
   cantrips: number;
   catalog: CatalogSpell[] | null;
-  error: string | null;
-  showSpinner: boolean;
   spells: CatalogSpell[];
   filtered: CatalogSpell[];
   learnedSpellIds: ReadonlySet<string>;
@@ -195,8 +196,6 @@ function CantripSection({
       />
       <SpellResults
         catalog={catalog}
-        error={error}
-        showSpinner={showSpinner}
         spells={spells}
         filtered={filtered}
         learnedSpellIds={learnedSpellIds}
@@ -212,13 +211,11 @@ function CantripSection({
 // note, search + results. Split from NewSpellsStep so the cantrip subsection can
 // sit above it without pushing the parent past the complexity gate.
 function LeveledSpellsSection({
-  selection, character, catalog, error, showSpinner, learnedSpellIds, framed,
+  selection, character, catalog, learnedSpellIds, framed,
 }: {
   selection: NewSpellsSelection;
   character: Character;
   catalog: CatalogSpell[] | null;
-  error: string | null;
-  showSpinner: boolean;
   learnedSpellIds: ReadonlySet<string>;
   framed: boolean;
 }) {
@@ -259,8 +256,6 @@ function LeveledSpellsSection({
       />
       <SpellResults
         catalog={catalog}
-        error={error}
-        showSpinner={showSpinner}
         spells={eligible}
         filtered={filtered}
         learnedSpellIds={learnedSpellIds}
@@ -286,12 +281,13 @@ export default function NewSpellsStep({ step }: { step: LevelUpStep }) {
 
   return (
     <div>
+      {/* The one useSpellCatalog fetch feeds both sections; its error/spinner
+          renders once here, never duplicated per section (#1826). */}
+      <SpellFetchStatus catalog={catalog} error={error} showSpinner={showSpinner} />
       {selection.cantrips > 0 && (
         <CantripSection
           cantrips={selection.cantrips}
           catalog={catalog}
-          error={error}
-          showSpinner={showSpinner}
           spells={eligibleCantrips}
           filtered={filteredCantrips}
           learnedSpellIds={learnedSpellIds}
@@ -307,8 +303,6 @@ export default function NewSpellsStep({ step }: { step: LevelUpStep }) {
           selection={selection}
           character={character}
           catalog={catalog}
-          error={error}
-          showSpinner={showSpinner}
           learnedSpellIds={learnedSpellIds}
           framed={selection.cantrips > 0}
         />

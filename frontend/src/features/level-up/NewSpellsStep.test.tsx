@@ -218,6 +218,16 @@ describe("NewSpellsStep — empty eligible list vs. search miss (#1826)", () => 
     expect(await screen.findByText("No spells match your filter.")).toBeInTheDocument();
     expect(screen.queryByText(/configuration problem/i)).not.toBeInTheDocument();
   });
+
+  // A level granting BOTH cantrips and leveled spells drives both sections from
+  // the one useSpellCatalog fetch; a fetch failure must render the shared error
+  // ONCE (SpellFetchStatus at the step level), not once per section.
+  it("renders the shared fetch error once on a level with both cantrips and leveled spells", async () => {
+    fetchMock.mockRejectedValue(new Error("boom"));
+    render(<Harness step={newSpellsStep(2, { maxSpellLevel: 2, spellLists: ["wizard"], cantrips: 1, cantripLists: ["wizard"] })} character={caster()} />);
+    expect(await screen.findByText("Couldn't load spell catalog.")).toBeInTheDocument();
+    expect(screen.getAllByText("Couldn't load spell catalog.")).toHaveLength(1);
+  });
 });
 
 describe("NewSpellsStep — cantrip picks (#1131)", () => {

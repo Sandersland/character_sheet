@@ -154,8 +154,7 @@ describe("CreationSpellsStep", () => {
   });
 
   // #1826: a successful-but-empty class fetch (e.g. the EK/AT resolver bug)
-  // must read as distinctly different from a search that matched nothing —
-  // CatalogStatus only guarded spinner + fetch error before this.
+  // must read as distinctly different from a search that matched nothing.
   it("shows a misconfiguration message when the class fetch succeeds with an empty catalog", async () => {
     fetchMock.mockResolvedValue([]);
     renderStep();
