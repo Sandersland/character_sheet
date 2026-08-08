@@ -8,13 +8,14 @@ import {
   type FeedRow,
 } from "@/lib/sessionLogFeed";
 import type { CharacterEvent, CharacterEventType } from "@/types/character";
+import type { ResolveActionEventData, ResolveActionEventToHit } from "@character-sheet/shared-types";
 
 function makeEvent(overrides: Partial<CharacterEvent>): CharacterEvent {
   return {
     id: "evt-1",
     category: "combat",
-    type: "attackRoll",
-    summary: "Longsword: 17 (1d20 + 5)",
+    type: "resolveAction",
+    summary: "Resolved Longsword (action)",
     actor: "player",
     reverted: false,
     createdAt: "2026-06-27T00:00:00.000Z",
@@ -34,10 +35,6 @@ function text(row: FeedRow): string {
   return row.segments.map((s) => s.text).join("");
 }
 
-// Concatenates a row's sentence AND its drill-in text, so a swing's PARTNER
-// event (visible only inside the drill-in, e.g. the attack roll behind a
-// merged "hit for N" line) still counts toward "did this event's data survive
-// rendering" assertions (#1237 §6).
 function allText(row: FeedRow): string {
   const drill = (row.drillIn ?? [])
     .map((d) => [d.label, d.formula, d.total, d.note].filter(Boolean).join(" "))
@@ -45,14 +42,31 @@ function allText(row: FeedRow): string {
   return `${text(row)} ${drill}`;
 }
 
-function miss(id: string, total: number, extra: Partial<CharacterEvent> = {}): CharacterEvent {
+// Builds a `resolveAction` event — the single consolidated event a resolution
+// writes (#1827 model B, #1829). `data` mirrors the backend's persisted
+// shape exactly (backend/src/lib/combat/resolve-action-ops.ts).
+function resolveEvent(
+  id: string,
+  data: Partial<ResolveActionEventData> & { source: string },
+  extra: Partial<CharacterEvent> = {},
+): CharacterEvent {
   return makeEvent({
     id,
-    type: "attackRoll",
-    category: "roll",
-    data: { kind: "attack", source: "Dagger", total, specLabel: "1d20 + 2", faces: [total - 2], swingId: id, verdict: "miss" },
+    type: "resolveAction",
+    category: "combat",
+    data: { actionId: id, cost: { kind: "action" }, ...data },
     ...extra,
   });
+}
+
+// A missed weapon swing — the run-collapse/round-separator fixtures below
+// need many of these, varying only id/total.
+function miss(id: string, total: number, extra: Partial<CharacterEvent> = {}): CharacterEvent {
+  return resolveEvent(
+    id,
+    { source: "Dagger", toHit: { faces: [total - 2], kept: total - 2, nat20: false, bonus: 2, total, verdict: "miss" } },
+    extra,
+  );
 }
 
 describe("visibleLogEvents (dropped/reverted/round-marker filter)", () => {
@@ -68,15 +82,12 @@ describe("visibleLogEvents (dropped/reverted/round-marker filter)", () => {
 });
 
 describe("feedItemRowCount (#1237 §4 — the CombatLogRow/SessionLog count parity guard)", () => {
-  it("counts a merged attack+damage swing as ONE row, not two events", () => {
+  it("counts a resolution as ONE row (a resolveAction event was always one event, #1827 model B)", () => {
     const events = [
-      makeEvent({
-        id: "dmg", type: "damageRoll", category: "roll",
-        data: { kind: "damage", source: "Shortsword", total: 8, damageType: "piercing", specLabel: "1d6 + 4", faces: [4], swingId: "s1", verdict: "hit" },
-      }),
-      makeEvent({
-        id: "atk", type: "attackRoll", category: "roll",
-        data: { kind: "attack", source: "Shortsword", total: 17, specLabel: "1d20 + 5", faces: [12], swingId: "s1", verdict: "hit" },
+      resolveEvent("swing", {
+        source: "Shortsword",
+        toHit: { faces: [12], kept: 12, nat20: false, bonus: 5, total: 17, verdict: "hit" },
+        effect: { spec: "1d6 + 4", faces: [4], total: 8, type: "piercing", kind: "damage", crit: false },
       }),
     ];
     expect(feedItemRowCount(buildFeedItems(events))).toBe(1);
@@ -115,36 +126,28 @@ describe("buildFeedItems ordering — newest at the bottom (#1237)", () => {
   });
 });
 
-describe("buildFeedItems swingId grouping (#1235 swing pairing)", () => {
-  it("merges an attackRoll + its damageRoll (same swingId) into ONE row", () => {
+describe("buildFeedItems resolveAction attack-roll shape (weapon swing / Fire Bolt)", () => {
+  it("renders a hit as one row: sentence + Attack/Damage drill-in", () => {
     const events = [
-      makeEvent({
-        id: "dmg",
-        type: "damageRoll",
-        category: "roll",
-        data: { kind: "damage", source: "Shortsword", total: 8, damageType: "piercing", specLabel: "1d6 + 4", faces: [4], swingId: "s1", verdict: "hit" },
-      }),
-      makeEvent({
-        id: "atk",
-        type: "attackRoll",
-        category: "roll",
-        data: { kind: "attack", source: "Shortsword", total: 17, specLabel: "1d20 + 5", faces: [12], swingId: "s1", verdict: "hit" },
+      resolveEvent("swing", {
+        source: "Shortsword",
+        toHit: { faces: [12], kept: 12, nat20: false, bonus: 5, total: 17, verdict: "hit" },
+        effect: { spec: "1d6 + 4", faces: [4], total: 8, type: "piercing", kind: "damage", crit: false },
       }),
     ];
     const rows = buildFeedItems(events).map(rowOf);
     expect(rows).toHaveLength(1);
     expect(text(rows[0])).toBe("Shortsword — hit for 8 piercing.");
-    expect(rows[0].drillIn).toBeDefined();
-    expect(rows[0].drillIn!.length).toBe(2); // attack row + damage row
+    expect(rows[0].drillIn).toHaveLength(2);
+    expect(rows[0].drillIn![0]).toMatchObject({ label: "Attack", total: "17" });
+    expect(rows[0].drillIn![1]).toMatchObject({ label: "Damage", total: "8 piercing" });
   });
 
-  it("keeps a lone attack roll (miss) as its own italic, muted row", () => {
+  it("keeps a miss as its own italic, muted row with no damage rolled", () => {
     const events = [
-      makeEvent({
-        id: "atk",
-        type: "attackRoll",
-        category: "roll",
-        data: { kind: "attack", source: "Shortsword", total: 9, specLabel: "1d20 + 3", faces: [5], swingId: "s2", verdict: "miss" },
+      resolveEvent("swing", {
+        source: "Shortsword",
+        toHit: { faces: [5], kept: 5, nat20: false, bonus: 3, total: 9, verdict: "miss" },
       }),
     ];
     const rows = buildFeedItems(events).map(rowOf);
@@ -154,21 +157,15 @@ describe("buildFeedItems swingId grouping (#1235 swing pairing)", () => {
     expect(rows[0].tone).toBe("muted");
     // The weapon name itself stays non-italic inside the muted line (mockup spec).
     expect(rows[0].segments[0].italic).toBe(false);
+    expect(rows[0].drillIn?.[1].note).toBe("Called a miss — no damage rolled.");
   });
 
   it("renders a critical hit distinctly, with the crit word toned 'harm'", () => {
     const events = [
-      makeEvent({
-        id: "dmg",
-        type: "damageRoll",
-        category: "roll",
-        data: { kind: "damage", source: "Shortsword", total: 13, damageType: "fire", specLabel: "2d6 + 1", faces: [2, 3], swingId: "s3", verdict: "crit", crit: true },
-      }),
-      makeEvent({
-        id: "atk",
-        type: "attackRoll",
-        category: "roll",
-        data: { kind: "attack", source: "Shortsword", total: 24, specLabel: "1d20 + 4", faces: [20], swingId: "s3", verdict: "crit", nat20: true, crit: true },
+      resolveEvent("swing", {
+        source: "Shortsword",
+        toHit: { faces: [20], kept: 20, nat20: true, bonus: 4, total: 24, verdict: "crit" },
+        effect: { spec: "2d6 + 1", faces: [2, 3], total: 13, type: "fire", kind: "damage", crit: true },
       }),
     ];
     const rows = buildFeedItems(events).map(rowOf);
@@ -177,196 +174,225 @@ describe("buildFeedItems swingId grouping (#1235 swing pairing)", () => {
     expect(critSeg?.tone).toBe("harm");
   });
 
-  it("renders an orphan damage roll (no swingId — e.g. a Flame Tongue rider) as its own line", () => {
+  it("renders a heal-shaped attack-roll resolution (e.g. a healing weapon rune) as a healed sentence", () => {
     const events = [
-      makeEvent({
-        id: "rider",
-        type: "damageRoll",
-        category: "roll",
-        data: { kind: "damage", source: "Flame Tongue", total: 7, damageType: "fire", specLabel: "2d6", faces: [3, 4] },
+      resolveEvent("swing", {
+        source: "Life Drinker",
+        toHit: { faces: [15], kept: 15, nat20: false, bonus: 6, total: 21, verdict: "hit" },
+        effect: { spec: "1d4", faces: [3], total: 3, type: "necrotic", kind: "heal", crit: false },
+      }),
+    ];
+    const rows = buildFeedItems(events).map(rowOf);
+    expect(text(rows[0])).toBe("Life Drinker — healed 3 HP.");
+  });
+});
+
+describe("buildFeedItems resolveAction save shape (Sacred Flame)", () => {
+  it("renders the DC/ability/damage sentence and Save+Damage drill-in", () => {
+    const events = [
+      resolveEvent("cast", {
+        source: "Sacred Flame",
+        save: { dc: 13, ability: "dexterity" },
+        effect: { spec: "1d8", faces: [6], total: 6, type: "radiant", kind: "damage", crit: false },
       }),
     ];
     const rows = buildFeedItems(events).map(rowOf);
     expect(rows).toHaveLength(1);
-    expect(text(rows[0])).toContain("Flame Tongue");
-    expect(rows[0].drillIn).toBeDefined();
+    expect(text(rows[0])).toBe("Sacred Flame — DC 13 Dexterity save, 6 radiant.");
+    expect(rows[0].drillIn).toHaveLength(2);
+    expect(rows[0].drillIn![0]).toMatchObject({ label: "Save", total: "DC 13 Dexterity" });
+    expect(rows[0].drillIn![1]).toMatchObject({ label: "Damage", total: "6 radiant" });
+  });
+
+  it("renders a save with no effect (a control spell) as just the DC sentence", () => {
+    const events = [resolveEvent("cast", { source: "Hold Person", save: { dc: 14, ability: "wisdom" } })];
+    const rows = buildFeedItems(events).map(rowOf);
+    expect(text(rows[0])).toBe("Hold Person — DC 14 Wisdom save.");
+    expect(rows[0].drillIn).toHaveLength(1);
   });
 });
 
-describe("buildFeedItems swingId multiplicity (#1237 §6 — no event may vanish)", () => {
-  it("pairs the FIRST attack with the FIRST damage when one attack gets two damage rolls (duplicate handleDamage call)", () => {
-    // Newest-first fixture; chronologically: atk -> dmg1 -> dmg2 (a second,
-    // buggy damage roll reusing the same swingId — useAttackRolls' swingIdRef
-    // is never cleared between calls).
+describe("buildFeedItems resolveAction auto-hit / multi-die shape (Magic Missile)", () => {
+  it("renders one row; the effect's faces[] give the per-dart breakdown in the drill-in, no instances array", () => {
     const events = [
-      makeEvent({ id: "dmg2", type: "damageRoll", category: "roll", data: { kind: "damage", source: "Shortsword", total: 5, damageType: "piercing", specLabel: "1d6", faces: [3], swingId: "s1", verdict: "hit" } }),
-      makeEvent({ id: "dmg1", type: "damageRoll", category: "roll", data: { kind: "damage", source: "Shortsword", total: 8, damageType: "piercing", specLabel: "1d6 + 4", faces: [4], swingId: "s1", verdict: "hit" } }),
-      makeEvent({ id: "atk", type: "attackRoll", category: "roll", data: { kind: "attack", source: "Shortsword", total: 17, specLabel: "1d20 + 5", faces: [12], swingId: "s1", verdict: "hit" } }),
-    ];
-    const rows = buildFeedItems(events).map(rowOf);
-    // Nothing dropped: the attack's total, both damage totals are all present.
-    const combined = rows.map(allText).join(" | ");
-    expect(combined).toContain("17"); // atk, only recoverable via the merged row's drill-in
-    expect(combined).toContain("8"); // dmg1, merged sentence
-    expect(combined).toContain("5"); // dmg2, its own standalone row
-    // dmg1 merges with the attack (gets its drill-in); dmg2 stands alone.
-    const dmg1Row = rows.find((r) => allText(r).includes("8"));
-    const dmg2Row = rows.find((r) => allText(r).includes("hit for 5"));
-    expect(dmg1Row?.drillIn?.length).toBe(2); // attack + damage
-    expect(dmg2Row?.drillIn?.length).toBe(1); // damage only — its attack was already consumed
-  });
-
-  it("pairs the FIRST damage with the FIRST attack when two attacks share a swingId with one damage", () => {
-    // Chronologically: atk1 -> atk2 (a second, buggy attack roll) -> dmg.
-    const events = [
-      makeEvent({ id: "dmg", type: "damageRoll", category: "roll", data: { kind: "damage", source: "Shortsword", total: 8, damageType: "piercing", specLabel: "1d6 + 4", faces: [4], swingId: "s2", verdict: "hit" } }),
-      makeEvent({ id: "atk2", type: "attackRoll", category: "roll", data: { kind: "attack", source: "Shortsword", total: 19, specLabel: "1d20 + 5", faces: [14], swingId: "s2", verdict: "hit" } }),
-      makeEvent({ id: "atk1", type: "attackRoll", category: "roll", data: { kind: "attack", source: "Shortsword", total: 17, specLabel: "1d20 + 5", faces: [12], swingId: "s2", verdict: "hit" } }),
-    ];
-    const rows = buildFeedItems(events).map(rowOf);
-    const combined = rows.map(allText).join(" | ");
-    expect(combined).toContain("8"); // dmg, merged sentence
-    expect(combined).toContain("17"); // atk1, merged row's drill-in
-    expect(combined).toContain("19"); // atk2, its own standalone row (never dropped)
-    const standalone = rows.find((r) => r.id === "atk2");
-    expect(standalone).toBeDefined();
-    expect(standalone!.drillIn?.length).toBe(1);
-  });
-});
-
-describe("buildFeedItems attack rolls with no swing partner (#1237 §3 — spell attacks)", () => {
-  it("renders the full sentence + drill-in (with the actual rolled die face) for an attack with no swingId", () => {
-    // useSpellPicker.handleAttackRoll logs an attack with no swingId and no verdict.
-    const events = [
-      makeEvent({
-        id: "spell-atk",
-        type: "attackRoll",
-        category: "roll",
-        summary: "Fire Bolt: 18 (1d20 + 7)",
-        data: { kind: "attack", source: "Fire Bolt", total: 18, specLabel: "1d20 + 7", faces: [11], attackComponents: { abilityMod: 4, proficiencyBonus: 3, rangedBonus: 0, attackRollBonus: 0 } },
+      resolveEvent("cast", {
+        source: "Magic Missile",
+        effect: { spec: "3d4+3", faces: [2, 3, 4], total: 12, type: "force", kind: "damage", crit: false },
+        slotLevel: 1,
       }),
     ];
     const rows = buildFeedItems(events).map(rowOf);
     expect(rows).toHaveLength(1);
-    expect(text(rows[0])).toBe("Rolled Fire Bolt — 18.");
-    expect(rows[0].drillIn).toBeDefined();
-    const drillText = allText(rows[0]);
-    expect(drillText).toContain("11"); // the actual rolled face, not just the flat total
-    expect(drillText).not.toBe(text(rows[0])); // never degrades to the raw event.summary
+    expect(text(rows[0])).toBe("Magic Missile — 12 force damage.");
+    expect(rows[0].drillIn).toHaveLength(1);
+    // The dice + the floored spec modifier (+3) must reconcile to the total (12).
+    expect(rows[0].drillIn![0].formula).toBe("3d4 (2, 3, 4) + 3");
   });
 });
 
-describe("buildFeedItems attack/damage drill-in ability naming (#1361)", () => {
-  it("renders the named ability via abilityLabel when attackComponents.ability is present", () => {
+// A drill-in that doesn't sum to its own total reads as a live bug to a
+// player — every effect/to-hit formula below must reconcile.
+function sumFormula(formula: string | undefined): number {
+  if (!formula) return NaN;
+  const faceGroups = [...formula.matchAll(/\(([\d,\s]+)(?: — dice doubled)?\)/g)].map((m) =>
+    m[1].split(",").reduce((sum, n) => sum + Number(n.trim()), 0),
+  );
+  const addends = [...formula.matchAll(/([+−])\s*(\d+)(?:\s*\([^)]*\))?/g)].map(
+    (m) => (m[1] === "−" ? -1 : 1) * Number(m[2]),
+  );
+  return [...faceGroups, ...addends].reduce((sum, n) => sum + n, 0);
+}
+
+describe("buildFeedItems resolveAction effect drill-in reconciliation (MUST-fix review finding)", () => {
+  it("floors to the spec's own trailing modifier when effect.components is absent (weapon hit)", () => {
     const events = [
-      makeEvent({
-        id: "spell-atk",
-        type: "attackRoll",
-        category: "roll",
-        summary: "Fire Bolt: 18 (1d20 + 7)",
-        data: {
-          kind: "attack",
-          source: "Fire Bolt",
-          total: 18,
-          specLabel: "1d20 + 7",
-          faces: [11],
-          attackComponents: { abilityMod: 4, proficiencyBonus: 3, rangedBonus: 0, attackRollBonus: 0, ability: "dexterity" },
-        },
+      resolveEvent("swing", {
+        source: "Shortsword",
+        toHit: { faces: [12], kept: 12, nat20: false, bonus: 5, total: 17, verdict: "hit" },
+        effect: { spec: "1d6 + 4", faces: [4], total: 8, type: "piercing", kind: "damage", crit: false },
       }),
     ];
     const rows = buildFeedItems(events).map(rowOf);
-    expect(rows[0].drillIn?.[0].formula).toContain("+ 4 (Dexterity)");
+    const damageDrill = rows[0].drillIn![1];
+    expect(damageDrill.formula).toBe("1d6 (4) + 4");
+    expect(sumFormula(damageDrill.formula)).toBe(8);
+    expect(damageDrill.total).toBe("8 piercing");
   });
 
-  it("falls back to the neutral 'Ability' label when attackComponents carries no ability (pre-existing event)", () => {
+  it("floors to the spec's own trailing modifier for a multi-die effect (Magic Missile)", () => {
     const events = [
-      makeEvent({
-        id: "spell-atk",
-        type: "attackRoll",
-        category: "roll",
-        summary: "Fire Bolt: 18 (1d20 + 7)",
-        data: {
-          kind: "attack",
-          source: "Fire Bolt",
-          total: 18,
-          specLabel: "1d20 + 7",
-          faces: [11],
-          attackComponents: { abilityMod: 4, proficiencyBonus: 3, rangedBonus: 0, attackRollBonus: 0 },
-        },
+      resolveEvent("cast", {
+        source: "Magic Missile",
+        effect: { spec: "3d4+3", faces: [2, 3, 4], total: 12, type: "force", kind: "damage", crit: false },
       }),
     ];
     const rows = buildFeedItems(events).map(rowOf);
-    expect(rows[0].drillIn?.[0].formula).toContain("+ 4 (Ability)");
+    const drill = rows[0].drillIn![0];
+    expect(sumFormula(drill.formula)).toBe(12);
   });
 
-  it("renders the named ability for damage components too", () => {
+  it("renders labeled addends (and skips the spec-modifier floor) when effect.components is present", () => {
     const events = [
-      makeEvent({
-        id: "rider",
-        type: "damageRoll",
-        category: "roll",
-        data: {
-          kind: "damage",
-          source: "Shortsword",
+      resolveEvent("swing", {
+        source: "Shortsword",
+        toHit: { faces: [12], kept: 12, nat20: false, bonus: 5, total: 17, verdict: "hit" },
+        effect: {
+          spec: "1d6 + 4",
+          faces: [4],
           total: 8,
-          damageType: "piercing",
-          specLabel: "1d6 + 3",
-          faces: [5],
-          damageComponents: { abilityMod: 3, meleeDamageBonus: 0, ability: "strength" },
+          type: "piercing",
+          kind: "damage",
+          crit: false,
+          components: { abilityMod: 4, meleeDamageBonus: 0, ability: "strength" },
         },
       }),
     ];
     const rows = buildFeedItems(events).map(rowOf);
-    expect(rows[0].drillIn?.[0].formula).toContain("+ 3 (Strength)");
+    const damageDrill = rows[0].drillIn![1];
+    expect(damageDrill.formula).toBe("1d6 (4) + 4 (Strength)");
+    expect(sumFormula(damageDrill.formula)).toBe(8);
+  });
+
+  it("renders labeled to-hit addends when toHit.components is present, instead of the flat Bonus line", () => {
+    const events = [
+      resolveEvent("swing", {
+        source: "Shortsword",
+        toHit: {
+          faces: [12],
+          kept: 12,
+          nat20: false,
+          bonus: 5,
+          total: 17,
+          verdict: "hit",
+          components: { abilityMod: 3, proficiencyBonus: 2, rangedBonus: 0, attackRollBonus: 0, ability: "dexterity" },
+        },
+        effect: { spec: "1d6 + 4", faces: [4], total: 8, type: "piercing", kind: "damage", crit: false },
+      }),
+    ];
+    const rows = buildFeedItems(events).map(rowOf);
+    const attackDrill = rows[0].drillIn![0];
+    expect(attackDrill.formula).toBe("1d20 (12) + 3 (Dexterity) + 2 (Proficiency)");
+    expect(attackDrill.formula).not.toContain("Bonus)");
+    expect(sumFormula(attackDrill.formula)).toBe(17);
   });
 });
 
-describe("buildFeedItems attack drill-in dropped d20 face (#1359)", () => {
-  function attackEvent(data: Record<string, unknown>) {
-    return makeEvent({
-      id: "atk",
-      type: "attackRoll",
-      category: "roll",
-      data: { kind: "attack", source: "Longsword", specLabel: "1d20 + 5", ...data },
+describe("buildFeedItems resolveAction heal shape", () => {
+  it("renders a healing sentence toned 'heal'", () => {
+    const events = [
+      resolveEvent("cast", {
+        source: "Cure Wounds",
+        effect: { spec: "1d8 + 3", faces: [5], total: 8, type: "healing", kind: "heal", crit: false },
+        slotLevel: 1,
+      }),
+    ];
+    const rows = buildFeedItems(events).map(rowOf);
+    expect(text(rows[0])).toBe("Cure Wounds — healed 8 HP.");
+    expect(rows[0].tone).toBe("heal");
+  });
+});
+
+describe("buildFeedItems resolveAction no-roll shape (Druidcraft)", () => {
+  it("renders a plain 'Cast X' row with no drill-in", () => {
+    const events = [resolveEvent("cast", { source: "Druidcraft" })];
+    const rows = buildFeedItems(events).map(rowOf);
+    expect(rows).toHaveLength(1);
+    expect(text(rows[0])).toBe("Cast Druidcraft.");
+    expect(rows[0].drillIn).toBeUndefined();
+  });
+});
+
+describe("buildFeedItems resolveAction to-hit drill-in (dropped d20 face)", () => {
+  function attackEvent(toHit: Partial<ResolveActionEventToHit>) {
+    return resolveEvent("atk", {
+      source: "Longsword",
+      toHit: { faces: [12], kept: 12, nat20: false, bonus: 5, total: 17, verdict: "hit", ...toHit },
+      effect: { spec: "1d8 + 3", faces: [5], total: 8, type: "slashing", kind: "damage", crit: false },
     });
   }
 
   it("renders both faces + 'lower kept' when the kept face is below the dropped one (disadvantage)", () => {
-    const rows = buildFeedItems([attackEvent({ total: 10, faces: [5], droppedFaces: [9] })]).map(rowOf);
+    const rows = buildFeedItems([attackEvent({ kept: 5, faces: [5, 9], total: 10 })]).map(rowOf);
     expect(rows[0].drillIn?.[0].formula).toContain("1d20 (5, 9 — lower kept)");
   });
 
   it("renders both faces + 'higher kept' when the kept face is above the dropped one (advantage)", () => {
-    const rows = buildFeedItems([attackEvent({ total: 20, faces: [15], droppedFaces: [5] })]).map(rowOf);
+    const rows = buildFeedItems([attackEvent({ kept: 15, faces: [15, 5], total: 20 })]).map(rowOf);
     expect(rows[0].drillIn?.[0].formula).toContain("1d20 (15, 5 — higher kept)");
   });
 
   it("renders the neutral 'kept' when both dice landed on the same face", () => {
-    const rows = buildFeedItems([attackEvent({ total: 17, faces: [12], droppedFaces: [12] })]).map(rowOf);
+    const rows = buildFeedItems([attackEvent({ kept: 12, faces: [12, 12], total: 17 })]).map(rowOf);
     expect(rows[0].drillIn?.[0].formula).toContain("1d20 (12, 12 — kept)");
   });
 
   it("keeps the nat-20 special case, showing the dropped face alongside it", () => {
-    const rows = buildFeedItems([attackEvent({ total: 25, faces: [20], droppedFaces: [9], nat20: true })]).map(rowOf);
+    const rows = buildFeedItems([attackEvent({ kept: 20, faces: [20, 9], nat20: true, total: 25 })]).map(rowOf);
     expect(rows[0].drillIn?.[0].formula).toContain("1d20 (nat 20, 9 — higher kept)");
   });
 
-  it("renders the old single-face form unchanged when droppedFaces is absent (pre-existing event)", () => {
-    const rows = buildFeedItems([attackEvent({ total: 17, faces: [12] })]).map(rowOf);
+  it("renders the single-face form when only one die was rolled (no advantage/disadvantage)", () => {
+    const rows = buildFeedItems([attackEvent({ kept: 12, faces: [12], total: 17 })]).map(rowOf);
     const formula = rows[0].drillIn?.[0].formula;
     expect(formula).toContain("1d20 (12)");
     expect(formula).not.toContain("kept");
+  });
+
+  it("omits the Bonus addend when toHit.bonus is 0, includes it otherwise", () => {
+    const zero = buildFeedItems([attackEvent({ bonus: 0 })]).map(rowOf);
+    expect(zero[0].drillIn?.[0].formula).not.toContain("Bonus");
+    const nonzero = buildFeedItems([attackEvent({ bonus: 5 })]).map(rowOf);
+    expect(nonzero[0].drillIn?.[0].formula).toContain("+ 5 (Bonus)");
   });
 });
 
 describe("damage-type tone segments (#1237 color table)", () => {
   it("tags a physical damage word with damageType but no elemental hue applies (caller resolves to neutral ink)", () => {
     const events = [
-      makeEvent({
-        id: "dmg",
-        type: "damageRoll",
-        category: "roll",
-        data: { kind: "damage", source: "Shortsword", total: 8, damageType: "piercing", specLabel: "1d6 + 4", faces: [4] },
+      resolveEvent("swing", {
+        source: "Shortsword",
+        toHit: { faces: [12], kept: 12, nat20: false, bonus: 5, total: 17, verdict: "hit" },
+        effect: { spec: "1d6 + 4", faces: [4], total: 8, type: "piercing", kind: "damage", crit: false },
       }),
     ];
     const rows = buildFeedItems(events).map(rowOf);
@@ -376,11 +402,10 @@ describe("damage-type tone segments (#1237 color table)", () => {
 
   it("tags an elemental damage word (fire)", () => {
     const events = [
-      makeEvent({
-        id: "dmg",
-        type: "damageRoll",
-        category: "roll",
-        data: { kind: "damage", source: "Fire Bolt", total: 10, damageType: "fire", specLabel: "2d10", faces: [5, 5] },
+      resolveEvent("cast", {
+        source: "Fire Bolt",
+        toHit: { faces: [11], kept: 11, nat20: false, bonus: 7, total: 18, verdict: "hit" },
+        effect: { spec: "2d10", faces: [5, 5], total: 10, type: "fire", kind: "damage", crit: false },
       }),
     ];
     const rows = buildFeedItems(events).map(rowOf);
@@ -390,14 +415,14 @@ describe("damage-type tone segments (#1237 color table)", () => {
 });
 
 describe("buildFeedItems roll-run collapsing (#983, raised threshold #1237 §2)", () => {
-  it("does NOT collapse 3 consecutive swings (Flurry of Blows) — all three stay visible", () => {
+  it("does NOT collapse 3 consecutive resolutions (Flurry of Blows) — all three stay visible", () => {
     const swings = [miss("s3", 13), miss("s2", 12), miss("s1", 11)];
     const items = buildFeedItems(swings);
     expect(items.filter((i) => i.kind === "rollRun")).toHaveLength(0);
     expect(items.filter((i) => i.kind === "row")).toHaveLength(3);
   });
 
-  it("collapses a run of 5 consecutive swings, keeping the most recent 3 visible", () => {
+  it("collapses a run of 5 consecutive resolutions, keeping the most recent 3 visible", () => {
     // Newest-first fixture: s5 is newest, s1 is oldest.
     const swings = [miss("s5", 15), miss("s4", 14), miss("s3", 13), miss("s2", 12), miss("s1", 11)];
     const items = buildFeedItems(swings);
@@ -418,7 +443,7 @@ describe("buildFeedItems roll-run collapsing (#983, raised threshold #1237 §2)"
     expect(runs).toHaveLength(1);
     if (runs[0].kind === "rollRun") {
       expect(runs[0].hidden).toHaveLength(1);
-      expect(runs[0].label).toBe("1 earlier weapon swing");
+      expect(runs[0].label).toBe("1 earlier resolution");
     }
   });
 
@@ -484,7 +509,7 @@ describe("buildFeedItems round separators (#1237 §1 — a run must never span a
     const separators = items.filter((i) => i.kind === "separator").map((s) => (s.kind === "separator" ? s.round : null));
     expect(separators).toEqual([1, 2]);
     const rows = items.filter((i): i is Extract<FeedItem, { kind: "row" }> => i.kind === "row");
-    expect(rows).toHaveLength(4); // 3 swings (below the collapse threshold) + "Combat began."
+    expect(rows).toHaveLength(4); // 3 misses (below the collapse threshold) + "Combat began."
     const roundById = new Map(rows.map((r) => [r.row.id, r.row.round]));
     expect(roundById.get("a1")).toBe(1);
     expect(roundById.get("a2")).toBe(1);
@@ -663,44 +688,35 @@ describe("buildFeedItems loot summary (#382, preserved)", () => {
   });
 });
 
-describe("buildFeedItems undefined-total guard (#1237 §5 — never render the literal 'undefined')", () => {
-  it("falls back to the stored summary when an attack roll's total is missing (old/incomplete data)", () => {
+describe("buildFeedItems legacy roll events (#1830 — rendering retired, no dual-read)", () => {
+  // useAttackRolls/InlineSpellAttackSection still emit these until the
+  // adapter slices (#1832/#1833) migrate them — this slice removes their
+  // special-cased rendering, so they fall back to the plain summary row like
+  // any other unhandled event type. No merged-swing behavior survives.
+  it("falls back to the stored summary for a legacy attackRoll/damageRoll event", () => {
     const rows = buildFeedItems([
       makeEvent({
         id: "old-atk",
         type: "attackRoll",
         category: "roll",
         summary: "Longsword: 17 (1d20 + 5)",
-        data: { kind: "attack", source: "Longsword", specLabel: "1d20 + 5", faces: [12] },
+        data: { kind: "attack", source: "Longsword", specLabel: "1d20 + 5", faces: [12], total: 17 },
       }),
-    ]).map(rowOf);
-    expect(text(rows[0])).toBe("Longsword: 17 (1d20 + 5)");
-    expect(text(rows[0])).not.toContain("undefined");
-  });
-
-  it("falls back to the stored summary when a damage roll's total is missing", () => {
-    const rows = buildFeedItems([
       makeEvent({
         id: "old-dmg",
         type: "damageRoll",
         category: "roll",
         summary: "Longsword: 8 slashing",
-        data: { kind: "damage", source: "Longsword", specLabel: "2d6", faces: [3, 5] },
+        data: { kind: "damage", source: "Longsword", specLabel: "2d6", faces: [3, 5], total: 8 },
       }),
     ]).map(rowOf);
+    expect(rows).toHaveLength(2); // no swingId pairing — each renders as its own plain row
     expect(text(rows[0])).toBe("Longsword: 8 slashing");
-    expect(text(rows[0])).not.toContain("undefined");
+    expect(text(rows[1])).toBe("Longsword: 17 (1d20 + 5)");
   });
+});
 
-  it("falls back to the stored summary for a swing whose damage partner has no total", () => {
-    const rows = buildFeedItems([
-      makeEvent({ id: "dmg", type: "damageRoll", category: "roll", summary: "Shortsword: 8 piercing", data: { kind: "damage", source: "Shortsword", specLabel: "1d6", faces: [4], swingId: "s1" } }),
-      makeEvent({ id: "atk", type: "attackRoll", category: "roll", data: { kind: "attack", source: "Shortsword", total: 17, specLabel: "1d20 + 5", faces: [12], swingId: "s1", verdict: "hit" } }),
-    ]).map(rowOf);
-    expect(text(rows[0])).toBe("Shortsword: 8 piercing");
-    expect(text(rows[0])).not.toContain("undefined");
-  });
-
+describe("buildFeedItems undefined-total guard (#1237 §5 — never render the literal 'undefined')", () => {
   it("falls back to the stored summary when a check/save/initiative roll's total is missing", () => {
     const rows = buildFeedItems([
       makeEvent({
@@ -712,6 +728,14 @@ describe("buildFeedItems undefined-total guard (#1237 §5 — never render the l
       }),
     ]).map(rowOf);
     expect(text(rows[0])).toBe("Perception: 14 (1d20 + 2)");
+    expect(text(rows[0])).not.toContain("undefined");
+  });
+
+  it("falls back to 'Cast <summary>' rather than 'Cast undefined' when a resolveAction event carries no data at all", () => {
+    const rows = buildFeedItems([
+      makeEvent({ id: "bare", type: "resolveAction", category: "combat", summary: "Resolved Druidcraft (action)" }),
+    ]).map(rowOf);
+    expect(text(rows[0])).toBe("Cast Resolved Druidcraft (action).");
     expect(text(rows[0])).not.toContain("undefined");
   });
 });
@@ -739,6 +763,7 @@ const ALL_EVENT_TYPES = [
   "equipped", "unequipped",
   "sessionStarted", "sessionEnded",
   "combatStarted", "combatEnded", "combatRoundAdvanced",
+  "resolveAction",
   "conditionApplied", "conditionRemoved", "exhaustionSet",
   "attackRoll", "damageRoll",
   "checkRoll", "saveRoll", "initiativeRoll",
