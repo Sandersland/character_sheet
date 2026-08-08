@@ -426,7 +426,8 @@ function assertCantripVsLeveledPlacement(
   levelOf: (op: LearnSpellOperation) => number | undefined,
 ): void {
   for (const op of cantripOps) {
-    if (levelOf(op) !== undefined && levelOf(op) !== 0) {
+    const level = levelOf(op);
+    if (level !== undefined && level !== 0) {
       throw new InvalidLevelUpError("Only cantrips (level 0) may be chosen as new cantrips.");
     }
   }
