@@ -253,8 +253,8 @@ function flameTongueRow(overrides: Partial<AttackRow> = {}): AttackRow {
   });
 }
 
-describe("InlineAttackPicker — on-hit dice riders (unaffected by the resolveAction migration)", () => {
-  it("renders a typed rider button after rolling to hit and rolls it with the fire type via logRoll", async () => {
+describe("InlineAttackPicker — on-hit dice riders (#1843: routed into resolveAction, not logRoll)", () => {
+  it("renders a typed rider button after rolling to hit, without touching logRoll", async () => {
     seedMid();
     renderPicker(makeCharacter({ attackRows: [flameTongueRow()] }));
     await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
@@ -262,11 +262,7 @@ describe("InlineAttackPicker — on-hit dice riders (unaffected by the resolveAc
     const riderButton = screen.getByRole("button", { name: /Roll \+2d6 fire/ });
     await userEvent.click(riderButton);
 
-    expect(vi.mocked(logRoll)).toHaveBeenCalledWith(
-      "char-1",
-      "sess-1",
-      expect.objectContaining({ kind: "damage", source: "Flame Tongue", damageType: "fire" }),
-    );
+    expect(vi.mocked(logRoll)).not.toHaveBeenCalled();
   });
 
   it("hides the rider when the served row carries none", async () => {
@@ -348,6 +344,81 @@ describe("InlineAttackPicker — resolveAction commit (epic #1827 Slice 5, #1832
 
     await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(1));
     expect(vi.mocked(logRoll)).not.toHaveBeenCalled();
+  });
+});
+
+describe("InlineAttackPicker — typed damage riders route into the single resolveAction op (#1843)", () => {
+  it("includes the rolled rider in ops[0].riders, alongside the primary effect, and never calls logRoll", async () => {
+    seedMid();
+    const character = makeCharacter({ attackRows: [flameTongueRow()] });
+    renderWithCharacter(<LiveHarness character={character} />, character);
+
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Roll \+2d6 fire/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Roll damage$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
+
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(1));
+    const [, ops] = vi.mocked(applyResolveActionOperations).mock.calls[0];
+    expect(ops[0].effect).toMatchObject({ type: "slashing", kind: "damage" });
+    expect(ops[0].riders).toHaveLength(1);
+    expect(ops[0].riders?.[0]).toMatchObject({ type: "fire", kind: "damage" });
+    expect(vi.mocked(logRoll)).not.toHaveBeenCalled();
+  });
+
+  it("omits riders from the op when none were rolled this swing", async () => {
+    seedMid();
+    const character = makeCharacter({ attackRows: [flameTongueRow()] });
+    renderWithCharacter(<LiveHarness character={character} />, character);
+
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Roll damage$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
+
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(1));
+    const [, ops] = vi.mocked(applyResolveActionOperations).mock.calls[0];
+    expect(ops[0].riders ?? []).toHaveLength(0);
+  });
+
+  it("does not carry a rider rolled on swing 1 into swing 2's op (Extra Attack)", async () => {
+    seedMid();
+    const character = makeCharacter({ attacksPerAction: 2, attackRows: [flameTongueRow()] });
+    renderWithCharacter(<LiveHarness character={character} />, character);
+
+    // Swing 1 — roll the rider.
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Roll \+2d6 fire/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Roll damage$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(1));
+
+    // Swing 2 — no rider rolled.
+    await waitFor(() => expect(screen.getByRole("button", { name: /Roll to hit/ })).not.toBeDisabled());
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Roll damage$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(2));
+
+    const [, op2] = vi.mocked(applyResolveActionOperations).mock.calls[1];
+    expect(op2[0].riders ?? []).toHaveLength(0);
+  });
+
+  it("drops a rolled rider when the swing is ultimately called a miss", async () => {
+    seedMid(); // ambiguous verdict — DamageRidersPanel stays visible until called
+    const character = makeCharacter({ attackRows: [flameTongueRow()] });
+    renderWithCharacter(<LiveHarness character={character} />, character);
+
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    // Roll the rider BEFORE the verdict is called — DamageRidersPanel is only
+    // gated on `verdict === "miss"`, not on the verdict already being settled.
+    await userEvent.click(screen.getByRole("button", { name: /Roll \+2d6 fire/ }));
+    await userEvent.click(screen.getByRole("button", { name: /it Missed/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
+
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(1));
+    const [, ops] = vi.mocked(applyResolveActionOperations).mock.calls[0];
+    expect(ops[0].toHit).toMatchObject({ verdict: "miss" });
+    expect(ops[0].riders ?? []).toHaveLength(0);
   });
 });
 
