@@ -14,7 +14,6 @@ import type { ItemSpellMeta } from "./inventory";
 export type { SpellComponents, SpellSchool };
 export type {
   CastSpellOperation,
-  CustomSpellInput,
   ForgetSpellOperation,
   LearnSpellOperation,
   SpellcastingOperation,
@@ -22,9 +21,10 @@ export type {
 
 // Request body for POST/PATCH /api/spells/custom (#1787, epic #1782 4/5) —
 // creating/editing a user-owned homebrew catalog spell (Spell.ownerId).
-// Aliased on import: CustomSpellInput above already names the per-character
-// inline-custom-spell payload (learnSpell.custom, no catalog row, no reuse
-// across characters) — a different, narrower shape than this one.
+// Aliased on import: contracts' own name for this payload is CustomSpellInput
+// — kept distinct here from the per-character inline learnSpell.custom shape
+// (a narrower payload, no catalog row; its authoring UI was retired in #1817
+// but the op stays on the wire so existing inline spells serialize/cast).
 export type { CustomSpellInput as HomebrewSpellInput } from "@character-sheet/contracts";
 
 /**

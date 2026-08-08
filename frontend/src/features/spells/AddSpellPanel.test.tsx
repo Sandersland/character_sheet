@@ -28,6 +28,33 @@ const REFERENCE: ReferenceData = {
   itemRarities: [],
 };
 
+// #1817: the legacy per-character "Custom spell" tab (CustomSpellForm) is
+// retired — Homebrew (a reusable, deletable catalog row) supersedes it. The
+// panel must show exactly two tabs.
+describe("AddSpellPanel tab set (#1817)", () => {
+  beforeEach(() => {
+    vi.mocked(client.fetchSpells).mockResolvedValue([]);
+    vi.mocked(client.fetchReference).mockResolvedValue(REFERENCE);
+  });
+
+  it("shows only From catalog + Homebrew, with no legacy Custom spell tab", async () => {
+    render(
+      <AddSpellPanel
+        onLearn={noop}
+        onClose={noop}
+        busy={false}
+        learnedSpellIds={new Set()}
+        edition="EDITION_2024"
+        characterId="char-1"
+      />
+    );
+
+    expect(await screen.findByRole("button", { name: "From catalog" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Homebrew" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Custom spell" })).not.toBeInTheDocument();
+  });
+});
+
 describe("AddSpellPanel accessibility", () => {
   beforeEach(() => {
     vi.mocked(client.fetchSpells).mockResolvedValue([]);

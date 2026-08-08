@@ -1,8 +1,6 @@
 // Shared "enable auto-rolling on cast" bordered checkbox wrapper — used by
-// CustomSpellForm (per-character inline spell) and HomebrewSpellForm
-// (catalog homebrew spell, #1787). Identical markup in both was flagged as
-// duplication; this is the single source now. `children` is the caller's own
-// effect-fields subtree, rendered only while `hasEffect` is on.
+// HomebrewSpellForm (catalog homebrew spell, #1787). `children` is the caller's
+// own effect-fields subtree, rendered only while `hasEffect` is on.
 import type { ReactNode } from "react";
 
 interface SpellEffectToggleProps {

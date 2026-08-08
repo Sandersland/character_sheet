@@ -1,7 +1,5 @@
-// Shared school-of-magic dropdown — used by CustomSpellForm (per-character
-// inline spell) and HomebrewSpellForm (catalog homebrew spell, #1787).
-// Identical markup in both was flagged as duplication; this is the single
-// source now.
+// Shared school-of-magic dropdown — used by HomebrewSpellForm (catalog homebrew
+// spell, #1787).
 import { INPUT_CLS, LABEL_CLS, SPELL_SCHOOLS } from "@/lib/addSpell";
 import type { SpellSchool } from "@/types/character";
 

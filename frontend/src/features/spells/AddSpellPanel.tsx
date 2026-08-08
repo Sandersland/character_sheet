@@ -1,10 +1,11 @@
 // AddSpellPanel — inline expand-in-place panel for learning a new spell.
-// Three tabs: catalog picker (SpellCatalogTab), inline custom-spell form
-// (CustomSpellForm — a per-character spell, never saved as its own catalog
-// row), and homebrew authoring + management (HomebrewTab — a user-owned
-// catalog Spell row, reusable across all of the caller's characters, create
-// #1787, edit/delete #1788). Not a modal — the overlay primitive is reserved
-// for read-only review surfaces.
+// Two tabs: catalog picker (SpellCatalogTab) and homebrew authoring +
+// management (HomebrewTab — a user-owned catalog Spell row, reusable across all
+// of the caller's characters, create #1787, edit/delete #1788). The legacy
+// per-character inline "Custom spell" tab (CustomSpellForm) was retired in
+// #1817 — homebrew supersedes it; the learnSpell `custom` op stays on the wire
+// so pre-existing inline custom spells still serialize/cast. Not a modal — the
+// overlay primitive is reserved for read-only review surfaces.
 //
 // The GET /api/spells fetch is owned HERE, not by SpellCatalogTab, so the
 // catalog tab's picker and the homebrew tab's manage list share one result
@@ -12,7 +13,6 @@
 // independent fetches.
 import { useState } from "react";
 
-import CustomSpellForm from "@/features/spells/CustomSpellForm";
 import HomebrewTab from "@/features/spells/HomebrewTab";
 import SpellCatalogTab from "@/features/spells/SpellCatalogTab";
 import { useSpellCatalog } from "@/features/spells/useSpellCatalog";
@@ -34,7 +34,7 @@ interface AddSpellPanelProps {
   characterId: string;
 }
 
-const TAB_LABELS = { catalog: "From catalog", custom: "Custom spell", homebrew: "Homebrew" } as const;
+const TAB_LABELS = { catalog: "From catalog", homebrew: "Homebrew" } as const;
 type Tab = keyof typeof TAB_LABELS;
 
 export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds, edition, characterId }: AddSpellPanelProps) {
@@ -113,7 +113,6 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds,
           onForked={handleForked}
         />
       )}
-      {tab === "custom" && <CustomSpellForm busy={busy} onLearn={onLearn} onClose={onClose} />}
       {tab === "homebrew" && (
         <HomebrewTab
           edition={edition}
