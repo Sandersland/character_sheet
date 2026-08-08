@@ -16,4 +16,5 @@ export type * from "./roll-event.js";
 export type * from "./session.js";
 export type * from "./spellcasting.js";
 export type * from "./starting-equipment.js";
+export type * from "./turn-resolution.js";
 export type * from "./warrior-of-elements.js";

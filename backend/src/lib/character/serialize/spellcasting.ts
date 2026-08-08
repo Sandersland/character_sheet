@@ -15,6 +15,7 @@ import {
   type AbilityScores,
 } from "@/lib/spellcasting/granted-spells.js";
 import { readEffectSpec, resolveEffectSpec, type EffectRoll } from "@/lib/combat/effects.js";
+import { deriveSpellCastCost } from "@/lib/spellcasting/cast-cost.js";
 import { SHADOW_ART_CONCENTRATION_PREFIX } from "@/lib/classes/shadow-arts.js";
 import { effectiveEntryLevel } from "@/lib/leveling/effective-levels.js";
 import { editionOf } from "@/lib/rules/edition.js";
@@ -258,6 +259,10 @@ function castableSlotLevels(spell: SpellEntry, view: CastableLevelsView): number
 // ability-modifier) resolve here so the client never re-derives them. A spec
 // with no dice (a utility spell) yields effectRolls: [], matching the prior
 // client-side computeCastSpec/effectPreview behaviour of returning null.
+// `castCost` (epic #1827 Slice 1, #1828) is the same promotion for the
+// spell's action-economy category — deriveSpellCastCost classifies the raw
+// castingTime text server-side so a TurnResolution's `cost.kind` is a served
+// enum, never a client-side parse.
 function decorateSpellEffects(
   spells: SpellEntry[],
   view: CastableLevelsView,
@@ -272,7 +277,8 @@ function decorateSpellEffects(
       const roll = resolveEffectSpec(effect, effectiveStep, { characterLevel, abilityMod });
       if (roll) effectRolls.push({ slotLevel, roll });
     }
-    return { ...spell, effect, effectRolls };
+    const castCost = deriveSpellCastCost(spell.castingTime);
+    return { ...spell, effect, effectRolls, castCost };
   });
 }
 
