@@ -12,6 +12,13 @@
 // Edit mode swaps the create-form-plus-list view for HomebrewSpellForm
 // itself in `editing` mode: only one form is ever mounted at a time, so the
 // static field ids (#homebrew-name etc.) never collide.
+//
+// onCreated/onEdited/onDeleted are bare refetch signals — AddSpellPanel just
+// bumps its shared catalogRefreshKey on any of them; #1811's campaign-aware
+// picker (`characterId` threaded into GET /api/spells) is what makes that
+// refetch re-supply a DM's CAMPAIGN fork now, so no row payload needs to
+// travel through these callbacks (a #1808-era local-override workaround,
+// removed once #1811 made it redundant — see git history for that shape).
 import { useState } from "react";
 
 import { deleteCustomSpell } from "@/api/client";
@@ -29,8 +36,10 @@ interface HomebrewTabProps {
   showSpinner?: boolean;
   /** A new spell was created — caller switches to the catalog tab + refetches. */
   onCreated: () => void;
-  /** An existing spell was edited or deleted — caller refetches, staying on this tab. */
-  onChanged: () => void;
+  /** An existing spell was edited — caller refetches, staying on this tab. */
+  onEdited: () => void;
+  /** An existing spell was deleted — caller refetches, staying on this tab. */
+  onDeleted: () => void;
   onClose: () => void;
 }
 
@@ -40,7 +49,8 @@ export default function HomebrewTab({
   catalogError = null,
   showSpinner = false,
   onCreated,
-  onChanged,
+  onEdited,
+  onDeleted,
   onClose,
 }: HomebrewTabProps) {
   const [editing, setEditing] = useState<CatalogSpell | null>(null);
@@ -58,7 +68,7 @@ export default function HomebrewTab({
     setDeleteError(null);
     try {
       await deleteCustomSpell(spell.id);
-      onChanged();
+      onDeleted();
     } catch (err) {
       setDeleteError(err instanceof Error ? err.message : "Failed to delete spell.");
       throw err;
@@ -69,7 +79,7 @@ export default function HomebrewTab({
 
   function handleSaved() {
     setEditing(null);
-    onChanged();
+    onEdited();
   }
 
   if (editing) {

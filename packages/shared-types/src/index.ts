@@ -6,6 +6,7 @@
 export type * from "./action-result.js";
 export type * from "./attack-row.js";
 export type * from "./capabilities.js";
+export type * from "./catalog.js";
 export type * from "./class-resources.js";
 export type * from "./edition.js";
 export type * from "./effects.js";

@@ -190,14 +190,77 @@ function catalogSpell(over: Partial<CatalogSpell> = {}): CatalogSpell {
 }
 
 describe("ownedHomebrewSpells", () => {
-  it("keeps only rows with an ownerId, dropping seeded rows", () => {
-    const seeded = catalogSpell({ id: "seeded", ownerId: undefined });
-    const homebrew = catalogSpell({ id: "own", ownerId: "u1" });
+  it("keeps only rows with catalog.editable true, dropping seeded rows", () => {
+    const seeded = catalogSpell({
+      id: "seeded",
+      ownerId: undefined,
+      catalog: { entryId: "entry-seeded", scope: "GLOBAL", isFork: false, forkedFromId: null, editable: false },
+    });
+    const homebrew = catalogSpell({
+      id: "own",
+      ownerId: "u1",
+      catalog: { entryId: "entry-own", scope: "USER", isFork: false, forkedFromId: null, editable: true },
+    });
     expect(ownedHomebrewSpells([seeded, homebrew])).toEqual([homebrew]);
   });
 
   it("returns an empty list when the catalog has no homebrew", () => {
-    expect(ownedHomebrewSpells([catalogSpell({ ownerId: undefined })])).toEqual([]);
+    const seeded = catalogSpell({
+      ownerId: undefined,
+      catalog: { entryId: "entry-1", scope: "GLOBAL", isFork: false, forkedFromId: null, editable: false },
+    });
+    expect(ownedHomebrewSpells([seeded])).toEqual([]);
+  });
+
+  // #1815 review findings 2/10: GET /api/spells used to leak the GRANTER's
+  // id as `ownerId` on a granted (not owned) row — the OLD `ownerId !==
+  // undefined` half of this filter would have wrongly kept it in the
+  // caller's own manage list (offering Edit/Delete buttons that then 403 on
+  // click). `catalog.editable` is the only signal this function reads now,
+  // and it's false for a granted row regardless of what ownerId says.
+  it("drops a granted (not owned) USER row even if ownerId carries the granter's id", () => {
+    const granted = catalogSpell({
+      id: "granted",
+      ownerId: "granter-id",
+      catalog: { entryId: "entry-granted", scope: "USER", isFork: false, forkedFromId: null, editable: false },
+    });
+    expect(ownedHomebrewSpells([granted])).toEqual([]);
+  });
+
+  // #1808 leak-fix, epic #1795 8/9 combined-state review: a DM's CAMPAIGN-
+  // scope fork has no ownerId (its CatalogEntry.ownerUserId is null, scope
+  // CAMPAIGN, #1796) but IS manageable BY ITS DM — gated on the server-
+  // computed `catalog.editable` (isCatalogEntryEditable, lib/catalog/
+  // entitlement.ts), never on scope alone: #1811's campaign-aware picker
+  // serves a CAMPAIGN row to every campaign member, not just its DM.
+  it("keeps a CAMPAIGN-scope row with no ownerId when catalog.editable is true (the DM's own fork)", () => {
+    const campaignFork = catalogSpell({
+      id: "campaign-fork",
+      ownerId: undefined,
+      catalog: { entryId: "entry-1", scope: "CAMPAIGN", isFork: true, forkedFromId: "entry-origin", editable: true },
+    });
+    expect(ownedHomebrewSpells([campaignFork])).toEqual([campaignFork]);
+  });
+
+  // The leak this gate exists to close: a non-DM member's picker also gets
+  // this row (#1811) but with editable: false — it must never enter the
+  // caller's OWN manage list, or the Edit/Delete buttons it feeds would 403.
+  it("drops a CAMPAIGN-scope row when catalog.editable is false (a fellow, non-DM member)", () => {
+    const notMyFork = catalogSpell({
+      id: "campaign-fork",
+      ownerId: undefined,
+      catalog: { entryId: "entry-1", scope: "CAMPAIGN", isFork: true, forkedFromId: "entry-origin", editable: false },
+    });
+    expect(ownedHomebrewSpells([notMyFork])).toEqual([]);
+  });
+
+  it("still drops a GLOBAL row with no ownerId", () => {
+    const seededGlobal = catalogSpell({
+      id: "seeded",
+      ownerId: undefined,
+      catalog: { entryId: "entry-2", scope: "GLOBAL", isFork: false, forkedFromId: null, editable: false },
+    });
+    expect(ownedHomebrewSpells([seededGlobal])).toEqual([]);
   });
 });
 

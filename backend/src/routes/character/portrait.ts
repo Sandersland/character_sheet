@@ -56,7 +56,7 @@ portraitRouter.post<{ id: string }>(
     });
     await deletePortraitBlobBestEffort(previousKey);
 
-    res.json(serializeCharacter(updated));
+    res.json(await serializeCharacter(updated));
   },
 );
 
@@ -78,5 +78,5 @@ portraitRouter.delete<{ id: string }>("/", async (req, res) => {
   });
   await deletePortraitBlobBestEffort(portraitKey);
 
-  res.json(serializeCharacter(updated));
+  res.json(await serializeCharacter(updated));
 });

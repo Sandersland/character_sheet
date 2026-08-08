@@ -241,6 +241,9 @@ async function applyArcaneRecoveryOp(ctx: SpellOpContext, op: ArcaneRecoveryOper
 const orUndef = <T>(v: T | null): T | undefined => v ?? undefined;
 
 // Snapshot a catalog Spell row into a new learned SpellEntry (buff fields #363).
+// Coupling latch: if you add a catalog-content field here, also add it to
+// overlaySpellMechanics (spell-catalog.ts, #1806) or a fork won't override it
+// on already-learned spells.
 function catalogSpellToEntry(catalogSpell: Spell): SpellEntry {
   return {
     id: randomUUID(),

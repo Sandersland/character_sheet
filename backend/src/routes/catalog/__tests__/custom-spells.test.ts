@@ -1,10 +1,12 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import supertest from "supertest";
 
+import { Prisma, type SpellSchool } from "@/generated/prisma/client.js";
 import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
+import * as spellClassesModule from "@/lib/spellcasting/spell-classes.js";
 
 // Owned-CRUD for user homebrew spells (#1785, epic #1782 2/5): campaign-style
 // ownership-scoped plain REST, real Postgres via supertest against the shared
@@ -12,9 +14,14 @@ import { ensureTestOwner } from "@/test-support/owner.js";
 
 const OWNER = "owner-custom-spells-owner";
 const OUTSIDER = "owner-custom-spells-outsider";
+const CAMPAIGN_DM = "owner-custom-spells-dm";
+const CAMPAIGN_MEMBER = "owner-custom-spells-member";
+const CAMPAIGN_ID = "test-custom-spells-campaign-1";
 
 let cookieOwner: string;
 let cookieOutsider: string;
+let cookieDm: string;
+let cookieMember: string;
 
 const agent = (cookie: string) => supertest.agent(app).set("Cookie", cookie);
 
@@ -37,29 +44,75 @@ const VALID_SPELL = {
 beforeAll(async () => {
   await ensureTestOwner(OWNER);
   await ensureTestOwner(OUTSIDER);
+  await ensureTestOwner(CAMPAIGN_DM);
+  await ensureTestOwner(CAMPAIGN_MEMBER);
   cookieOwner = await authCookie(OWNER);
   cookieOutsider = await authCookie(OUTSIDER);
+  cookieDm = await authCookie(CAMPAIGN_DM);
+  cookieMember = await authCookie(CAMPAIGN_MEMBER);
+
+  await prisma.campaign.deleteMany({ where: { id: CAMPAIGN_ID } });
+  await prisma.campaign.create({
+    data: {
+      id: CAMPAIGN_ID,
+      name: "Custom Spells DM Fixture",
+      ownerId: CAMPAIGN_DM,
+      inviteCode: `custom-spells-dm-${Date.now()}`,
+      members: {
+        create: [
+          { userId: CAMPAIGN_DM, role: "OWNER" },
+          { userId: CAMPAIGN_MEMBER, role: "PLAYER" },
+        ],
+      },
+    },
+  });
 });
 
 afterAll(async () => {
-  await prisma.spell.deleteMany({ where: { ownerId: { in: [OWNER, OUTSIDER] } } });
-  await prisma.user.deleteMany({ where: { id: { in: [OWNER, OUTSIDER] } } });
+  // Deleting the CatalogEntry cascades the Spell row (ON DELETE CASCADE,
+  // #1796) — the reverse cascade doesn't exist (the supertype stays closed),
+  // so a plain `spell.deleteMany` alone would orphan the entry.
+  await prisma.catalogEntry.deleteMany({ where: { ownerUserId: { in: [OWNER, OUTSIDER] } } });
+  await prisma.catalogEntry.deleteMany({ where: { ownerCampaignId: CAMPAIGN_ID } });
+  await prisma.campaign.deleteMany({ where: { id: CAMPAIGN_ID } });
+  await prisma.user.deleteMany({ where: { id: { in: [OWNER, OUTSIDER, CAMPAIGN_DM, CAMPAIGN_MEMBER] } } });
 });
 
+// Creates a CAMPAIGN-scope CatalogEntry + Spell directly (mirroring
+// forkContent's own shape, lib/catalog/fork.ts) rather than going through the
+// real fork route — this file is about the edit/delete ownership gate
+// (#1808), not the fork flow itself (covered by fork.ts's own tests).
+async function createCampaignForkFixture(name: string): Promise<string> {
+  const entry = await prisma.catalogEntry.create({
+    data: { kind: "SPELL", scope: "CAMPAIGN", ownerCampaignId: CAMPAIGN_ID, name, edition: "EDITION_2014" },
+  });
+  const { classes: _classes, school, ...spellColumns } = VALID_SPELL;
+  void _classes;
+  const spell = await prisma.spell.create({
+    data: { ...spellColumns, school: school as SpellSchool, name, edition: "EDITION_2014", catalogEntryId: entry.id },
+  });
+  return spell.id;
+}
+
 describe("POST /api/spells/custom", () => {
-  it("creates a spell with ownerId/edition forced + SpellClass rows written", async () => {
+  it("creates a spell with a USER-scope CatalogEntry + edition forced + SpellClass rows written (#1796)", async () => {
     const res = await agent(cookieOwner).post("/api/spells/custom").send(VALID_SPELL);
     expect(res.status).toBe(201);
     expect(res.body).toMatchObject({
-      ownerId: OWNER,
       edition: "EDITION_2014",
       name: "Test Bolt",
       classes: ["wizard"],
+      catalog: { scope: "USER", isFork: false, forkedFromId: null, editable: true },
     });
 
     const row = await prisma.spell.findUniqueOrThrow({ where: { id: res.body.id } });
-    expect(row.ownerId).toBe(OWNER);
+    expect(row.catalogEntryId).toBe(res.body.catalog.entryId);
     expect(row.edition).toBe("EDITION_2014");
+
+    const entry = await prisma.catalogEntry.findUniqueOrThrow({ where: { id: row.catalogEntryId } });
+    expect(entry.ownerUserId).toBe(OWNER);
+    expect(entry.scope).toBe("USER");
+    expect(entry.kind).toBe("SPELL");
 
     const memberships = await prisma.spellClass.findMany({ where: { spellId: res.body.id } });
     expect(memberships.map((m) => m.className)).toEqual(["wizard"]);
@@ -182,6 +235,89 @@ describe("PATCH /api/spells/custom/:id", () => {
       .send({ ...VALID_SPELL, name: "Edit Coherence Check", level: -1 });
     expect(res.status).toBe(400);
   });
+
+  // A DM's CAMPAIGN-scope fork (#1808, epic #1795 8/8): assertSpellOwnership's
+  // second admitted path, exercised through the real route rather than just
+  // the access.test.ts unit.
+  it("lets a campaign's DM edit a CAMPAIGN-scope fork they own", async () => {
+    const id = await createCampaignForkFixture("DM Editable Fork");
+
+    const res = await agent(cookieDm)
+      .patch(`/api/spells/custom/${id}`)
+      .send({ ...VALID_SPELL, name: "DM Edited Fork", effectDiceCount: 9, effectDiceFaces: 12 });
+    expect(res.status).toBe(200);
+    expect(res.body.name).toBe("DM Edited Fork");
+    expect(res.body.effectDiceCount).toBe(9);
+    expect(res.body.effectDiceFaces).toBe(12);
+    expect(res.body.catalog).toMatchObject({ scope: "CAMPAIGN" });
+  });
+
+  it("403s a non-DM member's edit attempt on a CAMPAIGN-scope fork", async () => {
+    const id = await createCampaignForkFixture("Member Cannot Edit");
+
+    const res = await agent(cookieMember)
+      .patch(`/api/spells/custom/${id}`)
+      .send({ ...VALID_SPELL, name: "Hijacked Fork" });
+    expect(res.status).toBe(403);
+  });
+
+  it("403s an outsider's edit attempt on a CAMPAIGN-scope fork", async () => {
+    const id = await createCampaignForkFixture("Outsider Cannot Edit");
+
+    const res = await agent(cookieOutsider)
+      .patch(`/api/spells/custom/${id}`)
+      .send({ ...VALID_SPELL, name: "Hijacked Fork" });
+    expect(res.status).toBe(403);
+  });
+
+  it("403s an edit attempt on a seeded GLOBAL-scope spell", async () => {
+    const globalSpell = await prisma.spell.findFirstOrThrow({
+      where: { edition: "EDITION_2014" },
+      orderBy: { name: "asc" },
+    });
+
+    const res = await agent(cookieOwner)
+      .patch(`/api/spells/custom/${globalSpell.id}`)
+      .send({ ...VALID_SPELL, name: "Hijacked Global" });
+    expect(res.status).toBe(403);
+  });
+
+  // #1815 review finding 7: assertSpellOwnership used to run OUTSIDE the
+  // $transaction, leaving a TOCTOU window where a concurrent DELETE between
+  // the check and the write threw an uncaught P2025 (500). Moving the check
+  // inside the transaction closes the large part of that window; this test
+  // pins the remaining defense — a mid-transaction "record to update not
+  // found" (simulated here via reconcileSpellClasses, which runs inside the
+  // SAME transaction after the catalogEntry/spell updates) is caught and
+  // mapped to a clean 404, never an uncaught 500.
+  it("404s instead of 500ing on a mid-transaction record-not-found race (P2025)", async () => {
+    const created = await agent(cookieOwner)
+      .post("/api/spells/custom")
+      .send({ ...VALID_SPELL, name: "Racy Patch Target" });
+    expect(created.status).toBe(201);
+    const id = created.body.id as string;
+
+    const spy = vi
+      .spyOn(spellClassesModule, "reconcileSpellClasses")
+      .mockRejectedValueOnce(
+        new Prisma.PrismaClientKnownRequestError("Record to update not found.", {
+          code: "P2025",
+          clientVersion: "test",
+        }),
+      );
+    try {
+      const res = await agent(cookieOwner)
+        .patch(`/api/spells/custom/${id}`)
+        .send({ ...VALID_SPELL, name: "Should Not Apply" });
+      expect(res.status).toBe(404);
+    } finally {
+      spy.mockRestore();
+    }
+
+    // The transaction rolled back — the rename above must not have applied.
+    const row = await prisma.spell.findUniqueOrThrow({ where: { id } });
+    expect(row.name).toBe("Racy Patch Target");
+  });
 });
 
 describe("DELETE /api/spells/custom/:id", () => {
@@ -210,6 +346,26 @@ describe("DELETE /api/spells/custom/:id", () => {
     const id = created.body.id as string;
 
     const res = await agent(cookieOutsider).delete(`/api/spells/custom/${id}`);
+    expect(res.status).toBe(403);
+
+    expect(await prisma.spell.findUnique({ where: { id } })).not.toBeNull();
+  });
+
+  // A DM's CAMPAIGN-scope fork (#1808, epic #1795 8/8) — same second
+  // admitted path as PATCH above.
+  it("lets a campaign's DM delete a CAMPAIGN-scope fork they own", async () => {
+    const id = await createCampaignForkFixture("DM Deletable Fork");
+
+    const res = await agent(cookieDm).delete(`/api/spells/custom/${id}`);
+    expect(res.status).toBe(204);
+
+    expect(await prisma.spell.findUnique({ where: { id } })).toBeNull();
+  });
+
+  it("403s a non-DM member's delete attempt on a CAMPAIGN-scope fork", async () => {
+    const id = await createCampaignForkFixture("Member Cannot Delete");
+
+    const res = await agent(cookieMember).delete(`/api/spells/custom/${id}`);
     expect(res.status).toBe(403);
 
     expect(await prisma.spell.findUnique({ where: { id } })).not.toBeNull();

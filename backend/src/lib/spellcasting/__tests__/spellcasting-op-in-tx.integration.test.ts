@@ -3,6 +3,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
+import { makeCatalogEntry } from "@/test-support/catalog-entry.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 import {
   InvalidSpellcastingOperationError,
@@ -61,10 +62,12 @@ describe("applySpellcastingOpInTx (#885 seam)", () => {
     wizardClassId = cls.id;
     // upsertEditionRow, not .upsert(): Spell's business key is now (name,
     // edition) (#1710), and this fixture spell is edition-neutral.
+    // catalogEntryId (#1796) is resolved first — required, no default.
+    const catalogEntryId = await makeCatalogEntry({ name: TEST_SPELL.name });
     const spell = await upsertEditionRow(
       prisma.spell,
       { name: TEST_SPELL.name, edition: null },
-      { ...TEST_SPELL, edition: null },
+      { ...TEST_SPELL, edition: null, catalogEntryId },
       TEST_SPELL,
     );
     catalogSpellId = spell.id;
@@ -79,7 +82,10 @@ describe("applySpellcastingOpInTx (#885 seam)", () => {
   });
 
   afterAll(async () => {
-    await prisma.spell.deleteMany({ where: { name: SPELL_NAME } });
+    // Deleting the CatalogEntry cascades the Spell row (ON DELETE CASCADE,
+    // #1796) — the reverse cascade doesn't exist (the supertype stays
+    // closed), so a plain `spell.deleteMany` alone would orphan the entry.
+    await prisma.catalogEntry.deleteMany({ where: { name: SPELL_NAME, kind: "SPELL" } });
     await prisma.characterClass.deleteMany({ where: { name: WIZARD_CATALOG_NAME } });
   });
 
@@ -160,10 +166,12 @@ describe("applySpellcastingOpInTx — learnSpell born-prepared (#1507 D7)", () =
       duration: "Instantaneous",
       description: "1d4 psychic damage.",
     };
+    // catalogEntryId (#1796) is resolved first — required, no default.
+    const catalogEntryId = await makeCatalogEntry({ name: BARD_SPELL_NAME });
     const spell = await upsertEditionRow(
       prisma.spell,
       { name: BARD_SPELL_NAME, edition: null },
-      { ...bardSpellData, edition: null },
+      { ...bardSpellData, edition: null, catalogEntryId },
       bardSpellData,
     );
     bardSpellId = spell.id;
@@ -174,7 +182,7 @@ describe("applySpellcastingOpInTx — learnSpell born-prepared (#1507 D7)", () =
   });
 
   afterAll(async () => {
-    await prisma.spell.deleteMany({ where: { name: BARD_SPELL_NAME } });
+    await prisma.catalogEntry.deleteMany({ where: { name: BARD_SPELL_NAME, kind: "SPELL" } });
     await prisma.characterClass.deleteMany({ where: { name: BARD_CATALOG_NAME } });
   });
 

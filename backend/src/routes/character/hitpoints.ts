@@ -38,5 +38,5 @@ hitPointsRouter.post<{ id: string }>("/", async (req, res) => {
   });
   // Response = serialized character plus any concentration check(s) triggered by
   // damage ops (issue #41) so the client can toast the auto-rolled CON save.
-  res.json({ ...serializeCharacter(updated!), concentrationChecks });
+  res.json({ ...(await serializeCharacter(updated!)), concentrationChecks });
 });

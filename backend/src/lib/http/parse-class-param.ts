@@ -49,3 +49,26 @@ export function parseSubclassIdParam(
   }
   return { ok: true, subclassId: raw.trim() };
 }
+
+/**
+ * Parse the OPTIONAL `?characterId=` query param for the spell catalog
+ * (#1811, epic #1795 9/9) — gives GET /api/spells campaign context so a spell
+ * shared/granted into that character's campaign, or a DM's CAMPAIGN override,
+ * reaches the picker. Same shape as parseSubclassIdParam: absent is success
+ * (the majority case — the route's viewer then has no campaign, exactly as
+ * before this slice). Ownership is NOT checked here — that stays
+ * assertCharacterAccess's job at the route, so 404-vs-403 resolves against
+ * real character data rather than this parser guessing.
+ */
+export function parseCharacterIdParam(
+  req: Pick<Request, "query">,
+  res: Response,
+): { ok: true; characterId?: string } | { ok: false } {
+  const raw = req.query.characterId;
+  if (raw === undefined) return { ok: true };
+  if (typeof raw !== "string" || raw.trim() === "") {
+    res.status(400).json({ error: "Invalid characterId: must be a non-empty id" });
+    return { ok: false };
+  }
+  return { ok: true, characterId: raw.trim() };
+}

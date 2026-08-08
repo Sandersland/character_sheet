@@ -27,18 +27,24 @@ interface AddSpellPanelProps {
   /** Set of spellId values already in the spellbook (to disable duplicates). */
   learnedSpellIds: Set<string>;
   edition: RulesEdition;
+  // #1811, epic #1795 9/9: the character this panel is learning FOR, forwarded
+  // to GET /api/spells so the picker resolves spells shared/granted into that
+  // character's campaign (and a DM's CAMPAIGN override), not just GLOBAL +
+  // the caller's own USER-scope entries.
+  characterId: string;
 }
 
 const TAB_LABELS = { catalog: "From catalog", custom: "Custom spell", homebrew: "Homebrew" } as const;
 type Tab = keyof typeof TAB_LABELS;
 
-export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds, edition }: AddSpellPanelProps) {
+export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds, edition, characterId }: AddSpellPanelProps) {
   const [tab, setTab] = useState<Tab>("catalog");
   // Bumped after a homebrew spell is created/edited/deleted (#1787/#1788) so
   // the shared useSpellCatalog fetch below refetches and both the catalog
   // picker and the homebrew manage list see the change without a remount.
   const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
-  const { catalog, error, showSpinner } = useSpellCatalog(edition, undefined, catalogRefreshKey);
+  // `{ characterId }` (#1811) — see this component's own prop comment.
+  const { catalog, error, showSpinner } = useSpellCatalog(edition, { characterId }, catalogRefreshKey);
 
   function handleCatalogLearn(spell: CatalogSpell) {
     onLearn({ type: "learnSpell", spellId: spell.id });
@@ -50,6 +56,15 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds,
   }
 
   function handleHomebrewChanged() {
+    setCatalogRefreshKey((k) => k + 1);
+  }
+
+  // A fork (#1801, epic #1795 6/6) creates a new catalog entry the same way a
+  // homebrew create does — bump the same shared refetch trigger so both the
+  // catalog tab and the homebrew manage list (a USER fork lands there too, and
+  // — since #1811's campaign-aware picker — a CAMPAIGN fork too, for its DM)
+  // pick it up.
+  function handleForked() {
     setCatalogRefreshKey((k) => k + 1);
   }
 
@@ -95,6 +110,7 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds,
           catalog={catalog}
           error={error}
           showSpinner={showSpinner}
+          onForked={handleForked}
         />
       )}
       {tab === "custom" && <CustomSpellForm busy={busy} onLearn={onLearn} onClose={onClose} />}
@@ -105,7 +121,8 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds,
           catalogError={error}
           showSpinner={showSpinner}
           onCreated={handleHomebrewCreated}
-          onChanged={handleHomebrewChanged}
+          onEdited={handleHomebrewChanged}
+          onDeleted={handleHomebrewChanged}
           onClose={onClose}
         />
       )}

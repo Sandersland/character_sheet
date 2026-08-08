@@ -48,7 +48,7 @@ charactersRouter.get("/characters/:id", async (req, res) => {
     include: characterInclude,
   });
 
-  res.json(serializeCharacter(character));
+  res.json(await serializeCharacter(character));
 });
 
 // Thin controller: parse the HTTP contract, delegate domain work to
@@ -75,7 +75,7 @@ charactersRouter.post("/characters", async (req, res) => {
     where: { id: result.id },
     include: characterInclude,
   });
-  res.status(201).json(serializeCharacter(character));
+  res.status(201).json(await serializeCharacter(character));
 });
 
 /**
@@ -147,7 +147,7 @@ charactersRouter.patch("/characters/:id", async (req, res) => {
     }) as typeof updated;
   }
 
-  res.json(serializeCharacter(updated as Parameters<typeof serializeCharacter>[0]));
+  res.json(await serializeCharacter(updated as Parameters<typeof serializeCharacter>[0]));
 });
 
 // Campaign-scoped play preferences (#537). Thin owner-only upsert of the prefs
@@ -185,7 +185,7 @@ charactersRouter.patch("/characters/:id/campaign-preferences", async (req, res) 
     where: { id: req.params.id },
     include: characterInclude,
   });
-  res.json(serializeCharacter(character));
+  res.json(await serializeCharacter(character));
 });
 
 charactersRouter.delete("/characters/:id", async (req, res) => {

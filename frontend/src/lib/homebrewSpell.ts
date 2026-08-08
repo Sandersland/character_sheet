@@ -93,12 +93,22 @@ export function validateHomebrewSpellDraft(draft: HomebrewSpellInput, hasEffect:
   return null;
 }
 
-// The manage view's own filter (#1788, epic #1782 5/5): GET /api/spells
-// already scopes ownerId to `{ null, caller }` server-side (#1786), so any
-// row with ownerId set here IS the caller's own — no separate "mine" endpoint
-// or current-user id needed on the frontend.
+// The manage view's own filter (#1788, epic #1782 5/5; widened #1808, epic
+// #1795 8/8; corrected #1808-leak-fix, epic #1795 8/9 combined-state review;
+// re-corrected #1815 review findings 2/10): gated purely on `catalog.editable`
+// (server-computed, isCatalogEntryEditable — lib/catalog/entitlement.ts),
+// never on `ownerId` or scope: a USER-scope row the caller owns AND a
+// CAMPAIGN-scope fork its DM owns are both `editable: true`, and nothing
+// else is — one predicate covers both "mine to manage" cases. The prior
+// `ownerId !== undefined` half of this check was wrong for a GRANTED (not
+// owned) USER-scope row: GET /api/spells used to serve the GRANTER's
+// ownerId on it (a leak fixed separately, backend routes/catalog/spells.ts),
+// so a fellow campaign member's shared homebrew would wrongly enter the
+// caller's OWN manage list and offer Edit/Delete buttons that 403 on click —
+// `catalog.editable` never has that failure mode because it's computed
+// against the real viewer, not derived from an incidental id.
 export function ownedHomebrewSpells(catalog: CatalogSpell[]): CatalogSpell[] {
-  return catalog.filter((spell) => spell.ownerId !== undefined);
+  return catalog.filter((spell) => spell.catalog?.editable === true);
 }
 
 // Maps a served CatalogSpell (GET /api/spells row) back into the editable

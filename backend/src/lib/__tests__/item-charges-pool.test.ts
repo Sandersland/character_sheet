@@ -11,6 +11,7 @@ import { applyInventoryOperations } from "@/lib/inventory/inventory.js";
 import { applySpellcastingOperations } from "@/lib/spellcasting/spellcasting.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
+import { makeCatalogEntry } from "@/test-support/catalog-entry.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 import type { SpellEntry } from "@/lib/spellcasting/spell-state.js";
 import type { CapabilityColumns } from "@/lib/inventory/capabilities.js";
@@ -121,7 +122,14 @@ describe("item charges pool (#555)", () => {
     await ensureTestOwner(OWNER_ID);
     // upsertEditionRow, not .upsert(): Spell's business key is now (name,
     // edition) (#1710), and this fixture spell is edition-neutral.
-    const spell = await upsertEditionRow(prisma.spell, { name: SPELL.name, edition: null }, { ...SPELL, edition: null }, SPELL);
+    // catalogEntryId (#1796) is resolved first — required, no default.
+    const catalogEntryId = await makeCatalogEntry({ name: SPELL.name });
+    const spell = await upsertEditionRow(
+      prisma.spell,
+      { name: SPELL.name, edition: null },
+      { ...SPELL, edition: null, catalogEntryId },
+      SPELL,
+    );
     spellId = spell.id;
     const character = await prisma.character.create({
       data: {
@@ -136,7 +144,10 @@ describe("item charges pool (#555)", () => {
 
   afterEach(async () => {
     await prisma.character.deleteMany({ where: { ownerId: OWNER_ID } });
-    await prisma.spell.deleteMany({ where: { name: SPELL.name } });
+    // Deleting the CatalogEntry cascades the Spell row (ON DELETE CASCADE,
+    // #1796) — the reverse cascade doesn't exist (the supertype stays
+    // closed), so a plain `spell.deleteMany` alone would orphan the entry.
+    await prisma.catalogEntry.deleteMany({ where: { name: SPELL.name, kind: "SPELL" } });
   });
 
   async function makeWand(
