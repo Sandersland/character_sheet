@@ -174,6 +174,19 @@ describe("buildFeedItems resolveAction attack-roll shape (weapon swing / Fire Bo
     expect(critSeg?.tone).toBe("harm");
   });
 
+  it("threads the row's computed isCrit into the primary effect drill so a DM-ruled crit (verdict:'crit', effect.crit:false) still shows 'dice doubled'", () => {
+    const events = [
+      resolveEvent("swing", {
+        source: "Shortsword",
+        toHit: { faces: [15], kept: 15, nat20: false, bonus: 4, total: 19, verdict: "crit" },
+        effect: { spec: "2d6 + 1", faces: [2, 3], total: 6, type: "slashing", kind: "damage", crit: false },
+      }),
+    ];
+    const rows = buildFeedItems(events).map(rowOf);
+    expect(text(rows[0])).toContain("critical hit!");
+    expect(rows[0].drillIn![1].formula).toContain("— dice doubled");
+  });
+
   it("renders a heal-shaped attack-roll resolution (e.g. a healing weapon rune) as a healed sentence", () => {
     const events = [
       resolveEvent("swing", {
@@ -209,6 +222,18 @@ describe("buildFeedItems resolveAction save shape (Sacred Flame)", () => {
     const rows = buildFeedItems(events).map(rowOf);
     expect(text(rows[0])).toBe("Hold Person — DC 14 Wisdom save.");
     expect(rows[0].drillIn).toHaveLength(1);
+  });
+
+  it("tones a save-shaped heal effect 'heal', consistent with the attack/effect-only builders", () => {
+    const events = [
+      resolveEvent("cast", {
+        source: "Life Transference",
+        save: { dc: 15, ability: "constitution" },
+        effect: { spec: "1d8 + 3", faces: [5], total: 8, type: "healing", kind: "heal", crit: false },
+      }),
+    ];
+    const rows = buildFeedItems(events).map(rowOf);
+    expect(rows[0].tone).toBe("heal");
   });
 });
 

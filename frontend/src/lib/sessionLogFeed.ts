@@ -326,9 +326,16 @@ function diceToken(spec: string | undefined, faces: number[] | undefined, double
 // bug to a player): with `components`, render the labeled addends; without
 // them, floor to `spec`'s own trailing modifier (`parseSpecModifier`) as one
 // unlabeled addend — either way the dice + addends sum to `total`.
-function buildEffectDrillRow(effect: ResolveActionEventEffect): DrillInRow {
+//
+// `doubled` keys the "— dice doubled" suffix; it defaults to the effect's own
+// `effect.crit` (a rider's own roll-time crit, via buildRiderDrillRow) but the
+// primary effect passes the resolution row's already-computed `isCrit`
+// instead — `toHit.verdict === "crit"` (a DM-ruled crit call) can be true
+// while `effect.crit` is false, and the drill-in must match the summary's
+// "critical hit!" wording rather than re-deciding doubling on its own.
+function buildEffectDrillRow(effect: ResolveActionEventEffect, doubled: boolean = effect.crit): DrillInRow {
   const label = effect.kind === "heal" ? "Healing" : "Damage";
-  const dice = diceToken(effect.spec, effect.faces, effect.crit) ?? effect.spec;
+  const dice = diceToken(effect.spec, effect.faces, doubled) ?? effect.spec;
   const addends = effect.components
     ? labeledAddends(effect.components, DAMAGE_ADDEND_LABELS)
     : (() => {
@@ -438,7 +445,7 @@ function buildAttackResolutionRow(
     tone: isHeal ? "heal" : "default",
     runKind: "resolveAction",
     segments,
-    drillIn: [buildToHitDrillRow(toHit), buildEffectDrillRow(effect), ...riders.map(buildRiderDrillRow)],
+    drillIn: [buildToHitDrillRow(toHit), buildEffectDrillRow(effect, isCrit), ...riders.map(buildRiderDrillRow)],
   };
 }
 
@@ -454,6 +461,7 @@ function buildSaveResolutionRow(
 ): FeedRow {
   const save = data.save!;
   const effect = data.effect;
+  const isHeal = effect?.kind === "heal";
   const segments: LogSegment[] = [
     { text: source, bold: true },
     { text: ` — DC ${save.dc} ${abilityLabel(save.ability)} save` },
@@ -467,7 +475,7 @@ function buildSaveResolutionRow(
   const drillIn: DrillInRow[] = [buildSaveDrillRow(save)];
   if (effect) drillIn.push(buildEffectDrillRow(effect), ...riders.map(buildRiderDrillRow));
 
-  return { id: e.id, round, tone: "default", runKind: "resolveAction", segments, drillIn };
+  return { id: e.id, round, tone: isHeal ? "heal" : "default", runKind: "resolveAction", segments, drillIn };
 }
 
 // Auto-hit (Magic Missile) or a self-targeted heal with neither a to-hit nor

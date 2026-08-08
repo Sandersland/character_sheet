@@ -182,6 +182,50 @@ describe("useResolution — attack-roll shape", () => {
     expect(result.current.view.attackChip).toBe("disadvantage — Poisoned");
     expect(result.current.view.attackMode).toBe("disadvantage");
   });
+
+  it("folds a flat roll-mode modifier (exhaustion) into the persisted bonus so kept + bonus reconciles to total (#1847 finding 7)", () => {
+    const exhausted: RollModifier[] = [{ mode: "flat", kind: "attack", modifier: -2, source: "Exhaustion" }];
+    mockDice([{ face: 15, faces: 20 }, { face: 6, faces: 8 }]);
+    const { result, commit } = setup({ resolution: ATTACK_RESOLUTION, rollModifiers: exhausted });
+
+    act(() => result.current.view.onRollToHit());
+    // die 15 + weapon bonus 5 + exhaustion −2 = 18.
+    expect(result.current.view.toHitRoll?.total).toBe(18);
+
+    act(() => result.current.view.onCallCrit());
+    act(() => result.current.view.onRollEffect());
+    act(() => result.current.view.onComplete());
+
+    const rolls = commit.mock.calls[0][0] as ResolutionRolls;
+    expect(rolls.toHit).toMatchObject({ kept: 15, bonus: 3, total: 18 });
+    expect(rolls.toHit!.kept + rolls.toHit!.bonus).toBe(rolls.toHit!.total);
+  });
+
+  it("onCallCrit is a no-op once damage has already been rolled (root guard, #1845)", () => {
+    mockDice([{ face: 12, faces: 20 }, { face: 5, faces: 8 }]);
+    const { result } = setup({ resolution: ATTACK_RESOLUTION });
+
+    act(() => result.current.view.onRollToHit());
+    act(() => result.current.view.onRollEffect());
+    expect(result.current.view.verdict).toBe("hit");
+
+    act(() => result.current.view.onCallCrit());
+    expect(result.current.view.verdict).toBe("hit"); // refused — damage already rolled
+    expect(result.current.view.isCrit).toBe(false);
+  });
+
+  it("onCallCrit is a no-op after a called miss", () => {
+    mockDice([{ face: 10, faces: 20 }]);
+    const { result } = setup({ resolution: ATTACK_RESOLUTION });
+
+    act(() => result.current.view.onRollToHit());
+    expect(result.current.view.verdict).toBeUndefined();
+    act(() => result.current.view.onCallMiss());
+    expect(result.current.view.verdict).toBe("miss");
+
+    act(() => result.current.view.onCallCrit());
+    expect(result.current.view.verdict).toBe("miss"); // refused — called a miss
+  });
 });
 
 describe("useResolution — saving-throw shape", () => {
@@ -286,6 +330,22 @@ describe("useResolution — economy gating and spend site", () => {
 
     act(() => result.current.view.onComplete());
     expect(turnState.consumeReaction).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("useResolution — onComplete ordering (#1847 finding 3)", () => {
+  it("does not spend the economy slot or mark completed when commit throws", () => {
+    const throwingCommit = vi.fn(() => {
+      throw new Error("boom");
+    });
+    const turnState = makeTurnState();
+    const { result } = setup({ resolution: NO_ROLL_RESOLUTION, commit: throwingCommit, turnState });
+
+    expect(() => act(() => result.current.view.onComplete())).toThrow("boom");
+
+    expect(throwingCommit).toHaveBeenCalledTimes(1);
+    expect(turnState.consumeAction).not.toHaveBeenCalled();
+    expect(result.current.view.completed).toBe(false); // recoverable — not permanently stuck
   });
 });
 

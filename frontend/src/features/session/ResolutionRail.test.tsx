@@ -109,6 +109,48 @@ describe("ResolutionRail — attack-roll shape", () => {
     expect(onCallCrit).toHaveBeenCalledTimes(1);
   });
 
+  it("disables it Missed / Crit! while the economy slot is unavailable", () => {
+    render(
+      <ResolutionRail
+        view={baseView({
+          steps: [
+            { kind: "toHit", state: "done" },
+            { kind: "callIt", state: "active" },
+            { kind: "damage", state: "active" },
+          ],
+          toHit,
+          toHitRoll: attackRoll(17),
+          attack: { total: 17, keptFace: 12, nat20: false, nat1: false, criticalHit: false },
+          verdict: undefined,
+          disabled: true,
+        })}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "it Missed" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Crit!" })).toBeDisabled();
+  });
+
+  it("disables the hit-chip's Crit! upgrade button while the economy slot is unavailable", () => {
+    render(
+      <ResolutionRail
+        view={baseView({
+          steps: [
+            { kind: "toHit", state: "done" },
+            { kind: "callIt", state: "done" },
+            { kind: "damage", state: "active" },
+          ],
+          toHit,
+          toHitRoll: attackRoll(17),
+          attack: { total: 17, keptFace: 12, nat20: false, nat1: false, criticalHit: false },
+          verdict: "hit",
+          effect: { spec: { count: 1, faces: 8, modifier: 3 }, kind: "damage", damageType: "slashing" },
+          disabled: true,
+        })}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Crit!" })).toBeDisabled();
+  });
+
   it("a called hit shows the hit chip, an upgrade button, and arms the damage roll", async () => {
     const onRollEffect = vi.fn();
     render(
