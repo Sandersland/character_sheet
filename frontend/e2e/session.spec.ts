@@ -66,15 +66,30 @@ test("session: desktop live Combat has no rails; a roll lands in the on-demand l
   await page.getByRole("button", { name: "Attack", exact: true }).click();
   const attackSheet = page.getByRole("dialog");
   await attackSheet.getByRole("button", { name: /Roll to hit/ }).first().click();
-  await attackSheet.getByRole("button", { name: /^Done$/ }).click();
+  // The rail (#1831) requires the swing fully resolved before "Done" appears —
+  // an implicit hit needs its damage rolled; a die-locked miss needs nothing
+  // more (DamageStepContent hides the Roll-damage button on a called miss).
+  const damage = attackSheet.getByRole("button", { name: /Roll (crit )?damage/ });
+  if (await damage.count()) await damage.click();
+  const done = attackSheet.getByRole("button", { name: /^Done$/ });
+  // Two-step dismiss (#1832 review): the rail's own "Done" commits the swing
+  // but doesn't close the sheet — Session Fighter has one attack per action,
+  // so once it's spent AttackSheetFooter's button relabels from "Close" to
+  // "Done" (same onClose handler, just a conditional label) and a second tap
+  // on the re-resolved locator hits that footer button, which actually closes
+  // the dialog. BottomSheet renders `role="dialog"` on both breakpoints (its
+  // own header comment: desktop just gets the centered-dialog treatment), so
+  // this holds here exactly as it does on mobile.
+  await done.click();
+  await done.click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
 
   // Open the on-demand log overlay (a right Drawer) — the attack roll landed in it
-  // without any tab switch. Matched on the chat-feed sentence rather than a bare
-  // type label, which the #1237 redesign removed.
+  // without any tab switch. Matched on the chat-feed sentence — one consolidated
+  // resolveAction row per swing (#1830) — rather than a bare type label.
   await page.getByRole("button", { name: /open session log/i }).click();
   const logDrawer = page.getByRole("dialog", { name: "Session Log" });
-  await expect(logDrawer.getByText(/Rolled |hit for |missed/).first()).toBeVisible();
+  await expect(logDrawer.getByText(/hit for |missed|critical hit/).first()).toBeVisible();
 
   expect(errors).toEqual([]);
 });
