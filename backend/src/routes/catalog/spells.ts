@@ -200,11 +200,14 @@ async function loadResolvedSpells(
   // level-10 gate is passed a level below its own threshold here — the
   // pre-existing "this route doesn't widen for Magical Secrets" behavior,
   // left unchanged; only the level-INDEPENDENT third-caster redirect is
-  // newly applied. The `?subclassId=` list-EXPANSION union (Warlock
-  // patrons) stays additive on top, unchanged.
-  const spellLists = spellListsFor(className, 1, subclassName, edition).spells;
+  // newly applied. That level-1 call is also below the only null-returning
+  // branch (Magical Secrets, level 10+ — see spellListsFor), so `spells` is
+  // always a concrete list here and no unrestricted-null case can arise. The
+  // `?subclassId=` list-EXPANSION union (Warlock patrons) stays additive on
+  // top, unchanged.
+  const spellLists = spellListsFor(className, 1, subclassName, edition).spells ?? [];
   return resolved.filter(
-    (row) => (spellLists === null || classesOf(row).some((c) => spellLists.includes(c))) || expandedSpellIds.has(row.id),
+    (row) => classesOf(row).some((c) => spellLists.includes(c)) || expandedSpellIds.has(row.id),
   );
 }
 

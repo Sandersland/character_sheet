@@ -764,8 +764,10 @@ export function bardMagicalSecretsAt(className: string, level: number): boolean 
   return className.toLowerCase() === "bard" && level >= 10;
 }
 
-/** Class lists a level-up pick may come from, per facet. `null` = unrestricted. */
-export interface MagicalSecretsLists {
+/** Class lists a spell pick may come from, per facet. `null` = unrestricted.
+ * Named for the resolver (spellListsFor), not Magical Secrets — it also carries
+ * the third-caster (EK/AT → wizard) redirect, which is not a Secrets rule (#1825). */
+export interface SpellPickLists {
   /** Class lists a leveled pick may come from; null = unrestricted (PHB'14 "from any class"). */
   spells: string[] | null;
   /** Class lists a cantrip pick may come from; null = unrestricted (PHB'14 "…or a cantrip"). */
@@ -838,7 +840,7 @@ export function spellListsFor(
   level: number,
   subclass: string | null | undefined,
   edition: RulesEdition,
-): MagicalSecretsLists {
+): SpellPickLists {
   if (THIRD_CASTER_SUBCLASSES[(subclass ?? "").toLowerCase()]) return { spells: ["wizard"], cantrips: ["wizard"] };
 
   const key = className.toLowerCase();
