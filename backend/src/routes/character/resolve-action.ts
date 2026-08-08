@@ -24,9 +24,10 @@ const transactionsRequestSchema = z.object({
  * (`castSpell`) — validate ops, apply atomically, write the audit event,
  * return the updated character.
  *
- * The frontend does not call this endpoint yet — `useAttackRolls`/
- * `useSpellPicker` still commit through the pre-existing `logRoll`/
- * `castSpell` paths until the adapter slices (#1832/#1833) migrate them.
+ * The weapon adapter (#1832, `frontend/src/api/combat.ts`) is the first
+ * frontend caller — `InlineAttackPicker`'s weapon swings commit here now.
+ * `useSpellPicker` still commits through the pre-existing `castSpell` path
+ * until the spell adapter slice (#1833) migrates it.
  */
 makeTransactionsEndpoint({
   router: resolveActionRouter,

@@ -1,10 +1,13 @@
 /**
  * resolveAction op schema (#1829) — the wire shape for
  * POST /api/characters/:id/resolve-action/transactions. Backend-local (not
- * `@character-sheet/contracts`) because no frontend caller exists yet — the
- * adapter slices (#1832/#1833) are what wire a client to this endpoint, and
- * that is the point this schema moves into the shared package (mirrors how
- * `castSpellOpSchema` stays local to routes/character/spellcasting.ts today).
+ * `@character-sheet/contracts`) even now that a real frontend caller exists
+ * (#1832, `frontend/src/api/combat.ts`) — mirrors `castSpellOpSchema` staying
+ * local to routes/character/spellcasting.ts while its own frontend caller
+ * imports a structurally-matching plain type (`ResolveActionEventData`,
+ * shared-types, #1830) rather than the validating schema itself. The
+ * frontend's `ResolveActionOperation` = that shared type + the op's literal
+ * `type` discriminant.
  *
  * Shape settled in the epic's design note (2026-08-08, per #1828 review): ONE
  * `effect` roll per resolution — no `instances[]` array. Magic Missile's three

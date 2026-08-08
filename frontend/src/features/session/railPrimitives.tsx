@@ -6,6 +6,7 @@
 // the second, generalized consumer.
 
 import type { StepState } from "@/lib/attackStepRail";
+import type { AttackEntry } from "@/lib/attackMath";
 
 const DOT_STYLE: Record<StepState, string> = {
   done: "border-garnet-600 bg-garnet-soft-surface text-garnet-on-surface",
@@ -66,6 +67,34 @@ export function VerdictChip({ tone, children }: { tone: "crit" | "miss" | "hit";
     <span className={`inline-block rounded-control px-2 py-1 text-xs font-semibold ${cls}`}>
       {children}
     </span>
+  );
+}
+
+/**
+ * The name + magical badge + "+N to hit · damage label" stats line (#1832
+ * fallow-flagged clone extraction): AttackStepCard's own SelectedFormSummary
+ * wraps this with its roll-mode chip; InlineAttackPicker's AttackFormSummary
+ * renders it bare (ResolutionRail shows the chip separately, #1831).
+ */
+export function AttackFormSummaryCore({ selected }: { selected: AttackEntry }) {
+  return (
+    <>
+      <span className="flex items-center gap-1.5 truncate text-sm font-semibold text-parchment-900">
+        {selected.name}
+        {selected.magical && (
+          <span
+            title="Counts as magical for overcoming resistance to nonmagical damage"
+            className="rounded-control bg-gold-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gold-800"
+          >
+            Magical
+          </span>
+        )}
+      </span>
+      <span className="block truncate text-xs text-parchment-600">
+        {selected.attackLabel} to hit · {selected.damageLabel}
+        {selected.note && <span className="ml-1 italic">{selected.note}</span>}
+      </span>
+    </>
   );
 }
 
