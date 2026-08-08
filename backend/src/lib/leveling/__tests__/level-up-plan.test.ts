@@ -486,6 +486,27 @@ describe("buildLevelUpPlan — newSpells (2024 prepared model)", () => {
     expect(at?.meta?.canSwap).toBe(true);
   });
 
+  // #1825: the reported live bug — a level-3 Fighter reaching Eldritch Knight
+  // (the SUBCLASS re-plan: the character was level 2 with no subclass, then
+  // picked Eldritch Knight AT level 3, the same shape the ceremony re-plans
+  // with once the `subclass` step commits) must serve the WIZARD list, not
+  // "fighter"/"rogue" (no catalog spell is ever on those lists, so the
+  // pre-fix served spellLists emptied both pickers — PHB'14 p. 75 Eldritch
+  // Knight / p. 98 Arcane Trickster, byte-identical in PHB'24).
+  it("a fresh level-3 Eldritch Knight/Arcane Trickster serves the wizard list, not its own class name (#1825)", () => {
+    for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {
+      const ek = buildLevelUpPlan(char("fighter", 2, null, edition), target("fighter", 3, "eldritch knight")).find((s) => s.kind === "newSpells");
+      expect(ek?.count).toBeGreaterThan(0);
+      expect(ek?.meta?.spellLists).toEqual(["wizard"]);
+      expect(ek?.meta?.cantripLists).toEqual(["wizard"]);
+
+      const at = buildLevelUpPlan(char("rogue", 2, null, edition), target("rogue", 3, "arcane trickster")).find((s) => s.kind === "newSpells");
+      expect(at?.count).toBeGreaterThan(0);
+      expect(at?.meta?.spellLists).toEqual(["wizard"]);
+      expect(at?.meta?.cantripLists).toEqual(["wizard"]);
+    }
+  });
+
   it("meta.casterModel is 'known' on a 2014 Bard's step, 'prepared' on a 2024 Bard's", () => {
     const bard2014 = buildLevelUpPlan(char("bard", 2, null, "EDITION_2014"), target("bard", 3)).find((s) => s.kind === "newSpells");
     expect(bard2014?.meta?.casterModel).toBe("known");

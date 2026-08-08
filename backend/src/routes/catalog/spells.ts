@@ -9,10 +9,12 @@ import { requireEditionOr400 } from "@/lib/http/parse-edition-param.js";
 import { assertCharacterAccess } from "@/lib/auth/access.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { EMPTY_CAMPAIGN_ID_SET, isCatalogEntryEditable, resolveDmCampaignIds, resolveVisibleEntries, type CatalogViewer } from "@/lib/catalog/entitlement.js";
+import { crossEditionRejection } from "@/lib/rules/catalog-edition.js";
 import { editionOf } from "@/lib/rules/edition.js";
 import { classesOf, resolveSpellCatalogForEdition, SPELL_CLASS_MEMBERSHIP_SELECT } from "@/lib/spellcasting/spell-classes.js";
 import { undefinedSpellEffectFields } from "@/lib/spellcasting/spell-effect-fields.js";
 import { loadSubclassSpellListExpansionIds } from "@/lib/spellcasting/spell-list-expansion.js";
+import { spellListsFor } from "@/lib/srd/spellcasting-tables.js";
 
 export const spellsRouter = Router();
 
@@ -107,6 +109,22 @@ async function resolveViewer(
   return resolveCharacterViewer(userId, characterId);
 }
 
+// Resolves `?subclassId=` to the catalog Subclass row's own NAME (#1825) — the
+// key spellListsFor's third-caster redirect checks (THIRD_CASTER_SUBCLASSES,
+// spellcasting-tables.ts), same free-text-name key that module's every other
+// third-caster check already uses. An id naming no row, or the WRONG
+// edition's row (crossEditionRejection, #1345 catalog-id-edition-guard), or
+// absent altogether all resolve to null — same "no widening" posture
+// parseSubclassIdParam's own doc comment takes for an unrecognized/absent id.
+// Never a 400 here: this is a read-only widening filter, not a mutation
+// endpoint, so a wrong-edition id is inert rather than rejected.
+async function resolveSubclassName(subclassId: string | undefined, edition: RulesEdition): Promise<string | null> {
+  if (!subclassId) return null;
+  const row = await prisma.subclass.findUnique({ where: { id: subclassId }, select: { name: true, edition: true } });
+  if (!row || crossEditionRejection(row, "Subclass", edition)) return null;
+  return row.name;
+}
+
 /**
  * The visible-entries → Spell rows → edition/class resolution pipeline,
  * pulled out of the route handler for the same CRAP-ceiling reason
@@ -169,8 +187,25 @@ async function loadResolvedSpells(
   const resolved = resolveSpellCatalogForEdition(owned, edition);
   if (!className) return resolved;
 
-  const expandedSpellIds = new Set(await loadSubclassSpellListExpansionIds(subclassId, edition));
-  return resolved.filter((row) => classesOf(row).includes(className) || expandedSpellIds.has(row.id));
+  const [expandedSpellIds, subclassName] = await Promise.all([
+    loadSubclassSpellListExpansionIds(subclassId, edition).then((ids) => new Set(ids)),
+    resolveSubclassName(subclassId, edition),
+  ]);
+  // #1825: routed through the SAME resolver the level-up gate uses, so a
+  // third-caster subclass's `?class=fighter&subclassId=<EK id>` picker widens
+  // to the wizard list instead of matching nothing — the divergence this
+  // route used to have from newSpellsStep/assertOnSpellList. No per-class
+  // character level reaches this route (unlike the level-up gate, which
+  // always has the advancing class's real level), so Magical Secrets'
+  // level-10 gate is passed a level below its own threshold here — the
+  // pre-existing "this route doesn't widen for Magical Secrets" behavior,
+  // left unchanged; only the level-INDEPENDENT third-caster redirect is
+  // newly applied. The `?subclassId=` list-EXPANSION union (Warlock
+  // patrons) stays additive on top, unchanged.
+  const spellLists = spellListsFor(className, 1, subclassName, edition).spells;
+  return resolved.filter(
+    (row) => (spellLists === null || classesOf(row).some((c) => spellLists.includes(c))) || expandedSpellIds.has(row.id),
+  );
 }
 
 /**
@@ -217,20 +252,27 @@ async function loadResolvedSpells(
  * match), and since it's then the group's ONLY candidate,
  * resolveSpellCatalogForEdition's graceful single-candidate fallback would
  * serve 2024 Command to a 2014 Bard's picker — exactly backwards. Resolving
- * first and filtering the RESOLVED row's own classesOf() list keeps the
- * class check scoped to the edition actually being served. The served JSON
+ * first and filtering the RESOLVED row's own classesOf() list against
+ * `spellListsFor`'s (spellcasting-tables.ts) served `spells` list — rather
+ * than a bare `.includes(className)` — keeps the class check scoped to the
+ * edition actually being served AND routes `?subclassId=`'s third-caster
+ * redirect (#1825: Eldritch Knight/Arcane Trickster → the wizard list, off
+ * the resolved subclass row's own name) through the SAME resolver the
+ * level-up gate uses (newSpellsStep/assertOnSpellList), so the two paths
+ * cannot diverge on which list a class+subclass resolves to. The served JSON
  * still flattens back to `classes: string[]` via classesOf, so
  * frontend/src/lib/newSpells.ts and spellList.ts consume the response
  * unchanged.
  *
- * `?subclassId=` (#1631) is a THIRD optional filter, applied alongside
+ * `?subclassId=` (#1631) is also a THIRD optional filter, applied alongside
  * `?class=`: a chosen subclass's SubclassSpellListExpansion widens the pool
  * with spells NOT on the class's own list (PHB'14 Warlock patrons — "Add
  * fiend spells to your warlock list"). Only ever WIDENS, never narrows —
  * absent or a subclass with no expansion rows is a no-op, matching
  * `?class=`'s own "no match still 200s with an empty/unwidened list" posture.
  * Ignored when `?class=` is absent (the unfiltered catalog already contains
- * everything a widening could add).
+ * everything a widening could add). Kept additive on top of the
+ * `spellListsFor`-driven filter above, never replacing it.
  *
  * The visibility filter (#1786, epic #1782 3/5; re-sourced off CatalogEntry
  * by #1796, epic #1795 1/6; wired to the resolver by #1798, epic #1795 3/6 —

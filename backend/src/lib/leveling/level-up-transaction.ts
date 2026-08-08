@@ -457,8 +457,8 @@ function capitalizeClassName(name: string): string {
 // depend across that tier boundary. Keep the two phrasings in sync by hand.
 function classListPhrase(spellLists: string[]): string {
   const names = spellLists.map(capitalizeClassName);
-  // Defensive, not reachable today: magicalSecretsSpellLists always returns at
-  // least [key], never [] — mirrors the identical guard in spellListsLabel (frontend).
+  // Defensive, not reachable today: spellListsFor always returns at least
+  // [key], never [] — mirrors the identical guard in spellListsLabel (frontend).
   if (names.length === 0) return "the spell list";
   if (names.length <= 1) return `the ${names[0]} spell list`;
   const joined = names.length === 2
@@ -510,8 +510,8 @@ function assertLeveledSpellEligibility(
 // but not cantrips (the trigger is the Prepared Spells number, level 1+ only)
 // while a qualifying 2014 Bard is unrestricted on both (PHB'14 p. 54 "...or a
 // cantrip"). The `.some()` check below handles a multi-entry cantripLists
-// correctly regardless; per the current magicalSecretsSpellLists
-// implementation cantripLists is always a single class or null, so the
+// correctly regardless; per the current spellListsFor implementation
+// cantripLists is always a single class or null, so the
 // rejection message never needs to name more than one list — but that's an
 // implementation fact, not a type guarantee. If a future subclass seam (2024
 // College of Lore Magical Discoveries, PHB'14 Additional Magical Secrets)
@@ -544,7 +544,7 @@ interface NewSpellsGate {
 // Reads the served eligibility facts off the newSpells step — the server-BUILT
 // plan step, never a client-supplied field (CLAUDE.md: never let a
 // client-computed value be trusted by a transaction endpoint), and never
-// re-deriving magicalSecretsSpellLists here. Returns null when the level-up has
+// re-deriving spellListsFor here. Returns null when the level-up has
 // no newSpells step (assertNoExcess/assertCantrips already rejected any pick in
 // that case, so there's nothing left to gate).
 // #1631: split out of resolveNewSpellsGate purely to keep that function's own

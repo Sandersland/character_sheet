@@ -284,6 +284,61 @@ describe("GET /api/spells — ?subclassId= list-expansion widening (#1631)", () 
   });
 });
 
+// #1825: the reported live bug's route-side counterpart — GET /api/spells
+// used to filter `?class=` through the raw class-name membership join with no
+// third-caster redirect, so `?class=fighter&subclassId=<Eldritch Knight id>`
+// matched nothing (no catalog spell is ever tagged "fighter"). Routed through
+// spellListsFor now, the SAME resolver the level-up gate uses, so the two
+// paths can't diverge on which list a class+subclass resolves to.
+describe("GET /api/spells — ?class= + ?subclassId= third-caster redirect (#1825)", () => {
+  it("an Eldritch Knight's ?subclassId= redirects ?class=fighter to the wizard list, in both editions", async () => {
+    const fighter = await prisma.characterClass.findUniqueOrThrow({ where: { name: "Fighter" }, select: { id: true } });
+    const eldritchKnight = await prisma.subclass.findFirstOrThrow({
+      where: { classId: fighter.id, name: "Eldritch Knight" },
+      select: { id: true },
+    });
+
+    for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {
+      const withoutSubclass = await get("/api/spells?class=fighter", edition);
+      expect(withoutSubclass.status).toBe(200);
+      expect(withoutSubclass.body).toEqual([]); // the bug: no spell is ever on the "fighter" list
+
+      const withSubclass = await get(`/api/spells?class=fighter&subclassId=${eldritchKnight.id}`, edition);
+      expect(withSubclass.status).toBe(200);
+      expect(withSubclass.body.length).toBeGreaterThan(0);
+      expect(withSubclass.body.every((s: { classes: string[] }) => s.classes.includes("wizard"))).toBe(true);
+    }
+  });
+
+  it("an Arcane Trickster's ?subclassId= redirects ?class=rogue to the wizard list", async () => {
+    const rogue = await prisma.characterClass.findUniqueOrThrow({ where: { name: "Rogue" }, select: { id: true } });
+    const arcaneTrickster = await prisma.subclass.findFirstOrThrow({
+      where: { classId: rogue.id, name: "Arcane Trickster" },
+      select: { id: true },
+    });
+
+    const withoutSubclass = await get("/api/spells?class=rogue", "EDITION_2024");
+    expect(withoutSubclass.body).toEqual([]);
+
+    const withSubclass = await get(`/api/spells?class=rogue&subclassId=${arcaneTrickster.id}`, "EDITION_2024");
+    expect(withSubclass.status).toBe(200);
+    expect(withSubclass.body.length).toBeGreaterThan(0);
+    expect(withSubclass.body.every((s: { classes: string[] }) => s.classes.includes("wizard"))).toBe(true);
+  });
+
+  it("a non-third-caster subclassId (e.g. Champion) does not redirect — ?class=fighter still matches nothing", async () => {
+    const fighter = await prisma.characterClass.findUniqueOrThrow({ where: { name: "Fighter" }, select: { id: true } });
+    const champion = await prisma.subclass.findFirstOrThrow({
+      where: { classId: fighter.id, name: "Champion" },
+      select: { id: true },
+    });
+
+    const response = await get(`/api/spells?class=fighter&subclassId=${champion.id}`, "EDITION_2024");
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual([]);
+  });
+});
+
 // #1711: membership is served entirely off the SpellClass join now — Spell
 // itself carries no `classes` column at all — so a membership row's own
 // lifecycle (add/remove), not any Spell field, is what the route reflects.
