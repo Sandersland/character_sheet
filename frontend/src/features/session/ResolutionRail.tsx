@@ -69,11 +69,12 @@ function CallItStepContent({ view }: { view: ResolutionView }) {
           <button
             type="button"
             onClick={view.onCallMiss}
-            className="min-h-11 flex-1 rounded-control border border-parchment-300 bg-parchment-50 px-3 text-xs font-semibold text-parchment-700 transition-colors hover:bg-parchment-100"
+            disabled={view.disabled}
+            className="min-h-11 flex-1 rounded-control border border-parchment-300 bg-parchment-50 px-3 text-xs font-semibold text-parchment-700 transition-colors hover:bg-parchment-100 disabled:cursor-not-allowed disabled:opacity-40"
           >
             it Missed
           </button>
-          <CritButton onCallCrit={view.onCallCrit} tall />
+          <CritButton onCallCrit={view.onCallCrit} disabled={view.disabled} tall />
         </div>
       </>
     );
@@ -83,7 +84,7 @@ function CallItStepContent({ view }: { view: ResolutionView }) {
   return (
     <div className="flex items-center gap-2">
       <VerdictChip tone="hit">✓ Hit</VerdictChip>
-      <CritButton onCallCrit={view.onCallCrit} />
+      <CritButton onCallCrit={view.onCallCrit} disabled={view.disabled} />
     </div>
   );
 }
