@@ -140,25 +140,31 @@ export async function rejectCrossEditionSpellForks(
  * way: the exact-match branch always wins — proven by spells.test.ts's
  * fork-disjointness suite.
  *
- * Grouping key is `(name, ownerId)`, not bare `name` (#1786, epic #1782 3/5):
- * a user's homebrew spell (non-null ownerId) can legally share a NAME with a
- * seeded spell (null ownerId) — they're distinct rows, both tagged
- * EDITION_2014, and neither should shadow the other the way a genuine 2014/
- * 2024 fork's two rows are MEANT to collapse to one. Widening the key to
- * include ownerId puts every homebrew row in its own singleton group (the
- * `(name, edition, ownerId)` unique constraint guarantees at most one), so it
- * always survives resolution and is served ALONGSIDE the seeded row of the
- * same name rather than replacing it — same "must not drop one for the
- * other" outcome resolveEditionCatalog's own `keyOf` widening documents for
- * Subclass's compound key.
+ * Grouping key is `(name, catalogOwnerUserId)`, not bare `name` (#1786, epic
+ * #1782 3/5): a user's homebrew spell (non-null catalogOwnerUserId) can
+ * legally share a NAME with a seeded spell (null catalogOwnerUserId) —
+ * they're distinct rows, both tagged EDITION_2014, and neither should shadow
+ * the other the way a genuine 2014/2024 fork's two rows are MEANT to
+ * collapse to one. Widening the key to include catalogOwnerUserId puts every
+ * homebrew row in its own singleton group (the
+ * `(name, edition, ownerUserId)` unique constraint on CatalogEntry
+ * guarantees at most one per owner), so it always survives resolution and is
+ * served ALONGSIDE the seeded row of the same name rather than replacing it
+ * — same "must not drop one for the other" outcome resolveEditionCatalog's
+ * own `keyOf` widening documents for Subclass's compound key.
+ *
+ * `catalogOwnerUserId` is the entry's RAW `CatalogEntry.ownerUserId`
+ * (grouping input only, never the wire's own leak-safe `ownerId` field —
+ * #1815 review finding 2: those two must never be the same field, or
+ * whichever fix nulls `ownerId` for a row the viewer doesn't own would also
+ * silently merge that row's group with the seeded one of the same name).
  */
-export function resolveSpellCatalogForEdition<T extends { name: string; edition: RulesEdition | null; ownerId: string | null }>(
-  rows: T[],
-  edition: RulesEdition,
-): T[] {
+export function resolveSpellCatalogForEdition<
+  T extends { name: string; edition: RulesEdition | null; catalogOwnerUserId: string | null },
+>(rows: T[], edition: RulesEdition): T[] {
   const byName = new Map<string, T[]>();
   for (const row of rows) {
-    const key = `${row.name}::${row.ownerId ?? ""}`;
+    const key = `${row.name}::${row.catalogOwnerUserId ?? ""}`;
     const group = byName.get(key);
     if (group) group.push(row);
     else byName.set(key, [row]);

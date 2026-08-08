@@ -5,37 +5,29 @@ import type { CatalogEntry, Spell } from "@/generated/prisma/client.js";
 import { assertCampaignOwner } from "@/lib/auth/access.js";
 import { AuthorizationError, NotFoundError } from "@/lib/auth/errors.js";
 import { forkContent, type ForkTarget } from "@/lib/catalog/fork.js";
+import { isCatalogEntryVisibleToUser } from "@/lib/catalog/entitlement.js";
 import { parseBodyOr400 } from "@/lib/http/parse-body.js";
 import { prisma } from "@/lib/core/prisma.js";
+import { undefinedSpellEffectFields } from "@/lib/spellcasting/spell-effect-fields.js";
 
 // Fork (make an overriding copy) route (#1800, epic #1795 5/6): a viewer
 // copies visible content into their own USER stash, or a campaign's DM copies
 // it into that campaign's CAMPAIGN scope. The resulting entry's
 // `forkedFromId` shadows the origin once the read resolver (slice 2, #1797)
-// lands — that assertion is deliberately NOT covered here (not on this
-// branch); see this PR's own description.
+// lands.
 
 export const forkRouter = Router();
 
-// Visibility check ahead of a fork (#1800): the same "GLOBAL or the caller's
-// own USER row or a CAMPAIGN row the caller belongs to" rule spells.ts's own
-// GET /api/spells TEMPORARILY applies pending the read resolver (slice 2,
-// #1797) — duplicated here rather than imported because that route's check is
-// inlined into its own query, not a shared helper. Both call sites are meant
-// to collapse onto the resolver once it lands.
+// Visibility check ahead of a fork (#1800): reuses the resolver's own
+// isCatalogEntryVisibleToUser (lib/catalog/entitlement.ts, #1815 review
+// finding 1) rather than a hand-rolled parallel check — the prior version
+// here predated the resolver and had NO grants arm at all, so a campaign
+// member could see a spell shared into their campaign (the resolver, slice
+// 2) but still get 403 forking it (this route).
 async function assertCatalogEntryVisible(userId: string, entryId: string): Promise<CatalogEntry> {
   const entry = await prisma.catalogEntry.findUnique({ where: { id: entryId } });
   if (!entry) throw new NotFoundError("Catalog entry not found");
-
-  if (entry.scope === "GLOBAL") return entry;
-  if (entry.scope === "USER" && entry.ownerUserId === userId) return entry;
-  if (entry.scope === "CAMPAIGN" && entry.ownerCampaignId) {
-    const membership = await prisma.campaignMembership.findUnique({
-      where: { campaignId_userId: { campaignId: entry.ownerCampaignId, userId } },
-      select: { userId: true },
-    });
-    if (membership) return entry;
-  }
+  if (await isCatalogEntryVisibleToUser(entry, userId)) return entry;
   throw new AuthorizationError("You do not have access to this catalog entry");
 }
 
@@ -53,37 +45,6 @@ async function resolveForkTarget(userId: string, input: CatalogForkInput): Promi
   return { scope: "CAMPAIGN", ownerCampaignId: input.campaignId! };
 }
 
-// Same nullable-on-Spell columns spells.ts's own UNDEFINED_DEFAULTED_FIELD_NAMES
-// walks (custom-spells.ts's EFFECT_FIELD_NAMES is the same list again) — a
-// loop over one list rather than nine hand-written `?? undefined` object
-// entries, which is what pushed this function's complexity over the fallow
-// gate before this extraction.
-const UNDEFINED_DEFAULTED_FIELD_NAMES = [
-  "effectKind",
-  "effectDiceCount",
-  "effectDiceFaces",
-  "effectModifier",
-  "damageType",
-  "attackType",
-  "saveAbility",
-  "saveEffect",
-  "upcastDicePerLevel",
-] as const satisfies readonly (keyof Spell)[];
-type UndefinedDefaultedFieldName = (typeof UNDEFINED_DEFAULTED_FIELD_NAMES)[number];
-type UndefinedDefaultedFields = { [K in UndefinedDefaultedFieldName]: Spell[K] | undefined };
-
-function undefinedDefaultedFields(spell: Spell): UndefinedDefaultedFields {
-  const out = {} as Record<UndefinedDefaultedFieldName, unknown>;
-  for (const name of UNDEFINED_DEFAULTED_FIELD_NAMES) {
-    out[name] = spell[name] ?? undefined;
-  }
-  // Every value above came straight from Spell's own typed columns (or
-  // undefined) — the single controlled cast back to the per-field union
-  // UndefinedDefaultedFields declares, same rationale as spells.ts's own
-  // undefinedDefaultedFields cast.
-  return out as UndefinedDefaultedFields;
-}
-
 function serializeForkedSpell(entry: CatalogEntry, spell: Spell, classes: string[]) {
   return {
     id: spell.id,
@@ -98,7 +59,7 @@ function serializeForkedSpell(entry: CatalogEntry, spell: Spell, classes: string
     ritual: spell.ritual,
     classes,
     cantripScaling: spell.cantripScaling,
-    ...undefinedDefaultedFields(spell),
+    ...undefinedSpellEffectFields(spell),
     // `editable` is always true here (#1808 leak-fix, epic #1795 8/9
     // combined-state review): resolveForkTarget above already gated the
     // target — USER always admits the forker as owner, CAMPAIGN only via

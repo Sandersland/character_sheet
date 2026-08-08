@@ -41,6 +41,10 @@ const SEEDED_SPELL: CatalogSpell = {
   cantripScaling: false,
 };
 
+// `catalog.editable: true` (#1815 review findings 2/10): ownedHomebrewSpells
+// (lib/homebrewSpell.ts) now gates purely on catalog.editable, never ownerId
+// — a fixture standing in for "the caller's own homebrew" must carry it, the
+// same shape a real GET /api/spells row does.
 const OWN_SPELL: CatalogSpell = {
   id: "own-1",
   ownerId: "u1",
@@ -55,6 +59,7 @@ const OWN_SPELL: CatalogSpell = {
   ritual: false,
   classes: ["wizard"],
   cantripScaling: false,
+  catalog: { entryId: "own-entry-1", scope: "USER", isFork: false, forkedFromId: null, editable: true },
 };
 
 // #1788, epic #1782 5/5: HomebrewTab is the manage-view — same tab

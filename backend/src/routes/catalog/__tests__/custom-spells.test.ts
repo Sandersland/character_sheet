@@ -1,11 +1,12 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import supertest from "supertest";
 
-import type { SpellSchool } from "@/generated/prisma/client.js";
+import { Prisma, type SpellSchool } from "@/generated/prisma/client.js";
 import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
+import * as spellClassesModule from "@/lib/spellcasting/spell-classes.js";
 
 // Owned-CRUD for user homebrew spells (#1785, epic #1782 2/5): campaign-style
 // ownership-scoped plain REST, real Postgres via supertest against the shared
@@ -279,6 +280,43 @@ describe("PATCH /api/spells/custom/:id", () => {
       .patch(`/api/spells/custom/${globalSpell.id}`)
       .send({ ...VALID_SPELL, name: "Hijacked Global" });
     expect(res.status).toBe(403);
+  });
+
+  // #1815 review finding 7: assertSpellOwnership used to run OUTSIDE the
+  // $transaction, leaving a TOCTOU window where a concurrent DELETE between
+  // the check and the write threw an uncaught P2025 (500). Moving the check
+  // inside the transaction closes the large part of that window; this test
+  // pins the remaining defense — a mid-transaction "record to update not
+  // found" (simulated here via reconcileSpellClasses, which runs inside the
+  // SAME transaction after the catalogEntry/spell updates) is caught and
+  // mapped to a clean 404, never an uncaught 500.
+  it("404s instead of 500ing on a mid-transaction record-not-found race (P2025)", async () => {
+    const created = await agent(cookieOwner)
+      .post("/api/spells/custom")
+      .send({ ...VALID_SPELL, name: "Racy Patch Target" });
+    expect(created.status).toBe(201);
+    const id = created.body.id as string;
+
+    const spy = vi
+      .spyOn(spellClassesModule, "reconcileSpellClasses")
+      .mockRejectedValueOnce(
+        new Prisma.PrismaClientKnownRequestError("Record to update not found.", {
+          code: "P2025",
+          clientVersion: "test",
+        }),
+      );
+    try {
+      const res = await agent(cookieOwner)
+        .patch(`/api/spells/custom/${id}`)
+        .send({ ...VALID_SPELL, name: "Should Not Apply" });
+      expect(res.status).toBe(404);
+    } finally {
+      spy.mockRestore();
+    }
+
+    // The transaction rolled back — the rename above must not have applied.
+    const row = await prisma.spell.findUniqueOrThrow({ where: { id } });
+    expect(row.name).toBe("Racy Patch Target");
   });
 });
 

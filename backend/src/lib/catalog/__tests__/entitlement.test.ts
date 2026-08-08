@@ -11,8 +11,33 @@ import { prisma } from "@/lib/core/prisma.js";
 import { makeCatalogEntry } from "@/test-support/catalog-entry.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 
-import { resolveSpellEntryIdsForCharacter, resolveVisibleEntryIds, type CatalogViewer } from "../entitlement.js";
+import {
+  resolveSpellEntitlementForCharacter,
+  resolveSpellEntryIdsForCharacter,
+  resolveVisibleEntryIds,
+  type CatalogViewer,
+} from "../entitlement.js";
 import type { CharacterWithRelations } from "@/lib/character/character-include.js";
+
+// Manual monkeypatch, not vi.spyOn/mockRestore, for the call-counting test
+// below: Prisma's model delegates don't restore cleanly through vi.spyOn's
+// own save/restore bookkeeping (observed leaving the spied method
+// permanently "not a function" for later tests in the same file). Capturing
+// the real bound method up front and reassigning it back in `finally`
+// sidesteps that.
+function countCalls<T extends object, K extends keyof T>(
+  target: T,
+  key: K,
+): { count: () => number; restore: () => void } {
+  const original = target[key];
+  const bound = (original as unknown as (...args: unknown[]) => unknown).bind(target);
+  let calls = 0;
+  target[key] = ((...args: unknown[]) => {
+    calls++;
+    return bound(...args);
+  }) as T[K];
+  return { count: () => calls, restore: () => (target[key] = original) };
+}
 
 const OWNER_USER_ID = `entitlement-owner-${randomUUID()}`;
 const MEMBER_USER_ID = `entitlement-member-${randomUUID()}`;
@@ -237,6 +262,61 @@ describe("resolveVisibleEntryIds (#1797)", () => {
 
     const result = await resolveVisibleEntryIds("SPELL", viewer({ userId: OWNER_USER_ID, campaignId: null }));
     expect(result).toContain(fork);
+  });
+
+  // #1815 review finding 4: forkContent only ever points a NEW entry's
+  // forkedFromId at an EXISTING one, so a cycle can't arise through ordinary
+  // use — but groupLineages' own lineageRoot walk must still degrade
+  // gracefully if the data is ever corrupted into one (a raw update, as
+  // here), rather than silently serving every cycle member as its own
+  // one-entry "lineage" (each becoming a winner). Both nodeA and nodeB are
+  // owned by the SAME viewer (rank 3 each) so the resolver would show both
+  // if it failed to group them — the only way to catch "two winners" here is
+  // to see the raw candidate count collapse to one.
+  it("a 2-node forkedFromId cycle (data-integrity violation) still resolves to exactly one winner, deterministically", async () => {
+    const nodeA = await fixtureEntry({ scope: "USER", ownerUserId: OWNER_USER_ID });
+    const nodeB = await fixtureEntry({ scope: "USER", ownerUserId: OWNER_USER_ID, forkedFromId: nodeA });
+    // Forces the cycle directly — the DAG invariant forkContent maintains
+    // would never produce this through the app.
+    await prisma.catalogEntry.update({ where: { id: nodeA }, data: { forkedFromId: nodeB } });
+
+    const visible = await resolveVisibleEntryIds("SPELL", viewer({ userId: OWNER_USER_ID, campaignId: null }));
+    const winners = visible.filter((id) => id === nodeA || id === nodeB);
+    expect(winners).toHaveLength(1);
+  });
+});
+
+// #1815 review finding 3: the character-serialize spell-catalog overlay used
+// to resolve META (resolveSpellEntitlementMetaForCharacter) and MECHANICS
+// (resolveSpellMechanicsOverridesForCharacter) as two INDEPENDENT
+// fetchCandidates-backed calls — each its own CatalogEntry read, so a fork
+// committing between them could split-brain the response (fork metadata from
+// one snapshot, mechanics from the other). resolveSpellEntitlementForCharacter
+// replaces both with ONE combined resolution; this pins that it issues
+// exactly one CatalogEntry read for the candidate set, not two, which is what
+// makes a split-brain snapshot impossible rather than merely unlikely.
+describe("resolveSpellEntitlementForCharacter (#1815 review finding 3: single-snapshot resolution)", () => {
+  function fakeCharacter(overrides: {
+    ownerId: string;
+    campaignId: string | null;
+    rulesEdition: "EDITION_2014" | "EDITION_2024";
+  }): CharacterWithRelations {
+    return overrides as unknown as CharacterWithRelations;
+  }
+
+  it("resolves META and MECHANICS from a single fetchCandidates (CatalogEntry.findMany) call", async () => {
+    await fixtureEntry({ scope: "GLOBAL", edition: "EDITION_2024" });
+
+    const findMany = countCalls(prisma.catalogEntry, "findMany");
+    try {
+      const character = fakeCharacter({ ownerId: OWNER_USER_ID, campaignId: null, rulesEdition: "EDITION_2024" });
+      const { metaByEntryId, mechanicsByEntryId } = await resolveSpellEntitlementForCharacter(character);
+      expect(metaByEntryId).toBeInstanceOf(Map);
+      expect(mechanicsByEntryId).toBeInstanceOf(Map);
+      expect(findMany.count()).toBe(1);
+    } finally {
+      findMany.restore();
+    }
   });
 });
 

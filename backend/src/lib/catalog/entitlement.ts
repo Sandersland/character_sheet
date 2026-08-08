@@ -89,12 +89,30 @@ function groupLineages(candidates: CandidateEntry[]): CandidateEntry[][] {
   const byId = new Map(candidates.map((entry) => [entry.id, entry]));
 
   function lineageRoot(entry: CandidateEntry): string {
-    const seen = new Set<string>([entry.id]);
+    const path: CandidateEntry[] = [entry];
     let current = entry;
     while (current.forkedFromId) {
       const parent = byId.get(current.forkedFromId);
-      if (!parent || seen.has(parent.id)) return current.forkedFromId;
-      seen.add(parent.id);
+      if (!parent) return current.forkedFromId;
+      const cycleStart = path.findIndex((node) => node.id === parent.id);
+      if (cycleStart !== -1) {
+        // A cyclic forkedFromId chain (data integrity violation — forks form
+        // a DAG by construction, forkContent only ever points a NEW entry at
+        // an EXISTING one) must still resolve to a STABLE root regardless of
+        // which cycle member lineageRoot started from, or every member
+        // becomes its own one-entry "lineage" and wins independently (#1815
+        // review finding 4: a 2-node cycle A<->B used to return root(A)=B.id
+        // and root(B)=A.id — two different lineages, two winners, both
+        // served). The lexicographically smallest id among the cycle's own
+        // members (the slice of this walk from the repeat back to its first
+        // occurrence, not the whole path — an acyclic tail leading into the
+        // cycle must still resolve to the SAME root the cycle itself does)
+        // is that stable choice: every member's own walk detects the same
+        // cycle membership and picks the same minimum, however it entered.
+        const cycle = path.slice(cycleStart);
+        return cycle.reduce((min, node) => (node.id < min ? node.id : min), cycle[0].id);
+      }
+      path.push(parent);
       current = parent;
     }
     return current.id;
@@ -148,6 +166,44 @@ export async function resolveVisibleEntryIds(kind: CatalogKind, viewer: CatalogV
 }
 
 /**
+ * Visibility check for ONE already-known CatalogEntry (#1815 review finding
+ * 1) — restates fetchCandidates' own GLOBAL/USER/CAMPAIGN/grant admission
+ * rule for a caller (the fork route) that already holds one entry rather
+ * than resolving a whole visible set. The grant arm checks ANY campaign the
+ * viewer belongs to, not one `viewer.campaignId` — a fork request carries no
+ * single campaign context (a USER-scope fork target has none at all), unlike
+ * resolveVisibleEntries' viewer-scoped resolution — so this widens
+ * fetchCandidates' `grants: { some: { campaignId } }` arm across every
+ * membership instead of one. Previously the fork route hand-rolled a copy of
+ * this check with NO grants arm at all: a member could see a spell shared
+ * into their campaign (this same resolver, slice 2) but got 403 forking it —
+ * the confirmed bug this function closes by giving fork.ts the resolver's
+ * own visibility notion instead of a second, incomplete one.
+ */
+export async function isCatalogEntryVisibleToUser(
+  entry: Pick<CandidateEntry, "id" | "scope" | "ownerUserId" | "ownerCampaignId">,
+  userId: string,
+): Promise<boolean> {
+  if (entry.scope === "GLOBAL") return true;
+  if (entry.scope === "USER" && entry.ownerUserId === userId) return true;
+  if (entry.scope === "CAMPAIGN" && entry.ownerCampaignId) {
+    const membership = await prisma.campaignMembership.findUnique({
+      where: { campaignId_userId: { campaignId: entry.ownerCampaignId, userId } },
+      select: { userId: true },
+    });
+    if (membership) return true;
+  }
+  if (entry.scope === "USER") {
+    const grant = await prisma.catalogGrant.findFirst({
+      where: { catalogEntryId: entry.id, campaign: { members: { some: { userId } } } },
+      select: { id: true },
+    });
+    if (grant) return true;
+  }
+  return false;
+}
+
+/**
  * Every campaign id `userId` DMs (role OWNER), one batched query — the
  * building block for `CatalogMeta.editable` (#1808 leak-fix, epic #1795 8/9
  * combined-state review). A caller with N CAMPAIGN-scope rows in one response
@@ -195,25 +251,33 @@ function toCatalogMeta(entry: CandidateEntry, viewerUserId: string, dmCampaignId
 }
 
 /**
- * Resolve, for EVERY visible candidate entry id (winners and shadowed
- * lineage members alike), the `CatalogMeta` of its lineage's WINNER — the
- * one place a call site can map "an entry id I already hold a reference to"
- * onto "what's actually entitled to be shown for it today" without
- * re-walking `forkedFromId` chains or re-deriving precedence itself (CLAUDE.md
- * "one shared function"). This is what lets a call site holding a stale
- * pre-shadow entry id (e.g. a character's learned-spell snapshot, taken
- * before a DM later forked the origin) resolve straight to the shadowing
- * fork's metadata by id, with no name-based fallback and no risk of a
- * same-named-but-unrelated lineage colliding with it.
+ * Resolve BOTH the entitlement META and MECHANICS winners for one (kind,
+ * viewer) from a SINGLE fetchCandidates snapshot (#1815 review finding 3).
+ * Previously the character-serialize spell-catalog overlay ran the META and
+ * MECHANICS resolutions as two independent `fetchCandidates`-backed calls
+ * inside one `Promise.all` — each its own CatalogEntry read, so a fork
+ * committing between them could produce a response with fork METADATA from
+ * the post-fork snapshot but MECHANICS from the pre-fork one (or vice
+ * versa): a split-brain response. Fetching candidates once and deriving both
+ * maps from the SAME lineage groupings makes that impossible — the two maps
+ * always agree on which lineage member won, because they're the same
+ * computation read twice, not two computations that can independently race.
+ * `CatalogMeta` maps every visible id (winners and shadowed lineage members
+ * alike) to its lineage's winner's meta; MECHANICS maps the same ids to the
+ * winner's `Spell` row, present only when the kind is SPELL and the winner
+ * has one (a winner CatalogEntry with no Spell row is the same data-
+ * integrity violation forkContent's own comment calls out — skipped
+ * defensively rather than thrown mid-serialize).
  *
  * Not exported: SPELL is the only kind today, so
- * resolveSpellEntitlementMetaForCharacter (below) is the only caller —
- * exported once a second kind needs its own viewer-typed wrapper.
+ * resolveSpellEntitlementForCharacter (below) is the only caller — exported
+ * once a second kind needs its own viewer-typed wrapper (same rule this
+ * function's own predecessor, resolveEntitlementMeta, followed).
  */
-async function resolveEntitlementMeta(
+async function resolveEntitlementForViewer(
   kind: CatalogKind,
   viewer: CatalogViewer,
-): Promise<Map<string, CatalogMeta>> {
+): Promise<{ metaByEntryId: Map<string, CatalogMeta>; mechanicsByEntryId: Map<string, Spell> }> {
   const candidates = await fetchCandidates(kind, viewer);
   // Skip the query entirely when there's nothing CAMPAIGN-scope to resolve
   // (the common case: no character in play, or one outside any campaign) —
@@ -222,52 +286,32 @@ async function resolveEntitlementMeta(
   const dmCampaignIds = candidates.some((entry) => entry.scope === "CAMPAIGN")
     ? await resolveDmCampaignIds(viewer.userId)
     : EMPTY_CAMPAIGN_ID_SET;
-  const meta = new Map<string, CatalogMeta>();
-  for (const lineage of groupLineages(candidates)) {
-    const winnerMeta = toCatalogMeta(pickLineageWinner(lineage, viewer), viewer.userId, dmCampaignIds);
-    for (const entry of lineage) meta.set(entry.id, winnerMeta);
-  }
-  return meta;
-}
 
-/**
- * Resolve, for every visible candidate SPELL entry id, the winning lineage's
- * `Spell` MECHANICS row (#1806, epic #1795 7/7) — a read-time-only sibling of
- * resolveEntitlementMeta above, keyed the SAME way (every lineage member's id
- * maps to its lineage's winner, not just the winner's own id), reusing the
- * SAME fetchCandidates/groupLineages/pickLineageWinner computation rather
- * than a second precedence path. What lets serialize's spell-catalog overlay
- * (character/serialize/spell-catalog.ts) look up "the mechanics a stale
- * pre-shadow spellId's own entry id resolves to today" by one hop, exactly
- * like resolveEntitlementMeta's metaByEntryId map does for CatalogMeta.
- *
- * Not generalized across CatalogKind (unlike resolveEntitlementMeta): `Spell`
- * is a kind-specific mechanics table with no generic analog yet — SPELL is
- * the only kind, so this stays a direct, un-dispatched query rather than
- * forkContent's kind-switch shape.
- */
-async function resolveSpellMechanicsWinners(viewer: CatalogViewer): Promise<Map<string, Spell>> {
-  const candidates = await fetchCandidates("SPELL", viewer);
   const lineageWinners = groupLineages(candidates).map((lineage) => ({
     lineage,
     winner: pickLineageWinner(lineage, viewer),
   }));
-  const winnerSpells = await prisma.spell.findMany({
-    where: { catalogEntryId: { in: lineageWinners.map(({ winner }) => winner.id) } },
-  });
-  const spellByEntryId = new Map(winnerSpells.map((spell) => [spell.catalogEntryId, spell]));
+
+  const metaByEntryId = new Map<string, CatalogMeta>();
+  for (const { lineage, winner } of lineageWinners) {
+    const winnerMeta = toCatalogMeta(winner, viewer.userId, dmCampaignIds);
+    for (const entry of lineage) metaByEntryId.set(entry.id, winnerMeta);
+  }
 
   const mechanicsByEntryId = new Map<string, Spell>();
-  for (const { lineage, winner } of lineageWinners) {
-    const winnerSpell = spellByEntryId.get(winner.id);
-    // Spell.catalogEntryId is required+unique (#1796) — a winner CatalogEntry
-    // with no Spell row would be the same data-integrity violation
-    // forkContent's own comment calls out, never a state a real lineage can
-    // reach; skip defensively rather than throw mid-serialize.
-    if (!winnerSpell) continue;
-    for (const entry of lineage) mechanicsByEntryId.set(entry.id, winnerSpell);
+  if (kind === "SPELL") {
+    const winnerSpells = await prisma.spell.findMany({
+      where: { catalogEntryId: { in: lineageWinners.map(({ winner }) => winner.id) } },
+    });
+    const spellByEntryId = new Map(winnerSpells.map((spell) => [spell.catalogEntryId, spell]));
+    for (const { lineage, winner } of lineageWinners) {
+      const winnerSpell = spellByEntryId.get(winner.id);
+      if (!winnerSpell) continue;
+      for (const entry of lineage) mechanicsByEntryId.set(entry.id, winnerSpell);
+    }
   }
-  return mechanicsByEntryId;
+
+  return { metaByEntryId, mechanicsByEntryId };
 }
 
 function viewerForCharacter(character: CharacterWithRelations): CatalogViewer {
@@ -287,16 +331,14 @@ export async function resolveSpellEntryIdsForCharacter(character: CharacterWithR
   return resolveVisibleEntryIds("SPELL", viewerForCharacter(character));
 }
 
-/** Same convenience wrapper as resolveSpellEntryIdsForCharacter, for resolveEntitlementMeta. */
-export async function resolveSpellEntitlementMetaForCharacter(
+/**
+ * Same convenience wrapper as resolveSpellEntryIdsForCharacter, for
+ * resolveEntitlementForViewer — the single-snapshot META+MECHANICS pair
+ * spell-catalog.ts's attachSpellCatalogMeta consumes together (#1815 review
+ * finding 3: this is what replaced its old two-independent-calls shape).
+ */
+export async function resolveSpellEntitlementForCharacter(
   character: CharacterWithRelations,
-): Promise<Map<string, CatalogMeta>> {
-  return resolveEntitlementMeta("SPELL", viewerForCharacter(character));
-}
-
-/** Same convenience wrapper as resolveSpellEntryIdsForCharacter, for resolveSpellMechanicsWinners. */
-export async function resolveSpellMechanicsOverridesForCharacter(
-  character: CharacterWithRelations,
-): Promise<Map<string, Spell>> {
-  return resolveSpellMechanicsWinners(viewerForCharacter(character));
+): Promise<{ metaByEntryId: Map<string, CatalogMeta>; mechanicsByEntryId: Map<string, Spell> }> {
+  return resolveEntitlementForViewer("SPELL", viewerForCharacter(character));
 }

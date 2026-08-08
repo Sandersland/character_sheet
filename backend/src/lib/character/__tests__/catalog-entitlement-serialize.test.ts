@@ -174,7 +174,7 @@ describe("serializeCharacter — catalog entitlement wiring (#1798, epic #1795 3
   // never learned — could collide in it, arbitrated only by unordered
   // findMany row order, and silently serve the WRONG meta for the learned
   // (shadowed) spell, defeating the DM's override. The fix moved lineage
-  // entirely into the resolver (resolveSpellEntitlementMetaForCharacter),
+  // entirely into the resolver (resolveSpellEntitlementForCharacter),
   // which maps every visible candidate id — winner or shadowed — straight to
   // its OWN lineage's winner; a same-named entry from an unrelated lineage
   // never enters the lookup at all any more.

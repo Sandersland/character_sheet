@@ -29,6 +29,15 @@ function serializeGrant(grant: CatalogGrant): GrantWire {
 // calling this — it needs the scope check to run BEFORE the ownership check
 // (see its own comment), which this helper's ownership-first order doesn't
 // support.
+//
+// Requires `scope === "USER"` in addition to the `ownerUserId` match (#1815
+// review finding 9): today `ownerUserId` is non-null only for USER-scope
+// entries (the CHECK constraint schema.prisma's own CatalogEntry comment
+// describes), so this can't currently diverge from an ownerUserId-only
+// check — but "grant-owned" should mean USER-scope-and-owned, not merely
+// "ownerUserId happens to match," so a future entry kind that also carries
+// an ownerUserId (e.g. a co-DM CAMPAIGN entry) can't silently pass grant
+// ownership without ALSO being the kind of entry grants are defined for.
 async function assertGrantEntryOwnership(
   entryId: string,
   userId: string,
@@ -40,10 +49,48 @@ async function assertGrantEntryOwnership(
   if (!entry) {
     throw new NotFoundError("Catalog entry not found");
   }
-  if (entry.ownerUserId !== userId) {
+  if (entry.scope !== "USER" || entry.ownerUserId !== userId) {
     throw new AuthorizationError("You do not have access to this catalog entry");
   }
   return entry;
+}
+
+// Recovery path for the POST handler's own create-then-catch P2002 (#1815
+// review finding 6, hardened against the follow-up double-race) — pulled
+// out of the route handler purely to keep it under the fallow pre-commit
+// CRAP/cyclomatic ceiling (CLAUDE.md), not a behavior change from having it
+// inline. Re-fetches the row that caused the conflict; if it's genuinely
+// gone (a concurrent DELETE — findUnique + null check, never
+// findUniqueOrThrow, which would throw an uncaught P2025 for exactly that
+// case), recreates it. That recreate can ITSELF P2002 under a double-race (a
+// THIRD concurrent POST winning the create in between) — caught the same
+// way, one more findUnique + null check, never a third create: an
+// extraordinarily narrow remaining window where rethrowing is still
+// strictly better than the pre-fix uncaught-P2002-500. `created` is `true`
+// only when THIS call's own create is what won, so the route handler can
+// still report 201 vs 200 accurately.
+async function recoverFromGrantConflict(
+  catalogEntryId: string,
+  campaignId: string,
+): Promise<{ grant: CatalogGrant; created: boolean }> {
+  const existing = await prisma.catalogGrant.findUnique({
+    where: { catalogEntryId_campaignId: { catalogEntryId, campaignId } },
+  });
+  if (existing) return { grant: existing, created: false };
+
+  try {
+    const recreated = await prisma.catalogGrant.create({ data: { catalogEntryId, campaignId } });
+    return { grant: recreated, created: true };
+  } catch (recreateErr) {
+    if (!(recreateErr instanceof Prisma.PrismaClientKnownRequestError) || recreateErr.code !== "P2002") {
+      throw recreateErr;
+    }
+    const winner = await prisma.catalogGrant.findUnique({
+      where: { catalogEntryId_campaignId: { catalogEntryId, campaignId } },
+    });
+    if (!winner) throw recreateErr;
+    return { grant: winner, created: false };
+  }
 }
 
 /**
@@ -56,8 +103,8 @@ async function assertGrantEntryOwnership(
  * campaignMembership.upsert's role elsewhere in this codebase, e.g.
  * campaigns.ts's own POST /campaigns/join): a find-then-create TOCTOU window
  * would let two concurrent identical POSTs both read no existing row and both
- * insert, so the loser's write hits the unique constraint — caught here as
- * P2002 and turned into a 200 of the winner's row rather than the 500 the
+ * insert, so the loser's write hits the unique constraint — caught here and
+ * resolved via recoverFromGrantConflict above rather than the 500 the
  * terminal error handler would otherwise map an uncaught P2002 to.
  */
 grantsRouter.post("/catalog/entries/:entryId/grants", async (req, res) => {
@@ -87,14 +134,11 @@ grantsRouter.post("/catalog/entries/:entryId/grants", async (req, res) => {
     });
     res.status(201).json(serializeGrant(grant));
   } catch (err) {
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
-      const existing = await prisma.catalogGrant.findUniqueOrThrow({
-        where: { catalogEntryId_campaignId: { catalogEntryId: entry.id, campaignId: data.campaignId } },
-      });
-      res.status(200).json(serializeGrant(existing));
-      return;
+    if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== "P2002") {
+      throw err;
     }
-    throw err;
+    const { grant, created } = await recoverFromGrantConflict(entry.id, data.campaignId);
+    res.status(created ? 201 : 200).json(serializeGrant(grant));
   }
 });
 

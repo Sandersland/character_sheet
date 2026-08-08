@@ -4,9 +4,11 @@ import { customSpellSchema, type CustomSpellInput } from "@character-sheet/contr
 
 import { Prisma, type CatalogEntry, type Spell } from "@/generated/prisma/client.js";
 import { assertSpellOwnership } from "@/lib/auth/access.js";
+import { NotFoundError } from "@/lib/auth/errors.js";
 import { parseBodyOr400 } from "@/lib/http/parse-body.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { reconcileSpellClasses } from "@/lib/spellcasting/spell-classes.js";
+import { nullableSpellEffectFields, undefinedSpellEffectFields } from "@/lib/spellcasting/spell-effect-fields.js";
 import {
   validateCustomSpellClasses,
   validateCustomSpellCoherence,
@@ -42,50 +44,10 @@ import {
 
 export const customSpellsRouter = Router();
 
-// The 9 structured-effect columns, all nullable on the Spell model. Named
-// once here and walked by both nullableEffectFields (write) and
-// undefinedEffectFields (serialize) below — a loop over one list instead of
-// nine hand-written `??` sites apiece, which is what drove custom-spells.ts's
-// own functions over the complexity/CRAP ceiling before this extraction.
-const EFFECT_FIELD_NAMES = [
-  "effectKind",
-  "effectDiceCount",
-  "effectDiceFaces",
-  "effectModifier",
-  "damageType",
-  "attackType",
-  "saveAbility",
-  "saveEffect",
-  "upcastDicePerLevel",
-] as const satisfies readonly (keyof CustomSpellInput & keyof Spell)[];
-type EffectFieldName = (typeof EFFECT_FIELD_NAMES)[number];
-type NullableEffectFields = Pick<Spell, EffectFieldName>;
-type UndefinedEffectFields = { [K in EffectFieldName]: Spell[K] | undefined };
-
-function nullableEffectFields(data: CustomSpellInput): NullableEffectFields {
-  const out = {} as Record<EffectFieldName, unknown>;
-  for (const name of EFFECT_FIELD_NAMES) {
-    out[name] = data[name] ?? null;
-  }
-  // TS can't narrow a Record write keyed by a union loop variable back to the
-  // per-field union NullableEffectFields declares — every value above came
-  // straight from CustomSpellInput's own typed fields (or null), so this is
-  // the single controlled cast back to that shape, not an escape hatch.
-  return out as NullableEffectFields;
-}
-
-function undefinedEffectFields(row: Spell): UndefinedEffectFields {
-  const out = {} as Record<EffectFieldName, unknown>;
-  for (const name of EFFECT_FIELD_NAMES) {
-    out[name] = row[name] ?? undefined;
-  }
-  // Same cast rationale as nullableEffectFields above.
-  return out as UndefinedEffectFields;
-}
-
 // Shared by POST's create and PATCH's update: every editable column except
 // ownerId/edition (server-forced, POST-only) and the structured-effect
-// columns (nullableEffectFields above).
+// columns (nullableSpellEffectFields, lib/spellcasting/spell-effect-fields.ts
+// — shared with spells.ts/fork.ts, #1815 review finding 5).
 function customSpellWriteData(data: CustomSpellInput) {
   return {
     name: data.name,
@@ -98,7 +60,7 @@ function customSpellWriteData(data: CustomSpellInput) {
     concentration: data.concentration ?? false,
     ritual: data.ritual ?? false,
     components: data.components ?? Prisma.JsonNull,
-    ...nullableEffectFields(data),
+    ...nullableSpellEffectFields(data),
   };
 }
 
@@ -127,7 +89,7 @@ function serializeCustomSpell(row: Spell, classes: string[], entry: CatalogEntry
     // No query needed to recompute a fact this route's own auth step already
     // established.
     catalog: { entryId: entry.id, scope: entry.scope, isFork: entry.forkedFromId !== null, forkedFromId: entry.forkedFromId, editable: true },
-    ...undefinedEffectFields(row),
+    ...undefinedSpellEffectFields(row),
   };
 }
 
@@ -193,31 +155,48 @@ customSpellsRouter.post("/spells/custom", async (req, res) => {
  * Full-field replace of an owned homebrew spell OR a CAMPAIGN-scope fork the
  * caller DMs (#1808, epic #1795 8/8). 404 if the spell doesn't exist, 403 if
  * it exists but the caller has neither editable path to it (including any
- * seeded GLOBAL row — assertSpellOwnership's own comment). Same atomic-write
- * guarantee as POST above. Also renames the linked CatalogEntry (its business
- * key includes `name`) so a rename can't leave the entry pointing at stale
- * content.
+ * seeded GLOBAL row — assertSpellOwnership's own comment). Also renames the
+ * linked CatalogEntry (its business key includes `name`) so a rename can't
+ * leave the entry pointing at stale content.
+ *
+ * assertSpellOwnership runs as the TRANSACTION's OWN first statement, not a
+ * separate call beforehand (#1815 review finding 7): the prior shape had a
+ * TOCTOU window between that outer check and this transaction's writes — a
+ * concurrent DELETE landing in between made `tx.catalogEntry.update` below
+ * throw an uncaught P2025 (500) for a spell that, from the caller's own
+ * perspective, no longer exists. Moving the check inside collapses the large
+ * part of that window (no separate round-trip, and no parseAndValidate DB
+ * work, in between); the catch below closes what's left — ANY mid-transaction
+ * "record to update not found" maps to the same 404 assertSpellOwnership
+ * itself would throw a moment later, never an uncaught 500.
  */
 customSpellsRouter.patch("/spells/custom/:id", async (req, res) => {
-  const owned = await assertSpellOwnership(prisma, req.user!.id, req.params.id);
-
   const data = await parseAndValidate(req, res);
   if (data === undefined) return;
 
-  const { spell, classes, entry } = await prisma.$transaction(async (tx) => {
-    const entry = await tx.catalogEntry.update({
-      where: { id: owned.catalogEntryId },
-      data: { name: data.name },
+  let result;
+  try {
+    result = await prisma.$transaction(async (tx) => {
+      const owned = await assertSpellOwnership(tx, req.user!.id, req.params.id);
+      const entry = await tx.catalogEntry.update({
+        where: { id: owned.catalogEntryId },
+        data: { name: data.name },
+      });
+      const updated = await tx.spell.update({
+        where: { id: req.params.id },
+        data: customSpellWriteData(data),
+      });
+      const classes = await reconcileSpellClasses(tx, updated.id, data.classes);
+      return { spell: updated, classes, entry };
     });
-    const updated = await tx.spell.update({
-      where: { id: req.params.id },
-      data: customSpellWriteData(data),
-    });
-    const classes = await reconcileSpellClasses(tx, updated.id, data.classes);
-    return { spell: updated, classes, entry };
-  });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2025") {
+      throw new NotFoundError("Spell not found");
+    }
+    throw err;
+  }
 
-  res.json(serializeCustomSpell(spell, classes, entry));
+  res.json(serializeCustomSpell(result.spell, result.classes, result.entry));
 });
 
 /**

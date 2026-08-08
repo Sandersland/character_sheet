@@ -88,6 +88,14 @@ export async function assertCampaignMembership(
 // — which is correct: a system spell is nobody's to edit or delete. Returns
 // catalogEntryId (not the CatalogEntry row itself) so a caller that needs to
 // mutate/delete the entry can do so without a second fetch.
+//
+// A missing `entry` (Spell.catalogEntryId resolving to no CatalogEntry) 404s
+// rather than falling through to the generic 403 (#1815 review finding 8):
+// the FK is ON DELETE CASCADE (schema.prisma's own comment on that column),
+// so an orphan can't be produced through ordinary writes — but if the
+// invariant is ever violated, a 403 would misreport "you can't touch this"
+// for content that doesn't actually exist, masking the real data-integrity
+// failure instead of surfacing it as the "not found" it actually is.
 export async function assertSpellOwnership(
   db: Db,
   userId: string,
@@ -105,10 +113,13 @@ export async function assertSpellOwnership(
     where: { id: spell.catalogEntryId },
     select: { scope: true, ownerUserId: true, ownerCampaignId: true },
   });
-  if (entry?.scope === "USER" && entry.ownerUserId === userId) {
+  if (!entry) {
+    throw new NotFoundError("Spell not found");
+  }
+  if (entry.scope === "USER" && entry.ownerUserId === userId) {
     return spell;
   }
-  if (entry?.scope === "CAMPAIGN" && entry.ownerCampaignId) {
+  if (entry.scope === "CAMPAIGN" && entry.ownerCampaignId) {
     await assertCampaignOwner(db, userId, entry.ownerCampaignId, "edit", "You do not have access to this spell");
     return spell;
   }

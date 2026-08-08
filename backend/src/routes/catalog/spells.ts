@@ -11,72 +11,51 @@ import { prisma } from "@/lib/core/prisma.js";
 import { EMPTY_CAMPAIGN_ID_SET, isCatalogEntryEditable, resolveDmCampaignIds, resolveVisibleEntries, type CatalogViewer } from "@/lib/catalog/entitlement.js";
 import { editionOf } from "@/lib/rules/edition.js";
 import { classesOf, resolveSpellCatalogForEdition, SPELL_CLASS_MEMBERSHIP_SELECT } from "@/lib/spellcasting/spell-classes.js";
+import { undefinedSpellEffectFields } from "@/lib/spellcasting/spell-effect-fields.js";
 import { loadSubclassSpellListExpansionIds } from "@/lib/spellcasting/spell-list-expansion.js";
 
 export const spellsRouter = Router();
 
-// The nullable-on-Spell columns this route defaults to `undefined` on serve
-// (never `null`, matching every other catalog route's wire shape) — named
-// once and walked in a loop rather than one hand-written `?? undefined` per
-// field, same shape custom-spells.ts's own EFFECT_FIELD_NAMES uses and for
-// the same reason (see that file's comment): eight-plus individual `??`
-// sites in one function is what crosses the complexity/CRAP ceiling.
-// `saveEffect` (#1788, epic #1782 5/5) was missing here even though
-// customSpellSchema/HomebrewSpellDamageFields have carried it since #1787 —
-// the manage view's "Edit" prefill is the first caller that actually reads
-// it back, and without it a saved "half damage on save" choice would
-// silently vanish from the form on every edit.
-//
-// `ownerId` is NOT in this list any more (#1796 dropped the Spell column it
-// read from) — it's computed separately in the route handler below, off the
-// CatalogEntry a row's `catalogEntryId` resolves to, and passed into
-// serializeCatalogSpellRow explicitly.
-const UNDEFINED_DEFAULTED_FIELD_NAMES = [
-  "effectKind",
-  "effectDiceCount",
-  "effectDiceFaces",
-  "effectModifier",
-  "damageType",
-  "attackType",
-  "saveAbility",
-  "saveEffect",
-  "upcastDicePerLevel",
-] as const satisfies readonly (keyof Spell)[];
-type UndefinedDefaultedFieldName = (typeof UNDEFINED_DEFAULTED_FIELD_NAMES)[number];
-type UndefinedDefaultedFields = { [K in UndefinedDefaultedFieldName]: Spell[K] | undefined };
-
-function undefinedDefaultedFields(row: Spell): UndefinedDefaultedFields {
-  const out = {} as Record<UndefinedDefaultedFieldName, unknown>;
-  for (const name of UNDEFINED_DEFAULTED_FIELD_NAMES) {
-    out[name] = row[name] ?? undefined;
-  }
-  // Every value above came straight from Spell's own typed columns (or
-  // undefined) — the single controlled cast back to the per-field union
-  // UndefinedDefaultedFields declares, same rationale as custom-spells.ts's
-  // own nullableEffectFields/undefinedEffectFields casts.
-  return out as UndefinedDefaultedFields;
-}
-
-// `ownerId`/`catalog` are derived off the CatalogEntry a row's
-// `catalogEntryId` resolves to (#1796 dropped the Spell column `ownerId` used
-// to read from), attached by the route handler below BEFORE
-// resolution/serialization — resolveSpellCatalogForEdition still groups on
-// `ownerId` (see that function's own comment), so it has to exist on the row
-// by the time these run, not just at response time.
-type CatalogSpellRow = Spell & { classMemberships: { className: string }[]; ownerId: string | null; catalog: CatalogMeta };
+// `ownerId`/`catalogOwnerUserId`/`catalog` are derived off the CatalogEntry a
+// row's `catalogEntryId` resolves to (#1796 dropped the Spell column
+// `ownerId` used to read from), attached by the route handler below BEFORE
+// resolution/serialization. Two DIFFERENT owner-shaped fields, deliberately
+// (#1815 review finding 2): `catalogOwnerUserId` is the entry's RAW
+// `ownerUserId` — resolveSpellCatalogForEdition's own grouping input (see
+// that function's comment), never served on the wire. `ownerId` is the
+// WIRE-SAFE field serializeCatalogSpellRow below actually serves — null
+// unless the row is the CALLER's own USER-scope entry. Collapsing these into
+// one field was the bug: GET /api/spells used to serve `e.ownerUserId`
+// unconditionally, which for a granted (not owned) entry is the GRANTER's
+// id, not the caller's — leaking another user's id and breaking every
+// ownerId-driven UI signal for a granted row (fork button hidden, wrong
+// scope badge). catalogProvenance.ts/homebrewSpell.ts (frontend) no longer
+// read `ownerId` for any of that (they read `catalog.editable`/`catalog.scope`
+// instead, per CLAUDE.md "frontend never originates a rule") — this fixes
+// the value too, as defense in depth, restoring the invariant this file's
+// own comment on `ownerId` below promises.
+type CatalogSpellRow = Spell & {
+  classMemberships: { className: string }[];
+  catalogOwnerUserId: string | null;
+  ownerId: string | undefined;
+  catalog: CatalogMeta;
+};
 
 // `ownerId` is present only on the caller's own homebrew (#1788) — every
-// other row's ownerId is already resolved to null (seeded/GLOBAL) or the
-// caller's own id (their USER-scope row) by the route handler's resolver
-// call, so this is the client's only signal for "mine, offer edit/delete" vs.
-// seeded content; it never leaks another user's id. `catalog` (#1798, epic
-// #1795 3/6 — additive over the pre-#1796 response, see SpellWire's own
-// comment in shared-types/src/catalog.ts) is the entitlement metadata every
-// catalog-content row now carries.
+// other row's ownerId is `undefined` (seeded/GLOBAL, another user's granted/
+// shared homebrew, or a DM's CAMPAIGN fork) by the time loadResolvedSpells
+// attaches it below, so this is the client's only signal for "mine, offer
+// edit/delete" vs. not — it never leaks another user's id (#1815 review
+// finding 2 restores this promise; see CatalogSpellRow's own comment for the
+// bug it used to have). `catalog` (#1798, epic #1795 3/6 — additive over the
+// pre-#1796 response, see SpellWire's own comment in shared-types/src/
+// catalog.ts) is the entitlement metadata every catalog-content row now
+// carries, and is what the frontend actually derives provenance/fork UI
+// from (never `ownerId` — CLAUDE.md "frontend never originates a rule").
 function serializeCatalogSpellRow(row: CatalogSpellRow) {
   return {
     id: row.id,
-    ownerId: row.ownerId ?? undefined,
+    ownerId: row.ownerId,
     name: row.name,
     level: row.level,
     school: row.school,
@@ -88,7 +67,7 @@ function serializeCatalogSpellRow(row: CatalogSpellRow) {
     ritual: row.ritual,
     classes: classesOf(row),
     cantripScaling: row.cantripScaling,
-    ...undefinedDefaultedFields(row),
+    ...undefinedSpellEffectFields(row),
     catalog: row.catalog,
   };
 }
@@ -145,7 +124,7 @@ async function loadResolvedSpells(
   const visibleEntries = await resolveVisibleEntries("SPELL", viewer);
   // Batched once per response, not per row (#1808 leak-fix review) — and
   // skipped entirely when nothing CAMPAIGN-scope is even in play, same fast
-  // path resolveEntitlementMeta's own comment documents.
+  // path resolveEntitlementForViewer's own comment documents.
   const dmCampaignIds = visibleEntries.some((e) => e.scope === "CAMPAIGN")
     ? await resolveDmCampaignIds(viewer.userId)
     : EMPTY_CAMPAIGN_ID_SET;
@@ -153,7 +132,13 @@ async function loadResolvedSpells(
     visibleEntries.map((e) => [
       e.id,
       {
-        ownerId: e.ownerUserId,
+        // Raw grouping input for resolveSpellCatalogForEdition below — NEVER
+        // served on the wire (see CatalogSpellRow's own comment).
+        catalogOwnerUserId: e.ownerUserId,
+        // Wire-safe: only the caller's own USER-scope row carries an id; a
+        // granted/shared entry's actual owner (e.ownerUserId) is someone
+        // else's id and must never reach the response (#1815 review finding 2).
+        ownerId: e.ownerUserId === viewer.userId ? e.ownerUserId : undefined,
         catalog: {
           entryId: e.id,
           scope: e.scope,
@@ -179,7 +164,7 @@ async function loadResolvedSpells(
     // so a miss here would mean the resolver and this route's own follow-up
     // query disagree — never a legitimate runtime state.
     if (!meta) throw new Error(`Spell ${row.id} resolved to an untracked catalog entry ${row.catalogEntryId}`);
-    return { ...row, ownerId: meta.ownerId, catalog: meta.catalog };
+    return { ...row, catalogOwnerUserId: meta.catalogOwnerUserId, ownerId: meta.ownerId, catalog: meta.catalog };
   });
   const resolved = resolveSpellCatalogForEdition(owned, edition);
   if (!className) return resolved;
@@ -269,11 +254,12 @@ async function loadResolvedSpells(
  * Spell.catalogEntryId carries no Prisma relation (the supertype stays
  * closed, see schema.prisma's own comment on that column), so the visible id
  * set is what's handed to a plain `catalogEntryId: { in: [...] }` filter.
- * Each row is then tagged with its resolved `ownerId` (null for GLOBAL, the
- * caller's own id for USER — never anyone else's, since the set was already
- * scoped) AND its `catalog` metadata (SpellWire.catalog, locked in slice 1)
- * before flowing through the exact same resolution/class/level pipeline as
- * before (resolveSpellCatalogForEdition's grouping key still accounts for
+ * Each row is then tagged with its wire-safe `ownerId` (undefined unless the
+ * row is the CALLER's own USER-scope entry — #1815 review finding 2; see
+ * CatalogSpellRow's own comment) AND its `catalog` metadata (SpellWire.catalog,
+ * locked in slice 1) before flowing through the exact same resolution/class/
+ * level pipeline as before (resolveSpellCatalogForEdition's grouping key
+ * uses the SEPARATE raw `catalogOwnerUserId` field, never the wire-safe
  * `ownerId` — see that function's own comment for the same-name collision
  * case). `spellsRouter` is mounted `"authed"` in routes/manifest.ts, so
  * `req.user` is always populated here.

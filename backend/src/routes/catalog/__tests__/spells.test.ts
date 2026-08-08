@@ -948,6 +948,28 @@ describe("GET /api/spells — ?characterId= campaign-aware picker (#1811)", () =
     expect(names(resOutsider.body)).not.toContain(name);
   });
 
+  // #1815 review finding 2: GET /api/spells used to serve `ownerId` as the
+  // ENTRY's raw ownerUserId unconditionally — for this exact granted row
+  // that's MEMBER_A's id, leaked to MEMBER_B's response. `ownerId` is the
+  // manage view's own "mine, offer edit/delete" signal (see
+  // serializeCatalogSpellRow's comment); leaking it here made MEMBER_B's
+  // picker treat MEMBER_A's shared spell as MEMBER_B's OWN homebrew — hiding
+  // the Fork button, showing Edit/Delete that then 403 on click, and
+  // labeling it "My homebrew" instead of "Shared homebrew".
+  it("does not leak the granter's ownerId to a member the entry was only GRANTED to, and marks it non-editable", async () => {
+    const name = "Test Picker Granted Bolt Ownerid Leak";
+    const { catalogEntryId } = await makeSpell({ name, scope: "USER", ownerUserId: MEMBER_A_ID });
+    await prisma.catalogGrant.create({ data: { catalogEntryId, campaignId } });
+
+    const resB = await supertest.agent(app).set("Cookie", cookieB)
+      .get(`/api/spells?edition=EDITION_2014&characterId=${charMemberB}`);
+    expect(resB.status).toBe(200);
+    const row = resB.body.find((s: { name: string }) => s.name === name);
+    expect(row).toBeDefined();
+    expect(row.ownerId).toBeUndefined();
+    expect(row.catalog).toMatchObject({ scope: "USER", editable: false });
+  });
+
   it("a DM's CAMPAIGN homebrew appears in members' pickers for characters in that campaign", async () => {
     const name = "Test Picker DM Campaign Spell";
     await makeSpell({ name, scope: "CAMPAIGN", ownerCampaignId: campaignId });

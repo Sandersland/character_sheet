@@ -190,14 +190,41 @@ function catalogSpell(over: Partial<CatalogSpell> = {}): CatalogSpell {
 }
 
 describe("ownedHomebrewSpells", () => {
-  it("keeps only rows with an ownerId, dropping seeded rows", () => {
-    const seeded = catalogSpell({ id: "seeded", ownerId: undefined });
-    const homebrew = catalogSpell({ id: "own", ownerId: "u1" });
+  it("keeps only rows with catalog.editable true, dropping seeded rows", () => {
+    const seeded = catalogSpell({
+      id: "seeded",
+      ownerId: undefined,
+      catalog: { entryId: "entry-seeded", scope: "GLOBAL", isFork: false, forkedFromId: null, editable: false },
+    });
+    const homebrew = catalogSpell({
+      id: "own",
+      ownerId: "u1",
+      catalog: { entryId: "entry-own", scope: "USER", isFork: false, forkedFromId: null, editable: true },
+    });
     expect(ownedHomebrewSpells([seeded, homebrew])).toEqual([homebrew]);
   });
 
   it("returns an empty list when the catalog has no homebrew", () => {
-    expect(ownedHomebrewSpells([catalogSpell({ ownerId: undefined })])).toEqual([]);
+    const seeded = catalogSpell({
+      ownerId: undefined,
+      catalog: { entryId: "entry-1", scope: "GLOBAL", isFork: false, forkedFromId: null, editable: false },
+    });
+    expect(ownedHomebrewSpells([seeded])).toEqual([]);
+  });
+
+  // #1815 review findings 2/10: GET /api/spells used to leak the GRANTER's
+  // id as `ownerId` on a granted (not owned) row — the OLD `ownerId !==
+  // undefined` half of this filter would have wrongly kept it in the
+  // caller's own manage list (offering Edit/Delete buttons that then 403 on
+  // click). `catalog.editable` is the only signal this function reads now,
+  // and it's false for a granted row regardless of what ownerId says.
+  it("drops a granted (not owned) USER row even if ownerId carries the granter's id", () => {
+    const granted = catalogSpell({
+      id: "granted",
+      ownerId: "granter-id",
+      catalog: { entryId: "entry-granted", scope: "USER", isFork: false, forkedFromId: null, editable: false },
+    });
+    expect(ownedHomebrewSpells([granted])).toEqual([]);
   });
 
   // #1808 leak-fix, epic #1795 8/9 combined-state review: a DM's CAMPAIGN-

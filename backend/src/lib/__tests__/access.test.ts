@@ -252,4 +252,23 @@ describe("assertSpellOwnership", () => {
     const row = await prisma.$transaction((tx) => assertSpellOwnership(tx, SPELL_DM, campaignSpellId));
     expect(row.id).toBe(campaignSpellId);
   });
+
+  // #1815 review finding 8: a Spell whose catalogEntryId resolves to no
+  // CatalogEntry used to fall through to the generic 403, misreporting "you
+  // can't touch this" for content that doesn't actually exist and masking
+  // the real data-integrity failure. The Spell->CatalogEntry FK is ON DELETE
+  // CASCADE (schema.prisma's own comment on that column), so a real orphan
+  // can't be produced through ordinary writes — this fakes the two lookups
+  // assertSpellOwnership itself makes (spell.findUnique then
+  // catalogEntry.findUnique) rather than fighting the FK to reproduce a
+  // state the schema itself guarantees can't occur.
+  it("throws a 404, not a 403, when the Spell's CatalogEntry is missing (data-integrity violation)", async () => {
+    const fakeDb = {
+      spell: { findUnique: async () => ({ id: "orphan-spell", catalogEntryId: "missing-entry" }) },
+      catalogEntry: { findUnique: async () => null },
+    } as unknown as Parameters<typeof assertSpellOwnership>[0];
+
+    await expect(assertSpellOwnership(fakeDb, SPELL_DM, "orphan-spell")).rejects.toBeInstanceOf(NotFoundError);
+    await expect(assertSpellOwnership(fakeDb, SPELL_DM, "orphan-spell")).rejects.toMatchObject({ status: 404 });
+  });
 });

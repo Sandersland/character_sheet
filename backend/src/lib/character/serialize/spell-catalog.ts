@@ -8,10 +8,7 @@ import type { CatalogMeta, SpellComponents } from "@character-sheet/shared-types
 
 import type { Spell } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
-import {
-  resolveSpellEntitlementMetaForCharacter,
-  resolveSpellMechanicsOverridesForCharacter,
-} from "@/lib/catalog/entitlement.js";
+import { resolveSpellEntitlementForCharacter } from "@/lib/catalog/entitlement.js";
 import type { CharacterWithRelations } from "@/lib/character/character-include.js";
 import type { SpellEntry } from "@/lib/spellcasting/spell-state.js";
 
@@ -73,10 +70,10 @@ function isCatalogLearned(spell: SpellEntry): spell is SpellEntry & { spellId: s
 /**
  * Attach `catalog.{scope,isFork,forkedFromId}` to every catalog-backed
  * learned spell (isCatalogLearned above), resolved through
- * resolveSpellEntitlementMetaForCharacter (lib/catalog/entitlement.ts) —
- * never re-derived here (CLAUDE.md "one shared function"). A
- * subclass/species/item-granted entry passes through untouched; those
- * aren't governed by catalog entitlement.
+ * resolveSpellEntitlementForCharacter (lib/catalog/entitlement.ts) — never
+ * re-derived here (CLAUDE.md "one shared function"). A subclass/species/
+ * item-granted entry passes through untouched; those aren't governed by
+ * catalog entitlement.
  *
  * The lookup is a single hop, by id only: the entry's OWN catalogEntryId,
  * looked up in the meta map the resolver already keys by EVERY visible
@@ -109,10 +106,16 @@ export async function attachSpellCatalogMeta(
   if (learned.length === 0) return spells;
   const storedSpellIds = [...new Set(learned.map((s) => s.spellId))];
 
-  const [storedSpells, metaByEntryId, mechanicsByEntryId] = await Promise.all([
+  // storedSpells is a separate, immutable-once-written lookup (a Spell row's
+  // own catalogEntryId never changes post-creation — forking always creates
+  // a NEW Spell row, never mutates an old one) so it's safe alongside the
+  // entitlement resolution in one Promise.all; META and MECHANICS themselves
+  // come from ONE resolveSpellEntitlementForCharacter call (#1815 review
+  // finding 3) rather than two independently-snapshotted ones, closing the
+  // split-brain window a fork committing mid-request used to open.
+  const [storedSpells, { metaByEntryId, mechanicsByEntryId }] = await Promise.all([
     prisma.spell.findMany({ where: { id: { in: storedSpellIds } }, select: { id: true, catalogEntryId: true } }),
-    resolveSpellEntitlementMetaForCharacter(row),
-    resolveSpellMechanicsOverridesForCharacter(row),
+    resolveSpellEntitlementForCharacter(row),
   ]);
   const catalogEntryIdBySpellId = new Map(storedSpells.map((s) => [s.id, s.catalogEntryId]));
 
