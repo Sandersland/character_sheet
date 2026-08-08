@@ -885,10 +885,11 @@ async function logSpellcastingEvent(
   });
 }
 
-// Character columns castAbilityWithSlotInTx needs to derive slot/arcana
-// totals from scratch — a lean subset of SPELLCASTING_SELECT for a caller
-// (the row-driven ability dispatcher, routes/character/actions.ts) with no
-// SpellOpContext of its own.
+// Character columns loadSlotPayContext needs to derive slot/arcana totals
+// from scratch — a lean subset of SPELLCASTING_SELECT for a caller (the
+// row-driven ability dispatcher, routes/character/actions.ts, and
+// resolveAction, lib/combat/resolve-action.ts, #1829) with no SpellOpContext
+// of its own.
 const SLOT_PAY_SELECT = {
   experiencePoints: true,
   abilityScores: true,
@@ -901,34 +902,34 @@ const SLOT_PAY_SELECT = {
 } satisfies Prisma.CharacterSelect;
 
 /**
- * Pays + logs a `{kind:"slot"}` ability cost for a caller with no
- * SpellOpContext of its own (#1687) — the row-driven ability dispatcher's
- * counterpart to applySpellcastingOpInTx's own load → pay → persist → log
- * sequence for a spell cast. Before this, a row-driven cost could only be
- * "pool" or "none": `costKind:"slot"` on a ClassFeature row typed, but
- * nothing loaded the slot/arcanum maps `payAbilityCostInTx` requires, and the
- * cast's OpOutcome was discarded (no event logged), so a spend would have
- * mutated nothing durable and left no undo trail.
+ * Loads the character, derives its slot/arcana totals, and assembles the
+ * `PayCostContext` a `{kind:"slot"}` payment needs — the "load → derive →
+ * build cost context" preamble `castAbilityWithSlotInTx` and
+ * `applyResolveActionOperations` (lib/combat/resolve-action.ts, #1829) both
+ * run before paying a slot cost. Extracted so the two callers can never
+ * compute slotTotals/arcanaTotals two different ways (fallow dup:0f5f60c3).
+ *
+ * `onMissing` is the ONE thing this helper does NOT unify: each caller keeps
+ * its own not-found semantics (castAbilityWithSlotInTx's 5xx internal
+ * invariant vs a domain's 400 op error) by supplying its own error to throw.
+ * The caller also owns its own before/after snapshot (cloneSpellState vs
+ * snapshotSpellcasting — equivalent shapes, kept as each call site already
+ * had them) since that isn't part of the shared preamble either.
  *
  * Mirrors buildSpellcastingOp's own derivation exactly: primary class only,
- * XP-derived TOTAL level — a pre-existing scope limit shared by both callers
+ * XP-derived TOTAL level — a pre-existing scope limit shared by every caller
  * (a spell cast has never combined multiclass slot tables here either), not
  * something this widens.
  */
-export async function castAbilityWithSlotInTx(
+export async function loadSlotPayContext(
   tx: Prisma.TransactionClient,
   characterId: string,
   batchId: string,
   sessionId: string | null,
-  input: CastAbilityInput,
-): Promise<OpOutcome> {
+  onMissing: (characterId: string) => Error,
+): Promise<{ state: SpellcastingMutableState; costCtx: PayCostContext }> {
   const row = await tx.character.findUnique({ where: { id: characterId }, select: SLOT_PAY_SELECT });
-  if (!row) {
-    // Internal invariant, not a client error: the character was already loaded
-    // in this same transaction (applyRowDrivenActionInTx) — a miss here is a
-    // server fault (5xx), so a plain Error, not the 400-mapped op error.
-    throw new Error(`Character not found: ${characterId}`);
-  }
+  if (!row) throw onMissing(characterId);
 
   const level = levelForExperience(row.experiencePoints);
   const profBonus = proficiencyBonusForLevel(level);
@@ -942,9 +943,7 @@ export async function castAbilityWithSlotInTx(
     editionOf(row),
   );
   const { slotTotals, arcanaTotals } = computeSlotTables(row.spellcasting, derived);
-
   const state = normalizeSpellcastingMutable(row.spellcasting);
-  const before = cloneSpellState(state);
 
   const costCtx: PayCostContext = {
     tx,
@@ -956,6 +955,38 @@ export async function castAbilityWithSlotInTx(
     slotTotals,
     arcanaTotals,
   };
+
+  return { state, costCtx };
+}
+
+/**
+ * Pays + logs a `{kind:"slot"}` ability cost for a caller with no
+ * SpellOpContext of its own (#1687) — the row-driven ability dispatcher's
+ * counterpart to applySpellcastingOpInTx's own load → pay → persist → log
+ * sequence for a spell cast. Before this, a row-driven cost could only be
+ * "pool" or "none": `costKind:"slot"` on a ClassFeature row typed, but
+ * nothing loaded the slot/arcanum maps `payAbilityCostInTx` requires, and the
+ * cast's OpOutcome was discarded (no event logged), so a spend would have
+ * mutated nothing durable and left no undo trail.
+ */
+export async function castAbilityWithSlotInTx(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  batchId: string,
+  sessionId: string | null,
+  input: CastAbilityInput,
+): Promise<OpOutcome> {
+  const { state, costCtx } = await loadSlotPayContext(
+    tx,
+    characterId,
+    batchId,
+    sessionId,
+    // Internal invariant, not a client error: the character was already loaded
+    // in this same transaction (applyRowDrivenActionInTx) — a miss here is a
+    // server fault (5xx), so a plain Error, not the 400-mapped op error.
+    (id) => new Error(`Character not found: ${id}`),
+  );
+  const before = cloneSpellState(state);
 
   const outcome = await castAbilityInTx(
     { tx, characterId, batchId, sessionId, cost: costCtx, concentrationHost: state },
