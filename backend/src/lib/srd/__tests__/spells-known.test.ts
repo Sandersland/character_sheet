@@ -308,12 +308,17 @@ describe("spellListsFor — the single class+subclass+edition spell-list resolve
     expect(spellListsFor("fighter", 5, "champion", "EDITION_2024")).toEqual({ spells: ["fighter"], cantrips: ["fighter"] });
   });
 
-  it("folds in Bard Magical Secrets — identical output to magicalSecretsSpellLists for every existing case", () => {
-    for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {
-      for (const level of [1, 9, 10, 14, 20]) {
-        expect(spellListsFor("bard", level, null, edition)).toEqual(magicalSecretsSpellLists("bard", level, null, edition));
-      }
-    }
+  it("folds in Bard Magical Secrets with the edition-forked concrete outputs", () => {
+    // Below the level-10 gate: the plain Bard list on both facets, both editions.
+    expect(spellListsFor("bard", 9, null, "EDITION_2014")).toEqual({ spells: ["bard"], cantrips: ["bard"] });
+    expect(spellListsFor("bard", 9, null, "EDITION_2024")).toEqual({ spells: ["bard"], cantrips: ["bard"] });
+    // 2014 (PHB'14 p. 54): unrestricted on both facets from level 10.
+    expect(spellListsFor("bard", 10, null, "EDITION_2014")).toEqual({ spells: null, cantrips: null });
+    expect(spellListsFor("bard", 20, null, "EDITION_2014")).toEqual({ spells: null, cantrips: null });
+    // 2024 (SRD 5.2 / PHB'24 p. 53): spells widen to Bard/Cleric/Druid/Wizard,
+    // cantrips do NOT (the Prepared Spells trigger is level 1+ only).
+    expect(spellListsFor("bard", 10, null, "EDITION_2024")).toEqual({ spells: ["bard", "cleric", "druid", "wizard"], cantrips: ["bard"] });
+    expect(spellListsFor("bard", 14, null, "EDITION_2024")).toEqual({ spells: ["bard", "cleric", "druid", "wizard"], cantrips: ["bard"] });
   });
 
   it("magicalSecretsSpellLists now delegates to spellListsFor, so EK/AT are fixed through the old call name too", () => {

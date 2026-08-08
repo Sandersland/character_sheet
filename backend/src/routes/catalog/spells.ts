@@ -112,16 +112,27 @@ async function resolveViewer(
 // Resolves `?subclassId=` to the catalog Subclass row's own NAME (#1825) — the
 // key spellListsFor's third-caster redirect checks (THIRD_CASTER_SUBCLASSES,
 // spellcasting-tables.ts), same free-text-name key that module's every other
-// third-caster check already uses. An id naming no row, or the WRONG
-// edition's row (crossEditionRejection, #1345 catalog-id-edition-guard), or
-// absent altogether all resolve to null — same "no widening" posture
-// parseSubclassIdParam's own doc comment takes for an unrecognized/absent id.
-// Never a 400 here: this is a read-only widening filter, not a mutation
-// endpoint, so a wrong-edition id is inert rather than rejected.
-async function resolveSubclassName(subclassId: string | undefined, edition: RulesEdition): Promise<string | null> {
+// third-caster check already uses. An id naming no row, the WRONG edition's row
+// (crossEditionRejection, #1345 catalog-id-edition-guard), or a subclass whose
+// class is NOT the queried `?class=` all resolve to null — same "no widening"
+// posture parseSubclassIdParam's own doc comment takes for an unrecognized id.
+// The class-ownership check is load-bearing: spellListsFor's third-caster
+// redirect fires on the subclass NAME before it inspects className, so without
+// it `?class=cleric&subclassId=<Eldritch Knight id>` would serve wizard spells
+// to a cleric query. Never a 400 here: this is a read-only widening filter, not
+// a mutation endpoint, so a mismatched/wrong-edition id is inert, not rejected.
+async function resolveSubclassName(
+  subclassId: string | undefined,
+  className: string,
+  edition: RulesEdition,
+): Promise<string | null> {
   if (!subclassId) return null;
-  const row = await prisma.subclass.findUnique({ where: { id: subclassId }, select: { name: true, edition: true } });
+  const row = await prisma.subclass.findUnique({
+    where: { id: subclassId },
+    select: { name: true, edition: true, class: { select: { name: true } } },
+  });
   if (!row || crossEditionRejection(row, "Subclass", edition)) return null;
+  if (row.class.name.toLowerCase() !== className) return null;
   return row.name;
 }
 
@@ -189,7 +200,7 @@ async function loadResolvedSpells(
 
   const [expandedSpellIds, subclassName] = await Promise.all([
     loadSubclassSpellListExpansionIds(subclassId, edition).then((ids) => new Set(ids)),
-    resolveSubclassName(subclassId, edition),
+    resolveSubclassName(subclassId, className, edition),
   ]);
   // #1825: routed through the SAME resolver the level-up gate uses, so a
   // third-caster subclass's `?class=fighter&subclassId=<EK id>` picker widens

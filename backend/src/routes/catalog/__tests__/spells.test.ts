@@ -337,6 +337,24 @@ describe("GET /api/spells — ?class= + ?subclassId= third-caster redirect (#182
     expect(response.status).toBe(200);
     expect(response.body).toEqual([]);
   });
+
+  it("ignores a subclassId whose class is NOT the queried ?class= — no cross-class redirect", async () => {
+    const fighter = await prisma.characterClass.findUniqueOrThrow({ where: { name: "Fighter" }, select: { id: true } });
+    const eldritchKnight = await prisma.subclass.findFirstOrThrow({
+      where: { classId: fighter.id, name: "Eldritch Knight" },
+      select: { id: true },
+    });
+
+    // ?class=cleric with an Eldritch Knight (a Fighter subclass) id: the EK's
+    // name would trip spellListsFor's third-caster redirect if the id were
+    // honored, serving wizard spells to a cleric query. The class-ownership
+    // check drops the mismatched id, so the cleric list is served unchanged.
+    const clericOnly = await get("/api/spells?class=cleric", "EDITION_2024");
+    const mismatched = await get(`/api/spells?class=cleric&subclassId=${eldritchKnight.id}`, "EDITION_2024");
+    expect(mismatched.status).toBe(200);
+    expect(mismatched.body).toEqual(clericOnly.body);
+    expect(mismatched.body.every((s: { classes: string[] }) => s.classes.includes("cleric"))).toBe(true);
+  });
 });
 
 // #1711: membership is served entirely off the SpellClass join now — Spell

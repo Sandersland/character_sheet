@@ -455,16 +455,20 @@ function capitalizeClassName(name: string): string {
 // Druid, or Wizard". Deliberately duplicated here rather than imported:
 // spellListsLabel lives in a frontend module, and backend rules code must not
 // depend across that tier boundary. Keep the two phrasings in sync by hand.
-function classListPhrase(spellLists: string[]): string {
-  const names = spellLists.map(capitalizeClassName);
+// `noun` is "spell" for a leveled pick and "cantrip" for a cantrip pick — the
+// two facets name different lists (#1440: an Eldritch Knight's cantripLists is
+// ["wizard"], not its base class), so the rejection must read "the Wizard
+// cantrip list", never the base class name.
+function classListPhrase(lists: string[], noun: "spell" | "cantrip" = "spell"): string {
+  const names = lists.map(capitalizeClassName);
   // Defensive, not reachable today: spellListsFor always returns at least
   // [key], never [] — mirrors the identical guard in spellListsLabel (frontend).
-  if (names.length === 0) return "the spell list";
-  if (names.length <= 1) return `the ${names[0]} spell list`;
+  if (names.length === 0) return `the ${noun} list`;
+  if (names.length <= 1) return `the ${names[0]} ${noun} list`;
   const joined = names.length === 2
     ? `${names[0]} or ${names[1]}`
     : `${names.slice(0, -1).join(", ")}, or ${names[names.length - 1]}`;
-  return `the ${joined} spell lists`;
+  return `the ${joined} ${noun} lists`;
 }
 
 // #1440: the served ceiling (meta.maxSpellLevel) applies to every leveled pick.
@@ -509,25 +513,21 @@ function assertLeveledSpellEligibility(
 // served value from spellLists, because 2024 Magical Secrets broadens spells
 // but not cantrips (the trigger is the Prepared Spells number, level 1+ only)
 // while a qualifying 2014 Bard is unrestricted on both (PHB'14 p. 54 "...or a
-// cantrip"). The `.some()` check below handles a multi-entry cantripLists
-// correctly regardless; per the current spellListsFor implementation
-// cantripLists is always a single class or null, so the
-// rejection message never needs to name more than one list — but that's an
-// implementation fact, not a type guarantee. If a future subclass seam (2024
-// College of Lore Magical Discoveries, PHB'14 Additional Magical Secrets)
-// widens it to several, this message needs the same treatment as the leveled
-// pick's rejection message (assertOnSpellList, via classListPhrase).
+// cantrip"). The rejection names cantripLists via classListPhrase — the SAME
+// treatment assertOnSpellList gives the leveled pick — so an Eldritch Knight's
+// message reads "the Wizard cantrip list", not its base "fighter" list, and a
+// future multi-entry cantripLists (2024 College of Lore Magical Discoveries,
+// PHB'14 Additional Magical Secrets) is phrased correctly for free.
 function assertCantripEligibility(
   cantripOps: LearnSpellOperation[],
   rowById: Map<string, SpellPickRow>,
   cantripLists: string[] | null,
-  lowerClass: string,
 ): void {
   for (const op of cantripOps) {
     const row = rowById.get(op.spellId);
     if (!row) continue; // unknown id — fall through to applyLearnSpellOp's not-found error
     if (cantripLists !== null && !row.classes.some((c) => cantripLists.includes(c))) {
-      throw new InvalidLevelUpError(`${row.name} is not on the ${lowerClass} cantrip list.`);
+      throw new InvalidLevelUpError(`${row.name} is not on ${classListPhrase(cantripLists, "cantrip")}.`);
     }
   }
 }
@@ -570,7 +570,6 @@ function resolveNewSpellsGate(steps: LevelUpStep[]): NewSpellsGate | null {
 async function assertPickSpellEligibility(
   submission: LevelUpSubmission,
   steps: LevelUpStep[],
-  className: string,
   edition: RulesEdition,
 ): Promise<void> {
   const cantripOps = submission.cantripsLearned ?? [];
@@ -581,9 +580,8 @@ async function assertPickSpellEligibility(
   const gate = resolveNewSpellsGate(steps);
   if (!gate) return;
 
-  const lowerClass = className.toLowerCase();
   assertLeveledSpellEligibility(spellOps, rowById, gate.maxSpellLevel, gate.spellLists, gate.expandedSpellIds);
-  assertCantripEligibility(cantripOps, rowById, gate.cantripLists, lowerClass);
+  assertCantripEligibility(cantripOps, rowById, gate.cantripLists);
 }
 
 /**
@@ -607,7 +605,7 @@ export async function applyLevelUpTransaction(
     await resolveLevelUpContext(characterId, submission.target, submission.subclassId);
 
   const steps = validateLevelUpSubmission(planCharacter, targetEntry, chosenSubclassName, submission, pickedSubclassFeatureRows);
-  await assertPickSpellEligibility(submission, steps, targetEntry.name, planCharacter.edition);
+  await assertPickSpellEligibility(submission, steps, planCharacter.edition);
 
   const ops = buildLevelUpOps(steps, submission);
 
