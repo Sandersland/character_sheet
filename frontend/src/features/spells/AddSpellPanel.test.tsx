@@ -28,8 +28,7 @@ const REFERENCE: ReferenceData = {
   itemRarities: [],
 };
 
-// #1817: the panel exposes exactly two tabs — From catalog + Homebrew — with
-// no inline per-character custom-spell authoring surface.
+// #1817: the panel exposes exactly two tabs.
 describe("AddSpellPanel tab set (#1817)", () => {
   beforeEach(() => {
     vi.mocked(client.fetchSpells).mockResolvedValue([]);

@@ -479,7 +479,7 @@ function assertWithinCeiling(row: SpellPickRow, maxSpellLevel: number): void {
 // `=== null`, never truthiness, since `[]` is truthy.
 // `expandedSpellIds` (#1631) admits a row NOT on the class's own list when
 // the subclass's list-expansion adds it (PHB'14 Warlock patrons) — the SAME
-// widening creationPickError (character-create.ts) applies at creation.
+// widening creationPickError applies at creation.
 function assertOnSpellList(row: SpellPickRow, spellLists: string[] | null, expandedSpellIds: string[]): void {
   if (spellLists !== null && !row.classes.some((c) => spellLists.includes(c)) && !expandedSpellIds.includes(row.id)) {
     throw new InvalidLevelUpError(`${row.name} is not on ${classListPhrase(spellLists)}.`);
