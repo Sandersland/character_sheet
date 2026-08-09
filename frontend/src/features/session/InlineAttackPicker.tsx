@@ -51,7 +51,7 @@ import { riderTotalsOf, useResolveActionCommit } from "@/features/session/useRes
 import type { ResolveActionEventEffect } from "@character-sheet/shared-types";
 import ResolutionRail from "@/features/session/ResolutionRail";
 import { AttackFormSummaryCore, AttackKickerPips, DamageRidersPanel } from "@/features/session/railPrimitives";
-import { buildManeuverView } from "@/features/session/maneuverViewBridge";
+import { buildManeuverView, MANEUVER_DAMAGE_RIDER_ID } from "@/features/session/maneuverViewBridge";
 import type { AttackEntryView } from "@/features/session/maneuverViewBridge";
 import AttackTallyStrip from "@/features/session/AttackTallyStrip";
 import AttackSheetFooter from "@/features/session/AttackSheetFooter";
@@ -363,7 +363,12 @@ export default function InlineAttackPicker({
     if (currentRow) turnState.addTallyDamageRider(currentRow.id, result.total);
   }
 
-  const maneuverView = buildManeuverView(resolutionView, armedEntry, currentRow, turnState);
+  // A damage maneuver's die rides the swing's op through the SAME riders[] map
+  // as weapon riders (#1843/#1844) — one stable key, overwrite-on-respend,
+  // cleared with every other rider after commit.
+  const maneuverView = buildManeuverView(resolutionView, armedEntry, currentRow, turnState, (effect) =>
+    local.setRiderEffect(MANEUVER_DAMAGE_RIDER_ID, effect),
+  );
 
   const isMobile = useIsBelowMd();
 

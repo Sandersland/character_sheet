@@ -426,6 +426,63 @@ describe("useResolution — onComplete ordering (#1847 finding 3)", () => {
   });
 });
 
+// External to-hit boost seam (#1844): a Precision Attack maneuver spends a
+// superiority die and adds it to the attack roll AFTER the die lands. The boost
+// must reach the committed toHit event (the audit log), not just the transient
+// tally — folded into both `total` and `bonus` so kept + bonus === total holds.
+describe("useResolution — external to-hit boost seam (#1844)", () => {
+  it("folds a boost into the committed toHit total and bonus (kept + bonus === total)", () => {
+    mockDice([{ face: 15, faces: 20 }, { face: 6, faces: 8 }]);
+    const { result, commit } = setup({ resolution: ATTACK_RESOLUTION });
+
+    act(() => result.current.view.onRollToHit());
+    expect(result.current.view.toHitRoll?.total).toBe(20); // 15 + weapon bonus 5
+
+    act(() => result.current.view.boostToHit(5)); // Precision Attack +5
+    act(() => result.current.view.onCallCrit());
+    act(() => result.current.view.onRollEffect());
+    act(() => result.current.view.onComplete());
+
+    const rolls = commit.mock.calls[0][0] as ResolutionRolls;
+    expect(rolls.toHit).toMatchObject({ kept: 15, bonus: 10, total: 25 });
+    expect(rolls.toHit!.kept + rolls.toHit!.bonus).toBe(rolls.toHit!.total);
+  });
+
+  it("is inert once completed — a late boost can't rewrite a committed roll", () => {
+    mockDice([{ face: 15, faces: 20 }, { face: 6, faces: 8 }]);
+    const { result, commit } = setup({ resolution: ATTACK_RESOLUTION });
+
+    act(() => result.current.view.onRollToHit());
+    act(() => result.current.view.onCallCrit());
+    act(() => result.current.view.onRollEffect());
+    act(() => result.current.view.onComplete());
+
+    act(() => result.current.view.boostToHit(5)); // too late
+
+    expect(commit).toHaveBeenCalledTimes(1);
+    const rolls = commit.mock.calls[0][0] as ResolutionRolls;
+    expect(rolls.toHit).toMatchObject({ total: 20, bonus: 5 });
+  });
+
+  it("reset clears an accumulated boost for the next resolution", () => {
+    mockDice([{ face: 15, faces: 20 }]);
+    const { result, commit } = setup({ resolution: ATTACK_RESOLUTION });
+
+    act(() => result.current.view.onRollToHit());
+    act(() => result.current.view.boostToHit(5));
+    act(() => result.current.reset());
+
+    mockDice([{ face: 10, faces: 20 }, { face: 4, faces: 8 }]);
+    act(() => result.current.view.onRollToHit());
+    act(() => result.current.view.onCallCrit());
+    act(() => result.current.view.onRollEffect());
+    act(() => result.current.view.onComplete());
+
+    const rolls = commit.mock.calls[0][0] as ResolutionRolls;
+    expect(rolls.toHit).toMatchObject({ total: 15, bonus: 5 }); // 10 + 5, no leftover boost
+  });
+});
+
 describe("useResolution — reset", () => {
   it("mints a fresh actionId and clears roll state for the next resolution", () => {
     mockDice([{ face: 3, faces: 4 }]);
