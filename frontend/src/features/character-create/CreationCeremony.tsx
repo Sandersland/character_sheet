@@ -221,10 +221,10 @@ export default function CreationCeremony() {
   // own step model (creationSteps) is reachable at all — it is impossible to
   // reach the identity step with rulesEdition unresolved. This early return only
   // gates the JSX below it: useCharacterCreation() (and its useReferenceData /
-  // fetchItems effects) already ran above, unconditionally — but useReferenceData
-  // now takes draft.rulesEdition (#1325) and skipTokens while it's null, so the
-  // reference fetch genuinely waits for this gate to resolve rather than firing
-  // early for a wrong/default edition.
+  // catalogKeys.items() queries, #1332) already ran above, unconditionally — but
+  // useReferenceData now takes draft.rulesEdition (#1325) and skipTokens while
+  // it's null, so the reference fetch genuinely waits for this gate to resolve
+  // rather than firing early for a wrong/default edition.
   if (c.draft.rulesEdition === null) {
     return (
       <CreationEntryGate

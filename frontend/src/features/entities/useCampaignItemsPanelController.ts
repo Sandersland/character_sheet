@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
-import { fetchCampaignItems, fetchItems } from "@/api/client";
-import { campaignKeys, catalogKeys } from "@/api/queryKeys";
+import { fetchCampaignItems } from "@/api/client";
+import { campaignKeys } from "@/api/queryKeys";
 import { useCampaignItemMutations } from "@/features/entities/useCampaignItemMutations";
 import { useCampaignEntities } from "@/hooks/useCampaignEntities";
+import { useItemCatalog } from "@/hooks/useItemCatalog";
 import { useItemRarities } from "@/hooks/useItemRarities";
 import { buildInput, emptyForm, formFromItem, type FormState } from "@/lib/campaignItemForm";
 import type { CampaignItem } from "@/types/character";
@@ -36,15 +37,9 @@ export function useCampaignItemsPanelController(campaignId: string, edition: Rul
   });
   const items = itemsQuery.data ?? [];
 
-  // Static SRD catalog for the clone-from-catalog picker — never changes
-  // mid-session, so it's fetched once and cached like referenceKeys. A failed
-  // fetch just leaves the picker empty (matches the old .catch(() => {})).
-  const catalogQuery = useQuery({
-    queryKey: catalogKeys.items(),
-    queryFn: fetchItems,
-    staleTime: Infinity,
-  });
-  const catalog = catalogQuery.data ?? [];
+  // Static SRD catalog for the clone-from-catalog picker (#1332): shared with
+  // every other /items reader via useItemCatalog/catalogKeys.items().
+  const catalog = useItemCatalog();
 
   const { createMutation, updateMutation, toggleRevealMutation, deleteMutation, awardMutation, revokeMutation } =
     useCampaignItemMutations(campaignId, entities);

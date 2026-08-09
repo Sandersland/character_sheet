@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { addCharacterToCampaign, createCharacter, fetchItems, uploadCharacterPortrait } from "@/api/client";
+import { addCharacterToCampaign, createCharacter, uploadCharacterPortrait } from "@/api/client";
 import { useToolProficiencyChoices } from "@/features/character-create/useToolProficiencyChoices";
 import type { ToolProficiencyChoices } from "@/features/character-create/useToolProficiencyChoices";
 import {
@@ -33,6 +33,7 @@ import type { Item, ReferenceData, SkillName } from "@/types/character";
 import { useCharacterDraft } from "@/hooks/useCharacterDraft";
 import type { CharacterDraft } from "@/hooks/useCharacterDraft";
 import { useDelayedFlag } from "@/hooks/useDelayedFlag";
+import { useItemCatalog } from "@/hooks/useItemCatalog";
 import { useReferenceData } from "@/hooks/useReferenceData";
 
 export interface CharacterCreationSkills extends CreationSkillChoices {
@@ -103,13 +104,13 @@ export function useCharacterCreation(): CharacterCreation {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [portraitFile, setPortraitFile] = useState<File | null>(null);
-  const [catalog, setCatalog] = useState<Item[]>([]);
   const showSpinner = useDelayedFlag(!reference && !referenceError);
 
-  // Load the item catalog once for the equipment picker's open-pick dropdowns.
-  useEffect(() => {
-    fetchItems().then(setCatalog).catch(() => {});
-  }, []);
+  // #1332: the equipment picker's open-pick dropdowns reuse useItemCatalog,
+  // which shares catalogKeys.items() with every other /items reader
+  // (useCampaignItemsPanelController) — one cached fetch per session, not one
+  // per surface.
+  const catalog = useItemCatalog();
 
   // #1131: switching class invalidates the chosen spells (different list + counts),
   // so clear them on an actual change — the ref guards against the initial mount
