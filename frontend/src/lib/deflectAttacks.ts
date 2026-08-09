@@ -51,33 +51,18 @@ export function deflectAttacksDamageTypeClause(character: Character): string {
   );
 }
 
-/** 1d10 + Dex modifier + Monk level — the base reduction (Monk L3, edition-invariant). */
-export function deflectAttacksReductionRoll(character: Character): RollSpec {
-  const dexMod = abilityModifier(character.abilityScores.dexterity);
-  return { count: 1, faces: 10, modifier: dexMod + classEntryLevel(character, "monk") };
-}
-
 /**
- * SRD 5.2 redirect: two Martial Arts die rolls + Dex modifier — the damage a
- * target must SAVE against when a ranged hit is reduced to 0. Die size is
- * read off the character's already-derived unarmedStrike (backend
- * deriveMartialArtsDie via serializeCharacter), never recomputed here.
+ * The resolved roll spec off a served action row's `effect.dice` (#1435) — the
+ * base reduction (`1d10 + Dex + monk level`) on the deflectAttacks/
+ * deflectMissiles row, or the redirect/throw-back (`2×MA die + Dex` in SRD 5.2,
+ * `1d6 + Dex` in SRD 5.1) on the redirect row. Both are resolved server-side by
+ * `deriveDeflectSpec` (backend lib/srd/deflect.ts) and attached via
+ * buildAvailableActionsView, so the client never re-derives the monk-level or
+ * die-size math. Undefined until the row (and its spec) is served.
  */
-export function deflectAttacksRedirectRoll(character: Character): RollSpec {
-  const dexMod = abilityModifier(character.abilityScores.dexterity);
-  return { count: 2, faces: character.unarmedStrike.damage.faces, modifier: dexMod };
-}
-
-/**
- * SRD 5.1 throw-back: a ranged ATTACK ROLL (not a save) with the caught
- * missile, standardized to 1d6 bludgeoning + Dex modifier — this app has no
- * per-ammo-type catch model, so it mirrors the `deflectMissilesThrow`
- * DERIVED_ACTIONS reminder (actions.ts) verbatim rather than tracking which
- * specific missile was caught.
- */
-export function deflectMissilesThrowRoll(character: Character): RollSpec {
-  const dexMod = abilityModifier(character.abilityScores.dexterity);
-  return { count: 1, faces: 6, modifier: dexMod };
+export function deflectRollFromAction(action: AvailableAction | undefined): RollSpec | undefined {
+  const dice = action?.effect?.dice;
+  return dice ? { count: dice.count, faces: dice.faces, modifier: dice.modifier ?? 0 } : undefined;
 }
 
 /**

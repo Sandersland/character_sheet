@@ -20,7 +20,6 @@ import {
   spellRestrictionFlags,
   type SpellCastThisTurn,
 } from "@/lib/spellPicker";
-import { canTwoWeaponFight } from "@/lib/turnRules";
 import { resolverFor, type ActionResolver } from "@/features/session/actionResolvers";
 import type { AvailableAction, Character, ResourcePool, UniversalActionOption } from "@/types/character";
 
@@ -256,12 +255,24 @@ export function bonusSpellOptions(
 }
 
 /**
+ * Whether the served off-hand / Two-Weapon Fighting affordance is enabled
+ * (#1435) — the eligibility rule (both equipped weapons Light) is resolved
+ * server-side onto the `offHandAttack` action row; the client reads the flag,
+ * never re-derives it from inventory. False when the row isn't served yet.
+ */
+export function offHandAttackEnabled(character: Character): boolean {
+  return character.availableActions?.find((a) => a.key === "offHandAttack")?.enabled ?? false;
+}
+
+/**
  * Footer hint for the Bonus Action sheet when TWF is unavailable. Names a
  * concrete owned light-weapon pair when one exists ("equip Two Shortswords…"),
  * else falls back to the generic requirement. Null when TWF is already live.
+ * The eligibility comes off the served row (offHandAttackEnabled); the
+ * item-name suggestion below stays client-side chrome (issue #1435 decision).
  */
 export function twfHint(character: Character): string | null {
-  if (canTwoWeaponFight(character.inventory)) return null;
+  if (offHandAttackEnabled(character)) return null;
   const lightWeapons = character.inventory.filter(
     (item) => item.category === "weapon" && item.weapon?.light === true,
   );

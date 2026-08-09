@@ -13,19 +13,20 @@ import { renderHook, act } from "@testing-library/react";
 
 import { useTurnState } from "@/features/session/useTurnState";
 import type { EconomySnapshot } from "@/features/session/useTurnState";
-import type { Character, InventoryItem } from "@/types/character";
+import type { AvailableAction, Character } from "@/types/character";
 
-// Minimal character fixture: useTurnState reads only inventory + the server-derived attacksPerAction.
+// Minimal character fixture: useTurnState reads only the served availableActions
+// (for twfAvailable, #1435) + the server-derived attacksPerAction.
 // Cast to avoid satisfying the full ~50-field Character interface.
 
 function makeCharacter(
   overrides: Partial<
-    Pick<Character, "attacksPerAction" | "inventory" | "offHandLocked" | "rulesEdition">
+    Pick<Character, "attacksPerAction" | "availableActions" | "offHandLocked" | "rulesEdition">
   > = {},
 ): Character {
   return {
     attacksPerAction: 1,
-    inventory: [],
+    availableActions: [],
     advancements: [],
     offHandLocked: false,
     rulesEdition: "EDITION_2024",
@@ -33,52 +34,18 @@ function makeCharacter(
   } as unknown as Character;
 }
 
-/** Minimal InventoryItem shape for a light weapon (TWF eligible). */
-function lightWeapon(id: string): InventoryItem {
+// The served off-hand eligibility row (#1435) — twfAvailable reads its
+// `enabled` flag; the two-Light-weapons rule itself is resolved server-side
+// (backend bothWeaponsLight; backend lib/character/__tests__/available-actions-
+// view.test.ts pins that), so the client tests only assert it mirrors the flag.
+function offHandAction(enabled: boolean): AvailableAction {
   return {
-    id,
-    name: "Shortsword",
-    category: "weapon",
-    quantity: 1,
-    equipped: true,
-    equippable: true,
-    allowedSlots: ["MAIN_HAND", "OFF_HAND"],
-    proficient: true,
-    weapon: {
-      damageDiceCount: 1,
-      damageDiceFaces: 6,
-      damageType: "piercing",
-      light: true,
-      finesse: true,
-      proficient: false,
-      attackBonus: 0,
-      damageModifier: 0,
-    },
-  } as unknown as InventoryItem;
-}
-
-/** A non-light (not TWF-eligible without the style) equipped weapon. */
-function heavyWeapon(id: string): InventoryItem {
-  return {
-    id,
-    name: "Longsword",
-    category: "weapon",
-    quantity: 1,
-    equipped: true,
-    equippable: true,
-    allowedSlots: ["MAIN_HAND", "OFF_HAND"],
-    proficient: true,
-    weapon: {
-      damageDiceCount: 1,
-      damageDiceFaces: 8,
-      damageType: "slashing",
-      light: false,
-      finesse: false,
-      proficient: true,
-      attackBonus: 0,
-      damageModifier: 0,
-    },
-  } as unknown as InventoryItem;
+    key: "offHandAttack",
+    name: "Off-Hand Attack",
+    cost: "bonusAction",
+    enabled,
+    ...(enabled ? {} : { disabledReason: "Off-hand attack needs two Light weapons equipped." }),
+  };
 }
 
 const SESSION_ID = "test-session-abc";
@@ -122,8 +89,8 @@ describe("combat lifecycle", () => {
     expect(result.current.reactionUsed).toBe(false);
   });
 
-  it("twfAvailable is true when inventory has two light weapons", () => {
-    const character = makeCharacter({ inventory: [lightWeapon("w1"), lightWeapon("w2")] });
+  it("twfAvailable is true when the served off-hand row is enabled (#1435)", () => {
+    const character = makeCharacter({ availableActions: [offHandAction(true)] });
     const { result } = renderHook(() => useTurnState(character, SESSION_ID));
 
     act(() => { result.current.startCombat(); });
@@ -132,7 +99,7 @@ describe("combat lifecycle", () => {
     expect(result.current.twfAvailable).toBe(true);
   });
 
-  it("twfAvailable is false with empty inventory", () => {
+  it("twfAvailable is false when no off-hand row is served", () => {
     const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
 
     act(() => { result.current.startCombat(); });
@@ -141,72 +108,31 @@ describe("combat lifecycle", () => {
     expect(result.current.twfAvailable).toBe(false);
   });
 
-  it("twfAvailable updates LIVE when the loadout changes mid-turn — no new startTurn (#733)", () => {
-    const oneWeapon = makeCharacter({ inventory: [lightWeapon("w1")] });
-    const twoWeapons = makeCharacter({ inventory: [lightWeapon("w1"), lightWeapon("w2")] });
-    const { result, rerender } = renderHook(({ c }) => useTurnState(c, SESSION_ID), {
-      initialProps: { c: oneWeapon },
-    });
-
-    act(() => { result.current.startCombat(); });
-    act(() => { result.current.startTurn(); });
-    expect(result.current.twfAvailable).toBe(false); // one weapon → no off-hand
-
-    rerender({ c: twoWeapons }); // swap a second light weapon in mid-turn
-    expect(result.current.twfAvailable).toBe(true); // derived → updates without startTurn
-  });
-
-  // The offhandAbilityDamage fixture is the mutation latch: it is the only place the
-  // Two-Weapon Fighting style still reaches twfAvailable through real code, so
-  // restoring the deleted short-circuit turns this test red. Keep it.
-  it("twfAvailable is false for a non-light pair even WITH the Two-Weapon Fighting style — the style adds off-hand damage, it does not waive the Light requirement (#1496; SRD 5.1 / PHB'14 p. 72, SRD 5.2)", () => {
-    const heavyPair = makeCharacter({ inventory: [heavyWeapon("h1"), heavyWeapon("h2")] });
-    const withStyle = {
-      ...heavyPair,
-      advancements: [
-        { id: "fs1", slot: "fightingStyle", improvements: [{ target: "offhandAbilityDamage", amount: 1 }] },
-      ],
-    } as unknown as Character;
-    const { result } = renderHook(() => useTurnState(withStyle, SESSION_ID));
-
-    act(() => { result.current.startCombat(); });
-    act(() => { result.current.startTurn(); });
-
-    expect(result.current.twfAvailable).toBe(false);
-  });
-
-  // Both editions agree, so canTwoWeaponFight takes no `edition` — this goes red the
-  // day someone forks the rule by edition (#1496).
-  it.each(["EDITION_2014", "EDITION_2024"] as const)(
-    "twfAvailable is false for a non-light pair with the style under %s",
-    (rulesEdition) => {
-      const heavyPair = makeCharacter({
-        inventory: [heavyWeapon("h1"), heavyWeapon("h2")],
-        rulesEdition,
-      });
-      const withStyle = {
-        ...heavyPair,
-        advancements: [
-          { id: "fs1", slot: "fightingStyle", improvements: [{ target: "offhandAbilityDamage", amount: 1 }] },
-        ],
-      } as unknown as Character;
-      const { result } = renderHook(() => useTurnState(withStyle, SESSION_ID));
-
-      act(() => { result.current.startCombat(); });
-      act(() => { result.current.startTurn(); });
-
-      expect(result.current.twfAvailable).toBe(false);
-    },
-  );
-
-  it("twfAvailable is false for a non-light pair WITHOUT the style", () => {
-    const character = makeCharacter({ inventory: [heavyWeapon("h1"), heavyWeapon("h2")] });
+  it("twfAvailable is false when the served off-hand row is disabled", () => {
+    const character = makeCharacter({ availableActions: [offHandAction(false)] });
     const { result } = renderHook(() => useTurnState(character, SESSION_ID));
 
     act(() => { result.current.startCombat(); });
     act(() => { result.current.startTurn(); });
 
     expect(result.current.twfAvailable).toBe(false);
+  });
+
+  it("twfAvailable updates LIVE when the served loadout changes mid-turn — no new startTurn (#733)", () => {
+    // A mid-turn weapon swap refetches the character, so the served offHandAttack
+    // flag flips; twfAvailable follows the live `character` prop without a new turn.
+    const before = makeCharacter({ availableActions: [offHandAction(false)] });
+    const after = makeCharacter({ availableActions: [offHandAction(true)] });
+    const { result, rerender } = renderHook(({ c }) => useTurnState(c, SESSION_ID), {
+      initialProps: { c: before },
+    });
+
+    act(() => { result.current.startCombat(); });
+    act(() => { result.current.startTurn(); });
+    expect(result.current.twfAvailable).toBe(false); // off-hand disabled
+
+    rerender({ c: after }); // second Light weapon equipped mid-turn → server re-derives
+    expect(result.current.twfAvailable).toBe(true); // served flag → updates without startTurn
   });
 
   it("endTurn while in combat: phase=idle, actionsRemaining=0, round untouched (server-driven, #1030), reactionUsed NOT reset", () => {

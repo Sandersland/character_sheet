@@ -27,10 +27,8 @@ import { applyActionTransactions } from "@/api/client";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import { rollSpec } from "@/lib/dice";
 import {
-  deflectAttacksRedirectRoll,
-  deflectAttacksReductionRoll,
   deflectBaseAction,
-  deflectMissilesThrowRoll,
+  deflectRollFromAction,
   formatDeflectAttacksMessage,
   formatDeflectAttacksRedirectMessage,
   formatDeflectMissilesThrowMessage,
@@ -95,20 +93,22 @@ export function useDeflectAttacksReaction({
   const redirectLabel = is2014 ? "Throw back · spend 1 ki" : "Redirect · spend 1 Focus";
 
   function handleDeflectAttacks() {
-    if (mutation.isPending || !baseAction) return;
+    const reductionSpec = deflectRollFromAction(baseAction);
+    if (mutation.isPending || !baseAction || !reductionSpec) return;
     consumeReaction();
     setShowReactionMenu(false);
-    const roll = rollSpec(deflectAttacksReductionRoll(character));
+    const roll = rollSpec(reductionSpec);
     setReactionMessage(formatDeflectAttacksMessage(character, baseAction, roll, redirectAction?.enabled ?? false));
     setPending(true);
   }
 
   async function handleDeflectAttacksRedirect() {
-    if (!deflectRedirectAvailable || mutation.isPending) return;
+    const redirectSpec = deflectRollFromAction(redirectAction);
+    if (!deflectRedirectAvailable || mutation.isPending || !redirectSpec) return;
     try {
       const updated = await mutation.mutateAsync(undefined);
       if (updated.batchId) attachBatchId(updated.batchId);
-      const redirectRoll = rollSpec(is2014 ? deflectMissilesThrowRoll(character) : deflectAttacksRedirectRoll(character));
+      const redirectRoll = rollSpec(redirectSpec);
       const redirectMessage = is2014
         ? formatDeflectMissilesThrowMessage(redirectRoll)
         : formatDeflectAttacksRedirectMessage(redirectRoll);

@@ -28,7 +28,7 @@
  */
 
 import { useReducer, useMemo, useEffect, useRef } from "react";
-import { canTwoWeaponFight } from "@/lib/turnRules";
+import { offHandAttackEnabled } from "@/lib/turnOptions";
 import { autoVerdict } from "@/lib/attackTallySummary";
 import { loadTurnState, saveTurnState } from "@/features/session/turnStatePersistence";
 import type {
@@ -1059,9 +1059,11 @@ export function useTurnState(character: Character, sessionId: string | null): Tu
     dispatch({ type: "hydrate", state: hydrateOrInit(sessionId) });
   }, [sessionId]);
 
-  // Derived (not persisted): TWF eligibility follows the LIVE loadout, so a
-  // mid-turn weapon swap updates the off-hand affordance immediately (#733).
-  const twfAvailable = canTwoWeaponFight(character.inventory);
+  // Server-resolved (#1435): the off-hand eligibility is served on the
+  // `offHandAttack` action row (backend bothWeaponsLight), read off the live
+  // `character` prop — a mid-turn weapon swap refetches the character, so the
+  // affordance still updates immediately without a new startTurn (#733).
+  const twfAvailable = offHandAttackEnabled(character);
 
   // Server-derived, multiclass-correct (max across classes); see srd.ts. Mirrored
   // into refs so the action facade stays a stable, dependency-free useMemo while

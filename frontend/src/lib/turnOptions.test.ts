@@ -429,12 +429,9 @@ describe("bonusSpellOptions", () => {
 });
 
 describe("twfHint", () => {
-  it("null when TWF is already available", () => {
+  it("null when TWF is already available (served off-hand row enabled, #1435)", () => {
     const c = makeCharacter({
-      inventory: [
-        weaponItem({ id: "a", name: "Shortsword" }, { light: true }),
-        weaponItem({ id: "b", name: "Shortsword" }, { light: true }),
-      ],
+      availableActions: [{ key: "offHandAttack", name: "Off-Hand Attack", cost: "bonusAction", enabled: true }],
     } as Partial<Character>);
     expect(twfHint(c)).toBeNull();
   });
