@@ -1,10 +1,27 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  OPEN_HAND_TECHNIQUE_LEVEL,
   canImposeOpenHandRider,
+  hasOpenHandTechnique,
   openHandRiderSummary,
   resolveOpenHandRiderOutcome,
 } from "@/lib/classes/open-hand-technique.js";
+
+// #1337: hasOpenHandTechnique is the single source of the L3 gate — both
+// openHandTechniqueRider and this module's own cast guard import it. No
+// numeric literal for the gate appears here; the boundary is derived from
+// OPEN_HAND_TECHNIQUE_LEVEL itself, so mutating that one constant would flip
+// both this assertion and the rider/guard together.
+describe("hasOpenHandTechnique (#1337 shared gate)", () => {
+  it("is false one level below the gate", () => {
+    expect(hasOpenHandTechnique(OPEN_HAND_TECHNIQUE_LEVEL - 1)).toBe(false);
+  });
+
+  it("is true exactly at the gate", () => {
+    expect(hasOpenHandTechnique(OPEN_HAND_TECHNIQUE_LEVEL)).toBe(true);
+  });
+});
 
 describe("canImposeOpenHandRider (once-per-turn guard)", () => {
   it("allows a first rider this turn", () => {

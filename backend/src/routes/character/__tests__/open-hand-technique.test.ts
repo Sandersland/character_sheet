@@ -13,6 +13,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { readPinnedEvents } from "@/test-support/events.js";
 import { authCookie } from "@/test-support/auth.js";
+import { OPEN_HAND_TECHNIQUE_LEVEL } from "@/lib/classes/open-hand-technique.js";
 
 const OWNER_ID = "owner-open-hand-technique";
 let COOKIE: string;
@@ -266,5 +267,70 @@ describe("Open Hand Technique prefers the subclass catalog FK over a misleading 
       .send({ operations: [{ type: "imposeOpenHandRider", rider: "addle", usedThisTurn: false }] });
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/open hand/i);
+  });
+});
+
+// #1337: hasOpenHandTechnique is the single source of the L3 gate — both the
+// serialized rider and this route's cast guard read it. Proven with a
+// Fighter/Warrior-of-the-Open-Hand multiclass whose TOTAL character level is
+// held CONSTANT across the two fixtures — only the monk entry's own level
+// moves across the gate, so the assertion cannot pass on `character.level`.
+describe("Open Hand Technique multiclass entry-scoping (#1337)", () => {
+  const MULTICLASS_ID = "test-open-hand-technique-multiclass-1";
+  const multiclassUrl = `/api/characters/${MULTICLASS_ID}/abilities/open-hand-technique/transactions`;
+  // Arbitrary total held constant across both fixtures below (must exceed
+  // OPEN_HAND_TECHNIQUE_LEVEL so the "below the gate" fixture's fighter level
+  // stays positive).
+  const TOTAL_LEVEL = 17;
+
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { id: MULTICLASS_ID } });
+  });
+
+  async function createFighterMonk(fighterLevel: number, monkLevel: number) {
+    await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
+    await prisma.character.create({
+      data: {
+        ...FIXTURE_BASE,
+        id: MULTICLASS_ID,
+        ownerId: OWNER_ID,
+        experiencePoints: 225000, // total level 17 in BOTH fixtures below
+        classEntries: {
+          create: [
+            { name: "fighter", position: 0, level: fighterLevel },
+            { name: "monk", position: 1, level: monkLevel, subclass: "Warrior of the Open Hand" },
+          ],
+        },
+      },
+    });
+  }
+
+  it("Fighter/Monk(Open Hand) below the gate [total level held constant]: no Open Hand Technique rider, and the guard rejects", async () => {
+    const monkLevel = OPEN_HAND_TECHNIQUE_LEVEL - 1;
+    await createFighterMonk(TOTAL_LEVEL - monkLevel, monkLevel);
+
+    const character = await agent().get(`/api/characters/${MULTICLASS_ID}`);
+    expect(character.body).not.toHaveProperty("openHandTechnique");
+
+    const guard = await agent()
+      .post(multiclassUrl)
+      .send({ operations: [{ type: "imposeOpenHandRider", rider: "addle", usedThisTurn: false }] });
+    expect(guard.status).toBe(400);
+    expect(guard.body.error).toMatch(/open hand/i);
+  });
+
+  it("Fighter/Monk(Open Hand) at the gate [total level held constant]: the Open Hand Technique rider is present, and the guard admits", async () => {
+    const monkLevel = OPEN_HAND_TECHNIQUE_LEVEL;
+    await createFighterMonk(TOTAL_LEVEL - monkLevel, monkLevel);
+
+    const character = await agent().get(`/api/characters/${MULTICLASS_ID}`);
+    expect(character.body).toHaveProperty("openHandTechnique");
+
+    const guard = await agent()
+      .post(multiclassUrl)
+      .send({ operations: [{ type: "imposeOpenHandRider", rider: "addle", usedThisTurn: false }] });
+    expect(guard.status).toBe(200);
+    expect(guard.body.character).toHaveProperty("openHandTechnique");
   });
 });
