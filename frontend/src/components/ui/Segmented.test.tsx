@@ -46,4 +46,20 @@ describe("Segmented", () => {
     await userEvent.keyboard("{ArrowLeft}");
     expect(onChange).toHaveBeenCalledWith("c");
   });
+
+  it("Home jumps to the first option", async () => {
+    const onChange = vi.fn();
+    render(<Segmented options={OPTIONS} value="c" onChange={onChange} label="Greek" />);
+    screen.getByRole("radio", { name: "Gamma" }).focus();
+    await userEvent.keyboard("{Home}");
+    expect(onChange).toHaveBeenCalledWith("a");
+  });
+
+  it("End jumps to the last option", async () => {
+    const onChange = vi.fn();
+    render(<Segmented options={OPTIONS} value="a" onChange={onChange} label="Greek" />);
+    screen.getByRole("radio", { name: "Alpha" }).focus();
+    await userEvent.keyboard("{End}");
+    expect(onChange).toHaveBeenCalledWith("c");
+  });
 });

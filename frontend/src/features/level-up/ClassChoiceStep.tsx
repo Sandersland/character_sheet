@@ -6,9 +6,10 @@
 // their unmet prerequisite. Renders as its own CeremonyCard — this runs before
 // a plan exists, so it can't use LevelUpStepContext.
 
-import { useState } from "react";
+import { useCallback, useMemo, useState, type KeyboardEvent, type RefCallback } from "react";
 
 import { CeremonyCard, CeremonyFooter } from "@/features/ceremony/CeremonyShell";
+import { useRovingRadioGroup } from "@/hooks/useRovingRadioGroup";
 import { sameLevelUpTarget, type ClassChoiceOption } from "@/lib/levelUpClassChoice";
 import type { LevelUpTarget } from "@/types/character";
 
@@ -26,10 +27,16 @@ function OptionRadio({
   option,
   isSelected,
   onSelect,
+  tabIndex,
+  itemRef,
+  onKeyDown,
 }: {
   option: ClassChoiceOption;
   isSelected: boolean;
   onSelect: () => void;
+  tabIndex: 0 | -1;
+  itemRef: RefCallback<HTMLButtonElement>;
+  onKeyDown: (e: KeyboardEvent<HTMLButtonElement>) => void;
 }) {
   return (
     <button
@@ -38,7 +45,10 @@ function OptionRadio({
       aria-checked={isSelected}
       aria-label={option.name}
       disabled={!option.eligible}
+      tabIndex={tabIndex}
+      ref={itemRef}
       onClick={onSelect}
+      onKeyDown={onKeyDown}
       className={`${CARD_BASE} ${
         !option.eligible ? CARD_DISABLED : isSelected ? CARD_SELECTED : CARD_IDLE
       }`}
@@ -71,8 +81,8 @@ export default function ClassChoiceStep({
   onContinue: (target: LevelUpTarget) => void;
   onCancel: () => void;
 }) {
-  const existingOptions = options.filter((o) => o.target.kind === "existing");
-  const newOptions = options.filter((o) => o.target.kind === "new");
+  const existingOptions = useMemo(() => options.filter((o) => o.target.kind === "existing"), [options]);
+  const newOptions = useMemo(() => options.filter((o) => o.target.kind === "new"), [options]);
 
   const [selected, setSelected] = useState<LevelUpTarget | null>(
     () => options.find((o) => o.eligible && sameLevelUpTarget(initialTarget, o.target))?.target ?? null,
@@ -83,6 +93,20 @@ export default function ClassChoiceStep({
   const [view, setView] = useState<"top" | "new">(() => (initialTarget?.kind === "new" ? "new" : "top"));
 
   const visibleOptions = view === "top" ? existingOptions : newOptions;
+  const checkedIndex = visibleOptions.findIndex((o) => sameLevelUpTarget(selected, o.target));
+  const selectOption = useCallback(
+    (index: number) => setSelected(visibleOptions[index].target),
+    [visibleOptions],
+  );
+  const isOptionDisabled = useCallback((index: number) => !visibleOptions[index].eligible, [visibleOptions]);
+  // #1324: cards can be disabled (ineligible prerequisites); arrow
+  // navigation and the tabIndex fallback must both skip them.
+  const { itemRef, tabIndexFor, keyDownFor } = useRovingRadioGroup(
+    visibleOptions.length,
+    checkedIndex,
+    selectOption,
+    isOptionDisabled,
+  );
 
   return (
     <CeremonyCard className="flex min-h-0 flex-1 flex-col px-5 py-7 sm:px-10">
@@ -111,12 +135,15 @@ export default function ClassChoiceStep({
           aria-label={view === "top" ? "Class to advance" : "New class to add"}
           className="grid gap-3 sm:grid-cols-2"
         >
-          {visibleOptions.map((option) => (
+          {visibleOptions.map((option, index) => (
             <OptionRadio
               key={optionKey(option.target)}
               option={option}
               isSelected={sameLevelUpTarget(selected, option.target)}
               onSelect={() => setSelected(option.target)}
+              tabIndex={tabIndexFor(index)}
+              itemRef={itemRef(index)}
+              onKeyDown={keyDownFor(index)}
             />
           ))}
         </div>
