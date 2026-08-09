@@ -3,6 +3,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 
 import { useCharacterCreation } from "@/hooks/useCharacterCreation";
 import type { CharacterDraft } from "@/hooks/useCharacterDraft";
+import { useItemCatalog } from "@/features/inventory/useItemCatalog";
 import type { ClassOption, ReferenceData } from "@/types/character";
 
 const navigate = vi.fn();
@@ -579,5 +580,20 @@ describe("useCharacterCreation", () => {
     const { result } = await mount();
     expect(result.current.stepIndex).toBe(0);
     expect(result.current.currentStep).toBe("identity");
+  });
+
+  // #1332: useCharacterCreation's item fetch shares catalogKeys.items() with
+  // every other /items reader (useItemCatalog, useCampaignItemsPanelController)
+  // — mounting alongside another consumer in the same session must collapse to
+  // one network call, not one per hook.
+  it("shares the item catalog cache with another /items consumer mounted in the same session", async () => {
+    seedDraft(validDraft());
+    const { result } = await mount();
+    const other = renderHook(() => useItemCatalog());
+
+    await waitFor(() => expect(result.current.catalog).toEqual([]));
+    await waitFor(() => expect(other.result.current).toEqual([]));
+
+    expect(fetchItems).toHaveBeenCalledTimes(1);
   });
 });
