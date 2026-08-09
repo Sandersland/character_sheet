@@ -36,13 +36,20 @@ export function useRovingRadioGroup(
 ): UseRovingRadioGroupResult {
   const itemsRef = useRef<(HTMLButtonElement | null)[]>([]);
 
-  const itemRef = useCallback(
-    (index: number): RefCallback<HTMLButtonElement> =>
-      (el) => {
-        itemsRef.current[index] = el;
-      },
-    [],
-  );
+  // Cached by index so the same index yields the same function reference
+  // across renders -- an inline `(el) => ...` per call makes React detach
+  // and reattach the ref (null, then the element) on every render.
+  const refCallbacksRef = useRef<Map<number, RefCallback<HTMLButtonElement>>>(new Map());
+
+  const itemRef = useCallback((index: number): RefCallback<HTMLButtonElement> => {
+    const cached = refCallbacksRef.current.get(index);
+    if (cached) return cached;
+    const callback: RefCallback<HTMLButtonElement> = (el) => {
+      itemsRef.current[index] = el;
+    };
+    refCallbacksRef.current.set(index, callback);
+    return callback;
+  }, []);
 
   const firstEnabled = useCallback((): number => {
     for (let i = 0; i < count; i++) {
@@ -66,16 +73,20 @@ export function useRovingRadioGroup(
     [checkedIndex, isDisabled, firstEnabled],
   );
 
-  // Steps from `from` in `delta` direction, wrapping, until it lands on an
-  // enabled option; returns `from` unchanged if every option is disabled.
+  // Steps from `from` in `delta` direction, wrapping, until it lands on a
+  // *different* enabled option; returns -1 if the scan completes a full
+  // cycle back to `from` (every other option is disabled -- `from` itself
+  // being enabled is not a valid destination, or the moveFocus/onSelect call
+  // it triggers would be a no-op that still fires on every keypress).
   const step = useCallback(
     (from: number, delta: 1 | -1): number => {
       let next = from;
       for (let i = 0; i < count; i++) {
         next = (next + delta + count) % count;
+        if (next === from) return -1;
         if (!isDisabled(next)) return next;
       }
-      return from;
+      return -1;
     },
     [count, isDisabled],
   );
@@ -102,9 +113,12 @@ export function useRovingRadioGroup(
       else if (e.key === "Home") next = firstEnabled();
       else if (e.key === "End") next = lastEnabled();
       else return;
-      if (next < 0) return; // every option disabled -- nothing to move to
 
+      // Unconditional once the key is recognized, matching the pre-#1324
+      // Segmented handler -- Home/End have a real default (scroll the page)
+      // that must be swallowed even when there's nowhere to move.
       e.preventDefault();
+      if (next < 0) return; // no other enabled option to move to
       moveFocus(next);
     },
     [count, step, firstEnabled, lastEnabled, moveFocus],

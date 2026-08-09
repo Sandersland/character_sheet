@@ -6,7 +6,7 @@
 // their unmet prerequisite. Renders as its own CeremonyCard — this runs before
 // a plan exists, so it can't use LevelUpStepContext.
 
-import { useState, type KeyboardEvent, type RefCallback } from "react";
+import { useCallback, useMemo, useState, type KeyboardEvent, type RefCallback } from "react";
 
 import { CeremonyCard, CeremonyFooter } from "@/features/ceremony/CeremonyShell";
 import { useRovingRadioGroup } from "@/hooks/useRovingRadioGroup";
@@ -81,8 +81,12 @@ export default function ClassChoiceStep({
   onContinue: (target: LevelUpTarget) => void;
   onCancel: () => void;
 }) {
-  const existingOptions = options.filter((o) => o.target.kind === "existing");
-  const newOptions = options.filter((o) => o.target.kind === "new");
+  // Memoized (dep: options) so useRovingRadioGroup's isDisabled/onSelect
+  // callbacks below stay referentially stable across renders that don't
+  // change `options` -- an inline Array.filter here busted every
+  // useCallback inside the hook on every render (claude-review on #1865).
+  const existingOptions = useMemo(() => options.filter((o) => o.target.kind === "existing"), [options]);
+  const newOptions = useMemo(() => options.filter((o) => o.target.kind === "new"), [options]);
 
   const [selected, setSelected] = useState<LevelUpTarget | null>(
     () => options.find((o) => o.eligible && sameLevelUpTarget(initialTarget, o.target))?.target ?? null,
@@ -94,14 +98,19 @@ export default function ClassChoiceStep({
 
   const visibleOptions = view === "top" ? existingOptions : newOptions;
   const checkedIndex = visibleOptions.findIndex((o) => sameLevelUpTarget(selected, o.target));
+  const selectOption = useCallback(
+    (index: number) => setSelected(visibleOptions[index].target),
+    [visibleOptions],
+  );
+  const isOptionDisabled = useCallback((index: number) => !visibleOptions[index].eligible, [visibleOptions]);
   // #1324: this radiogroup's cards can be disabled (ineligible prerequisites),
   // the wrinkle the shared hook didn't handle until this migration -- arrow
   // navigation and the tabIndex fallback must both skip them.
   const { itemRef, tabIndexFor, keyDownFor } = useRovingRadioGroup(
     visibleOptions.length,
     checkedIndex,
-    (index) => setSelected(visibleOptions[index].target),
-    (index) => !visibleOptions[index].eligible,
+    selectOption,
+    isOptionDisabled,
   );
 
   return (

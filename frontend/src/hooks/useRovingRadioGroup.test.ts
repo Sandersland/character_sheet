@@ -64,6 +64,22 @@ describe("useRovingRadioGroup", () => {
       expect(result.current.tabIndexFor(1)).toBe(0);
       expect(result.current.tabIndexFor(2)).toBe(-1);
     });
+
+    // claude-review on #1865: with every OTHER option disabled, the scan
+    // wraps all the way back to `from` -- which is itself enabled -- and
+    // returned it as a "next" index, so arrow keys fired a redundant
+    // onSelect(from) on every keypress instead of doing nothing.
+    it("arrow navigation does not call onSelect when the current option is the only enabled one", () => {
+      const onSelect = vi.fn();
+      const isDisabled = (i: number) => i !== 1;
+      const { result } = renderHook(() => useRovingRadioGroup(3, 1, onSelect, isDisabled));
+      result.current.itemRef(0)(fakeButton());
+      result.current.itemRef(1)(fakeButton());
+      result.current.itemRef(2)(fakeButton());
+      result.current.keyDownFor(1)(fakeEvent("ArrowRight"));
+      result.current.keyDownFor(1)(fakeEvent("ArrowLeft"));
+      expect(onSelect).not.toHaveBeenCalled();
+    });
   });
 
   describe("Home/End (#1324)", () => {
@@ -88,5 +104,30 @@ describe("useRovingRadioGroup", () => {
       result.current.keyDownFor(0)(fakeEvent("End"));
       expect(onSelect).toHaveBeenCalledWith(1);
     });
+
+    // claude-review on #1865: preventDefault sat after the "nothing to move
+    // to" guard, so Home/End on an all-disabled group fell through to the
+    // browser's default (scroll the page to top/bottom) instead of being
+    // swallowed the way the pre-#1324 Segmented handler always did.
+    it("Home still prevents the browser default when every option is disabled", () => {
+      const onSelect = vi.fn();
+      const isDisabled = () => true;
+      const { result } = renderHook(() => useRovingRadioGroup(3, -1, onSelect, isDisabled));
+      const event = fakeEvent("Home");
+      result.current.keyDownFor(0)(event);
+      expect(event.preventDefault).toHaveBeenCalled();
+      expect(onSelect).not.toHaveBeenCalled();
+    });
+  });
+
+  // claude-review on #1865: itemRef(index) returned a brand-new closure on
+  // every call, so React detached and reattached every button's ref on each
+  // render (null -> element) even though nothing about that index changed.
+  it("itemRef returns the same function reference for the same index across renders", () => {
+    const { result, rerender } = renderHook(() => useRovingRadioGroup(3, 0, vi.fn()));
+    const first = result.current.itemRef(1);
+    rerender();
+    const second = result.current.itemRef(1);
+    expect(second).toBe(first);
   });
 });
