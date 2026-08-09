@@ -93,8 +93,9 @@ export function useDeflectAttacksReaction({
   const redirectLabel = is2014 ? "Throw back · spend 1 ki" : "Redirect · spend 1 Focus";
 
   function handleDeflectAttacks() {
+    if (mutation.isPending || !baseAction) return;
     const reductionSpec = deflectRollFromAction(baseAction);
-    if (mutation.isPending || !baseAction || !reductionSpec) return;
+    if (!reductionSpec) return;
     consumeReaction();
     setShowReactionMenu(false);
     const roll = rollSpec(reductionSpec);
@@ -103,8 +104,9 @@ export function useDeflectAttacksReaction({
   }
 
   async function handleDeflectAttacksRedirect() {
+    if (!deflectRedirectAvailable || mutation.isPending) return;
     const redirectSpec = deflectRollFromAction(redirectAction);
-    if (!deflectRedirectAvailable || mutation.isPending || !redirectSpec) return;
+    if (!redirectSpec) return;
     try {
       const updated = await mutation.mutateAsync(undefined);
       if (updated.batchId) attachBatchId(updated.batchId);
