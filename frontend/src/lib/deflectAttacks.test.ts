@@ -2,10 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   deflectAttacksDamageTypeClause,
-  deflectAttacksReductionRoll,
-  deflectAttacksRedirectRoll,
   deflectBaseAction,
-  deflectMissilesThrowRoll,
+  deflectRollFromAction,
   formatDeflectAttacksMessage,
   formatDeflectAttacksRedirectMessage,
   formatDeflectMissilesThrowMessage,
@@ -88,38 +86,48 @@ describe("deflectAttacksDamageTypeClause", () => {
   });
 });
 
-describe("deflectAttacksReductionRoll", () => {
-  it("is 1d10 + Dex modifier + monk level (edition-invariant)", () => {
-    // Dex 16 → +3 modifier; level 5 → spec modifier is 3 + 5 = 8.
-    expect(deflectAttacksReductionRoll(monk({ level: 5 }))).toEqual({ count: 1, faces: 10, modifier: 8 });
+// The roll math itself moved server-side to deriveDeflectSpec (#1435,
+// backend lib/srd/__tests__/deflect.test.ts); here the client only reads the
+// spec off the served row's `effect.dice`, never re-deriving it.
+describe("deflectRollFromAction", () => {
+  it("reads the served reduction spec off the base row's effect.dice", () => {
+    const row: AvailableAction = {
+      key: "deflectAttacks",
+      name: "Deflect Attacks",
+      cost: "reaction",
+      enabled: true,
+      effect: { effectType: "utility", dice: { count: 1, faces: 10, modifier: 8 }, scaling: { mode: "none" } },
+    };
+    expect(deflectRollFromAction(row)).toEqual({ count: 1, faces: 10, modifier: 8 });
   });
 
-  it("scales the flat modifier with monk level", () => {
-    expect(deflectAttacksReductionRoll(monk({ level: 13 }))).toEqual({ count: 1, faces: 10, modifier: 16 });
+  it("reads the served redirect spec off the redirect row's effect.dice", () => {
+    const row: AvailableAction = {
+      key: "deflectAttacksRedirect",
+      name: "Deflect Attacks — Redirect",
+      cost: "free",
+      enabled: true,
+      effect: { effectType: "damage", dice: { count: 2, faces: 8, modifier: 3 }, scaling: { mode: "none" } },
+    };
+    expect(deflectRollFromAction(row)).toEqual({ count: 2, faces: 8, modifier: 3 });
   });
 
-  it("scales the flat modifier with the Monk entry level, not total character level (Monk 3 / Fighter 10)", () => {
-    // Dex 16 → +3 modifier; Monk entry level 3 → spec modifier is 3 + 3 = 6 (not 3 + 13 = 16).
-    expect(deflectAttacksReductionRoll(monkFighter())).toEqual({ count: 1, faces: 10, modifier: 6 });
+  it("defaults a missing modifier to 0", () => {
+    const row: AvailableAction = {
+      key: "deflectMissilesThrow",
+      name: "Deflect Missiles — Throw Back",
+      cost: "free",
+      enabled: true,
+      effect: { effectType: "damage", dice: { count: 1, faces: 6 }, scaling: { mode: "none" } },
+    };
+    expect(deflectRollFromAction(row)).toEqual({ count: 1, faces: 6, modifier: 0 });
   });
 
-  it("single-class Monk 13 still scales on the full character level — regression guard", () => {
+  it("is undefined when the row (or its spec) isn't served yet", () => {
+    expect(deflectRollFromAction(undefined)).toBeUndefined();
     expect(
-      deflectAttacksReductionRoll(monk({ level: 13, classes: [{ name: "Monk", level: 13 }] } as unknown as Partial<Character>)),
-    ).toEqual({ count: 1, faces: 10, modifier: 16 });
-  });
-});
-
-describe("deflectAttacksRedirectRoll", () => {
-  it("is two Martial Arts die rolls + Dex modifier, reusing the derived unarmedStrike die (SRD 5.2)", () => {
-    // faces: 8 (from the unarmedStrike fixture) — count 2, Dex mod +3.
-    expect(deflectAttacksRedirectRoll(monk())).toEqual({ count: 2, faces: 8, modifier: 3 });
-  });
-});
-
-describe("deflectMissilesThrowRoll", () => {
-  it("is 1d6 + Dex modifier (SRD 5.1 throw-back, an attack roll not a save)", () => {
-    expect(deflectMissilesThrowRoll(monk())).toEqual({ count: 1, faces: 6, modifier: 3 });
+      deflectRollFromAction({ key: "deflectAttacks", name: "Deflect Attacks", cost: "reaction", enabled: true }),
+    ).toBeUndefined();
   });
 });
 

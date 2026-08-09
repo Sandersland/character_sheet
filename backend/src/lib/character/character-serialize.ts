@@ -523,7 +523,19 @@ export async function serializeCharacter(rawRow: CharacterRow) {
 
     // Class-specific available actions for the turn tracker (universal ones ride
     // GET /api/reference instead, resolved per edition — #1430).
-    availableActions: buildAvailableActionsView(row.classEntries, progress.level, resources, unarmoredUnshielded, editionOf(row)),
+    availableActions: buildAvailableActionsView(
+      row.classEntries,
+      progress.level,
+      resources,
+      unarmoredUnshielded,
+      editionOf(row),
+      effectiveScores,
+      // Off-hand eligibility input (#1435): the light flags of the equipped
+      // weapons, read off the SAME serialized inventory the attack rows use.
+      inventory
+        .filter((item) => item.category === "weapon" && item.equipped && item.weapon)
+        .map((item) => ({ light: Boolean(item.weapon?.light) })),
+    ),
 
     // Combat attack rows — derived at read time so the session turn sheets render
     // served numbers instead of recomputing attack math on the client (#1434).

@@ -1,7 +1,7 @@
 /**
  * Action-economy catalog types and the executeAction operation.
  */
-import type { ExecuteActionResult } from "@character-sheet/shared-types";
+import type { EffectSpec, ExecuteActionResult } from "@character-sheet/shared-types";
 
 /**
  * Action-economy cost — which slot an action consumes on the character's turn.
@@ -61,6 +61,13 @@ export interface AvailableAction {
    * row at a time (#1383).
    */
   resolverKind?: string;
+  /**
+   * A resolved roll spec for this action (#1435) — the #1381 resolved-spec-on-a-
+   * row field, reused rather than a second bespoke field. `deflectRollFromAction`
+   * (lib/deflectAttacks.ts) is the reader. `effect.dice` is the RollSpec — the
+   * client never re-derives the monk-level or Martial-Arts-die math.
+   */
+  effect?: EffectSpec;
 }
 
 // ExecuteActionResult (#1528) is defined in @character-sheet/shared-types —

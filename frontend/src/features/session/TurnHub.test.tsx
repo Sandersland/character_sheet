@@ -1202,8 +1202,17 @@ describe("TurnHub — Deflect Attacks reaction (#1241)", () => {
           // overrides this to "any damage type" itself, the same way the real
           // backend would, instead of the client re-deriving the threshold.
           damageTypeClause: "bludgeoning, piercing, or slashing damage",
+          // Reduction spec resolved server-side (#1435): Dex +3 + monk level 5 = 8.
+          effect: { effectType: "utility", dice: { count: 1, faces: 10, modifier: 8 }, scaling: { mode: "none" } },
         },
-        { key: "deflectAttacksRedirect", name: "Deflect Attacks — Redirect", cost: "free", enabled: true, resourceKey: "focus" },
+        {
+          key: "deflectAttacksRedirect",
+          name: "Deflect Attacks — Redirect",
+          cost: "free",
+          enabled: true,
+          resourceKey: "focus",
+          effect: { effectType: "damage", dice: { count: 2, faces: 8, modifier: 3 }, scaling: { mode: "none" } },
+        },
       ],
       resources: {
         features: [],
@@ -1261,6 +1270,7 @@ describe("TurnHub — Deflect Attacks reaction (#1241)", () => {
             name: "Deflect Attacks",
             cost: "reaction",
             enabled: true,
+            effect: { effectType: "utility", dice: { count: 1, faces: 10, modifier: 8 }, scaling: { mode: "none" } },
           },
           { key: "deflectAttacksRedirect", name: "Deflect Attacks — Redirect", cost: "free", enabled: false, disabledReason: "No focus remaining" },
         ],
@@ -1292,8 +1302,17 @@ describe("TurnHub — Deflect Attacks reaction (#1241)", () => {
             cost: "reaction",
             enabled: true,
             damageTypeClause: "any damage type",
+            // Dex +3 + monk level 13 = 16.
+            effect: { effectType: "utility", dice: { count: 1, faces: 10, modifier: 16 }, scaling: { mode: "none" } },
           },
-          { key: "deflectAttacksRedirect", name: "Deflect Attacks — Redirect", cost: "free", enabled: true, resourceKey: "focus" },
+          {
+            key: "deflectAttacksRedirect",
+            name: "Deflect Attacks — Redirect",
+            cost: "free",
+            enabled: true,
+            resourceKey: "focus",
+            effect: { effectType: "damage", dice: { count: 2, faces: 10, modifier: 3 }, scaling: { mode: "none" } },
+          },
         ],
       } as unknown as Partial<Character>),
     );

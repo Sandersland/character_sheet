@@ -397,6 +397,12 @@ describe("serializeCharacter snapshot lock (#1003)", () => {
         key: "secondWind", name: "Second Wind", cost: "bonusAction", enabled: true,
         reminder: "Regain 1d10 + 1 HP", resolverKind: "heal-roll",
       },
+      // Off-hand eligibility (#1435) — served for every character; this caster
+      // holds no two-Light-weapon pair, so it's disabled.
+      {
+        key: "offHandAttack", name: "Off-Hand Attack", cost: "bonusAction", enabled: false,
+        disabledReason: "Off-hand attack needs two Light weapons equipped.",
+      },
     ]);
     expect(serialized).toMatchSnapshot();
   });

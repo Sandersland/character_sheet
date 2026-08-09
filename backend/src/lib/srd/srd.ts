@@ -28,5 +28,6 @@ export * from "@/lib/srd/advancement-slots.js";
 export * from "@/lib/srd/primary-abilities.js";
 export * from "@/lib/srd/proficiencies.js";
 export * from "@/lib/srd/weapon-damage.js";
+export * from "@/lib/srd/deflect.js";
 export * from "@/lib/srd/character-derive.js";
 export * from "@/lib/srd/feats.js";
