@@ -17,7 +17,7 @@ interface SegmentedProps<T extends string> {
 
 // Single-select segmented control (WAI-ARIA radiogroup), styled like Tabs.tsx.
 // Roving tabindex + arrow/Home/End keyboard behavior comes from the shared
-// #1111/#1324 hook rather than a hand-rolled handler.
+// useRovingRadioGroup hook (#1111/#1324).
 export default function Segmented<T extends string>({
   options,
   value,
