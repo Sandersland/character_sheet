@@ -55,6 +55,7 @@ import { authCookie } from "@/test-support/auth.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 import { fighterResourceRowsData } from "@/test-support/fighter-resource-rows.js";
 import { readInventorySnapshot } from "@/lib/inventory/inventory-snapshot-read.js";
+import { startSoloSession } from "@/lib/session/sessions.js";
 
 // Sessions are campaign-level (#245): create a throwaway campaign to host a
 // Session row when a test only needs a valid sessionId to tag events with.
@@ -416,6 +417,105 @@ describe("POST /:id/events/:batchId/revert — Wizard scenarios", () => {
     // Both the HP change and the slot spend are undone together.
     expect(res.body.hitPoints.current).toBe(8);
     expect(res.body.spellcasting.slots.find((s: { level: number }) => s.level === 1).used).toBe(0);
+  });
+
+  // ── resolveAction LIFO undo + the roll-category skip (#1845) ──────────────
+  //
+  // #1845 retired the last standalone attackRoll/damageRoll writers
+  // (off-hand/Flurry's old useAttackRolls path) in favor of ONE resolveAction
+  // event per swing — but the `category: { not: "roll" }` skip in
+  // revertPreflight's LIFO scan (activity.ts) is NOT specific to attack/
+  // damage kinds: it excludes every roll-category event (attackRoll/
+  // damageRoll/checkRoll/saveRoll/initiativeRoll) from ever counting as "the
+  // most recent action" a real batch must yield to. checkRoll/saveRoll/
+  // initiativeRoll are logged by a completely separate, still-very-much-live
+  // path (POST .../sessions/:sessionId/roll, used by every ability check/
+  // save/initiative button) that #1845 never touches — so the skip stays
+  // load-bearing regardless of what #1845 does to attack/damage. These tests
+  // prove both halves: a resolveAction batch undoes cleanly on its own, and a
+  // roll-category event logged AFTER it does not block that undo (removing
+  // the skip would 409 the second test with "Only the most recent action can
+  // be undone" the instant a player rolled so much as an Athletics check).
+  describe("resolveAction LIFO undo + the roll-category skip (#1845)", () => {
+    function weaponResolveOp(actionId = "twf-action-1") {
+      return {
+        type: "resolveAction" as const,
+        actionId,
+        source: "Dagger (off-hand)",
+        cost: { kind: "bonus" as const },
+        toHit: { faces: [15], kept: 15, nat20: false, bonus: 5, total: 20, verdict: "hit" as const },
+        effect: { spec: "1d4+3", faces: [3], total: 6, type: "piercing", kind: "damage" as const, crit: false },
+      };
+    }
+
+    function postResolveAction(op: ReturnType<typeof weaponResolveOp>) {
+      return supertest.agent(app).set("Cookie", COOKIE)
+        .post(`/api/characters/${WIZARD_ID}/resolve-action/transactions`)
+        .send({ operations: [op] });
+    }
+
+    it("reverts a resolveAction batch cleanly — the swing's own event LIFO-undoes on its own", async () => {
+      const res = await postResolveAction(weaponResolveOp());
+      expect(res.status).toBe(200);
+      const batchId = await latestBatchId(WIZARD_ID);
+
+      const revertRes = await revert(WIZARD_ID, batchId);
+      expect(revertRes.status).toBe(200);
+
+      const event = await prisma.characterEvent.findFirst({ where: { characterId: WIZARD_ID, batchId } });
+      expect(event?.reverted).toBe(true);
+    });
+
+    it("a checkRoll logged AFTER a resolveAction batch does not block that batch's LIFO undo", async () => {
+      // Solo session started FIRST — its own `sessionStarted` bookkeeping
+      // event (category "session", not "roll") must not become the thing
+      // under test; starting it before the resolveAction op keeps it the
+      // OLDEST event instead of interleaved.
+      const session = await startSoloSession(WIZARD_ID);
+
+      const resolveRes = await postResolveAction(weaponResolveOp("twf-action-2"));
+      expect(resolveRes.status).toBe(200);
+      const batchId = await latestBatchId(WIZARD_ID);
+
+      // A later, unrelated ability check — its own fresh batchId, category "roll".
+      const rollRes = await supertest.agent(app).set("Cookie", COOKIE)
+        .post(`/api/characters/${WIZARD_ID}/sessions/${session.id}/roll`)
+        .send({ kind: "check", source: "Athletics", total: 14, ability: "strength" });
+      expect(rollRes.status).toBe(201);
+
+      // The checkRoll is now the most-recent CharacterEvent by createdAt, but
+      // must never be eligible as "the most recent action" for LIFO purposes.
+      const revertRes = await revert(WIZARD_ID, batchId);
+      expect(revertRes.status).toBe(200);
+    });
+
+    it("a saveRoll and an initiativeRoll between two resolveAction batches never block the LIFO chain", async () => {
+      const session = await startSoloSession(WIZARD_ID);
+
+      const first = await postResolveAction(weaponResolveOp("twf-action-3"));
+      expect(first.status).toBe(200);
+      const firstBatch = await latestBatchId(WIZARD_ID);
+
+      await supertest.agent(app).set("Cookie", COOKIE)
+        .post(`/api/characters/${WIZARD_ID}/sessions/${session.id}/roll`)
+        .send({ kind: "save", source: "Dexterity save", total: 11, ability: "dexterity", dc: 13 });
+
+      const second = await postResolveAction(weaponResolveOp("twf-action-4"));
+      expect(second.status).toBe(200);
+      const secondBatch = await latestBatchId(WIZARD_ID);
+      expect(secondBatch).not.toBe(firstBatch);
+
+      await supertest.agent(app).set("Cookie", COOKIE)
+        .post(`/api/characters/${WIZARD_ID}/sessions/${session.id}/roll`)
+        .send({ kind: "initiative", source: "Initiative", total: 17 });
+
+      // LIFO order: undo the SECOND resolveAction batch first (the initiativeRoll
+      // after it must not block this), then the first.
+      const undoSecond = await revert(WIZARD_ID, secondBatch);
+      expect(undoSecond.status).toBe(200);
+      const undoFirst = await revert(WIZARD_ID, firstBatch);
+      expect(undoFirst.status).toBe(200);
+    });
   });
 });
 
