@@ -12,7 +12,7 @@ import userEvent from "@testing-library/user-event";
 import InlineAttackPicker from "@/features/session/InlineAttackPicker";
 import { RollProvider } from "@/features/dice/RollContext";
 import { useTurnState } from "@/features/session/useTurnState";
-import { applyResolveActionOperations, logRoll, castManeuverTransaction } from "@/api/client";
+import { applyResolveActionOperations, logRollAction, castManeuverTransaction } from "@/api/client";
 import { getQueryClient } from "@/api/queryClient";
 import { characterKeys } from "@/api/queryKeys";
 import { renderWithCharacter } from "@/test/renderWithCharacter";
@@ -26,7 +26,7 @@ vi.mock("@/api/client", () => ({
   applySpellcastingTransactions: vi.fn(),
   applyResolveActionOperations: vi.fn(),
   castManeuverTransaction: vi.fn(),
-  logRoll: vi.fn().mockResolvedValue(undefined),
+  logRollAction: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Fixed mid-face d20 (11 kept) — non-crit, non-miss, so "Roll to hit" resolves
@@ -44,7 +44,8 @@ function seedNat1() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(logRoll).mockResolvedValue(undefined);
+  // Resolved value is unused — weapons never call the roll logger (asserted below).
+  vi.mocked(logRollAction).mockResolvedValue(undefined as never);
 });
 
 afterEach(() => {
@@ -261,7 +262,7 @@ describe("InlineAttackPicker — on-hit dice riders (#1843: routed into resolveA
     const riderButton = screen.getByRole("button", { name: /Roll \+2d6 fire/ });
     await userEvent.click(riderButton);
 
-    expect(vi.mocked(logRoll)).not.toHaveBeenCalled();
+    expect(vi.mocked(logRollAction)).not.toHaveBeenCalled();
   });
 
   it("hides the rider when the served row carries none", async () => {
@@ -341,7 +342,7 @@ describe("InlineAttackPicker — resolveAction commit (epic #1827 Slice 5, #1832
     await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
 
     await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(1));
-    expect(vi.mocked(logRoll)).not.toHaveBeenCalled();
+    expect(vi.mocked(logRollAction)).not.toHaveBeenCalled();
   });
 });
 
@@ -361,7 +362,7 @@ describe("InlineAttackPicker — typed damage riders route into the single resol
     expect(ops[0].effect).toMatchObject({ type: "slashing", kind: "damage" });
     expect(ops[0].riders).toHaveLength(1);
     expect(ops[0].riders?.[0]).toMatchObject({ type: "fire", kind: "damage" });
-    expect(vi.mocked(logRoll)).not.toHaveBeenCalled();
+    expect(vi.mocked(logRollAction)).not.toHaveBeenCalled();
   });
 
   it("omits riders from the op when none were rolled this swing", async () => {

@@ -1,9 +1,9 @@
 /**
  * Decomposed-roll-addend zod validators for `RollEventAttackComponents` /
  * `RollEventDamageComponents` (shared-types roll-event.ts) — the ONE
- * validation for a shape TWO callers accept over the wire: the roll-log route
- * (`routes/session/session-route-helpers.ts`, `POST .../sessions/:id/roll`)
- * and the `resolveAction` op (`lib/combat/resolve-action-ops.ts`, #1829/#1830).
+ * validation for a shape TWO resolve-action ops accept over the wire: the
+ * `resolveAction` combat op (`lib/combat/resolve-action-ops.ts`, #1829/#1830)
+ * and the standalone `logRoll` op (`lib/combat/standalone-roll-op.ts`, #1861).
  * Lives in lib (not routes) so a lib module can depend on it without a
  * lib→routes inversion.
  */
