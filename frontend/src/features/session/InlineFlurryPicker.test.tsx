@@ -1,23 +1,30 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { useEffect } from "react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import InlineFlurryPicker from "@/features/session/InlineFlurryPicker";
 import { RollProvider } from "@/features/dice/RollContext";
-import { logRoll } from "@/api/client";
+import { useTurnState } from "@/features/session/useTurnState";
+import { applyResolveActionOperations, logRoll } from "@/api/client";
 import { renderWithCharacter } from "@/test/renderWithCharacter";
 import { IMPROVISED_ROW, UNARMED_ROW, attackRow } from "@/test/attackRowFixtures";
 import type { Character } from "@/types/character";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 
 vi.mock("@/api/client", () => ({
-  logRoll: vi.fn().mockResolvedValue(undefined),
+  applyResolveActionOperations: vi.fn(),
   castManeuverTransaction: vi.fn(),
+  logRoll: vi.fn().mockResolvedValue(undefined),
 }));
 
 beforeEach(() => {
   vi.clearAllMocks();
 });
+
+function seedMid() {
+  return vi.spyOn(Math, "random").mockReturnValue(0.5);
+}
 
 function makeTurnState(bonusAttack: { total: number; used: number } | null) {
   return {
@@ -59,6 +66,7 @@ function monkCharacter(overrides: Partial<Character> = {}): Character {
       },
     ],
     attacksPerAction: 1,
+    critRange: 20,
     unarmedStrike: { attackBonus: 6, damage: { count: 1, faces: 6, modifier: 3, damageType: "bludgeoning" } },
     improvisedWeapon: { attackBonus: 2, damage: { count: 1, faces: 4, modifier: 0, damageType: "bludgeoning" }, proficient: false },
     resources: { pools: [] },
@@ -77,6 +85,7 @@ function monkCharacter(overrides: Partial<Character> = {}): Character {
       { ...UNARMED_ROW, attackSpec: { count: 1, faces: 20, modifier: 6 }, damageSpec: { count: 1, faces: 6, modifier: 3 } },
       IMPROVISED_ROW,
     ],
+    availableActions: [{ key: "flurryOfBlows", name: "Flurry of Blows", count: 2 }] as unknown as Character["availableActions"],
     ...overrides,
   } as unknown as Character;
 }
@@ -90,7 +99,6 @@ function renderPicker(
     <RollProvider>
       <InlineFlurryPicker
         turnState={turnState}
-        sessionId="sess-1"
         onClose={handlers.onClose ?? vi.fn()}
         onCancel={handlers.onCancel ?? vi.fn()}
         onLogChanged={vi.fn()}
@@ -101,10 +109,10 @@ function renderPicker(
   );
 }
 
-describe("InlineFlurryPicker (#1217)", () => {
+describe("InlineFlurryPicker (#1217, rewired onto the shared resolver #1845)", () => {
   it("resolves Unarmed Strike only — no weapon form selector even with a weapon equipped", () => {
     renderPicker(monkCharacter(), makeTurnState({ total: 2, used: 0 }));
-    expect(screen.getByText("Unarmed Strike")).toBeInTheDocument();
+    expect(screen.getAllByText("Unarmed Strike").length).toBeGreaterThan(0);
     expect(screen.queryByText("Shortsword")).not.toBeInTheDocument();
     expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument();
   });
@@ -115,6 +123,7 @@ describe("InlineFlurryPicker (#1217)", () => {
   });
 
   it("records a bonusAction-source Unarmed Strike roll via recordFlurryAttack", async () => {
+    seedMid();
     const turnState = makeTurnState({ total: 2, used: 0 });
     renderPicker(monkCharacter(), turnState);
 
@@ -124,11 +133,20 @@ describe("InlineFlurryPicker (#1217)", () => {
     expect(turnState.recordFlurryAttack).toHaveBeenCalledWith(
       expect.objectContaining({ source: "bonusAction", formName: "Unarmed Strike" }),
     );
-    expect(vi.mocked(logRoll)).toHaveBeenCalledWith(
-      "char-1",
-      "sess-1",
-      expect.objectContaining({ kind: "attack", source: "Unarmed Strike" }),
-    );
+  });
+
+  it("never calls logRoll for a strike's attack/damage rolls (retired #1845)", async () => {
+    seedMid();
+    const turnState = makeTurnState({ total: 2, used: 0 });
+    vi.mocked(applyResolveActionOperations).mockResolvedValue(monkCharacter());
+    renderPicker(monkCharacter(), turnState);
+
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Roll damage$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
+
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(logRoll)).not.toHaveBeenCalled();
   });
 
   it("shows Cancel — refund bonus action before any strike is rolled", () => {
@@ -153,24 +171,39 @@ describe("InlineFlurryPicker (#1217)", () => {
   });
 
   it("spends Focus exactly once across a full 2-strike flurry — not per strike", async () => {
+    seedMid();
     const turnState = makeTurnState({ total: 2, used: 0 });
     const onCommitFocusSpend = vi.fn();
+    vi.mocked(applyResolveActionOperations).mockResolvedValue(monkCharacter());
     renderPicker(monkCharacter(), turnState, { onCommitFocusSpend });
 
     await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
     expect(onCommitFocusSpend).toHaveBeenCalledOnce();
 
-    // Re-arm (Next — the mocked recordFlurryAttack never actually decrements
-    // the static `used` prop, so Roll to hit reappears for the 2nd strike).
-    await userEvent.click(screen.getByRole("button", { name: /^Next$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Roll damage$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(1));
+
+    // Strike 2 — the rail re-arms itself (mirrors InlineAttackPicker's Extra
+    // Attack loop) since a strike remains.
+    await waitFor(() => expect(screen.getByRole("button", { name: /Roll to hit/ })).not.toBeDisabled());
     await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
 
     expect(turnState.recordFlurryAttack).toHaveBeenCalledTimes(2);
     expect(onCommitFocusSpend).toHaveBeenCalledOnce();
   });
 
-  it("shows Close (not Done) after one of two strikes — the second is still pending", () => {
-    renderPicker(monkCharacter(), makeTurnState({ total: 2, used: 1 }));
+  it("shows Close (not Done) after one of two strikes commits — the second is still pending", async () => {
+    seedMid();
+    const turnState = makeTurnState({ total: 2, used: 0 });
+    vi.mocked(applyResolveActionOperations).mockResolvedValue(monkCharacter());
+    renderPicker(monkCharacter(), turnState);
+
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Roll damage$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(1));
+
     expect(screen.getByRole("button", { name: /^Close$/ })).toBeInTheDocument();
   });
 
@@ -191,5 +224,66 @@ describe("InlineFlurryPicker (#1217)", () => {
     } as unknown as Partial<Character>);
     renderPicker(bm, makeTurnState({ total: 2, used: 0 }));
     expect(screen.getByRole("button", { name: /Battle Master maneuvers/ })).toBeInTheDocument();
+  });
+});
+
+// Live turn state — needed to prove a full resolveAction commit + the
+// strike-loop re-arm without double-spending the bonus action (mirrors
+// InlineAttackPicker.test.tsx's own LiveHarness for the Extra Attack loop).
+function LiveHarness({ character }: { character: Character }) {
+  vi.mocked(applyResolveActionOperations).mockResolvedValue(character);
+  const liveTurnState = useTurnState(character, "sess-flurry");
+  useEffect(() => {
+    liveTurnState.startCombat();
+    liveTurnState.startTurn();
+    liveTurnState.consumeBonusAction();
+    liveTurnState.enterFlurryMode(2);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- harness drives into flurry mode once on mount; empty deps intentional
+  }, []);
+  return (
+    <RollProvider>
+      <InlineFlurryPicker
+        turnState={liveTurnState}
+        onClose={vi.fn()}
+        onCancel={vi.fn()}
+        onLogChanged={vi.fn()}
+        onCommitFocusSpend={vi.fn()}
+      />
+    </RollProvider>
+  );
+}
+
+describe("InlineFlurryPicker — resolveAction commit + strike loop (live turnState, #1845)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    // useTurnState persists to localStorage keyed by sessionId — clear so a
+    // prior test's economy never rehydrates into the next one.
+    window.localStorage.clear();
+  });
+
+  it("commits one resolveAction op per strike, cost.kind bonus, and finishes at 2 of 2", async () => {
+    seedMid();
+    const character = monkCharacter();
+    renderWithCharacter(<LiveHarness character={character} />, character);
+
+    expect(screen.getByText(/2 of 2 remaining/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Roll damage$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(1));
+
+    const [, ops1] = vi.mocked(applyResolveActionOperations).mock.calls[0];
+    expect(ops1[0]).toMatchObject({ type: "resolveAction", source: "Unarmed Strike", cost: { kind: "bonus" } });
+
+    await waitFor(() => expect(screen.getByText(/1 of 2 remaining/)).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: /Roll to hit/ })).not.toBeDisabled();
+
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Roll damage$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(2));
+
+    await waitFor(() => expect(screen.getByText(/0 of 2 remaining/)).toBeInTheDocument());
   });
 });

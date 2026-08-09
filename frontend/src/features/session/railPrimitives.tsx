@@ -5,8 +5,11 @@
 // VerdictChip/CritButton definitions now import from here; ResolutionRail is
 // the second, generalized consumer.
 
+import DamageRiderList from "@/features/session/DamageRiderList";
+import type { ResolutionView } from "@/features/session/useResolution";
+import type { AttackState } from "@/features/session/useTurnState";
 import type { StepState } from "@/lib/attackStepRail";
-import type { AttackEntry } from "@/lib/attackMath";
+import type { AttackEntry, DamageRider } from "@/lib/attackMath";
 
 const DOT_STYLE: Record<StepState, string> = {
   done: "border-garnet-600 bg-garnet-soft-surface text-garnet-on-surface",
@@ -95,6 +98,55 @@ export function AttackFormSummaryCore({ selected }: { selected: AttackEntry }) {
         {selected.note && <span className="ml-1 italic">{selected.note}</span>}
       </span>
     </>
+  );
+}
+
+/** "Attacks · N of M remaining" kicker with spent/remaining pips (total > 1
+ *  only) — shared by the Attack sheet's Extra Attack loop and Flurry's
+ *  2+-strike loop (moved out of AttackStepCard.tsx, retired #1845). */
+export function AttackKickerPips({ attack }: { attack: AttackState | null }) {
+  if (!attack || attack.total <= 1) return null;
+  return (
+    <div className="flex items-center gap-2">
+      <span className="flex items-center gap-1">
+        {Array.from({ length: attack.total }).map((_, i) => (
+          <span
+            key={i}
+            className={`inline-block h-2 w-2 rounded-full ${
+              i < attack.used ? "bg-parchment-300" : "bg-garnet-soft-surface"
+            }`}
+          />
+        ))}
+      </span>
+      <span className="text-[11px] font-semibold uppercase tracking-wide text-garnet-700">
+        Attacks · {attack.total - attack.used} of {attack.total} remaining
+      </span>
+    </div>
+  );
+}
+
+/**
+ * On-hit dice riders (Flame Tongue +2d6 fire) — visible once a to-hit roll
+ * exists for this swing and it isn't a called/auto miss (#1832/#1845 shared
+ * gate — every useResolution-driven picker, weapon or bonus, hides riders the
+ * same way the pre-#1832 boundView binding did).
+ */
+export function DamageRidersPanel({
+  resolutionView,
+  armedEntry,
+  riderTotals,
+  onDamageRider,
+}: {
+  resolutionView: ResolutionView;
+  armedEntry: AttackEntry;
+  riderTotals: Record<string, number>;
+  onDamageRider: (rider: DamageRider) => void;
+}) {
+  if (!resolutionView.toHitRoll || resolutionView.verdict === "miss" || armedEntry.damageRiders.length === 0) {
+    return null;
+  }
+  return (
+    <DamageRiderList riders={armedEntry.damageRiders} riderTotals={riderTotals} onDamageRider={onDamageRider} />
   );
 }
 

@@ -1,15 +1,16 @@
-// The Two-Weapon Fighting off-hand attack sheet (#732, redesigned #813): the
-// same step-rail shell as the main Attack sheet (InlineAttackPicker), scoped to
-// the single off-hand swing. One AttackStepCard (Roll to hit → Call it → Damage)
-// over forms=[buildOffHandEntry] — the segmented selector collapses to the
-// "Dagger (off-hand)" header — plus the "This bonus action" tally strip, the
-// Battle Master maneuvers disclosure (RAW: maneuvers apply to any weapon
-// attack), and the shared footer. No Resume/counter pips: the bonus action is a
-// single swing. Rolls record a `bonusAction`-source tally row so they land in
-// the turn-summary banner and resolve inline exactly like an Attack-action row.
-// The roll/miss/crit/skip/next wiring is shared with InlineFlurryPicker via
-// useBonusAttackSheet (#1217) — this file owns only the off-hand-specific form
-// (buildOffHandEntry, which may be null) and its footer/layout composition.
+// The Two-Weapon Fighting off-hand attack sheet (#732, redesigned #813,
+// rewired onto the shared resolver #1845): the same rail shell as the main
+// Attack sheet (InlineAttackPicker) via useResolution/ResolutionRail, scoped
+// to the single off-hand swing — no "Attacking with" selector (there is only
+// ever one form), plus the "This bonus action" tally strip and the Battle
+// Master maneuvers disclosure (RAW: maneuvers apply to any weapon attack). No
+// Resume/counter pips: the bonus action is a single swing. The swing commits
+// ONE resolveAction event with cost.kind "bonus", recording a
+// bonusAction-source tally row so it lands in the turn-summary banner and
+// resolves inline exactly like an Attack-action row. The roll/commit wiring
+// is shared with InlineFlurryPicker via useBonusAttackSheet (#1217, rewired
+// #1845) — this file owns only the off-hand-specific form (buildBonusSwingEntry,
+// which may be null) and its footer/layout composition.
 //
 // Off-hand damage omits the ability modifier unless the character has the
 // Two-Weapon Fighting style — the adjustment is applied server-side and arrives
@@ -26,15 +27,14 @@ import { useIsBelowMd } from "@/hooks/useIsBelowMd";
 
 import { buildBonusSwingEntry } from "@/lib/attackMath";
 import { useBonusAttackSheet } from "@/features/session/useBonusAttackSheet";
-import AttackStepCard from "@/features/session/AttackStepCard";
+import ResolutionRail from "@/features/session/ResolutionRail";
+import { AttackFormSummaryCore, DamageRidersPanel } from "@/features/session/railPrimitives";
 import AttackSheetFooter from "@/features/session/AttackSheetFooter";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 
 interface InlineOffHandPickerProps {
   turnState: TurnState & TurnStateActions;
-  /** Active session id — off-hand rolls are logged against it. */
-  sessionId: string;
   /** Commit and dismiss (bonus action already spent by the roll). */
   onClose: () => void;
   /** Back out before rolling — refunds the bonus action and reopens the menu. */
@@ -48,7 +48,6 @@ interface InlineOffHandPickerProps {
 
 export default function InlineOffHandPicker({
   turnState,
-  sessionId,
   onClose,
   onCancel,
   onLogChanged,
@@ -58,38 +57,32 @@ export default function InlineOffHandPicker({
   // variant-aware entry (#1218): off-hand weapon for "twf", Unarmed Strike for
   // "unarmed"; the useBonusAttackSheet shell (#1217) is otherwise identical.
   const entry = buildBonusSwingEntry(character, variant);
-  // recordTwfAttack clears bonusAttack once the single swing lands — "rolled"
-  // doubles as "exhausted" for a swing that only ever happens once.
-  const rolled = turnState.bonusAttack === null;
+  const totalSwings = 1;
 
-  const {
-    currentRow,
-    riderTotals,
-    viewFor,
-    boundView,
-    handleRollToHit,
-    handleCallMiss,
-    handleCallCrit,
-    handleSkip,
-    handleNext,
-    tallyStrip,
-    maneuversDisclosure,
-  } = useBonusAttackSheet({
-    character,
-    turnState,
-    sessionId,
-    entry,
-    recordAttack: turnState.recordTwfAttack,
-    attacksExhausted: rolled,
-    onLogChanged,
-  });
+  const { resolutionView, riderTotals, onDamageRider, completedSwings, tallyStrip, maneuversDisclosure } =
+    useBonusAttackSheet({
+      character,
+      turnState,
+      entry,
+      totalSwings,
+      record: turnState.recordTwfAttack,
+      onLogChanged,
+    });
 
   const isMobile = useIsBelowMd();
 
+  // Mirrors InlineAttackPicker's own footer-timing comment: keyed off
+  // `completedSwings` (only advances once the resolveAction commit lands),
+  // NOT off a to-hit roll alone — `attacksRemain` covers the interval between
+  // "rolled" and "committed" so the footer never shows its OWN "Done" at the
+  // same time as ResolutionRail's completion tap (single swing → the same
+  // interval old TWF called "rolled", just timed off the local counter now).
+  const preRoll = completedSwings === 0 && !resolutionView.toHitRoll;
+  const attacksRemain = !preRoll && completedSwings < totalSwings;
   const footer = (
     <AttackSheetFooter
-      preRoll={!rolled}
-      attacksRemain={false}
+      preRoll={preRoll}
+      attacksRemain={attacksRemain}
       onCancel={onCancel}
       onClose={onClose}
       refundLabel="Cancel — refund bonus action"
@@ -108,23 +101,18 @@ export default function InlineOffHandPicker({
   }
 
   const stepCard = (
-    <AttackStepCard
-      forms={[entry]}
-      selectedId={entry.id}
-      onSelect={() => {}}
-      selectedView={viewFor(entry)}
-      boundView={boundView}
-      currentRow={currentRow}
-      attack={turnState.bonusAttack}
-      attacksExhausted={rolled}
-      onRollToHit={handleRollToHit}
-      onCallMiss={handleCallMiss}
-      onCallCrit={handleCallCrit}
-      onSkip={handleSkip}
-      onNext={handleNext}
-      riderTotals={riderTotals}
-      showKicker={false}
-    />
+    <div className="flex flex-col gap-2">
+      <span className="min-w-0">
+        <AttackFormSummaryCore selected={entry} />
+      </span>
+      <ResolutionRail view={resolutionView} />
+      <DamageRidersPanel
+        resolutionView={resolutionView}
+        armedEntry={entry}
+        riderTotals={riderTotals}
+        onDamageRider={onDamageRider}
+      />
+    </div>
   );
 
   // Mobile: one column in journey order. md+: the step card keeps the left column

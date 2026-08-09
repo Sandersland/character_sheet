@@ -1,12 +1,19 @@
-// useAttackTallyBridge (epic #1827 Slice 5, #1832) — feeds a live-in-progress
-// weapon swing into turnState.attackTally the INSTANT each roll lands
-// (to-hit, then damage, then any explicit verdict call), rather than waiting
-// for the swing to fully commit, and re-arms useResolution for the next Extra
-// Attack swing once the current one completes. Extracted out of
-// InlineAttackPicker (fallow flagged the component's own complexity — every
-// hook call this component makes directly adds "hook-density" cognitive
-// weight, #1832 review) — bundling the four related effects into ONE hook
-// call is the lever, not merely moving code around.
+// useAttackTallyBridge (epic #1827 Slice 5, #1832; generalized #1845) — feeds
+// a live-in-progress swing into turnState.attackTally the INSTANT each roll
+// lands (to-hit, then damage, then any explicit verdict call), rather than
+// waiting for the swing to fully commit, and re-arms useResolution for the
+// next swing in the same economy slot once the current one completes.
+// Extracted out of InlineAttackPicker (fallow flagged the component's own
+// complexity — every hook call this component makes directly adds
+// "hook-density" cognitive weight, #1832 review) — bundling the four related
+// effects into ONE hook call is the lever, not merely moving code around.
+//
+// Generalized (#1845) to drive the off-hand/Flurry bonus pickers too: `source`
+// picks which tally column this swing belongs to, and `record` is the
+// turnState action that both appends the row AND advances that source's own
+// economy counter in one call (`recordAttack` for the Action's Extra Attack
+// loop, `recordTwfAttack`/`recordFlurryAttack` for a bonusAction swing) — all
+// three share the exact same `(recorded?: RecordedAttack) => void` shape.
 //
 // Why the tally row fires this early, not at commit: SneakAttack/
 // StunningStrike/QuiveringPalm/ManeuversDisclosure all need `currentRow` to
@@ -25,19 +32,21 @@
 import { useEffect } from "react";
 
 import type { AttackEntry } from "@/lib/attackMath";
-import type { AttackTallyRow } from "@/lib/attackTallySummary";
+import type { AttackTallyRow, TallyRowSource } from "@/lib/attackTallySummary";
 import type { ResolutionView } from "@/features/session/useResolution";
-import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
+import type { RecordedAttack, TurnState, TurnStateActions } from "@/features/session/useTurnState";
 
 export function useAttackTallyBridge(
   turnState: TurnState & TurnStateActions,
   armedEntry: AttackEntry,
   resolutionView: ResolutionView,
   completedSwings: number,
-  attackTotal: number,
+  totalSwings: number,
   reset: () => void,
+  source: TallyRowSource = "action",
+  record: (recorded?: RecordedAttack) => void = turnState.recordAttack,
 ): { currentRow: AttackTallyRow | null } {
-  const currentRowIndex = turnState.attackTally.map((r) => r.source).lastIndexOf("action");
+  const currentRowIndex = turnState.attackTally.map((r) => r.source).lastIndexOf(source);
   const currentRow = currentRowIndex >= 0 ? turnState.attackTally[currentRowIndex] : null;
 
   // Provisional-row effect: appends the tally row the instant a to-hit roll
@@ -46,13 +55,13 @@ export function useAttackTallyBridge(
   const toHitTotal = resolutionView.toHitRoll?.total;
   useEffect(() => {
     if (toHitTotal === undefined || !resolutionView.attack) return;
-    turnState.recordAttack({
+    record({
       formId: armedEntry.id,
       formName: armedEntry.name,
-      source: "action",
+      source,
       attack: resolutionView.attack,
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- fires once per NEW to-hit roll (toHitTotal identity); turnState/armedEntry read fresh via closure
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fires once per NEW to-hit roll (toHitTotal identity); record/armedEntry/source read fresh via closure
   }, [toHitTotal]);
 
   // Damage effect: writes the effect roll's total into the row just created
@@ -78,12 +87,13 @@ export function useAttackTallyBridge(
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fires once per NEW verdict value
   }, [verdict]);
 
-  // Extra Attack loop (epic #1827): re-arms the SAME useResolution instance
-  // for the next swing once one completes with attacks still unspent.
+  // Multi-swing loop (Extra Attack, epic #1827; Flurry's 2+ strikes, #1845):
+  // re-arms the SAME useResolution instance for the next swing once one
+  // completes with this slot's swings still unspent.
   useEffect(() => {
-    if (resolutionView.completed && completedSwings < attackTotal) reset();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `reset` is a fresh closure every render (useResolution doesn't memoize it); gating on resolutionView.completed/completedSwings/attackTotal alone is what keeps this effect idempotent
-  }, [resolutionView.completed, completedSwings, attackTotal]);
+    if (resolutionView.completed && completedSwings < totalSwings) reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `reset` is a fresh closure every render (useResolution doesn't memoize it); gating on resolutionView.completed/completedSwings/totalSwings alone is what keeps this effect idempotent
+  }, [resolutionView.completed, completedSwings, totalSwings]);
 
   return { currentRow };
 }

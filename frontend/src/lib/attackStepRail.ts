@@ -1,5 +1,6 @@
 // Pure step model for the attack sheet's 1-2-3 rail (#811): Roll to hit →
-// Call it → Damage. No JSX — rendered by AttackStepCard.
+// Call it → Damage. No JSX — the weapon/attack-roll shape of
+// computeResolutionSteps (resolutionSteps.ts), rendered by ResolutionRail.
 //
 // "Damage" arms as soon as a roll exists (implicit hit — rolling damage IS the
 // hit call), so it never gates on step 2; a miss verdict parks it (a missed

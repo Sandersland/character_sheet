@@ -27,7 +27,7 @@ import type { SheetTab, SheetTabId } from "@/features/character-meta/sheetTabs";
 import type { ReferenceData, Session } from "@/types/character";
 
 // #1279: the live turn tracker pulls the session domain's heaviest trees
-// (TurnHub/useTurnActions/AttackStepCard) — lazied so a sheet that never goes
+// (TurnHub/useTurnActions/InlineAttackPicker) — lazied so a sheet that never goes
 // live never fetches them. Import fires once a live+joined session actually
 // exists (renderLivePanel below), not on every sheet load.
 const CombatLivePanel = lazy(() => import("@/features/session/CombatLivePanel"));

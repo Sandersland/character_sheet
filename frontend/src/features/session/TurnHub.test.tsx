@@ -1149,6 +1149,10 @@ describe("TurnHub — Bonus Unarmed Strike (Martial Arts, #1218)", () => {
     await user.click(screen.getByRole("button", { name: /Roll to hit/ }));
     expect(applyActionTransactions).not.toHaveBeenCalled();
 
+    // The shared resolver (#1845) requires the swing fully resolved — hit
+    // and damaged, or missed — before "Done" appears (no mid-swing "Skip"
+    // affordance, matching the main Attack sheet's own #1832 shape).
+    await user.click(screen.getByRole("button", { name: /^Roll damage$/ }));
     await user.click(screen.getByRole("button", { name: /^Done$/ }));
 
     // Bonus action is spent; exclusivity blocks re-opening the menu.

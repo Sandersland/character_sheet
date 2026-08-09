@@ -11,24 +11,24 @@
 // switches via useIsBelowMd (single mount per widget, like BottomSheet's own
 // breakpoint gating).
 //
-// `useAttackRolls`/`AttackStepCard` stay in place — InlineOffHandPicker/
-// InlineFlurryPicker (useBonusAttackSheet) still depend on them, and the epic
-// spec explicitly scopes bonus-action pickers as "not redesigned here" (they
-// keep current behavior). This file is the only migrated consumer.
+// `useAttackRolls`/`AttackStepCard` are retired (#1845): InlineOffHandPicker/
+// InlineFlurryPicker (useBonusAttackSheet) now drive this same
+// useResolution/ResolutionRail pair too — every weapon/bonus-swing picker
+// shares one resolver.
 //
 // One real behavior gap from the migration: `ResolutionRail`'s completion
 // model requires a swing fully resolved (hit-and-damaged, or missed) before
 // advancing — there is no "Skip, roll the next attack, leave this one
 // unresolved" affordance the old AttackStepCard offered. That escape hatch
-// doesn't exist in the shared rail (#1831) and is out of this slice's scope
-// to add.
+// doesn't exist in the shared rail (#1831) and stays out of scope — #1845
+// carried the same gap into the bonus-action pickers rather than reproducing
+// AttackStepCard's Skip link, matching this file's own accepted shape.
 
 import { useState } from "react";
 
 import Segmented from "@/components/ui/Segmented";
 import { useIsBelowMd } from "@/hooks/useIsBelowMd";
 
-import { applyResolveActionOperations, type ResolveActionOperation } from "@/api/client";
 import { useRoll } from "@/features/dice/RollContext";
 import RollModeChoice from "@/features/dice/RollModeChoice";
 import { formatRollSpec } from "@/lib/dice";
@@ -41,22 +41,20 @@ import {
   type AttackEntry,
   type DamageRider,
 } from "@/lib/attackMath";
-import { buildResolveActionOp } from "@/lib/resolveActionOp";
 import { weaponToResolution } from "@/lib/weaponToResolution";
 import type { AttackTallyRow } from "@/lib/attackTallySummary";
-import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import { useAttackTallyBridge } from "@/features/session/useAttackTallyBridge";
 import { useManeuverDie } from "@/features/session/useManeuverDie";
 import { INERT_RESOLUTION_CONSUMERS, useResolution } from "@/features/session/useResolution";
 import type { ResolutionRolls, ResolutionTurnState, ResolutionView } from "@/features/session/useResolution";
+import { riderTotalsOf, useResolveActionCommit } from "@/features/session/useResolveActionCommit";
 import type { ResolveActionEventEffect } from "@character-sheet/shared-types";
 import ResolutionRail from "@/features/session/ResolutionRail";
-import { AttackKickerPips } from "@/features/session/AttackStepCard";
-import { AttackFormSummaryCore } from "@/features/session/railPrimitives";
-import type { AttackEntryView } from "@/features/session/useAttackRolls";
+import { AttackFormSummaryCore, AttackKickerPips, DamageRidersPanel } from "@/features/session/railPrimitives";
+import { buildManeuverView } from "@/features/session/maneuverViewBridge";
+import type { AttackEntryView } from "@/features/session/maneuverViewBridge";
 import AttackTallyStrip from "@/features/session/AttackTallyStrip";
 import AttackSheetFooter from "@/features/session/AttackSheetFooter";
-import DamageRiderList from "@/features/session/DamageRiderList";
 import ManeuversDisclosure from "@/features/session/ManeuversDisclosure";
 import SneakAttackSection from "@/features/session/SneakAttackSection";
 import StunningStrikeSection from "@/features/session/StunningStrikeSection";
@@ -183,31 +181,6 @@ function ManeuversPanel({
   );
 }
 
-// On-hit dice riders (Flame Tongue +2d6 fire) — visible once a to-hit roll
-// exists for this swing and it isn't a called/auto miss, mirrors the old
-// boundView binding (bound right after Roll to hit, unbound the instant Miss
-// is called). Extracted alongside HitGatedSection/ManeuversPanel: the
-// three-term `&&` chain this replaces was the single biggest contributor to
-// InlineAttackPicker's own complexity score (#1832 review).
-function DamageRidersPanel({
-  resolutionView,
-  armedEntry,
-  riderTotals,
-  onDamageRider,
-}: {
-  resolutionView: ResolutionView;
-  armedEntry: AttackEntry;
-  riderTotals: Record<string, number>;
-  onDamageRider: (rider: DamageRider) => void;
-}) {
-  if (!resolutionView.toHitRoll || resolutionView.verdict === "miss" || armedEntry.damageRiders.length === 0) {
-    return null;
-  }
-  return (
-    <DamageRiderList riders={armedEntry.damageRiders} riderTotals={riderTotals} onDamageRider={onDamageRider} />
-  );
-}
-
 // The economy shim useResolution spends against (#1831 review comment 2):
 // Extra Attack's real economy spend already happened via enterAttackMode
 // (useTurnActions.handleAttackAction, BEFORE this sheet mounts) — the
@@ -261,47 +234,6 @@ function guardResolutionView(view: ResolutionView): ResolutionView {
   };
 }
 
-// A minimal AttackEntryView the pre-existing ManeuversDisclosure still needs
-// (its Precision/damage-maneuver prompts read `lastAttackRoll`/
-// `lastDamageRoll`/`onRollsUpdated`, unrelated to useAttackRolls' own rolling
-// — the values live on `resolutionView` now). Present once a to-hit exists
-// for the current swing, mirroring the old boundView binding. Pure (not a
-// hook) — extracted alongside useAttackTallyBridge so the branch/object-
-// literal don't add to InlineAttackPicker's own complexity score.
-//
-// KNOWN GAP: a maneuver-boosted total writes into the tally (so the tally
-// strip / turn-summary banner display the boosted number, unchanged from
-// before) but NOT into the resolveAction event already built from
-// useResolution's own (un-boosted) roll state — the persisted audit log
-// keeps the raw die total. Fixing that needs an override seam on
-// useResolution itself (#1831), out of this slice's scope.
-function buildManeuverView(
-  resolutionView: ResolutionView,
-  armedEntry: AttackEntry,
-  currentRow: AttackTallyRow | null,
-  turnState: TurnState & TurnStateActions,
-): AttackEntryView | null {
-  if (!resolutionView.toHitRoll) return null;
-  return {
-    entry: armedEntry,
-    attackTotal: null,
-    damageTotal: null,
-    lastAttackRoll: resolutionView.toHitRoll,
-    lastDamageRoll: resolutionView.effectRoll,
-    isCrit: resolutionView.isCrit,
-    attackChip: resolutionView.attackChip,
-    attackMode: resolutionView.attackMode,
-    onAttack: () => {},
-    onDamage: () => {},
-    onDamageRider: () => {},
-    onRollsUpdated: (newAttackTotal, newDamageTotal) => {
-      if (!currentRow) return;
-      if (newAttackTotal !== null) turnState.setTallyAttackTotal(currentRow.id, newAttackTotal);
-      if (newDamageTotal !== null) turnState.setTallyDamage(currentRow.id, newDamageTotal);
-    },
-  };
-}
-
 // Bundles the picker's own local UI state — the ADV/DIS choice (#958), rolled
 // rider effects, the armed form, and the completed-swings counter — into ONE
 // useState instead of four (fallow flagged InlineAttackPicker's own
@@ -334,13 +266,6 @@ function usePickerLocalState(initialSelectedId: string, turnState: TurnState) {
     setSelectedId: (selectedId: string) => setState((s) => ({ ...s, selectedId })),
     recordSwingComplete: () => setState((s) => ({ ...s, completedSwings: s.completedSwings + 1 })),
   };
-}
-
-// Display-only projection of `riderEffects` for DamageRiderList's own
-// `riderTotals` prop (unchanged contract) — one source of truth (riderEffects)
-// instead of two states that could drift.
-function riderTotalsOf(effects: Record<string, ResolveActionEventEffect>): Record<string, number> {
-  return Object.fromEntries(Object.entries(effects).map(([id, effect]) => [id, effect.total]));
 }
 
 interface InlineAttackPickerProps {
@@ -378,32 +303,23 @@ export default function InlineAttackPicker({
   const attackTotal = turnState.attack?.total ?? 1;
   const resolutionTurnState = attackResolutionTurnState(attackTotal, local.completedSwings);
 
-  const resolveActionMutation = useCharacterMutation({
-    characterId: character.id,
-    mutationFn: (op: ResolveActionOperation) => applyResolveActionOperations(character.id, [op]),
-    toCharacter: (c) => c,
-    fallbackMessage: "Failed to resolve attack",
-    onCharacterWritten: onLogChanged,
-  });
-
   // Fires the resolveAction transaction and advances the completed-swings
   // count — the two things left to do at completion. Recording the tally row
   // happens EARLIER, the instant to-hit rolls (see useAttackTallyBridge):
   // SneakAttack/StunningStrike/QuiveringPalm/ManeuversDisclosure all need
   // `currentRow` DURING the swing, not just after it commits, mirroring the
-  // pre-#1832 useAttackRolls timing.
-  //
-  // Riders (#1843): a rider rolled before "it Missed" is called (the panel
-  // stays visible until the verdict settles — DamageRidersPanel's own gate)
-  // is dropped rather than attached to a miss's op, matching `effect: null`
-  // on a miss — a typed rider makes no sense on a swing that didn't land.
-  // `clearRiders` always fires so a swing's rider state never bleeds into
-  // the NEXT Extra Attack swing, rolled or not.
+  // pre-#1832 useAttackRolls timing. `clearRiders` always fires so a swing's
+  // rider state never bleeds into the NEXT Extra Attack swing, rolled or not.
+  const { commit } = useResolveActionCommit({
+    characterId: character.id,
+    onLogChanged,
+    onCommitted: () => {
+      local.recordSwingComplete();
+      local.clearRiders();
+    },
+  });
   function handleCommit(rolls: ResolutionRolls) {
-    const riders = rolls.toHit?.verdict === "miss" ? [] : Object.values(local.riderEffects);
-    resolveActionMutation.mutate(buildResolveActionOp(resolution, rolls, { riders }));
-    local.recordSwingComplete();
-    local.clearRiders();
+    commit(resolution, rolls, local.riderEffects);
   }
 
   const { view: rawResolutionView, reset } = useResolution({

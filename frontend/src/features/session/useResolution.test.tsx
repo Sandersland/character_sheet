@@ -30,6 +30,13 @@ const ATTACK_RESOLUTION: TurnResolution = {
   effect: { spec: { count: 1, faces: 8, modifier: 3 }, kind: "damage", damageType: "slashing" },
 };
 
+// Champion's widened crit range (#1120) served per-resolution via
+// TurnResolution.toHit.critRange — parameterizes ATTACK_RESOLUTION's own
+// critRange rather than copying the whole descriptor per test.
+function attackResolutionWithCritRange(critRange: number): TurnResolution {
+  return { ...ATTACK_RESOLUTION, toHit: { ...ATTACK_RESOLUTION.toHit!, critRange } };
+}
+
 const SAVE_RESOLUTION: TurnResolution = {
   source: "Sacred Flame",
   cost: { kind: "action" },
@@ -225,6 +232,76 @@ describe("useResolution — attack-roll shape", () => {
 
     act(() => result.current.view.onCallCrit());
     expect(result.current.view.verdict).toBe("miss"); // refused — called a miss
+  });
+});
+
+// Champion widened crit range (#1120) end-to-end through useResolution:
+// TurnResolution.toHit.critRange → toHitSnapshot's criticalHit decision →
+// autoVerdict → the doubled-dice damage roll. Restores coverage lost when
+// useAttackRolls.combatLog.test.tsx was deleted alongside useAttackRolls.ts
+// (#1845) — that file's own nat-19/nat-18 Champion cases had no equivalent
+// on the migrated resolver path (every other test here pins critRange:20).
+describe("useResolution — Champion widened crit range (#1120, coverage restored #1845)", () => {
+  it("nat 19 does NOT crit at critRange:20 (the SRD default)", () => {
+    mockDice([{ face: 19, faces: 20 }]);
+    const { result } = setup({ resolution: attackResolutionWithCritRange(20) });
+
+    act(() => result.current.view.onRollToHit());
+
+    expect(result.current.view.attack?.criticalHit).toBe(false);
+    expect(result.current.view.verdict).toBeUndefined(); // ambiguous — needs a manual call
+    expect(result.current.view.isCrit).toBe(false);
+  });
+
+  it("nat 19 crits and auto-verdicts to 'crit' at critRange:19 (Champion L3, Improved Critical)", () => {
+    mockDice([{ face: 19, faces: 20 }]);
+    const { result } = setup({ resolution: attackResolutionWithCritRange(19) });
+
+    act(() => result.current.view.onRollToHit());
+
+    expect(result.current.view.attack?.criticalHit).toBe(true);
+    expect(result.current.view.verdict).toBe("crit"); // die-locked, no manual call needed
+    expect(result.current.view.isCrit).toBe(true);
+  });
+
+  it("nat 18 crits at critRange:18 (Champion L15, Superior Critical)", () => {
+    mockDice([{ face: 18, faces: 20 }]);
+    const { result } = setup({ resolution: attackResolutionWithCritRange(18) });
+
+    act(() => result.current.view.onRollToHit());
+
+    expect(result.current.view.attack?.criticalHit).toBe(true);
+    expect(result.current.view.verdict).toBe("crit");
+  });
+
+  it("nat 17 does NOT crit at critRange:18 — one face below the widened threshold", () => {
+    mockDice([{ face: 17, faces: 20 }]);
+    const { result } = setup({ resolution: attackResolutionWithCritRange(18) });
+
+    act(() => result.current.view.onRollToHit());
+
+    expect(result.current.view.attack?.criticalHit).toBe(false);
+    expect(result.current.view.verdict).toBeUndefined();
+    expect(result.current.view.isCrit).toBe(false);
+  });
+
+  it("doubles damage dice on a widened-range crit (nat 19, not a natural 20)", () => {
+    mockDice([{ face: 19, faces: 20 }, { face: 4, faces: 8 }, { face: 5, faces: 8 }]);
+    const { result, commit } = setup({ resolution: attackResolutionWithCritRange(19) });
+
+    act(() => result.current.view.onRollToHit());
+    expect(result.current.view.attack?.nat20).toBe(false); // widened range, not a literal nat 20
+    expect(result.current.view.verdict).toBe("crit");
+
+    act(() => result.current.view.onRollEffect());
+    // 1d8 doubles to 2d8 on the crit — the same critDamageSpec/doubling path
+    // a die-forced nat-20 crit uses, driven here by the widened range instead.
+    expect(result.current.view.effectRoll?.spec.crit).toBe(true);
+    expect(result.current.view.effectRoll?.dice).toHaveLength(2);
+
+    act(() => result.current.view.onComplete());
+    const rolls = commit.mock.calls[0][0] as ResolutionRolls;
+    expect(rolls.effect).toMatchObject({ kind: "damage", crit: true });
   });
 });
 

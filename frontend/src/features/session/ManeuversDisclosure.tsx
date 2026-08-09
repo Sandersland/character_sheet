@@ -8,7 +8,7 @@ import { useState } from "react";
 
 import AttackOptionSection from "@/features/session/AttackOptionSection";
 import ManeuverPrompt from "@/features/session/ManeuverPrompt";
-import type { AttackEntryView } from "@/features/session/useAttackRolls";
+import type { AttackEntryView } from "@/features/session/maneuverViewBridge";
 import type { UseManeuverDieReturn } from "@/features/session/useManeuverDie";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 
