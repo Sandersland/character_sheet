@@ -375,6 +375,10 @@ describe("classActionOption", () => {
 });
 
 describe("bonusSpellOptions", () => {
+  // The server-resolved interlock (#1439): unrestricted vs a leveled Action
+  // spell already cast this turn (which blocks bonus-action casting).
+  const UNRESTRICTED = { bonusActionBlockedByActionSpell: false, actionLimitedToCantrips: false };
+  const ACTION_SPELL_BLOCKS = { bonusActionBlockedByActionSpell: true, actionLimitedToCantrips: false };
   const spellcastingCharacter = (spells: Spell[], slots = [{ level: 1, total: 3, used: 1 }]) =>
     makeCharacter({
       spellcasting: {
@@ -387,12 +391,12 @@ describe("bonusSpellOptions", () => {
     } as Partial<Character>);
 
   it("empty for non-casters", () => {
-    expect(bonusSpellOptions(makeCharacter(), {})).toEqual([]);
+    expect(bonusSpellOptions(makeCharacter(), UNRESTRICTED)).toEqual([]);
   });
 
   it("builds slot badge + effect-preview subtitle for a leveled spell", () => {
     const c = spellcastingCharacter([makeSpell()]);
-    expect(bonusSpellOptions(c, {})).toEqual([
+    expect(bonusSpellOptions(c, UNRESTRICTED)).toEqual([
       {
         spellId: "spell-1",
         name: "Healing Word",
@@ -406,7 +410,7 @@ describe("bonusSpellOptions", () => {
     const c = spellcastingCharacter([
       makeSpell({ id: "s0", name: "Shillelagh", level: 0, effectKind: null, effectDiceCount: null, effectDiceFaces: null }),
     ]);
-    expect(bonusSpellOptions(c, {})).toEqual([
+    expect(bonusSpellOptions(c, UNRESTRICTED)).toEqual([
       { spellId: "s0", name: "Shillelagh", subtitle: "Bonus-action cast", badge: "at will" },
     ]);
   });
@@ -419,12 +423,12 @@ describe("bonusSpellOptions", () => {
       ],
       [{ level: 1, total: 3, used: 1 }], // no L2 slot
     );
-    expect(bonusSpellOptions(c, {})).toEqual([]);
+    expect(bonusSpellOptions(c, UNRESTRICTED)).toEqual([]);
   });
 
   it("respects the 5e interlock: leveled action-spell blocks bonus-action casting", () => {
     const c = spellcastingCharacter([makeSpell()]);
-    expect(bonusSpellOptions(c, { action: "leveled" })).toEqual([]);
+    expect(bonusSpellOptions(c, ACTION_SPELL_BLOCKS)).toEqual([]);
   });
 });
 

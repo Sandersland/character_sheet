@@ -1,8 +1,12 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 import { fetchCombatState } from "@/api/client";
+import type { SpellEconomyState } from "@/types/character";
 
 const POLL_MS = 5000;
+
+/** A manual, on-demand combat-state resync (#1439) — fetch once and sync. */
+export type CombatRefresh = () => Promise<void>;
 
 /**
  * Polls the server's authoritative combat state (~5s) while a live-joined
@@ -13,15 +17,30 @@ const POLL_MS = 5000;
  * know it's happening yet, so it could never flip its own local flag to
  * start polling for it). Paused while the tab is hidden — a background timer
  * would just burn requests nobody sees — and cleared on unmount.
+ *
+ * Returns a stable `refresh` (#1439) so a just-committed spell cast can pull the
+ * server-resolved bonus-action interlock immediately, instead of waiting up to
+ * ~5s for the next poll tick — the cast records the interlock on the
+ * participant row, and `refresh` is how this client observes it now.
  */
 export function useCombatPoll(
   characterId: string,
   sessionId: string | null,
   active: boolean,
-  onSync: (round: number, combatActive: boolean, updatedAt: string) => void,
-): void {
+  onSync: (round: number, combatActive: boolean, updatedAt: string, spellEconomy: SpellEconomyState) => void,
+): CombatRefresh {
   const onSyncRef = useRef(onSync);
   onSyncRef.current = onSync;
+
+  const refresh = useCallback<CombatRefresh>(async () => {
+    if (!sessionId) return;
+    try {
+      const state = await fetchCombatState(characterId, sessionId);
+      onSyncRef.current(state.round, state.combatActive, state.updatedAt, state.spellEconomy);
+    } catch {
+      // Best-effort — the ~5s poll will reconcile on the next tick.
+    }
+  }, [characterId, sessionId]);
 
   useEffect(() => {
     if (!active || !sessionId) return;
@@ -35,7 +54,7 @@ export function useCombatPoll(
       lastPollAt = Date.now();
       try {
         const state = await fetchCombatState(characterId, id);
-        if (!cancelled) onSyncRef.current(state.round, state.combatActive, state.updatedAt);
+        if (!cancelled) onSyncRef.current(state.round, state.combatActive, state.updatedAt, state.spellEconomy);
       } catch {
         // Best-effort — a failed poll just waits for the next tick.
       }
@@ -70,4 +89,6 @@ export function useCombatPoll(
       document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [characterId, sessionId, active]);
+
+  return refresh;
 }

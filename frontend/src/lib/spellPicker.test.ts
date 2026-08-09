@@ -6,7 +6,7 @@ import {
   isArcanumLevel,
   availableSlotsForSpell,
   resolvedSlot,
-  spellRestrictionFlags,
+  restrictionFlagsForSlot,
   slotRestrictionHint,
   filterCastableSpells,
   sortSpells,
@@ -91,26 +91,43 @@ describe("resolvedSlot", () => {
   });
 });
 
-describe("spellRestrictionFlags", () => {
-  it("blocks bonus-action casting after a leveled action spell", () => {
-    expect(spellRestrictionFlags("bonusAction", { action: "leveled" })).toEqual({
-      bonusActionBlockedByActionSpell: true,
-      actionLimitedToCantrips: false,
-    });
+// Pins the client's projection of the SERVER-resolved interlock (#1439): the
+// picker consumes the served SpellEconomyState, never re-derives the rule.
+describe("restrictionFlagsForSlot", () => {
+  it("routes the served block onto the bonus-action picker", () => {
+    expect(
+      restrictionFlagsForSlot("bonusAction", {
+        bonusActionBlockedByActionSpell: true,
+        actionLimitedToCantrips: false,
+      }),
+    ).toEqual({ bonusActionBlockedByActionSpell: true, actionLimitedToCantrips: false });
   });
 
-  it("limits the action to cantrips after a leveled bonus-action spell", () => {
-    expect(spellRestrictionFlags("action", { bonus: "leveled" })).toEqual({
-      bonusActionBlockedByActionSpell: false,
-      actionLimitedToCantrips: true,
-    });
+  it("routes the served cantrip-limit onto the action picker", () => {
+    expect(
+      restrictionFlagsForSlot("action", {
+        bonusActionBlockedByActionSpell: false,
+        actionLimitedToCantrips: true,
+      }),
+    ).toEqual({ bonusActionBlockedByActionSpell: false, actionLimitedToCantrips: true });
   });
 
-  it("is unrestricted otherwise", () => {
-    expect(spellRestrictionFlags("action", {})).toEqual({
-      bonusActionBlockedByActionSpell: false,
-      actionLimitedToCantrips: false,
-    });
+  it("does not apply the bonus-action block to the action picker (slot-gated, e.g. after Action Surge)", () => {
+    expect(
+      restrictionFlagsForSlot("action", {
+        bonusActionBlockedByActionSpell: true,
+        actionLimitedToCantrips: false,
+      }),
+    ).toEqual({ bonusActionBlockedByActionSpell: false, actionLimitedToCantrips: false });
+  });
+
+  it("never gates a reaction spell", () => {
+    expect(
+      restrictionFlagsForSlot("reaction", {
+        bonusActionBlockedByActionSpell: true,
+        actionLimitedToCantrips: true,
+      }),
+    ).toEqual({ bonusActionBlockedByActionSpell: false, actionLimitedToCantrips: false });
   });
 });
 

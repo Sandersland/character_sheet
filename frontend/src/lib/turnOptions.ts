@@ -16,12 +16,17 @@ import {
   availableArcanaLevels,
   availableSlotLevels,
   filterCastableSpells,
+  restrictionFlagsForSlot,
   sortSpells,
-  spellRestrictionFlags,
-  type SpellCastThisTurn,
 } from "@/lib/spellPicker";
 import { resolverFor, type ActionResolver } from "@/features/session/actionResolvers";
-import type { AvailableAction, Character, ResourcePool, UniversalActionOption } from "@/types/character";
+import type {
+  AvailableAction,
+  Character,
+  ResourcePool,
+  SpellEconomyState,
+  UniversalActionOption,
+} from "@/types/character";
 
 /** "Longsword · +7 to hit · 1d8 + 4 slashing" for the first attack row
  *  (first equipped weapon, falling back naturally to Unarmed Strike). */
@@ -219,22 +224,24 @@ export interface BonusSpellOption {
 }
 
 /**
- * Castable bonus-action spells for the Bonus Action sheet. Mirrors
- * InlineSpellPicker's own deriveSpellList filtering argument-for-argument
- * (same pure spellPicker.ts predicates, castingTimeFilter "1 bonus action")
- * so the card list and the picker that opens from it can never disagree.
+ * Castable bonus-action spells for the Bonus Action sheet. Shares
+ * InlineSpellPicker's own deriveSpellList filtering by calling the same pure
+ * spellPicker.ts predicates — including `restrictionFlagsForSlot`, the one
+ * projection of the server-resolved interlock (#1439) both surfaces read — so
+ * the card list and the picker that opens from it can never disagree. `economy`
+ * is the served `SpellEconomyState`; the client never re-derives the rule.
  */
 export function bonusSpellOptions(
   character: Character,
-  spellCastThisTurn: SpellCastThisTurn,
+  economy: SpellEconomyState,
 ): BonusSpellOption[] {
   const spellcasting = character.spellcasting;
   if (!spellcasting) return [];
   const slotLevels = availableSlotLevels(spellcasting.slots ?? []);
   const arcanaLevels = availableArcanaLevels(spellcasting.arcana ?? []);
-  const { bonusActionBlockedByActionSpell, actionLimitedToCantrips } = spellRestrictionFlags(
+  const { bonusActionBlockedByActionSpell, actionLimitedToCantrips } = restrictionFlagsForSlot(
     "bonusAction",
-    spellCastThisTurn,
+    economy,
   );
   const castable = filterCastableSpells(spellcasting.spells ?? [], {
     castingTimeFilter: "1 bonus action",

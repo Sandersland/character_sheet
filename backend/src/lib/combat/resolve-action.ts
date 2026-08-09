@@ -30,6 +30,7 @@ import {
 } from "@/lib/spellcasting/ability-cost.js";
 import { castSpellForResolutionInTx, loadSlotPayContext } from "@/lib/spellcasting/spellcasting.js";
 import { snapshotSpellcasting } from "@/lib/spellcasting/spell-state.js";
+import { recordTurnSpellCast } from "@/lib/session/sessions.js";
 import {
   resolveActionOperationSchema,
   type ResolveActionOperation,
@@ -130,6 +131,21 @@ async function payActionCostAndSideEffectsInTx(
   return { before, after };
 }
 
+// Record the per-turn spell-cast kind for the 5e bonus-action interlock (#1439)
+// — only a spell resolution (entryId present) whose character is in an active
+// session; a weapon swing has no entryId and no interlock. `kind` is leveled
+// iff a slot was spent (a cantrip has no slotLevel). Kept out of applyOp so its
+// own guard doesn't count against that function's complexity budget.
+async function recordSpellCastForOp(
+  tx: Prisma.TransactionClient,
+  sessionId: string | null,
+  characterId: string,
+  op: ResolveActionOperation,
+): Promise<void> {
+  if (op.entryId == null || sessionId == null) return;
+  await recordTurnSpellCast(tx, sessionId, characterId, op.cost.kind, op.slotLevel != null ? "leveled" : "cantrip");
+}
+
 function summaryFor(op: ResolveActionOperation): string {
   const costWord = op.cost.attacks && op.cost.attacks > 1 ? `${op.cost.attacks} attacks` : op.cost.kind;
   return `Resolved ${op.source} (${costWord})`;
@@ -157,6 +173,8 @@ export async function applyResolveActionOperations(
     notFound: (id) => new InvalidResolveActionOperationError(`Character not found: ${id}`),
     applyOp: async ({ tx, op, characterId: id, batchId, sessionId }) => {
       const { before, after } = await payActionCostAndSideEffectsInTx(tx, id, batchId, sessionId, casterUserId, op);
+
+      await recordSpellCastForOp(tx, sessionId, id, op);
 
       await logEvent(tx, {
         characterId: id,

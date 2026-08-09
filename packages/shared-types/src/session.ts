@@ -122,15 +122,36 @@ export interface SessionDoorwayState {
 }
 
 /**
+ * The 5e bonus-action spellcasting interlock, resolved server-side (#1439) from
+ * the acting participant's per-turn cast record — the client receives these two
+ * booleans, never the raw cast kinds plus the predicate. `bonusActionBlocked-
+ * ByActionSpell`: a leveled spell was cast with the Action this turn, so no
+ * bonus-action spell may be cast. `actionLimitedToCantrips`: a leveled spell was
+ * cast as a bonus action this turn, so the Action may cast only cantrips.
+ */
+export interface SpellEconomyState {
+  bonusActionBlockedByActionSpell: boolean;
+  actionLimitedToCantrips: boolean;
+}
+
+/**
  * Server-authoritative combat state for a session (#1030): `Session.round`/
  * `combatActive` are a deliberate derive-don't-persist exception (shared
  * mutable session state no client can compute alone). This is the shape both
  * the combat/start|end|round mutation responses and the cheap poll GET
  * (`.../sessions/:sessionId/combat`) return — clients dispatch it verbatim
  * into their local turn tracker; they never compute round themselves.
+ *
+ * `spellEconomy` (#1439) is the acting character's resolved bonus-action
+ * spellcasting interlock — the SECOND per-turn derive-don't-persist exception,
+ * carried on the same payload the round rides so it reaches the client through
+ * one sync seam. `updatedAt` is the max of the session's and this participant's
+ * own updatedAt, so the client's monotonic guard advances on a cast (a
+ * participant-only change) as well as a round change.
  */
 export interface CombatState {
   round: number;
   combatActive: boolean;
   updatedAt: string; // ISO 8601
+  spellEconomy: SpellEconomyState;
 }

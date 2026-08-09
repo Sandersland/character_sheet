@@ -38,7 +38,7 @@ import type {
   TallyVerdict,
 } from "@/lib/attackTallySummary";
 import type { InteractionSpend } from "@/lib/loadoutPicker";
-import type { Character } from "@/types/character";
+import type { Character, SpellEconomyState } from "@/types/character";
 
 export type { AttackTallyRow, TallyAttackRoll } from "@/lib/attackTallySummary";
 
@@ -88,9 +88,6 @@ export interface AttackState {
   used: number;
 }
 
-/** Which kind of spell was cast from a given slot this turn — for 5e bonus-action restriction. */
-export type SpellCastKind = "cantrip" | "leveled";
-
 export interface TurnState {
   /** Whether the character is currently in a combat encounter. Gates turn-taking. */
   inCombat: boolean;
@@ -136,12 +133,13 @@ export interface TurnState {
    */
   castTally: CastTallyRow[];
   /**
-   * Tracks what was cast from each slot this turn (set when InlineSpellPicker
-   * commits a cast). Used to enforce the 5e bonus-action spell restriction:
-   * casting a leveled spell as a bonus action → only cantrips allowed as
-   * actions; casting a leveled spell as an action → no bonus-action spells.
+   * The 5e bonus-action spell interlock, RESOLVED SERVER-SIDE (#1439) and
+   * synced in through `syncCombat` — no longer computed from a client-held
+   * `spellCastThisTurn`, which moved to SessionParticipant so two clients agree
+   * and the block survives a reload. The picker reads these two booleans; it
+   * never re-derives the rule. Default `{false, false}` until the first sync.
    */
-  spellCastThisTurn: { action?: SpellCastKind; bonus?: SpellCastKind };
+  spellEconomy: SpellEconomyState;
   /** Made an attack this turn — feeds the durable-buff turn-hook (#457). */
   attackedThisTurn: boolean;
   /** Took damage this turn — feeds the durable-buff turn-hook (#457). */
@@ -186,7 +184,6 @@ export type EconomySnapshot = Pick<
   | "reactionUsed"
   | "attack"
   | "bonusAttack"
-  | "spellCastThisTurn"
   | "attackTally"
   | "attackEquipCredits"
   | "freeInteractionUsed"
@@ -311,14 +308,15 @@ export interface TurnStateActions {
   /** Reverse a prior spendInteractionBudget — the loadout-swap Refund surface. */
   refundInteractionBudget: (spend: InteractionSpend) => void;
   /**
-   * Commit the action slot for a spell cast (consumes the action and records the
-   * spell kind for the 5e bonus-action restriction). Call on successful cast.
+   * Commit the action slot for a spell cast (consumes the action). Call on
+   * successful cast. The 5e bonus-action interlock is no longer recorded here
+   * (#1439) — it's resolved server-side and arrives via `syncCombat`.
    */
-  commitActionSpell: (spellLevel: number) => void;
+  commitActionSpell: () => void;
   /**
    * Commit the bonus-action slot for a spell cast. Call on successful cast.
    */
-  commitBonusActionSpell: (spellLevel: number) => void;
+  commitBonusActionSpell: () => void;
   /**
    * Commit the reaction slot for a spell cast. Call on successful cast.
    */
@@ -362,7 +360,7 @@ export interface TurnStateActions {
    * false→false, or true→false sync only ever touches round/inCombat —
    * economy stays local, per this hook's header comment.
    */
-  syncCombat: (round: number, combatActive: boolean, updatedAt: string) => void;
+  syncCombat: (round: number, combatActive: boolean, updatedAt: string, spellEconomy: SpellEconomyState) => void;
   /**
    * Post-failure reconcile seam (#1030 finding #1): applies an authoritative
    * refetch even when its `updatedAt` is not newer than `combatUpdatedAt` —
@@ -375,7 +373,7 @@ export interface TurnStateActions {
    * wired to routine poll results, or the guard it deliberately skips would be
    * pointless.
    */
-  reconcileCombat: (round: number, combatActive: boolean, updatedAt: string) => void;
+  reconcileCombat: (round: number, combatActive: boolean, updatedAt: string, spellEconomy: SpellEconomyState) => void;
 }
 
 /**
@@ -390,6 +388,14 @@ export type TurnStateView = TurnState &
     twfAvailable: boolean;
   };
 
+// The interlock's cleared state — used at every turn boundary and as the
+// pre-first-sync default. Server-authoritative (#1439): a real cast's flags
+// arrive via syncCombat, never from a local commit.
+const NO_SPELL_ECONOMY: SpellEconomyState = {
+  bonusActionBlockedByActionSpell: false,
+  actionLimitedToCantrips: false,
+};
+
 function initialState(): TurnState {
   return {
     inCombat: false,
@@ -403,7 +409,7 @@ function initialState(): TurnState {
     bonusAttack: null,
     attackTally: [],
     castTally: [],
-    spellCastThisTurn: {},
+    spellEconomy: NO_SPELL_ECONOMY,
     attackedThisTurn: false,
     tookDamageThisTurn: false,
     sneakAttackUsedThisTurn: false,
@@ -423,7 +429,6 @@ function economyOf(s: TurnState): EconomySnapshot {
     reactionUsed: s.reactionUsed,
     attack: s.attack,
     bonusAttack: s.bonusAttack,
-    spellCastThisTurn: s.spellCastThisTurn,
     attackTally: s.attackTally,
     attackEquipCredits: s.attackEquipCredits,
     freeInteractionUsed: s.freeInteractionUsed,
@@ -755,7 +760,7 @@ function endTurnState(s: TurnState): TurnState {
     bonusAttack: null,
     attackTally: [],
     castTally: [],
-    spellCastThisTurn: {},
+    spellEconomy: NO_SPELL_ECONOMY,
     attackedThisTurn: false,
     tookDamageThisTurn: false,
     sneakAttackUsedThisTurn: false,
@@ -776,9 +781,10 @@ function syncCombatState(
   round: number,
   combatActive: boolean,
   updatedAt: string,
+  spellEconomy: SpellEconomyState,
 ): TurnState {
   if (s.combatUpdatedAt !== null && updatedAt <= s.combatUpdatedAt) return s;
-  return applyCombatState(s, round, combatActive, updatedAt);
+  return applyCombatState(s, round, combatActive, updatedAt, spellEconomy);
 }
 
 // Shared by syncCombatState (guarded) and reconcileCombatState (unguarded, see
@@ -789,11 +795,15 @@ function applyCombatState(
   round: number,
   combatActive: boolean,
   updatedAt: string,
+  spellEconomy: SpellEconomyState,
 ): TurnState {
+  // A fresh encounter still starts with a cleared interlock; the server's own
+  // reset makes `spellEconomy` false/false here anyway, so it's not threaded in.
   if (!s.inCombat && combatActive) return freshEncounterState(round, updatedAt);
-  return s.round === round && s.inCombat === combatActive
-    ? { ...s, combatUpdatedAt: updatedAt }
-    : { ...s, round, inCombat: combatActive, combatUpdatedAt: updatedAt };
+  // The interlock rides every sync (#1439): even a round/inCombat no-op must
+  // still apply the served flags, since a cast advances `updatedAt` (participant
+  // change) without changing the round — this is the seam the block arrives on.
+  return { ...s, round, inCombat: combatActive, combatUpdatedAt: updatedAt, spellEconomy };
 }
 
 // Bypasses syncCombatState's monotonic guard entirely — see
@@ -803,8 +813,9 @@ function reconcileCombatState(
   round: number,
   combatActive: boolean,
   updatedAt: string,
+  spellEconomy: SpellEconomyState,
 ): TurnState {
-  return applyCombatState(s, round, combatActive, updatedAt);
+  return applyCombatState(s, round, combatActive, updatedAt, spellEconomy);
 }
 
 // Remaining transitions extracted for the reducer (#967).
@@ -821,7 +832,7 @@ function startCombatState(): TurnState {
     bonusAttack: null,
     attackTally: [],
     castTally: [],
-    spellCastThisTurn: {},
+    spellEconomy: NO_SPELL_ECONOMY,
     attackedThisTurn: false,
     tookDamageThisTurn: false,
     sneakAttackUsedThisTurn: false,
@@ -856,7 +867,7 @@ function startTurnState(s: TurnState): TurnState {
     bonusAttack: null,
     attackTally: [],
     castTally: [],
-    spellCastThisTurn: {},
+    spellEconomy: NO_SPELL_ECONOMY,
     sneakAttackUsedThisTurn: false, // once per turn — resets each of your turns
     stunningStrikeUsedThisTurn: false, // once per turn — resets each of your turns
     openHandRiderUsedThisTurn: false, // once per turn — resets each of your turns
@@ -866,23 +877,23 @@ function startTurnState(s: TurnState): TurnState {
   };
 }
 
-function commitActionSpellState(s: TurnState, spellLevel: number): TurnState {
-  const kind: SpellCastKind = spellLevel === 0 ? "cantrip" : "leveled";
+// Spend the local Action slot for a spell cast. The cast KIND is no longer
+// recorded here (#1439): the 5e interlock is resolved server-side from the
+// SessionParticipant row the resolveAction cast wrote, and arrives via
+// syncCombat. The economy slot itself stays local (this hook's header comment).
+function commitActionSpellState(s: TurnState): TurnState {
   return {
     ...s,
     actionsRemaining: Math.max(0, s.actionsRemaining - 1),
     attack: null,
-    spellCastThisTurn: { ...s.spellCastThisTurn, action: kind },
   };
 }
 
-function commitBonusActionSpellState(s: TurnState, spellLevel: number): TurnState {
-  const kind: SpellCastKind = spellLevel === 0 ? "cantrip" : "leveled";
+function commitBonusActionSpellState(s: TurnState): TurnState {
   return {
     ...s,
     bonusActionUsed: true,
     bonusAttack: null,
-    spellCastThisTurn: { ...s.spellCastThisTurn, bonus: kind },
   };
 }
 
@@ -920,8 +931,8 @@ type TurnAction =
   | { type: "grantExtraAction" }
   | { type: "spendInteractionBudget"; spend: InteractionSpend }
   | { type: "refundInteractionBudget"; spend: InteractionSpend }
-  | { type: "commitActionSpell"; spellLevel: number }
-  | { type: "commitBonusActionSpell"; spellLevel: number }
+  | { type: "commitActionSpell" }
+  | { type: "commitBonusActionSpell" }
   // Non-undoable tally refinements — write through, never push.
   | { type: "setTallyDamage"; rowId: string; damage: number }
   | { type: "setTallyDamageAt"; index: number; damage: number }
@@ -939,8 +950,8 @@ type TurnAction =
   | { type: "markStunningStrikeUsed" }
   | { type: "markOpenHandRiderUsed" }
   | { type: "hydrate"; state: TurnState }
-  | { type: "syncCombat"; round: number; combatActive: boolean; updatedAt: string }
-  | { type: "reconcileCombat"; round: number; combatActive: boolean; updatedAt: string };
+  | { type: "syncCombat"; round: number; combatActive: boolean; updatedAt: string; spellEconomy: SpellEconomyState }
+  | { type: "reconcileCombat"; round: number; combatActive: boolean; updatedAt: string; spellEconomy: SpellEconomyState };
 
 // The action types whose transition pushes an undo snapshot (the former `mutate`
 // callers). refundAction and commitReactionSpell are facade aliases that dispatch
@@ -999,8 +1010,8 @@ const HANDLERS: TurnActionHandlers = {
   grantExtraAction: (s) => ({ ...s, actionsRemaining: s.actionsRemaining + 1 }),
   spendInteractionBudget: (s, a) => spendInteractionBudgetState(s, a.spend),
   refundInteractionBudget: (s, a) => refundInteractionBudgetState(s, a.spend),
-  commitActionSpell: (s, a) => commitActionSpellState(s, a.spellLevel),
-  commitBonusActionSpell: (s, a) => commitBonusActionSpellState(s, a.spellLevel),
+  commitActionSpell: (s) => commitActionSpellState(s),
+  commitBonusActionSpell: (s) => commitBonusActionSpellState(s),
   setTallyDamage: (s, a) => setTallyDamageState(s, a.rowId, a.damage),
   setTallyDamageAt: (s, a) => setTallyDamageAtState(s, a.index, a.damage),
   setTallyAttackTotal: (s, a) => setTallyAttackTotalState(s, a.rowId, a.total),
@@ -1019,8 +1030,8 @@ const HANDLERS: TurnActionHandlers = {
   markOpenHandRiderUsed: (s) =>
     s.openHandRiderUsedThisTurn ? s : { ...s, openHandRiderUsedThisTurn: true },
   hydrate: (_s, a) => a.state,
-  syncCombat: (s, a) => syncCombatState(s, a.round, a.combatActive, a.updatedAt),
-  reconcileCombat: (s, a) => reconcileCombatState(s, a.round, a.combatActive, a.updatedAt),
+  syncCombat: (s, a) => syncCombatState(s, a.round, a.combatActive, a.updatedAt, a.spellEconomy),
+  reconcileCombat: (s, a) => reconcileCombatState(s, a.round, a.combatActive, a.updatedAt, a.spellEconomy),
 };
 
 function turnReducer(state: TurnState, action: TurnAction): TurnState {
@@ -1136,18 +1147,18 @@ export function useTurnState(character: Character, sessionId: string | null): Tu
       refundAction: () => dispatch({ type: "grantExtraAction" }),
       spendInteractionBudget: (spend) => dispatch({ type: "spendInteractionBudget", spend }),
       refundInteractionBudget: (spend) => dispatch({ type: "refundInteractionBudget", spend }),
-      commitActionSpell: (spellLevel) => dispatch({ type: "commitActionSpell", spellLevel }),
-      commitBonusActionSpell: (spellLevel) => dispatch({ type: "commitBonusActionSpell", spellLevel }),
+      commitActionSpell: () => dispatch({ type: "commitActionSpell" }),
+      commitBonusActionSpell: () => dispatch({ type: "commitBonusActionSpell" }),
       commitReactionSpell: () => dispatch({ type: "consumeReaction" }),
       attachBatchId: (batchId) => dispatch({ type: "attachBatchId", batchId }),
       undo: () => dispatch({ type: "undo" }),
       markSneakAttackUsed: () => dispatch({ type: "markSneakAttackUsed" }),
       markStunningStrikeUsed: () => dispatch({ type: "markStunningStrikeUsed" }),
       markOpenHandRiderUsed: () => dispatch({ type: "markOpenHandRiderUsed" }),
-      syncCombat: (round, combatActive, updatedAt) =>
-        dispatch({ type: "syncCombat", round, combatActive, updatedAt }),
-      reconcileCombat: (round, combatActive, updatedAt) =>
-        dispatch({ type: "reconcileCombat", round, combatActive, updatedAt }),
+      syncCombat: (round, combatActive, updatedAt, spellEconomy) =>
+        dispatch({ type: "syncCombat", round, combatActive, updatedAt, spellEconomy }),
+      reconcileCombat: (round, combatActive, updatedAt, spellEconomy) =>
+        dispatch({ type: "reconcileCombat", round, combatActive, updatedAt, spellEconomy }),
     }),
     [],
   );

@@ -6,16 +6,10 @@
  * (and its hook) can stay presentational.
  */
 
-import type { Spell, SpellSlots } from "@/types/character";
+import type { Spell, SpellSlots, SpellEconomyState } from "@/types/character";
 
 /** Economy slot the picker is managing. */
 export type EconomySlot = "action" | "bonusAction" | "reaction";
-
-/** Which kind of spell was cast in each economy slot this turn (5e restriction). */
-export interface SpellCastThisTurn {
-  action?: "cantrip" | "leveled";
-  bonus?: "cantrip" | "leveled";
-}
 
 /** Slot levels (ascending) that still have a use remaining. */
 export function availableSlotLevels(slots: SpellSlots[]): number[] {
@@ -61,14 +55,24 @@ export function resolvedSlot(
   return availableSlotsForSpell(spell, slotLevels, arcanaLevels)[0];
 }
 
-/** 5e bonus-action spell restriction flags derived from what was cast this turn. */
-export function spellRestrictionFlags(
+/**
+ * Project the SERVER-RESOLVED 5e bonus-action interlock (#1439) onto the
+ * CastableFilter flags for one economy slot. The rule ("a leveled Action spell
+ * blocks a bonus-action spell; a leveled bonus-action spell limits the Action to
+ * cantrips") is resolved server-side and arrives as `SpellEconomyState`; this
+ * only routes each served boolean to the picker slot it gates — never
+ * re-deriving the rule from cast history. Both spell-picker surfaces
+ * (InlineSpellPicker's own deriveSpellList and turnOptions' bonusSpellOptions)
+ * call THIS, so they read one shared projection and can never disagree — the
+ * seam that used to need the "mirror" latch. A reaction cast is never gated.
+ */
+export function restrictionFlagsForSlot(
   slot: EconomySlot,
-  spellCastThisTurn: SpellCastThisTurn,
+  economy: SpellEconomyState,
 ): { bonusActionBlockedByActionSpell: boolean; actionLimitedToCantrips: boolean } {
   return {
-    bonusActionBlockedByActionSpell: slot === "bonusAction" && spellCastThisTurn.action === "leveled",
-    actionLimitedToCantrips: slot === "action" && spellCastThisTurn.bonus === "leveled",
+    bonusActionBlockedByActionSpell: slot === "bonusAction" && economy.bonusActionBlockedByActionSpell,
+    actionLimitedToCantrips: slot === "action" && economy.actionLimitedToCantrips,
   };
 }
 

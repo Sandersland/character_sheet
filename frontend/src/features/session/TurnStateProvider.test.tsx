@@ -9,7 +9,10 @@ import { LiveSessionProvider } from "@/features/session/LiveSessionProvider";
 import { TurnStateProvider, useTurnStateContext } from "@/features/session/TurnStateProvider";
 import { useLiveRound } from "@/features/session/useLiveRound";
 import { renderWithCharacter } from "@/test/renderWithCharacter";
-import type { Character, Session, SessionDoorwayState } from "@/types/character";
+import type { Character, Session, SessionDoorwayState, SpellEconomyState } from "@/types/character";
+
+// The cleared 5e interlock every combat mock returns (#1439).
+const NO_ECON: SpellEconomyState = { bonusActionBlockedByActionSpell: false, actionLimitedToCantrips: false };
 
 // fetchCombatState must be mocked even where a test ignores it: TurnStateProvider
 // mounts useCombatPoll, so leaving it off the factory makes the poll call
@@ -69,7 +72,7 @@ describe("TurnStateProvider single instance + useLiveRound", () => {
     mockDoorway.mockReset();
     mockActive.mockReset();
     mockCombat.mockReset();
-    mockCombat.mockResolvedValue({ round: 0, combatActive: false, updatedAt: "2026-07-26T00:00:00.000Z" });
+    mockCombat.mockResolvedValue({ round: 0, combatActive: false, updatedAt: "2026-07-26T00:00:00.000Z", spellEconomy: NO_ECON });
   });
 
   it("has a null turn context and a null round when not joined (server round shows only in preview)", async () => {
@@ -94,7 +97,7 @@ describe("TurnStateProvider single instance + useLiveRound", () => {
     mockActive.mockResolvedValue(fullSession);
     // The poll agrees with the seeded local round, so this pins what the test is
     // named for — the doorway's stale 99 losing — rather than the poll racing it.
-    mockCombat.mockResolvedValue({ round: 3, combatActive: true, updatedAt: "2026-07-26T00:00:01.000Z" });
+    mockCombat.mockResolvedValue({ round: 3, combatActive: true, updatedAt: "2026-07-26T00:00:01.000Z", spellEconomy: NO_ECON });
     renderStack();
     await waitFor(() => expect(screen.getByTestId("turn")).toHaveTextContent("present"));
     // Own waitFor, same reason as the not-joined case above: "present" can land

@@ -12,6 +12,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
+import { startSoloSession } from "@/lib/session/sessions.js";
 
 const OWNER_ID = "owner-resolve-action";
 let COOKIE: string;
@@ -176,6 +177,22 @@ function healCastOp(actionId = "action-heal") {
     slotLevel: 1,
     entryId: HEAL_SPELL.id,
     apply: { target: "self" as const, kind: "heal" as const, amount: 5 },
+  };
+}
+
+// A leveled spell cast as a BONUS action (#1439) — entryId present so it routes
+// through the recorder, cost.kind "bonus" so it lands on spellCastAsBonus.
+function bonusLeveledCastOp(entryId: string, actionId: string) {
+  return {
+    type: "resolveAction" as const,
+    actionId,
+    source: "Test Concentration B",
+    cost: { kind: "bonus" as const },
+    toHit: null,
+    save: null,
+    effect: null,
+    slotLevel: 1,
+    entryId,
   };
 }
 
@@ -571,5 +588,79 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     expect(revertRes.status).toBe(200);
     expect(revertRes.body.hitPoints.current).toBe(3);
     expect(revertRes.body.spellcasting.slots.find((s: { level: number }) => s.level === 1).used).toBe(0);
+  });
+
+  // ── 5e bonus-action spell interlock resolved from session state (#1439) ────
+
+  const combatGet = (sid: string) =>
+    supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}/sessions/${sid}/combat`);
+  const combatStart = (sid: string) =>
+    supertest.agent(app).set("Cookie", COOKIE).post(`/api/characters/${FIXTURE_ID}/sessions/${sid}/combat/start`).send({});
+  const combatRound = (sid: string) =>
+    supertest.agent(app).set("Cookie", COOKIE).post(`/api/characters/${FIXTURE_ID}/sessions/${sid}/combat/round`).send({});
+
+  it("serves both interlock flags false when nothing has been cast this turn", async () => {
+    const { id: sid } = await startSoloSession(FIXTURE_ID);
+    const res = await combatGet(sid);
+    expect(res.status).toBe(200);
+    expect(res.body.spellEconomy).toEqual({
+      bonusActionBlockedByActionSpell: false,
+      actionLimitedToCantrips: false,
+    });
+  });
+
+  it("a leveled Action spell blocks bonus-action casting, and the block survives a re-read (#1439)", async () => {
+    const { id: sid } = await startSoloSession(FIXTURE_ID);
+    expect((await combatStart(sid)).body.spellEconomy.bonusActionBlockedByActionSpell).toBe(false);
+
+    const cast = await post([concentrationCastOp(CONCENTRATION_SPELL_A.id, "cast-action")]);
+    expect(cast.status).toBe(200);
+
+    // Re-read (a fresh request = the "another client / after reload" observer).
+    const after = await combatGet(sid);
+    expect(after.body.spellEconomy).toEqual({
+      bonusActionBlockedByActionSpell: true,
+      actionLimitedToCantrips: false,
+    });
+  });
+
+  it("a leveled bonus-action spell limits the Action to cantrips (#1439)", async () => {
+    const { id: sid } = await startSoloSession(FIXTURE_ID);
+    await combatStart(sid);
+
+    const cast = await post([bonusLeveledCastOp(CONCENTRATION_SPELL_B.id, "cast-bonus")]);
+    expect(cast.status).toBe(200);
+
+    const after = await combatGet(sid);
+    expect(after.body.spellEconomy).toEqual({
+      bonusActionBlockedByActionSpell: false,
+      actionLimitedToCantrips: true,
+    });
+  });
+
+  it("advancing the round (turn boundary) clears the interlock (#1439)", async () => {
+    const { id: sid } = await startSoloSession(FIXTURE_ID);
+    await combatStart(sid);
+    await post([concentrationCastOp(CONCENTRATION_SPELL_A.id, "cast-action")]);
+    expect((await combatGet(sid)).body.spellEconomy.bonusActionBlockedByActionSpell).toBe(true);
+
+    const round = await combatRound(sid);
+    expect(round.status).toBe(201);
+    expect(round.body.spellEconomy).toEqual({
+      bonusActionBlockedByActionSpell: false,
+      actionLimitedToCantrips: false,
+    });
+    // And a subsequent poll agrees the block is gone.
+    expect((await combatGet(sid)).body.spellEconomy.bonusActionBlockedByActionSpell).toBe(false);
+  });
+
+  it("a weapon swing (no entryId) records no interlock (#1439)", async () => {
+    const { id: sid } = await startSoloSession(FIXTURE_ID);
+    await combatStart(sid);
+    await post([weaponOp()]);
+    expect((await combatGet(sid)).body.spellEconomy).toEqual({
+      bonusActionBlockedByActionSpell: false,
+      actionLimitedToCantrips: false,
+    });
   });
 });

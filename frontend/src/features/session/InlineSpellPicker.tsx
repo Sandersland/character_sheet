@@ -20,9 +20,12 @@
  * `castAbilityInTx` sequence (`castSpellForResolutionInTx`,
  * lib/spellcasting/spellcasting.ts). A damage spell never sets `apply` — no
  * target/enemy model (self-or-announce, CLAUDE.md), so its effect is
- * announced only. The 5e bonus-action leveled-spell interlock
- * (`spellCastThisTurn`) is untouched: `onCommitSlot` still fires with the
- * spell's base level, exactly as the old picker did.
+ * announced only. The 5e bonus-action leveled-spell interlock is now resolved
+ * SERVER-SIDE (#1439): the resolveAction cast records the per-turn cast kind on
+ * the SessionParticipant row, and the picker reads the resolved flags via the
+ * `spellEconomy` prop (synced from combat state) rather than a client-held
+ * `spellCastThisTurn`. `onCommitSlot` fires on a successful cast to spend the
+ * local economy slot; the caller re-reads the interlock from the server.
  *
  * Selection/slot predicates still live in `lib/spellPicker`; this is the
  * thin list/resolver shell.
@@ -62,14 +65,14 @@ import {
   hiddenLevelsNote,
   hiddenSpellLevels,
   resolvedSlot,
+  restrictionFlagsForSlot,
   slotPipsForLevel,
   slotRestrictionHint,
   sortSpells,
-  spellRestrictionFlags,
   type EconomySlot,
 } from "@/lib/spellPicker";
-import type { RecordedSpellCast, SpellCastKind } from "@/features/session/useTurnState";
-import type { Character, Spell, SpellSlots } from "@/types/character";
+import type { RecordedSpellCast } from "@/features/session/useTurnState";
+import type { Character, Spell, SpellSlots, SpellEconomyState } from "@/types/character";
 
 interface InlineSpellPickerProps {
   /** Active session id — kept for prop-shape parity with sibling pickers (not read directly; the resolveAction mutation is character-scoped). */
@@ -82,14 +85,15 @@ interface InlineSpellPickerProps {
   /** True when the slot is still available to spend. */
   slotAvailable: boolean;
   /**
-   * Called with the spell's BASE level when a cast succeeds, so TurnHub can
-   * commit the appropriate action/bonus/reaction slot (and record the spell
-   * kind for the 5e bonus-action restriction) — unchanged contract from the
-   * pre-#1833 picker.
+   * Called when a cast succeeds, so TurnHub can commit the appropriate
+   * action/bonus/reaction economy slot. The 5e interlock kind is no longer
+   * passed here (#1439) — it's recorded server-side by the resolveAction cast
+   * and re-read via the combat sync the caller triggers.
    */
-  onCommitSlot: (spellLevel: number) => void;
-  /** From useTurnState — used to enforce the 5e bonus-action spell restriction. */
-  spellCastThisTurn: { action?: SpellCastKind; bonus?: SpellCastKind };
+  onCommitSlot: () => void;
+  /** Server-resolved 5e bonus-action interlock (#1439), synced from session
+   *  state — the picker reads these flags, never re-derives the rule. */
+  spellEconomy: SpellEconomyState;
   /** Opted-in party members a healing cast can target on their sheet (#462). */
   allies: AllyOption[];
   /**
@@ -275,7 +279,7 @@ interface SpellResolverProps {
   slotLevels: number[];
   arcanaLevels: number[];
   allies: AllyOption[];
-  onCommitSlot: (spellLevel: number) => void;
+  onCommitSlot: () => void;
   onCastSettled?: (recorded: RecordedSpellCast) => void;
   onLogChanged: () => void;
   onBack: () => void;
@@ -339,7 +343,7 @@ function SpellResolver({
     resolveActionMutation
       .mutateAsync(op)
       .then(() => {
-        onCommitSlot(spell.level);
+        onCommitSlot();
         onCastSettled?.(castSettledEntry(spell, isHeal, effectiveSlot, rolls, spellcasting.spellSaveDC));
       })
       .catch(() => {});
@@ -450,20 +454,20 @@ interface SpellListDerivations {
 // The castable-list derivation — split out of the top-level component so its
 // own branching (5e restriction flags, the two filter passes) doesn't count
 // against InlineSpellPicker's own complexity budget (fallow flagged the
-// pre-extraction shape, #1833 review-fix pass) — mirrors useSpellPicker's
-// pre-#1833 filtering exactly, just as a plain function instead of a hook
-// (nothing here reads component state).
+// pre-extraction shape, #1833 review-fix pass). The interlock flags come from
+// the SERVER-resolved `economy` via restrictionFlagsForSlot (#1439), the same
+// projection turnOptions' bonusSpellOptions calls — so the two never disagree.
 function deriveSpellList(
   spellcasting: NonNullable<Character["spellcasting"]>,
   slot: EconomySlot,
-  spellCastThisTurn: { action?: SpellCastKind; bonus?: SpellCastKind },
+  economy: SpellEconomyState,
   castingTimeFilter: string | undefined,
 ): SpellListDerivations {
   const slotLevels = availableSlotLevels(spellcasting.slots ?? []);
   const arcanaLevels = availableArcanaLevels(spellcasting.arcana ?? []);
-  const { bonusActionBlockedByActionSpell, actionLimitedToCantrips } = spellRestrictionFlags(
+  const { bonusActionBlockedByActionSpell, actionLimitedToCantrips } = restrictionFlagsForSlot(
     slot,
-    spellCastThisTurn,
+    economy,
   );
   const sortedSpells = sortSpells(
     filterCastableSpells(spellcasting.spells, {
@@ -566,7 +570,7 @@ export default function InlineSpellPicker({
   slot,
   slotAvailable,
   onCommitSlot,
-  spellCastThisTurn,
+  spellEconomy,
   castingTimeFilter,
   focusSpellId,
   allies,
@@ -581,7 +585,7 @@ export default function InlineSpellPicker({
   const { slotLevels, arcanaLevels, sortedSpells, slotUsedHint, hiddenNote } = deriveSpellList(
     spellcasting,
     slot,
-    spellCastThisTurn,
+    spellEconomy,
     castingTimeFilter,
   );
   const focusSpell = sortedSpells.find((s) => s.id === focusId);
