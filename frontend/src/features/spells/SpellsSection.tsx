@@ -85,7 +85,16 @@ export default function SpellsSection({
           />
         )}
 
-        <div className="flex items-center justify-between gap-3 border-t border-parchment-200 pt-4">
+        {/* #1859: sticky footer — the grimoire's own scroll region has no reserved
+            space for SheetBottomNav (CharacterSheetBody's <main> is pb-0 on mobile),
+            so at max scroll this row used to land flush against the nav with zero
+            clearance and become untappable. Pinning it to the scroller's bottom
+            keeps Learn/Done reachable regardless of spell count; bg-parchment-100
+            matches the page background (index.css `body`) so scrolled spell rows
+            don't show through. md:static reverts to plain flow — desktop doesn't
+            scroll this region, so stickiness would otherwise pin the row against
+            the browser viewport instead. */}
+        <div className="sticky bottom-0 flex items-center justify-between gap-3 border-t border-parchment-200 bg-parchment-100 pt-4 pb-4 md:static md:pb-0">
           {addPanelOpen ? (
             <span />
           ) : (
