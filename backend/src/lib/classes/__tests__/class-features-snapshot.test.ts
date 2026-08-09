@@ -134,7 +134,7 @@ describe("deriveResourcesForCharacterRow", () => {
     // row-driven base pools (Second Wind/Action Surge/Indomitable) are absent
     // from `.resources` here. #1546 Part B retired the LAST exception:
     // Battle Master's superiorityDice pool/maneuverChoiceCount/
-    // toolProfChoiceCount/maneuverSaveDC moved off fighter.ts's `resourceFn`/
+    // toolProfChoiceCount/announcedSaveDC moved off fighter.ts's `resourceFn`/
     // `deriveExtras` (unaffected by a missing carrier) onto rows too, so this
     // absent-carrier caller now sees NOTHING at all — `derived` is null.
     expect(derived).toBeNull();

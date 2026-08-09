@@ -83,22 +83,21 @@
 // NOT re-declare this pool — they author GrantedAbility rows with
 // `costPoolKey: "channelDivinity"` (spenders, not declarers).
 //
-// saveDcAbilities is DELIBERATELY UNSET on every row below, for the same two
-// blockers cleric-features.ts disclosed first: (1) deriveRowExtras
-// (registry.ts) is only ever called with `subclassRows`, gated on
-// `sub.active` — Channel Divinity/Abjure Foes are BASE-CLASS rows
-// (subclassId: null), so a `saveDcAbilities` value here would be read by
-// nothing, ever. (2) The one field it feeds, `ClassExtras.maneuverSaveDC`, is
-// Fighter-named/Fighter-consumed — a Paladin value would clobber a
-// Paladin/Battle-Master multiclass's real Str/Dex maneuver DC. The DC
-// formula instead stays in prose ("the DC equals the spell save DC from this
-// class's Spellcasting feature", i.e. 8 + Proficiency Bonus + Charisma
-// modifier) — channelDivinitySaveDC (lib/classes/channel-divinity.ts)
-// already serves the number per CD option. Follow-up filed: generalise
-// deriveAnnouncedSaveDC to base-class rows and rename
-// ClassExtras.maneuverSaveDC -> announcedSaveDC (already filed by #1225 as
-// #1225's own follow-up; Paladin is the second class blocked by it, not a
-// second issue).
+// saveDcAbilities is STILL DELIBERATELY UNSET on every row below, for the
+// same reason cleric-features.ts's own header now records after #1589 (which
+// fixed the two original blockers this comment used to name — deriveRowExtras
+// now runs over base-class rows unconditionally, and ClassExtras.maneuverSaveDC
+// is renamed to the generic announcedSaveDC): `announcedSaveDC` stays a
+// SINGLE scalar overlaid across every class entry, so a Paladin/Battle-Master
+// multiclass populating it here would still collide with Combat Superiority —
+// #1589 turns that into a loud throw at derive time rather than a silent
+// clobber, but doesn't make the two coexist. There is no consumer benefit to
+// risk it for: Paladin already serves Channel Divinity/Abjure Foes' DC
+// through a fully independent, already-correct path — channelDivinitySaveDC
+// (lib/classes/channel-divinity.ts) — which `saveDcAbilities`/
+// `announcedSaveDC` would duplicate, not improve. The DC formula instead
+// stays in prose ("the DC equals the spell save DC from this class's
+// Spellcasting feature", i.e. 8 + Proficiency Bonus + Charisma modifier).
 //
 // TEXT-ONLY (mechanics not wired up, same disclosed shape as every prior
 // retab wave): Blessed Warrior's swappable-cantrip choice, Paladin's Smite's

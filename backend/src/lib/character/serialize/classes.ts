@@ -26,19 +26,20 @@ export type PrimaryClass = CharacterWithRelations["classEntries"][number] | unde
 // Resources clamp-on-read: derive class/subclass pools + level-gated caps, then
 // layer stored `used` counts and known lists (clamped to caps). Returns the
 // resources view (undefined for classes with no pools) plus the raw
-// maneuverSaveDC number — serializeCharacter folds it into the top-level
-// `maneuvers` rider (#1316), so it isn't part of the resources payload.
-// Fighting Style is a feat now (#1137) — surfaced via top-level
-// fightingStyleSlots + advancements, not here. The choice-cap fields are
-// entry-scoped (#1177) via deriveEntryScopedResources — mirrors
-// loadResourcesReconcileState (level-reconciliation.ts) so both sides compute
-// the legal limit through the one shared rule function.
+// announcedSaveDC number (#1589, renamed from the Fighter-specific
+// maneuverSaveDC) — serializeCharacter folds it into the top-level `maneuvers`
+// rider (#1316), so it isn't part of the resources payload. Fighting Style is
+// a feat now (#1137) — surfaced via top-level fightingStyleSlots +
+// advancements, not here. The choice-cap fields are entry-scoped (#1177) via
+// deriveEntryScopedResources — mirrors loadResourcesReconcileState
+// (level-reconciliation.ts) so both sides compute the legal limit through the
+// one shared rule function.
 export function buildResourcesView(
   row: CharacterWithRelations,
   level: number,
   abilityScores: Record<string, number>,
   proficiencyBonus: number,
-): { resources: object | undefined; maneuverSaveDC: number | undefined; classFeatureImprovements: FeatImprovement[] } {
+): { resources: object | undefined; announcedSaveDC: number | undefined; classFeatureImprovements: FeatImprovement[] } {
   // The ONE production caller that supplies real ClassFeature rows (#1524):
   // characterInclude loaded entry.class.features (already subclassId:null
   // filtered) and entry.subclassRef.features — featuresFromRows/poolsFromRows
@@ -64,7 +65,7 @@ export function buildResourcesView(
   // own per-entry loop); applyFeatLayer merges this with advancement-sourced
   // improvements through the shared deriveImprovementBonuses/
   // deriveImprovementProficiencies evaluator.
-  return { resources, maneuverSaveDC: derivedRes?.maneuverSaveDC, classFeatureImprovements: derivedRes?.improvements ?? [] };
+  return { resources, announcedSaveDC: derivedRes?.announcedSaveDC, classFeatureImprovements: derivedRes?.improvements ?? [] };
 }
 
 // #1272/#1374: DerivedFeature.edition is a server-side selector (which of a

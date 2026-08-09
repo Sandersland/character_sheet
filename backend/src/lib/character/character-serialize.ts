@@ -136,7 +136,7 @@ function buildRiderView(
   abilityScores: Record<string, number>,
   profBonus: number,
   activeEffects: ActiveEffectsMutableState,
-  maneuverSaveDC: number | undefined,
+  announcedSaveDC: number | undefined,
 ): {
   sneakAttack?: DiceRider;
   stunningStrike?: SaveRider;
@@ -158,8 +158,12 @@ function buildRiderView(
     // deriveEntryScopedResources via buildResourcesView. maneuverChoiceCount/
     // toolProfChoiceCount stay in `resources` — they're choice counts,
     // load-bearing for the clamp-on-read in serialize/classes.ts. Named for
-    // the feature (`maneuvers`), like every other rider, not the field.
-    ...(maneuverSaveDC !== undefined ? { maneuvers: { saveDC: maneuverSaveDC } } : {}),
+    // the feature (`maneuvers`), like every other rider, not the field —
+    // `announcedSaveDC` (#1589) is the GENERIC ClassExtras field this rider
+    // happens to be the sole consumer of today; a future Cleric/Monk/
+    // Barbarian/Rogue rider would read the SAME field under its OWN rider
+    // name, never a second `maneuvers`-shaped consumer of it.
+    ...(announcedSaveDC !== undefined ? { maneuvers: { saveDC: announcedSaveDC } } : {}),
   };
 }
 
@@ -289,7 +293,7 @@ export async function serializeCharacter(rawRow: CharacterRow) {
     progress.proficiencyBonus,
   );
   const spellcasting = await decorateSpellcastingCatalog(row, spellcastingBase);
-  const { resources, maneuverSaveDC, classFeatureImprovements } = buildResourcesView(
+  const { resources, announcedSaveDC, classFeatureImprovements } = buildResourcesView(
     row,
     progress.level,
     abilityScoresMap,
@@ -387,7 +391,7 @@ export async function serializeCharacter(rawRow: CharacterRow) {
   const attackRows = buildAttackRowsView(inventory, unarmedAttacks, clampedAdvancements);
 
   // Riders (#1316) — each key present only when the character has it.
-  const riders = buildRiderView(row.classEntries, effectiveScores, progress.proficiencyBonus, activeEffects, maneuverSaveDC);
+  const riders = buildRiderView(row.classEntries, effectiveScores, progress.proficiencyBonus, activeEffects, announcedSaveDC);
 
   // 6. Final assembly — one field per line, each fed by a builder above.
   return {

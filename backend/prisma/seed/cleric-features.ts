@@ -75,25 +75,29 @@
 // as its own "Wisdom DC N" badge — the DC is still on the wire, just not
 // duplicated into the pool's own description string.
 //
-// saveDcAbilities is DELIBERATELY UNSET on every row below, despite the
-// issue instructing it — two independent blockers, both verified: (1)
-// deriveAnnouncedSaveDC (registry.ts's deriveRowExtras) is only ever called
-// with `subclassRows`, gated on `sub.active` — Turn Undead/Channel Divinity
-// are BASE-CLASS rows (subclassId: null), so a `saveDcAbilities` value here
-// would be read by nothing, ever. (2) The one field it feeds,
-// `ClassExtras.maneuverSaveDC`, is Fighter-named and Fighter-consumed
-// (`maneuvers: { saveDC }`, ManeuversSection.tsx) — since overlayExtrasFields
-// (registry.ts) is defined-wins/later-entry-wins per class entry, a Cleric/
-// Battle-Master multiclass would have Cleric's Wisdom-derived value silently
-// CLOBBER the Fighter's real Str/Dex maneuver DC. A live bug, not
-// hypothetical. The DC formula instead stays in this file's own prose (SRD
-// 5.2's "the DC equals the spell save DC from this class's Spellcasting
-// feature", i.e. 8 + Proficiency Bonus + Wisdom modifier) — see the 2024
-// Turn Undead row's own text above. schema.prisma's `saveDcAbilities` comment
-// is corrected in the SAME commit to record this as an aspiration, not a
-// live path. Follow-up filed: generalise deriveAnnouncedSaveDC to base-class
-// rows and rename ClassExtras.maneuverSaveDC -> announcedSaveDC before any
-// non-Fighter class populates saveDcAbilities.
+// saveDcAbilities is STILL DELIBERATELY UNSET on every row below, even after
+// #1589 fixed both original blockers this comment used to name (deriveRowExtras
+// now runs over base-class rows unconditionally, and ClassExtras.maneuverSaveDC
+// is renamed to the generic announcedSaveDC) — the reason has moved, not
+// disappeared. (1) `announcedSaveDC` stays a SINGLE scalar overlaid across
+// every class entry (deriveEntryScopedResources' overlayExtrasFields), so a
+// Cleric/Battle-Master multiclass populating it here alongside Combat
+// Superiority would still be a real collision — #1589 turns that collision
+// into a loud throw at derive time (registry.ts's assignAnnouncedSaveDC)
+// rather than the old silent clobber, but it does not make the two values
+// coexist. (2) There is no consumer benefit to accept that risk for: Cleric
+// already serves its Turn Undead/Channel Divinity DC through a fully
+// independent, already-correct path — channelDivinitySaveDC
+// (lib/classes/channel-divinity.ts), rendered per-option by
+// ChannelDivinitySection.tsx — which `saveDcAbilities`/`announcedSaveDC`
+// would duplicate, not improve. The DC formula instead stays in this file's
+// own prose (SRD 5.2's "the DC equals the spell save DC from this class's
+// Spellcasting feature", i.e. 8 + Proficiency Bonus + Wisdom modifier) — see
+// the 2024 Turn Undead row's own text above. If a future change gives
+// `announcedSaveDC` per-feature wire scoping (so two classes' DCs can coexist
+// on the wire the way sneakAttack/stunningStrike/maneuvers already do as
+// separate riders), THAT is when this row should move onto saveDcAbilities —
+// not before.
 //
 // TEXT-ONLY (mechanics not wired up, same disclosed shape as every prior
 // retab wave — see EDITIONS_STILL_IDENTICAL's removal comment in

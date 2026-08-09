@@ -72,7 +72,7 @@ describe("the exact null-safe expressions resolveArcaneRecoveryContext / loadRes
 
 // #1546 Part B-ii opens a SECOND null-flip channel, distinct from #1524's
 // above: before this issue, Battle Master's maneuverChoiceCount/
-// toolProfChoiceCount/maneuverSaveDC came from fighter.ts's `deriveExtras` —
+// toolProfChoiceCount/announcedSaveDC came from fighter.ts's `deriveExtras` —
 // CODE, unaffected by whether a featureRows carrier was supplied at all — so
 // an EMPTY carrier for a Battle Master fighter still produced a fully
 // populated DerivedClassInfo. After this issue, that same content is ONLY on
@@ -102,7 +102,7 @@ describe("#1546 Part B-ii: the featureRows carrier can flip a Battle Master's re
     expect(info).not.toBeNull();
     expect(info?.maneuverChoiceCount).toBe(3); // gained at 3, no tier crossed again before 7
     expect(info?.toolProfChoiceCount).toBe(1);
-    expect(typeof info?.maneuverSaveDC).toBe("number");
+    expect(typeof info?.announcedSaveDC).toBe("number");
     expect(info?.resources.map((r) => r.key)).toContain("superiorityDice");
   });
 });
