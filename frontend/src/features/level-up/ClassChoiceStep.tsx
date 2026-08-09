@@ -103,8 +103,7 @@ export default function ClassChoiceStep({
     [visibleOptions],
   );
   const isOptionDisabled = useCallback((index: number) => !visibleOptions[index].eligible, [visibleOptions]);
-  // #1324: this radiogroup's cards can be disabled (ineligible prerequisites),
-  // the wrinkle the shared hook didn't handle until this migration -- arrow
+  // #1324: cards can be disabled (ineligible prerequisites); arrow
   // navigation and the tabIndex fallback must both skip them.
   const { itemRef, tabIndexFor, keyDownFor } = useRovingRadioGroup(
     visibleOptions.length,

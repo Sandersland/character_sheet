@@ -1,3 +1,5 @@
+import { useCallback } from "react";
+
 import { useRovingRadioGroup } from "@/hooks/useRovingRadioGroup";
 
 interface SegmentedOption<T extends string> {
@@ -24,9 +26,8 @@ export default function Segmented<T extends string>({
   className = "",
 }: SegmentedProps<T>) {
   const checkedIndex = options.findIndex((opt) => opt.value === value);
-  const { itemRef, tabIndexFor, keyDownFor } = useRovingRadioGroup(options.length, checkedIndex, (index) =>
-    onChange(options[index].value),
-  );
+  const selectOption = useCallback((index: number) => onChange(options[index].value), [onChange, options]);
+  const { itemRef, tabIndexFor, keyDownFor } = useRovingRadioGroup(options.length, checkedIndex, selectOption);
 
   return (
     <div

@@ -23,10 +23,8 @@ const noneDisabled = () => false;
  * (wrapping at both ends, skipping disabled options), and Home/End jump to
  * the first/last enabled option.
  *
- * `isDisabled` is optional -- omitting it (SubclassStep, FeatFlow,
- * CreationEntryGate, EditionPicker) keeps every option eligible for
- * navigation, identical to the pre-#1324 behavior. `ClassChoiceStep` is the
- * one caller with real disabled options today.
+ * `isDisabled` is optional -- omitting it keeps every option eligible for
+ * navigation, identical to the pre-#1324 behavior.
  */
 export function useRovingRadioGroup(
   count: number,
