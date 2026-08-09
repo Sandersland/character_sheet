@@ -49,7 +49,9 @@ export interface UseDeflectAttacksReactionArgs {
 export interface UseDeflectAttacksReactionReturn {
   /** True once the base roll fired and the redirect's resource remains — gates the redirect button. */
   deflectRedirectAvailable: boolean;
-  /** "Redirect · spend 1 Focus" (2024) / "Throw back · spend 1 ki" (2014) — read off the served row's own name + cost, not hardcoded per edition. */
+  /** The redirect button's label — the served redirect row's own `name`
+   *  ("Deflect Attacks — Redirect" in SRD 5.2, "Deflect Missiles — Throw Back"
+   *  in SRD 5.1), never a per-edition literal. Empty when no redirect row is served. */
   redirectLabel: string;
   busy: boolean;
   error: string | null;
@@ -90,12 +92,19 @@ export function useDeflectAttacksReaction({
   // rather than re-checking the pool here, same as every other resource-gated action.
   const redirectAction = availableActions.find((a) => a.key === redirectKey);
   const deflectRedirectAvailable = pending && (redirectAction?.enabled ?? false);
-  const redirectLabel = is2014 ? "Throw back · spend 1 ki" : "Redirect · spend 1 Focus";
+  const redirectLabel = redirectAction?.name ?? "";
 
   function handleDeflectAttacks() {
     if (mutation.isPending || !baseAction) return;
     const reductionSpec = deflectRollFromAction(baseAction);
-    if (!reductionSpec) return;
+    // An enabled button must never silently no-op: a stale character whose row
+    // is missing its served spec surfaces an error rather than swallowing the
+    // click, and leaves the reaction unspent so a refetch can retry.
+    if (!reductionSpec) {
+      setShowReactionMenu(false);
+      setReactionMessage("Deflect couldn't roll — reload the character sheet and try again.");
+      return;
+    }
     consumeReaction();
     setShowReactionMenu(false);
     const roll = rollSpec(reductionSpec);
@@ -106,7 +115,10 @@ export function useDeflectAttacksReaction({
   async function handleDeflectAttacksRedirect() {
     if (!deflectRedirectAvailable || mutation.isPending) return;
     const redirectSpec = deflectRollFromAction(redirectAction);
-    if (!redirectSpec) return;
+    if (!redirectSpec) {
+      setReactionMessage((prev) => `${prev ?? ""} Redirect couldn't roll — reload the character sheet and try again.`.trim());
+      return;
+    }
     try {
       const updated = await mutation.mutateAsync(undefined);
       if (updated.batchId) attachBatchId(updated.batchId);

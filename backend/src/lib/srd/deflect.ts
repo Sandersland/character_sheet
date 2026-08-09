@@ -12,9 +12,10 @@ export interface DeflectRoll {
 /**
  * Deflect Attacks (SRD 5.2 / PHB'24 p.90, Monk L3) and Deflect Missiles
  * (SRD 5.1 / PHB'14 p.77, Monk L3) roll specs, resolved server-side so the
- * client never re-derives them (#1435, retiring `deflectAttacksReductionRoll`/
- * `deflectAttacksRedirectRoll`/`deflectMissilesThrowRoll` from
- * frontend/src/lib/deflectAttacks.ts).
+ * client never re-derives them (#1435) — the client reads the resolved spec
+ * through `deflectRollFromAction`, retiring the former client-side
+ * `deflectAttacksReductionRoll`/`deflectAttacksRedirectRoll`/
+ * `deflectMissilesThrowRoll` roll builders.
  *
  * - `reduction` — the free base reduction: `1d10 + Dex modifier + monk level`.
  *   PHB'14 *Deflect Missiles* ("1d10 + your Dexterity modifier + your monk

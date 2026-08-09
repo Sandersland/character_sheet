@@ -43,6 +43,12 @@ describe("off-hand eligibility row (#1435)", () => {
     expect(row?.disabledReason).toMatch(/Light weapons/);
   });
 
+  it("is disabled for a MIXED Light/non-Light pair — BOTH weapons must be Light (guards an every→some regression)", () => {
+    const row = offHandRow([{ light: true }, { light: false }]);
+    expect(row?.enabled).toBe(false);
+    expect(row?.disabledReason).toMatch(/Light weapons/);
+  });
+
   it("is served for every character, including a non-combat loadout", () => {
     expect(offHandRow([])?.enabled).toBe(false);
   });
@@ -80,6 +86,14 @@ describe("Deflect specs attached to the served rows (#1435)", () => {
     );
     // Dex +3 + Monk entry level 3 = 6 (not 3 + 13 = 16).
     expect(actions.find((a) => a.key === "deflectAttacks")?.effect?.dice).toEqual({ count: 1, faces: 10, modifier: 6 });
+  });
+
+  it("single-class: the reduction uses the XP-derived level, not a stale entry.level (effectiveEntryLevel)", () => {
+    // entry.level lags at 3 while the XP-derived level arg is 5. For a single
+    // class, effectiveEntryLevel returns the XP-derived level (the per-entry
+    // column self-heals lazily), so the reduction is Dex +3 + 5 = 8, not +3+3.
+    const actions = buildAvailableActionsView(entries([{ name: "monk", level: 3 }]), 5, undefined, true, "EDITION_2024", DEX16, []);
+    expect(actions.find((a) => a.key === "deflectAttacks")?.effect?.dice).toEqual({ count: 1, faces: 10, modifier: 8 });
   });
 
   it("attaches no deflect spec for a non-monk (no deflect row exists), but still serves the off-hand row", () => {

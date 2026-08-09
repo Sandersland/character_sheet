@@ -87,7 +87,7 @@ function DeflectRedirectButton({
   onRedirect,
 }: {
   available: boolean;
-  /** "Redirect · spend 1 Focus" (2024) / "Throw back · spend 1 ki" (2014) — see useDeflectAttacksReaction. */
+  /** The served redirect row's own `name` — see useDeflectAttacksReaction. */
   label: string;
   busy: boolean;
   onRedirect: () => void;
@@ -230,7 +230,7 @@ function ReactionSheetBody({
  * The Reaction economy slot — shared between idle and active render branches
  * so both always show the same state and the same result strip.
  */
-// fallow-ignore-next-line complexity -- threading `redirectLabel` (#1505: the edition-resolved "Redirect · spend 1 Focus" / "Throw back · spend 1 ki" button text, replacing a hardcoded 2024 string) is one more pass-through prop on an already-flat JSX-composition component, not new branchy logic — every existing prop here is likewise a plain pass-through to ReactionSlotResult/ReactionSheetBody.
+// fallow-ignore-next-line complexity -- threading `redirectLabel` (the served redirect row's own name, #1435) is one more pass-through prop on an already-flat JSX-composition component, not new branchy logic — every existing prop here is likewise a plain pass-through to ReactionSlotResult/ReactionSheetBody.
 export default function ReactionSlot({
   reactionUsed,
   showReactionMenu,
