@@ -59,7 +59,7 @@ describe("deriveEntryScopedResources", () => {
     // the entry-level DC which differs from a total-level derivation).
     expect(derived?.maneuverChoiceCount).toBe(5);
     const bareAtEntryLevel = deriveResources("fighter", "battle master", 7, ABILITY_SCORES, profBonus, testFeatureRowsFor("fighter", "battle master"), "EDITION_2024");
-    expect(derived?.maneuverSaveDC).toBe(bareAtEntryLevel?.maneuverSaveDC);
+    expect(derived?.announcedSaveDC).toBe(bareAtEntryLevel?.announcedSaveDC);
   });
 
   it("Battle Master fighter PRIMARY in a multiclass: caps derive at the primary entry's own level, not the summed total", () => {

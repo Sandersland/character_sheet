@@ -50,7 +50,7 @@ let battleMasterSubclassId: string;
 
 beforeAll(async () => {
   await ensureTestOwner(OWNER_ID);
-  // #1546 Part B-ii: Battle Master's maneuverChoiceCount/maneuverSaveDC are
+  // #1546 Part B-ii: Battle Master's maneuverChoiceCount/announcedSaveDC are
   // ROW-driven now (fighter.ts's deriveExtras is gone) — resolving them needs
   // the REAL FK relations (CharacterClassEntry.classId/subclassId), which this
   // fixture previously omitted entirely (harmless while Battle Master's
@@ -91,14 +91,14 @@ describe("serializeCharacter rider contract (#1316)", () => {
     expect(payload).not.toHaveProperty("openHandTechnique");
     expect(payload).not.toHaveProperty("quiveringPalm");
 
-    // maneuverSaveDC folds into the same rider contract, at the top level,
+    // announcedSaveDC folds into the same rider contract, at the top level,
     // named for the feature like every other rider (`maneuvers`, not
-    // `maneuverSaveDC`) — Str 16 (+3) > Dex 10 (0), prof +3 → DC 14.
+    // `announcedSaveDC`) — Str 16 (+3) > Dex 10 (0), prof +3 → DC 14.
     expect(payload).toHaveProperty("maneuvers", { saveDC: 14 });
     // maneuverChoiceCount/toolProfChoiceCount stay put in resources (#1316) —
     // only the save DC moved out.
     expect((payload.resources as { maneuverChoiceCount?: number }).maneuverChoiceCount).toBe(5);
-    expect(payload.resources).not.toHaveProperty("maneuverSaveDC");
+    expect(payload.resources).not.toHaveProperty("announcedSaveDC");
   });
 
   it("a rogue's sneak-attack dice are still correct, with no other rider keys", async () => {

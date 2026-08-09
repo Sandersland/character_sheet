@@ -77,11 +77,11 @@ describe("deriveResources — Battle Master subclass gating", () => {
     expect(poolKeys).not.toContain("superiorityDice");
   });
 
-  it("sets maneuverChoiceCount and maneuverSaveDC at level 3", () => {
+  it("sets maneuverChoiceCount and announcedSaveDC at level 3", () => {
     const result = deriveResources("fighter", "battle master", 3, ABILITY_SCORES, PROF_2, testFeatureRowsFor("fighter", "battle master"), "EDITION_2024");
     expect(result!.maneuverChoiceCount).toBe(3);
     // STR mod +3, DEX mod 0, prof 2 → DC = 8 + 2 + 3 = 13
-    expect(result!.maneuverSaveDC).toBe(13);
+    expect(result!.announcedSaveDC).toBe(13);
     expect(result!.toolProfChoiceCount).toBe(1);
   });
 });

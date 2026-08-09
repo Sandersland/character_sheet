@@ -138,7 +138,8 @@ function derivedAt(
   // subclassFeatureRows, resolved by the caller — see TargetClassEntry's own
   // comment), replacing the `undefined` this call passed before. #1546 Part
   // B-ii is what makes it load-bearing: Battle Master's maneuverChoiceCount/
-  // toolProfChoiceCount/maneuverSaveDC moved OFF SubclassDefinition.deriveExtras
+  // toolProfChoiceCount/announcedSaveDC (#1589, renamed from maneuverSaveDC)
+  // moved OFF SubclassDefinition.deriveExtras
   // (code) onto these rows (registry.ts's deriveRowExtras), so choiceCountStep
   // below now genuinely diffs row-driven counts, not a coincidental `?? 0` over
   // two absent code-authored values. That also opens a null-flip channel this

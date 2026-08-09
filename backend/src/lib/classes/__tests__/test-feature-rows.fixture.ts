@@ -213,7 +213,7 @@ export const FIGHTER_BASE_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2
 // BATTLE_MASTER_RAW verbatim, INCLUDING the resourceKey/resourceTotals/
 // resourceDieTiers/derivedStat/derivedStatTiers/saveDcAbilities columns Part
 // B-ii adds there — Combat Superiority's superiority-dice pool +
-// maneuverChoiceCount + maneuverSaveDC, and Student of War's
+// maneuverChoiceCount + announcedSaveDC (#1589, renamed from maneuverSaveDC), and Student of War's
 // toolProfChoiceCount, are now ALL row-driven (fighter.ts's old
 // resourceFn/deriveExtras are gone). Same rootDir boundary as
 // FIGHTER_BASE_ROWS above (a src file can't import prisma/), same reason for

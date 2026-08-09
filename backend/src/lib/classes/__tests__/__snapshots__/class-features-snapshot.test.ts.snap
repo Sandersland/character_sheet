@@ -5631,8 +5631,8 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
+      "announcedSaveDC": 13,
       "maneuverChoiceCount": 3,
-      "maneuverSaveDC": 13,
       "resources": [
         {
           "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
@@ -5664,8 +5664,8 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
+      "announcedSaveDC": 13,
       "maneuverChoiceCount": 3,
-      "maneuverSaveDC": 13,
       "resources": [
         {
           "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
@@ -5697,8 +5697,8 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
+      "announcedSaveDC": 14,
       "maneuverChoiceCount": 3,
-      "maneuverSaveDC": 14,
       "resources": [
         {
           "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
@@ -5730,8 +5730,8 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
+      "announcedSaveDC": 14,
       "maneuverChoiceCount": 3,
-      "maneuverSaveDC": 14,
       "resources": [
         {
           "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
@@ -5763,8 +5763,8 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
+      "announcedSaveDC": 14,
       "maneuverChoiceCount": 5,
-      "maneuverSaveDC": 14,
       "resources": [
         {
           "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
@@ -5796,8 +5796,8 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
+      "announcedSaveDC": 14,
       "maneuverChoiceCount": 5,
-      "maneuverSaveDC": 14,
       "resources": [
         {
           "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
@@ -5829,8 +5829,8 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
+      "announcedSaveDC": 15,
       "maneuverChoiceCount": 5,
-      "maneuverSaveDC": 15,
       "resources": [
         {
           "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
@@ -5869,8 +5869,8 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
+      "announcedSaveDC": 15,
       "maneuverChoiceCount": 7,
-      "maneuverSaveDC": 15,
       "resources": [
         {
           "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
@@ -5909,8 +5909,8 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
+      "announcedSaveDC": 15,
       "maneuverChoiceCount": 7,
-      "maneuverSaveDC": 15,
       "resources": [
         {
           "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
@@ -5949,8 +5949,8 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
+      "announcedSaveDC": 15,
       "maneuverChoiceCount": 7,
-      "maneuverSaveDC": 15,
       "resources": [
         {
           "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
@@ -5989,8 +5989,8 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
+      "announcedSaveDC": 16,
       "maneuverChoiceCount": 7,
-      "maneuverSaveDC": 16,
       "resources": [
         {
           "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
@@ -6029,8 +6029,8 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
+      "announcedSaveDC": 16,
       "maneuverChoiceCount": 7,
-      "maneuverSaveDC": 16,
       "resources": [
         {
           "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
@@ -6069,8 +6069,8 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
+      "announcedSaveDC": 16,
       "maneuverChoiceCount": 9,
-      "maneuverSaveDC": 16,
       "resources": [
         {
           "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
@@ -6109,8 +6109,8 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
+      "announcedSaveDC": 16,
       "maneuverChoiceCount": 9,
-      "maneuverSaveDC": 16,
       "resources": [
         {
           "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
@@ -6149,8 +6149,8 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
+      "announcedSaveDC": 17,
       "maneuverChoiceCount": 9,
-      "maneuverSaveDC": 17,
       "resources": [
         {
           "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
@@ -6189,8 +6189,8 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
+      "announcedSaveDC": 17,
       "maneuverChoiceCount": 9,
-      "maneuverSaveDC": 17,
       "resources": [
         {
           "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
@@ -6229,8 +6229,8 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
+      "announcedSaveDC": 17,
       "maneuverChoiceCount": 9,
-      "maneuverSaveDC": 17,
       "resources": [
         {
           "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
@@ -6269,8 +6269,8 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
   },
   {
     "info": {
+      "announcedSaveDC": 17,
       "maneuverChoiceCount": 9,
-      "maneuverSaveDC": 17,
       "resources": [
         {
           "description": "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",

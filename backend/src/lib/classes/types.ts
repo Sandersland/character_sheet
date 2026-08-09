@@ -191,8 +191,23 @@ export interface DerivedFeature {
 export interface ClassExtras {
   /** How many picks the character may hold from a level-gated "choose N" cap at this level. */
   maneuverChoiceCount?: number;
-  /** DC an announced effect from that cap is rolled against: 8 + proficiency + max(Str, Dex) mod. */
-  maneuverSaveDC?: number;
+  /**
+   * A closed-form save DC a class/subclass row announces (#1589, renamed from
+   * the Fighter-specific `maneuverSaveDC`): 8 + proficiency + max of the
+   * row's `saveDcAbilities` modifiers — Battle Master maneuvers today, Cleric
+   * Turn Undead/Channel Divinity or a future Monk/Barbarian/Rogue retab
+   * tomorrow (deriveAnnouncedSaveDC, lib/srd/announced-save-dc.ts). Populated
+   * from EITHER a base-class row or an active subclass row (registry.ts's
+   * deriveRowExtras runs over both) — but stays a SINGLE scalar overlaid
+   * across every class entry (deriveEntryScopedResources), so two DIFFERENT
+   * entries each declaring one is a real collision, not two independent
+   * values: registry.ts's overlay throws rather than silently letting one
+   * clobber the other (mirrors SHARED_POOL_MERGE's unsanctioned-duplicate
+   * throw for pool keys). No production character can hit that today — see
+   * cleric-features.ts's own header for why Cleric deliberately still leaves
+   * `saveDcAbilities` unset despite this column now being reachable.
+   */
+  announcedSaveDC?: number;
   /**
    * Tool-proficiency choices granted by a subclass feature at this level.
    * Undefined when no subclass feature grants a tool choice — assignDefined

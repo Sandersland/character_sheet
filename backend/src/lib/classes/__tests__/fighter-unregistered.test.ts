@@ -86,7 +86,7 @@ describe("Champion, Battle Master and Eldritch Knight all still resolve their OW
       const info = deriveResources("fighter", "battle master", LEVEL, ABILITY_SCORES, proficiencyBonusForLevel(LEVEL), featureRows, edition);
       expect(info?.resources.map((r) => r.key), edition).toContain("superiorityDice");
       expect(info?.maneuverChoiceCount, edition).toBeGreaterThan(0);
-      expect(info?.maneuverSaveDC, edition).toBeGreaterThan(0);
+      expect(info?.announcedSaveDC, edition).toBeGreaterThan(0);
     }
   });
 

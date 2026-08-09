@@ -6,9 +6,9 @@
  * Rally) applies self temp HP through the core's self-apply path.
  *
  * The 5e rules that live here: the die is always 1× the current superiority die
- * (no scaling), the announced save DC = 8 + prof + max(Str,Dex) (maneuverSaveDC),
- * and Rally grants die + Cha mod as self temp HP. Placement/save columns come
- * from the catalog; the known list + die size come from resources + deriveResources.
+ * (no scaling), the announced save DC = 8 + prof + max(Str,Dex) (announcedSaveDC,
+ * #1589), and Rally grants die + Cha mod as self temp HP. Placement/save columns
+ * come from the catalog; the known list + die size come from resources + deriveResources.
  */
 
 import type { CastManeuverOperation, ManeuverOperation } from "@character-sheet/contracts";
@@ -69,20 +69,23 @@ type ManeuverRow = Prisma.CharacterGetPayload<{ select: typeof MANEUVER_SELECT }
 
 // Gate: only a Battle Master fighter (L3+) has a superiority die + save DC.
 // featureRowsOf (#1528 chunk 0) — Battle Master's superiority-dice pool and
-// its maneuverSaveDC are now BOTH row-driven (#1546 Part B: resourceKey/
+// its announcedSaveDC are now BOTH row-driven (#1546 Part B: resourceKey/
 // resourceTotals/resourceDieTiers + saveDcAbilities on the Combat Superiority
 // row, read via deriveEntryScopedResourcesForCharacterRow -> registry.ts's
 // deriveRowExtras), which is exactly why this carrier is threaded through
 // here — not a forward-looking comment anymore, but the live path. The gate
 // itself stays Battle-Master-specific in EFFECT (only that subclass's rows
-// ever populate maneuverSaveDC/superiorityDice) — only the thrown message's
-// TEXT is deliberately class-agnostic (#1532's goal grep), so nobody reads a
+// populate superiorityDice; #1589 generalised announcedSaveDC's MECHANISM to
+// base-class rows too, but no base-class row populates saveDcAbilities in
+// production today, so this entry's own announcedSaveDC still only ever
+// comes from Combat Superiority) — only the thrown message's TEXT is
+// deliberately class-agnostic (#1532's goal grep), so nobody reads a
 // hardcoded class name here and "helpfully" restores it. Do not re-add the
 // class name to the string below; the why is recorded here, not there.
 function resolveSuperiority(row: ManeuverRow): { saveDcBase: number; dieFaces: number } {
   const { derived } = deriveEntryScopedResourcesForCharacterRow(row, featureRowsOf);
 
-  const saveDcBase = derived?.maneuverSaveDC;
+  const saveDcBase = derived?.announcedSaveDC;
   const dieFaces = derived ? resolveClassDie("superiorityDice", derived) : null;
   if (saveDcBase === undefined || dieFaces === null) {
     throw new InvalidManeuverOperationError(
