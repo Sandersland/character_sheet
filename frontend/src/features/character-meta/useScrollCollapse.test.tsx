@@ -1,5 +1,5 @@
 import { render, act } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useScrollCollapse } from "@/features/character-meta/useScrollCollapse";
 
@@ -53,9 +53,11 @@ beforeEach(() => {
   MockIO.instances = [];
   collapsedState = false;
   globalThis.IntersectionObserver = MockIO as unknown as typeof IntersectionObserver;
+  vi.useFakeTimers();
 });
 afterEach(() => {
   globalThis.IntersectionObserver = original;
+  vi.useRealTimers();
 });
 
 describe("useScrollCollapse hysteresis (#1083)", () => {
@@ -96,8 +98,35 @@ describe("useScrollCollapse hysteresis (#1083)", () => {
     // Scrolled back into the dead zone: collapse observer re-enters — held collapsed.
     collapseObs().emit(true);
     expect(collapsedState).toBe(true);
-    // Only reaching the very top (expand observer enters) re-expands.
+    // Only reaching the very top (expand observer enters) re-expands, and only
+    // once the debounce window (#1859) elapses without a reversal.
     expandObs().emit(true);
+    expect(collapsedState).toBe(true);
+    act(() => vi.advanceTimersByTime(120));
+    expect(collapsedState).toBe(false);
+  });
+
+  it("debounces the re-expand commit so a same-gesture bounce doesn't snap the header open (#1859)", () => {
+    render(<Harness />);
+    collapseObs().emit(false);
+    expect(collapsedState).toBe(true);
+    // Momentum scroll grazes the top, then immediately bounces back out —
+    // never committed, so the header never visibly re-opens.
+    expandObs().emit(true);
+    act(() => vi.advanceTimersByTime(60));
+    expect(collapsedState).toBe(true);
+    collapseObs().emit(false);
+    act(() => vi.advanceTimersByTime(120));
+    expect(collapsedState).toBe(true);
+  });
+
+  it("commits the re-expand once the debounce window elapses without a reversal (#1859)", () => {
+    render(<Harness />);
+    collapseObs().emit(false);
+    expandObs().emit(true);
+    act(() => vi.advanceTimersByTime(119));
+    expect(collapsedState).toBe(true);
+    act(() => vi.advanceTimersByTime(1));
     expect(collapsedState).toBe(false);
   });
 
