@@ -290,11 +290,9 @@ function offHandActionRow(equippedWeaponLight: ReadonlyArray<{ light: boolean }>
 // Attaches the resolved Deflect Attacks / Deflect Missiles roll specs (#1435)
 // onto the served rows via the #1381 `effect` field: the base row carries the
 // reduction spec, the redirect / throw-back row its own. Both resolve off the
-// Monk entry's effective level (`effectiveEntryLevel`, reproducing today's
-// frontend `classEntryLevel(character, "monk")` arithmetic — the multiclass
-// class-level correction is a separate ticket) and the character's Dex mod, via
-// the ONE edition-forked `deriveDeflectSpec` rule. A no-op for a non-Monk (no
-// deflect row is present to annotate).
+// Monk entry's effective level (`effectiveEntryLevel`) and the character's Dex
+// mod, via the ONE edition-forked `deriveDeflectSpec` rule. A no-op for a
+// non-Monk (no deflect row is present to annotate).
 function withDeflectSpecs(
   actions: AvailableAction[],
   classEntries: CharacterWithRelations["classEntries"],

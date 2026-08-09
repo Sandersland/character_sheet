@@ -63,9 +63,7 @@ export interface AvailableAction {
   resolverKind?: string;
   /**
    * A resolved roll spec for this action (#1435) — the #1381 resolved-spec-on-a-
-   * row field, reused rather than a second bespoke field. Today only the Deflect
-   * Attacks / Deflect Missiles base row (its reduction) and the redirect /
-   * throw-back row (its own spec) carry it; `deflectRollFromAction`
+   * row field, reused rather than a second bespoke field. `deflectRollFromAction`
    * (lib/deflectAttacks.ts) is the reader. `effect.dice` is the RollSpec — the
    * client never re-derives the monk-level or Martial-Arts-die math.
    */
