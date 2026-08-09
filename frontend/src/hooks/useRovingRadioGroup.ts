@@ -73,10 +73,11 @@ export function useRovingRadioGroup(
 
   const step = useCallback(
     (from: number, delta: 1 | -1): number => {
-      let next = from;
-      for (let i = 0; i < count; i++) {
-        next = (next + delta + count) % count;
-        if (next === from) return -1;
+      // Scan the count-1 candidates away from `from` in direction `delta`
+      // (offsets 1..count-1 never revisit `from`); first enabled wins, else
+      // -1 when `from` is the only enabled option or all are disabled.
+      for (let i = 1; i < count; i++) {
+        const next = (((from + delta * i) % count) + count) % count;
         if (!isDisabled(next)) return next;
       }
       return -1;
