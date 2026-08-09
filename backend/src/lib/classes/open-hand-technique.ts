@@ -31,6 +31,19 @@ import { resolveSubclassSlug, type SubclassSlug } from "./subclass-slug.js";
 
 export class InvalidOpenHandTechniqueOperationError extends Error {}
 
+// Open Hand Technique's grant level (#1337): Open Hand monk L3 in BOTH
+// editions (SRD 5.2 / PHB'24 p.90, SRD 5.1 / PHB'14 p.78 — matching the 2014
+// Way of the Open Hand's own Open Hand Technique at 3rd level) —
+// edition-invariant, so no `edition` parameter. The single source for this
+// gate; character-serialize.ts's openHandTechniqueRider imports
+// hasOpenHandTechnique rather than re-declaring the threshold.
+export const OPEN_HAND_TECHNIQUE_LEVEL = 3;
+
+/** Whether an Open Hand monk entry (its own level, never `character.level`) has Open Hand Technique. */
+export function hasOpenHandTechnique(monkLevel: number): boolean {
+  return monkLevel >= OPEN_HAND_TECHNIQUE_LEVEL;
+}
+
 export type OpenHandRiderOutcome = "applied" | "resisted";
 
 export interface OpenHandRiderResult {
@@ -137,9 +150,9 @@ async function imposeOpenHandRider(
   const { row, op, characterId, tx, batchId, sessionId } = ctx;
   const monk = monkEntry(row);
 
-  if (!monk || monk.level < 3 || !isOpenHandFamily(row)) {
+  if (!monk || !hasOpenHandTechnique(monk.level) || !isOpenHandFamily(row)) {
     throw new InvalidOpenHandTechniqueOperationError(
-      "Only an Open Hand monk (level 3+) has Open Hand Technique",
+      `Only an Open Hand monk (level ${OPEN_HAND_TECHNIQUE_LEVEL}+) has Open Hand Technique`,
     );
   }
   if (!canImposeOpenHandRider({ usedThisTurn: op.usedThisTurn })) {

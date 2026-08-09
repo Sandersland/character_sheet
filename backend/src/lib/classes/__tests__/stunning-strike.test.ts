@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { canAttemptStunningStrike, resolveStunningStrikeOutcome, stunningStrikeSummary } from "@/lib/classes/stunning-strike.js";
+import {
+  STUNNING_STRIKE_LEVEL,
+  canAttemptStunningStrike,
+  hasStunningStrike,
+  resolveStunningStrikeOutcome,
+  stunningStrikeSummary,
+} from "@/lib/classes/stunning-strike.js";
 import { monkSaveDC, monkPoolKey } from "@/lib/classes/monk.js";
 
 // Renamed for #1499 (the old name cited only the 2024 "Focus" pool). SRD 5.1
@@ -33,6 +39,25 @@ describe("monkPoolKey (#1313 D3)", () => {
 
   it('is "focus" for EDITION_2024', () => {
     expect(monkPoolKey("EDITION_2024")).toBe("focus");
+  });
+});
+
+// #1337: hasStunningStrike is the single source of the L5 gate — both
+// character-serialize.ts's stunningStrikeRider and this module's own cast
+// guard import it. No numeric literal for the gate appears here; the
+// boundary is derived from STUNNING_STRIKE_LEVEL itself, so mutating that one
+// constant would flip both this assertion and the rider/guard together.
+describe("hasStunningStrike (#1337 shared gate)", () => {
+  it("is false one level below the gate", () => {
+    expect(hasStunningStrike(STUNNING_STRIKE_LEVEL - 1)).toBe(false);
+  });
+
+  it("is true exactly at the gate", () => {
+    expect(hasStunningStrike(STUNNING_STRIKE_LEVEL)).toBe(true);
+  });
+
+  it("is true above the gate", () => {
+    expect(hasStunningStrike(STUNNING_STRIKE_LEVEL + 5)).toBe(true);
   });
 });
 

@@ -277,3 +277,63 @@ describe("Stunning Strike for a non-monk", () => {
     expect(res.body.error).toMatch(/monk/i);
   });
 });
+
+// #1337: hasStunningStrike (stunning-strike.ts) is the single source of the
+// L5 gate — both the serialized rider and this route's cast guard read it.
+// Proven with a Fighter/Monk multiclass, where the monk class ENTRY's own
+// level (not the derived total character level) decides the gate.
+describe("Stunning Strike multiclass entry-scoping (#1337)", () => {
+  const MULTICLASS_ID = "test-stunning-strike-multiclass-1";
+  const multiclassUrl = `/api/characters/${MULTICLASS_ID}/abilities/stunning-strike/transactions`;
+
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { id: MULTICLASS_ID } });
+  });
+  afterAll(async () => {
+    await prisma.characterClass.deleteMany({ where: { name: CLASS_NAME } });
+  });
+
+  async function createFighterMonk(monkLevel: number) {
+    await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
+    await prisma.character.create({
+      data: {
+        ...FIXTURE_BASE,
+        id: MULTICLASS_ID,
+        ownerId: OWNER_ID,
+        classEntries: {
+          create: [
+            { name: "fighter", position: 0, level: 5 },
+            { name: "monk", position: 1, level: monkLevel },
+          ],
+        },
+      },
+    });
+  }
+
+  it("Fighter 5 / Monk 4: no Stunning Strike rider, and the guard rejects", async () => {
+    await createFighterMonk(4);
+
+    const character = await agent().get(`/api/characters/${MULTICLASS_ID}`);
+    expect(character.body).not.toHaveProperty("stunningStrike");
+
+    const guard = await agent()
+      .post(multiclassUrl)
+      .send({ operations: [{ type: "attemptStunningStrike", usedThisTurn: false }] });
+    expect(guard.status).toBe(400);
+    expect(guard.body.error).toMatch(/monk/i);
+  });
+
+  it("Fighter 5 / Monk 5: the Stunning Strike rider is present, and the guard admits", async () => {
+    await createFighterMonk(5);
+
+    const character = await agent().get(`/api/characters/${MULTICLASS_ID}`);
+    expect(character.body).toHaveProperty("stunningStrike");
+
+    const guard = await agent()
+      .post(multiclassUrl)
+      .send({ operations: [{ type: "attemptStunningStrike", usedThisTurn: false }] });
+    expect(guard.status).toBe(200);
+    expect(guard.body.character).toHaveProperty("stunningStrike");
+  });
+});

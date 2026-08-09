@@ -1,6 +1,21 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveQuiveringPalmDamage } from "@/lib/classes/quivering-palm.js";
+import { QUIVERING_PALM_LEVEL, hasQuiveringPalm, resolveQuiveringPalmDamage } from "@/lib/classes/quivering-palm.js";
+
+// #1337: hasQuiveringPalm is the single source of the L17 gate — both
+// character-serialize.ts's quiveringPalmRider and this module's own cast
+// guard import it. No numeric literal for the gate appears here; the
+// boundary is derived from QUIVERING_PALM_LEVEL itself, so mutating that one
+// constant would flip both this assertion and the rider/guard together.
+describe("hasQuiveringPalm (#1337 shared gate)", () => {
+  it("is false one level below the gate", () => {
+    expect(hasQuiveringPalm(QUIVERING_PALM_LEVEL - 1)).toBe(false);
+  });
+
+  it("is true exactly at the gate", () => {
+    expect(hasQuiveringPalm(QUIVERING_PALM_LEVEL)).toBe(true);
+  });
+});
 
 describe("resolveQuiveringPalmDamage — 2024 (SRD 5.2: 10d12 Force, half on a successful Con save)", () => {
   it("is a fail (full damage) when the roll is below the DC", () => {

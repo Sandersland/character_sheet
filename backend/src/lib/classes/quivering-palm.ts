@@ -46,6 +46,18 @@ export class InvalidQuiveringPalmOperationError extends Error {}
 
 export const QUIVERING_PALM_BUFF_KEY = "quiveringPalm";
 
+// Quivering Palm's grant level (#1337): Open Hand monk L17 in BOTH editions
+// (SRD 5.2 / PHB'24 p.90, SRD 5.1 / PHB'14 p.79 — see the module header's
+// citations) — edition-invariant, so no `edition` parameter. The single
+// source for this gate; character-serialize.ts's quiveringPalmRider imports
+// hasQuiveringPalm rather than re-declaring the threshold.
+export const QUIVERING_PALM_LEVEL = 17;
+
+/** Whether an Open Hand monk entry (its own level, never `character.level`) has Quivering Palm. */
+export function hasQuiveringPalm(monkLevel: number): boolean {
+  return monkLevel >= QUIVERING_PALM_LEVEL;
+}
+
 // Cost by edition (#1501): SRD 5.1 / PHB'14 p.79 spends 3 ki; SRD 5.2 /
 // PHB'24 p.90 spends 4 focus. The pool NAME forks through monkPoolKey; only
 // the AMOUNT needs its own switch here.
@@ -154,9 +166,9 @@ function isOpenHandFamily(row: QuiveringPalmRow): boolean {
 /** Throws unless this is a level-17+ Open Hand monk (either edition); returns the monk level. */
 function assertQuiveringPalmAvailable(row: QuiveringPalmRow): number {
   const monk = monkEntry(row);
-  if (!monk || monk.level < 17 || !isOpenHandFamily(row)) {
+  if (!monk || !hasQuiveringPalm(monk.level) || !isOpenHandFamily(row)) {
     throw new InvalidQuiveringPalmOperationError(
-      "Only an Open Hand monk (level 17+) has Quivering Palm",
+      `Only an Open Hand monk (level ${QUIVERING_PALM_LEVEL}+) has Quivering Palm`,
     );
   }
   return monk.level;

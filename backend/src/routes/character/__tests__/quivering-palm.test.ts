@@ -251,3 +251,62 @@ describe("Quivering Palm for a 2014 Way of the Open Hand monk (#1501)", () => {
     }
   });
 });
+
+// #1337: hasQuiveringPalm (quivering-palm.ts) is the single source of the L17
+// gate — both the serialized rider and this route's cast guard read it.
+// Proven with a Fighter/Warrior-of-the-Open-Hand multiclass whose TOTAL
+// character level is held CONSTANT across the two fixtures (18 both times) —
+// only the monk entry's own level moves (16 -> 17), so the assertion cannot
+// pass on `character.level`.
+describe("Quivering Palm multiclass entry-scoping (#1337)", () => {
+  const MULTICLASS_ID = "test-quivering-palm-multiclass-1";
+  const multiclassUrl = `/api/characters/${MULTICLASS_ID}/abilities/quivering-palm/transactions`;
+
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { id: MULTICLASS_ID } });
+  });
+  afterAll(async () => {
+    await prisma.characterClass.deleteMany({ where: { name: CLASS_NAME } });
+  });
+
+  async function createFighterMonk(fighterLevel: number, monkLevel: number) {
+    await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
+    await prisma.character.create({
+      data: {
+        ...FIXTURE_BASE,
+        id: MULTICLASS_ID,
+        ownerId: OWNER_ID,
+        experiencePoints: 305000, // total level 18 in BOTH fixtures below
+        classEntries: {
+          create: [
+            { name: "fighter", position: 0, level: fighterLevel },
+            { name: "monk", position: 1, level: monkLevel, subclass: "Warrior of the Open Hand" },
+          ],
+        },
+      },
+    });
+  }
+
+  it("Fighter 2 / Monk(Open Hand) 16 [total 18]: no Quivering Palm rider, and the guard rejects", async () => {
+    await createFighterMonk(2, 16);
+
+    const character = await agent().get(`/api/characters/${MULTICLASS_ID}`);
+    expect(character.body).not.toHaveProperty("quiveringPalm");
+
+    const guard = await agent().post(multiclassUrl).send({ operations: [{ type: "setQuiveringPalm" }] });
+    expect(guard.status).toBe(400);
+    expect(guard.body.error).toMatch(/open hand/i);
+  });
+
+  it("Fighter 1 / Monk(Open Hand) 17 [total 18]: the Quivering Palm rider is present, and the guard admits", async () => {
+    await createFighterMonk(1, 17);
+
+    const character = await agent().get(`/api/characters/${MULTICLASS_ID}`);
+    expect(character.body).toHaveProperty("quiveringPalm");
+
+    const guard = await agent().post(multiclassUrl).send({ operations: [{ type: "setQuiveringPalm" }] });
+    expect(guard.status).toBe(200);
+    expect(guard.body.character).toHaveProperty("quiveringPalm");
+  });
+});

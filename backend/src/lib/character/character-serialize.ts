@@ -12,7 +12,9 @@ import { ATTUNEMENT_LIMIT } from "@/lib/inventory/inventory-attunement.js";
 import { currencyOrEmpty } from "@/lib/inventory/inventory-currency.js";
 import { sneakAttackSpecForEntries } from "@/lib/classes/sneak-attack.js";
 import { monkSaveDC } from "@/lib/classes/monk.js";
-import { QUIVERING_PALM_BUFF_KEY } from "@/lib/classes/quivering-palm.js";
+import { hasStunningStrike } from "@/lib/classes/stunning-strike.js";
+import { QUIVERING_PALM_BUFF_KEY, hasQuiveringPalm } from "@/lib/classes/quivering-palm.js";
+import { hasOpenHandTechnique } from "@/lib/classes/open-hand-technique.js";
 import { resolveSubclassSlug, type SubclassIdentityInput } from "@/lib/classes/subclass-slug.js";
 import { featureRowsOf } from "@/lib/classes/feature-rows-select.js";
 import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
@@ -68,15 +70,17 @@ function sneakAttackRider(classEntries: { name: string; level: number }[]): Dice
   return spec ? { dice: { count: spec.count, faces: spec.faces } } : undefined;
 }
 
-// Stunning Strike: the focus save DC, undefined below monk L5. Scales with
-// the monk class entry's own level, matching monkLevel() in stunning-strike.ts.
+// Stunning Strike: the focus save DC, undefined below the gate. Scales with
+// the monk class entry's own level, gated through stunning-strike.ts's
+// hasStunningStrike (#1337: the single source of the L5 threshold, also
+// consumed by that module's own cast guard).
 function stunningStrikeRider(
   classEntries: { name: string; level: number }[],
   abilityScores: Record<string, number>,
   profBonus: number,
 ): SaveRider | undefined {
   const monkLevel = classEntries.find((c) => c.name.toLowerCase() === "monk")?.level ?? 0;
-  return monkLevel >= 5 ? { saveDC: monkSaveDC(abilityScores, profBonus) } : undefined;
+  return hasStunningStrike(monkLevel) ? { saveDC: monkSaveDC(abilityScores, profBonus) } : undefined;
 }
 
 type RiderClassEntry = SubclassIdentityInput & { name: string; level: number };
@@ -98,22 +102,26 @@ function openHandMonkEntry(classEntries: RiderClassEntry[]): RiderClassEntry | u
 }
 
 // Open Hand Technique (Warrior of the Open Hand L3, #1245): the focus save DC
-// for the Push/Topple riders, undefined below monk L3 off-subclass. Addle
+// for the Push/Topple riders, undefined off-subclass or below the gate. Addle
 // carries no save, but the shape stays uniform (saveDC is always present once
-// unlocked) — live-play automation lives in open-hand-technique.ts.
+// unlocked). Gated through open-hand-technique.ts's hasOpenHandTechnique
+// (#1337: the single source of the L3 threshold, also consumed by that
+// module's own cast guard) — live-play automation lives in that module too.
 function openHandTechniqueRider(
   classEntries: RiderClassEntry[],
   abilityScores: Record<string, number>,
   profBonus: number,
 ): SaveRider | undefined {
   const monk = openHandMonkEntry(classEntries);
-  return monk && monk.level >= 3 ? { saveDC: monkSaveDC(abilityScores, profBonus) } : undefined;
+  return monk && hasOpenHandTechnique(monk.level) ? { saveDC: monkSaveDC(abilityScores, profBonus) } : undefined;
 }
 
 // Quivering Palm (Warrior of the Open Hand L17, #1245): the focus save DC for
 // the Con-save trigger, plus whether vibrations are currently set (the
 // activeEffects buff registry's inert QUIVERING_PALM_BUFF_KEY marker — see
-// quivering-palm.ts's header for why a buff, not new persisted state).
+// quivering-palm.ts's header for why a buff, not new persisted state). Gated
+// through quivering-palm.ts's hasQuiveringPalm (#1337: the single source of
+// the L17 threshold, also consumed by that module's own cast guard).
 function quiveringPalmRider(
   classEntries: RiderClassEntry[],
   abilityScores: Record<string, number>,
@@ -121,7 +129,7 @@ function quiveringPalmRider(
   activeEffects: ActiveEffectsMutableState,
 ): SaveRider | undefined {
   const monk = openHandMonkEntry(classEntries);
-  if (!monk || monk.level < 17) return undefined;
+  if (!monk || !hasQuiveringPalm(monk.level)) return undefined;
   return {
     saveDC: monkSaveDC(abilityScores, profBonus),
     active: activeEffects.buffs.some((b) => b.key === QUIVERING_PALM_BUFF_KEY),

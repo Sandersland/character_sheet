@@ -41,6 +41,18 @@ import { monkSaveDC, monkPoolKey } from "./monk.js";
 
 export class InvalidStunningStrikeOperationError extends Error {}
 
+// Stunning Strike's grant level (#1337): monk L5 in BOTH editions (SRD 5.1 /
+// PHB'14 p.77, SRD 5.2 / PHB'24 p.88 — see the module header's citations) —
+// edition-invariant, so no `edition` parameter. The single source for this
+// gate; character-serialize.ts's stunningStrikeRider imports hasStunningStrike
+// rather than re-declaring the threshold.
+export const STUNNING_STRIKE_LEVEL = 5;
+
+/** Whether a monk (identified by its own class-entry level, never `character.level`) has Stunning Strike. */
+export function hasStunningStrike(monkLevel: number): boolean {
+  return monkLevel >= STUNNING_STRIKE_LEVEL;
+}
+
 export type StunningStrikeOutcome = "fail" | "success";
 
 export interface StunningStrikeAttemptResult {
@@ -106,8 +118,8 @@ async function attemptStunningStrike(
 ): Promise<StunningStrikeAttemptResult> {
   const { tx, row, op, characterId, batchId, sessionId } = ctx;
 
-  if (monkLevel(row) < 5) {
-    throw new InvalidStunningStrikeOperationError("Only a monk (level 5+) has Stunning Strike");
+  if (!hasStunningStrike(monkLevel(row))) {
+    throw new InvalidStunningStrikeOperationError(`Only a monk (level ${STUNNING_STRIKE_LEVEL}+) has Stunning Strike`);
   }
   const edition = editionOf(row);
   if (!canAttemptStunningStrike({ usedThisTurn: op.usedThisTurn }, edition)) {
