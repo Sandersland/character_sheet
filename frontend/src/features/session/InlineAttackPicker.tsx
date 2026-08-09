@@ -53,7 +53,8 @@ import type { ResolveActionEventEffect } from "@character-sheet/shared-types";
 import ResolutionRail from "@/features/session/ResolutionRail";
 import { AttackKickerPips } from "@/features/session/AttackStepCard";
 import { AttackFormSummaryCore } from "@/features/session/railPrimitives";
-import type { AttackEntryView } from "@/features/session/useAttackRolls";
+import { buildManeuverView } from "@/features/session/maneuverViewBridge";
+import type { AttackEntryView } from "@/features/session/maneuverViewBridge";
 import AttackTallyStrip from "@/features/session/AttackTallyStrip";
 import AttackSheetFooter from "@/features/session/AttackSheetFooter";
 import DamageRiderList from "@/features/session/DamageRiderList";
@@ -257,47 +258,6 @@ function guardResolutionView(view: ResolutionView): ResolutionView {
     onRollEffect: () => {
       if (!view.toHitRoll) return;
       view.onRollEffect();
-    },
-  };
-}
-
-// A minimal AttackEntryView the pre-existing ManeuversDisclosure still needs
-// (its Precision/damage-maneuver prompts read `lastAttackRoll`/
-// `lastDamageRoll`/`onRollsUpdated`, unrelated to useAttackRolls' own rolling
-// — the values live on `resolutionView` now). Present once a to-hit exists
-// for the current swing, mirroring the old boundView binding. Pure (not a
-// hook) — extracted alongside useAttackTallyBridge so the branch/object-
-// literal don't add to InlineAttackPicker's own complexity score.
-//
-// KNOWN GAP: a maneuver-boosted total writes into the tally (so the tally
-// strip / turn-summary banner display the boosted number, unchanged from
-// before) but NOT into the resolveAction event already built from
-// useResolution's own (un-boosted) roll state — the persisted audit log
-// keeps the raw die total. Fixing that needs an override seam on
-// useResolution itself (#1831), out of this slice's scope.
-function buildManeuverView(
-  resolutionView: ResolutionView,
-  armedEntry: AttackEntry,
-  currentRow: AttackTallyRow | null,
-  turnState: TurnState & TurnStateActions,
-): AttackEntryView | null {
-  if (!resolutionView.toHitRoll) return null;
-  return {
-    entry: armedEntry,
-    attackTotal: null,
-    damageTotal: null,
-    lastAttackRoll: resolutionView.toHitRoll,
-    lastDamageRoll: resolutionView.effectRoll,
-    isCrit: resolutionView.isCrit,
-    attackChip: resolutionView.attackChip,
-    attackMode: resolutionView.attackMode,
-    onAttack: () => {},
-    onDamage: () => {},
-    onDamageRider: () => {},
-    onRollsUpdated: (newAttackTotal, newDamageTotal) => {
-      if (!currentRow) return;
-      if (newAttackTotal !== null) turnState.setTallyAttackTotal(currentRow.id, newAttackTotal);
-      if (newDamageTotal !== null) turnState.setTallyDamage(currentRow.id, newDamageTotal);
     },
   };
 }
