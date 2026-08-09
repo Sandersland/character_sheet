@@ -2,14 +2,14 @@ import { useEffect } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 
-import { logRoll } from "@/api/client";
+import { logRollAction } from "@/api/client";
 import { RollProvider, useRoll, type RollLog } from "@/features/dice/RollContext";
 import { DiceRollStyleProvider } from "@/features/dice/DiceRollStyleProvider";
 import RollResultSeal from "@/features/dice/RollResultSeal";
 import type { RollResult, RollSpec } from "@/lib/dice";
 
 vi.mock("@/api/client", () => ({
-  logRoll: vi.fn().mockResolvedValue(undefined),
+  logRollAction: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Stub the 3D DiceRoller (mounts a Three.js Canvas that doesn't render in jsdom):
@@ -37,7 +37,7 @@ vi.mock("@/features/dice/DiceRoller", () => ({
   },
 }));
 
-const mockLogRoll = vi.mocked(logRoll);
+const mockLogRoll = vi.mocked(logRollAction);
 
 function AnimatedRollOnMount({ spec, label, log }: { spec: RollSpec; label: string; log?: RollLog }) {
   const { rollAnimated } = useRoll();
@@ -75,9 +75,9 @@ describe("RollProvider — rollAnimated + logging", () => {
     expect(seal).toHaveTextContent("22");
     expect(screen.queryByTestId("dice-roller")).not.toBeInTheDocument();
 
-    const [cid, sid, payload] = mockLogRoll.mock.calls[0];
+    const [cid, payload] = mockLogRoll.mock.calls[0];
     expect(cid).toBe("char-1");
-    expect(sid).toBe("sess-1");
+    // No sessionId on the wire — the resolver derives it from the active session (#1861).
     expect(payload).toMatchObject({
       kind: "check",
       source: "Perception check",
@@ -108,7 +108,7 @@ describe("RollProvider — rollAnimated + logging", () => {
     expect(chip).toHaveTextContent("Perception check");
     expect(screen.queryByTestId("dice-roller")).not.toBeInTheDocument();
     await waitFor(() => expect(mockLogRoll).toHaveBeenCalledTimes(1));
-    expect(mockLogRoll.mock.calls[0][2]).toMatchObject({ kind: "check", skill: "perception" });
+    expect(mockLogRoll.mock.calls[0][1]).toMatchObject({ kind: "check", skill: "perception" });
   });
 
   it("does not log when no session is active (still settles into the seal)", async () => {
@@ -161,7 +161,7 @@ describe("RollProvider — rollAnimated + logging", () => {
     );
 
     await waitFor(() => expect(mockLogRoll).toHaveBeenCalledTimes(1));
-    expect(mockLogRoll.mock.calls[0][2]).toMatchObject({
+    expect(mockLogRoll.mock.calls[0][1]).toMatchObject({
       kind: "initiative",
       rollMode: "advantage",
     });
@@ -190,7 +190,7 @@ describe("RollProvider — rollAnimated + logging", () => {
     );
 
     await waitFor(() => expect(mockLogRoll).toHaveBeenCalledTimes(1));
-    expect(mockLogRoll.mock.calls[0][2]).toMatchObject({
+    expect(mockLogRoll.mock.calls[0][1]).toMatchObject({
       faces: [15],
       droppedFaces: [5],
     });
@@ -212,6 +212,6 @@ describe("RollProvider — rollAnimated + logging", () => {
     );
 
     await waitFor(() => expect(mockLogRoll).toHaveBeenCalledTimes(1));
-    expect(mockLogRoll.mock.calls[0][2]).not.toHaveProperty("droppedFaces");
+    expect(mockLogRoll.mock.calls[0][1]).not.toHaveProperty("droppedFaces");
   });
 });

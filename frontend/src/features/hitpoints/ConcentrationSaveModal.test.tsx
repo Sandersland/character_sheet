@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 
-import { logRoll } from "@/api/client";
+import { logRollAction } from "@/api/client";
 import ConcentrationSaveModal, {
   type PendingConcentrationSave,
 } from "@/features/hitpoints/ConcentrationSaveModal";
@@ -10,7 +10,7 @@ import { RollProvider } from "@/features/dice/RollContext";
 import type { RollResult } from "@/lib/dice";
 
 vi.mock("@/api/client", () => ({
-  logRoll: vi.fn().mockResolvedValue(undefined),
+  logRollAction: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Stub the 3D roller: fire onResult once on mount with a fixed natural d20 (12).
@@ -30,7 +30,7 @@ vi.mock("@/features/dice/DiceRoller", () => ({
   },
 }));
 
-const mockLogRoll = vi.mocked(logRoll);
+const mockLogRoll = vi.mocked(logRollAction);
 
 const save: PendingConcentrationSave = {
   entryId: "entry-1",
@@ -58,9 +58,9 @@ describe("ConcentrationSaveModal session logging", () => {
     screen.getByRole("button", { name: /roll save/i }).click();
 
     await waitFor(() => expect(mockLogRoll).toHaveBeenCalledTimes(1));
-    const [cid, sid, payload] = mockLogRoll.mock.calls[0];
+    const [cid, payload] = mockLogRoll.mock.calls[0];
     expect(cid).toBe("char-1");
-    expect(sid).toBe("sess-1");
+    // No sessionId on the wire — the resolver derives it from the active session (#1861).
     expect(payload).toMatchObject({
       kind: "save",
       ability: "constitution",

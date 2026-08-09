@@ -88,7 +88,7 @@ const EXPECTED_EXPORTS = [
   "joinSession",
   "leaveSession",
   "logout",
-  "logRoll",
+  "logRollAction",
   "patchPreferences",
   "prepareEntityMerge",
   "revertBatch",

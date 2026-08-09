@@ -257,7 +257,7 @@ describe("solo session event tagging", () => {
   });
 });
 
-describe("solo session combat + rolls (existing participant-gated routes)", () => {
+describe("solo session combat + rolls", () => {
   it("logs combat start, round, and a roll on a solo session", async () => {
     const session = await startSoloSession(CHAR_SOLO);
 
@@ -274,10 +274,12 @@ describe("solo session combat + rolls (existing participant-gated routes)", () =
     expect(round.status).toBe(201);
     expect(round.body).toMatchObject({ round: 2, combatActive: true });
 
+    // Standalone roll via the resolve-action logRoll op (#1861), not the retired
+    // /roll route — sessionId is derived from the character's active session.
     const roll = await agent()
-      .post(`/api/characters/${CHAR_SOLO}/sessions/${session.id}/roll`)
-      .send({ kind: "attack", source: "Longsword", total: 17 });
-    expect(roll.status).toBe(201);
+      .post(`/api/characters/${CHAR_SOLO}/resolve-action/transactions`)
+      .send({ operations: [{ type: "logRoll", kind: "attack", source: "Longsword", total: 17 }] });
+    expect(roll.status).toBe(200);
 
     const events = await prisma.characterEvent.findMany({
       where: { characterId: CHAR_SOLO, sessionId: session.id },

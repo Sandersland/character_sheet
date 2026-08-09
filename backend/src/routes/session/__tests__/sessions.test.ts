@@ -255,13 +255,14 @@ describe("end session", () => {
     const sessionId = start.body.session.id as string;
     await agent(cookiePlayer).post(`${startUrl(campaignId)}/${sessionId}/join`).send({ characterId: CHAR_PLAYER });
 
-    // Each participant logs a roll (character-scoped roll route).
+    // Each participant logs a roll (resolve-action logRoll op, #1861 — sessionId
+    // is derived from each character's active session).
     await agent(cookieOwner)
-      .post(`/api/characters/${CHAR_OWNER}/sessions/${sessionId}/roll`)
-      .send({ kind: "attack", source: "Longsword", total: 17 });
+      .post(`/api/characters/${CHAR_OWNER}/resolve-action/transactions`)
+      .send({ operations: [{ type: "logRoll", kind: "attack", source: "Longsword", total: 17 }] });
     await agent(cookiePlayer)
-      .post(`/api/characters/${CHAR_PLAYER}/sessions/${sessionId}/roll`)
-      .send({ kind: "attack", source: "Dagger", total: 14 });
+      .post(`/api/characters/${CHAR_PLAYER}/resolve-action/transactions`)
+      .send({ operations: [{ type: "logRoll", kind: "attack", source: "Dagger", total: 14 }] });
 
     const end = await agent(cookieOwner).post(`${startUrl(campaignId)}/${sessionId}/end`).send({});
     expect(end.status).toBe(200);
@@ -302,22 +303,9 @@ describe("end session", () => {
   });
 });
 
-// ── Combat / roll participant gating ──────────────────────────────────────────
+// ── Combat participant gating ─────────────────────────────────────────────────
 
-describe("combat/roll require an active participant", () => {
-  it("rejects a roll from a character that has not joined the session", async () => {
-    const campaignId = await setupCampaign();
-    const start = await agent(cookieOwner).post(startUrl(campaignId)).send({ characterId: CHAR_OWNER });
-    const sessionId = start.body.session.id as string;
-
-    // CHAR_PLAYER never joined → not a participant.
-    const res = await agent(cookiePlayer)
-      .post(`/api/characters/${CHAR_PLAYER}/sessions/${sessionId}/roll`)
-      .send({ kind: "attack", source: "Dagger", total: 12 });
-    expect(res.status).toBe(409);
-    expect(res.body.error).toMatch(/participant/i);
-  });
-
+describe("combat requires an active participant", () => {
   it("rejects combat/round from a participant who has left", async () => {
     const campaignId = await setupCampaign();
     const start = await agent(cookieOwner).post(startUrl(campaignId)).send({ characterId: CHAR_OWNER });
@@ -328,17 +316,6 @@ describe("combat/roll require an active participant", () => {
       .post(`/api/characters/${CHAR_OWNER}/sessions/${sessionId}/combat/round`)
       .send({ round: 2 });
     expect(res.status).toBe(409);
-  });
-
-  it("accepts a roll from an active participant", async () => {
-    const campaignId = await setupCampaign();
-    const start = await agent(cookieOwner).post(startUrl(campaignId)).send({ characterId: CHAR_OWNER });
-    const sessionId = start.body.session.id as string;
-
-    const res = await agent(cookieOwner)
-      .post(`/api/characters/${CHAR_OWNER}/sessions/${sessionId}/roll`)
-      .send({ kind: "attack", source: "Longsword", total: 17 });
-    expect(res.status).toBe(201);
   });
 });
 
@@ -491,24 +468,31 @@ describe("combat state is server-authoritative", () => {
 });
 
 // ── Roll kinds under the `roll` category (#128) ───────────────────────────────
-
+//
+// Standalone rolls now commit through the resolve-action resolver as a
+// `logRoll` op (#1861), not the retired POST .../roll route — but the persisted
+// event is byte-for-byte the same (category "roll", the same type + `data`
+// shape), which these tests pin. The resolver derives the sessionId from the
+// caller's active session (getActiveSessionId), so an active session is set up
+// per test exactly as before.
 describe("roll kinds log under the `roll` category", () => {
-  async function activeSession(): Promise<string> {
+  async function activeSession(): Promise<void> {
     const campaignId = await setupCampaign();
-    const start = await agent(cookieOwner).post(startUrl(campaignId)).send({ characterId: CHAR_OWNER });
-    return start.body.session.id as string;
+    await agent(cookieOwner).post(startUrl(campaignId)).send({ characterId: CHAR_OWNER });
   }
 
-  const rollUrl = (sessionId: string) =>
-    `/api/characters/${CHAR_OWNER}/sessions/${sessionId}/roll`;
+  const resolveUrl = `/api/characters/${CHAR_OWNER}/resolve-action/transactions`;
+  function logRoll(body: Record<string, unknown>) {
+    return agent(cookieOwner).post(resolveUrl).send({ operations: [{ type: "logRoll", ...body }] });
+  }
 
   it("logs a check roll as type checkRoll under the roll category, with data + null before/after", async () => {
-    const sessionId = await activeSession();
-    const res = await agent(cookieOwner).post(rollUrl(sessionId)).send({
+    await activeSession();
+    const res = await logRoll({
       kind: "check", source: "Athletics", total: 18,
       ability: "strength", skill: "athletics", dc: 15, rollMode: "advantage", faces: [17],
     });
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(200);
 
     const ev = await prisma.characterEvent.findFirst({
       where: { characterId: CHAR_OWNER, type: "checkRoll" },
@@ -524,13 +508,9 @@ describe("roll kinds log under the `roll` category", () => {
   });
 
   it("logs save + initiative rolls under the roll category", async () => {
-    const sessionId = await activeSession();
-    await agent(cookieOwner).post(rollUrl(sessionId)).send({
-      kind: "save", source: "Dexterity save", total: 12, ability: "dexterity", dc: 13,
-    });
-    await agent(cookieOwner).post(rollUrl(sessionId)).send({
-      kind: "initiative", source: "Initiative", total: 19, rollMode: "normal",
-    });
+    await activeSession();
+    await logRoll({ kind: "save", source: "Dexterity save", total: 12, ability: "dexterity", dc: 13 });
+    await logRoll({ kind: "initiative", source: "Initiative", total: 19, rollMode: "normal" });
 
     const save = await prisma.characterEvent.findFirst({ where: { characterId: CHAR_OWNER, type: "saveRoll" } });
     const init = await prisma.characterEvent.findFirst({ where: { characterId: CHAR_OWNER, type: "initiativeRoll" } });
@@ -541,9 +521,9 @@ describe("roll kinds log under the `roll` category", () => {
   });
 
   it("re-homes attack/damage rolls under the roll category", async () => {
-    const sessionId = await activeSession();
-    await agent(cookieOwner).post(rollUrl(sessionId)).send({ kind: "attack", source: "Longsword", total: 17 });
-    await agent(cookieOwner).post(rollUrl(sessionId)).send({ kind: "damage", source: "Longsword", total: 9, damageType: "slashing" });
+    await activeSession();
+    await logRoll({ kind: "attack", source: "Longsword", total: 17 });
+    await logRoll({ kind: "damage", source: "Longsword", total: 9, damageType: "slashing" });
 
     const attack = await prisma.characterEvent.findFirst({ where: { characterId: CHAR_OWNER, type: "attackRoll" } });
     const dmg = await prisma.characterEvent.findFirst({ where: { characterId: CHAR_OWNER, type: "damageRoll" } });
@@ -554,17 +534,17 @@ describe("roll kinds log under the `roll` category", () => {
 
   // #1235: combat-log decomposition fields on the roll event's persisted `data`.
   it("persists verdict/crit flags/modeSources/attackComponents and shares a swingId with its damage event", async () => {
-    const sessionId = await activeSession();
+    await activeSession();
     const modeSources = [{ mode: "disadvantage", kind: "attack", source: "Poisoned" }];
     const attackComponents = { abilityMod: 3, proficiencyBonus: 2, rangedBonus: 0, attackRollBonus: 0 };
     const damageComponents = { abilityMod: 3, meleeDamageBonus: 0 };
 
-    await agent(cookieOwner).post(rollUrl(sessionId)).send({
+    await logRoll({
       kind: "attack", source: "Longsword", total: 8, swingId: "swing-a",
       verdict: "hit", nat20: false, nat1: false, crit: false,
       modeSources, attackComponents,
     });
-    await agent(cookieOwner).post(rollUrl(sessionId)).send({
+    await logRoll({
       kind: "damage", source: "Longsword", total: 6, damageType: "slashing",
       swingId: "swing-a", damageComponents,
     });
@@ -582,9 +562,9 @@ describe("roll kinds log under the `roll` category", () => {
   });
 
   it("gives two unrelated swings distinct swingIds", async () => {
-    const sessionId = await activeSession();
-    await agent(cookieOwner).post(rollUrl(sessionId)).send({ kind: "attack", source: "Longsword", total: 8, swingId: "swing-a" });
-    await agent(cookieOwner).post(rollUrl(sessionId)).send({ kind: "attack", source: "Dagger", total: 12, swingId: "swing-b" });
+    await activeSession();
+    await logRoll({ kind: "attack", source: "Longsword", total: 8, swingId: "swing-a" });
+    await logRoll({ kind: "attack", source: "Dagger", total: 12, swingId: "swing-b" });
 
     const events = await prisma.characterEvent.findMany({ where: { characterId: CHAR_OWNER, type: "attackRoll" }, orderBy: { createdAt: "asc" } });
     expect(events).toHaveLength(2);
@@ -593,8 +573,8 @@ describe("roll kinds log under the `roll` category", () => {
   });
 
   it("never persists target/outcome, even if a caller sends them (#1235 self-or-announce — no enemy/target model)", async () => {
-    const sessionId = await activeSession();
-    await agent(cookieOwner).post(rollUrl(sessionId)).send({
+    await activeSession();
+    await logRoll({
       kind: "attack", source: "Longsword", total: 8,
       target: { name: "Goblin" }, outcome: "dropped",
     });
@@ -603,16 +583,14 @@ describe("roll kinds log under the `roll` category", () => {
     expect(attack!.data).not.toHaveProperty("outcome");
   });
 
-  // #1359: the dropped d20 face of an advantage/disadvantage roll survives
-  // parseRollInput -> logRollEvent all the way to the persisted event data.
+  // #1359: the dropped d20 face of an advantage/disadvantage roll survives the
+  // logRoll op all the way to the persisted event data.
   it("persists droppedFaces on an advantage roll; a normal roll's event has no droppedFaces key", async () => {
-    const sessionId = await activeSession();
-    await agent(cookieOwner).post(rollUrl(sessionId)).send({
+    await activeSession();
+    await logRoll({
       kind: "attack", source: "Longsword", total: 20, faces: [15], droppedFaces: [5], rollMode: "advantage",
     });
-    await agent(cookieOwner).post(rollUrl(sessionId)).send({
-      kind: "attack", source: "Dagger", total: 12, faces: [7],
-    });
+    await logRoll({ kind: "attack", source: "Dagger", total: 12, faces: [7] });
 
     const events = await prisma.characterEvent.findMany({
       where: { characterId: CHAR_OWNER, type: "attackRoll" },
@@ -621,29 +599,29 @@ describe("roll kinds log under the `roll` category", () => {
     expect(events).toHaveLength(2);
     expect(events[0].data).toMatchObject({ faces: [15], droppedFaces: [5] });
     // Unset optional fields persist as JSON null (like `faces`/`swingId`/etc.),
-    // never as an omitted key — see logRollEvent's `rollData` object.
+    // never as an omitted key — see writeStandaloneRollEvent's `data` object.
     expect((events[1].data as { droppedFaces?: unknown }).droppedFaces).toBeNull();
   });
 
   it("rejects an invalid kind, rollMode, or dc with 400", async () => {
-    const sessionId = await activeSession();
-    const badKind = await agent(cookieOwner).post(rollUrl(sessionId)).send({ kind: "perception", source: "x", total: 1 });
+    await activeSession();
+    const badKind = await logRoll({ kind: "perception", source: "x", total: 1 });
     expect(badKind.status).toBe(400);
-    const badMode = await agent(cookieOwner).post(rollUrl(sessionId)).send({ kind: "check", source: "x", total: 1, rollMode: "super" });
+    const badMode = await logRoll({ kind: "check", source: "x", total: 1, rollMode: "super" });
     expect(badMode.status).toBe(400);
-    const badDc = await agent(cookieOwner).post(rollUrl(sessionId)).send({ kind: "save", source: "x", total: 1, dc: "high" });
+    const badDc = await logRoll({ kind: "save", source: "x", total: 1, dc: "high" });
     expect(badDc.status).toBe(400);
   });
 
-  it("keeps roll events non-undoable — reverting a roll batch 409s", async () => {
-    const sessionId = await activeSession();
-    await agent(cookieOwner).post(rollUrl(sessionId)).send({ kind: "check", source: "Athletics", total: 18 });
+  it("makes a standalone roll batch trivially undoable — reverting it succeeds (#1861)", async () => {
+    await activeSession();
+    await logRoll({ kind: "check", source: "Athletics", total: 18 });
     const ev = await prisma.characterEvent.findFirst({
       where: { characterId: CHAR_OWNER, type: "checkRoll" }, select: { batchId: true },
     });
     const res = await agent(cookieOwner)
       .post(`/api/characters/${CHAR_OWNER}/events/${ev!.batchId}/revert`).send({});
-    expect(res.status).toBe(409);
+    expect(res.status).toBe(200);
   });
 });
 

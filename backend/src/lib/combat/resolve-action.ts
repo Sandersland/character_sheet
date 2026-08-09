@@ -3,8 +3,9 @@
  * half of the unified combat-action resolver: a weapon swing or spell cast
  * persists as ONE undoable `CharacterEvent` whose `data` carries the rolls,
  * instead of the separate attackRoll/damageRoll/castSpell rows the old
- * per-domain paths write. Those old paths (logRoll, castSpell) are untouched —
- * this is additive; the frontend adopts resolveAction in slices #1832/#1833.
+ * per-domain paths wrote. The old attack/damage roll-log path is retired
+ * (#1845/#1861 — standalone check/save/initiative/tally rolls now commit here
+ * too via the `logRoll` op arm); the `castSpell` op remains for pre-#1833 callers.
  *
  * The only state delta this slice handles is a leveled spell's slot spend
  * (`slotLevel` on the op) — paid through the same `loadSlotPayContext` +
@@ -31,12 +32,14 @@ import {
 import { castSpellForResolutionInTx, loadSlotPayContext } from "@/lib/spellcasting/spellcasting.js";
 import { snapshotSpellcasting } from "@/lib/spellcasting/spell-state.js";
 import {
-  resolveActionOperationSchema,
+  resolveActionRequestOperationSchema,
   type ResolveActionOperation,
+  type ResolveActionRequestOperation,
 } from "./resolve-action-ops.js";
+import { writeStandaloneRollEvent } from "./standalone-roll-op.js";
 import type { CastSpellOperation } from "@character-sheet/shared-types";
 
-export { resolveActionOperationSchema, type ResolveActionOperation };
+export { resolveActionRequestOperationSchema, type ResolveActionRequestOperation };
 
 // status → the 400 the central `errorHandler` maps (client op-validation error).
 export class InvalidResolveActionOperationError extends Error {
@@ -149,13 +152,20 @@ function summaryFor(op: ResolveActionOperation): string {
  */
 export async function applyResolveActionOperations(
   characterId: string,
-  operations: ResolveActionOperation[],
+  operations: ResolveActionRequestOperation[],
   casterUserId: string,
 ): Promise<void> {
   await runCharacterTransaction(characterId, operations, {
     select: { id: true },
     notFound: (id) => new InvalidResolveActionOperationError(`Character not found: ${id}`),
     applyOp: async ({ tx, op, characterId: id, batchId, sessionId }) => {
+      // Standalone player roll (#1861): a check/save/initiative or tally-damage
+      // roll — no combat cost/side-effects, just its own roll-category event.
+      if (op.type === "logRoll") {
+        await writeStandaloneRollEvent(tx, id, batchId, sessionId, op);
+        return;
+      }
+
       const { before, after } = await payActionCostAndSideEffectsInTx(tx, id, batchId, sessionId, casterUserId, op);
 
       await logEvent(tx, {

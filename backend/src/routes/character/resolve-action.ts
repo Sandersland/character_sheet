@@ -6,13 +6,13 @@ import {
   applyResolveActionOperations,
   InvalidResolveActionOperationError,
   InvalidSpellcastingOperationError,
-  resolveActionOperationSchema,
+  resolveActionRequestOperationSchema,
 } from "@/lib/combat/resolve-action.js";
 
 export const resolveActionRouter = Router({ mergeParams: true });
 
 const transactionsRequestSchema = z.object({
-  operations: z.array(resolveActionOperationSchema).min(1),
+  operations: z.array(resolveActionRequestOperationSchema).min(1),
 });
 
 /**
