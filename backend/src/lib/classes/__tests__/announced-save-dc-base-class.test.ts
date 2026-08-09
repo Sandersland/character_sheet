@@ -94,4 +94,32 @@ describe("deriveAnnouncedSaveDC generalised to base-class rows (#1589)", () => {
     );
     expect(derived?.announcedSaveDC).toBeDefined();
   });
+
+  // combineRowExtras' own comment: within ONE class entry, a base-class row
+  // and its active subclass's row can't both win — subclass wins on a
+  // same-key collision (spreads subclassRows last). No shipped row set hits
+  // this today (Cleric leaves saveDcAbilities unset — cleric-features.ts's
+  // own header), but the precedence is a real, documented design decision
+  // that deserves a runnable proof, not just a comment.
+  it("within a single class entry, an active subclass row's announcedSaveDC wins over a base-class row's (subclass overrides base)", () => {
+    // "fighter"/"battle master" — a REAL registered subclass (unlike
+    // "testbaseclass" above) so `sub.active` actually resolves true at
+    // level 5 (gate 3 in EDITION_2024); an unregistered subclass name would
+    // make isSubclassActive short-circuit false and never read subclassRows.
+    const level = 5;
+    const profBonus = proficiencyBonusForLevel(level);
+    const result = deriveResources(
+      "fighter",
+      "battle master",
+      level,
+      ABILITY_SCORES,
+      profBonus,
+      {
+        classRows: [baseRowWithSaveDc()], // WIS +3 -> DC 8 + prof + 3
+        subclassRows: [{ ...baseRowWithSaveDc(), saveDcAbilities: ["strength", "dexterity"] }], // STR/DEX +0 -> DC 8 + prof + 0
+      },
+      "EDITION_2024",
+    );
+    expect(result?.announcedSaveDC).toBe(8 + profBonus + 0);
+  });
 });

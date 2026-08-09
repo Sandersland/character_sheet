@@ -314,10 +314,12 @@ function deriveRowExtras(
 // already-undefined-when-so) active subclass's row extras (#1589) — subclass
 // wins on a same-key collision, mirroring deriveSubclassClassExtras/
 // mergeLayers' subclass-overrides-base intuition. No shipped row set today
-// populates the SAME field from both halves of one class entry (Cleric's
-// base Turn Undead sets announcedSaveDC; neither Life nor Trickery Domain
-// sets it too), so which side wins is currently untested by production data —
-// documented rather than silently arbitrary.
+// populates the SAME field from both halves of one class entry — the closest
+// candidate would be a future Cleric whose base Turn Undead row activates
+// saveDcAbilities (currently deliberately unset, cleric-features.ts's own
+// header) while an active subclass row also declares one; neither of today's
+// Cleric subclasses (Life, Trickery) does, so which side wins is currently
+// untested by production data — documented rather than silently arbitrary.
 function combineRowExtras(fromClassRows: ClassExtras | undefined, fromSubclassRows: ClassExtras | undefined): ClassExtras | undefined {
   if (!fromClassRows && !fromSubclassRows) return undefined;
   const merged = { ...fromClassRows, ...fromSubclassRows };
