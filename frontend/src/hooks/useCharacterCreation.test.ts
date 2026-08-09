@@ -3,8 +3,8 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 
 import { useCharacterCreation } from "@/hooks/useCharacterCreation";
 import type { CharacterDraft } from "@/hooks/useCharacterDraft";
-import { useItemCatalog } from "@/features/inventory/useItemCatalog";
-import type { ClassOption, ReferenceData } from "@/types/character";
+import { useItemCatalog } from "@/hooks/useItemCatalog";
+import type { ClassOption, Item, ReferenceData } from "@/types/character";
 
 const navigate = vi.fn();
 vi.mock("react-router-dom", () => ({ useNavigate: () => navigate }));
@@ -582,18 +582,26 @@ describe("useCharacterCreation", () => {
     expect(result.current.currentStep).toBe("identity");
   });
 
-  // #1332: useCharacterCreation's item fetch shares catalogKeys.items() with
-  // every other /items reader (useItemCatalog, useCampaignItemsPanelController)
-  // — mounting alongside another consumer in the same session must collapse to
-  // one network call, not one per hook.
-  it("shares the item catalog cache with another /items consumer mounted in the same session", async () => {
+  // #1332: useCharacterCreation's item fetch reuses useItemCatalog, sharing
+  // catalogKeys.items() with every other /items reader
+  // (useCampaignItemsPanelController) — a second consumer mounted AFTER this
+  // one has already resolved must read the cache, not fetch again. Mounting
+  // both concurrently would pass even at staleTime: 0 (TanStack dedupes
+  // simultaneously in-flight requests to the same key regardless of
+  // staleTime), so the second mount happens only once the first has settled —
+  // and to a non-empty resolved value, so the waitFor actually waits for the
+  // fetch rather than matching the pre-resolution [] on tick 0.
+  it("shares the item catalog cache with another /items consumer mounted after it resolves", async () => {
+    const club: Item[] = [{ id: "i1", name: "Club", category: "weapon" } as Item];
+    fetchItems.mockReset().mockResolvedValue(club);
     seedDraft(validDraft());
     const { result } = await mount();
+
+    await waitFor(() => expect(result.current.catalog).toEqual(club));
+    expect(fetchItems).toHaveBeenCalledTimes(1);
+
     const other = renderHook(() => useItemCatalog());
-
-    await waitFor(() => expect(result.current.catalog).toEqual([]));
-    await waitFor(() => expect(other.result.current).toEqual([]));
-
+    expect(other.result.current).toEqual(club);
     expect(fetchItems).toHaveBeenCalledTimes(1);
   });
 });

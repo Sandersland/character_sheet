@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import { addCharacterToCampaign, createCharacter, uploadCharacterPortrait } from "@/api/client";
 import { useToolProficiencyChoices } from "@/features/character-create/useToolProficiencyChoices";
 import type { ToolProficiencyChoices } from "@/features/character-create/useToolProficiencyChoices";
-import { useItemCatalog } from "@/features/inventory/useItemCatalog";
 import {
   buildCreatePayload,
   deriveBackgroundBonuses,
@@ -34,6 +33,7 @@ import type { Item, ReferenceData, SkillName } from "@/types/character";
 import { useCharacterDraft } from "@/hooks/useCharacterDraft";
 import type { CharacterDraft } from "@/hooks/useCharacterDraft";
 import { useDelayedFlag } from "@/hooks/useDelayedFlag";
+import { useItemCatalog } from "@/hooks/useItemCatalog";
 import { useReferenceData } from "@/hooks/useReferenceData";
 
 export interface CharacterCreationSkills extends CreationSkillChoices {
