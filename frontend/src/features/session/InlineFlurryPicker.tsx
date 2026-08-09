@@ -1,12 +1,12 @@
-// The Flurry of Blows sheet (#1217): SRD 5.2 Focus — "Expend 1 Focus Point to
-// make two Unarmed Strikes as a Bonus Action" (three at Heightened Focus, monk
-// L10, #1244 — not yet built). Modeled on InlineOffHandPicker's step-rail
-// shell but looping over `turnState.bonusAttack.total` strikes instead of
-// TWF's fixed single swing: forms is always [Unarmed Strike]
-// (buildUnarmedOnlyForms), so AttackStepCard's "Attacking with" selector never
-// renders — no weapon toggle, matching the 2024 rule (unlike the pre-#1217
-// generic attack-picker this replaced). The roll/miss/crit/skip/next wiring is
-// shared with InlineOffHandPicker via useBonusAttackSheet.
+// The Flurry of Blows sheet (#1217, rewired onto the shared resolver #1845):
+// SRD 5.2 Focus — "Expend 1 Focus Point to make two Unarmed Strikes as a
+// Bonus Action" (three at Heightened Focus, monk L10, #1244 — not yet built).
+// Modeled on InlineOffHandPicker's rail shell but looping over
+// `turnState.bonusAttack.total` strikes instead of TWF's fixed single swing:
+// forms is always [Unarmed Strike] (buildUnarmedOnlyForms), so there is no
+// weapon toggle — matching the 2024 rule (unlike the pre-#1217 generic
+// attack-picker this replaced). The roll/commit wiring is shared with
+// InlineOffHandPicker via useBonusAttackSheet.
 //
 // The 1 Focus spend is deferred to the first strike roll (onCommitFocusSpend,
 // wired to useBonusAttackSheet's onFirstStrike) rather than fired when the
@@ -19,9 +19,10 @@ import { useIsBelowMd } from "@/hooks/useIsBelowMd";
 
 import RollModeChoice from "@/features/dice/RollModeChoice";
 import type { RollMode } from "@/lib/dice";
-import { attacksExhausted as computeAttacksExhausted, buildUnarmedOnlyForms } from "@/lib/attackMath";
+import { buildUnarmedOnlyForms, flurryStrikeCount } from "@/lib/attackMath";
 import { useBonusAttackSheet } from "@/features/session/useBonusAttackSheet";
-import AttackStepCard, { AttackKickerPips } from "@/features/session/AttackStepCard";
+import ResolutionRail from "@/features/session/ResolutionRail";
+import { AttackKickerPips, DamageRidersPanel } from "@/features/session/railPrimitives";
 import AttackSheetFooter from "@/features/session/AttackSheetFooter";
 import OpenHandTechniqueSection from "@/features/session/OpenHandTechniqueSection";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
@@ -29,8 +30,6 @@ import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 
 interface InlineFlurryPickerProps {
   turnState: TurnState & TurnStateActions;
-  /** Active session id — attack/damage rolls are logged against it. */
-  sessionId: string;
   /** Commit and dismiss (bonus action already spent on open; Focus was spent on the first strike, if any). */
   onClose: () => void;
   /** Back out before rolling any strike — refunds the bonus action. No Focus is spent yet, so there's nothing to refund there. */
@@ -43,7 +42,6 @@ interface InlineFlurryPickerProps {
 
 export default function InlineFlurryPicker({
   turnState,
-  sessionId,
   onClose,
   onCancel,
   onLogChanged,
@@ -56,35 +54,23 @@ export default function InlineFlurryPicker({
   const forms = buildUnarmedOnlyForms(character);
   const entry = forms[0];
   const attack = turnState.bonusAttack;
-  const attacksExhausted = computeAttacksExhausted(attack);
+  const totalSwings = attack?.total ?? flurryStrikeCount(character);
 
-  const {
-    currentRow,
-    riderTotals,
-    viewFor,
-    boundView,
-    handleRollToHit,
-    handleCallMiss,
-    handleCallCrit,
-    handleSkip,
-    handleNext,
-    tallyStrip,
-    maneuversDisclosure,
-  } = useBonusAttackSheet({
-    character,
-    turnState,
-    sessionId,
-    entry,
-    recordAttack: turnState.recordFlurryAttack,
-    attacksExhausted,
-    onFirstStrike: onCommitFocusSpend,
-    onLogChanged,
-    manualMode: attackMode,
-  });
+  const { currentRow, resolutionView, riderTotals, onDamageRider, completedSwings, tallyStrip, maneuversDisclosure } =
+    useBonusAttackSheet({
+      character,
+      turnState,
+      entry,
+      totalSwings,
+      record: turnState.recordFlurryAttack,
+      onFirstStrike: onCommitFocusSpend,
+      onLogChanged,
+      manualMode: attackMode,
+    });
 
   const isMobile = useIsBelowMd();
 
-  const openHandTechnique = boundView && (
+  const openHandTechnique = currentRow && (
     <OpenHandTechniqueSection turnState={turnState} currentRow={currentRow} />
   );
 
@@ -97,28 +83,29 @@ export default function InlineFlurryPicker({
     </div>
   );
   const stepCard = (
-    <AttackStepCard
-      forms={forms}
-      selectedId={entry.id}
-      onSelect={() => {}}
-      selectedView={viewFor(entry)}
-      boundView={boundView}
-      currentRow={currentRow}
-      attack={attack}
-      attacksExhausted={attacksExhausted}
-      onRollToHit={handleRollToHit}
-      onCallMiss={handleCallMiss}
-      onCallCrit={handleCallCrit}
-      onSkip={handleSkip}
-      onNext={handleNext}
-      riderTotals={riderTotals}
-      showKicker={isMobile}
-    />
+    <div className="flex flex-col gap-2">
+      {isMobile && <AttackKickerPips attack={attack} />}
+      <ResolutionRail view={resolutionView} />
+      <DamageRidersPanel
+        resolutionView={resolutionView}
+        armedEntry={entry}
+        riderTotals={riderTotals}
+        onDamageRider={onDamageRider}
+      />
+    </div>
   );
+  // Mirrors InlineAttackPicker's own footer-timing comment: keyed off
+  // `completedSwings` (only advances once a strike's resolveAction commit
+  // lands), NOT `turnState.bonusAttack.used` — that counter ticks the
+  // instant to-hit rolls (the tally bridge's own `record` call), which would
+  // otherwise show the footer's OWN "Done"/"Close" one beat ahead of
+  // ResolutionRail's completion tap for the strike still in flight.
+  const preRoll = completedSwings === 0 && !resolutionView.toHitRoll;
+  const attacksRemain = !preRoll && completedSwings < totalSwings;
   const footer = (
     <AttackSheetFooter
-      preRoll={attack !== null && attack.used === 0}
-      attacksRemain={attack !== null && attack.used > 0 && attack.used < attack.total}
+      preRoll={preRoll}
+      attacksRemain={attacksRemain}
       onCancel={onCancel}
       onClose={onClose}
       refundLabel="Cancel — refund bonus action"

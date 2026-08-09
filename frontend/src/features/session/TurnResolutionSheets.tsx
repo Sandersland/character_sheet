@@ -141,7 +141,6 @@ function AttackResolutionSheet({
 }
 
 function TwfResolutionSheet({
-  sessionId,
   turnState,
   activeResolution,
   closeResolution,
@@ -149,7 +148,6 @@ function TwfResolutionSheet({
   onLogChanged,
 }: Pick<
   TurnResolutionSheetsProps,
-  | "sessionId"
   | "turnState"
   | "activeResolution"
   | "closeResolution"
@@ -172,7 +170,6 @@ function TwfResolutionSheet({
     >
       <InlineOffHandPicker
         turnState={turnState}
-        sessionId={sessionId}
         variant={isUnarmed ? "unarmed" : "twf"}
         onClose={closeResolution}
         onCancel={() => {
@@ -197,7 +194,6 @@ function TwfResolutionSheet({
 // generic click path uses elsewhere, just wired as InlineFlurryPicker's
 // onCommitFocusSpend so a pre-roll cancel truly costs nothing.
 function FlurryResolutionSheet({
-  sessionId,
   turnState,
   closeResolution,
   setShowBonusMenu,
@@ -205,7 +201,6 @@ function FlurryResolutionSheet({
   send,
 }: Pick<
   TurnResolutionSheetsProps,
-  | "sessionId"
   | "turnState"
   | "closeResolution"
   | "setShowBonusMenu"
@@ -230,7 +225,6 @@ function FlurryResolutionSheet({
     >
       <InlineFlurryPicker
         turnState={turnState}
-        sessionId={sessionId}
         onClose={closeFlurrySheet}
         onCancel={() => {
           turnState.cancelFlurry();
