@@ -26,7 +26,7 @@ import { weaponToResolution } from "@/lib/weaponToResolution";
 import { useRoll } from "@/features/dice/RollContext";
 import { useAttackTallyBridge } from "@/features/session/useAttackTallyBridge";
 import { useManeuverDie } from "@/features/session/useManeuverDie";
-import { buildManeuverView } from "@/features/session/maneuverViewBridge";
+import { buildManeuverView, MANEUVER_DAMAGE_RIDER_ID } from "@/features/session/maneuverViewBridge";
 import { INERT_RESOLUTION_CONSUMERS, useResolution } from "@/features/session/useResolution";
 import type { ResolutionRolls, ResolutionTurnState, ResolutionView } from "@/features/session/useResolution";
 import { riderTotalsOf, useResolveActionCommit } from "@/features/session/useResolveActionCommit";
@@ -214,7 +214,9 @@ function useBonusResolution({
     if (currentRow) turnState.addTallyDamageRider(currentRow.id, result.total);
   }
 
-  const maneuverView = buildManeuverView(resolutionView, armedEntry, currentRow, turnState);
+  const maneuverView = buildManeuverView(resolutionView, armedEntry, currentRow, turnState, (effect) =>
+    setLocal((s) => ({ ...s, riderEffects: { ...s.riderEffects, [MANEUVER_DAMAGE_RIDER_ID]: effect } })),
+  );
 
   return {
     currentRow,

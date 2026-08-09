@@ -136,6 +136,11 @@ export interface ResolutionView {
   /** "Crit!" — refused when already die-locked to crit or miss. */
   onCallCrit: () => void;
   onRollEffect: () => void;
+  /** External to-hit booster seam (#1844): a Precision Attack maneuver adds
+   *  `delta` (its spent superiority die) to the committed to-hit total AFTER
+   *  the d20 lands. Folds into the persisted event, not just the tally; inert
+   *  once completed. */
+  boostToHit: (delta: number) => void;
   /** The one completion tap: spends the economy, fires `commit`, and marks
    *  `completed`. No-ops when `disabled`, already `completed`, or not yet
    *  `readyToComplete`. */
@@ -184,7 +189,11 @@ function isDieLocked(attack: TallyAttackRoll): boolean {
   return attack.criticalHit || attack.nat1;
 }
 
-function buildToHitEvent(state: ToHitState, descriptor: NonNullable<TurnResolution["toHit"]>): ResolveActionEventToHit {
+function buildToHitEvent(
+  state: ToHitState,
+  descriptor: NonNullable<TurnResolution["toHit"]>,
+  boost: number,
+): ResolveActionEventToHit {
   const verdict = state.verdict;
   if (verdict === undefined) {
     throw new Error("useResolution: buildToHitEvent called before the verdict settled");
@@ -196,9 +205,11 @@ function buildToHitEvent(state: ToHitState, descriptor: NonNullable<TurnResoluti
     // `descriptor.bonus` alone omits the roll-mode flat modifier (exhaustion,
     // #1136) that was folded into the actual die roll — adding `state.modifier`
     // keeps `bonus` the true resolved flat total added to the die, per
-    // ResolveActionEventToHit's contract (kept + bonus === total).
-    bonus: descriptor.bonus + state.modifier,
-    total: state.result.total,
+    // ResolveActionEventToHit's contract (kept + bonus === total). `boost`
+    // (#1844) is an external booster's post-roll addend (Precision Attack's
+    // superiority die), added to BOTH sides so that contract still holds.
+    bonus: descriptor.bonus + state.modifier + boost,
+    total: state.result.total + boost,
     verdict,
     ...(descriptor.components ? { components: descriptor.components } : {}),
   };
@@ -232,6 +243,11 @@ export function useResolution({
 
   const [toHitState, setToHitState] = useState<ToHitState | null>(null);
   const [effectRoll, setEffectRoll] = useState<RollResult | null>(null);
+  // External to-hit addend (#1844): a Precision Attack maneuver spends its
+  // superiority die AFTER the d20 lands, then boosts the committed roll through
+  // `boostToHit`. Held here so `buildToHitEvent` folds it into the audit event,
+  // not just the transient tally.
+  const [toHitBoost, setToHitBoost] = useState(0);
   const [completed, setCompleted] = useState(false);
   const actionIdRef = useRef(randomId());
 
@@ -296,6 +312,15 @@ export function useResolution({
     resolveImplicitHit();
   }
 
+  // The external booster seam (#1844): a maneuver adapter adds its spent die
+  // to the committed to-hit total after the d20 lands. Inert once the roll is
+  // committed (`completed`) or the slot is unavailable — matches every other
+  // handler here, so a late tap can't rewrite a persisted event.
+  function boostToHit(delta: number) {
+    if (disabled || completed) return;
+    setToHitBoost((b) => b + delta);
+  }
+
   function onComplete() {
     if (disabled || completed || !readyToComplete) return;
     // `commit` runs BEFORE the spend/complete side effects — a throwing
@@ -303,7 +328,7 @@ export function useResolution({
     // out a retry (the caller can catch and let the player try again).
     commit({
       actionId: actionIdRef.current,
-      toHit: resolution.toHit && toHitState ? buildToHitEvent(toHitState, resolution.toHit) : null,
+      toHit: resolution.toHit && toHitState ? buildToHitEvent(toHitState, resolution.toHit, toHitBoost) : null,
       save: resolution.save ?? null,
       effect: resolution.effect && effectRoll ? buildEffectEvent(effectRoll, resolution.effect, isCrit) : null,
     });
@@ -314,6 +339,7 @@ export function useResolution({
   function reset() {
     setToHitState(null);
     setEffectRoll(null);
+    setToHitBoost(0);
     setCompleted(false);
     actionIdRef.current = randomId();
   }
@@ -338,6 +364,7 @@ export function useResolution({
     onCallMiss,
     onCallCrit,
     onRollEffect,
+    boostToHit,
     onComplete,
   };
 

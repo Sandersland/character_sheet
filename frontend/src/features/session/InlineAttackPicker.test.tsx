@@ -604,15 +604,15 @@ describe("InlineAttackPicker — 'it Missed' re-arms the next attack (#811)", ()
   });
 });
 
-// #809/#1831 review: ManeuversDisclosure still reads useResolution's live
-// roll state (toHitRoll/effectRoll) via a small local compat object, not
-// useAttackRolls — the Precision Attack boost still shows and writes the
-// tally row's displayed total (the KNOWN GAP: it does not retroactively
-// change the already-built resolveAction op).
-describe("InlineAttackPicker — Precision Attack under the attack card (#809)", () => {
+// #809/#1831 review: ManeuversDisclosure reads useResolution's live roll state
+// (toHitRoll/effectRoll) via buildManeuverView, not useAttackRolls. As of #1844
+// the maneuver boost also reaches the committed resolveAction op — the Precision
+// (to-hit) half through useResolution's boostToHit seam, the damage half through
+// the existing riders[] seam (#1843) — so the audit log matches the tally.
+describe("InlineAttackPicker — Precision Attack under the attack card (#809, boost logged #1844)", () => {
   const SERVER_ROLL = 5;
 
-  function battleMaster(): Character {
+  function battleMaster(maneuversKnown: Array<Record<string, unknown>>): Character {
     return makeCharacter({
       attackRows: [
         weaponRow("Longsword", "inv-1", {
@@ -626,22 +626,23 @@ describe("InlineAttackPicker — Precision Attack under the attack card (#809)",
         pools: [
           { key: "superiorityDice", label: "Superiority Dice", die: "d8", total: 4, recharge: "shortRest", used: 0, remaining: 4 },
         ],
-        maneuversKnown: [
-          { id: "m-precision", name: "Precision Attack", description: "Add to the attack roll.", placement: "attackRoll" },
-        ],
+        maneuversKnown,
       },
     } as unknown as Character);
   }
+
+  const PRECISION = { id: "m-precision", name: "Precision Attack", description: "Add to the attack roll.", placement: "attackRoll" };
+  const TRIP = { id: "m-trip", name: "Trip Attack", description: "Add to the damage roll.", placement: "damageRoll" };
 
   it("spending Precision after a to-hit boosts the result line and the tally row", async () => {
     const user = userEvent.setup();
     seedMid(); // d20 face 11 → non-crit, non-miss
     vi.mocked(castManeuverTransaction).mockResolvedValue({
-      character: battleMaster(),
+      character: battleMaster([PRECISION]),
       results: [{ roll: SERVER_ROLL, saveDc: 15, summary: "used Precision Attack" }],
     } as unknown as Awaited<ReturnType<typeof castManeuverTransaction>>);
 
-    const character = battleMaster();
+    const character = battleMaster([PRECISION]);
     renderWithCharacter(<LiveHarness character={character} />, character);
 
     // 11 (d20) + 5 (attackBonus) = 16 to hit.
@@ -653,5 +654,56 @@ describe("InlineAttackPicker — Precision Attack under the attack card (#809)",
 
     // 16 + 5 (superiority die) = 21 everywhere the tally reads it.
     await waitFor(() => expect(screen.getAllByText("21").length).toBeGreaterThanOrEqual(1));
+  });
+
+  it("logs the Precision boost in the committed op's toHit total, not just the tally (#1844)", async () => {
+    const user = userEvent.setup();
+    seedMid();
+    vi.mocked(castManeuverTransaction).mockResolvedValue({
+      character: battleMaster([PRECISION]),
+      results: [{ roll: SERVER_ROLL, saveDc: 15, summary: "used Precision Attack" }],
+    } as unknown as Awaited<ReturnType<typeof castManeuverTransaction>>);
+
+    const character = battleMaster([PRECISION]);
+    renderWithCharacter(<LiveHarness character={character} />, character);
+
+    await user.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    await user.click(screen.getByRole("button", { name: /Battle Master maneuvers/ }));
+    await user.click(screen.getByRole("button", { name: /Precision Attack/ }));
+    await waitFor(() => expect(screen.getAllByText("21").length).toBeGreaterThanOrEqual(1));
+
+    await user.click(screen.getByRole("button", { name: /^Roll damage$/ }));
+    await user.click(screen.getByRole("button", { name: /^Done$/ }));
+
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(1));
+    const [, ops] = vi.mocked(applyResolveActionOperations).mock.calls[0];
+    // 11 (kept) + 5 (weapon) + 5 (Precision die) = 21; kept + bonus === total.
+    expect(ops[0].toHit).toMatchObject({ kept: 11, bonus: 10, total: 21 });
+  });
+
+  it("logs a damage maneuver's die as a rider on the committed op (#1844)", async () => {
+    const user = userEvent.setup();
+    seedMid();
+    vi.mocked(castManeuverTransaction).mockResolvedValue({
+      character: battleMaster([TRIP]),
+      results: [{ roll: SERVER_ROLL, saveDc: 15, summary: "used Trip Attack" }],
+    } as unknown as Awaited<ReturnType<typeof castManeuverTransaction>>);
+
+    const character = battleMaster([TRIP]);
+    renderWithCharacter(<LiveHarness character={character} />, character);
+
+    await user.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    await user.click(screen.getByRole("button", { name: /^Roll damage$/ }));
+    await user.click(screen.getByRole("button", { name: /Battle Master maneuvers/ }));
+    await user.click(screen.getByRole("button", { name: /Trip Attack/ }));
+    // The die (5) lands on the damage tally row before completion.
+    await waitFor(() => expect(vi.mocked(castManeuverTransaction)).toHaveBeenCalled());
+
+    await user.click(screen.getByRole("button", { name: /^Done$/ }));
+
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(1));
+    const [, ops] = vi.mocked(applyResolveActionOperations).mock.calls[0];
+    expect(ops[0].riders).toHaveLength(1);
+    expect(ops[0].riders?.[0]).toMatchObject({ type: "slashing", kind: "damage", total: SERVER_ROLL });
   });
 });

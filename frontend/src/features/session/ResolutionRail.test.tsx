@@ -27,6 +27,7 @@ function baseView(overrides: Partial<ResolutionView> = {}): ResolutionView {
     onCallMiss: vi.fn(),
     onCallCrit: vi.fn(),
     onRollEffect: vi.fn(),
+    boostToHit: vi.fn(),
     onComplete: vi.fn(),
     ...overrides,
   };
