@@ -40,6 +40,16 @@ describe("weaponToResolution", () => {
     });
   });
 
+  it("defaults to an action-cost descriptor when no cost kind is given", () => {
+    const resolution = weaponToResolution(LONGBOW, 20, 1);
+    expect(resolution.cost.kind).toBe("action");
+  });
+
+  it("builds a bonusAction-cost descriptor for a bonus-action swing (off-hand/Flurry, #1845)", () => {
+    const resolution = weaponToResolution(LONGBOW, 20, 1, "bonusAction");
+    expect(resolution.cost).toEqual({ kind: "bonusAction", attacks: 1 });
+  });
+
   it("populates toHit.components and effect.components from the served decomposition (#1830 review)", () => {
     const resolution = weaponToResolution(LONGBOW, 20, 1);
 

@@ -11,7 +11,7 @@
 // (#1830 review).
 
 import type { AttackEntry } from "@/lib/attackMath";
-import type { TurnResolution } from "@character-sheet/shared-types";
+import type { TurnResolution, TurnResolutionCostKind } from "@character-sheet/shared-types";
 
 /**
  * @param entry the armed weapon/unarmed/improvised form (buildAttackForms).
@@ -19,11 +19,20 @@ import type { TurnResolution } from "@character-sheet/shared-types";
  * @param attacks Extra Attack count (`Character.attacksPerAction`) — carried
  *   on `cost.attacks` for the picker's own multi-swing loop to read; useResolution
  *   itself never branches on it (the loop lives in the driving component).
+ * @param costKind which economy slot the swing spends — `"action"` (default,
+ *   the main Attack sheet) or `"bonusAction"` for the off-hand/Flurry single-
+ *   swing bonus pickers (#1845), which reuse this same builder rather than a
+ *   second copy.
  */
-export function weaponToResolution(entry: AttackEntry, critRange: number, attacks: number): TurnResolution {
+export function weaponToResolution(
+  entry: AttackEntry,
+  critRange: number,
+  attacks: number,
+  costKind: TurnResolutionCostKind = "action",
+): TurnResolution {
   return {
     source: entry.name,
-    cost: { kind: "action", attacks },
+    cost: { kind: costKind, attacks },
     toHit: {
       bonus: entry.attackSpec.modifier,
       critRange,
