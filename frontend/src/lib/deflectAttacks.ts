@@ -18,11 +18,9 @@
  * Deflect Energy threshold client-side, which is now resolved server-side
  * onto the deflectAttacks row's `damageTypeClause`).
  *
- * The base reduction's scaling variable is "Monk level"
- * (`classEntryLevel(character, "monk")`), not total character level —
- * PHB'14 *Deflect Missiles* ("1d10 + your Dexterity modifier + your monk
- * level") and SRD 5.2 *Deflect Attacks* ("1d10 plus your Dexterity modifier
- * and Monk level") agree; the reduction formula is edition-invariant (#1441).
+ * The reduction/redirect roll specs are resolved server-side
+ * (`deriveDeflectSpec`, #1435); `classEntryLevel` is read here only for the
+ * "monk level N" display string in formatDeflectAttacksMessage.
  */
 
 import { abilityModifier, formatModifier } from "@/lib/abilities";
