@@ -81,10 +81,6 @@ export default function ClassChoiceStep({
   onContinue: (target: LevelUpTarget) => void;
   onCancel: () => void;
 }) {
-  // Memoized (dep: options) so useRovingRadioGroup's isDisabled/onSelect
-  // callbacks below stay referentially stable across renders that don't
-  // change `options` -- an inline Array.filter here busted every
-  // useCallback inside the hook on every render (claude-review on #1865).
   const existingOptions = useMemo(() => options.filter((o) => o.target.kind === "existing"), [options]);
   const newOptions = useMemo(() => options.filter((o) => o.target.kind === "new"), [options]);
 

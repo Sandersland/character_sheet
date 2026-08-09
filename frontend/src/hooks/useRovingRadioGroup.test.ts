@@ -65,10 +65,6 @@ describe("useRovingRadioGroup", () => {
       expect(result.current.tabIndexFor(2)).toBe(-1);
     });
 
-    // claude-review on #1865: with every OTHER option disabled, the scan
-    // wraps all the way back to `from` -- which is itself enabled -- and
-    // returned it as a "next" index, so arrow keys fired a redundant
-    // onSelect(from) on every keypress instead of doing nothing.
     it("arrow navigation does not call onSelect when the current option is the only enabled one", () => {
       const onSelect = vi.fn();
       const isDisabled = (i: number) => i !== 1;
@@ -105,10 +101,6 @@ describe("useRovingRadioGroup", () => {
       expect(onSelect).toHaveBeenCalledWith(1);
     });
 
-    // claude-review on #1865: preventDefault sat after the "nothing to move
-    // to" guard, so Home/End on an all-disabled group fell through to the
-    // browser's default (scroll the page to top/bottom) instead of being
-    // swallowed the way the pre-#1324 Segmented handler always did.
     it("Home still prevents the browser default when every option is disabled", () => {
       const onSelect = vi.fn();
       const isDisabled = () => true;
@@ -120,9 +112,6 @@ describe("useRovingRadioGroup", () => {
     });
   });
 
-  // claude-review on #1865: itemRef(index) returned a brand-new closure on
-  // every call, so React detached and reattached every button's ref on each
-  // render (null -> element) even though nothing about that index changed.
   it("itemRef returns the same function reference for the same index across renders", () => {
     const { result, rerender } = renderHook(() => useRovingRadioGroup(3, 0, vi.fn()));
     const first = result.current.itemRef(1);

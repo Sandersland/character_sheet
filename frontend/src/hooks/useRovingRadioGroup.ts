@@ -24,7 +24,7 @@ const noneDisabled = () => false;
  * the first/last enabled option.
  *
  * `isDisabled` is optional -- omitting it keeps every option eligible for
- * navigation, identical to the pre-#1324 behavior.
+ * navigation.
  */
 export function useRovingRadioGroup(
   count: number,
@@ -71,11 +71,6 @@ export function useRovingRadioGroup(
     [checkedIndex, isDisabled, firstEnabled],
   );
 
-  // Steps from `from` in `delta` direction, wrapping, until it lands on a
-  // *different* enabled option; returns -1 if the scan completes a full
-  // cycle back to `from` (every other option is disabled -- `from` itself
-  // being enabled is not a valid destination, or the moveFocus/onSelect call
-  // it triggers would be a no-op that still fires on every keypress).
   const step = useCallback(
     (from: number, delta: 1 | -1): number => {
       let next = from;
@@ -112,9 +107,6 @@ export function useRovingRadioGroup(
       else if (e.key === "End") next = lastEnabled();
       else return;
 
-      // Unconditional once the key is recognized, matching the pre-#1324
-      // Segmented handler -- Home/End have a real default (scroll the page)
-      // that must be swallowed even when there's nowhere to move.
       e.preventDefault();
       if (next < 0) return; // no other enabled option to move to
       moveFocus(next);
