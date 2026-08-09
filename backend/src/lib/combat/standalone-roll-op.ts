@@ -50,7 +50,9 @@ const positiveFaces = z.array(z.number().int().positive());
 export const standaloneRollOperationSchema = z.object({
   type: z.literal("logRoll"),
   kind: z.enum(["attack", "damage", "check", "save", "initiative"]),
-  source: z.string().trim().min(1),
+  // Written verbatim into the durable log (as the summary AND `data.source`) —
+  // bounded like modeSource.source below to keep a caller from inflating it.
+  source: z.string().trim().min(1).max(200),
   total: z.number().finite(),
   specLabel: z.string().optional(),
   damageType: z.string().optional(),

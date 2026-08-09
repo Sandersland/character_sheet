@@ -3,8 +3,9 @@
  * half of the unified combat-action resolver: a weapon swing or spell cast
  * persists as ONE undoable `CharacterEvent` whose `data` carries the rolls,
  * instead of the separate attackRoll/damageRoll/castSpell rows the old
- * per-domain paths write. Those old paths (logRoll, castSpell) are untouched —
- * this is additive; the frontend adopts resolveAction in slices #1832/#1833.
+ * per-domain paths wrote. The old attack/damage roll-log path is retired
+ * (#1845/#1861 — standalone check/save/initiative/tally rolls now commit here
+ * too via the `logRoll` op arm); the `castSpell` op remains for pre-#1833 callers.
  *
  * The only state delta this slice handles is a leveled spell's slot spend
  * (`slotLevel` on the op) — paid through the same `loadSlotPayContext` +
