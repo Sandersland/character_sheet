@@ -71,9 +71,9 @@ function sneakAttackRider(classEntries: { name: string; level: number }[]): Dice
 }
 
 // Stunning Strike: the focus save DC, undefined below the gate. Scales with
-// the monk class entry's own level, gated through stunning-strike.ts's
-// hasStunningStrike (#1337: the single source of the L5 threshold, also
-// consumed by that module's own cast guard).
+// the monk class entry's own level, gated through hasStunningStrike (#1337:
+// the single source of the L5 threshold, also consumed by that module's own
+// cast guard).
 function stunningStrikeRider(
   classEntries: { name: string; level: number }[],
   abilityScores: Record<string, number>,
@@ -104,9 +104,9 @@ function openHandMonkEntry(classEntries: RiderClassEntry[]): RiderClassEntry | u
 // Open Hand Technique (Warrior of the Open Hand L3, #1245): the focus save DC
 // for the Push/Topple riders, undefined off-subclass or below the gate. Addle
 // carries no save, but the shape stays uniform (saveDC is always present once
-// unlocked). Gated through open-hand-technique.ts's hasOpenHandTechnique
-// (#1337: the single source of the L3 threshold, also consumed by that
-// module's own cast guard) — live-play automation lives in that module too.
+// unlocked). Gated through hasOpenHandTechnique (#1337: the single source of
+// the L3 threshold, also consumed by that module's own cast guard) —
+// live-play automation lives in that module too.
 function openHandTechniqueRider(
   classEntries: RiderClassEntry[],
   abilityScores: Record<string, number>,
@@ -120,8 +120,8 @@ function openHandTechniqueRider(
 // the Con-save trigger, plus whether vibrations are currently set (the
 // activeEffects buff registry's inert QUIVERING_PALM_BUFF_KEY marker — see
 // quivering-palm.ts's header for why a buff, not new persisted state). Gated
-// through quivering-palm.ts's hasQuiveringPalm (#1337: the single source of
-// the L17 threshold, also consumed by that module's own cast guard).
+// through hasQuiveringPalm (#1337: the single source of the L17 threshold,
+// also consumed by that module's own cast guard).
 function quiveringPalmRider(
   classEntries: RiderClassEntry[],
   abilityScores: Record<string, number>,

@@ -13,6 +13,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { readPinnedEvents } from "@/test-support/events.js";
 import { authCookie } from "@/test-support/auth.js";
+import { QUIVERING_PALM_LEVEL } from "@/lib/classes/quivering-palm.js";
 
 const OWNER_ID = "owner-quivering-palm";
 let COOKIE: string;
@@ -252,21 +253,21 @@ describe("Quivering Palm for a 2014 Way of the Open Hand monk (#1501)", () => {
   });
 });
 
-// #1337: hasQuiveringPalm (quivering-palm.ts) is the single source of the L17
-// gate — both the serialized rider and this route's cast guard read it.
-// Proven with a Fighter/Warrior-of-the-Open-Hand multiclass whose TOTAL
-// character level is held CONSTANT across the two fixtures (18 both times) —
-// only the monk entry's own level moves (16 -> 17), so the assertion cannot
-// pass on `character.level`.
+// #1337: hasQuiveringPalm is the single source of the L17 gate — both the
+// serialized rider and this route's cast guard read it. Proven with a
+// Fighter/Warrior-of-the-Open-Hand multiclass whose TOTAL character level is
+// held CONSTANT across the two fixtures — only the monk entry's own level
+// moves across the gate, so the assertion cannot pass on `character.level`.
 describe("Quivering Palm multiclass entry-scoping (#1337)", () => {
   const MULTICLASS_ID = "test-quivering-palm-multiclass-1";
   const multiclassUrl = `/api/characters/${MULTICLASS_ID}/abilities/quivering-palm/transactions`;
+  // Arbitrary total held constant across both fixtures below (must exceed
+  // QUIVERING_PALM_LEVEL so the "below the gate" fixture's fighter level
+  // stays positive).
+  const TOTAL_LEVEL = 18;
 
   afterEach(async () => {
     await prisma.character.deleteMany({ where: { id: MULTICLASS_ID } });
-  });
-  afterAll(async () => {
-    await prisma.characterClass.deleteMany({ where: { name: CLASS_NAME } });
   });
 
   async function createFighterMonk(fighterLevel: number, monkLevel: number) {
@@ -288,8 +289,9 @@ describe("Quivering Palm multiclass entry-scoping (#1337)", () => {
     });
   }
 
-  it("Fighter 2 / Monk(Open Hand) 16 [total 18]: no Quivering Palm rider, and the guard rejects", async () => {
-    await createFighterMonk(2, 16);
+  it("Fighter/Monk(Open Hand) below the gate [total level held constant]: no Quivering Palm rider, and the guard rejects", async () => {
+    const monkLevel = QUIVERING_PALM_LEVEL - 1;
+    await createFighterMonk(TOTAL_LEVEL - monkLevel, monkLevel);
 
     const character = await agent().get(`/api/characters/${MULTICLASS_ID}`);
     expect(character.body).not.toHaveProperty("quiveringPalm");
@@ -299,8 +301,9 @@ describe("Quivering Palm multiclass entry-scoping (#1337)", () => {
     expect(guard.body.error).toMatch(/open hand/i);
   });
 
-  it("Fighter 1 / Monk(Open Hand) 17 [total 18]: the Quivering Palm rider is present, and the guard admits", async () => {
-    await createFighterMonk(1, 17);
+  it("Fighter/Monk(Open Hand) at the gate [total level held constant]: the Quivering Palm rider is present, and the guard admits", async () => {
+    const monkLevel = QUIVERING_PALM_LEVEL;
+    await createFighterMonk(TOTAL_LEVEL - monkLevel, monkLevel);
 
     const character = await agent().get(`/api/characters/${MULTICLASS_ID}`);
     expect(character.body).toHaveProperty("quiveringPalm");

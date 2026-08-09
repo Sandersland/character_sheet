@@ -15,6 +15,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { readPinnedEvents } from "@/test-support/events.js";
 import { authCookie } from "@/test-support/auth.js";
+import { STUNNING_STRIKE_LEVEL } from "@/lib/classes/stunning-strike.js";
 
 const OWNER_ID = "owner-stunning-strike";
 let COOKIE: string;
@@ -278,19 +279,16 @@ describe("Stunning Strike for a non-monk", () => {
   });
 });
 
-// #1337: hasStunningStrike (stunning-strike.ts) is the single source of the
-// L5 gate — both the serialized rider and this route's cast guard read it.
-// Proven with a Fighter/Monk multiclass, where the monk class ENTRY's own
-// level (not the derived total character level) decides the gate.
+// #1337: hasStunningStrike is the single source of the L5 gate — both the
+// serialized rider and this route's cast guard read it. Proven with a
+// Fighter/Monk multiclass, where the monk class ENTRY's own level (not the
+// derived total character level) decides the gate.
 describe("Stunning Strike multiclass entry-scoping (#1337)", () => {
   const MULTICLASS_ID = "test-stunning-strike-multiclass-1";
   const multiclassUrl = `/api/characters/${MULTICLASS_ID}/abilities/stunning-strike/transactions`;
 
   afterEach(async () => {
     await prisma.character.deleteMany({ where: { id: MULTICLASS_ID } });
-  });
-  afterAll(async () => {
-    await prisma.characterClass.deleteMany({ where: { name: CLASS_NAME } });
   });
 
   async function createFighterMonk(monkLevel: number) {
@@ -301,6 +299,7 @@ describe("Stunning Strike multiclass entry-scoping (#1337)", () => {
         ...FIXTURE_BASE,
         id: MULTICLASS_ID,
         ownerId: OWNER_ID,
+        experiencePoints: 64000, // total level 10 (fighter 5 + monk 4 or 5), proficiency +4
         classEntries: {
           create: [
             { name: "fighter", position: 0, level: 5 },
@@ -311,8 +310,8 @@ describe("Stunning Strike multiclass entry-scoping (#1337)", () => {
     });
   }
 
-  it("Fighter 5 / Monk 4: no Stunning Strike rider, and the guard rejects", async () => {
-    await createFighterMonk(4);
+  it("Fighter 5 / Monk below the gate: no Stunning Strike rider, and the guard rejects", async () => {
+    await createFighterMonk(STUNNING_STRIKE_LEVEL - 1);
 
     const character = await agent().get(`/api/characters/${MULTICLASS_ID}`);
     expect(character.body).not.toHaveProperty("stunningStrike");
@@ -324,8 +323,8 @@ describe("Stunning Strike multiclass entry-scoping (#1337)", () => {
     expect(guard.body.error).toMatch(/monk/i);
   });
 
-  it("Fighter 5 / Monk 5: the Stunning Strike rider is present, and the guard admits", async () => {
-    await createFighterMonk(5);
+  it("Fighter 5 / Monk at the gate: the Stunning Strike rider is present, and the guard admits", async () => {
+    await createFighterMonk(STUNNING_STRIKE_LEVEL);
 
     const character = await agent().get(`/api/characters/${MULTICLASS_ID}`);
     expect(character.body).toHaveProperty("stunningStrike");

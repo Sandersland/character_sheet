@@ -35,8 +35,8 @@ export class InvalidOpenHandTechniqueOperationError extends Error {}
 // editions (SRD 5.2 / PHB'24 p.90, SRD 5.1 / PHB'14 p.78 — matching the 2014
 // Way of the Open Hand's own Open Hand Technique at 3rd level) —
 // edition-invariant, so no `edition` parameter. The single source for this
-// gate; character-serialize.ts's openHandTechniqueRider imports
-// hasOpenHandTechnique rather than re-declaring the threshold.
+// gate; openHandTechniqueRider imports hasOpenHandTechnique rather than
+// re-declaring the threshold.
 export const OPEN_HAND_TECHNIQUE_LEVEL = 3;
 
 /** Whether an Open Hand monk entry (its own level, never `character.level`) has Open Hand Technique. */

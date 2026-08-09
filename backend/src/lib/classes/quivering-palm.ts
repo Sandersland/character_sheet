@@ -49,8 +49,8 @@ export const QUIVERING_PALM_BUFF_KEY = "quiveringPalm";
 // Quivering Palm's grant level (#1337): Open Hand monk L17 in BOTH editions
 // (SRD 5.2 / PHB'24 p.90, SRD 5.1 / PHB'14 p.79 — see the module header's
 // citations) — edition-invariant, so no `edition` parameter. The single
-// source for this gate; character-serialize.ts's quiveringPalmRider imports
-// hasQuiveringPalm rather than re-declaring the threshold.
+// source for this gate; quiveringPalmRider imports hasQuiveringPalm rather
+// than re-declaring the threshold.
 export const QUIVERING_PALM_LEVEL = 17;
 
 /** Whether an Open Hand monk entry (its own level, never `character.level`) has Quivering Palm. */

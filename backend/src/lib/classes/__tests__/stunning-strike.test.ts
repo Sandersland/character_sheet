@@ -43,10 +43,10 @@ describe("monkPoolKey (#1313 D3)", () => {
 });
 
 // #1337: hasStunningStrike is the single source of the L5 gate — both
-// character-serialize.ts's stunningStrikeRider and this module's own cast
-// guard import it. No numeric literal for the gate appears here; the
-// boundary is derived from STUNNING_STRIKE_LEVEL itself, so mutating that one
-// constant would flip both this assertion and the rider/guard together.
+// stunningStrikeRider and this module's own cast guard import it. No
+// numeric literal for the gate appears here; the boundary is derived from
+// STUNNING_STRIKE_LEVEL itself, so mutating that one constant would flip
+// both this assertion and the rider/guard together.
 describe("hasStunningStrike (#1337 shared gate)", () => {
   it("is false one level below the gate", () => {
     expect(hasStunningStrike(STUNNING_STRIKE_LEVEL - 1)).toBe(false);

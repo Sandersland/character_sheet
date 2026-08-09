@@ -44,8 +44,8 @@ export class InvalidStunningStrikeOperationError extends Error {}
 // Stunning Strike's grant level (#1337): monk L5 in BOTH editions (SRD 5.1 /
 // PHB'14 p.77, SRD 5.2 / PHB'24 p.88 — see the module header's citations) —
 // edition-invariant, so no `edition` parameter. The single source for this
-// gate; character-serialize.ts's stunningStrikeRider imports hasStunningStrike
-// rather than re-declaring the threshold.
+// gate; stunningStrikeRider imports hasStunningStrike rather than
+// re-declaring the threshold.
 export const STUNNING_STRIKE_LEVEL = 5;
 
 /** Whether a monk (identified by its own class-entry level, never `character.level`) has Stunning Strike. */
