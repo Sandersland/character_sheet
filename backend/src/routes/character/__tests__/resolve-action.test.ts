@@ -663,4 +663,36 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
       actionLimitedToCantrips: false,
     });
   });
+
+  // #1439 review finding 1: a no-op re-press of Start Combat must NOT clear a
+  // valid in-progress bonus-action block (the reset is gated on the real
+  // false→true transition, alongside the log event).
+  it("a redundant startCombat while already in combat does NOT clear an existing block", async () => {
+    const { id: sid } = await startSoloSession(FIXTURE_ID);
+    await combatStart(sid);
+    await post([concentrationCastOp(CONCENTRATION_SPELL_A.id, "cast-action")]);
+    expect((await combatGet(sid)).body.spellEconomy.bonusActionBlockedByActionSpell).toBe(true);
+
+    // Second Start Combat: combat is already active, so this is a pure no-op.
+    const second = await combatStart(sid);
+    expect(second.status).toBe(201);
+    expect(second.body).toMatchObject({ round: 1, combatActive: true });
+    expect(second.body.spellEconomy.bonusActionBlockedByActionSpell).toBe(true);
+    expect((await combatGet(sid)).body.spellEconomy.bonusActionBlockedByActionSpell).toBe(true);
+  });
+
+  // #1439 review finding 2: cast-kind recording is coupled to the spell
+  // resolution actually running — a weapon-shaped op carrying a spurious
+  // entryId is rejected by the spell validator (the whole tx aborts), so it can
+  // never corrupt the interlock.
+  it("a weapon op carrying a spurious entryId is rejected and records no interlock", async () => {
+    const { id: sid } = await startSoloSession(FIXTURE_ID);
+    await combatStart(sid);
+    const res = await post([{ ...weaponOp(), entryId: "not-a-real-spell-entry" }]);
+    expect(res.status).toBe(400);
+    expect((await combatGet(sid)).body.spellEconomy).toEqual({
+      bonusActionBlockedByActionSpell: false,
+      actionLimitedToCantrips: false,
+    });
+  });
 });

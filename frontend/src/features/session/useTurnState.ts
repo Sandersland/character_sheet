@@ -797,9 +797,11 @@ function applyCombatState(
   updatedAt: string,
   spellEconomy: SpellEconomyState,
 ): TurnState {
-  // A fresh encounter still starts with a cleared interlock; the server's own
-  // reset makes `spellEconomy` false/false here anyway, so it's not threaded in.
-  if (!s.inCombat && combatActive) return freshEncounterState(round, updatedAt);
+  // A fresh encounter honors the SERVED interlock (#1439 review): startCombat
+  // resets it server-side, so this is normally false/false — but the client
+  // must not assume that (a late-joiner observing an encounter already past its
+  // first cast would otherwise drop a real block). Apply what the server sent.
+  if (!s.inCombat && combatActive) return freshEncounterState(round, updatedAt, spellEconomy);
   // The interlock rides every sync (#1439): even a round/inCombat no-op must
   // still apply the served flags, since a cast advances `updatedAt` (participant
   // change) without changing the round — this is the seam the block arrives on.
@@ -846,10 +848,11 @@ function startCombatState(): TurnState {
 
 // A remote false→true transition (#1030 finding #3): reuses startCombatState's
 // fresh-encounter fields but with the SERVER's round (not a hardcoded 1 — a
-// late joiner can observe combat already past round 1) and the sync's
-// updatedAt as the new monotonicity baseline.
-function freshEncounterState(round: number, updatedAt: string): TurnState {
-  return { ...startCombatState(), round, combatUpdatedAt: updatedAt };
+// late joiner can observe combat already past round 1), the sync's updatedAt as
+// the new monotonicity baseline, and the SERVED interlock (#1439 review — a
+// late joiner may observe a block already in effect, so don't force-clear it).
+function freshEncounterState(round: number, updatedAt: string, spellEconomy: SpellEconomyState): TurnState {
+  return { ...startCombatState(), round, combatUpdatedAt: updatedAt, spellEconomy };
 }
 
 // Begin the turn. Deliberately does NOT reset attackedThisTurn/tookDamageThisTurn

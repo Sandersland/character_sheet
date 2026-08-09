@@ -260,6 +260,15 @@ describe("combat lifecycle", () => {
     expect(result.current.reactionUsed).toBe(false);
   });
 
+  it("syncCombat (#1439 review): a false→true transition honors the SERVED interlock, not a forced clear", () => {
+    const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+    // A late joiner observes an encounter where a leveled Action spell was
+    // already cast — the fresh-encounter branch must apply the served block.
+    act(() => { result.current.syncCombat(2, true, "2026-01-01T00:00:05.000Z", ACTION_SPELL_BLOCK); });
+    expect(result.current.inCombat).toBe(true);
+    expect(result.current.spellEconomy).toEqual(ACTION_SPELL_BLOCK);
+  });
+
   it("reconcileCombat (#1030 finding #1) applies even when updatedAt is NOT newer — unlike syncCombat", () => {
     const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
     act(() => { result.current.startCombat(); });

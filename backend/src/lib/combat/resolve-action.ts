@@ -20,7 +20,7 @@
  * criterion here exercises it — and is flagged in the slice report.
  */
 
-import { Prisma } from "@/generated/prisma/client.js";
+import { Prisma, type SpellCastKind } from "@/generated/prisma/client.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
 import { logEvent } from "@/lib/activity/events.js";
 import {
@@ -102,6 +102,23 @@ async function payResolveActionCost(
 // event logged by the caller carries the actual rail data (toHit/save/
 // effect/riders) separately, so `roll`'s own eventData never surfaces on
 // the wire.
+// The per-turn interlock record a resolution produces (#1439). ONLY the spell
+// branch below builds one — so the cast-kind recording is coupled to the spell
+// resolution actually running (castSpellForResolutionInTx, which throws for an
+// entryId that isn't a real spell entry), never to entryId presence alone. A
+// weapon/cantrip-with-no-entryId op returns null and can never touch the
+// interlock. `kind` is leveled iff a slot was spent (a cantrip has no slotLevel).
+interface TurnSpellCast {
+  economy: "action" | "bonus" | "reaction";
+  kind: SpellCastKind;
+}
+
+type PayResult = {
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  spellCast: TurnSpellCast | null;
+};
+
 async function payActionCostAndSideEffectsInTx(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -109,9 +126,10 @@ async function payActionCostAndSideEffectsInTx(
   sessionId: string | null,
   casterUserId: string,
   op: ResolveActionOperation,
-): Promise<{ before: Record<string, unknown> | null; after: Record<string, unknown> | null }> {
+): Promise<PayResult> {
   if (op.entryId == null) {
-    return payResolveActionCost(tx, characterId, batchId, sessionId, op);
+    const { before, after } = await payResolveActionCost(tx, characterId, batchId, sessionId, op);
+    return { before, after, spellCast: null };
   }
   const castOp: CastSpellOperation = {
     type: "castSpell",
@@ -120,6 +138,11 @@ async function payActionCostAndSideEffectsInTx(
     roll: op.effect?.total ?? 0,
     ...(op.apply ? { apply: op.apply } : {}),
   };
+  // Reaching here means the op declared a spell (entryId); castSpellForResolutionInTx
+  // then VALIDATES the entry exists (throws InvalidSpellcastingOperationError
+  // otherwise), so a weapon op with a spurious entryId aborts the whole
+  // transaction before any interlock write. Only a genuine, resolved spell cast
+  // yields a spellCast record.
   const { before, after } = await castSpellForResolutionInTx(
     tx,
     characterId,
@@ -128,22 +151,25 @@ async function payActionCostAndSideEffectsInTx(
     casterUserId,
     castOp,
   );
-  return { before, after };
+  return {
+    before,
+    after,
+    spellCast: { economy: op.cost.kind, kind: op.slotLevel != null ? "leveled" : "cantrip" },
+  };
 }
 
 // Record the per-turn spell-cast kind for the 5e bonus-action interlock (#1439)
-// — only a spell resolution (entryId present) whose character is in an active
-// session; a weapon swing has no entryId and no interlock. `kind` is leveled
-// iff a slot was spent (a cantrip has no slotLevel). Kept out of applyOp so its
-// own guard doesn't count against that function's complexity budget.
+// — no-op unless a spell actually resolved (spellCast produced by the spell
+// branch above) and the character is in an active session. Kept out of applyOp
+// so its own guard doesn't count against that function's complexity budget.
 async function recordSpellCastForOp(
   tx: Prisma.TransactionClient,
   sessionId: string | null,
   characterId: string,
-  op: ResolveActionOperation,
+  spellCast: TurnSpellCast | null,
 ): Promise<void> {
-  if (op.entryId == null || sessionId == null) return;
-  await recordTurnSpellCast(tx, sessionId, characterId, op.cost.kind, op.slotLevel != null ? "leveled" : "cantrip");
+  if (spellCast == null || sessionId == null) return;
+  await recordTurnSpellCast(tx, sessionId, characterId, spellCast.economy, spellCast.kind);
 }
 
 function summaryFor(op: ResolveActionOperation): string {
@@ -172,9 +198,9 @@ export async function applyResolveActionOperations(
     select: { id: true },
     notFound: (id) => new InvalidResolveActionOperationError(`Character not found: ${id}`),
     applyOp: async ({ tx, op, characterId: id, batchId, sessionId }) => {
-      const { before, after } = await payActionCostAndSideEffectsInTx(tx, id, batchId, sessionId, casterUserId, op);
+      const { before, after, spellCast } = await payActionCostAndSideEffectsInTx(tx, id, batchId, sessionId, casterUserId, op);
 
-      await recordSpellCastForOp(tx, sessionId, id, op);
+      await recordSpellCastForOp(tx, sessionId, id, spellCast);
 
       await logEvent(tx, {
         characterId: id,

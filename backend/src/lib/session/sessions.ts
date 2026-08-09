@@ -580,15 +580,26 @@ async function readCombatColumns(
   spellCastAsBonus: SpellCastKind | null;
   participantUpdatedAt: Date | null;
 } | null> {
+  // ONE query so round/combatActive and the participant's cast record come from
+  // a single committed snapshot (#1439 review): two separate findUniques could
+  // straddle a concurrent combat mutation and serve a torn state. The nested
+  // participant read is filtered to the acting character (the include is a join
+  // in one round-trip, not a second statement).
   const session = await db.session.findUnique({
     where: { id: sessionId },
-    select: { round: true, combatActive: true, updatedAt: true },
+    select: {
+      round: true,
+      combatActive: true,
+      updatedAt: true,
+      participants: {
+        where: { characterId },
+        select: { spellCastAsAction: true, spellCastAsBonus: true, updatedAt: true },
+        take: 1,
+      },
+    },
   });
   if (!session) return null;
-  const participant = await db.sessionParticipant.findUnique({
-    where: { sessionId_characterId: { sessionId, characterId } },
-    select: { spellCastAsAction: true, spellCastAsBonus: true, updatedAt: true },
-  });
+  const participant = session.participants[0];
   return {
     round: session.round,
     combatActive: session.combatActive,
@@ -609,9 +620,9 @@ function toCombatState(cols: NonNullable<Awaited<ReturnType<typeof readCombatCol
   return {
     round: cols.round,
     combatActive: cols.combatActive,
-    // JSON-serialized to an ISO string on the wire (Date#toISOString), matching
-    // the client's `updatedAt: string` — the existing Session.updatedAt contract.
-    updatedAt: updatedAt.toISOString() as unknown as CombatState["updatedAt"],
+    // ISO string on the wire, matching the client's `updatedAt: string` — the
+    // existing Session.updatedAt contract.
+    updatedAt: updatedAt.toISOString(),
     spellEconomy: spellEconomyRestrictions(cols.spellCastAsAction, cols.spellCastAsBonus),
   };
 }
@@ -701,10 +712,15 @@ export async function startCombat(characterId: string, sessionId: string): Promi
       where: { id: sessionId, combatActive: false },
       data: { combatActive: true, round: 1 },
     });
-    if (count > 0) await logCombatLifecycleEvent(characterId, sessionId, "combatStarted", undefined, tx);
-    // A fresh encounter starts every turn clean — clear this participant's
-    // per-turn spell interlock (#1439), mirroring the reducer's startCombat reset.
-    await resetTurnSpellCast(tx, sessionId, characterId);
+    // Gate BOTH side-effects on the real false→true transition (count > 0): a
+    // no-op re-press while combat is already live must not log a second
+    // combatStarted NOR clear a valid in-progress bonus-action block (#1439
+    // review). A fresh encounter starts every turn clean — this is the server
+    // twin of the reducer's startCombat reset.
+    if (count > 0) {
+      await logCombatLifecycleEvent(characterId, sessionId, "combatStarted", undefined, tx);
+      await resetTurnSpellCast(tx, sessionId, characterId);
+    }
     return buildCombatStateOrThrow(tx, sessionId, characterId);
   });
 }
@@ -721,8 +737,12 @@ export async function endCombat(characterId: string, sessionId: string): Promise
       where: { id: sessionId, combatActive: true },
       data: { combatActive: false, round: 0 },
     });
-    if (count > 0) await logCombatLifecycleEvent(characterId, sessionId, "combatEnded", undefined, tx);
-    await resetTurnSpellCast(tx, sessionId, characterId);
+    // Same gating as startCombat (#1439 review): only the real true→false
+    // transition logs and clears; a stale second End Combat is a pure no-op.
+    if (count > 0) {
+      await logCombatLifecycleEvent(characterId, sessionId, "combatEnded", undefined, tx);
+      await resetTurnSpellCast(tx, sessionId, characterId);
+    }
     return buildCombatStateOrThrow(tx, sessionId, characterId);
   });
 }
