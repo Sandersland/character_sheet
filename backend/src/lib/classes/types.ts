@@ -201,11 +201,13 @@ export interface ClassExtras {
    * deriveRowExtras runs over both) — but stays a SINGLE scalar overlaid
    * across every class entry (deriveEntryScopedResources), so two DIFFERENT
    * entries each declaring one is a real collision, not two independent
-   * values: registry.ts's overlay throws rather than silently letting one
-   * clobber the other (mirrors SHARED_POOL_MERGE's unsanctioned-duplicate
-   * throw for pool keys). No production character can hit that today — see
-   * cleric-features.ts's own header for why Cleric deliberately still leaves
-   * `saveDcAbilities` unset despite this column now being reachable.
+   * values. On the read path `assignAnnouncedSaveDC` degrades rather than
+   * throwing (logs a warning, keeps the primary/first-declaring entry's DC) so
+   * a content/homebrew misconfiguration never 500s serializeCharacter; a loud
+   * rejection is reserved for a future write/validation path. No production
+   * character can hit the collision today — see cleric-features.ts's own header
+   * for why Cleric deliberately still leaves `saveDcAbilities` unset despite
+   * this column now being reachable.
    */
   announcedSaveDC?: number;
   /**
