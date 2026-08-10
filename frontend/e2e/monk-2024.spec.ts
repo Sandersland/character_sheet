@@ -66,7 +66,7 @@ test("2024 monk live play: Flurry, Stunning Strike, Deflect Attacks redirect, an
   await page.getByRole("button", { name: "Use Reaction" }).click();
   await page.getByRole("button", { name: "Deflect Attacks" }).click();
   await expect(page.getByText(/Deflect Attacks — reduce/)).toBeVisible();
-  const redirect = page.getByRole("button", { name: /Redirect · spend 1 Focus/ });
+  const redirect = page.getByRole("button", { name: /Redirect · spend 1 Focus Points/ });
   await expect(redirect).toBeVisible();
   await redirect.click();
   await expect.poll(() => focusRemaining(page.request, id)).toBe(focusStart - 3);

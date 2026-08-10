@@ -51,7 +51,10 @@ export interface UseDeflectAttacksReactionReturn {
   deflectRedirectAvailable: boolean;
   /** The redirect button's label — the served redirect row's own `name`
    *  ("Deflect Attacks — Redirect" in SRD 5.2, "Deflect Missiles — Throw Back"
-   *  in SRD 5.1), never a per-edition literal. Empty when no redirect row is served. */
+   *  in SRD 5.1) plus the character's served spend-pool label ("Focus Points" /
+   *  "Ki Points"), e.g. "Deflect Attacks — Redirect · spend 1 Focus Points".
+   *  Fully served-derived — no per-edition literal. Empty when no redirect row
+   *  is served; just the name when the pool isn't. */
   redirectLabel: string;
   busy: boolean;
   error: string | null;
@@ -92,7 +95,17 @@ export function useDeflectAttacksReaction({
   // rather than re-checking the pool here, same as every other resource-gated action.
   const redirectAction = availableActions.find((a) => a.key === redirectKey);
   const deflectRedirectAvailable = pending && (redirectAction?.enabled ?? false);
-  const redirectLabel = redirectAction?.name ?? "";
+  // Label = the served redirect row's own name + the character's actual spend
+  // pool label (Focus Points / Ki Points — both served), so it carries the
+  // resource cost with no per-edition client literal (#1435). The redirect
+  // spends one point in either edition, so the count is the lone invariant
+  // connective; the pool the monk actually has decides focus vs ki.
+  const redirectPool = character.resources?.pools?.find((p) => p.key === "focus" || p.key === "ki");
+  const redirectLabel = redirectAction
+    ? redirectPool
+      ? `${redirectAction.name} · spend 1 ${redirectPool.label}`
+      : redirectAction.name
+    : "";
 
   function handleDeflectAttacks() {
     if (mutation.isPending || !baseAction) return;
