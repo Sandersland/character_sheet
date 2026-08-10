@@ -1806,6 +1806,192 @@ describe("POST …/level-up/transactions — Way of the Four Elements discipline
     const known = res.body.resources.choicesKnown.fourElementsDisciplines as { optionId: string }[];
     expect(known.map((k) => k.optionId).sort()).toEqual([river.id, water.id].sort());
     expect(await distinctBatchIds("lvtx-four-elements-6")).toHaveLength(1);
+
+    // Code-review finding (#1516): the assertions above prove the swap
+    // SUCCEEDED but never verified the audit event's own shape — a field
+    // rename (e.g. eventData.optionName -> choiceName) would pass every
+    // assertion above while silently breaking the activity feed and LIFO undo.
+    const forgetEvent = await prisma.characterEvent.findFirstOrThrow({
+      where: { characterId: "lvtx-four-elements-6", type: "forgetSubclassChoice" },
+    });
+    expect(forgetEvent.summary).toBe(`Removed fourElementsDisciplines choice: ${fangs.name}`);
+    expect(forgetEvent.data).toEqual({ choiceKey: "fourElementsDisciplines", entryId: "e-fangs", optionName: fangs.name });
+  });
+});
+
+// #1516: the maneuver swap (Battle Master) — "Each time you learn new
+// maneuvers, you can also replace one maneuver you know with a different
+// one" (PHB'14 p.73; SRD 5.2 carries the equivalent grant). Same shape as the
+// Way of the Four Elements discipline swap above, scoped to maneuversKnown/
+// forgetManeuver. maneuverChoiceCount thresholds: 3@3, 5@7, 7@10, 9@15.
+describe("POST …/level-up/transactions — maneuver swap (#1516, Battle Master)", () => {
+  async function makeBattleMaster(
+    id: string,
+    xp: number,
+    hitDiceTotal: number,
+    entryLevel: number,
+    known: { id: string; maneuverId: string; name: string; description: string }[],
+  ): Promise<string> {
+    const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    const battleMaster = await prisma.subclass.findFirstOrThrow({ where: { classId: fighter.id, name: "Battle Master" } });
+    await prisma.character.create({
+      data: {
+        ...BASE,
+        ownerId: OWNER_ID,
+        id,
+        name: "LevelUpTx Maneuver Swap",
+        experiencePoints: xp,
+        hitPoints: { current: 50, max: 50, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: hitDiceTotal, die: "d10", spent: 0 },
+        abilityScores: { strength: 16, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 10, charisma: 10 },
+        spellcasting: Prisma.JsonNull,
+        resources: {
+          used: {},
+          maneuversKnown: known,
+          toolProficienciesKnown: [],
+          choicesKnown: {},
+          advancements: [],
+        } as unknown as Prisma.InputJsonValue,
+        classEntries: {
+          create: [{ name: "fighter", subclass: "Battle Master", subclassId: battleMaster.id, classId: fighter.id, position: 0, level: entryLevel }],
+        },
+      },
+    });
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: id } });
+    return entry.id;
+  }
+
+  it("6→7: a swap (3 learns + 1 forget netting to the step's count 2) commits atomically", async () => {
+    const catalog = await prisma.grantedAbility.findMany({ where: { source: "maneuver" }, take: 6, select: { id: true, name: true, description: true } });
+    expect(catalog).toHaveLength(6);
+    const known = catalog.slice(0, 3).map((m, i) => ({ id: `k${i}`, maneuverId: m.id, name: m.name, description: m.description }));
+    const newPicks = catalog.slice(3, 6);
+    const entryId = await makeBattleMaster("lvtx-maneuver-swap-6", 23000, 6, 6, known);
+
+    const res = await post("lvtx-maneuver-swap-6", {
+      target: { kind: "existing", classEntryId: entryId },
+      hp: { method: "average" },
+      maneuvers: newPicks.map((m) => ({ type: "learnManeuver", maneuverId: m.id })),
+      maneuversForgotten: [{ type: "forgetManeuver", entryId: "k0" }],
+    });
+    expect(res.status).toBe(200);
+    const maneuversKnown = res.body.resources.maneuversKnown as { maneuverId: string }[];
+    expect(maneuversKnown).toHaveLength(5); // cap at fighter-7
+    expect(maneuversKnown.map((m) => m.maneuverId)).not.toContain(known[0].maneuverId);
+    expect(maneuversKnown.map((m) => m.maneuverId)).toEqual(
+      expect.arrayContaining(newPicks.map((m) => m.id)),
+    );
+    expect(await distinctBatchIds("lvtx-maneuver-swap-6")).toHaveLength(1);
+
+    // Code-review finding: the assertions above prove the swap SUCCEEDED but
+    // never verified the audit event's own shape — a field rename (e.g.
+    // eventData.maneuverName -> choiceName) would pass every assertion above
+    // while silently breaking the activity feed and LIFO undo (both read
+    // this event's summary/data).
+    const forgetEvent = await prisma.characterEvent.findFirstOrThrow({
+      where: { characterId: "lvtx-maneuver-swap-6", type: "forgetManeuver" },
+    });
+    expect(forgetEvent.summary).toBe(`Forgot maneuver: ${known[0].name}`);
+    expect(forgetEvent.data).toEqual({ entryId: "k0", maneuverName: known[0].name });
+  });
+
+  it("6→7: rejects two forgets in one level-up", async () => {
+    const catalog = await prisma.grantedAbility.findMany({ where: { source: "maneuver" }, take: 7, select: { id: true, name: true, description: true } });
+    expect(catalog).toHaveLength(7);
+    const known = catalog.slice(0, 3).map((m, i) => ({ id: `k${i}`, maneuverId: m.id, name: m.name, description: m.description }));
+    const newPicks = catalog.slice(3, 7); // 4 learns, net-matches the step count (2) against 2 forgets
+    const entryId = await makeBattleMaster("lvtx-maneuver-swap-two-forgets", 23000, 6, 6, known);
+
+    const res = await post("lvtx-maneuver-swap-two-forgets", {
+      target: { kind: "existing", classEntryId: entryId },
+      hp: { method: "average" },
+      maneuvers: newPicks.map((m) => ({ type: "learnManeuver", maneuverId: m.id })),
+      maneuversForgotten: [
+        { type: "forgetManeuver", entryId: "k0" },
+        { type: "forgetManeuver", entryId: "k1" },
+      ],
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/at most one/i);
+  });
+
+  // Fighter-3→4 is not a maneuver-growth level (3@3, still 3@4) — no
+  // "maneuvers" step exists, so PHB'14's "each time you learn new maneuvers"
+  // condition never fires. Level 4 is also an ASI level, so `advancement` is
+  // included to isolate the forget rejection.
+  it("3→4: rejects a forget — the level grants no new maneuvers", async () => {
+    const catalog = await prisma.grantedAbility.findMany({ where: { source: "maneuver" }, take: 3, select: { id: true, name: true, description: true } });
+    const known = catalog.map((m, i) => ({ id: `k${i}`, maneuverId: m.id, name: m.name, description: m.description }));
+    const entryId = await makeBattleMaster("lvtx-maneuver-no-step", 2700, 3, 3, known);
+
+    const res = await post("lvtx-maneuver-no-step", {
+      target: { kind: "existing", classEntryId: entryId },
+      hp: { method: "average" },
+      advancement: { type: "takeAsi", increases: [{ ability: "strength", amount: 2 }] },
+      maneuversForgotten: [{ type: "forgetManeuver", entryId: "k0" }],
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/does not allow swapping a maneuver/i);
+  });
+
+  // #1516 decision point 1 (level-down repair): clampChoicesToCaps-style
+  // trimming already applies to maneuversKnown via reconcileManeuvers
+  // (level-reconciliation.ts, unchanged by this issue — it never calls
+  // applyForgetManeuverOp). The bounded "repair" the decision calls for is the
+  // ORDINARY learn-time step: after a level-down trims maneuversKnown to the
+  // new cap, leveling back up re-offers exactly the trimmed count via the same
+  // "maneuvers" step (delta between the level-derived caps) — no bespoke
+  // repair mechanism needed. This is the mutation-proof regression latch: if a
+  // future change moved this issue's guard INSIDE the shared trim primitive
+  // (clampChoicesToCaps/reconcileManeuvers) instead of the op boundary, the
+  // XP-drop step below would break.
+  it("level-down trims to the level-6 cap; leveling back up offers exactly the trimmed count", async () => {
+    const catalog = await prisma.grantedAbility.findMany({ where: { source: "maneuver" }, take: 5, select: { id: true, name: true, description: true } });
+    expect(catalog).toHaveLength(5);
+    const known = catalog.map((m, i) => ({ id: `k${i}`, maneuverId: m.id, name: m.name, description: m.description }));
+    const CHAR_ID = "lvtx-maneuver-repair";
+    const entryId = await makeBattleMaster(CHAR_ID, 23000, 7, 7, known); // level 7, cap 5, at cap
+
+    const dropped = await supertest(app)
+      .post(`/api/characters/${CHAR_ID}/experience`)
+      .set("Cookie", COOKIE)
+      .send({ operations: [{ type: "set", value: 14000 }] }); // level 6 threshold → cap 3
+    expect(dropped.status).toBe(200);
+    expect(dropped.body.resources.maneuversKnown).toHaveLength(3);
+    expect(dropped.body.hitDice.total).toBe(6);
+    expect(dropped.body.pendingLevelUps).toBe(0);
+
+    // XP back up to the level-7 threshold — hitDice.total is untouched (HP
+    // level-up is a separate explicit action, docs/leveling.md), so this
+    // reopens exactly ONE pending level-up (6→7) for the ceremony below.
+    const raised = await supertest(app)
+      .post(`/api/characters/${CHAR_ID}/experience`)
+      .set("Cookie", COOKIE)
+      .send({ operations: [{ type: "set", value: 23000 }] });
+    expect(raised.status).toBe(200);
+    expect(raised.body.hitDice.total).toBe(6);
+    expect(raised.body.pendingLevelUps).toBe(1);
+
+    const plan = await getPlan(CHAR_ID).query({ classEntryId: entryId });
+    expect(plan.status).toBe(200);
+    const maneuversStep = (plan.body.steps as Array<{ kind: string; count?: number; meta?: { canSwap?: boolean } }>)
+      .find((s) => s.kind === "maneuvers");
+    expect(maneuversStep).toMatchObject({ count: 2, meta: { canSwap: true } });
+
+    const freshCatalog = await prisma.grantedAbility.findMany({
+      where: { source: "maneuver", id: { notIn: known.map((k) => k.maneuverId) } },
+      take: 2,
+      select: { id: true },
+    });
+    expect(freshCatalog).toHaveLength(2);
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entryId },
+      hp: { method: "average" },
+      maneuvers: freshCatalog.map((m) => ({ type: "learnManeuver", maneuverId: m.id })),
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.resources.maneuversKnown).toHaveLength(5);
+    expect(res.body.resources.maneuverChoiceCount).toBe(5);
   });
 });
 

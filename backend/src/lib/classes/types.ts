@@ -286,11 +286,13 @@ export interface DerivedSubclassChoice {
  * replace one you know" (PHB'14 p.80, Way of the Four Elements' Disciple of
  * the Elements). `edition` last (subclassGateLevel's pattern, #1499) even
  * though only one source/edition pair currently answers "onLevelUp" — future
- * choose-N features (#1516) extend this function, never duplicate it. Gates
- * only the LEVEL-UP CEREMONY's own swap path (LevelUpSubmission.subclassChoicesForgotten);
- * the generic forgetSubclassChoice op on POST .../resources/transactions
- * stays unrestricted, same as every other choose-N feature's forget — #1516
- * is the tracked follow-up for a global choose-N forget policy.
+ * choose-N features extend this function, never duplicate it. This function
+ * only decides WHICH choices carry the swap privilege; #1516 is what makes
+ * the privilege exclusive — `forgetSubclassChoice` (resources.ts) now 400s
+ * unless the call site is a validated level-up step (ctx.allowChooseNForget),
+ * so a "never" catalogSource is unreachable end to end, and an "onLevelUp"
+ * one is reachable only through LevelUpSubmission.subclassChoicesForgotten,
+ * never the generic POST .../resources/transactions route.
  */
 export function subclassChoiceSwapCadence(catalogSource: string, edition: RulesEdition): "onLevelUp" | "never" {
   return catalogSource === "discipline" && edition === "EDITION_2014" ? "onLevelUp" : "never";

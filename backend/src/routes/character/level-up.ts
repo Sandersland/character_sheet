@@ -22,6 +22,7 @@ import { InvalidSpellcastingOperationError } from "@/lib/spellcasting/spellcasti
 import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
 import { takeAsiOpSchema, takeFeatOpSchema } from "@/routes/character/advancement.js";
 import {
+  forgetManeuverOpSchema,
   forgetSubclassChoiceOpSchema,
   learnManeuverOpSchema,
   learnToolProficiencyOpSchema,
@@ -148,6 +149,9 @@ const levelUpSubmissionSchema = z.object({
   subclassId: z.string().min(1).optional(),
   fightingStyleFeat: takeFeatOpSchema.optional(),
   maneuvers: z.array(learnManeuverOpSchema).optional(),
+  // #1516: a maneuver swap (learn-time only) — validated against its step's
+  // meta.canSwap by assertManeuverForgets.
+  maneuversForgotten: z.array(forgetManeuverOpSchema).optional(),
   toolProficiencies: z.array(learnToolProficiencyOpSchema).optional(),
   subclassChoices: z.array(learnSubclassChoiceOpSchema).optional(),
   // #1503: a choose-N swap (e.g. Way of the Four Elements) — validated

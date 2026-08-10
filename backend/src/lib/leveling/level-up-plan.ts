@@ -243,13 +243,24 @@ function fightingStyleFeatStep({ target }: PlanContext): LevelUpStep | null {
 }
 
 // Diff one bespoke choose-N count (maneuvers/tools) across N vs N-1.
+// #1516: maneuvers carries meta.canSwap unconditionally whenever the step
+// exists — "Each time you learn new maneuvers, you can also replace one
+// maneuver you know with a different one" (PHB'14 Battle Master p.73; SRD 5.2
+// carries the equivalent grant). Unlike subclassChoiceSwapCadence (per
+// catalogSource, since most choose-N features carry no such text), EVERY
+// source of maneuverChoiceCount grants this, and the condition is exactly
+// "new maneuvers were just learned" — the same delta>0 that already gates
+// this step's existence — so no separate swap-only step is needed, mirroring
+// subclassChoiceSteps' own reasoning. Tool proficiency choices carry no such
+// text, so they never get canSwap.
 function choiceCountStep(
   { now, prev }: PlanContext,
   kind: LevelUpStepKind,
   field: "maneuverChoiceCount" | "toolProfChoiceCount",
 ): LevelUpStep | null {
   const delta = (now?.[field] ?? 0) - (prev?.[field] ?? 0);
-  return delta > 0 ? { kind, count: delta } : null;
+  if (delta <= 0) return null;
+  return { kind, count: delta, ...(kind === "maneuvers" ? { meta: { canSwap: true } } : {}) };
 }
 
 // Generic subclass "choose N from a catalog" (#899): one step per key that

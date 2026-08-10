@@ -357,6 +357,94 @@ describe("validateLevelUpSubmission — choose-N swap (#1503, Way of the Four El
   });
 });
 
+// #1516: the maneuver swap — "Each time you learn new maneuvers, you can also
+// replace one maneuver you know with a different one" (PHB'14 Battle Master
+// p.73; SRD 5.2 carries the equivalent grant), unconditional whenever the
+// "maneuvers" step exists (choiceCountStep, level-up-plan.ts). Same shape as
+// the choose-N swap suite above, scoped to the single "maneuvers" step.
+describe("validateLevelUpSubmission — maneuver swap (#1516, Battle Master)", () => {
+  // maneuverChoiceCount thresholds (BATTLE_MASTER_ROWS): 3@3, 5@7, 7@10, 9@15.
+  const bmTarget = (newLevel: number): TargetClassEntry => ({
+    ...target("fighter", newLevel, "battle master"),
+    subclassFeatureRows: BATTLE_MASTER_ROWS,
+  });
+  const charBM = (level: number): LevelUpPlanCharacter => char("fighter", level, "battle master");
+  const learnManeuver = (id: string): NonNullable<LevelUpSubmission["maneuvers"]>[number] => ({ type: "learnManeuver", maneuverId: id });
+  const forgetManeuver = (entryId: string): NonNullable<LevelUpSubmission["maneuversForgotten"]>[number] => ({ type: "forgetManeuver", entryId });
+  const base = { target: { kind: "existing", classEntryId: "x" } as const, hp: { method: "average" as const } };
+
+  it("6→7 (delta 2) accepts a swap: 3 learns + 1 forget nets to the step's count (2)", () => {
+    const steps = validateLevelUpSubmission(charBM(6), bmTarget(7), null, {
+      ...base,
+      maneuvers: [learnManeuver("m1"), learnManeuver("m2"), learnManeuver("m3")],
+      maneuversForgotten: [forgetManeuver("entry-1")],
+    });
+    expect(kinds(steps)).toEqual(["hitPoints", "maneuvers", "review"]);
+  });
+
+  it("rejects two forgets in one level-up", () => {
+    expect(() =>
+      validateLevelUpSubmission(charBM(6), bmTarget(7), null, {
+        ...base,
+        maneuvers: [learnManeuver("m1"), learnManeuver("m2"), learnManeuver("m3"), learnManeuver("m4")],
+        maneuversForgotten: [forgetManeuver("entry-1"), forgetManeuver("entry-2")],
+      }),
+    ).toThrow(/at most one/i);
+  });
+
+  // Fighter-3→4 is not a maneuver-growth level (3 at L3, still 3 at L4) — no
+  // "maneuvers" step exists at all, so PHB'14's "each time you learn new
+  // maneuvers" condition never fires here. (Fighter 4 is also an ASI level,
+  // so `advancement` is included to isolate the forget rejection.)
+  it("rejects a forget on a level granting no new maneuvers (3→4)", () => {
+    expect(() =>
+      validateLevelUpSubmission(charBM(3), bmTarget(4), null, {
+        ...base,
+        advancement: takeAsi,
+        maneuversForgotten: [forgetManeuver("entry-1")],
+      }),
+    ).toThrow(/does not allow swapping a maneuver/i);
+  });
+
+  it("rejects a net mismatch (1 learn, 1 forget, but the step expects 2 net)", () => {
+    expect(() =>
+      validateLevelUpSubmission(charBM(6), bmTarget(7), null, {
+        ...base,
+        maneuvers: [learnManeuver("m1")],
+        maneuversForgotten: [forgetManeuver("entry-1")],
+      }),
+    ).toThrow(/expected 2 maneuvers/i);
+  });
+
+  // Code-review finding: assertCounts' negative-net branch (a forget with NO
+  // replacement learn at all) hardcoded "spell" for every domain — a Battle
+  // Master forgetting with zero learns got "replacement spell", not
+  // "replacement maneuver". swapUnitNoun keys the message off the step kind.
+  it("names the maneuver (not 'spell') when a forget has no replacement learn at all", () => {
+    expect(() =>
+      validateLevelUpSubmission(charBM(6), bmTarget(7), null, {
+        ...base,
+        maneuversForgotten: [forgetManeuver("entry-1")],
+      }),
+    ).toThrow(/replacement maneuver for every maneuver you swap out/i);
+  });
+
+  // Code-review finding: on a no-growth level (no "maneuvers" step at all —
+  // canSwap is never true), 2 forgets must still say "does not allow
+  // swapping", not "at most one" (which wrongly implies exactly one forget
+  // WOULD be legal there). assertManeuverForgets checks canSwap before the
+  // length>1 guard for exactly this reason.
+  it("rejects two forgets on a level granting no new maneuvers with the cadence message, not 'at most one'", () => {
+    expect(() =>
+      validateLevelUpSubmission(charBM(3), bmTarget(4), null, {
+        ...base,
+        advancement: takeAsi,
+        maneuversForgotten: [forgetManeuver("entry-1"), forgetManeuver("entry-2")],
+      }),
+    ).toThrow(/does not allow swapping a maneuver/i);
+  });
+});
+
 describe("validateLevelUpSubmission — new cantrips (#1131)", () => {
   const learn = (spellId: string): NonNullable<LevelUpSubmission["spellsLearned"]>[number] => ({ type: "learnSpell", spellId });
   const forget = (entryId: string): NonNullable<LevelUpSubmission["spellsForgotten"]>[number] => ({ type: "forgetSpell", entryId });
