@@ -30,10 +30,12 @@ const OWNER_ID = "owner-granted-domains";
 let COOKIE: string;
 const CHAR_ID = "test-granted-domains-1";
 
-// XP thresholds (levelForExperience): L1=0, L5=6500, L7=34000, L9=48000.
+// XP thresholds (levelForExperience): L1=0, L2=300, L3=900, L5=6500, L7=23000, L9=48000.
 const XP_LVL_1 = 0;
+const XP_LVL_2 = 300;
+const XP_LVL_3 = 900;
 const XP_LVL_5 = 6500;
-const XP_LVL_7 = 34000;
+const XP_LVL_7 = 23000;
 const XP_LVL_9 = 48000;
 
 let clericClassId: string;
@@ -45,6 +47,10 @@ let warlockClassId: string;
 let fiendId: string;
 let archfeyId: string;
 let greatOldOneId: string;
+let rogueClassId: string;
+let arcaneTricksterId: string;
+let wizardClassId: string;
+let illusionId: string;
 
 async function requireClass(name: string): Promise<string> {
   const cls = await prisma.characterClass.findUnique({ where: { name }, select: { id: true } });
@@ -83,6 +89,12 @@ beforeAll(async () => {
   fiendId = await requireSharedSubclass(warlockClassId, "The Fiend");
   archfeyId = await require2014Subclass(warlockClassId, "The Archfey");
   greatOldOneId = await require2014Subclass(warlockClassId, "The Great Old One");
+
+  rogueClassId = await requireClass("Rogue");
+  arcaneTricksterId = await requireSharedSubclass(rogueClassId, "Arcane Trickster");
+
+  wizardClassId = await requireClass("Wizard");
+  illusionId = await requireSharedSubclass(wizardClassId, "School of Illusion");
 });
 
 afterEach(async () => {
@@ -97,7 +109,12 @@ interface CasterSpec {
   savingThrowProficiencies: string[];
 }
 
-async function createCaster(spec: CasterSpec, xp: number, rulesEdition: "EDITION_2014" | "EDITION_2024") {
+async function createCaster(
+  spec: CasterSpec,
+  xp: number,
+  rulesEdition: "EDITION_2014" | "EDITION_2024",
+  storedSpells: unknown[] = [],
+) {
   await prisma.character.create({
     data: {
       id: CHAR_ID,
@@ -117,7 +134,7 @@ async function createCaster(spec: CasterSpec, xp: number, rulesEdition: "EDITION
       skills: [], toolProficiencies: [],
       currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
       ownerId: OWNER_ID,
-      spellcasting: { slotsUsed: {}, spells: [] } as Prisma.InputJsonValue,
+      spellcasting: { slotsUsed: {}, spells: storedSpells } as Prisma.InputJsonValue,
       classEntries: {
         // ClassEntry.level is left at its default (1): the single-class serialize
         // path derives level from experiencePoints (the per-class column can be
@@ -144,10 +161,19 @@ async function createLifeCleric(xp: number, rulesEdition: "EDITION_2014" | "EDIT
 }
 
 interface GrantedSpell { name: string; level: number; source?: string; prepared?: boolean }
-async function grantedSpells(): Promise<GrantedSpell[]> {
+async function fullCharacter(): Promise<{ spells: GrantedSpell[]; preparedSpellCount?: number; preparedSpellLimit?: number | null }> {
   const res = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${CHAR_ID}`);
   expect(res.status).toBe(200);
-  return ((res.body.spellcasting?.spells ?? []) as GrantedSpell[]).filter((s) => s.source === "subclass");
+  return res.body.spellcasting ?? { spells: [] };
+}
+async function grantedSpells(): Promise<GrantedSpell[]> {
+  const { spells } = await fullCharacter();
+  return spells.filter((s) => s.source === "subclass");
+}
+// Every spell in the served list regardless of source — the dedup test needs
+// to see the STORED (already-known) copy survive, not just the grant.
+async function allSpells(): Promise<GrantedSpell[]> {
+  return (await fullCharacter()).spells;
 }
 
 describe("Life Domain granted spells (#913, #1626)", () => {
@@ -232,6 +258,20 @@ describe("Oath of Devotion granted spells (#913, #1626)", () => {
     expect(names).toEqual(["Aid", "Protection from Evil and Good", "Shield of Faith", "Zone of Truth"]);
     expect(names).not.toContain("Sanctuary");
     expect(names).not.toContain("Lesser Restoration");
+  });
+
+  // #901: a LEVELED grant (Protection from Evil and Good, level 1) is the
+  // one that actually exercises derivePreparedFields' `source == null`
+  // guard — a cantrip grant (Illusion Wizard's own prepared-cap test) can't
+  // tell that guard apart from the separate `level > 0` filter, since a
+  // cantrip is already excluded by level alone.
+  it("a leveled subclass grant doesn't count against the prepared-spell cap either", async () => {
+    await createDevotionPaladin(XP_LVL_5, "EDITION_2014");
+    const { preparedSpellCount, spells } = await fullCharacter();
+    const grant = spells.find((s) => s.name === "Protection from Evil and Good");
+    expect(grant?.source).toBe("subclass");
+    expect(grant?.level).toBeGreaterThan(0);
+    expect(preparedSpellCount).toBe(0);
   });
 });
 
@@ -402,5 +442,121 @@ describe("per-edition grant filtering on the serialize path (#1625)", () => {
     expect(names).toContain("Charm Person");
     expect(names).not.toContain("Disguise Self");
     expect(names).toContain("Bless");
+  });
+});
+
+// #901: Mage Hand is edition-INVARIANT. Per rogue-features.ts's own header, no
+// first-party SRD text exists for Arcane Trickster in either edition (2014 is
+// PHB'14, page not re-verified; 2024 is PHB'24, mirror-sourced, not in SRD
+// 5.2), but both grant Mage Hand at the subclass's own L3 gate (Rogue
+// subclassLevel is 3 in both editions, #1308) — ONE shared row, asserted over
+// both editions in a single test so a needless per-edition fork would be
+// visible as redundant coverage, not proven by a second copy of the same
+// assertion.
+describe("Arcane Trickster granted spells (#901)", () => {
+  async function createArcaneTrickster(xp: number, edition: "EDITION_2014" | "EDITION_2024") {
+    await createCaster(
+      { className: "Rogue", classId: rogueClassId, subclassName: "Arcane Trickster", subclassId: arcaneTricksterId, savingThrowProficiencies: ["dexterity", "intelligence"] },
+      xp,
+      edition,
+    );
+  }
+
+  it.each(["EDITION_2014", "EDITION_2024"] as const)(
+    "a %s Arcane Trickster surfaces Mage Hand as an always-prepared subclass grant at level 3",
+    async (edition) => {
+      await createArcaneTrickster(XP_LVL_5, edition);
+      const granted = await grantedSpells();
+      expect(granted.map((s) => s.name)).toEqual(["Mage Hand"]);
+      expect(granted[0].prepared).toBe(true);
+      expect(granted[0].source).toBe("subclass");
+    },
+  );
+
+  // Boundary pair: L2 (absent) vs L3 (present) — the it.each above only
+  // proves the grant survives well ABOVE the gate (XP_LVL_5), so a wrong
+  // gateLevel of e.g. 4 would still pass it. These two pin the actual L3 edge.
+  it("grants nothing at level 2, one level below the gate", async () => {
+    await createArcaneTrickster(XP_LVL_2, "EDITION_2024");
+    expect(await grantedSpells()).toEqual([]);
+  });
+
+  it("grants Mage Hand exactly at level 3, the gate itself", async () => {
+    await createArcaneTrickster(XP_LVL_3, "EDITION_2024");
+    expect((await grantedSpells()).map((s) => s.name)).toEqual(["Mage Hand"]);
+  });
+});
+
+// #901: Minor Illusion survives into 2024 but at a NEW gate under a renamed
+// feature (Improved Minor Illusion, PHB'14 p.117, Wizard L2 = the subclass's
+// own 2014 pick level) -> (Improved Illusions, PHB'24 mirror-sourced — not in
+// SRD 5.2, wizard-features.ts ILLUSION_RAW, Wizard L3 = the 2024-uniform
+// subclass gate). The Subclass catalog row itself stayed ONE shared row
+// across editions (subclasses.ts — PHB'24 renamed the feature/subclass
+// DISPLAY text but wizard-features.ts's ILLUSION_RAW still keys its 2024 rows
+// to the same `wizard-school-of-illusion` slug, so there is no separate
+// "Illusionist" Subclass row to resolve through and #1408's slug rekey is not
+// a blocker here) — forked on gateLevel only, same subclassId, same
+// castingAbility (decision 2, #901).
+describe("Illusion Wizard granted spells (#901)", () => {
+  async function createIllusionWizard(xp: number, edition: "EDITION_2014" | "EDITION_2024", storedSpells: unknown[] = []) {
+    await createCaster(
+      { className: "Wizard", classId: wizardClassId, subclassName: "School of Illusion", subclassId: illusionId, savingThrowProficiencies: ["intelligence", "wisdom"] },
+      xp,
+      edition,
+      storedSpells,
+    );
+  }
+
+  // XP_LVL_2, not XP_LVL_5: a character well above the gate can't tell a
+  // correct gateLevel of 2 from a wrong one of 3 — this pins the actual edge.
+  it("a 2014 Illusion wizard has Minor Illusion granted at level 2", async () => {
+    await createIllusionWizard(XP_LVL_2, "EDITION_2014");
+    const granted = await grantedSpells();
+    expect(granted.map((s) => s.name)).toEqual(["Minor Illusion"]);
+  });
+
+  it("a 2024 Illusionist does NOT have Minor Illusion at level 2", async () => {
+    await createIllusionWizard(XP_LVL_2, "EDITION_2024");
+    expect(await grantedSpells()).toEqual([]);
+  });
+
+  it("a 2024 Illusionist DOES have Minor Illusion at level 3", async () => {
+    await createIllusionWizard(XP_LVL_3, "EDITION_2024");
+    const granted = await grantedSpells();
+    expect(granted.map((s) => s.name)).toEqual(["Minor Illusion"]);
+  });
+
+  it("a wizard who already knows Minor Illusion sees it exactly once — the granted copy is suppressed", async () => {
+    const learnedMinorIllusion = {
+      id: "learned-minor-illusion",
+      name: "Minor Illusion",
+      level: 0,
+      school: "illusion",
+      prepared: true,
+      castingTime: "1 action",
+      range: "30 ft",
+      duration: "1 minute",
+      description: "Create a sound or an image of an object within range.",
+    };
+    await createIllusionWizard(XP_LVL_5, "EDITION_2014", [learnedMinorIllusion]);
+    const spells = await allSpells();
+    const minorIllusions = spells.filter((s) => s.name === "Minor Illusion");
+    expect(minorIllusions).toHaveLength(1);
+    // The learned (stored) copy wins — it carries no source marker at all.
+    expect(minorIllusions[0].source).toBeUndefined();
+  });
+
+  it("the grant does not count against the prepared-spell cap", async () => {
+    await createIllusionWizard(XP_LVL_5, "EDITION_2014");
+    const { preparedSpellCount, spells } = await fullCharacter();
+    const grant = spells.find((s) => s.name === "Minor Illusion");
+    expect(grant?.source).toBe("subclass");
+    // Minor Illusion is level 0, so this only exercises derivePreparedFields'
+    // `level > 0` filter, not its separate `source == null` guard — the two
+    // filters are indistinguishable here since either alone already excludes
+    // a cantrip. The Oath of Devotion describe block above carries the
+    // leveled-grant test that isolates the source guard specifically.
+    expect(preparedSpellCount).toBe(0);
   });
 });
