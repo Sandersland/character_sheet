@@ -88,16 +88,19 @@ const TARGET_ENTRY_SELECT = {
       features: FEATURE_ROWS_CLASS_FEATURES,
       // #1497: effectiveMaxHitPointsForRow's featSlotCap inputs (every class
       // entry, not just the target) — the same two columns buildHpOpContext
-      // selects for its own row.classEntries.
+      // selects for its own row.classEntries. `subclassLevel` (#1123):
+      // draconicResilienceMaxHpTerm's 2014-gate input, same composition.
       extraAsiLevels: true,
       fightingStyleFeatLevel: true,
+      subclassLevel: true,
     },
   },
   // #1546 Part B-i: the PERSISTED subclass's own feature rows. Absent
   // (relation null) when no subclass is set yet. `id` (#1631): the catalog
   // Subclass row's own id, so resolveLevelUpContext can load its
   // SubclassSpellListExpansion rows without re-resolving by name.
-  subclassRef: { select: { id: true, features: FEATURE_ROWS_SUBCLASS_FEATURES } },
+  // `slug` (#1123): draconicResilienceMaxHpTerm's FK identity input.
+  subclassRef: { select: { id: true, slug: true, features: FEATURE_ROWS_SUBCLASS_FEATURES } },
 } satisfies Prisma.CharacterClassEntrySelect;
 
 // Fetch the target class's catalog subclassLevel/extraAsiLevels/
@@ -287,7 +290,7 @@ export async function resolveLevelUpContext(
   });
   if (!character) throw new InvalidLevelUpError(`Character not found: ${characterId}`);
   const edition = editionOf(character);
-  const { hp: baselineHp, featMaxHpBonus, exhaustionLevel } = effectiveMaxHitPointsForRow(character);
+  const { hp: baselineHp, maxHpBonus, exhaustionLevel } = effectiveMaxHitPointsForRow(character);
 
   const isMulticlass = character.classEntries.length > 1;
   const hitDice = normalizeHitDice(character.hitDice);
@@ -318,7 +321,7 @@ export async function resolveLevelUpContext(
       // #1101: the known-spell list the validator checks a swap forget against.
       spellEntries: normalizeSpellcastingMutable(character.spellcasting).spells.map((s) => ({ id: s.id, level: s.level, source: s.source ?? null })),
       edition,
-      hpBaseline: { rawMax: baselineHp.max, featMaxHpBonus, exhaustionLevel },
+      hpBaseline: { rawMax: baselineHp.max, maxHpBonus, exhaustionLevel },
     },
     targetEntry: {
       name: targetClassName,

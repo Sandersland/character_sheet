@@ -122,7 +122,7 @@ describe("buildLevelUpPlan — hitPoints meta", () => {
 // wrong once the halving itself grows with the new max.
 describe("buildLevelUpPlan — hitPoints meta — effective post-level max (#1497)", () => {
   function effectiveMaxMeta(
-    hpBaseline: { rawMax: number; featMaxHpBonus: number; exhaustionLevel: number },
+    hpBaseline: { rawMax: number; maxHpBonus: number; exhaustionLevel: number },
     edition: "EDITION_2014" | "EDITION_2024",
     hitDie = "d10",
     constitution = 14,
@@ -142,19 +142,19 @@ describe("buildLevelUpPlan — hitPoints meta — effective post-level max (#149
 
   // Con 14 → conMod +2; d10 average gain = floor(10/2)+1+2 = 8.
   it("halves an ODD pre-halving max the same way the commit does (2014, exhaustion 4, rawMax 31)", () => {
-    const meta = effectiveMaxMeta({ rawMax: 31, featMaxHpBonus: 0, exhaustionLevel: 4 }, "EDITION_2014");
+    const meta = effectiveMaxMeta({ rawMax: 31, maxHpBonus: 0, exhaustionLevel: 4 }, "EDITION_2014");
     // newRawMax = 31 + 8 = 39; halved (round up subtracted) = 39 - 20 = 19.
     expect(meta.effectiveMaxAverage).toBe(19);
   });
 
   it("halves an EVEN pre-halving max the same way the commit does (2014, exhaustion 4, rawMax 30)", () => {
-    const meta = effectiveMaxMeta({ rawMax: 30, featMaxHpBonus: 0, exhaustionLevel: 4 }, "EDITION_2014");
+    const meta = effectiveMaxMeta({ rawMax: 30, maxHpBonus: 0, exhaustionLevel: 4 }, "EDITION_2014");
     // newRawMax = 30 + 8 = 38; halved (round up subtracted) = 38 - 19 = 19.
     expect(meta.effectiveMaxAverage).toBe(19);
   });
 
   it("serves a per-roll effective-max array, indexed 1..faces, each independently halved (2014, exhaustion 4, rawMax 31)", () => {
-    const meta = effectiveMaxMeta({ rawMax: 31, featMaxHpBonus: 0, exhaustionLevel: 4 }, "EDITION_2014", "d6", 14);
+    const meta = effectiveMaxMeta({ rawMax: 31, maxHpBonus: 0, exhaustionLevel: 4 }, "EDITION_2014", "d6", 14);
     const byRoll = meta.effectiveMaxByRoll as number[];
     expect(byRoll[0]).toBe(0); // inert placeholder — never a roll value.
     // Con +2; roll r → gain max(1, r+2); newRawMax = 31 + gain; then halved.
@@ -166,18 +166,18 @@ describe("buildLevelUpPlan — hitPoints meta — effective post-level max (#149
   });
 
   it("a feat maxHp bonus is added before the exhaustion halving, same order as effectiveMaxHitPoints (2014, exhaustion 4)", () => {
-    const meta = effectiveMaxMeta({ rawMax: 30, featMaxHpBonus: 4, exhaustionLevel: 4 }, "EDITION_2014");
+    const meta = effectiveMaxMeta({ rawMax: 30, maxHpBonus: 4, exhaustionLevel: 4 }, "EDITION_2014");
     // newRawMax = 30 + 8 = 38; + feat 4 = 42; halved = 42 - 21 = 21.
     expect(meta.effectiveMaxAverage).toBe(21);
   });
 
   it("matches plain rawMax + gain when exhaustion is below tier 4 (2014, exhaustion 3) — today's numbers, unchanged", () => {
-    const meta = effectiveMaxMeta({ rawMax: 31, featMaxHpBonus: 0, exhaustionLevel: 3 }, "EDITION_2014");
+    const meta = effectiveMaxMeta({ rawMax: 31, maxHpBonus: 0, exhaustionLevel: 3 }, "EDITION_2014");
     expect(meta.effectiveMaxAverage).toBe(31 + 8);
   });
 
   it("matches plain rawMax + gain under SRD 5.2, even at a nominal exhaustion 4 — no tier-4 HP rule in 2024 (#1321)", () => {
-    const meta = effectiveMaxMeta({ rawMax: 31, featMaxHpBonus: 0, exhaustionLevel: 4 }, "EDITION_2024");
+    const meta = effectiveMaxMeta({ rawMax: 31, maxHpBonus: 0, exhaustionLevel: 4 }, "EDITION_2024");
     expect(meta.effectiveMaxAverage).toBe(31 + 8);
   });
 });

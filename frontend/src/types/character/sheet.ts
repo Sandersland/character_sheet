@@ -50,6 +50,11 @@ export interface Character {
   armorClassBreakdown: ArmorClassPart[];
   initiativeBonus: number;
   speed: number;
+  /** Dragon Wings (#1123) — 2014 only (PHB'14 p.107: passive fly speed equal
+   * to current speed), present only while unarmored at Draconic L14. Never
+   * present for 2024 characters: PHB'24 p.148 Dragon Wings is a flat 60 ft
+   * activated ability on its own resource pool, not a derived value. */
+  flySpeed?: number;
   proficiencyBonus: number;
 
   hitPoints: {

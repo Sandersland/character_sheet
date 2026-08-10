@@ -18,6 +18,7 @@ export * from "@/lib/srd/roll-effects.js";
 export * from "@/lib/srd/item-rarity.js";
 export * from "@/lib/srd/armor-class.js";
 export * from "@/lib/srd/movement.js";
+export * from "@/lib/srd/hit-points.js";
 export * from "@/lib/srd/extra-attack.js";
 export * from "@/lib/srd/crit-range.js";
 export * from "@/lib/srd/announced-save-dc.js";

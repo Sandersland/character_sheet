@@ -25,6 +25,7 @@ import {
   normalizeHitPoints,
 } from "@/lib/combat/hitpoints.js";
 import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
+import { draconicResilienceMaxHpTerm } from "./draconic-bloodline.js";
 import {
   abilityModifier,
   characterFightingStyleFeatSlots,
@@ -182,7 +183,18 @@ const ADD_CLASS_SELECT = {
   rulesEdition: true,
   classEntries: {
     orderBy: { position: "asc" as const },
-    select: { id: true, name: true, level: true, position: true, classId: true, class: { select: { extraAsiLevels: true, fightingStyleFeatLevel: true } } },
+    // subclass/subclassRef.slug/class.subclassLevel (#1123):
+    // draconicResilienceMaxHpTerm's identity inputs for the clamp below.
+    select: {
+      id: true,
+      name: true,
+      level: true,
+      position: true,
+      classId: true,
+      subclass: true,
+      subclassRef: { select: { slug: true } },
+      class: { select: { extraAsiLevels: true, fightingStyleFeatLevel: true, subclassLevel: true } },
+    },
   },
 } satisfies Prisma.CharacterSelect;
 
@@ -266,9 +278,20 @@ async function applyAddClass(ctx: ClassOpContext, op: AddClassOperation): Promis
   const derivedLevel = levelForExperience(character.experiencePoints);
   const fightingStyleSlotTotal = characterFightingStyleFeatSlots(character.classEntries, derivedLevel);
   const inCapAdvancements = inCapAdvancementsAt(character.resources, character.classEntries, derivedLevel, fightingStyleSlotTotal);
-  const featMaxHpBonus = deriveFeatBonuses(inCapAdvancements, beforeHd.total + 1).maxHp;
+  // #1123: the Draconic term must see the POST-op multiclass shape (the new
+  // entry appended), not the pre-op list — for a single-class Draconic
+  // sorcerer multiclassing out, effectiveEntryLevel over the still-length-1
+  // pre-op list would read the XP-derived TOTAL level instead of the sorcerer
+  // entry's own (now lower) level, overstating the term by the pending level.
+  const entriesAfterAdd = [
+    ...character.classEntries,
+    { name: catalog.name, level: 1, subclass: null, subclassRef: null, class: null },
+  ];
+  const maxHpBonus =
+    deriveFeatBonuses(inCapAdvancements, beforeHd.total + 1).maxHp +
+    draconicResilienceMaxHpTerm(entriesAfterAdd, derivedLevel, character.rulesEdition);
   const exhaustionLevel = normalizeConditionsMutable(character.conditions).exhaustion;
-  const newEffMax = effectiveMaxHitPoints(newMax, featMaxHpBonus, exhaustionLevel, character.rulesEdition);
+  const newEffMax = effectiveMaxHitPoints(newMax, maxHpBonus, exhaustionLevel, character.rulesEdition);
   const afterHp = {
     ...beforeHp,
     max: newMax,

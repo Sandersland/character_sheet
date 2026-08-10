@@ -71,13 +71,16 @@ export function normalizeHitDice(json: Prisma.JsonValue): HitDice {
  */
 export function effectiveMaxHitPoints(
   baseMax: number,
-  featMaxHpBonus: number,
+  // Feat bonuses (e.g. Tough) plus Draconic Resilience's subclass term
+  // (#1123) — every pre-halving max-HP addend, composed by the caller
+  // (effectiveMaxHitPointsForRow / applyFeatLayer).
+  maxHpBonus: number,
   exhaustionLevel: number,
   edition: RulesEdition,
 ): number {
-  const withFeat = baseMax + featMaxHpBonus;
-  const penalty = exhaustionMaxHpPenalty(exhaustionLevel, withFeat, edition);
-  return Math.max(1, withFeat - penalty);
+  const withBonuses = baseMax + maxHpBonus;
+  const penalty = exhaustionMaxHpPenalty(exhaustionLevel, withBonuses, edition);
+  return Math.max(1, withBonuses - penalty);
 }
 
 // The minimal per-entry shape characterAdvancementSlots needs — same

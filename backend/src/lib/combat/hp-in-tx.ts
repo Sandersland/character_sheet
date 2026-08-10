@@ -41,10 +41,20 @@ export async function applyHealInTx(
       // extraAsiLevels read — this is one of the reconciler/clamp-on-read pair's
       // seven query sites CLAUDE.md governs; it must resolve the SAME column as
       // reconcileAdvancements' select. `fightingStyleFeatLevel` (#1321):
-      // effectiveMaxHitPointsForRow's fs-cap arg.
+      // effectiveMaxHitPointsForRow's fs-cap arg. subclassRef.slug/
+      // class.subclassLevel (#1123): draconicResilienceMaxHpTerm's identity
+      // inputs — the heal cap must include the Draconic term or a Draconic
+      // sorcerer's top HP is unreachable by healing.
       classEntries: {
         orderBy: { position: "asc" as const },
-        select: { id: true, level: true, name: true, subclass: true, class: { select: { extraAsiLevels: true, fightingStyleFeatLevel: true } } },
+        select: {
+          id: true,
+          level: true,
+          name: true,
+          subclass: true,
+          subclassRef: { select: { slug: true } },
+          class: { select: { extraAsiLevels: true, fightingStyleFeatLevel: true, subclassLevel: true } },
+        },
       },
     },
   });
