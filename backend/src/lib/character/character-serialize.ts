@@ -17,6 +17,7 @@ import { QUIVERING_PALM_BUFF_KEY, hasQuiveringPalm } from "@/lib/classes/quiveri
 import { hasOpenHandTechnique } from "@/lib/classes/open-hand-technique.js";
 import { resolveSubclassSlug, type SubclassIdentityInput } from "@/lib/classes/subclass-slug.js";
 import { assassinateEligible } from "@/lib/classes/assassinate.js";
+import { weaponBondEligible, WEAPON_BOND_LIMIT } from "@/lib/classes/weapon-bond.js";
 import { featureRowsOf } from "@/lib/classes/feature-rows-select.js";
 import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
 import { normalizeActiveEffectsMutable, type ActiveEffectsMutableState } from "@/lib/combat/active-effects.js";
@@ -391,6 +392,16 @@ export async function serializeCharacter(rawRow: CharacterRow) {
   // or Shield. Computed once here — `deriveActions` is the first consumer, but
   // the flag is generic (`requiresUnarmored`) so future gated features share it.
   const unarmoredUnshielded = bestArmor == null && !hasShield;
+  // Eldritch Knight Weapon Bond (#1854): clamp-on-read half of the
+  // reconciler/clamp pair — weaponBondEligible is the SAME rule function
+  // reconcileWeaponBond (level-reconciliation.ts) and the bond/unbond
+  // transaction op (weapon-bond.ts) call. A stale `weaponBonded` flag on a
+  // character who's since lost eligibility (level-down, lost the subclass)
+  // reads as 0 here until reconcileWeaponBond physically clears it on the
+  // next XP transaction.
+  const bondedWeaponCount = weaponBondEligible(row.classEntries, progress.level, editionOf(row)).eligible
+    ? row.inventoryItems.filter((item) => item.weaponBonded).length
+    : 0;
   const { armorClass, armorClassBreakdown } = buildArmorClassView(
     row,
     effectiveScores,
@@ -514,6 +525,10 @@ export async function serializeCharacter(rawRow: CharacterRow) {
     // attune path's 409 rejects on — the sheet used to re-type the literal in
     // four places.
     attunementCap: ATTUNEMENT_LIMIT,
+    // Weapon Bond's 2-weapon cap (#1854), same served-constant shape as
+    // attunementCap above — the bond endpoint's 409 rejects on the same
+    // WEAPON_BOND_LIMIT.
+    weaponBondCap: WEAPON_BOND_LIMIT,
     spellcasting,
     resources,
     // Active status conditions + exhaustion level. Normalized on read (unknown
@@ -560,7 +575,9 @@ export async function serializeCharacter(rawRow: CharacterRow) {
     },
 
     // Class-specific available actions for the turn tracker (universal ones ride
-    // GET /api/reference instead, resolved per edition — #1430).
+    // GET /api/reference instead, resolved per edition — #1430). bondedWeaponCount
+    // (#1854) is the clamp-on-read half of the reconciler/clamp pair — see its
+    // own computation above.
     availableActions: buildAvailableActionsView(
       row.classEntries,
       progress.level,
@@ -573,6 +590,7 @@ export async function serializeCharacter(rawRow: CharacterRow) {
       inventory
         .filter((item) => item.category === "weapon" && item.equipped && item.weapon)
         .map((item) => ({ light: Boolean(item.weapon?.light) })),
+      bondedWeaponCount,
     ),
 
     // Combat attack rows — derived at read time so the session turn sheets render

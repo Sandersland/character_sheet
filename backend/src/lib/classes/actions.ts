@@ -276,6 +276,25 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // both are now row-driven (actionsFromRows below), read off Fighter's own
   // ClassFeature rows (activationCost/resolverKind/cost*/effect* columns,
   // prisma/seed/fighter-features.ts) instead of a DERIVED_ACTIONS entry.
+  //
+  // Eldritch Knight — Weapon Bond (2014, PHB'14 p.75, #1854): `enabled` reads
+  // a synthetic "weaponBond" pool (character-serialize.ts) built from
+  // weapon-bond.ts's weaponBondEligible + a live count of `weaponBonded`
+  // inventory rows — never a resource spend (bonding/unbonding is its own
+  // "weapon-bond" ability, not this action). 2014-only: 2024 Eldritch Knight
+  // text is unverified/PARKED (#1531), so this stays 2014 until that lands.
+  {
+    key: "summonBondedWeapon",
+    name: "Summon Bonded Weapon",
+    cost: "bonusAction",
+    grantClass: "fighter",
+    grantLevel: 3,
+    grantSubclassSlugs: ["fighter-eldritch-knight"],
+    resourceKey: "weaponBond",
+    resourceAmount: 1,
+    edition: "EDITION_2014",
+    reminder: "Drop what you're holding and summon one bonded weapon into your hand. Bonded weapons can't be disarmed.",
+  },
 
   // Monk
   // Martial Arts (#1218): a free Unarmed Strike as a Bonus Action from L1 — no

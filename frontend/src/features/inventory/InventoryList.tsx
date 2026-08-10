@@ -12,9 +12,11 @@ import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { useIsBelowMd } from "@/hooks/useIsBelowMd";
 import { useInventoryTransactions } from "@/features/inventory/useInventoryTransactions";
 import { useSellSelection } from "@/features/inventory/useSellSelection";
+import { useWeaponBondTransactions } from "@/features/inventory/useWeaponBondTransactions";
 import { useItemCatalog } from "@/hooks/useItemCatalog";
 import { buildSellOperations, type SellLine } from "@/lib/bulkSell";
 import { buildSections, filterInventory, selectionGp, type FilterKey } from "@/lib/inventorySections";
+import { bondedWeaponCount, weaponBondEligible, type WeaponBondProps } from "@/lib/weaponBond";
 import { useState } from "react";
 
 // The sheet's inventory editor: category-sectioned rows + add/sell panels, all funneling through one submitOperations that calls POST .../inventory/transactions and swaps in the returned character.
@@ -24,6 +26,7 @@ export default function InventoryList() {
   const isMobile = useIsBelowMd();
   const { pending, error, addOpen, editingId, setAddOpen, setEditingId, applyOps, submitOperations } =
     useInventoryTransactions(character);
+  const bondMutation = useWeaponBondTransactions(character);
   const sell = useSellSelection();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
@@ -39,6 +42,16 @@ export default function InventoryList() {
   // Counting the live rows stays local; the limit itself never does.
   const attunedCount = character.inventory.filter((item) => item.attuned).length;
   const atCap = attunedCount >= character.attunementCap;
+  // Same served-cap shape as attunement (#1854): weaponBondEligible reads the
+  // server-resolved availableActions signal rather than re-deriving the 2014
+  // EK L3+ gate client-side. Bundled into one WeaponBondProps (see that
+  // type's own comment) rather than threaded as discrete props.
+  const bond: WeaponBondProps = {
+    eligible: weaponBondEligible(character),
+    atCap: bondedWeaponCount(character) >= character.weaponBondCap,
+    pending: bondMutation.pending,
+    onSubmit: bondMutation.submitOperations,
+  };
 
   const filtered = filterInventory(character.inventory, filter, search);
   const sections = buildSections(filtered);
@@ -91,6 +104,7 @@ export default function InventoryList() {
       onCancelSell={sell.stopConfiguring}
       onAddItem={() => setAddOpen(true)}
       onSubmit={submitOperations}
+      bond={bond}
       onEdit={setEditingId}
       onCancelEdit={() => setEditingId(null)}
       onToggleSelect={sell.toggleSelect}

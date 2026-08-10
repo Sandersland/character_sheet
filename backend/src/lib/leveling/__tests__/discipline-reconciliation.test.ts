@@ -141,6 +141,7 @@ describe("LEVEL_GATED_RECONCILERS gained no entry for disciplines (#1503)", () =
     expect(entries).toEqual([
       "reconcileClassEntryLevels",
       "reconcileSubclass",
+      "reconcileWeaponBond",
       "reconcileGrantedSpells",
       "reconcilePreparedSpells",
       "reconcileManeuvers",

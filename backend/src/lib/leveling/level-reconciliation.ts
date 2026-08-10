@@ -50,6 +50,7 @@ import {
 import { characterAdvancementSlots, characterFightingStyleFeatSlots, derivePreparedSpellLimit, deriveFeatBonuses } from "@/lib/srd/srd.js";
 import { deriveEntryScopedResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
 import { draconicResilienceMaxHpTerm } from "@/lib/classes/draconic-bloodline.js";
+import { weaponBondEligible } from "@/lib/classes/weapon-bond.js";
 import { FEATURE_ROWS_ENTRY_SELECT, featureRowsOf } from "@/lib/classes/feature-rows-select.js";
 import { reverseAdvancementEffects } from "./advancement.js";
 import { effectiveMaxHitPoints, normalizeHitDice, normalizeHitPoints } from "@/lib/combat/hitpoints.js";
@@ -119,6 +120,55 @@ async function reconcileSubclass(ctx: ReconcileContext): Promise<void> {
       before: { subclassId: entry.subclassId ?? null, subclass: entry.subclass ?? null },
       after: { subclassId: null, subclass: null },
       data: { classEntryId: entry.id },
+      batchId,
+    });
+  }
+}
+
+// Eldritch Knight Weapon Bond (2014, PHB'14 p.75, #1854): the bonded set's
+// legal cap depends on level (WEAPON_BOND_LIMIT while an EK L3+ 2014, else 0)
+// — CLAUDE.md's level-gated-state rule. Runs AFTER reconcileSubclass so a
+// just-cleared EK subclass is already reflected. weaponBondEligible is the
+// SAME rule function the bond/unbond transaction op and the clamp-on-read in
+// character-serialize.ts both call. Removing a bonded item from inventory
+// needs no reconciler here — the `weaponBonded` flag lives ON the InventoryItem
+// row, so deleting the row deletes the flag with it; this reconciler only
+// handles the character-level-down/lost-subclass case.
+async function reconcileWeaponBond(ctx: ReconcileContext): Promise<void> {
+  const { tx, characterId, newDerivedLevel, edition, batchId } = ctx;
+
+  const row = await tx.character.findUnique({
+    where: { id: characterId },
+    select: {
+      classEntries: {
+        orderBy: { position: "asc" as const },
+        select: { name: true, level: true, subclass: true, subclassId: true, subclassRef: { select: { slug: true } } },
+      },
+    },
+  });
+  if (!row) return;
+
+  const { eligible } = weaponBondEligible(row.classEntries, newDerivedLevel, edition);
+  if (eligible) return;
+
+  const bonded = await tx.inventoryItem.findMany({
+    where: { characterId, weaponBonded: true },
+    select: { id: true, name: true },
+  });
+  if (bonded.length === 0) return;
+
+  await tx.inventoryItem.updateMany({ where: { characterId, weaponBonded: true }, data: { weaponBonded: false } });
+
+  for (const item of bonded) {
+    await logEvent(tx, {
+      characterId,
+      category: "inventory",
+      type: "weaponUnbonded",
+      summary: `${item.name} unbonded (level dropped below Weapon Bond's requirement)`,
+      entityType: "InventoryItem",
+      entityId: item.id,
+      before: { weaponBonded: true },
+      after: { weaponBonded: false },
       batchId,
     });
   }
@@ -792,6 +842,7 @@ async function reconcileClassEntryLevels(ctx: ReconcileContext): Promise<void> {
 const LEVEL_GATED_RECONCILERS: Reconciler[] = [
   reconcileClassEntryLevels,
   reconcileSubclass,
+  reconcileWeaponBond,
   reconcileGrantedSpells,
   reconcilePreparedSpells,
   reconcileManeuvers,

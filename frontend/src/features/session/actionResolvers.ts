@@ -170,6 +170,13 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
   // instead of a hand-authored entry here. Second Wind's heal is also
   // server-rolled now (was client `healRoll`, #1528) — see resolverFromRow.
 
+  // Eldritch Knight Weapon Bond (2014, #1854) — narrated only, like
+  // recklessAttack: bonding/unbonding a weapon is its own separate flow
+  // (the inventory row's Bond toggle), not this action. Summoning just
+  // consumes the bonus action; `enabled` (server-computed from the bonded
+  // count) already gates whether the option is clickable.
+  summonBondedWeapon: { key: "summonBondedWeapon", kind: "simple-confirm", slot: "bonusAction", serverEffect: false },
+
   // Martial Arts Bonus Unarmed Strike (#1218) — reuses the twf-picker economy
   // path (single bonusAction-source swing), locked to the Unarmed Strike
   // profile. Gated server-side by requiresUnarmored, not a resource pool.

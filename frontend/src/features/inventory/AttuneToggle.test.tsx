@@ -14,6 +14,7 @@ const mockItem: InventoryItem = {
   quantity: 1,
   equipped: false,
   attuned: false,
+  weaponBonded: false,
   requiresAttunement: true,
   attunementPrereqText: "a spellcaster",
   equippable: false,

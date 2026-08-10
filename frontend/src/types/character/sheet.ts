@@ -89,6 +89,8 @@ export interface Character {
   carriedWeight: number;
   /** The attunement cap the server's attune path rejects past (#1377). */
   attunementCap: number;
+  /** Eldritch Knight Weapon Bond's 2-weapon cap (#1854) the server's bond path rejects past. */
+  weaponBondCap: number;
 
   spellcasting?: {
     ability: AbilityName;

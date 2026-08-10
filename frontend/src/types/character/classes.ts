@@ -46,6 +46,7 @@ export type { ResourceOpAudit as ResourceOpResult } from "@character-sheet/share
 // fallow gate.
 export type {
   AttemptStunningStrikeOperation,
+  BondWeaponOperation,
   CastChannelDivinityOperation,
   CastShadowArtOperation,
   ChannelDivinityOperation,
@@ -57,6 +58,8 @@ export type {
   SetQuiveringPalmOperation,
   ShadowArtOperation,
   TriggerQuiveringPalmOperation,
+  UnbondWeaponOperation,
+  WeaponBondOperation,
 } from "@character-sheet/contracts";
 
 /** Focus (or other pool) cost of an activated ability. Mirror of backend AbilityCost. */

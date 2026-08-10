@@ -8,7 +8,7 @@ import * as barrel from "@/api/client";
 
 // #1270: locks the post-split shape of frontend/src/api/ so the domain cut
 // can't silently regress back into one file, and so client.ts can't grow a
-// function body again. The 103-name list is the exact public surface today —
+// function body again. The 105-name list is the exact public surface today —
 // changing it on purpose (new endpoint) means editing this list on purpose.
 const EXPECTED_EXPORTS = [
   "addCharacterToCampaign",
@@ -29,6 +29,7 @@ const EXPECTED_EXPORTS = [
   "applyWarriorOfElementsTransactions",
   "attemptStunningStrikeTransaction",
   "awardCampaignItem",
+  "bondWeaponTransaction",
   "castDisciplineTransaction",
   "castManeuverTransaction",
   "checkHealth",
@@ -103,6 +104,7 @@ const EXPECTED_EXPORTS = [
   "startSoloSession",
   "submitLevelUp",
   "triggerQuiveringPalmTransaction",
+  "unbondWeaponTransaction",
   "unmergeEntityMerge",
   "unshareCatalogEntry",
   "updateCampaignItem",
@@ -125,7 +127,7 @@ function apiSourceFiles(): string[] {
 // PIN (passes today): the exact export set, so a dropped `export *` in any
 // domain-move commit fails loudly instead of silently shrinking the barrel.
 describe("api barrel surface", () => {
-  it("exports exactly the 103 documented names", () => {
+  it("exports exactly the 105 documented names", () => {
     const actual = Object.keys(barrel).sort();
     expect(actual).toEqual(EXPECTED_EXPORTS);
   });

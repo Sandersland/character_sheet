@@ -11,6 +11,7 @@ export * from "@/api/spells";
 export * from "@/api/inventory";
 export * from "@/api/abilities";
 export * from "@/api/disciplines";
+export * from "@/api/weapon-bond";
 export * from "@/api/characters";
 export * from "@/api/combat";
 export * from "@/api/leveling";

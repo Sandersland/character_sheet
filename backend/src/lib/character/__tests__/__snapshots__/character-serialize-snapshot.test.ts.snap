@@ -321,6 +321,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
         "weaponClass": "martial",
         "weaponRange": "melee",
       },
+      "weaponBonded": false,
       "weight": undefined,
     },
     {
@@ -359,6 +360,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
       "requiresAttunement": false,
       "slot": undefined,
       "weapon": undefined,
+      "weaponBonded": false,
       "weight": undefined,
     },
     {
@@ -397,6 +399,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
       "requiresAttunement": false,
       "slot": undefined,
       "weapon": undefined,
+      "weaponBonded": false,
       "weight": undefined,
     },
     {
@@ -455,6 +458,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
       "requiresAttunement": false,
       "slot": "NECK",
       "weapon": undefined,
+      "weaponBonded": false,
       "weight": undefined,
     },
     {
@@ -491,6 +495,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
       "requiresAttunement": false,
       "slot": undefined,
       "weapon": undefined,
+      "weaponBonded": false,
       "weight": undefined,
     },
   ],
@@ -785,6 +790,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
     },
     "magical": false,
   },
+  "weaponBondCap": 2,
   "weaponProficiencies": [],
 }
 `;
@@ -1179,6 +1185,7 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
     },
     "magical": false,
   },
+  "weaponBondCap": 2,
   "weaponProficiencies": [],
 }
 `;

@@ -1,84 +1,20 @@
 import { useEffect, useState } from "react";
 
-import type { EquipSlot, InventoryItem, InventoryOperation, ItemRarityOption } from "@/types/character";
-import { EQUIP_SLOT_ICONS, Lock, MoreHorizontal, TriangleAlert } from "@/components/ui/icons";
-import Badge from "@/components/ui/Badge";
+import type { EquipSlot, InventoryItem, InventoryOperation } from "@/types/character";
+import { EQUIP_SLOT_ICONS, Lock } from "@/components/ui/icons";
 import Popover from "@/components/ui/Popover";
 import SlotPickerPanel from "@/features/inventory/SlotPickerPanel";
-import AttuneToggle from "@/features/inventory/AttuneToggle";
+import LoadoutFilledRow from "@/features/inventory/LoadoutFilledRow";
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { useItemRarities } from "@/hooks/useItemRarities";
+import { useWeaponBondTransactions } from "@/features/inventory/useWeaponBondTransactions";
 import { bagItemsForSlot } from "@/lib/paperDoll";
-import { attunementSummary, buildLoadoutGroups, type FilledLoadoutRow } from "@/lib/loadout";
-import { paperDollRarityLabel, rarityTone } from "@/lib/rarity";
+import { attunementSummary, buildLoadoutGroups } from "@/lib/loadout";
+import { bondedWeaponCount, weaponBondEligible } from "@/lib/weaponBond";
 
 interface LoadoutListProps {
   pending: boolean;
   onSubmit: (operations: InventoryOperation[]) => Promise<void>;
-}
-
-interface FilledRowProps {
-  row: FilledLoadoutRow;
-  candidates: InventoryItem[];
-  pending: boolean;
-  rarities: ItemRarityOption[];
-  onUnequip: (item: InventoryItem) => void;
-  onReplace: (incoming: InventoryItem, outgoing: InventoryItem) => void;
-}
-
-// A filled row's trailing action popover: Unequip, or Swap → SlotPickerPanel.
-function FilledRowActions({ row, candidates, pending, rarities, onUnequip, onReplace }: FilledRowProps) {
-  const [swapping, setSwapping] = useState(false);
-  return (
-    <Popover
-      align="right"
-      label={`${row.label}: ${row.item.name}`}
-      onClose={() => setSwapping(false)}
-      trigger={
-        <span className="flex size-7 items-center justify-center rounded-control text-parchment-500 hover:bg-parchment-100 hover:text-parchment-800">
-          <MoreHorizontal aria-hidden="true" className="size-4" />
-        </span>
-      }
-    >
-      {swapping ? (
-        <div className="w-56 p-3">
-          <SlotPickerPanel
-            slotLabel={`Swap ${row.label}`}
-            candidates={candidates}
-            pending={pending}
-            action="replace"
-            rarities={rarities}
-            onPick={(incoming) => {
-              setSwapping(false);
-              onReplace(incoming, row.item);
-            }}
-            onClose={() => setSwapping(false)}
-          />
-        </div>
-      ) : (
-        <div className="flex w-40 flex-col gap-2 p-3 text-xs">
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => onUnequip(row.item)}
-            className="text-left font-semibold text-garnet-700 hover:underline disabled:opacity-50"
-          >
-            Unequip
-          </button>
-          {candidates.length > 0 && (
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => setSwapping(true)}
-              className="text-left font-semibold text-arcane-700 hover:underline disabled:opacity-50"
-            >
-              Swap
-            </button>
-          )}
-        </div>
-      )}
-    </Popover>
-  );
 }
 
 // The interactive "Worn" loadout list (#925): grouped Weapons / Armor /
@@ -90,6 +26,9 @@ export default function LoadoutList({ pending, onSubmit }: LoadoutListProps) {
   const rarities = useItemRarities(character.rulesEdition);
   const groups = buildLoadoutGroups(character);
   const attunement = attunementSummary(inventory, character.attunementCap);
+  const bondEligible = weaponBondEligible(character);
+  const bondAtCap = bondedWeaponCount(character) >= character.weaponBondCap;
+  const bond = useWeaponBondTransactions(character);
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
@@ -182,48 +121,22 @@ export default function LoadoutList({ pending, onSubmit }: LoadoutListProps) {
                   </li>
                 );
               }
-              const { item, notProficient, grip } = row;
-              // Null until the served rows land (#1437), so no raw enum key ever paints.
-              const rarityText = paperDollRarityLabel(item.rarity, rarities);
               return (
-                <li
+                <LoadoutFilledRow
                   key={row.key}
-                  className="flex items-center gap-2 rounded-card border border-parchment-200 bg-parchment-50 px-3 py-2 max-md:rounded-none max-md:border-0 max-md:border-b max-md:px-4"
-                >
-                  <Icon aria-hidden="true" className="size-5 shrink-0 text-garnet-700" />
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    <span className="flex items-center gap-1.5">
-                      <span className="truncate text-sm font-medium text-parchment-900">{item.name}</span>
-                      {notProficient && (
-                        <>
-                          <TriangleAlert aria-hidden="true" className="size-3.5 shrink-0 text-gold-600" />
-                          <span className="sr-only">Not proficient</span>
-                        </>
-                      )}
-                    </span>
-                    <span className="text-xs uppercase tracking-wide text-parchment-400">{row.label}</span>
-                  </div>
-                  {grip && <Badge tone="neutral">{grip.short}</Badge>}
-                  {item.rarity && rarityText && (
-                    <Badge tone={rarityTone(item.rarity)}>{rarityText}</Badge>
-                  )}
-                  {item.requiresAttunement && (
-                    <AttuneToggle
-                      item={item}
-                      pending={pending}
-                      atCap={attunement.atCap}
-                      onSubmit={onSubmit}
-                    />
-                  )}
-                  <FilledRowActions
-                    row={row}
-                    candidates={bagItemsForSlot(inventory, row.slot)}
-                    pending={pending}
-                    rarities={rarities}
-                    onUnequip={unequip}
-                    onReplace={(incoming, outgoing) => void replace(incoming, outgoing, row.slot)}
-                  />
-                </li>
+                  row={row}
+                  pending={pending}
+                  rarities={rarities}
+                  attunementAtCap={attunement.atCap}
+                  bondEligible={bondEligible}
+                  bondAtCap={bondAtCap}
+                  bondPending={bond.pending}
+                  onSubmit={onSubmit}
+                  onBondSubmit={bond.submitOperations}
+                  candidates={bagItemsForSlot(inventory, row.slot)}
+                  onUnequip={unequip}
+                  onReplace={(incoming, outgoing) => void replace(incoming, outgoing, row.slot)}
+                />
               );
             })}
           </ul>

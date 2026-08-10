@@ -52,6 +52,7 @@ const mockCharacter: Character = {
   carryCapacity: 180,
   carriedWeight: 0.5,
   attunementCap: 3,
+  weaponBondCap: 2,
   conditions: { active: [], exhaustion: 0 },
   exhaustionEffectText: "No exhaustion.",
   activeEffects: { buffs: [] },

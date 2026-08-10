@@ -97,6 +97,7 @@ async function recreateDeletedItem(
       requiresAttunement: deletedItem.requiresAttunement,
       attunementPrereqKind: deletedItem.attunementPrereqKind,
       attunementPrereqValue: deletedItem.attunementPrereqValue,
+      weaponBonded: deletedItem.weaponBonded,
       notes: deletedItem.notes ?? undefined,
       position: deletedItem.position,
       usesRemaining: deletedItem.usesRemaining,
@@ -108,8 +109,9 @@ async function recreateDeletedItem(
 
 // Restores the scalar(s) captured in a surviving row's `before` snapshot:
 // quantity (partial sell/adjust), equippedSlot (setEquipped), attuned
-// (attune/unattune), activatedUsesSpent (activate), usesRemaining (charged use),
-// and capabilityUsed (a #555 charges-pool spend).
+// (attune/unattune), weaponBonded (bondWeapon/unbondWeapon, #1854),
+// activatedUsesSpent (activate), usesRemaining (charged use), and
+// capabilityUsed (a #555 charges-pool spend).
 async function restoreScalars(
   tx: Prisma.TransactionClient,
   entityId: string,
@@ -117,6 +119,7 @@ async function restoreScalars(
     quantity?: number;
     equippedSlot?: EquipSlot | null;
     attuned?: boolean;
+    weaponBonded?: boolean;
     activatedUsesSpent?: number;
     usesRemaining?: number;
     capabilityUsed?: { capabilityId: string; used: number };
@@ -126,6 +129,7 @@ async function restoreScalars(
   if (before.quantity !== undefined) updateData.quantity = before.quantity;
   if (before.equippedSlot !== undefined) updateData.equippedSlot = before.equippedSlot;
   if (before.attuned !== undefined) updateData.attuned = before.attuned;
+  if (before.weaponBonded !== undefined) updateData.weaponBonded = before.weaponBonded;
   if (before.activatedUsesSpent !== undefined) updateData.activatedUsesSpent = before.activatedUsesSpent;
   // Promoted out of InventoryConsumableDetail (#1648) — a plain InventoryItem
   // column, so restoring it is just another field in this same update.

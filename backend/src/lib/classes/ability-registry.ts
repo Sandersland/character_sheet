@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   activateCloakOfShadowsOpSchema,
   attemptStunningStrikeOpSchema,
+  bondWeaponOpSchema,
   castChannelDivinityOpSchema,
   castDisciplineOpSchema,
   castManeuverOpSchema,
@@ -11,6 +12,7 @@ import {
   rollSneakAttackOpSchema,
   setQuiveringPalmOpSchema,
   triggerQuiveringPalmOpSchema,
+  unbondWeaponOpSchema,
   useHandOfUltimateMercyOpSchema,
 } from "@character-sheet/contracts";
 
@@ -41,6 +43,7 @@ import {
   ELEMENTAL_DAMAGE_TYPES,
   InvalidWarriorOfElementsOperationError,
 } from "./warrior-of-elements.js";
+import { applyWeaponBondOperations, InvalidWeaponBondOperationError } from "./weapon-bond.js";
 
 const elementalDamageTypeSchema = z.enum(ELEMENTAL_DAMAGE_TYPES);
 
@@ -213,5 +216,16 @@ export const ABILITY_REGISTRY: Record<string, TransactionHandler> = {
     apply: (characterId, data) => applyWarriorOfElementsOperations(characterId, data.operations),
     domainErrors: [InvalidWarriorOfElementsOperationError, InvalidResourceOperationError],
     respond: (character, results) => ({ character, results }),
+  }),
+
+  // Eldritch Knight Weapon Bond (2014, PHB'14 p.75, #1854): bondWeapon marks
+  // an owned weapon InventoryItem row bonded (L3+ EK gate, 2-weapon cap, 409
+  // on the 3rd); unbondWeapon is always legal. The "Summon bonded weapon"
+  // bonus action itself is a plain DERIVED_ACTIONS row (actions.ts) — no
+  // ability here casts or rolls anything.
+  "weapon-bond": defineAbility({
+    schema: opBatch(bondWeaponOpSchema, unbondWeaponOpSchema),
+    apply: (characterId, data) => applyWeaponBondOperations(characterId, data.operations),
+    domainErrors: [InvalidWeaponBondOperationError],
   }),
 };
