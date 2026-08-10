@@ -68,7 +68,12 @@ describe("deriveAnnouncedSaveDC generalised to base-class rows (#1589)", () => {
     expect(result?.announcedSaveDC).toBeUndefined();
   });
 
-  it("cross-entry collision: two DIFFERENT class entries each declaring an announced save DC throws, instead of one silently clobbering the other", () => {
+  // #1875 review: this runs on the GET read path (serializeCharacter), so a
+  // cross-entry collision must DEGRADE, not throw — throwing would 500 the whole
+  // character load. The deterministic winner is the FIRST declaring entry
+  // (classEntries is primary-first). The misconfiguration is still a bug, logged
+  // via logger.warn; the loud #1589 rejection belongs on a future write path.
+  it("cross-entry collision: two DIFFERENT class entries each declaring an announced save DC does NOT throw — keeps the first (primary) entry's DC", () => {
     const totalLevel = 8; // testbaseclass 5 + fighter(battle master) 3
     const profBonus = proficiencyBonusForLevel(totalLevel);
     const entries = [
@@ -80,9 +85,12 @@ describe("deriveAnnouncedSaveDC generalised to base-class rows (#1589)", () => {
         ? { classRows: [baseRowWithSaveDc()], subclassRows: [] }
         : testFeatureRowsFor(e.name, e.subclass);
 
-    expect(() =>
-      deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus, "EDITION_2024", getFeatureRows),
-    ).toThrow(/announced save DC/i);
+    let result: ReturnType<typeof deriveEntryScopedResources> | undefined;
+    expect(() => {
+      result = deriveEntryScopedResources(entries, totalLevel, ABILITY_SCORES, profBonus, "EDITION_2024", getFeatureRows);
+    }).not.toThrow();
+    // First entry (testbaseclass, WIS +3) wins: 8 + prof(3) + 3 = 14.
+    expect(result?.derived?.announcedSaveDC).toBe(8 + profBonus + 3);
   });
 
   it("single Battle Master entry (the pre-#1589 sole producer) is unaffected — no collision, no throw", () => {

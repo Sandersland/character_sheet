@@ -5,6 +5,7 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 
 import { levelForExperience, proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 import { effectiveEntryLevel, subclassActiveAt } from "@/lib/leveling/effective-levels.js";
+import { logger } from "@/lib/core/logger.js";
 import { editionOf } from "@/lib/rules/edition.js";
 import { deriveAnnouncedSaveDC } from "@/lib/srd/srd.js";
 
@@ -540,22 +541,26 @@ function assignDefined<T, K extends keyof T>(target: T, key: K, value: T[K] | un
 // contributor per character: unlike maneuverChoiceCount/toolProfChoiceCount
 // (Battle Master only, today), two DIFFERENT classes can each declare their
 // own saveDcAbilities (a future Cleric retab's Turn Undead DC alongside a
-// Fighter/Battle Master's maneuver DC). assignDefined's plain last-entry-wins
-// would silently let one legitimate announced DC clobber another — exactly
-// the clobber #1589 exists to retire, just relabelled from "Fighter-named
-// field gets a Wisdom DC" to "generic field gets two different classes'
-// DCs" — so a SECOND entry's defined value throws instead of silently
-// winning, mirroring addOrMergeEntryPool's unsanctioned-collision guard
-// (SHARED_POOL_MERGE). No production character can hit this today (Cleric's
-// rows deliberately leave saveDcAbilities unset, cleric-features.ts's own
-// header) — this guard exists so the NEXT class to populate it fails loudly
-// at derive time instead of corrupting another class's announced DC.
+// Fighter/Battle Master's maneuver DC). A second declaring class is a real
+// misconfiguration — one shared ClassExtras field can't carry two per-feature
+// DCs and #1589 exists to retire exactly that clobber. But this runs on the GET
+// READ path (deriveEntryScopedResources → serializeCharacter), so throwing here
+// would 500 the ENTIRE character load — unopenable — instead of degrading one
+// field (#1875 review). So the read path DEGRADES: keep a deterministic winner
+// (FIRST declaring entry — classEntries is primary-first, so the primary class's
+// DC wins) and drop the collision, logging a warning so the misconfiguration is
+// still visible. If a WRITE/validation path is ever added (homebrew authoring),
+// that is where the loud #1589 rejection belongs — not the read path every
+// serialize traverses. No production character can hit this today (Cleric's rows
+// deliberately leave saveDcAbilities unset, cleric-features.ts's own header).
 function assignAnnouncedSaveDC(target: DerivedClassInfo, value: number | undefined): void {
   if (value === undefined) return;
   if (target.announcedSaveDC !== undefined) {
-    throw new Error(
-      `deriveEntryScopedResources: multiple class entries declared an announced save DC (${target.announcedSaveDC} and ${value}) — needs per-feature scoping on the wire, not one shared ClassExtras field`,
+    logger.warn(
+      { existing: target.announcedSaveDC, dropped: value },
+      "deriveEntryScopedResources: multiple class entries declared an announced save DC — keeping the first (primary-class) DC and dropping the collision; announcedSaveDC needs per-feature scoping on the wire, not one shared ClassExtras field (#1589/#1875)",
     );
+    return;
   }
   target.announcedSaveDC = value;
 }
