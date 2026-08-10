@@ -69,4 +69,16 @@ describe("useDeflectAttacksReaction — redirectLabel (served name + served pool
     // Substring the monk-2014 e2e matches.
     expect(label).toContain("Throw Back · spend 1 Ki Points");
   });
+
+  it("falls back to the bare served name when no focus/ki pool is served (button still labelled)", () => {
+    const noPool = {
+      id: "char-1",
+      abilityScores: { strength: 10, dexterity: 16, constitution: 12, intelligence: 10, wisdom: 14, charisma: 10 },
+      unarmedStrike: { attackBonus: 6, damage: { count: 1, faces: 8, modifier: 3, damageType: "bludgeoning" } },
+      availableActions: [{ key: "deflectAttacks", name: "Base", cost: "reaction", enabled: true }],
+      resources: { pools: [] },
+    } as unknown as Character;
+    const label = labelFor(noPool, { key: "deflectAttacksRedirect", name: "Deflect Attacks — Redirect", cost: "free", enabled: true });
+    expect(label).toBe("Deflect Attacks — Redirect");
+  });
 });

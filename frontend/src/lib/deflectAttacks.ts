@@ -66,25 +66,30 @@ export function deflectRollFromAction(action: AvailableAction | undefined): Roll
 /**
  * Toast text for the base reduction, once rolled. `action` is the served row
  * (deflectBaseAction) — its `name` labels the message and its `key` decides
- * which edition's flavor text/redirect hint applies.
+ * which edition's flavor text/redirect hint applies. `spendLabel` is the served
+ * spend-pool label ("Focus Points" / "Ki Points") the redirect-hint names, so
+ * the toast and the redirect button agree on the resource; only the message
+ * STRUCTURE stays client-side (#1435). Falls back to "point" when unserved.
  */
 export function formatDeflectAttacksMessage(
   character: Character,
   action: AvailableAction,
   roll: RollResult,
   redirectAvailable: boolean,
+  spendLabel?: string,
 ): string {
   const dexMod = abilityModifier(character.abilityScores.dexterity);
   const monkLevel = classEntryLevel(character, "monk");
   const rolled = `1d10 rolled ${roll.dice[0].value} + DEX ${formatModifier(dexMod)} + monk level ${monkLevel}`;
+  const spend = `1 ${spendLabel ?? "point"}`;
   if (action.key === "deflectMissiles") {
     const base = `${action.name} — reduce ranged weapon attack damage by ${roll.total} (${rolled}).`;
-    return redirectAvailable ? `${base} Caught it with a free hand? Spend 1 ki to throw it back.` : base;
+    return redirectAvailable ? `${base} Caught it with a free hand? Spend ${spend} to throw it back.` : base;
   }
   const clause = deflectAttacksDamageTypeClause(character);
   const base = `${action.name} — reduce ${clause} by ${roll.total} (${rolled}).`;
   return redirectAvailable
-    ? `${base} Reduced a ranged hit to 0 with a free hand? Spend 1 Focus to redirect.`
+    ? `${base} Reduced a ranged hit to 0 with a free hand? Spend ${spend} to redirect.`
     : base;
 }
 
