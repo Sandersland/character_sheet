@@ -1,8 +1,9 @@
 /**
  * Direct ShadowArtRow pins (#688) — previously covered only transitively via
- * ShadowArtsSection.test.tsx. Pins the flat focus cast gating, the name-prefix
- * strip, the concentration badges + replacement warning, the buff chip, and
- * the expandable description, ahead of the shared-row-shell extraction.
+ * ShadowArtsSection.test.tsx. Pins the pool-cast gating (focus or ki, #1738),
+ * the name-prefix strip, the concentration badges + replacement warning, the
+ * buff chip, and the expandable description, ahead of the shared-row-shell
+ * extraction.
  */
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
@@ -30,7 +31,7 @@ const DARKNESS: CatalogShadowArt = {
 
 // Synthetic fixture exercising ShadowArtRow's generic buff-chip path (shared
 // with Channel Divinity via catalogEffectSpec) — no current Shadow Art carries
-// a buff (the 2014 Pass without Trace option is retired, #1246).
+// a buff (the 2014 four-spell menu are all utilities; the 2024 menu is Darkness only).
 const BUFF_ART_FIXTURE: CatalogShadowArt = {
   id: "sa-test-buff",
   name: "Shadow Arts: Test Buff",
@@ -56,7 +57,8 @@ function renderRow(over: Partial<Parameters<typeof ShadowArtRow>[0]> = {}) {
     <ul>
       <ShadowArtRow
         art={DARKNESS}
-        focusAvailable={4}
+        poolAvailable={4}
+        poolLabel="focus"
         busy={false}
         isConcentrating={false}
         concentratingOnName={null}
@@ -79,14 +81,30 @@ describe("ShadowArtRow (#688)", () => {
     expect(onCast).toHaveBeenCalledWith({ type: "castShadowArt", shadowArtId: "sa-darkness" });
   });
 
-  it("disables Cast below the focus cost with the needs-N title", async () => {
+  it("disables Cast below the pool cost with the needs-N title", async () => {
     const user = userEvent.setup();
-    const { onCast } = renderRow({ focusAvailable: 0 });
+    const { onCast } = renderRow({ poolAvailable: 0 });
     const cast = screen.getByRole("button", { name: "Cast" });
     expect(cast).toBeDisabled();
     expect(cast).toHaveAttribute("title", "Not enough focus (needs 1)");
     await user.click(cast).catch(() => undefined);
     expect(onCast).not.toHaveBeenCalled();
+  });
+
+  // #1738: the 2014 Way of Shadow menu costs ki, not focus — poolLabel is
+  // caller-supplied (resolved from the character's own resource pool by
+  // art.cost.key), never a hardcoded "focus" literal inside this row.
+  it("renders the caller-supplied pool label (ki for a 2014 Way of Shadow row)", () => {
+    renderRow({
+      art: { ...DARKNESS, cost: { kind: "pool", key: "ki", base: 2 } },
+      poolAvailable: 4,
+      poolLabel: "Ki Points",
+    });
+    expect(screen.getByText("2 Ki Points")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cast" })).toHaveAttribute(
+      "title",
+      "Cast Darkness (2 Ki Points)",
+    );
   });
 
   it("shows the conc chip, and the active 'concentrating' chip when held", () => {

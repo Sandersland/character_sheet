@@ -1,8 +1,12 @@
 /**
- * ShadowArtRow — the Warrior of Shadow Shadow Art (Darkness) with an expandable
- * description and a flat 1-focus cast affordance (#1246). Renders through
- * AbilityRowShell (shared with ManeuverRow); the buff-chip path stays generic
- * (shared with Channel Divinity) even though no current Shadow Art uses it.
+ * ShadowArtRow — one Shadow Art with an expandable description and a pool-cast
+ * affordance. Shared by both editions (#1738): a 2024 Warrior of Shadow row
+ * casts Darkness for 1 focus, a 2014 Way of Shadow row casts one of the
+ * four-spell menu for 2 ki — `poolLabel`/`poolAvailable` are resolved by the
+ * caller from the character's own resource pools (keyed off `art.cost.key`,
+ * never a hardcoded "focus"). Renders through AbilityRowShell (shared with
+ * ManeuverRow); the buff-chip path stays generic (shared with Channel
+ * Divinity) even though no current Shadow Art uses it.
  */
 
 import AbilityRowShell, { CastAbilityButton } from "@/features/class/AbilityRowShell";
@@ -14,7 +18,9 @@ import type {
 
 interface Props {
   art: CatalogShadowArt;
-  focusAvailable: number;
+  poolAvailable: number;
+  /** Served DerivedResource.label for this row's pool ("Focus Points" / "Ki Points"). */
+  poolLabel: string;
   busy: boolean;
   /** True when this Shadow Art is the character's active concentration. */
   isConcentrating: boolean;
@@ -25,13 +31,14 @@ interface Props {
 
 export default function ShadowArtRow({
   art,
-  focusAvailable,
+  poolAvailable,
+  poolLabel,
   busy,
   isConcentrating,
   concentratingOnName,
   onCast,
 }: Props) {
-  const view = shadowArtView(art, focusAvailable, isConcentrating, concentratingOnName);
+  const view = shadowArtView(art, poolAvailable, isConcentrating, concentratingOnName);
 
   function handleCast() {
     if (busy || !view.canAfford) return;
@@ -44,7 +51,7 @@ export default function ShadowArtRow({
       chips={
         <>
           <span className="text-[10px] text-gold-700" aria-hidden="true">
-            {view.focusCost} focus
+            {view.poolCost} {poolLabel}
           </span>
           {view.concentrates &&
             (isConcentrating ? (
@@ -69,8 +76,8 @@ export default function ShadowArtRow({
           onClick={handleCast}
           title={
             !view.canAfford
-              ? `Not enough focus (needs ${view.focusCost})`
-              : `Cast ${view.displayName} (${view.focusCost} focus)`
+              ? `Not enough ${poolLabel} (needs ${view.poolCost})`
+              : `Cast ${view.displayName} (${view.poolCost} ${poolLabel})`
           }
         />
       }

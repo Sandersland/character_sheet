@@ -1,55 +1,32 @@
 /**
- * ShadowArtsSection — Warrior of Shadow's Shadow Arts block inside
- * ClassFeaturesSection. Fetches the single-item Darkness catalog (2024 rewrite,
- * #1246 — the 2014 4-spell menu is retired) and wires the cast up to the
- * orchestrator. The cast is flat 1-focus, roll-less, and routes its
+ * ShadowArtsSection — the monk Shadow Arts block inside ClassFeaturesSection.
+ * Fetches the edition-scoped catalog (#1412: a 2024 Warrior of Shadow gets the
+ * single 1-focus Darkness row, a 2014 Way of Shadow gets the four-spell 2-ki
+ * menu — Darkness/Darkvision/Pass without Trace/Silence, #1738) and wires the
+ * cast up to the orchestrator. Casts are roll-less, and route their
  * concentration result through the re-rendered character (concentration
- * banner) rather than a dice toast.
+ * banner) rather than a dice toast. The catalog fetch lives in
+ * useShadowArtsCatalog and the pool-resolution/concentration-id derivations
+ * in lib/shadowArts.ts (both pure/directly tested), keeping this component to
+ * layout + wiring.
  */
 
-import { useEffect, useState } from "react";
-
-import { fetchShadowArts } from "@/api/client";
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
-import type {
-  CastShadowArtOperation,
-  CatalogShadowArt,
-  Character,
-} from "@/types/character";
+import { concentratingArtState, poolForArt, summaryPools } from "@/lib/shadowArts";
+import type { CastShadowArtOperation } from "@/types/character";
 import ShadowArtRow from "@/features/class/ShadowArtRow";
+import { useShadowArtsCatalog } from "@/features/class/useShadowArtsCatalog";
 
 interface Props {
   busy: boolean;
   onCast: (op: CastShadowArtOperation) => void;
 }
 
-// Remaining Focus from the character's derived resource pools.
-function focusRemaining(character: Character): number {
-  return character.resources?.pools.find((p) => p.key === "focus")?.remaining ?? 0;
-}
-
 export default function ShadowArtsSection({ busy, onCast }: Props) {
   const { character } = useCurrentCharacter();
-  const [catalog, setCatalog] = useState<CatalogShadowArt[] | null>(null);
-  const [catalogError, setCatalogError] = useState<string | null>(null);
-
-  // The mounted flag alone is the StrictMode-safe fetch guard. The catalog is
-  // edition-scoped server-side (#1412), so the edition belongs in the deps —
-  // Character.rulesEdition is write-once, so in practice it never re-fires.
-  useEffect(() => {
-    let mounted = true;
-    fetchShadowArts(character.rulesEdition)
-      .then((rows) => { if (mounted) setCatalog(rows); })
-      .catch(() => { if (mounted) setCatalogError("Couldn't load Shadow Arts."); });
-    return () => { mounted = false; };
-  }, [character.rulesEdition]);
-
-  const focusAvailable = focusRemaining(character);
-  const concentratingOn = character.spellcasting?.concentratingOn ?? null;
-  // A cast Shadow Art's concentration entryId is prefixed (disjoint from Spell.id) on the backend.
-  const concentratingArtId = concentratingOn?.entryId?.startsWith("shadow-art:")
-    ? concentratingOn.entryId.slice("shadow-art:".length)
-    : null;
+  const { catalog, error: catalogError, retry } = useShadowArtsCatalog(character.rulesEdition);
+  const { concentratingOn, concentratingArtId } = concentratingArtState(character);
+  const pools = summaryPools(character, catalog);
 
   return (
     <div>
@@ -60,12 +37,15 @@ export default function ShadowArtsSection({ busy, onCast }: Props) {
         {busy && <span className="text-[10px] text-parchment-600">Saving…</span>}
       </div>
 
-      <p className="mb-3 text-xs text-parchment-600">
-        Cast Darkness for 1 focus.
-        <span className="ml-2">
-          Focus remaining: <span className="font-semibold text-gold-800">{focusAvailable}</span>
-        </span>
-      </p>
+      {pools.length > 0 && (
+        <p className="mb-3 text-xs text-parchment-600">
+          {pools.map((pool, i) => (
+            <span key={pool.key} className={i > 0 ? "ml-3" : undefined}>
+              {pool.label} remaining: <span className="font-semibold text-gold-800">{pool.remaining}</span>
+            </span>
+          ))}
+        </p>
+      )}
 
       {concentratingOn && (
         <p className="mb-3 rounded-control border border-arcane-300 bg-arcane-50 px-3 py-1.5 text-xs text-arcane-800" role="status">
@@ -74,22 +54,29 @@ export default function ShadowArtsSection({ busy, onCast }: Props) {
       )}
 
       {catalogError ? (
-        <p className="rounded-control bg-garnet-50 px-3 py-2 text-xs font-semibold text-garnet-700">
+        <p className="flex items-center justify-between rounded-control bg-garnet-50 px-3 py-2 text-xs font-semibold text-garnet-700">
           {catalogError}
+          <button type="button" onClick={retry} className="underline">
+            Retry
+          </button>
         </p>
       ) : (
         <ul className="divide-y divide-parchment-200">
-          {(catalog ?? []).map((art) => (
-            <ShadowArtRow
-              key={art.id}
-              art={art}
-              focusAvailable={focusAvailable}
-              busy={busy}
-              isConcentrating={concentratingArtId === art.id}
-              concentratingOnName={concentratingOn?.spellName ?? null}
-              onCast={onCast}
-            />
-          ))}
+          {(catalog ?? []).map((art) => {
+            const pool = poolForArt(character, art);
+            return (
+              <ShadowArtRow
+                key={art.id}
+                art={art}
+                poolAvailable={pool?.remaining ?? 0}
+                poolLabel={pool?.label ?? "points"}
+                busy={busy}
+                isConcentrating={concentratingArtId === art.id}
+                concentratingOnName={concentratingOn?.spellName ?? null}
+                onCast={onCast}
+              />
+            );
+          })}
           {catalog === null && (
             <li className="py-3 text-center text-sm text-parchment-600">Loading Shadow Arts…</li>
           )}
