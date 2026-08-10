@@ -370,21 +370,48 @@ async function revertClassEvent(ctx: RevertContext): Promise<void> {
 // (#1439 review) — the SessionParticipant field the resolveAction transaction
 // set (recordTurnSpellCast) is not part of the event's character `before`/
 // `after`, so undo must clear it explicitly or the block reappears on the next
-// poll. Clearing to null (rather than restoring a prior value) is functionally
-// exact: the interlock reads only `leveled`, and re-casting on the same economy
-// slot in one turn is itself out of rules scope. No-op for a weapon swing
-// (no entryId), a reaction cast, or a cast outside a session.
+// poll. No-op for a weapon swing (no entryId), a reaction cast, or a cast
+// outside a session.
+//
+// MIRRORS recordTurnSpellCast's downgrade guard (#1439 review): reverting a
+// CANTRIP cast must only clear a cantrip record — never a `leveled` one that an
+// earlier leveled cast set on the same economy slot this turn (Action Surge:
+// leveled Action spell, then a cantrip; the record correctly kept `leveled`, so
+// undoing the cantrip must NOT lift that block). The reverted event's own
+// `slotLevel` (present ⇒ leveled) distinguishes the two: a leveled revert clears
+// unconditionally (it IS the leveled record being undone); a cantrip revert
+// clears only a null-or-cantrip field.
+type ParticipantScope = { sessionId: string; characterId: string };
+
+// The where for clearing one interlock field: a leveled revert clears
+// unconditionally; a cantrip revert clears only a null-or-cantrip field (mirrors
+// recordTurnSpellCast's downgrade guard). Split out to keep the caller under the
+// complexity gate.
+function clearWhere(
+  scope: ParticipantScope,
+  field: "spellCastAsAction" | "spellCastAsBonus",
+  revertedCantrip: boolean,
+): Prisma.SessionParticipantWhereInput {
+  if (!revertedCantrip) return scope;
+  return field === "spellCastAsAction"
+    ? { ...scope, OR: [{ spellCastAsAction: null }, { spellCastAsAction: "cantrip" }] }
+    : { ...scope, OR: [{ spellCastAsBonus: null }, { spellCastAsBonus: "cantrip" }] };
+}
+
 async function clearRevertedSpellCastInterlock(
   tx: Prisma.TransactionClient,
   event: CharacterEvent,
 ): Promise<void> {
-  const data = event.data as { entryId?: string | null; cost?: { kind?: string } } | null;
+  const data = event.data as { entryId?: string | null; slotLevel?: number | null; cost?: { kind?: string } } | null;
   const economy = data?.cost?.kind;
   if (event.sessionId == null || data?.entryId == null) return;
   if (economy !== "action" && economy !== "bonus") return;
+  const scope: ParticipantScope = { sessionId: event.sessionId, characterId: event.characterId };
+  const revertedCantrip = data.slotLevel == null;
+  const field = economy === "action" ? "spellCastAsAction" : "spellCastAsBonus";
   await tx.sessionParticipant.updateMany({
-    where: { sessionId: event.sessionId, characterId: event.characterId },
-    data: economy === "action" ? { spellCastAsAction: null } : { spellCastAsBonus: null },
+    where: clearWhere(scope, field, revertedCantrip),
+    data: field === "spellCastAsAction" ? { spellCastAsAction: null } : { spellCastAsBonus: null },
   });
 }
 

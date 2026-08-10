@@ -730,6 +730,30 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     expect((await combatGet(sid)).body.spellEconomy).toEqual(NONE);
   });
 
+  // #1439 review (pass 4): the symmetric twin of the record-side downgrade guard
+  // — undoing a CANTRIP cast must NOT clear a leveled block set by an earlier
+  // leveled cast on the same economy slot (Action Surge).
+  it("reverting an Action-Surge cantrip does NOT lift a leveled Action block", async () => {
+    const { id: sid } = await startSoloSession(FIXTURE_ID);
+    await combatStart(sid);
+    await post([concentrationCastOp(CONCENTRATION_SPELL_A.id, "cast-leveled")]); // leveled Action
+    await post([cantripCastOp("action", "cast-cantrip")]); // cantrip Action (Action Surge)
+
+    // Revert ONLY the cantrip batch.
+    const events = (await activity(FIXTURE_ID)).body as Array<{ type: string; batchId?: string; data?: { actionId?: string } }>;
+    const cantripBatch = events.find((e) => e.type === "resolveAction" && e.data?.actionId === "cast-cantrip")?.batchId as string;
+    expect(await revert(FIXTURE_ID, cantripBatch).then((r) => r.status)).toBe(200);
+
+    // The leveled Action record survives — spellCastAsAction stays 'leveled',
+    // so the block persists (2024: bonus limited to cantrips).
+    const participant = await prisma.sessionParticipant.findFirstOrThrow({
+      where: { sessionId: sid, characterId: FIXTURE_ID },
+      select: { spellCastAsAction: true },
+    });
+    expect(participant.spellCastAsAction).toBe("leveled");
+    expect((await combatGet(sid)).body.spellEconomy.bonusActionLimitedToCantrips).toBe(true);
+  });
+
   // #1439 review finding 2 (edition): the interlock is edition-specific and the
   // character's `rulesEdition` is threaded through the served combat state. A
   // 2014 character casting a CANTRIP as a bonus action limits the Action to
