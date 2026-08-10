@@ -87,7 +87,7 @@ function DeflectRedirectButton({
   onRedirect,
 }: {
   available: boolean;
-  /** The served redirect row's own `name` — see useDeflectAttacksReaction. */
+  /** The served redirect row's `name` + served spend-pool label — see useDeflectAttacksReaction. */
   label: string;
   busy: boolean;
   onRedirect: () => void;

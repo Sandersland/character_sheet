@@ -170,6 +170,27 @@ describe("formatDeflectAttacksMessage", () => {
     const msg = formatDeflectAttacksMessage(character, DEFLECT_ATTACKS_2024("bludgeoning, piercing, or slashing damage"), roll, true);
     expect(msg).toContain("monk level 3)");
   });
+
+  it("names the served spend-pool label in the redirect hint so it agrees with the button (#1435)", () => {
+    const character = monk({ level: 5, availableActions: [DEFLECT_ATTACKS_2024("bludgeoning, piercing, or slashing damage")] });
+    const roll = summarizeRoll([6], { count: 1, faces: 10, modifier: 8 });
+    // SRD 5.2: the served pool label is "Focus Points".
+    expect(formatDeflectAttacksMessage(character, DEFLECT_ATTACKS_2024("bludgeoning, piercing, or slashing damage"), roll, true, "Focus Points")).toMatch(
+      /Spend 1 Focus Points to redirect/,
+    );
+    // SRD 5.1 throw-back with the served "Ki Points" label.
+    expect(formatDeflectAttacksMessage(monk({ availableActions: [DEFLECT_MISSILES_2014] }), DEFLECT_MISSILES_2014, roll, true, "Ki Points")).toMatch(
+      /Spend 1 Ki Points to throw it back/,
+    );
+  });
+
+  it("falls back to 'point' when no spend label is served", () => {
+    const character = monk({ level: 5, availableActions: [DEFLECT_ATTACKS_2024("bludgeoning, piercing, or slashing damage")] });
+    const roll = summarizeRoll([6], { count: 1, faces: 10, modifier: 8 });
+    expect(formatDeflectAttacksMessage(character, DEFLECT_ATTACKS_2024("bludgeoning, piercing, or slashing damage"), roll, true)).toMatch(
+      /Spend 1 point to redirect/,
+    );
+  });
 });
 
 describe("formatDeflectAttacksRedirectMessage", () => {
