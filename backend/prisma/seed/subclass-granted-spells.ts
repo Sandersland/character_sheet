@@ -254,4 +254,42 @@ export const SUBCLASS_GRANTED_SPELLS: SubclassGrantedSpellSeed[] = [
   // every row here would have been 2014-only regardless; this is the SAME
   // "list-expansion, not a free grant" correction as The Fiend above, not an
   // edition change.
+
+  // Arcane Trickster (Rogue) — Mage Hand grant is edition-INVARIANT (#901).
+  // Per rogue-features.ts's own header: no first-party SRD text exists for
+  // this subclass in EITHER edition, so it is never cited as "SRD 5.2" — 2014
+  // is PHB'14 (page not re-verified for the #1231 migration, pinned byte-
+  // identical by rogue-2014-snapshot.test.ts) and 2024 is PHB'24
+  // (mirror-sourced; not in SRD 5.2 — SRD 5.2 ships only Thief for Rogue).
+  // Both editions grant Mage Hand (plus two more wizard cantrips of the
+  // player's choice — a chooser, out of scope for this fixed grant, #901) at
+  // the subclass's own gate, which is L3 in both editions (Rogue
+  // subclassLevel is 3 in both, #1308, "CLASSES — 2014 subclass gate
+  // levels"). ONE shared row: this is a catalog JOIN to the Spell table, not
+  // transcribed rules prose, so CLAUDE.md's fork-transcribed-content rule
+  // doesn't reach it even though the neighbouring Illusion grant below does.
+  { className: "Rogue", subclassName: "Arcane Trickster", spellName: "Mage Hand", gateLevel: 3, castingAbility: "intelligence" },
+
+  // School of Illusion (Wizard) — Minor Illusion forks on gateLevel ONLY
+  // (#901). Per wizard-features.ts's own header: PHB'14 p.117 "Improved Minor
+  // Illusion" grants it at the subclass's own 2014 pick level (Wizard L2,
+  // subclassLevel). PHB'24's renamed "Improved Illusions" (mirror-sourced;
+  // not in SRD 5.2 — wizard-features.ts ILLUSION_RAW) still grants it, but at
+  // the subclass's 2024-uniform gate (L3) — subclassGateLevel ignores
+  // subclassLevel entirely for EDITION_2024. Both editions' text also carries
+  // "or a different wizard cantrip if you already know it" — the dedup half
+  // of that clause is handled generically by mergeGrantedSpells
+  // (serialize/spellcasting.ts, pre-existing: the player's learned copy wins
+  // over any subclass grant of the same name); the "different cantrip"
+  // replacement CHOICE is a player pick with no app affordance yet and stays
+  // out of scope (#901 decision 4). Both rows target the SAME Subclass row:
+  // PHB'24 renamed the feature/subclass DISPLAY text but never split the
+  // catalog row — wizard-features.ts's 2024 ILLUSION_RAW rows still key off
+  // `slug("wizard-school-of-illusion")`, the same slug the 2014 row uses
+  // (subclasses.ts has no "Illusionist" row) — so there is nothing here for
+  // #1408's slug rekey to fix; the existing (className, subclassName) lookup
+  // already resolves both tagged rows onto the one shared Subclass row
+  // exactly like Life Domain's Spiritual Weapon/Aid fork above.
+  { className: "Wizard", subclassName: "School of Illusion", spellName: "Minor Illusion", gateLevel: 2, castingAbility: "intelligence", edition: "EDITION_2014" },
+  { className: "Wizard", subclassName: "School of Illusion", spellName: "Minor Illusion", gateLevel: 3, castingAbility: "intelligence", edition: "EDITION_2024" },
 ];

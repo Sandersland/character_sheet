@@ -848,19 +848,42 @@ describe("referential integrity", () => {
 
   // Unlike the grantLevel drift test above (reverted to direct equality by
   // #1291, now that both tables are 2014-scoped), THIS check stays resolved
-  // through subclassGateLevel(..., EDITION_2024): these gateLevel values are
-  // 2024-only content (#1128) — e.g. Life Domain's earliest tier is authored
-  // as gateLevel 3 because 2024 doesn't grant the subclass before level 3, so
-  // its two 2014 tiers (1st/3rd) collapsed into one. Comparing against the raw
-  // (now 2014-scoped) subclassLevel column would wrongly flag every such row.
-  it("every SUBCLASS_GRANTED_SPELLS gateLevel is at least its class's 2024-resolved subclass gate", () => {
-    const subclassLevelByClass = new Map(
-      CLASSES.map((c) => [c.name, subclassGateLevel(c.subclassLevel, "EDITION_2024")]),
-    );
-    const early = SUBCLASS_GRANTED_SPELLS.filter(
-      (row) => row.gateLevel < (subclassLevelByClass.get(row.className) ?? 0),
-    ).map((row) => `${row.className}/${row.subclassName}/${row.spellName}@${row.gateLevel}`);
-    expect(early, "granted spell gated below its 2024-resolved subclass gate").toEqual([]);
+  // through subclassGateLevel: these gateLevel values are content authored
+  // per the row's OWN admitted edition(s) (#1128, #901) — e.g. Life Domain's
+  // earliest tier is authored as gateLevel 3 because 2024 doesn't grant the
+  // subclass before level 3, so its two 2014 tiers (1st/3rd) collapsed into
+  // one. Comparing against the raw (now 2014-scoped) subclassLevel column
+  // would wrongly flag every such row. A row TAGGED EDITION_2014 (#901's
+  // Illusion Minor Illusion grant, gateLevel 2) is only ever served to a 2014
+  // character, so it's checked against subclassGateLevel(..., EDITION_2014)
+  // instead — the 2024-resolved gate would wrongly flag legitimate PHB'14
+  // content that gates earlier than 2024's uniform L3. A shared (untagged)
+  // row is served to BOTH editions, so it's checked against the STRICTER
+  // 2024-resolved gate (subclassGateLevel(..., EDITION_2024) is never lower
+  // than the 2014-resolved gate for any class, #1308), which also proves it
+  // clears the 2014 gate. A row whose className has no CLASSES entry (a typo)
+  // is flagged directly, in its OWN accumulator so the failure message names
+  // the right category instead of "gated below its own admitted edition's
+  // resolved subclass gate" — Map.get's `undefined` would otherwise reach
+  // subclassGateLevel, which resolves undefined to the constant 3 for EITHER
+  // edition (the 2024 branch ignores its first arg; the 2014 branch's `?? 3`
+  // does the same), so a typo'd row with gateLevel >= 3 would pass unchecked,
+  // the same gap the old `?? 0` fallback had.
+  it("every SUBCLASS_GRANTED_SPELLS gateLevel is at least its own admitted edition's resolved subclass gate", () => {
+    const subclassLevelByClassName = new Map(CLASSES.map((c) => [c.name, c.subclassLevel]));
+    const unknownClass: string[] = [];
+    const early: string[] = [];
+    for (const row of SUBCLASS_GRANTED_SPELLS) {
+      const subclassLevel = subclassLevelByClassName.get(row.className);
+      if (subclassLevel === undefined) {
+        unknownClass.push(`${row.className}/${row.subclassName}/${row.spellName}`);
+        continue;
+      }
+      const required = subclassGateLevel(subclassLevel, row.edition ?? "EDITION_2024");
+      if (row.gateLevel < required) early.push(`${row.className}/${row.subclassName}/${row.spellName}@${row.gateLevel}`);
+    }
+    expect(unknownClass, "granted spell's className has no CLASSES entry").toEqual([]);
+    expect(early, "granted spell gated below its own admitted edition's resolved subclass gate").toEqual([]);
   });
 });
 
