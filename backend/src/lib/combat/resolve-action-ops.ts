@@ -33,6 +33,7 @@
 import { z } from "zod";
 
 import { attackComponentsSchema, damageComponentsSchema } from "@/lib/session/roll-components.js";
+import { standaloneRollOperationSchema } from "./standalone-roll-op.js";
 
 const resolveActionCostSchema = z.object({
   kind: z.enum(["action", "bonus", "reaction"]),
@@ -109,7 +110,7 @@ const resolveActionEffectSchema = z.object({
   components: damageComponentsSchema.nullable().optional(),
 });
 
-export const resolveActionOperationSchema = z.object({
+const resolveActionOperationSchema = z.object({
   type: z.literal("resolveAction"),
   // Client-generated id correlating this resolution's rolls across the rail
   // steps (useResolution, #1831) — opaque to the backend, stored verbatim.
@@ -147,3 +148,14 @@ export const resolveActionOperationSchema = z.object({
 });
 
 export type ResolveActionOperation = z.infer<typeof resolveActionOperationSchema>;
+
+// The resolve-action endpoint's request op union (#1861): a combat resolution
+// (`resolveAction`) or a standalone player roll (`logRoll`) — check/save/
+// initiative/tally-damage, migrated off the retired session-roll route so they
+// commit through THIS one resolver as real batched, trivially-undoable events.
+export const resolveActionRequestOperationSchema = z.discriminatedUnion("type", [
+  resolveActionOperationSchema,
+  standaloneRollOperationSchema,
+]);
+
+export type ResolveActionRequestOperation = z.infer<typeof resolveActionRequestOperationSchema>;

@@ -458,7 +458,6 @@ export default function TurnHub({ sessionId, turnState, onLogChanged, allies, ov
   // skipped attacks, shared-shaped with the in-sheet strip's rule.
   const tallyResolve = useTallyResolve({
     character,
-    sessionId,
     setTallyVerdict: turnState.setTallyVerdict,
     setTallyDamageAt: turnState.setTallyDamageAt,
     onLogChanged,

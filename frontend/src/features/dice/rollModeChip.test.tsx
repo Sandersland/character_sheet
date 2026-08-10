@@ -3,13 +3,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-import { logRoll } from "@/api/client";
+import { logRollAction } from "@/api/client";
 import { RollProvider } from "@/features/dice/RollContext";
 import AbilityScoreBox from "@/features/abilities/AbilityScoreBox";
 import type { RollResult, RollSpec } from "@/lib/dice";
 import type { RollModifier } from "@/types/character";
 
-vi.mock("@/api/client", () => ({ logRoll: vi.fn().mockResolvedValue(undefined) }));
+vi.mock("@/api/client", () => ({ logRollAction: vi.fn().mockResolvedValue(undefined) }));
 
 vi.mock("@/features/dice/DiceRoller", () => ({
   default: function MockDiceRoller({ onResult, spec }: { onResult?: (r: RollResult) => void; spec?: RollSpec }) {
@@ -22,7 +22,7 @@ vi.mock("@/features/dice/DiceRoller", () => ({
   },
 }));
 
-const mockLogRoll = vi.mocked(logRoll);
+const mockLogRoll = vi.mocked(logRollAction);
 
 const rage: RollModifier[] = [
   { mode: "advantage", kind: "check", ability: "strength", source: "Rage" },
@@ -62,7 +62,7 @@ describe("state-driven roll mode + affected-row indicator (#486/#984)", () => {
 
     await user.click(screen.getByTitle(/Roll Strength check/));
     await waitFor(() => expect(mockLogRoll).toHaveBeenCalledTimes(1));
-    expect(mockLogRoll.mock.calls[0][2]).toMatchObject({ kind: "check", rollMode: "advantage" });
+    expect(mockLogRoll.mock.calls[0][1]).toMatchObject({ kind: "check", rollMode: "advantage" });
   });
 
   it("shows no indicator and rolls normally once no state applies (Rage ended)", async () => {
@@ -72,7 +72,7 @@ describe("state-driven roll mode + affected-row indicator (#486/#984)", () => {
 
     await user.click(screen.getByTitle(/Roll Strength check/));
     await waitFor(() => expect(mockLogRoll).toHaveBeenCalledTimes(1));
-    expect(mockLogRoll.mock.calls[0][2].rollMode).toBe("normal");
+    expect(mockLogRoll.mock.calls[0][1].rollMode).toBe("normal");
   });
 
   it("still cancels advantage + disadvantage from different sources to normal (RAW)", async () => {
@@ -83,7 +83,7 @@ describe("state-driven roll mode + affected-row indicator (#486/#984)", () => {
 
     await user.click(screen.getByTitle(/Roll Strength check/));
     await waitFor(() => expect(mockLogRoll).toHaveBeenCalledTimes(1));
-    expect(mockLogRoll.mock.calls[0][2].rollMode).toBe("normal");
+    expect(mockLogRoll.mock.calls[0][1].rollMode).toBe("normal");
   });
 
   it("keeps an ability/category-scoped grant off a non-matching affordance", () => {
@@ -101,7 +101,7 @@ describe("state-driven roll mode + affected-row indicator (#486/#984)", () => {
 
     await user.click(screen.getByTitle(/Roll Strength check/));
     await waitFor(() => expect(mockLogRoll).toHaveBeenCalledTimes(1));
-    const log = mockLogRoll.mock.calls[0][2];
+    const log = mockLogRoll.mock.calls[0][1];
     expect(log.rollMode).toBe("normal");
     // Strength 16 → +3 check, minus exhaustion −4 → −1; d20 face 11 → total 10.
     expect(log.total).toBe(10);

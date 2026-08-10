@@ -1,16 +1,19 @@
 /**
- * useRollLogger — the shared best-effort "persist this attack/damage roll to the
- * Session Log" helper used by the attack sheets (InlineAttackPicker,
- * InlineOffHandPicker). Fires `logRoll` for an explicit character + session and
- * calls `onLogChanged` on success; never blocks play (errors are logged only).
+ * useRollLogger — the shared best-effort "persist this roll to the Session Log"
+ * helper. Since #1861 its only caller is the tally-resolve inline damage roll
+ * (useTallyResolve); it commits through the resolve-action resolver
+ * (`logRollAction`, the `logRoll` op) as a real batched, trivially-undoable
+ * event and calls `onLogChanged` on success — never blocking play (errors are
+ * logged only). The backend derives the sessionId from the character's active
+ * session, so none rides on the wire.
  *
  * (Distinct from RollContext's `logSessionRoll`, which is a no-op unless the
- * provider was handed a character + session — these pickers always have both.)
+ * provider was handed a character + session — this hook's caller always has both.)
  */
 
 import { useCallback } from "react";
 
-import { logRoll } from "@/api/client";
+import { logRollAction } from "@/api/client";
 import { formatRollSpec } from "@/lib/dice";
 import type { RollResult, RollSpec } from "@/lib/dice";
 import type {
@@ -40,7 +43,7 @@ interface RollLogExtra {
   damageComponents?: RollEventDamageComponents;
 }
 
-export function useRollLogger(characterId: string, sessionId: string, onLogChanged: () => void) {
+export function useRollLogger(characterId: string, onLogChanged: () => void) {
   return useCallback(
     (
       kind: RollLogKind,
@@ -53,7 +56,7 @@ export function useRollLogger(characterId: string, sessionId: string, onLogChang
       // Non-empty only: an empty droppedFaces on every normal roll would be
       // pure noise on the wire and in the persisted event log.
       const droppedFaces = result.dice.filter((d) => d.dropped).map((d) => d.value);
-      logRoll(characterId, sessionId, {
+      logRollAction(characterId, {
         kind,
         source,
         total: result.total,
@@ -66,6 +69,6 @@ export function useRollLogger(characterId: string, sessionId: string, onLogChang
         .then(onLogChanged)
         .catch((e) => console.error("roll log failed", e));
     },
-    [characterId, sessionId, onLogChanged],
+    [characterId, onLogChanged],
   );
 }

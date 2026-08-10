@@ -1,6 +1,5 @@
 import type { Character, CharacterEvent, CombatState, Session, SessionDoorwayState } from "@/types/character";
 import { jsonBody, request, send } from "@/api/http";
-import type { RollEventData } from "@character-sheet/shared-types";
 
 /** Start a shared campaign session with the given character as first participant. */
 export async function startCampaignSession(
@@ -196,22 +195,3 @@ export async function fetchCombatState(
   );
 }
 
-/**
- * Log a single roll from the session UI. Best-effort — callers catch and
- * console.error. `payload` is `RollEventData`, the single cross-tier shape for
- * this route's request body AND the persisted event `data` (#1235); see that
- * type for the field-by-field contract. `target`/`outcome` are omitted so
- * passing them is a compile error rather than a silent no-op — the route drops
- * them, and there is deliberately no producer (self-or-announce).
- */
-export async function logRoll(
-  characterId: string,
-  sessionId: string,
-  payload: Omit<RollEventData, "target" | "outcome">,
-): Promise<void> {
-  await send(
-    `/characters/${characterId}/sessions/${sessionId}/roll`,
-    jsonBody(payload),
-    "Failed to log roll",
-  );
-}

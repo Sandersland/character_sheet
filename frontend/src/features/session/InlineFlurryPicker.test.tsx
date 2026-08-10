@@ -6,7 +6,7 @@ import userEvent from "@testing-library/user-event";
 import InlineFlurryPicker from "@/features/session/InlineFlurryPicker";
 import { RollProvider } from "@/features/dice/RollContext";
 import { useTurnState } from "@/features/session/useTurnState";
-import { applyResolveActionOperations, logRoll } from "@/api/client";
+import { applyResolveActionOperations, logRollAction } from "@/api/client";
 import { renderWithCharacter } from "@/test/renderWithCharacter";
 import { IMPROVISED_ROW, UNARMED_ROW, attackRow } from "@/test/attackRowFixtures";
 import type { Character } from "@/types/character";
@@ -15,7 +15,7 @@ import type { TurnState, TurnStateActions } from "@/features/session/useTurnStat
 vi.mock("@/api/client", () => ({
   applyResolveActionOperations: vi.fn(),
   castManeuverTransaction: vi.fn(),
-  logRoll: vi.fn().mockResolvedValue(undefined),
+  logRollAction: vi.fn().mockResolvedValue(undefined),
 }));
 
 beforeEach(() => {
@@ -146,7 +146,7 @@ describe("InlineFlurryPicker (#1217, rewired onto the shared resolver #1845)", (
     await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
 
     await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(1));
-    expect(vi.mocked(logRoll)).not.toHaveBeenCalled();
+    expect(vi.mocked(logRollAction)).not.toHaveBeenCalled();
   });
 
   it("shows Cancel — refund bonus action before any strike is rolled", () => {

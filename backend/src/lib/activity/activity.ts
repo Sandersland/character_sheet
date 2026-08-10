@@ -528,9 +528,11 @@ async function revertPreflight(
       characterId,
       reverted: false,
       type: { not: "revert" },
-      // Roll events (attack/damage/check/save/initiative) are non-undoable log
-      // entries — skip them so they neither undo themselves nor block a real undo.
-      category: { not: "roll" },
+      // No category is excluded here: a standalone roll (check/save/initiative/
+      // tally-damage, #1861) is now a real batched roll-category event committed
+      // through the resolve-action resolver, so it IS the most-recent action
+      // when it's the newest — trivially undoable (before/after null → reversing
+      // it restores nothing), never a dead log entry that blocks a real undo.
       // Don't look through events whose session has been ended.
       OR: [
         { sessionId: null },

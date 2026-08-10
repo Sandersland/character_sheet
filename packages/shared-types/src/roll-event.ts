@@ -1,12 +1,14 @@
 // Roll-event wire type (#1235) — the single cross-tier shape for the `data`
-// JSON persisted on a roll-category CharacterEvent (POST .../sessions/:id/roll).
-// useRollLogger/logRoll and parseRollInput/logRollEvent all read/write this
-// shape instead of hand-mirroring it (epic #820); it doubles as the request
-// payload AND the persisted `data` column (free-form JSON, no schema of its
-// own). Additive-only: every field beyond the original five is optional, so
+// JSON persisted on a roll-category CharacterEvent. Since #1861 a standalone
+// roll commits through the `logRoll` op on POST .../resolve-action/transactions
+// (the retired POST .../sessions/:id/roll route is gone): useRollLogger /
+// logRollAction and standaloneRollOperationSchema / writeStandaloneRollEvent all
+// read/write this shape instead of hand-mirroring it (epic #820); it doubles as
+// the op payload AND the persisted `data` column (free-form JSON, no schema of
+// its own). Additive-only: every field beyond the original five is optional, so
 // pre-#1235 events still parse under this type.
 
-/** The five roll-log categories over the session-roll route. */
+/** The five roll-log categories carried by a `logRoll` op / roll-category event. */
 export type RollEventKind = "attack" | "damage" | "check" | "save" | "initiative";
 
 export type RollEventMode = "normal" | "advantage" | "disadvantage";
@@ -74,7 +76,8 @@ export interface RollEventDamageComponents {
 }
 
 /**
- * `data` on a roll-category `CharacterEvent` (`POST .../sessions/:sessionId/roll`).
+ * `data` on a roll-category `CharacterEvent` (written by the `logRoll` op on
+ * `POST .../resolve-action/transactions`, #1861).
  * `target`/`outcome` are RESERVED for a future per-swing "Goblin hit/dropped"
  * annotation — no producer populates them; the engine has no enemy/target
  * model and building one is an explicit non-goal (self-or-announce, CLAUDE.md).

@@ -10,15 +10,7 @@ import {
   type ParticipantSummary,
 } from "./session-summary.js";
 import type { Prisma, SpellCastKind } from "@/generated/prisma/client.js";
-import type {
-  CombatState,
-  RollEventAttackComponents,
-  RollEventDamageComponents,
-  RollEventKind,
-  RollEventMode,
-  RollEventModeSource,
-  RollEventVerdict,
-} from "@character-sheet/shared-types";
+import type { CombatState } from "@character-sheet/shared-types";
 
 // Session/combat domain errors carry the HTTP status the central `errorHandler`
 // maps. Default 409 (conflict — wrong session state / not a participant); pass
@@ -435,127 +427,6 @@ const COMBAT_SUMMARIES: Record<CombatEventType, (round?: number) => string> = {
   combatEnded: () => "Combat ended",
   combatRoundAdvanced: (round) => `Round ${round ?? 2} began`,
 };
-
-// Aliased (not redeclared) from the shared wire type (#1235/#820) — kept as
-// short local names because both RollInput and LogRollParams use them.
-export type RollKind = RollEventKind;
-export type RollMode = RollEventMode;
-
-const ROLL_EVENT_TYPES: Record<RollKind, EventType> = {
-  attack: "attackRoll",
-  damage: "damageRoll",
-  check: "checkRoll",
-  save: "saveRoll",
-  initiative: "initiativeRoll",
-};
-
-interface LogRollParams {
-  kind: RollKind;
-  source: string;
-  total: number;
-  specLabel?: string;
-  damageType?: string;
-  /** Raw kept die faces (non-dropped), e.g. [12] for 1d20 or [3, 5] for 2d6. */
-  faces?: number[];
-  /** Non-kept d20 face(s) of an advantage/disadvantage roll (#1359). */
-  droppedFaces?: number[];
-  /** Ability key for check/save/initiative rolls (already a display-resolved source). */
-  ability?: string;
-  /** Skill key for check rolls. */
-  skill?: string;
-  /** Target difficulty class, when the roll is made against one. */
-  dc?: number;
-  /** Advantage state the d20 was rolled with. */
-  rollMode?: RollMode;
-  // #1235 combat-log decomposition fields — see RollEventData for the
-  // field-by-field rationale. target/outcome are deliberately absent (never
-  // accepted here, never persisted) — see logRollEvent's `data` object below.
-  swingId?: string;
-  verdict?: RollEventVerdict;
-  nat20?: boolean;
-  nat1?: boolean;
-  crit?: boolean;
-  modeSources?: RollEventModeSource[];
-  attackComponents?: RollEventAttackComponents;
-  damageComponents?: RollEventDamageComponents;
-}
-
-function buildRollSummary(params: LogRollParams): string {
-  const { kind, source, total, specLabel, damageType, dc } = params;
-  if (kind === "damage") {
-    return `${source}: ${total}${damageType ? ` ${damageType}` : ""}${specLabel ? ` (${specLabel})` : ""}`;
-  }
-  const dcSuffix = dc !== undefined ? ` vs DC ${dc}` : "";
-  return `${source}: ${total}${dcSuffix}${specLabel ? ` (${specLabel})` : ""}`;
-}
-
-// Optional wire field -> persisted JSON value: undefined becomes null (a JSON
-// column can't hold undefined), so every unset LogRollParams field still
-// stores as an explicit null rather than an omitted key. Shared by every
-// rollData field below (#1359) so logRollEvent's own branch count doesn't
-// grow by one per optional field — the backend CI health step ratchets that
-// ceiling (#1235).
-function nullish<T>(value: T | undefined): T | null {
-  return value ?? null;
-}
-
-/**
- * Logs a single roll (attack / damage / check / save / initiative) from the
- * session UI. The caller must be an active participant of an active session.
- * Pure log entry — no state mutation, and non-undoable (before/after null).
- */
-export async function logRollEvent(
-  characterId: string,
-  sessionId: string,
-  params: LogRollParams,
-) {
-  await assertActiveParticipant(sessionId, characterId);
-
-  const {
-    kind, source, total, specLabel, damageType, faces, droppedFaces, ability, skill, dc, rollMode,
-    swingId, verdict, nat20, nat1, crit, modeSources, attackComponents, damageComponents,
-  } = params;
-  const batchId = randomUUID();
-
-  // Hoisted out of the transaction call so building this object doesn't count
-  // toward $transaction's callback's cyclomatic complexity (#1235).
-  // target/outcome are NEVER written here — see LogRollParams' comment
-  // (#1235 reserves them on the wire type for a future target/outcome
-  // feature; the engine has no enemy/target model to populate them from).
-  const rollData = {
-    kind,
-    source,
-    total,
-    specLabel: nullish(specLabel),
-    damageType: nullish(damageType),
-    faces: nullish(faces),
-    droppedFaces: nullish(droppedFaces),
-    ability: nullish(ability),
-    skill: nullish(skill),
-    dc: nullish(dc),
-    rollMode: nullish(rollMode),
-    swingId: nullish(swingId),
-    verdict: nullish(verdict),
-    nat20: nullish(nat20),
-    nat1: nullish(nat1),
-    crit: nullish(crit),
-    modeSources: nullish(modeSources),
-    attackComponents: nullish(attackComponents),
-    damageComponents: nullish(damageComponents),
-  };
-
-  return prisma.$transaction(async (tx) => {
-    await logEvent(tx, {
-      characterId,
-      category: "roll",
-      type: ROLL_EVENT_TYPES[kind],
-      summary: buildRollSummary(params),
-      batchId,
-      sessionId,
-      data: rollData,
-    });
-  });
-}
 
 // Combat state read out of Session (#1030) + the acting participant's per-turn
 // spell interlock (#1439) — the shape every combat lifecycle mutation returns,

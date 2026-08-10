@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-import { logRoll } from "@/api/client";
+import { logRollAction } from "@/api/client";
 import { RollProvider } from "@/features/dice/RollContext";
 import AllSkillsCard from "@/features/abilities/AllSkillsCard";
 import AbilityScoreBox from "@/features/abilities/AbilityScoreBox";
@@ -13,7 +13,7 @@ import type { RollResult, RollSpec } from "@/lib/dice";
 import type { AbilityScores, Character, Skill } from "@/types/character";
 
 vi.mock("@/api/client", () => ({
-  logRoll: vi.fn().mockResolvedValue(undefined),
+  logRollAction: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("@/features/dice/DiceRoller", () => ({
@@ -38,7 +38,7 @@ vi.mock("@/features/dice/DiceRoller", () => ({
   },
 }));
 
-const mockLogRoll = vi.mocked(logRoll);
+const mockLogRoll = vi.mocked(logRollAction);
 
 const scores: AbilityScores = {
   strength: 14,
@@ -73,7 +73,7 @@ describe("roll affordances log their category event", () => {
     await user.click(screen.getByTitle(/Roll Perception check/));
 
     await waitFor(() => expect(mockLogRoll).toHaveBeenCalledTimes(1));
-    expect(mockLogRoll.mock.calls[0][2]).toMatchObject({
+    expect(mockLogRoll.mock.calls[0][1]).toMatchObject({
       kind: "check",
       source: "Perception check",
       ability: "wisdom",
@@ -96,7 +96,7 @@ describe("roll affordances log their category event", () => {
     await user.click(screen.getByTitle(/Roll Strength save/));
 
     await waitFor(() => expect(mockLogRoll).toHaveBeenCalledTimes(1));
-    expect(mockLogRoll.mock.calls[0][2]).toMatchObject({
+    expect(mockLogRoll.mock.calls[0][1]).toMatchObject({
       kind: "save",
       source: "Strength save",
       ability: "strength",
@@ -119,7 +119,7 @@ describe("roll affordances log their category event", () => {
     await user.click(screen.getByTitle(/Roll Initiative/));
 
     await waitFor(() => expect(mockLogRoll).toHaveBeenCalledTimes(1));
-    expect(mockLogRoll.mock.calls[0][2]).toMatchObject({
+    expect(mockLogRoll.mock.calls[0][1]).toMatchObject({
       kind: "initiative",
       source: "Initiative",
     });

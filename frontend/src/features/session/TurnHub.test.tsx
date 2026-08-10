@@ -16,7 +16,7 @@ import {
   advanceCombatRound,
   fetchCombatState,
   applyInventoryTransactions,
-  logRoll,
+  logRollAction,
   rollInitiativeTransaction,
 } from "@/api/client";
 import { seedUniversalActions } from "@/test/universalActions";
@@ -40,7 +40,7 @@ vi.mock("@/api/client", () => ({
   advanceCombatRound: vi.fn(),
   fetchCombatState: vi.fn(),
   applyInventoryTransactions: vi.fn(),
-  logRoll: vi.fn(),
+  logRollAction: vi.fn(),
   rollInitiativeTransaction: vi.fn(),
   // Must be present even though every test seeds the reference cache directly
   // and never calls it (#1430): useTurnActions' useUniversalActions imports it
@@ -176,7 +176,7 @@ beforeEach(() => {
   vi.mocked(startCombat).mockResolvedValue({ round: 1, combatActive: true, updatedAt: "2026-01-01T00:00:01.000Z", spellEconomy: NO_ECON });
   vi.mocked(advanceCombatRound).mockResolvedValue({ round: 2, combatActive: true, updatedAt: "2026-01-01T00:00:02.000Z", spellEconomy: NO_ECON });
   vi.mocked(endCombat).mockResolvedValue({ round: 0, combatActive: false, updatedAt: "2026-01-01T00:00:03.000Z", spellEconomy: NO_ECON });
-  vi.mocked(logRoll).mockResolvedValue(undefined);
+  vi.mocked(logRollAction).mockResolvedValue(undefined as never);
   // No onInitiative pools on this fixture (a Fighter) — a real rollInitiative
   // call would report an empty regen, same as this default (#1239/#1243).
   vi.mocked(rollInitiativeTransaction).mockImplementation(async () => ({
