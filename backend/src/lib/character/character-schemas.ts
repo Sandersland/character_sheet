@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { ALL_RULES_EDITIONS } from "@/lib/rules/edition.js";
+
 const abilityScoresSchema = z.object({
   strength: z.number().int(),
   dexterity: z.number().int(),
@@ -129,7 +131,9 @@ export const createCharacterSchema = z
     // #1285: the only endpoint that may set a character's edition (write-once).
     // Optional — omitting it takes the Character.rulesEdition column default,
     // which stays the single source of that default. The picker is #1286.
-    rulesEdition: z.enum(["EDITION_2014", "EDITION_2024"]).optional(),
+    // Derives from ALL_RULES_EDITIONS (#1527), never a literal array — a third
+    // edition becomes settable here the moment it's added to RulesEdition.
+    rulesEdition: z.enum(ALL_RULES_EDITIONS).optional(),
   })
   .strict();
 

@@ -845,8 +845,19 @@ export function spellListsFor(
 
   const key = className.toLowerCase();
   if (key !== "bard" || level < 10) return { spells: [key], cantrips: [key] };
-  if (edition === "EDITION_2014") return { spells: null, cantrips: null };
-  return { spells: ["bard", "cleric", "druid", "wizard"], cantrips: ["bard"] };
+  // Exhaustive switch, not `if (edition === "EDITION_2014") … else …` (#1527):
+  // the if/else shape let an unrecognized third edition silently take the SRD
+  // 5.2 Magical Secrets branch instead of failing loudly.
+  switch (edition) {
+    case "EDITION_2014":
+      return { spells: null, cantrips: null };
+    case "EDITION_2024":
+      return { spells: ["bard", "cleric", "druid", "wizard"], cantrips: ["bard"] };
+    default: {
+      const exhaustive: never = edition;
+      throw new Error(`spellListsFor: unhandled edition ${String(exhaustive)}`);
+    }
+  }
 }
 
 /** @deprecated Renamed to spellListsFor (#1825), which also fixes the EK/AT
