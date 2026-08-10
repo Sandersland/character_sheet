@@ -20,7 +20,7 @@ function entries(list: { name: string; level: number }[]): ClassEntries {
 const DEX16 = { dexterity: 16 };
 
 function offHandRow(equipped: { light: boolean }[], scores: Record<string, number> = {}) {
-  const actions = buildAvailableActionsView(entries([]), 1, undefined, true, "EDITION_2024", scores, equipped);
+  const actions = buildAvailableActionsView(entries([]), 1, undefined, true, "EDITION_2024", scores, equipped, 0);
   return actions.find((a) => a.key === "offHandAttack");
 }
 
@@ -56,7 +56,7 @@ describe("off-hand eligibility row (#1435)", () => {
 
 describe("Deflect specs attached to the served rows (#1435)", () => {
   it("SRD 5.2: deflectAttacks carries the 1d10 + Dex + monk-level reduction; the redirect carries 2×MA die + Dex", () => {
-    const actions = buildAvailableActionsView(entries([{ name: "monk", level: 5 }]), 5, undefined, true, "EDITION_2024", DEX16, []);
+    const actions = buildAvailableActionsView(entries([{ name: "monk", level: 5 }]), 5, undefined, true, "EDITION_2024", DEX16, [], 0);
     const base = actions.find((a) => a.key === "deflectAttacks");
     const redirect = actions.find((a) => a.key === "deflectAttacksRedirect");
     expect(base?.effect?.dice).toEqual({ count: 1, faces: 10, modifier: 8 });
@@ -64,7 +64,7 @@ describe("Deflect specs attached to the served rows (#1435)", () => {
   });
 
   it("SRD 5.1: deflectMissiles carries the same reduction; the throw-back carries 1d6 + Dex", () => {
-    const actions = buildAvailableActionsView(entries([{ name: "monk", level: 5 }]), 5, undefined, true, "EDITION_2014", DEX16, []);
+    const actions = buildAvailableActionsView(entries([{ name: "monk", level: 5 }]), 5, undefined, true, "EDITION_2014", DEX16, [], 0);
     const base = actions.find((a) => a.key === "deflectMissiles");
     const throwBack = actions.find((a) => a.key === "deflectMissilesThrow");
     expect(base?.effect?.dice).toEqual({ count: 1, faces: 10, modifier: 8 });
@@ -83,6 +83,7 @@ describe("Deflect specs attached to the served rows (#1435)", () => {
       "EDITION_2024",
       DEX16,
       [],
+      0,
     );
     // Dex +3 + Monk entry level 3 = 6 (not 3 + 13 = 16).
     expect(actions.find((a) => a.key === "deflectAttacks")?.effect?.dice).toEqual({ count: 1, faces: 10, modifier: 6 });
@@ -92,12 +93,12 @@ describe("Deflect specs attached to the served rows (#1435)", () => {
     // entry.level lags at 3 while the XP-derived level arg is 5. For a single
     // class, effectiveEntryLevel returns the XP-derived level (the per-entry
     // column self-heals lazily), so the reduction is Dex +3 + 5 = 8, not +3+3.
-    const actions = buildAvailableActionsView(entries([{ name: "monk", level: 3 }]), 5, undefined, true, "EDITION_2024", DEX16, []);
+    const actions = buildAvailableActionsView(entries([{ name: "monk", level: 3 }]), 5, undefined, true, "EDITION_2024", DEX16, [], 0);
     expect(actions.find((a) => a.key === "deflectAttacks")?.effect?.dice).toEqual({ count: 1, faces: 10, modifier: 8 });
   });
 
   it("attaches no deflect spec for a non-monk (no deflect row exists), but still serves the off-hand row", () => {
-    const actions = buildAvailableActionsView(entries([{ name: "fighter", level: 5 }]), 5, undefined, true, "EDITION_2024", DEX16, []);
+    const actions = buildAvailableActionsView(entries([{ name: "fighter", level: 5 }]), 5, undefined, true, "EDITION_2024", DEX16, [], 0);
     expect(actions.some((a) => a.key === "deflectAttacks" || a.key === "deflectMissiles")).toBe(false);
     expect(actions.some((a) => a.key === "offHandAttack")).toBe(true);
   });

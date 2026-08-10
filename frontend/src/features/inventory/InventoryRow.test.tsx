@@ -12,6 +12,7 @@ const mockItem: InventoryItem = {
   quantity: 2,
   equipped: false,
   attuned: false,
+  weaponBonded: false,
   requiresAttunement: false,
   equippable: true,
   allowedSlots: ["MAIN_HAND", "OFF_HAND"],
@@ -153,6 +154,50 @@ describe("InventoryRow (view mode)", () => {
     expect(screen.getByRole("button", { name: "Equip" })).toBeDisabled();
   });
 
+  // Bond/unbond goes through a SEPARATE transaction endpoint (the shared
+  // ability endpoint, #1275) than attune/equip/use (inventory/transactions),
+  // so its own in-flight state is tracked by `bond.pending`, not the row's
+  // generic `pending` — a prior wiring bug fed the generic `pending` into
+  // WeaponBondToggle instead, which left the Bond pill never disabling
+  // mid-request.
+  describe("Weapon Bond toggle (#1854)", () => {
+    function renderBondableRow(bondOverrides: Partial<Parameters<typeof InventoryRow>[0]["bond"]> = {}) {
+      return renderRow({
+        bond: {
+          eligible: true,
+          atCap: false,
+          pending: false,
+          onSubmit: vi.fn().mockResolvedValue(undefined),
+          ...bondOverrides,
+        },
+      });
+    }
+
+    it("shows an enabled Bond pill when neither pending flag is set", () => {
+      renderBondableRow();
+      expect(screen.getByRole("button", { name: "Bond" })).not.toBeDisabled();
+    });
+
+    it("disables the Bond pill when bond.pending is true, even while the row's pending is false", () => {
+      renderRow({
+        pending: false,
+        bond: { eligible: true, atCap: false, pending: true, onSubmit: vi.fn().mockResolvedValue(undefined) },
+      });
+      expect(screen.getByRole("button", { name: "Bond" })).toBeDisabled();
+    });
+
+    it("does NOT disable the Bond pill off the row's generic pending flag alone", () => {
+      renderRow({
+        pending: true,
+        bond: { eligible: true, atCap: false, pending: false, onSubmit: vi.fn().mockResolvedValue(undefined) },
+      });
+      expect(screen.getByRole("button", { name: "Bond" })).not.toBeDisabled();
+      // Equip — a genuine `pending` consumer — stays disabled, proving this
+      // render actually exercised `pending: true` rather than a no-op.
+      expect(screen.getByRole("button", { name: "Equip" })).toBeDisabled();
+    });
+  });
+
   it("in select mode shows a checkbox and hides the per-row actions", async () => {
     const user = userEvent.setup();
     const onToggleSelect = vi.fn();
@@ -176,6 +221,7 @@ describe("InventoryRow (edit mode)", () => {
     quantity: 2,
     equipped: false,
     attuned: false,
+    weaponBonded: false,
     requiresAttunement: false,
     equippable: true,
     allowedSlots: ["MAIN_HAND", "OFF_HAND"],
@@ -202,6 +248,7 @@ describe("InventoryRow (edit mode)", () => {
     quantity: 1,
     equipped: false,
     attuned: false,
+    weaponBonded: false,
     requiresAttunement: false,
     equippable: true,
     allowedSlots: ["BODY"],
@@ -221,6 +268,7 @@ describe("InventoryRow (edit mode)", () => {
     quantity: 3,
     equipped: false,
     attuned: false,
+    weaponBonded: false,
     requiresAttunement: false,
     equippable: false,
     allowedSlots: [],

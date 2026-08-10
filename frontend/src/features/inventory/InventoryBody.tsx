@@ -5,6 +5,7 @@ import InventoryContent from "@/features/inventory/InventoryContent";
 import SellPanel from "@/features/inventory/SellPanel";
 import { type SellLine } from "@/lib/bulkSell";
 import { type InventorySection } from "@/lib/inventorySections";
+import type { WeaponBondProps } from "@/lib/weaponBond";
 
 interface InventoryBodyProps {
   configuringSell: boolean;
@@ -21,6 +22,8 @@ interface InventoryBodyProps {
   onCancelSell: () => void;
   onAddItem: () => void;
   onSubmit: (operations: InventoryOperation[]) => Promise<void>;
+  // Bundled (#1854) — see WeaponBondProps' own comment.
+  bond: WeaponBondProps;
   onEdit: (id: string) => void;
   onCancelEdit: () => void;
   onToggleSelect: (id: string) => void;

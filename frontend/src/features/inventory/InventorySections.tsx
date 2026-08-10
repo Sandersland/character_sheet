@@ -8,6 +8,7 @@ import InventoryRowCompact from "@/features/inventory/InventoryRowCompact";
 import ItemDetailSheet from "@/features/inventory/ItemDetailSheet";
 import { formatWeight, type InventorySection } from "@/lib/inventorySections";
 import { itemCategoryLabel } from "@/lib/items";
+import type { WeaponBondProps } from "@/lib/weaponBond";
 
 interface InventorySectionsProps {
   sections: InventorySection[];
@@ -19,6 +20,8 @@ interface InventorySectionsProps {
   onEdit: (id: string) => void;
   onCancelEdit: () => void;
   onSubmit: (operations: InventoryOperation[]) => Promise<void>;
+  // Bundled (#1854) — see WeaponBondProps' own comment.
+  bond: WeaponBondProps;
   onToggleSelect: (id: string) => void;
 }
 
@@ -35,6 +38,7 @@ export default function InventorySections({
   onEdit,
   onCancelEdit,
   onSubmit,
+  bond,
   onToggleSelect,
 }: InventorySectionsProps) {
   const isMobile = useIsBelowMd();
@@ -75,6 +79,7 @@ export default function InventorySections({
             pending={pending}
             atCap={atCap}
             onSubmit={onSubmit}
+            bond={bond}
             onClose={() => setOpenId(null)}
           />
         )}
@@ -104,6 +109,7 @@ export default function InventorySections({
                   onCancel={onCancelEdit}
                   onSubmit={onSubmit}
                   atCap={atCap}
+                  bond={bond}
                   selectMode={selectMode}
                   selected={selectedIds.has(item.id)}
                   onToggleSelect={() => onToggleSelect(item.id)}

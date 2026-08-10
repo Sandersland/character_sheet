@@ -263,11 +263,20 @@ export function buildAvailableActionsView(
   // Light flags of the currently-equipped weapons — the off-hand eligibility
   // input (#1435), computed by the caller from the already-serialized inventory.
   equippedWeaponLight: ReadonlyArray<{ light: boolean }>,
+  // Eldritch Knight Weapon Bond (#1854): count of `weaponBonded` inventory
+  // rows, ALREADY clamped by the caller through weaponBondEligible (the
+  // clamp-on-read half — a stale bonded flag on a disqualified character
+  // reads as 0 here until reconcileWeaponBond physically clears it). Folded
+  // into a synthetic "weaponBond" pool rather than a bespoke enablement path,
+  // reusing DERIVED_ACTIONS' existing resourceKey/resourceAmount gate.
+  bondedWeaponCount: number,
 ): AvailableAction[] {
-  const pools =
-    resources && "pools" in resources
+  const pools = [
+    ...(resources && "pools" in resources
       ? (resources as { pools: { key: string; remaining: number }[] }).pools
-      : [];
+      : []),
+    { key: "weaponBond", remaining: bondedWeaponCount },
+  ];
   // featureRowsOf (#1528 chunk 0): a Fighter entry's row-driven actions
   // (Second Wind/Action Surge) surface here through the SAME carrier
   // buildResourcesView passes for its pools/features.

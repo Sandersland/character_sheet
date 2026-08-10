@@ -1,35 +1,32 @@
 import ActivateControl from "@/features/inventory/ActivateControl";
-import AttuneToggle from "@/features/inventory/AttuneToggle";
-import EquipToggle from "@/features/inventory/EquipToggle";
-import UseConsumableButton from "@/features/inventory/UseConsumableButton";
+import InventoryRowControls from "@/features/inventory/InventoryRowControls";
 import type { InventoryItem, InventoryOperation } from "@/types/character";
+import type { WeaponBondProps } from "@/lib/weaponBond";
 
 interface ItemDetailControlsProps {
   item: InventoryItem;
   pending: boolean;
   atCap: boolean;
   onSubmit: (operations: InventoryOperation[]) => Promise<void>;
+  // Bundled (#1854) — see WeaponBondProps' own comment.
+  bond: WeaponBondProps;
 }
 
 // The reused per-item action pills inside the detail sheet (#1029): equip,
-// use, attune, activate — each gated by the item's shape, same as the row.
-export default function ItemDetailControls({ item, pending, atCap, onSubmit }: ItemDetailControlsProps) {
+// use, attune, bond (InventoryRowControls — the row's own pill cluster) plus
+// activate, which the row renders outside its pill cluster instead.
+export default function ItemDetailControls({ item, pending, atCap, onSubmit, bond }: ItemDetailControlsProps) {
   const hasControls =
     item.equippable ||
     item.category === "consumable" ||
     item.requiresAttunement ||
+    (item.category === "weapon" && bond.eligible) ||
     Boolean(item.activated);
   if (!hasControls) return null;
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {item.equippable && <EquipToggle item={item} pending={pending} onSubmit={onSubmit} />}
-      {item.category === "consumable" && (
-        <UseConsumableButton item={item} pending={pending} onSubmit={onSubmit} />
-      )}
-      {item.requiresAttunement && (
-        <AttuneToggle item={item} pending={pending} atCap={atCap} onSubmit={onSubmit} />
-      )}
+      <InventoryRowControls item={item} pending={pending} atCap={atCap} onSubmit={onSubmit} bond={bond} />
       {item.activated && <ActivateControl item={item} pending={pending} onSubmit={onSubmit} />}
     </div>
   );

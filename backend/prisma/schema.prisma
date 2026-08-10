@@ -2073,6 +2073,14 @@ model InventoryItem {
   requiresAttunement    Boolean               @default(false)
   attunementPrereqKind  AttunementPrereqKind?
   attunementPrereqValue String?
+  // Eldritch Knight Weapon Bond (2014, PHB'14 p.75, #1854): persisted boolean,
+  // mirrors `attuned` — the WEAPON_BOND_LIMIT-item cap (lib/classes/weapon-bond.ts)
+  // is DERIVED (counted), never stored. bond/unbond go through
+  // POST …/abilities/weapon-bond/transactions, never PATCH. Item removal
+  // self-reconciles (the flag lives ON the row, so a deleted row needs no
+  // separate cleanup); a character no longer eligible (level-down, lost
+  // subclass) is handled by reconcileWeaponBond (level-reconciliation.ts).
+  weaponBonded          Boolean               @default(false)
   notes                 String?
   position              Int                   @default(0)
   // Uses spent on an activatedEffect capability since its last recharge (#543).
@@ -2230,6 +2238,9 @@ enum CharacterEventType {
   // inventory attunement (#545)
   attuned
   unattuned
+  // Eldritch Knight Weapon Bond (2014, #1854)
+  weaponBonded
+  weaponUnbonded
   // inventory activated effects (#543)
   activated
   deactivated

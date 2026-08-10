@@ -53,6 +53,7 @@ function makeItem(overrides: Partial<InventoryItem> = {}): InventoryItem {
     weight: 65,
     equipped: false,
     attuned: false,
+    weaponBonded: false,
     requiresAttunement: false,
     equippable: true,
     allowedSlots: ["BODY"],

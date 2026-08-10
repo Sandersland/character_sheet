@@ -106,6 +106,9 @@ export type EventType =
   // inventory attunement (#545)
   | "attuned"
   | "unattuned"
+  // Eldritch Knight Weapon Bond (2014, #1854)
+  | "weaponBonded"
+  | "weaponUnbonded"
   // inventory activated effects (#543)
   | "activated"
   | "deactivated"

@@ -62,6 +62,7 @@ export type { SerializedCapability as ItemCapability };
  * the `RollSpec` shape rather than a "1d6" string, so a future damage-roll
  * feature reads these directly — mirrors the `ItemWeaponDetail` model.
  */
+// fallow-ignore-next-line code-duplication -- pre-existing field mirror against packages/shared-types/src/item-detail-inputs.ts's WeaponDetailInput (the frontend/backend wire-type split, #1272/#1273); surfaced only because #1854 touched this file elsewhere, not introduced by it
 export interface WeaponDetail {
   damageDiceCount: number;
   damageDiceFaces: number;
@@ -281,6 +282,14 @@ export interface InventoryItem {
    * above, which remain on the wire for the DM item form's round-trip.
    */
   attunementPrereqText?: string;
+  /**
+   * Eldritch Knight Weapon Bond (2014, PHB'14 p.75, #1854). May read stale
+   * `true` on a character no longer eligible (level-down, lost the subclass)
+   * until the server's reconciler runs — the served `availableActions`
+   * Summon Bonded Weapon action is already clamped, so this flag is display
+   * only.
+   */
+  weaponBonded: boolean;
 
   notes?: string;
   weapon?: WeaponDetail;

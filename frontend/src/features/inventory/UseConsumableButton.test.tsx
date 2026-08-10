@@ -37,6 +37,7 @@ function makeConsumable(overrides: Partial<InvItem> = {}): InvItem {
     quantity: 2,
     equipped: false,
     attuned: false,
+    weaponBonded: false,
     requiresAttunement: false,
     equippable: false,
     allowedSlots: [],
