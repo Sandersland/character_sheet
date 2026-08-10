@@ -257,7 +257,7 @@ const combatStateBody = (over: Partial<{ round: number; combatActive: boolean }>
   round: 1,
   combatActive: true,
   updatedAt: "2026-07-26T00:00:00.000Z",
-  spellEconomy: { bonusActionBlockedByActionSpell: false, actionLimitedToCantrips: false },
+  spellEconomy: { bonusActionBlockedByActionSpell: false, bonusActionLimitedToCantrips: false, actionLimitedToCantrips: false },
   ...over,
 });
 

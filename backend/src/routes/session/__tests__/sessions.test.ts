@@ -398,17 +398,20 @@ describe("combat state is server-authoritative", () => {
       where: { sessionId_characterId: { sessionId, characterId: CHAR_PLAYER } },
       data: { spellCastAsAction: "leveled" },
     });
+    // PLAYER is a 2024 (default-edition) character, so a leveled Action spell
+    // limits the bonus action to cantrips (it doesn't fully block it).
     const blocked = await agent(cookiePlayer).get(combatStateUrl(CHAR_PLAYER, sessionId));
-    expect(blocked.body.spellEconomy.bonusActionBlockedByActionSpell).toBe(true);
+    expect(blocked.body.spellEconomy.bonusActionLimitedToCantrips).toBe(true);
 
     // OWNER (not PLAYER) ends and restarts combat.
     await agent(cookieOwner).post(endCombatUrl(sessionId)).send({});
     await agent(cookieOwner).post(startCombatUrl(sessionId)).send({});
 
-    // PLAYER's block must be cleared — not stranded across the restart.
+    // PLAYER's restriction must be cleared — not stranded across the restart.
     const after = await agent(cookiePlayer).get(combatStateUrl(CHAR_PLAYER, sessionId));
     expect(after.body.spellEconomy).toEqual({
       bonusActionBlockedByActionSpell: false,
+      bonusActionLimitedToCantrips: false,
       actionLimitedToCantrips: false,
     });
   });

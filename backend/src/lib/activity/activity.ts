@@ -366,6 +366,28 @@ async function revertClassEvent(ctx: RevertContext): Promise<void> {
 // revertSpellcastingEvent/revertResourcesEvent. A cantrip/weapon resolution
 // snapshots neither column, so this is a no-op for it — the batch is still
 // marked reverted by applyBatchReversal regardless.
+// Lift the per-turn bonus-action interlock a reverted spell cast recorded
+// (#1439 review) — the SessionParticipant field the resolveAction transaction
+// set (recordTurnSpellCast) is not part of the event's character `before`/
+// `after`, so undo must clear it explicitly or the block reappears on the next
+// poll. Clearing to null (rather than restoring a prior value) is functionally
+// exact: the interlock reads only `leveled`, and re-casting on the same economy
+// slot in one turn is itself out of rules scope. No-op for a weapon swing
+// (no entryId), a reaction cast, or a cast outside a session.
+async function clearRevertedSpellCastInterlock(
+  tx: Prisma.TransactionClient,
+  event: CharacterEvent,
+): Promise<void> {
+  const data = event.data as { entryId?: string | null; cost?: { kind?: string } } | null;
+  const economy = data?.cost?.kind;
+  if (event.sessionId == null || data?.entryId == null) return;
+  if (economy !== "action" && economy !== "bonus") return;
+  await tx.sessionParticipant.updateMany({
+    where: { sessionId: event.sessionId, characterId: event.characterId },
+    data: economy === "action" ? { spellCastAsAction: null } : { spellCastAsBonus: null },
+  });
+}
+
 async function revertCombatEvent(ctx: RevertContext): Promise<void> {
   const { tx, characterId, before } = ctx;
   const beforeSpellcasting = before.spellcasting as Record<string, unknown> | undefined;
@@ -434,6 +456,14 @@ async function reverseEvent(
   if (event.category === "inventory") {
     await revertInventoryEvent(tx, characterId, event);
     return;
+  }
+
+  // Undoing a spell cast must also lift the per-turn interlock it recorded
+  // (#1439 review) — BEFORE the `before` guard, because a cantrip cast has no
+  // slot `before` snapshot yet still set the interlock. A leveled cast falls
+  // through to restore its spent slot via revertCombatEvent below.
+  if (event.category === "combat" && event.type === "resolveAction") {
+    await clearRevertedSpellCastInterlock(tx, event);
   }
 
   const before = event.before as Record<string, unknown> | null;

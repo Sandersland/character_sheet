@@ -201,6 +201,9 @@ export function useTurnActions({
     try {
       await undoBatch(top.batchId);
       undo();
+      // The caller re-reads combat state after this resolves (#1439 review):
+      // undoing a spell cast lifts the interlock it recorded server-side
+      // (revertCombatEvent), and the block must not linger until the next poll.
     } catch {
       // error already carries the message via useTurnActionMutations.
     }

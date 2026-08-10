@@ -12,7 +12,7 @@ import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character, Session, SessionDoorwayState, SpellEconomyState } from "@/types/character";
 
 // The cleared 5e interlock every combat mock returns (#1439).
-const NO_ECON: SpellEconomyState = { bonusActionBlockedByActionSpell: false, actionLimitedToCantrips: false };
+const NO_ECON: SpellEconomyState = { bonusActionBlockedByActionSpell: false, bonusActionLimitedToCantrips: false, actionLimitedToCantrips: false };
 
 // fetchCombatState must be mocked even where a test ignores it: TurnStateProvider
 // mounts useCombatPoll, so leaving it off the factory makes the poll call

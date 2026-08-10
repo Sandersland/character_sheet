@@ -27,7 +27,7 @@ import type { AttackRow } from "@character-sheet/shared-types";
 import type { Character, SpellEconomyState } from "@/types/character";
 
 // The cleared 5e interlock every combat mock returns (#1439).
-const NO_ECON: SpellEconomyState = { bonusActionBlockedByActionSpell: false, actionLimitedToCantrips: false };
+const NO_ECON: SpellEconomyState = { bonusActionBlockedByActionSpell: false, bonusActionLimitedToCantrips: false, actionLimitedToCantrips: false };
 
 vi.mock("@/api/client", () => ({
   applyActionTransactions: vi.fn(),

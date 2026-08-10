@@ -89,10 +89,25 @@ const HEAL_SPELL = {
   effectModifier: 0,
 };
 
+// A cantrip (level 0) — casting it spends no slot, so the interlock records it
+// as `cantrip` (#1439 finding 1: it must not downgrade a leveled block).
+const CANTRIP_SPELL = {
+  id: "entry-cantrip",
+  name: "Test Fire Bolt",
+  level: 0,
+  school: "evocation",
+  prepared: true,
+  castingTime: "1 action",
+  range: "120 feet",
+  duration: "Instantaneous",
+  description: "",
+  concentration: false,
+};
+
 const FIXTURE_SPELLCASTING_JSON = {
   slotsUsed: {},
   arcanumUsed: {},
-  spells: [CONCENTRATION_SPELL_A, CONCENTRATION_SPELL_B, HEAL_SPELL],
+  spells: [CONCENTRATION_SPELL_A, CONCENTRATION_SPELL_B, HEAL_SPELL, CANTRIP_SPELL],
   concentratingOn: null,
 };
 
@@ -193,6 +208,19 @@ function bonusLeveledCastOp(entryId: string, actionId: string) {
     effect: null,
     slotLevel: 1,
     entryId,
+  };
+}
+
+// A cantrip cast — entryId present, NO slotLevel (no slot spent). `economy` is
+// the cost kind so the recorder classifies it as a cantrip in that slot.
+function cantripCastOp(economy: "action" | "bonus", actionId: string) {
+  return {
+    type: "resolveAction" as const,
+    actionId,
+    source: "Test Fire Bolt",
+    cost: { kind: economy },
+    effect: { spec: "1d10", faces: [6], total: 6, type: "fire", kind: "damage" as const, crit: false },
+    entryId: CANTRIP_SPELL.id,
   };
 }
 
@@ -599,27 +627,28 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
   const combatRound = (sid: string) =>
     supertest.agent(app).set("Cookie", COOKIE).post(`/api/characters/${FIXTURE_ID}/sessions/${sid}/combat/round`).send({});
 
-  it("serves both interlock flags false when nothing has been cast this turn", async () => {
+  // The fixture is a 2024 (default-edition) Wizard, so these assert SRD 5.2
+  // semantics: a leveled spell in one economy limits the OTHER to cantrips.
+  const NONE = { bonusActionBlockedByActionSpell: false, bonusActionLimitedToCantrips: false, actionLimitedToCantrips: false };
+
+  it("serves no interlock when nothing has been cast this turn", async () => {
     const { id: sid } = await startSoloSession(FIXTURE_ID);
     const res = await combatGet(sid);
     expect(res.status).toBe(200);
-    expect(res.body.spellEconomy).toEqual({
-      bonusActionBlockedByActionSpell: false,
-      actionLimitedToCantrips: false,
-    });
+    expect(res.body.spellEconomy).toEqual(NONE);
   });
 
-  it("a leveled Action spell blocks bonus-action casting, and the block survives a re-read (#1439)", async () => {
+  it("a leveled Action spell limits bonus casting to cantrips (2024), and it survives a re-read (#1439)", async () => {
     const { id: sid } = await startSoloSession(FIXTURE_ID);
-    expect((await combatStart(sid)).body.spellEconomy.bonusActionBlockedByActionSpell).toBe(false);
+    expect((await combatStart(sid)).body.spellEconomy).toEqual(NONE);
 
     const cast = await post([concentrationCastOp(CONCENTRATION_SPELL_A.id, "cast-action")]);
     expect(cast.status).toBe(200);
 
     // Re-read (a fresh request = the "another client / after reload" observer).
-    const after = await combatGet(sid);
-    expect(after.body.spellEconomy).toEqual({
-      bonusActionBlockedByActionSpell: true,
+    expect((await combatGet(sid)).body.spellEconomy).toEqual({
+      bonusActionBlockedByActionSpell: false,
+      bonusActionLimitedToCantrips: true,
       actionLimitedToCantrips: false,
     });
   });
@@ -631,9 +660,9 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     const cast = await post([bonusLeveledCastOp(CONCENTRATION_SPELL_B.id, "cast-bonus")]);
     expect(cast.status).toBe(200);
 
-    const after = await combatGet(sid);
-    expect(after.body.spellEconomy).toEqual({
+    expect((await combatGet(sid)).body.spellEconomy).toEqual({
       bonusActionBlockedByActionSpell: false,
+      bonusActionLimitedToCantrips: false,
       actionLimitedToCantrips: true,
     });
   });
@@ -642,43 +671,95 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     const { id: sid } = await startSoloSession(FIXTURE_ID);
     await combatStart(sid);
     await post([concentrationCastOp(CONCENTRATION_SPELL_A.id, "cast-action")]);
-    expect((await combatGet(sid)).body.spellEconomy.bonusActionBlockedByActionSpell).toBe(true);
+    expect((await combatGet(sid)).body.spellEconomy.bonusActionLimitedToCantrips).toBe(true);
 
     const round = await combatRound(sid);
     expect(round.status).toBe(201);
-    expect(round.body.spellEconomy).toEqual({
-      bonusActionBlockedByActionSpell: false,
-      actionLimitedToCantrips: false,
-    });
+    expect(round.body.spellEconomy).toEqual(NONE);
     // And a subsequent poll agrees the block is gone.
-    expect((await combatGet(sid)).body.spellEconomy.bonusActionBlockedByActionSpell).toBe(false);
+    expect((await combatGet(sid)).body.spellEconomy).toEqual(NONE);
   });
 
   it("a weapon swing (no entryId) records no interlock (#1439)", async () => {
     const { id: sid } = await startSoloSession(FIXTURE_ID);
     await combatStart(sid);
     await post([weaponOp()]);
-    expect((await combatGet(sid)).body.spellEconomy).toEqual({
-      bonusActionBlockedByActionSpell: false,
-      actionLimitedToCantrips: false,
-    });
+    expect((await combatGet(sid)).body.spellEconomy).toEqual(NONE);
   });
 
-  // #1439 review finding 1: a no-op re-press of Start Combat must NOT clear a
-  // valid in-progress bonus-action block (the reset is gated on the real
-  // false→true transition, alongside the log event).
-  it("a redundant startCombat while already in combat does NOT clear an existing block", async () => {
+  // #1439 review finding 1 (pass 2): a no-op re-press of Start Combat must NOT
+  // clear a valid in-progress restriction (reset gated on the real false→true
+  // transition).
+  it("a redundant startCombat while already in combat does NOT clear an existing restriction", async () => {
     const { id: sid } = await startSoloSession(FIXTURE_ID);
     await combatStart(sid);
     await post([concentrationCastOp(CONCENTRATION_SPELL_A.id, "cast-action")]);
-    expect((await combatGet(sid)).body.spellEconomy.bonusActionBlockedByActionSpell).toBe(true);
+    expect((await combatGet(sid)).body.spellEconomy.bonusActionLimitedToCantrips).toBe(true);
 
-    // Second Start Combat: combat is already active, so this is a pure no-op.
     const second = await combatStart(sid);
     expect(second.status).toBe(201);
     expect(second.body).toMatchObject({ round: 1, combatActive: true });
-    expect(second.body.spellEconomy.bonusActionBlockedByActionSpell).toBe(true);
-    expect((await combatGet(sid)).body.spellEconomy.bonusActionBlockedByActionSpell).toBe(true);
+    expect(second.body.spellEconomy.bonusActionLimitedToCantrips).toBe(true);
+    expect((await combatGet(sid)).body.spellEconomy.bonusActionLimitedToCantrips).toBe(true);
+  });
+
+  // #1439 review finding 1 (pass 3): a later cantrip Action spell must NOT
+  // downgrade an existing leveled block (Action Surge: leveled then cantrip).
+  it("a cantrip Action cast does not downgrade a leveled Action block", async () => {
+    const { id: sid } = await startSoloSession(FIXTURE_ID);
+    await combatStart(sid);
+    await post([concentrationCastOp(CONCENTRATION_SPELL_A.id, "cast-leveled")]); // leveled Action
+    await post([cantripCastOp("action", "cast-cantrip")]); // cantrip Action (Action Surge)
+    // Still limited (spellCastAsAction stayed 'leveled', not overwritten to 'cantrip').
+    expect((await combatGet(sid)).body.spellEconomy.bonusActionLimitedToCantrips).toBe(true);
+  });
+
+  // #1439 review finding 4: undoing a spell cast lifts the interlock it recorded.
+  it("reverting a cast batch clears the recorded interlock (#1439)", async () => {
+    const { id: sid } = await startSoloSession(FIXTURE_ID);
+    await combatStart(sid);
+    const cast = await post([concentrationCastOp(CONCENTRATION_SPELL_A.id, "cast-action")]);
+    const batchId = (await activity(FIXTURE_ID)).body.find(
+      (e: { type: string }) => e.type === "resolveAction",
+    ).batchId as string;
+    expect(cast.status).toBe(200);
+    expect((await combatGet(sid)).body.spellEconomy.bonusActionLimitedToCantrips).toBe(true);
+
+    const revertRes = await revert(FIXTURE_ID, batchId);
+    expect(revertRes.status).toBe(200);
+    expect((await combatGet(sid)).body.spellEconomy).toEqual(NONE);
+  });
+
+  // #1439 review finding 2 (edition): the interlock is edition-specific and the
+  // character's `rulesEdition` is threaded through the served combat state. A
+  // 2014 character casting a CANTRIP as a bonus action limits the Action to
+  // cantrips (SRD 5.1: any bonus spell) — the SAME cast in 2024 would not.
+  it("threads the character's edition: a 2014 cantrip-as-bonus limits the Action (unlike 2024)", async () => {
+    const CHAR_2014 = "test-resolve-action-2014";
+    await prisma.character.create({
+      data: {
+        ...FIXTURE_BASE,
+        id: CHAR_2014,
+        name: "Resolve Action Test Wizard 2014",
+        ownerId: OWNER_ID,
+        rulesEdition: "EDITION_2014",
+        spellcasting: FIXTURE_SPELLCASTING_JSON as Prisma.InputJsonValue,
+        classEntries: { create: [{ name: "wizard", classId: wizardClassId, position: 0 }] },
+      },
+    });
+    try {
+      const { id: sid } = await startSoloSession(CHAR_2014);
+      const agent2014 = supertest.agent(app).set("Cookie", COOKIE);
+      await agent2014.post(`/api/characters/${CHAR_2014}/sessions/${sid}/combat/start`).send({});
+      await agent2014
+        .post(`/api/characters/${CHAR_2014}/resolve-action/transactions`)
+        .send({ operations: [cantripCastOp("bonus", "cantrip-bonus-2014")] });
+
+      const state = await agent2014.get(`/api/characters/${CHAR_2014}/sessions/${sid}/combat`);
+      expect(state.body.spellEconomy.actionLimitedToCantrips).toBe(true);
+    } finally {
+      await prisma.character.deleteMany({ where: { id: CHAR_2014 } });
+    }
   });
 
   // #1439 review finding 2: cast-kind recording is coupled to the spell
@@ -690,9 +771,6 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     await combatStart(sid);
     const res = await post([{ ...weaponOp(), entryId: "not-a-real-spell-entry" }]);
     expect(res.status).toBe(400);
-    expect((await combatGet(sid)).body.spellEconomy).toEqual({
-      bonusActionBlockedByActionSpell: false,
-      actionLimitedToCantrips: false,
-    });
+    expect((await combatGet(sid)).body.spellEconomy).toEqual(NONE);
   });
 });

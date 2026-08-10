@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { logEvent, type EventType } from "@/lib/activity/events.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { spellEconomyRestrictions } from "@/lib/spellcasting/spell-economy.js";
+import { DEFAULT_RULES_EDITION, type RulesEdition } from "@/lib/rules/edition.js";
 import {
   computeCampaignRecap,
   computeSessionSummary,
@@ -366,7 +367,9 @@ export async function joinSession(sessionId: string, characterId: string) {
   return prisma.sessionParticipant.upsert({
     where: { sessionId_characterId: { sessionId, characterId } },
     create: { sessionId, characterId },
-    update: { leftAt: null },
+    // Clear any per-turn spell interlock on (re)join (#1439 review) — a record
+    // stranded from a prior interval must not block a freshly-rejoined player.
+    update: { leftAt: null, spellCastAsAction: null, spellCastAsBonus: null },
   });
 }
 
@@ -579,12 +582,14 @@ async function readCombatColumns(
   spellCastAsAction: SpellCastKind | null;
   spellCastAsBonus: SpellCastKind | null;
   participantUpdatedAt: Date | null;
+  edition: RulesEdition;
 } | null> {
-  // ONE query so round/combatActive and the participant's cast record come from
-  // a single committed snapshot (#1439 review): two separate findUniques could
-  // straddle a concurrent combat mutation and serve a torn state. The nested
-  // participant read is filtered to the acting character (the include is a join
-  // in one round-trip, not a second statement).
+  // ONE query so round/combatActive, the participant's cast record, and the
+  // character's edition come from a single committed snapshot (#1439 review):
+  // two separate findUniques could straddle a concurrent combat mutation and
+  // serve a torn state. The nested participant read is filtered to the acting
+  // character (the include is a join in one round-trip, not a second statement);
+  // `rulesEdition` rides the same join because the interlock is edition-specific.
   const session = await db.session.findUnique({
     where: { id: sessionId },
     select: {
@@ -593,7 +598,12 @@ async function readCombatColumns(
       updatedAt: true,
       participants: {
         where: { characterId },
-        select: { spellCastAsAction: true, spellCastAsBonus: true, updatedAt: true },
+        select: {
+          spellCastAsAction: true,
+          spellCastAsBonus: true,
+          updatedAt: true,
+          character: { select: { rulesEdition: true } },
+        },
         take: 1,
       },
     },
@@ -607,11 +617,15 @@ async function readCombatColumns(
     spellCastAsAction: participant?.spellCastAsAction ?? null,
     spellCastAsBonus: participant?.spellCastAsBonus ?? null,
     participantUpdatedAt: participant?.updatedAt ?? null,
+    // A missing participant (guarded against by the route) can't resolve an
+    // edition; fall back to the schema default so the flags stay well-defined.
+    edition: participant?.character.rulesEdition ?? DEFAULT_RULES_EDITION,
   };
 }
 
 // Assemble the wire CombatState from the read columns: resolve the interlock via
-// the shared rule fn and take the freshest `updatedAt` of session/participant.
+// the shared rule fn (edition-specific) and take the freshest `updatedAt` of
+// session/participant.
 function toCombatState(cols: NonNullable<Awaited<ReturnType<typeof readCombatColumns>>>): CombatState {
   const updatedAt =
     cols.participantUpdatedAt && cols.participantUpdatedAt > cols.sessionUpdatedAt
@@ -623,7 +637,7 @@ function toCombatState(cols: NonNullable<Awaited<ReturnType<typeof readCombatCol
     // ISO string on the wire, matching the client's `updatedAt: string` — the
     // existing Session.updatedAt contract.
     updatedAt: updatedAt.toISOString(),
-    spellEconomy: spellEconomyRestrictions(cols.spellCastAsAction, cols.spellCastAsBonus),
+    spellEconomy: spellEconomyRestrictions(cols.spellCastAsAction, cols.spellCastAsBonus, cols.edition),
   };
 }
 
@@ -677,6 +691,12 @@ async function resetAllTurnSpellCasts(tx: Prisma.TransactionClient, sessionId: s
  * session. `economy` is the op's cost kind; a reaction cast never restricts the
  * action/bonus economy, so it is not recorded. `kind` is leveled iff a slot was
  * spent (a cantrip has no slotLevel) — the only distinction the interlock reads.
+ *
+ * A cantrip write must NOT downgrade an existing `leveled` record for the same
+ * economy slot this turn (#1439 review): under Action Surge a leveled Action
+ * spell then a cantrip both cost the Action, and the cantrip must not lift the
+ * block. So a `cantrip` update is gated on the field not already being leveled;
+ * a `leveled` write always lands (it can only raise the restriction).
  */
 export async function recordTurnSpellCast(
   tx: Prisma.TransactionClient,
@@ -686,10 +706,25 @@ export async function recordTurnSpellCast(
   kind: SpellCastKind,
 ): Promise<void> {
   if (economy === "reaction") return;
-  await tx.sessionParticipant.updateMany({
-    where: { sessionId, characterId },
-    data: economy === "action" ? { spellCastAsAction: kind } : { spellCastAsBonus: kind },
-  });
+  if (economy === "action") {
+    await tx.sessionParticipant.updateMany({
+      // A cantrip may write over null (initial) or an existing cantrip, but NOT
+      // over `leveled` — a bare `{ not: "leveled" }` would also exclude the null
+      // row (SQL NULL comparison), skipping the first cantrip cast, so match
+      // null OR cantrip explicitly. A leveled write always lands.
+      where: kind === "cantrip"
+        ? { sessionId, characterId, OR: [{ spellCastAsAction: null }, { spellCastAsAction: "cantrip" }] }
+        : { sessionId, characterId },
+      data: { spellCastAsAction: kind },
+    });
+  } else {
+    await tx.sessionParticipant.updateMany({
+      where: kind === "cantrip"
+        ? { sessionId, characterId, OR: [{ spellCastAsBonus: null }, { spellCastAsBonus: "cantrip" }] }
+        : { sessionId, characterId },
+      data: { spellCastAsBonus: kind },
+    });
+  }
 }
 
 async function logCombatLifecycleEvent(

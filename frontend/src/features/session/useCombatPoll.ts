@@ -31,11 +31,17 @@ export function useCombatPoll(
 ): CombatRefresh {
   const onSyncRef = useRef(onSync);
   onSyncRef.current = onSync;
+  // `active` read through a ref so `refresh` can re-check it AFTER its await
+  // (#1439 review): a refresh() that resolves once the poll is no longer active
+  // (session ended/left) must not re-apply a now-stale combat state.
+  const activeRef = useRef(active);
+  activeRef.current = active;
 
   const refresh = useCallback<CombatRefresh>(async () => {
-    if (!sessionId) return;
+    if (!sessionId || !activeRef.current) return;
     try {
       const state = await fetchCombatState(characterId, sessionId);
+      if (!activeRef.current) return; // torn down while the fetch was in flight
       onSyncRef.current(state.round, state.combatActive, state.updatedAt, state.spellEconomy);
     } catch {
       // Best-effort — the ~5s poll will reconcile on the next tick.

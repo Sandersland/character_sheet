@@ -16,7 +16,7 @@ import {
   hiddenLevelsNote,
   castCostBadge,
 } from "@/lib/spellPicker";
-import type { Spell, SpellSlots } from "@/types/character";
+import type { Spell, SpellSlots, SpellEconomyState } from "@/types/character";
 
 function spell(overrides: Partial<Spell>): Spell {
   return {
@@ -92,56 +92,80 @@ describe("resolvedSlot", () => {
 });
 
 // Pins the client's projection of the SERVER-resolved interlock (#1439): the
-// picker consumes the served SpellEconomyState, never re-derives the rule.
+// picker consumes the served SpellEconomyState (3 booleans), never re-derives
+// the rule. `filterCastableSpells`'s two flags are picker-neutral primitives —
+// bonusActionBlockedByActionSpell = drop all, actionLimitedToCantrips = drop leveled.
 describe("restrictionFlagsForSlot", () => {
-  it("routes the served block onto the bonus-action picker", () => {
-    expect(
-      restrictionFlagsForSlot("bonusAction", {
-        bonusActionBlockedByActionSpell: true,
-        actionLimitedToCantrips: false,
-      }),
-    ).toEqual({ bonusActionBlockedByActionSpell: true, actionLimitedToCantrips: false });
+  const econ = (over: Partial<SpellEconomyState> = {}): SpellEconomyState => ({
+    bonusActionBlockedByActionSpell: false,
+    bonusActionLimitedToCantrips: false,
+    actionLimitedToCantrips: false,
+    ...over,
   });
 
-  it("routes the served cantrip-limit onto the action picker", () => {
-    expect(
-      restrictionFlagsForSlot("action", {
-        bonusActionBlockedByActionSpell: false,
-        actionLimitedToCantrips: true,
-      }),
-    ).toEqual({ bonusActionBlockedByActionSpell: false, actionLimitedToCantrips: true });
+  it("bonus picker: a full block (SRD 5.1 leveled Action) drops all", () => {
+    expect(restrictionFlagsForSlot("bonusAction", econ({ bonusActionBlockedByActionSpell: true }))).toEqual({
+      bonusActionBlockedByActionSpell: true,
+      actionLimitedToCantrips: false,
+    });
   });
 
-  it("does not apply the bonus-action block to the action picker (slot-gated, e.g. after Action Surge)", () => {
+  it("bonus picker: a cantrips-only limit (SRD 5.2 leveled Action) drops leveled, keeps cantrips", () => {
+    expect(restrictionFlagsForSlot("bonusAction", econ({ bonusActionLimitedToCantrips: true }))).toEqual({
+      bonusActionBlockedByActionSpell: false,
+      actionLimitedToCantrips: true,
+    });
+  });
+
+  it("action picker: a bonus-spell cast limits it to cantrips (drops leveled)", () => {
+    expect(restrictionFlagsForSlot("action", econ({ actionLimitedToCantrips: true }))).toEqual({
+      bonusActionBlockedByActionSpell: false,
+      actionLimitedToCantrips: true,
+    });
+  });
+
+  it("action picker: the bonus-side flags never leak in (slot-gated, e.g. after Action Surge)", () => {
     expect(
-      restrictionFlagsForSlot("action", {
-        bonusActionBlockedByActionSpell: true,
-        actionLimitedToCantrips: false,
-      }),
+      restrictionFlagsForSlot("action", econ({ bonusActionBlockedByActionSpell: true, bonusActionLimitedToCantrips: true })),
     ).toEqual({ bonusActionBlockedByActionSpell: false, actionLimitedToCantrips: false });
   });
 
   it("never gates a reaction spell", () => {
     expect(
-      restrictionFlagsForSlot("reaction", {
-        bonusActionBlockedByActionSpell: true,
-        actionLimitedToCantrips: true,
-      }),
+      restrictionFlagsForSlot("reaction", econ({ bonusActionBlockedByActionSpell: true, actionLimitedToCantrips: true })),
     ).toEqual({ bonusActionBlockedByActionSpell: false, actionLimitedToCantrips: false });
   });
 });
 
 describe("slotRestrictionHint", () => {
-  it("returns the block message when bonus-action casting is blocked", () => {
-    expect(slotRestrictionHint(true, false)).toMatch(/bonus-action spell casting is not allowed/i);
+  const econ = (over: Partial<SpellEconomyState> = {}): SpellEconomyState => ({
+    bonusActionBlockedByActionSpell: false,
+    bonusActionLimitedToCantrips: false,
+    actionLimitedToCantrips: false,
+    ...over,
   });
 
-  it("returns the cantrip-only message when limited", () => {
-    expect(slotRestrictionHint(false, true)).toMatch(/only cantrips may be cast/i);
+  it("bonus picker: full block (2014)", () => {
+    expect(slotRestrictionHint("bonusAction", econ({ bonusActionBlockedByActionSpell: true }))).toMatch(
+      /no bonus-action spell allowed/i,
+    );
+  });
+
+  it("bonus picker: cantrips only (2024)", () => {
+    expect(slotRestrictionHint("bonusAction", econ({ bonusActionLimitedToCantrips: true }))).toMatch(
+      /only a cantrip may be cast as a bonus action/i,
+    );
+  });
+
+  it("action picker: cantrips only", () => {
+    expect(slotRestrictionHint("action", econ({ actionLimitedToCantrips: true }))).toMatch(
+      /only cantrips may be cast with the action/i,
+    );
   });
 
   it("returns null when unrestricted", () => {
-    expect(slotRestrictionHint(false, false)).toBeNull();
+    expect(slotRestrictionHint("action", econ())).toBeNull();
+    expect(slotRestrictionHint("bonusAction", econ())).toBeNull();
   });
 });
 

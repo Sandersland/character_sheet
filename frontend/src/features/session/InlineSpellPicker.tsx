@@ -478,7 +478,7 @@ function deriveSpellList(
       actionLimitedToCantrips,
     }),
   );
-  const slotUsedHint = slotRestrictionHint(bonusActionBlockedByActionSpell, actionLimitedToCantrips);
+  const slotUsedHint = slotRestrictionHint(slot, economy);
   // Deliberately NOT the real restriction flags computed above: this footer
   // explains only slot-based hiding (no affordable slot at that level);
   // economy-rule blocking (a leveled spell already cast this turn) is

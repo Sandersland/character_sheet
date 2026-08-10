@@ -123,14 +123,23 @@ export interface SessionDoorwayState {
 
 /**
  * The 5e bonus-action spellcasting interlock, resolved server-side (#1439) from
- * the acting participant's per-turn cast record — the client receives these two
- * booleans, never the raw cast kinds plus the predicate. `bonusActionBlocked-
- * ByActionSpell`: a leveled spell was cast with the Action this turn, so no
- * bonus-action spell may be cast. `actionLimitedToCantrips`: a leveled spell was
- * cast as a bonus action this turn, so the Action may cast only cantrips.
+ * the acting participant's per-turn cast record AND the character's edition —
+ * the client receives these resolved booleans, never the raw cast kinds plus the
+ * predicate. The two editions genuinely differ (see `spellEconomyRestrictions`):
+ *
+ * - `bonusActionBlockedByActionSpell`: no bonus-action spell at all may be cast
+ *   this turn. SRD 5.1 only — a leveled Action spell blocks the bonus action
+ *   entirely (a bonus cantrip is not the permitted exception).
+ * - `bonusActionLimitedToCantrips`: the bonus action may cast only cantrips.
+ *   SRD 5.2 only — a leveled Action spell leaves bonus cantrips castable (one
+ *   spell slot per turn), so leveled bonus spells drop but cantrips stay.
+ * - `actionLimitedToCantrips`: the Action may cast only cantrips. Both editions,
+ *   after the triggering bonus-action spell (SRD 5.1: ANY bonus spell; SRD 5.2:
+ *   a leveled one).
  */
 export interface SpellEconomyState {
   bonusActionBlockedByActionSpell: boolean;
+  bonusActionLimitedToCantrips: boolean;
   actionLimitedToCantrips: boolean;
 }
 

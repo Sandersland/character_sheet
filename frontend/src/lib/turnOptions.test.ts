@@ -375,10 +375,12 @@ describe("classActionOption", () => {
 });
 
 describe("bonusSpellOptions", () => {
-  // The server-resolved interlock (#1439): unrestricted vs a leveled Action
-  // spell already cast this turn (which blocks bonus-action casting).
-  const UNRESTRICTED = { bonusActionBlockedByActionSpell: false, actionLimitedToCantrips: false };
-  const ACTION_SPELL_BLOCKS = { bonusActionBlockedByActionSpell: true, actionLimitedToCantrips: false };
+  // The server-resolved interlock (#1439). ACTION_SPELL_BLOCKS = SRD 5.1 after a
+  // leveled Action spell (bonus fully blocked); ACTION_SPELL_CANTRIPS_ONLY =
+  // SRD 5.2 (bonus limited to cantrips).
+  const UNRESTRICTED = { bonusActionBlockedByActionSpell: false, bonusActionLimitedToCantrips: false, actionLimitedToCantrips: false };
+  const ACTION_SPELL_BLOCKS = { bonusActionBlockedByActionSpell: true, bonusActionLimitedToCantrips: false, actionLimitedToCantrips: false };
+  const ACTION_SPELL_CANTRIPS_ONLY = { bonusActionBlockedByActionSpell: false, bonusActionLimitedToCantrips: true, actionLimitedToCantrips: false };
   const spellcastingCharacter = (spells: Spell[], slots = [{ level: 1, total: 3, used: 1 }]) =>
     makeCharacter({
       spellcasting: {
@@ -426,9 +428,19 @@ describe("bonusSpellOptions", () => {
     expect(bonusSpellOptions(c, UNRESTRICTED)).toEqual([]);
   });
 
-  it("respects the 5e interlock: leveled action-spell blocks bonus-action casting", () => {
+  it("respects the 5e interlock (2014): a leveled action-spell blocks ALL bonus-action casting", () => {
     const c = spellcastingCharacter([makeSpell()]);
     expect(bonusSpellOptions(c, ACTION_SPELL_BLOCKS)).toEqual([]);
+  });
+
+  it("respects the 5e interlock (2024): a leveled action-spell drops leveled bonus spells but keeps cantrips", () => {
+    const c = spellcastingCharacter([
+      makeSpell(), // leveled — dropped
+      makeSpell({ id: "s0", name: "Shillelagh", level: 0, effectKind: null, effectDiceCount: null, effectDiceFaces: null }),
+    ]);
+    expect(bonusSpellOptions(c, ACTION_SPELL_CANTRIPS_ONLY)).toEqual([
+      { spellId: "s0", name: "Shillelagh", subtitle: "Bonus-action cast", badge: "at will" },
+    ]);
   });
 });
 

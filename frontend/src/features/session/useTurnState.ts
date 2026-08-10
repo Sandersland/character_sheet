@@ -393,6 +393,7 @@ export type TurnStateView = TurnState &
 // arrive via syncCombat, never from a local commit.
 const NO_SPELL_ECONOMY: SpellEconomyState = {
   bonusActionBlockedByActionSpell: false,
+  bonusActionLimitedToCantrips: false,
   actionLimitedToCantrips: false,
 };
 

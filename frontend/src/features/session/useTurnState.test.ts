@@ -17,8 +17,8 @@ import type { AvailableAction, Character, SpellEconomyState } from "@/types/char
 
 // The server-resolved interlock (#1439) carried on every combat sync. Most
 // tests don't exercise it, so they pass the cleared shape.
-const NO_ECON: SpellEconomyState = { bonusActionBlockedByActionSpell: false, actionLimitedToCantrips: false };
-const ACTION_SPELL_BLOCK: SpellEconomyState = { bonusActionBlockedByActionSpell: true, actionLimitedToCantrips: false };
+const NO_ECON: SpellEconomyState = { bonusActionBlockedByActionSpell: false, bonusActionLimitedToCantrips: false, actionLimitedToCantrips: false };
+const ACTION_SPELL_BLOCK: SpellEconomyState = { bonusActionBlockedByActionSpell: true, bonusActionLimitedToCantrips: false, actionLimitedToCantrips: false };
 
 // Minimal character fixture: useTurnState reads only the served availableActions
 // (for twfAvailable, #1435) + the server-derived attacksPerAction.
