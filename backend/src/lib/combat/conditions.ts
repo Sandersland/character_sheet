@@ -25,6 +25,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { levelForExperience } from "@/lib/leveling/experience.js";
+import { draconicResilienceMaxHpTerm } from "@/lib/classes/draconic-bloodline.js";
 import {
   CONDITIONS,
   EXHAUSTION_MAX,
@@ -214,12 +215,13 @@ function resolveRemoveCondition(state: ConditionsMutableState, op: RemoveConditi
 }
 
 // #1321: hp-max inputs a setExhaustion resolution needs to enforce the
-// one-way clamp (decision 4) — the same featMaxHpBonus/edition composition
+// one-way clamp (decision 4) — the same maxHpBonus/edition composition
 // buildHpOpContext assembles, gathered here independently (conditions.ts has
 // no HpOpContext of its own) via the same shared rule functions.
 interface ExhaustionHpClampInputs {
   hp: HitPoints;
-  featMaxHpBonus: number;
+  /** Feat + Draconic subclass max-HP bonus (#1123) — effectiveMaxHitPointsForRow's own composition. */
+  maxHpBonus: number;
   edition: RulesEdition;
 }
 
@@ -244,8 +246,8 @@ function resolveSetExhaustion(
   // undo restores it. Dropping back below 4 does NOT hand the hit points back
   // (decision 5, PHB'14 p. 197 is a ceiling, never a floor) — that asymmetry
   // is exactly why this is a write and not a read-time-only Math.min.
-  const { hp, featMaxHpBonus, edition } = hpClamp;
-  const newEffMax = effectiveMaxHitPoints(hp.max, featMaxHpBonus, state.exhaustion, edition);
+  const { hp, maxHpBonus, edition } = hpClamp;
+  const newEffMax = effectiveMaxHitPoints(hp.max, maxHpBonus, state.exhaustion, edition);
   const clampedCurrent = Math.min(hp.current, newEffMax);
   const hpAfter = clampedCurrent === hp.current ? undefined : { ...hp, current: clampedCurrent };
 
@@ -293,7 +295,16 @@ const CONDITIONS_SELECT = {
   rulesEdition: true,
   classEntries: {
     orderBy: { position: "asc" as const },
-    select: { level: true, class: { select: { extraAsiLevels: true, fightingStyleFeatLevel: true } } },
+    // name/subclass/subclassRef.slug/class.subclassLevel (#1123):
+    // draconicResilienceMaxHpTerm's identity inputs — the select and the term
+    // travel together (see DraconicSorcererEntry).
+    select: {
+      level: true,
+      name: true,
+      subclass: true,
+      subclassRef: { select: { slug: true } },
+      class: { select: { extraAsiLevels: true, fightingStyleFeatLevel: true, subclassLevel: true } },
+    },
   },
 } satisfies Prisma.CharacterSelect;
 
@@ -316,9 +327,12 @@ export function effectiveMaxHitPointsForRow(row: {
   experiencePoints: number;
   classEntries: readonly {
     level: number;
-    class: { extraAsiLevels: readonly number[]; fightingStyleFeatLevel: number | null } | null;
+    name: string;
+    subclass: string | null;
+    subclassRef: { slug: string } | null;
+    class: { extraAsiLevels: readonly number[]; fightingStyleFeatLevel: number | null; subclassLevel: number } | null;
   }[];
-}): { hp: HitPoints; hd: HitDice; featMaxHpBonus: number; exhaustionLevel: number; effMax: number } {
+}): { hp: HitPoints; hd: HitDice; maxHpBonus: number; exhaustionLevel: number; effMax: number } {
   const hp = normalizeHitPoints(row.hitPoints);
   const hd = normalizeHitDice(row.hitDice);
   const derivedLevel = levelForExperience(row.experiencePoints);
@@ -327,10 +341,16 @@ export function effectiveMaxHitPointsForRow(row: {
   // be — matches reconcileAdvancements/applyAdvancementOpInTx's fidelity.
   const fightingStyleSlotTotal = characterFightingStyleFeatSlots(row.classEntries, derivedLevel);
   const inCapAdvancements = inCapAdvancementsAt(row.resources, row.classEntries, derivedLevel, fightingStyleSlotTotal);
-  const featMaxHpBonus = deriveFeatBonuses(inCapAdvancements, hd.total).maxHp;
+  // maxHpBonus = feat bonuses (e.g. Tough) + Draconic Resilience (#1123), the
+  // SAME pre-halving composition serializeCharacter's applyFeatLayer serves —
+  // the subclass term routed through the ONE shared function
+  // (draconicResilienceMaxHpTerm), never an inline copy.
+  const maxHpBonus =
+    deriveFeatBonuses(inCapAdvancements, hd.total).maxHp +
+    draconicResilienceMaxHpTerm(row.classEntries, derivedLevel, row.rulesEdition);
   const exhaustionLevel = normalizeConditionsMutable(row.conditions).exhaustion;
-  const effMax = effectiveMaxHitPoints(hp.max, featMaxHpBonus, exhaustionLevel, row.rulesEdition);
-  return { hp, hd, featMaxHpBonus, exhaustionLevel, effMax };
+  const effMax = effectiveMaxHitPoints(hp.max, maxHpBonus, exhaustionLevel, row.rulesEdition);
+  return { hp, hd, maxHpBonus, exhaustionLevel, effMax };
 }
 
 export async function applyConditionsOperations(
@@ -344,11 +364,11 @@ export async function applyConditionsOperations(
       const state = normalizeConditionsMutable(row.conditions);
       const beforeState = deepCopy(state);
 
-      const { hp, featMaxHpBonus } = effectiveMaxHitPointsForRow(row);
+      const { hp, maxHpBonus } = effectiveMaxHitPointsForRow(row);
 
       const { eventType, summary, eventData, hpAfter } = resolveConditionOp(state, op, {
         hp,
-        featMaxHpBonus,
+        maxHpBonus,
         edition: row.rulesEdition,
       });
 

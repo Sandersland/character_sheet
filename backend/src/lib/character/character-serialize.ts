@@ -345,6 +345,8 @@ export async function serializeCharacter(rawRow: CharacterRow) {
     hitDice.total,
     hitPoints.max,
     conditions.exhaustion,
+    row.classEntries,
+    progress.level,
     editionOf(row),
   );
 
@@ -399,7 +401,16 @@ export async function serializeCharacter(rawRow: CharacterRow) {
     buffTargets,
     editionOf(row),
   );
-  const speed = buildSpeedView(row, bestArmor, hasShield, featBonuses, buffTargets, conditions.exhaustion, editionOf(row));
+  const { speed, flySpeed } = buildSpeedView(
+    row,
+    bestArmor,
+    hasShield,
+    featBonuses,
+    buffTargets,
+    conditions.exhaustion,
+    progress.level,
+    editionOf(row),
+  );
   const unarmedAttacks = buildUnarmedAttacksView(
     row,
     effectiveScores,
@@ -451,6 +462,12 @@ export async function serializeCharacter(rawRow: CharacterRow) {
     armorClassBreakdown,
     initiativeBonus: effectiveInitBonus + featBonuses.initiative,
     speed,
+    // Dragon Wings (#1123) — 2014 only (PHB'14 p.107; the 2024 form is a
+    // resource-gated activated ability, withheld — see
+    // deriveDragonWingsFlySpeed's header), present only while unarmored at
+    // Draconic L14. Absent (never 0) when not flying, same "key present only
+    // when the character has it" convention as the riders above.
+    flySpeed,
     proficiencyBonus: progress.proficiencyBonus,
 
     experiencePoints: row.experiencePoints,

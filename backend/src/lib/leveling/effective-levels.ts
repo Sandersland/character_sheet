@@ -10,6 +10,30 @@ export function effectiveEntryLevel(entryLevel: number, entryCount: number, deri
   return entryCount <= 1 ? derivedLevel : entryLevel;
 }
 
+// The post-level-down per-entry class levels (#124's LIFO trim as a pure
+// rule): the highest-position (most-recently-added) class loses levels first;
+// the position-0 base class is floored at 1, every other entry at 0 — a 0
+// means "entry deleted". Input MUST be ordered by position ascending. The ONE
+// allocation both reconcileClassEntryLevels (which persists it) and
+// computeLevelDownState (which must PROJECT it — its HP clamp runs BEFORE the
+// reconciler chain, when the rows still hold pre-down levels, #1123) resolve
+// through — never two inline copies of the trim.
+export function levelDownEntryLevels(
+  entryLevels: readonly number[],
+  newDerivedLevel: number,
+): number[] {
+  const result = [...entryLevels];
+  let excess = result.reduce((sum, level) => sum + level, 0) - newDerivedLevel;
+  for (let i = result.length - 1; i >= 0 && excess > 0; i--) {
+    const floor = i === 0 ? 1 : 0;
+    const reducible = Math.min(result[i] - floor, excess);
+    if (reducible <= 0) continue;
+    result[i] -= reducible;
+    excess -= reducible;
+  }
+  return result;
+}
+
 // A subclass's grant gate. 2024 (SRD 5.2): every class gains its subclass at
 // level 3, so the catalog column is ignored. 2014 (PHB'14): the catalog column
 // carries the per-class gate — Cleric/Sorcerer/Warlock 1, Druid/Wizard 2, rest 3.

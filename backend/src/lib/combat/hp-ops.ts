@@ -158,7 +158,7 @@ function bumpHpForLevelUp(ctx: HpOpContext, op: LevelUpOperation, dieFaces: numb
   const gain = levelUpHpGain(dieFaces, ctx.conMod, op.method, op.roll);
   ctx.hd.total += 1;
   ctx.hp.max += gain;
-  const newEffMax = effectiveMaxHitPoints(ctx.hp.max, ctx.featMaxHpBonus, ctx.exhaustionLevel, ctx.row.rulesEdition);
+  const newEffMax = effectiveMaxHitPoints(ctx.hp.max, ctx.maxHpBonus, ctx.exhaustionLevel, ctx.row.rulesEdition);
   ctx.hp.current = Math.min(ctx.hp.current + gain, newEffMax);
   return gain;
 }

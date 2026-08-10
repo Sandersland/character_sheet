@@ -14,6 +14,7 @@ import {
 import type { EffectSpec } from "@/lib/combat/effects.js";
 import { deriveEntryScopedResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
 import { featureRowsOf } from "@/lib/classes/feature-rows-select.js";
+import { draconicResilienceMaxHpTerm } from "@/lib/classes/draconic-bloodline.js";
 import type { DerivedFeature } from "@/lib/classes/types.js";
 import type { FeatImprovement } from "@/lib/classes/resources-state.js";
 import { deriveEntryScopedActions, type AvailableAction } from "@/lib/classes/actions.js";
@@ -214,6 +215,8 @@ export function applyFeatLayer(
   // so this needs both to route through effectiveMaxHitPoints (the composition
   // shared with buildHpOpContext/applyHealInTx — never a fourth inline copy).
   exhaustionLevel: number,
+  classEntries: CharacterWithRelations["classEntries"],
+  totalLevel: number,
   edition: RulesEdition,
 ): {
   featBonuses: ReturnType<typeof deriveImprovementBonuses>;
@@ -226,7 +229,15 @@ export function applyFeatLayer(
     ...speciesTraitImprovements,
   ];
   const featBonuses = deriveImprovementBonuses(improvements, hitDiceTotal);
-  const effectiveMaxHp = effectiveMaxHitPoints(maxHp, featBonuses.maxHp, exhaustionLevel, edition);
+  // #1123: the subclass term composes into the SAME effectiveMaxHitPoints call
+  // as the feat bonus — added to the base BEFORE exhaustion's tier-4 halving,
+  // never a second inline `+ subclassBonus` after the fact (see #1123's own
+  // composition-order acceptance case, mirroring #1321's decision 2).
+  // draconicResilienceMaxHpTerm is the ONE shared function this clamp-on-read,
+  // the write seam (effectiveMaxHitPointsForRow), and the reconciler
+  // (reconcileAdvancements) all resolve the subclass term through.
+  const subclassMaxHpBonus = draconicResilienceMaxHpTerm(classEntries, totalLevel, edition);
+  const effectiveMaxHp = effectiveMaxHitPoints(maxHp, featBonuses.maxHp + subclassMaxHpBonus, exhaustionLevel, edition);
   // Proficiency grants from feats + class feature rows (skills + saving
   // throws + armor + weapons). Merged with stored proficiencies by the
   // caller using OR — existing proficiency is never removed.

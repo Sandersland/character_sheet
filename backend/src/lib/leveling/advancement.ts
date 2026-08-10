@@ -37,6 +37,7 @@ import { characterAdvancementSlots, abilityModifier, characterFightingStyleFeatS
 import { featOfferedForAsiSlot, type FeatCategory } from "@/lib/srd/feats.js";
 import { effectiveMaxHitPoints, normalizeHitPoints, normalizeHitDice, type HitPoints, type HitDice } from "@/lib/combat/hitpoints.js";
 import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
+import { draconicResilienceMaxHpTerm } from "@/lib/classes/draconic-bloodline.js";
 import { editionOf } from "@/lib/rules/edition.js";
 import { crossEditionRejection } from "@/lib/rules/catalog-edition.js";
 import type { RulesEdition } from "@character-sheet/shared-types";
@@ -83,6 +84,14 @@ function computeAdvancementEffect(
  * Reverses a list of AdvancementEntry values against the current column values,
  * subtracting each entry's stored deltas in LIFO order. Returns the restored
  * column values (does not write anything).
+ *
+ * Deliberately does NOT clamp `current` — the raw `max` column excludes feat
+ * (Tough) and Draconic Resilience (#1123) bonuses, so a legal `current` can sit
+ * ABOVE it and a raw-max Math.min here would destroy that headroom (min only
+ * lowers; a later effective-max clamp can't restore). Every caller clamps
+ * against effectiveMaxHitPoints instead: reconcileAdvancements,
+ * applyAdvancementOpInTx's shared tail, and serializeCharacter's own
+ * `Math.min(current, effectiveMaxHp)` after applyAdvancementClamp.
  */
 export function reverseAdvancementEffects(
   scores: Record<string, number>,
@@ -106,7 +115,9 @@ export function reverseAdvancementEffects(
     newHp = {
       ...newHp,
       max: newHp.max - entry.hpDelta,
-      current: Math.min(newHp.current, newHp.max - entry.hpDelta),
+      // Exact mirror of the take side (`current: hp.current + hpDelta`),
+      // floored at 0 for a low-current character losing a Con-raising entry.
+      current: Math.max(0, newHp.current - entry.hpDelta),
     };
     newInit = newInit - entry.initDelta;
   }
@@ -570,7 +581,15 @@ const ADVANCEMENT_SELECT = {
     // `class` (#1529): a seventh reconciler/clamp-on-read query site beyond the
     // issue's own enumerated six — found via the signature change + typecheck,
     // resolving the SAME extraAsiLevels/fightingStyleFeatLevel columns.
-    select: { name: true, level: true, class: { select: { extraAsiLevels: true, fightingStyleFeatLevel: true } } },
+    // subclass/subclassRef.slug/class.subclassLevel (#1123):
+    // draconicResilienceMaxHpTerm's identity inputs for the shared-tail clamp.
+    select: {
+      name: true,
+      level: true,
+      subclass: true,
+      subclassRef: { select: { slug: true } },
+      class: { select: { extraAsiLevels: true, fightingStyleFeatLevel: true, subclassLevel: true } },
+    },
   },
 } satisfies Prisma.CharacterSelect;
 
@@ -617,14 +636,19 @@ export async function applyAdvancementOpInTx(
 
   // #1321: one shared-tail clamp covers takeAsi/takeFeat (which raise max+current
   // by the same hpDelta — at exhaustion 4+ the effective max grows by LESS) and
-  // removeAdvancement (which lowers max — reverseAdvancementEffects' own clamp
-  // is against the RAW max, superseded here). ctx.state.advancements already
+  // removeAdvancement (which lowers max — reverseAdvancementEffects subtracts
+  // exact deltas without clamping, so this is the ONLY clamp on that path).
+  // ctx.state.advancements already
   // reflects the op's push/splice, so the feat-slot-cap dance below sees the
   // POST-op advancement list — a just-taken Tough immediately counts.
   const { kept: inCapForHpClamp } = splitAdvancementsBySlotCap(ctx.state.advancements, ctx.totalSlots, ctx.fightingStyleSlotTotal);
-  const featMaxHpBonusForClamp = deriveFeatBonuses(inCapForHpClamp, ctx.hitDice.total).maxHp;
+  // #1123: the Draconic Resilience term joins the feat bonus via the ONE
+  // shared function, matching serializeCharacter's applyFeatLayer composition.
+  const maxHpBonusForClamp =
+    deriveFeatBonuses(inCapForHpClamp, ctx.hitDice.total).maxHp +
+    draconicResilienceMaxHpTerm(character.classEntries, ctx.level, ctx.edition);
   const exhaustionLevel = normalizeConditionsMutable(character.conditions).exhaustion;
-  const newEffMax = effectiveMaxHitPoints(outcome.newHp.max, featMaxHpBonusForClamp, exhaustionLevel, ctx.edition);
+  const newEffMax = effectiveMaxHitPoints(outcome.newHp.max, maxHpBonusForClamp, exhaustionLevel, ctx.edition);
   outcome.newHp = { ...outcome.newHp, current: Math.min(outcome.newHp.current, newEffMax) };
 
   await tx.character.update({

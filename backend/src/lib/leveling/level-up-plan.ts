@@ -59,7 +59,7 @@ export interface LevelUpPlanCharacter {
   // all-zero default (hitPointsStep) — matches extraAsiLevels/subclassLevel's
   // own optional-with-fallback pattern above — so the many existing plan
   // fixtures that never touch exhaustion don't need updating.
-  hpBaseline?: { rawMax: number; featMaxHpBonus: number; exhaustionLevel: number };
+  hpBaseline?: { rawMax: number; maxHpBonus: number; exhaustionLevel: number };
 }
 
 // The class entry AFTER this level-up. subclassLevel is passed in ALREADY
@@ -123,7 +123,7 @@ interface PlanContext {
   edition: RulesEdition;
   // hitPointsStep's effective-max preview inputs — see
   // LevelUpPlanCharacter.hpBaseline's own comment.
-  hpBaseline?: { rawMax: number; featMaxHpBonus: number; exhaustionLevel: number };
+  hpBaseline?: { rawMax: number; maxHpBonus: number; exhaustionLevel: number };
 }
 
 // deriveResources at a given per-class level, holding the target subclass fixed.
@@ -199,9 +199,9 @@ function derivedAt(
 function hitPointsStep({ target, abilityScores, hpBaseline, edition }: PlanContext): LevelUpStep {
   const faces = hitDieFace(target.hitDie);
   const conMod = abilityModifier(abilityScores.constitution ?? 10);
-  const baseline = hpBaseline ?? { rawMax: 0, featMaxHpBonus: 0, exhaustionLevel: 0 };
+  const baseline = hpBaseline ?? { rawMax: 0, maxHpBonus: 0, exhaustionLevel: 0 };
   const effectiveMaxForGain = (gain: number) =>
-    effectiveMaxHitPoints(baseline.rawMax + gain, baseline.featMaxHpBonus, baseline.exhaustionLevel, edition);
+    effectiveMaxHitPoints(baseline.rawMax + gain, baseline.maxHpBonus, baseline.exhaustionLevel, edition);
   const averageGain = levelUpHpGain(faces, conMod, "average");
   return {
     kind: "hitPoints",

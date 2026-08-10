@@ -225,6 +225,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
     "total": 1,
     "used": 0,
   },
+  "flySpeed": undefined,
   "grantedAdvantages": [],
   "grantedProficiencies": [],
   "hitDice": {
@@ -233,7 +234,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
     "total": 5,
   },
   "hitPoints": {
-    "current": 22,
+    "current": 24,
     "deathSaves": {
       "failures": 0,
       "successes": 0,
@@ -934,6 +935,7 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
     "total": 1,
     "used": 0,
   },
+  "flySpeed": undefined,
   "grantedAdvantages": [],
   "grantedProficiencies": [],
   "hitDice": {

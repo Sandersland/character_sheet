@@ -35,7 +35,7 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 
 import { Prisma } from "@/generated/prisma/client.js";
 import { proficiencyBonusForLevel } from "./experience.js";
-import { effectiveEntryLevel, subclassActiveAt, subclassGateLevel } from "./effective-levels.js";
+import { effectiveEntryLevel, levelDownEntryLevels, subclassActiveAt, subclassGateLevel } from "./effective-levels.js";
 import { logEvent, type EventType } from "@/lib/activity/events.js";
 import {
   clampChoicesToCaps,
@@ -49,6 +49,7 @@ import {
 } from "@/lib/classes/resources.js";
 import { characterAdvancementSlots, characterFightingStyleFeatSlots, derivePreparedSpellLimit, deriveFeatBonuses } from "@/lib/srd/srd.js";
 import { deriveEntryScopedResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
+import { draconicResilienceMaxHpTerm } from "@/lib/classes/draconic-bloodline.js";
 import { FEATURE_ROWS_ENTRY_SELECT, featureRowsOf } from "@/lib/classes/feature-rows-select.js";
 import { reverseAdvancementEffects } from "./advancement.js";
 import { effectiveMaxHitPoints, normalizeHitDice, normalizeHitPoints } from "@/lib/combat/hitpoints.js";
@@ -566,8 +567,18 @@ async function reconcileAdvancements(ctx: ReconcileContext): Promise<void> {
         // not just the primary. `class` (#1529): the reconciler's half of the
         // reconciler/clamp-on-read pair CLAUDE.md governs — must resolve
         // extraAsiLevels/fightingStyleFeatLevel through the SAME columns
-        // applyAdvancementClamp reads via characterInclude.
-        select: { name: true, level: true, class: { select: { extraAsiLevels: true, fightingStyleFeatLevel: true } } },
+        // applyAdvancementClamp reads via characterInclude. subclass/
+        // subclassRef.slug/class.subclassLevel (#1123):
+        // draconicResilienceMaxHpTerm's identity inputs — without them the
+        // term silently resolves 0 and the clamp below writes `current` up to
+        // the Draconic bonus too low.
+        select: {
+          name: true,
+          level: true,
+          subclass: true,
+          subclassRef: { select: { slug: true } },
+          class: { select: { extraAsiLevels: true, fightingStyleFeatLevel: true, subclassLevel: true } },
+        },
       },
     },
   });
@@ -603,16 +614,24 @@ async function reconcileAdvancements(ctx: ReconcileContext): Promise<void> {
   const reversed = reverseAdvancementEffects(scores, hp, initBonus, toRemove);
   state.advancements = kept;
 
-  // #1321: reverseAdvancementEffects' own internal clamp is against the RAW
-  // max (harmless there — it's an intermediate value this function always
-  // re-clamps below); the persisted current must clamp against the EFFECTIVE
-  // max instead — the same shared function serializeCharacter's clamp-on-read
-  // resolves through (CLAUDE.md: reconciler and clamp-on-read must agree).
-  // `kept` is the POST-reconcile advancement list, matching applyFeatLayer's
-  // own use of the clamped (in-cap) slice.
-  const featMaxHpBonus = deriveFeatBonuses(kept, hd.total).maxHp;
+  // #1321: reverseAdvancementEffects subtracts exact deltas and never clamps
+  // (its raw `max` excludes feat/subclass bonuses — see its header); the
+  // persisted current clamps HERE against the EFFECTIVE max — the same shared
+  // function serializeCharacter's clamp-on-read resolves through (CLAUDE.md:
+  // reconciler and clamp-on-read must agree). `kept` is the POST-reconcile
+  // advancement list, matching applyFeatLayer's own use of the clamped
+  // (in-cap) slice.
+  // #1123: the Draconic Resilience term joins the feat bonus in the SAME
+  // pre-halving composition serializeCharacter's applyFeatLayer serves, via
+  // the ONE shared function (draconicResilienceMaxHpTerm) — omitting it
+  // clamped a Draconic sorcerer's stored `current` up to the bonus too low on
+  // level-down. newDerivedLevel is the POST-level-down XP level, matching the
+  // clamp-on-read's own progress.level input.
+  const maxHpBonus =
+    deriveFeatBonuses(kept, hd.total).maxHp +
+    draconicResilienceMaxHpTerm(row.classEntries, newDerivedLevel, edition);
   const exhaustionLevel = normalizeConditionsMutable(row.conditions).exhaustion;
-  const newEffMax = effectiveMaxHitPoints(reversed.hitPoints.max, featMaxHpBonus, exhaustionLevel, edition);
+  const newEffMax = effectiveMaxHitPoints(reversed.hitPoints.max, maxHpBonus, exhaustionLevel, edition);
   const newHp = {
     ...reversed.hitPoints,
     current: Math.min(reversed.hitPoints.current, newEffMax),
@@ -704,16 +723,16 @@ async function reconcileClassEntryLevels(ctx: ReconcileContext): Promise<void> {
   if (sum <= newDerivedLevel) return; // within the derived total, nothing to trim
 
   const before = entries.map((e) => ({ ...e }));
-  let excess = sum - newDerivedLevel;
   const removedNames: string[] = [];
 
-  for (let i = entries.length - 1; i >= 0 && excess > 0; i--) {
+  // The trim itself is the shared pure rule (levelDownEntryLevels,
+  // effective-levels.ts) so computeLevelDownState can project this exact
+  // outcome before it has run (#1123); this function only persists it.
+  const newLevels = levelDownEntryLevels(entries.map((e) => e.level), newDerivedLevel);
+  for (let i = entries.length - 1; i >= 0; i--) {
     const entry = entries[i];
-    const floor = entry.position === 0 ? 1 : 0; // never delete the base class
-    const reducible = Math.min(entry.level - floor, excess);
-    if (reducible <= 0) continue;
-    const newLevel = entry.level - reducible;
-    excess -= reducible;
+    const newLevel = newLevels[i];
+    if (newLevel === entry.level) continue;
     if (newLevel <= 0) {
       await tx.characterClassEntry.delete({ where: { id: entry.id } });
       removedNames.push(entry.name);
