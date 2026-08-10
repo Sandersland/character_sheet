@@ -639,12 +639,10 @@ async function buildCombatState(
   return cols ? toCombatState(cols) : null;
 }
 
-// Clear the acting participant's per-turn spell-cast record (#1439) — every turn
-// boundary (startCombat/endCombat/advanceCombatRound) resets the interlock, the
-// server-side twin of the client reducer's `spellCastThisTurn: {}` resets. The
-// @updatedAt bump this triggers is load-bearing: it advances the served
-// CombatState's `updatedAt` so a client that ended its turn syncs the cleared
-// flags past its own monotonic guard.
+// Clear ONE participant's per-turn spell-cast record (#1439) — the per-CHARACTER
+// turn boundary (advanceCombatRound: this character's turn ended). The @updatedAt
+// bump is load-bearing: it advances the served CombatState's `updatedAt` so the
+// client syncs the cleared flags past its own monotonic guard.
 async function resetTurnSpellCast(
   tx: Prisma.TransactionClient,
   sessionId: string,
@@ -652,6 +650,22 @@ async function resetTurnSpellCast(
 ): Promise<void> {
   await tx.sessionParticipant.updateMany({
     where: { sessionId, characterId },
+    data: { spellCastAsAction: null, spellCastAsBonus: null },
+  });
+}
+
+// Clear EVERY participant's per-turn spell-cast record (#1439 review) — the
+// combat-LEVEL boundaries (startCombat/endCombat) are shared across the whole
+// party, so they reset all participants, not just the caller. Scoping these to
+// the caller stranded another participant's stale block across a combat restart:
+// a player who cast a leveled Action spell but never advanced a round (combat
+// ended mid-turn by someone else) would still be blocked in the next combat, and
+// the `if (count > 0)` idempotency guard stops a no-op re-press from
+// self-clearing it. advanceCombatRound stays per-character (resetTurnSpellCast) —
+// only the ending character's own turn resets there.
+async function resetAllTurnSpellCasts(tx: Prisma.TransactionClient, sessionId: string): Promise<void> {
+  await tx.sessionParticipant.updateMany({
+    where: { sessionId },
     data: { spellCastAsAction: null, spellCastAsBonus: null },
   });
 }
@@ -719,7 +733,7 @@ export async function startCombat(characterId: string, sessionId: string): Promi
     // twin of the reducer's startCombat reset.
     if (count > 0) {
       await logCombatLifecycleEvent(characterId, sessionId, "combatStarted", undefined, tx);
-      await resetTurnSpellCast(tx, sessionId, characterId);
+      await resetAllTurnSpellCasts(tx, sessionId);
     }
     return buildCombatStateOrThrow(tx, sessionId, characterId);
   });
@@ -741,7 +755,7 @@ export async function endCombat(characterId: string, sessionId: string): Promise
     // transition logs and clears; a stale second End Combat is a pure no-op.
     if (count > 0) {
       await logCombatLifecycleEvent(characterId, sessionId, "combatEnded", undefined, tx);
-      await resetTurnSpellCast(tx, sessionId, characterId);
+      await resetAllTurnSpellCasts(tx, sessionId);
     }
     return buildCombatStateOrThrow(tx, sessionId, characterId);
   });
