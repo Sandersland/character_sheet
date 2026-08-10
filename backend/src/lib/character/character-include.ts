@@ -38,8 +38,13 @@ export const characterInclude = {
       // characterAdvancementSlots/characterFightingStyleFeatSlots/
       // buildMergedArmorProficiencies/buildMergedWeaponProficiencies read off
       // this relation instead of a name-keyed lib/srd/ Record.
+      // `name` (#1495): the CANONICAL catalog class name, read by
+      // fightingStyleGrantingClassNames for the served
+      // fightingStyleGrantingClasses field — never CharacterClassEntry's own
+      // `name` column, a free-to-diverge display name.
       class: {
         select: {
+          name: true,
           subclassLevel: true,
           armorProficiencies: true,
           weaponProficiencies: true,

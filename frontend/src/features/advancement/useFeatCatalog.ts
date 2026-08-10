@@ -18,10 +18,15 @@ export interface FeatCatalog {
 // mirrors it, so `filter` is search-only. Pass `undefined` to read the whole
 // edition catalog: the Fighting Style picker needs the fighting_style rows that
 // rule always rejects.
+//
+// `classNames` gates the offered Fighting Style subset via
+// fightingStyleFeatOfferedForClasses (#1495) — pass the character's class
+// name(s) from the Fighting Style picker; other callers omit it.
 export function useFeatCatalog(
   active: boolean,
   asiLevel: number | undefined,
   edition: RulesEdition,
+  classNames?: string[],
 ): FeatCatalog {
   const [catalog, setCatalog] = useState<CatalogFeat[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +34,7 @@ export function useFeatCatalog(
   const showSpinner = useDelayedFlag(active && catalog === null && !error);
 
   const ensureFetched = useCallback(() => {
-    const key = `${edition}|${asiLevel ?? ""}`;
+    const key = `${edition}|${asiLevel ?? ""}|${(classNames ?? []).join(",")}`;
     if (fetchedKey.current === key) return;
     fetchedKey.current = key;
     // Clear before refetching, or the rows from the previous asiLevel stay on
@@ -39,13 +44,18 @@ export function useFeatCatalog(
     // is write-once, so a mounted hook's edition cannot change under it.
     setCatalog(null);
     setError(null);
-    fetchFeats(edition, asiLevel)
+    // Omit the third argument entirely when absent, rather than passing
+    // `undefined` — keeps the ASI feat picker's existing pinned call shape
+    // (`fetchFeats(edition, asiLevel)`) unchanged for callers that never pass
+    // classNames (#1495 only touches the Fighting Style picker's call site).
+    (classNames === undefined ? fetchFeats(edition, asiLevel) : fetchFeats(edition, asiLevel, classNames))
       // A superseded request must not win: an asiLevel change can leave the
       // previous fetch in flight, and a late resolve would repopulate the list
       // with the old level's rows.
       .then((rows) => { if (fetchedKey.current === key) setCatalog(rows); })
       .catch(() => { if (fetchedKey.current === key) setError("Couldn't load feat catalog."); });
-  }, [edition, asiLevel]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- classNames is an array literal at most call sites; depending on it by reference would refetch every render. The join() inside `key` above is the real dependency signal.
+  }, [edition, asiLevel, (classNames ?? []).join(",")]);
 
   useEffect(() => {
     if (active) ensureFetched();

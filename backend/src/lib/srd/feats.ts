@@ -4,6 +4,7 @@ import type { AdvancementEntry } from "@/lib/classes/resources.js";
 import type { FeatImprovement } from "@/lib/classes/resources-state.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 import { bothWeaponsLight } from "@/lib/srd/weapon-damage.js";
+import type { RulesEdition } from "@character-sheet/shared-types";
 
 /** PHB'24 feat categories (local union keeps srd/ a dependency leaf). */
 export type FeatCategory = "origin" | "general" | "fighting_style" | "epic_boon";
@@ -37,6 +38,48 @@ export function featOfferedForAsiSlot(
       return level >= (feat.levelPrerequisite ?? 19);
     default:
       return false; // unknown future category — fail safe-closed, never leak feats
+  }
+}
+
+/**
+ * Whether `feat` (a Feat.classes-shaped row) is an offered Fighting Style for
+ * a character holding `classNames` (#1495). One edition-parameterized rule
+ * function, `edition` last, total-mapping `switch` — the subclassGateLevel
+ * pattern (#1527) — never a second column and never `=== "EDITION_…"`.
+ *
+ * 2024 (SRD 5.2 p. 47): no per-class subset — any class with the Fighting
+ * Style feature may take any of the four 2024 styles, so this branch ignores
+ * `feat.classes` entirely.
+ *
+ * 2014 (PHB'14 p. 72/82/91): `feat.classes` carries the per-class subset
+ * (Fighter all six; Paladin Defense/Dueling/Great Weapon Fighting/Protection;
+ * Ranger Archery/Defense/Dueling/Two-Weapon Fighting) — empty means
+ * unrestricted (every non-fighting_style feat's default). Matched
+ * case-insensitively against each of `classNames`, same convention as
+ * `capabilities.ts`'s `meetsAttunementPrereq` class check.
+ *
+ * `classNames` may hold more than one entry for a multiclass character — the
+ * settled shape is the UNION of what each class offers (2026-08-10 decision):
+ * a 2014 Fighter1/Paladin2 sees every style either class grants. Per-entry
+ * slot attribution (which style came from which class) is out of scope here.
+ */
+export function fightingStyleFeatOfferedForClasses(
+  feat: { classes: readonly string[] },
+  classNames: readonly string[],
+  edition: RulesEdition,
+): boolean {
+  switch (edition) {
+    case "EDITION_2024":
+      return true;
+    case "EDITION_2014": {
+      if (feat.classes.length === 0) return true;
+      const wanted = new Set(classNames.map((c) => c.trim().toLowerCase()));
+      return feat.classes.some((c) => wanted.has(c.trim().toLowerCase()));
+    }
+    default: {
+      const exhaustive: never = edition;
+      throw new Error(`fightingStyleFeatOfferedForClasses: unhandled edition ${String(exhaustive)}`);
+    }
   }
 }
 

@@ -345,6 +345,7 @@ async function seedFeats(prisma: PrismaClient) {
         abilityOptions: orElse(feat.abilityOptions, []),
         abilityIncrease: orElse(feat.abilityIncrease, 0),
         improvements: orElse(feat.improvements, []),
+        classes: orElse(feat.classes, []),
       },
     );
   }

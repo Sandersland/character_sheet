@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import {
   fightingStyleFeatSlots,
   characterFightingStyleFeatSlots,
+  fightingStyleGrantingClassNames,
   advancementSlotsForLevel,
   characterAdvancementSlots,
   deriveRangedAttackRollBonus,
@@ -59,6 +60,57 @@ describe("characterFightingStyleFeatSlots", () => {
   });
   it("level-0 / empty roster gets 0", () => {
     expect(characterFightingStyleFeatSlots([], 0)).toBe(0);
+  });
+});
+
+// #1495: fightingStyleGrantingClassNames feeds the offered-Fighting-Style
+// union (fightingStyleFeatOfferedForClasses) — the class NAMES that have
+// actually earned the feature at derivedLevel, not merely belong to a
+// granting class. Uses the CANONICAL class.name (never the entry's own
+// drifting display name, CharacterClassEntry.name) and the same per-entry
+// effective-level judgment characterFightingStyleFeatSlots already makes.
+describe("fightingStyleGrantingClassNames", () => {
+  const FIGHTER = { name: "Fighter", fightingStyleFeatLevel: 1 };
+  const PALADIN = { name: "Paladin", fightingStyleFeatLevel: 2 };
+  const RANGER = { name: "Ranger", fightingStyleFeatLevel: 2 };
+  const WIZARD = { name: "Wizard", fightingStyleFeatLevel: null };
+
+  it("a single granting class at its grant level is included", () => {
+    expect(fightingStyleGrantingClassNames([{ level: 1, class: FIGHTER }], 1)).toEqual(["Fighter"]);
+  });
+
+  it("excludes a class that hasn't reached its OWN grant level yet — Fighter1/Ranger1 (Ranger's FS is at L2)", () => {
+    expect(
+      fightingStyleGrantingClassNames(
+        [{ level: 1, class: FIGHTER }, { level: 1, class: RANGER }],
+        2,
+      ),
+    ).toEqual(["Fighter"]);
+  });
+
+  it("includes both once the second class reaches ITS grant level — Fighter1/Ranger2", () => {
+    expect(
+      fightingStyleGrantingClassNames(
+        [{ level: 1, class: FIGHTER }, { level: 2, class: RANGER }],
+        3,
+      ),
+    ).toEqual(["Fighter", "Ranger"]);
+  });
+
+  it("a non-granting class (Wizard) is never included, regardless of level", () => {
+    expect(fightingStyleGrantingClassNames([{ level: 20, class: WIZARD }], 20)).toEqual([]);
+  });
+
+  it("a Paladin below its grant level (level 1) is excluded", () => {
+    expect(fightingStyleGrantingClassNames([{ level: 1, class: PALADIN }], 1)).toEqual([]);
+  });
+
+  it("a homebrew entry with no class relation is excluded", () => {
+    expect(fightingStyleGrantingClassNames([{ level: 5, class: null }], 5)).toEqual([]);
+  });
+
+  it("empty roster returns []", () => {
+    expect(fightingStyleGrantingClassNames([], 0)).toEqual([]);
   });
 });
 

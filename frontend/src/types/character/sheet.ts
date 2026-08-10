@@ -263,6 +263,14 @@ export interface Character {
   advancementSlots: AdvancementSlots;
   /** Fighting Style feat slots (#1137): a partition separate from ASI slots. */
   fightingStyleSlots: AdvancementSlots;
+  /** Class names that have EARNED the Fighting Style feature at this level
+   *  (#1495, fightingStyleGrantingClassNames) — the level-gated subset of
+   *  `classes`, not every class the character has. Pass this straight
+   *  through as the Fighting Style picker's `classes` scope (fetchFeats'
+   *  classNames arg) rather than deriving it from `classes` — a class that
+   *  merely HAS a fightingStyleFeatLevel but hasn't reached it yet must not
+   *  widen the offered set (CLAUDE.md: rules logic is backend-owned). */
+  fightingStyleGrantingClasses: string[];
 
   classes?: ClassEntry[];
 

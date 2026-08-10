@@ -61,9 +61,24 @@ export async function fetchSpells(edition: RulesEdition, filter: SpellCatalogFil
 // (#1438) — omit it and the whole edition catalog comes back, which is what the
 // Fighting Style picker and the level-up review step need, since both read rows
 // that rule rejects by design.
-export async function fetchFeats(edition: RulesEdition, asiLevel?: number): Promise<CatalogFeat[]> {
+//
+// `classNames` asks the server to apply the Fighting Style class gate (#1495)
+// via fightingStyleFeatOfferedForClasses — a 2014 character's picker sees only
+// the PHB'14 subset its class(es) grant. Omit it (or pass []) for the
+// unfiltered catalog, same "absent = no narrowing" shape as asiLevel.
+export async function fetchFeats(
+  edition: RulesEdition,
+  asiLevel?: number,
+  classNames?: string[],
+): Promise<CatalogFeat[]> {
   const asiParam = asiLevel === undefined ? "" : `&asiLevel=${asiLevel}`;
-  return request<CatalogFeat[]>(`/feats?edition=${edition}${asiParam}`, undefined, "Failed to fetch feat catalog");
+  const classesParam =
+    classNames && classNames.length > 0 ? `&classes=${encodeURIComponent(classNames.join(","))}` : "";
+  return request<CatalogFeat[]>(
+    `/feats?edition=${edition}${asiParam}${classesParam}`,
+    undefined,
+    "Failed to fetch feat catalog",
+  );
 }
 
 // The only catalog call in this module that takes NO edition, and deliberately

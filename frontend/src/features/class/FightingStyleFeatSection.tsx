@@ -7,7 +7,7 @@
 import { useState } from "react";
 
 import Spinner from "@/components/ui/Spinner";
-import { useFeatCatalog } from "@/features/advancement/useFeatCatalog";
+import { useFeatCatalog, type FeatCatalog } from "@/features/advancement/useFeatCatalog";
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { AdvancementEntry, CatalogFeat, TakeFeatOperation } from "@/types/character";
 
@@ -28,6 +28,54 @@ function TakenFeat({ entry }: { entry: AdvancementEntry }) {
   );
 }
 
+// The open picker's status + results — error/spinner/empty-message/list, split
+// out of FeatPicker so that component's own branching stays around open/closed
+// and catalog-fetch wiring, not this block's four independent render conditions.
+function FeatPickerResults({
+  feats,
+  options,
+  busy,
+  onChoose,
+}: {
+  feats: FeatCatalog;
+  options: CatalogFeat[];
+  busy: boolean;
+  onChoose: (feat: CatalogFeat) => void;
+}) {
+  return (
+    <>
+      {feats.error && <p className="text-xs text-garnet-700">{feats.error}</p>}
+      {feats.catalog === null && !feats.error && feats.showSpinner && <Spinner />}
+      {feats.catalog !== null && options.length === 0 && (
+        <p className="py-2 text-center text-xs text-parchment-600">No fighting styles left to choose.</p>
+      )}
+
+      <ul className="max-h-72 overflow-y-auto">
+        {options.map((feat) => (
+          <li
+            key={feat.id}
+            className="flex items-start justify-between gap-3 border-b border-gold-100 py-2.5 last:border-0"
+          >
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-parchment-900">{feat.name}</p>
+              <p className="mt-0.5 text-xs leading-relaxed text-parchment-600">{feat.description}</p>
+            </div>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => onChoose(feat)}
+              className="shrink-0 rounded bg-gold-400 px-2.5 py-1 text-xs font-semibold text-ink hover:bg-gold-500 disabled:cursor-not-allowed disabled:opacity-40"
+              title={`Choose ${feat.name}`}
+            >
+              Choose
+            </button>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
 function FeatPicker({
   takenIds,
   busy,
@@ -42,7 +90,14 @@ function FeatPicker({
   // No asiLevel (#1438): featOfferedForAsiSlot always rejects fighting_style, so
   // asking the server for the ASI-legal set would empty this picker. It reads
   // feats.catalog raw for the same reason — feats.filter is search-only.
-  const feats = useFeatCatalog(open, undefined, character.rulesEdition);
+  //
+  // classNames (#1495): character.fightingStyleGrantingClasses — the classes
+  // that have EARNED the feature, server-computed by
+  // fightingStyleGrantingClassNames — never `character.classes` as a whole.
+  // A class that merely HAS a fightingStyleFeatLevel but hasn't reached it
+  // yet (a Fighter1/Ranger1 multiclass's Ranger entry) must not widen the
+  // offered set, or the write path 400s a style the picker just offered.
+  const feats = useFeatCatalog(open, undefined, character.rulesEdition, character.fightingStyleGrantingClasses);
   const options = (feats.catalog ?? []).filter(
     (f) => f.category === "fighting_style" && !takenIds.has(f.id),
   );
@@ -80,34 +135,7 @@ function FeatPicker({
         </button>
       </div>
 
-      {feats.error && <p className="text-xs text-garnet-700">{feats.error}</p>}
-      {feats.catalog === null && !feats.error && feats.showSpinner && <Spinner />}
-      {feats.catalog !== null && options.length === 0 && (
-        <p className="py-2 text-center text-xs text-parchment-600">No fighting styles left to choose.</p>
-      )}
-
-      <ul className="max-h-72 overflow-y-auto">
-        {options.map((feat) => (
-          <li
-            key={feat.id}
-            className="flex items-start justify-between gap-3 border-b border-gold-100 py-2.5 last:border-0"
-          >
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-parchment-900">{feat.name}</p>
-              <p className="mt-0.5 text-xs leading-relaxed text-parchment-600">{feat.description}</p>
-            </div>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => choose(feat)}
-              className="shrink-0 rounded bg-gold-400 px-2.5 py-1 text-xs font-semibold text-ink hover:bg-gold-500 disabled:cursor-not-allowed disabled:opacity-40"
-              title={`Choose ${feat.name}`}
-            >
-              Choose
-            </button>
-          </li>
-        ))}
-      </ul>
+      <FeatPickerResults feats={feats} options={options} busy={busy} onChoose={choose} />
     </div>
   );
 }

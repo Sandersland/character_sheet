@@ -100,6 +100,7 @@ const mockCharacter: Character = {
   advancements: [],
   advancementSlots: { total: 1, used: 0 },
   fightingStyleSlots: { total: 0, used: 0 },
+  fightingStyleGrantingClasses: [],
   journal: [],
   speciesTraits: [],
 };

@@ -23,6 +23,13 @@ export interface ChoiceLoadContext {
   targetLevel: number;
   /** The advancing character's edition — every catalog fetch below is edition-scoped (#1325, #1412). */
   edition: RulesEdition;
+  /**
+   * The character's own class names plus the level-up target's className
+   * (#1495) — fed straight through to fetchFeats' class-scope gate. Only
+   * fightingStyleFeat reads this; maneuvers/toolProficiency/subclassChoice
+   * ignore it.
+   */
+  classNames?: string[];
 }
 
 export interface ChoiceKindConfig {
@@ -55,8 +62,11 @@ const maneuvers: ChoiceKindConfig = {
 
 const fightingStyleFeat: ChoiceKindConfig = {
   single: true,
+  // classNames (#1495): the server applies PHB'14's per-class subset via
+  // fightingStyleFeatOfferedForClasses — this config never re-derives it,
+  // only forwards the context's class-name scope.
   loadOptions: (ctx) =>
-    fetchFeats(ctx.edition).then((list) =>
+    fetchFeats(ctx.edition, undefined, ctx.classNames).then((list) =>
       list
         .filter((f) => f.category === "fighting_style")
         .map((f) => ({ id: f.id, name: f.name, description: f.description })),

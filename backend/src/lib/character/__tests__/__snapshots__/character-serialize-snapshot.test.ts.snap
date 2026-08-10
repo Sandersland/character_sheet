@@ -222,6 +222,9 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
   "damageImmunities": [],
   "exhaustionEffectText": "−4 on d20 Tests; Speed −10 ft.",
   "experiencePoints": 14000,
+  "fightingStyleGrantingClasses": [
+    "Test Fighter (Snapshot Suite)",
+  ],
   "fightingStyleSlots": {
     "total": 1,
     "used": 0,
@@ -940,6 +943,9 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
   "damageImmunities": [],
   "exhaustionEffectText": "No exhaustion.",
   "experiencePoints": 6500,
+  "fightingStyleGrantingClasses": [
+    "Test Fighter (Snapshot Suite)",
+  ],
   "fightingStyleSlots": {
     "total": 1,
     "used": 0,

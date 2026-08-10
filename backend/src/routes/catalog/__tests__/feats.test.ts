@@ -239,3 +239,90 @@ describe("GET /api/feats?asiLevel= — 2014 general/origin feats (#1310)", () =>
     expect(atFour).toHaveLength(26);
   });
 });
+
+/**
+ * PHB'14 p. 72 (Fighter) / p. 82 (Paladin) / p. 91 (Ranger), = SRD 5.1 (#1495).
+ * Runs against the REAL SEEDED catalog, same pattern as the suites above.
+ * `?classes=` gates the offered Fighting Style set to the per-class PHB'14
+ * subset via fightingStyleFeatOfferedForClasses — 2024 draws no such subset.
+ */
+describe("GET /api/feats?classes= — 2014 Fighting Style class gate (#1495)", () => {
+  async function get(query: string): Promise<{ name: string; category: string }[]> {
+    const res = await supertest(app).get(`/api/feats?${query}`).set("Cookie", COOKIE);
+    expect(res.status).toBe(200);
+    return res.body;
+  }
+
+  const fightingStyles = (rows: { name: string; category: string }[]) =>
+    rows.filter((r) => r.category === "fighting_style").map((r) => r.name).sort();
+
+  it("a 2014 Ranger is offered only Archery, Defense, Dueling, Two-Weapon Fighting", async () => {
+    const rows = await get("edition=EDITION_2014&classes=Ranger");
+    expect(fightingStyles(rows)).toEqual(["Archery", "Defense", "Dueling", "Two-Weapon Fighting"]);
+  });
+
+  it("a 2014 Paladin is offered only Defense, Dueling, Great Weapon Fighting, Protection", async () => {
+    const rows = await get("edition=EDITION_2014&classes=Paladin");
+    expect(fightingStyles(rows)).toEqual(["Defense", "Dueling", "Great Weapon Fighting", "Protection"]);
+  });
+
+  it("a 2014 Fighter is offered all six styles", async () => {
+    const rows = await get("edition=EDITION_2014&classes=Fighter");
+    expect(fightingStyles(rows)).toEqual(
+      ["Archery", "Defense", "Dueling", "Great Weapon Fighting", "Protection", "Two-Weapon Fighting"],
+    );
+  });
+
+  it("a 2014 multiclass Fighter/Paladin sees the union (all six, via Fighter alone)", async () => {
+    const rows = await get("edition=EDITION_2014&classes=Fighter,Paladin");
+    expect(fightingStyles(rows)).toEqual(
+      ["Archery", "Defense", "Dueling", "Great Weapon Fighting", "Protection", "Two-Weapon Fighting"],
+    );
+  });
+
+  it("a 2024 Ranger (or any class) is offered all four styles — no per-class restriction", async () => {
+    const rows = await get("edition=EDITION_2024&classes=Ranger");
+    expect(fightingStyles(rows)).toEqual(["Archery", "Defense", "Great Weapon Fighting", "Two-Weapon Fighting"]);
+  });
+
+  it("without ?classes= still serves every style for the edition, unfiltered", async () => {
+    const rows = await get("edition=EDITION_2014");
+    expect(fightingStyles(rows)).toHaveLength(6);
+  });
+
+  it("does not narrow non-fighting_style feats — their Feat.classes is always unrestricted", async () => {
+    const rows = await get("edition=EDITION_2014&classes=Ranger");
+    expect(rows.some((r) => r.category === "general")).toBe(true);
+  });
+
+  it("400s on an empty ?classes=", async () => {
+    const res = await supertest(app).get("/api/feats?edition=EDITION_2014&classes=").set("Cookie", COOKIE);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/^Invalid classes: /);
+  });
+
+  // Review finding (#1495): asiLevel's own gate (featOfferedForAsiSlot) always
+  // strips every fighting_style row before the classes filter ever runs, so
+  // combining the two params was a SILENT no-op — classes then matches only
+  // general/epic_boon rows, which are always unrestricted (Feat.classes=[]).
+  // A clear 400 beats a response that looks valid but ignores half its input.
+  it("400s when ?classes= and ?asiLevel= are combined — the two params serve disjoint feat categories", async () => {
+    const res = await supertest(app)
+      .get("/api/feats?edition=EDITION_2014&asiLevel=4&classes=Ranger")
+      .set("Cookie", COOKIE);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/classes.*asiLevel|asiLevel.*classes/i);
+  });
+
+  // Review finding (#1495): a repeated `?classes=` key (or `?classes[]=`) parses
+  // as an array under Express's query parser, not a string — the error must
+  // name that specific reason, not just "must be a non-empty list" (which
+  // reads as though the caller supplied nothing).
+  it("400s on a repeated ?classes= (array-shaped query value) with a diagnostic naming the actual problem", async () => {
+    const res = await supertest(app)
+      .get("/api/feats?edition=EDITION_2014&classes=Fighter&classes=Ranger")
+      .set("Cookie", COOKIE);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/single comma-separated/i);
+  });
+});

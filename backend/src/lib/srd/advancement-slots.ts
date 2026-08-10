@@ -54,6 +54,34 @@ export function characterFightingStyleFeatSlots(
   );
 }
 
+// The class NAMES that have actually earned the Fighting Style feature at
+// `derivedLevel` (#1495) — the offered-style union's input
+// (fightingStyleFeatOfferedForClasses, lib/srd/feats.ts). Same per-entry
+// effective-level judgment as characterFightingStyleFeatSlots above — never
+// re-derive it at a call site — but returns the granting class NAMES instead
+// of a slot count, and reads the CANONICAL catalog `class.name` rather than
+// CharacterClassEntry's own `name` column, which schema.prisma documents as a
+// free-to-diverge display name (same pattern as that model's `subclass`
+// field) and so is the wrong source for a rule keyed on the catalog's own
+// class vocabulary (Feat.classes).
+interface FightingStyleGrantingEntry {
+  level: number;
+  class: { name: string; fightingStyleFeatLevel: number | null } | null;
+}
+
+export function fightingStyleGrantingClassNames(
+  entries: readonly FightingStyleGrantingEntry[],
+  derivedLevel: number,
+): string[] {
+  return entries
+    .filter(
+      (e) =>
+        e.class != null &&
+        fightingStyleFeatSlots(e.class.fightingStyleFeatLevel, effectiveEntryLevel(e.level, entries.length, derivedLevel)) > 0,
+    )
+    .map((e) => e.class!.name);
+}
+
 // The minimal per-entry shape characterAdvancementSlots needs.
 interface AdvancementGatedEntry {
   level: number;

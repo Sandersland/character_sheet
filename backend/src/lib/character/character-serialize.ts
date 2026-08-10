@@ -337,8 +337,17 @@ export async function serializeCharacter(rawRow: CharacterRow) {
   //    effectiveMaxHp composes the feat bonus with exhaustion's PHB'14 p. 291
   //    tier-4 halving, so the feat layer needs the exhaustion level in hand.
   const conditions = normalizeConditionsMutable(row.conditions);
-  const { effectiveScores, hitPoints, effectiveInitBonus, clampedAdvancements, advSlotTotal, usedSlots, fightingStyleSlotTotal, usedFightingStyleSlots } =
-    applyAdvancementClamp(row, progress.level, normalizedHitPoints);
+  const {
+    effectiveScores,
+    hitPoints,
+    effectiveInitBonus,
+    clampedAdvancements,
+    advSlotTotal,
+    usedSlots,
+    fightingStyleSlotTotal,
+    usedFightingStyleSlots,
+    fightingStyleGrantingClasses,
+  } = applyAdvancementClamp(row, progress.level, normalizedHitPoints);
   const { featBonuses, effectiveMaxHp, featProficiencies } = applyFeatLayer(
     clampedAdvancements,
     classFeatureImprovements,
@@ -588,6 +597,14 @@ export async function serializeCharacter(rawRow: CharacterRow) {
       total: fightingStyleSlotTotal,
       used: usedFightingStyleSlots,
     },
+    // #1495: the class names that have EARNED the Fighting Style feature at
+    // this level (fightingStyleGrantingClassNames — the level-gated subset,
+    // never `character.classes` as a whole) — the picker and level-up
+    // ceremony pass this straight through as GET /api/feats?classes=' scope,
+    // matching exactly what the write path (resolveCatalogFeat) enforces so
+    // a served option can never 400. CLAUDE.md: the frontend consumes this
+    // resolved value rather than re-deriving the level-threshold rule.
+    fightingStyleGrantingClasses,
 
     // Class-specific available actions for the turn tracker (universal ones ride
     // GET /api/reference instead, resolved per edition — #1430). bondedWeaponCount

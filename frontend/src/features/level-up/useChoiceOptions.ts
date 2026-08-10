@@ -24,12 +24,14 @@ function useChoiceOptions(
   config: ChoiceKindConfig | undefined,
   targetLevel: number,
   edition: RulesEdition,
+  classNames: string[],
 ): {
   options: ChoiceOption[] | null;
   loadError: boolean;
 } {
   const [options, setOptions] = useState<ChoiceOption[] | null>(null);
   const [loadError, setLoadError] = useState(false);
+  const classNamesKey = classNames.join(",");
 
   useEffect(() => {
     if (!config) return;
@@ -37,7 +39,7 @@ function useChoiceOptions(
     setOptions(null);
     setLoadError(false);
     config
-      .loadOptions({ targetLevel, edition })
+      .loadOptions({ targetLevel, edition, classNames })
       .then((opts) => {
         if (!ignore) setOptions(opts);
       })
@@ -47,7 +49,8 @@ function useChoiceOptions(
     return () => {
       ignore = true;
     };
-  }, [config, targetLevel, edition]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- classNamesKey is the real dependency signal; classNames is a fresh array each render (see useChoiceCatalog's useMemo, and #1495's useFeatCatalog for the same pattern)
+  }, [config, targetLevel, edition, classNamesKey]);
 
   return { options, loadError };
 }
@@ -70,8 +73,21 @@ export function useChoiceCatalog(
   config: ChoiceKindConfig | undefined,
   character: Character,
   targetLevel: number,
+  targetClassName: string,
 ): ChoiceCatalog {
-  const { options, loadError } = useChoiceOptions(config, targetLevel, character.rulesEdition);
+  // #1495: the union of the character's ALREADY-EARNED Fighting Style classes
+  // (fightingStyleGrantingClasses — the level-gated subset served by
+  // serializeCharacter, never `character.classes` as a whole, which would
+  // wrongly include a class that hasn't reached its OWN grant level yet)
+  // plus the level-up target's own className: the fightingStyleFeat step
+  // only appears when THIS level-up is what grants the target class its
+  // Fighting Style feature, so the pre-level-up served set can't include it
+  // yet. Other kinds ignore this. Fed to fightingStyleFeat's class gate.
+  const classNames = useMemo(
+    () => Array.from(new Set([...(character.fightingStyleGrantingClasses ?? []), targetClassName])),
+    [character.fightingStyleGrantingClasses, targetClassName],
+  );
+  const { options, loadError } = useChoiceOptions(config, targetLevel, character.rulesEdition, classNames);
   const showSpinner = useDelayedFlag(options === null && !loadError);
   const [search, setSearch] = useState("");
   useEffect(() => setSearch(""), [config]);

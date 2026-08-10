@@ -7,6 +7,7 @@ import {
   bothWeaponsLight,
   characterAdvancementSlots,
   characterFightingStyleFeatSlots,
+  fightingStyleGrantingClassNames,
   deriveDeflectSpec,
   deriveImprovementBonuses,
   deriveImprovementProficiencies,
@@ -153,11 +154,19 @@ export function applyAdvancementClamp(
   usedSlots: number;
   fightingStyleSlotTotal: number;
   usedFightingStyleSlots: number;
+  fightingStyleGrantingClasses: string[];
 } {
   const storedForAdv = normalizeResourcesMutable(row.resources);
   const advSlotTotal = characterAdvancementSlots(row.classEntries, level);
   // Fighting Style feat cap across all class entries (#1137) — its own partition.
   const fightingStyleSlotTotal = characterFightingStyleFeatSlots(row.classEntries, level);
+  // #1495: the class names that have actually EARNED the Fighting Style
+  // feature at this level — served so the picker/level-up ceremony ask the
+  // server which classes to pass to GET /api/feats?classes=/the takeFeat
+  // write path, rather than re-deriving the level threshold client-side
+  // (CLAUDE.md: rules logic is backend-owned). Same shared rule
+  // resolveCatalogFeat's own gate reads (advancement.ts).
+  const fightingStyleGrantingClasses = fightingStyleGrantingClassNames(row.classEntries, level);
   let effectiveScores = row.abilityScores as Record<string, number>;
   let effectiveInitBonus = row.initiativeBonus;
   let effectiveHitPoints = hitPoints;
@@ -183,7 +192,17 @@ export function applyAdvancementClamp(
     effectiveInitBonus = reversed.initiativeBonus;
   }
 
-  return { effectiveScores, hitPoints: effectiveHitPoints, effectiveInitBonus, clampedAdvancements, advSlotTotal, usedSlots, fightingStyleSlotTotal, usedFightingStyleSlots };
+  return {
+    effectiveScores,
+    hitPoints: effectiveHitPoints,
+    effectiveInitBonus,
+    clampedAdvancements,
+    advSlotTotal,
+    usedSlots,
+    fightingStyleSlotTotal,
+    usedFightingStyleSlots,
+    fightingStyleGrantingClasses,
+  };
 }
 
 // Improvement modifier layer: sum structured improvements from the kept
