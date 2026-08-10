@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import type { SeedEdition } from "./edition.js";
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
+import { ALL_RULES_EDITIONS } from "../../src/lib/rules/edition.js";
 
 export interface SubclassSeed {
   className: string;    // must match an entry in CLASSES
@@ -37,7 +38,9 @@ export const subclassSeedSchema = z.object({
   name: z.string().min(1),
   description: z.string().min(1),
   slug: z.enum(SUBCLASS_SLUGS),
-  edition: z.enum(["EDITION_2014", "EDITION_2024"]).optional(),
+  // Derives from ALL_RULES_EDITIONS (#1527), never a literal array — a third
+  // edition becomes seedable here the moment it's added to RulesEdition.
+  edition: z.enum(ALL_RULES_EDITIONS).optional(),
 });
 
 export const SUBCLASSES: SubclassSeed[] = [

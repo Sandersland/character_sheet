@@ -22,8 +22,34 @@
 import { afterAll, afterEach, describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/core/prisma.js";
+import { ALL_RULES_EDITIONS } from "@/lib/rules/edition.js";
 
+import type { SeedEdition } from "../edition.js";
 import { staleCatalogRowsWhere } from "../prune.js";
+
+// Pure, non-DB proof that the OR-clause is built by reading ALL_RULES_EDITIONS
+// (#1527) rather than a hardcoded literal — asserted against the exported set
+// itself, so this test can't go stale the way a literal `["EDITION_2014",
+// "EDITION_2024"]` expectation would if a third edition were added.
+//
+// staleCatalogRowsWhere returns a structurally-typed Prisma where-fragment
+// (no explicit return-type annotation, deliberately, so it stays assignable
+// to every model's WhereInput — Feat/Subclass/Action/GrantedAbility — without
+// a rigid shape of its own); `Array.isArray` narrows the inferred `AND` to a
+// tuple here, since inspecting the OR branches is test-only, not a shape any
+// production call site relies on.
+describe("staleCatalogRowsWhere — partitions over every edition in the set (#1527)", () => {
+  it("builds one OR-branch per ALL_RULES_EDITIONS member, plus the null/shared branch", () => {
+    const where = staleCatalogRowsWhere("name", []);
+    if (!Array.isArray(where.AND)) throw new Error("expected AND to be an array");
+    const orClause = where.AND[1];
+    if (!orClause || !("OR" in orClause) || !Array.isArray(orClause.OR)) {
+      throw new Error("expected AND[1] to carry an OR array");
+    }
+    const branchEditions = orClause.OR.map((clause: { edition: SeedEdition | null }) => clause.edition);
+    expect(branchEditions).toEqual([null, ...ALL_RULES_EDITIONS]);
+  });
+});
 
 describe("staleCatalogRowsWhere — edition-safe prune (#1306)", () => {
   const NAME = "Zzz Prune Probe (#1306)";

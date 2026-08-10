@@ -16,10 +16,13 @@ import {
   joinCampaignSchema,
   updateArcSchema,
   updateEntitySchema,
+  type CreateCampaignInput,
   type CreateEntityInput,
 } from "@character-sheet/contracts";
 import { describe, expect, expectTypeOf, it } from "vitest";
 import type { z } from "zod";
+
+import type { RulesEdition } from "@character-sheet/shared-types";
 
 describe("campaign/entity/arc op wire contract", () => {
   it("keeps every migrated schema's client-constructible input identical to its output", () => {
@@ -62,5 +65,17 @@ describe("campaign/entity/arc op wire contract", () => {
     expect(updateArcSchema.safeParse({}).success).toBe(false);
     expect(updateArcSchema.safeParse({ name: "New name" }).success).toBe(true);
     expect(updateArcSchema.safeParse({ position: 2 }).success).toBe(true);
+  });
+
+  // Exhaustiveness latch (#1527): createCampaignSchema's rulesEdition can't
+  // derive from RulesEdition/ALL_RULES_EDITIONS directly — the package
+  // boundary forbids `contracts` from importing anything zoned, not even
+  // `shared-types` type-only (see campaign-ops.ts's why-comment on this
+  // field). This is the compile-time check that stands in for that import: a
+  // RulesEdition member added without updating createCampaignSchema's z.enum
+  // fails HERE, at `npm run typecheck`, not silently. expectTypeOf is erased
+  // at runtime — the assertion only does its job under `npm run typecheck`.
+  it("keeps rulesEdition's enum in lockstep with RulesEdition", () => {
+    expectTypeOf<CreateCampaignInput["rulesEdition"]>().toEqualTypeOf<RulesEdition | undefined>();
   });
 });

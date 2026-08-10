@@ -263,9 +263,21 @@ const CONDITIONS_2014_OVERRIDES: Partial<Record<ConditionKey, { description: str
  */
 export function conditionDefinition(key: ConditionKey, edition: RulesEdition): ConditionDefinition {
   const base = CONDITIONS.find((c) => c.key === key)!;
-  if (edition !== "EDITION_2014") return base;
-  const override = CONDITIONS_2014_OVERRIDES[key];
-  return override ? { ...base, ...override } : base;
+  // Exhaustive switch, not `if (edition !== "EDITION_2014") return base` (#1527):
+  // the if/else shape let an unrecognized third edition silently take the SRD
+  // 5.2 branch instead of failing loudly.
+  switch (edition) {
+    case "EDITION_2024":
+      return base;
+    case "EDITION_2014": {
+      const override = CONDITIONS_2014_OVERRIDES[key];
+      return override ? { ...base, ...override } : base;
+    }
+    default: {
+      const exhaustive: never = edition;
+      throw new Error(`conditionDefinition: unhandled edition ${String(exhaustive)}`);
+    }
+  }
 }
 
 /** One resolved condition row served on the wire (GET /api/reference, #1322). */
@@ -329,10 +341,22 @@ function exhaustionRollEffects2014(level: number): RollEffect[] {
  * exhaustionSpeedPenalty) and death at level 6 are handled elsewhere.
  */
 export function exhaustionRollEffects(level: number, edition: RulesEdition): RollEffect[] {
-  if (edition === "EDITION_2014") return exhaustionRollEffects2014(level);
-  if (level < 1) return [];
-  const modifier = -2 * level;
-  return EXHAUSTION_ROLL_KINDS.map((kind) => ({ mode: "flat", modifier, kind }));
+  // Exhaustive switch (#1527): the prior `if (edition === "EDITION_2014")
+  // … else …` let an unrecognized third edition silently fall to the 2024
+  // flat-penalty branch instead of failing loudly.
+  switch (edition) {
+    case "EDITION_2014":
+      return exhaustionRollEffects2014(level);
+    case "EDITION_2024": {
+      if (level < 1) return [];
+      const modifier = -2 * level;
+      return EXHAUSTION_ROLL_KINDS.map((kind) => ({ mode: "flat", modifier, kind }));
+    }
+    default: {
+      const exhaustive: never = edition;
+      throw new Error(`exhaustionRollEffects: unhandled edition ${String(exhaustive)}`);
+    }
+  }
 }
 
 /**
@@ -345,12 +369,21 @@ export function exhaustionRollEffects(level: number, edition: RulesEdition): Rol
  * instead of 12).
  */
 export function exhaustionSpeedPenalty(level: number, currentSpeed: number, edition: RulesEdition): number {
-  if (edition === "EDITION_2014") {
-    if (level < 2) return 0;
-    if (level < 5) return Math.ceil(currentSpeed / 2);
-    return currentSpeed;
+  // Exhaustive switch (#1527): see exhaustionRollEffects' comment on why an
+  // if/else fallthrough is the anti-pattern here.
+  switch (edition) {
+    case "EDITION_2014": {
+      if (level < 2) return 0;
+      if (level < 5) return Math.ceil(currentSpeed / 2);
+      return currentSpeed;
+    }
+    case "EDITION_2024":
+      return 5 * Math.max(0, level);
+    default: {
+      const exhaustive: never = edition;
+      throw new Error(`exhaustionSpeedPenalty: unhandled edition ${String(exhaustive)}`);
+    }
   }
-  return 5 * Math.max(0, level);
 }
 
 /**
@@ -364,10 +397,22 @@ export function exhaustionSpeedPenalty(level: number, currentSpeed: number, edit
  * has no hit-point-maximum exhaustion tier at all — 2024 always returns 0.
  */
 export function exhaustionMaxHpPenalty(level: number, currentMax: number, edition: RulesEdition): number {
-  if (edition === "EDITION_2014" && level >= 4) {
-    return Math.ceil(currentMax / 2);
+  // Exhaustive switch (#1527, applied here for consistency with this file's
+  // other exhaustion rules even though this function postdates #1527's
+  // original 11-site audit — #1321 landed after the issue was filed and
+  // reintroduced the same if/else fallthrough shape).
+  switch (edition) {
+    case "EDITION_2014":
+      return level >= 4 ? Math.ceil(currentMax / 2) : 0;
+    case "EDITION_2024":
+      // SRD 5.2 has no hit-point-maximum exhaustion tier at all — a
+      // deliberate 0, not a fallthrough default.
+      return 0;
+    default: {
+      const exhaustive: never = edition;
+      throw new Error(`exhaustionMaxHpPenalty: unhandled edition ${String(exhaustive)}`);
+    }
   }
-  return 0;
 }
 
 // PHB'14 p. 291's tiers are cumulative, so the sentence for a given level
@@ -404,6 +449,16 @@ export function exhaustionEffectText(level: number, edition: RulesEdition): stri
   const clamped = Math.min(EXHAUSTION_MAX, Math.max(0, Math.trunc(level)));
   if (clamped === 0) return "No exhaustion.";
   if (clamped === EXHAUSTION_MAX) return "Death.";
-  if (edition === "EDITION_2014") return exhaustionEffectText2014(clamped);
-  return `−${2 * clamped} on d20 Tests; Speed −${5 * clamped} ft.`;
+  // Exhaustive switch (#1527): see exhaustionRollEffects' comment on why an
+  // if/else fallthrough is the anti-pattern here.
+  switch (edition) {
+    case "EDITION_2014":
+      return exhaustionEffectText2014(clamped);
+    case "EDITION_2024":
+      return `−${2 * clamped} on d20 Tests; Speed −${5 * clamped} ft.`;
+    default: {
+      const exhaustive: never = edition;
+      throw new Error(`exhaustionEffectText: unhandled edition ${String(exhaustive)}`);
+    }
+  }
 }

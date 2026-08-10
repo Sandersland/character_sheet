@@ -14,10 +14,13 @@ import type { RulesEdition } from "@character-sheet/shared-types";
  * 2024 default.
  *
  * A rule that differs by edition takes `edition` as its **last** parameter and
- * stays one function per rule (branching inside, or dispatching to per-edition
- * helpers) — `subclassGateLevel` is the pattern-setter. A reconciler and its
- * clamp-on-read must always resolve to the same one. A rule that is
- * edition-invariant — the majority — takes no `edition` and changes nothing.
+ * stays one function per rule, shaped as a total mapping over `edition` — a
+ * `switch` with an `assertNever`-typed `default`, or a `Record<RulesEdition,
+ * …>` — never `if (edition === …) … else …`, which lets an unrecognized
+ * edition silently fall into whichever branch is the `else` (#1527).
+ * `subclassGateLevel` is the pattern-setter. A reconciler and its clamp-on-read
+ * must always resolve to the same one. A rule that is edition-invariant — the
+ * majority — takes no `edition` and changes nothing.
  *
  * Pure, zero-project-import modules (`effectiveEntryLevel`, `subclassGateLevel`)
  * import `RulesEdition` straight from `@character-sheet/shared-types` to stay
@@ -27,24 +30,39 @@ export function editionOf(row: { rulesEdition: RulesEdition }): RulesEdition {
   return row.rulesEdition;
 }
 
-// The ONE RulesEdition order array in the codebase, and its order IS the order
-// editionsRouter serves and EditionPicker renders — 2024 first, because that is
-// what most new tables run. Until #1436 there was a second array of the same
-// name in the frontend in the OPPOSITE order, while two client sites treated
-// index 0 as the creation default; "aligning the two arrays" would silently have
-// flipped the edition of every new campaign and solo character. Never index this
-// array to obtain a default — that is DEFAULT_RULES_EDITION's job, and the two
-// are independent concerns that merely agree today (a product decision to show
+// The exhaustive validity set (#1527) — every `RulesEdition` union member,
+// derived so a member added to the type without a matching entry HERE is a
+// `tsc` error against the `satisfies Record<RulesEdition, true>` below,
+// rather than an array someone forgot to extend. This is the SOURCE OF TRUTH
+// for "is this a real edition"; RULES_EDITION_DISPLAY_ORDER is a presentation
+// ordering OVER this set (asserted a permutation of it in edition.test.ts),
+// never a second copy of it. Object.keys widens to `string[]` at the type
+// level, but RulesEdition's members are exactly EDITION_PRESENCE's keys by
+// construction, so the cast back to `RulesEdition[]` is sound.
+const EDITION_PRESENCE = { EDITION_2014: true, EDITION_2024: true } satisfies Record<RulesEdition, true>;
+export const ALL_RULES_EDITIONS: readonly RulesEdition[] = Object.keys(EDITION_PRESENCE) as RulesEdition[];
+
+// A presentation ordering OVER ALL_RULES_EDITIONS (#1527) — NOT the validity
+// set (isRulesEdition below membership-tests ALL_RULES_EDITIONS instead), so
+// reordering or shortening this array for a display decision can never make a
+// real edition unrecognized. Its order IS the order editionsRouter serves and
+// EditionPicker renders — 2024 first, because that is what most new tables
+// run. Until #1436 there was a second array of the same name in the frontend
+// in the OPPOSITE order, while two client sites treated index 0 as the
+// creation default; "aligning the two arrays" would silently have flipped the
+// edition of every new campaign and solo character. Never index this array to
+// obtain a default — that is DEFAULT_RULES_EDITION's job, and the two are
+// independent concerns that merely agree today (a product decision to show
 // 2014 first must not move the creation default).
 export const RULES_EDITION_DISPLAY_ORDER: readonly RulesEdition[] = ["EDITION_2024", "EDITION_2014"];
 
 // The one guard for an edition arriving over the wire (a query param, a body
 // field) rather than read off a Character row — feats.ts and reference.ts both
 // need this, so it lives here rather than being copy-pasted a third time. It
-// only membership-tests the array above, so display order is irrelevant to it
-// and there is no second array to fall out of sync with.
+// only membership-tests ALL_RULES_EDITIONS (#1527), so display order is
+// irrelevant to it and there is no second array to fall out of sync with.
 export function isRulesEdition(raw: unknown): raw is RulesEdition {
-  return (RULES_EDITION_DISPLAY_ORDER as readonly string[]).includes(raw as string);
+  return (ALL_RULES_EDITIONS as readonly string[]).includes(raw as string);
 }
 
 // Mirrors Character.rulesEdition's Prisma `@default(EDITION_2024)` — the ONE
