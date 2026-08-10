@@ -88,7 +88,7 @@ describe("revert-matrix — reverseEvent per-category undo (#615)", () => {
 
     // before-snapshot restored: back to the fresh empty conditions state.
     const after = await getChar("rm-conditions");
-    expect(after.conditions).toEqual({ active: [], exhaustion: 0 });
+    expect(after.conditions).toEqual({ active: [], exhaustion: 0, suspended: [] });
   });
 
   // #1321: setExhaustion 3→4 (PHB'14 p. 291 tier 4) carries the one-way HP

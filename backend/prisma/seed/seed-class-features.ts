@@ -63,6 +63,12 @@ const DESCRIPTOR_RESET = {
   // #1688 — same Prisma.DbNull sentinel, same reason: "populated nowhere" for
   // a row that authors no `activationRequires` list.
   activationRequires: Prisma.DbNull,
+  // #1121 — conditionImmunities is a plain String[] column (like
+  // saveDcAbilities above), not Json, so its "populated nowhere" reset is an
+  // empty array, not Prisma.DbNull.
+  conditionImmunities: [] as string[],
+  conditionImmunitiesRequireActiveBuff: null,
+  conditionImmunitiesOnBuffStart: null,
 };
 
 function partitionKey(classId: string, subclassId: string | null): string {

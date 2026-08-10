@@ -109,7 +109,7 @@ describe("POST /api/characters/:id/conditions/transactions", () => {
   it("defaults a fresh character to empty conditions + exhaustion 0", async () => {
     const res = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}`);
     expect(res.status).toBe(200);
-    expect(res.body.conditions).toEqual({ active: [], exhaustion: 0 });
+    expect(res.body.conditions).toEqual({ active: [], exhaustion: 0, suspended: [] });
   });
 
   // ── applyCondition ────────────────────────────────────────────────────────

@@ -20,7 +20,7 @@ import { randomUUID } from "node:crypto";
 
 import { Prisma, type Spell } from "@/generated/prisma/client.js";
 import { castAbilityInTx, type CastAbilityInput, type OpOutcome } from "./ability-cast.js";
-import { clearBuffByKeyInTx, clearBuffsForSourceInTx } from "@/lib/combat/active-effects.js";
+import { clearBuffByKeyInTx, clearBuffsForSourceInTx } from "@/lib/combat/buff-end.js";
 import { InvalidSpellcastingOperationError, type AbilityCost, type PayCostContext } from "./ability-cost.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
 import { applyResourceOpInTx } from "@/lib/classes/resources.js";

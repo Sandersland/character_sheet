@@ -1,5 +1,6 @@
 import { Prisma, type EquipSlot } from "@/generated/prisma/client.js";
-import { clearBuffByKeyInTx, normalizeActiveEffectsMutable } from "@/lib/combat/active-effects.js";
+import { normalizeActiveEffectsMutable } from "@/lib/combat/active-effects.js";
+import { clearBuffByKeyInTx } from "@/lib/combat/buff-end.js";
 import { logEvent } from "@/lib/activity/events.js";
 import type { ClearOnTrigger } from "@/lib/classes/class-feature-rows.js";
 import type { ItemCategory, ArmorCategory } from "./item-detail-inputs.js";

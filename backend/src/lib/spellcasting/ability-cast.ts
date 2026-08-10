@@ -11,7 +11,8 @@
 
 import { Prisma } from "@/generated/prisma/client.js";
 import { payAbilityCostInTx, type AbilityCost, type PayCostContext, type SlotCostSubject } from "./ability-cost.js";
-import { appendActiveBuffInTx, clearBuffsForSourceInTx } from "@/lib/combat/active-effects.js";
+import { appendActiveBuffInTx } from "@/lib/combat/active-effects.js";
+import { clearBuffsForSourceInTx } from "@/lib/combat/buff-end.js";
 import { assertCampaignMembership } from "@/lib/auth/access.js";
 import { AuthorizationError } from "@/lib/auth/errors.js";
 import { resolveBuffSpec, type EffectSpec } from "@/lib/combat/effects.js";

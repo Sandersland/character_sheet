@@ -487,9 +487,17 @@ function recoverExhaustionOnLongRest(row: HpOpContext["row"]): {
 } | null {
   const state = normalizeConditionsMutable(row.conditions);
   if (state.exhaustion <= 0) return null;
-  const beforeConditionsState = { active: state.active.map((e) => ({ ...e })), exhaustion: state.exhaustion };
+  const beforeConditionsState = {
+    active: state.active.map((e) => ({ ...e })),
+    exhaustion: state.exhaustion,
+    suspended: state.suspended.map((e) => ({ ...e })),
+  };
   state.exhaustion -= 1;
-  const afterConditionsState = { active: state.active.map((e) => ({ ...e })), exhaustion: state.exhaustion };
+  const afterConditionsState = {
+    active: state.active.map((e) => ({ ...e })),
+    exhaustion: state.exhaustion,
+    suspended: state.suspended.map((e) => ({ ...e })),
+  };
   return {
     beforeConditionsState,
     afterConditionsState,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  activeImmuneConditions,
   activeResistedDamageTypes,
   buffsByTarget,
   normalizeActiveEffectsMutable,
@@ -94,6 +95,22 @@ describe("normalizeActiveEffectsMutable", () => {
     });
     expect(noneLeft.buffs[0].resistDamageTypes).toBeUndefined();
   });
+
+  it("round-trips conditionImmunities and drops an empty/malformed list (#1121, mirrors resistDamageTypes)", () => {
+    const state: ActiveEffectsMutableState = {
+      buffs: [{ id: "r", key: "rage", target: "meleeDamage", modifier: 2, source: "Rage", duration: "while-active", conditionImmunities: ["charmed", "frightened"] }],
+    };
+    const serialized = JSON.parse(JSON.stringify(serializeActiveEffectsState(state)));
+    expect(normalizeActiveEffectsMutable(serialized)).toEqual(state);
+    const cleaned = normalizeActiveEffectsMutable({
+      buffs: [{ id: "r", key: "rage", target: "meleeDamage", modifier: 2, source: "Rage", duration: "while-active", conditionImmunities: ["charmed", 5, null] }],
+    });
+    expect(cleaned.buffs[0].conditionImmunities).toEqual(["charmed"]);
+    const noneLeft = normalizeActiveEffectsMutable({
+      buffs: [{ id: "r", key: "rage", target: "meleeDamage", modifier: 2, source: "Rage", duration: "while-active", conditionImmunities: [] }],
+    });
+    expect(noneLeft.buffs[0].conditionImmunities).toBeUndefined();
+  });
 });
 
 describe("activeResistedDamageTypes (#456)", () => {
@@ -107,6 +124,20 @@ describe("activeResistedDamageTypes (#456)", () => {
       ],
     };
     expect(activeResistedDamageTypes(state)).toEqual(new Set(["bludgeoning", "piercing", "slashing"]));
+  });
+});
+
+describe("activeImmuneConditions (#1121) — mirrors activeResistedDamageTypes", () => {
+  it("unions conditionImmunities across active buffs; empty when none declare any", () => {
+    expect(activeImmuneConditions({ buffs: [] })).toEqual(new Set());
+    const state: ActiveEffectsMutableState = {
+      buffs: [
+        { id: "1", key: "rage", target: "meleeDamage", modifier: 2, source: "Rage", duration: "while-active", conditionImmunities: ["charmed", "frightened"] },
+        { id: "2", key: "warding", target: "athletics", modifier: 0, source: "Warding", duration: "concentration", conditionImmunities: ["frightened"] },
+        { id: "3", key: "bless", target: "athletics", modifier: 1, source: "Bless", duration: "concentration" },
+      ],
+    };
+    expect(activeImmuneConditions(state)).toEqual(new Set(["charmed", "frightened"]));
   });
 });
 

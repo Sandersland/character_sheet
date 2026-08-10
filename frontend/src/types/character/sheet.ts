@@ -7,7 +7,7 @@ import type { AttackRow, DiceRider, RulesEdition, SaveRider } from "@character-s
 import type { AvailableAction } from "./actions";
 import type { CampaignPreferences } from "./campaign";
 import type { ArmorProficiency, CharacterResources, ClassEntry, ToolProficiency, WeaponProficiency } from "./classes";
-import type { ActiveEffectsState, ArmorClassPart, ConditionsState, DerivedAttack, DerivedImprovisedAttack, RollModifier } from "./combat";
+import type { ActiveEffectsState, ArmorClassPart, ConditionKey, ConditionsState, DerivedAttack, DerivedImprovisedAttack, RollModifier } from "./combat";
 import type { InventoryItem, ItemAdvantageGrant, ItemConditionImmunity, ItemDamageTrait, ItemProficiencyGrant } from "./inventory";
 import type { JournalEntry } from "./journal";
 import type { AdvancementEntry, AdvancementSlots } from "./leveling";
@@ -161,6 +161,17 @@ export interface Character {
    * frontend-authored sentence is what let a 2014 character show 2024 text.
    */
   exhaustionEffectText: string;
+  /**
+   * Condition keys the character is currently immune to (#1121) — Mindless
+   * Rage/Beguiling Defenses/Nature's Ward — through the same rule the
+   * conditions write-guard enforces, so the sheet can show WHY a condition is
+   * unavailable. Derived, never persisted; NOT part of `conditions` for the
+   * same reason `exhaustionEffectText` isn't. Optional (not "always present")
+   * purely so the many pre-#1121 test fixtures constructing a full Character
+   * literal don't all need editing for a field none of them exercise yet —
+   * the backend always serializes it (defaults to `[]`).
+   */
+  immuneConditions?: ConditionKey[];
   /**
    * Active cast-granted passive modifiers (buffs). Always present (normalized on
    * read). Each is also summed into its target skill/stat's tempModifier.

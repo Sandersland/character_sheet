@@ -169,6 +169,11 @@ export interface ClassFeatureSeedRow {
   // comment for the shape/evaluator. `EffectBuffRow` is a type-only import,
   // same reasoning as `ResourceTotalFormula` above.
   effectBuffs?: EffectBuffRow[];
+  // #1121 — see ClassFeature.conditionImmunities/conditionImmunitiesRequireActiveBuff/
+  // conditionImmunitiesOnBuffStart's own schema.prisma comments for the vocabulary.
+  conditionImmunities?: string[];
+  conditionImmunitiesRequireActiveBuff?: string;
+  conditionImmunitiesOnBuffStart?: "clear" | "suspend";
 }
 
 // The full seed family: Fighter's, Barbarian's, Bard's, Ranger's, Rogue's,
@@ -317,6 +322,9 @@ const effectBuffSchema = z
     clearOn: z.array(z.enum(CLEAR_ON_TRIGGERS)).optional(),
     endReminder: z.string().min(1).optional(),
     resistDamageTypes: z.array(z.string().min(1)).optional(),
+    // #1121, mirrors resistDamageTypes — see EffectBuffRow.conditionImmunities'
+    // own comment for why no production row sets this yet.
+    conditionImmunities: z.array(z.string().min(1)).optional(),
     rollEffects: z.array(rollEffectSchema).optional(),
   })
   .refine((buff) => buff.target === buff.key || KNOWN_BUFF_TARGETS.includes(buff.target), {
@@ -357,4 +365,9 @@ export const classFeatureSeedSchema = z.object({
   improvements: z.array(featImprovementSchema).nullable().optional(),
   effectBuffs: effectBuffsSchema.nullable().optional(),
   activationRequires: activationRequiresSchema.nullable().optional(),
+  // #1121 — see ClassFeature.conditionImmunities/conditionImmunitiesRequireActiveBuff/
+  // conditionImmunitiesOnBuffStart's own schema.prisma comments for the vocabulary.
+  conditionImmunities: z.array(z.string().min(1)).optional(),
+  conditionImmunitiesRequireActiveBuff: z.string().min(1).optional(),
+  conditionImmunitiesOnBuffStart: z.enum(["clear", "suspend"]).optional(),
 });

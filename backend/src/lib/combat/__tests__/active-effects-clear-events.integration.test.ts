@@ -12,14 +12,16 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import {
-  clearBuffByKeyInTx,
-  clearBuffsForRestInTx,
-  clearBuffsForSourceInTx,
-  clearWhileActiveBuffsInTx,
   normalizeActiveEffectsMutable,
   serializeActiveEffectsState,
   type ActiveBuff,
 } from "@/lib/combat/active-effects.js";
+import {
+  clearBuffByKeyInTx,
+  clearBuffsForRestInTx,
+  clearBuffsForSourceInTx,
+  clearWhileActiveBuffsInTx,
+} from "@/lib/combat/buff-end.js";
 
 const OWNER_ID = "owner-clear-events";
 const FIXTURE_ID = "test-clear-events-character-1";

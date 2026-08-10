@@ -157,6 +157,8 @@ export interface EffectBuffRow {
   clearOn?: ClearOnTrigger[];
   endReminder?: string;
   resistDamageTypes?: string[];
+  /** Condition keys this buff grants immunity to while active (#1121) — mirrors resistDamageTypes; see ActiveBuff.conditionImmunities' own comment for why this is unused by Rage's own row (Mindless Rage's immunity is subclass-gated). */
+  conditionImmunities?: string[];
   rollEffects?: RollEffect[];
 }
 
@@ -295,6 +297,18 @@ export interface ClassFeatureRow extends ResourceColumns, ActivationColumns {
   // The row-declared while-active buff list a "toggle" resolverKind
   // activates (#1686) — see EffectBuffRow's own comment for the shape.
   effectBuffs?: EffectBuffRow[] | null;
+  // Condition keys this feature grants immunity to once its own level/edition
+  // gate is met (#1121) — see ClassFeature.conditionImmunities' own
+  // schema.prisma comment. Read by conditionImmunitiesFromRows below.
+  conditionImmunities?: string[] | null;
+  // Gates conditionImmunities on a buff of this key currently being active
+  // (#1121) — e.g. Mindless Rage names "rage". Absent = unconditional
+  // (Beguiling Defenses, Nature's Ward).
+  conditionImmunitiesRequireActiveBuff?: string | null;
+  // "clear" | "suspend" — what happens to an EXISTING matching condition when
+  // the gating buff above starts (#1121). See ClassFeature
+  // .conditionImmunitiesOnBuffStart's own schema.prisma comment.
+  conditionImmunitiesOnBuffStart?: "clear" | "suspend" | null;
 }
 
 /**
@@ -379,6 +393,7 @@ export interface ResolvedEffectBuff {
   duration: EffectBuffDuration;
   clearOn?: ClearOnTrigger[];
   resistDamageTypes?: string[];
+  conditionImmunities?: string[];
   rollEffects?: RollEffect[];
 }
 
@@ -399,6 +414,7 @@ export function effectBuffsFromRow(row: ClassFeatureRow, ctx: ResourceTotalConte
       duration: buff.duration,
       ...(buff.clearOn ? { clearOn: buff.clearOn } : {}),
       ...(buff.resistDamageTypes ? { resistDamageTypes: buff.resistDamageTypes } : {}),
+      ...(buff.conditionImmunities ? { conditionImmunities: buff.conditionImmunities } : {}),
       ...(buff.rollEffects ? { rollEffects: buff.rollEffects } : {}),
     }));
 }
@@ -512,4 +528,36 @@ export function saveDcAbilitiesFromRows(
     if (row.saveDcAbilities && row.saveDcAbilities.length > 0) return row.saveDcAbilities;
   }
   return undefined;
+}
+
+/**
+ * Every condition key a class/subclass's rows grant immunity to, at one
+ * character level (#1121) — filters by edition + grant level exactly like
+ * derivedStatFromRows/saveDcAbilitiesFromRows, then further gates a row
+ * naming `conditionImmunitiesRequireActiveBuff` on that key currently being
+ * present in `activeBuffKeys` (Mindless Rage requires "rage"; Beguiling
+ * Defenses/Nature's Ward name no gating buff, so they're unconditional once
+ * their own level/edition gate is met). This is the read-time HALF of the
+ * #1121 rule — deriveImmuneConditions (lib/combat/conditions.ts) is the ONE
+ * caller that unions this with activeImmuneConditions (buff-declared
+ * immunity, active-effects.ts) into the actual immune set the write-guard and
+ * the wire both read; conditionImmunitiesOnBuffStart (the "clear"/"suspend"
+ * state TRANSITION at the gating buff's own start/end) is interpreted
+ * separately, by applyRowDrivenActionInTx's toggle branch
+ * (routes/character/actions.ts) — this function only ever answers "is X
+ * currently immune", never mutates anything.
+ */
+export function conditionImmunitiesFromRows(
+  rows: readonly ClassFeatureRow[],
+  level: number,
+  edition: RulesEdition,
+  activeBuffKeys: ReadonlySet<string>,
+): string[] {
+  const out = new Set<string>();
+  for (const row of rows) {
+    if (row.edition !== edition || row.level > level || !row.conditionImmunities?.length) continue;
+    if (row.conditionImmunitiesRequireActiveBuff && !activeBuffKeys.has(row.conditionImmunitiesRequireActiveBuff)) continue;
+    for (const key of row.conditionImmunities) out.add(key);
+  }
+  return [...out];
 }

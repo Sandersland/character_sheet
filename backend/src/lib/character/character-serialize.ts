@@ -18,7 +18,7 @@ import { hasOpenHandTechnique } from "@/lib/classes/open-hand-technique.js";
 import { resolveSubclassSlug, type SubclassIdentityInput } from "@/lib/classes/subclass-slug.js";
 import { assassinateEligible } from "@/lib/classes/assassinate.js";
 import { featureRowsOf } from "@/lib/classes/feature-rows-select.js";
-import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
+import { normalizeConditionsMutable, deriveImmuneConditions, immuneConditionEntryRows } from "@/lib/combat/conditions.js";
 import { normalizeActiveEffectsMutable, type ActiveEffectsMutableState } from "@/lib/combat/active-effects.js";
 import { isOffHandLocked } from "@/lib/inventory/inventory-placement.js";
 import { RULES_EDITION_LABELS, editionOf } from "@/lib/rules/edition.js";
@@ -357,6 +357,16 @@ export async function serializeCharacter(rawRow: CharacterRow) {
   const weaponGrants = buildMergedWeaponProficiencies(row.classEntries, featProficiencies.weapons);
   const activeEffects = normalizeActiveEffectsMutable(row.activeEffects);
   const buffTargets = buildTargetModifiers(row, activeEffects);
+  // The immune-condition set (#1121) — Mindless Rage/Beguiling Defenses/
+  // Nature's Ward — through the SAME shared rule function the conditions
+  // write-guard calls (deriveImmuneConditions, lib/combat/conditions.ts), so
+  // the sheet can never show a condition as available that the endpoint
+  // would actually reject.
+  const immuneConditions = deriveImmuneConditions(
+    immuneConditionEntryRows(row.classEntries, progress.level),
+    editionOf(row),
+    activeEffects,
+  );
   const { itemGrants, itemSkillProfs, itemSaveProfs } = buildItemGrantsView(row);
   // Archery Fighting Style feat (#1137): +2 to ranged attack rolls, summed from
   // the kept advancements' rangedAttackRoll improvements.
@@ -527,6 +537,11 @@ export async function serializeCharacter(rawRow: CharacterRow) {
     // into `conditions`: that object is also the write shape and the audit
     // before/after payload, and a derived string has no business being persisted.
     exhaustionEffectText: exhaustionEffectText(conditions.exhaustion, editionOf(row)),
+    // Condition keys the character is currently immune to (#1121) — Mindless
+    // Rage/Beguiling Defenses/Nature's Ward — so the sheet can show WHY a
+    // condition is unavailable. NOT folded into `conditions` for the same
+    // reason exhaustionEffectText isn't: derived, never persisted.
+    immuneConditions,
     // Active cast-granted passive modifiers (buffs). Normalized on read; each is
     // also summed into its target skill/stat's tempModifier above.
     activeEffects,
