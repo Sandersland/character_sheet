@@ -50,8 +50,7 @@ backend/src/lib/classes/maneuvers.ts:loadManeuver:persisted id, deliberately ung
 backend/src/lib/classes/disciplines.ts:loadKnownDiscipline:persisted id, deliberately unguarded — same shape as loadManeuver (#1345 R2), see the why-comment at loadKnownDiscipline (#1503)
 backend/src/lib/leveling/level-up-transaction.ts:resolvePickedSubclass:guarded by crossEditionRejection (Subclass, #1414)
 backend/src/routes/character/level-up.ts:pickedGrantSource:reachable only after resolveLevelUpContext admitted the id — see the why-comment at pickedGrantSource (#1414)
-backend/src/routes/catalog/spells.ts:resolveSubclassName:guarded by crossEditionRejection (Subclass, #1825)
-backend/src/lib/leveling/advancement.ts:assertCustomFightingStyleNameEligible:query itself scopes by edition (OR: [{edition},{edition:null}]) — no crossEditionRejection needed, a wrong-edition row can never be returned (#1495)"
+backend/src/routes/catalog/spells.ts:resolveSubclassName:guarded by crossEditionRejection (Subclass, #1825)"
 
 MIN_OCCURRENCES=9
 PATTERN='\.(feat|subclass|grantedAbility|background|action)\.(findUnique|findFirst)\('

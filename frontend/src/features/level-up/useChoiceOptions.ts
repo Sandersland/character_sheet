@@ -75,13 +75,17 @@ export function useChoiceCatalog(
   targetLevel: number,
   targetClassName: string,
 ): ChoiceCatalog {
-  // #1495: the union of the character's existing classes plus the level-up
-  // target's own className (which may be a brand-new multiclass entry not
-  // yet on `character.classes`) — fed to fightingStyleFeat's class gate.
-  // Other kinds ignore it.
+  // #1495: the union of the character's ALREADY-EARNED Fighting Style classes
+  // (fightingStyleGrantingClasses — the level-gated subset served by
+  // serializeCharacter, never `character.classes` as a whole, which would
+  // wrongly include a class that hasn't reached its OWN grant level yet)
+  // plus the level-up target's own className: the fightingStyleFeat step
+  // only appears when THIS level-up is what grants the target class its
+  // Fighting Style feature, so the pre-level-up served set can't include it
+  // yet. Other kinds ignore this. Fed to fightingStyleFeat's class gate.
   const classNames = useMemo(
-    () => Array.from(new Set([...(character.classes ?? []).map((c) => c.name), targetClassName])),
-    [character.classes, targetClassName],
+    () => Array.from(new Set([...(character.fightingStyleGrantingClasses ?? []), targetClassName])),
+    [character.fightingStyleGrantingClasses, targetClassName],
   );
   const { options, loadError } = useChoiceOptions(config, targetLevel, character.rulesEdition, classNames);
   const showSpinner = useDelayedFlag(options === null && !loadError);

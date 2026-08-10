@@ -39,7 +39,7 @@ import { effectiveMaxHitPoints, normalizeHitPoints, normalizeHitDice, type HitPo
 import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
 import { draconicResilienceMaxHpTerm } from "@/lib/classes/draconic-bloodline.js";
 import { editionOf } from "@/lib/rules/edition.js";
-import { crossEditionRejection } from "@/lib/rules/catalog-edition.js";
+import { crossEditionRejection, resolveEditionRow } from "@/lib/rules/catalog-edition.js";
 import type { RulesEdition } from "@character-sheet/shared-types";
 
 export class InvalidAdvancementOperationError extends Error {}
@@ -462,20 +462,30 @@ async function resolveCatalogFeat(
 }
 
 // #1495: a custom feat placed in the fightingStyle slot whose NAME matches a
-// catalog Fighting Style row (case-insensitive, this edition or the shared
-// NULL-edition partition) is a pick of that style through the custom
+// catalog Fighting Style row is a pick of that style through the custom
 // channel, not genuine homebrew — the class gate must apply identically, or
 // a rejected catalog pick could be routed around by retyping it as `custom`.
 // A name matching no catalog row is untouched (real homebrew is unaffected).
+//
+// findMany (unfiltered by edition) + resolveEditionRow, not a findFirst with
+// an `OR: [{edition},{edition:null}]` where clause: the SAME name can carry
+// BOTH an exact-edition row and a shared/other-edition row (e.g. "Great
+// Weapon Fighting" is tagged both EDITION_2014 and EDITION_2024, with
+// different `classes`) — an unordered findFirst leaves Postgres free to
+// return either one, silently admitting the wrong edition's (and wrong
+// class-scope's) row. resolveEditionRow is the SAME exact-then-null-fallback
+// resolution GET /api/feats itself runs (resolveEditionCatalog), so this
+// reads the same row that route would ultimately have offered.
 async function assertCustomFightingStyleNameEligible(
   tx: Prisma.TransactionClient,
   featName: string,
   edition: RulesEdition,
   fightingStyleClassNames: readonly string[],
 ): Promise<void> {
-  const matching = await tx.feat.findFirst({
-    where: { category: "fighting_style", name: { equals: featName, mode: "insensitive" }, OR: [{ edition }, { edition: null }] },
+  const candidates = await tx.feat.findMany({
+    where: { category: "fighting_style", name: { equals: featName, mode: "insensitive" } },
   });
+  const matching = resolveEditionRow(candidates, edition);
   if (matching && !fightingStyleFeatOfferedForClasses(matching, fightingStyleClassNames, edition)) {
     throw new InvalidAdvancementOperationError(
       `takeFeat: "${featName}" is not an offered Fighting Style for ${fightingStyleClassNames.join("/") || "this character"}`,

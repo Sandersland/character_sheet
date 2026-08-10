@@ -362,4 +362,115 @@ describe("Fighting Style class gate — custom feat in the fightingStyle slot (#
     const res = await takeCustomStyle({ name: "Whirling Blades (homebrew)", description: "made up" });
     expect(res.status).toBe(200);
   });
+
+  // #1495 review finding: when a NULL-edition (unrestricted) row and an
+  // EDITION_2014-tagged (restricted) row share the same name, an unordered
+  // findFirst leaves Postgres free to return either — sometimes the
+  // unrestricted one, which would bypass the class gate entirely.
+  // resolveEditionRow's exact-then-null-fallback must deterministically
+  // prefer the edition-specific row.
+  describe("edition-ambiguous name resolution", () => {
+    const AMBIGUOUS_NAME = "Test Ambiguous Style (FS Gate)";
+
+    beforeAll(async () => {
+      // Unrestricted (would pass ANY class) — the row that must NOT win.
+      await prisma.feat.create({
+        data: {
+          name: AMBIGUOUS_NAME, description: "shared, unrestricted", category: "fighting_style",
+          edition: null, classes: [],
+        },
+      });
+      // Paladin-only, EDITION_2014 — a 2014 Ranger must NOT be offered this.
+      await prisma.feat.create({
+        data: {
+          name: AMBIGUOUS_NAME, description: "2014, Paladin-only", category: "fighting_style",
+          edition: "EDITION_2014", classes: ["Paladin"],
+        },
+      });
+    });
+
+    afterAll(async () => {
+      await prisma.feat.deleteMany({ where: { name: AMBIGUOUS_NAME } });
+    });
+
+    it("resolves to the EDITION_2014 (class-restricted) row, not the shared unrestricted one", async () => {
+      const res = await takeCustomStyle({ name: AMBIGUOUS_NAME, description: "attempted bypass" });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/not an offered Fighting Style/);
+    });
+  });
+});
+
+/**
+ * #1495 review finding: the served `fightingStyleGrantingClasses` field
+ * (GET /api/characters/:id, read by both the sheet picker and the level-up
+ * ceremony) must reflect the LEVEL-GATED earned subset, not every class on
+ * the roster. A Fighter1/Ranger1 multiclass has earned Fighter's Fighting
+ * Style (grant L1) but not Ranger's (grant L2, entry only L1) — the served
+ * field must name only Fighter until Ranger's own entry reaches level 2.
+ */
+describe("fightingStyleGrantingClasses — served field (#1495)", () => {
+  const SERVE_OWNER_ID = "owner-fs-feats-serve";
+  const SERVE_FIXTURE_ID = "test-fs-feats-serve";
+  let serveCookie: string;
+  let serveFighterClassId: string;
+  let serveRangerClassId: string;
+
+  const getServe = () => supertest.agent(app).set("Cookie", serveCookie).get(`/api/characters/${SERVE_FIXTURE_ID}`);
+
+  beforeAll(async () => {
+    serveFighterClassId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" }, select: { id: true } })).id;
+    serveRangerClassId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Ranger" }, select: { id: true } })).id;
+  });
+
+  beforeEach(async () => {
+    await ensureTestOwner(SERVE_OWNER_ID);
+    serveCookie = await authCookie(SERVE_OWNER_ID);
+    await prisma.character.create({
+      data: {
+        id: SERVE_FIXTURE_ID, name: "FS Served Field Fixture", alignment: "True Neutral",
+        ownerId: SERVE_OWNER_ID, experiencePoints: 300, initiativeBonus: 1, speed: 30,
+        rulesEdition: "EDITION_2014",
+        hitPoints: { current: 15, max: 15, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 2, die: "d10", spent: 0 },
+        abilityScores: { strength: 14, dexterity: 14, constitution: 14, intelligence: 10, wisdom: 12, charisma: 10 },
+        savingThrowProficiencies: [], skills: [], toolProficiencies: [],
+        currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
+        spellcasting: Prisma.JsonNull,
+        // XP 300 = level 2, matching the Fighter1+Ranger1 entry sum exactly —
+        // no clamp-on-read reshuffling to worry about.
+        classEntries: {
+          create: [
+            { position: 0, name: "Fighter", classId: serveFighterClassId, level: 1 },
+            { position: 1, name: "Ranger", classId: serveRangerClassId, level: 1 },
+          ],
+        },
+      },
+    });
+  });
+
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { id: SERVE_FIXTURE_ID } });
+  });
+
+  it("Fighter1/Ranger1: serves only Fighter — Ranger hasn't reached its own L2 grant", async () => {
+    const res = await getServe();
+    expect(res.status).toBe(200);
+    expect(res.body.fightingStyleGrantingClasses).toEqual(["Fighter"]);
+  });
+
+  it("after Ranger's own entry reaches level 2, both Fighter and Ranger are served", async () => {
+    const rangerEntry = await prisma.characterClassEntry.findFirstOrThrow({
+      where: { characterId: SERVE_FIXTURE_ID, name: "Ranger" },
+      select: { id: true },
+    });
+    // XP 900 = level 3, matching the new Fighter1+Ranger2 entry sum — again
+    // no clamp-on-read reshuffling.
+    await prisma.character.update({ where: { id: SERVE_FIXTURE_ID }, data: { experiencePoints: 900 } });
+    await prisma.characterClassEntry.update({ where: { id: rangerEntry.id }, data: { level: 2 } });
+
+    const res = await getServe();
+    expect(res.status).toBe(200);
+    expect([...res.body.fightingStyleGrantingClasses].sort()).toEqual(["Fighter", "Ranger"]);
+  });
 });

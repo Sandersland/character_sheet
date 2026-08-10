@@ -33,14 +33,17 @@ const FS_CATALOG = [
 
 // A fighter with a Fighting Style slot partition (#1137). `taken` are the
 // fightingStyle-slot advancements; `used` derives from their count by default.
-// `classes` (#1495) carries the real ClassEntry[] wire shape — the class-name
-// scope FightingStyleFeatSection forwards to fetchFeats' class gate.
+// `classes` carries the real ClassEntry[] wire shape; `fightingStyleGrantingClasses`
+// (#1495) is the server-computed EARNED subset FightingStyleFeatSection
+// forwards to fetchFeats' class gate — a single-class Fighter's earned set
+// is trivially just itself.
 function makeFighter(opts: { total: number; taken?: AdvancementEntry[] }): Character {
   const taken = opts.taken ?? [];
   return {
     id: "char-1",
     class: "Fighter",
     classes: [{ id: "ce-1", name: "Fighter", level: 5, needsSubclass: false, subclassMismatch: false }],
+    fightingStyleGrantingClasses: ["Fighter"],
     rulesEdition: "EDITION_2014",
     level: 5,
     fightingStyleSlots: { total: opts.total, used: taken.length },

@@ -91,13 +91,13 @@ function FeatPicker({
   // asking the server for the ASI-legal set would empty this picker. It reads
   // feats.catalog raw for the same reason — feats.filter is search-only.
   //
-  // classNames (#1495): every one of the character's own classes, gating the
-  // server's offered set to fightingStyleFeatOfferedForClasses' union — a
-  // non-granting class name in the list is harmless (Feat.classes never names
-  // it), so passing all of them (not just the style-granting ones) needs no
-  // extra client-side knowledge of which class grants the feature.
-  const classNames = (character.classes ?? []).map((c) => c.name);
-  const feats = useFeatCatalog(open, undefined, character.rulesEdition, classNames);
+  // classNames (#1495): character.fightingStyleGrantingClasses — the classes
+  // that have EARNED the feature, server-computed by
+  // fightingStyleGrantingClassNames — never `character.classes` as a whole.
+  // A class that merely HAS a fightingStyleFeatLevel but hasn't reached it
+  // yet (a Fighter1/Ranger1 multiclass's Ranger entry) must not widen the
+  // offered set, or the write path 400s a style the picker just offered.
+  const feats = useFeatCatalog(open, undefined, character.rulesEdition, character.fightingStyleGrantingClasses);
   const options = (feats.catalog ?? []).filter(
     (f) => f.category === "fighting_style" && !takenIds.has(f.id),
   );

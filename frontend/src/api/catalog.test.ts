@@ -173,14 +173,13 @@ describe("fetchFeats", () => {
     expect(fetchMock.mock.calls[2][0]).toMatch(/\/feats\?edition=EDITION_2014$/);
   });
 
-  it("combines ?asiLevel= and ?classes= when both are given", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => [] });
-    vi.stubGlobal("fetch", fetchMock);
-
-    await fetchFeats("EDITION_2014", 4, ["Ranger"]);
-
-    expect(fetchMock.mock.calls[0][0]).toMatch(/\/feats\?edition=EDITION_2014&asiLevel=4&classes=Ranger$/);
-  });
+  // No "combines ?asiLevel= and ?classes=" test: the route now 400s that
+  // combination (asiLevel's own gate always strips fighting_style rows
+  // first, making classes a silent no-op — see feats.ts's route comment and
+  // feats.test.ts's "cannot be combined" case). No real caller sends both —
+  // AdvancementPanel passes asiLevel only, the Fighting Style picker and
+  // level-up ceremony pass classNames only — so this unit doesn't need to
+  // document a request shape that's illegal on the wire.
 });
 
 // #1801, epic #1795 6/6: share (grant) + fork API coverage.
