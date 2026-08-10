@@ -43,7 +43,9 @@ import { applySpendResourceInTx } from "@/lib/classes/resources.js";
 import { deriveMartialArtsDie } from "@/lib/srd/srd.js";
 import { DEFAULT_RULES_EDITION, editionOf } from "@/lib/rules/edition.js";
 import { rollDie } from "@/lib/core/dice.js";
-import { appendActiveBuffInTx, clearBuffByKeyInTx, normalizeActiveEffectsMutable } from "@/lib/combat/active-effects.js";
+import { appendActiveBuffInTx, normalizeActiveEffectsMutable } from "@/lib/combat/active-effects.js";
+import { clearBuffByKeyInTx } from "@/lib/combat/buff-end.js";
+import { syncConditionImmunityOnBuffStartInTx, type ConditionImmunityBuffRows } from "@/lib/combat/conditions.js";
 import { currentArmorStateInTx, unmetActivationRequirements, ActivationRequirementError } from "@/lib/classes/activation-requires.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
 import { getActiveSessionId } from "@/lib/session/sessions.js";
@@ -52,7 +54,7 @@ import { serializeCharacter } from "@/lib/character/character-serialize.js";
 import { levelForExperience, proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 import { effectiveEntryLevel } from "@/lib/leveling/effective-levels.js";
 import { FEATURE_ROWS_ENTRY_SELECT, featureRowsOf } from "@/lib/classes/feature-rows-select.js";
-import type { ClassFeatureRow, ResourceTotalContext } from "@/lib/classes/class-feature-rows.js";
+import { effectBuffsFromRow, type ClassFeatureRow, type ResourceTotalContext } from "@/lib/classes/class-feature-rows.js";
 
 export const actionsRouter = Router({ mergeParams: true });
 
@@ -105,6 +107,11 @@ interface EligibleRowAction {
   entryLevel: number;
   actionKey: string;
   isToggleEnd: boolean;
+  // The OWNING class entry's own classRows + active subclass's subclassRows
+  // (#1121) — syncConditionImmunityOnBuffStartInTx's Mindless Rage sibling
+  // scan needs the CARRIER, not just the one toggling row, since Mindless
+  // Rage rides a SEPARATE Berserker row from Rage's own base-class row.
+  carrier: ConditionImmunityBuffRows;
 }
 
 // Every row-driven action row available to this character right now — each
@@ -123,14 +130,15 @@ function eligibleRowActions(character: RowActionCharacter): EligibleRowAction[] 
   for (const entry of character.classEntries) {
     const effLevel = effectiveEntryLevel(entry.level, character.classEntries.length, totalLevel);
     const { classRows, subclassRows } = featureRowsOf(entry);
+    const carrier: ConditionImmunityBuffRows = { classRows, subclassRows };
     for (const row of [...classRows, ...subclassRows]) {
       if (!row.activationCost || row.edition !== edition || row.level > effLevel) continue;
       if (row.resolverKind === "toggle") {
         if (!row.resourceKey) continue;
-        rows.push({ row, entryLevel: effLevel, actionKey: row.resourceKey, isToggleEnd: false });
-        rows.push({ row, entryLevel: effLevel, actionKey: endActionKey(row.resourceKey), isToggleEnd: true });
+        rows.push({ row, entryLevel: effLevel, actionKey: row.resourceKey, isToggleEnd: false, carrier });
+        rows.push({ row, entryLevel: effLevel, actionKey: endActionKey(row.resourceKey), isToggleEnd: true, carrier });
       } else if (row.resourceKey) {
-        rows.push({ row, entryLevel: effLevel, actionKey: row.resourceKey, isToggleEnd: false });
+        rows.push({ row, entryLevel: effLevel, actionKey: row.resourceKey, isToggleEnd: false, carrier });
       }
     }
   }
@@ -233,14 +241,7 @@ async function applyRowDrivenActionInTx(
   await assertActivationRequirementsMet(tx, characterId, character, row, isToggleEnd);
 
   if (row.resolverKind === "toggle") {
-    const ctx: ResourceTotalContext = {
-      level: entryLevel,
-      abilityScores: character.abilityScores as Record<string, number>,
-      profBonus: proficiencyBonusForLevel(levelForExperience(character.experiencePoints)),
-    };
-    for (const effect of toggleRowOps(row, ctx, isToggleEnd)) {
-      await applyActionEffectInTx(tx, characterId, effect, batchId, sessionId);
-    }
+    await applyToggleRowActionInTx(tx, characterId, character, eligible, batchId, sessionId);
     return {};
   }
 
@@ -296,6 +297,37 @@ async function applyRowDrivenActionInTx(
     },
   );
   return { roll };
+}
+
+/**
+ * The toggle branch of applyRowDrivenActionInTx (#1686): instantiate the
+ * row's `effectBuffs` as buff ops (activate) or clear them (end), then —
+ * on START only — sync any sibling row's conditionImmunities gated on that
+ * SAME buff key (#1121: Mindless Rage rides a separate Berserker row from
+ * Rage's own base-class row — see ConditionImmunityBuffRows' own comment on
+ * `carrier`). The toggle END needs no sync call: the clearBuff effect
+ * already restored any suspended condition inside clearBuffByKeyInTx.
+ */
+async function applyToggleRowActionInTx(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  character: RowActionCharacter,
+  eligible: EligibleRowAction,
+  batchId: string,
+  sessionId: string | null,
+): Promise<void> {
+  const { row, entryLevel, isToggleEnd, carrier } = eligible;
+  const ctx: ResourceTotalContext = {
+    level: entryLevel,
+    abilityScores: character.abilityScores as Record<string, number>,
+    profBonus: proficiencyBonusForLevel(levelForExperience(character.experiencePoints)),
+  };
+  for (const effect of toggleRowOps(row, ctx, isToggleEnd)) {
+    await applyActionEffectInTx(tx, characterId, effect, batchId, sessionId);
+  }
+  if (isToggleEnd) return;
+  const buffKeys = effectBuffsFromRow(row, ctx).map((b) => b.key);
+  await syncConditionImmunityOnBuffStartInTx(tx, characterId, carrier, entryLevel, editionOf(character), buffKeys, batchId, sessionId);
 }
 
 /** The primitive op types `ACTION_EFFECT_FN` yields for a non-cast action. */

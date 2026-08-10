@@ -1,6 +1,6 @@
 import { Prisma } from "@/generated/prisma/client.js";
 import { describeAttunementPrereq, meetsAttunementPrereq } from "./capabilities.js";
-import { clearBuffByKeyInTx } from "@/lib/combat/active-effects.js";
+import { clearBuffByKeyInTx } from "@/lib/combat/buff-end.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { AttunementLimitError, InvalidInventoryOperationError } from "./inventory-currency.js";
 import {

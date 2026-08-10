@@ -209,6 +209,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
       },
     ],
     "exhaustion": 2,
+    "suspended": [],
   },
   "critRange": 20,
   "currency": {
@@ -243,6 +244,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
     "temp": 3,
   },
   "id": "snap-char-multi",
+  "immuneConditions": [],
   "improvisedWeapon": {
     "attackBonus": 0,
     "damage": {
@@ -919,6 +921,7 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
   "conditions": {
     "active": [],
     "exhaustion": 0,
+    "suspended": [],
   },
   "critRange": 20,
   "currency": {
@@ -953,6 +956,7 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
     "temp": 0,
   },
   "id": "snap-char-simple",
+  "immuneConditions": [],
   "improvisedWeapon": {
     "attackBonus": 3,
     "damage": {

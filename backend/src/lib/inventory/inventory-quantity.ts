@@ -1,5 +1,5 @@
 import { Prisma } from "@/generated/prisma/client.js";
-import { clearBuffByKeyInTx } from "@/lib/combat/active-effects.js";
+import { clearBuffByKeyInTx } from "@/lib/combat/buff-end.js";
 import { logEvent } from "@/lib/activity/events.js";
 import {
   InvalidInventoryOperationError,

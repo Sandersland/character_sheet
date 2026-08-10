@@ -16,11 +16,10 @@ import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
 import {
   appendActiveBuffInTx,
-  clearBuffByKeyInTx,
-  clearBuffsForSourceInTx,
   normalizeActiveEffectsMutable,
   type ActiveBuff,
 } from "@/lib/combat/active-effects.js";
+import { clearBuffByKeyInTx, clearBuffsForSourceInTx } from "@/lib/combat/buff-end.js";
 import { applyHitPointOperations } from "@/lib/combat/hitpoints.js";
 import { inventoryItemFixtureData } from "@/test-support/inventory-snapshot-fixture.js";
 

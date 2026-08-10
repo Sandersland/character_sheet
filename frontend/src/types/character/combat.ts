@@ -51,10 +51,24 @@ export interface ConditionEntry {
   appliedAt: string;
 }
 
+/** A condition suspended (not cured) by an active buff, restored when that buff ends — e.g. 2014 Mindless Rage (#1121, PHB'14 p.49). */
+export interface SuspendedConditionEntry extends ConditionEntry {
+  /** The buff key whose end restores this condition, e.g. "rage". */
+  gatingBuffKey: string;
+}
+
 export interface ConditionsState {
   active: ConditionEntry[];
   /** Exhaustion level, 0–6 (6 = death). Special case, not part of `active`. */
   exhaustion: number;
+  /**
+   * Conditions suspended by an active buff (#1121) — see
+   * SuspendedConditionEntry. Optional (not "always present" like `active`)
+   * purely so the many pre-#1121 test fixtures across the frontend suite
+   * don't all need editing for a field none of them exercise; the backend
+   * always serializes it (normalizeConditionsMutable defaults to `[]`).
+   */
+  suspended?: SuspendedConditionEntry[];
 }
 
 /**
@@ -79,6 +93,8 @@ export interface ActiveBuff {
   restType?: "short" | "long";
   // Damage types this buff makes the character resistant to (halved on take) (#456).
   resistDamageTypes?: string[];
+  // Condition keys this buff makes the character immune to while active (#1121). Mirrors resistDamageTypes.
+  conditionImmunities?: string[];
   // State-driven advantage/disadvantage grants (#486), e.g. Rage's advantage on Strength checks & saves.
   rollEffects?: RollEffect[];
 }

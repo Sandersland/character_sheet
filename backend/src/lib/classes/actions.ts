@@ -1475,6 +1475,7 @@ export function toggleRowOps(row: ClassFeatureRow, ctx: ResourceTotalContext, is
       duration: b.duration,
       ...(b.clearOn ? { clearOn: b.clearOn } : {}),
       ...(b.resistDamageTypes ? { resistDamageTypes: b.resistDamageTypes } : {}),
+      ...(b.conditionImmunities ? { conditionImmunities: b.conditionImmunities } : {}),
       ...(b.rollEffects ? { rollEffects: b.rollEffects } : {}),
     },
   }));

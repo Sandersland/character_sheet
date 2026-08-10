@@ -905,6 +905,30 @@ model ClassFeature {
   // BUFF_TARGET_CLEAR_ON).
   effectBuffs Json?
 
+  // Condition keys this feature grants immunity to, once its own level/
+  // edition gate is met (#1121) — read together with the two columns below.
+  // A plain String[] (mirrors saveDcAbilities), not nested in effectBuffs:
+  // Beguiling Defenses/Nature's Ward are UNCONDITIONAL (no gating buff), so
+  // forcing them through the buff-only effectBuffs list would need a fake
+  // always-active buff for a feature the player never toggles.
+  conditionImmunities String[] @default([])
+  // Gates `conditionImmunities` on a buff of this key currently being active
+  // (#1121) — e.g. Mindless Rage names "rage" (the Barbarian base-class Rage
+  // row's own effectBuffs key), so the immunity applies only while raging.
+  // Absent/null = unconditional (Beguiling Defenses, Nature's Ward).
+  conditionImmunitiesRequireActiveBuff String?
+  // What happens to an EXISTING matching condition when the gating buff above
+  // STARTS (#1121, PHB'14 p.49 / SRD 5.2): "clear" permanently removes it
+  // (2024 Mindless Rage — entering Rage ends Charmed/Frightened outright);
+  // "suspend" removes it but restores it when the gating buff ENDS (2014
+  // Mindless Rage — the condition is suspended, not cured, for the rage's
+  // duration). Meaningless without conditionImmunitiesRequireActiveBuff;
+  // applyRowDrivenActionInTx's toggle branch (routes/character/actions.ts) is
+  // the one place this vocabulary is interpreted, alongside
+  // conditionImmunitiesFromRows (lib/classes/class-feature-rows.ts) for the
+  // read-time immune SET itself.
+  conditionImmunitiesOnBuffStart String?
+
   // NULLS NOT DISTINCT is hand-written in the migration (Prisma's DSL cannot
   // express it) — subclassId is nullable and base-class features are the
   // majority of rows, so without it two identical (fighter, NULL, "Second
