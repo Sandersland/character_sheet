@@ -567,9 +567,13 @@ async function resetAllTurnSpellCasts(tx: Prisma.TransactionClient, sessionId: s
  * (startTurn/round advance), and OUT of combat there are no turn boundaries to
  * clear it, so a record written while `combatActive` is false would linger and
  * serve a spurious `bonusActionLimitedToCantrips` block until combat next starts
- * (#1875 review). So this is a no-op unless the session's combat is active —
- * read from the session inside this same transaction so it stays consistent with
- * the participant write below.
+ * (#1875 review). So this is a no-op unless the session's combat is active. That
+ * check is a `session: { combatActive: true }` filter on the write's own WHERE —
+ * NOT a separate read-then-write: under READ COMMITTED a concurrent endCombat
+ * committing between a preliminary read and the update would strand a stale
+ * interlock in post-combat state (the very lingering-block bug, via TOCTOU).
+ * Folding it into the updateMany makes "combat still active" and the write one
+ * atomic condition.
  *
  * A cantrip write must NOT downgrade an existing `leveled` record for the same
  * economy slot this turn (#1439 review): under Action Surge a leveled Action
@@ -585,8 +589,9 @@ export async function recordTurnSpellCast(
   kind: SpellCastKind,
 ): Promise<void> {
   if (economy === "reaction") return;
-  const session = await tx.session.findUnique({ where: { id: sessionId }, select: { combatActive: true } });
-  if (session == null || !session.combatActive) return;
+  // `session: { combatActive: true }` gates the write atomically (see JSDoc):
+  // the row updates only if combat is still active AT WRITE TIME, so a
+  // concurrent endCombat can't leave a stranded interlock.
   if (economy === "action") {
     await tx.sessionParticipant.updateMany({
       // A cantrip may write over null (initial) or an existing cantrip, but NOT
@@ -594,15 +599,15 @@ export async function recordTurnSpellCast(
       // row (SQL NULL comparison), skipping the first cantrip cast, so match
       // null OR cantrip explicitly. A leveled write always lands.
       where: kind === "cantrip"
-        ? { sessionId, characterId, OR: [{ spellCastAsAction: null }, { spellCastAsAction: "cantrip" }] }
-        : { sessionId, characterId },
+        ? { sessionId, characterId, session: { combatActive: true }, OR: [{ spellCastAsAction: null }, { spellCastAsAction: "cantrip" }] }
+        : { sessionId, characterId, session: { combatActive: true } },
       data: { spellCastAsAction: kind },
     });
   } else {
     await tx.sessionParticipant.updateMany({
       where: kind === "cantrip"
-        ? { sessionId, characterId, OR: [{ spellCastAsBonus: null }, { spellCastAsBonus: "cantrip" }] }
-        : { sessionId, characterId },
+        ? { sessionId, characterId, session: { combatActive: true }, OR: [{ spellCastAsBonus: null }, { spellCastAsBonus: "cantrip" }] }
+        : { sessionId, characterId, session: { combatActive: true } },
       data: { spellCastAsBonus: kind },
     });
   }

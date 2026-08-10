@@ -163,7 +163,10 @@ async function payActionCostAndSideEffectsInTx(
 
 // Record the per-turn spell-cast kind for the 5e bonus-action interlock (#1439)
 // — no-op unless a spell actually resolved (spellCast produced by the spell
-// branch above) and the character is in an active session. Kept out of applyOp
+// branch above) and the character is in a session. recordTurnSpellCast is
+// itself a further no-op when the session's combat is inactive (its WHERE
+// gates on session.combatActive, #1875) — out of combat there are no turn
+// boundaries to clear a recorded block, so none is written. Kept out of applyOp
 // so its own guard doesn't count against that function's complexity budget.
 async function recordSpellCastForOp(
   tx: Prisma.TransactionClient,

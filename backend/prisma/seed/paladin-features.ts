@@ -90,8 +90,10 @@
 // is renamed to the generic announcedSaveDC): `announcedSaveDC` stays a
 // SINGLE scalar overlaid across every class entry, so a Paladin/Battle-Master
 // multiclass populating it here would still collide with Combat Superiority —
-// #1589 turns that into a loud throw at derive time rather than a silent
-// clobber, but doesn't make the two coexist. There is no consumer benefit to
+// assignAnnouncedSaveDC (registry.ts) keeps the first (primary-class) DC and
+// drops the second with a logged warning rather than a silent clobber (it
+// degrades instead of throwing because it runs on the GET read path, #1875),
+// but doesn't make the two coexist. There is no consumer benefit to
 // risk it for: Paladin already serves Channel Divinity/Abjure Foes' DC
 // through a fully independent, already-correct path — channelDivinitySaveDC
 // (lib/classes/channel-divinity.ts) — which `saveDcAbilities`/

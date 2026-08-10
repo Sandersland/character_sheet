@@ -60,8 +60,10 @@
 // (renamed from `maneuverSaveDC`) stays a SINGLE scalar overlaid across every
 // class entry — a Rogue/Battle-Master multiclass populating it here would
 // collide with Combat Superiority's own value (registry.ts's
-// assignAnnouncedSaveDC now throws on that rather than silently clobbering),
-// and no wire consumer reads a Rogue announced DC today (`ManeuversSection`
+// assignAnnouncedSaveDC keeps the first/primary DC and drops the second with a
+// logged warning rather than silently clobbering — it degrades instead of
+// throwing because it runs on the GET read path, #1875), and no wire consumer
+// reads a Rogue announced DC today (`ManeuversSection`
 // is gated on `maneuverChoiceCount`, which no Rogue row sets). The Cunning
 // Strike EFFECT CATALOG (dice-spend + enemy-targeted save effects) is a
 // subsystem this issue does not build — #1138-adjacent follow-up, analogous

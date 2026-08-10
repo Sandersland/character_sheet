@@ -626,6 +626,8 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     supertest.agent(app).set("Cookie", COOKIE).post(`/api/characters/${FIXTURE_ID}/sessions/${sid}/combat/start`).send({});
   const combatRound = (sid: string) =>
     supertest.agent(app).set("Cookie", COOKIE).post(`/api/characters/${FIXTURE_ID}/sessions/${sid}/combat/round`).send({});
+  const combatEnd = (sid: string) =>
+    supertest.agent(app).set("Cookie", COOKIE).post(`/api/characters/${FIXTURE_ID}/sessions/${sid}/combat/end`).send({});
 
   // The fixture is a 2024 (default-edition) Wizard, so these assert SRD 5.2
   // semantics: a leveled spell in one economy limits the OTHER to cantrips.
@@ -645,6 +647,28 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
   // inactive.
   it("a leveled Action cast out of combat (combatActive=false) records no interlock", async () => {
     const { id: sid } = await startSoloSession(FIXTURE_ID);
+    const cast = await post([concentrationCastOp(CONCENTRATION_SPELL_A.id, "cast-action")]);
+    expect(cast.status).toBe(200);
+
+    const participant = await prisma.sessionParticipant.findFirstOrThrow({
+      where: { sessionId: sid, characterId: FIXTURE_ID },
+      select: { spellCastAsAction: true, spellCastAsBonus: true },
+    });
+    expect(participant.spellCastAsAction).toBeNull();
+    expect(participant.spellCastAsBonus).toBeNull();
+    expect((await combatGet(sid)).body.spellEconomy).toEqual(NONE);
+  });
+
+  // #1875 re-review (TOCTOU): the combatActive check lives INSIDE the write's
+  // WHERE (`session: { combatActive: true }`), not a separate read-then-write —
+  // so a cast that lands after combat has ended strands no interlock. Ending
+  // combat first is the deterministic stand-in for the endCombat-commits-mid-
+  // resolve race: with the atomic filter the updateMany matches zero rows.
+  it("a leveled Action cast after combat has ended strands no interlock (atomic combatActive filter)", async () => {
+    const { id: sid } = await startSoloSession(FIXTURE_ID);
+    await combatStart(sid);
+    await combatEnd(sid);
+
     const cast = await post([concentrationCastOp(CONCENTRATION_SPELL_A.id, "cast-action")]);
     expect(cast.status).toBe(200);
 

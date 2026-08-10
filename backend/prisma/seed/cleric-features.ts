@@ -82,10 +82,11 @@
 // disappeared. (1) `announcedSaveDC` stays a SINGLE scalar overlaid across
 // every class entry (deriveEntryScopedResources' overlayExtrasFields), so a
 // Cleric/Battle-Master multiclass populating it here alongside Combat
-// Superiority would still be a real collision — #1589 turns that collision
-// into a loud throw at derive time (registry.ts's assignAnnouncedSaveDC)
-// rather than the old silent clobber, but it does not make the two values
-// coexist. (2) There is no consumer benefit to accept that risk for: Cleric
+// Superiority would still be a real collision — assignAnnouncedSaveDC
+// (registry.ts) keeps the first (primary-class) DC and drops the second with
+// a logged warning rather than the old silent clobber (it degrades instead of
+// throwing because it runs on the GET read path, #1875), but it does not make
+// the two values coexist. (2) There is no consumer benefit to accept that risk for: Cleric
 // already serves its Turn Undead/Channel Divinity DC through a fully
 // independent, already-correct path — channelDivinitySaveDC
 // (lib/classes/channel-divinity.ts), rendered per-option by
