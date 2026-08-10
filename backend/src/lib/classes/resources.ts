@@ -63,6 +63,7 @@ import type {
 // submission/transaction, ability-cost, the actions + resources routes) keep
 // resolving them unchanged.
 export type {
+  ForgetManeuverOperation,
   ForgetSubclassChoiceOperation,
   LearnManeuverOperation,
   LearnSubclassChoiceOperation,
@@ -406,10 +407,25 @@ async function applyLearnManeuverOp(
   };
 }
 
+// #1516: "Each time you learn new maneuvers, you can also replace one
+// maneuver you know with a different one" (PHB'14 Battle Master p.73; SRD 5.2
+// carries the equivalent grant) — RAW bounds a maneuver replacement to
+// learn-time, so this primitive is unreachable outside a validated level-up
+// step (ctx.allowChooseNForget), same guard shape as
+// applyForgetSubclassChoiceOp below. The reconciler (level-reconciliation.ts)
+// trims maneuversKnown directly, never through this op, so it is unaffected —
+// gating HERE (the op boundary), not inside a shared trim primitive, is what
+// keeps level-down reconciliation working (#1516 decision).
 function applyForgetManeuverOp(
   state: ResourcesMutableState,
   op: ForgetManeuverOperation,
+  allowChooseNForget: boolean,
 ): ResourceOpAudit {
+  if (!allowChooseNForget) {
+    throw new InvalidResourceOperationError(
+      "Forgetting a maneuver is only allowed while learning new maneuvers (level-up ceremony)",
+    );
+  }
   const idx = state.maneuversKnown.findIndex((m) => m.id === op.entryId);
   if (idx === -1) {
     throw new InvalidResourceOperationError(
@@ -557,10 +573,28 @@ async function applyLearnSubclassChoiceOp(
   };
 }
 
+// #1516: both editions bound a choose-N replacement to learn-time (PHB'14
+// Battle Master maneuvers p.73, Way of the Four Elements disciplines p.81;
+// SRD 5.2 carries the equivalent grants) — this primitive is unreachable
+// outside a validated level-up step (ctx.allowChooseNForget), which itself
+// only carries a forget when subclassChoiceSwapCadence resolved "onLevelUp"
+// for that catalogSource (assertSubclassChoiceForgets, level-up-submission.ts)
+// — so a non-swappable choice (e.g. Hunter's Prey) is rejected at the
+// ceremony layer before it would ever reach here. The reconciler
+// (reconcileSubclassChoices) trims choicesKnown directly via
+// clampChoicesToCaps, never through this op, so it is unaffected — gating
+// HERE (the op boundary), not inside that shared trim primitive, is what
+// keeps level-down reconciliation working (#1516 decision).
 function applyForgetSubclassChoiceOp(
   state: ResourcesMutableState,
   op: ForgetSubclassChoiceOperation,
+  allowChooseNForget: boolean,
 ): ResourceOpAudit {
+  if (!allowChooseNForget) {
+    throw new InvalidResourceOperationError(
+      "Forgetting a subclass choice is only allowed while learning a new one (level-up ceremony)",
+    );
+  }
   const known = state.choicesKnown[op.choiceKey] ?? [];
   const idx = known.findIndex((e) => e.id === op.entryId);
   if (idx === -1) {
@@ -595,6 +629,17 @@ interface ResourceOpContext {
   sessionId: string | null;
   /** Gates a client-supplied maneuverId/optionId against the row's edition (#1345). */
   edition: RulesEdition;
+  /**
+   * #1516: whether this call site is a validated level-up ceremony step
+   * (level-up-transaction.ts, after validateLevelUpSubmission's
+   * assertManeuverForgets/assertSubclassChoiceForgets already proved the
+   * forgetManeuver/forgetSubclassChoice op belongs to a canSwap-carrying
+   * step) — false for every other caller, including the generic
+   * POST .../resources/transactions route, so a choose-N forget is
+   * unreachable outside learn-time. The client never sets this: it is
+   * server-computed per call site, never a client-supplied op field.
+   */
+  allowChooseNForget: boolean;
 }
 
 // The handler-map return type — async ops return a Promise. Unrelated to the
@@ -613,11 +658,11 @@ const RESOURCE_OP_HANDLERS: {
   rollInitiative: (ctx) =>
     applyRollInitiativeOp(ctx.tx, ctx.characterId, ctx.state, ctx.derivedInfo, ctx.batchId, ctx.sessionId),
   learnManeuver: (ctx, op) => applyLearnManeuverOp(ctx.tx, ctx.state, op, ctx.derivedInfo, ctx.edition),
-  forgetManeuver: (ctx, op) => applyForgetManeuverOp(ctx.state, op),
+  forgetManeuver: (ctx, op) => applyForgetManeuverOp(ctx.state, op, ctx.allowChooseNForget),
   learnToolProficiency: (ctx, op) => applyLearnToolProficiencyOp(ctx.state, op, ctx.derivedInfo),
   forgetToolProficiency: (ctx, op) => applyForgetToolProficiencyOp(ctx.state, op),
   learnSubclassChoice: (ctx, op) => applyLearnSubclassChoiceOp(ctx.tx, ctx.state, op, ctx.derivedInfo, ctx.edition),
-  forgetSubclassChoice: (ctx, op) => applyForgetSubclassChoiceOp(ctx.state, op),
+  forgetSubclassChoice: (ctx, op) => applyForgetSubclassChoiceOp(ctx.state, op, ctx.allowChooseNForget),
 };
 
 function dispatchResourceOp(ctx: ResourceOpContext, op: ResourceOperation): ResourceOpResult {
@@ -658,6 +703,13 @@ const RESOURCES_SELECT = {
  * `tx` on every call (a batch of spends sees each prior result), dispatches via
  * dispatchResourceOp → writes back → logs its own event (the single copy of the
  * logic; applySpendResourceInTx is a thin, spend-typed delegate over this).
+ *
+ * `allowChooseNForget` (#1516) defaults false: only level-up-transaction.ts's
+ * caller — after validateLevelUpSubmission already proved a
+ * forgetManeuver/forgetSubclassChoice op belongs to a canSwap-carrying step —
+ * passes true. Every other caller (the generic resources route, the actions
+ * orchestrator's spend/restore composition) leaves it false, which is what
+ * makes a choose-N forget unreachable outside learn-time.
  */
 export async function applyResourceOpInTx(
   tx: Prisma.TransactionClient,
@@ -665,6 +717,7 @@ export async function applyResourceOpInTx(
   op: ResourceOperation,
   batchId: string,
   sessionId: string | null,
+  allowChooseNForget = false,
 ): Promise<ResourceOpAudit> {
   const row = await tx.character.findUnique({
     where: { id: characterId },
@@ -693,7 +746,10 @@ export async function applyResourceOpInTx(
   const state = normalizeResourcesMutable(row.resources);
   const beforeState = snapshotResourcesState(state);
 
-  const audit = await dispatchResourceOp({ tx, state, derivedInfo, characterId, batchId, sessionId, edition }, op);
+  const audit = await dispatchResourceOp(
+    { tx, state, derivedInfo, characterId, batchId, sessionId, edition, allowChooseNForget },
+    op,
+  );
 
   // Write the updated state back — always via serializeResourcesState so
   // all keys round-trip (prevents clobbering toolProficienciesKnown when

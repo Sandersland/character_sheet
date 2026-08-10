@@ -9,6 +9,7 @@ import type { LevelUpTarget } from "@character-sheet/contracts";
 import type { AdvancementOperation, TakeFeatOperation } from "@/lib/leveling/advancement.js";
 import type { ClassFeatureRow } from "@/lib/classes/class-feature-rows.js";
 import type {
+  ForgetManeuverOperation,
   ForgetSubclassChoiceOperation,
   LearnManeuverOperation,
   LearnToolProficiencyOperation,
@@ -42,6 +43,10 @@ export interface LevelUpSubmission {
   // slot:"fightingStyle" server-side so it lands in the fs partition.
   fightingStyleFeat?: TakeFeatOperation;
   maneuvers?: LearnManeuverOperation[];
+  // #1516: a swap for a maneuver — one forgotten entry offset by one extra
+  // learn under the SAME step, mirroring subclassChoicesForgotten's/
+  // spellsForgotten's own shape/assert (assertManeuverForgets below).
+  maneuversForgotten?: ForgetManeuverOperation[];
   toolProficiencies?: LearnToolProficiencyOperation[];
   subclassChoices?: LearnSubclassChoiceOperation[];
   // #1503: a swap for a choose-N choice whose swapCadence is "onLevelUp"
@@ -156,11 +161,27 @@ function assertCounts(plan: LevelUpStep[], chosenSubclassName: string | null, su
     if (provided !== expected) {
       // A negative net only happens when a swap forget outnumbers the learns.
       if (provided < 0) {
-        throw new InvalidLevelUpError("You must learn a replacement spell for every spell you swap out.");
+        const unit = swapUnitNoun(step);
+        throw new InvalidLevelUpError(`You must learn a replacement ${unit} for every ${unit} you swap out.`);
       }
       throw new InvalidLevelUpError(`expected ${expected} ${noun} for this level-up, got ${provided}`);
     }
   }
+}
+
+// The negative-net message (assertCounts above) names the swappable UNIT
+// being forgotten, singular — distinct from stepProvided's noun, which is
+// plural/label-shaped for the "expected N <noun>" message (e.g. "new
+// spells", "maneuvers", "fourElementsDisciplines choices"). Only step kinds
+// with a swap mechanism can go negative (a forget outnumbering its
+// replacement learn): newSpells, subclassChoice, maneuvers. #1516 found this
+// wrong for maneuvers (a hardcoded "spell" leaked into every domain's
+// message) — fixed by keying the unit off the step itself, one function, not
+// a copy per domain.
+function swapUnitNoun(step: LevelUpStep): string {
+  if (step.kind === "maneuvers") return "maneuver";
+  if (step.kind === "subclassChoice") return `${String(step.meta?.key)} choice`;
+  return "spell";
 }
 
 // #1101: learns net of the one optional swap forget.
@@ -175,6 +196,13 @@ function netSubclassChoiceLearned(key: unknown, submission: LevelUpSubmission): 
   const learned = (submission.subclassChoices ?? []).filter((c) => c.choiceKey === key).length;
   const forgotten = (submission.subclassChoicesForgotten ?? []).filter((c) => c.choiceKey === key).length;
   return learned - forgotten;
+}
+
+// #1516: same shape as netSpellsLearned/netSubclassChoiceLearned — a maneuver
+// swap (forget one, learn a different one) offsets, so the NET learn count
+// must equal the "maneuvers" step's own count.
+function netManeuversLearned(submission: LevelUpSubmission): number {
+  return (submission.maneuvers?.length ?? 0) - (submission.maneuversForgotten?.length ?? 0);
 }
 
 function stepProvided(
@@ -193,6 +221,10 @@ function stepProvided(
   // step count (spellsLearned.length === step.count + spellsForgotten.length).
   if (step.kind === "newSpells") {
     return { provided: netSpellsLearned(submission), noun: "new spells" };
+  }
+  // #1516: same net-of-forgets treatment as newSpells, above.
+  if (step.kind === "maneuvers") {
+    return { provided: netManeuversLearned(submission), noun: "maneuvers" };
   }
   const domain = SIMPLE_DOMAINS.find((d) => d.kind === step.kind)!;
   return { provided: domain.provided(submission), noun: domain.noun };
@@ -289,6 +321,31 @@ function assertSubclassChoiceForgets(plan: LevelUpStep[], submission: LevelUpSub
   }
 }
 
+// #1516: a maneuver swap forgets at most one entry, only on a "maneuvers" step
+// whose meta.canSwap is true (unconditional whenever the step exists — see
+// choiceCountStep, level-up-plan.ts) — sibling of assertForgets/
+// assertSubclassChoiceForgets above, same shape. Entry-existence is NOT
+// re-checked here — applyForgetManeuverOp (resources.ts) already rejects an
+// unknown entryId at apply time, the same "second bespoke guard" avoidance
+// assertSubclassChoiceForgets documents.
+//
+// canSwap is checked BEFORE the length>1 guard (unlike this function's first
+// cut, which checked length first): on a level that disallows swapping
+// entirely (no "maneuvers" step, e.g. a no-growth level), 2 forgets must
+// still say "does not allow swapping a maneuver" — "you may swap at most
+// one" would wrongly imply exactly one forget IS legal there.
+function assertManeuverForgets(plan: LevelUpStep[], submission: LevelUpSubmission): void {
+  const forgets = submission.maneuversForgotten ?? [];
+  if (forgets.length === 0) return;
+  const step = plan.find((s) => s.kind === "maneuvers");
+  if (step?.meta?.canSwap !== true) {
+    throw new InvalidLevelUpError("this level-up does not allow swapping a maneuver");
+  }
+  if (forgets.length > 1) {
+    throw new InvalidLevelUpError("You may swap at most one maneuver per level-up.");
+  }
+}
+
 // #1131: new cantrips ride the newSpells step's meta.cantrips, counted separately
 // from leveled picks (a cantrip never offsets a swap forget). A level with no
 // newSpells step — or one granting no cantrips — rejects any cantripsLearned.
@@ -324,6 +381,7 @@ export function validateLevelUpSubmission(
   assertNoExcess(plan, submission);
   assertForgets(plan, character, submission);
   assertSubclassChoiceForgets(plan, submission);
+  assertManeuverForgets(plan, submission);
   assertCantrips(plan, submission);
   return plan;
 }

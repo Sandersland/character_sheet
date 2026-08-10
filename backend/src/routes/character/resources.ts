@@ -45,7 +45,11 @@ export const learnManeuverOpSchema = z
     message: "Provide exactly one of maneuverId or custom",
   });
 
-const forgetManeuverOpSchema = z.object({
+// Exported (#1516) so the level-up ceremony's own submission schema
+// (routes/character/level-up.ts) can reuse it verbatim for
+// maneuversForgotten — same "one op schema, two call sites" pattern as
+// forgetSubclassChoiceOpSchema below.
+export const forgetManeuverOpSchema = z.object({
   type: z.literal("forgetManeuver"),
   entryId: z.string().min(1),
 });
@@ -104,11 +108,18 @@ const transactionsRequestSchema = z.object({
  *   restoreResource       — restore spent units (undo mis-click or Relentless trigger)
  *   rollInitiative        — regain resources on combat start (onInitiative pools, #1239)
  *   learnManeuver         — add a maneuver from catalog or custom payload
- *   forgetManeuver        — remove a known maneuver by entry id
+ *   forgetManeuver        — 400s here (#1516): both editions bound a maneuver
+ *                           replacement to learn-time (PHB'14 Battle Master
+ *                           p.73; SRD 5.2 equivalent) — only reachable through
+ *                           a validated level-up ceremony step, never this
+ *                           generic route.
  *   learnToolProficiency  — choose an artisan's tool (Student of War, level 3+)
  *   forgetToolProficiency — undo a tool proficiency choice by entry id
  *   learnSubclassChoice   — pick an option for a generic subclass choose-N (#899)
- *   forgetSubclassChoice  — undo a subclass-choice pick by entry id
+ *   forgetSubclassChoice  — 400s here (#1516): same learn-time bound as
+ *                           forgetManeuver above (PHB'14 Way of the Four
+ *                           Elements p.81 is the other cited text) — only
+ *                           reachable through a validated level-up step.
  *
  * Returns the full updated character on success, plus a top-level `results`
  * array (one ResourceOpAudit per op) so a roll-driven op's outcome — today,

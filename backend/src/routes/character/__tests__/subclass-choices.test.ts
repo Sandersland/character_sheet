@@ -228,7 +228,13 @@ describe("subclass choices — derivation + ops", () => {
     expect(res.status).toBe(400);
   });
 
-  it("accepts a custom option and forgets it by entry id", async () => {
+  // #1516: PHB'14 Way of the Four Elements p.81 / Battle Master p.73 bound a
+  // choose-N replacement to learn-time — this generic route is never a
+  // validated level-up step, so forgetSubclassChoice 400s here regardless of
+  // whether the entry actually exists. Only POST …/level-up/transactions (a
+  // canSwap-carrying "subclassChoice" step) can forget a choice — see
+  // level-up-transaction.test.ts's Way of the Four Elements swap suite.
+  it("400s forgetSubclassChoice — only reachable through a level-up ceremony step", async () => {
     const learn = await post([
       { type: "learnSubclassChoice", choiceKey: "defensiveTactics", custom: { name: "Homebrew Tactic", description: "Custom." } },
     ]);
@@ -237,12 +243,14 @@ describe("subclass choices — derivation + ops", () => {
     expect(entry.optionId).toBeUndefined();
 
     const forget = await post([{ type: "forgetSubclassChoice", choiceKey: "defensiveTactics", entryId: entry.id }]);
-    expect(forget.status).toBe(200);
-    // Emptied key is dropped from the map.
-    expect(resources(forget).choicesKnown.defensiveTactics).toBeUndefined();
+    expect(forget.status).toBe(400);
+    expect(forget.body.error).toMatch(/level-up ceremony/i);
+    // The learn is untouched — the op never reached applyForgetSubclassChoiceOp's mutation.
+    const char = await agent().get(`/api/characters/${FIXTURE_ID}`);
+    expect(resources(char).choicesKnown.defensiveTactics).toHaveLength(1);
   });
 
-  it("400s forgetting a non-existent entry", async () => {
+  it("400s forgetting a non-existent entry (cadence-gated before entry lookup)", async () => {
     const res = await post([{ type: "forgetSubclassChoice", choiceKey: "huntersPrey", entryId: "nope" }]);
     expect(res.status).toBe(400);
   });

@@ -313,23 +313,27 @@ describe("POST /api/characters/:id/resources/transactions", () => {
     expect(fourth.status).toBe(400);
   });
 
-  // ── forgetManeuver ──────────────────────────────────────────────────────────
+  // ── forgetManeuver (#1516: learn-time only, unreachable from this route) ────
 
-  it("forgetManeuver removes a learned maneuver by entry id", async () => {
+  // PHB'14 Battle Master p.73 / SRD 5.2 equivalent bounds a maneuver
+  // replacement to learn-time — this generic route is never a validated
+  // level-up step, so forgetManeuver 400s here unconditionally regardless of
+  // whether the entry actually exists (the cadence guard is checked before
+  // entry lookup). Only POST …/level-up/transactions (a canSwap-carrying
+  // "maneuvers" step) can forget a maneuver — see level-up-transaction.test.ts.
+  it("400s forgetManeuver — only reachable through a level-up ceremony step", async () => {
     const learn = await post([{ type: "learnManeuver", custom: { name: "Disarm", description: "d" } }]);
     const entryId = maneuvers(learn)[0].id;
 
     const res = await post([{ type: "forgetManeuver", entryId }]);
-    expect(res.status).toBe(200);
-    expect(maneuvers(res).find((m) => m.id === entryId)).toBeUndefined();
-
-    const events = await activity();
-    const forget = events.find((e) => e.type === "forgetManeuver")!;
-    expect(forget.summary).toBe("Forgot maneuver: Disarm");
-    expect(forget.data).toEqual({ entryId, maneuverName: "Disarm" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/level-up ceremony/i);
+    // The learn is untouched — the op never reached applyForgetManeuverOp's mutation.
+    const char = await agent().get(`/api/characters/${FIXTURE_ID}`);
+    expect(maneuvers(char).find((m) => m.id === entryId)).toBeDefined();
   });
 
-  it("400s on forgetManeuver for an unknown entry id", async () => {
+  it("400s on forgetManeuver for an unknown entry id (cadence-gated before entry lookup)", async () => {
     const res = await post([{ type: "forgetManeuver", entryId: "does-not-exist" }]);
     expect(res.status).toBe(400);
   });

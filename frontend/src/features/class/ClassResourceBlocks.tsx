@@ -58,7 +58,6 @@ export default function ClassResourceBlocks({ view, busy, run }: Props) {
           maneuverKnownIds={view.maneuverKnownIds}
           busy={busy}
           onLearn={(op) => resourceOp(op)}
-          onForget={(entryId) => run(() => applyResourceTransactions(character.id, [{ type: "forgetManeuver", entryId }]))}
         />
       )}
 

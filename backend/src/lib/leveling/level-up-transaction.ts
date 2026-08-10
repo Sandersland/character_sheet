@@ -351,7 +351,10 @@ const STEP_OP_BUILDERS: Record<LevelUpStepKind, (submission: LevelUpSubmission, 
   subclass: (s) => [{ domain: "class", op: { type: "setSubclass", subclassId: s.subclassId! } }],
   // #1137: force the fs slot so the pick lands in the fightingStyle partition.
   fightingStyleFeat: (s) => [{ domain: "advancement", op: { ...s.fightingStyleFeat!, slot: "fightingStyle" } }],
-  maneuvers: (s) => (s.maneuvers ?? []).map((op) => ({ domain: "resources", op })),
+  // #1516: forgets apply BEFORE learns (ops run sequentially in tx order),
+  // mirroring subclassChoice's own forget-before-learn ordering above.
+  maneuvers: (s) =>
+    [...(s.maneuversForgotten ?? []), ...(s.maneuvers ?? [])].map((op) => ({ domain: "resources", op })),
   toolProficiency: (s) => (s.toolProficiencies ?? []).map((op) => ({ domain: "resources", op })),
   // #1503: forgets apply BEFORE learns (ops run sequentially in tx order),
   // mirroring #1101's newSpells ordering — resolveChoiceOption's dup guard
@@ -383,7 +386,12 @@ const LEVEL_UP_OP_APPLIERS: Record<
   hp: (tx, id, op, batchId, sessionId) => applyLevelUpHpInTx(tx, id, op as LevelUpOperation, batchId, sessionId),
   advancement: (tx, id, op, batchId, sessionId) => applyAdvancementOpInTx(tx, id, op as AdvancementOperation, batchId, sessionId),
   class: (tx, id, op, batchId, sessionId) => setSubclassInTx(tx, id, op as SetSubclassOperation, batchId, sessionId),
-  resources: (tx, id, op, batchId, sessionId) => applyResourceOpInTx(tx, id, op as ResourceOperation, batchId, sessionId),
+  // #1516: allowChooseNForget=true — every resources op reaching this call
+  // site was already projected from steps validateLevelUpSubmission proved
+  // legal (assertManeuverForgets/assertSubclassChoiceForgets ran first), so a
+  // forgetManeuver/forgetSubclassChoice op here is always pre-validated.
+  resources: (tx, id, op, batchId, sessionId) =>
+    applyResourceOpInTx(tx, id, op as ResourceOperation, batchId, sessionId, true),
   spellcasting: (tx, id, op, batchId, sessionId, userId) =>
     applySpellcastingOpInTx(tx, id, op as SpellcastingOperation, batchId, sessionId, userId),
 };
