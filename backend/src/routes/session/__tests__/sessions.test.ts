@@ -384,6 +384,38 @@ describe("combat state is server-authoritative", () => {
     expect(startedEvents).toBe(1);
   });
 
+  // #1439 review: startCombat/endCombat are combat-LEVEL boundaries — they must
+  // clear EVERY participant's per-turn spell interlock, not just the caller's.
+  // Otherwise a player who cast a leveled Action spell but never advanced a round
+  // (combat ended mid-turn by someone else) stays blocked across the restart.
+  it("combat/end + restart by another participant clears a stranded participant's spell block", async () => {
+    const { campaignId, sessionId } = await activeSession();
+    await agent(cookiePlayer).post(`${startUrl(campaignId)}/${sessionId}/join`).send({ characterId: CHAR_PLAYER });
+    await agent(cookieOwner).post(startCombatUrl(sessionId)).send({});
+
+    // PLAYER cast a leveled Action spell this turn but never advanced a round.
+    await prisma.sessionParticipant.update({
+      where: { sessionId_characterId: { sessionId, characterId: CHAR_PLAYER } },
+      data: { spellCastAsAction: "leveled" },
+    });
+    // PLAYER is a 2024 (default-edition) character, so a leveled Action spell
+    // limits the bonus action to cantrips (it doesn't fully block it).
+    const blocked = await agent(cookiePlayer).get(combatStateUrl(CHAR_PLAYER, sessionId));
+    expect(blocked.body.spellEconomy.bonusActionLimitedToCantrips).toBe(true);
+
+    // OWNER (not PLAYER) ends and restarts combat.
+    await agent(cookieOwner).post(endCombatUrl(sessionId)).send({});
+    await agent(cookieOwner).post(startCombatUrl(sessionId)).send({});
+
+    // PLAYER's restriction must be cleared — not stranded across the restart.
+    const after = await agent(cookiePlayer).get(combatStateUrl(CHAR_PLAYER, sessionId));
+    expect(after.body.spellEconomy).toEqual({
+      bonusActionBlockedByActionSpell: false,
+      bonusActionLimitedToCantrips: false,
+      actionLimitedToCantrips: false,
+    });
+  });
+
   it("combat/round ignores a client-supplied round and advances by exactly 1", async () => {
     const { sessionId } = await activeSession();
     await agent(cookieOwner).post(startCombatUrl(sessionId)).send({});

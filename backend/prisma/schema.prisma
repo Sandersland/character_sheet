@@ -2333,9 +2333,37 @@ model SessionParticipant {
   joinedAt    DateTime  @default(now())
   leftAt      DateTime?
   summary     Json?
+  // Per-turn spell-cast kind (#1439) — the SECOND deliberate DERIVE-DON'T-PERSIST
+  // EXCEPTION, alongside Session.combatActive/round (#1030). The 5e bonus-action
+  // spellcasting interlock (a leveled spell cast with your Action blocks a
+  // bonus-action spell; a leveled bonus-action spell limits the Action to
+  // cantrips) is a function of the TURN, not the character, so it cannot be
+  // derived from any character column. It is shared state two clients viewing
+  // this participant must agree on and that must survive a reload — which a
+  // client-only reducer cannot provide (the reason this became server state,
+  // #1439). Per-participant, not on Session: a shared field would let one PC's
+  // cast wrongly block another's. Recorded when a spell resolves (resolveAction),
+  // reset to null at every turn boundary (startCombat/endCombat/advanceCombatRound).
+  // Null = nothing of that economy kind cast this turn. The resolved interlock
+  // flags are computed from these via the one shared rule fn (spellEconomyRestrictions).
+  spellCastAsAction SpellCastKind?
+  spellCastAsBonus  SpellCastKind?
+  // Bumped on every cast-record/reset above so the combat-state payload's
+  // `updatedAt` (max of this and Session.updatedAt) advances on a
+  // participant-only change, keeping the client's monotonic sync guard correct
+  // for the interlock flags, not just for round (#1439).
+  updatedAt   DateTime  @updatedAt @default(now())
 
   @@unique([sessionId, characterId])
   @@index([sessionId])
+}
+
+// Whether the spell cast in a given economy slot this turn was a cantrip or a
+// leveled spell — the raw per-turn record behind the 5e bonus-action interlock
+// (#1439). Mirrors the client's SpellCastKind union.
+enum SpellCastKind {
+  cantrip
+  leveled
 }
 
 // kind distinguishes the two capture surfaces sharing this table: full ENTRY
