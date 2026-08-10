@@ -107,4 +107,18 @@ export interface ResolveActionEventData {
    * announced only, never auto-applied.
    */
   apply?: { target: "self" | { characterId: string }; kind: "heal" | "damage"; amount: number };
+  /**
+   * 2014 Assassin Assassinate (#1526): true when the player declared the
+   * target surprised, converting THIS swing's hit into a critical hit
+   * (PHB'24/SRD 5.2 deleted the clause, #1231 — 2014-only). The server does
+   * not compute the crit itself (self-or-announce, no target/AC model to
+   * verify a hit against) but DOES gate who may assert it —
+   * `applyResolveActionOperations` rejects `assassinate: true` from a
+   * character `assassinateEligible` says no to, and the schema requires
+   * `toHit.verdict === "crit"` whenever this is true. Omitted/false for
+   * every other swing, including a crit from any other cause (nat20, a
+   * manual "Crit!" call) — never a second availability signal the way
+   * `SaveRider.active` documents that pattern for a rider.
+   */
+  assassinate?: boolean;
 }

@@ -416,11 +416,16 @@ function buildAttackResolutionRow(
   const effect = data.effect;
   const isCrit = toHit.verdict === "crit" || effect.crit === true;
   const isHeal = effect.kind === "heal";
+  // Assassinate (#1526): a crit this app can't itself verify against a
+  // target/AC still needs a legible CAUSE in the log, not just "critical
+  // hit!" — the same requirement `data.assassinate` exists to satisfy, per
+  // ResolveActionEventData's own contract comment.
+  const critLabel = data.assassinate ? "critical hit — Assassinate!" : "critical hit!";
   const segments: LogSegment[] = isCrit
     ? [
         { text: source, bold: true },
         { text: " — " },
-        { text: "critical hit!", tone: "harm" },
+        { text: critLabel, tone: "harm" },
         { text: " " },
         { text: `${effect.total}`, bold: true },
         ...effectTailSegments(effect, riders, true),

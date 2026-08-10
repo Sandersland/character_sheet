@@ -41,13 +41,19 @@ export function useResolveActionCommit({
   // stays visible until the verdict settles) is dropped rather than attached
   // to a miss's op, matching `effect: null` on a miss — a typed rider makes
   // no sense on a swing that didn't land.
+  //
+  // `assassinate` (#1526) is optional — only InlineAttackPicker's own
+  // AssassinateSection ever sets it true; the off-hand/Flurry callers
+  // (useBonusAttackSheet, #1845) omit it and get the same false/omitted wire
+  // shape they always have.
   function commit(
     resolution: TurnResolution,
     rolls: ResolutionRolls,
     riderEffects: Record<string, ResolveActionEventEffect>,
+    assassinate?: boolean,
   ) {
     const riders = rolls.toHit?.verdict === "miss" ? [] : Object.values(riderEffects);
-    mutation.mutate(buildResolveActionOp(resolution, rolls, { riders }));
+    mutation.mutate(buildResolveActionOp(resolution, rolls, { riders, assassinate }));
     onCommitted();
   }
 

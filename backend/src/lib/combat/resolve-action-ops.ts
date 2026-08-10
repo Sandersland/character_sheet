@@ -110,42 +110,58 @@ const resolveActionEffectSchema = z.object({
   components: damageComponentsSchema.nullable().optional(),
 });
 
-const resolveActionOperationSchema = z.object({
-  type: z.literal("resolveAction"),
-  // Client-generated id correlating this resolution's rolls across the rail
-  // steps (useResolution, #1831) — opaque to the backend, stored verbatim.
-  actionId: z.string().min(1),
-  // Display name of the resolved thing ("Fire Bolt", "Longbow").
-  source: z.string().min(1),
-  cost: resolveActionCostSchema,
-  toHit: resolveActionToHitSchema.nullable().optional(),
-  save: resolveActionSaveSchema.nullable().optional(),
-  effect: resolveActionEffectSchema.nullable().optional(),
-  // Typed damage riders (#1843) — zero or more, each validated as its own
-  // effect. Omitted/empty for the common no-rider swing.
-  riders: z.array(resolveActionEffectSchema).optional(),
-  // Present only for a leveled spell cast (or upcast) — expends one slot of
-  // this level via the same payer castSpell uses. Absent for a cantrip or a
-  // weapon swing, which have no character state to spend.
-  slotLevel: z.number().int().min(1).max(9).optional(),
-  // The character's own spellcasting entry id — present only for a spell
-  // resolution (#1833). Its presence, not `slotLevel`'s, is what routes the
-  // op through castSpellForResolutionInTx: a cantrip cast has no slotLevel
-  // but still needs entryId so concentration/buff side effects apply.
-  entryId: z.string().min(1).optional(),
-  // Where a cast's rolled effect lands: the caster's own HP, or a consenting
-  // ally's sheet (heal only, #462) — mirrors castSpellOpSchema's own `apply`
-  // (routes/character/spellcasting.ts) exactly. Never set for a damage
-  // resolution: there is no target/enemy model (self-or-announce, CLAUDE.md),
-  // so a damage spell's effect is announced only, never auto-applied.
-  apply: z
-    .object({
-      target: z.union([z.literal("self"), z.object({ characterId: z.string().min(1) })]),
-      kind: z.enum(["heal", "damage"]),
-      amount: z.number().int().positive(),
-    })
-    .optional(),
-});
+const resolveActionOperationSchema = z
+  .object({
+    type: z.literal("resolveAction"),
+    // Client-generated id correlating this resolution's rolls across the rail
+    // steps (useResolution, #1831) — opaque to the backend, stored verbatim.
+    actionId: z.string().min(1),
+    // Display name of the resolved thing ("Fire Bolt", "Longbow").
+    source: z.string().min(1),
+    cost: resolveActionCostSchema,
+    toHit: resolveActionToHitSchema.nullable().optional(),
+    save: resolveActionSaveSchema.nullable().optional(),
+    effect: resolveActionEffectSchema.nullable().optional(),
+    // Typed damage riders (#1843) — zero or more, each validated as its own
+    // effect. Omitted/empty for the common no-rider swing.
+    riders: z.array(resolveActionEffectSchema).optional(),
+    // Present only for a leveled spell cast (or upcast) — expends one slot of
+    // this level via the same payer castSpell uses. Absent for a cantrip or a
+    // weapon swing, which have no character state to spend.
+    slotLevel: z.number().int().min(1).max(9).optional(),
+    // The character's own spellcasting entry id — present only for a spell
+    // resolution (#1833). Its presence, not `slotLevel`'s, is what routes the
+    // op through castSpellForResolutionInTx: a cantrip cast has no slotLevel
+    // but still needs entryId so concentration/buff side effects apply.
+    entryId: z.string().min(1).optional(),
+    // Where a cast's rolled effect lands: the caster's own HP, or a consenting
+    // ally's sheet (heal only, #462) — mirrors castSpellOpSchema's own `apply`
+    // (routes/character/spellcasting.ts) exactly. Never set for a damage
+    // resolution: there is no target/enemy model (self-or-announce, CLAUDE.md),
+    // so a damage spell's effect is announced only, never auto-applied.
+    apply: z
+      .object({
+        target: z.union([z.literal("self"), z.object({ characterId: z.string().min(1) })]),
+        kind: z.enum(["heal", "damage"]),
+        amount: z.number().int().positive(),
+      })
+      .optional(),
+    // 2014 Assassin Assassinate (#1526) — see ResolveActionEventData.assassinate
+    // (shared-types) for the full contract. Wire-shape consistency only here
+    // (assassinate ⇒ verdict crit); ELIGIBILITY (is this character even a 2014
+    // Assassin L3+) needs the character row, so that check lives in
+    // resolve-action.ts's applyOp, not this schema.
+    assassinate: z.boolean().optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.assassinate && val.toHit?.verdict !== "crit") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["assassinate"],
+        message: "assassinate requires toHit.verdict to be crit",
+      });
+    }
+  });
 
 export type ResolveActionOperation = z.infer<typeof resolveActionOperationSchema>;
 

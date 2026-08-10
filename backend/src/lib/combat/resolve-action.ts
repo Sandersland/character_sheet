@@ -32,6 +32,8 @@ import {
 import { castSpellForResolutionInTx, loadSlotPayContext } from "@/lib/spellcasting/spellcasting.js";
 import { snapshotSpellcasting } from "@/lib/spellcasting/spell-state.js";
 import { recordTurnSpellCast } from "@/lib/session/sessions.js";
+import { assassinateEligible } from "@/lib/classes/assassinate.js";
+import { editionOf } from "@/lib/rules/edition.js";
 import {
   resolveActionRequestOperationSchema,
   type ResolveActionOperation,
@@ -40,11 +42,32 @@ import {
 import { writeStandaloneRollEvent } from "./standalone-roll-op.js";
 import type { CastSpellOperation } from "@character-sheet/shared-types";
 
+const RESOLVE_ACTION_SELECT = {
+  id: true,
+  rulesEdition: true,
+  classEntries: {
+    select: { name: true, level: true, subclass: true, subclassRef: { select: { slug: true } } },
+  },
+} satisfies Prisma.CharacterSelect;
+
+type ResolveActionRow = Prisma.CharacterGetPayload<{ select: typeof RESOLVE_ACTION_SELECT }>;
+
 export { resolveActionRequestOperationSchema, type ResolveActionRequestOperation };
 
 // status → the 400 the central `errorHandler` maps (client op-validation error).
 export class InvalidResolveActionOperationError extends Error {
   status = 400;
+}
+
+// Assassinate's eligibility gate (#1526): the character row is already
+// widened to carry classEntries/rulesEdition for this, so the check costs no
+// extra query. Self-or-announce (CLAUDE.md) still means the server never
+// computes the crit itself — it only gates WHO may assert one via this flag.
+function assertAssassinateEligible(row: ResolveActionRow, op: ResolveActionOperation): void {
+  if (!op.assassinate) return;
+  if (!assassinateEligible(row.classEntries, editionOf(row))) {
+    throw new InvalidResolveActionOperationError("Only a 2014 Assassin at class level 3+ may declare Assassinate");
+  }
 }
 
 // Pays the op's `slotLevel` (if any) against the character's own slot/arcanum
@@ -201,15 +224,17 @@ export async function applyResolveActionOperations(
   casterUserId: string,
 ): Promise<void> {
   await runCharacterTransaction(characterId, operations, {
-    select: { id: true },
+    select: RESOLVE_ACTION_SELECT,
     notFound: (id) => new InvalidResolveActionOperationError(`Character not found: ${id}`),
-    applyOp: async ({ tx, op, characterId: id, batchId, sessionId }) => {
+    applyOp: async ({ tx, row, op, characterId: id, batchId, sessionId }) => {
       // Standalone player roll (#1861): a check/save/initiative or tally-damage
       // roll — no combat cost/side-effects, just its own roll-category event.
       if (op.type === "logRoll") {
         await writeStandaloneRollEvent(tx, id, batchId, sessionId, op);
         return;
       }
+
+      assertAssassinateEligible(row, op);
 
       const { before, after, spellCast } = await payActionCostAndSideEffectsInTx(tx, id, batchId, sessionId, casterUserId, op);
 
@@ -240,6 +265,10 @@ export async function applyResolveActionOperations(
           // buff/apply side effects it triggered already logged their own
           // events with their own before/after under this same batch).
           entryId: op.entryId ?? null,
+          // 2014 Assassinate attribution (#1526) — always a boolean (never
+          // undefined) so the feed can distinguish "not Assassinate" from
+          // "old event predates this field", same convention as `riders`.
+          assassinate: op.assassinate ?? false,
         },
         batchId,
         sessionId,

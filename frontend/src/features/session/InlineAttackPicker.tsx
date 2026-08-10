@@ -59,6 +59,7 @@ import ManeuversDisclosure from "@/features/session/ManeuversDisclosure";
 import SneakAttackSection from "@/features/session/SneakAttackSection";
 import StunningStrikeSection from "@/features/session/StunningStrikeSection";
 import QuiveringPalmSection from "@/features/session/QuiveringPalmSection";
+import AssassinateSection from "@/features/session/AssassinateSection";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { Character } from "@/types/character";
@@ -250,12 +251,18 @@ function guardResolutionView(view: ResolutionView): ResolutionView {
 // swing's resolveAction op at commit — `clearRiders` resets it after every
 // commit so a rider rolled on swing 1 of an Extra Attack sequence never rides
 // along into swing 2's op.
+//
+// `assassinateSurprised` (#1526) follows the SAME per-swing lifecycle as
+// `riderEffects` — cleared in `onCommitted`, never carried into the next
+// Extra Attack swing — so a later, non-toggled swing starts unchecked (AC:
+// "changes only that swing").
 function usePickerLocalState(initialSelectedId: string, turnState: TurnState) {
   const [state, setState] = useState(() => ({
     attackMode: "normal" as RollMode,
     riderEffects: {} as Record<string, ResolveActionEventEffect>,
     selectedId: initialSelectedId,
     completedSwings: turnState.attack?.used ?? 0,
+    assassinateSurprised: false,
   }));
   return {
     ...state,
@@ -265,6 +272,8 @@ function usePickerLocalState(initialSelectedId: string, turnState: TurnState) {
     clearRiders: () => setState((s) => ({ ...s, riderEffects: {} })),
     setSelectedId: (selectedId: string) => setState((s) => ({ ...s, selectedId })),
     recordSwingComplete: () => setState((s) => ({ ...s, completedSwings: s.completedSwings + 1 })),
+    setAssassinateSurprised: (assassinateSurprised: boolean) => setState((s) => ({ ...s, assassinateSurprised })),
+    clearAssassinateSurprised: () => setState((s) => ({ ...s, assassinateSurprised: false })),
   };
 }
 
@@ -316,10 +325,17 @@ export default function InlineAttackPicker({
     onCommitted: () => {
       local.recordSwingComplete();
       local.clearRiders();
+      local.clearAssassinateSurprised();
     },
   });
+  // Only true when the toggle was actually checked AND it's what this swing's
+  // hit resolved to — a box checked after "it Missed" already settled the
+  // verdict (AssassinateSection's own onCallCrit effect no-ops on a miss)
+  // must NOT send `assassinate: true` on a non-crit op (the server's own
+  // schema requires toHit.verdict === "crit" whenever it's set).
   function handleCommit(rolls: ResolutionRolls) {
-    commit(resolution, rolls, local.riderEffects);
+    const assassinate = local.assassinateSurprised && rolls.toHit?.verdict === "crit";
+    commit(resolution, rolls, local.riderEffects, assassinate);
   }
 
   const { view: rawResolutionView, reset } = useResolution({
@@ -399,6 +415,18 @@ export default function InlineAttackPicker({
   const quiveringPalm = (
     <QuiveringPalmSection turnState={turnState} currentRow={currentRow} />
   );
+  // Assassinate (#1526): mounted unconditionally like Quivering Palm — the
+  // player may declare surprise before OR after rolling to hit, so it isn't
+  // gated on currentRow the way SneakAttack/StunningStrike are (those roll
+  // extra dice that need a bound hit row to fold into; this only flips the
+  // SAME swing's own verdict). The section itself gates on character.assassinate.
+  const assassinate = (
+    <AssassinateSection
+      resolutionView={resolutionView}
+      surprised={local.assassinateSurprised}
+      onSurprisedChange={local.setAssassinateSurprised}
+    />
+  );
   const damageRiders = (
     <DamageRidersPanel
       resolutionView={resolutionView}
@@ -461,6 +489,7 @@ export default function InlineAttackPicker({
         {maneuversDisclosure}
         {sneakAttack}
         {stunningStrike}
+        {assassinate}
         {quiveringPalm}
         {footer}
       </div>
@@ -480,6 +509,7 @@ export default function InlineAttackPicker({
         {maneuversDisclosure}
         {sneakAttack}
         {stunningStrike}
+        {assassinate}
         {quiveringPalm}
       </div>
     </div>
