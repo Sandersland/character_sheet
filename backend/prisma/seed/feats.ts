@@ -43,6 +43,10 @@ export interface FeatSeed {
   // Omitted = shared (NULL column, valid in both editions, #1306). Only a feat
   // that mechanically diverges between editions sets this.
   edition?: SeedEdition;
+  // Class-name scope (#1495): omitted/[] = any class with the feature may take
+  // it. Only the six 2014 Fighting Style rows set this (PHB'14's per-class
+  // subset) — read through fightingStyleFeatOfferedForClasses (lib/srd/feats.ts).
+  classes?: string[];
 }
 
 const ALL_ABILITIES = ["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"];
@@ -168,15 +172,16 @@ export const FEATS: FeatSeed[] = [
 
   // ── 2014 Fighting Style feats (PHB'14 p. 72 Fighter / p. 82 Paladin / p. 91
   // Ranger, = SRD 5.1) — #1311. A Fighting Style is per-class in 2014 (Fighter
-  // gets all six; Paladin/Ranger get a four-style subset each), but the
-  // per-class option gating is #1495's scope, not this one — every 2014 class
-  // with the feature is offered all six rows here until that lands. Dueling
-  // and Protection have no SRD 5.2 counterpart, so they exist only as
-  // EDITION_2014 rows. Archery/Defense/Two-Weapon Fighting carry the same
-  // improvement as their 2024 sibling (the derived effect is identical; only
-  // the transcribed wording differs) — Great Weapon Fighting's reroll and
-  // Protection's imposed-disadvantage-on-another-creature's-roll stay
-  // descriptive (self-or-announce; GWF also untracked in 2024 above).
+  // gets all six; Paladin gets Defense/Dueling/Great Weapon Fighting/
+  // Protection; Ranger gets Archery/Defense/Dueling/Two-Weapon Fighting) —
+  // `classes` encodes exactly that subset (#1495), read through
+  // fightingStyleFeatOfferedForClasses. Dueling and Protection have no SRD 5.2
+  // counterpart, so they exist only as EDITION_2014 rows. Archery/Defense/
+  // Two-Weapon Fighting carry the same improvement as their 2024 sibling (the
+  // derived effect is identical; only the transcribed wording differs) —
+  // Great Weapon Fighting's reroll and Protection's imposed-disadvantage-on-
+  // another-creature's-roll stay descriptive (self-or-announce; GWF also
+  // untracked in 2024 above).
   {
     name: "Archery",
     description: "You gain a +2 bonus to attack rolls you make with ranged weapons.",
@@ -184,6 +189,7 @@ export const FEATS: FeatSeed[] = [
     prerequisite: "Fighting Style feature",
     improvements: [{ target: "rangedAttackRoll", amount: 2 }],
     edition: "EDITION_2014",
+    classes: ["Fighter", "Ranger"],
   },
   {
     name: "Defense",
@@ -192,6 +198,7 @@ export const FEATS: FeatSeed[] = [
     prerequisite: "Fighting Style feature",
     improvements: [{ target: "armorClassWhileArmored", amount: 1 }],
     edition: "EDITION_2014",
+    classes: ["Fighter", "Paladin", "Ranger"],
   },
   {
     name: "Dueling",
@@ -200,6 +207,7 @@ export const FEATS: FeatSeed[] = [
     category: "fighting_style",
     prerequisite: "Fighting Style feature",
     edition: "EDITION_2014",
+    classes: ["Fighter", "Paladin", "Ranger"],
   },
   {
     name: "Great Weapon Fighting",
@@ -208,6 +216,7 @@ export const FEATS: FeatSeed[] = [
     category: "fighting_style",
     prerequisite: "Fighting Style feature",
     edition: "EDITION_2014",
+    classes: ["Fighter", "Paladin"],
   },
   {
     name: "Protection",
@@ -216,6 +225,7 @@ export const FEATS: FeatSeed[] = [
     category: "fighting_style",
     prerequisite: "Fighting Style feature",
     edition: "EDITION_2014",
+    classes: ["Fighter", "Paladin"],
   },
   {
     name: "Two-Weapon Fighting",
@@ -225,6 +235,7 @@ export const FEATS: FeatSeed[] = [
     prerequisite: "Fighting Style feature",
     improvements: [{ target: "offhandAbilityDamage", amount: 1 }],
     edition: "EDITION_2014",
+    classes: ["Fighter", "Ranger"],
   },
 
   // ── 2014 catalog: General / Origin feats (PHB'14 pp. 165-170) — #1310 ───────

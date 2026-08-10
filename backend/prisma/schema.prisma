@@ -1586,6 +1586,16 @@ model Feat {
   // name are still rejected — see resolveEditionRow, the single place the
   // exact/NULL fallback ordering is expressed.
   edition           RulesEdition?
+  // Class-name scope (#1495): [] = any class with the feature may take this
+  // feat (2024's Fighting Style feats, and every non-fighting_style feat).
+  // Non-empty restricts it to those classes, matched case-insensitively —
+  // PHB'14's per-class Fighting Style subset (Fighter all six; Paladin
+  // Defense/Dueling/Great Weapon Fighting/Protection; Ranger
+  // Archery/Defense/Dueling/Two-Weapon Fighting). Read through
+  // fightingStyleFeatOfferedForClasses (lib/srd/feats.ts), the one
+  // edition-parameterized rule function — never a second column and never
+  // `=== "EDITION_…"` (subclassGateLevel precedent, #1527).
+  classes           String[]      @default([])
 
   // Backgrounds that grant this feat as their Origin feat (PHB'24).
   originForBackgrounds Background[]

@@ -152,6 +152,32 @@ describe("ChoiceStep", () => {
     });
   });
 
+  // #1495: the picker's class-name scope is the union of the character's
+  // OWN classes plus the level-up target's className (a brand-new multiclass
+  // entry isn't on character.classes yet) — both must reach fetchFeats so the
+  // server can apply fightingStyleFeatOfferedForClasses.
+  it("forwards the character's classes plus the target's className to fetchFeats' class gate", async () => {
+    const character = {
+      rulesEdition: "EDITION_2014",
+      classes: [{ id: "entry-0", name: "Fighter", level: 1 }],
+      resources: {},
+      advancements: [],
+    } as unknown as Character;
+    const planWithPaladinTarget: LevelUpPlanResponse = {
+      target: { className: "Paladin", subclass: null, newLevel: 2, isPrimary: true },
+      steps: [],
+      grantedSpells: [],
+    };
+    render(
+      <Harness step={{ kind: "fightingStyleFeat" }} character={character} plan={planWithPaladinTarget} />,
+    );
+
+    await screen.findByText("Archery");
+    await waitFor(() =>
+      expect(vi.mocked(fetchFeats)).toHaveBeenCalledWith("EDITION_2014", undefined, ["Fighter", "Paladin"]),
+    );
+  });
+
   it("has no axe violations once loaded", async () => {
     const { container } = render(<Harness step={{ kind: "maneuvers", count: 2 }} />);
     await screen.findByText("Riposte");

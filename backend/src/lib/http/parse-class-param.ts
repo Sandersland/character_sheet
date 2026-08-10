@@ -51,6 +51,35 @@ export function parseSubclassIdParam(
 }
 
 /**
+ * Parse the OPTIONAL `?classes=` query param for the feat catalog (#1495) — a
+ * comma-separated list of class names, used to gate the offered Fighting
+ * Style set via fightingStyleFeatOfferedForClasses (lib/srd/feats.ts).
+ * Absent is success (no filtering — every non-fighting_style Feat.classes is
+ * always `[]`, unrestricted, so omitting it changes nothing for those rows).
+ *
+ * Unlike parseClassFilterOr400 above, no lowercasing happens here:
+ * Feat.classes is matched case-insensitively downstream by the rule
+ * function itself, not by a stored-lowercase convention like SpellClass.className.
+ */
+export function parseClassesParam(
+  req: Pick<Request, "query">,
+  res: Response,
+): { ok: true; classNames?: string[] } | { ok: false } {
+  const raw = req.query.classes;
+  if (raw === undefined) return { ok: true };
+  if (typeof raw !== "string" || raw.trim() === "") {
+    res.status(400).json({ error: "Invalid classes: must be a non-empty comma-separated class name list" });
+    return { ok: false };
+  }
+  const classNames = raw.split(",").map((c) => c.trim()).filter((c) => c.length > 0);
+  if (classNames.length === 0) {
+    res.status(400).json({ error: "Invalid classes: must be a non-empty comma-separated class name list" });
+    return { ok: false };
+  }
+  return { ok: true, classNames };
+}
+
+/**
  * Parse the OPTIONAL `?characterId=` query param for the spell catalog
  * (#1811, epic #1795 9/9) — gives GET /api/spells campaign context so a spell
  * shared/granted into that character's campaign, or a DM's CAMPAIGN override,

@@ -24,12 +24,14 @@ function useChoiceOptions(
   config: ChoiceKindConfig | undefined,
   targetLevel: number,
   edition: RulesEdition,
+  classNames: string[],
 ): {
   options: ChoiceOption[] | null;
   loadError: boolean;
 } {
   const [options, setOptions] = useState<ChoiceOption[] | null>(null);
   const [loadError, setLoadError] = useState(false);
+  const classNamesKey = classNames.join(",");
 
   useEffect(() => {
     if (!config) return;
@@ -37,7 +39,7 @@ function useChoiceOptions(
     setOptions(null);
     setLoadError(false);
     config
-      .loadOptions({ targetLevel, edition })
+      .loadOptions({ targetLevel, edition, classNames })
       .then((opts) => {
         if (!ignore) setOptions(opts);
       })
@@ -47,7 +49,8 @@ function useChoiceOptions(
     return () => {
       ignore = true;
     };
-  }, [config, targetLevel, edition]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- classNamesKey is the real dependency signal; classNames is a fresh array each render (see useChoiceCatalog's useMemo, and #1495's useFeatCatalog for the same pattern)
+  }, [config, targetLevel, edition, classNamesKey]);
 
   return { options, loadError };
 }
@@ -70,8 +73,17 @@ export function useChoiceCatalog(
   config: ChoiceKindConfig | undefined,
   character: Character,
   targetLevel: number,
+  targetClassName: string,
 ): ChoiceCatalog {
-  const { options, loadError } = useChoiceOptions(config, targetLevel, character.rulesEdition);
+  // #1495: the union of the character's existing classes plus the level-up
+  // target's own className (which may be a brand-new multiclass entry not
+  // yet on `character.classes`) — fed to fightingStyleFeat's class gate.
+  // Other kinds ignore it.
+  const classNames = useMemo(
+    () => Array.from(new Set([...(character.classes ?? []).map((c) => c.name), targetClassName])),
+    [character.classes, targetClassName],
+  );
+  const { options, loadError } = useChoiceOptions(config, targetLevel, character.rulesEdition, classNames);
   const showSpinner = useDelayedFlag(options === null && !loadError);
   const [search, setSearch] = useState("");
   useEffect(() => setSearch(""), [config]);

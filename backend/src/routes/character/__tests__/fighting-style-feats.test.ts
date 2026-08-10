@@ -142,3 +142,70 @@ describe("Defense Fighting Style feat", () => {
     expect(after.armorClass).toBe(before.armorClass);
   });
 });
+
+/**
+ * PHB'14 per-class Fighting Style subset (#1495) — hard enforcement at the
+ * write path, not just the picker: resolveCatalogFeat rejects a fightingStyle
+ * takeFeat op for a style the character's class(es) don't offer, even if the
+ * caller bypasses the GET /api/feats?classes= filter entirely. Runs against
+ * the REAL SEEDED 2014 catalog (backend/prisma/seed/feats.ts), a second
+ * fixture character (a Ranger) alongside this file's Fighter fixture above.
+ */
+describe("Fighting Style class gate — write path (#1495)", () => {
+  const RANGER_OWNER_ID = "owner-fs-feats-ranger";
+  const RANGER_FIXTURE_ID = "test-fs-feats-ranger";
+  let rangerCookie: string;
+  let rangerClassId: string;
+  let greatWeaponFighting2014Id: string;
+  let archery2014Id: string;
+
+  const rangerAdvUrl = `/api/characters/${RANGER_FIXTURE_ID}/advancement/transactions`;
+  const takeRangerStyle = (featId: string) =>
+    supertest.agent(app).set("Cookie", rangerCookie).post(rangerAdvUrl).send({
+      operations: [{ type: "takeFeat", featId, slot: "fightingStyle" }],
+    });
+
+  beforeAll(async () => {
+    rangerClassId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Ranger" }, select: { id: true } })).id;
+    greatWeaponFighting2014Id = (
+      await prisma.feat.findFirstOrThrow({ where: { name: "Great Weapon Fighting", edition: "EDITION_2014" }, select: { id: true } })
+    ).id;
+    archery2014Id = (
+      await prisma.feat.findFirstOrThrow({ where: { name: "Archery", edition: "EDITION_2014" }, select: { id: true } })
+    ).id;
+  });
+
+  beforeEach(async () => {
+    await ensureTestOwner(RANGER_OWNER_ID);
+    rangerCookie = await authCookie(RANGER_OWNER_ID);
+    await prisma.character.create({
+      data: {
+        id: RANGER_FIXTURE_ID, name: "FS Class Gate Fixture", alignment: "True Neutral",
+        ownerId: RANGER_OWNER_ID, experiencePoints: L5_XP, initiativeBonus: 3, speed: 30,
+        rulesEdition: "EDITION_2014",
+        hitPoints: { current: 44, max: 44, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 5, die: "d10", spent: 0 },
+        abilityScores: { strength: 16, dexterity: 16, constitution: 14, intelligence: 10, wisdom: 10, charisma: 10 },
+        savingThrowProficiencies: [], skills: [], toolProficiencies: [],
+        currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
+        spellcasting: Prisma.JsonNull,
+        classEntries: { create: [{ position: 0, name: "Ranger", classId: rangerClassId, level: 5 }] },
+      },
+    });
+  });
+
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { id: RANGER_FIXTURE_ID } });
+  });
+
+  it("rejects Great Weapon Fighting (Fighter/Paladin-only) for a 2014 Ranger", async () => {
+    const res = await takeRangerStyle(greatWeaponFighting2014Id);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/not an offered Fighting Style/);
+  });
+
+  it("accepts Archery (in the Ranger subset) for a 2014 Ranger", async () => {
+    const res = await takeRangerStyle(archery2014Id);
+    expect(res.status).toBe(200);
+  });
+});

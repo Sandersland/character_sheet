@@ -34,7 +34,7 @@ import {
   type ResourcesMutableState,
 } from "@/lib/classes/resources.js";
 import { characterAdvancementSlots, abilityModifier, characterFightingStyleFeatSlots, deriveFeatBonuses } from "@/lib/srd/srd.js";
-import { featOfferedForAsiSlot, type FeatCategory } from "@/lib/srd/feats.js";
+import { featOfferedForAsiSlot, fightingStyleFeatOfferedForClasses, type FeatCategory } from "@/lib/srd/feats.js";
 import { effectiveMaxHitPoints, normalizeHitPoints, normalizeHitDice, type HitPoints, type HitDice } from "@/lib/combat/hitpoints.js";
 import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
 import { draconicResilienceMaxHpTerm } from "@/lib/classes/draconic-bloodline.js";
@@ -183,6 +183,15 @@ interface AdvancementOpContext {
   totalSlots: number;
   /** Fighting Style feat cap across all class entries (#1137). */
   fightingStyleSlotTotal: number;
+  /**
+   * Names of class entries that grant the Fighting Style feature (#1495) —
+   * `class.fightingStyleFeatLevel != null` — fed to
+   * fightingStyleFeatOfferedForClasses so a multiclass character's offered
+   * set is the union across every style-granting entry, not just the
+   * primary. `[]` for a homebrew-only character, which offers unrestricted
+   * (empty-classes) rows only under the 2014 branch and everything under 2024.
+   */
+  fightingStyleClassNames: string[];
   /** This character's edition — gates a client-supplied featId (#1345). */
   edition: RulesEdition;
 }
@@ -283,6 +292,7 @@ function resolveHalfFeatBump(args: {
 }
 
 /** Validates a takeAsi op's increases (count, sum, ability names, per-ability cap). */
+// fallow-ignore-next-line complexity -- pre-existing guard-clause validator, untouched by and out of scope for #1495
 function validateAsiIncreases(op: TakeAsiOperation, scores: Record<string, number>): void {
   if (!op.increases || op.increases.length === 0 || op.increases.length > 2) {
     throw new InvalidAdvancementOperationError(
@@ -360,6 +370,48 @@ interface ResolvedFeat {
   abilityDeltas: Record<string, number>;
 }
 
+// Slot eligibility for a catalog feat (#1137/#1310/#1495): a fightingStyle-slot
+// op must be a fighting_style feat offered to one of the character's
+// style-granting classes; an ASI-slot op must satisfy featOfferedForAsiSlot at
+// `level`. Split out of resolveCatalogFeat so that function's own branching
+// stays around the fetch/cross-edition/half-feat-resolution steps, not this
+// block's two independent throw-shaped rules.
+function assertFeatSlotEligible(
+  catalogFeat: { name: string; category: FeatCategory; classes: readonly string[]; levelPrerequisite: number | null },
+  isFightingStyleSlot: boolean,
+  level: number,
+  edition: RulesEdition,
+  fightingStyleClassNames: readonly string[],
+): void {
+  if (isFightingStyleSlot) {
+    // The fightingStyle slot (#1137) takes only fighting_style feats — never a
+    // General/Origin/Epic Boon feat routed through it.
+    if (catalogFeat.category !== "fighting_style") {
+      throw new InvalidAdvancementOperationError(
+        `takeFeat: "${catalogFeat.name}" (${catalogFeat.category}) is not a Fighting Style feat`,
+      );
+    }
+    // Hard enforcement (#1495): PHB'14's per-class subset applies at the write
+    // path too, not just the GET /api/feats?classes= picker filter — a client
+    // can't originate the rule, so a non-conforming pick 400s here even if the
+    // caller bypassed the query param entirely.
+    if (!fightingStyleFeatOfferedForClasses(catalogFeat, fightingStyleClassNames, edition)) {
+      throw new InvalidAdvancementOperationError(
+        `takeFeat: "${catalogFeat.name}" is not an offered Fighting Style for ${fightingStyleClassNames.join("/") || "this character"}`,
+      );
+    }
+    return;
+  }
+  // Edition-invariant (#1310): only General/Epic Boon feats the character's
+  // level satisfies may be taken via an ASI slot — Origin (backgrounds) and
+  // Fighting Style (class) can't, in either edition.
+  if (!featOfferedForAsiSlot(catalogFeat, level)) {
+    throw new InvalidAdvancementOperationError(
+      `takeFeat: "${catalogFeat.name}" (${catalogFeat.category}) is not available at level ${level}`,
+    );
+  }
+}
+
 async function resolveCatalogFeat(
   tx: Prisma.TransactionClient,
   op: TakeFeatOperation,
@@ -367,6 +419,7 @@ async function resolveCatalogFeat(
   level: number,
   isFightingStyleSlot: boolean,
   edition: RulesEdition,
+  fightingStyleClassNames: readonly string[],
 ): Promise<ResolvedFeat> {
   const catalogFeat = await tx.feat.findUnique({ where: { id: op.featId } });
   if (!catalogFeat) {
@@ -382,22 +435,13 @@ async function resolveCatalogFeat(
   const mismatch = crossEditionRejection(catalogFeat, `Feat "${catalogFeat.name}"`, edition);
   if (mismatch) throw new InvalidAdvancementOperationError(`takeFeat: ${mismatch}`);
   const category = catalogFeat.category as FeatCategory;
-  if (isFightingStyleSlot) {
-    // The fightingStyle slot (#1137) takes only fighting_style feats — never a
-    // General/Origin/Epic Boon feat routed through it.
-    if (category !== "fighting_style") {
-      throw new InvalidAdvancementOperationError(
-        `takeFeat: "${catalogFeat.name}" (${category}) is not a Fighting Style feat`,
-      );
-    }
-  } else if (!featOfferedForAsiSlot({ category, levelPrerequisite: catalogFeat.levelPrerequisite }, level)) {
-    // Edition-invariant (#1310): only General/Epic Boon feats the character's
-    // level satisfies may be taken via an ASI slot — Origin (backgrounds) and
-    // Fighting Style (class) can't, in either edition.
-    throw new InvalidAdvancementOperationError(
-      `takeFeat: "${catalogFeat.name}" (${category}) is not available at level ${level}`,
-    );
-  }
+  assertFeatSlotEligible(
+    { name: catalogFeat.name, category, classes: catalogFeat.classes, levelPrerequisite: catalogFeat.levelPrerequisite },
+    isFightingStyleSlot,
+    level,
+    edition,
+    fightingStyleClassNames,
+  );
   return {
     featName: catalogFeat.name,
     featDescription: catalogFeat.description,
@@ -455,7 +499,7 @@ async function applyTakeFeat(ctx: AdvancementOpContext, op: TakeFeatOperation): 
 
   const { featName, featDescription, featId: resolvedFeatId, improvements: featImprovements, abilityDeltas } =
     op.featId
-      ? await resolveCatalogFeat(tx, op, scores, level, isFightingStyleSlot, ctx.edition)
+      ? await resolveCatalogFeat(tx, op, scores, level, isFightingStyleSlot, ctx.edition, ctx.fightingStyleClassNames)
       : resolveCustomFeat(op, scores);
 
   // A character can't hold the same Fighting Style twice (#1137) — dedup by
@@ -628,6 +672,12 @@ export async function applyAdvancementOpInTx(
     level,
     totalSlots: characterAdvancementSlots(character.classEntries, level),
     fightingStyleSlotTotal: characterFightingStyleFeatSlots(character.classEntries, level),
+    // #1495: only entries that actually grant the Fighting Style feature feed
+    // the class-scope union — a non-granting multiclass entry (e.g. a Wizard
+    // dip) must not widen the offered set.
+    fightingStyleClassNames: character.classEntries
+      .filter((e) => e.class?.fightingStyleFeatLevel != null)
+      .map((e) => e.name),
     edition: editionOf(character),
   };
 

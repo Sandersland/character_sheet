@@ -33,11 +33,14 @@ const FS_CATALOG = [
 
 // A fighter with a Fighting Style slot partition (#1137). `taken` are the
 // fightingStyle-slot advancements; `used` derives from their count by default.
+// `classes` (#1495) carries the real ClassEntry[] wire shape — the class-name
+// scope FightingStyleFeatSection forwards to fetchFeats' class gate.
 function makeFighter(opts: { total: number; taken?: AdvancementEntry[] }): Character {
   const taken = opts.taken ?? [];
   return {
     id: "char-1",
     class: "Fighter",
+    classes: [{ id: "ce-1", name: "Fighter", level: 5, needsSubclass: false, subclassMismatch: false }],
     rulesEdition: "EDITION_2014",
     level: 5,
     fightingStyleSlots: { total: opts.total, used: taken.length },
@@ -78,8 +81,10 @@ describe("ClassFeaturesSection — Fighting Style", () => {
 
     await user.click(screen.getByRole("button", { name: /choose a fighting style/i }));
     // No asiLevel (#1438): the server's ASI gate rejects every fighting_style row,
-    // so a level here would render this picker permanently empty.
-    expect(client.fetchFeats).toHaveBeenCalledWith("EDITION_2014", undefined);
+    // so a level here would render this picker permanently empty. classNames
+    // (#1495) forwards the character's own class(es) for the server-side
+    // per-class subset gate.
+    expect(client.fetchFeats).toHaveBeenCalledWith("EDITION_2014", undefined, ["Fighter"]);
     // A general-category feat must not leak into the fighting-style picker.
     expect(await screen.findByText("Archery")).toBeInTheDocument();
     expect(screen.queryByText("Sentinel")).not.toBeInTheDocument();
