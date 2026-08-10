@@ -563,6 +563,14 @@ async function resetAllTurnSpellCasts(tx: Prisma.TransactionClient, sessionId: s
  * action/bonus economy, so it is not recorded. `kind` is leveled iff a slot was
  * spent (a cantrip has no slotLevel) — the only distinction the interlock reads.
  *
+ * The interlock is a per-turn/combat concept: it is cleared at turn boundaries
+ * (startTurn/round advance), and OUT of combat there are no turn boundaries to
+ * clear it, so a record written while `combatActive` is false would linger and
+ * serve a spurious `bonusActionLimitedToCantrips` block until combat next starts
+ * (#1875 review). So this is a no-op unless the session's combat is active —
+ * read from the session inside this same transaction so it stays consistent with
+ * the participant write below.
+ *
  * A cantrip write must NOT downgrade an existing `leveled` record for the same
  * economy slot this turn (#1439 review): under Action Surge a leveled Action
  * spell then a cantrip both cost the Action, and the cantrip must not lift the
@@ -577,6 +585,8 @@ export async function recordTurnSpellCast(
   kind: SpellCastKind,
 ): Promise<void> {
   if (economy === "reaction") return;
+  const session = await tx.session.findUnique({ where: { id: sessionId }, select: { combatActive: true } });
+  if (session == null || !session.combatActive) return;
   if (economy === "action") {
     await tx.sessionParticipant.updateMany({
       // A cantrip may write over null (initial) or an existing cantrip, but NOT

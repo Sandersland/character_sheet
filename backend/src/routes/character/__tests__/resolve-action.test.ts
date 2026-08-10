@@ -638,6 +638,25 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     expect(res.body.spellEconomy).toEqual(NONE);
   });
 
+  // #1875 review finding 1: the interlock is a per-turn/COMBAT concept — out of
+  // combat there are no turn boundaries to clear it, so a leveled cast while
+  // combatActive=false must NOT record the interlock (else the block would
+  // linger until startCombat/round advance). A solo session starts with combat
+  // inactive.
+  it("a leveled Action cast out of combat (combatActive=false) records no interlock", async () => {
+    const { id: sid } = await startSoloSession(FIXTURE_ID);
+    const cast = await post([concentrationCastOp(CONCENTRATION_SPELL_A.id, "cast-action")]);
+    expect(cast.status).toBe(200);
+
+    const participant = await prisma.sessionParticipant.findFirstOrThrow({
+      where: { sessionId: sid, characterId: FIXTURE_ID },
+      select: { spellCastAsAction: true, spellCastAsBonus: true },
+    });
+    expect(participant.spellCastAsAction).toBeNull();
+    expect(participant.spellCastAsBonus).toBeNull();
+    expect((await combatGet(sid)).body.spellEconomy).toEqual(NONE);
+  });
+
   it("a leveled Action spell limits bonus casting to cantrips (2024), and it survives a re-read (#1439)", async () => {
     const { id: sid } = await startSoloSession(FIXTURE_ID);
     expect((await combatStart(sid)).body.spellEconomy).toEqual(NONE);
