@@ -357,15 +357,6 @@ async function revertClassEvent(ctx: RevertContext): Promise<void> {
   return revertSubclassChange(ctx);
 }
 
-// resolveAction (#1829): the only combat-category event that carries a
-// `before` snapshot — combatStarted/combatEnded/combatRoundAdvanced carry
-// none, so they never reach this handler (reverseEvent's `if (!before)
-// return` guard runs first). A resolution's cost is either a spent spell
-// slot (spellcasting) or, in a future slice, a class resource pool — restore
-// whichever column its before snapshot carries, identical in shape to
-// revertSpellcastingEvent/revertResourcesEvent. A cantrip/weapon resolution
-// snapshots neither column, so this is a no-op for it — the batch is still
-// marked reverted by applyBatchReversal regardless.
 // Lift the per-turn bonus-action interlock a reverted spell cast recorded
 // (#1439 review) — the SessionParticipant field the resolveAction transaction
 // set (recordTurnSpellCast) is not part of the event's character `before`/
@@ -415,6 +406,15 @@ async function clearRevertedSpellCastInterlock(
   });
 }
 
+// resolveAction (#1829): the only combat-category event that carries a
+// `before` snapshot — combatStarted/combatEnded/combatRoundAdvanced carry
+// none, so they never reach this handler (reverseEvent's `if (!before)
+// return` guard runs first). A resolution's cost is either a spent spell
+// slot (spellcasting) or, in a future slice, a class resource pool — restore
+// whichever column its before snapshot carries, identical in shape to
+// revertSpellcastingEvent/revertResourcesEvent. A cantrip/weapon resolution
+// snapshots neither column, so this is a no-op for it — the batch is still
+// marked reverted by applyBatchReversal regardless.
 async function revertCombatEvent(ctx: RevertContext): Promise<void> {
   const { tx, characterId, before } = ctx;
   const beforeSpellcasting = before.spellcasting as Record<string, unknown> | undefined;
