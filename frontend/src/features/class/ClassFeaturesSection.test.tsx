@@ -98,9 +98,10 @@ describe("ClassFeaturesSection — Cloak of Shadows (2024 rewrite, #1246: L11 ->
     return {
       id: "char-1",
       class: "Monk",
-      // hasCloakOfShadows is edition-gated (#1505 — the "cloakOfShadows" key
-      // collides with 2014 Way of Shadow's own free-at-L11 row, and this
-      // fixture is explicitly the 2024 rewrite per this describe block's title).
+      // "cloakOfShadows" is a same-key collision with 2014 Way of Shadow's own
+      // free-at-L11 row (#1505); this fixture is explicitly the 2024 rewrite
+      // per this describe block's title. Both editions share one wire-driven
+      // component since #1738 — the gate is now key-presence, not edition.
       rulesEdition: "EDITION_2024",
       level: cloakAvailable ? 17 : 11,
       subclass: "Warrior of Shadow",
@@ -113,7 +114,13 @@ describe("ClassFeaturesSection — Cloak of Shadows (2024 rewrite, #1246: L11 ->
       },
       // cloakOfShadows entitlement is availableActions[] presence (#1315), not a resources boolean.
       availableActions: cloakAvailable
-        ? [{ key: "cloakOfShadows", name: "Cloak of Shadows", cost: "action", enabled: true }]
+        ? [{
+            key: "cloakOfShadows",
+            name: "Cloak of Shadows",
+            cost: "action",
+            enabled: true,
+            reminder: "Magic action, entirely within dim light or darkness: spend 3 focus to become invisible…",
+          }]
         : [],
     } as unknown as Character;
   }

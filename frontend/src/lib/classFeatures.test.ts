@@ -87,8 +87,8 @@ describe("deriveClassFeatureView", () => {
           advancements: [
             { id: "fs1", slot: "fightingStyle", featId: "archery", featName: "Archery" },
           ] as unknown as Character["advancements"],
-          // shadowArts/cloakOfShadows entitlement is availableActions[] presence (#1315)
-          // gated to 2024 (#1505 — see has2024ShadowAction), not a resources boolean.
+          // shadowArts/cloakOfShadows entitlement is availableActions[] presence
+          // (#1315), edition-agnostic since #1738, not a resources boolean.
           availableActions: [
             { key: "shadowArts", name: "Shadow Arts (Darkness)", cost: "action", enabled: true },
             { key: "cloakOfShadows", name: "Cloak of Shadows", cost: "action", enabled: true },
@@ -126,14 +126,12 @@ describe("deriveClassFeatureView", () => {
     expect(view.hasElementsWarrior).toBe(false);
   });
 
-  // #1505 regression: 2014 Way of Shadow grants the SAME "shadowArts"/
-  // "cloakOfShadows" keys as 2024 Warrior of Shadow (actions.ts), but their
-  // 2024-shaped UI (hardcoded "focus" copy, single Darkness cast, always-
-  // 3-focus Cloak) is wrong for a ki-based 2014 monk and has no 2014
-  // counterpart built — hasShadowArts/hasCloakOfShadows must stay false so
-  // that mismatched panel never reaches a 2014 sheet (browser-verification-
-  // caught, like the elementalAttunement collision above).
-  it("hasShadowArts/hasCloakOfShadows are false on a 2014 character even though it carries the same action keys", () => {
+  // #1738: 2014 Way of Shadow grants the SAME "shadowArts"/"cloakOfShadows"
+  // keys as 2024 Warrior of Shadow (actions.ts) — #1505 kept both flags false
+  // on a 2014 sheet because only the 2024-shaped UI existed; now that
+  // ShadowArtsSection/CloakOfShadowsSection are wire-driven for both
+  // editions (#1738), bare key-presence is correct here too.
+  it("hasShadowArts/hasCloakOfShadows are true on a 2014 character carrying the same action keys", () => {
     const view = deriveClassFeatureView(
       makeChar({
         rulesEdition: "EDITION_2014",
@@ -144,8 +142,8 @@ describe("deriveClassFeatureView", () => {
       }),
       [fighterDef],
     );
-    expect(view.hasShadowArts).toBe(false);
-    expect(view.hasCloakOfShadows).toBe(false);
+    expect(view.hasShadowArts).toBe(true);
+    expect(view.hasCloakOfShadows).toBe(true);
   });
 
   // Positive case for hasElementsWarrior — previously untested: a wrong/renamed
