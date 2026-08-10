@@ -16,12 +16,21 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 
-import { useCombatPoll } from "@/features/session/useCombatPoll";
+import { useCombatPoll, type CombatRefresh } from "@/features/session/useCombatPoll";
 import { useLiveSession } from "@/features/session/LiveSessionProvider";
 import { useTurnState, type TurnStateView } from "@/features/session/useTurnState";
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
+import type { SpellEconomyState } from "@/types/character";
 
-const TurnStateContext = createContext<TurnStateView | null>(null);
+/**
+ * The turn state plus a manual combat resync (#1439) — `refreshCombat` pulls the
+ * server-resolved bonus-action interlock right after a cast, so the block shows
+ * without waiting for the ~5s poll. It lives on the context (not the reducer,
+ * which can't fetch) so the resolution sheet can trigger it via one read.
+ */
+export type TurnStateContextValue = TurnStateView & { refreshCombat: CombatRefresh };
+
+const TurnStateContext = createContext<TurnStateContextValue | null>(null);
 
 interface Props {
   children: ReactNode;
@@ -41,15 +50,17 @@ export function TurnStateProvider({ children }: Props) {
   // Plain arrow, not useCallback: `view` is a fresh `{ ...state, ... }` object
   // every render, so the memo never stayed stable anyway — useCombatPoll
   // already reads this through a ref on every tick, so nothing is gained by
-  // memoizing it here.
-  const onSync = (round: number, combatActive: boolean, updatedAt: string) =>
-    view?.syncCombat(round, combatActive, updatedAt);
-  useCombatPoll(character.id, sessionId, joined, onSync);
+  // memoizing it here. The synced `spellEconomy` (#1439) is the server-resolved
+  // bonus-action interlock, rebroadcast into the reducer alongside round.
+  const onSync = (round: number, combatActive: boolean, updatedAt: string, spellEconomy: SpellEconomyState) =>
+    view?.syncCombat(round, combatActive, updatedAt, spellEconomy);
+  const refreshCombat = useCombatPoll(character.id, sessionId, joined, onSync);
 
-  return <TurnStateContext.Provider value={view}>{children}</TurnStateContext.Provider>;
+  const value = view ? { ...view, refreshCombat } : null;
+  return <TurnStateContext.Provider value={value}>{children}</TurnStateContext.Provider>;
 }
 
 /** Null when there is no live joined session — callers branch on it. */
-export function useTurnStateContext(): TurnStateView | null {
+export function useTurnStateContext(): TurnStateContextValue | null {
   return useContext(TurnStateContext);
 }

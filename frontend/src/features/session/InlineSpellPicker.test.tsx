@@ -165,7 +165,7 @@ function renderPicker(character: Character, opts: RenderOpts = {}) {
         slot="action"
         slotAvailable={opts.slotAvailable ?? true}
         onCommitSlot={onCommitSlot}
-        spellCastThisTurn={{}}
+        spellEconomy={{ bonusActionBlockedByActionSpell: false, bonusActionLimitedToCantrips: false, actionLimitedToCantrips: false }}
         castingTimeFilter="1 action"
         allies={[]}
         onCastSettled={opts.onCastSettled}
@@ -206,7 +206,7 @@ describe("InlineSpellPicker — attack-roll shape (Fire Bolt)", () => {
     expect(op.slotLevel).toBeUndefined();
     expect(op.apply).toBeUndefined();
     // Deferred to the mutation's success (#1848 review fix), not synchronous.
-    await waitFor(() => expect(onCommitSlot).toHaveBeenCalledWith(0));
+    await waitFor(() => expect(onCommitSlot).toHaveBeenCalled());
   });
 });
 
@@ -280,7 +280,7 @@ describe("InlineSpellPicker — no-roll utility shape (Druidcraft)", () => {
 });
 
 describe("InlineSpellPicker — economy interlock + single spend", () => {
-  it("commits exactly once per resolution and fires onCommitSlot (deferred to mutation success) with the spell's base level", async () => {
+  it("commits exactly once per resolution and fires onCommitSlot (deferred to mutation success)", async () => {
     const user = userEvent.setup();
     const { onCommitSlot } = renderPicker(makeCharacter([DRUIDCRAFT]));
 
@@ -292,7 +292,6 @@ describe("InlineSpellPicker — economy interlock + single spend", () => {
     // onCommitSlot fires only once the mutation's promise resolves (#1848
     // review fix) — not synchronously alongside the mutate() call.
     await waitFor(() => expect(onCommitSlot).toHaveBeenCalledTimes(1));
-    expect(onCommitSlot).toHaveBeenCalledWith(0);
     // The rail's own completion button disappears once completed — no second tap possible.
     expect(screen.queryByRole("button", { name: "Resolve" })).not.toBeInTheDocument();
   });

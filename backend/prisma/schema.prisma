@@ -843,22 +843,25 @@ model ClassFeature {
   derivedStat      String?
   derivedStatTiers Json? // [{ minLevel, value }] — ASCENDING by minLevel, last-match-wins
 
-  // A closed-form save DC a subclass announces from the abilities named here
-  // (#1546): 8 + proficiency bonus + the higher of these abilities' modifiers
-  // (Battle Master maneuvers, PHB'14 p.73 / PHB'24 p.83). Genuinely generic in
-  // FORMULA — Monk's focus DC, Cleric's turn DC, Barbarian's frighten DC and
-  // Rogue's assassin DC are the same closed form hardcoded into class TS
-  // strings today — not a Fighter special case, but NOT YET a live path for
-  // any of them: deriveAnnouncedSaveDC (registry.ts's deriveRowExtras) is
-  // only ever called with subclassRows, gated on the subclass being active —
-  // a BASE-CLASS row (subclassId: null, e.g. Cleric's Turn Undead/Channel
-  // Divinity) populating this column would be read by nothing. Only Combat
-  // Superiority (a SUBCLASS row) is a genuinely live consumer today (#1225
-  // research, cleric-features.ts's own RESOURCE POOL header block) — every
-  // other class's DC stays prose in its row's own `description` until
-  // deriveAnnouncedSaveDC is generalised to base-class rows and
-  // ClassExtras.maneuverSaveDC is renamed to something non-Fighter-specific
-  // (#1589). Deliberately NOT layered
+  // A closed-form save DC a class/subclass row announces from the abilities
+  // named here (#1546): 8 + proficiency bonus + the higher of these
+  // abilities' modifiers (Battle Master maneuvers, PHB'14 p.73 / PHB'24
+  // p.83). Genuinely generic in FORMULA — Monk's focus DC, Cleric's turn DC,
+  // Barbarian's frighten DC and Rogue's assassin DC are the same closed form
+  // hardcoded into class TS strings today — not a Fighter special case, and
+  // (#1589) now a genuinely live path for a BASE-CLASS row too: registry.ts's
+  // deriveRowExtras runs over both classRows (unconditional) and an active
+  // subclass's subclassRows, feeding ClassExtras.announcedSaveDC (renamed
+  // from the Fighter-specific `maneuverSaveDC`). Still only Combat Superiority
+  // (a SUBCLASS row) actually sets this column in production — Cleric's Turn
+  // Undead/Channel Divinity deliberately still don't (cleric-features.ts's own
+  // header): `announcedSaveDC` stays a SINGLE scalar overlaid across every
+  // class entry (deriveEntryScopedResources), so two entries each declaring
+  // one is a real collision — registry.ts's overlay throws on it rather than
+  // silently letting one clobber the other, and Cleric already serves its own
+  // DC through a fully independent, already-correct path
+  // (channelDivinitySaveDC, lib/classes/channel-divinity.ts) with no need to
+  // risk that collision for zero consumer benefit. Deliberately NOT layered
   // onto derivedStat/derivedStatTiers: the DC is per-character ability math,
   // not a level tier, and Combat Superiority's own derivedStat slot is
   // already claimed by maneuverChoiceCount's tiers on the SAME row — one
@@ -2330,9 +2333,37 @@ model SessionParticipant {
   joinedAt    DateTime  @default(now())
   leftAt      DateTime?
   summary     Json?
+  // Per-turn spell-cast kind (#1439) — the SECOND deliberate DERIVE-DON'T-PERSIST
+  // EXCEPTION, alongside Session.combatActive/round (#1030). The 5e bonus-action
+  // spellcasting interlock (a leveled spell cast with your Action blocks a
+  // bonus-action spell; a leveled bonus-action spell limits the Action to
+  // cantrips) is a function of the TURN, not the character, so it cannot be
+  // derived from any character column. It is shared state two clients viewing
+  // this participant must agree on and that must survive a reload — which a
+  // client-only reducer cannot provide (the reason this became server state,
+  // #1439). Per-participant, not on Session: a shared field would let one PC's
+  // cast wrongly block another's. Recorded when a spell resolves (resolveAction),
+  // reset to null at every turn boundary (startCombat/endCombat/advanceCombatRound).
+  // Null = nothing of that economy kind cast this turn. The resolved interlock
+  // flags are computed from these via the one shared rule fn (spellEconomyRestrictions).
+  spellCastAsAction SpellCastKind?
+  spellCastAsBonus  SpellCastKind?
+  // Bumped on every cast-record/reset above so the combat-state payload's
+  // `updatedAt` (max of this and Session.updatedAt) advances on a
+  // participant-only change, keeping the client's monotonic sync guard correct
+  // for the interlock flags, not just for round (#1439).
+  updatedAt   DateTime  @updatedAt @default(now())
 
   @@unique([sessionId, characterId])
   @@index([sessionId])
+}
+
+// Whether the spell cast in a given economy slot this turn was a cantrip or a
+// leveled spell — the raw per-turn record behind the 5e bonus-action interlock
+// (#1439). Mirrors the client's SpellCastKind union.
+enum SpellCastKind {
+  cantrip
+  leveled
 }
 
 // kind distinguishes the two capture surfaces sharing this table: full ENTRY

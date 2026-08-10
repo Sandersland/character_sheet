@@ -332,6 +332,29 @@ describe("serializeCharacter attackRows — off-hand row (Two-Weapon Fighting)",
     expect(offHandRow(withStyle)!.damageComponents).toEqual({ abilityMod: 0, meleeDamageBonus: 0, ability: "strength" });
   });
 
+  // #1435 eligibility latch (end-to-end): the served offHandAttack row's
+  // `enabled` is the two-Light-weapon rule alone — the Two-Weapon Fighting
+  // style, present here via TWF_STYLE advancements, never enables a non-Light
+  // pair. Restores the guarantee the deleted frontend canTwoWeaponFight test held.
+  it("serves offHandAttack disabled for a non-Light pair even WITH the Two-Weapon Fighting style, but enabled for a Light pair (#1435/#1496)", async () => {
+    const nonLightPair: WeaponFixture[] = [
+      { name: "Longsword", equippedSlot: "MAIN_HAND", damageDiceFaces: 8, damageType: "slashing", light: false },
+      { name: "Longsword", equippedSlot: "OFF_HAND", damageDiceFaces: 8, damageType: "slashing", light: false },
+    ];
+    const lightPair: WeaponFixture[] = [
+      { name: "Shortsword", equippedSlot: "MAIN_HAND", damageDiceFaces: 6, damageType: "piercing", finesse: true, light: true },
+      { name: "Shortsword", equippedSlot: "OFF_HAND", damageDiceFaces: 6, damageType: "piercing", finesse: true, light: true },
+    ];
+
+    const nonLight = await serialize(await createFighter(nonLightPair, { resources: TWF_STYLE }));
+    const nonLightRow = nonLight.availableActions.find((a) => a.key === "offHandAttack");
+    expect(nonLightRow?.enabled).toBe(false);
+    expect(nonLightRow?.disabledReason).toMatch(/Light weapons/);
+
+    const light = await serialize(await createFighter(lightPair, { resources: TWF_STYLE }));
+    expect(light.availableActions.find((a) => a.key === "offHandAttack")?.enabled).toBe(true);
+  });
+
   it("keeps a negative ability modifier without the style — only a positive one is dropped", async () => {
     const id = await createFighter(
       [

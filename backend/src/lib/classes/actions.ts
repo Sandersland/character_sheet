@@ -201,6 +201,15 @@ export interface AvailableAction {
   /** Resolved damage-type clause (#1505) — see DerivedActionRecord.damageTypeClause. */
   damageTypeClause?: string;
   /**
+   * A resolved roll spec for this action (#1435) — the #1381 resolved-spec-on-a-
+   * row field (`ManeuverEntry.effect`), reused here rather than a second bespoke
+   * field. Attached by buildAvailableActionsView (serialize/classes.ts): the
+   * Deflect Attacks / Deflect Missiles base row carries its reduction spec and
+   * the redirect / throw-back row carries its own, both resolved from the monk's
+   * effective level + Dex so the client never re-derives them.
+   */
+  effect?: EffectSpec;
+  /**
    * Which inline resolution tool the client renders for this action (#1528) —
    * served only for a row-driven action (`actionsFromRows` below); a
    * DERIVED_ACTIONS row leaves this undefined, and the frontend's

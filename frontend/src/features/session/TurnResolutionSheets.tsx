@@ -17,6 +17,7 @@ import SongOfDefenseInput from "@/features/session/SongOfDefenseInput";
 import type { ActiveResolution } from "@/features/session/useActiveResolution";
 import type { LoadoutSwapControls } from "@/features/session/useLoadoutSwap";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
+import { useTurnStateContext } from "@/features/session/TurnStateProvider";
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { AllyOption } from "@/lib/spellMeta";
 
@@ -322,10 +323,18 @@ function SpellResolutionSheet({
         ? !turnState.bonusActionUsed
         : !turnState.reactionUsed;
 
-  const onCommitSlot = (spellLevel: number) => {
-    if (slot === "action") turnState.commitActionSpell(spellLevel);
-    else if (slot === "bonusAction") turnState.commitBonusActionSpell(spellLevel);
+  // refreshCombat lives on the turn-state context (not the reducer, which can't
+  // fetch) — pull it here so a successful cast re-reads the server-resolved
+  // interlock immediately (#1439), rather than waiting for the ~5s poll.
+  const refreshCombat = useTurnStateContext()?.refreshCombat;
+
+  const onCommitSlot = () => {
+    if (slot === "action") turnState.commitActionSpell();
+    else if (slot === "bonusAction") turnState.commitBonusActionSpell();
     else turnState.commitReactionSpell();
+    // The cast recorded its interlock kind server-side (resolveAction, #1439);
+    // pull the resolved flags now so the block shows without a poll wait.
+    void refreshCombat?.();
   };
 
   return (
@@ -337,7 +346,7 @@ function SpellResolutionSheet({
         slot={slot}
         slotAvailable={slotAvailable}
         onCommitSlot={onCommitSlot}
-        spellCastThisTurn={turnState.spellCastThisTurn}
+        spellEconomy={turnState.spellEconomy}
         allies={allies}
         castingTimeFilter={SPELL_CASTING_TIME[slot]}
         focusSpellId={focusSpellId}

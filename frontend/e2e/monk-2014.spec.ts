@@ -106,7 +106,7 @@ test("2014 monk live play: Flurry, Patient Defense, Step of the Wind, Deflect Mi
   await page.getByRole("button", { name: "Use Reaction" }).click();
   await page.getByRole("button", { name: "Deflect Missiles" }).click();
   await expect(page.getByText(/Deflect Missiles — reduce ranged weapon attack damage/)).toBeVisible();
-  const throwBack = page.getByRole("button", { name: /Throw back · spend 1 ki/ });
+  const throwBack = page.getByRole("button", { name: /Throw Back · spend 1 Ki Points/ });
   await expect(throwBack).toBeVisible();
   await throwBack.click();
   await expect.poll(() => kiRemaining(page.request, id)).toBe(kiStart - 3);

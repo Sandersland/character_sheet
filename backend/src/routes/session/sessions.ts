@@ -506,7 +506,7 @@ sessionsRouter.get("/characters/:id/sessions/:sessionId/combat", async (req, res
     return;
   }
 
-  const state = await getCombatState(req.params.sessionId);
+  const state = await getCombatState(req.params.sessionId, req.params.id);
   if (!state) {
     res.status(404).json({ error: "Session not found" });
     return;

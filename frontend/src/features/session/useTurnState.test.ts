@@ -13,19 +13,25 @@ import { renderHook, act } from "@testing-library/react";
 
 import { useTurnState } from "@/features/session/useTurnState";
 import type { EconomySnapshot } from "@/features/session/useTurnState";
-import type { Character, InventoryItem } from "@/types/character";
+import type { AvailableAction, Character, SpellEconomyState } from "@/types/character";
 
-// Minimal character fixture: useTurnState reads only inventory + the server-derived attacksPerAction.
+// The server-resolved interlock (#1439) carried on every combat sync. Most
+// tests don't exercise it, so they pass the cleared shape.
+const NO_ECON: SpellEconomyState = { bonusActionBlockedByActionSpell: false, bonusActionLimitedToCantrips: false, actionLimitedToCantrips: false };
+const ACTION_SPELL_BLOCK: SpellEconomyState = { bonusActionBlockedByActionSpell: true, bonusActionLimitedToCantrips: false, actionLimitedToCantrips: false };
+
+// Minimal character fixture: useTurnState reads only the served availableActions
+// (for twfAvailable, #1435) + the server-derived attacksPerAction.
 // Cast to avoid satisfying the full ~50-field Character interface.
 
 function makeCharacter(
   overrides: Partial<
-    Pick<Character, "attacksPerAction" | "inventory" | "offHandLocked" | "rulesEdition">
+    Pick<Character, "attacksPerAction" | "availableActions" | "offHandLocked" | "rulesEdition">
   > = {},
 ): Character {
   return {
     attacksPerAction: 1,
-    inventory: [],
+    availableActions: [],
     advancements: [],
     offHandLocked: false,
     rulesEdition: "EDITION_2024",
@@ -33,52 +39,18 @@ function makeCharacter(
   } as unknown as Character;
 }
 
-/** Minimal InventoryItem shape for a light weapon (TWF eligible). */
-function lightWeapon(id: string): InventoryItem {
+// The served off-hand eligibility row (#1435) — twfAvailable reads its
+// `enabled` flag; the two-Light-weapons rule itself is resolved server-side
+// (backend bothWeaponsLight; backend lib/character/__tests__/available-actions-
+// view.test.ts pins that), so the client tests only assert it mirrors the flag.
+function offHandAction(enabled: boolean): AvailableAction {
   return {
-    id,
-    name: "Shortsword",
-    category: "weapon",
-    quantity: 1,
-    equipped: true,
-    equippable: true,
-    allowedSlots: ["MAIN_HAND", "OFF_HAND"],
-    proficient: true,
-    weapon: {
-      damageDiceCount: 1,
-      damageDiceFaces: 6,
-      damageType: "piercing",
-      light: true,
-      finesse: true,
-      proficient: false,
-      attackBonus: 0,
-      damageModifier: 0,
-    },
-  } as unknown as InventoryItem;
-}
-
-/** A non-light (not TWF-eligible without the style) equipped weapon. */
-function heavyWeapon(id: string): InventoryItem {
-  return {
-    id,
-    name: "Longsword",
-    category: "weapon",
-    quantity: 1,
-    equipped: true,
-    equippable: true,
-    allowedSlots: ["MAIN_HAND", "OFF_HAND"],
-    proficient: true,
-    weapon: {
-      damageDiceCount: 1,
-      damageDiceFaces: 8,
-      damageType: "slashing",
-      light: false,
-      finesse: false,
-      proficient: true,
-      attackBonus: 0,
-      damageModifier: 0,
-    },
-  } as unknown as InventoryItem;
+    key: "offHandAttack",
+    name: "Off-Hand Attack",
+    cost: "bonusAction",
+    enabled,
+    ...(enabled ? {} : { disabledReason: "Off-hand attack needs two Light weapons equipped." }),
+  };
 }
 
 const SESSION_ID = "test-session-abc";
@@ -122,8 +94,8 @@ describe("combat lifecycle", () => {
     expect(result.current.reactionUsed).toBe(false);
   });
 
-  it("twfAvailable is true when inventory has two light weapons", () => {
-    const character = makeCharacter({ inventory: [lightWeapon("w1"), lightWeapon("w2")] });
+  it("twfAvailable is true when the served off-hand row is enabled (#1435)", () => {
+    const character = makeCharacter({ availableActions: [offHandAction(true)] });
     const { result } = renderHook(() => useTurnState(character, SESSION_ID));
 
     act(() => { result.current.startCombat(); });
@@ -132,7 +104,7 @@ describe("combat lifecycle", () => {
     expect(result.current.twfAvailable).toBe(true);
   });
 
-  it("twfAvailable is false with empty inventory", () => {
+  it("twfAvailable is false when no off-hand row is served", () => {
     const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
 
     act(() => { result.current.startCombat(); });
@@ -141,72 +113,31 @@ describe("combat lifecycle", () => {
     expect(result.current.twfAvailable).toBe(false);
   });
 
-  it("twfAvailable updates LIVE when the loadout changes mid-turn — no new startTurn (#733)", () => {
-    const oneWeapon = makeCharacter({ inventory: [lightWeapon("w1")] });
-    const twoWeapons = makeCharacter({ inventory: [lightWeapon("w1"), lightWeapon("w2")] });
-    const { result, rerender } = renderHook(({ c }) => useTurnState(c, SESSION_ID), {
-      initialProps: { c: oneWeapon },
-    });
-
-    act(() => { result.current.startCombat(); });
-    act(() => { result.current.startTurn(); });
-    expect(result.current.twfAvailable).toBe(false); // one weapon → no off-hand
-
-    rerender({ c: twoWeapons }); // swap a second light weapon in mid-turn
-    expect(result.current.twfAvailable).toBe(true); // derived → updates without startTurn
-  });
-
-  // The offhandAbilityDamage fixture is the mutation latch: it is the only place the
-  // Two-Weapon Fighting style still reaches twfAvailable through real code, so
-  // restoring the deleted short-circuit turns this test red. Keep it.
-  it("twfAvailable is false for a non-light pair even WITH the Two-Weapon Fighting style — the style adds off-hand damage, it does not waive the Light requirement (#1496; SRD 5.1 / PHB'14 p. 72, SRD 5.2)", () => {
-    const heavyPair = makeCharacter({ inventory: [heavyWeapon("h1"), heavyWeapon("h2")] });
-    const withStyle = {
-      ...heavyPair,
-      advancements: [
-        { id: "fs1", slot: "fightingStyle", improvements: [{ target: "offhandAbilityDamage", amount: 1 }] },
-      ],
-    } as unknown as Character;
-    const { result } = renderHook(() => useTurnState(withStyle, SESSION_ID));
-
-    act(() => { result.current.startCombat(); });
-    act(() => { result.current.startTurn(); });
-
-    expect(result.current.twfAvailable).toBe(false);
-  });
-
-  // Both editions agree, so canTwoWeaponFight takes no `edition` — this goes red the
-  // day someone forks the rule by edition (#1496).
-  it.each(["EDITION_2014", "EDITION_2024"] as const)(
-    "twfAvailable is false for a non-light pair with the style under %s",
-    (rulesEdition) => {
-      const heavyPair = makeCharacter({
-        inventory: [heavyWeapon("h1"), heavyWeapon("h2")],
-        rulesEdition,
-      });
-      const withStyle = {
-        ...heavyPair,
-        advancements: [
-          { id: "fs1", slot: "fightingStyle", improvements: [{ target: "offhandAbilityDamage", amount: 1 }] },
-        ],
-      } as unknown as Character;
-      const { result } = renderHook(() => useTurnState(withStyle, SESSION_ID));
-
-      act(() => { result.current.startCombat(); });
-      act(() => { result.current.startTurn(); });
-
-      expect(result.current.twfAvailable).toBe(false);
-    },
-  );
-
-  it("twfAvailable is false for a non-light pair WITHOUT the style", () => {
-    const character = makeCharacter({ inventory: [heavyWeapon("h1"), heavyWeapon("h2")] });
+  it("twfAvailable is false when the served off-hand row is disabled", () => {
+    const character = makeCharacter({ availableActions: [offHandAction(false)] });
     const { result } = renderHook(() => useTurnState(character, SESSION_ID));
 
     act(() => { result.current.startCombat(); });
     act(() => { result.current.startTurn(); });
 
     expect(result.current.twfAvailable).toBe(false);
+  });
+
+  it("twfAvailable updates LIVE when the served loadout changes mid-turn — no new startTurn (#733)", () => {
+    // A mid-turn weapon swap refetches the character, so the served offHandAttack
+    // flag flips; twfAvailable follows the live `character` prop without a new turn.
+    const before = makeCharacter({ availableActions: [offHandAction(false)] });
+    const after = makeCharacter({ availableActions: [offHandAction(true)] });
+    const { result, rerender } = renderHook(({ c }) => useTurnState(c, SESSION_ID), {
+      initialProps: { c: before },
+    });
+
+    act(() => { result.current.startCombat(); });
+    act(() => { result.current.startTurn(); });
+    expect(result.current.twfAvailable).toBe(false); // off-hand disabled
+
+    rerender({ c: after }); // second Light weapon equipped mid-turn → server re-derives
+    expect(result.current.twfAvailable).toBe(true); // served flag → updates without startTurn
   });
 
   it("endTurn while in combat: phase=idle, actionsRemaining=0, round untouched (server-driven, #1030), reactionUsed NOT reset", () => {
@@ -236,7 +167,7 @@ describe("combat lifecycle", () => {
     act(() => { result.current.consumeBonusAction(); });
     act(() => { result.current.consumeReaction(); });
 
-    act(() => { result.current.syncCombat(2, true, "2026-01-01T00:00:01.000Z"); });
+    act(() => { result.current.syncCombat(2, true, "2026-01-01T00:00:01.000Z", NO_ECON); });
 
     expect(result.current.round).toBe(2);
     expect(result.current.inCombat).toBe(true);
@@ -254,7 +185,7 @@ describe("combat lifecycle", () => {
     act(() => { result.current.startTurn(); });
     act(() => { result.current.consumeAction(); });
 
-    act(() => { result.current.syncCombat(0, false, "2026-01-01T00:00:01.000Z"); });
+    act(() => { result.current.syncCombat(0, false, "2026-01-01T00:00:01.000Z", NO_ECON); });
 
     expect(result.current.inCombat).toBe(false);
     expect(result.current.round).toBe(0);
@@ -267,7 +198,7 @@ describe("combat lifecycle", () => {
     const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
     act(() => { result.current.startCombat(); });
 
-    act(() => { result.current.syncCombat(5, true, "2026-01-01T00:00:01.000Z"); });
+    act(() => { result.current.syncCombat(5, true, "2026-01-01T00:00:01.000Z", NO_ECON); });
 
     expect(result.current.history).toEqual([]);
   });
@@ -277,9 +208,9 @@ describe("combat lifecycle", () => {
     act(() => { result.current.startCombat(); });
 
     // A fresher sync lands first (e.g. End Turn's own confirmation)...
-    act(() => { result.current.syncCombat(2, true, "2026-01-01T00:00:02.000Z"); });
+    act(() => { result.current.syncCombat(2, true, "2026-01-01T00:00:02.000Z", NO_ECON); });
     // ...then a stale in-flight poll answered before it resolves.
-    act(() => { result.current.syncCombat(1, true, "2026-01-01T00:00:01.000Z"); });
+    act(() => { result.current.syncCombat(1, true, "2026-01-01T00:00:01.000Z", NO_ECON); });
 
     expect(result.current.round).toBe(2); // NOT rolled back to 1
   });
@@ -288,8 +219,8 @@ describe("combat lifecycle", () => {
     const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
     act(() => { result.current.startCombat(); });
 
-    act(() => { result.current.syncCombat(1, true, "2026-01-01T00:00:01.000Z"); });
-    act(() => { result.current.syncCombat(2, true, "2026-01-01T00:00:02.000Z"); });
+    act(() => { result.current.syncCombat(1, true, "2026-01-01T00:00:01.000Z", NO_ECON); });
+    act(() => { result.current.syncCombat(2, true, "2026-01-01T00:00:02.000Z", NO_ECON); });
 
     expect(result.current.round).toBe(2);
   });
@@ -300,10 +231,10 @@ describe("combat lifecycle", () => {
     act(() => { result.current.startTurn(); });
     act(() => { result.current.consumeAction(); });
 
-    act(() => { result.current.syncCombat(1, true, "2026-01-01T00:00:01.000Z"); });
+    act(() => { result.current.syncCombat(1, true, "2026-01-01T00:00:01.000Z", NO_ECON); });
     // Same timestamp again, but claiming a different round — must be ignored:
     // a real server row can't produce two different snapshots at one instant.
-    act(() => { result.current.syncCombat(3, true, "2026-01-01T00:00:01.000Z"); });
+    act(() => { result.current.syncCombat(3, true, "2026-01-01T00:00:01.000Z", NO_ECON); });
 
     expect(result.current.round).toBe(1);
   });
@@ -319,7 +250,7 @@ describe("combat lifecycle", () => {
     act(() => { result.current.endCombat(); }); // local reset: inCombat false
 
     // A remote participant starts a NEW encounter already at round 1.
-    act(() => { result.current.syncCombat(1, true, "2026-01-01T00:00:05.000Z"); });
+    act(() => { result.current.syncCombat(1, true, "2026-01-01T00:00:05.000Z", NO_ECON); });
 
     expect(result.current.inCombat).toBe(true);
     expect(result.current.round).toBe(1);
@@ -329,15 +260,24 @@ describe("combat lifecycle", () => {
     expect(result.current.reactionUsed).toBe(false);
   });
 
+  it("syncCombat (#1439 review): a false→true transition honors the SERVED interlock, not a forced clear", () => {
+    const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+    // A late joiner observes an encounter where a leveled Action spell was
+    // already cast — the fresh-encounter branch must apply the served block.
+    act(() => { result.current.syncCombat(2, true, "2026-01-01T00:00:05.000Z", ACTION_SPELL_BLOCK); });
+    expect(result.current.inCombat).toBe(true);
+    expect(result.current.spellEconomy).toEqual(ACTION_SPELL_BLOCK);
+  });
+
   it("reconcileCombat (#1030 finding #1) applies even when updatedAt is NOT newer — unlike syncCombat", () => {
     const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
     act(() => { result.current.startCombat(); });
-    act(() => { result.current.syncCombat(1, true, "2026-01-01T00:00:01.000Z"); });
+    act(() => { result.current.syncCombat(1, true, "2026-01-01T00:00:01.000Z", NO_ECON); });
 
     // A post-failure reconcile reporting the SAME timestamp as the last
     // applied sync (the server never actually changed) — syncCombat would
     // reject this as a no-op; reconcileCombat must still apply it.
-    act(() => { result.current.reconcileCombat(1, false, "2026-01-01T00:00:01.000Z"); });
+    act(() => { result.current.reconcileCombat(1, false, "2026-01-01T00:00:01.000Z", NO_ECON); });
 
     expect(result.current.inCombat).toBe(false);
     expect(result.current.round).toBe(1);
@@ -347,7 +287,7 @@ describe("combat lifecycle", () => {
     const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
     act(() => { result.current.startCombat(); });
 
-    act(() => { result.current.reconcileCombat(1, true, "2026-01-01T00:00:01.000Z"); });
+    act(() => { result.current.reconcileCombat(1, true, "2026-01-01T00:00:01.000Z", NO_ECON); });
 
     expect(result.current.history).toEqual([]);
   });
@@ -355,14 +295,14 @@ describe("combat lifecycle", () => {
   it("reconcileCombat (finding #1): a failed endCombat's optimistic exit reconciles back onto the server's still-active state", () => {
     const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
     act(() => { result.current.startCombat(); });
-    act(() => { result.current.syncCombat(1, true, "2026-01-01T00:00:01.000Z"); });
+    act(() => { result.current.syncCombat(1, true, "2026-01-01T00:00:01.000Z", NO_ECON); });
     // Optimistic endCombat() ran locally, but the server call failed — the
     // server was never actually mutated, so a reconcile fetch reports the
     // SAME round/updatedAt as before (an ordinary syncCombat would discard this).
     act(() => { result.current.endCombat(); });
     expect(result.current.inCombat).toBe(false);
 
-    act(() => { result.current.reconcileCombat(1, true, "2026-01-01T00:00:01.000Z"); });
+    act(() => { result.current.reconcileCombat(1, true, "2026-01-01T00:00:01.000Z", NO_ECON); });
 
     expect(result.current.inCombat).toBe(true);
     expect(result.current.round).toBe(1);
@@ -372,8 +312,8 @@ describe("combat lifecycle", () => {
     const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
     act(() => { result.current.startCombat(); });
 
-    act(() => { result.current.syncCombat(2, true, "2026-01-01T00:00:02.000Z"); });
-    act(() => { result.current.syncCombat(1, true, "2026-01-01T00:00:01.000Z"); }); // stale, out-of-order
+    act(() => { result.current.syncCombat(2, true, "2026-01-01T00:00:02.000Z", NO_ECON); });
+    act(() => { result.current.syncCombat(1, true, "2026-01-01T00:00:01.000Z", NO_ECON); }); // stale, out-of-order
 
     expect(result.current.round).toBe(2); // still rejected, as before this fix
   });
@@ -524,10 +464,9 @@ describe("attack mode flow", () => {
     act(() => { result.current.enterAttackMode(); });   // → 1, attack set
     expect(result.current.actionsRemaining).toBe(1);
 
-    act(() => { result.current.grantExtraAction(); result.current.commitActionSpell(0); });
+    act(() => { result.current.grantExtraAction(); result.current.commitActionSpell(); });
     expect(result.current.actionsRemaining).toBe(1); // +1 then −1 → unchanged
     expect(result.current.attack).toBeNull();
-    expect(result.current.spellCastThisTurn.action).toBe("cantrip");
   });
 
   it("enterAttackMode is a no-op when actionsRemaining is 0", () => {
@@ -1316,36 +1255,41 @@ describe("spell commits", () => {
     return hook;
   }
 
-  it("commitActionSpell(0) → spellCastThisTurn.action='cantrip' and action decremented", () => {
+  // The commit fns now spend only the LOCAL economy slot (#1439) — the 5e
+  // interlock kind is recorded server-side and arrives via syncCombat, no
+  // longer set here from the spell level.
+  it("commitActionSpell → action decremented", () => {
     const { result } = inActiveTurn();
-    act(() => { result.current.commitActionSpell(0); });
-    expect(result.current.spellCastThisTurn.action).toBe("cantrip");
+    act(() => { result.current.commitActionSpell(); });
     expect(result.current.actionsRemaining).toBe(0);
   });
 
-  it("commitActionSpell(3) → spellCastThisTurn.action='leveled'", () => {
+  it("commitBonusActionSpell → bonusActionUsed", () => {
     const { result } = inActiveTurn();
-    act(() => { result.current.commitActionSpell(3); });
-    expect(result.current.spellCastThisTurn.action).toBe("leveled");
-  });
-
-  it("commitBonusActionSpell(0) → spellCastThisTurn.bonus='cantrip' and bonusActionUsed", () => {
-    const { result } = inActiveTurn();
-    act(() => { result.current.commitBonusActionSpell(0); });
-    expect(result.current.spellCastThisTurn.bonus).toBe("cantrip");
+    act(() => { result.current.commitBonusActionSpell(); });
     expect(result.current.bonusActionUsed).toBe(true);
-  });
-
-  it("commitBonusActionSpell(2) → spellCastThisTurn.bonus='leveled'", () => {
-    const { result } = inActiveTurn();
-    act(() => { result.current.commitBonusActionSpell(2); });
-    expect(result.current.spellCastThisTurn.bonus).toBe("leveled");
   });
 
   it("commitReactionSpell → reactionUsed:true", () => {
     const { result } = inActiveTurn();
     act(() => { result.current.commitReactionSpell(); });
     expect(result.current.reactionUsed).toBe(true);
+  });
+
+  // The interlock itself (#1439) is server-resolved: syncCombat carries the
+  // resolved flags into the reducer, and turn boundaries clear them.
+  it("syncCombat applies the served spellEconomy flags", () => {
+    const { result } = inActiveTurn();
+    act(() => { result.current.syncCombat(1, true, "2026-01-01T00:00:02.000Z", ACTION_SPELL_BLOCK); });
+    expect(result.current.spellEconomy).toEqual(ACTION_SPELL_BLOCK);
+  });
+
+  it("startTurn clears the interlock flags synced from the previous turn", () => {
+    const { result } = inActiveTurn();
+    act(() => { result.current.syncCombat(1, true, "2026-01-01T00:00:02.000Z", ACTION_SPELL_BLOCK); });
+    act(() => { result.current.endTurn(); });
+    act(() => { result.current.startTurn(); });
+    expect(result.current.spellEconomy).toEqual(NO_ECON);
   });
 });
 
@@ -1386,7 +1330,7 @@ describe("cast tally", () => {
 
   it("does not push an undo snapshot — undo leaves the cast receipt in place", () => {
     const { result } = inActiveTurn();
-    act(() => { result.current.commitActionSpell(1); });
+    act(() => { result.current.commitActionSpell(); });
     act(() => { result.current.recordSpellCast({ spellName: "Burning Hands", level: 1, total: 14 }); });
     expect(result.current.actionsRemaining).toBe(0);
     act(() => { result.current.undo(); });
@@ -1447,7 +1391,6 @@ describe("localStorage persistence", () => {
       reactionUsed: false,
       attack: null,
       bonusAttack: null,
-      spellCastThisTurn: {},
       attackedThisTurn: false,
       tookDamageThisTurn: false,
     };
@@ -1475,7 +1418,6 @@ describe("localStorage persistence", () => {
       reactionUsed: false,
       attack: { total: 2, used: 1 },
       bonusAttack: null,
-      spellCastThisTurn: {},
       attackedThisTurn: true,
       tookDamageThisTurn: false,
       history: [
@@ -1485,7 +1427,6 @@ describe("localStorage persistence", () => {
           reactionUsed: false,
           attack: null,
           bonusAttack: null,
-          spellCastThisTurn: {},
         },
       ],
     };
@@ -1510,7 +1451,6 @@ describe("localStorage persistence", () => {
       reactionUsed: false,
       attack: null,
       bonusAttack: null,
-      spellCastThisTurn: {},
       attackedThisTurn: false,
       tookDamageThisTurn: false,
       history: [
@@ -1520,7 +1460,6 @@ describe("localStorage persistence", () => {
           reactionUsed: false,
           attack: null,
           bonusAttack: null,
-          spellCastThisTurn: {},
         },
       ],
     };
@@ -1548,7 +1487,6 @@ describe("localStorage persistence", () => {
       attack: { total: 1, used: 1 },
       bonusAttack: null,
       attackTally: [legacyRow],
-      spellCastThisTurn: {},
       attackedThisTurn: true,
       tookDamageThisTurn: false,
       history: [
@@ -1558,7 +1496,6 @@ describe("localStorage persistence", () => {
           reactionUsed: false,
           attack: null,
           bonusAttack: null,
-          spellCastThisTurn: {},
           attackTally: [legacyRow],
         },
       ],
@@ -1582,7 +1519,6 @@ describe("localStorage persistence", () => {
       reactionUsed: false,
       attack: null,
       bonusAttack: null,
-      spellCastThisTurn: {},
       attackTally: [],
       attackEquipCredits: 0,
       freeInteractionUsed: false,
@@ -1596,7 +1532,7 @@ describe("localStorage persistence", () => {
       reactionUsed: true,
       attack: null,
       bonusAttack: null,
-      spellCastThisTurn: { action: "leveled" as const },
+      spellEconomy: ACTION_SPELL_BLOCK,
       attackedThisTurn: true,
       tookDamageThisTurn: false,
       attackEquipCredits: 0,
@@ -1608,7 +1544,7 @@ describe("localStorage persistence", () => {
     const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
     expect(result.current.round).toBe(3);
     expect(result.current.reactionUsed).toBe(true);
-    expect(result.current.spellCastThisTurn).toEqual({ action: "leveled" });
+    expect(result.current.spellEconomy).toEqual(ACTION_SPELL_BLOCK);
     expect(result.current.history).toEqual([snapshot]);
   });
 

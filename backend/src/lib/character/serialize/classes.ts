@@ -3,11 +3,15 @@
 import type { RulesEdition } from "@character-sheet/shared-types";
 
 import {
+  abilityModifier,
+  bothWeaponsLight,
   characterAdvancementSlots,
   characterFightingStyleFeatSlots,
+  deriveDeflectSpec,
   deriveImprovementBonuses,
   deriveImprovementProficiencies,
 } from "@/lib/srd/srd.js";
+import type { EffectSpec } from "@/lib/combat/effects.js";
 import { deriveEntryScopedResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
 import { featureRowsOf } from "@/lib/classes/feature-rows-select.js";
 import type { DerivedFeature } from "@/lib/classes/types.js";
@@ -26,19 +30,20 @@ export type PrimaryClass = CharacterWithRelations["classEntries"][number] | unde
 // Resources clamp-on-read: derive class/subclass pools + level-gated caps, then
 // layer stored `used` counts and known lists (clamped to caps). Returns the
 // resources view (undefined for classes with no pools) plus the raw
-// maneuverSaveDC number — serializeCharacter folds it into the top-level
-// `maneuvers` rider (#1316), so it isn't part of the resources payload.
-// Fighting Style is a feat now (#1137) — surfaced via top-level
-// fightingStyleSlots + advancements, not here. The choice-cap fields are
-// entry-scoped (#1177) via deriveEntryScopedResources — mirrors
-// loadResourcesReconcileState (level-reconciliation.ts) so both sides compute
-// the legal limit through the one shared rule function.
+// announcedSaveDC number (#1589, renamed from the Fighter-specific
+// maneuverSaveDC) — serializeCharacter folds it into the top-level `maneuvers`
+// rider (#1316), so it isn't part of the resources payload. Fighting Style is
+// a feat now (#1137) — surfaced via top-level fightingStyleSlots +
+// advancements, not here. The choice-cap fields are entry-scoped (#1177) via
+// deriveEntryScopedResources — mirrors loadResourcesReconcileState
+// (level-reconciliation.ts) so both sides compute the legal limit through the
+// one shared rule function.
 export function buildResourcesView(
   row: CharacterWithRelations,
   level: number,
   abilityScores: Record<string, number>,
   proficiencyBonus: number,
-): { resources: object | undefined; maneuverSaveDC: number | undefined; classFeatureImprovements: FeatImprovement[] } {
+): { resources: object | undefined; announcedSaveDC: number | undefined; classFeatureImprovements: FeatImprovement[] } {
   // The ONE production caller that supplies real ClassFeature rows (#1524):
   // characterInclude loaded entry.class.features (already subclassId:null
   // filtered) and entry.subclassRef.features — featuresFromRows/poolsFromRows
@@ -64,7 +69,7 @@ export function buildResourcesView(
   // own per-entry loop); applyFeatLayer merges this with advancement-sourced
   // improvements through the shared deriveImprovementBonuses/
   // deriveImprovementProficiencies evaluator.
-  return { resources, maneuverSaveDC: derivedRes?.maneuverSaveDC, classFeatureImprovements: derivedRes?.improvements ?? [] };
+  return { resources, announcedSaveDC: derivedRes?.announcedSaveDC, classFeatureImprovements: derivedRes?.improvements ?? [] };
 }
 
 // #1272/#1374: DerivedFeature.edition is a server-side selector (which of a
@@ -243,6 +248,10 @@ export function buildAvailableActionsView(
   // gates the Monk's Bonus Unarmed Strike (requiresUnarmored in DERIVED_ACTIONS).
   unarmoredUnshielded: boolean,
   edition: RulesEdition,
+  effectiveScores: Record<string, number>,
+  // Light flags of the currently-equipped weapons — the off-hand eligibility
+  // input (#1435), computed by the caller from the already-serialized inventory.
+  equippedWeaponLight: ReadonlyArray<{ light: boolean }>,
 ): AvailableAction[] {
   const pools =
     resources && "pools" in resources
@@ -251,7 +260,70 @@ export function buildAvailableActionsView(
   // featureRowsOf (#1528 chunk 0): a Fighter entry's row-driven actions
   // (Second Wind/Action Surge) surface here through the SAME carrier
   // buildResourcesView passes for its pools/features.
-  return deriveEntryScopedActions(classEntries, level, pools, unarmoredUnshielded, edition, featureRowsOf);
+  const actions = deriveEntryScopedActions(classEntries, level, pools, unarmoredUnshielded, edition, featureRowsOf);
+  return [
+    ...withDeflectSpecs(actions, classEntries, level, effectiveScores, edition),
+    // Off-hand / Two-Weapon Fighting eligibility (#1435) — served for EVERY
+    // character (TWF is not class-gated), enabled only when both equipped
+    // weapons are Light (`bothWeaponsLight`; the Two-Weapon Fighting style
+    // grants off-hand DAMAGE only and never waives this, #1496/#1640, so no
+    // `hasOffHandAbilityDamage` clause here). Distinct from `offHandBusy` (a
+    // shield OR two weapons) — the distinction this row exists to make.
+    offHandActionRow(equippedWeaponLight),
+  ];
+}
+
+// The off-hand bonus-action eligibility row (#1435): `enabled` is the pure
+// two-Light-weapons rule; when disabled, the reason names that requirement
+// (the frontend's twfHint adds the concrete item-name suggestion on top).
+function offHandActionRow(equippedWeaponLight: ReadonlyArray<{ light: boolean }>): AvailableAction {
+  const enabled = bothWeaponsLight(equippedWeaponLight);
+  return {
+    key: "offHandAttack",
+    name: "Off-Hand Attack",
+    cost: "bonusAction",
+    enabled,
+    ...(enabled ? {} : { disabledReason: "Off-hand attack needs two Light weapons equipped." }),
+  };
+}
+
+// Attaches the resolved Deflect Attacks / Deflect Missiles roll specs (#1435)
+// onto the served rows via the #1381 `effect` field: the base row carries the
+// reduction spec, the redirect / throw-back row its own. Both resolve off the
+// Monk entry's effective level (`effectiveEntryLevel`) and the character's Dex
+// mod, via the ONE edition-forked `deriveDeflectSpec` rule. A no-op for a
+// non-Monk (no deflect row is present to annotate).
+function withDeflectSpecs(
+  actions: AvailableAction[],
+  classEntries: CharacterWithRelations["classEntries"],
+  level: number,
+  effectiveScores: Record<string, number>,
+  edition: RulesEdition,
+): AvailableAction[] {
+  const monkEntry = classEntries.find((e) => e.name?.toLowerCase() === "monk");
+  if (!monkEntry) return actions;
+  const monkLevel = effectiveEntryLevel(monkEntry.level, classEntries.length, level);
+  const dexMod = abilityModifier(effectiveScores.dexterity ?? 10);
+  const { reduction, redirect } = deriveDeflectSpec(monkLevel, dexMod, edition);
+  return actions.map((a) => {
+    if (a.key === "deflectAttacks" || a.key === "deflectMissiles") {
+      return { ...a, effect: rollAsEffect(reduction, "utility") };
+    }
+    if (a.key === "deflectAttacksRedirect" || a.key === "deflectMissilesThrow") {
+      return { ...a, effect: rollAsEffect(redirect, "damage") };
+    }
+    return a;
+  });
+}
+
+// Wrap a resolved roll as a minimal EffectSpec — the same "utility kind carries
+// dice" shape a maneuver's served effect uses (deriveManeuverEffect), so the
+// frontend reads `action.effect.dice` verbatim as its RollSpec.
+function rollAsEffect(
+  dice: { count: number; faces: number; modifier: number },
+  effectType: EffectSpec["effectType"],
+): EffectSpec {
+  return { effectType, dice, scaling: { mode: "none" } };
 }
 
 // Structured, multiclass-aware view alongside the flattened class/subclass.

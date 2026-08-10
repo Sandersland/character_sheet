@@ -55,15 +55,20 @@
 // Attack's Nd6 is a computed rule function off the class entry's own level,
 // never a persisted pool — see sneak-attack.ts), and Cunning Strike's
 // announced save DC (base L5) is stated as SRD prose instead of
-// `saveDcAbilities`: `deriveRowExtras` (registry.ts) reads only
-// `subclassRows`, so a base-class row declaring the column would be silently
-// inert, and the column's only sink (`ClassExtras.maneuverSaveDC` ->
-// `ManeuversSection`, gated on `maneuverChoiceCount`) is never set by a
-// Rogue. The Cunning Strike EFFECT CATALOG (dice-spend + enemy-targeted save
-// effects) is a subsystem this issue does not build — #1138-adjacent
-// follow-up, analogous to Battle Master maneuvers; every Cunning-Strike-
-// related row below is descriptive text only, matching Barbarian's Brutal
-// Strike precedent.
+// `saveDcAbilities`: even after #1589 generalised `deriveRowExtras`
+// (registry.ts) to read base-class rows too, `ClassExtras.announcedSaveDC`
+// (renamed from `maneuverSaveDC`) stays a SINGLE scalar overlaid across every
+// class entry — a Rogue/Battle-Master multiclass populating it here would
+// collide with Combat Superiority's own value (registry.ts's
+// assignAnnouncedSaveDC keeps the first/primary DC and drops the second with a
+// logged warning rather than silently clobbering — it degrades instead of
+// throwing because it runs on the GET read path, #1875), and no wire consumer
+// reads a Rogue announced DC today (`ManeuversSection`
+// is gated on `maneuverChoiceCount`, which no Rogue row sets). The Cunning
+// Strike EFFECT CATALOG (dice-spend + enemy-targeted save effects) is a
+// subsystem this issue does not build — #1138-adjacent follow-up, analogous
+// to Battle Master maneuvers; every Cunning-Strike-related row below is
+// descriptive text only, matching Barbarian's Brutal Strike precedent.
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { SeedEdition } from "./edition.js";
 import type { ClassFeatureSeedRow } from "./class-features.js";

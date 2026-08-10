@@ -95,10 +95,11 @@ interface RawFighterFeature {
   // each row's own comment.
   derivedStat?: string;
   derivedStatTiers?: { minLevel: number; value: number | string }[];
-  // #1546 Part B: the ability list Combat Superiority's maneuverSaveDC is
-  // computed from (8 + PB + max of these). Deliberately NOT matched against
-  // `derivedStat` by name — see class-feature-rows.ts's
-  // saveDcAbilitiesFromRows for why the same row needs both axes at once.
+  // #1546 Part B: the ability list Combat Superiority's announcedSaveDC
+  // (#1589, renamed from maneuverSaveDC) is computed from (8 + PB + max of
+  // these). Deliberately NOT matched against `derivedStat` by name — see
+  // class-feature-rows.ts's saveDcAbilitiesFromRows for why the same row
+  // needs both axes at once.
   saveDcAbilities?: string[];
 }
 

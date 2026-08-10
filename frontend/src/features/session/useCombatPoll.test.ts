@@ -14,7 +14,12 @@ function setHidden(hidden: boolean) {
 describe("useCombatPoll (#1030)", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    vi.mocked(fetchCombatState).mockResolvedValue({ round: 2, combatActive: true, updatedAt: "x" });
+    vi.mocked(fetchCombatState).mockResolvedValue({
+      round: 2,
+      combatActive: true,
+      updatedAt: "x",
+      spellEconomy: { bonusActionBlockedByActionSpell: false, bonusActionLimitedToCantrips: false, actionLimitedToCantrips: false },
+    });
     setHidden(false);
   });
 
@@ -29,7 +34,7 @@ describe("useCombatPoll (#1030)", () => {
 
     await vi.waitFor(() => expect(fetchCombatState).toHaveBeenCalledTimes(1));
     expect(fetchCombatState).toHaveBeenCalledWith("char-1", "sess-1");
-    await vi.waitFor(() => expect(onSync).toHaveBeenCalledWith(2, true, "x"));
+    await vi.waitFor(() => expect(onSync).toHaveBeenCalledWith(2, true, "x", { bonusActionBlockedByActionSpell: false, bonusActionLimitedToCantrips: false, actionLimitedToCantrips: false }));
 
     await vi.advanceTimersByTimeAsync(5000);
     expect(fetchCombatState).toHaveBeenCalledTimes(2);
@@ -84,7 +89,7 @@ describe("useCombatPoll (#1030)", () => {
 
     await vi.advanceTimersByTimeAsync(5000);
     await vi.waitFor(() => expect(fetchCombatState).toHaveBeenCalledTimes(2));
-    await vi.waitFor(() => expect(onSync).toHaveBeenCalledWith(2, true, "x"));
+    await vi.waitFor(() => expect(onSync).toHaveBeenCalledWith(2, true, "x", { bonusActionBlockedByActionSpell: false, bonusActionLimitedToCantrips: false, actionLimitedToCantrips: false }));
   });
 
   it("throttles the resume path — rapid hidden→shown toggles fire one request, not N (#1030 finding #7)", async () => {

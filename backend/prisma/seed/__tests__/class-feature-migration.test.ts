@@ -299,8 +299,9 @@ function isPopulatedBladesingerRow(row: RowKey): boolean {
 // ignore the field.
 type RowKey = { className: string; subclassSlug: string | null; name: string; edition: string };
 
-// #1546 Part B: the ability list Combat Superiority's maneuverSaveDC is
-// computed from — the one row that sets it, both editions.
+// #1546 Part B: the ability list Combat Superiority's announcedSaveDC (#1589,
+// renamed from maneuverSaveDC) is computed from — the one row that sets it,
+// both editions.
 function isSaveDcRow(row: RowKey): boolean {
   return isPopulatedBattleMasterPoolRow(row);
 }

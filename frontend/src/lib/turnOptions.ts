@@ -16,13 +16,17 @@ import {
   availableArcanaLevels,
   availableSlotLevels,
   filterCastableSpells,
+  restrictionFlagsForSlot,
   sortSpells,
-  spellRestrictionFlags,
-  type SpellCastThisTurn,
 } from "@/lib/spellPicker";
-import { canTwoWeaponFight } from "@/lib/turnRules";
 import { resolverFor, type ActionResolver } from "@/features/session/actionResolvers";
-import type { AvailableAction, Character, ResourcePool, UniversalActionOption } from "@/types/character";
+import type {
+  AvailableAction,
+  Character,
+  ResourcePool,
+  SpellEconomyState,
+  UniversalActionOption,
+} from "@/types/character";
 
 /** "Longsword · +7 to hit · 1d8 + 4 slashing" for the first attack row
  *  (first equipped weapon, falling back naturally to Unarmed Strike). */
@@ -220,22 +224,24 @@ export interface BonusSpellOption {
 }
 
 /**
- * Castable bonus-action spells for the Bonus Action sheet. Mirrors
- * InlineSpellPicker's own deriveSpellList filtering argument-for-argument
- * (same pure spellPicker.ts predicates, castingTimeFilter "1 bonus action")
- * so the card list and the picker that opens from it can never disagree.
+ * Castable bonus-action spells for the Bonus Action sheet. Shares
+ * InlineSpellPicker's own deriveSpellList filtering by calling the same pure
+ * spellPicker.ts predicates — including `restrictionFlagsForSlot`, the one
+ * projection of the server-resolved interlock (#1439) both surfaces read — so
+ * the card list and the picker that opens from it can never disagree. `economy`
+ * is the served `SpellEconomyState`; the client never re-derives the rule.
  */
 export function bonusSpellOptions(
   character: Character,
-  spellCastThisTurn: SpellCastThisTurn,
+  economy: SpellEconomyState,
 ): BonusSpellOption[] {
   const spellcasting = character.spellcasting;
   if (!spellcasting) return [];
   const slotLevels = availableSlotLevels(spellcasting.slots ?? []);
   const arcanaLevels = availableArcanaLevels(spellcasting.arcana ?? []);
-  const { bonusActionBlockedByActionSpell, actionLimitedToCantrips } = spellRestrictionFlags(
+  const { bonusActionBlockedByActionSpell, actionLimitedToCantrips } = restrictionFlagsForSlot(
     "bonusAction",
-    spellCastThisTurn,
+    economy,
   );
   const castable = filterCastableSpells(spellcasting.spells ?? [], {
     castingTimeFilter: "1 bonus action",
@@ -256,12 +262,24 @@ export function bonusSpellOptions(
 }
 
 /**
+ * Whether the served off-hand / Two-Weapon Fighting affordance is enabled
+ * (#1435) — the eligibility rule (both equipped weapons Light) is resolved
+ * server-side onto the `offHandAttack` action row; the client reads the flag,
+ * never re-derives it from inventory. False when the row isn't served yet.
+ */
+export function offHandAttackEnabled(character: Character): boolean {
+  return character.availableActions?.find((a) => a.key === "offHandAttack")?.enabled ?? false;
+}
+
+/**
  * Footer hint for the Bonus Action sheet when TWF is unavailable. Names a
  * concrete owned light-weapon pair when one exists ("equip Two Shortswords…"),
  * else falls back to the generic requirement. Null when TWF is already live.
+ * The eligibility comes off the served row (offHandAttackEnabled); the
+ * item-name suggestion below stays client-side chrome (issue #1435 decision).
  */
 export function twfHint(character: Character): string | null {
-  if (canTwoWeaponFight(character.inventory)) return null;
+  if (offHandAttackEnabled(character)) return null;
   const lightWeapons = character.inventory.filter(
     (item) => item.category === "weapon" && item.weapon?.light === true,
   );

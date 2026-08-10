@@ -24,7 +24,10 @@ import { axe } from "@/test/axe";
 import { cachedCharacter, renderWithCharacter } from "@/test/renderWithCharacter";
 import { IMPROVISED_ROW, UNARMED_ROW, attackRow } from "@/test/attackRowFixtures";
 import type { AttackRow } from "@character-sheet/shared-types";
-import type { Character } from "@/types/character";
+import type { Character, SpellEconomyState } from "@/types/character";
+
+// The cleared 5e interlock every combat mock returns (#1439).
+const NO_ECON: SpellEconomyState = { bonusActionBlockedByActionSpell: false, bonusActionLimitedToCantrips: false, actionLimitedToCantrips: false };
 
 vi.mock("@/api/client", () => ({
   applyActionTransactions: vi.fn(),
@@ -170,9 +173,9 @@ beforeEach(() => {
   // increasing updatedAt per lifecycle stage — syncCombat drops a sync whose
   // updatedAt doesn't strictly advance past the last one applied, so a real
   // start→round-advance→end sequence must never tie.
-  vi.mocked(startCombat).mockResolvedValue({ round: 1, combatActive: true, updatedAt: "2026-01-01T00:00:01.000Z" });
-  vi.mocked(advanceCombatRound).mockResolvedValue({ round: 2, combatActive: true, updatedAt: "2026-01-01T00:00:02.000Z" });
-  vi.mocked(endCombat).mockResolvedValue({ round: 0, combatActive: false, updatedAt: "2026-01-01T00:00:03.000Z" });
+  vi.mocked(startCombat).mockResolvedValue({ round: 1, combatActive: true, updatedAt: "2026-01-01T00:00:01.000Z", spellEconomy: NO_ECON });
+  vi.mocked(advanceCombatRound).mockResolvedValue({ round: 2, combatActive: true, updatedAt: "2026-01-01T00:00:02.000Z", spellEconomy: NO_ECON });
+  vi.mocked(endCombat).mockResolvedValue({ round: 0, combatActive: false, updatedAt: "2026-01-01T00:00:03.000Z", spellEconomy: NO_ECON });
   vi.mocked(logRollAction).mockResolvedValue(undefined as never);
   // No onInitiative pools on this fixture (a Fighter) — a real rollInitiative
   // call would report an empty regen, same as this default (#1239/#1243).
@@ -234,6 +237,7 @@ describe("TurnHub — combat lifecycle", () => {
       round: 1,
       combatActive: true,
       updatedAt: "2026-01-01T00:00:01.000Z",
+      spellEconomy: NO_ECON,
     });
 
     await user.click(screen.getByRole("button", { name: "End combat" }));
@@ -254,6 +258,7 @@ describe("TurnHub — combat lifecycle", () => {
       round: 0,
       combatActive: false,
       updatedAt: "2026-01-01T00:00:00.500Z",
+      spellEconomy: NO_ECON,
     });
 
     await user.click(screen.getByRole("button", { name: /Start combat/ }));
@@ -1202,8 +1207,17 @@ describe("TurnHub — Deflect Attacks reaction (#1241)", () => {
           // overrides this to "any damage type" itself, the same way the real
           // backend would, instead of the client re-deriving the threshold.
           damageTypeClause: "bludgeoning, piercing, or slashing damage",
+          // Reduction spec resolved server-side (#1435): Dex +3 + monk level 5 = 8.
+          effect: { effectType: "utility", dice: { count: 1, faces: 10, modifier: 8 }, scaling: { mode: "none" } },
         },
-        { key: "deflectAttacksRedirect", name: "Deflect Attacks — Redirect", cost: "free", enabled: true, resourceKey: "focus" },
+        {
+          key: "deflectAttacksRedirect",
+          name: "Deflect Attacks — Redirect",
+          cost: "free",
+          enabled: true,
+          resourceKey: "focus",
+          effect: { effectType: "damage", dice: { count: 2, faces: 8, modifier: 3 }, scaling: { mode: "none" } },
+        },
       ],
       resources: {
         features: [],
@@ -1261,6 +1275,7 @@ describe("TurnHub — Deflect Attacks reaction (#1241)", () => {
             name: "Deflect Attacks",
             cost: "reaction",
             enabled: true,
+            effect: { effectType: "utility", dice: { count: 1, faces: 10, modifier: 8 }, scaling: { mode: "none" } },
           },
           { key: "deflectAttacksRedirect", name: "Deflect Attacks — Redirect", cost: "free", enabled: false, disabledReason: "No focus remaining" },
         ],
@@ -1292,8 +1307,17 @@ describe("TurnHub — Deflect Attacks reaction (#1241)", () => {
             cost: "reaction",
             enabled: true,
             damageTypeClause: "any damage type",
+            // Dex +3 + monk level 13 = 16.
+            effect: { effectType: "utility", dice: { count: 1, faces: 10, modifier: 16 }, scaling: { mode: "none" } },
           },
-          { key: "deflectAttacksRedirect", name: "Deflect Attacks — Redirect", cost: "free", enabled: true, resourceKey: "focus" },
+          {
+            key: "deflectAttacksRedirect",
+            name: "Deflect Attacks — Redirect",
+            cost: "free",
+            enabled: true,
+            resourceKey: "focus",
+            effect: { effectType: "damage", dice: { count: 2, faces: 10, modifier: 3 }, scaling: { mode: "none" } },
+          },
         ],
       } as unknown as Partial<Character>),
     );
