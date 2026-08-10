@@ -33,7 +33,7 @@ import {
   type FeatImprovement,
   type ResourcesMutableState,
 } from "@/lib/classes/resources.js";
-import { characterAdvancementSlots, abilityModifier, characterFightingStyleFeatSlots, deriveFeatBonuses } from "@/lib/srd/srd.js";
+import { characterAdvancementSlots, abilityModifier, characterFightingStyleFeatSlots, fightingStyleGrantingClassNames, deriveFeatBonuses } from "@/lib/srd/srd.js";
 import { featOfferedForAsiSlot, fightingStyleFeatOfferedForClasses, type FeatCategory } from "@/lib/srd/feats.js";
 import { effectiveMaxHitPoints, normalizeHitPoints, normalizeHitDice, type HitPoints, type HitDice } from "@/lib/combat/hitpoints.js";
 import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
@@ -461,12 +461,44 @@ async function resolveCatalogFeat(
   };
 }
 
-function resolveCustomFeat(op: TakeFeatOperation, scores: Record<string, number>): ResolvedFeat {
+// #1495: a custom feat placed in the fightingStyle slot whose NAME matches a
+// catalog Fighting Style row (case-insensitive, this edition or the shared
+// NULL-edition partition) is a pick of that style through the custom
+// channel, not genuine homebrew — the class gate must apply identically, or
+// a rejected catalog pick could be routed around by retyping it as `custom`.
+// A name matching no catalog row is untouched (real homebrew is unaffected).
+async function assertCustomFightingStyleNameEligible(
+  tx: Prisma.TransactionClient,
+  featName: string,
+  edition: RulesEdition,
+  fightingStyleClassNames: readonly string[],
+): Promise<void> {
+  const matching = await tx.feat.findFirst({
+    where: { category: "fighting_style", name: { equals: featName, mode: "insensitive" }, OR: [{ edition }, { edition: null }] },
+  });
+  if (matching && !fightingStyleFeatOfferedForClasses(matching, fightingStyleClassNames, edition)) {
+    throw new InvalidAdvancementOperationError(
+      `takeFeat: "${featName}" is not an offered Fighting Style for ${fightingStyleClassNames.join("/") || "this character"}`,
+    );
+  }
+}
+
+async function resolveCustomFeat(
+  tx: Prisma.TransactionClient,
+  op: TakeFeatOperation,
+  scores: Record<string, number>,
+  isFightingStyleSlot: boolean,
+  edition: RulesEdition,
+  fightingStyleClassNames: readonly string[],
+): Promise<ResolvedFeat> {
   const c = op.custom!;
   if (!c.name?.trim()) {
     throw new InvalidAdvancementOperationError("takeFeat: custom feat name is required");
   }
   const featName = c.name.trim();
+  if (isFightingStyleSlot) {
+    await assertCustomFightingStyleNameEligible(tx, featName, edition, fightingStyleClassNames);
+  }
   return {
     featName,
     featDescription: c.description ?? "",
@@ -500,7 +532,7 @@ async function applyTakeFeat(ctx: AdvancementOpContext, op: TakeFeatOperation): 
   const { featName, featDescription, featId: resolvedFeatId, improvements: featImprovements, abilityDeltas } =
     op.featId
       ? await resolveCatalogFeat(tx, op, scores, level, isFightingStyleSlot, ctx.edition, ctx.fightingStyleClassNames)
-      : resolveCustomFeat(op, scores);
+      : await resolveCustomFeat(tx, op, scores, isFightingStyleSlot, ctx.edition, ctx.fightingStyleClassNames);
 
   // A character can't hold the same Fighting Style twice (#1137) — dedup by
   // catalog id, else by snapshot name (custom / migrated styles carry no featId).
@@ -627,12 +659,18 @@ const ADVANCEMENT_SELECT = {
     // resolving the SAME extraAsiLevels/fightingStyleFeatLevel columns.
     // subclass/subclassRef.slug/class.subclassLevel (#1123):
     // draconicResilienceMaxHpTerm's identity inputs for the shared-tail clamp.
+    // `class.name` (#1495): the canonical catalog class name, read by
+    // fightingStyleGrantingClassNames — never the entry's own `name` column,
+    // which is a free-to-diverge display name (see CharacterClassEntry's own
+    // schema comment), the wrong source for a rule keyed on Feat.classes.
     select: {
       name: true,
       level: true,
       subclass: true,
       subclassRef: { select: { slug: true } },
-      class: { select: { extraAsiLevels: true, fightingStyleFeatLevel: true, subclassLevel: true } },
+      class: {
+        select: { name: true, extraAsiLevels: true, fightingStyleFeatLevel: true, subclassLevel: true },
+      },
     },
   },
 } satisfies Prisma.CharacterSelect;
@@ -672,12 +710,10 @@ export async function applyAdvancementOpInTx(
     level,
     totalSlots: characterAdvancementSlots(character.classEntries, level),
     fightingStyleSlotTotal: characterFightingStyleFeatSlots(character.classEntries, level),
-    // #1495: only entries that actually grant the Fighting Style feature feed
-    // the class-scope union — a non-granting multiclass entry (e.g. a Wizard
-    // dip) must not widen the offered set.
-    fightingStyleClassNames: character.classEntries
-      .filter((e) => e.class?.fightingStyleFeatLevel != null)
-      .map((e) => e.name),
+    // #1495: only entries that have actually EARNED the Fighting Style feature
+    // (not merely belong to a granting class — a Fighter1/Ranger1 multiclass
+    // hasn't reached Ranger's own L2 grant yet) feed the offered-style union.
+    fightingStyleClassNames: fightingStyleGrantingClassNames(character.classEntries, level),
     edition: editionOf(character),
   };
 

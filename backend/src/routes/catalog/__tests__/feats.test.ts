@@ -300,4 +300,29 @@ describe("GET /api/feats?classes= — 2014 Fighting Style class gate (#1495)", (
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/^Invalid classes: /);
   });
+
+  // Review finding (#1495): asiLevel's own gate (featOfferedForAsiSlot) always
+  // strips every fighting_style row before the classes filter ever runs, so
+  // combining the two params was a SILENT no-op — classes then matches only
+  // general/epic_boon rows, which are always unrestricted (Feat.classes=[]).
+  // A clear 400 beats a response that looks valid but ignores half its input.
+  it("400s when ?classes= and ?asiLevel= are combined — the two params serve disjoint feat categories", async () => {
+    const res = await supertest(app)
+      .get("/api/feats?edition=EDITION_2014&asiLevel=4&classes=Ranger")
+      .set("Cookie", COOKIE);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/classes.*asiLevel|asiLevel.*classes/i);
+  });
+
+  // Review finding (#1495): a repeated `?classes=` key (or `?classes[]=`) parses
+  // as an array under Express's query parser, not a string — the error must
+  // name that specific reason, not just "must be a non-empty list" (which
+  // reads as though the caller supplied nothing).
+  it("400s on a repeated ?classes= (array-shaped query value) with a diagnostic naming the actual problem", async () => {
+    const res = await supertest(app)
+      .get("/api/feats?edition=EDITION_2014&classes=Fighter&classes=Ranger")
+      .set("Cookie", COOKIE);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/single comma-separated/i);
+  });
 });

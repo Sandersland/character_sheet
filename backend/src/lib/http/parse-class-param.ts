@@ -67,6 +67,14 @@ export function parseClassesParam(
 ): { ok: true; classNames?: string[] } | { ok: false } {
   const raw = req.query.classes;
   if (raw === undefined) return { ok: true };
+  // A repeated `?classes=` key (or `?classes[]=`) parses as an array under
+  // Express's extended query parser, not a string — name that specific
+  // reason rather than a generic "must be non-empty" message, which reads as
+  // though nothing was supplied when in fact several values were.
+  if (Array.isArray(raw)) {
+    res.status(400).json({ error: "Invalid classes: expected a single comma-separated string, not a repeated/array query value" });
+    return { ok: false };
+  }
   if (typeof raw !== "string" || raw.trim() === "") {
     res.status(400).json({ error: "Invalid classes: must be a non-empty comma-separated class name list" });
     return { ok: false };

@@ -37,6 +37,13 @@ export const featsRouter = Router();
 // own refinement note: a class-scope param follows that pattern rather than
 // splitting filtering across layers) — harmless for every other category,
 // since their Feat.classes is always `[]` (unrestricted).
+//
+// `?classes=` and `?asiLevel=` together 400 rather than silently combining:
+// featOfferedForAsiSlot always rejects fighting_style (Origin/Fighting Style
+// come from backgrounds/classes, never an ASI slot), so asiLevel's own filter
+// strips every fighting_style row before classes ever runs — the two params
+// serve disjoint feat categories, and letting them compose would return a
+// response that looks class-scoped but silently ignores that scope.
 featsRouter.get("/feats", async (req, res) => {
   const edition = requireEditionOr400(req, res);
   if (edition === undefined) return;
@@ -48,6 +55,13 @@ featsRouter.get("/feats", async (req, res) => {
   const parsedClasses = parseClassesParam(req, res);
   if (!parsedClasses.ok) return;
   const { classNames } = parsedClasses;
+
+  if (asiLevel !== undefined && classNames !== undefined) {
+    res.status(400).json({
+      error: "Invalid classes: cannot be combined with asiLevel — asiLevel never offers a Fighting Style row",
+    });
+    return;
+  }
 
   const feats = await prisma.feat.findMany({
     orderBy: { name: "asc" },
