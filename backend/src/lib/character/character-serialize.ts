@@ -16,13 +16,14 @@ import { hasStunningStrike } from "@/lib/classes/stunning-strike.js";
 import { QUIVERING_PALM_BUFF_KEY, hasQuiveringPalm } from "@/lib/classes/quivering-palm.js";
 import { hasOpenHandTechnique } from "@/lib/classes/open-hand-technique.js";
 import { resolveSubclassSlug, type SubclassIdentityInput } from "@/lib/classes/subclass-slug.js";
+import { assassinateEligible } from "@/lib/classes/assassinate.js";
 import { featureRowsOf } from "@/lib/classes/feature-rows-select.js";
 import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
 import { normalizeActiveEffectsMutable, type ActiveEffectsMutableState } from "@/lib/combat/active-effects.js";
 import { isOffHandLocked } from "@/lib/inventory/inventory-placement.js";
 import { RULES_EDITION_LABELS, editionOf } from "@/lib/rules/edition.js";
 import { portraitKeyVersion } from "@/lib/storage/portrait-blob.js";
-import type { DiceRider, SaveRider } from "@character-sheet/shared-types";
+import type { DiceRider, RulesEdition, SaveRider } from "@character-sheet/shared-types";
 import { resolveCharacterInventory, type CharacterRow, type CharacterWithRelations } from "./character-include.js";
 import { buildRollModifiers, buildTargetModifiers } from "./serialize/effects.js";
 import {
@@ -136,6 +137,15 @@ function quiveringPalmRider(
   };
 }
 
+// Assassinate (2014 Assassin L3+, #1526): presence-only — no dice/DC, so a
+// plain `true` rather than the DiceRider/SaveRider `Rider` shapes (riders.ts:
+// "availability via presence" is exactly this case with nothing else to
+// carry). Shares assassinateEligible with resolve-action.ts's op validation
+// — see that function's own header for why it's the ONE gate both sides call.
+function assassinateRider(classEntries: RiderClassEntry[], edition: RulesEdition): true | undefined {
+  return assassinateEligible(classEntries, edition) ? true : undefined;
+}
+
 // Assembles the rider view (#1316): each key spread in only when present.
 // Kept as its own function (not inlined in serializeCharacter's return) so
 // adding a rider's gate doesn't grow serializeCharacter's own branching.
@@ -145,22 +155,26 @@ function buildRiderView(
   profBonus: number,
   activeEffects: ActiveEffectsMutableState,
   announcedSaveDC: number | undefined,
+  edition: RulesEdition,
 ): {
   sneakAttack?: DiceRider;
   stunningStrike?: SaveRider;
   openHandTechnique?: SaveRider;
   quiveringPalm?: SaveRider;
   maneuvers?: SaveRider;
+  assassinate?: true;
 } {
   const sneakAttack = sneakAttackRider(classEntries);
   const stunningStrike = stunningStrikeRider(classEntries, abilityScores, profBonus);
   const openHandTechnique = openHandTechniqueRider(classEntries, abilityScores, profBonus);
   const quiveringPalm = quiveringPalmRider(classEntries, abilityScores, profBonus, activeEffects);
+  const assassinate = assassinateRider(classEntries, edition);
   return {
     ...(sneakAttack ? { sneakAttack } : {}),
     ...(stunningStrike ? { stunningStrike } : {}),
     ...(openHandTechnique ? { openHandTechnique } : {}),
     ...(quiveringPalm ? { quiveringPalm } : {}),
+    ...(assassinate ? { assassinate } : {}),
     // Battle Master maneuver save DC, folded into the rider contract (#1316) —
     // structurally the same shape as stunningStrike, just sourced from
     // deriveEntryScopedResources via buildResourcesView. maneuverChoiceCount/
@@ -399,7 +413,14 @@ export async function serializeCharacter(rawRow: CharacterRow) {
   const attackRows = buildAttackRowsView(inventory, unarmedAttacks, clampedAdvancements);
 
   // Riders (#1316) — each key present only when the character has it.
-  const riders = buildRiderView(row.classEntries, effectiveScores, progress.proficiencyBonus, activeEffects, announcedSaveDC);
+  const riders = buildRiderView(
+    row.classEntries,
+    effectiveScores,
+    progress.proficiencyBonus,
+    activeEffects,
+    announcedSaveDC,
+    editionOf(row),
+  );
 
   // 6. Final assembly — one field per line, each fed by a builder above.
   return {
@@ -562,7 +583,8 @@ export async function serializeCharacter(rawRow: CharacterRow) {
     // weapon's die, while this one says nothing may occupy the off-hand at all.
     offHandLocked: isOffHandLocked(row.inventoryItems),
     // Riders (#1316): sneakAttack/stunningStrike/openHandTechnique/
-    // quiveringPalm/maneuvers, each present only when the character has it.
+    // quiveringPalm/maneuvers/assassinate, each present only when the
+    // character has it.
     ...riders,
 
     // Species-granted information (#1682): name + cited trait text for the

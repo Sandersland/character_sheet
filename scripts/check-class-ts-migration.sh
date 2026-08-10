@@ -36,7 +36,7 @@ NOT_YET_MIGRATED="bard cleric druid monk paladin ranger sorcerer warlock wizard"
 # check below, which fails loudly the moment a file in that directory is
 # neither here nor in ALL_CLASSES, rather than silently scanning it as
 # "migrated" (a thirteenth class's module would otherwise land unclassified).
-NON_CLASS_MODULES="ability-registry actions activation-requires channel-divinity class class-feature-rows class-features disciplines feature-rows-select focus-cast hand-of-harm hand-of-ultimate-mercy maneuver-effect maneuvers open-hand-technique quivering-palm registry resources resources-state shadow-arts sneak-attack stunning-strike subclass-slug types warrior-of-elements"
+NON_CLASS_MODULES="ability-registry actions activation-requires assassinate channel-divinity class class-feature-rows class-features disciplines feature-rows-select focus-cast hand-of-harm hand-of-ultimate-mercy maneuver-effect maneuvers open-hand-technique quivering-palm registry resources resources-state shadow-arts sneak-attack stunning-strike subclass-slug types warrior-of-elements"
 
 # Reverse check: every backend/src/lib/classes/*.ts file's basename must be
 # classified as EITHER a class (ALL_CLASSES) or shared infrastructure
@@ -167,11 +167,20 @@ fi
 #     leaves NOT_YET_MIGRATED and this file's own `\brogue\b` hits (the
 #     "Only a rogue (level 1+) has Sneak Attack" error string, the
 #     `name.toLowerCase() === "rogue"` lookup) would otherwise flag red.
+#   - classes/assassinate.ts: PERMANENT (#1526). Same shape as the
+#     sneak-attack.ts entry directly above: assassinateEligible is a rule
+#     function keyed off the rogue class entry's own level (plus its
+#     subclass slug), never routed through rogue.ts's AuthoredFeature/
+#     resourceFn machinery — ClassFeature has no descriptor column for a
+#     hit-to-crit-conversion eligibility predicate. Its own
+#     name.toLowerCase() === "rogue" lookup would otherwise flag red now
+#     that "rogue" is MIGRATED.
 FILE_ALLOWLIST="backend/src/lib/classes/subclass-slug.ts
 backend/src/lib/classes/actions.ts
 backend/src/lib/character/serialize/combat.ts
 backend/src/lib/srd/armor-class.ts
-backend/src/lib/classes/sneak-attack.ts"
+backend/src/lib/classes/sneak-attack.ts
+backend/src/lib/classes/assassinate.ts"
 
 is_allowlisted_file() {
   target="$1"

@@ -231,6 +231,13 @@ export interface Character {
    *  Masters. maneuverChoiceCount/toolProfChoiceCount stay on `resources`
    *  (they're choice counts, not save DCs). */
   maneuvers?: SaveRider;
+  /** 2014 Assassin L3+ Assassinate (#1526) — PHB'14 p.97: "any hit you score
+   *  against a creature that is surprised is a critical hit." Presence-only
+   *  (no dice/DC to carry), so a plain `true` rather than DiceRider/SaveRider;
+   *  absent below rogue L3, off-subclass, or on a 2024 character (SRD 5.2/
+   *  PHB'24 deleted the clause, #1231) — gated server-side, this key is
+   *  never re-derived on the frontend. */
+  assassinate?: true;
 
   /** Taken ASI / feat entries, in the order chosen (clamped to advancementSlots.total). */
   advancements: AdvancementEntry[];

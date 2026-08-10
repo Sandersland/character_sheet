@@ -38,6 +38,10 @@ export interface BuildResolveActionOpOptions {
   entryId?: string;
   /** Self/ally heal apply (#1833/#462) — see ResolveActionEventData's own comment. */
   apply?: { target: "self" | { characterId: string }; kind: "heal" | "damage"; amount: number };
+  /** 2014 Assassinate (#1526) — see ResolveActionEventData's own comment. Only
+   *  ever true; the wire field is omitted (not sent as `false`) for every
+   *  other swing, matching `riders`/`slotLevel`'s own omit-when-absent shape. */
+  assassinate?: boolean;
 }
 
 export function buildResolveActionOp(
@@ -45,7 +49,7 @@ export function buildResolveActionOp(
   rolls: ResolutionRolls,
   options: BuildResolveActionOpOptions = {},
 ): ResolveActionOperation {
-  const { slotLevel, riders, entryId, apply } = options;
+  const { slotLevel, riders, entryId, apply, assassinate } = options;
   return {
     type: "resolveAction",
     actionId: rolls.actionId,
@@ -61,5 +65,6 @@ export function buildResolveActionOp(
     ...(slotLevel !== undefined ? { slotLevel } : {}),
     ...(entryId !== undefined ? { entryId } : {}),
     ...(apply !== undefined ? { apply } : {}),
+    ...(assassinate ? { assassinate: true } : {}),
   };
 }

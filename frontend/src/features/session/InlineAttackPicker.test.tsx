@@ -708,3 +708,89 @@ describe("InlineAttackPicker — Precision Attack under the attack card (#809, b
     expect(ops[0].riders?.[0]).toMatchObject({ type: "slashing", kind: "damage", total: SERVER_ROLL });
   });
 });
+
+// #1526: the "target is surprised" toggle on the attack card, gated on the
+// backend-computed `character.assassinate` rider — a 2014 Assassin L3+ only.
+// Absence covers EVERY ineligible case at once (2024 Assassin, sub-L3, a
+// non-Assassin rogue): the backend already tests each gate individually
+// (assassinate.test.ts, character-serialize-assassinate.test.ts,
+// resolve-action-assassinate.test.ts's mutation-proof case) — at the wire
+// level they all collapse to `character.assassinate` being absent, and this
+// component only ever checks presence (never re-derives edition/subclass/
+// level itself, per CLAUDE.md's rules-are-backend-owned).
+describe("InlineAttackPicker — Assassinate toggle (2014 Assassin L3+, #1526)", () => {
+  it("shows the toggle for a 2014 Assassin L3+ character (character.assassinate present)", () => {
+    renderPicker(makeCharacter({ assassinate: true, attackRows: [weaponRow("Dagger", "inv-1")] }));
+    expect(screen.getByLabelText(/target is surprised/i)).toBeInTheDocument();
+  });
+
+  it("shows no toggle when character.assassinate is absent (2024 Assassin / sub-L3 / non-Assassin rogue)", () => {
+    renderPicker(makeCharacter({ assassinate: undefined, attackRows: [weaponRow("Dagger", "inv-1")] }));
+    expect(screen.queryByLabelText(/target is surprised/i)).not.toBeInTheDocument();
+  });
+
+  it("toggling surprised converts this swing's hit to a crit, attributed on the committed op — a later non-toggled swing stays normal", async () => {
+    seedMid(); // ambiguous d20 (11 kept) — non-crit, non-miss until called
+    const character = makeCharacter({
+      assassinate: true,
+      attacksPerAction: 2,
+      attackRows: [weaponRow("Dagger", "inv-1", { damageRiders: [] })],
+    });
+    renderWithCharacter(<LiveHarness character={character} />, character);
+
+    // Swing 1: check the box, THEN roll to hit — the effect converts the
+    // ambiguous roll straight to a crit, with no separate "Crit!" tap.
+    await userEvent.click(screen.getByLabelText(/target is surprised/i));
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    await waitFor(() => expect(screen.getByText(/^Crit!$/)).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole("button", { name: /^Roll crit damage$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
+
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(1));
+    const [, firstOps] = vi.mocked(applyResolveActionOperations).mock.calls[0];
+    expect(firstOps[0]).toMatchObject({ assassinate: true });
+    expect(firstOps[0].toHit).toMatchObject({ verdict: "crit" });
+    expect(firstOps[0].effect?.crit).toBe(true);
+
+    // Swing 2 (Extra Attack): the toggle reset — do NOT check it. A normal
+    // ambiguous roll stays a plain hit, not a crit — critRange itself was
+    // never touched (weaponToResolution reads character.critRange, unchanged).
+    await waitFor(() => expect(screen.getByRole("button", { name: /Roll to hit/ })).not.toBeDisabled());
+    expect(screen.getByLabelText(/target is surprised/i)).not.toBeChecked();
+
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Roll damage$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
+
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(2));
+    const [, secondOps] = vi.mocked(applyResolveActionOperations).mock.calls[1];
+    expect(secondOps[0].assassinate).toBeFalsy();
+    expect(secondOps[0].toHit).toMatchObject({ verdict: "hit" });
+    expect(secondOps[0].effect?.crit).toBe(false);
+  });
+
+  it("does not force a crit on a natural 1 — surprise cannot upgrade an auto-miss", async () => {
+    seedNat1();
+    const character = makeCharacter({
+      assassinate: true,
+      attackRows: [weaponRow("Dagger", "inv-1", { damageRiders: [] })],
+    });
+    renderWithCharacter(<LiveHarness character={character} />, character);
+
+    // Checked BEFORE rolling — the roll itself die-locks the verdict to
+    // "miss" (nat1) before AssassinateSection's effect ever gets a chance to
+    // call onCallCrit, and that call's own guard refuses on a miss anyway.
+    await userEvent.click(screen.getByLabelText(/target is surprised/i));
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    await waitFor(() => expect(screen.getByText(/Miss — nat 1/)).toBeInTheDocument());
+    expect(screen.getByLabelText(/target is surprised/i)).toBeDisabled();
+
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
+
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(1));
+    const [, ops] = vi.mocked(applyResolveActionOperations).mock.calls[0];
+    expect(ops[0].toHit).toMatchObject({ verdict: "miss" });
+    expect(ops[0].assassinate).toBeFalsy();
+  });
+});
