@@ -45,7 +45,11 @@ export function buildResourcesView(
   level: number,
   abilityScores: Record<string, number>,
   proficiencyBonus: number,
-): { resources: object | undefined; announcedSaveDC: number | undefined; classFeatureImprovements: FeatImprovement[] } {
+): {
+  resources: ReturnType<typeof buildResourcesPayload> | undefined;
+  announcedSaveDC: number | undefined;
+  classFeatureImprovements: FeatImprovement[];
+} {
   // The ONE production caller that supplies real ClassFeature rows (#1524):
   // characterInclude loaded entry.class.features (already subclassId:null
   // filtered) and entry.subclassRef.features — featuresFromRows/poolsFromRows
@@ -88,10 +92,15 @@ export function toWireFeatures(
 // Assemble the wire `resources` payload from the derived caps + stored mutable
 // state, clamping each level-gated list to its derived count (defense-in-depth
 // for characters who haven't had a reconciling XP op since their level dropped).
+// No explicit return type (#1588 review): was a widened `object`, which forced
+// every downstream reader (buildSkillsView) into an `"x" in resources` guard +
+// an `as {...}` cast to reach a single field — inferring the literal return
+// shape here instead lets ReturnType<typeof buildResourcesPayload> (used by
+// buildResourcesView below) carry every field, incl. expertiseKnown, precisely.
 function buildResourcesPayload(
   derivedRes: DerivedClassInfo,
   stored: ReturnType<typeof normalizeResourcesMutable>,
-): object {
+) {
   const clampedManeuversKnown =
     derivedRes.maneuverChoiceCount !== undefined
       ? stored.maneuversKnown.slice(0, derivedRes.maneuverChoiceCount)

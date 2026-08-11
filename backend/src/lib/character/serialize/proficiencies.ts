@@ -149,18 +149,19 @@ export function buildSavingThrowProficiencies(
 // (buildResourcesView's buildResourcesPayload) — this sets `expertise: true`
 // on exactly those skills; the frontend's skillBonus() doubles proficiency
 // bonus off that flag (already shipped before this feature, per the plan).
+// Narrowed to exactly the one field this reads (#1588 review) — was
+// `object | undefined`, which forced an `"expertiseKnown" in resources` guard
+// plus an `as {...}` cast below; buildResourcesPayload's own return type is
+// now precise enough that the caller (character-serialize.ts) passes this
+// shape directly, no cast needed at either end.
 export function buildSkillsView(
   row: CharacterWithRelations,
   featProficiencies: ReturnType<typeof deriveFeatProficiencies>,
   itemSkillProfs: Set<string>,
   buffTargets: TargetModifierMap,
-  resources: object | undefined,
+  resources: { expertiseKnown: ExpertiseEntry[] } | undefined,
 ) {
-  const expertSkills = new Set(
-    resources && "expertiseKnown" in resources
-      ? (resources as { expertiseKnown: ExpertiseEntry[] }).expertiseKnown.map((e) => e.skill)
-      : [],
-  );
+  const expertSkills = new Set((resources?.expertiseKnown ?? []).map((e) => e.skill));
   return (row.skills as { name: string; ability: string; proficient: boolean }[]).map((s) => {
     const buffs = buffTargets[s.name] ?? [];
     const tempModifier = buffs.reduce((sum, b) => sum + b.modifier, 0);
