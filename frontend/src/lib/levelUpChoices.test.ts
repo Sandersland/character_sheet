@@ -152,6 +152,40 @@ describe("CHOICE_KIND_CONFIGS", () => {
     });
   });
 
+  describe("expertise", () => {
+    const cfg = CHOICE_KIND_CONFIGS.expertise!;
+
+    // #1588: unlike maneuvers/toolProficiency (own catalog fetch), the option
+    // list IS the character's proficient skills — no server round-trip.
+    it("options are the context's proficientSkills, no catalog fetch", async () => {
+      const proficientSkills = [{ id: "stealth", name: "Stealth" }, { id: "perception", name: "Perception" }];
+      expect(await cfg.loadOptions({ targetLevel: 1, edition: "EDITION_2014", proficientSkills })).toEqual(proficientSkills);
+      expect(fetchManeuvers).not.toHaveBeenCalled();
+    });
+
+    it("defaults to no options when proficientSkills is absent from the context", async () => {
+      expect(await cfg.loadOptions({ targetLevel: 1, edition: "EDITION_2014" })).toEqual([]);
+    });
+
+    it("round-trips select → selected as learnExpertise ops", () => {
+      const patch = cfg.select(baseDraft, ["stealth", "perception"]);
+      expect(patch).toEqual({
+        expertise: [
+          { type: "learnExpertise", skill: "stealth" },
+          { type: "learnExpertise", skill: "perception" },
+        ],
+      });
+      expect(cfg.selected(patch as LevelUpDraft)).toEqual(["stealth", "perception"]);
+    });
+
+    it("fromCharacter reads already-chosen expertise skills", () => {
+      const character = characterWith({
+        expertiseKnown: [{ id: "e1", skill: "stealth" }],
+      } as Character["resources"]);
+      expect([...cfg.fromCharacter(character)]).toEqual(["stealth"]);
+    });
+  });
+
   describe("nextChoiceSelection", () => {
     it("single-select replaces the current pick", () => {
       expect(nextChoiceSelection(["a"], "b", { single: true, count: 1 })).toEqual(["b"]);
