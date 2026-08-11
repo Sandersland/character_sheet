@@ -2340,7 +2340,14 @@ describe("POST …/level-up/transactions — the served HP meta equals the commi
   it("single-class Fighter 6→7: hitPoints.max rises by exactly meta.averageGain", async () => {
     const CHAR_ID = "lvtx-hp-meta-single";
     const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
-    const champion = (await prisma.subclass.findFirstOrThrow({ where: { classId: fighter.id, name: "Champion" } })).id;
+    // No subclass (#1148): this fixture is L6→7 in 2024, exactly the level
+    // Champion's Additional Fighting Style grants a second slot, and also the
+    // level Battle Master's maneuver count grows — either would ALSO need its
+    // own choice op in the level-up submission (see the "adds a Fighter
+    // second class"/maneuver-swap tests elsewhere in this file), which is
+    // orthogonal to what this test asserts (HP preview == commit). Fine for
+    // this fixture: the subclass gate (L3) is long past, and no OTHER step
+    // here depends on which subclass is chosen.
     await prisma.character.create({
       data: {
         ...BASE,
@@ -2352,7 +2359,7 @@ describe("POST …/level-up/transactions — the served HP meta equals the commi
         hitDice: { total: 6, die: "d10", spent: 0 },
         abilityScores: { strength: 14, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 10, charisma: 10 },
         spellcasting: Prisma.JsonNull,
-        classEntries: { create: [{ name: "fighter", subclass: "Champion", subclassId: champion, classId: fighter.id, position: 0, level: 6 }] },
+        classEntries: { create: [{ name: "fighter", classId: fighter.id, position: 0, level: 6 }] },
       },
     });
     const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });

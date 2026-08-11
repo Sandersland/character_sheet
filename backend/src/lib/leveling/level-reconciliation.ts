@@ -627,7 +627,10 @@ async function reconcileAdvancements(ctx: ReconcileContext): Promise<void> {
           level: true,
           subclass: true,
           subclassRef: { select: { slug: true } },
-          class: { select: { extraAsiLevels: true, fightingStyleFeatLevel: true, subclassLevel: true } },
+          // `class.name` (#1148): characterFightingStyleFeatSlots' resolveSubclassSlug
+          // input — the CANONICAL class name, same #1495 rationale as
+          // applyAdvancementClamp's own select.
+          class: { select: { name: true, extraAsiLevels: true, fightingStyleFeatLevel: true, subclassLevel: true } },
         },
       },
     },
@@ -638,7 +641,10 @@ async function reconcileAdvancements(ctx: ReconcileContext): Promise<void> {
   if (state.advancements.length === 0) return; // nothing to trim
 
   const allowed = characterAdvancementSlots(row.classEntries, newDerivedLevel);
-  const fightingStyleAllowed = characterFightingStyleFeatSlots(row.classEntries, newDerivedLevel);
+  // edition (#1148): Champion's Additional Fighting Style second slot forks
+  // 7 (2024) vs 10 (2014) — must resolve through the SAME
+  // characterFightingStyleFeatSlots applyAdvancementClamp reads.
+  const fightingStyleAllowed = characterFightingStyleFeatSlots(row.classEntries, newDerivedLevel, edition);
 
   // Origin feats are exempt from both caps and never reversed (#1130); ASI feats
   // trim beyond `allowed`, Fighting Style feats beyond `fightingStyleAllowed`

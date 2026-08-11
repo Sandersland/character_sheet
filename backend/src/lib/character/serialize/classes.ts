@@ -158,15 +158,18 @@ export function applyAdvancementClamp(
 } {
   const storedForAdv = normalizeResourcesMutable(row.resources);
   const advSlotTotal = characterAdvancementSlots(row.classEntries, level);
+  const edition = editionOf(row);
   // Fighting Style feat cap across all class entries (#1137) — its own partition.
-  const fightingStyleSlotTotal = characterFightingStyleFeatSlots(row.classEntries, level);
+  // edition (#1148): Champion's Additional Fighting Style second slot forks 7
+  // (2024) vs 10 (2014).
+  const fightingStyleSlotTotal = characterFightingStyleFeatSlots(row.classEntries, level, edition);
   // #1495: the class names that have actually EARNED the Fighting Style
   // feature at this level — served so the picker/level-up ceremony ask the
   // server which classes to pass to GET /api/feats?classes=/the takeFeat
   // write path, rather than re-deriving the level threshold client-side
   // (CLAUDE.md: rules logic is backend-owned). Same shared rule
   // resolveCatalogFeat's own gate reads (advancement.ts).
-  const fightingStyleGrantingClasses = fightingStyleGrantingClassNames(row.classEntries, level);
+  const fightingStyleGrantingClasses = fightingStyleGrantingClassNames(row.classEntries, level, edition);
   let effectiveScores = row.abilityScores as Record<string, number>;
   let effectiveInitBonus = row.initiativeBonus;
   let effectiveHitPoints = hitPoints;

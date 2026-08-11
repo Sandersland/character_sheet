@@ -75,6 +75,7 @@ export interface ClassEntryRow {
   // deriveRestPools' ClassFeatureRowsCarrier so isSubclassActive no longer
   // depends on a lib/classes/<class>.ts module being present.
   class: {
+    name: string;
     hitDie: string;
     extraAsiLevels: number[];
     subclassLevel: number;
@@ -144,11 +145,14 @@ export async function buildHpOpContext(
           // `extraAsiLevels` (#1529): the featSlotCap read below
           // (characterAdvancementSlots). `fightingStyleFeatLevel` (#1321):
           // effectiveMaxHitPointsForRow's fs-cap arg (characterFightingStyleFeatSlots).
+          // `name` (#1148): characterFightingStyleFeatSlots' resolveSubclassSlug
+          // input — the CANONICAL class name, same #1495 rationale as elsewhere.
           // `subclassLevel` (#1576): deriveRestPools' carrier needs it so a
           // 2014 Cleric/Sorcerer/Warlock/Druid/Wizard's subclass pools still
           // gate at their PHB'14 level once the class module is gone.
           class: {
             select: {
+              name: true,
               hitDie: true,
               extraAsiLevels: true,
               fightingStyleFeatLevel: true,

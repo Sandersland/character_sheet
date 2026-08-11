@@ -90,6 +90,9 @@ const TARGET_ENTRY_SELECT = {
       // entry, not just the target) — the same two columns buildHpOpContext
       // selects for its own row.classEntries. `subclassLevel` (#1123):
       // draconicResilienceMaxHpTerm's 2014-gate input, same composition.
+      // `name` (#1148): characterFightingStyleFeatSlots' resolveSubclassSlug
+      // input — the CANONICAL class name, same #1495 rationale as elsewhere.
+      name: true,
       extraAsiLevels: true,
       fightingStyleFeatLevel: true,
       subclassLevel: true,
@@ -141,6 +144,12 @@ type TargetEntryRow = Prisma.CharacterClassEntryGetPayload<{ select: typeof TARG
 interface ResolvedTargetEntry {
   targetClassName: string;
   persistedSubclass: string | null;
+  // #1148 review finding: the PERSISTED subclass's own FK slug — resolveSubclassSlug's
+  // preferred identity path (#1277), alongside targetClassName above (its
+  // classKey input). Without this, fightingStyleFeatStep's resolveSubclassSlug
+  // call had only the exact-name fallback, silently missing a Champion whose
+  // CharacterClassEntry.subclass text had drifted from "Champion".
+  persistedSubclassRef: { slug: string } | null;
   // #1631: the PERSISTED subclass's own catalog id (subclassRef.id) — null
   // when no subclass is chosen yet. Distinct from persistedSubclass (a name)
   // because loadSubclassSpellListExpansionIds keys on id, mirroring
@@ -169,6 +178,24 @@ function persistedSubclassIdOf(entry: TargetEntryRow): string | null {
   return entry.subclassRef?.id ?? null;
 }
 
+// #1148 review finding: the CANONICAL catalog class name (entry.class.name),
+// never entry.name — CharacterClassEntry's own `name` column is a
+// free-to-diverge display name (#1495's same rationale), and
+// resolveSubclassSlug's FK-first path requires the classKey it's called
+// with to match SUBCLASS_IDENTITY's classKey or the FK is silently
+// rejected (subclass-slug.ts's own class-mismatch guard). Split out
+// alongside persistedSubclassIdOf/persistedSubclassRefOf, same #1631 reason.
+function canonicalClassNameOf(entry: TargetEntryRow): string {
+  return entry.class?.name ?? entry.name;
+}
+
+// The PERSISTED subclass's own FK slug — resolveSubclassSlug's preferred
+// identity path (#1277), alongside canonicalClassNameOf above (its classKey
+// input). Same #1631 split reason as persistedSubclassIdOf.
+function persistedSubclassRefOf(entry: TargetEntryRow): { slug: string } | null {
+  return entry.subclassRef ? { slug: entry.subclassRef.slug } : null;
+}
+
 function resolveExistingTargetEntry(
   target: Extract<LevelUpTarget, { kind: "existing" }>,
   classEntries: TargetEntryRow[],
@@ -178,8 +205,9 @@ function resolveExistingTargetEntry(
   const entry = classEntries.find((e) => e.id === target.classEntryId);
   if (!entry) throw new InvalidLevelUpError(`Class entry not found: ${target.classEntryId}`);
   return {
-    targetClassName: entry.name,
+    targetClassName: canonicalClassNameOf(entry),
     persistedSubclass: entry.subclass,
+    persistedSubclassRef: persistedSubclassRefOf(entry),
     persistedSubclassId: persistedSubclassIdOf(entry),
     newLevel: isMulticlass ? entry.level + 1 : hitDiceTotal + 1,
     classId: entry.classId,
@@ -199,6 +227,7 @@ async function resolveNewTargetEntry(target: Extract<LevelUpTarget, { kind: "new
   return {
     targetClassName: catalog.name,
     persistedSubclass: null,
+    persistedSubclassRef: null, // a brand new entry has no persisted subclass
     persistedSubclassId: null, // a brand new entry has no persisted subclass
     newLevel: 1,
     classId: target.classId,
@@ -296,7 +325,7 @@ export async function resolveLevelUpContext(
   const hitDice = normalizeHitDice(character.hitDice);
 
   const {
-    targetClassName, persistedSubclass, persistedSubclassId, newLevel, classId, targetIsPrimary,
+    targetClassName, persistedSubclass, persistedSubclassRef, persistedSubclassId, newLevel, classId, targetIsPrimary,
     catalogHitDie, classFeatureRows, subclassFeatureRows,
   } = await resolveTargetEntry(target, character.classEntries, isMulticlass, hitDice.total);
 
@@ -326,6 +355,7 @@ export async function resolveLevelUpContext(
     targetEntry: {
       name: targetClassName,
       subclass: persistedSubclass,
+      subclassRef: persistedSubclassRef,
       newLevel,
       subclassLevel,
       hitDie,

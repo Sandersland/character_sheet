@@ -53,7 +53,9 @@ export async function applyHealInTx(
           name: true,
           subclass: true,
           subclassRef: { select: { slug: true } },
-          class: { select: { extraAsiLevels: true, fightingStyleFeatLevel: true, subclassLevel: true } },
+          // `name` (#1148): characterFightingStyleFeatSlots' resolveSubclassSlug
+          // input — the CANONICAL class name, same #1495 rationale as elsewhere.
+          class: { select: { name: true, extraAsiLevels: true, fightingStyleFeatLevel: true, subclassLevel: true } },
         },
       },
     },

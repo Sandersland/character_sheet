@@ -709,6 +709,7 @@ export async function applyAdvancementOpInTx(
 
   const level = levelForExperience(character.experiencePoints);
   proficiencyBonusForLevel(level); // validate level is reachable (side-effect-free)
+  const edition = editionOf(character);
 
   const ctx: AdvancementOpContext = {
     tx,
@@ -719,12 +720,14 @@ export async function applyAdvancementOpInTx(
     state: normalizeResourcesMutable(character.resources),
     level,
     totalSlots: characterAdvancementSlots(character.classEntries, level),
-    fightingStyleSlotTotal: characterFightingStyleFeatSlots(character.classEntries, level),
+    // edition (#1148): Champion's Additional Fighting Style second slot forks
+    // 7 (2024) vs 10 (2014).
+    fightingStyleSlotTotal: characterFightingStyleFeatSlots(character.classEntries, level, edition),
     // #1495: only entries that have actually EARNED the Fighting Style feature
     // (not merely belong to a granting class — a Fighter1/Ranger1 multiclass
     // hasn't reached Ranger's own L2 grant yet) feed the offered-style union.
-    fightingStyleClassNames: fightingStyleGrantingClassNames(character.classEntries, level),
-    edition: editionOf(character),
+    fightingStyleClassNames: fightingStyleGrantingClassNames(character.classEntries, level, edition),
+    edition,
   };
 
   const before = snapshotAdvancementState(ctx.scores, ctx.hp, ctx.initBonus, ctx.state);
