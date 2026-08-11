@@ -266,8 +266,10 @@ export function useTurnActions({
   }
 
   // No-server-effect reminder actions (e.g. Shadow Step): the rule text is the
-  // whole deliverable, so surface it on use.
-  function surfaceReminder(key: string, cost: "action" | "bonusAction" | "reaction") {
+  // whole deliverable, so surface it on use. Takes the served card's own cost
+  // (Action Surge's is "special", #1852) — only "reaction" routes to the
+  // reaction strip, everything else to the effect strip.
+  function surfaceReminder(key: string, cost: AvailableAction["cost"]) {
     const reminder = availableActions.find((a) => a.key === key)?.reminder;
     if (!reminder) return;
     if (cost === "reaction") setReactionMessage(reminder);
@@ -345,6 +347,10 @@ export function useTurnActions({
     try {
       await spendActionSurge();
       grantExtraAction();
+      // The served actionSurge card carries a reminder only when the backend
+      // attached one (Arcane Charge, #1852 — an Eldritch Knight L15+ under
+      // 2014 rules); surfaceReminder is a no-op without it.
+      surfaceReminder("actionSurge", "special");
     } catch {
       // error already carries the message via useTurnActionMutations.
     }

@@ -357,6 +357,40 @@ describe("TurnHub — action economy", () => {
     expect(screen.getByRole("button", { name: "Use Action" })).toBeInTheDocument();
   });
 
+  // Arcane Charge (#1852): the backend attaches the teleport reminder to the
+  // served actionSurge card for a 2014 Eldritch Knight L15+ only — the surge
+  // press surfaces whatever reminder the wire carries and shows nothing when
+  // the card carries none, so no rule is re-derived client-side.
+  it("Action Surge surfaces the served Arcane Charge reminder after a successful surge", async () => {
+    const user = userEvent.setup();
+    const reminder =
+      "Arcane Charge: teleport up to 30 ft to an unoccupied space you can see (before or after the additional action).";
+    const base = makeCharacter();
+    renderHub({
+      ...base,
+      availableActions: [
+        ...(base.availableActions ?? []),
+        { key: "actionSurge", name: "Action Surge", cost: "special", enabled: true, resolverKind: "simple-confirm", reminder },
+      ],
+    } as Character);
+    await startTurn(user);
+
+    await user.click(screen.getByRole("button", { name: /Action Surge/ }));
+
+    await waitFor(() => expect(screen.getByText(reminder)).toBeInTheDocument());
+  });
+
+  it("Action Surge surfaces no reminder when the served card carries none", async () => {
+    const user = userEvent.setup();
+    renderHub();
+    await startTurn(user);
+
+    await user.click(screen.getByRole("button", { name: /Action Surge/ }));
+
+    await waitFor(() => expect(applyActionTransactions).toHaveBeenCalled());
+    expect(screen.queryByText(/Arcane Charge/)).not.toBeInTheDocument();
+  });
+
   it("Lay on Hands opens the input and heals for the entered amount", async () => {
     const user = userEvent.setup();
     renderHub();
