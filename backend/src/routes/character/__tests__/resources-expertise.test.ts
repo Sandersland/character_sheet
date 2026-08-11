@@ -128,3 +128,79 @@ describe("POST /api/characters/:id/resources/transactions — learnExpertise/for
     expect(res.status).toBe(400);
   });
 });
+
+// Opus review regression (#1588): expertiseChoiceCount must SUM across
+// grantor entries in a multiclass, never overlay defined-wins (registry.ts's
+// overlayExtrasFields) — a 2014 Rogue 6 / Bard 3 grants 4 + 2 = 6, not
+// whichever entry's own count happened to apply last. Exercises the full
+// stack the pure derive-entry-scoped-resources.test.ts unit test can't: the
+// learn cap (applyLearnExpertiseOp) and the clamp-on-read
+// (buildResourcesPayload) both read the same summed field, so a real
+// multiclass character must actually be ABLE to learn all 6 and see all 6
+// survive a re-read, not just derive the number 6 in isolation.
+describe("POST /api/characters/:id/resources/transactions — multiclass expertiseChoiceCount sums, never clobbers (#1588)", () => {
+  const MULTI_FIXTURE_ID = "test-resources-expertise-multiclass-1";
+  const multiUrl = `/api/characters/${MULTI_FIXTURE_ID}/resources/transactions`;
+
+  async function postMulti(operations: unknown[]) {
+    return agent().post(multiUrl).send({ operations });
+  }
+
+  beforeEach(async () => {
+    const bardClassId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Bard" } })).id;
+    await prisma.character.create({
+      data: {
+        ...FIXTURE_BASE,
+        id: MULTI_FIXTURE_ID,
+        name: "Resources Expertise Test Rogue6/Bard3",
+        experiencePoints: 23000, // total level 9 (rogue 6 + bard 3)
+        hitDice: { total: 9, die: "d8" },
+        // Proficient in 7 skills — the full summed cap (4 + 2) plus one spare
+        // (insight) so the "beyond cap" assertion below tests the CAP, not
+        // proficiency — a non-proficient pick would 400 for the wrong reason.
+        skills: [
+          { name: "stealth", ability: "dexterity", proficient: true },
+          { name: "perception", ability: "wisdom", proficient: true },
+          { name: "acrobatics", ability: "dexterity", proficient: true },
+          { name: "athletics", ability: "strength", proficient: true },
+          { name: "performance", ability: "charisma", proficient: true },
+          { name: "persuasion", ability: "charisma", proficient: true },
+          { name: "insight", ability: "wisdom", proficient: true },
+        ],
+        ownerId: OWNER_ID,
+        classEntries: {
+          create: [
+            { name: "rogue", classId: rogueClassId, position: 0, level: 6 },
+            { name: "bard", classId: bardClassId, position: 1, level: 3 },
+          ],
+        },
+      },
+    });
+  });
+
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { id: MULTI_FIXTURE_ID } });
+  });
+
+  it("the learn cap allows all 6 picks (Rogue's 4 + Bard's 2, summed not clobbered)", async () => {
+    const skills = ["stealth", "perception", "acrobatics", "athletics", "performance", "persuasion"];
+    const res = await postMulti(skills.map((skill) => ({ type: "learnExpertise", skill })));
+    expect(res.status).toBe(200);
+    expect((res.body.resources as { expertiseChoiceCount?: number }).expertiseChoiceCount).toBe(6);
+    expect(expertSkillNames(res)).toEqual(skills);
+
+    // A 7th pick — "insight", proficient but beyond the summed cap of 6 — is
+    // rejected on the CAP, not on proficiency (which would pass for the wrong reason).
+    const seventh = await postMulti([{ type: "learnExpertise", skill: "insight" }]);
+    expect(seventh.status).toBe(400);
+  });
+
+  it("the clamp-on-read keeps all 6 on a fresh GET (not clamped down to 2 or 4)", async () => {
+    const skills = ["stealth", "perception", "acrobatics", "athletics", "performance", "persuasion"];
+    await postMulti(skills.map((skill) => ({ type: "learnExpertise", skill })));
+
+    const check = await agent().get(`/api/characters/${MULTI_FIXTURE_ID}`);
+    expect(expertSkillNames(check)).toEqual(skills);
+    expect((check.body.resources as { expertiseChoiceCount?: number }).expertiseChoiceCount).toBe(6);
+  });
+});

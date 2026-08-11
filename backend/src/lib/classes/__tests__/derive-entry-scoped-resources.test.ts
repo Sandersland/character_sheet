@@ -32,12 +32,32 @@ const ROGUE_EXPERTISE_ROW: ClassFeatureRow = {
   ],
 };
 
+// Mirrors Bard's real 2014 seed row (bard-features.ts): 2 skills at L3, 4 at L10.
+const BARD_EXPERTISE_ROW: ClassFeatureRow = {
+  name: "Expertise",
+  level: 3,
+  description: "Choose two of your skill proficiencies. Your proficiency bonus is doubled for those skills.",
+  edition: "EDITION_2014",
+  derivedStat: "expertiseChoiceCount",
+  derivedStatTiers: [
+    { minLevel: 3, value: 2 },
+    { minLevel: 10, value: 4 },
+  ],
+};
+
 function rogueEntriesAtLevel(level: number) {
   return [{ name: "rogue", subclass: undefined, level }];
 }
 
 function getRows(): ClassFeatureRowsCarrier {
   return { classRows: [ROGUE_EXPERTISE_ROW], subclassRows: [] };
+}
+
+// Per-entry row lookup for the multiclass test below — mirrors production's
+// featureRowsOf, which resolves each class ENTRY's own rows independently.
+function getRowsByClassName(entry: { name: string }): ClassFeatureRowsCarrier {
+  const row = entry.name === "rogue" ? ROGUE_EXPERTISE_ROW : BARD_EXPERTISE_ROW;
+  return { classRows: [row], subclassRows: [] };
 }
 
 describe("expertiseChoiceCount derivation (#1588)", () => {
@@ -55,5 +75,20 @@ describe("expertiseChoiceCount derivation (#1588)", () => {
 
     const wrongEdition = deriveEntryScopedResources(rogueEntriesAtLevel(1), 1, ABILITIES, 2, "EDITION_2024", getRows);
     expect(wrongEdition.derived?.expertiseChoiceCount).toBeUndefined();
+  });
+
+  // Regression for the multiclass clobber bug (Opus review, #1588): four
+  // classes grant Expertise, so two grantor entries on ONE character is real
+  // RAW territory, not a misconfiguration — overlayExtrasFields must SUM
+  // expertiseChoiceCount across entries (like subclassChoices' concat), never
+  // defined-wins overlay it (like maneuverChoiceCount/toolProfChoiceCount,
+  // which stay single-source — Battle Master only — so overlay is safe there).
+  it("SUMS expertiseChoiceCount across two grantor entries in a multiclass (Rogue 6 / Bard 3, 2014: 4 + 2 = 6)", () => {
+    const entries = [
+      { name: "rogue", subclass: undefined, level: 6 },
+      { name: "bard", subclass: undefined, level: 3 },
+    ];
+    const { derived } = deriveEntryScopedResources(entries, 9, ABILITIES, 4, "EDITION_2014", getRowsByClassName);
+    expect(derived?.expertiseChoiceCount).toBe(6);
   });
 });
