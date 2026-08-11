@@ -26,6 +26,12 @@ export interface SubclassSeed {
   // are non-SRD and unverifiable, so no 2024 rows are authored and both are
   // tagged EDITION_2014 here in the same commit.
   edition?: SeedEdition;
+  // Third-caster identity (#1531) — omitted (both NULL) for every subclass
+  // that grants no spellcasting of its own. Both must be set together (a
+  // caster without an ability, or vice versa, is a malformed row) — enforced
+  // below by subclassSeedSchema's refine.
+  casterFraction?: "third";
+  spellcastingAbility?: string;
 }
 
 // Validated at seed time (prisma/seed/validate.ts) — a malformed row fails the
@@ -33,15 +39,25 @@ export interface SubclassSeed {
 // z.enum(SUBCLASS_SLUGS) rejects a typo'd slug the SAME way the SubclassSlug
 // union rejects it at compile time (M1, #1277); the cross-row duplicate-slug
 // check (M2) catches what no type can — two rows sharing one slug.
-export const subclassSeedSchema = z.object({
-  className: z.string().min(1),
-  name: z.string().min(1),
-  description: z.string().min(1),
-  slug: z.enum(SUBCLASS_SLUGS),
-  // Derives from ALL_RULES_EDITIONS (#1527), never a literal array — a third
-  // edition becomes seedable here the moment it's added to RulesEdition.
-  edition: z.enum(ALL_RULES_EDITIONS).optional(),
-});
+export const subclassSeedSchema = z
+  .object({
+    className: z.string().min(1),
+    name: z.string().min(1),
+    description: z.string().min(1),
+    slug: z.enum(SUBCLASS_SLUGS),
+    // Derives from ALL_RULES_EDITIONS (#1527), never a literal array — a third
+    // edition becomes seedable here the moment it's added to RulesEdition.
+    edition: z.enum(ALL_RULES_EDITIONS).optional(),
+    casterFraction: z.literal("third").optional(),
+    spellcastingAbility: z.string().min(1).optional(),
+  })
+  // #1531: casterFraction/spellcastingAbility are a pair — a row setting one
+  // without the other is malformed (a caster with no ability, or an ability
+  // orphaned from any fraction), so this fails the seed loudly rather than
+  // writing a half-set Subclass row.
+  .refine((row) => Boolean(row.casterFraction) === Boolean(row.spellcastingAbility), {
+    message: "casterFraction and spellcastingAbility must be set together, or not at all",
+  });
 
 export const SUBCLASSES: SubclassSeed[] = [
   // ── Fighter ────────────────────────────────────────────────────────────────
@@ -65,6 +81,12 @@ export const SUBCLASSES: SubclassSeed[] = [
     description:
       "A warrior who weaves abjuration and evocation magic into combat. You gain spellcasting using Intelligence, following the third-caster progression (slots start at level 3).",
     slug: "fighter-eldritch-knight",
+    // #1531: SRD 5.1 (Fighter → Martial Archetype: Eldritch Knight). This row
+    // is edition-NULL (shared), so one value pair serves both editions — no
+    // SRD 5.2 citation needed (see subclass-slug.ts's SUBCLASS_IDENTITY note
+    // on why no edition fork exists here).
+    casterFraction: "third",
+    spellcastingAbility: "intelligence",
   },
   // ── Wizard ────────────────────────────────────────────────────────────────
   // Bladesinging (#1676): TCoE (Tasha's Cauldron of Everything) p. 76 is the
@@ -110,6 +132,10 @@ export const SUBCLASSES: SubclassSeed[] = [
     description:
       "You combine roguish skill with arcane magic, learning enchantment and illusion spells using Intelligence following the third-caster progression. Mage Hand becomes an extension of your cunning.",
     slug: "rogue-arcane-trickster",
+    // #1531: SRD 5.1 (Rogue → Roguish Archetype: Arcane Trickster) — same
+    // edition-NULL shape as Eldritch Knight above.
+    casterFraction: "third",
+    spellcastingAbility: "intelligence",
   },
   {
     className: "Rogue",

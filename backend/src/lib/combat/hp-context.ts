@@ -83,7 +83,9 @@ export interface ClassEntryRow {
   } | null;
   // `slug` (#1123): draconicResilienceMaxHpTerm's FK identity input
   // (effectiveMaxHitPointsForRow) — the select below carries it too.
-  subclassRef: { slug: string; features: ClassFeatureRow[] } | null;
+  // `casterFraction`/`spellcastingAbility` (#1531): restoreWarlockPactSlots'
+  // deriveMulticlassSpellcasting call (rest.ts) needs the third-caster columns.
+  subclassRef: { slug: string; features: ClassFeatureRow[]; casterFraction: "third" | null; spellcastingAbility: string | null } | null;
 }
 
 export interface HpOpResult {
@@ -160,7 +162,9 @@ export async function buildHpOpContext(
               features: FEATURE_ROWS_CLASS_FEATURES,
             },
           },
-          subclassRef: { select: { slug: true, features: FEATURE_ROWS_SUBCLASS_FEATURES } },
+          subclassRef: {
+            select: { slug: true, casterFraction: true, spellcastingAbility: true, features: FEATURE_ROWS_SUBCLASS_FEATURES },
+          },
         },
       },
     },

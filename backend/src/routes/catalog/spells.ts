@@ -14,7 +14,7 @@ import { editionOf } from "@/lib/rules/edition.js";
 import { classesOf, resolveSpellCatalogForEdition, SPELL_CLASS_MEMBERSHIP_SELECT } from "@/lib/spellcasting/spell-classes.js";
 import { undefinedSpellEffectFields } from "@/lib/spellcasting/spell-effect-fields.js";
 import { loadSubclassSpellListExpansionIds } from "@/lib/spellcasting/spell-list-expansion.js";
-import { spellListsFor } from "@/lib/srd/spellcasting-tables.js";
+import { spellListsFor, type SubclassCasterRef } from "@/lib/srd/spellcasting-tables.js";
 
 export const spellsRouter = Router();
 
@@ -109,31 +109,32 @@ async function resolveViewer(
   return resolveCharacterViewer(userId, characterId);
 }
 
-// Resolves `?subclassId=` to the catalog Subclass row's own NAME (#1825) — the
-// key spellListsFor's third-caster redirect checks (THIRD_CASTER_SUBCLASSES,
-// spellcasting-tables.ts), same free-text-name key that module's every other
-// third-caster check already uses. An id naming no row, the WRONG edition's row
-// (crossEditionRejection, #1345 catalog-id-edition-guard), or a subclass whose
-// class is NOT the queried `?class=` all resolve to null — same "no widening"
-// posture parseSubclassIdParam's own doc comment takes for an unrecognized id.
-// The class-ownership check is load-bearing: spellListsFor's third-caster
-// redirect fires on the subclass NAME before it inspects className, so without
-// it `?class=cleric&subclassId=<Eldritch Knight id>` would serve wizard spells
-// to a cleric query. Never a 400 here: this is a read-only widening filter, not
-// a mutation endpoint, so a mismatched/wrong-edition id is inert, not rejected.
-async function resolveSubclassName(
+// Resolves `?subclassId=` to the catalog Subclass row's own third-caster
+// identity (#1531: casterFraction/spellcastingAbility columns) — the fact
+// spellListsFor's third-caster redirect now reads, replacing the retired
+// THIRD_CASTER_SUBCLASSES name-keyed lookup (spellcasting-tables.ts). An id
+// naming no row, the WRONG edition's row (crossEditionRejection, #1345
+// catalog-id-edition-guard), or a subclass whose class is NOT the queried
+// `?class=` all resolve to null — same "no widening" posture
+// parseSubclassIdParam's own doc comment takes for an unrecognized id. The
+// class-ownership check is load-bearing: spellListsFor's third-caster redirect
+// must not fire before it inspects className, so without it
+// `?class=cleric&subclassId=<Eldritch Knight id>` would serve wizard spells to
+// a cleric query. Never a 400 here: this is a read-only widening filter, not a
+// mutation endpoint, so a mismatched/wrong-edition id is inert, not rejected.
+async function resolveSubclassCasterRef(
   subclassId: string | undefined,
   className: string,
   edition: RulesEdition,
-): Promise<string | null> {
+): Promise<SubclassCasterRef | null> {
   if (!subclassId) return null;
   const row = await prisma.subclass.findUnique({
     where: { id: subclassId },
-    select: { name: true, edition: true, class: { select: { name: true } } },
+    select: { casterFraction: true, spellcastingAbility: true, edition: true, class: { select: { name: true } } },
   });
   if (!row || crossEditionRejection(row, "Subclass", edition)) return null;
   if (row.class.name.toLowerCase() !== className) return null;
-  return row.name;
+  return { casterFraction: row.casterFraction, spellcastingAbility: row.spellcastingAbility };
 }
 
 /**
@@ -198,9 +199,9 @@ async function loadResolvedSpells(
   const resolved = resolveSpellCatalogForEdition(owned, edition);
   if (!className) return resolved;
 
-  const [expandedSpellIds, subclassName] = await Promise.all([
+  const [expandedSpellIds, subclassCasterRef] = await Promise.all([
     loadSubclassSpellListExpansionIds(subclassId, edition).then((ids) => new Set(ids)),
-    resolveSubclassName(subclassId, className, edition),
+    resolveSubclassCasterRef(subclassId, className, edition),
   ]);
   // #1825: routed through the SAME resolver the level-up gate uses, so a
   // third-caster subclass's `?class=fighter&subclassId=<EK id>` picker widens
@@ -216,7 +217,7 @@ async function loadResolvedSpells(
   // always a concrete list here and no unrestricted-null case can arise. The
   // `?subclassId=` list-EXPANSION union (Warlock patrons) stays additive on
   // top, unchanged.
-  const spellLists = spellListsFor(className, 1, subclassName, edition).spells ?? [];
+  const spellLists = spellListsFor(className, 1, subclassCasterRef, edition).spells ?? [];
   return resolved.filter(
     (row) => classesOf(row).some((c) => spellLists.includes(c)) || expandedSpellIds.has(row.id),
   );
@@ -271,7 +272,8 @@ async function loadResolvedSpells(
  * than a bare `.includes(className)` — keeps the class check scoped to the
  * edition actually being served AND routes `?subclassId=`'s third-caster
  * redirect (#1825: Eldritch Knight/Arcane Trickster → the wizard list, off
- * the resolved subclass row's own name) through the SAME resolver the
+ * the resolved subclass row's own casterFraction/spellcastingAbility columns,
+ * #1531) through the SAME resolver the
  * level-up gate uses (newSpellsStep/assertOnSpellList), so the two paths
  * cannot diverge on which list a class+subclass resolves to. The served JSON
  * still flattens back to `classes: string[]` via classesOf, so

@@ -311,7 +311,14 @@ async function reconcilePreparedSpells(ctx: ReconcileContext): Promise<void> {
       abilityScores: true,
       classEntries: {
         orderBy: { position: "asc" as const },
-        select: { name: true, level: true, subclass: true },
+        // `subclassRef` (#1531): derivePreparedSpellLimit resolves third-caster
+        // identity off the Subclass row's casterFraction/spellcastingAbility
+        // columns, not the free-text `subclass` name — this select must carry
+        // it or this write-side reconciler and buildSpellcastingView's
+        // clamp-on-read (which reads it through characterInclude) would
+        // resolve DIFFERENT caps for the same Eldritch Knight/Arcane
+        // Trickster character (CLAUDE.md's "one shared rule function" clause).
+        select: { name: true, level: true, subclassRef: { select: { casterFraction: true, spellcastingAbility: true } } },
       },
     },
   });
@@ -321,7 +328,7 @@ async function reconcilePreparedSpells(ctx: ReconcileContext): Promise<void> {
   const entries = row.classEntries.map((e) => ({
     name: e.name,
     level: effectiveEntryLevel(e.level, row.classEntries.length, newDerivedLevel),
-    subclass: e.subclass,
+    subclassRef: e.subclassRef,
   }));
   // Deliberate-coupling latch (#1507 D2/D3): resolves through the same
   // derivePreparedSpellLimit as buildSpellcastingView's clamp-on-read

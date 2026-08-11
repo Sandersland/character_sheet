@@ -5,7 +5,7 @@
 
 import { PROFICIENCY_KINDS, type SnapshotCapability } from "@character-sheet/contracts";
 
-import { casterFractionFor } from "@/lib/srd/srd.js";
+import { casterFractionFor, type SubclassCasterRef } from "@/lib/srd/srd.js";
 import type {
   ActivatedDurationKind,
   ActivationType,
@@ -863,7 +863,7 @@ export interface AttunementPrereq {
 
 // The character facts an attunement prerequisite is checked against.
 export interface AttunementSubject {
-  classEntries: { name: string; subclass?: string | null }[];
+  classEntries: { name: string; subclassRef?: SubclassCasterRef | null }[];
   raceName: string | null;
   alignment: string | null;
 }
@@ -900,7 +900,7 @@ export function meetsAttunementPrereq(prereq: AttunementPrereq, subject: Attunem
   const want = (prereq.value ?? "").trim().toLowerCase();
   switch (prereq.kind) {
     case "spellcaster":
-      return subject.classEntries.some((e) => casterFractionFor(e.name, e.subclass) !== "none");
+      return subject.classEntries.some((e) => casterFractionFor(e.name, e.subclassRef) !== "none");
     case "class":
       return subject.classEntries.some((e) => e.name.trim().toLowerCase() === want);
     case "species":

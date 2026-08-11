@@ -468,3 +468,103 @@ describe("prepared-spell reconciliation — 2014 known caster (#1507)", () => {
     expect(await eventsByType("recon-bard-read", "unprepareSpell" as ReconEventType)).toHaveLength(0);
   });
 });
+
+// #1531, arbiter AC: reconcilePreparedSpells' select gained `subclassRef` so it
+// and buildSpellcastingView's clamp-on-read resolve an Eldritch Knight's
+// third-caster prepared cap through the SAME derivePreparedSpellLimit call —
+// mirrors the Bard 2014 write-side/read-side pair above exactly, proving the
+// reconciler's select widening actually landed (a reconciler still missing
+// `subclassRef` would see the entry as a non-caster at every level and never
+// trim, while the read-side clamp — fed by characterInclude, unaffected by
+// that select — would still visually clamp the SERVED count; the write-side
+// test below distinguishes the two by asserting the PERSISTED unprepareSpell
+// event actually fired, not just the served number).
+function thirteenPreparedEldritchKnightSpells() {
+  return Array.from({ length: 13 }, (_, i) => ({
+    id: `ek-spell-${i + 1}`,
+    name: `Eldritch Knight Spell ${i + 1}`,
+    level: 1,
+    school: "abjuration",
+    prepared: true,
+    castingTime: "1 action",
+    range: "60 ft",
+    duration: "Instantaneous",
+    description: "Placeholder.",
+  }));
+}
+
+describe("prepared-spell reconciliation — Eldritch Knight third caster (#1531)", () => {
+  // Fighter 4 → THIRD_CASTER_PREPARED[4-3] = 4 (still gate-active, level >= 3);
+  // Fighter 20 → THIRD_CASTER_PREPARED[20-3] = 13 (spellcasting-tables.ts).
+  const XP_LVL_4 = 2700;
+  const XP_LVL_20 = 355000;
+  let fighterClassId: string;
+  let eldritchKnightSubclassId: string;
+
+  beforeAll(async () => {
+    fighterClassId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } })).id;
+    eldritchKnightSubclassId = (await prisma.subclass.findFirstOrThrow({ where: { slug: "fighter-eldritch-knight" } })).id;
+  });
+
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { name: { startsWith: "ReconEK" } } });
+  });
+
+  async function createEldritchKnight(id: string, level: 4 | 20) {
+    return prisma.character.create({
+      data: {
+        ...BASE_CHARACTER,
+        ownerId: OWNER_ID,
+        id,
+        name: `ReconEK ${id}`,
+        experiencePoints: level === 20 ? XP_LVL_20 : XP_LVL_4,
+        hitPoints: { current: 100, max: 100, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: level, die: "d10", spent: 0 },
+        abilityScores: { ...BASE_ABILITY_SCORES, intelligence: 16 },
+        spellcasting: { slotsUsed: {}, arcanumUsed: {}, concentratingOn: null, spells: thirteenPreparedEldritchKnightSpells() },
+        classEntries: {
+          create: [{
+            name: "fighter",
+            classId: fighterClassId,
+            subclass: "Eldritch Knight",
+            subclassId: eldritchKnightSubclassId,
+            position: 0,
+            level,
+          }],
+        },
+      },
+    });
+  }
+
+  it("write-side: reconcilePreparedSpells trims 13 prepared -> 4 on Fighter/EK 20->4, one unprepareSpell event naming the new cap", async () => {
+    await createEldritchKnight("recon-ek-write", 20);
+    const res = await postXp("recon-ek-write", { operations: [{ type: "set", value: XP_LVL_4 }] });
+    expect(res.status).toBe(200);
+    expect(res.body.spellcasting.preparedSpellLimit).toBe(4);
+    expect(res.body.spellcasting.preparedSpellCount).toBe(4);
+
+    const [ev] = await eventsByType("recon-ek-write", "unprepareSpell" as ReconEventType);
+    expect(ev.category).toBe("spellcasting");
+    expect(ev.data).toMatchObject({ trimmedCount: 9, limit: 4 });
+    const before = ev.before as { spellcasting: { spells: Array<{ id: string; prepared: boolean }> } };
+    const after = ev.after as { spellcasting: { spells: Array<{ id: string; prepared: boolean }> } };
+    expect(before.spellcasting.spells.filter((s) => s.prepared)).toHaveLength(13);
+    expect(after.spellcasting.spells.filter((s) => s.prepared)).toHaveLength(4);
+
+    // Persisted, not just served: re-fetch straight from Postgres to prove the
+    // reconciler actually WROTE the trim, rather than the read-side clamp
+    // alone making the served number look right.
+    const persisted = await prisma.character.findUniqueOrThrow({ where: { id: "recon-ek-write" } });
+    const persistedSpells = (persisted.spellcasting as { spells: Array<{ prepared: boolean }> }).spells;
+    expect(persistedSpells.filter((s) => s.prepared)).toHaveLength(4);
+  });
+
+  it("read-side: buildSpellcastingView clamps an over-cap blob written directly (no XP op, reconciler never runs) to the same 4", async () => {
+    await createEldritchKnight("recon-ek-read", 4);
+    const res = await supertest(app).get("/api/characters/recon-ek-read").set("Cookie", COOKIE);
+    expect(res.status).toBe(200);
+    expect(res.body.spellcasting.preparedSpellLimit).toBe(4);
+    expect(res.body.spellcasting.preparedSpellCount).toBe(4);
+    expect(await eventsByType("recon-ek-read", "unprepareSpell" as ReconEventType)).toHaveLength(0);
+  });
+});

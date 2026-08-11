@@ -7,7 +7,9 @@ import {
   CASTER_FRACTION_BY_CLASS,
   MULTICLASS_SPELL_SLOTS,
   FULL_CASTER_SLOTS,
+  type SubclassCasterRef,
 } from "@/lib/srd/srd.js";
+import { ELDRITCH_KNIGHT, ARCANE_TRICKSTER, NON_CASTER_SUBCLASS } from "./third-caster.fixture.js";
 
 // Even scores keep the ability math simple: mod = +2 at 14, +3 at 16, +0 at 10.
 const SCORES = { intelligence: 16, wisdom: 14, charisma: 16, strength: 10, dexterity: 10, constitution: 10 };
@@ -23,11 +25,13 @@ describe("caster fraction rules data", () => {
     expect(casterFractionFor("Rogue")).toBe("none");
   });
 
-  it("classifies third-caster subclasses", () => {
-    expect(casterFractionFor("Fighter", "Eldritch Knight")).toBe("third");
-    expect(casterFractionFor("Rogue", "Arcane Trickster")).toBe("third");
+  it("classifies third-caster subclasses off subclassRef, never a name match (#1531)", () => {
+    expect(casterFractionFor("Fighter", ELDRITCH_KNIGHT)).toBe("third");
+    expect(casterFractionFor("Rogue", ARCANE_TRICKSTER)).toBe("third");
     // A plain Champion fighter is still a non-caster.
-    expect(casterFractionFor("Fighter", "Champion")).toBe("none");
+    expect(casterFractionFor("Fighter", NON_CASTER_SUBCLASS)).toBe("none");
+    // No subclassRef at all (homebrew, or no subclass chosen) is also "none".
+    expect(casterFractionFor("Fighter", null)).toBe("none");
   });
 
   it("exposes the caster fraction map as rules data", () => {
@@ -42,7 +46,7 @@ describe("caster fraction rules data", () => {
 });
 
 describe("deriveMulticlassSpellcasting — single class byte-for-byte with deriveSpellcasting", () => {
-  const cases: Array<{ name: string; level: number; subclass?: string }> = [
+  const cases: Array<{ name: string; level: number; label?: string; subclassRef?: SubclassCasterRef }> = [
     { name: "Wizard", level: 1 },
     { name: "Wizard", level: 5 },
     { name: "Wizard", level: 20 },
@@ -51,16 +55,16 @@ describe("deriveMulticlassSpellcasting — single class byte-for-byte with deriv
     { name: "Paladin", level: 3 }, // odd level: class table (3× L1) differs from multiclass floor
     { name: "Paladin", level: 6 },
     { name: "Ranger", level: 9 },
-    { name: "Fighter", level: 3, subclass: "Eldritch Knight" },
-    { name: "Rogue", level: 13, subclass: "Arcane Trickster" },
+    { name: "Fighter", level: 3, label: "Eldritch Knight", subclassRef: ELDRITCH_KNIGHT },
+    { name: "Rogue", level: 13, label: "Arcane Trickster", subclassRef: ARCANE_TRICKSTER },
     { name: "Fighter", level: 5 }, // non-caster
   ];
 
   for (const c of cases) {
-    it(`${c.name} ${c.level}${c.subclass ? ` (${c.subclass})` : ""}`, () => {
-      const single = deriveSpellcasting(c.name, c.level, SCORES, 3, c.subclass, "EDITION_2024");
+    it(`${c.name} ${c.level}${c.label ? ` (${c.label})` : ""}`, () => {
+      const single = deriveSpellcasting(c.name, c.level, SCORES, 3, c.subclassRef, "EDITION_2024");
       const multi = deriveMulticlassSpellcasting(
-        [{ name: c.name, level: c.level, subclass: c.subclass ?? null }],
+        [{ name: c.name, level: c.level, subclassRef: c.subclassRef ?? null }],
         SCORES,
         3,
         "EDITION_2024",
@@ -138,7 +142,7 @@ describe("deriveMulticlassSpellcasting — multiclass combos (PHB p. 164)", () =
   it("third caster contributes floor(level/3): EK 6 / Wizard 4 -> 2 + 4 = 6", () => {
     const info = deriveMulticlassSpellcasting(
       [
-        { name: "Fighter", level: 6, subclass: "Eldritch Knight" },
+        { name: "Fighter", level: 6, subclassRef: ELDRITCH_KNIGHT },
         { name: "Wizard", level: 4 },
       ],
       SCORES,

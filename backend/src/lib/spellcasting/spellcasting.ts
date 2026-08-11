@@ -46,7 +46,7 @@ import type {
   SpellComponents,
   SpellcastingMutableState,
 } from "./spell-state.js";
-import { deriveSpellcasting, derivePreparedSpellLimit, casterModelForEntries } from "@/lib/srd/srd.js";
+import { deriveSpellcasting, derivePreparedSpellLimit, casterModelForEntries, type SubclassCasterRef } from "@/lib/srd/srd.js";
 import { deriveResources } from "@/lib/classes/class-features.js";
 import { FEATURE_ROWS_CLASS_FEATURES, FEATURE_ROWS_SUBCLASS_FEATURES, featureRowsOf } from "@/lib/classes/feature-rows-select.js";
 import { editionOf } from "@/lib/rules/edition.js";
@@ -897,7 +897,7 @@ const SLOT_PAY_SELECT = {
   spellcasting: true,
   classEntries: {
     orderBy: { position: "asc" as const },
-    select: { name: true, subclass: true },
+    select: { name: true, subclassRef: { select: { casterFraction: true, spellcastingAbility: true } } },
   },
 } satisfies Prisma.CharacterSelect;
 
@@ -939,7 +939,7 @@ export async function loadSlotPayContext(
     level,
     row.abilityScores as Record<string, number>,
     profBonus,
-    primary?.subclass ?? undefined,
+    primary?.subclassRef,
     editionOf(row),
   );
   const { slotTotals, arcanaTotals } = computeSlotTables(row.spellcasting, derived);
@@ -1122,9 +1122,13 @@ const SPELLCASTING_SELECT = {
       // widening the fetched columns further — `name` is kept explicitly since
       // injectDerivedSpells' GrantedSpellSource (granted-spells.ts) reads it
       // (an `include` used to carry every scalar column along for free).
+      // `casterFraction`/`spellcastingAbility` (#1531): limitEntries' third-caster
+      // resolution below (derivePreparedSpellLimit/casterModelForEntries).
       subclassRef: {
         select: {
           name: true,
+          casterFraction: true,
+          spellcastingAbility: true,
           grantedSpells: { orderBy: { gateLevel: "asc" }, include: { spell: true } },
           features: FEATURE_ROWS_SUBCLASS_FEATURES,
         },
@@ -1197,9 +1201,9 @@ function buildSpellcastingOp(
   const derived = deriveSpellcasting(className, level, abilityScores, profBonus, undefined, edition);
   // Single-class uses the XP-derived level (per-class column can be stale) so the
   // enforced cap matches the serialized limit; multiclass uses per-entry levels.
-  const limitEntries = row.classEntries.length === 1
-    ? [{ name: className, level, subclass: row.classEntries[0]?.subclass ?? null }]
-    : row.classEntries.map((e) => ({ name: e.name, level: e.level, subclass: e.subclass }));
+  const limitEntries: Array<{ name: string; level: number; subclassRef?: SubclassCasterRef | null }> = row.classEntries.length === 1
+    ? [{ name: className, level, subclassRef: row.classEntries[0]?.subclassRef ?? null }]
+    : row.classEntries.map((e) => ({ name: e.name, level: e.level, subclassRef: e.subclassRef }));
   // Deliberate-coupling latch (#1507 D2/D3): resolves through the same
   // derivePreparedSpellLimit as buildSpellcastingView's clamp-on-read and
   // reconcilePreparedSpells — never a second inline copy of the cap.

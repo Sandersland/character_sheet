@@ -104,7 +104,13 @@ levelUpRouter.get<{ id: string }>("/plan", async (req, res) => {
     // #1546 Part B-i: context.pickedSubclassFeatureRows carries the not-yet-
     // committed pick's own rows through the re-plan splice — see
     // resolveLevelUpPlan's own comment.
-    const steps = resolveLevelUpPlan(context.planCharacter, context.targetEntry, context.chosenSubclassName, context.pickedSubclassFeatureRows);
+    const steps = resolveLevelUpPlan(
+      context.planCharacter,
+      context.targetEntry,
+      context.chosenSubclassName,
+      context.pickedSubclassFeatureRows,
+      context.chosenSubclassCasterRef,
+    );
     const persisted = await persistedGrantSource(target);
     const picked = await pickedGrantSource(parsed.data.subclassId);
     const gained = grantedSpellsGained(
@@ -115,6 +121,10 @@ levelUpRouter.get<{ id: string }>("/plan", async (req, res) => {
       context.planCharacter.edition,
     );
     const targetSubclass = context.chosenSubclassName ?? context.targetEntry.subclass ?? null;
+    // #1531: same persisted/picked precedence as targetSubclass above — the
+    // not-yet-committed pick's own third-caster identity wins when this same
+    // level-up sets a new subclass.
+    const targetSubclassCasterRef = context.chosenSubclassCasterRef ?? context.targetEntry.subclassCasterRef ?? null;
     res.json({
       target: {
         className: context.targetEntry.name,
@@ -125,7 +135,7 @@ levelUpRouter.get<{ id: string }>("/plan", async (req, res) => {
         // subclass grant like a Domain/Pact spell, independent of any
         // newSpells step) can render the right noun without re-deriving the
         // rule — null for a non-caster target.
-        casterModel: casterModelFor(context.targetEntry.name, targetSubclass, context.planCharacter.edition),
+        casterModel: casterModelFor(context.targetEntry.name, targetSubclassCasterRef, context.planCharacter.edition),
       },
       steps,
       grantedSpells: gained.map((s) => ({ name: s.name, level: s.level, school: s.school })),

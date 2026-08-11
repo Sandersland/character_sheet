@@ -226,6 +226,14 @@ enum RulesEdition {
   EDITION_2024
 }
 
+// Domain for Subclass.casterFraction (#1531) — see that column's own comment
+// for why this is an enum rather than a plain string. Single member today:
+// only a third-caster subclass (Eldritch Knight / Arcane Trickster) grants
+// spellcasting of its own in 5e.
+enum SubclassCasterFraction {
+  third
+}
+
 model CampaignMembership {
   id         String       @id @default(uuid())
   campaignId String
@@ -658,6 +666,28 @@ model Subclass {
   // NULLS NOT DISTINCT on the migration's unique index — see resolveEditionRow,
   // the single place the exact/NULL fallback ordering is expressed.
   edition     RulesEdition?
+  // Third-caster identity (#1531): NULL for every subclass that grants no
+  // spellcasting of its own (the vast majority — Champion, Battle Master, …).
+  // "third" for Eldritch Knight / Arcane Trickster today. A Prisma enum
+  // (review finding 1), not a plain string like SubclassGrantedSpell.
+  // castingAbility below: THIS column feeds thirdCasterAbilityOf's
+  // `!== "third"` gate directly, so an unrecognized value must be a compile
+  // error at every call site, not a silently-false runtime comparison — the
+  // same failure shape #1339 already taught this codebase to close at
+  // compile time, just for a value instead of a name. Extend the enum (never
+  // add a second column) if a half/full-caster subclass ever needs one.
+  // Replaces the retired THIRD_CASTER_SUBCLASSES name-keyed lookup
+  // (spellcasting-tables.ts) — a renamed or homebrew subclass now carries its
+  // own mechanics on this row instead of matching a display name.
+  casterFraction       SubclassCasterFraction?
+  // Governing ability for this subclass's granted spellcasting ("intelligence"
+  // for EK/AT) — NULL alongside casterFraction for a non-caster subclass.
+  // Plain string (unlike casterFraction): the value space is 5e's six ability
+  // names, already used loosely as strings everywhere in this codebase
+  // (SPELLCASTING_ABILITY, SubclassGrantedSpell.castingAbility above) — no
+  // single call site branches on it the way thirdCasterAbilityOf branches on
+  // casterFraction, so there's no compile-time gate to buy with an enum here.
+  spellcastingAbility  String?
 
   selections          CharacterClassEntry[]
   grantedSpells       SubclassGrantedSpell[]

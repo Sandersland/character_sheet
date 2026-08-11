@@ -15,6 +15,7 @@ import {
   level1SpellPicksFor,
   eldritchKnightSpellSchoolGate,
 } from "@/lib/srd/spellcasting-tables.js";
+import { ELDRITCH_KNIGHT, ARCANE_TRICKSTER } from "./third-caster.fixture.js";
 
 describe("levelUpSpellPicks — 2024 new-spell pick count on level-up", () => {
   it("Wizard scribes 6 at level 1 — its spellbook size, not its prepared count (#1513) — then a flat 2 per level", () => {
@@ -72,9 +73,9 @@ describe("levelUpSpellPicks — 2024 new-spell pick count on level-up", () => {
   });
 
   it("Eldritch Knight / Arcane Trickster offer the third-caster delta from level 3", () => {
-    expect(levelUpSpellPicks("fighter", 3, "Eldritch Knight", "EDITION_2024")).toBe(3); // first prepared: 0 → 3
-    expect(levelUpSpellPicks("fighter", 4, "Eldritch Knight", "EDITION_2024")).toBe(1); // 3 → 4
-    expect(levelUpSpellPicks("rogue", 12, "Arcane Trickster", "EDITION_2024")).toBe(0); // 8 → 8
+    expect(levelUpSpellPicks("fighter", 3, ELDRITCH_KNIGHT, "EDITION_2024")).toBe(3); // first prepared: 0 → 3
+    expect(levelUpSpellPicks("fighter", 4, ELDRITCH_KNIGHT, "EDITION_2024")).toBe(1); // 3 → 4
+    expect(levelUpSpellPicks("rogue", 12, ARCANE_TRICKSTER, "EDITION_2024")).toBe(0); // 8 → 8
   });
 });
 
@@ -129,7 +130,7 @@ describe("levelUpSpellPicks — 2014 known-caster new-spell pick count on level-
   });
 
   it("EK/AT's identical 18-number table gives the same delta in both editions", () => {
-    expect(levelUpSpellPicks("fighter", 4, "Eldritch Knight", "EDITION_2014")).toBe(levelUpSpellPicks("fighter", 4, "Eldritch Knight", "EDITION_2024"));
+    expect(levelUpSpellPicks("fighter", 4, ELDRITCH_KNIGHT, "EDITION_2014")).toBe(levelUpSpellPicks("fighter", 4, ELDRITCH_KNIGHT, "EDITION_2024"));
   });
 });
 
@@ -142,8 +143,8 @@ describe("level1SpellPicksFor — spellbookSize marks the Wizard's spellbook/pre
     for (const cls of ["bard", "cleric", "sorcerer", "warlock", "paladin", "ranger"]) {
       expect(level1SpellPicksFor(cls, null, "EDITION_2024")?.spellbookSize).toBeUndefined();
     }
-    expect(level1SpellPicksFor("fighter", "Eldritch Knight", "EDITION_2024")?.spellbookSize).toBeUndefined();
-    expect(level1SpellPicksFor("rogue", "Arcane Trickster", "EDITION_2024")?.spellbookSize).toBeUndefined();
+    expect(level1SpellPicksFor("fighter", ELDRITCH_KNIGHT, "EDITION_2024")?.spellbookSize).toBeUndefined();
+    expect(level1SpellPicksFor("rogue", ARCANE_TRICKSTER, "EDITION_2024")?.spellbookSize).toBeUndefined();
   });
 });
 
@@ -167,8 +168,8 @@ describe("levelUpCantripPicks — 2024 cantrip pick count on level-up (#1131)", 
   });
 
   it("third casters (EK/AT) gain 2 at level 3 and 1 more at level 10", () => {
-    expect(levelUpCantripPicks("fighter", 3, "Eldritch Knight")).toBe(2); // 0 → 2
-    expect(levelUpCantripPicks("rogue", 10, "Arcane Trickster")).toBe(1); // 2 → 3
+    expect(levelUpCantripPicks("fighter", 3, ELDRITCH_KNIGHT)).toBe(2); // 0 → 2
+    expect(levelUpCantripPicks("rogue", 10, ARCANE_TRICKSTER)).toBe(1); // 2 → 3
   });
 
   it("is 0 for a non-caster at every level", () => {
@@ -281,7 +282,7 @@ describe("magicalSecretsSpellLists — Bard Magical Secrets, edition-forked", ()
 describe("spellListsFor — the single class+subclass+edition spell-list resolver (#1825)", () => {
   it("redirects Eldritch Knight to the wizard list on both facets, in both editions", () => {
     for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {
-      expect(spellListsFor("fighter", 3, "eldritch knight", edition)).toEqual({
+      expect(spellListsFor("fighter", 3, ELDRITCH_KNIGHT, edition)).toEqual({
         spells: ["wizard"],
         cantrips: ["wizard"],
       });
@@ -290,15 +291,15 @@ describe("spellListsFor — the single class+subclass+edition spell-list resolve
 
   it("redirects Arcane Trickster to the wizard list on both facets, in both editions", () => {
     for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {
-      expect(spellListsFor("rogue", 3, "arcane trickster", edition)).toEqual({
+      expect(spellListsFor("rogue", 3, ARCANE_TRICKSTER, edition)).toEqual({
         spells: ["wizard"],
         cantrips: ["wizard"],
       });
     }
   });
 
-  it("matches the subclass name case-insensitively, and the redirect holds at every level", () => {
-    expect(spellListsFor("fighter", 12, "Eldritch Knight", "EDITION_2024")).toEqual({
+  it("the redirect holds at every level, resolved off subclassRef alone — no display-name match involved (#1531)", () => {
+    expect(spellListsFor("fighter", 12, ELDRITCH_KNIGHT, "EDITION_2024")).toEqual({
       spells: ["wizard"],
       cantrips: ["wizard"],
     });
@@ -306,7 +307,7 @@ describe("spellListsFor — the single class+subclass+edition spell-list resolve
 
   it("a plain class with no third-caster subclass keeps its own list, unchanged", () => {
     expect(spellListsFor("wizard", 5, null, "EDITION_2024")).toEqual({ spells: ["wizard"], cantrips: ["wizard"] });
-    expect(spellListsFor("fighter", 5, "champion", "EDITION_2024")).toEqual({ spells: ["fighter"], cantrips: ["fighter"] });
+    expect(spellListsFor("fighter", 5, undefined, "EDITION_2024")).toEqual({ spells: ["fighter"], cantrips: ["fighter"] });
   });
 
   it("folds in Bard Magical Secrets with the edition-forked concrete outputs", () => {
@@ -323,7 +324,7 @@ describe("spellListsFor — the single class+subclass+edition spell-list resolve
   });
 
   it("magicalSecretsSpellLists now delegates to spellListsFor, so EK/AT are fixed through the old call name too", () => {
-    expect(magicalSecretsSpellLists("fighter", 3, "Eldritch Knight", "EDITION_2024")).toEqual({
+    expect(magicalSecretsSpellLists("fighter", 3, ELDRITCH_KNIGHT, "EDITION_2024")).toEqual({
       spells: ["wizard"],
       cantrips: ["wizard"],
     });

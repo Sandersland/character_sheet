@@ -23,6 +23,7 @@ import {
   type LevelUpStepKind,
   type TargetClassEntry,
 } from "./level-up-plan.js";
+import type { SubclassCasterRef } from "@/lib/srd/spellcasting-tables.js";
 
 // Untyped status → the transactions-endpoint scaffold defaults domain errors to
 // 400 (the #1007 typed-error system), so no `status` field here.
@@ -116,6 +117,14 @@ export function resolveLevelUpPlan(
   // spells. Absent/undefined whenever chosenSubclassName is null (no pick
   // submitted, so the re-plan branch below never runs).
   pickedSubclassFeatureRows?: ClassFeatureRow[] | null,
+  // #1531: the PICKED subclass's own casterFraction/spellcastingAbility —
+  // trailing/optional (appended after pickedSubclassFeatureRows, not inserted
+  // before it) so every existing caller/fixture that never chooses a
+  // third-caster subclass mid-level-up keeps compiling unchanged. Required for
+  // a level-3 Fighter/Rogue picking Eldritch Knight/Arcane Trickster for the
+  // FIRST time to still resolve its own newSpells step correctly on re-plan —
+  // target.subclassCasterRef alone would carry the OLD (pre-pick) value here.
+  chosenSubclassCasterRef?: SubclassCasterRef | null,
 ): LevelUpStep[] {
   const basePlan = buildLevelUpPlan(character, target);
   if (!chosenSubclassName || !basePlan.some((step) => step.kind === "subclass")) {
@@ -124,6 +133,7 @@ export function resolveLevelUpPlan(
   const replan = buildLevelUpPlan(character, {
     ...target,
     subclass: chosenSubclassName,
+    subclassCasterRef: chosenSubclassCasterRef ?? null,
     // The PICKED subclass's own rows, not target's (there is none — the
     // subclass step being present is exactly what "not yet chosen" means).
     subclassFeatureRows: pickedSubclassFeatureRows ?? [],
@@ -139,8 +149,9 @@ function resolveEffectivePlan(
   chosenSubclassName: string | null,
   submission: LevelUpSubmission,
   pickedSubclassFeatureRows?: ClassFeatureRow[] | null,
+  chosenSubclassCasterRef?: SubclassCasterRef | null,
 ): LevelUpStep[] {
-  const plan = resolveLevelUpPlan(character, target, chosenSubclassName, pickedSubclassFeatureRows);
+  const plan = resolveLevelUpPlan(character, target, chosenSubclassName, pickedSubclassFeatureRows, chosenSubclassCasterRef);
   const needsSubclass = plan.some((step) => step.kind === "subclass");
   if (needsSubclass && !chosenSubclassName) {
     throw new InvalidLevelUpError("this level-up requires choosing a subclass");
@@ -375,8 +386,9 @@ export function validateLevelUpSubmission(
   chosenSubclassName: string | null,
   submission: LevelUpSubmission,
   pickedSubclassFeatureRows?: ClassFeatureRow[] | null,
+  chosenSubclassCasterRef?: SubclassCasterRef | null,
 ): LevelUpStep[] {
-  const plan = resolveEffectivePlan(character, target, chosenSubclassName, submission, pickedSubclassFeatureRows);
+  const plan = resolveEffectivePlan(character, target, chosenSubclassName, submission, pickedSubclassFeatureRows, chosenSubclassCasterRef);
   assertCounts(plan, chosenSubclassName, submission);
   assertNoExcess(plan, submission);
   assertForgets(plan, character, submission);

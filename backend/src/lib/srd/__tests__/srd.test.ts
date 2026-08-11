@@ -4,6 +4,7 @@ import { bard } from "@/lib/classes/bard.js";
 import { deriveResources } from "@/lib/classes/class-features.js";
 import { testFeatureRowsFor } from "@/lib/classes/__tests__/test-feature-rows.fixture.js";
 import { deriveSpellcasting, type DerivedSpellcastingInfo } from "@/lib/srd/srd.js";
+import { ELDRITCH_KNIGHT, ARCANE_TRICKSTER } from "./third-caster.fixture.js";
 
 // Ability scores with distinct INT/WIS/CHA mods so tests can assert the right
 // governing ability is used: INT 12 (+1), WIS 14 (+2), CHA 16 (+3).
@@ -714,14 +715,14 @@ describe("deriveSpellcasting — Mystic Arcanum", () => {
 // ── deriveSpellcasting — third-caster subclasses (regression) ─────────────────
 
 describe("deriveSpellcasting — third casters", () => {
-  it("derives Eldritch Knight slots at level 3 (INT-based, no arcanum)", () => {
-    const info = deriveSpellcasting("fighter", 3, CASTER_SCORES, PROF_2, "Eldritch Knight", "EDITION_2024")!;
+  it("derives Eldritch Knight slots at level 3 (INT-based, no arcanum), resolved off subclassRef", () => {
+    const info = deriveSpellcasting("fighter", 3, CASTER_SCORES, PROF_2, ELDRITCH_KNIGHT, "EDITION_2024")!;
     expect(info.ability).toBe("intelligence");
     expect(slotMap(info)).toEqual({ 1: 2 });
     expect(info.arcana).toEqual([]);
   });
 
   it("returns null for an Arcane Trickster below level 3", () => {
-    expect(deriveSpellcasting("rogue", 2, CASTER_SCORES, PROF_2, "Arcane Trickster", "EDITION_2024")).toBeNull();
+    expect(deriveSpellcasting("rogue", 2, CASTER_SCORES, PROF_2, ARCANE_TRICKSTER, "EDITION_2024")).toBeNull();
   });
 });
