@@ -306,6 +306,11 @@ function deriveRowExtras(
   if (maneuverChoiceCount !== undefined) extras.maneuverChoiceCount = maneuverChoiceCount;
   const toolProfChoiceCount = derivedStatFromRows(rows, level, edition, "toolProfChoiceCount");
   if (toolProfChoiceCount !== undefined) extras.toolProfChoiceCount = toolProfChoiceCount;
+  // Expertise pick count (#1588). Base-class feature, so deriveRowExtras' ungated
+  // pass over base rows resolves it (Rogue PHB'14 p.96 / Bard p.53 / Ranger &
+  // Wizard SRD 5.2). Same derivedStat mechanism as maneuverChoiceCount.
+  const expertiseChoiceCount = derivedStatFromRows(rows, level, edition, "expertiseChoiceCount");
+  if (expertiseChoiceCount !== undefined) extras.expertiseChoiceCount = expertiseChoiceCount;
   const announcedSaveDC = deriveAnnouncedSaveDC(rows, level, edition, abilityScores, profBonus);
   if (announcedSaveDC !== undefined) extras.announcedSaveDC = announcedSaveDC;
   return Object.keys(extras).length > 0 ? extras : undefined;
@@ -512,6 +517,7 @@ const EXTRAS_FIELDS = [
   "maneuverChoiceCount",
   "announcedSaveDC",
   "toolProfChoiceCount",
+  "expertiseChoiceCount",
 ] as const satisfies readonly (keyof ClassExtras)[];
 
 // Compile-time latch: a ClassExtras field missing from EXTRAS_FIELDS makes this

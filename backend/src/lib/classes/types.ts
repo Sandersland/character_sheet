@@ -216,6 +216,13 @@ export interface ClassExtras {
    * and entryContributesExtras both branch on exactly that.
    */
   toolProfChoiceCount?: number;
+  /**
+   * How many skills the character may hold Expertise in (double proficiency
+   * bonus) at this level (#1588) — Rogue/Bard/Ranger(2024)/Wizard(2024)
+   * grantor rows. Resolved the same way as maneuverChoiceCount/
+   * toolProfChoiceCount (derivedStatFromRows), never a second inline copy.
+   */
+  expertiseChoiceCount?: number;
 }
 
 export interface DerivedClassInfo extends ClassExtras {
