@@ -127,6 +127,33 @@ describe("POST /api/characters/:id/resources/transactions — learnExpertise/for
     const res = await post([{ type: "forgetExpertise", entryId: "nope" }]);
     expect(res.status).toBe(400);
   });
+
+  // Fighter has no expertiseChoiceCount grant at all (undefined, not 0) — the
+  // learn cap must still reject rather than skip the check on `undefined`
+  // (Opus review: a non-grantor class could otherwise inject Expertise via a
+  // crafted API call, since the UI never offers the step but the endpoint
+  // must not trust reachability, CLAUDE.md).
+  it("400s learnExpertise for a class that grants no Expertise at all (undefined cap treated as 0, not skipped)", async () => {
+    const fighterClassId = (await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } })).id;
+    const fighterId = "test-resources-expertise-fighter-1";
+    await prisma.character.create({
+      data: {
+        ...FIXTURE_BASE,
+        id: fighterId,
+        name: "Resources Expertise Test Fighter",
+        ownerId: OWNER_ID,
+        classEntries: { create: [{ name: "fighter", classId: fighterClassId, position: 0, level: 1 }] },
+      },
+    });
+    try {
+      const res = await agent().post(`/api/characters/${fighterId}/resources/transactions`).send({
+        operations: [{ type: "learnExpertise", skill: "stealth" }],
+      });
+      expect(res.status).toBe(400);
+    } finally {
+      await prisma.character.deleteMany({ where: { id: fighterId } });
+    }
+  });
 });
 
 // Opus review regression (#1588): expertiseChoiceCount must SUM across

@@ -100,14 +100,17 @@ function buildResourcesPayload(
     derivedRes.toolProfChoiceCount !== undefined
       ? stored.toolProficienciesKnown.slice(0, derivedRes.toolProfChoiceCount)
       : stored.toolProficienciesKnown;
-  // #1588: mirrors clampedToolProfsKnown — defense-in-depth for a character
-  // not yet reconciled since a level-down (reconcileExpertise is the write-side
-  // twin, level-reconciliation.ts; both resolve expertiseChoiceCount through
-  // the SAME deriveEntryScopedResources call this function's caller made).
-  const clampedExpertiseKnown =
-    derivedRes.expertiseChoiceCount !== undefined
-      ? stored.expertiseKnown.slice(0, derivedRes.expertiseChoiceCount)
-      : stored.expertiseKnown;
+  // #1588 (Opus review): deliberately NOT clampedToolProfsKnown's `!==
+  // undefined ? slice : full` shape — an undefined expertiseChoiceCount (no
+  // grantor class at all) clamps to ZERO here, matching applyLearnExpertiseOp's
+  // own undefined -> 0 treatment (resources.ts) so learn/clamp/reconcile all
+  // agree. toolProficienciesKnown/maneuversKnown stay on the permissive
+  // pattern (out of scope, pre-existing) — Expertise is the more exploitable
+  // case (four grantor classes) and reconcileExpertise (level-reconciliation.ts)
+  // already treats `derived?.expertiseChoiceCount ?? 0` as the allowed count,
+  // so this was already the reconciler's behavior; the clamp-on-read was the
+  // one site out of step with it.
+  const clampedExpertiseKnown = stored.expertiseKnown.slice(0, derivedRes.expertiseChoiceCount ?? 0);
   // Generic subclass "choose N" clamp-on-read (#899): keep only keys the derived
   // subclassChoices still grant, each capped to its count — defense-in-depth
   // mirroring reconcileSubclassChoices for characters not yet reconciled.

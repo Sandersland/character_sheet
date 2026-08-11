@@ -536,8 +536,19 @@ function applyLearnExpertiseOp(
     );
   }
 
-  const expertiseChoiceCount = derivedInfo?.expertiseChoiceCount;
-  if (expertiseChoiceCount !== undefined && state.expertiseKnown.length >= expertiseChoiceCount) {
+  // #1588 (Opus review): undefined (no grantor class at all) is treated as
+  // cap 0 here, NOT skipped — deliberately diverging from
+  // applyLearnToolProficiencyOp/applyLearnManeuverOp's `!== undefined &&`
+  // pattern above, which leaves an undefined cap unlimited. That's a live
+  // exploit for Expertise specifically: FOUR classes grant it, so a crafted
+  // op on any character (e.g. a pure Fighter) could otherwise take Expertise
+  // in any proficient skill via a direct API call the UI never offers.
+  // Matches the clamp-on-read's own undefined -> 0 treatment
+  // (buildResourcesPayload, serialize/classes.ts) so learn/clamp/reconcile
+  // all agree a non-grantor class holds zero Expertise, never "however many
+  // happen to already be stored."
+  const expertiseChoiceCount = derivedInfo?.expertiseChoiceCount ?? 0;
+  if (state.expertiseKnown.length >= expertiseChoiceCount) {
     throw new InvalidResourceOperationError(
       `Cannot take more Expertise: already have ${state.expertiseKnown.length}/${expertiseChoiceCount}`
     );
