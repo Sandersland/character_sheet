@@ -378,3 +378,70 @@ describe("NewSpellsStep — swap selection (#1101)", () => {
     expect(screen.queryByText(/0 \+ 1 swap/)).not.toBeInTheDocument();
   });
 });
+
+// #1855: Eldritch Knight (2014) leveled-spell school gate — this is a DISPLAY
+// filter over the served spellSchools/freeSchoolPicks; the hard enforcement is
+// assertSpellSchoolEligibility on the transaction endpoint. School-varied
+// catalog, distinct from the shared CATALOG (which is all-evocation).
+const SCHOOL_CATALOG: CatalogSpell[] = [
+  spell("MageArmor", 1, ["wizard"]),
+  { ...spell("DetectMagic", 1, ["wizard"]), school: "divination" },
+  { ...spell("CharmPerson", 1, ["wizard"]), school: "enchantment" },
+];
+
+function ekStep(freeSchoolPicks = 0, count = 2): LevelUpStep {
+  return newSpellsStep(count, {
+    maxSpellLevel: 2, spellLists: ["wizard"], cantripLists: ["wizard"],
+    spellSchools: ["abjuration", "evocation"], ...(freeSchoolPicks ? { freeSchoolPicks } : {}),
+  });
+}
+
+describe("NewSpellsStep — Eldritch Knight (2014) spell-school gate (#1855)", () => {
+  it("renders the school-gate note naming the restricted schools", async () => {
+    fetchMock.mockResolvedValueOnce(SCHOOL_CATALOG);
+    render(<Harness step={ekStep()} character={caster()} />);
+    expect(await screen.findByText(/Eldritch Knight/)).toBeInTheDocument();
+    expect(screen.getByText(/Abjuration or Evocation/)).toBeInTheDocument();
+  });
+
+  it("with NO free pick, an off-school spell is disabled and an on-school spell is pickable", async () => {
+    fetchMock.mockResolvedValueOnce(SCHOOL_CATALOG);
+    render(<Harness step={ekStep(0)} character={caster()} />);
+    expect(await screen.findByRole("button", { name: "Add MageArmor" })).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: "Add DetectMagic" })).toBeDisabled();
+  });
+
+  it("with ONE free pick, an off-school spell is selectable — and using it disables further off-school picks", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValueOnce(SCHOOL_CATALOG);
+    render(<Harness step={ekStep(1, 2)} character={caster()} />);
+    const detectMagic = await screen.findByRole("button", { name: "Add DetectMagic" });
+    expect(detectMagic).not.toBeDisabled();
+
+    await user.click(detectMagic);
+
+    // The free-school budget (1) is spent — a SECOND off-school spell disables,
+    // even though the overall cap (2) isn't reached yet.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Add CharmPerson" })).toBeDisabled());
+    // The on-school spell stays pickable — only the school gate, not the cap, moved.
+    expect(screen.getByRole("button", { name: "Add MageArmor" })).not.toBeDisabled();
+  });
+
+  it("cantrips are never school-gated even when every leveled pick is restricted", async () => {
+    const cantripCatalog: CatalogSpell[] = [
+      ...SCHOOL_CATALOG,
+      { ...spell("MageHand", 0, ["wizard"]), school: "conjuration" },
+    ];
+    fetchMock.mockResolvedValueOnce(cantripCatalog);
+    render(
+      <Harness
+        step={newSpellsStep(1, {
+          maxSpellLevel: 2, spellLists: ["wizard"], cantripLists: ["wizard"], cantrips: 1,
+          spellSchools: ["abjuration", "evocation"],
+        })}
+        character={caster()}
+      />,
+    );
+    expect(await screen.findByRole("button", { name: "Add MageHand" })).not.toBeDisabled();
+  });
+});

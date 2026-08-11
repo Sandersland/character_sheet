@@ -3,9 +3,11 @@ import { describe, it, expect } from "vitest";
 import {
   eligibleNewCantrips,
   eligibleNewSpells,
+  offListSelectedCount,
   readNewSpellsMeta,
   selectedSpellIds,
   spellListsLabel,
+  spellSchoolEligible,
   swappableKnownSpells,
   toggleForgetSpell,
   toggleLearnSpell,
@@ -40,6 +42,7 @@ describe("readNewSpellsMeta", () => {
     expect(readNewSpellsMeta(step)).toEqual({
       count: 2, maxSpellLevel: 5, magicalSecrets: true, canSwap: false, cantrips: 0,
       spellLists: ["bard", "wizard"], cantripLists: ["bard"], casterModel: null, expandedSpellIds: [],
+      spellSchools: null, freeSchoolPicks: 0,
     });
   });
 
@@ -48,7 +51,21 @@ describe("readNewSpellsMeta", () => {
     expect(readNewSpellsMeta(step)).toEqual({
       count: 1, maxSpellLevel: 0, magicalSecrets: false, canSwap: false, cantrips: 0,
       spellLists: null, cantripLists: null, casterModel: null, expandedSpellIds: [],
+      spellSchools: null, freeSchoolPicks: 0,
     });
+  });
+
+  // #1855: Eldritch Knight (2014) spell-school gate — served alongside
+  // spellLists but a SEPARATE facet (spellLists is class-membership,
+  // spellSchools is the wizard-list SCHOOL restriction).
+  it("reads spellSchools/freeSchoolPicks from meta (#1855)", () => {
+    const step: LevelUpStep = {
+      kind: "newSpells",
+      count: 3,
+      meta: { spellSchools: ["abjuration", "evocation"], freeSchoolPicks: 1 },
+    };
+    expect(readNewSpellsMeta(step).spellSchools).toEqual(["abjuration", "evocation"]);
+    expect(readNewSpellsMeta(step).freeSchoolPicks).toBe(1);
   });
 
   it("reads expandedSpellIds from meta (#1631)", () => {
@@ -212,6 +229,49 @@ describe("eligibleNewSpells (#1440: takes the served spellLists, not className/m
   it("omitted expandedSpellIds behaves exactly as before (#1440 regression guard)", () => {
     const eligible = eligibleNewSpells(CATALOG, { maxSpellLevel: 2, spellLists: ["wizard"] });
     expect(eligible.map((s) => s.id)).toEqual(["shield", "mistyStep"]);
+  });
+});
+
+// #1855: the Eldritch Knight (2014) leveled-pick school gate is a DISPLAY
+// filter over the served spellSchools/freeSchoolPicks — never re-deriving
+// which schools or how many free picks (assertSpellSchoolEligibility, backend,
+// is the real enforcement). abjuration/evocation "on-list", every other
+// school "off-list".
+describe("spellSchoolEligible (#1855)", () => {
+  it("unrestricted (spellSchools null) always admits, regardless of school or free picks", () => {
+    expect(spellSchoolEligible({ school: "necromancy" }, null, 0, 0)).toBe(true);
+  });
+
+  it("admits a spell whose school is on the restricted list, free picks or not", () => {
+    expect(spellSchoolEligible({ school: "abjuration" }, ["abjuration", "evocation"], 0, 0)).toBe(true);
+  });
+
+  it("rejects an off-list school once the free-pick budget is exhausted", () => {
+    expect(spellSchoolEligible({ school: "illusion" }, ["abjuration", "evocation"], 1, 1)).toBe(false);
+  });
+
+  it("admits an off-list school while a free pick still remains", () => {
+    expect(spellSchoolEligible({ school: "illusion" }, ["abjuration", "evocation"], 1, 0)).toBe(true);
+  });
+});
+
+describe("offListSelectedCount (#1855)", () => {
+  const SCHOOL_CATALOG: CatalogSpell[] = [
+    spell("mageArmor", 1, ["wizard"]),
+    { ...spell("detectMagic", 1, ["wizard"]), school: "divination" },
+    { ...spell("charmPerson", 1, ["wizard"]), school: "enchantment" },
+  ];
+
+  it("counts only the selected ids whose school is off the restricted list", () => {
+    expect(offListSelectedCount(["mageArmor", "detectMagic", "charmPerson"], SCHOOL_CATALOG, ["abjuration", "evocation"])).toBe(2);
+  });
+
+  it("is 0 when spellSchools is unrestricted (null)", () => {
+    expect(offListSelectedCount(["detectMagic", "charmPerson"], SCHOOL_CATALOG, null)).toBe(0);
+  });
+
+  it("is 0 for a null catalog (still loading)", () => {
+    expect(offListSelectedCount(["detectMagic"], null, ["abjuration", "evocation"])).toBe(0);
   });
 });
 

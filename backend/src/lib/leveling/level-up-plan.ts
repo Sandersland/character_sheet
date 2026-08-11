@@ -7,18 +7,20 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 import { deriveResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
 import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "@/lib/classes/class-feature-rows.js";
 import { subclassChoiceSwapCadence } from "@/lib/classes/types.js";
-import { resolveSubclassSlug } from "@/lib/classes/subclass-slug.js";
+import { isEldritchKnightSlug, resolveSubclassSlug } from "@/lib/classes/subclass-slug.js";
 import { effectiveMaxHitPoints, fixedAverageForDie, levelUpHpGain } from "@/lib/combat/hitpoints.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 import { abilityModifier, advancementSlotsForLevel, fightingStyleFeatSlots, hitDieFace } from "@/lib/srd/srd.js";
 import {
   bardMagicalSecretsAt,
   casterModelFor,
+  eldritchKnightSpellSchoolGate,
   levelUpCantripPicks,
   levelUpSpellPicks,
   maxSpellLevelForClass,
   spellListsFor,
   swapCadenceFor,
+  type SpellSchoolGate,
 } from "@/lib/srd/spellcasting-tables.js";
 
 export type LevelUpStepKind =
@@ -336,6 +338,29 @@ function expandedSpellIdsMeta(target: TargetClassEntry): { expandedSpellIds: str
   return target.subclassSpellListExpansionIds?.length ? { expandedSpellIds: target.subclassSpellListExpansionIds } : {};
 }
 
+// #1855: the Eldritch Knight leveled-spell school gate (PHB'14 p. 74) — resolved
+// through resolveSubclassSlug (#1277), never a name literal, mirroring this
+// file's own subclassChoiceSteps/fightingStyleFeatStep identity checks. `null`
+// for every non-EK target (including Arcane Trickster, out of #1855's scope)
+// so newSpellsStep's meta spread below omits spellSchools entirely for them.
+function ekSpellSchoolGate(target: TargetClassEntry, edition: RulesEdition): SpellSchoolGate | null {
+  const slug = resolveSubclassSlug(target.name, { subclass: target.subclass, subclassRef: target.subclassRef });
+  return isEldritchKnightSlug(slug) ? eldritchKnightSpellSchoolGate(target.newLevel, edition) : null;
+}
+
+// #1855: split out of newSpellsStep purely to keep that function's own
+// cyclomatic count under the fallow health gate — same #1631 reasoning as
+// expandedSpellIdsMeta just above.
+function schoolGateMeta(schoolGate: SpellSchoolGate | null): Record<string, unknown> {
+  return {
+    // `schools` is `string[] | null` (SpellSchoolGate) — branch on `!== null`,
+    // never truthiness, matching level-up-transaction.ts's assertOnSpellList
+    // convention for the identically-shaped `spellLists`/`cantripLists`.
+    ...(schoolGate !== null && schoolGate.schools !== null ? { spellSchools: schoolGate.schools } : {}),
+    ...(schoolGate?.freePicks ? { freeSchoolPicks: schoolGate.freePicks } : {}),
+  };
+}
+
 function newSpellsStep({ target, edition }: PlanContext): LevelUpStep | null {
   const count = levelUpSpellPicks(target.name, target.newLevel, target.subclass, edition);
   const cantrips = levelUpCantripPicks(target.name, target.newLevel, target.subclass);
@@ -345,6 +370,7 @@ function newSpellsStep({ target, edition }: PlanContext): LevelUpStep | null {
   const maxSpellLevel = maxSpellLevelForClass(target.name, target.newLevel, target.subclass, edition);
   const lists = spellListsFor(target.name, target.newLevel, target.subclass, edition);
   const casterModel = casterModelFor(target.name, target.subclass, edition);
+  const schoolGate = ekSpellSchoolGate(target, edition);
   return {
     kind: "newSpells",
     count,
@@ -356,6 +382,7 @@ function newSpellsStep({ target, edition }: PlanContext): LevelUpStep | null {
       ...(canSwap ? { canSwap: true } : {}),
       ...(cantrips > 0 ? { cantrips } : {}),
       ...(casterModel ? { casterModel } : {}),
+      ...schoolGateMeta(schoolGate),
       ...expandedSpellIdsMeta(target),
     },
   };

@@ -16,7 +16,16 @@ import { useNewSpellsSelection, type NewSpellsSelection } from "@/features/level
 import { useLevelUpStepContext } from "@/features/level-up/useLevelUpStepContext";
 import { useSpellCatalog } from "@/features/spells/useSpellCatalog";
 import { INPUT_CLS, filterCatalog } from "@/lib/addSpell";
-import { casterModelNoun, eligibleNewCantrips, eligibleNewSpells, spellListsLabel, swappableKnownSpells } from "@/lib/newSpells";
+import {
+  casterModelNoun,
+  eligibleNewCantrips,
+  eligibleNewSpells,
+  offListSelectedCount,
+  spellListsLabel,
+  spellSchoolEligible,
+  spellSchoolsLabel,
+  swappableKnownSpells,
+} from "@/lib/newSpells";
 import { deriveSpellList } from "@/lib/spellList";
 import { pickDetailCtaLabel, pickRowState } from "@/lib/spellPickerView";
 import type { CatalogSpell, Character, LevelUpStep } from "@/types/character";
@@ -50,7 +59,7 @@ function learnSummary(count: number, canSwap: boolean, casterModel: "known" | "p
 // never drift. `spells` is the unfiltered eligible list, kept separate from
 // `filtered` so the open detail card survives a search-text edit.
 function SpellRowList({
-  spells, filtered, learnedSpellIds, selectedIds, cap, onToggle,
+  spells, filtered, learnedSpellIds, selectedIds, cap, onToggle, spellSchools = null, freeSchoolPicks = 0,
 }: {
   spells: CatalogSpell[];
   filtered: CatalogSpell[];
@@ -58,23 +67,32 @@ function SpellRowList({
   selectedIds: string[];
   cap: number;
   onToggle: (spellId: string) => void;
+  /** #1855: the Eldritch Knight (2014) school gate — omitted (null/0) for the
+   * cantrip section, which is never school-restricted. */
+  spellSchools?: string[] | null;
+  freeSchoolPicks?: number;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const atCap = selectedIds.length >= cap;
   const openSpell = openId ? spells.find((s) => s.id === openId) : undefined;
   const openState = openSpell ? pickRowState(openSpell, learnedSpellIds, selectedIds, atCap) : null;
+  // #1855: how many already-selected picks are spending the free-school
+  // budget — a row past that budget disables even though the overall `cap`
+  // isn't reached yet (the level-3 EK "2 of 3" case: cap 3, freeSchoolPicks 1).
+  const offList = offListSelectedCount(selectedIds, spells, spellSchools);
 
   return (
     <>
       <ul className="mt-2 flex flex-col gap-2">
         {filtered.map((spell) => {
           const { state, disabled } = pickRowState(spell, learnedSpellIds, selectedIds, atCap);
+          const schoolBlocked = state === "select" && !spellSchoolEligible(spell, spellSchools, freeSchoolPicks, offList);
           return (
             <SpellPickerRow
               key={spell.id}
               spell={spell}
               state={state}
-              disabled={disabled}
+              disabled={disabled || schoolBlocked}
               onToggle={onToggle}
               onOpen={() => setOpenId(spell.id)}
             />
@@ -86,7 +104,7 @@ function SpellRowList({
           spell={openSpell}
           cta={{
             label: pickDetailCtaLabel(openSpell.name, openState.state, openState.disabled, cap, selectedIds.length, "Learn"),
-            disabled: openState.disabled,
+            disabled: openState.disabled || (openState.state === "select" && !spellSchoolEligible(openSpell, spellSchools, freeSchoolPicks, offList)),
             onPress: () => {
               if (openState.state !== "known") onToggle(openSpell.id);
               setOpenId(null);
@@ -138,7 +156,7 @@ function SpellPoolStatus({ catalog, error, spells, filtered }: { catalog: Catalo
 // Extracted so NewSpellsStep stays under the complexity gate once the #1101 swap
 // panel is layered on top.
 function SpellResults({
-  catalog, error, spells, filtered, learnedSpellIds, selectedIds, cap, onToggle,
+  catalog, error, spells, filtered, learnedSpellIds, selectedIds, cap, onToggle, spellSchools, freeSchoolPicks,
 }: {
   catalog: CatalogSpell[] | null;
   error: string | null;
@@ -148,6 +166,9 @@ function SpellResults({
   selectedIds: string[];
   cap: number;
   onToggle: (spellId: string) => void;
+  /** #1855: forwarded to SpellRowList; omitted by the cantrip section. */
+  spellSchools?: string[] | null;
+  freeSchoolPicks?: number;
 }) {
   return (
     <>
@@ -159,6 +180,8 @@ function SpellResults({
         selectedIds={selectedIds}
         cap={cap}
         onToggle={onToggle}
+        spellSchools={spellSchools}
+        freeSchoolPicks={freeSchoolPicks}
       />
     </>
   );
@@ -212,6 +235,38 @@ function CantripSection({
   );
 }
 
+// #1855: the Eldritch Knight (2014) school-gate note, PHB'14 p. 74 — leveled
+// picks are restricted to Abjuration/Evocation, except the free any-school
+// grant at class level 3/8/14/20 (freeSchoolPicks). Split out of
+// LeveledSpellsSection purely to keep that function's own complexity under
+// the fallow health gate, mirroring this file's own SwapPanel/magicalSecrets
+// note split.
+function SchoolGateNote({ spellSchools, freeSchoolPicks }: { spellSchools: string[]; freeSchoolPicks: number }) {
+  return (
+    <p className="mt-1 text-center text-xs text-arcane-700">
+      Eldritch Knight — pick from <strong>{spellSchoolsLabel(spellSchools)}</strong> spells
+      {freeSchoolPicks > 0 && (
+        <> ({freeSchoolPicks === 1 ? "one pick" : `${freeSchoolPicks} picks`} this level may be any school)</>
+      )}.
+    </p>
+  );
+}
+
+// The 2024 Magical Secrets note (level 10+ Bard) — split out of
+// LeveledSpellsSection alongside SchoolGateNote (#1855) purely to keep that
+// function's own complexity under the fallow health gate.
+function MagicalSecretsNote({ spellLists }: { spellLists: string[] | null }) {
+  return (
+    <p className="mt-1 text-center text-xs text-arcane-700">
+      Magical Secrets — pick from {spellLists === null ? (
+        <><strong>any class&apos;s</strong> spell list.</>
+      ) : (
+        <>the <strong>{spellListsLabel(spellLists)}</strong> spell lists.</>
+      )}
+    </p>
+  );
+}
+
 // The leveled-spell picker: budget header, optional swap panel, Magical Secrets
 // note, search + results. Split from NewSpellsStep so the cantrip subsection can
 // sit above it without pushing the parent past the complexity gate.
@@ -225,7 +280,10 @@ function LeveledSpellsSection({
   learnedSpellIds: ReadonlySet<string>;
   framed: boolean;
 }) {
-  const { count, maxSpellLevel, magicalSecrets, spellLists, canSwap, selectedIds, forgottenEntryId, toggle, toggleForget, casterModel, expandedSpellIds } = selection;
+  const {
+    count, maxSpellLevel, magicalSecrets, spellLists, canSwap, selectedIds, forgottenEntryId, toggle, toggleForget,
+    casterModel, expandedSpellIds, spellSchools, freeSchoolPicks,
+  } = selection;
   const [search, setSearch] = useState("");
   const eligible = eligibleNewSpells(catalog, { maxSpellLevel, spellLists, expandedSpellIds });
   const filtered = filterCatalog(eligible, search, "");
@@ -243,15 +301,8 @@ function LeveledSpellsSection({
       {canSwap && (
         <SwapPanel candidates={swapCandidates} forgottenEntryId={forgottenEntryId} onToggle={toggleForget} casterModel={casterModel} />
       )}
-      {magicalSecrets && (
-        <p className="mt-1 text-center text-xs text-arcane-700">
-          Magical Secrets — pick from {spellLists === null ? (
-            <><strong>any class&apos;s</strong> spell list.</>
-          ) : (
-            <>the <strong>{spellListsLabel(spellLists)}</strong> spell lists.</>
-          )}
-        </p>
-      )}
+      {magicalSecrets && <MagicalSecretsNote spellLists={spellLists} />}
+      {spellSchools && <SchoolGateNote spellSchools={spellSchools} freeSchoolPicks={freeSchoolPicks} />}
       <input
         type="search"
         aria-label="Search spells"
@@ -269,6 +320,8 @@ function LeveledSpellsSection({
         selectedIds={selectedIds}
         cap={cap}
         onToggle={toggle}
+        spellSchools={spellSchools}
+        freeSchoolPicks={freeSchoolPicks}
       />
     </div>
   );

@@ -865,6 +865,58 @@ export function spellListsFor(
  * existing caller/test naming this symbol keeps compiling. */
 export const magicalSecretsSpellLists = spellListsFor;
 
+// Fighter levels PHB'14 p. 74 grants a free "any school of magic" leveled
+// pick at: the 3rd-level initial grant includes one ("two of these spells
+// must be from the abjuration or evocation school"), and 8th/14th/20th each
+// grant one further spell "of any school of magic". One free pick per level
+// lines up exactly with THIRD_CASTER_PREPARED's own new-spell delta at each
+// of these four levels (always exactly 1) — no separate count to persist.
+const EK_FREE_SCHOOL_LEVELS = new Set([3, 8, 14, 20]);
+
+/** Result of eldritchKnightSpellSchoolGate: `schools` is the restricted set a
+ * leveled pick must belong to (null = unrestricted), `freePicks` is how many
+ * of THIS level-up's leveled picks may ignore it. */
+export interface SpellSchoolGate {
+  schools: string[] | null;
+  freePicks: number;
+}
+
+const EK_UNRESTRICTED_SCHOOL_GATE: SpellSchoolGate = { schools: null, freePicks: 0 };
+
+/**
+ * Eldritch Knight leveled-spell school restriction (#1855). Callers gate this
+ * to the Eldritch Knight subclass themselves — via resolveSubclassSlug
+ * (classes/subclass-slug.ts), never a name literal — so this function only
+ * encodes the LEVEL math, a pure (fighterLevel, edition) → gate like
+ * subclassGateLevel. Never applies to cantrips (PHB'14's restriction names
+ * only the "wizard spells you know", not cantrips) or to Arcane Trickster
+ * (out of #1855's scope, tracked separately).
+ *
+ * PHB'14 p. 74, Eldritch Knight Spellcasting: "Two of the spells you learn at
+ * [3rd level] must be Abjuration or Evocation spells... You can use your
+ * Spell Mastery... The spells you learn at 8th, 14th, and 20th level can come
+ * from any school of magic." SRD 5.1 has no Eldritch Knight (a PHB-only
+ * fighter subclass in that edition), so EDITION_2014 below is the only rules
+ * text this cites.
+ *
+ * PHB'24 dropped the restriction — a 2024 Eldritch Knight draws freely from
+ * the whole wizard spell list (widely reported change; PHB'24's own EK
+ * feature text is unverified/PARKED, #1531, so no page citation is claimed
+ * here beyond "the restriction is gone").
+ */
+export function eldritchKnightSpellSchoolGate(fighterLevel: number, edition: RulesEdition): SpellSchoolGate {
+  switch (edition) {
+    case "EDITION_2014":
+      return { schools: ["abjuration", "evocation"], freePicks: EK_FREE_SCHOOL_LEVELS.has(fighterLevel) ? 1 : 0 };
+    case "EDITION_2024":
+      return EK_UNRESTRICTED_SCHOOL_GATE;
+    default: {
+      const exhaustive: never = edition;
+      throw new Error(`eldritchKnightSpellSchoolGate: unhandled edition ${String(exhaustive)}`);
+    }
+  }
+}
+
 /**
  * Highest spell level a class can cast/scribe at `level` — the ceiling on spells
  * learnable at level-up. Derived from the slot table (max slot level) rather than
