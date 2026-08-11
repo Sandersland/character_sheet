@@ -6,6 +6,19 @@ import {
   type LevelUpPlanCharacter,
   type TargetClassEntry,
 } from "@/lib/leveling/level-up-plan.js";
+import type { SubclassCasterRef } from "@/lib/srd/spellcasting-tables.js";
+import { ELDRITCH_KNIGHT, ARCANE_TRICKSTER } from "@/lib/srd/__tests__/third-caster.fixture.js";
+
+// #1531: target()'s stand-in for what a real caller (resolveLevelUpContext)
+// resolves off the Subclass row's own casterFraction/spellcastingAbility
+// columns before constructing a TargetClassEntry — this pure-planner suite has
+// no DB row to read, so it mirrors that resolution by name here ONLY as test
+// fixture plumbing; production code never does this (THIRD_CASTER_SUBCLASSES,
+// the name-keyed lookup this issue retires, is gone from spellcasting-tables.ts).
+const THIRD_CASTER_TEST_REF: Record<string, SubclassCasterRef> = {
+  "eldritch knight": ELDRITCH_KNIGHT,
+  "arcane trickster": ARCANE_TRICKSTER,
+};
 
 const ABILITIES = { strength: 16, dexterity: 14, constitution: 14, intelligence: 12, wisdom: 12, charisma: 10 };
 
@@ -50,7 +63,8 @@ function target(
   hitDie = ANY_DIE,
 ): TargetClassEntry {
   const defaults = CLASS_TABLE_DEFAULTS[name.toLowerCase()] ?? { extraAsiLevels: [], fightingStyleFeatLevel: null };
-  return { name, newLevel, subclass, subclassLevel, hitDie, ...defaults };
+  const subclassCasterRef = subclass ? THIRD_CASTER_TEST_REF[subclass.toLowerCase()] ?? null : null;
+  return { name, newLevel, subclass, subclassCasterRef, subclassLevel, hitDie, ...defaults };
 }
 
 // Extracts just the step kinds in order (the plan's ordered shape).

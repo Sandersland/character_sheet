@@ -1528,14 +1528,17 @@ function creationSpellCountError(
   spells: CreationSpells,
   className: string,
   classDisplay: string,
-  subclass: string | null,
   edition: RulesEdition,
 ): Fail | null {
   // #1508 carried AC, #1510: `null` for a 2014 Paladin/Ranger (no Spellcasting
   // until level 2) or any non-caster — the "does not cast spells at level 1"
   // 400 below is the correct, intentional response rather than a silently
   // accepted pick count.
-  const picks = level1SpellPicksFor(className, subclass, edition);
+  // #1531: no `subclassRef` at creation — a level-1 pick is always below the
+  // third-caster gate (3), so this class's own base-class table is always the
+  // right one; there is no Subclass row to read yet (setSubclassInTx links
+  // the FK later, at the subclass-grant level).
+  const picks = level1SpellPicksFor(className, null, edition);
   if (picks == null) {
     return { ok: false, status: 400, error: `${classDisplay} does not cast spells at level 1` };
   }
@@ -1567,9 +1570,8 @@ async function resolveCreationSpells(
 
   const classDisplay = selections.characterClass.name;
   const className = classDisplay.toLowerCase();
-  const subclass = selections.subclassName;
   const { edition } = selections;
-  const countError = creationSpellCountError(spells, className, classDisplay, subclass, edition);
+  const countError = creationSpellCountError(spells, className, classDisplay, edition);
   if (countError) return countError;
 
   const allIds = [...spells.cantripIds, ...spells.spellIds];
@@ -1582,7 +1584,9 @@ async function resolveCreationSpells(
   const forkError = await rejectCrossEditionSpellForks(rows, edition);
   if (forkError) return { ok: false, status: 400, error: forkError };
   const byId = new Map(rows.map((r) => [r.id, { ...r, classes: classesOf(r) }]));
-  const maxLevel = maxSpellLevelForClass(className, 1, subclass, edition);
+  // #1531: same "no Subclass row at creation, level 1 is below the
+  // third-caster gate" reasoning as creationSpellCountError's own call above.
+  const maxLevel = maxSpellLevelForClass(className, 1, null, edition);
   // #1631: a subclass chosen at level 1 (a 2014 Warlock's patron) may already
   // widen the choosable pool at creation — e.g. a 2014 Fiend Warlock's level-1
   // spells-known pick may be Burning Hands or Command, neither on the base
@@ -1803,8 +1807,12 @@ function clampCreationSpellEntries(
   effectiveScores: Record<string, number>,
 ): SpellEntry[] | null {
   if (!spellEntries) return null;
+  // #1531: no `subclassRef` at creation (same "level 1 is below the
+  // third-caster gate" reasoning as creationSpellCountError above) — omitted
+  // rather than passed as null so this reads as "no Subclass row exists yet",
+  // not "resolved to no subclass".
   const limit = derivePreparedSpellLimit(
-    [{ name: primaryClassChoice.name, level: 1, subclass: selections.subclassName }],
+    [{ name: primaryClassChoice.name, level: 1 }],
     effectiveScores,
     selections.edition,
   );

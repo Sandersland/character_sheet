@@ -12,6 +12,7 @@ import {
   InvalidLevelUpError,
   type LevelUpSubmission,
 } from "@/lib/leveling/level-up-submission.js";
+import { ELDRITCH_KNIGHT as ELDRITCH_KNIGHT_CASTER_REF } from "@/lib/srd/__tests__/third-caster.fixture.js";
 
 const ABILITIES = { strength: 16, dexterity: 14, constitution: 14, intelligence: 12, wisdom: 12, charisma: 10 };
 
@@ -66,6 +67,32 @@ describe("resolveLevelUpPlan — submission-free plan resolution (#886)", () => 
     expect(steps.map((s) => s.kind)).toEqual(["hitPoints", "subclass", "maneuvers", "toolProficiency", "review"]);
     const replan = buildLevelUpPlan(char("fighter", 2), { ...target("fighter", 3, "battle master"), subclassFeatureRows: BATTLE_MASTER_ROWS });
     expect(steps.filter((s) => s.kind !== "subclass")).toEqual(replan);
+  });
+
+  // Review finding 3: the re-plan branch specifically for a THIRD CASTER —
+  // target.subclassCasterRef is null (no persisted subclass yet, same as the
+  // Battle Master case above), and the newSpells step can only exist because
+  // resolveLevelUpPlan threads the 5th param, chosenSubclassCasterRef, into
+  // the replanned target. Without that threading this step silently vanishes
+  // (newSpellsStep's own early-return: count<=0 && cantrips<=0 && !canSwap) —
+  // exactly the live bug shape a missed `subclassCasterRef` regression takes.
+  it("Fighter 2→3 picking Eldritch Knight for the FIRST time re-plans and emits a newSpells step via chosenSubclassCasterRef", () => {
+    const steps = resolveLevelUpPlan(
+      char("fighter", 2),
+      target("fighter", 3, null),
+      "Eldritch Knight",
+      [],
+      ELDRITCH_KNIGHT_CASTER_REF,
+    );
+    expect(steps.map((s) => s.kind)).toEqual(["hitPoints", "subclass", "newSpells", "review"]);
+    const newSpells = steps.find((s) => s.kind === "newSpells")!;
+    expect(newSpells.count).toBeGreaterThan(0);
+    expect(newSpells.meta?.spellLists).toEqual(["wizard"]);
+
+    // Omitting chosenSubclassCasterRef (undefined, the pre-#1531-fix shape)
+    // must NOT produce the same plan — the newSpells step depends on it.
+    const withoutRef = resolveLevelUpPlan(char("fighter", 2), target("fighter", 3, null), "Eldritch Knight", []);
+    expect(withoutRef.map((s) => s.kind)).toEqual(["hitPoints", "subclass", "review"]);
   });
 });
 

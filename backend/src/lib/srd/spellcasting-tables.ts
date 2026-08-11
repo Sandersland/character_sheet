@@ -138,13 +138,39 @@ function mysticArcanumLevels(warlockLevel: number): number[] {
   return levels;
 }
 
-// Third-caster subclasses that grant spellcasting — Eldritch Knight and
-// Arcane Trickster. Both use Intelligence and follow the same slot table.
-// Keyed by lowercase subclass name.
-const THIRD_CASTER_SUBCLASSES: Readonly<Record<string, string>> = {
-  "eldritch knight": "intelligence",
-  "arcane trickster": "intelligence",
-};
+// The Subclass catalog columns third-caster identity resolves from (#1531) —
+// any object carrying these two fields satisfies it, so a full Prisma
+// `subclassRef` relation (character-include.ts includes every scalar column)
+// or a narrow `{ select: { casterFraction, spellcastingAbility } }` projection
+// both work with no adapter. Replaces THIRD_CASTER_SUBCLASSES, the lowercase-
+// name-keyed lookup this module used to gate every third-caster check on — the
+// last name-keyed subclass lookup in lib/srd/, and #1339's failure shape: a
+// renamed or homebrew subclass could silently inherit or lose the mechanic. A
+// caster-fraction fact now lives on the `Subclass` row instead, where the join
+// is an FK (resolveSubclassSlug's own identity, #1277), never a string match.
+//
+// `casterFraction` is narrowed to the schema's `SubclassCasterFraction` enum
+// (review finding 1), not a bare `string`: thirdCasterAbilityOf gates
+// everything below on `!== "third"`, so an unrecognized value (a typo, a
+// future half/full-caster backfill) must fail to compile at the call site
+// instead of silently comparing false at runtime — the value-shaped twin of
+// #1339's name-shaped failure. The Prisma enum's generated type IS this
+// literal union already, so `entry.subclassRef` (any select/include carrying
+// the column) satisfies this interface structurally, with no cast needed at
+// any call site.
+export interface SubclassCasterRef {
+  casterFraction: "third" | null;
+  spellcastingAbility: string | null;
+}
+
+// Eldritch Knight and Arcane Trickster are the only seeded third casters
+// today — both Intelligence, both the same slot table below. Resolves every
+// third-caster check in this module off the Subclass row's OWN columns,
+// never off `subclassRef`'s free-text `name`.
+function thirdCasterAbilityOf(subclassRef: SubclassCasterRef | null | undefined): string | null {
+  if (!subclassRef || subclassRef.casterFraction !== "third") return null;
+  return subclassRef.spellcastingAbility;
+}
 
 // Third-caster slot table (PHB Fighter/Rogue spell slot table). EK/AT are in
 // neither SRD; re-verified against a PHB'14 transcription during the #1507
@@ -174,8 +200,8 @@ const THIRD_CASTER_SLOTS: Readonly<Record<number, Readonly<Record<number, number
 
 // How much each class contributes to the combined multiclass caster level:
 // full = +level, half = +floor(level/2), third = +floor(level/3), pact = tracked
-// separately (never merged), none = non-caster. Third casters are keyed by
-// subclass (Eldritch Knight / Arcane Trickster) via THIRD_CASTER_SUBCLASSES.
+// separately (never merged), none = non-caster. Third casters are resolved by
+// subclass (Eldritch Knight / Arcane Trickster) via thirdCasterAbilityOf.
 export type CasterFraction = "full" | "half" | "third" | "pact" | "none";
 
 export const CASTER_FRACTION_BY_CLASS: Readonly<Record<string, CasterFraction>> = {
@@ -192,9 +218,9 @@ export const CASTER_FRACTION_BY_CLASS: Readonly<Record<string, CasterFraction>> 
 // Verified edition-invariant (#1507): SRD 5.1's multiclass text ("…and half
 // your levels (rounded down) in the paladin and ranger classes…") is the same
 // rule as SRD 5.2's — no `edition`.
-/** Caster fraction for a class (third casters resolved via subclass). "none" for non-casters. */
-export function casterFractionFor(className: string, subclass?: string | null): CasterFraction {
-  if (THIRD_CASTER_SUBCLASSES[(subclass ?? "").toLowerCase()]) return "third";
+/** Caster fraction for a class (third casters resolved via the Subclass row). "none" for non-casters. */
+export function casterFractionFor(className: string, subclassRef?: SubclassCasterRef | null): CasterFraction {
+  if (thirdCasterAbilityOf(subclassRef)) return "third";
   return CASTER_FRACTION_BY_CLASS[className.toLowerCase()] ?? "none";
 }
 
@@ -206,10 +232,9 @@ export function casterFractionFor(className: string, subclass?: string | null): 
 // no `edition`.
 function casterProfile(
   className: string,
-  subclass?: string | null,
+  subclassRef?: SubclassCasterRef | null,
 ): { fraction: CasterFraction; ability: string } | null {
-  const subKey = (subclass ?? "").toLowerCase();
-  const thirdAbility = THIRD_CASTER_SUBCLASSES[subKey];
+  const thirdAbility = thirdCasterAbilityOf(subclassRef);
   if (thirdAbility) return { fraction: "third", ability: thirdAbility };
 
   const key = className.toLowerCase();
@@ -282,10 +307,10 @@ const SPELLS_KNOWN_BY_CLASS_2014: Readonly<Record<string, ReadonlyArray<number |
  */
 export function spellcastingStartLevel(
   className: string,
-  subclass: string | null | undefined,
+  subclassRef: SubclassCasterRef | null | undefined,
   edition: RulesEdition,
 ): number {
-  if (THIRD_CASTER_SUBCLASSES[(subclass ?? "").toLowerCase()]) return 3;
+  if (thirdCasterAbilityOf(subclassRef)) return 3;
   if (edition === "EDITION_2014" && HALF_CASTER_CLASSES.has(className.toLowerCase())) return 2;
   return 1;
 }
@@ -336,14 +361,13 @@ function preparedSpellCount2014(key: string, level: number, abilityScores: Recor
 export function preparedSpellCountAt(
   className: string,
   level: number,
-  subclass: string | null | undefined,
+  subclassRef: SubclassCasterRef | null | undefined,
   abilityScores: Record<string, number>,
   edition: RulesEdition,
 ): number | null {
-  if (level < spellcastingStartLevel(className, subclass, edition)) return null;
+  if (level < spellcastingStartLevel(className, subclassRef, edition)) return null;
 
-  const subKey = (subclass ?? "").toLowerCase();
-  if (THIRD_CASTER_SUBCLASSES[subKey]) {
+  if (thirdCasterAbilityOf(subclassRef)) {
     return THIRD_CASTER_PREPARED[Math.min(20, level) - 3] ?? null;
   }
 
@@ -370,14 +394,14 @@ export function preparedSpellCountAt(
  * the read-side clamp) call — never two inline copies of the cap.
  */
 export function derivePreparedSpellLimit(
-  classEntries: ReadonlyArray<{ name: string; level: number; subclass?: string | null }>,
+  classEntries: ReadonlyArray<{ name: string; level: number; subclassRef?: SubclassCasterRef | null }>,
   abilityScores: Record<string, number>,
   edition: RulesEdition,
 ): number | null {
   let total = 0;
   let anyCaster = false;
   for (const entry of classEntries) {
-    const count = preparedSpellCountAt(entry.name, entry.level, entry.subclass, abilityScores, edition);
+    const count = preparedSpellCountAt(entry.name, entry.level, entry.subclassRef, abilityScores, edition);
     if (count == null) continue;
     anyCaster = true;
     total += count;
@@ -401,10 +425,10 @@ const KNOWN_CASTER_CLASSES_2014: ReadonlySet<string> = new Set(["bard", "sorcere
  */
 export function casterModelFor(
   className: string,
-  subclass: string | null | undefined,
+  subclassRef: SubclassCasterRef | null | undefined,
   edition: RulesEdition,
 ): "known" | "prepared" | null {
-  const isThirdCaster = Boolean(THIRD_CASTER_SUBCLASSES[(subclass ?? "").toLowerCase()]);
+  const isThirdCaster = Boolean(thirdCasterAbilityOf(subclassRef));
   const key = className.toLowerCase();
   if (!isThirdCaster && CASTER_FRACTION_BY_CLASS[key] === undefined) return null; // non-caster
   if (edition !== "EDITION_2014") return "prepared";
@@ -420,13 +444,13 @@ export function casterModelFor(
  * — never two inline copies.
  */
 export function casterModelForEntries(
-  classEntries: ReadonlyArray<{ name: string; subclass?: string | null }>,
+  classEntries: ReadonlyArray<{ name: string; subclassRef?: SubclassCasterRef | null }>,
   edition: RulesEdition,
 ): "known" | "prepared" | null {
   let anyCaster = false;
   let allKnown = true;
   for (const entry of classEntries) {
-    const model = casterModelFor(entry.name, entry.subclass, edition);
+    const model = casterModelFor(entry.name, entry.subclassRef, edition);
     if (model == null) continue;
     anyCaster = true;
     if (model !== "known") allKnown = false;
@@ -464,8 +488,8 @@ const CANTRIP_BREAKPOINTS: Readonly<Record<string, ReadonlyArray<readonly [numbe
 const THIRD_CASTER_CANTRIPS: ReadonlyArray<readonly [number, number]> = [[3, 2], [10, 3]];
 
 /** Cantrips known at a class level (SRD 5.2); 0 for Paladin/Ranger and non-casters. */
-export function cantripsKnownAtLevel(className: string, level: number, subclass?: string | null): number {
-  const breakpoints = THIRD_CASTER_SUBCLASSES[(subclass ?? "").toLowerCase()]
+export function cantripsKnownAtLevel(className: string, level: number, subclassRef?: SubclassCasterRef | null): number {
+  const breakpoints = thirdCasterAbilityOf(subclassRef)
     ? THIRD_CASTER_CANTRIPS
     : CANTRIP_BREAKPOINTS[className.toLowerCase()];
   if (!breakpoints) return 0;
@@ -503,10 +527,10 @@ const SWAP_CADENCE_BY_CLASS: Readonly<Record<string, SwapCadence>> = {
  */
 export function swapCadenceFor(
   className: string,
-  subclass: string | null | undefined,
+  subclassRef: SubclassCasterRef | null | undefined,
   edition: RulesEdition,
 ): SwapCadence | null {
-  if (THIRD_CASTER_SUBCLASSES[(subclass ?? "").toLowerCase()]) return "onLevelUp";
+  if (thirdCasterAbilityOf(subclassRef)) return "onLevelUp";
   const key = className.toLowerCase();
   if (edition === "EDITION_2014") {
     if (key === "ranger") return "onLevelUp";
@@ -535,7 +559,7 @@ export interface MulticlassSpellcastingInfo {
 }
 
 /** One caster class after its per-entry save DC / attack bonus are resolved. */
-type CombinedEntry = { name: string; level: number; subclass?: string | null; fraction: CasterFraction };
+type CombinedEntry = { name: string; level: number; subclassRef?: SubclassCasterRef | null; fraction: CasterFraction };
 
 /**
  * The combined-pool slot totals. A lone contributing caster uses its own class
@@ -552,7 +576,7 @@ function resolveCombinedSlotTotals(
 ): Array<{ level: number; total: number }> {
   if (combinedEntries.length === 1) {
     const only = combinedEntries[0];
-    return deriveSpellcasting(only.name, only.level, abilityScores, proficiencyBonus, only.subclass ?? undefined, edition)?.slotTotals ?? [];
+    return deriveSpellcasting(only.name, only.level, abilityScores, proficiencyBonus, only.subclassRef, edition)?.slotTotals ?? [];
   }
   if (combinedEntries.length > 1 && combinedCasterLevel > 0) {
     return Object.entries(MULTICLASS_SPELL_SLOTS[Math.min(20, combinedCasterLevel)] ?? {})
@@ -576,7 +600,7 @@ function resolveCombinedSlotTotals(
  * Pure function — no DB access, safe to call in serializeCharacter.
  */
 export function deriveMulticlassSpellcasting(
-  classEntries: ReadonlyArray<{ name: string; level: number; subclass?: string | null }>,
+  classEntries: ReadonlyArray<{ name: string; level: number; subclass?: string | null; subclassRef?: SubclassCasterRef | null }>,
   abilityScores: Record<string, number>,
   proficiencyBonus: number,
   edition: RulesEdition,
@@ -588,7 +612,7 @@ export function deriveMulticlassSpellcasting(
   let arcana: Array<{ level: number; total: number }> = [];
 
   for (const entry of classEntries) {
-    const profile = casterProfile(entry.name, entry.subclass);
+    const profile = casterProfile(entry.name, entry.subclassRef);
     if (!profile) continue;
 
     const abilityMod = abilityModifier(abilityScores[profile.ability] ?? 10);
@@ -596,6 +620,9 @@ export function deriveMulticlassSpellcasting(
     const spellAttackBonus = proficiencyBonus + abilityMod;
     classes.push({
       className: entry.name,
+      // Display-only (never consulted for resolution — profile above already
+      // resolved off entry.subclassRef): the drifting free-text name a player
+      // may have edited (schema.prisma's own comment on this column).
       subclass: entry.subclass ?? null,
       ability: profile.ability,
       spellSaveDC,
@@ -629,9 +656,10 @@ export function deriveMulticlassSpellcasting(
  *
  * Pure function — no DB access, safe to call in serializeCharacter.
  *
- * @param subclass Subclass name, or null/undefined — used to detect third-caster
+ * @param subclassRef The class entry's Subclass catalog row (casterFraction/
+ *   spellcastingAbility columns), or null/undefined — used to detect third-caster
  *   subclasses (Eldritch Knight / Arcane Trickster) which grant their own
- *   INT-based spellcasting.
+ *   INT-based spellcasting (#1531: resolved off the row, never a name match).
  * @param edition Half-caster start level forks here (#1507 D4): SRD 5.1
  *   Paladin/Ranger have no Spellcasting feature until level 2, gated via
  *   spellcastingStartLevel — the shared predicate that also gates
@@ -642,7 +670,7 @@ export function deriveSpellcasting(
   characterLevel: number,
   abilityScores: Record<string, number>,
   proficiencyBonus: number,
-  subclass: string | null | undefined,
+  subclassRef: SubclassCasterRef | null | undefined,
   edition: RulesEdition,
 ): DerivedSpellcastingInfo | null {
   // Builds the standard save-DC / attack-bonus pair plus a sorted slotTotals
@@ -667,10 +695,9 @@ export function deriveSpellcasting(
 
   // Check third-caster subclasses first — they grant spellcasting independent
   // of the base class's caster status (Fighter/Rogue are not casters without them).
-  const subclassKey = (subclass ?? "").toLowerCase();
-  const thirdCasterAbility = THIRD_CASTER_SUBCLASSES[subclassKey];
+  const thirdCasterAbility = thirdCasterAbilityOf(subclassRef);
   if (thirdCasterAbility) {
-    if (characterLevel < spellcastingStartLevel(className, subclass, edition)) return null;
+    if (characterLevel < spellcastingStartLevel(className, subclassRef, edition)) return null;
     return fromSlotRow(
       thirdCasterAbility,
       THIRD_CASTER_SLOTS[Math.min(20, Math.max(3, characterLevel))] ?? {},
@@ -688,7 +715,7 @@ export function deriveSpellcasting(
   if (HALF_CASTER_CLASSES.has(classKey)) {
     // SRD 5.2: half-casters cast from level 1; SRD 5.1 from level 2 (#1507 D4) —
     // spellcastingStartLevel is the one shared gate for both.
-    if (characterLevel < spellcastingStartLevel(className, subclass, edition)) return null;
+    if (characterLevel < spellcastingStartLevel(className, subclassRef, edition)) return null;
     return fromSlotRow(ability, HALF_CASTER_SLOTS[Math.min(20, Math.max(1, characterLevel))] ?? {});
   }
 
@@ -721,7 +748,7 @@ export function deriveSpellcasting(
 export function levelUpSpellPicks(
   className: string,
   level: number,
-  subclass: string | null | undefined,
+  subclassRef: SubclassCasterRef | null | undefined,
   edition: RulesEdition,
 ): number {
   // #1131: a fresh level-1 entry (creation or multiclass-add) picks its full
@@ -735,16 +762,16 @@ export function levelUpSpellPicks(
   // that number lives, shared with level1SpellPicksFor.
   if (level <= 1) {
     if (className.toLowerCase() === "wizard") return WIZARD_LEVEL1_SPELLBOOK_SIZE;
-    return preparedSpellCountAt(className, 1, subclass, {}, edition) ?? 0;
+    return preparedSpellCountAt(className, 1, subclassRef, {}, edition) ?? 0;
   }
   if (className.toLowerCase() === "wizard") return 2;
-  if (swapCadenceFor(className, subclass, edition) !== "onLevelUp") return 0;
+  if (swapCadenceFor(className, subclassRef, edition) !== "onLevelUp") return 0;
   // #1509 D3: a previous-level count of null (below spellcastingStartLevel — a
   // 2014 Ranger reading its own level 1) reads as 0, not "no data": the class
   // had nothing to compare against, so the whole level-N count is new. Same
   // null-safe read the fresh-entry branch above uses.
-  const now = preparedSpellCountAt(className, level, subclass, {}, edition) ?? 0;
-  const prev = preparedSpellCountAt(className, level - 1, subclass, {}, edition) ?? 0;
+  const now = preparedSpellCountAt(className, level, subclassRef, {}, edition) ?? 0;
+  const prev = preparedSpellCountAt(className, level - 1, subclassRef, {}, edition) ?? 0;
   return Math.max(0, now - prev);
 }
 
@@ -753,9 +780,9 @@ export function levelUpSpellPicks(
  * cantrips-known delta from N-1 to N (full count at level 1). 0 for Paladin/Ranger
  * and non-casters. #1131 wires this into the level-up newSpells step and creation.
  */
-export function levelUpCantripPicks(className: string, level: number, subclass?: string | null): number {
-  const now = cantripsKnownAtLevel(className, level, subclass);
-  const prev = level <= 1 ? 0 : cantripsKnownAtLevel(className, level - 1, subclass);
+export function levelUpCantripPicks(className: string, level: number, subclassRef?: SubclassCasterRef | null): number {
+  const now = cantripsKnownAtLevel(className, level, subclassRef);
+  const prev = level <= 1 ? 0 : cantripsKnownAtLevel(className, level - 1, subclassRef);
   return Math.max(0, now - prev);
 }
 
@@ -787,13 +814,10 @@ export interface SpellPickLists {
  *    equals the lowercased class name, which for Fighter/Rogue is
  *    "fighter"/"rogue" — no catalog spell is ever on those lists, so the New
  *    Spells step served an empty picker for a level-3 Eldritch Knight/Arcane
- *    Trickster. Keyed off THIRD_CASTER_SUBCLASSES (same map every other
- *    third-caster check in this module uses) rather than the subclass's
- *    catalog slug: every function here already resolves third-caster status
- *    off the free-text `subclass` name, so keying this one function off the
- *    slug instead would be a second, divergent identity check for the same
- *    subclass at neighboring call sites — the coupling this module already
- *    has to a display-name key, not a new one #1825 introduces.
+ *    Trickster. Resolved via thirdCasterAbilityOf off the caller-supplied
+ *    `subclassRef` (#1531: the Subclass row's own casterFraction/
+ *    spellcastingAbility columns) — the same resolver every other third-caster
+ *    check in this module uses, never a name or slug match of its own.
  * 2. Bard Magical Secrets, edition-forked (folds in the former
  *    `magicalSecretsSpellLists`, now a delegate below for callers/tests still
  *    naming it) — governs BOTH the leveled-spell and the cantrip facet of a
@@ -838,10 +862,10 @@ export interface SpellPickLists {
 export function spellListsFor(
   className: string,
   level: number,
-  subclass: string | null | undefined,
+  subclassRef: SubclassCasterRef | null | undefined,
   edition: RulesEdition,
 ): SpellPickLists {
-  if (THIRD_CASTER_SUBCLASSES[(subclass ?? "").toLowerCase()]) return { spells: ["wizard"], cantrips: ["wizard"] };
+  if (thirdCasterAbilityOf(subclassRef)) return { spells: ["wizard"], cantrips: ["wizard"] };
 
   const key = className.toLowerCase();
   if (key !== "bard" || level < 10) return { spells: [key], cantrips: [key] };
@@ -929,11 +953,11 @@ export function eldritchKnightSpellSchoolGate(fighterLevel: number, edition: Rul
 export function maxSpellLevelForClass(
   className: string,
   level: number,
-  subclass: string | null | undefined,
+  subclassRef: SubclassCasterRef | null | undefined,
   edition: RulesEdition,
 ): number {
   // Ability scores / proficiency don't affect slot LEVELS, so pass neutral values.
-  const derived = deriveSpellcasting(className, level, {}, 2, subclass ?? undefined, edition);
+  const derived = deriveSpellcasting(className, level, {}, 2, subclassRef, edition);
   if (!derived) return 0;
   return derived.slotTotals.reduce((max, slot) => Math.max(max, slot.level), 0);
 }
@@ -1013,21 +1037,21 @@ const WIZARD_LEVEL1_SPELLBOOK_SIZE = 6;
  */
 export function level1SpellPicksFor(
   className: string,
-  subclass: string | null | undefined,
+  subclassRef: SubclassCasterRef | null | undefined,
   edition: RulesEdition,
 ): { cantrips: number; spells: number; maxSpellLevel: number; spellbookSize?: number } | null {
-  if (spellcastingStartLevel(className, subclass, edition) > 1) return null;
+  if (spellcastingStartLevel(className, subclassRef, edition) > 1) return null;
 
   const isWizard = className.toLowerCase() === "wizard";
   const spells = isWizard
     ? WIZARD_LEVEL1_SPELLBOOK_SIZE
     : edition === "EDITION_2014"
       ? (LEVEL1_CREATION_SPELLS_2014[className.toLowerCase()] ?? null)
-      : preparedSpellCountAt(className, 1, subclass, {}, edition);
+      : preparedSpellCountAt(className, 1, subclassRef, {}, edition);
   if (spells == null) return null; // non-caster
 
-  const cantrips = cantripsKnownAtLevel(className, 1, subclass);
-  const maxSpellLevel = spells === 0 ? 0 : maxSpellLevelForClass(className, 1, subclass, edition);
+  const cantrips = cantripsKnownAtLevel(className, 1, subclassRef);
+  const maxSpellLevel = spells === 0 ? 0 : maxSpellLevelForClass(className, 1, subclassRef, edition);
   return {
     cantrips,
     spells,

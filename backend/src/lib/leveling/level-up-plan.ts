@@ -21,6 +21,7 @@ import {
   spellListsFor,
   swapCadenceFor,
   type SpellSchoolGate,
+  type SubclassCasterRef,
 } from "@/lib/srd/spellcasting-tables.js";
 
 export type LevelUpStepKind =
@@ -83,6 +84,15 @@ export interface TargetClassEntry {
   // only the exact-name fallback, silently missing a Champion whose
   // CharacterClassEntry.name or .subclass text had drifted from the catalog.
   subclassRef?: { slug: string } | null;
+  // #1531: the same PERSISTED (or re-plan PICKED, mirroring subclassRef's own
+  // comment) subclass's casterFraction/spellcastingAbility — the caller
+  // resolves this from the Subclass row alongside subclassRef.slug, since a
+  // pure planner has no DB relation to read it from itself. Every third-caster
+  // check below (newSpells' levelUpSpellPicks/swapCadenceFor/
+  // maxSpellLevelForClass/spellListsFor/casterModelFor) reads THIS field, never
+  // `subclass`/`subclassRef.slug` — replaces the retired THIRD_CASTER_SUBCLASSES
+  // name-keyed lookup (spellcasting-tables.ts).
+  subclassCasterRef?: SubclassCasterRef | null;
   newLevel: number;
   subclassLevel?: number;
   // The hit die THIS level-up rolls, already resolved through advancingHitDie by
@@ -362,14 +372,14 @@ function schoolGateMeta(schoolGate: SpellSchoolGate | null): Record<string, unkn
 }
 
 function newSpellsStep({ target, edition }: PlanContext): LevelUpStep | null {
-  const count = levelUpSpellPicks(target.name, target.newLevel, target.subclass, edition);
-  const cantrips = levelUpCantripPicks(target.name, target.newLevel, target.subclass);
-  const canSwap = swapCadenceFor(target.name, target.subclass, edition) === "onLevelUp" && target.newLevel >= 2;
+  const count = levelUpSpellPicks(target.name, target.newLevel, target.subclassCasterRef, edition);
+  const cantrips = levelUpCantripPicks(target.name, target.newLevel, target.subclassCasterRef);
+  const canSwap = swapCadenceFor(target.name, target.subclassCasterRef, edition) === "onLevelUp" && target.newLevel >= 2;
   if (count <= 0 && cantrips <= 0 && !canSwap) return null;
   const magicalSecrets = bardMagicalSecretsAt(target.name, target.newLevel);
-  const maxSpellLevel = maxSpellLevelForClass(target.name, target.newLevel, target.subclass, edition);
-  const lists = spellListsFor(target.name, target.newLevel, target.subclass, edition);
-  const casterModel = casterModelFor(target.name, target.subclass, edition);
+  const maxSpellLevel = maxSpellLevelForClass(target.name, target.newLevel, target.subclassCasterRef, edition);
+  const lists = spellListsFor(target.name, target.newLevel, target.subclassCasterRef, edition);
+  const casterModel = casterModelFor(target.name, target.subclassCasterRef, edition);
   const schoolGate = ekSpellSchoolGate(target, edition);
   return {
     kind: "newSpells",

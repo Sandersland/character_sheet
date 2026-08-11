@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import { level1SpellPicksFor } from "@/lib/srd/srd.js";
+import { ELDRITCH_KNIGHT } from "./third-caster.fixture.js";
 
 // #1510: level1SpellPicksFor owns the whole level-1 creation-picks object for
 // BOTH the reference route and the creation gate (D4) — pin the full table for
@@ -33,7 +34,7 @@ describe("level1SpellPicksFor — EDITION_2014", () => {
 
   it("non-caster classes and a level-1 third-caster subclass are both null", () => {
     expect(level1SpellPicksFor("Fighter", null, "EDITION_2014")).toBeNull();
-    expect(level1SpellPicksFor("Fighter", "Eldritch Knight", "EDITION_2014")).toBeNull();
+    expect(level1SpellPicksFor("Fighter", ELDRITCH_KNIGHT, "EDITION_2014")).toBeNull();
   });
 });
 

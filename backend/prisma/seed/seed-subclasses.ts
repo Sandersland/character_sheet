@@ -255,16 +255,33 @@ export async function pruneStaleSubclasses(
 // fields so a rename actually lands on the existing row. Prisma's compound-key
 // `where: { slug_edition: {...} }` shorthand can't express a null edition (see
 // upsertEditionRow), so this finds-then-writes instead.
+// #1531: casterFraction/spellcastingAbility default to NULL (the schema
+// column default) for every subclass that doesn't set them — `?? null` here
+// is an explicit write of that default, not a fallback guess. Split out of
+// seedSubclasses purely to keep that function's own cyclomatic count low:
+// prisma/seed/** carries no vitest coverage instrumentation (vitest.config.ts
+// scopes coverage.include to src/**), so a function here floors at the
+// UNCOVERED CRAP formula CC^2+CC no matter how well tested it actually is —
+// same reasoning as this file's own editionLabel/countReferencingBySubclassId
+// splits above (and seed-class-features.ts's groupPresentEditionsBySubclassId).
+function casterIdentityOf(sub: { casterFraction?: "third"; spellcastingAbility?: string }): {
+  casterFraction: "third" | null;
+  spellcastingAbility: string | null;
+} {
+  return { casterFraction: sub.casterFraction ?? null, spellcastingAbility: sub.spellcastingAbility ?? null };
+}
+
 export async function seedSubclasses(prisma: PrismaClient, classIds: Map<string, string>): Promise<void> {
   for (const sub of SUBCLASSES) {
     const classId = classIds.get(sub.className);
     if (!classId) throw new Error(`Seed error: unknown class "${sub.className}" in SUBCLASSES`);
     const edition = sub.edition ?? null;
+    const { casterFraction, spellcastingAbility } = casterIdentityOf(sub);
     await upsertEditionRow(
       prisma.subclass,
       { slug: sub.slug, edition },
-      { classId, name: sub.name, description: sub.description, slug: sub.slug, edition },
-      { classId, name: sub.name, description: sub.description },
+      { classId, name: sub.name, description: sub.description, slug: sub.slug, edition, casterFraction, spellcastingAbility },
+      { classId, name: sub.name, description: sub.description, casterFraction, spellcastingAbility },
     );
   }
   await pruneStaleSubclasses(

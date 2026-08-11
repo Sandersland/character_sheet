@@ -41,6 +41,7 @@ import type {
 import { editionOf } from "@/lib/rules/edition.js";
 import { crossEditionRejection } from "@/lib/rules/catalog-edition.js";
 import { subclassGateLevel } from "./effective-levels.js";
+import type { SubclassCasterRef } from "@/lib/srd/spellcasting-tables.js";
 import type { RulesEdition } from "@character-sheet/shared-types";
 import type { ClassFeatureRow } from "@/lib/classes/class-feature-rows.js";
 import { FEATURE_ROWS_CLASS_FEATURES, FEATURE_ROWS_SUBCLASS_FEATURES } from "@/lib/classes/feature-rows-select.js";
@@ -69,6 +70,13 @@ export interface LevelUpContext {
   // to resolveLevelUpPlan by every caller of this context (the commit path
   // and the GET /plan route) so the re-plan splice carries the matching rows.
   pickedSubclassFeatureRows: ClassFeatureRow[] | null;
+  // #1531: the not-yet-committed pick's own casterFraction/spellcastingAbility
+  // — the "picked" half of the persisted/picked pair mirrored on
+  // targetEntry.subclassCasterRef, same rationale as pickedSubclassFeatureRows
+  // above. Fed to resolveLevelUpPlan's chosenSubclassCasterRef parameter so a
+  // level-3 Fighter/Rogue picking Eldritch Knight/Arcane Trickster for the
+  // FIRST time resolves its own newSpells step correctly on re-plan.
+  chosenSubclassCasterRef: SubclassCasterRef | null;
 }
 
 const TARGET_ENTRY_SELECT = {
@@ -103,7 +111,11 @@ const TARGET_ENTRY_SELECT = {
   // Subclass row's own id, so resolveLevelUpContext can load its
   // SubclassSpellListExpansion rows without re-resolving by name.
   // `slug` (#1123): draconicResilienceMaxHpTerm's FK identity input.
-  subclassRef: { select: { id: true, slug: true, features: FEATURE_ROWS_SUBCLASS_FEATURES } },
+  // `casterFraction`/`spellcastingAbility` (#1531): newSpellsStep's
+  // third-caster resolution — see TargetClassEntry.subclassCasterRef.
+  subclassRef: {
+    select: { id: true, slug: true, casterFraction: true, spellcastingAbility: true, features: FEATURE_ROWS_SUBCLASS_FEATURES },
+  },
 } satisfies Prisma.CharacterClassEntrySelect;
 
 // Fetch the target class's catalog subclassLevel/extraAsiLevels/
@@ -150,6 +162,10 @@ interface ResolvedTargetEntry {
   // call had only the exact-name fallback, silently missing a Champion whose
   // CharacterClassEntry.subclass text had drifted from "Champion".
   persistedSubclassRef: { slug: string } | null;
+  // #1531: the PERSISTED subclass's own casterFraction/spellcastingAbility —
+  // fed to newSpellsStep via TargetClassEntry.subclassCasterRef, same "FK
+  // over free-text name" reasoning as persistedSubclassRef above.
+  persistedSubclassCasterRef: SubclassCasterRef | null;
   // #1631: the PERSISTED subclass's own catalog id (subclassRef.id) — null
   // when no subclass is chosen yet. Distinct from persistedSubclass (a name)
   // because loadSubclassSpellListExpansionIds keys on id, mirroring
@@ -171,29 +187,34 @@ interface ResolvedTargetEntry {
   subclassFeatureRows: ClassFeatureRow[];
 }
 
-// #1631: split out of resolveExistingTargetEntry purely to keep that
-// function's own cyclomatic count from crossing the CI health gate (mirrors
-// this file's own targetClassCatalogFor/resolveTargetEntry split reasoning).
-function persistedSubclassIdOf(entry: TargetEntryRow): string | null {
-  return entry.subclassRef?.id ?? null;
-}
-
 // #1148 review finding: the CANONICAL catalog class name (entry.class.name),
 // never entry.name — CharacterClassEntry's own `name` column is a
 // free-to-diverge display name (#1495's same rationale), and
 // resolveSubclassSlug's FK-first path requires the classKey it's called
 // with to match SUBCLASS_IDENTITY's classKey or the FK is silently
-// rejected (subclass-slug.ts's own class-mismatch guard). Split out
-// alongside persistedSubclassIdOf/persistedSubclassRefOf, same #1631 reason.
+// rejected (subclass-slug.ts's own class-mismatch guard). Split out of
+// resolveExistingTargetEntry purely to keep that function's own cyclomatic
+// count from crossing the CI health gate (mirrors this file's own
+// targetClassCatalogFor/resolveTargetEntry split reasoning).
 function canonicalClassNameOf(entry: TargetEntryRow): string {
   return entry.class?.name ?? entry.name;
 }
 
-// The PERSISTED subclass's own FK slug — resolveSubclassSlug's preferred
-// identity path (#1277), alongside canonicalClassNameOf above (its classKey
-// input). Same #1631 split reason as persistedSubclassIdOf.
-function persistedSubclassRefOf(entry: TargetEntryRow): { slug: string } | null {
-  return entry.subclassRef ? { slug: entry.subclassRef.slug } : null;
+// The three PERSISTED-subclass facts resolveExistingTargetEntry needs, bundled
+// behind ONE null guard (review finding 4 — id/ref/casterRef used to be three
+// separate one-liners, each re-testing `entry.subclassRef` for null): the
+// catalog id (#1631, loadSubclassSpellListExpansionIds' key), the FK slug
+// (#1148, resolveSubclassSlug's preferred identity path over the drift-prone
+// free-text name), and the third-caster identity (#1531, newSpellsStep's
+// TargetClassEntry.subclassCasterRef input). All three are null together —
+// there is no "some persisted, some not" state a CharacterClassEntry can be
+// in — so one guard is the honest shape, not three coincidentally-matching ones.
+function persistedSubclassDataOf(
+  entry: TargetEntryRow,
+): { id: string | null; ref: { slug: string } | null; casterRef: SubclassCasterRef | null } {
+  if (!entry.subclassRef) return { id: null, ref: null, casterRef: null };
+  const { id, slug, casterFraction, spellcastingAbility } = entry.subclassRef;
+  return { id, ref: { slug }, casterRef: { casterFraction, spellcastingAbility } };
 }
 
 function resolveExistingTargetEntry(
@@ -204,11 +225,13 @@ function resolveExistingTargetEntry(
 ): ResolvedTargetEntry {
   const entry = classEntries.find((e) => e.id === target.classEntryId);
   if (!entry) throw new InvalidLevelUpError(`Class entry not found: ${target.classEntryId}`);
+  const subclassData = persistedSubclassDataOf(entry);
   return {
     targetClassName: canonicalClassNameOf(entry),
     persistedSubclass: entry.subclass,
-    persistedSubclassRef: persistedSubclassRefOf(entry),
-    persistedSubclassId: persistedSubclassIdOf(entry),
+    persistedSubclassRef: subclassData.ref,
+    persistedSubclassCasterRef: subclassData.casterRef,
+    persistedSubclassId: subclassData.id,
     newLevel: isMulticlass ? entry.level + 1 : hitDiceTotal + 1,
     classId: entry.classId,
     targetIsPrimary: entry.position === 0,
@@ -228,6 +251,7 @@ async function resolveNewTargetEntry(target: Extract<LevelUpTarget, { kind: "new
     targetClassName: catalog.name,
     persistedSubclass: null,
     persistedSubclassRef: null, // a brand new entry has no persisted subclass
+    persistedSubclassCasterRef: null, // a brand new entry has no persisted subclass
     persistedSubclassId: null, // a brand new entry has no persisted subclass
     newLevel: 1,
     classId: target.classId,
@@ -259,8 +283,12 @@ function resolveTargetEntry(
 async function resolvePickedSubclass(
   subclassId: string | undefined,
   edition: RulesEdition,
-): Promise<{ chosenSubclassName: string | null; pickedSubclassFeatureRows: ClassFeatureRow[] | null }> {
-  if (!subclassId) return { chosenSubclassName: null, pickedSubclassFeatureRows: null };
+): Promise<{
+  chosenSubclassName: string | null;
+  pickedSubclassFeatureRows: ClassFeatureRow[] | null;
+  chosenSubclassCasterRef: SubclassCasterRef | null;
+}> {
+  if (!subclassId) return { chosenSubclassName: null, pickedSubclassFeatureRows: null, chosenSubclassCasterRef: null };
   // Cross-edition before membership: a wrong-edition row is "not in this
   // character's catalog at all" (#1414), the ordering applySetSubclass also
   // carries. Reuses the `edition` const bound at the call site — never
@@ -269,15 +297,20 @@ async function resolvePickedSubclass(
   // id → name. `features` (#1546 Part B-i): this pick's own rows, so a
   // re-plan (the subclass hasn't been committed to the character yet) still
   // resolves its subclass-derived choices — one line added to an existing
-  // lookup, no new query.
+  // lookup, no new query. `casterFraction`/`spellcastingAbility` (#1531):
+  // this pick's own third-caster identity, same rationale.
   const sub = await prisma.subclass.findUnique({
     where: { id: subclassId },
-    select: { name: true, edition: true, features: FEATURE_ROWS_SUBCLASS_FEATURES },
+    select: { name: true, edition: true, casterFraction: true, spellcastingAbility: true, features: FEATURE_ROWS_SUBCLASS_FEATURES },
   });
   if (!sub) throw new InvalidLevelUpError(`Subclass not found: ${subclassId}`);
   const mismatch = crossEditionRejection(sub, `Subclass "${sub.name}"`, edition);
   if (mismatch) throw new InvalidLevelUpError(mismatch);
-  return { chosenSubclassName: sub.name, pickedSubclassFeatureRows: sub.features as unknown as ClassFeatureRow[] };
+  return {
+    chosenSubclassName: sub.name,
+    pickedSubclassFeatureRows: sub.features as unknown as ClassFeatureRow[],
+    chosenSubclassCasterRef: { casterFraction: sub.casterFraction, spellcastingAbility: sub.spellcastingAbility },
+  };
 }
 
 // #1631: the EFFECTIVE subclass id this level-up's newSpells step should
@@ -325,7 +358,7 @@ export async function resolveLevelUpContext(
   const hitDice = normalizeHitDice(character.hitDice);
 
   const {
-    targetClassName, persistedSubclass, persistedSubclassRef, persistedSubclassId, newLevel, classId, targetIsPrimary,
+    targetClassName, persistedSubclass, persistedSubclassRef, persistedSubclassCasterRef, persistedSubclassId, newLevel, classId, targetIsPrimary,
     catalogHitDie, classFeatureRows, subclassFeatureRows,
   } = await resolveTargetEntry(target, character.classEntries, isMulticlass, hitDice.total);
 
@@ -335,7 +368,7 @@ export async function resolveLevelUpContext(
 
   const { subclassLevel, extraAsiLevels, fightingStyleFeatLevel } = await targetClassCatalogFor(classId, targetClassName, edition);
 
-  const { chosenSubclassName, pickedSubclassFeatureRows } = await resolvePickedSubclass(subclassId, edition);
+  const { chosenSubclassName, pickedSubclassFeatureRows, chosenSubclassCasterRef } = await resolvePickedSubclass(subclassId, edition);
   // #1631: widen the newSpells step's choosable pool against the EFFECTIVE
   // subclass — see effectiveSubclassId's own comment.
   const subclassSpellListExpansionIds = await loadSubclassSpellListExpansionIds(
@@ -356,6 +389,7 @@ export async function resolveLevelUpContext(
       name: targetClassName,
       subclass: persistedSubclass,
       subclassRef: persistedSubclassRef,
+      subclassCasterRef: persistedSubclassCasterRef,
       newLevel,
       subclassLevel,
       hitDie,
@@ -368,6 +402,7 @@ export async function resolveLevelUpContext(
     chosenSubclassName,
     targetIsPrimary,
     pickedSubclassFeatureRows,
+    chosenSubclassCasterRef,
   };
 }
 
@@ -703,10 +738,10 @@ export async function applyLevelUpTransaction(
   submission: LevelUpSubmission,
   userId: string,
 ): Promise<void> {
-  const { planCharacter, targetEntry, chosenSubclassName, pickedSubclassFeatureRows } =
+  const { planCharacter, targetEntry, chosenSubclassName, pickedSubclassFeatureRows, chosenSubclassCasterRef } =
     await resolveLevelUpContext(characterId, submission.target, submission.subclassId);
 
-  const steps = validateLevelUpSubmission(planCharacter, targetEntry, chosenSubclassName, submission, pickedSubclassFeatureRows);
+  const steps = validateLevelUpSubmission(planCharacter, targetEntry, chosenSubclassName, submission, pickedSubclassFeatureRows, chosenSubclassCasterRef);
   await assertPickSpellEligibility(submission, steps, planCharacter.edition);
 
   const ops = buildLevelUpOps(steps, submission);

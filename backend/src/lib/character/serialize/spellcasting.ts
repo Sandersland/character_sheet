@@ -5,6 +5,7 @@ import {
   derivePreparedSpellLimit,
   casterModelForEntries,
   CASTER_MODEL_LABELS,
+  type SubclassCasterRef,
 } from "@/lib/srd/srd.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spellcasting.js";
 import { clampPreparedToLimit, type SpellEntry } from "@/lib/spellcasting/spell-state.js";
@@ -334,14 +335,14 @@ function preparedLimitEntries(
   row: CharacterWithRelations,
   primaryClass: PrimaryClass,
   level: number,
-): Array<{ name: string; level: number; subclass: string | null }> {
+): Array<{ name: string; level: number; subclassRef: SubclassCasterRef | null }> {
   if (row.classEntries.length === 0) {
-    return [{ name: primaryClass?.name ?? "", level, subclass: primaryClass?.subclass ?? null }];
+    return [{ name: primaryClass?.name ?? "", level, subclassRef: primaryClass?.subclassRef ?? null }];
   }
   return row.classEntries.map((e) => ({
     name: e.name,
     level: effectiveEntryLevel(e.level, row.classEntries.length, level),
-    subclass: e.subclass,
+    subclassRef: e.subclassRef,
   }));
 }
 
@@ -438,7 +439,7 @@ function buildSingleClassSpellcastingView(
     level,
     abilityScores,
     proficiencyBonus,
-    primaryClass?.subclass ?? undefined,
+    primaryClass?.subclassRef,
     editionOf(row),
   );
   const edition = editionOf(row);
@@ -469,7 +470,7 @@ function buildMulticlassSpellcastingView(
   proficiencyBonus: number,
 ): object | undefined {
   const multi = deriveMulticlassSpellcasting(
-    row.classEntries.map((e) => ({ name: e.name, level: e.level, subclass: e.subclass })),
+    row.classEntries.map((e) => ({ name: e.name, level: e.level, subclass: e.subclass, subclassRef: e.subclassRef })),
     abilityScores,
     proficiencyBonus,
     editionOf(row),

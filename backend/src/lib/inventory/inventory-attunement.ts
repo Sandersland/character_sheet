@@ -44,7 +44,9 @@ export async function applyAttune(
         // raceSelection.name is the last fallback for a homebrew/no-species-FK
         // character (raw-inserted fixtures with no speciesId).
         raceSelection: { select: { name: true, species: { select: { name: true } }, variant: { select: { name: true } } } },
-        classEntries: { select: { name: true, subclass: true } },
+        classEntries: {
+          select: { name: true, subclassRef: { select: { casterFraction: true, spellcastingAbility: true } } },
+        },
       },
     });
     const prereq = { kind: item.attunementPrereqKind, value: item.attunementPrereqValue };
