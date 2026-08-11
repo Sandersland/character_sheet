@@ -49,7 +49,7 @@ import { effectiveEntryLevel } from "@/lib/leveling/effective-levels.js";
 import { resolveSubclassSlug, type SubclassSlug, type SubclassIdentityInput } from "./subclass-slug.js";
 import { effectBuffsFromRow, type ClassFeatureRow, type ClassFeatureRowsCarrier, type ResourceTotalContext } from "./class-feature-rows.js";
 import { monkPoolKey } from "./monk.js";
-import { ARCANE_CHARGE_REMINDER, hasArcaneCharge } from "./arcane-charge.js";
+import { appendArcaneChargeReminder, hasArcaneCharge } from "./arcane-charge.js";
 import { DEFAULT_RULES_EDITION } from "@/lib/rules/edition.js";
 
 export type ActionCost = "action" | "bonusAction" | "reaction" | "free" | "special";
@@ -1054,10 +1054,7 @@ function withArcaneChargeReminder(
 ): AvailableAction {
   if (action.key !== "actionSurge") return action;
   if (!hasArcaneCharge(entryLevel, slug === "fighter-eldritch-knight", edition)) return action;
-  return {
-    ...action,
-    reminder: action.reminder ? `${action.reminder} ${ARCANE_CHARGE_REMINDER}` : ARCANE_CHARGE_REMINDER,
-  };
+  return { ...action, reminder: appendArcaneChargeReminder(action.reminder) };
 }
 
 /**

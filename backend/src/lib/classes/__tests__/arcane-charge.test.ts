@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { arcaneChargeAvailable, hasArcaneCharge, ARCANE_CHARGE_LEVEL } from "../arcane-charge.js";
+import {
+  appendArcaneChargeReminder,
+  arcaneChargeAvailable,
+  hasArcaneCharge,
+  ARCANE_CHARGE_LEVEL,
+  ARCANE_CHARGE_REMINDER,
+} from "../arcane-charge.js";
 
 describe("arcaneChargeAvailable", () => {
   it("is available in 2014", () => {
@@ -32,5 +38,15 @@ describe("hasArcaneCharge", () => {
 
   it("is false in 2024, even for a qualifying level/subclass", () => {
     expect(hasArcaneCharge(ARCANE_CHARGE_LEVEL, true, "EDITION_2024")).toBe(false);
+  });
+});
+
+describe("appendArcaneChargeReminder", () => {
+  it("is the Arcane Charge text alone when the card carries no reminder", () => {
+    expect(appendArcaneChargeReminder(undefined)).toBe(ARCANE_CHARGE_REMINDER);
+  });
+
+  it("appends after an existing reminder, space-separated, existing text first", () => {
+    expect(appendArcaneChargeReminder("Regain 1d10 + 15 HP")).toBe(`Regain 1d10 + 15 HP ${ARCANE_CHARGE_REMINDER}`);
   });
 });

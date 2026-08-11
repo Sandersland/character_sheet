@@ -208,5 +208,20 @@ describe("deriveEntryScopedActions", () => {
       const card = actions.find((a) => a.key === "actionSurge");
       expect(card?.reminder).toMatch(/Arcane Charge/);
     });
+
+    // The discriminating negative: total level (25) clears the L15 gate but
+    // the fighter ENTRY's own level (14) does not — a gate reading total
+    // level would wrongly attach the reminder here, so this test FAILS if
+    // withArcaneChargeReminder is ever fed totalLevel instead of effLevel.
+    it("a multiclass Eldritch Knight below Fighter 15 gets no reminder even when total level clears 15", () => {
+      const entries = [
+        { name: "wizard", subclass: undefined, level: 11 },
+        { name: "fighter", subclass: "eldritch knight", level: 14 },
+      ];
+      const actions = deriveEntryScopedActions(entries, 25, [], true, "EDITION_2014", getFeatureRows);
+      const card = actions.find((a) => a.key === "actionSurge");
+      expect(card).toBeDefined();
+      expect(card?.reminder).toBeUndefined();
+    });
   });
 });

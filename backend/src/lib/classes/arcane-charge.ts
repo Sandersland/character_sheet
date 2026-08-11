@@ -40,7 +40,18 @@ export function arcaneChargeAvailable(edition: RulesEdition): boolean {
   }
 }
 
-/** Whether a character entry at `entryLevel` who IS an Eldritch Knight has Arcane Charge. */
+// `entryLevel` is the FIGHTER entry's own effective level, never the
+// character's total level — a Fighter-14/Wizard-1 (total 15) does not have
+// Arcane Charge (PHB'14 p.75 grants it at Fighter 15).
 export function hasArcaneCharge(entryLevel: number, isEldritchKnight: boolean, edition: RulesEdition): boolean {
   return isEldritchKnight && entryLevel >= ARCANE_CHARGE_LEVEL && arcaneChargeAvailable(edition);
+}
+
+/**
+ * Arcane Charge appended after whatever reminder the Action Surge card
+ * already carries (none today — Action Surge has no `effectKind`, see
+ * describeRowReminder — but a future served reminder must not be clobbered).
+ */
+export function appendArcaneChargeReminder(existing: string | undefined): string {
+  return existing ? `${existing} ${ARCANE_CHARGE_REMINDER}` : ARCANE_CHARGE_REMINDER;
 }
