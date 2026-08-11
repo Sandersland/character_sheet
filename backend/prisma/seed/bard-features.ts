@@ -204,6 +204,14 @@ const BARD_BASE_RAW: RawBardFeature[] = [
     edition: "EDITION_2014",
     description:
       "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more skills at level 10.",
+    // #1588: PHB'14 p.53 — 2 skills at L3, 4 (2 more) at L10. Thieves' Tools
+    // alternative not modelled (expertiseKnown is skills only) — same
+    // disclosed-gap shape as Rogue's own 2014 row.
+    derivedStat: "expertiseChoiceCount",
+    derivedStatTiers: [
+      { minLevel: 3, value: 2 },
+      { minLevel: 10, value: 4 },
+    ],
   },
   {
     subclassSlug: null,
@@ -214,6 +222,13 @@ const BARD_BASE_RAW: RawBardFeature[] = [
     // level-shifts 3 -> 2 AND the second grant 10 -> 9.
     description:
       "Choose two of your skill proficiencies (or one skill proficiency and your Thieves' Tools proficiency). Your Proficiency Bonus is doubled for any ability check you make with either chosen proficiency. At level 9, choose two more skill proficiencies to gain this benefit.",
+    // #1588: SRD 5.2.1 — 2 skills at L2, 4 (2 more) at L9 (this row's own
+    // level-shifted grant, NOT the 2014 row's L3/L10 pair).
+    derivedStat: "expertiseChoiceCount",
+    derivedStatTiers: [
+      { minLevel: 2, value: 2 },
+      { minLevel: 9, value: 4 },
+    ],
   },
   {
     subclassSlug: null,

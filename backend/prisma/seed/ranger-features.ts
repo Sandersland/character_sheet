@@ -241,13 +241,20 @@ const RANGER_BASE_RAW: RawRangerFeature[] = [
     level: 2,
     edition: "EDITION_2024",
     // SRD 5.2. NEW in 2024 — no 2014 counterpart; fills Fighting Style's old
-    // L2 exploration-kit role with a different mechanic. C7: the Expertise
-    // grant is real persisted state this row doesn't populate (grep finds no
-    // Expertise modelling anywhere in backend/src/lib — same disclosed gap as
-    // Barbarian's Primal Knowledge, Wizard's Scholar) — text only. The
-    // two-languages grant is likewise text only.
+    // L2 exploration-kit role with a different mechanic. The two-languages
+    // grant stays text only (no language-proficiency model exists).
     description:
       "Choose one skill you're proficient in; you gain Expertise in it (double proficiency bonus on its checks). You also learn two languages of your choice.",
+    // #1588: the whole Expertise ladder lives on THIS row (1 at L2, 3 at L9)
+    // rather than split across this row and the L9 "Expertise" row below —
+    // derivedStatFromRows takes the max across every qualifying row, so
+    // either shape resolves correctly, but one row is the simpler ladder to
+    // read (mirrors Combat Superiority's single-row precedent).
+    derivedStat: "expertiseChoiceCount",
+    derivedStatTiers: [
+      { minLevel: 2, value: 1 },
+      { minLevel: 9, value: 3 },
+    ],
   },
   {
     subclassSlug: null,
@@ -287,10 +294,12 @@ const RANGER_BASE_RAW: RawRangerFeature[] = [
     name: "Expertise",
     level: 9,
     edition: "EDITION_2024",
-    // SRD 5.2. NEW in 2024 — no 2014 counterpart. C7: grants Expertise in two
-    // MORE skills you're proficient in — same disclosed text-only shape as
-    // Deft Explorer's L2 grant above (grep finds no Expertise modelling
-    // anywhere in backend/src/lib).
+    // SRD 5.2. NEW in 2024 — no 2014 counterpart. Grants Expertise in two
+    // MORE skills you're proficient in — the count ladder for this grant
+    // (#1588) lives on the Deft Explorer L2 row above (derivedStatFromRows
+    // takes the max across rows, so one row carrying the whole ladder is
+    // enough); this row leaves derivedStat unset to avoid authoring the same
+    // ladder twice.
     description: "Choose two more skills you're proficient in; you gain Expertise in them.",
   },
   {
