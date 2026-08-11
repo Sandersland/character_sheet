@@ -426,7 +426,7 @@ const LEVEL_UP_OP_APPLIERS: Record<
     applySpellcastingOpInTx(tx, id, op as SpellcastingOperation, batchId, sessionId, userId),
 };
 
-type SpellPickRow = { id: string; name: string; level: number; classes: string[] };
+type SpellPickRow = { id: string; name: string; level: number; classes: string[]; school: string };
 
 // One catalog read validates every id list before the tx opens (the count
 // check in validateLevelUpSubmission can't see spell levels/classes). Returns
@@ -440,7 +440,7 @@ async function loadPickCatalogRows(
   const rows = ids.length
     ? await prisma.spell.findMany({
         where: { id: { in: ids } },
-        select: { id: true, name: true, level: true, edition: true, ...SPELL_CLASS_MEMBERSHIP_SELECT },
+        select: { id: true, name: true, level: true, edition: true, school: true, ...SPELL_CLASS_MEMBERSHIP_SELECT },
       })
     : [];
   // #1712: reject an id that's provably the WRONG edition's fork before it
@@ -453,7 +453,8 @@ async function loadPickCatalogRows(
   // Flattened to SpellPickRow's `classes: string[]` here (#1711) so the
   // eligibility checks below (assertOnSpellList, assertCantripEligibility)
   // never see the join shape — one seam resolves membership, not two.
-  const rowById = new Map(rows.map((r) => [r.id, { id: r.id, name: r.name, level: r.level, classes: classesOf(r) }]));
+  // `school` (#1855): the Eldritch Knight spell-school gate's own input.
+  const rowById = new Map(rows.map((r) => [r.id, { id: r.id, name: r.name, level: r.level, classes: classesOf(r), school: r.school }]));
   const levelOf = (op: LearnSpellOperation): number | undefined => rowById.get(op.spellId)?.level;
   return { rowById, levelOf };
 }
@@ -485,6 +486,17 @@ function capitalizeClassName(name: string): string {
   return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
+// Oxford-comma "a, b, or c" join shared by classListPhrase and
+// schoolListPhrase below — the one piece actually duplicated between them
+// (fallow-flagged); each caller keeps its own surrounding "the ... list(s)"
+// wrapping, which differs per caller.
+function oxfordOr(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? "";
+  return names.length === 2
+    ? `${names[0]} or ${names[1]}`
+    : `${names.slice(0, -1).join(", ")}, or ${names[names.length - 1]}`;
+}
+
 // Message-only phrasing for the leveled-spell rejection below: names the single
 // class list normally, or the full served list — capitalized, Oxford-comma
 // "or"-joined — when Magical Secrets widened it (2024 Bard 10+,
@@ -506,10 +518,7 @@ function classListPhrase(lists: string[], noun: "spell" | "cantrip" = "spell"): 
   // [key], never [] — mirrors the identical guard in spellListsLabel (frontend).
   if (names.length === 0) return `the ${noun} list`;
   if (names.length <= 1) return `the ${names[0]} ${noun} list`;
-  const joined = names.length === 2
-    ? `${names[0]} or ${names[1]}`
-    : `${names.slice(0, -1).join(", ")}, or ${names[names.length - 1]}`;
-  return `the ${joined} ${noun} lists`;
+  return `the ${oxfordOr(names)} ${noun} lists`;
 }
 
 // #1440: the served ceiling (meta.maxSpellLevel) applies to every leveled pick.
@@ -531,7 +540,44 @@ function assertOnSpellList(row: SpellPickRow, spellLists: string[] | null, expan
   }
 }
 
-// #1440: leveled picks must clear both assertWithinCeiling and assertOnSpellList.
+// #1855: Oxford-comma phrase for the Eldritch Knight spell-school gate's
+// rejection message ("Abjuration or Evocation") — same join shape as
+// classListPhrase, kept separate since it names schools, never a class list.
+function schoolListPhrase(schools: string[]): string {
+  return oxfordOr(schools.map(capitalizeClassName));
+}
+
+// #1855: PHB'14 p. 74 Eldritch Knight Spellcasting — every leveled pick
+// (spellOps only; cantrips are unrestricted) must be on `spellSchools`,
+// except up to `freeSchoolPicks` of them, consumed in submission order. This
+// is order-independent-correct for the RAW rule regardless of which specific
+// pick is "the free one" — at most `freeSchoolPicks` off-list picks are ever
+// legal, matching e.g. the 3rd-level grant's "two of these three must be
+// Abjuration or Evocation" (freeSchoolPicks 1 of 3) exactly. A swap's
+// replacement pick rides the same `spellsLearned` array (STEP_OP_BUILDERS'
+// newSpells projection) and is gated identically — no separate accounting.
+function assertSpellSchoolEligibility(
+  spellOps: LearnSpellOperation[],
+  rowById: Map<string, SpellPickRow>,
+  spellSchools: string[] | null,
+  freeSchoolPicks: number,
+): void {
+  if (spellSchools === null) return;
+  let freeRemaining = freeSchoolPicks;
+  for (const op of spellOps) {
+    const row = rowById.get(op.spellId);
+    if (!row) continue; // unknown id — fall through to applyLearnSpellOp's not-found error
+    if (spellSchools.includes(row.school)) continue;
+    if (freeRemaining > 0) {
+      freeRemaining -= 1;
+      continue;
+    }
+    throw new InvalidLevelUpError(`${row.name} must be an ${schoolListPhrase(spellSchools)} spell.`);
+  }
+}
+
+// #1440: leveled picks must clear assertWithinCeiling, assertOnSpellList, and
+// (#1855) the Eldritch Knight spell-school gate.
 // Unknown ids `continue` so applyLearnSpellOp's own not-found error stays the
 // one thrown when the tx runs (the atomicity test depends on this: a bogus id
 // must reach the tx, not be pre-empted here).
@@ -580,6 +626,10 @@ interface NewSpellsGate {
   // #1631: leveled-pick ids the subclass's list-expansion admits, alongside
   // spellLists — see newSpellsStep (level-up-plan.ts)'s own comment.
   expandedSpellIds: string[];
+  // #1855: Eldritch Knight (2014) leveled-pick school gate — null/0 for every
+  // other class/edition, see newSpellsStep's own ekSpellSchoolGate comment.
+  spellSchools: string[] | null;
+  freeSchoolPicks: number;
 }
 
 // Reads the served eligibility facts off the newSpells step — the server-BUILT
@@ -594,6 +644,15 @@ function expandedSpellIdsOf(step: LevelUpStep): string[] {
   return (step.meta?.expandedSpellIds as string[] | undefined) ?? [];
 }
 
+// #1855: split out of resolveNewSpellsGate for the same #1631 cyclomatic
+// reason as expandedSpellIdsOf just above.
+function spellSchoolGateOf(step: LevelUpStep): Pick<NewSpellsGate, "spellSchools" | "freeSchoolPicks"> {
+  return {
+    spellSchools: (step.meta?.spellSchools as string[] | null | undefined) ?? null,
+    freeSchoolPicks: typeof step.meta?.freeSchoolPicks === "number" ? step.meta.freeSchoolPicks : 0,
+  };
+}
+
 function resolveNewSpellsGate(steps: LevelUpStep[]): NewSpellsGate | null {
   const step = steps.find((s): s is LevelUpStep & { kind: "newSpells" } => s.kind === "newSpells");
   if (!step) return null;
@@ -602,6 +661,7 @@ function resolveNewSpellsGate(steps: LevelUpStep[]): NewSpellsGate | null {
     spellLists: (step.meta?.spellLists as string[] | null | undefined) ?? null,
     cantripLists: (step.meta?.cantripLists as string[] | null | undefined) ?? null,
     expandedSpellIds: expandedSpellIdsOf(step),
+    ...spellSchoolGateOf(step),
   };
 }
 
@@ -622,6 +682,7 @@ async function assertPickSpellEligibility(
   if (!gate) return;
 
   assertLeveledSpellEligibility(spellOps, rowById, gate.maxSpellLevel, gate.spellLists, gate.expandedSpellIds);
+  assertSpellSchoolEligibility(spellOps, rowById, gate.spellSchools, gate.freeSchoolPicks);
   assertCantripEligibility(cantripOps, rowById, gate.cantripLists);
 }
 

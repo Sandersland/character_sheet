@@ -545,6 +545,57 @@ describe("buildLevelUpPlan — newSpells (2024 prepared model)", () => {
     const bard2024 = buildLevelUpPlan(char("bard", 2, null, "EDITION_2024"), target("bard", 3)).find((s) => s.kind === "newSpells");
     expect(bard2024?.meta?.casterModel).toBe("prepared");
   });
+
+  // #1855: PHB'14 p. 74 Eldritch Knight Spellcasting — leveled picks (never
+  // cantrips) are gated to Abjuration/Evocation, except one free any-school
+  // pick at fighter level 3, 8, 14, 20. 2024 EK carries no restriction.
+  describe("meta.spellSchools/meta.freeSchoolPicks — Eldritch Knight (2014) school gate (#1855)", () => {
+    it("a fresh level-3 Eldritch Knight (2014) carries the Abj/Evoc gate with ONE free pick", () => {
+      const step = buildLevelUpPlan(
+        char("fighter", 2, null, "EDITION_2014"),
+        target("fighter", 3, "eldritch knight"),
+      ).find((s) => s.kind === "newSpells");
+      expect(step?.meta?.spellSchools).toEqual(["abjuration", "evocation"]);
+      expect(step?.meta?.freeSchoolPicks).toBe(1);
+    });
+
+    it("an ordinary EK level-up (e.g. 3→4) carries the gate with NO free pick", () => {
+      const step = buildLevelUpPlan(
+        char("fighter", 3, "eldritch knight", "EDITION_2014"),
+        target("fighter", 4, "eldritch knight"),
+      ).find((s) => s.kind === "newSpells");
+      expect(step?.meta?.spellSchools).toEqual(["abjuration", "evocation"]);
+      expect(step?.meta?.freeSchoolPicks).toBeUndefined();
+    });
+
+    it("fighter levels 8, 14, and 20 each carry a free any-school pick", () => {
+      for (const [prev, next] of [[7, 8], [13, 14], [19, 20]] as const) {
+        const step = buildLevelUpPlan(
+          char("fighter", prev, "eldritch knight", "EDITION_2014"),
+          target("fighter", next, "eldritch knight"),
+        ).find((s) => s.kind === "newSpells");
+        expect(step?.meta?.spellSchools).toEqual(["abjuration", "evocation"]);
+        expect(step?.meta?.freeSchoolPicks).toBe(1);
+      }
+    });
+
+    it("2024 Eldritch Knight carries no spellSchools restriction at all (mutation-proof: dropping the edition gate would restrict a 2024 EK)", () => {
+      const step = buildLevelUpPlan(
+        char("fighter", 3, "eldritch knight", "EDITION_2024"),
+        target("fighter", 4, "eldritch knight"),
+      ).find((s) => s.kind === "newSpells");
+      expect(step?.meta?.spellSchools).toBeUndefined();
+      expect(step?.meta?.freeSchoolPicks).toBeUndefined();
+    });
+
+    it("Arcane Trickster (a different third caster) carries no spellSchools restriction — #1855 scopes EK only", () => {
+      const step = buildLevelUpPlan(
+        char("rogue", 3, "arcane trickster", "EDITION_2014"),
+        target("rogue", 4, "arcane trickster"),
+      ).find((s) => s.kind === "newSpells");
+      expect(step?.meta?.spellSchools).toBeUndefined();
+    });
+  });
 });
 
 // #1509: the 2014 known-caster fork reaches the ceremony's plan — edition-correct

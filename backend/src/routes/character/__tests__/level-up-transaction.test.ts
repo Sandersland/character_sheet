@@ -262,6 +262,271 @@ describe("POST /api/characters/:id/level-up/transactions — Eldritch Knight cer
   });
 });
 
+// #1855: PHB'14 p. 74 Eldritch Knight Spellcasting — leveled picks (never
+// cantrips) are gated to Abjuration/Evocation, except one free any-school pick
+// at fighter level 3, 8, 14, and 20. SRD 5.1 has no Eldritch Knight; PHB'24
+// dropped the restriction, so a 2024 EK stays unaffected.
+describe("POST /api/characters/:id/level-up/transactions — Eldritch Knight spell-school gate (2014, #1855)", () => {
+  let fighterClassId: string;
+  let eldritchKnightId: string;
+
+  beforeEach(async () => {
+    const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    fighterClassId = fighter.id;
+    eldritchKnightId = (await prisma.subclass.findFirstOrThrow({ where: { name: "Eldritch Knight" }, select: { id: true } })).id;
+  });
+
+  async function makeEldritchKnight(
+    id: string,
+    opts: { edition: "EDITION_2014" | "EDITION_2024"; hitDiceTotal: number; xp: number },
+  ): Promise<string> {
+    await prisma.character.create({
+      data: {
+        ...BASE,
+        ownerId: OWNER_ID,
+        id,
+        name: "LevelUpTx EldritchSchool",
+        rulesEdition: opts.edition,
+        experiencePoints: opts.xp,
+        hitPoints: { current: 30, max: 30, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: opts.hitDiceTotal, die: "d10", spent: 0 },
+        abilityScores: { strength: 16, dexterity: 12, constitution: 14, intelligence: 13, wisdom: 10, charisma: 10 },
+        spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
+        classEntries: {
+          create: [{
+            name: "fighter",
+            subclass: "Eldritch Knight",
+            subclassId: eldritchKnightId,
+            classId: fighterClassId,
+            position: 0,
+            level: opts.hitDiceTotal,
+          }],
+        },
+      },
+    });
+    return (await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: id } })).id;
+  }
+
+  // Fighter 3→4 and 7→8 both cross a universal ASI level (advancement-slots.ts's
+  // BASE_ASI_LEVELS = [4, 8, 12, 16, 19]) — every ordinary-level test below
+  // carries a `takeAsi` op so the count-check (validateLevelUpSubmission)
+  // doesn't 400 before the school gate this suite is actually exercising ever
+  // runs. Wisdom, never Intelligence, so it never perturbs the third-caster
+  // spellcasting ability these fixtures otherwise hold fixed.
+  const ORDINARY_ASI = { type: "takeAsi" as const, increases: [{ ability: "wisdom" as const, amount: 2 }] };
+
+  it("2014 EK 3→4: rejects a non-Abjuration/Evocation pick at an ordinary level (no free pick left)", async () => {
+    const entryId = await makeEldritchKnight("lvtx-ek-school-4", { edition: "EDITION_2014", hitDiceTotal: 3, xp: 2700 });
+    // Detect Magic (divination) — not Abjuration/Evocation, and this level's
+    // single pick (THIRD_CASTER_PREPARED 3→4 delta) carries no free pick.
+    const detectMagic = await prisma.spell.findFirstOrThrow({
+      where: { name: "Detect Magic", edition: "EDITION_2014" },
+      select: { id: true, name: true },
+    });
+
+    const res = await post("lvtx-ek-school-4", {
+      target: { kind: "existing", classEntryId: entryId },
+      hp: { method: "average" },
+      advancement: ORDINARY_ASI,
+      spellsLearned: [{ type: "learnSpell", spellId: detectMagic.id }],
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe(`${detectMagic.name} must be an Abjuration or Evocation spell.`);
+    expect(await eventCount("lvtx-ek-school-4")).toBe(0);
+  });
+
+  it("2014 EK 3→4: an Abjuration or Evocation pick succeeds at an ordinary level", async () => {
+    const entryId = await makeEldritchKnight("lvtx-ek-school-ok4", { edition: "EDITION_2014", hitDiceTotal: 3, xp: 2700 });
+    const mageArmor = await prisma.spell.findFirstOrThrow({
+      where: { name: "Mage Armor", edition: "EDITION_2014" },
+      select: { id: true, name: true },
+    });
+
+    const res = await post("lvtx-ek-school-ok4", {
+      target: { kind: "existing", classEntryId: entryId },
+      hp: { method: "average" },
+      advancement: ORDINARY_ASI,
+      spellsLearned: [{ type: "learnSpell", spellId: mageArmor.id }],
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.spellcasting.spells.map((s: { name: string }) => s.name)).toContain(mageArmor.name);
+  });
+
+  it("2014 EK fresh 2→3: 2-of-3 rule — two Abjuration/Evocation picks + one free any-school pick succeeds", async () => {
+    const fighter2 = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    const CHAR_ID = "lvtx-ek-school-3of3";
+    await prisma.character.create({
+      data: {
+        ...BASE,
+        ownerId: OWNER_ID,
+        id: CHAR_ID,
+        name: "LevelUpTx EldritchSchool",
+        rulesEdition: "EDITION_2014",
+        experiencePoints: 900, // level 3 threshold
+        hitPoints: { current: 18, max: 18, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 2, die: "d10", spent: 0 },
+        abilityScores: { strength: 16, dexterity: 12, constitution: 14, intelligence: 13, wisdom: 10, charisma: 10 },
+        spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
+        classEntries: { create: [{ name: "fighter", subclass: null, classId: fighter2.id, position: 0, level: 2 }] },
+      },
+    });
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
+    const mageArmor = await prisma.spell.findFirstOrThrow({ where: { name: "Mage Armor", edition: "EDITION_2014" }, select: { id: true } });
+    const magicMissile = await prisma.spell.findFirstOrThrow({ where: { name: "Magic Missile", edition: "EDITION_2014" }, select: { id: true } });
+    const detectMagic = await prisma.spell.findFirstOrThrow({ where: { name: "Detect Magic", edition: "EDITION_2014" }, select: { id: true, name: true } });
+    // The fresh 3rd-level grant also carries 2 cantrips (THIRD_CASTER_CANTRIPS) —
+    // cantrips are unrestricted, so any two wizard cantrips satisfy the count.
+    const mageHand = await prisma.spell.findFirstOrThrow({ where: { name: "Mage Hand", edition: "EDITION_2014" }, select: { id: true } });
+    const fireBolt = await prisma.spell.findFirstOrThrow({ where: { name: "Fire Bolt", edition: "EDITION_2014" }, select: { id: true } });
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entry.id },
+      hp: { method: "average" },
+      subclassId: eldritchKnightId,
+      cantripsLearned: [
+        { type: "learnSpell", spellId: mageHand.id },
+        { type: "learnSpell", spellId: fireBolt.id },
+      ],
+      spellsLearned: [
+        { type: "learnSpell", spellId: mageArmor.id },
+        { type: "learnSpell", spellId: magicMissile.id },
+        { type: "learnSpell", spellId: detectMagic.id },
+      ],
+    });
+
+    expect(res.status).toBe(200);
+    const names = res.body.spellcasting.spells.map((s: { name: string }) => s.name);
+    expect(names).toContain(detectMagic.name);
+  });
+
+  it("2014 EK fresh 2→3: a SECOND off-school pick exceeds the one free slot and is rejected", async () => {
+    const fighter2 = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    const CHAR_ID = "lvtx-ek-school-2of3-fail";
+    await prisma.character.create({
+      data: {
+        ...BASE,
+        ownerId: OWNER_ID,
+        id: CHAR_ID,
+        name: "LevelUpTx EldritchSchool",
+        rulesEdition: "EDITION_2014",
+        experiencePoints: 900,
+        hitPoints: { current: 18, max: 18, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 2, die: "d10", spent: 0 },
+        abilityScores: { strength: 16, dexterity: 12, constitution: 14, intelligence: 13, wisdom: 10, charisma: 10 },
+        spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
+        classEntries: { create: [{ name: "fighter", subclass: null, classId: fighter2.id, position: 0, level: 2 }] },
+      },
+    });
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
+    const mageArmor = await prisma.spell.findFirstOrThrow({ where: { name: "Mage Armor", edition: "EDITION_2014" }, select: { id: true } });
+    const detectMagic = await prisma.spell.findFirstOrThrow({ where: { name: "Detect Magic", edition: "EDITION_2014" }, select: { id: true } });
+    const charmPerson = await prisma.spell.findFirstOrThrow({ where: { name: "Charm Person", edition: "EDITION_2014" }, select: { id: true, name: true } });
+    const mageHand = await prisma.spell.findFirstOrThrow({ where: { name: "Mage Hand", edition: "EDITION_2014" }, select: { id: true } });
+    const fireBolt = await prisma.spell.findFirstOrThrow({ where: { name: "Fire Bolt", edition: "EDITION_2014" }, select: { id: true } });
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entry.id },
+      hp: { method: "average" },
+      subclassId: eldritchKnightId,
+      cantripsLearned: [
+        { type: "learnSpell", spellId: mageHand.id },
+        { type: "learnSpell", spellId: fireBolt.id },
+      ],
+      spellsLearned: [
+        { type: "learnSpell", spellId: mageArmor.id },
+        { type: "learnSpell", spellId: detectMagic.id },
+        { type: "learnSpell", spellId: charmPerson.id },
+      ],
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe(`${charmPerson.name} must be an Abjuration or Evocation spell.`);
+    expect(await eventCount(CHAR_ID)).toBe(0);
+  });
+
+  it("2014 EK 7→8: the free any-school pick at fighter level 8 admits an off-school spell", async () => {
+    const entryId = await makeEldritchKnight("lvtx-ek-school-8", { edition: "EDITION_2014", hitDiceTotal: 7, xp: 34000 });
+    const detectMagic = await prisma.spell.findFirstOrThrow({ where: { name: "Detect Magic", edition: "EDITION_2014" }, select: { id: true, name: true } });
+
+    const res = await post("lvtx-ek-school-8", {
+      target: { kind: "existing", classEntryId: entryId },
+      hp: { method: "average" },
+      advancement: ORDINARY_ASI,
+      spellsLearned: [{ type: "learnSpell", spellId: detectMagic.id }],
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.spellcasting.spells.map((s: { name: string }) => s.name)).toContain(detectMagic.name);
+  });
+
+  it("2014 EK cantrips are unrestricted by school even when every leveled pick is gated", async () => {
+    const CHAR_ID = "lvtx-ek-school-cantrip";
+    const fighter2 = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    await prisma.character.create({
+      data: {
+        ...BASE,
+        ownerId: OWNER_ID,
+        id: CHAR_ID,
+        name: "LevelUpTx EldritchSchool",
+        rulesEdition: "EDITION_2014",
+        experiencePoints: 900,
+        hitPoints: { current: 18, max: 18, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 2, die: "d10", spent: 0 },
+        abilityScores: { strength: 16, dexterity: 12, constitution: 14, intelligence: 13, wisdom: 10, charisma: 10 },
+        spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
+        classEntries: { create: [{ name: "fighter", subclass: null, classId: fighter2.id, position: 0, level: 2 }] },
+      },
+    });
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
+    // Both wizard cantrips off the Abjuration/Evocation gate entirely (conjuration, illusion).
+    const mageHand = await prisma.spell.findFirstOrThrow({ where: { name: "Mage Hand", edition: "EDITION_2014" }, select: { id: true } });
+    const minorIllusion = await prisma.spell.findFirstOrThrow({ where: { name: "Minor Illusion", edition: "EDITION_2014" }, select: { id: true } });
+    const mageArmor = await prisma.spell.findFirstOrThrow({ where: { name: "Mage Armor", edition: "EDITION_2014" }, select: { id: true } });
+    const magicMissile = await prisma.spell.findFirstOrThrow({ where: { name: "Magic Missile", edition: "EDITION_2014" }, select: { id: true } });
+    const detectMagic = await prisma.spell.findFirstOrThrow({ where: { name: "Detect Magic", edition: "EDITION_2014" }, select: { id: true } });
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entry.id },
+      hp: { method: "average" },
+      subclassId: eldritchKnightId,
+      cantripsLearned: [
+        { type: "learnSpell", spellId: mageHand.id },
+        { type: "learnSpell", spellId: minorIllusion.id },
+      ],
+      spellsLearned: [
+        { type: "learnSpell", spellId: mageArmor.id },
+        { type: "learnSpell", spellId: magicMissile.id },
+        { type: "learnSpell", spellId: detectMagic.id },
+      ],
+    });
+
+    expect(res.status).toBe(200);
+    const names = res.body.spellcasting.spells.map((s: { name: string }) => s.name);
+    expect(names).toContain("Mage Hand");
+    expect(names).toContain("Minor Illusion");
+  });
+
+  // Mutation-proof: if the EDITION_2014/EDITION_2024 gate in
+  // eldritchKnightSpellSchoolGate were dropped (always restricting), this
+  // 2024 EK's off-school picks would 400 and this test would go red.
+  it("2024 EK 3→4 is unaffected — no school restriction at all", async () => {
+    const entryId = await makeEldritchKnight("lvtx-ek-school-2024", { edition: "EDITION_2024", hitDiceTotal: 3, xp: 2700 });
+    const detectMagic = await prisma.spell.findFirstOrThrow({ where: { name: "Detect Magic", edition: "EDITION_2024" }, select: { id: true, name: true } });
+
+    const res = await post("lvtx-ek-school-2024", {
+      target: { kind: "existing", classEntryId: entryId },
+      hp: { method: "average" },
+      advancement: ORDINARY_ASI,
+      spellsLearned: [{ type: "learnSpell", spellId: detectMagic.id }],
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.spellcasting.spells.map((s: { name: string }) => s.name)).toContain(detectMagic.name);
+  });
+});
+
 // #1497: at 2014 exhaustion 4+ (PHB'14 p. 291), `hitPoints.max` is already the
 // halved EFFECTIVE max — the GET /plan preview and the actual commit must
 // agree on the post-level max WITHOUT the client re-deriving the halving

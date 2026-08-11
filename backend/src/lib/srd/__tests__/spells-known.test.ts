@@ -13,6 +13,7 @@ import {
   magicalSecretsSpellLists,
   spellListsFor,
   level1SpellPicksFor,
+  eldritchKnightSpellSchoolGate,
 } from "@/lib/srd/spellcasting-tables.js";
 
 describe("levelUpSpellPicks — 2024 new-spell pick count on level-up", () => {
@@ -326,5 +327,38 @@ describe("spellListsFor — the single class+subclass+edition spell-list resolve
       spells: ["wizard"],
       cantrips: ["wizard"],
     });
+  });
+});
+
+// #1855: PHB'14 p. 74 "Eldritch Knight Spellcasting" — the leveled-spell school
+// restriction. Two of the 3rd-level grant's three spells (and every ordinary
+// level-up pick after) must be Abjuration or Evocation; the 3rd/8th/14th/20th
+// level grants each include exactly one "any school" pick — a single free
+// pick per qualifying level, which is why THIRD_CASTER_PREPARED's own delta at
+// each of those four levels is exactly 1 (no separate count to track). SRD 5.1
+// has no Eldritch Knight; PHB'24 dropped the restriction entirely.
+describe("eldritchKnightSpellSchoolGate — the 2014 Abjuration/Evocation gate (#1855)", () => {
+  it("restricts to Abjuration/Evocation with no free pick at an ordinary fighter level (2014)", () => {
+    for (const level of [4, 5, 6, 7, 9, 10, 11, 12, 13, 15, 16, 17, 18, 19]) {
+      expect(eldritchKnightSpellSchoolGate(level, "EDITION_2014")).toEqual({
+        schools: ["abjuration", "evocation"],
+        freePicks: 0,
+      });
+    }
+  });
+
+  it("grants exactly one free any-school pick at fighter level 3, 8, 14, and 20 (2014)", () => {
+    for (const level of [3, 8, 14, 20]) {
+      expect(eldritchKnightSpellSchoolGate(level, "EDITION_2014")).toEqual({
+        schools: ["abjuration", "evocation"],
+        freePicks: 1,
+      });
+    }
+  });
+
+  it("2024 Eldritch Knight is unrestricted at every level — the whole wizard list, no school gate", () => {
+    for (const level of [3, 4, 8, 14, 20]) {
+      expect(eldritchKnightSpellSchoolGate(level, "EDITION_2024")).toEqual({ schools: null, freePicks: 0 });
+    }
   });
 });
