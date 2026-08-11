@@ -34,6 +34,18 @@ export interface ToolProfEntry {
 }
 
 /**
+ * A skill chosen for Expertise (#1588) — doubles proficiency bonus on that
+ * skill's checks (buildSkillsView sets `expertise: true` for its `skill`).
+ * Capped at the level-derived `expertiseChoiceCount` (Rogue/Bard/Ranger/
+ * Wizard grantor rows); clamped on read and reconciled on level-down the
+ * same way toolProficienciesKnown is.
+ */
+export interface ExpertiseEntry {
+  id: string;    // per-character entry UUID (operation target)
+  skill: string; // camelCase skill key, e.g. "stealth"
+}
+
+/**
  * One picked option of a generic subclass "choose N" feature (#899) —
  * e.g. a Ranger's Hunter's Prey selection. Mirrors ManeuverEntry but carries
  * no mechanics: the option catalog is GrantedAbility rows, the selection is
@@ -115,6 +127,8 @@ export interface ResourcesMutableState {
   maneuversKnown: ManeuverEntry[];
   /** Level-gated tool proficiency choices (currently: Student of War). */
   toolProficienciesKnown: ToolProfEntry[];
+  /** Level-gated Expertise skill choices (#1588 — Rogue/Bard/Ranger/Wizard). */
+  expertiseKnown: ExpertiseEntry[];
   /**
    * Generic subclass "choose N" selections (#899), keyed by SubclassChoice.key
    * (e.g. "huntersPrey"). Each list is capped at the level-derived count and
@@ -194,6 +208,7 @@ export function normalizeResourcesMutable(json: Prisma.JsonValue): ResourcesMuta
       used: {},
       maneuversKnown: [],
       toolProficienciesKnown: [],
+      expertiseKnown: [],
       choicesKnown: {},
       advancements: [],
     };
@@ -208,6 +223,7 @@ export function normalizeResourcesMutable(json: Prisma.JsonValue): ResourcesMuta
     used: (obj.used as Record<string, number>) ?? {},
     maneuversKnown: (obj.maneuversKnown as ManeuverEntry[]) ?? [],
     toolProficienciesKnown: (obj.toolProficienciesKnown as ToolProfEntry[]) ?? [],
+    expertiseKnown: (obj.expertiseKnown as ExpertiseEntry[]) ?? [],
     choicesKnown,
     advancements: (obj.advancements as AdvancementEntry[]) ?? [],
   };
@@ -223,6 +239,7 @@ export function serializeResourcesState(state: ResourcesMutableState): Prisma.In
     used: state.used,
     maneuversKnown: state.maneuversKnown,
     toolProficienciesKnown: state.toolProficienciesKnown,
+    expertiseKnown: state.expertiseKnown,
     choicesKnown: state.choicesKnown,
     advancements: state.advancements,
   } as unknown as Prisma.InputJsonValue;
@@ -240,6 +257,7 @@ export function snapshotResources(state: ResourcesMutableState): ResourcesMutabl
     used: { ...state.used },
     maneuversKnown: state.maneuversKnown.map((m) => ({ ...m })),
     toolProficienciesKnown: state.toolProficienciesKnown.map((t) => ({ ...t })),
+    expertiseKnown: state.expertiseKnown.map((e) => ({ ...e })),
     choicesKnown: Object.fromEntries(
       Object.entries(state.choicesKnown).map(([key, entries]) => [key, entries.map((e) => ({ ...e }))]),
     ),

@@ -40,15 +40,18 @@ import {
   splitAdvancementsBySlotCap,
   type AdvancementEntry,
   type ChoiceEntry,
+  type ExpertiseEntry,
   type FeatImprovement,
   type ManeuverEntry,
   type ResourcesMutableState,
   type ToolProfEntry,
 } from "./resources-state.js";
 import type {
+  ForgetExpertiseOperation,
   ForgetManeuverOperation,
   ForgetSubclassChoiceOperation,
   ForgetToolProficiencyOperation,
+  LearnExpertiseOperation,
   LearnManeuverOperation,
   LearnSubclassChoiceOperation,
   LearnToolProficiencyOperation,
@@ -63,8 +66,12 @@ import type {
 // submission/transaction, ability-cost, the actions + resources routes) keep
 // resolving them unchanged.
 export type {
+  // fallow-ignore-next-line unused-type -- consumed by applyLearnExpertiseOp/applyForgetExpertiseOp + the resources route's zod schema, landing later in #1588's build sequence
+  ForgetExpertiseOperation,
   ForgetManeuverOperation,
   ForgetSubclassChoiceOperation,
+  // fallow-ignore-next-line unused-type -- consumed by applyLearnExpertiseOp/applyForgetExpertiseOp + the resources route's zod schema, landing later in #1588's build sequence
+  LearnExpertiseOperation,
   LearnManeuverOperation,
   LearnSubclassChoiceOperation,
   LearnToolProficiencyOperation,
@@ -87,6 +94,8 @@ export {
 export type {
   AdvancementEntry,
   ChoiceEntry,
+  // fallow-ignore-next-line unused-type -- consumed by buildSkillsView's expertise-flag read (serialize/proficiencies.ts) + applyLearnExpertiseOp, landing later in #1588's build sequence
+  ExpertiseEntry,
   FeatImprovement,
   ManeuverEntry,
   ResourcesMutableState,
