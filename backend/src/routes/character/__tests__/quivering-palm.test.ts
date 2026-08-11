@@ -91,7 +91,7 @@ describe("POST /api/characters/:id/abilities/quivering-palm/transactions", () =>
     expect(res.status).toBe(200);
 
     const noResourcesUsed = {
-      resources: { used: {}, maneuversKnown: [], toolProficienciesKnown: [], choicesKnown: {}, advancements: [] },
+      resources: { used: {}, maneuversKnown: [], toolProficienciesKnown: [], expertiseKnown: [], choicesKnown: {}, advancements: [] },
     };
     const buff = {
       id: expect.any(String), key: "quiveringPalm", source: "Quivering Palm",

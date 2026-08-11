@@ -219,7 +219,7 @@ describe("POST /api/characters/:id/abilities/warrior-of-elements/transactions", 
     expect(res.status).toBe(200);
 
     const noResourcesUsed = {
-      resources: { used: {}, maneuversKnown: [], toolProficienciesKnown: [], choicesKnown: {}, advancements: [] },
+      resources: { used: {}, maneuversKnown: [], toolProficienciesKnown: [], expertiseKnown: [], choicesKnown: {}, advancements: [] },
     };
     const buff = {
       id: expect.any(String), key: ELEMENTAL_ATTUNEMENT_BUFF_KEY, source: "Elemental Attunement",

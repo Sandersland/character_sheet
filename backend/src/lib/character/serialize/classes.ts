@@ -100,6 +100,14 @@ function buildResourcesPayload(
     derivedRes.toolProfChoiceCount !== undefined
       ? stored.toolProficienciesKnown.slice(0, derivedRes.toolProfChoiceCount)
       : stored.toolProficienciesKnown;
+  // #1588: mirrors clampedToolProfsKnown — defense-in-depth for a character
+  // not yet reconciled since a level-down (reconcileExpertise is the write-side
+  // twin, level-reconciliation.ts; both resolve expertiseChoiceCount through
+  // the SAME deriveEntryScopedResources call this function's caller made).
+  const clampedExpertiseKnown =
+    derivedRes.expertiseChoiceCount !== undefined
+      ? stored.expertiseKnown.slice(0, derivedRes.expertiseChoiceCount)
+      : stored.expertiseKnown;
   // Generic subclass "choose N" clamp-on-read (#899): keep only keys the derived
   // subclassChoices still grant, each capped to its count — defense-in-depth
   // mirroring reconcileSubclassChoices for characters not yet reconciled.
@@ -114,6 +122,7 @@ function buildResourcesPayload(
     features: toWireFeatures(derivedRes.features),
     maneuverChoiceCount: derivedRes.maneuverChoiceCount,
     toolProfChoiceCount: derivedRes.toolProfChoiceCount,
+    expertiseChoiceCount: derivedRes.expertiseChoiceCount,
     pools: derivedRes.resources.map((pool) => ({
       key: pool.key,
       label: pool.label,
@@ -128,6 +137,7 @@ function buildResourcesPayload(
       ? clampedManeuversKnown.map((m) => ({ ...m, effect: maneuverEffect }))
       : clampedManeuversKnown,
     toolProficienciesKnown: clampedToolProfsKnown,
+    expertiseKnown: clampedExpertiseKnown,
     // Generic subclass "choose N" surface (#899): the derived choices (key/label/
     // count/catalogSource) tell the level-up Choose-N step which pickers to render;
     // choicesKnown holds the (clamped) selections.

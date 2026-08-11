@@ -536,6 +536,8 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
   "resistances": [],
   "resources": {
     "choicesKnown": {},
+    "expertiseChoiceCount": undefined,
+    "expertiseKnown": [],
     "features": [
       {
         "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
@@ -646,6 +648,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
   "skills": [
     {
       "ability": "strength",
+      "expertise": false,
       "name": "athletics",
       "proficient": false,
       "tempModifier": 3,
@@ -662,11 +665,13 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
     },
     {
       "ability": "intelligence",
+      "expertise": false,
       "name": "arcana",
       "proficient": true,
     },
     {
       "ability": "wisdom",
+      "expertise": false,
       "name": "animalHandling",
       "proficient": false,
     },
@@ -997,6 +1002,8 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
   "resistances": [],
   "resources": {
     "choicesKnown": {},
+    "expertiseChoiceCount": undefined,
+    "expertiseKnown": [],
     "features": [
       {
         "description": "Choose a fighting style specialty: Archery (+2 ranged attack rolls), Defense (+1 AC in armor), Dueling (+2 melee damage when only wielding one weapon), Great Weapon Fighting (reroll 1s and 2s on damage with two-handed weapons), Protection (impose disadvantage on attacks against adjacent allies), or Two-Weapon Fighting (add ability modifier to off-hand damage).",
@@ -1164,11 +1171,13 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
   "skills": [
     {
       "ability": "strength",
+      "expertise": false,
       "name": "athletics",
       "proficient": true,
     },
     {
       "ability": "charisma",
+      "expertise": false,
       "name": "intimidation",
       "proficient": false,
     },

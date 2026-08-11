@@ -191,7 +191,7 @@ describe("POST /api/characters/:id/abilities/maneuvers/transactions", () => {
         "When you hit a creature with a weapon attack, expend a superiority die and add it to the damage roll. " +
         "If the target is Large or smaller, it must make a Strength saving throw or be knocked prone.",
     }];
-    const base = { maneuversKnown: known, toolProficienciesKnown: [], choicesKnown: {}, advancements: [] };
+    const base = { maneuversKnown: known, toolProficienciesKnown: [], expertiseKnown: [], choicesKnown: {}, advancements: [] };
 
     expect(await readPinnedEvents(FIXTURE_ID, ["castManeuver", "spendResource"])).toEqual([
       {

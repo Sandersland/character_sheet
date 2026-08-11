@@ -522,7 +522,7 @@ export async function serializeCharacter(rawRow: CharacterRow) {
       featProficiencies.savingThrows,
       itemSaveProfs,
     ),
-    skills: buildSkillsView(row, featProficiencies, itemSkillProfs, buffTargets),
+    skills: buildSkillsView(row, featProficiencies, itemSkillProfs, buffTargets, resources),
     toolProficiencies: buildToolProficienciesView(row, resources, itemGrants),
     // Armor/weapon proficiencies — derived fully at read time from class,
     // species-trait, and feat grants (species grants arrive feat-sourced since

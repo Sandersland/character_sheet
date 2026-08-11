@@ -6,7 +6,7 @@
  *
  * Since #818 every reconciler snapshots the SAME canonical resources shape
  * via snapshotResources(): { used, maneuversKnown,
- * toolProficienciesKnown, advancements, fightingStyle }. The former per-site
+ * toolProficienciesKnown, expertiseKnown, advancements, fightingStyle }. The former per-site
  * divergence (maneuvers/toolProfs emitted a partial 4-key object) was an
  * undo-correctness bug — an omitted key wiped on wholesale revert — now fixed.
  *
@@ -209,6 +209,7 @@ describe("level-reconciliation characterization (#617)", () => {
         used: {},
         maneuversKnown: fiveManeuvers(),
         toolProficienciesKnown: oneToolProf(),
+        expertiseKnown: [],
         choicesKnown: {},
         advancements: [],
       },
@@ -218,6 +219,7 @@ describe("level-reconciliation characterization (#617)", () => {
         used: {},
         maneuversKnown: fiveManeuvers().slice(0, 3),
         toolProficienciesKnown: oneToolProf(),
+        expertiseKnown: [],
         choicesKnown: {},
         advancements: [],
       },
@@ -236,10 +238,10 @@ describe("level-reconciliation characterization (#617)", () => {
     expect(man.summary).toBe("All 5 maneuvers removed — subclass no longer available");
     expect(man.data).toEqual({ removedCount: 5, allowed: 0 });
     expect(man.before).toEqual({
-      resources: { used: {}, maneuversKnown: fiveManeuvers(), toolProficienciesKnown: oneToolProf(), choicesKnown: {}, advancements: [] },
+      resources: { used: {}, maneuversKnown: fiveManeuvers(), toolProficienciesKnown: oneToolProf(), expertiseKnown: [], choicesKnown: {}, advancements: [] },
     });
     expect(man.after).toEqual({
-      resources: { used: {}, maneuversKnown: [], toolProficienciesKnown: oneToolProf(), choicesKnown: {}, advancements: [] },
+      resources: { used: {}, maneuversKnown: [], toolProficienciesKnown: oneToolProf(), expertiseKnown: [], choicesKnown: {}, advancements: [] },
     });
 
     const [tool] = await eventsByType("recon-full", "toolProficienciesReconciled");
@@ -248,10 +250,10 @@ describe("level-reconciliation characterization (#617)", () => {
     expect(tool.data).toEqual({ removedCount: 1, allowed: 0 });
     // Ordering interaction: maneuvers already trimmed → maneuversKnown is [] here.
     expect(tool.before).toEqual({
-      resources: { used: {}, maneuversKnown: [], toolProficienciesKnown: oneToolProf(), choicesKnown: {}, advancements: [] },
+      resources: { used: {}, maneuversKnown: [], toolProficienciesKnown: oneToolProf(), expertiseKnown: [], choicesKnown: {}, advancements: [] },
     });
     expect(tool.after).toEqual({
-      resources: { used: {}, maneuversKnown: [], toolProficienciesKnown: [], choicesKnown: {}, advancements: [] },
+      resources: { used: {}, maneuversKnown: [], toolProficienciesKnown: [], expertiseKnown: [], choicesKnown: {}, advancements: [] },
     });
 
     // Registry order: maneuvers event precedes toolProfs event within the batch.
