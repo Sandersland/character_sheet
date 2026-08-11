@@ -193,7 +193,9 @@ const ADD_CLASS_SELECT = {
       classId: true,
       subclass: true,
       subclassRef: { select: { slug: true } },
-      class: { select: { extraAsiLevels: true, fightingStyleFeatLevel: true, subclassLevel: true } },
+      // `class.name` (#1148): the CANONICAL class name — characterFightingStyleFeatSlots'
+      // resolveSubclassSlug input, same rationale as #1495's own class.name select.
+      class: { select: { name: true, extraAsiLevels: true, fightingStyleFeatLevel: true, subclassLevel: true } },
     },
   },
 } satisfies Prisma.CharacterSelect;
@@ -276,7 +278,7 @@ async function applyAddClass(ctx: ClassOpContext, op: AddClassOperation): Promis
   // effective max rather than gain the full `gain` unconditionally (mirrors
   // bumpHpForLevelUp's own reasoning, hp-ops.ts).
   const derivedLevel = levelForExperience(character.experiencePoints);
-  const fightingStyleSlotTotal = characterFightingStyleFeatSlots(character.classEntries, derivedLevel);
+  const fightingStyleSlotTotal = characterFightingStyleFeatSlots(character.classEntries, derivedLevel, character.rulesEdition);
   const inCapAdvancements = inCapAdvancementsAt(character.resources, character.classEntries, derivedLevel, fightingStyleSlotTotal);
   // #1123: the Draconic term must see the POST-op multiclass shape (the new
   // entry appended), not the pre-op list — for a single-class Draconic

@@ -53,7 +53,9 @@ function computeLevelDownState(
       name: string;
       subclass: string | null;
       subclassRef: { slug: string } | null;
-      class: { extraAsiLevels: number[]; fightingStyleFeatLevel: number | null; subclassLevel: number } | null;
+      // `name` (#1148): characterFightingStyleFeatSlots' resolveSubclassSlug
+      // input — the CANONICAL class name, same #1495 rationale as elsewhere.
+      class: { name: string; extraAsiLevels: number[]; fightingStyleFeatLevel: number | null; subclassLevel: number } | null;
     }[];
   },
   levelUpEvents: { data: Prisma.JsonValue }[],
@@ -80,7 +82,7 @@ function computeLevelDownState(
   // The feat-bonus half of that composition is evaluated once, at the FINAL
   // (post-reversal) advancement-slot cap, mirroring how deriveFeatBonuses'
   // appliedLevel argument tracks hd.total inside the loop below.
-  const fightingStyleSlotTotal = characterFightingStyleFeatSlots(character.classEntries, targetLevel);
+  const fightingStyleSlotTotal = characterFightingStyleFeatSlots(character.classEntries, targetLevel, edition);
   const inCapAdvancements = inCapAdvancementsAt(character.resources, character.classEntries, targetLevel, fightingStyleSlotTotal);
   const exhaustionLevel = normalizeConditionsMutable(character.conditions).exhaustion;
   // #1123: Draconic Resilience joins the feat bonus in the clamp's pre-halving
@@ -159,7 +161,9 @@ async function revertLevelUps(
           name: true,
           subclass: true,
           subclassRef: { select: { slug: true } },
-          class: { select: { extraAsiLevels: true, fightingStyleFeatLevel: true, subclassLevel: true } },
+          // `name` (#1148): characterFightingStyleFeatSlots' resolveSubclassSlug
+          // input — the CANONICAL class name, same #1495 rationale as elsewhere.
+          class: { select: { name: true, extraAsiLevels: true, fightingStyleFeatLevel: true, subclassLevel: true } },
         },
       },
     },

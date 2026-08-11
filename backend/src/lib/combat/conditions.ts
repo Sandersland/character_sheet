@@ -443,7 +443,9 @@ const CONDITIONS_SELECT = {
       name: true,
       subclass: true,
       subclassRef: { select: { slug: true, features: FEATURE_ROWS_SUBCLASS_FEATURES } },
-      class: { select: { extraAsiLevels: true, fightingStyleFeatLevel: true, ...IMMUNE_CONDITIONS_CLASS_SELECT } },
+      // `name` (#1148): characterFightingStyleFeatSlots' resolveSubclassSlug
+      // input — the CANONICAL class name, same #1495 rationale as elsewhere.
+      class: { select: { name: true, extraAsiLevels: true, fightingStyleFeatLevel: true, ...IMMUNE_CONDITIONS_CLASS_SELECT } },
     },
   },
 } satisfies Prisma.CharacterSelect;
@@ -489,7 +491,9 @@ export function effectiveMaxHitPointsForRow(row: {
     name: string;
     subclass: string | null;
     subclassRef: { slug: string } | null;
-    class: { extraAsiLevels: readonly number[]; fightingStyleFeatLevel: number | null; subclassLevel: number } | null;
+    // `class.name` (#1148): characterFightingStyleFeatSlots' resolveSubclassSlug
+    // input — the CANONICAL class name, same #1495 rationale as its own select.
+    class: { name: string; extraAsiLevels: readonly number[]; fightingStyleFeatLevel: number | null; subclassLevel: number } | null;
   }[];
 }): { hp: HitPoints; hd: HitDice; maxHpBonus: number; exhaustionLevel: number; effMax: number } {
   const hp = normalizeHitPoints(row.hitPoints);
@@ -498,7 +502,7 @@ export function effectiveMaxHitPointsForRow(row: {
   // Real fs cap (not the Infinity default) so an over-cap fs feat is excluded
   // from the maxHp-relevant "kept" set exactly like an over-cap ASI/feat would
   // be — matches reconcileAdvancements/applyAdvancementOpInTx's fidelity.
-  const fightingStyleSlotTotal = characterFightingStyleFeatSlots(row.classEntries, derivedLevel);
+  const fightingStyleSlotTotal = characterFightingStyleFeatSlots(row.classEntries, derivedLevel, row.rulesEdition);
   const inCapAdvancements = inCapAdvancementsAt(row.resources, row.classEntries, derivedLevel, fightingStyleSlotTotal);
   // maxHpBonus = feat bonuses (e.g. Tough) + Draconic Resilience (#1123), the
   // SAME pre-halving composition serializeCharacter's applyFeatLayer serves —

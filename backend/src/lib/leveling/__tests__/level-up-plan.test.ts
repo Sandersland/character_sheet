@@ -252,6 +252,38 @@ describe("buildLevelUpPlan — bespoke choose-N (maneuvers/fightingStyleFeat/too
     expect(kinds(buildLevelUpPlan(char("fighter", 4, "champion"), target("fighter", 5, "champion")))).not.toContain("fightingStyleFeat");
   });
 
+  // #1148: Champion's Additional Fighting Style — a SECOND fighting-style feat
+  // slot, at a level that forks by edition (SRD 5.2 p.82 L7 / PHB'14 p.72 L10).
+  it("2024 Champion 6→7 grants a second fighting-style feat", () => {
+    const plan = buildLevelUpPlan(char("fighter", 6, "champion", "EDITION_2024"), target("fighter", 7, "champion"));
+    expect(kinds(plan)).toContain("fightingStyleFeat");
+    expect(plan.find((s) => s.kind === "fightingStyleFeat")?.count).toBe(1);
+  });
+
+  it("2014 Champion 9→10 grants a second fighting-style feat", () => {
+    const plan = buildLevelUpPlan(char("fighter", 9, "champion", "EDITION_2014"), target("fighter", 10, "champion"));
+    expect(kinds(plan)).toContain("fightingStyleFeat");
+    expect(plan.find((s) => s.kind === "fightingStyleFeat")?.count).toBe(1);
+  });
+
+  // #1148 review finding 1: fightingStyleFeatStep resolves the target's
+  // subclass via resolveSubclassSlug, which prefers the FK (target.subclassRef)
+  // over the exact-name text match. This pins that preference at the pure-planner
+  // level: subclass text has drifted to something resolveSubclassSlug's
+  // name-fallback would NOT match ("Champ" is not "Champion" in
+  // SUBCLASS_IDENTITY), but subclassRef.slug still correctly names
+  // "fighter-champion" — the step must still appear. Before the review fix (no
+  // subclassRef field on TargetClassEntry at all, so resolveSubclassSlug had
+  // only the name-fallback path), this exact case produced NO step — a
+  // Champion whose persisted `subclass` display text had drifted (independent
+  // of the correct subclassId FK) would silently never be offered the L7 slot.
+  it("2024 Champion 6→7 grants the second feat even when the subclass display text has drifted, via the subclassRef FK", () => {
+    const drifted = { ...target("fighter", 7, "Champ"), subclassRef: { slug: "fighter-champion" } };
+    const plan = buildLevelUpPlan(char("fighter", 6, "Champ", "EDITION_2024"), drifted);
+    expect(kinds(plan)).toContain("fightingStyleFeat");
+    expect(plan.find((s) => s.kind === "fightingStyleFeat")?.count).toBe(1);
+  });
+
   it("Battle Master 2→3 re-plan (subclass pre-chosen) surfaces maneuvers + tool proficiency", () => {
     // #1546 Part B-ii: same row-driven carrier requirement as the 6→7 case above.
     const plan = buildLevelUpPlan(char("fighter", 2), { ...target("fighter", 3, "battle master"), subclassFeatureRows: BATTLE_MASTER_ROWS });

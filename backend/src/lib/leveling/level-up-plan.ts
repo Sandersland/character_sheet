@@ -7,6 +7,7 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 import { deriveResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
 import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "@/lib/classes/class-feature-rows.js";
 import { subclassChoiceSwapCadence } from "@/lib/classes/types.js";
+import { resolveSubclassSlug } from "@/lib/classes/subclass-slug.js";
 import { effectiveMaxHitPoints, fixedAverageForDie, levelUpHpGain } from "@/lib/combat/hitpoints.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 import { abilityModifier, advancementSlotsForLevel, fightingStyleFeatSlots, hitDieFace } from "@/lib/srd/srd.js";
@@ -71,6 +72,15 @@ export interface LevelUpPlanCharacter {
 export interface TargetClassEntry {
   name: string;
   subclass?: string | null;
+  // #1148 review finding: the FK identity resolveSubclassSlug prefers over
+  // the (drift-prone) `subclass` display name — resolveLevelUpContext
+  // resolves this from the PERSISTED entry's subclassRef (mirroring
+  // persistedSubclassId's own comment), `null` when no subclass is chosen
+  // yet or the target is a brand-new entry. Without this field,
+  // fightingStyleFeatStep's resolveSubclassSlug call had no FK path at all —
+  // only the exact-name fallback, silently missing a Champion whose
+  // CharacterClassEntry.name or .subclass text had drifted from the catalog.
+  subclassRef?: { slug: string } | null;
   newLevel: number;
   subclassLevel?: number;
   // The hit die THIS level-up rolls, already resolved through advancingHitDie by
@@ -235,10 +245,18 @@ function subclassStep({ target }: PlanContext): LevelUpStep | null {
 }
 
 // A Fighting Style feat pick (#1137): Fighter's arrives with a new level-1 entry,
-// Paladin's and Ranger's at level 2. Derived from the fightingStyleFeatSlots delta.
-function fightingStyleFeatStep({ target }: PlanContext): LevelUpStep | null {
+// Paladin's and Ranger's at level 2, and a Champion's second slot at 7 (2024) /
+// 10 (2014) — #1148. Derived from the fightingStyleFeatSlots delta. `target.subclass`
+// is resolved via resolveSubclassSlug (never a raw string comparison, #1277) —
+// this is the CURRENTLY-KNOWN persisted subclass (see buildLevelUpPlan's own
+// comment), so a level-up that PICKS Champion this same step doesn't yet see
+// the extra slot, matching subclassStep's own persisted-only gate.
+function fightingStyleFeatStep({ target, edition }: PlanContext): LevelUpStep | null {
   const fightingStyleFeatLevel = target.fightingStyleFeatLevel ?? null;
-  const delta = fightingStyleFeatSlots(fightingStyleFeatLevel, target.newLevel) - fightingStyleFeatSlots(fightingStyleFeatLevel, target.newLevel - 1);
+  const subclass = resolveSubclassSlug(target.name, target);
+  const delta =
+    fightingStyleFeatSlots(fightingStyleFeatLevel, target.newLevel, subclass, edition) -
+    fightingStyleFeatSlots(fightingStyleFeatLevel, target.newLevel - 1, subclass, edition);
   return delta > 0 ? { kind: "fightingStyleFeat", count: delta } : null;
 }
 

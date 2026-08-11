@@ -185,13 +185,25 @@ fi
 #     literal — "fighter" — read only to find the right class entry), same
 #     reason (NON_CLASS_MODULES above already classifies this file as shared
 #     infrastructure, not a per-class module).
+#   - srd/advancement-slots.ts: PERMANENT (#1148). fightingStyleFeatSlots'
+#     Champion branch reads the "fighter-champion" SUBCLASS_SLUGS identity
+#     string (#1277's join-key vocabulary, subclass-slug.ts's own PERMANENT
+#     entry above) to gate the Additional Fighting Style second-slot
+#     threshold — a computed rule function keyed off subclass identity +
+#     level + edition, never routed through fighter's retired
+#     AuthoredFeature/resourceFn machinery. ClassFeature has no descriptor
+#     column for "how many Fighting Style feat slots this entry carries";
+#     the slot-count threshold (7 in 2024, 10 in 2014) is exactly the rule
+#     arithmetic CLAUDE.md keeps in lib/, same shape as armor-class.ts and
+#     character/serialize/combat.ts above.
 FILE_ALLOWLIST="backend/src/lib/classes/subclass-slug.ts
 backend/src/lib/classes/actions.ts
 backend/src/lib/character/serialize/combat.ts
 backend/src/lib/srd/armor-class.ts
 backend/src/lib/classes/sneak-attack.ts
 backend/src/lib/classes/assassinate.ts
-backend/src/lib/classes/weapon-bond.ts"
+backend/src/lib/classes/weapon-bond.ts
+backend/src/lib/srd/advancement-slots.ts"
 
 is_allowlisted_file() {
   target="$1"
