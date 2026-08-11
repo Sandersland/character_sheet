@@ -43,6 +43,7 @@ import {
   serializeResourcesState,
   snapshotResources,
   splitAdvancementsBySlotCap,
+  type ExpertiseEntry,
   type ManeuverEntry,
   type ResourcesMutableState,
   type ToolProfEntry,
@@ -387,8 +388,8 @@ async function reconcilePreparedSpells(ctx: ReconcileContext): Promise<void> {
 // Uses `resources`-category events so the existing undo branch in activity.ts
 // restores the full before.resources JSON with no new undo code.
 
-type KnownListKey = "maneuversKnown" | "toolProficienciesKnown";
-type KnownEntry = ManeuverEntry | ToolProfEntry;
+type KnownListKey = "maneuversKnown" | "toolProficienciesKnown" | "expertiseKnown";
+type KnownEntry = ManeuverEntry | ToolProfEntry | ExpertiseEntry;
 
 interface KnownListConfig {
   /** Which ResourcesMutableState array this reconciler trims. */
@@ -525,6 +526,24 @@ async function reconcileToolProficiencies(ctx: ReconcileContext): Promise<void> 
       allowed === 0
         ? `${removedCount} tool proficiency choice${removedCount > 1 ? "s" : ""} removed — subclass no longer available`
         : `${removedCount} tool proficiency choice${removedCount > 1 ? "s" : ""} removed — level cap reduced to ${allowed}`,
+    snapshot: (state) => ({ resources: snapshotResources(state) }),
+  });
+}
+
+// Trims expertiseKnown when the level-derived pick count drops (Rogue L6->L5,
+// or a class removed). expertiseChoiceCount resolves through the SAME
+// deriveEntryScopedResources the clamp-on-read (buildResourcesPayload) uses —
+// CLAUDE.md's one-shared-function rule. See reconcileKnownList for the shared
+// trim/audit flow.
+async function reconcileExpertise(ctx: ReconcileContext): Promise<void> {
+  return reconcileKnownList(ctx, {
+    listKey: "expertiseKnown",
+    allowed: (derived) => derived?.expertiseChoiceCount ?? 0,
+    eventType: "expertiseReconciled",
+    summary: (removedCount, allowed) =>
+      allowed === 0
+        ? `${removedCount} Expertise skill${removedCount > 1 ? "s" : ""} removed — no longer granted at this level`
+        : `${removedCount} Expertise skill${removedCount > 1 ? "s" : ""} removed — level cap reduced to ${allowed}`,
     snapshot: (state) => ({ resources: snapshotResources(state) }),
   });
 }
@@ -860,6 +879,7 @@ const LEVEL_GATED_RECONCILERS: Reconciler[] = [
   reconcilePreparedSpells,
   reconcileManeuvers,
   reconcileToolProficiencies,
+  reconcileExpertise,
   reconcileSubclassChoices,
   reconcileAdvancements,
 ];

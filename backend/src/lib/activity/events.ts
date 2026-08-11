@@ -95,6 +95,7 @@ export type EventType =
   // Expertise (#1588)
   | "learnExpertise"
   | "forgetExpertise"
+  | "expertiseReconciled"
   | "learnSubclassChoice"
   | "forgetSubclassChoice"
   | "subclassChoicesReconciled"

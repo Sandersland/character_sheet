@@ -129,7 +129,7 @@ describe("Level-down reconciliation trims fourElementsDisciplines (#1503, generi
 // from outside level-reconciliation.ts without widening that module's public
 // surface just for a test.
 describe("LEVEL_GATED_RECONCILERS gained no entry for disciplines (#1503)", () => {
-  it("still 8 reconcilers, reconcileSubclassChoices present, no discipline-specific reconciler added", () => {
+  it("still 9 reconcilers (#1588 added reconcileExpertise, a bespoke list unlike disciplines' generic reuse), reconcileSubclassChoices present, no discipline-specific reconciler added", () => {
     const path = fileURLToPath(new URL("../level-reconciliation.js", import.meta.url)).replace(/\.js$/, ".ts");
     const text = readFileSync(path, "utf-8");
     const match = text.match(/const LEVEL_GATED_RECONCILERS: Reconciler\[\] = \[([\s\S]*?)\];/);
@@ -146,6 +146,7 @@ describe("LEVEL_GATED_RECONCILERS gained no entry for disciplines (#1503)", () =
       "reconcilePreparedSpells",
       "reconcileManeuvers",
       "reconcileToolProficiencies",
+      "reconcileExpertise",
       "reconcileSubclassChoices",
       "reconcileAdvancements",
     ]);
