@@ -737,6 +737,14 @@ describe("POST …/level-up/transactions — Bard Magical Secrets eligibility ga
         hitPoints: { current: 50, max: 50, temp: 0, deathSaves: { successes: 0, failures: 0 } },
         hitDice: { total: opts.hitDiceTotal, die: "d8", spent: 0 },
         abilityScores: { strength: 10, dexterity: 14, constitution: 14, intelligence: 10, wisdom: 10, charisma: 16 },
+        // #1588: proficient in 2 skills — Bard's Expertise grants a step at
+        // L9 (2024) and L3/L10 (2014); a level-up crossing either tier needs
+        // a legal pick available (applyLearnExpertiseOp rejects a skill the
+        // character isn't proficient in).
+        skills: [
+          { name: "performance", ability: "charisma", proficient: true },
+          { name: "persuasion", ability: "charisma", proficient: true },
+        ],
         spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
         classEntries: {
           create: [{ name: "bard", subclass: "College of Lore", subclassId: collegeOfLore, classId: bard.id, position: 0, level: opts.hitDiceTotal }],
@@ -746,6 +754,14 @@ describe("POST …/level-up/transactions — Bard Magical Secrets eligibility ga
     const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: id } });
     return entry.id;
   }
+
+  // #1588: Bard Expertise picks for a level-up crossing L9 (2024) or L10
+  // (2014) — both fixture skills are legal (proficient), so this is the
+  // fixed submission every affected test below reuses.
+  const EXPERTISE_PICKS = [
+    { type: "learnExpertise" as const, skill: "performance" },
+    { type: "learnExpertise" as const, skill: "persuasion" },
+  ];
 
   it("a Bard reaching 10 may take Fireball via Magical Secrets (200)", async () => {
     const CHAR_ID = "lvtx-bard-10";
@@ -806,6 +822,10 @@ describe("POST …/level-up/transactions — Bard Magical Secrets eligibility ga
     const res = await post(CHAR_ID, {
       target: { kind: "existing", classEntryId: entryId },
       hp: { method: "average" },
+      // #1588: this level-up also crosses Bard Expertise's L9 tier (2024) —
+      // include the now-required pick so the ONLY 400 in play is the
+      // Magical Secrets rejection under test.
+      expertise: EXPERTISE_PICKS,
       spellsLearned: [{ type: "learnSpell", spellId: fireball.id }, { type: "learnSpell", spellId: bardSpell.id }],
     });
     expect(res.status).toBe(400);
@@ -837,6 +857,9 @@ describe("POST …/level-up/transactions — Bard Magical Secrets eligibility ga
     const res = await post(CHAR_ID, {
       target: { kind: "existing", classEntryId: entryId },
       hp: { method: "average" },
+      // #1588: this level-up also crosses Bard Expertise's 2014 L10 tier
+      // (2 more, PHB'14 p.53) — a required step this level-up must satisfy.
+      expertise: EXPERTISE_PICKS,
       spellsLearned: [{ type: "learnSpell", spellId: ensnaringStrike.id }, { type: "learnSpell", spellId: second.id }],
       cantripsLearned: [{ type: "learnSpell", spellId: cantrip.id }],
     });
@@ -892,6 +915,8 @@ describe("POST …/level-up/transactions — Bard Magical Secrets eligibility ga
     const res = await post(CHAR_ID, {
       target: { kind: "existing", classEntryId: entryId },
       hp: { method: "average" },
+      // #1588: same required L10 (2014) Expertise tier as the sibling test above.
+      expertise: EXPERTISE_PICKS,
       spellsLearned: [{ type: "learnSpell", spellId: ensnaringStrike.id }, { type: "learnSpell", spellId: second.id }],
       cantripsLearned: [{ type: "learnSpell", spellId: fireBolt.id }],
     });
@@ -1060,6 +1085,10 @@ describe("POST …/level-up/transactions — 2014 known-caster level-up (#1509)"
           hitPoints: { current: 18, max: 18, temp: 0, deathSaves: { successes: 0, failures: 0 } },
           hitDice: { total: 1, die: "d10", spent: 0 },
           abilityScores: { strength: 12, dexterity: 16, constitution: 14, intelligence: 10, wisdom: 14, charisma: 8 },
+          // #1588: proficient in survival — 2024 Ranger's Deft Explorer grants
+          // an Expertise step at L2 (EDITION_2024 only), so a legal pick must
+          // be available for that branch's level-up to validate.
+          skills: [{ name: "survival", ability: "wisdom", proficient: true }],
           spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
           classEntries: { create: [{ name: "ranger", subclass: null, classId: ranger.id, position: 0, level: 1 }] },
         },
@@ -1083,6 +1112,9 @@ describe("POST …/level-up/transactions — 2014 known-caster level-up (#1509)"
       target: { kind: "existing", classEntryId: entry2024 },
       hp: { method: "average" },
       fightingStyleFeat: { type: "takeFeat", featId: defense2024.id },
+      // #1588: 2024 Ranger 1→2 also grants a required Deft Explorer Expertise
+      // pick — included so the ONLY 400 in play is the swap rejection under test.
+      expertise: [{ type: "learnExpertise", skill: "survival" }],
       spellsForgotten: [{ type: "forgetSpell", entryId: "whatever" }],
     });
     expect(res2024.status).toBe(400);

@@ -76,7 +76,6 @@ export type {
   // ForgetExpertiseOperation (freely reversible, no ceremony-scoped forget
   // list), so it stays imported-but-not-re-exported, mirroring
   // ForgetToolProficiencyOperation below.
-  // fallow-ignore-next-line unused-type -- consumed by level-up-submission.ts/level-up-plan.ts, landing in #1588's next commit
   LearnExpertiseOperation,
   LearnManeuverOperation,
   LearnSubclassChoiceOperation,

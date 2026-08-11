@@ -32,6 +32,7 @@ const STEP_BODIES: Record<LevelUpStepKind, React.ComponentType<{ step: LevelUpSt
   maneuvers: ChoiceStep,
   fightingStyleFeat: ChoiceStep,
   toolProficiency: ChoiceStep,
+  expertise: ChoiceStep,
   subclass: SubclassStep,
   subclassChoice: ChoiceStep,
   newSpells: NewSpellsStep,

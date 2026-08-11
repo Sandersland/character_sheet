@@ -2,6 +2,7 @@
  * Advancement / feat / XP / level-up-ceremony wire types and their operations.
  */
 import type {
+  LearnExpertiseOperation,
   LearnManeuverOperation,
   LearnSubclassChoiceOperation,
   LearnToolProficiencyOperation,
@@ -128,6 +129,7 @@ export type LevelUpStepKind =
   | "maneuvers"
   | "fightingStyleFeat"
   | "toolProficiency"
+  | "expertise"
   | "subclassChoice"
   | "newSpells"
   | "review";
@@ -214,6 +216,8 @@ export interface LevelUpSubmission {
   fightingStyleFeat?: TakeFeatOperation;
   maneuvers?: LearnManeuverOperation[];
   toolProficiencies?: LearnToolProficiencyOperation[];
+  /** #1588: Expertise skill picks — freely reversible, no ceremony forget/swap. */
+  expertise?: LearnExpertiseOperation[];
   subclassChoices?: LearnSubclassChoiceOperation[];
   spellsLearned?: LearnSpellOperation[];
   /** #1131: new cantrips this level — counted against the newSpells step's meta.cantrips. */

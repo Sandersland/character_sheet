@@ -31,6 +31,7 @@ export type LevelUpStepKind =
   | "maneuvers"
   | "fightingStyleFeat"
   | "toolProficiency"
+  | "expertise"
   | "subclassChoice"
   | "newSpells"
   | "review";
@@ -286,7 +287,7 @@ function fightingStyleFeatStep({ target, edition }: PlanContext): LevelUpStep | 
 function choiceCountStep(
   { now, prev }: PlanContext,
   kind: LevelUpStepKind,
-  field: "maneuverChoiceCount" | "toolProfChoiceCount",
+  field: "maneuverChoiceCount" | "toolProfChoiceCount" | "expertiseChoiceCount",
 ): LevelUpStep | null {
   const delta = (now?.[field] ?? 0) - (prev?.[field] ?? 0);
   if (delta <= 0) return null;
@@ -425,6 +426,7 @@ export function buildLevelUpPlan(character: LevelUpPlanCharacter, target: Target
     choiceCountStep(ctx, "maneuvers", "maneuverChoiceCount"),
     fightingStyleFeatStep(ctx),
     choiceCountStep(ctx, "toolProficiency", "toolProfChoiceCount"),
+    choiceCountStep(ctx, "expertise", "expertiseChoiceCount"),
     ...subclassChoiceSteps(ctx),
     newSpellsStep(ctx),
     { kind: "review" },

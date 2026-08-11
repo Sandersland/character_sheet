@@ -89,8 +89,7 @@ export const forgetSubclassChoiceOpSchema = z.object({
 // Exported so the level-up ceremony's own submission schema
 // (routes/character/level-up.ts) can reuse it verbatim for the "expertise"
 // step, same "one op schema, two call sites" pattern as
-// learnToolProficiencyOpSchema above — landing in #1588's next commit.
-// fallow-ignore-next-line unused-export -- consumed by level-up.ts's submission schema, landing in #1588's next commit
+// learnToolProficiencyOpSchema above.
 export const learnExpertiseOpSchema = z.object({
   type: z.literal("learnExpertise"),
   skill: z.string().min(1),
