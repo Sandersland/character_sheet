@@ -514,22 +514,29 @@ function applyForgetToolProficiencyOp(
  * Learn Expertise in a skill (#1588) — doubles proficiency bonus on that
  * skill's checks (buildSkillsView, serialize/proficiencies.ts). Validates
  * BOTH the skill key is real and the character is actually proficient in it
- * (`proficientSkills`, computed in applyResourceOpInTx the same way the read
- * path does — base skill rows + feat/class-feature-row + item grants — never
- * trusted from the client) and the level-derived expertiseChoiceCount cap.
- * Freely reversible (applyForgetExpertiseOp below carries no learn-time gate,
- * unlike applyForgetManeuverOp/applyForgetSubclassChoiceOp): Expertise has no
- * RAW swap-only text to bound it to a ceremony step.
+ * (`proficientSkillsOf`'s own scoped read, the same way the read path
+ * resolves proficiency — base skill rows + feat/class-feature-row + item
+ * grants — never trusted from the client) and the level-derived
+ * expertiseChoiceCount cap. Takes `tx`/`characterId` (mirrors
+ * applyLearnManeuverOp's own tx.grantedAbility.findUnique) so the
+ * skills/inventory query stays scoped to THIS op, not RESOURCES_SELECT's
+ * every-op read (#1588 perf review — spendResource/restoreResource are the
+ * combat hot path and never need this). Freely reversible
+ * (applyForgetExpertiseOp below carries no learn-time gate, unlike
+ * applyForgetManeuverOp/applyForgetSubclassChoiceOp): Expertise has no RAW
+ * swap-only text to bound it to a ceremony step.
  */
-function applyLearnExpertiseOp(
+async function applyLearnExpertiseOp(
+  tx: Prisma.TransactionClient,
+  characterId: string,
   state: ResourcesMutableState,
   op: LearnExpertiseOperation,
   derivedInfo: DerivedClassInfo | null,
-  proficientSkills: Set<string>,
-): ResourceOpAudit {
+): Promise<ResourceOpAudit> {
   if (!SKILL_KEYS.includes(op.skill)) {
     throw new InvalidResourceOperationError(`"${op.skill}" is not a known skill.`);
   }
+  const proficientSkills = await proficientSkillsOf(tx, characterId, state);
   if (!proficientSkills.has(op.skill)) {
     throw new InvalidResourceOperationError(
       `Cannot take Expertise in "${op.skill}": not proficient in that skill.`
@@ -709,8 +716,9 @@ interface ResourceOpContext {
   tx: Prisma.TransactionClient;
   state: ResourcesMutableState;
   derivedInfo: DerivedClassInfo | null;
-  /** Only rollInitiative reads these — its bonusHeal composes applyHealInTx
-   *  in the same tx/batch (#1243). */
+  /** rollInitiative's bonusHeal composes applyHealInTx in the same tx/batch
+   *  (#1243); applyLearnExpertiseOp's own scoped proficient-skill read
+   *  (#1588) also uses both — see proficientSkillsOf. */
   characterId: string;
   batchId: string;
   sessionId: string | null;
@@ -727,13 +735,6 @@ interface ResourceOpContext {
    * server-computed per call site, never a client-supplied op field.
    */
   allowChooseNForget: boolean;
-  /**
-   * The character's proficient skill set (#1588), computed once in
-   * applyResourceOpInTx the SAME way the read path does (buildSkillsView):
-   * base skill rows + feat/class-feature-row-granted + item-granted. Only
-   * applyLearnExpertiseOp reads this.
-   */
-  proficientSkills: Set<string>;
 }
 
 // The handler-map return type — async ops return a Promise. Unrelated to the
@@ -757,7 +758,7 @@ const RESOURCE_OP_HANDLERS: {
   forgetToolProficiency: (ctx, op) => applyForgetToolProficiencyOp(ctx.state, op),
   learnSubclassChoice: (ctx, op) => applyLearnSubclassChoiceOp(ctx.tx, ctx.state, op, ctx.derivedInfo, ctx.edition),
   forgetSubclassChoice: (ctx, op) => applyForgetSubclassChoiceOp(ctx.state, op, ctx.allowChooseNForget),
-  learnExpertise: (ctx, op) => applyLearnExpertiseOp(ctx.state, op, ctx.derivedInfo, ctx.proficientSkills),
+  learnExpertise: (ctx, op) => applyLearnExpertiseOp(ctx.tx, ctx.characterId, ctx.state, op, ctx.derivedInfo),
   forgetExpertise: (ctx, op) => applyForgetExpertiseOp(ctx.state, op),
 };
 
@@ -781,37 +782,49 @@ function snapshotResourcesState(state: ResourcesMutableState): {
 // scaffold row is an existence-only { id: true } check. Every entry (not just
 // the primary) + its level is selected so deriveEntryScopedResources can derive
 // each entry's own choice-cap fields (#1177).
-// #1588: `skills`/`inventoryItems` are additions for applyLearnExpertiseOp's
-// proficient-skill validation — must include feat/item-granted proficiencies,
-// not just the base skills row, mirroring buildSkillsView's own read-path
-// merge (serialize/proficiencies.ts). `inventoryItemDetailInclude` is the
-// same fan-in every op applier's live-row read uses (#1649) so
-// resolveInventoryItem reconstructs weaponDetail/armorDetail/capabilities
-// identically to the read path.
-const RESOURCES_SELECT = {
+//
+// Deliberately LEAN (#1588 perf review): this select re-runs on EVERY resource
+// op, including spendResource/restoreResource — the combat hot path. `skills`/
+// `inventoryItems` (needed only by applyLearnExpertiseOp's proficient-skill
+// validation) do NOT live here; they're a scoped follow-on read inside that one
+// applier (see EXPERTISE_PROFICIENCY_SELECT/proficientSkillsOf below), the same
+// "extra read only on the path that needs it" shape applyLearnManeuverOp's own
+// tx.grantedAbility.findUnique already uses.
+export const RESOURCES_SELECT = {
   resources: true,
   experiencePoints: true,
   abilityScores: true,
   rulesEdition: true,
-  skills: true,
-  inventoryItems: { include: inventoryItemDetailInclude },
   classEntries: {
     orderBy: { position: "asc" as const },
     select: { name: true, subclass: true, level: true, ...FEATURE_ROWS_ENTRY_SELECT },
   },
 } satisfies Prisma.CharacterSelect;
 
+// applyLearnExpertiseOp's own scoped read (#1588 perf review) — `skills` +
+// `inventoryItems` (via inventoryItemDetailInclude, the same fan-in every op
+// applier's live-row read uses, #1649) live ONLY here, not in RESOURCES_SELECT,
+// so spendResource/restoreResource and every other op never pay this cost.
+const EXPERTISE_PROFICIENCY_SELECT = {
+  skills: true,
+  inventoryItems: { include: inventoryItemDetailInclude },
+} satisfies Prisma.CharacterSelect;
+
 // The character's proficient skill set (#1588) — base skill rows +
 // feat-granted (deriveFeatProficiencies over the UNCLAMPED state.advancements;
 // an over-cap feat is a transient not-yet-reconciled state that the next XP
 // op self-heals, same tolerance clamp-on-read already extends elsewhere) +
-// item-granted (deriveItemGrants over the resolved inventory). Computed once
-// per op so applyLearnExpertiseOp validates against the SAME set the wire
-// response's skills[].proficient already reflects.
-function proficientSkillsOf(
-  row: { skills: unknown; inventoryItems: Parameters<typeof resolveInventoryItem>[0][] },
+// item-granted (deriveItemGrants over the resolved inventory). Re-reads its
+// own narrow row (EXPERTISE_PROFICIENCY_SELECT) rather than taking one from
+// the caller, so only applyLearnExpertiseOp ever pays the skills/inventory
+// query cost — never the RESOURCES_SELECT read every other op shares.
+async function proficientSkillsOf(
+  tx: Prisma.TransactionClient,
+  characterId: string,
   state: ResourcesMutableState,
-): Set<string> {
+): Promise<Set<string>> {
+  const row = await tx.character.findUnique({ where: { id: characterId }, select: EXPERTISE_PROFICIENCY_SELECT });
+  if (!row) throw new InvalidResourceOperationError(`Character not found: ${characterId}`);
   const baseProficient = (row.skills as { name: string; proficient: boolean }[])
     .filter((s) => s.proficient)
     .map((s) => s.name);
@@ -881,10 +894,9 @@ export async function applyResourceOpInTx(
 
   const state = normalizeResourcesMutable(row.resources);
   const beforeState = snapshotResourcesState(state);
-  const proficientSkills = proficientSkillsOf(row, state);
 
   const audit = await dispatchResourceOp(
-    { tx, state, derivedInfo, characterId, batchId, sessionId, edition, allowChooseNForget, proficientSkills },
+    { tx, state, derivedInfo, characterId, batchId, sessionId, edition, allowChooseNForget },
     op,
   );
 

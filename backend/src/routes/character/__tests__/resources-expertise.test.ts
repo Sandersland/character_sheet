@@ -11,6 +11,7 @@ import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
+import { inventoryItemFixtureData } from "@/test-support/inventory-snapshot-fixture.js";
 
 const OWNER_ID = "owner-resources-expertise";
 let COOKIE: string;
@@ -37,6 +38,12 @@ const FIXTURE_BASE = {
     { name: "perception", ability: "wisdom", proficient: true },
     { name: "acrobatics", ability: "dexterity", proficient: true },
     { name: "arcana", ability: "intelligence", proficient: false },
+    // Not base-proficient — the feat-/item-granted proficiency tests below
+    // grant these via an advancement/item instead, so they must still appear
+    // in the served skills[] array (a real character's skills[] always lists
+    // all 18 canonical skills) for expertSkillNames to see the result.
+    { name: "history", ability: "intelligence", proficient: false },
+    { name: "insight", ability: "wisdom", proficient: false },
   ],
   toolProficiencies: [],
   currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
@@ -152,6 +159,58 @@ describe("POST /api/characters/:id/resources/transactions — learnExpertise/for
       expect(res.status).toBe(400);
     } finally {
       await prisma.character.deleteMany({ where: { id: fighterId } });
+    }
+  });
+});
+
+// #1588 perf review regression net: applyLearnExpertiseOp's proficient-skill
+// check moved from a value threaded in via RESOURCES_SELECT (every op) to its
+// OWN scoped follow-on read (EXPERTISE_PROFICIENCY_SELECT, resources.ts) —
+// these prove that rescoping preserved feat- and item-granted proficiency
+// detection exactly, not just the base skills[] row already covered above.
+describe("POST /api/characters/:id/resources/transactions — learnExpertise honors feat/item-granted proficiency (#1588)", () => {
+  it("allows Expertise in a skill granted only by a feat (not the base skills row)", async () => {
+    await prisma.character.update({
+      where: { id: FIXTURE_ID },
+      data: {
+        resources: {
+          expertiseKnown: [],
+          advancements: [
+            {
+              id: "adv-feat-history",
+              level: 1,
+              kind: "feat",
+              featName: "Test Skilled",
+              abilityDeltas: {},
+              hpDelta: 0,
+              initDelta: 0,
+              improvements: [{ target: "skillProficiency", key: "history", amount: 0 }],
+            },
+          ],
+        },
+      },
+    });
+    const res = await post([{ type: "learnExpertise", skill: "history" }]);
+    expect(res.status).toBe(200);
+    expect(expertSkillNames(res)).toEqual(["history"]);
+  });
+
+  it("allows Expertise in a skill granted only by an equipped item (not the base skills row)", async () => {
+    await prisma.inventoryItem.create({
+      data: inventoryItemFixtureData({
+        characterId: FIXTURE_ID,
+        name: "Eyes of the Eagle",
+        category: "gear",
+        equippedSlot: "HEAD",
+        capabilities: [{ kind: "grant", grantType: "proficiency", grantValueKind: "skill", grantValue: "insight" }],
+      }),
+    });
+    try {
+      const res = await post([{ type: "learnExpertise", skill: "insight" }]);
+      expect(res.status).toBe(200);
+      expect(expertSkillNames(res)).toEqual(["insight"]);
+    } finally {
+      await prisma.inventoryItem.deleteMany({ where: { characterId: FIXTURE_ID } });
     }
   });
 });
