@@ -17,10 +17,14 @@ import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/exp
 import { logEvent } from "@/lib/activity/events.js";
 import { deriveEntryScopedResources, type DerivedClassInfo } from "./class-features.js";
 import { FEATURE_ROWS_ENTRY_SELECT, featureRowsOf } from "./feature-rows-select.js";
+import { inventoryItemDetailInclude, resolveInventoryItem } from "@/lib/inventory/inventory-types.js";
 import { editionOf } from "@/lib/rules/edition.js";
 import { crossEditionRejection } from "@/lib/rules/catalog-edition.js";
 import type { RulesEdition } from "@character-sheet/shared-types";
 import { toolsByCategory } from "@/lib/srd/srd.js";
+import { SKILL_KEYS } from "@/lib/srd/alignments.js";
+import { deriveFeatProficiencies } from "@/lib/srd/feats.js";
+import { deriveItemGrants, type GrantItem } from "@/lib/inventory/capabilities.js";
 import { rollDie } from "@/lib/core/dice.js";
 // Cross-domain HP heal for Uncanny Metabolism's bonusHeal (#1243) — precedented
 // by lib/spellcasting/ability-cast.ts, which also composes applyHealInTx from a
@@ -66,11 +70,13 @@ import type {
 // submission/transaction, ability-cost, the actions + resources routes) keep
 // resolving them unchanged.
 export type {
-  // fallow-ignore-next-line unused-type -- consumed by applyLearnExpertiseOp/applyForgetExpertiseOp + the resources route's zod schema, landing later in #1588's build sequence
-  ForgetExpertiseOperation,
   ForgetManeuverOperation,
   ForgetSubclassChoiceOperation,
-  // fallow-ignore-next-line unused-type -- consumed by applyLearnExpertiseOp/applyForgetExpertiseOp + the resources route's zod schema, landing later in #1588's build sequence
+  // #1588: LearnExpertiseOperation only — no ceremony ever reuses
+  // ForgetExpertiseOperation (freely reversible, no ceremony-scoped forget
+  // list), so it stays imported-but-not-re-exported, mirroring
+  // ForgetToolProficiencyOperation below.
+  // fallow-ignore-next-line unused-type -- consumed by level-up-submission.ts/level-up-plan.ts, landing in #1588's next commit
   LearnExpertiseOperation,
   LearnManeuverOperation,
   LearnSubclassChoiceOperation,
@@ -505,6 +511,69 @@ function applyForgetToolProficiencyOp(
   };
 }
 
+/**
+ * Learn Expertise in a skill (#1588) — doubles proficiency bonus on that
+ * skill's checks (buildSkillsView, serialize/proficiencies.ts). Validates
+ * BOTH the skill key is real and the character is actually proficient in it
+ * (`proficientSkills`, computed in applyResourceOpInTx the same way the read
+ * path does — base skill rows + feat/class-feature-row + item grants — never
+ * trusted from the client) and the level-derived expertiseChoiceCount cap.
+ * Freely reversible (applyForgetExpertiseOp below carries no learn-time gate,
+ * unlike applyForgetManeuverOp/applyForgetSubclassChoiceOp): Expertise has no
+ * RAW swap-only text to bound it to a ceremony step.
+ */
+function applyLearnExpertiseOp(
+  state: ResourcesMutableState,
+  op: LearnExpertiseOperation,
+  derivedInfo: DerivedClassInfo | null,
+  proficientSkills: Set<string>,
+): ResourceOpAudit {
+  if (!SKILL_KEYS.includes(op.skill)) {
+    throw new InvalidResourceOperationError(`"${op.skill}" is not a known skill.`);
+  }
+  if (!proficientSkills.has(op.skill)) {
+    throw new InvalidResourceOperationError(
+      `Cannot take Expertise in "${op.skill}": not proficient in that skill.`
+    );
+  }
+
+  const expertiseChoiceCount = derivedInfo?.expertiseChoiceCount;
+  if (expertiseChoiceCount !== undefined && state.expertiseKnown.length >= expertiseChoiceCount) {
+    throw new InvalidResourceOperationError(
+      `Cannot take more Expertise: already have ${state.expertiseKnown.length}/${expertiseChoiceCount}`
+    );
+  }
+
+  if (state.expertiseKnown.some((e) => e.skill === op.skill)) {
+    throw new InvalidResourceOperationError(`Expertise already taken in: ${op.skill}`);
+  }
+
+  const newEntry: ExpertiseEntry = { id: randomUUID(), skill: op.skill };
+  state.expertiseKnown.push(newEntry);
+  return {
+    eventType: "learnExpertise",
+    summary: `Took Expertise in: ${op.skill}`,
+    eventData: { entryId: newEntry.id, skill: op.skill },
+  };
+}
+
+function applyForgetExpertiseOp(
+  state: ResourcesMutableState,
+  op: ForgetExpertiseOperation,
+): ResourceOpAudit {
+  const idx = state.expertiseKnown.findIndex((e) => e.id === op.entryId);
+  if (idx === -1) {
+    throw new InvalidResourceOperationError(`Expertise entry not found: ${op.entryId}`);
+  }
+  const forgotten = state.expertiseKnown[idx];
+  state.expertiseKnown.splice(idx, 1);
+  return {
+    eventType: "forgetExpertise",
+    summary: `Removed Expertise in: ${forgotten.skill}`,
+    eventData: { entryId: op.entryId, skill: forgotten.skill },
+  };
+}
+
 // Generic subclass "choose N" appliers (#899): validate against the level-derived subclassChoices declaration: the choice
 // must be available at this level/subclass, the option must belong to the
 // choice's catalog source, and the pick must stay within the derived count.
@@ -648,6 +717,13 @@ interface ResourceOpContext {
    * server-computed per call site, never a client-supplied op field.
    */
   allowChooseNForget: boolean;
+  /**
+   * The character's proficient skill set (#1588), computed once in
+   * applyResourceOpInTx the SAME way the read path does (buildSkillsView):
+   * base skill rows + feat/class-feature-row-granted + item-granted. Only
+   * applyLearnExpertiseOp reads this.
+   */
+  proficientSkills: Set<string>;
 }
 
 // The handler-map return type — async ops return a Promise. Unrelated to the
@@ -671,6 +747,8 @@ const RESOURCE_OP_HANDLERS: {
   forgetToolProficiency: (ctx, op) => applyForgetToolProficiencyOp(ctx.state, op),
   learnSubclassChoice: (ctx, op) => applyLearnSubclassChoiceOp(ctx.tx, ctx.state, op, ctx.derivedInfo, ctx.edition),
   forgetSubclassChoice: (ctx, op) => applyForgetSubclassChoiceOp(ctx.state, op, ctx.allowChooseNForget),
+  learnExpertise: (ctx, op) => applyLearnExpertiseOp(ctx.state, op, ctx.derivedInfo, ctx.proficientSkills),
+  forgetExpertise: (ctx, op) => applyForgetExpertiseOp(ctx.state, op),
 };
 
 function dispatchResourceOp(ctx: ResourceOpContext, op: ResourceOperation): ResourceOpResult {
@@ -693,16 +771,56 @@ function snapshotResourcesState(state: ResourcesMutableState): {
 // scaffold row is an existence-only { id: true } check. Every entry (not just
 // the primary) + its level is selected so deriveEntryScopedResources can derive
 // each entry's own choice-cap fields (#1177).
+// #1588: `skills`/`inventoryItems` are additions for applyLearnExpertiseOp's
+// proficient-skill validation — must include feat/item-granted proficiencies,
+// not just the base skills row, mirroring buildSkillsView's own read-path
+// merge (serialize/proficiencies.ts). `inventoryItemDetailInclude` is the
+// same fan-in every op applier's live-row read uses (#1649) so
+// resolveInventoryItem reconstructs weaponDetail/armorDetail/capabilities
+// identically to the read path.
 const RESOURCES_SELECT = {
   resources: true,
   experiencePoints: true,
   abilityScores: true,
   rulesEdition: true,
+  skills: true,
+  inventoryItems: { include: inventoryItemDetailInclude },
   classEntries: {
     orderBy: { position: "asc" as const },
     select: { name: true, subclass: true, level: true, ...FEATURE_ROWS_ENTRY_SELECT },
   },
 } satisfies Prisma.CharacterSelect;
+
+// The character's proficient skill set (#1588) — base skill rows +
+// feat-granted (deriveFeatProficiencies over the UNCLAMPED state.advancements;
+// an over-cap feat is a transient not-yet-reconciled state that the next XP
+// op self-heals, same tolerance clamp-on-read already extends elsewhere) +
+// item-granted (deriveItemGrants over the resolved inventory). Computed once
+// per op so applyLearnExpertiseOp validates against the SAME set the wire
+// response's skills[].proficient already reflects.
+function proficientSkillsOf(
+  row: { skills: unknown; inventoryItems: Parameters<typeof resolveInventoryItem>[0][] },
+  state: ResourcesMutableState,
+): Set<string> {
+  const baseProficient = (row.skills as { name: string; proficient: boolean }[])
+    .filter((s) => s.proficient)
+    .map((s) => s.name);
+  const featProficiencies = deriveFeatProficiencies(state.advancements);
+  const resolvedItems = row.inventoryItems.map(resolveInventoryItem);
+  const itemGrants = deriveItemGrants(
+    resolvedItems.map(
+      (i): GrantItem => ({
+        name: i.name,
+        equipped: i.equippedSlot != null,
+        attuned: i.attuned,
+        requiresAttunement: i.requiresAttunement,
+        capabilities: i.capabilities,
+      }),
+    ),
+  );
+  const itemSkillProfs = itemGrants.proficiencies.filter((p) => p.profType === "skill").map((p) => p.value);
+  return new Set([...baseProficient, ...featProficiencies.skills, ...itemSkillProfs]);
+}
 
 /**
  * Applies one resource op inside a caller-supplied transaction/batchId, so the
@@ -753,9 +871,10 @@ export async function applyResourceOpInTx(
 
   const state = normalizeResourcesMutable(row.resources);
   const beforeState = snapshotResourcesState(state);
+  const proficientSkills = proficientSkillsOf(row, state);
 
   const audit = await dispatchResourceOp(
-    { tx, state, derivedInfo, characterId, batchId, sessionId, edition, allowChooseNForget },
+    { tx, state, derivedInfo, characterId, batchId, sessionId, edition, allowChooseNForget, proficientSkills },
     op,
   );
 

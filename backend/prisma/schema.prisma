@@ -2263,6 +2263,10 @@ enum CharacterEventType {
   learnToolProficiency
   forgetToolProficiency
   toolProficienciesReconciled
+  // Expertise (#1588): choose/undo a skill's double proficiency bonus.
+  learnExpertise
+  forgetExpertise
+  expertiseReconciled
   learnSubclassChoice
   forgetSubclassChoice
   subclassChoicesReconciled
