@@ -94,7 +94,6 @@ export {
 export type {
   AdvancementEntry,
   ChoiceEntry,
-  // fallow-ignore-next-line unused-type -- consumed by buildSkillsView's expertise-flag read (serialize/proficiencies.ts) + applyLearnExpertiseOp, landing later in #1588's build sequence
   ExpertiseEntry,
   FeatImprovement,
   ManeuverEntry,
