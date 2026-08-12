@@ -12,10 +12,13 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 // character's edition, so this is what keeps the picker from ever offering a
 // spell from the other edition.
 //
-// `refreshKey` (#1787) lets a caller force a re-fetch. There is no TanStack
-// query key to invalidate here, so a caller that just wrote a new homebrew
-// spell (AddSpellPanel, after createCustomSpell) bumps a counter instead, and
-// this effect re-runs.
+// `refreshKey` (#1787) lets a caller force a re-fetch. It has the same
+// `unknown` escape-hatch type as SessionLog's own refresh prop, so if you
+// change one, check the other. Some other GET data in this app goes through
+// TanStack Query (for example useReferenceData, for GET /api/reference), but
+// GET /api/spells does not, so there is no query key to invalidate. Instead,
+// a caller that just wrote a new homebrew spell (AddSpellPanel, after
+// createCustomSpell) bumps a plain counter, and this effect re-runs.
 export function useSpellCatalog(edition: RulesEdition, filter?: SpellCatalogFilter, refreshKey?: unknown) {
   const [catalog, setCatalog] = useState<CatalogSpell[] | null>(null);
   const [error, setError] = useState<string | null>(null);
