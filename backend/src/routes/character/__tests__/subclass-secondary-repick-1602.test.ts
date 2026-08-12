@@ -35,7 +35,7 @@ beforeAll(async () => {
     where: { classId: warlockId, slug: "warlock-the-archfey" },
   })).id;
   fiendId = (await prisma.subclass.findFirstOrThrow({
-    where: { classId: warlockId, name: "The Fiend" },
+    where: { classId: warlockId, slug: "warlock-the-fiend" },
   })).id;
 });
 

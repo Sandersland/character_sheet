@@ -3,11 +3,7 @@ import { isMulticlass } from "@/lib/multiclass";
 import type { ClassEntry, ClassOption } from "@/types/character";
 
 interface Props {
-  /** One roster entry (#1602) — a multiclass character can be stranded on
-   *  ANY entry, not only the primary one, so this component renders one
-   *  entry at a time instead of reading the character's top-level subclass
-   *  field. `entry.needsSubclass`/`entry.subclassUnavailable` are backend-
-   *  computed (buildClassesView); see their doc comments on ClassEntry. */
+  /** Per-entry subclass state (#1602): reads needsSubclass/subclassUnavailable from the entry, not character.subclass. */
   entry: ClassEntry;
   classDef: ClassOption | undefined;
   busy: boolean;

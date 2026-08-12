@@ -137,8 +137,7 @@ function isFeatureViewEmpty(flags: ClassFeatureFlags, roster: ClassEntry[]): boo
   return signals.every((signal) => !signal);
 }
 
-/** Looks up a roster entry's catalog row by class name — shared by the
- *  primary lookup below and by ClassFeaturesSection's per-entry lookup. */
+/** Class-name to ClassOption lookup; shared by deriveClassFeatureView and ClassFeaturesSection. */
 export function resolveClassDef(className: string, referenceClasses: ClassOption[]): ClassOption | undefined {
   return referenceClasses.find((c) => c.name === className);
 }

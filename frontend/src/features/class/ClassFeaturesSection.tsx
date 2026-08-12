@@ -32,10 +32,7 @@ export default function ClassFeaturesSection({ referenceClasses }: Props) {
 
       <ClassRosterSection rosterEntries={view.rosterEntries} />
 
-      {/* One section per roster entry that holds or needs a subclass (#1602) —
-          a multiclass character can be stranded on any entry, not only the
-          primary one. setSubclass resolves its target by the picked
-          subclass's own class, so every entry shares the same onChoose. */}
+      {/* One SubclassSection per roster entry; each renders null when the entry has no subclass state. */}
       {view.rosterEntries.map((entry) => (
         <SubclassSection
           key={entry.id}
