@@ -38,30 +38,23 @@ describe("deriveClassFeatureView", () => {
     expect(view.rosterEntries).toBe(classes);
   });
 
-  // #1598: needsSubclass/subclassUnavailable are backend-computed
-  // (buildClassesView) and read off classes[0] — deriveClassFeatureView must
-  // NOT re-derive them from character.level/classDef.subclassGateLevel (that
-  // mirror is what stranded a character on a cross-edition subclass row with
-  // no way out, since a held subclass name made the old client-side
-  // `!character.subclass` half of the check false).
-  it("reads needsSubclass/subclassUnavailable off classes[0] rather than re-deriving them", () => {
-    function withEntry(needsSubclass: boolean, subclassUnavailable = false) {
-      const classes = [
-        { id: "c1", name: "Fighter", level: 5, needsSubclass, subclassUnavailable },
-      ] as unknown as Character["classes"];
-      return deriveClassFeatureView(makeChar({ classes }), [fighterDef]);
-    }
-    expect(withEntry(true).needsSubclass).toBe(true);
-    expect(withEntry(false).needsSubclass).toBe(false);
-    expect(withEntry(true, true).subclassUnavailable).toBe(true);
-    expect(withEntry(true, false).subclassUnavailable).toBe(false);
-  });
-
-  it("defaults needsSubclass/subclassUnavailable to false when classes[] hasn't loaded yet (never computed from level)", () => {
-    const view = deriveClassFeatureView(makeChar({ level: 5, subclass: undefined }), [fighterDef]);
-    expect(view.needsSubclass).toBe(false);
-    expect(view.subclassUnavailable).toBe(false);
-    expect(deriveClassFeatureView(makeChar({ level: 5 }), []).needsSubclass).toBe(false);
+  // #1598/#1602: needsSubclass/subclassUnavailable are backend-computed
+  // (buildClassesView) and passed through on every roster entry, never
+  // re-derived from character.level/classDef.subclassGateLevel (that mirror
+  // is what stranded a character on a cross-edition subclass row with no way
+  // out, since a held subclass name made the old client-side
+  // `!character.subclass` half of the check false). #1602: this must hold for
+  // EVERY entry, not just the primary one — a multiclass character can be
+  // stranded on a secondary class only.
+  it("passes needsSubclass/subclassUnavailable through unchanged for every roster entry, not just the first", () => {
+    const classes = [
+      { id: "c1", name: "Fighter", level: 5, needsSubclass: false, subclassUnavailable: false },
+      { id: "c2", name: "Warlock", level: 3, subclass: "The Archfey", needsSubclass: true, subclassUnavailable: true },
+    ] as unknown as Character["classes"];
+    const view = deriveClassFeatureView(makeChar({ classes }), [fighterDef]);
+    expect(view.rosterEntries[0].needsSubclass).toBe(false);
+    expect(view.rosterEntries[1].needsSubclass).toBe(true);
+    expect(view.rosterEntries[1].subclassUnavailable).toBe(true);
   });
 
   it("collects maneuver ids, skipping entries without a maneuverId", () => {
@@ -213,6 +206,29 @@ describe("deriveClassFeatureView", () => {
   it("isEmpty stays false when a subclass is still needed", () => {
     const classes = [
       { id: "c1", name: "Fighter", level: 5, needsSubclass: true, subclassUnavailable: false },
+    ] as unknown as Character["classes"];
+    const view = deriveClassFeatureView(makeChar({ classes, subclass: undefined }), [fighterDef]);
+    expect(view.isEmpty).toBe(false);
+  });
+
+  // #1602: before the fix, isEmpty only looked at the PRIMARY entry's
+  // subclass state. A multiclass character needing or holding a subclass on
+  // a SECONDARY entry only, with no other class features, would show "No
+  // class features available at this level" instead of that entry's own
+  // Subclass section.
+  it("isEmpty stays false when only a SECONDARY roster entry needs a subclass", () => {
+    const classes = [
+      { id: "c1", name: "Fighter", level: 5, needsSubclass: false, subclassUnavailable: false },
+      { id: "c2", name: "Warlock", level: 3, needsSubclass: true, subclassUnavailable: false },
+    ] as unknown as Character["classes"];
+    const view = deriveClassFeatureView(makeChar({ classes, subclass: undefined }), [fighterDef]);
+    expect(view.isEmpty).toBe(false);
+  });
+
+  it("isEmpty stays false when only a SECONDARY roster entry holds a subclass", () => {
+    const classes = [
+      { id: "c1", name: "Fighter", level: 5, needsSubclass: false, subclassUnavailable: false },
+      { id: "c2", name: "Warlock", level: 3, subclass: "The Fiend", needsSubclass: false, subclassUnavailable: false },
     ] as unknown as Character["classes"];
     const view = deriveClassFeatureView(makeChar({ classes, subclass: undefined }), [fighterDef]);
     expect(view.isEmpty).toBe(false);

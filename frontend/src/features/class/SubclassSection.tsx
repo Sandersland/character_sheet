@@ -1,14 +1,15 @@
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
-import type { ClassOption } from "@/types/character";
+import { isMulticlass } from "@/lib/multiclass";
+import type { ClassEntry, ClassOption } from "@/types/character";
 
 interface Props {
+  /** One roster entry (#1602) — a multiclass character can be stranded on
+   *  ANY entry, not only the primary one, so this component renders one
+   *  entry at a time instead of reading the character's top-level subclass
+   *  field. `entry.needsSubclass`/`entry.subclassUnavailable` are backend-
+   *  computed (buildClassesView); see their doc comments on ClassEntry. */
+  entry: ClassEntry;
   classDef: ClassOption | undefined;
-  needsSubclass: boolean;
-  /** #1598: the held subclass row is edition-tagged for a different edition
-   *  than the character's own (a catalog retag after the pick). Renders the
-   *  picker ALONGSIDE the stranded name (rather than instead of it), plus an
-   *  explanation — reusing the existing setSubclass op, no new endpoint. */
-  subclassUnavailable: boolean;
   busy: boolean;
   onChoose: (subclassId: string) => void;
 }
@@ -55,48 +56,48 @@ function SubclassPicker({ classDef, showGatePrompt, busy, onChoose }: PickerProp
   );
 }
 
-export default function SubclassSection({ classDef, needsSubclass, subclassUnavailable, busy, onChoose }: Props) {
+export default function SubclassSection({ entry, classDef, busy, onChoose }: Props) {
   const { character } = useCurrentCharacter();
-  if (!character.subclass && !needsSubclass) return null;
+  const { subclass, needsSubclass, subclassUnavailable } = entry;
+  if (!subclass && !needsSubclass) return null;
 
-  // A stranded entry still shows its held name (buildClassesView emits it
-  // unconditionally, #1598) — this additionally opens the picker for it,
-  // rather than only for "never picked", so the player has a way out.
+  // A stranded entry still shows its held name (buildClassesView always sends
+  // it, #1598). We also open the picker for it, not only for "never picked",
+  // so the player has a way to fix it.
   //
-  // Deliberately NOT `needsSubclass`, though that is the backend's own answer
-  // to a near-identical question. The two diverge on a homebrew subclass — a
-  // name with no catalog row (#911) — where `needsSubclass` is true (its
-  // `!entry.subclassId` half) but the player holds a subclass on purpose and
-  // must not be prompted to replace it. Whether homebrew deserves the same
-  // explain-and-re-pick treatment is a real question, and a separate one.
+  // We check `subclassUnavailable` here, not `needsSubclass`, even though the
+  // backend's `needsSubclass` answers a similar question. The two differ for
+  // a homebrew subclass — a name with no catalog row (#911). There,
+  // `needsSubclass` is true, but the player chose that name on purpose and
+  // should not be asked to replace it.
   //
-  // `classDef` is required because the option list comes from it, and it is
-  // genuinely absent for a beat: ClassPanel passes `reference?.classes ?? []`
-  // while the reference query resolves. The retired deriveNeedsSubclass used
-  // to make that unreachable (`if (!classDef) return false` meant
-  // needsSubclass implied classDef); once the flag moved to the wire the
-  // backend can't know whether the client's catalog has loaded, so the guard
-  // has to live here instead. The name and the explanation below need no
-  // catalog and still render.
-  const showPicker = !character.subclass || subclassUnavailable;
+  // `classDef` can be missing for a moment while the reference catalog is
+  // still loading. When that happens we still show the name and the
+  // explanation, and only skip the picker until `classDef` arrives.
+  const showPicker = !subclass || subclassUnavailable;
+  // #1602: a multiclass character can render more than one of these sections
+  // (one per roster entry that holds or needs a subclass) — name the class so
+  // the sections are distinguishable. A single-class sheet keeps the plain
+  // "Subclass" heading it always had.
+  const heading = isMulticlass(character.classes) ? `${entry.name} Subclass` : "Subclass";
 
   return (
     <div>
       <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
-        Subclass
+        {heading}
       </h3>
-      {character.subclass && (
-        <p className="text-sm font-semibold text-parchment-900">{character.subclass}</p>
+      {subclass && (
+        <p className="text-sm font-semibold text-parchment-900">{subclass}</p>
       )}
       {subclassUnavailable && (
         <p className="mt-1 text-xs text-garnet-700">
-          {character.subclass} isn&apos;t part of {character.rulesEditionLabel} — choose a new subclass below.
+          {subclass} isn&apos;t part of {character.rulesEditionLabel} — choose a new subclass below.
         </p>
       )}
       {showPicker && classDef && (
         <SubclassPicker
           classDef={classDef}
-          showGatePrompt={!character.subclass}
+          showGatePrompt={!subclass}
           busy={busy}
           onChoose={onChoose}
         />

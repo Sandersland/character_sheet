@@ -4,7 +4,7 @@
 
 import { applyAdvancementTransactions, applyClassTransactions } from "@/api/client";
 import type { ClassOption } from "@/types/character";
-import { deriveClassFeatureView } from "@/lib/classFeatures";
+import { deriveClassFeatureView, resolveClassDef } from "@/lib/classFeatures";
 import { useClassTransactions } from "@/features/class/useClassTransactions";
 import ClassFeaturesList from "@/features/class/ClassFeaturesList";
 import ClassResourceBlocks from "@/features/class/ClassResourceBlocks";
@@ -32,13 +32,19 @@ export default function ClassFeaturesSection({ referenceClasses }: Props) {
 
       <ClassRosterSection rosterEntries={view.rosterEntries} />
 
-      <SubclassSection
-        classDef={view.classDef}
-        needsSubclass={view.needsSubclass}
-        subclassUnavailable={view.subclassUnavailable}
-        busy={busy}
-        onChoose={(subclassId) => run(() => applyClassTransactions(character.id, [{ type: "setSubclass", subclassId }]))}
-      />
+      {/* One section per roster entry that holds or needs a subclass (#1602) —
+          a multiclass character can be stranded on any entry, not only the
+          primary one. setSubclass resolves its target by the picked
+          subclass's own class, so every entry shares the same onChoose. */}
+      {view.rosterEntries.map((entry) => (
+        <SubclassSection
+          key={entry.id}
+          entry={entry}
+          classDef={resolveClassDef(entry.name, referenceClasses)}
+          busy={busy}
+          onChoose={(subclassId) => run(() => applyClassTransactions(character.id, [{ type: "setSubclass", subclassId }]))}
+        />
+      ))}
 
       <ClassResourceBlocks view={view} busy={busy} run={run} />
 

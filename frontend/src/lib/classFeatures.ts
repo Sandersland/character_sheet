@@ -26,11 +26,6 @@ export interface ClassFeatureFlags {
 export interface ClassFeatureView extends ClassFeatureFlags {
   classDef: ClassOption | undefined;
   rosterEntries: ClassEntry[];
-  needsSubclass: boolean;
-  /** #1598: the primary entry's held subclass row is edition-tagged for a
-   *  different edition than the character's own — SubclassSection renders an
-   *  explanation alongside the re-pick, rather than hiding the stranded name. */
-  subclassUnavailable: boolean;
   maneuverKnownIds: string[];
   isEmpty: boolean;
 }
@@ -122,11 +117,11 @@ function deriveFlags(character: Character): ClassFeatureFlags {
 // Data-driven so a new flag (hasFourElements, #1505) is one more array entry,
 // not another branch — keeps this function's own cyclomatic complexity flat
 // regardless of how many entitlement flags ClassFeatureFlags grows to.
-function isFeatureViewEmpty(
-  flags: ClassFeatureFlags,
-  hasSubclass: boolean,
-  needsSubclass: boolean,
-): boolean {
+//
+// Checks every roster entry, not just the primary one (#1602): a multiclass
+// character can hold or need a subclass on a SECONDARY entry only, and the
+// section must still render for them.
+function isFeatureViewEmpty(flags: ClassFeatureFlags, roster: ClassEntry[]): boolean {
   const signals = [
     flags.hasPools,
     flags.hasManeuvers,
@@ -136,33 +131,31 @@ function isFeatureViewEmpty(
     flags.hasFourElements,
     flags.hasFeatures,
     flags.hasFightingStyle,
-    hasSubclass,
-    needsSubclass,
+    roster.some((entry) => Boolean(entry.subclass)),
+    roster.some((entry) => entry.needsSubclass),
   ];
   return signals.every((signal) => !signal);
+}
+
+/** Looks up a roster entry's catalog row by class name — shared by the
+ *  primary lookup below and by ClassFeaturesSection's per-entry lookup. */
+export function resolveClassDef(className: string, referenceClasses: ClassOption[]): ClassOption | undefined {
+  return referenceClasses.find((c) => c.name === className);
 }
 
 export function deriveClassFeatureView(
   character: Character,
   referenceClasses: ClassOption[],
 ): ClassFeatureView {
-  const classDef = referenceClasses.find((c) => c.name === character.class);
+  const classDef = resolveClassDef(character.class, referenceClasses);
   const roster = deriveRoster(character);
-  // ClassFeaturesSection/SubclassSection render only the primary entry
-  // (roster[0]) today, same scope the retired deriveNeedsSubclass covered —
-  // this reads its backend-computed flags rather than re-deriving them.
-  const primaryEntry = roster[0];
-  const needsSubclass = primaryEntry?.needsSubclass ?? false;
-  const subclassUnavailable = primaryEntry?.subclassUnavailable ?? false;
   const flags = deriveFlags(character);
 
   return {
     classDef,
     rosterEntries: roster,
-    needsSubclass,
-    subclassUnavailable,
     maneuverKnownIds: deriveManeuverIds(character.resources),
     ...flags,
-    isEmpty: isFeatureViewEmpty(flags, Boolean(character.subclass), needsSubclass),
+    isEmpty: isFeatureViewEmpty(flags, roster),
   };
 }

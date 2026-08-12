@@ -193,9 +193,9 @@ export async function reportStrandedSubclassCharacters(prisma: PrismaClient): Pr
     [
       `seedSubclasses: ${stranded.length} character(s) hold a subclass row edition-tagged for a ` +
         "DIFFERENT edition than their own (#1598) — buildClassesView marks EVERY such entry " +
-        "(subclassUnavailable) rather than silently rendering zero subclass features, but the " +
-        "sheet only offers the re-pick on a character's PRIMARY class entry, so a stranded " +
-        "MULTICLASS secondary entry below is reported here and nowhere else (#1602):",
+        "(subclassUnavailable) and the sheet offers a re-pick on every affected class entry, " +
+        "primary or secondary (#1602). Logged anyway so an operator watching a deploy sees " +
+        "exactly which characters this touches:",
       ...stranded.map((e) => {
         const name = e.subclass ?? e.subclassRef!.name; // subclass: drifting display name (schema.prisma) — prefer it, catalog name is the fallback
         return `  ${e.character.name} (${e.character.id}, ${editionLabel(e.character.rulesEdition as SeedEdition)}): ` +

@@ -214,3 +214,101 @@ describe("ClassFeaturesSection — subclass gate is backend-computed (#1598)", (
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
   });
 });
+
+// #1602: #1598 wired the explanation + re-pick to the PRIMARY class entry
+// only. A multiclass character stranded on a cross-edition subclass in their
+// SECONDARY entry got no explanation and no re-pick — the same dead end #1598
+// closed for the primary entry, surviving for multiclass characters. The wire
+// data was already per-entry (buildClassesView); this pins that the frontend
+// now reads every roster entry instead of just classes[0].
+describe("ClassFeaturesSection — stranded SECONDARY class entry (#1602)", () => {
+  function fighterDef(): ClassOption {
+    return {
+      id: "class-fighter",
+      name: "Fighter",
+      hitDie: "d10",
+      savingThrows: [],
+      skillChoiceCount: 2,
+      skillChoices: [],
+      isSpellcaster: false,
+      subclassGateLevel: 3,
+      subclasses: [{ id: "sc-champion", name: "Champion", description: "" }],
+      startingEquipment: null,
+      multiclassPrerequisite: null,
+      toolProficiencies: [],
+      toolChoices: [],
+      toolChoiceCount: 0,
+      level1SpellPicks: null,
+      primaryAbility: ["strength"],
+    };
+  }
+
+  function warlockDef(): ClassOption {
+    return {
+      id: "class-warlock",
+      name: "Warlock",
+      hitDie: "d8",
+      savingThrows: [],
+      skillChoiceCount: 2,
+      skillChoices: [],
+      isSpellcaster: true,
+      subclassGateLevel: 3,
+      subclasses: [{ id: "sc-fiend", name: "The Fiend", description: "" }],
+      startingEquipment: null,
+      multiclassPrerequisite: null,
+      toolProficiencies: [],
+      toolChoices: [],
+      toolChoiceCount: 0,
+      level1SpellPicks: { cantrips: 2, spells: 0, maxSpellLevel: 1 },
+      primaryAbility: ["charisma"],
+    };
+  }
+
+  function strandedMulticlassCharacter(): Character {
+    return {
+      id: "char-1",
+      class: "Fighter",
+      subclass: "Champion",
+      level: 5,
+      rulesEdition: "EDITION_2024",
+      rulesEditionLabel: "2024 rules",
+      classes: [
+        { id: "ce-fighter", name: "Fighter", level: 2, subclass: "Champion", needsSubclass: false, subclassUnavailable: false },
+        { id: "ce-warlock", name: "Warlock", level: 3, subclass: "The Archfey", needsSubclass: true, subclassUnavailable: true },
+      ],
+      resources: { features: [], pools: [], maneuversKnown: [], toolProficienciesKnown: [] },
+    } as unknown as Character;
+  }
+
+  it("shows the explanation and offers a re-pick for the stranded SECONDARY entry, alongside the healthy primary entry", () => {
+    renderWithCharacter(
+      <ClassFeaturesSection referenceClasses={[fighterDef(), warlockDef()]} />,
+      strandedMulticlassCharacter(),
+    );
+
+    // Primary entry: healthy, name only, no picker, no explanation. "Champion"
+    // appears twice (once in the roster list, once in the primary Subclass
+    // section) — getAllByText just proves the primary section rendered too.
+    expect(screen.getAllByText("Champion").length).toBeGreaterThan(0);
+    expect(screen.getByText("Fighter Subclass")).toBeInTheDocument();
+
+    // Secondary entry: the stranded name, the plain-language explanation, and a picker.
+    expect(screen.getByText("Warlock Subclass")).toBeInTheDocument();
+    expect(screen.getAllByText("The Archfey").length).toBeGreaterThan(0);
+    expect(screen.getByText(/The Archfey isn't part of 2024 rules/)).toBeInTheDocument();
+    expect(screen.getByRole("combobox")).toBeInTheDocument();
+  });
+
+  it("re-picking the secondary entry's subclass sends setSubclass through the shared class-transactions wiring", async () => {
+    const user = userEvent.setup();
+    vi.mocked(client.applyClassTransactions).mockResolvedValue(strandedMulticlassCharacter());
+
+    renderWithCharacter(
+      <ClassFeaturesSection referenceClasses={[fighterDef(), warlockDef()]} />,
+      strandedMulticlassCharacter(),
+    );
+
+    await user.selectOptions(screen.getByRole("combobox"), "sc-fiend");
+    expect(client.applyClassTransactions).toHaveBeenCalledWith("char-1", [{ type: "setSubclass", subclassId: "sc-fiend" }]);
+  });
+});
