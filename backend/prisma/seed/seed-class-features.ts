@@ -803,13 +803,13 @@ function throwSubclassPopulationFailure(failures: readonly string[]): never {
  *
  * Scoped to `prisma.subclass` rows whose `slug` is in SUBCLASSES — the seed's
  * OWN emitted set — never a bare table scan. A long-lived database can hold
- * an ORPHANED Subclass row the seed no longer produces at all (three
- * `monk-way-of-*` rows stranded by the 2024 rename to `monk-warrior-of-*`,
- * #1559 disclosure); those have zero ClassFeature rows in either edition too,
- * but they are a separate, already-disclosed bug with its own fix (remap the
- * two characters that still reference them, then delete the rows) — this
- * guard scanning every DB row would hard-fail seeding for anyone carrying
- * that orphan, bricking the seed for a bug this guard doesn't own.
+ * a Subclass row the seed no longer emits at all, for example after a rename
+ * drops the old slug outright. That row is a different problem from the one
+ * this guard checks: reportUnseededSubclassRows (seed-subclasses.ts, #1562)
+ * reports rows like that on every seed run instead. This guard scanning
+ * every DB row, instead of only the seeded ones, would hard-fail seeding for
+ * anyone carrying such a row — failing the deploy for a problem this guard
+ * doesn't own.
  *
  * Exported so a test can call it directly against a deliberately broken DB
  * state, same reasoning as assertEveryClassEditionPopulated's own JSDoc.

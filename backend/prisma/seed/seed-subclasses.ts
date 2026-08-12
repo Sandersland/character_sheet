@@ -205,6 +205,50 @@ export async function reportStrandedSubclassCharacters(prisma: PrismaClient): Pr
   );
 }
 
+// Detector for #1562: a Subclass row whose slug the seed does not emit at
+// all any more. This happens when a rename drops the old slug outright,
+// instead of just changing its edition tag (pruneStaleSubclasses above only
+// ever touches a row under a slug the seed STILL emits — see its own
+// comment). This function only reports; it never deletes anything.
+// CharacterClassEntry.subclassRef is onDelete: SetNull, so deleting one of
+// these rows would silently clear the subclass on any character still
+// pointing at it — the same reason assertNoCharactersReferenceStaleSubclasses
+// above refuses to delete a row a character references. A human reads this
+// report and decides what to do: point the affected characters at a renamed
+// replacement, clear their pick, or leave the row alone.
+export async function reportUnseededSubclassRows(
+  prisma: PrismaClient,
+  seededSlugs: readonly string[],
+): Promise<void> {
+  const orphans = await prisma.subclass.findMany({
+    where: { slug: { notIn: [...seededSlugs] } },
+    select: { id: true, slug: true, edition: true },
+  });
+  if (orphans.length === 0) return;
+
+  const referencing = await prisma.characterClassEntry.groupBy({
+    by: ["subclassId"],
+    where: { subclassId: { in: orphans.map((o) => o.id) } },
+    _count: { _all: true },
+  });
+  const countBySubclassId = countReferencingBySubclassId(referencing);
+
+  // Loud, not silent — same tone as the other reports in this file: an
+  // operator watching a deploy's seed output should see exactly which rows
+  // this is about and how many characters, if any, still point at them.
+  console.log(
+    [
+      `seedSubclasses: ${orphans.length} Subclass row(s) exist that the seed no longer emits (#1562) —`,
+      ...orphans.map(
+        (o) =>
+          `  ${o.slug} (${editionLabel(o.edition as SeedEdition | null)}): ` +
+          `${countBySubclassId.get(o.id) ?? 0} referencing CharacterClassEntry row(s)`,
+      ),
+      "This is a report only. Nothing was deleted or changed.",
+    ].join("\n"),
+  );
+}
+
 // Prune the row a subclass's edition tag CHANGE strands (Totem Warrior null
 // -> EDITION_2014, #1559): see assertNoCharactersReferenceStaleSubclasses's
 // own comment for why upsertEditionRow's create-not-update-in-place behavior
@@ -220,8 +264,8 @@ export async function reportStrandedSubclassCharacters(prisma: PrismaClient): Pr
 // that a live character's nullable subclassId FK still references; a blanket
 // sweep would delete those too — this prune only ever removes a row whose
 // OWN slug is still seeded, under an edition no longer wanted for it. A slug
-// the seed has stopped emitting altogether is untouched and left for its own
-// deliberate fix (the three orphaned monk-way-of-* rows, #1559 disclosure).
+// the seed has stopped emitting altogether is left alone here on purpose:
+// reportUnseededSubclassRows (below) reports those rows instead (#1562).
 export async function pruneStaleSubclasses(
   prisma: PrismaClient,
   seeded: readonly { slug: string; edition: SeedEdition | null }[],
@@ -289,4 +333,8 @@ export async function seedSubclasses(prisma: PrismaClient, classIds: Map<string,
     SUBCLASSES.map((s) => ({ slug: s.slug, edition: s.edition ?? null })),
   );
   await reportStrandedSubclassCharacters(prisma);
+  await reportUnseededSubclassRows(
+    prisma,
+    SUBCLASSES.map((s) => s.slug),
+  );
 }
