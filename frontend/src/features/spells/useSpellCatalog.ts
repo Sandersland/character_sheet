@@ -8,17 +8,14 @@ import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 import type { CatalogSpell } from "@/types/character";
 import type { RulesEdition } from "@character-sheet/shared-types";
 
-// `edition` is required (#1712): every caller already has the viewing
-// character's edition (or the creation draft's chosen one) in hand, so
-// threading it through here is what keeps the picker from ever offering a
-// cross-edition row.
+// `edition` is required (#1712): every caller already knows the viewing
+// character's edition, so this is what keeps the picker from ever offering a
+// spell from the other edition.
 //
-// `refreshKey` (#1787) is an opt-in manual-refetch trigger, same `unknown`
-// escape-hatch shape as SessionLog's own prop: GET /api/spells is not on
-// TanStack Query here (unlike GET /api/reference's useReferenceData), so
-// there is no query key to invalidate — a caller that just wrote a new
-// homebrew spell (AddSpellPanel, after createCustomSpell) bumps a counter to
-// force this effect to re-run instead.
+// `refreshKey` (#1787) lets a caller force a re-fetch. There is no TanStack
+// query key to invalidate here, so a caller that just wrote a new homebrew
+// spell (AddSpellPanel, after createCustomSpell) bumps a counter instead, and
+// this effect re-runs.
 export function useSpellCatalog(edition: RulesEdition, filter?: SpellCatalogFilter, refreshKey?: unknown) {
   const [catalog, setCatalog] = useState<CatalogSpell[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -36,8 +33,18 @@ export function useSpellCatalog(edition: RulesEdition, filter?: SpellCatalogFilt
   useEffect(() => {
     let mounted = true;
     fetchSpells(edition, { className, maxLevel, subclassId, characterId })
-      .then((spells) => { if (mounted) setCatalog(spells); })
-      .catch(() => { if (mounted) setError("Couldn't load spell catalog."); });
+      .then((spells) => {
+        if (!mounted) return;
+        setCatalog(spells);
+        setError(null);
+      })
+      // A re-fetch (#1840) drops the old rows on failure so the UI never
+      // shows a loaded list next to an error banner at the same time.
+      .catch(() => {
+        if (!mounted) return;
+        setError("Couldn't load spell catalog.");
+        setCatalog(null);
+      });
     return () => { mounted = false; };
   }, [edition, className, maxLevel, subclassId, characterId, refreshKey]);
 
