@@ -132,10 +132,11 @@ function SpellFetchStatus({ catalog, error, showSpinner }: { catalog: CatalogSpe
 // (`spells`, pre-search) is a resolver bug — e.g. the Eldritch Knight case:
 // "Choose N of N" against zero rows — distinct copy from an ordinary search
 // that filtered a non-empty list to zero. Suppressed while the fetch is not in
-// a trusted-loaded state — `catalog === null` (initial load) OR `error`
-// (useSpellCatalog leaves a STALE catalog in place on a failed re-fetch, so
-// error is the authoritative "don't read the pool" signal) — so an empty pool
-// never reads as misconfigured on top of SpellFetchStatus's single error line.
+// a trusted-loaded state — `catalog === null` (initial load) OR `error`. When
+// a fetch fails, useSpellCatalog sets catalog to null AND sets error, so
+// catalog === null already covers the failure case; checking error too is
+// just an extra safety check, so an empty pool never reads as misconfigured
+// on top of SpellFetchStatus's single error line.
 function SpellPoolStatus({ catalog, error, spells, filtered }: { catalog: CatalogSpell[] | null; error: string | null; spells: CatalogSpell[]; filtered: CatalogSpell[] }) {
   if (catalog === null || error) return null;
   if (spells.length === 0) {
