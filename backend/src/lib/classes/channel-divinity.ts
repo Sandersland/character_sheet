@@ -146,6 +146,43 @@ function preserveLifeHpPool(clericLevel: number): number {
   return clericLevel * 5;
 }
 
+// Invoke Duplicity's reminder text by edition. PHB'14 p.63 keeps it an Action
+// that needs Concentration. PHB'24 pp.75-76 (mirror-sourced, see
+// cleric-features.ts) makes it a Bonus Action instead, drops Concentration,
+// and lets you move the duplicate with a Bonus Action too.
+function invokeDuplicityReminder(edition: RulesEdition): string {
+  switch (edition) {
+    case "EDITION_2014":
+      return "Illusory duplicate for 1 minute (concentration); advantage vs creatures within 5 ft of it.";
+    case "EDITION_2024":
+      return "Illusory duplicate for 1 minute (no concentration); use a bonus action to move it up to 30 ft; advantage vs creatures within 5 ft of it.";
+    default: {
+      const exhaustive: never = edition;
+      throw new Error(`invokeDuplicityReminder: unhandled edition ${String(exhaustive)}`);
+    }
+  }
+}
+
+// Turn Undead's reminder text by edition. PHB'14 p.57 makes undead flee (a
+// "turned" state). SRD 5.2 p.37 (cleric-features.ts) instead gives Frightened
+// and Incapacitated, with its own early-end clause on damage. `saveDc` is
+// always a real number here (Turn Undead's kind is "announce"), but its type
+// stays nullable, so this falls back to "?" instead of ever printing the
+// word "null".
+function turnUndeadReminder(saveAbility: string | null | undefined, saveDc: number | null, edition: RulesEdition): string {
+  const dc = saveDc ?? "?";
+  switch (edition) {
+    case "EDITION_2014":
+      return `Targets make a ${saveAbility} save (DC ${dc}) or are turned for 1 minute.`;
+    case "EDITION_2024":
+      return `Targets make a ${saveAbility} save (DC ${dc}) or gain the Frightened and Incapacitated conditions for 1 minute (ends early if they take damage, you have the Incapacitated condition, or you die).`;
+    default: {
+      const exhaustive: never = edition;
+      throw new Error(`turnUndeadReminder: unhandled edition ${String(exhaustive)}`);
+    }
+  }
+}
+
 // Descriptor (shared by GET + cast summary).
 export interface ChannelDivinityDescriptor {
   id: string;
@@ -188,41 +225,11 @@ export function describeChannelDivinity(
     case "Channel Divinity: Cloak of Shadows":
       reminder = "Invisible until the end of your next turn.";
       break;
-    // #1590: PHB'14 p.63 keeps Invoke Duplicity as an Action that requires
-    // Concentration. PHB'24 pp.75-76 (mirror-sourced, cleric-features.ts)
-    // changes it to a Bonus Action, drops Concentration entirely, and lets
-    // you move the duplicate with a Bonus Action.
     case "Channel Divinity: Invoke Duplicity":
-      switch (ctx.edition) {
-        case "EDITION_2014":
-          reminder = "Illusory duplicate for 1 minute (concentration); advantage vs creatures within 5 ft of it.";
-          break;
-        case "EDITION_2024":
-          reminder =
-            "Illusory duplicate for 1 minute (no concentration); use a bonus action to move it up to 30 ft; advantage vs creatures within 5 ft of it.";
-          break;
-        default: {
-          const exhaustive: never = ctx.edition;
-          throw new Error(`describeChannelDivinity: unhandled edition ${String(exhaustive)}`);
-        }
-      }
+      reminder = invokeDuplicityReminder(ctx.edition);
       break;
-    // #1590: PHB'14 p.57 turns undead into a fleeing "turned" state. SRD 5.2
-    // p.37 (cleric-features.ts) instead gives Frightened and Incapacitated,
-    // with its own early-end clause on damage.
     case "Channel Divinity: Turn Undead":
-      switch (ctx.edition) {
-        case "EDITION_2014":
-          reminder = `Targets make a ${row.saveAbility} save (DC ${saveDc}) or are turned for 1 minute.`;
-          break;
-        case "EDITION_2024":
-          reminder = `Targets make a ${row.saveAbility} save (DC ${saveDc}) or gain the Frightened and Incapacitated conditions for 1 minute (ends early if they take damage, you have the Incapacitated condition, or you die).`;
-          break;
-        default: {
-          const exhaustive: never = ctx.edition;
-          throw new Error(`describeChannelDivinity: unhandled edition ${String(exhaustive)}`);
-        }
-      }
+      reminder = turnUndeadReminder(row.saveAbility, saveDc, ctx.edition);
       break;
     // #1229 follow-on 2: without its own arm, this reminder-kind row (no
     // saveAbility) would fall to the default branch's `saveDc !== null &&

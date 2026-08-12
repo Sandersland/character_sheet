@@ -424,7 +424,7 @@ describe("Channel Divinity cast endpoint", () => {
     expect(res.body.error).toMatch(/life domain/i);
   });
 
-  it("rejects an oath option below the granting level (Cloak of Shadows needs L6)", async () => {
+  it("rejects a domain option below the granting level (Cloak of Shadows needs L6)", async () => {
     // #1590: Cloak of Shadows is EDITION_2014-only — see the fixture above.
     await createCharacter(XP_L3, "cleric", "trickery domain", "EDITION_2014");
     const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Cloak of Shadows::EDITION_2014"] }]);
