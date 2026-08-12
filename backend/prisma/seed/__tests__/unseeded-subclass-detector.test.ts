@@ -1,11 +1,10 @@
-// #1562's seed-time detector: reportUnseededSubclassRows (seed-subclasses.ts)
-// reports (never deletes) a Subclass row whose slug the seed no longer
-// emits at all — for example after a rename drops the old slug outright,
-// rather than just changing which edition it is tagged for.
-// pruneStaleSubclasses only ever removes a row under a slug the seed STILL
-// emits (see its own comment), so a row like this survives every seed run
-// until a human decides what to do with it and any characters that still
-// reference it.
+// #1562's seed-time detector: reportUnseededSubclassRows reports (never
+// deletes) a Subclass row whose slug the seed no longer emits at all — for
+// example after a rename drops the old slug outright, rather than just
+// changing which edition it is tagged for. pruneStaleSubclasses only ever
+// removes a row under a slug the seed STILL emits (see its own comment), so
+// a row like this survives every seed run until a human decides what to do
+// with it and any characters that still reference it.
 //
 // Uses this vitest worker's own isolated test database (never the dev
 // database) — every fixture row below uses a class name/slug unique to this
@@ -99,7 +98,12 @@ describe("reportUnseededSubclassRows (#1562)", () => {
     logSpy.mockRestore();
   });
 
-  it("logs nothing when every Subclass row's slug is still seeded", async () => {
+  it("does not name this fixture's own row when its slug is still seeded", async () => {
+    // Not asserting total silence: this detector scans the WHOLE Subclass
+    // table, so a real, pre-existing orphan row on a long-lived database
+    // would also make it log here, and that is not this test's concern.
+    // What this test pins is narrower: THIS fixture's own row, once its slug
+    // is in the seeded list, must never be named in the report.
     const classId = await ensureFixtureClass();
     await prisma.subclass.create({
       data: { classId, name: "Fixture Still Seeded", description: "still seeded", slug: SEEDED_SLUG, edition: "EDITION_2014" },
@@ -107,7 +111,8 @@ describe("reportUnseededSubclassRows (#1562)", () => {
 
     await reportUnseededSubclassRows(prisma, [...REAL_SEEDED_SLUGS, SEEDED_SLUG]);
 
-    expect(logSpy).not.toHaveBeenCalled();
+    const messages = logSpy.mock.calls.map((call) => call[0] as string);
+    expect(messages.join("\n")).not.toContain(SEEDED_SLUG);
   });
 
   it("reports an orphan row's slug and edition, and does not delete it", async () => {

@@ -265,7 +265,7 @@ export async function reportUnseededSubclassRows(
 // sweep would delete those too — this prune only ever removes a row whose
 // OWN slug is still seeded, under an edition no longer wanted for it. A slug
 // the seed has stopped emitting altogether is left alone here on purpose:
-// reportUnseededSubclassRows (below) reports those rows instead (#1562).
+// reportUnseededSubclassRows (above) reports those rows instead (#1562).
 export async function pruneStaleSubclasses(
   prisma: PrismaClient,
   seeded: readonly { slug: string; edition: SeedEdition | null }[],
@@ -328,13 +328,11 @@ export async function seedSubclasses(prisma: PrismaClient, classIds: Map<string,
       { classId, name: sub.name, description: sub.description, casterFraction, spellcastingAbility },
     );
   }
-  await pruneStaleSubclasses(
-    prisma,
-    SUBCLASSES.map((s) => ({ slug: s.slug, edition: s.edition ?? null })),
-  );
+  const seededSubclasses = SUBCLASSES.map((s) => ({ slug: s.slug, edition: s.edition ?? null }));
+  await pruneStaleSubclasses(prisma, seededSubclasses);
   await reportStrandedSubclassCharacters(prisma);
   await reportUnseededSubclassRows(
     prisma,
-    SUBCLASSES.map((s) => s.slug),
+    seededSubclasses.map((s) => s.slug),
   );
 }

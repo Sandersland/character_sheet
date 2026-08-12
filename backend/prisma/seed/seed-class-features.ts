@@ -805,8 +805,8 @@ function throwSubclassPopulationFailure(failures: readonly string[]): never {
  * OWN emitted set — never a bare table scan. A long-lived database can hold
  * a Subclass row the seed no longer emits at all, for example after a rename
  * drops the old slug outright. That row is a different problem from the one
- * this guard checks: reportUnseededSubclassRows (seed-subclasses.ts, #1562)
- * reports rows like that on every seed run instead. This guard scanning
+ * this guard checks: reportUnseededSubclassRows (#1562) reports rows like
+ * that on every seed run instead. This guard scanning
  * every DB row, instead of only the seeded ones, would hard-fail seeding for
  * anyone carrying such a row — failing the deploy for a problem this guard
  * doesn't own.
