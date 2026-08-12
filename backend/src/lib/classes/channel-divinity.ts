@@ -41,8 +41,19 @@ export type ChannelDivinityKind = "announce" | "buff" | "advantage" | "invisible
 interface ChannelDivinityGate {
   className: "cleric" | "paladin";
   subclass?: string; // lowercase; absent = any subclass of that class
-  minLevel: number;  // class level at which the option is granted
+  // The class level at which the option is granted. Most options grant at the
+  // same level in both editions and use a plain number. A few grant at
+  // different levels per edition (Preserve Life, Invoke Duplicity) and use a
+  // Record naming both editions' levels instead — see minLevelFor below.
+  minLevel: number | Record<RulesEdition, number>;
   kind: ChannelDivinityKind;
+}
+
+// Reads a gate's minLevel for one edition. Most gates set a plain number
+// (the same level in both editions); only a gate whose grant level actually
+// differs sets the Record form.
+function minLevelFor(gate: ChannelDivinityGate, edition: RulesEdition): number {
+  return typeof gate.minLevel === "number" ? gate.minLevel : gate.minLevel[edition];
 }
 
 // Gate + kind per option, keyed by the catalog row name. Rows themselves carry
@@ -59,9 +70,29 @@ interface ChannelDivinityGate {
 // (no `subclass` — every 2024 Paladin regardless of oath), added below.
 export const CHANNEL_DIVINITY_OPTIONS: Record<string, ChannelDivinityGate> = {
   "Channel Divinity: Turn Undead": { className: "cleric", minLevel: 2, kind: "announce" },
-  // SRD 5.2: domain Channel Divinity options unlock with the level-3 subclass grant (#1128).
-  "Channel Divinity: Preserve Life": { className: "cleric", subclass: "life domain", minLevel: 3, kind: "reminder" },
-  "Channel Divinity: Invoke Duplicity": { className: "cleric", subclass: "trickery domain", minLevel: 3, kind: "reminder" },
+  // #1590: the domain Channel Divinity options grant at DIFFERENT levels per
+  // edition — PHB'14 p.59/p.63 grants both at level 2, alongside Channel
+  // Divinity itself; SRD 5.2 p.40 shifts both to level 3, alongside the
+  // subclass grant (#1128 only recorded the 2024 level, which wrongly held a
+  // 2014 Cleric to level 3 too).
+  "Channel Divinity: Preserve Life": {
+    className: "cleric",
+    subclass: "life domain",
+    minLevel: { EDITION_2014: 2, EDITION_2024: 3 },
+    kind: "reminder",
+  },
+  "Channel Divinity: Invoke Duplicity": {
+    className: "cleric",
+    subclass: "trickery domain",
+    minLevel: { EDITION_2014: 2, EDITION_2024: 3 },
+    kind: "reminder",
+  },
+  // #1590: this option is only in PHB'14 p.63. SRD 5.2 drops it and replaces
+  // it with Trickster's Transposition (cleric-features.ts). The catalog row
+  // is now tagged EDITION_2014 (prisma/seed/channel-divinity.ts), so a 2024
+  // character's list query already excludes it before this gate is ever
+  // read — the same pattern as Turn the Unholy/Turn the Faithless/Abjure
+  // Enemy above.
   "Channel Divinity: Cloak of Shadows": { className: "cleric", subclass: "trickery domain", minLevel: 6, kind: "invisible" },
   "Channel Divinity: Sacred Weapon": { className: "paladin", subclass: "oath of devotion", minLevel: 3, kind: "buff" },
   "Channel Divinity: Turn the Unholy": { className: "paladin", subclass: "oath of devotion", minLevel: 3, kind: "announce" },
@@ -91,8 +122,8 @@ export interface GateEntry {
 // gate level is the character's total level from XP — the same single-class-
 // primary assumption deriveResources uses (persisted classEntry.level is a
 // multiclass hint, not maintained from XP, so it isn't trusted here).
-export function isEntitled(gate: ChannelDivinityGate, entries: GateEntry[], characterLevel: number): boolean {
-  if (characterLevel < gate.minLevel) return false;
+export function isEntitled(gate: ChannelDivinityGate, entries: GateEntry[], characterLevel: number, edition: RulesEdition): boolean {
+  if (characterLevel < minLevelFor(gate, edition)) return false;
   return entries.some((e) => {
     if (e.name.toLowerCase() !== gate.className) return false;
     return !gate.subclass || (e.subclass ?? "").toLowerCase() === gate.subclass;
@@ -130,6 +161,7 @@ interface DescribeContext {
   abilityScores: Record<string, number>;
   profBonus: number;
   classLevel: number; // level of the granting class (for derived numbers)
+  edition: RulesEdition;
 }
 
 // Build the human descriptor for an option: the save DC (announce), the derived
@@ -156,8 +188,41 @@ export function describeChannelDivinity(
     case "Channel Divinity: Cloak of Shadows":
       reminder = "Invisible until the end of your next turn.";
       break;
+    // #1590: PHB'14 p.63 keeps Invoke Duplicity as an Action that requires
+    // Concentration. PHB'24 pp.75-76 (mirror-sourced, cleric-features.ts)
+    // changes it to a Bonus Action, drops Concentration entirely, and lets
+    // you move the duplicate with a Bonus Action.
     case "Channel Divinity: Invoke Duplicity":
-      reminder = "Illusory duplicate for 1 minute (concentration); advantage vs creatures within 5 ft of it.";
+      switch (ctx.edition) {
+        case "EDITION_2014":
+          reminder = "Illusory duplicate for 1 minute (concentration); advantage vs creatures within 5 ft of it.";
+          break;
+        case "EDITION_2024":
+          reminder =
+            "Illusory duplicate for 1 minute (no concentration); use a bonus action to move it up to 30 ft; advantage vs creatures within 5 ft of it.";
+          break;
+        default: {
+          const exhaustive: never = ctx.edition;
+          throw new Error(`describeChannelDivinity: unhandled edition ${String(exhaustive)}`);
+        }
+      }
+      break;
+    // #1590: PHB'14 p.57 turns undead into a fleeing "turned" state. SRD 5.2
+    // p.37 (cleric-features.ts) instead gives Frightened and Incapacitated,
+    // with its own early-end clause on damage.
+    case "Channel Divinity: Turn Undead":
+      switch (ctx.edition) {
+        case "EDITION_2014":
+          reminder = `Targets make a ${row.saveAbility} save (DC ${saveDc}) or are turned for 1 minute.`;
+          break;
+        case "EDITION_2024":
+          reminder = `Targets make a ${row.saveAbility} save (DC ${saveDc}) or gain the Frightened and Incapacitated conditions for 1 minute (ends early if they take damage, you have the Incapacitated condition, or you die).`;
+          break;
+        default: {
+          const exhaustive: never = ctx.edition;
+          throw new Error(`describeChannelDivinity: unhandled edition ${String(exhaustive)}`);
+        }
+      }
       break;
     // #1229 follow-on 2: without its own arm, this reminder-kind row (no
     // saveAbility) would fall to the default branch's `saveDc !== null &&
@@ -248,9 +313,9 @@ async function resolveChannelDivinityCast(
   if (!gate) {
     throw new InvalidChannelDivinityOperationError(`Unknown Channel Divinity option: ${catalog.name}`);
   }
-  if (!isEntitled(gate, ctx.entries, ctx.level)) {
+  if (!isEntitled(gate, ctx.entries, ctx.level, ctx.edition)) {
     throw new InvalidChannelDivinityOperationError(
-      `Not entitled to ${catalog.name} (requires ${gate.className}${gate.subclass ? ` — ${gate.subclass}` : ""} level ${gate.minLevel})`,
+      `Not entitled to ${catalog.name} (requires ${gate.className}${gate.subclass ? ` — ${gate.subclass}` : ""} level ${minLevelFor(gate, ctx.edition)})`,
     );
   }
 
@@ -264,6 +329,7 @@ async function resolveChannelDivinityCast(
     abilityScores: ctx.abilityScores,
     profBonus: ctx.profBonus,
     classLevel: ctx.level,
+    edition: ctx.edition,
   });
 
   return { catalog, gate, cost, descriptor };
