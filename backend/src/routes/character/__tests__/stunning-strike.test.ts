@@ -15,6 +15,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { readPinnedEvents } from "@/test-support/events.js";
 import { authCookie } from "@/test-support/auth.js";
+import { STUNNING_STRIKE_LEVEL } from "@/lib/classes/stunning-strike.js";
 
 const OWNER_ID = "owner-stunning-strike";
 let COOKIE: string;
@@ -101,7 +102,7 @@ describe("POST /api/characters/:id/abilities/stunning-strike/transactions", () =
     expect(res.status).toBe(200);
     const { roll, outcome, summary } = res.body.results[0];
     const noResourcesUsed = {
-      resources: { used: {}, maneuversKnown: [], toolProficienciesKnown: [], choicesKnown: {}, advancements: [] },
+      resources: { used: {}, maneuversKnown: [], toolProficienciesKnown: [], expertiseKnown: [], choicesKnown: {}, advancements: [] },
     };
 
     expect(await readPinnedEvents(FIXTURE_ID)).toEqual([
@@ -275,5 +276,63 @@ describe("Stunning Strike for a non-monk", () => {
       .send({ operations: [{ type: "attemptStunningStrike", usedThisTurn: false }] });
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/monk/i);
+  });
+});
+
+// #1337: hasStunningStrike is the single source of the L5 gate — both the
+// serialized rider and this route's cast guard read it. Proven with a
+// Fighter/Monk multiclass, where the monk class ENTRY's own level (not the
+// derived total character level) decides the gate.
+describe("Stunning Strike multiclass entry-scoping (#1337)", () => {
+  const MULTICLASS_ID = "test-stunning-strike-multiclass-1";
+  const multiclassUrl = `/api/characters/${MULTICLASS_ID}/abilities/stunning-strike/transactions`;
+
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { id: MULTICLASS_ID } });
+  });
+
+  async function createFighterMonk(monkLevel: number) {
+    await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
+    await prisma.character.create({
+      data: {
+        ...FIXTURE_BASE,
+        id: MULTICLASS_ID,
+        ownerId: OWNER_ID,
+        experiencePoints: 64000, // total level 10 (fighter 5 + monk 4 or 5), proficiency +4
+        classEntries: {
+          create: [
+            { name: "fighter", position: 0, level: 5 },
+            { name: "monk", position: 1, level: monkLevel },
+          ],
+        },
+      },
+    });
+  }
+
+  it("Fighter 5 / Monk below the gate: no Stunning Strike rider, and the guard rejects", async () => {
+    await createFighterMonk(STUNNING_STRIKE_LEVEL - 1);
+
+    const character = await agent().get(`/api/characters/${MULTICLASS_ID}`);
+    expect(character.body).not.toHaveProperty("stunningStrike");
+
+    const guard = await agent()
+      .post(multiclassUrl)
+      .send({ operations: [{ type: "attemptStunningStrike", usedThisTurn: false }] });
+    expect(guard.status).toBe(400);
+    expect(guard.body.error).toMatch(/monk/i);
+  });
+
+  it("Fighter 5 / Monk at the gate: the Stunning Strike rider is present, and the guard admits", async () => {
+    await createFighterMonk(STUNNING_STRIKE_LEVEL);
+
+    const character = await agent().get(`/api/characters/${MULTICLASS_ID}`);
+    expect(character.body).toHaveProperty("stunningStrike");
+
+    const guard = await agent()
+      .post(multiclassUrl)
+      .send({ operations: [{ type: "attemptStunningStrike", usedThisTurn: false }] });
+    expect(guard.status).toBe(200);
+    expect(guard.body.character).toHaveProperty("stunningStrike");
   });
 });

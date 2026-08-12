@@ -8,7 +8,10 @@
 // at the caller (`entry.class?.… ?? …`), which is the base schedule / never
 // granted / no prerequisite — by FK, not by name (fixes #1388's class half).
 
+import type { RulesEdition } from "@character-sheet/shared-types";
+
 import { effectiveEntryLevel } from "@/lib/leveling/effective-levels.js";
+import { resolveSubclassSlug, type SubclassIdentityInput, type SubclassSlug } from "@/lib/classes/subclass-slug.js";
 
 const BASE_ASI_LEVELS = [4, 8, 12, 16, 19];
 
@@ -21,37 +24,107 @@ export function advancementSlotsForLevel(extraAsiLevels: readonly number[], leve
   return [...BASE_ASI_LEVELS, ...extraAsiLevels].filter((l) => level >= l).length;
 }
 
+// SRD 5.2 p.82 / PHB'14 p.72: the Champion's Additional Fighting Style grants a
+// SECOND Fighting Style feat slot — level 7 in 2024 (Remarkable Athlete moved
+// to 3, Heroic Warrior lands at 10) vs level 10 in 2014 (Remarkable Athlete is
+// at 7) — the grant level forks by edition even though the feature exists in
+// both (#1148, re-derived from both PHB tables in the issue thread). One
+// function, `edition` last, `switch` + `assertNever` default — the
+// subclassGateLevel pattern (#1499/#1527).
+function championAdditionalFightingStyleLevel(edition: RulesEdition): number {
+  switch (edition) {
+    case "EDITION_2024":
+      return 7;
+    case "EDITION_2014":
+      return 10;
+    default: {
+      const exhaustive: never = edition;
+      throw new Error(`championAdditionalFightingStyleLevel: unhandled edition ${String(exhaustive)}`);
+    }
+  }
+}
+
 // SRD 5.2: the Fighting Style feature grants a Fighting Style feat — Fighter at
 // level 1, Paladin and Ranger at level 2 (CharacterClass.fightingStyleFeatLevel,
-// #1529); `null` means the class never grants one. Champion's second style at
-// L7 is a follow-up (#1148): add a `subclass` param here and one subclass-keyed
-// branch.
-export function fightingStyleFeatSlots(fightingStyleFeatLevel: number | null | undefined, level: number): number {
-  return fightingStyleFeatLevel != null && level >= fightingStyleFeatLevel ? 1 : 0;
+// #1529); `null` means the class never grants one. `subclass` is the resolved
+// SUBCLASS_SLUGS identity (resolveSubclassSlug, #1277) — a raw display-name
+// string is never accepted here — and only "fighter-champion" adds the #1148
+// second slot; every other subclass (including `undefined`, homebrew, or an
+// off-slug fighter subclass) leaves the base grant untouched.
+export function fightingStyleFeatSlots(
+  fightingStyleFeatLevel: number | null | undefined,
+  level: number,
+  subclass: SubclassSlug | undefined,
+  edition: RulesEdition,
+): number {
+  const base = fightingStyleFeatLevel != null && level >= fightingStyleFeatLevel ? 1 : 0;
+  const championExtra = subclass === "fighter-champion" && level >= championAdditionalFightingStyleLevel(edition) ? 1 : 0;
+  return base + championExtra;
 }
 
-// The minimal per-entry shape characterFightingStyleFeatSlots needs — a class
-// relation carrying just the grant level, `?? null` when the entry is homebrew
-// (CharacterClassEntry.classId is nullable by design, #1529).
-interface FightingStyleGatedEntry {
+// The minimal per-entry shape the Fighting Style feat-slot/grant-name
+// functions need — `subclass`/`subclassRef` feed resolveSubclassSlug
+// (Champion's Additional Fighting Style, #1148), `class.name` is the
+// CANONICAL catalog class name (#1495 — never CharacterClassEntry's own
+// `name` column, a free-to-diverge display name), and `class` is `null`/its
+// fields are absent when the entry is homebrew (CharacterClassEntry.classId
+// is nullable by design, #1529).
+interface FightingStyleGatedEntry extends SubclassIdentityInput {
   level: number;
-  class: { fightingStyleFeatLevel: number | null } | null;
+  class: { name: string; fightingStyleFeatLevel: number | null } | null;
 }
 
-// Total Fighting Style feat entitlement across every class entry, each judged at
-// its own effective class level (#1065: a wizard/Fighter multiclass IS entitled
-// via the Fighter entry). The single shared rule for the takeFeat slot channel,
-// reconcileAdvancements' fs partition, and the serializeCharacter fightingStyleSlots
-// read — never inline a per-entry copy at those sites.
+// The ONE per-entry Fighting Style feat-slot evaluation — resolves the
+// entry's subclass identity and its class's grant level, both at the entry's
+// own effective level (#1065: a Wizard4/Fighter1 multiclass IS entitled via
+// the Fighter entry). characterFightingStyleFeatSlots (sum) and
+// fightingStyleGrantingClassNames (filter > 0) below BOTH route through this
+// — a #1495 review finding: the predicate used to be copy-pasted between the
+// two call sites, which is exactly the two-inline-copies drift CLAUDE.md's
+// level-gated-state rule exists to prevent (and here it's a #1148
+// side-effect: adding the subclass/edition fork gave the duplication a real
+// chance to disagree).
+function fightingStyleFeatSlotsForEntry(
+  entry: FightingStyleGatedEntry,
+  entryCount: number,
+  derivedLevel: number,
+  edition: RulesEdition,
+): number {
+  const subclass = entry.class ? resolveSubclassSlug(entry.class.name, entry) : undefined;
+  return fightingStyleFeatSlots(
+    entry.class?.fightingStyleFeatLevel ?? null,
+    effectiveEntryLevel(entry.level, entryCount, derivedLevel),
+    subclass,
+    edition,
+  );
+}
+
+// Total Fighting Style feat entitlement across every class entry. The single
+// shared rule for the takeFeat slot channel, reconcileAdvancements' fs
+// partition, and the serializeCharacter fightingStyleSlots read — never
+// inline a per-entry copy at those sites.
 export function characterFightingStyleFeatSlots(
   entries: readonly FightingStyleGatedEntry[],
   derivedLevel: number,
+  edition: RulesEdition,
 ): number {
-  return entries.reduce(
-    (sum, e) =>
-      sum + fightingStyleFeatSlots(e.class?.fightingStyleFeatLevel ?? null, effectiveEntryLevel(e.level, entries.length, derivedLevel)),
-    0,
-  );
+  return entries.reduce((sum, e) => sum + fightingStyleFeatSlotsForEntry(e, entries.length, derivedLevel, edition), 0);
+}
+
+// The class NAMES that have actually earned the Fighting Style feature at
+// `derivedLevel` (#1495) — the offered-style union's input
+// (fightingStyleFeatOfferedForClasses, lib/srd/feats.ts). Same per-entry
+// evaluation as characterFightingStyleFeatSlots above (fightingStyleFeatSlotsForEntry)
+// — never re-derive it at a call site — but returns the granting class NAMES
+// instead of a slot count.
+export function fightingStyleGrantingClassNames(
+  entries: readonly FightingStyleGatedEntry[],
+  derivedLevel: number,
+  edition: RulesEdition,
+): string[] {
+  return entries
+    .filter((e) => e.class != null && fightingStyleFeatSlotsForEntry(e, entries.length, derivedLevel, edition) > 0)
+    .map((e) => e.class!.name);
 }
 
 // The minimal per-entry shape characterAdvancementSlots needs.

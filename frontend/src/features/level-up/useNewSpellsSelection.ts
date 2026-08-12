@@ -28,11 +28,18 @@ export interface NewSpellsSelection {
   casterModel: "known" | "prepared" | null;
   /** #1631: leveled-pick ids the subclass's list-expansion admits, alongside spellLists. */
   expandedSpellIds: string[];
+  /** #1855: the Eldritch Knight (2014) leveled-spell school gate (null = unrestricted). */
+  spellSchools: string[] | null;
+  /** #1855: how many of this level-up's leveled picks may ignore spellSchools. */
+  freeSchoolPicks: number;
 }
 
 export function useNewSpellsSelection(step: LevelUpStep): NewSpellsSelection {
   const { draft, setDraft } = useLevelUpStepContext();
-  const { count, maxSpellLevel, magicalSecrets, canSwap, cantrips, spellLists, cantripLists, casterModel, expandedSpellIds } = readNewSpellsMeta(step);
+  const {
+    count, maxSpellLevel, magicalSecrets, canSwap, cantrips, spellLists, cantripLists, casterModel, expandedSpellIds,
+    spellSchools, freeSchoolPicks,
+  } = readNewSpellsMeta(step);
   const selectedIds = selectedSpellIds(draft.spellsLearned);
   const cantripSelectedIds = selectedSpellIds(draft.cantripsLearned);
   const forgottenEntryId = draft.spellsForgotten?.[0]?.entryId ?? null;
@@ -62,5 +69,6 @@ export function useNewSpellsSelection(step: LevelUpStep): NewSpellsSelection {
     selectedIds, forgottenEntryId, toggle, toggleForget,
     cantrips, cantripSelectedIds, toggleCantrip,
     spellLists, cantripLists, casterModel, expandedSpellIds,
+    spellSchools, freeSchoolPicks,
   };
 }

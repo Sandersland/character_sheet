@@ -1,4 +1,5 @@
 import type { SeedEdition } from "./edition.js";
+import { ALL_RULES_EDITIONS } from "../../src/lib/rules/edition.js";
 
 // Builds a `deleteMany`/`findMany` where-clause matching every catalog row
 // whose (identity, edition) pair isn't in the currently-seeded set (#1306): a
@@ -31,16 +32,22 @@ import type { SeedEdition } from "./edition.js";
 // #1306's own migration, so a divergent row CAN exist in each and the
 // partitioning stopped being a no-op.
 //
-// A caller passing only `edition: null` entries gives the 2014/2024 partitions
-// an empty `notIn: []`, which matches EVERY row in them — correct for a source
-// that authors no forked content, fatal for one that does. So a source gaining
-// forked rows must thread their editions into `seeded` in the same change.
+// A caller passing only `edition: null` entries gives every non-null edition
+// partition an empty `notIn: []`, which matches EVERY row in them — correct
+// for a source that authors no forked content, fatal for one that does. So a
+// source gaining forked rows must thread their editions into `seeded` in the
+// same change.
 export function staleCatalogRowsWhere(
   identityColumn: "name" | "key" | "slug",
   seeded: readonly { identity: string; edition: SeedEdition | null }[],
   extraWhere: object = {},
 ) {
-  const editions: (SeedEdition | null)[] = [null, "EDITION_2014", "EDITION_2024"];
+  // Reads ALL_RULES_EDITIONS rather than a hardcoded literal (#1527) — a
+  // third edition added there is automatically partitioned and pruned here
+  // too; before this change it silently fell outside every branch, so its
+  // stale rows were never pruned (the one #1527 site with real data
+  // consequences, not just a compile-time gap).
+  const editions: (SeedEdition | null)[] = [null, ...ALL_RULES_EDITIONS];
   // Three explicit branches rather than a computed key: a computed key would
   // give the clause an index signature, which no Prisma WhereInput accepts.
   // Exhaustive by `never` rather than a fall-through `return`: widening the

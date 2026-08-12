@@ -18,6 +18,7 @@ function item(overrides: Partial<InventoryItem> = {}): InventoryItem {
     quantity: 1,
     equipped: false,
     attuned: false,
+    weaponBonded: false,
     requiresAttunement: false,
     equippable: false,
     allowedSlots: [],

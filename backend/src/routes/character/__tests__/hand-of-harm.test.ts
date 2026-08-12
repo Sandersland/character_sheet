@@ -99,7 +99,7 @@ describe("POST /api/characters/:id/abilities/hand-of-harm/transactions", () => {
     expect(res.status).toBe(200);
 
     const noResourcesUsed = {
-      resources: { used: {}, maneuversKnown: [], toolProficienciesKnown: [], choicesKnown: {}, advancements: [] },
+      resources: { used: {}, maneuversKnown: [], toolProficienciesKnown: [], expertiseKnown: [], choicesKnown: {}, advancements: [] },
     };
 
     expect(await readPinnedEvents(FIXTURE_ID)).toEqual([

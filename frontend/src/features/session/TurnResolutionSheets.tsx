@@ -17,6 +17,7 @@ import SongOfDefenseInput from "@/features/session/SongOfDefenseInput";
 import type { ActiveResolution } from "@/features/session/useActiveResolution";
 import type { LoadoutSwapControls } from "@/features/session/useLoadoutSwap";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
+import { useTurnStateContext } from "@/features/session/TurnStateProvider";
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { AllyOption } from "@/lib/spellMeta";
 
@@ -104,14 +105,12 @@ function LoadoutResolutionSheet({
 }
 
 function AttackResolutionSheet({
-  sessionId,
   turnState,
   closeResolution,
   setShowActionMenu,
   onLogChanged,
 }: Pick<
   TurnResolutionSheetsProps,
-  | "sessionId"
   | "turnState"
   | "closeResolution"
   | "setShowActionMenu"
@@ -130,7 +129,6 @@ function AttackResolutionSheet({
     <BottomSheet title="Attack" subtitle={attackKicker(turnState.attack)} wide onClose={closeAttackSheet}>
       <InlineAttackPicker
         turnState={turnState}
-        sessionId={sessionId}
         onClose={closeAttackSheet}
         onCancel={() => {
           turnState.cancelAttack();
@@ -144,7 +142,6 @@ function AttackResolutionSheet({
 }
 
 function TwfResolutionSheet({
-  sessionId,
   turnState,
   activeResolution,
   closeResolution,
@@ -152,7 +149,6 @@ function TwfResolutionSheet({
   onLogChanged,
 }: Pick<
   TurnResolutionSheetsProps,
-  | "sessionId"
   | "turnState"
   | "activeResolution"
   | "closeResolution"
@@ -175,7 +171,6 @@ function TwfResolutionSheet({
     >
       <InlineOffHandPicker
         turnState={turnState}
-        sessionId={sessionId}
         variant={isUnarmed ? "unarmed" : "twf"}
         onClose={closeResolution}
         onCancel={() => {
@@ -200,7 +195,6 @@ function TwfResolutionSheet({
 // generic click path uses elsewhere, just wired as InlineFlurryPicker's
 // onCommitFocusSpend so a pre-roll cancel truly costs nothing.
 function FlurryResolutionSheet({
-  sessionId,
   turnState,
   closeResolution,
   setShowBonusMenu,
@@ -208,7 +202,6 @@ function FlurryResolutionSheet({
   send,
 }: Pick<
   TurnResolutionSheetsProps,
-  | "sessionId"
   | "turnState"
   | "closeResolution"
   | "setShowBonusMenu"
@@ -233,7 +226,6 @@ function FlurryResolutionSheet({
     >
       <InlineFlurryPicker
         turnState={turnState}
-        sessionId={sessionId}
         onClose={closeFlurrySheet}
         onCancel={() => {
           turnState.cancelFlurry();
@@ -331,10 +323,18 @@ function SpellResolutionSheet({
         ? !turnState.bonusActionUsed
         : !turnState.reactionUsed;
 
-  const onCommitSlot = (spellLevel: number) => {
-    if (slot === "action") turnState.commitActionSpell(spellLevel);
-    else if (slot === "bonusAction") turnState.commitBonusActionSpell(spellLevel);
+  // refreshCombat lives on the turn-state context (not the reducer, which can't
+  // fetch) — pull it here so a successful cast re-reads the server-resolved
+  // interlock immediately (#1439), rather than waiting for the ~5s poll.
+  const refreshCombat = useTurnStateContext()?.refreshCombat;
+
+  const onCommitSlot = () => {
+    if (slot === "action") turnState.commitActionSpell();
+    else if (slot === "bonusAction") turnState.commitBonusActionSpell();
     else turnState.commitReactionSpell();
+    // The cast recorded its interlock kind server-side (resolveAction, #1439);
+    // pull the resolved flags now so the block shows without a poll wait.
+    void refreshCombat?.();
   };
 
   return (
@@ -346,7 +346,7 @@ function SpellResolutionSheet({
         slot={slot}
         slotAvailable={slotAvailable}
         onCommitSlot={onCommitSlot}
-        spellCastThisTurn={turnState.spellCastThisTurn}
+        spellEconomy={turnState.spellEconomy}
         allies={allies}
         castingTimeFilter={SPELL_CASTING_TIME[slot]}
         focusSpellId={focusSpellId}

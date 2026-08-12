@@ -4,6 +4,7 @@ import { bard } from "@/lib/classes/bard.js";
 import { deriveResources } from "@/lib/classes/class-features.js";
 import { testFeatureRowsFor } from "@/lib/classes/__tests__/test-feature-rows.fixture.js";
 import { deriveSpellcasting, type DerivedSpellcastingInfo } from "@/lib/srd/srd.js";
+import { ELDRITCH_KNIGHT, ARCANE_TRICKSTER } from "./third-caster.fixture.js";
 
 // Ability scores with distinct INT/WIS/CHA mods so tests can assert the right
 // governing ability is used: INT 12 (+1), WIS 14 (+2), CHA 16 (+3).
@@ -77,11 +78,11 @@ describe("deriveResources — Battle Master subclass gating", () => {
     expect(poolKeys).not.toContain("superiorityDice");
   });
 
-  it("sets maneuverChoiceCount and maneuverSaveDC at level 3", () => {
+  it("sets maneuverChoiceCount and announcedSaveDC at level 3", () => {
     const result = deriveResources("fighter", "battle master", 3, ABILITY_SCORES, PROF_2, testFeatureRowsFor("fighter", "battle master"), "EDITION_2024");
     expect(result!.maneuverChoiceCount).toBe(3);
     // STR mod +3, DEX mod 0, prof 2 → DC = 8 + 2 + 3 = 13
-    expect(result!.maneuverSaveDC).toBe(13);
+    expect(result!.announcedSaveDC).toBe(13);
     expect(result!.toolProfChoiceCount).toBe(1);
   });
 });
@@ -714,14 +715,14 @@ describe("deriveSpellcasting — Mystic Arcanum", () => {
 // ── deriveSpellcasting — third-caster subclasses (regression) ─────────────────
 
 describe("deriveSpellcasting — third casters", () => {
-  it("derives Eldritch Knight slots at level 3 (INT-based, no arcanum)", () => {
-    const info = deriveSpellcasting("fighter", 3, CASTER_SCORES, PROF_2, "Eldritch Knight", "EDITION_2024")!;
+  it("derives Eldritch Knight slots at level 3 (INT-based, no arcanum), resolved off subclassRef", () => {
+    const info = deriveSpellcasting("fighter", 3, CASTER_SCORES, PROF_2, ELDRITCH_KNIGHT, "EDITION_2024")!;
     expect(info.ability).toBe("intelligence");
     expect(slotMap(info)).toEqual({ 1: 2 });
     expect(info.arcana).toEqual([]);
   });
 
   it("returns null for an Arcane Trickster below level 3", () => {
-    expect(deriveSpellcasting("rogue", 2, CASTER_SCORES, PROF_2, "Arcane Trickster", "EDITION_2024")).toBeNull();
+    expect(deriveSpellcasting("rogue", 2, CASTER_SCORES, PROF_2, ARCANE_TRICKSTER, "EDITION_2024")).toBeNull();
   });
 });

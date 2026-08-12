@@ -49,21 +49,28 @@
 // `Impostor` and 2014's `Steady Aim`-adjacent speed clause — see that row's
 // own comment) — it never edits a 2014 row's own name/level/description.
 //
-// Rogue authors NO descriptor columns (resourceKey/derivedStat/
-// saveDcAbilities/...) here — RawRogueFeature deliberately carries only the
-// identity fields. Rogue has no resource pool in either edition (Sneak
-// Attack's Nd6 is a computed rule function off the class entry's own level,
-// never a persisted pool — see sneak-attack.ts), and Cunning Strike's
-// announced save DC (base L5) is stated as SRD prose instead of
-// `saveDcAbilities`: `deriveRowExtras` (registry.ts) reads only
-// `subclassRows`, so a base-class row declaring the column would be silently
-// inert, and the column's only sink (`ClassExtras.maneuverSaveDC` ->
-// `ManeuversSection`, gated on `maneuverChoiceCount`) is never set by a
-// Rogue. The Cunning Strike EFFECT CATALOG (dice-spend + enemy-targeted save
-// effects) is a subsystem this issue does not build — #1138-adjacent
-// follow-up, analogous to Battle Master maneuvers; every Cunning-Strike-
-// related row below is descriptive text only, matching Barbarian's Brutal
-// Strike precedent.
+// Rogue authors NO resource/activation descriptor columns (resourceKey/
+// saveDcAbilities/...) here — Rogue has no resource pool in either edition
+// (Sneak Attack's Nd6 is a computed rule function off the class entry's own
+// level, never a persisted pool — see sneak-attack.ts). RawRogueFeature DOES
+// carry the derivedStat/derivedStatTiers pair (#1588: the base-class
+// Expertise row's pick-count ladder) — the same mechanism #1530/#1546
+// already use on Fighter/Bard/Ranger/Wizard. Cunning Strike's announced save
+// DC (base L5) is stated as SRD prose instead of `saveDcAbilities`: even
+// after #1589 generalised `deriveRowExtras`
+// (registry.ts) to read base-class rows too, `ClassExtras.announcedSaveDC`
+// (renamed from `maneuverSaveDC`) stays a SINGLE scalar overlaid across every
+// class entry — a Rogue/Battle-Master multiclass populating it here would
+// collide with Combat Superiority's own value (registry.ts's
+// assignAnnouncedSaveDC keeps the first/primary DC and drops the second with a
+// logged warning rather than silently clobbering — it degrades instead of
+// throwing because it runs on the GET read path, #1875), and no wire consumer
+// reads a Rogue announced DC today (`ManeuversSection`
+// is gated on `maneuverChoiceCount`, which no Rogue row sets). The Cunning
+// Strike EFFECT CATALOG (dice-spend + enemy-targeted save effects) is a
+// subsystem this issue does not build — #1138-adjacent follow-up, analogous
+// to Battle Master maneuvers; every Cunning-Strike-related row below is
+// descriptive text only, matching Barbarian's Brutal Strike precedent.
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { SeedEdition } from "./edition.js";
 import type { ClassFeatureSeedRow } from "./class-features.js";
@@ -84,6 +91,10 @@ interface RawRogueFeature {
   description: string;
   /** Omitted -> identical text seeded for both editions (see file header) — unused today, see EDITION RULE above. */
   edition?: SeedEdition;
+  // #1588: populated only on the base-class Expertise row (both editions) —
+  // see this file's own header for why every other row leaves this undefined.
+  derivedStat?: string;
+  derivedStatTiers?: { minLevel: number; value: number | string }[];
 }
 
 function expand(raw: RawRogueFeature): ClassFeatureSeedRow[] {
@@ -93,6 +104,8 @@ function expand(raw: RawRogueFeature): ClassFeatureSeedRow[] {
     name: raw.name,
     level: raw.level,
     description: raw.description,
+    derivedStat: raw.derivedStat,
+    derivedStatTiers: raw.derivedStatTiers,
   };
   const editions: SeedEdition[] = raw.edition ? [raw.edition] : ["EDITION_2014", "EDITION_2024"];
   return editions.map((edition) => ({ ...base, edition }));
@@ -115,6 +128,16 @@ const ROGUE_BASE_RAW: RawRogueFeature[] = [
     edition: "EDITION_2014",
     description:
       "Choose two of your skill proficiencies (or one skill + Thieves' Tools). Your proficiency bonus is doubled for those skills. Two more at level 6.",
+    // #1588: PHB'14 p.96 — 2 skills at L1, 4 (2 more) at L6. The Thieves'
+    // Tools alternative the prose above still names is not modelled: the
+    // persisted expertiseKnown list is skills only (#1588's own scope), a
+    // disclosed gap matching Ranger Deft Explorer's/Wizard Scholar's own
+    // pre-existing "text only" disclosures elsewhere in this file family.
+    derivedStat: "expertiseChoiceCount",
+    derivedStatTiers: [
+      { minLevel: 1, value: 2 },
+      { minLevel: 6, value: 4 },
+    ],
   },
   {
     subclassSlug: null,
@@ -126,6 +149,12 @@ const ROGUE_BASE_RAW: RawRogueFeature[] = [
     // checklist).
     description:
       "You gain Expertise in two of your skill proficiencies of your choice. Sleight of Hand and Stealth are recommended if you have proficiency in them. At Rogue level 6, you gain Expertise in two more of your skill proficiencies of your choice.",
+    // #1588: SRD 5.2 — same 2/L1, 4/L6 ladder as the 2014 row.
+    derivedStat: "expertiseChoiceCount",
+    derivedStatTiers: [
+      { minLevel: 1, value: 2 },
+      { minLevel: 6, value: 4 },
+    ],
   },
   {
     subclassSlug: null,

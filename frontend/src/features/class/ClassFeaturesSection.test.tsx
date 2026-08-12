@@ -33,11 +33,17 @@ const FS_CATALOG = [
 
 // A fighter with a Fighting Style slot partition (#1137). `taken` are the
 // fightingStyle-slot advancements; `used` derives from their count by default.
+// `classes` carries the real ClassEntry[] wire shape; `fightingStyleGrantingClasses`
+// (#1495) is the server-computed EARNED subset FightingStyleFeatSection
+// forwards to fetchFeats' class gate — a single-class Fighter's earned set
+// is trivially just itself.
 function makeFighter(opts: { total: number; taken?: AdvancementEntry[] }): Character {
   const taken = opts.taken ?? [];
   return {
     id: "char-1",
     class: "Fighter",
+    classes: [{ id: "ce-1", name: "Fighter", level: 5, needsSubclass: false, subclassMismatch: false }],
+    fightingStyleGrantingClasses: ["Fighter"],
     rulesEdition: "EDITION_2014",
     level: 5,
     fightingStyleSlots: { total: opts.total, used: taken.length },
@@ -78,8 +84,10 @@ describe("ClassFeaturesSection — Fighting Style", () => {
 
     await user.click(screen.getByRole("button", { name: /choose a fighting style/i }));
     // No asiLevel (#1438): the server's ASI gate rejects every fighting_style row,
-    // so a level here would render this picker permanently empty.
-    expect(client.fetchFeats).toHaveBeenCalledWith("EDITION_2014", undefined);
+    // so a level here would render this picker permanently empty. classNames
+    // (#1495) forwards the character's own class(es) for the server-side
+    // per-class subset gate.
+    expect(client.fetchFeats).toHaveBeenCalledWith("EDITION_2014", undefined, ["Fighter"]);
     // A general-category feat must not leak into the fighting-style picker.
     expect(await screen.findByText("Archery")).toBeInTheDocument();
     expect(screen.queryByText("Sentinel")).not.toBeInTheDocument();
@@ -98,9 +106,10 @@ describe("ClassFeaturesSection — Cloak of Shadows (2024 rewrite, #1246: L11 ->
     return {
       id: "char-1",
       class: "Monk",
-      // hasCloakOfShadows is edition-gated (#1505 — the "cloakOfShadows" key
-      // collides with 2014 Way of Shadow's own free-at-L11 row, and this
-      // fixture is explicitly the 2024 rewrite per this describe block's title).
+      // "cloakOfShadows" is a same-key collision with 2014 Way of Shadow's own
+      // free-at-L11 row (#1505); this fixture is explicitly the 2024 rewrite
+      // per this describe block's title. Both editions share one wire-driven
+      // component since #1738 — the gate is now key-presence, not edition.
       rulesEdition: "EDITION_2024",
       level: cloakAvailable ? 17 : 11,
       subclass: "Warrior of Shadow",
@@ -113,7 +122,13 @@ describe("ClassFeaturesSection — Cloak of Shadows (2024 rewrite, #1246: L11 ->
       },
       // cloakOfShadows entitlement is availableActions[] presence (#1315), not a resources boolean.
       availableActions: cloakAvailable
-        ? [{ key: "cloakOfShadows", name: "Cloak of Shadows", cost: "action", enabled: true }]
+        ? [{
+            key: "cloakOfShadows",
+            name: "Cloak of Shadows",
+            cost: "action",
+            enabled: true,
+            reminder: "Magic action, entirely within dim light or darkness: spend 3 focus to become invisible…",
+          }]
         : [],
     } as unknown as Character;
   }

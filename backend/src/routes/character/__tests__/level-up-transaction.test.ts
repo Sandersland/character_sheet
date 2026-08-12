@@ -201,6 +201,332 @@ describe("POST /api/characters/:id/level-up/transactions — Battle Master cerem
   });
 });
 
+// #1825 Finding 1: an Eldritch Knight's cantripLists is ["wizard"], not its
+// base "fighter" list, so a rejected cantrip must name the WIZARD cantrip list
+// (via classListPhrase), never the base class the old message hardcoded.
+describe("POST /api/characters/:id/level-up/transactions — Eldritch Knight ceremony (Fighter 2→3)", () => {
+  const CHAR_ID = "lvtx-eldritch-knight-3";
+
+  beforeEach(async () => {
+    const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    await prisma.character.create({
+      data: {
+        ...BASE,
+        ownerId: OWNER_ID,
+        id: CHAR_ID,
+        name: "LevelUpTx Eldritch Knight",
+        experiencePoints: 900, // level 3 threshold
+        hitPoints: { current: 18, max: 18, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 2, die: "d10", spent: 0 },
+        abilityScores: { strength: 16, dexterity: 12, constitution: 14, intelligence: 13, wisdom: 10, charisma: 10 },
+        spellcasting: Prisma.JsonNull,
+        classEntries: {
+          create: [{ name: "fighter", subclass: null, classId: fighter.id, position: 0, level: 2 }],
+        },
+      },
+    });
+  });
+
+  it("rejects a non-wizard cantrip naming the WIZARD cantrip list, not the base fighter class", async () => {
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
+    const eldritchKnight = await prisma.subclass.findFirstOrThrow({ where: { name: "Eldritch Knight" }, select: { id: true } });
+    const wizardCantrip = await prisma.spell.findFirstOrThrow({
+      where: { level: 0, edition: "EDITION_2024", classMemberships: { some: { className: "wizard" } } },
+      select: { id: true },
+    });
+    // A cleric cantrip that is NOT on the wizard list — the ineligible pick.
+    const clericCantrip = await prisma.spell.findFirstOrThrow({
+      where: { level: 0, edition: "EDITION_2024", classMemberships: { some: { className: "cleric" }, none: { className: "wizard" } } },
+      select: { id: true, name: true },
+    });
+    const wizardSpells = await prisma.spell.findMany({
+      where: { level: 1, edition: "EDITION_2024", classMemberships: { some: { className: "wizard" } } },
+      orderBy: { name: "asc" },
+      take: 3,
+      select: { id: true },
+    });
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entry.id },
+      hp: { method: "average" },
+      subclassId: eldritchKnight.id,
+      cantripsLearned: [
+        { type: "learnSpell", spellId: wizardCantrip.id },
+        { type: "learnSpell", spellId: clericCantrip.id },
+      ],
+      spellsLearned: wizardSpells.map((s) => ({ type: "learnSpell", spellId: s.id })),
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe(`${clericCantrip.name} is not on the Wizard cantrip list.`);
+  });
+});
+
+// #1855: PHB'14 p. 74 Eldritch Knight Spellcasting — leveled picks (never
+// cantrips) are gated to Abjuration/Evocation, except one free any-school pick
+// at fighter level 3, 8, 14, and 20. SRD 5.1 has no Eldritch Knight; PHB'24
+// dropped the restriction, so a 2024 EK stays unaffected.
+describe("POST /api/characters/:id/level-up/transactions — Eldritch Knight spell-school gate (2014, #1855)", () => {
+  let fighterClassId: string;
+  let eldritchKnightId: string;
+
+  beforeEach(async () => {
+    const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    fighterClassId = fighter.id;
+    eldritchKnightId = (await prisma.subclass.findFirstOrThrow({ where: { name: "Eldritch Knight" }, select: { id: true } })).id;
+  });
+
+  async function makeEldritchKnight(
+    id: string,
+    opts: { edition: "EDITION_2014" | "EDITION_2024"; hitDiceTotal: number; xp: number },
+  ): Promise<string> {
+    await prisma.character.create({
+      data: {
+        ...BASE,
+        ownerId: OWNER_ID,
+        id,
+        name: "LevelUpTx EldritchSchool",
+        rulesEdition: opts.edition,
+        experiencePoints: opts.xp,
+        hitPoints: { current: 30, max: 30, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: opts.hitDiceTotal, die: "d10", spent: 0 },
+        abilityScores: { strength: 16, dexterity: 12, constitution: 14, intelligence: 13, wisdom: 10, charisma: 10 },
+        spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
+        classEntries: {
+          create: [{
+            name: "fighter",
+            subclass: "Eldritch Knight",
+            subclassId: eldritchKnightId,
+            classId: fighterClassId,
+            position: 0,
+            level: opts.hitDiceTotal,
+          }],
+        },
+      },
+    });
+    return (await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: id } })).id;
+  }
+
+  // Fighter 3→4 and 7→8 both cross a universal ASI level (advancement-slots.ts's
+  // BASE_ASI_LEVELS = [4, 8, 12, 16, 19]) — every ordinary-level test below
+  // carries a `takeAsi` op so the count-check (validateLevelUpSubmission)
+  // doesn't 400 before the school gate this suite is actually exercising ever
+  // runs. Wisdom, never Intelligence, so it never perturbs the third-caster
+  // spellcasting ability these fixtures otherwise hold fixed.
+  const ORDINARY_ASI = { type: "takeAsi" as const, increases: [{ ability: "wisdom" as const, amount: 2 }] };
+
+  it("2014 EK 3→4: rejects a non-Abjuration/Evocation pick at an ordinary level (no free pick left)", async () => {
+    const entryId = await makeEldritchKnight("lvtx-ek-school-4", { edition: "EDITION_2014", hitDiceTotal: 3, xp: 2700 });
+    // Detect Magic (divination) — not Abjuration/Evocation, and this level's
+    // single pick (THIRD_CASTER_PREPARED 3→4 delta) carries no free pick.
+    const detectMagic = await prisma.spell.findFirstOrThrow({
+      where: { name: "Detect Magic", edition: "EDITION_2014" },
+      select: { id: true, name: true },
+    });
+
+    const res = await post("lvtx-ek-school-4", {
+      target: { kind: "existing", classEntryId: entryId },
+      hp: { method: "average" },
+      advancement: ORDINARY_ASI,
+      spellsLearned: [{ type: "learnSpell", spellId: detectMagic.id }],
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe(`${detectMagic.name} must be an Abjuration or Evocation spell.`);
+    expect(await eventCount("lvtx-ek-school-4")).toBe(0);
+  });
+
+  it("2014 EK 3→4: an Abjuration or Evocation pick succeeds at an ordinary level", async () => {
+    const entryId = await makeEldritchKnight("lvtx-ek-school-ok4", { edition: "EDITION_2014", hitDiceTotal: 3, xp: 2700 });
+    const mageArmor = await prisma.spell.findFirstOrThrow({
+      where: { name: "Mage Armor", edition: "EDITION_2014" },
+      select: { id: true, name: true },
+    });
+
+    const res = await post("lvtx-ek-school-ok4", {
+      target: { kind: "existing", classEntryId: entryId },
+      hp: { method: "average" },
+      advancement: ORDINARY_ASI,
+      spellsLearned: [{ type: "learnSpell", spellId: mageArmor.id }],
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.spellcasting.spells.map((s: { name: string }) => s.name)).toContain(mageArmor.name);
+  });
+
+  it("2014 EK fresh 2→3: 2-of-3 rule — two Abjuration/Evocation picks + one free any-school pick succeeds", async () => {
+    const fighter2 = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    const CHAR_ID = "lvtx-ek-school-3of3";
+    await prisma.character.create({
+      data: {
+        ...BASE,
+        ownerId: OWNER_ID,
+        id: CHAR_ID,
+        name: "LevelUpTx EldritchSchool",
+        rulesEdition: "EDITION_2014",
+        experiencePoints: 900, // level 3 threshold
+        hitPoints: { current: 18, max: 18, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 2, die: "d10", spent: 0 },
+        abilityScores: { strength: 16, dexterity: 12, constitution: 14, intelligence: 13, wisdom: 10, charisma: 10 },
+        spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
+        classEntries: { create: [{ name: "fighter", subclass: null, classId: fighter2.id, position: 0, level: 2 }] },
+      },
+    });
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
+    const mageArmor = await prisma.spell.findFirstOrThrow({ where: { name: "Mage Armor", edition: "EDITION_2014" }, select: { id: true } });
+    const magicMissile = await prisma.spell.findFirstOrThrow({ where: { name: "Magic Missile", edition: "EDITION_2014" }, select: { id: true } });
+    const detectMagic = await prisma.spell.findFirstOrThrow({ where: { name: "Detect Magic", edition: "EDITION_2014" }, select: { id: true, name: true } });
+    // The fresh 3rd-level grant also carries 2 cantrips (THIRD_CASTER_CANTRIPS) —
+    // cantrips are unrestricted, so any two wizard cantrips satisfy the count.
+    const mageHand = await prisma.spell.findFirstOrThrow({ where: { name: "Mage Hand", edition: "EDITION_2014" }, select: { id: true } });
+    const fireBolt = await prisma.spell.findFirstOrThrow({ where: { name: "Fire Bolt", edition: "EDITION_2014" }, select: { id: true } });
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entry.id },
+      hp: { method: "average" },
+      subclassId: eldritchKnightId,
+      cantripsLearned: [
+        { type: "learnSpell", spellId: mageHand.id },
+        { type: "learnSpell", spellId: fireBolt.id },
+      ],
+      spellsLearned: [
+        { type: "learnSpell", spellId: mageArmor.id },
+        { type: "learnSpell", spellId: magicMissile.id },
+        { type: "learnSpell", spellId: detectMagic.id },
+      ],
+    });
+
+    expect(res.status).toBe(200);
+    const names = res.body.spellcasting.spells.map((s: { name: string }) => s.name);
+    expect(names).toContain(detectMagic.name);
+  });
+
+  it("2014 EK fresh 2→3: a SECOND off-school pick exceeds the one free slot and is rejected", async () => {
+    const fighter2 = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    const CHAR_ID = "lvtx-ek-school-2of3-fail";
+    await prisma.character.create({
+      data: {
+        ...BASE,
+        ownerId: OWNER_ID,
+        id: CHAR_ID,
+        name: "LevelUpTx EldritchSchool",
+        rulesEdition: "EDITION_2014",
+        experiencePoints: 900,
+        hitPoints: { current: 18, max: 18, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 2, die: "d10", spent: 0 },
+        abilityScores: { strength: 16, dexterity: 12, constitution: 14, intelligence: 13, wisdom: 10, charisma: 10 },
+        spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
+        classEntries: { create: [{ name: "fighter", subclass: null, classId: fighter2.id, position: 0, level: 2 }] },
+      },
+    });
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
+    const mageArmor = await prisma.spell.findFirstOrThrow({ where: { name: "Mage Armor", edition: "EDITION_2014" }, select: { id: true } });
+    const detectMagic = await prisma.spell.findFirstOrThrow({ where: { name: "Detect Magic", edition: "EDITION_2014" }, select: { id: true } });
+    const charmPerson = await prisma.spell.findFirstOrThrow({ where: { name: "Charm Person", edition: "EDITION_2014" }, select: { id: true, name: true } });
+    const mageHand = await prisma.spell.findFirstOrThrow({ where: { name: "Mage Hand", edition: "EDITION_2014" }, select: { id: true } });
+    const fireBolt = await prisma.spell.findFirstOrThrow({ where: { name: "Fire Bolt", edition: "EDITION_2014" }, select: { id: true } });
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entry.id },
+      hp: { method: "average" },
+      subclassId: eldritchKnightId,
+      cantripsLearned: [
+        { type: "learnSpell", spellId: mageHand.id },
+        { type: "learnSpell", spellId: fireBolt.id },
+      ],
+      spellsLearned: [
+        { type: "learnSpell", spellId: mageArmor.id },
+        { type: "learnSpell", spellId: detectMagic.id },
+        { type: "learnSpell", spellId: charmPerson.id },
+      ],
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe(`${charmPerson.name} must be an Abjuration or Evocation spell.`);
+    expect(await eventCount(CHAR_ID)).toBe(0);
+  });
+
+  it("2014 EK 7→8: the free any-school pick at fighter level 8 admits an off-school spell", async () => {
+    const entryId = await makeEldritchKnight("lvtx-ek-school-8", { edition: "EDITION_2014", hitDiceTotal: 7, xp: 34000 });
+    const detectMagic = await prisma.spell.findFirstOrThrow({ where: { name: "Detect Magic", edition: "EDITION_2014" }, select: { id: true, name: true } });
+
+    const res = await post("lvtx-ek-school-8", {
+      target: { kind: "existing", classEntryId: entryId },
+      hp: { method: "average" },
+      advancement: ORDINARY_ASI,
+      spellsLearned: [{ type: "learnSpell", spellId: detectMagic.id }],
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.spellcasting.spells.map((s: { name: string }) => s.name)).toContain(detectMagic.name);
+  });
+
+  it("2014 EK cantrips are unrestricted by school even when every leveled pick is gated", async () => {
+    const CHAR_ID = "lvtx-ek-school-cantrip";
+    const fighter2 = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    await prisma.character.create({
+      data: {
+        ...BASE,
+        ownerId: OWNER_ID,
+        id: CHAR_ID,
+        name: "LevelUpTx EldritchSchool",
+        rulesEdition: "EDITION_2014",
+        experiencePoints: 900,
+        hitPoints: { current: 18, max: 18, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 2, die: "d10", spent: 0 },
+        abilityScores: { strength: 16, dexterity: 12, constitution: 14, intelligence: 13, wisdom: 10, charisma: 10 },
+        spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
+        classEntries: { create: [{ name: "fighter", subclass: null, classId: fighter2.id, position: 0, level: 2 }] },
+      },
+    });
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
+    // Both wizard cantrips off the Abjuration/Evocation gate entirely (conjuration, illusion).
+    const mageHand = await prisma.spell.findFirstOrThrow({ where: { name: "Mage Hand", edition: "EDITION_2014" }, select: { id: true } });
+    const minorIllusion = await prisma.spell.findFirstOrThrow({ where: { name: "Minor Illusion", edition: "EDITION_2014" }, select: { id: true } });
+    const mageArmor = await prisma.spell.findFirstOrThrow({ where: { name: "Mage Armor", edition: "EDITION_2014" }, select: { id: true } });
+    const magicMissile = await prisma.spell.findFirstOrThrow({ where: { name: "Magic Missile", edition: "EDITION_2014" }, select: { id: true } });
+    const detectMagic = await prisma.spell.findFirstOrThrow({ where: { name: "Detect Magic", edition: "EDITION_2014" }, select: { id: true } });
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entry.id },
+      hp: { method: "average" },
+      subclassId: eldritchKnightId,
+      cantripsLearned: [
+        { type: "learnSpell", spellId: mageHand.id },
+        { type: "learnSpell", spellId: minorIllusion.id },
+      ],
+      spellsLearned: [
+        { type: "learnSpell", spellId: mageArmor.id },
+        { type: "learnSpell", spellId: magicMissile.id },
+        { type: "learnSpell", spellId: detectMagic.id },
+      ],
+    });
+
+    expect(res.status).toBe(200);
+    const names = res.body.spellcasting.spells.map((s: { name: string }) => s.name);
+    expect(names).toContain("Mage Hand");
+    expect(names).toContain("Minor Illusion");
+  });
+
+  // Mutation-proof: if the EDITION_2014/EDITION_2024 gate in
+  // eldritchKnightSpellSchoolGate were dropped (always restricting), this
+  // 2024 EK's off-school picks would 400 and this test would go red.
+  it("2024 EK 3→4 is unaffected — no school restriction at all", async () => {
+    const entryId = await makeEldritchKnight("lvtx-ek-school-2024", { edition: "EDITION_2024", hitDiceTotal: 3, xp: 2700 });
+    const detectMagic = await prisma.spell.findFirstOrThrow({ where: { name: "Detect Magic", edition: "EDITION_2024" }, select: { id: true, name: true } });
+
+    const res = await post("lvtx-ek-school-2024", {
+      target: { kind: "existing", classEntryId: entryId },
+      hp: { method: "average" },
+      advancement: ORDINARY_ASI,
+      spellsLearned: [{ type: "learnSpell", spellId: detectMagic.id }],
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.spellcasting.spells.map((s: { name: string }) => s.name)).toContain(detectMagic.name);
+  });
+});
+
 // #1497: at 2014 exhaustion 4+ (PHB'14 p. 291), `hitPoints.max` is already the
 // halved EFFECTIVE max — the GET /plan preview and the actual commit must
 // agree on the post-level max WITHOUT the client re-deriving the halving
@@ -411,6 +737,14 @@ describe("POST …/level-up/transactions — Bard Magical Secrets eligibility ga
         hitPoints: { current: 50, max: 50, temp: 0, deathSaves: { successes: 0, failures: 0 } },
         hitDice: { total: opts.hitDiceTotal, die: "d8", spent: 0 },
         abilityScores: { strength: 10, dexterity: 14, constitution: 14, intelligence: 10, wisdom: 10, charisma: 16 },
+        // #1588: proficient in 2 skills — Bard's Expertise grants a step at
+        // L9 (2024) and L3/L10 (2014); a level-up crossing either tier needs
+        // a legal pick available (applyLearnExpertiseOp rejects a skill the
+        // character isn't proficient in).
+        skills: [
+          { name: "performance", ability: "charisma", proficient: true },
+          { name: "persuasion", ability: "charisma", proficient: true },
+        ],
         spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
         classEntries: {
           create: [{ name: "bard", subclass: "College of Lore", subclassId: collegeOfLore, classId: bard.id, position: 0, level: opts.hitDiceTotal }],
@@ -420,6 +754,14 @@ describe("POST …/level-up/transactions — Bard Magical Secrets eligibility ga
     const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: id } });
     return entry.id;
   }
+
+  // #1588: Bard Expertise picks for a level-up crossing L9 (2024) or L10
+  // (2014) — both fixture skills are legal (proficient), so this is the
+  // fixed submission every affected test below reuses.
+  const EXPERTISE_PICKS = [
+    { type: "learnExpertise" as const, skill: "performance" },
+    { type: "learnExpertise" as const, skill: "persuasion" },
+  ];
 
   it("a Bard reaching 10 may take Fireball via Magical Secrets (200)", async () => {
     const CHAR_ID = "lvtx-bard-10";
@@ -480,6 +822,10 @@ describe("POST …/level-up/transactions — Bard Magical Secrets eligibility ga
     const res = await post(CHAR_ID, {
       target: { kind: "existing", classEntryId: entryId },
       hp: { method: "average" },
+      // #1588: this level-up also crosses Bard Expertise's L9 tier (2024) —
+      // include the now-required pick so the ONLY 400 in play is the
+      // Magical Secrets rejection under test.
+      expertise: EXPERTISE_PICKS,
       spellsLearned: [{ type: "learnSpell", spellId: fireball.id }, { type: "learnSpell", spellId: bardSpell.id }],
     });
     expect(res.status).toBe(400);
@@ -511,6 +857,9 @@ describe("POST …/level-up/transactions — Bard Magical Secrets eligibility ga
     const res = await post(CHAR_ID, {
       target: { kind: "existing", classEntryId: entryId },
       hp: { method: "average" },
+      // #1588: this level-up also crosses Bard Expertise's 2014 L10 tier
+      // (2 more, PHB'14 p.53) — a required step this level-up must satisfy.
+      expertise: EXPERTISE_PICKS,
       spellsLearned: [{ type: "learnSpell", spellId: ensnaringStrike.id }, { type: "learnSpell", spellId: second.id }],
       cantripsLearned: [{ type: "learnSpell", spellId: cantrip.id }],
     });
@@ -566,6 +915,8 @@ describe("POST …/level-up/transactions — Bard Magical Secrets eligibility ga
     const res = await post(CHAR_ID, {
       target: { kind: "existing", classEntryId: entryId },
       hp: { method: "average" },
+      // #1588: same required L10 (2014) Expertise tier as the sibling test above.
+      expertise: EXPERTISE_PICKS,
       spellsLearned: [{ type: "learnSpell", spellId: ensnaringStrike.id }, { type: "learnSpell", spellId: second.id }],
       cantripsLearned: [{ type: "learnSpell", spellId: fireBolt.id }],
     });
@@ -734,6 +1085,10 @@ describe("POST …/level-up/transactions — 2014 known-caster level-up (#1509)"
           hitPoints: { current: 18, max: 18, temp: 0, deathSaves: { successes: 0, failures: 0 } },
           hitDice: { total: 1, die: "d10", spent: 0 },
           abilityScores: { strength: 12, dexterity: 16, constitution: 14, intelligence: 10, wisdom: 14, charisma: 8 },
+          // #1588: proficient in survival — 2024 Ranger's Deft Explorer grants
+          // an Expertise step at L2 (EDITION_2024 only), so a legal pick must
+          // be available for that branch's level-up to validate.
+          skills: [{ name: "survival", ability: "wisdom", proficient: true }],
           spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
           classEntries: { create: [{ name: "ranger", subclass: null, classId: ranger.id, position: 0, level: 1 }] },
         },
@@ -757,6 +1112,9 @@ describe("POST …/level-up/transactions — 2014 known-caster level-up (#1509)"
       target: { kind: "existing", classEntryId: entry2024 },
       hp: { method: "average" },
       fightingStyleFeat: { type: "takeFeat", featId: defense2024.id },
+      // #1588: 2024 Ranger 1→2 also grants a required Deft Explorer Expertise
+      // pick — included so the ONLY 400 in play is the swap rejection under test.
+      expertise: [{ type: "learnExpertise", skill: "survival" }],
       spellsForgotten: [{ type: "forgetSpell", entryId: "whatever" }],
     });
     expect(res2024.status).toBe(400);
@@ -1745,6 +2103,192 @@ describe("POST …/level-up/transactions — Way of the Four Elements discipline
     const known = res.body.resources.choicesKnown.fourElementsDisciplines as { optionId: string }[];
     expect(known.map((k) => k.optionId).sort()).toEqual([river.id, water.id].sort());
     expect(await distinctBatchIds("lvtx-four-elements-6")).toHaveLength(1);
+
+    // Code-review finding (#1516): the assertions above prove the swap
+    // SUCCEEDED but never verified the audit event's own shape — a field
+    // rename (e.g. eventData.optionName -> choiceName) would pass every
+    // assertion above while silently breaking the activity feed and LIFO undo.
+    const forgetEvent = await prisma.characterEvent.findFirstOrThrow({
+      where: { characterId: "lvtx-four-elements-6", type: "forgetSubclassChoice" },
+    });
+    expect(forgetEvent.summary).toBe(`Removed fourElementsDisciplines choice: ${fangs.name}`);
+    expect(forgetEvent.data).toEqual({ choiceKey: "fourElementsDisciplines", entryId: "e-fangs", optionName: fangs.name });
+  });
+});
+
+// #1516: the maneuver swap (Battle Master) — "Each time you learn new
+// maneuvers, you can also replace one maneuver you know with a different
+// one" (PHB'14 p.73; SRD 5.2 carries the equivalent grant). Same shape as the
+// Way of the Four Elements discipline swap above, scoped to maneuversKnown/
+// forgetManeuver. maneuverChoiceCount thresholds: 3@3, 5@7, 7@10, 9@15.
+describe("POST …/level-up/transactions — maneuver swap (#1516, Battle Master)", () => {
+  async function makeBattleMaster(
+    id: string,
+    xp: number,
+    hitDiceTotal: number,
+    entryLevel: number,
+    known: { id: string; maneuverId: string; name: string; description: string }[],
+  ): Promise<string> {
+    const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    const battleMaster = await prisma.subclass.findFirstOrThrow({ where: { classId: fighter.id, name: "Battle Master" } });
+    await prisma.character.create({
+      data: {
+        ...BASE,
+        ownerId: OWNER_ID,
+        id,
+        name: "LevelUpTx Maneuver Swap",
+        experiencePoints: xp,
+        hitPoints: { current: 50, max: 50, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: hitDiceTotal, die: "d10", spent: 0 },
+        abilityScores: { strength: 16, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 10, charisma: 10 },
+        spellcasting: Prisma.JsonNull,
+        resources: {
+          used: {},
+          maneuversKnown: known,
+          toolProficienciesKnown: [],
+          choicesKnown: {},
+          advancements: [],
+        } as unknown as Prisma.InputJsonValue,
+        classEntries: {
+          create: [{ name: "fighter", subclass: "Battle Master", subclassId: battleMaster.id, classId: fighter.id, position: 0, level: entryLevel }],
+        },
+      },
+    });
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: id } });
+    return entry.id;
+  }
+
+  it("6→7: a swap (3 learns + 1 forget netting to the step's count 2) commits atomically", async () => {
+    const catalog = await prisma.grantedAbility.findMany({ where: { source: "maneuver" }, take: 6, select: { id: true, name: true, description: true } });
+    expect(catalog).toHaveLength(6);
+    const known = catalog.slice(0, 3).map((m, i) => ({ id: `k${i}`, maneuverId: m.id, name: m.name, description: m.description }));
+    const newPicks = catalog.slice(3, 6);
+    const entryId = await makeBattleMaster("lvtx-maneuver-swap-6", 23000, 6, 6, known);
+
+    const res = await post("lvtx-maneuver-swap-6", {
+      target: { kind: "existing", classEntryId: entryId },
+      hp: { method: "average" },
+      maneuvers: newPicks.map((m) => ({ type: "learnManeuver", maneuverId: m.id })),
+      maneuversForgotten: [{ type: "forgetManeuver", entryId: "k0" }],
+    });
+    expect(res.status).toBe(200);
+    const maneuversKnown = res.body.resources.maneuversKnown as { maneuverId: string }[];
+    expect(maneuversKnown).toHaveLength(5); // cap at fighter-7
+    expect(maneuversKnown.map((m) => m.maneuverId)).not.toContain(known[0].maneuverId);
+    expect(maneuversKnown.map((m) => m.maneuverId)).toEqual(
+      expect.arrayContaining(newPicks.map((m) => m.id)),
+    );
+    expect(await distinctBatchIds("lvtx-maneuver-swap-6")).toHaveLength(1);
+
+    // Code-review finding: the assertions above prove the swap SUCCEEDED but
+    // never verified the audit event's own shape — a field rename (e.g.
+    // eventData.maneuverName -> choiceName) would pass every assertion above
+    // while silently breaking the activity feed and LIFO undo (both read
+    // this event's summary/data).
+    const forgetEvent = await prisma.characterEvent.findFirstOrThrow({
+      where: { characterId: "lvtx-maneuver-swap-6", type: "forgetManeuver" },
+    });
+    expect(forgetEvent.summary).toBe(`Forgot maneuver: ${known[0].name}`);
+    expect(forgetEvent.data).toEqual({ entryId: "k0", maneuverName: known[0].name });
+  });
+
+  it("6→7: rejects two forgets in one level-up", async () => {
+    const catalog = await prisma.grantedAbility.findMany({ where: { source: "maneuver" }, take: 7, select: { id: true, name: true, description: true } });
+    expect(catalog).toHaveLength(7);
+    const known = catalog.slice(0, 3).map((m, i) => ({ id: `k${i}`, maneuverId: m.id, name: m.name, description: m.description }));
+    const newPicks = catalog.slice(3, 7); // 4 learns, net-matches the step count (2) against 2 forgets
+    const entryId = await makeBattleMaster("lvtx-maneuver-swap-two-forgets", 23000, 6, 6, known);
+
+    const res = await post("lvtx-maneuver-swap-two-forgets", {
+      target: { kind: "existing", classEntryId: entryId },
+      hp: { method: "average" },
+      maneuvers: newPicks.map((m) => ({ type: "learnManeuver", maneuverId: m.id })),
+      maneuversForgotten: [
+        { type: "forgetManeuver", entryId: "k0" },
+        { type: "forgetManeuver", entryId: "k1" },
+      ],
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/at most one/i);
+  });
+
+  // Fighter-3→4 is not a maneuver-growth level (3@3, still 3@4) — no
+  // "maneuvers" step exists, so PHB'14's "each time you learn new maneuvers"
+  // condition never fires. Level 4 is also an ASI level, so `advancement` is
+  // included to isolate the forget rejection.
+  it("3→4: rejects a forget — the level grants no new maneuvers", async () => {
+    const catalog = await prisma.grantedAbility.findMany({ where: { source: "maneuver" }, take: 3, select: { id: true, name: true, description: true } });
+    const known = catalog.map((m, i) => ({ id: `k${i}`, maneuverId: m.id, name: m.name, description: m.description }));
+    const entryId = await makeBattleMaster("lvtx-maneuver-no-step", 2700, 3, 3, known);
+
+    const res = await post("lvtx-maneuver-no-step", {
+      target: { kind: "existing", classEntryId: entryId },
+      hp: { method: "average" },
+      advancement: { type: "takeAsi", increases: [{ ability: "strength", amount: 2 }] },
+      maneuversForgotten: [{ type: "forgetManeuver", entryId: "k0" }],
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/does not allow swapping a maneuver/i);
+  });
+
+  // #1516 decision point 1 (level-down repair): clampChoicesToCaps-style
+  // trimming already applies to maneuversKnown via reconcileManeuvers
+  // (level-reconciliation.ts, unchanged by this issue — it never calls
+  // applyForgetManeuverOp). The bounded "repair" the decision calls for is the
+  // ORDINARY learn-time step: after a level-down trims maneuversKnown to the
+  // new cap, leveling back up re-offers exactly the trimmed count via the same
+  // "maneuvers" step (delta between the level-derived caps) — no bespoke
+  // repair mechanism needed. This is the mutation-proof regression latch: if a
+  // future change moved this issue's guard INSIDE the shared trim primitive
+  // (clampChoicesToCaps/reconcileManeuvers) instead of the op boundary, the
+  // XP-drop step below would break.
+  it("level-down trims to the level-6 cap; leveling back up offers exactly the trimmed count", async () => {
+    const catalog = await prisma.grantedAbility.findMany({ where: { source: "maneuver" }, take: 5, select: { id: true, name: true, description: true } });
+    expect(catalog).toHaveLength(5);
+    const known = catalog.map((m, i) => ({ id: `k${i}`, maneuverId: m.id, name: m.name, description: m.description }));
+    const CHAR_ID = "lvtx-maneuver-repair";
+    const entryId = await makeBattleMaster(CHAR_ID, 23000, 7, 7, known); // level 7, cap 5, at cap
+
+    const dropped = await supertest(app)
+      .post(`/api/characters/${CHAR_ID}/experience`)
+      .set("Cookie", COOKIE)
+      .send({ operations: [{ type: "set", value: 14000 }] }); // level 6 threshold → cap 3
+    expect(dropped.status).toBe(200);
+    expect(dropped.body.resources.maneuversKnown).toHaveLength(3);
+    expect(dropped.body.hitDice.total).toBe(6);
+    expect(dropped.body.pendingLevelUps).toBe(0);
+
+    // XP back up to the level-7 threshold — hitDice.total is untouched (HP
+    // level-up is a separate explicit action, docs/leveling.md), so this
+    // reopens exactly ONE pending level-up (6→7) for the ceremony below.
+    const raised = await supertest(app)
+      .post(`/api/characters/${CHAR_ID}/experience`)
+      .set("Cookie", COOKIE)
+      .send({ operations: [{ type: "set", value: 23000 }] });
+    expect(raised.status).toBe(200);
+    expect(raised.body.hitDice.total).toBe(6);
+    expect(raised.body.pendingLevelUps).toBe(1);
+
+    const plan = await getPlan(CHAR_ID).query({ classEntryId: entryId });
+    expect(plan.status).toBe(200);
+    const maneuversStep = (plan.body.steps as Array<{ kind: string; count?: number; meta?: { canSwap?: boolean } }>)
+      .find((s) => s.kind === "maneuvers");
+    expect(maneuversStep).toMatchObject({ count: 2, meta: { canSwap: true } });
+
+    const freshCatalog = await prisma.grantedAbility.findMany({
+      where: { source: "maneuver", id: { notIn: known.map((k) => k.maneuverId) } },
+      take: 2,
+      select: { id: true },
+    });
+    expect(freshCatalog).toHaveLength(2);
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entryId },
+      hp: { method: "average" },
+      maneuvers: freshCatalog.map((m) => ({ type: "learnManeuver", maneuverId: m.id })),
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.resources.maneuversKnown).toHaveLength(5);
+    expect(res.body.resources.maneuverChoiceCount).toBe(5);
   });
 });
 
@@ -2093,7 +2637,14 @@ describe("POST …/level-up/transactions — the served HP meta equals the commi
   it("single-class Fighter 6→7: hitPoints.max rises by exactly meta.averageGain", async () => {
     const CHAR_ID = "lvtx-hp-meta-single";
     const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
-    const champion = (await prisma.subclass.findFirstOrThrow({ where: { classId: fighter.id, name: "Champion" } })).id;
+    // No subclass (#1148): this fixture is L6→7 in 2024, exactly the level
+    // Champion's Additional Fighting Style grants a second slot, and also the
+    // level Battle Master's maneuver count grows — either would ALSO need its
+    // own choice op in the level-up submission (see the "adds a Fighter
+    // second class"/maneuver-swap tests elsewhere in this file), which is
+    // orthogonal to what this test asserts (HP preview == commit). Fine for
+    // this fixture: the subclass gate (L3) is long past, and no OTHER step
+    // here depends on which subclass is chosen.
     await prisma.character.create({
       data: {
         ...BASE,
@@ -2105,7 +2656,7 @@ describe("POST …/level-up/transactions — the served HP meta equals the commi
         hitDice: { total: 6, die: "d10", spent: 0 },
         abilityScores: { strength: 14, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 10, charisma: 10 },
         spellcasting: Prisma.JsonNull,
-        classEntries: { create: [{ name: "fighter", subclass: "Champion", subclassId: champion, classId: fighter.id, position: 0, level: 6 }] },
+        classEntries: { create: [{ name: "fighter", classId: fighter.id, position: 0, level: 6 }] },
       },
     });
     const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });

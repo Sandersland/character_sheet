@@ -163,6 +163,13 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
       "reminder": "Regain 1d10 + 1 HP",
       "resolverKind": "heal-roll",
     },
+    {
+      "cost": "bonusAction",
+      "disabledReason": "Off-hand attack needs two Light weapons equipped.",
+      "enabled": false,
+      "key": "offHandAttack",
+      "name": "Off-Hand Attack",
+    },
   ],
   "background": "",
   "campaignId": undefined,
@@ -202,6 +209,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
       },
     ],
     "exhaustion": 2,
+    "suspended": [],
   },
   "critRange": 20,
   "currency": {
@@ -214,10 +222,14 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
   "damageImmunities": [],
   "exhaustionEffectText": "−4 on d20 Tests; Speed −10 ft.",
   "experiencePoints": 14000,
+  "fightingStyleGrantingClasses": [
+    "Test Fighter (Snapshot Suite)",
+  ],
   "fightingStyleSlots": {
     "total": 1,
     "used": 0,
   },
+  "flySpeed": undefined,
   "grantedAdvantages": [],
   "grantedProficiencies": [],
   "hitDice": {
@@ -226,7 +238,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
     "total": 5,
   },
   "hitPoints": {
-    "current": 22,
+    "current": 24,
     "deathSaves": {
       "failures": 0,
       "successes": 0,
@@ -235,6 +247,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
     "temp": 3,
   },
   "id": "snap-char-multi",
+  "immuneConditions": [],
   "improvisedWeapon": {
     "attackBonus": 0,
     "damage": {
@@ -313,6 +326,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
         "weaponClass": "martial",
         "weaponRange": "melee",
       },
+      "weaponBonded": false,
       "weight": undefined,
     },
     {
@@ -351,6 +365,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
       "requiresAttunement": false,
       "slot": undefined,
       "weapon": undefined,
+      "weaponBonded": false,
       "weight": undefined,
     },
     {
@@ -389,6 +404,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
       "requiresAttunement": false,
       "slot": undefined,
       "weapon": undefined,
+      "weaponBonded": false,
       "weight": undefined,
     },
     {
@@ -447,6 +463,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
       "requiresAttunement": false,
       "slot": "NECK",
       "weapon": undefined,
+      "weaponBonded": false,
       "weight": undefined,
     },
     {
@@ -483,6 +500,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
       "requiresAttunement": false,
       "slot": undefined,
       "weapon": undefined,
+      "weaponBonded": false,
       "weight": undefined,
     },
   ],
@@ -518,6 +536,8 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
   "resistances": [],
   "resources": {
     "choicesKnown": {},
+    "expertiseChoiceCount": undefined,
+    "expertiseKnown": [],
     "features": [
       {
         "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
@@ -628,6 +648,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
   "skills": [
     {
       "ability": "strength",
+      "expertise": false,
       "name": "athletics",
       "proficient": false,
       "tempModifier": 3,
@@ -644,11 +665,13 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
     },
     {
       "ability": "intelligence",
+      "expertise": false,
       "name": "arcana",
       "proficient": true,
     },
     {
       "ability": "wisdom",
+      "expertise": false,
       "name": "animalHandling",
       "proficient": false,
     },
@@ -699,6 +722,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
     "spellSaveDC": 14,
     "spells": [
       {
+        "castCost": "action",
         "castingTime": "1 action",
         "description": "Boom.",
         "duration": "Instantaneous",
@@ -727,6 +751,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
         "school": "evocation",
       },
       {
+        "castCost": "action",
         "castingTime": "1 action",
         "description": "AC 13 + Dex.",
         "duration": "8 hours",
@@ -775,6 +800,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
     },
     "magical": false,
   },
+  "weaponBondCap": 2,
   "weaponProficiencies": [],
 }
 `;
@@ -879,6 +905,13 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
       "name": "Action Surge",
       "resolverKind": "simple-confirm",
     },
+    {
+      "cost": "bonusAction",
+      "disabledReason": "Off-hand attack needs two Light weapons equipped.",
+      "enabled": false,
+      "key": "offHandAttack",
+      "name": "Off-Hand Attack",
+    },
   ],
   "background": "",
   "campaignId": undefined,
@@ -902,6 +935,7 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
   "conditions": {
     "active": [],
     "exhaustion": 0,
+    "suspended": [],
   },
   "critRange": 20,
   "currency": {
@@ -914,10 +948,14 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
   "damageImmunities": [],
   "exhaustionEffectText": "No exhaustion.",
   "experiencePoints": 6500,
+  "fightingStyleGrantingClasses": [
+    "Test Fighter (Snapshot Suite)",
+  ],
   "fightingStyleSlots": {
     "total": 1,
     "used": 0,
   },
+  "flySpeed": undefined,
   "grantedAdvantages": [],
   "grantedProficiencies": [],
   "hitDice": {
@@ -935,6 +973,7 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
     "temp": 0,
   },
   "id": "snap-char-simple",
+  "immuneConditions": [],
   "improvisedWeapon": {
     "attackBonus": 3,
     "damage": {
@@ -963,6 +1002,8 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
   "resistances": [],
   "resources": {
     "choicesKnown": {},
+    "expertiseChoiceCount": undefined,
+    "expertiseKnown": [],
     "features": [
       {
         "description": "Choose a fighting style specialty: Archery (+2 ranged attack rolls), Defense (+1 AC in armor), Dueling (+2 melee damage when only wielding one weapon), Great Weapon Fighting (reroll 1s and 2s on damage with two-handed weapons), Protection (impose disadvantage on attacks against adjacent allies), or Two-Weapon Fighting (add ability modifier to off-hand damage).",
@@ -1130,11 +1171,13 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
   "skills": [
     {
       "ability": "strength",
+      "expertise": false,
       "name": "athletics",
       "proficient": true,
     },
     {
       "ability": "charisma",
+      "expertise": false,
       "name": "intimidation",
       "proficient": false,
     },
@@ -1161,6 +1204,7 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
     },
     "magical": false,
   },
+  "weaponBondCap": 2,
   "weaponProficiencies": [],
 }
 `;

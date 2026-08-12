@@ -159,7 +159,9 @@ describe("GET /api/characters/:id/level-up/plan", () => {
     expect(res.status).toBe(200);
     // #1509: casterModel is null for a non-caster target (a plain Fighter, no
     // third-caster subclass) — served alongside className/subclass/newLevel.
-    expect(res.body.target).toEqual({ className: "fighter", subclass: "Champion", newLevel: 8, isPrimary: true, casterModel: null });
+    // className is "Fighter" (#1148 review finding 1) — the CANONICAL catalog
+    // class.name, not this fixture's own lowercase entry.name column.
+    expect(res.body.target).toEqual({ className: "Fighter", subclass: "Champion", newLevel: 8, isPrimary: true, casterModel: null });
     expect(res.body.steps.map((s: { kind: string }) => s.kind)).toEqual(["hitPoints", "advancement", "review"]);
   });
 
@@ -185,7 +187,9 @@ describe("GET /api/characters/:id/level-up/plan", () => {
     await makeCleric({ id: "lvplan-cleric-3", xp: 900, entryLevel: 2 });
     const atThree = await getPlan("lvplan-cleric-3");
     expect(atThree.status).toBe(200);
-    expect(atThree.body.target).toMatchObject({ className: "cleric", subclass: null, newLevel: 3 });
+    // className is "Cleric" (#1148 review finding 1) — the CANONICAL catalog
+    // class.name, not this fixture's own lowercase entry.name column.
+    expect(atThree.body.target).toMatchObject({ className: "Cleric", subclass: null, newLevel: 3 });
     expect(atThree.body.steps.map((s: { kind: string }) => s.kind)).toContain("subclass");
 
     await makeCleric({ id: "lvplan-cleric-2", xp: 300, entryLevel: 1 });

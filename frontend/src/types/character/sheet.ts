@@ -7,7 +7,7 @@ import type { AttackRow, DiceRider, RulesEdition, SaveRider } from "@character-s
 import type { AvailableAction } from "./actions";
 import type { CampaignPreferences } from "./campaign";
 import type { ArmorProficiency, CharacterResources, ClassEntry, ToolProficiency, WeaponProficiency } from "./classes";
-import type { ActiveEffectsState, ArmorClassPart, ConditionsState, DerivedAttack, DerivedImprovisedAttack, RollModifier } from "./combat";
+import type { ActiveEffectsState, ArmorClassPart, ConditionKey, ConditionsState, DerivedAttack, DerivedImprovisedAttack, RollModifier } from "./combat";
 import type { InventoryItem, ItemAdvantageGrant, ItemConditionImmunity, ItemDamageTrait, ItemProficiencyGrant } from "./inventory";
 import type { JournalEntry } from "./journal";
 import type { AdvancementEntry, AdvancementSlots } from "./leveling";
@@ -50,6 +50,11 @@ export interface Character {
   armorClassBreakdown: ArmorClassPart[];
   initiativeBonus: number;
   speed: number;
+  /** Dragon Wings (#1123) — 2014 only (PHB'14 p.107: passive fly speed equal
+   * to current speed), present only while unarmored at Draconic L14. Never
+   * present for 2024 characters: PHB'24 p.148 Dragon Wings is a flat 60 ft
+   * activated ability on its own resource pool, not a derived value. */
+  flySpeed?: number;
   proficiencyBonus: number;
 
   hitPoints: {
@@ -84,6 +89,8 @@ export interface Character {
   carriedWeight: number;
   /** The attunement cap the server's attune path rejects past (#1377). */
   attunementCap: number;
+  /** Eldritch Knight Weapon Bond's 2-weapon cap (#1854) the server's bond path rejects past. */
+  weaponBondCap: number;
 
   spellcasting?: {
     ability: AbilityName;
@@ -156,6 +163,17 @@ export interface Character {
    * frontend-authored sentence is what let a 2014 character show 2024 text.
    */
   exhaustionEffectText: string;
+  /**
+   * Condition keys the character is currently immune to (#1121) — Mindless
+   * Rage/Beguiling Defenses/Nature's Ward — through the same rule the
+   * conditions write-guard enforces, so the sheet can show WHY a condition is
+   * unavailable. Derived, never persisted; NOT part of `conditions` for the
+   * same reason `exhaustionEffectText` isn't. Optional (not "always present")
+   * purely so the many pre-#1121 test fixtures constructing a full Character
+   * literal don't all need editing for a field none of them exercise yet —
+   * the backend always serializes it (defaults to `[]`).
+   */
+  immuneConditions?: ConditionKey[];
   /**
    * Active cast-granted passive modifiers (buffs). Always present (normalized on
    * read). Each is also summed into its target skill/stat's tempModifier.
@@ -231,6 +249,13 @@ export interface Character {
    *  Masters. maneuverChoiceCount/toolProfChoiceCount stay on `resources`
    *  (they're choice counts, not save DCs). */
   maneuvers?: SaveRider;
+  /** 2014 Assassin L3+ Assassinate (#1526) — PHB'14 p.97: "any hit you score
+   *  against a creature that is surprised is a critical hit." Presence-only
+   *  (no dice/DC to carry), so a plain `true` rather than DiceRider/SaveRider;
+   *  absent below rogue L3, off-subclass, or on a 2024 character (SRD 5.2/
+   *  PHB'24 deleted the clause, #1231) — gated server-side, this key is
+   *  never re-derived on the frontend. */
+  assassinate?: true;
 
   /** Taken ASI / feat entries, in the order chosen (clamped to advancementSlots.total). */
   advancements: AdvancementEntry[];
@@ -238,6 +263,14 @@ export interface Character {
   advancementSlots: AdvancementSlots;
   /** Fighting Style feat slots (#1137): a partition separate from ASI slots. */
   fightingStyleSlots: AdvancementSlots;
+  /** Class names that have EARNED the Fighting Style feature at this level
+   *  (#1495, fightingStyleGrantingClassNames) — the level-gated subset of
+   *  `classes`, not every class the character has. Pass this straight
+   *  through as the Fighting Style picker's `classes` scope (fetchFeats'
+   *  classNames arg) rather than deriving it from `classes` — a class that
+   *  merely HAS a fightingStyleFeatLevel but hasn't reached it yet must not
+   *  widen the offered set (CLAUDE.md: rules logic is backend-owned). */
+  fightingStyleGrantingClasses: string[];
 
   classes?: ClassEntry[];
 

@@ -52,6 +52,7 @@ const mockCharacter: Character = {
   carryCapacity: 180,
   carriedWeight: 0.5,
   attunementCap: 3,
+  weaponBondCap: 2,
   conditions: { active: [], exhaustion: 0 },
   exhaustionEffectText: "No exhaustion.",
   activeEffects: { buffs: [] },
@@ -99,6 +100,7 @@ const mockCharacter: Character = {
   advancements: [],
   advancementSlots: { total: 1, used: 0 },
   fightingStyleSlots: { total: 0, used: 0 },
+  fightingStyleGrantingClasses: [],
   journal: [],
   speciesTraits: [],
 };
@@ -165,5 +167,18 @@ describe("BannerVitals", () => {
     expect(screen.getByText("Initiative")).toBeInTheDocument();
     expect(screen.getByText("Speed")).toBeInTheDocument();
     expect(screen.getByText("Proficiency")).toBeInTheDocument();
+    expect(screen.queryByText("Fly Speed")).not.toBeInTheDocument();
+  });
+
+  // Dragon Wings (#1123): a fifth card appears only when the wire carries flySpeed.
+  it("renders a Fly Speed card when the character has flySpeed", () => {
+    renderWithCharacter(
+      <RollProvider>
+        <BannerVitals />
+      </RollProvider>,
+      { ...mockCharacter, flySpeed: 30 },
+    );
+    expect(screen.getByText("Fly Speed")).toBeInTheDocument();
+    expect(screen.getByText("30 ft")).toBeInTheDocument();
   });
 });

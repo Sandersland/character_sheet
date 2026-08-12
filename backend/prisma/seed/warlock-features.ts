@@ -91,6 +91,9 @@ interface RawWarlockFeature {
   resourceLabel?: string;
   resourceRecharge?: string;
   resourceTotals?: { minLevel: number; total: ResourceTotalFormula; shortRestRegain?: number }[];
+  // Beguiling Defenses' unconditional Charmed immunity (#1121) — see this
+  // file's own header for why only its row below sets this.
+  conditionImmunities?: string[];
 }
 
 function expand(raw: RawWarlockFeature): ClassFeatureSeedRow[] {
@@ -104,6 +107,7 @@ function expand(raw: RawWarlockFeature): ClassFeatureSeedRow[] {
     resourceLabel: raw.resourceLabel,
     resourceRecharge: raw.resourceRecharge,
     resourceTotals: raw.resourceTotals,
+    conditionImmunities: raw.conditionImmunities,
   };
   const editions: SeedEdition[] = raw.edition ? [raw.edition] : ["EDITION_2014", "EDITION_2024"];
   return editions.map((edition) => ({ ...base, edition }));
@@ -436,6 +440,14 @@ const ARCHFEY_RAW: RawWarlockFeature[] = [
     edition: "EDITION_2014",
     description:
       "You are immune to being charmed. When another creature attempts to charm you, you can use your reaction to have it make a Wisdom saving throw (spell save DC) or be charmed by you for 1 minute or until it takes damage.",
+    // #1121 — unconditional (no gating buff): PHB'14 p.109 flat Charmed
+    // immunity, shared with PHB'24's Archfey (verified against PHB'24: "You
+    // are immune to the Charmed condition") — Beguiling Defenses stays L10 in
+    // both editions, so no level fork is needed here either. The reflect-
+    // damage reaction half is enemy-targeted (self-or-announce), so it stays
+    // reminder text in `description` only. Wires once Archfey seeds a 2024
+    // row (Warlock #461) — no code change needed, only a second row.
+    conditionImmunities: ["charmed"],
   },
   {
     name: "Dark Delirium",

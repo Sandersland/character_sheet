@@ -6,16 +6,10 @@
  * (and its hook) can stay presentational.
  */
 
-import type { Spell, SpellSlots } from "@/types/character";
+import type { Spell, SpellSlots, SpellEconomyState } from "@/types/character";
 
 /** Economy slot the picker is managing. */
 export type EconomySlot = "action" | "bonusAction" | "reaction";
-
-/** Which kind of spell was cast in each economy slot this turn (5e restriction). */
-export interface SpellCastThisTurn {
-  action?: "cantrip" | "leveled";
-  bonus?: "cantrip" | "leveled";
-}
 
 /** Slot levels (ascending) that still have a use remaining. */
 export function availableSlotLevels(slots: SpellSlots[]): number[] {
@@ -61,26 +55,50 @@ export function resolvedSlot(
   return availableSlotsForSpell(spell, slotLevels, arcanaLevels)[0];
 }
 
-/** 5e bonus-action spell restriction flags derived from what was cast this turn. */
-export function spellRestrictionFlags(
+/**
+ * Project the SERVER-RESOLVED 5e bonus-action interlock (#1439) onto the
+ * CastableFilter flags for one economy slot. The rule is resolved server-side
+ * (edition-specific, #1439) and arrives as `SpellEconomyState`; this only routes
+ * the served booleans to the picker slot they gate — never re-deriving the rule.
+ * `filterCastableSpells`'s two flags are picker-neutral primitives:
+ * `bonusActionBlockedByActionSpell` drops ALL spells, `actionLimitedToCantrips`
+ * drops leveled ones (keeps cantrips). Both spell-picker surfaces
+ * (InlineSpellPicker's deriveSpellList and turnOptions' bonusSpellOptions) call
+ * THIS, so they share one projection and can never disagree — the seam that used
+ * to need the "mirror" latch. A reaction cast is never gated.
+ */
+export function restrictionFlagsForSlot(
   slot: EconomySlot,
-  spellCastThisTurn: SpellCastThisTurn,
+  economy: SpellEconomyState,
 ): { bonusActionBlockedByActionSpell: boolean; actionLimitedToCantrips: boolean } {
-  return {
-    bonusActionBlockedByActionSpell: slot === "bonusAction" && spellCastThisTurn.action === "leveled",
-    actionLimitedToCantrips: slot === "action" && spellCastThisTurn.bonus === "leveled",
-  };
+  if (slot === "bonusAction") {
+    // SRD 5.1: a leveled Action spell blocks the bonus action outright (drop
+    // all). SRD 5.2: it only limits it to cantrips (drop leveled).
+    return {
+      bonusActionBlockedByActionSpell: economy.bonusActionBlockedByActionSpell,
+      actionLimitedToCantrips: economy.bonusActionLimitedToCantrips,
+    };
+  }
+  if (slot === "action") {
+    return { bonusActionBlockedByActionSpell: false, actionLimitedToCantrips: economy.actionLimitedToCantrips };
+  }
+  return { bonusActionBlockedByActionSpell: false, actionLimitedToCantrips: false };
 }
 
-/** Economy hint shown when the 5e restriction blocks further casts. */
-export function slotRestrictionHint(
-  bonusActionBlockedByActionSpell: boolean,
-  actionLimitedToCantrips: boolean,
-): string | null {
-  if (bonusActionBlockedByActionSpell) {
-    return "Leveled spell cast this turn — bonus-action spell casting is not allowed (5e).";
+/** Economy hint shown when the interlock restricts further casts in this slot.
+ *  Slot-aware (#1439): the bonus picker's cantrips-only case (2024) reads
+ *  differently from the action picker's. Chrome only — the RULE is server-side. */
+export function slotRestrictionHint(slot: EconomySlot, economy: SpellEconomyState): string | null {
+  if (slot === "bonusAction") {
+    if (economy.bonusActionBlockedByActionSpell) {
+      return "Leveled spell cast this turn — no bonus-action spell allowed (5e).";
+    }
+    if (economy.bonusActionLimitedToCantrips) {
+      return "Leveled spell cast this turn — only a cantrip may be cast as a bonus action (5e).";
+    }
+    return null;
   }
-  if (actionLimitedToCantrips) {
+  if (slot === "action" && economy.actionLimitedToCantrips) {
     return "Bonus-action spell cast this turn — only cantrips may be cast with the action (5e).";
   }
   return null;

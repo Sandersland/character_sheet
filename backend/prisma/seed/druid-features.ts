@@ -79,6 +79,9 @@ interface RawDruidFeature {
   resourceLabel?: string;
   resourceRecharge?: string;
   resourceTotals?: { minLevel: number; total: ResourceTotalFormula; shortRestRegain?: number }[];
+  // Nature's Ward's unconditional Poisoned immunity (#1121) — see this file's
+  // own header for the two rows that set this.
+  conditionImmunities?: string[];
 }
 
 function expand(raw: RawDruidFeature): ClassFeatureSeedRow[] {
@@ -92,6 +95,7 @@ function expand(raw: RawDruidFeature): ClassFeatureSeedRow[] {
     resourceLabel: raw.resourceLabel,
     resourceRecharge: raw.resourceRecharge,
     resourceTotals: raw.resourceTotals,
+    conditionImmunities: raw.conditionImmunities,
   };
   const editions: SeedEdition[] = raw.edition ? [raw.edition] : ["EDITION_2014", "EDITION_2024"];
   return editions.map((edition) => ({ ...base, edition }));
@@ -367,6 +371,16 @@ const CIRCLE_OF_THE_LAND_RAW: RawDruidFeature[] = [
     level: 10,
     edition: "EDITION_2014",
     description: "Immune to poison and disease. Elementals and fey can't charm or frighten you.",
+    // #1121, PHB'14 p.68: poison immunity is unconditional — modeled here.
+    // Disease immunity has no ConditionKey to target (disease isn't a 5e
+    // status condition), so it stays reminder text only. The "by elementals
+    // or fey" charm/fright qualifier is source-conditional — this app has no
+    // attacker/source model (self-or-announce, an explicit non-goal to build
+    // one), so it is deliberately NOT added to conditionImmunities: doing so
+    // would grant unconditional charm/fright immunity, which is MORE
+    // permissive than PHB'14 actually says (the #1516/#1496 failure class).
+    // It stays reminder text in `description` only.
+    conditionImmunities: ["poisoned"],
   },
   {
     subclassSlug: CIRCLE_OF_THE_LAND_SLUG,
@@ -376,8 +390,12 @@ const CIRCLE_OF_THE_LAND_RAW: RawDruidFeature[] = [
     // SRD 5.2: a full rewrite — immunity narrows to the Poisoned condition
     // (drops disease immunity and the elemental/fey charm-fright clause) and
     // adds a Resistance keyed to your chosen land type.
+    // #1121 — unconditional Poisoned immunity, modeled directly; the
+    // land-typed damage Resistance clause is a separate, unwired axis (out of
+    // scope here — see #1121's own scope notes).
     description:
       "You are immune to the Poisoned condition, and you have Resistance to a damage type based on your Druid Circle land: Fire if your land is arid, Cold if it's polar, Lightning if it's temperate, or Poison if it's tropical.",
+    conditionImmunities: ["poisoned"],
   },
   {
     subclassSlug: CIRCLE_OF_THE_LAND_SLUG,

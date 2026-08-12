@@ -208,7 +208,7 @@ describe("Shadow Arts cast endpoint", () => {
     const res = await cast([{ type: "castShadowArt", shadowArtId: darknessId }]);
     expect(res.status).toBe(200);
     const noResourcesUsed = {
-      resources: { used: {}, maneuversKnown: [], toolProficienciesKnown: [], choicesKnown: {}, advancements: [] },
+      resources: { used: {}, maneuversKnown: [], toolProficienciesKnown: [], expertiseKnown: [], choicesKnown: {}, advancements: [] },
     };
     const noSpellcasting = { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null };
 

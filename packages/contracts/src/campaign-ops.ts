@@ -23,6 +23,17 @@ import { z } from "zod";
 
 // rulesEdition is optional (the Prisma column default applies when omitted).
 // Never patchable after creation — there is no PATCH /campaigns/:id route.
+//
+// This literal can't derive from `RulesEdition`/`ALL_RULES_EDITIONS`
+// (backend `lib/rules/edition.ts`, #1527): the package boundary
+// (.fallowrc.jsonc) forbids `contracts` from importing ANYTHING zoned, not
+// even `shared-types` type-only — see the boundary comment there, point 5.
+// So the "adding a 3rd RulesEdition member is a compile error" guarantee for
+// THIS site lives on the backend side of the boundary instead, as an
+// `expectTypeOf` latch in campaign-op-contract.test.ts asserting this field's
+// type against `RulesEdition` (mirrors this package's existing z.input/
+// z.output latches, e.g. preferences-ops.ts) — update this array AND that
+// latch together.
 export const createCampaignSchema = z
   .object({ name: z.string().min(1), rulesEdition: z.enum(["EDITION_2014", "EDITION_2024"]).optional() })
   .strict();

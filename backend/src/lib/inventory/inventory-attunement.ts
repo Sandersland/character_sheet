@@ -1,6 +1,6 @@
 import { Prisma } from "@/generated/prisma/client.js";
 import { describeAttunementPrereq, meetsAttunementPrereq } from "./capabilities.js";
-import { clearBuffByKeyInTx } from "@/lib/combat/active-effects.js";
+import { clearBuffByKeyInTx } from "@/lib/combat/buff-end.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { AttunementLimitError, InvalidInventoryOperationError } from "./inventory-currency.js";
 import {
@@ -44,7 +44,9 @@ export async function applyAttune(
         // raceSelection.name is the last fallback for a homebrew/no-species-FK
         // character (raw-inserted fixtures with no speciesId).
         raceSelection: { select: { name: true, species: { select: { name: true } }, variant: { select: { name: true } } } },
-        classEntries: { select: { name: true, subclass: true } },
+        classEntries: {
+          select: { name: true, subclassRef: { select: { casterFraction: true, spellcastingAbility: true } } },
+        },
       },
     });
     const prereq = { kind: item.attunementPrereqKind, value: item.attunementPrereqValue };

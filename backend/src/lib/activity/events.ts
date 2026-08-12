@@ -92,6 +92,10 @@ export type EventType =
   | "learnToolProficiency"
   | "forgetToolProficiency"
   | "toolProficienciesReconciled"
+  // Expertise (#1588)
+  | "learnExpertise"
+  | "forgetExpertise"
+  | "expertiseReconciled"
   | "learnSubclassChoice"
   | "forgetSubclassChoice"
   | "subclassChoicesReconciled"
@@ -106,6 +110,9 @@ export type EventType =
   // inventory attunement (#545)
   | "attuned"
   | "unattuned"
+  // Eldritch Knight Weapon Bond (2014, #1854)
+  | "weaponBonded"
+  | "weaponUnbonded"
   // inventory activated effects (#543)
   | "activated"
   | "deactivated"
@@ -117,6 +124,12 @@ export type EventType =
   | "combatStarted"
   | "combatEnded"
   | "combatRoundAdvanced"
+  // combat action resolution (#1829, epic #1827) — one undoable event per
+  // resolved weapon swing / spell cast, carrying its rolls in `data`
+  // (replaces the separate attackRoll/damageRoll/castSpell rows a resolution
+  // used to write; those event types stay for the standalone roll-log paths
+  // until the adapter slices #1832/#1833 retire them).
+  | "resolveAction"
   // conditions
   | "conditionApplied"
   | "conditionRemoved"

@@ -12,15 +12,19 @@ import { ATTUNEMENT_LIMIT } from "@/lib/inventory/inventory-attunement.js";
 import { currencyOrEmpty } from "@/lib/inventory/inventory-currency.js";
 import { sneakAttackSpecForEntries } from "@/lib/classes/sneak-attack.js";
 import { monkSaveDC } from "@/lib/classes/monk.js";
-import { QUIVERING_PALM_BUFF_KEY } from "@/lib/classes/quivering-palm.js";
+import { hasStunningStrike } from "@/lib/classes/stunning-strike.js";
+import { QUIVERING_PALM_BUFF_KEY, hasQuiveringPalm } from "@/lib/classes/quivering-palm.js";
+import { hasOpenHandTechnique } from "@/lib/classes/open-hand-technique.js";
 import { resolveSubclassSlug, type SubclassIdentityInput } from "@/lib/classes/subclass-slug.js";
+import { assassinateEligible } from "@/lib/classes/assassinate.js";
+import { weaponBondEligible, WEAPON_BOND_LIMIT } from "@/lib/classes/weapon-bond.js";
 import { featureRowsOf } from "@/lib/classes/feature-rows-select.js";
-import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
+import { normalizeConditionsMutable, deriveImmuneConditions, immuneConditionEntryRows } from "@/lib/combat/conditions.js";
 import { normalizeActiveEffectsMutable, type ActiveEffectsMutableState } from "@/lib/combat/active-effects.js";
 import { isOffHandLocked } from "@/lib/inventory/inventory-placement.js";
 import { RULES_EDITION_LABELS, editionOf } from "@/lib/rules/edition.js";
 import { portraitKeyVersion } from "@/lib/storage/portrait-blob.js";
-import type { DiceRider, SaveRider } from "@character-sheet/shared-types";
+import type { DiceRider, RulesEdition, SaveRider } from "@character-sheet/shared-types";
 import { resolveCharacterInventory, type CharacterRow, type CharacterWithRelations } from "./character-include.js";
 import { buildRollModifiers, buildTargetModifiers } from "./serialize/effects.js";
 import {
@@ -68,15 +72,17 @@ function sneakAttackRider(classEntries: { name: string; level: number }[]): Dice
   return spec ? { dice: { count: spec.count, faces: spec.faces } } : undefined;
 }
 
-// Stunning Strike: the focus save DC, undefined below monk L5. Scales with
-// the monk class entry's own level, matching monkLevel() in stunning-strike.ts.
+// Stunning Strike: the focus save DC, undefined below the gate. Scales with
+// the monk class entry's own level, gated through hasStunningStrike (#1337:
+// the single source of the L5 threshold, also consumed by that module's own
+// cast guard).
 function stunningStrikeRider(
   classEntries: { name: string; level: number }[],
   abilityScores: Record<string, number>,
   profBonus: number,
 ): SaveRider | undefined {
   const monkLevel = classEntries.find((c) => c.name.toLowerCase() === "monk")?.level ?? 0;
-  return monkLevel >= 5 ? { saveDC: monkSaveDC(abilityScores, profBonus) } : undefined;
+  return hasStunningStrike(monkLevel) ? { saveDC: monkSaveDC(abilityScores, profBonus) } : undefined;
 }
 
 type RiderClassEntry = SubclassIdentityInput & { name: string; level: number };
@@ -98,22 +104,26 @@ function openHandMonkEntry(classEntries: RiderClassEntry[]): RiderClassEntry | u
 }
 
 // Open Hand Technique (Warrior of the Open Hand L3, #1245): the focus save DC
-// for the Push/Topple riders, undefined below monk L3 off-subclass. Addle
+// for the Push/Topple riders, undefined off-subclass or below the gate. Addle
 // carries no save, but the shape stays uniform (saveDC is always present once
-// unlocked) — live-play automation lives in open-hand-technique.ts.
+// unlocked). Gated through hasOpenHandTechnique (#1337: the single source of
+// the L3 threshold, also consumed by that module's own cast guard) —
+// live-play automation lives in that module too.
 function openHandTechniqueRider(
   classEntries: RiderClassEntry[],
   abilityScores: Record<string, number>,
   profBonus: number,
 ): SaveRider | undefined {
   const monk = openHandMonkEntry(classEntries);
-  return monk && monk.level >= 3 ? { saveDC: monkSaveDC(abilityScores, profBonus) } : undefined;
+  return monk && hasOpenHandTechnique(monk.level) ? { saveDC: monkSaveDC(abilityScores, profBonus) } : undefined;
 }
 
 // Quivering Palm (Warrior of the Open Hand L17, #1245): the focus save DC for
 // the Con-save trigger, plus whether vibrations are currently set (the
 // activeEffects buff registry's inert QUIVERING_PALM_BUFF_KEY marker — see
-// quivering-palm.ts's header for why a buff, not new persisted state).
+// quivering-palm.ts's header for why a buff, not new persisted state). Gated
+// through hasQuiveringPalm (#1337: the single source of the L17 threshold,
+// also consumed by that module's own cast guard).
 function quiveringPalmRider(
   classEntries: RiderClassEntry[],
   abilityScores: Record<string, number>,
@@ -121,11 +131,20 @@ function quiveringPalmRider(
   activeEffects: ActiveEffectsMutableState,
 ): SaveRider | undefined {
   const monk = openHandMonkEntry(classEntries);
-  if (!monk || monk.level < 17) return undefined;
+  if (!monk || !hasQuiveringPalm(monk.level)) return undefined;
   return {
     saveDC: monkSaveDC(abilityScores, profBonus),
     active: activeEffects.buffs.some((b) => b.key === QUIVERING_PALM_BUFF_KEY),
   };
+}
+
+// Assassinate (2014 Assassin L3+, #1526): presence-only — no dice/DC, so a
+// plain `true` rather than the DiceRider/SaveRider `Rider` shapes (riders.ts:
+// "availability via presence" is exactly this case with nothing else to
+// carry). Shares assassinateEligible with resolve-action.ts's op validation
+// — see that function's own header for why it's the ONE gate both sides call.
+function assassinateRider(classEntries: RiderClassEntry[], edition: RulesEdition): true | undefined {
+  return assassinateEligible(classEntries, edition) ? true : undefined;
 }
 
 // Assembles the rider view (#1316): each key spread in only when present.
@@ -136,30 +155,38 @@ function buildRiderView(
   abilityScores: Record<string, number>,
   profBonus: number,
   activeEffects: ActiveEffectsMutableState,
-  maneuverSaveDC: number | undefined,
+  announcedSaveDC: number | undefined,
+  edition: RulesEdition,
 ): {
   sneakAttack?: DiceRider;
   stunningStrike?: SaveRider;
   openHandTechnique?: SaveRider;
   quiveringPalm?: SaveRider;
   maneuvers?: SaveRider;
+  assassinate?: true;
 } {
   const sneakAttack = sneakAttackRider(classEntries);
   const stunningStrike = stunningStrikeRider(classEntries, abilityScores, profBonus);
   const openHandTechnique = openHandTechniqueRider(classEntries, abilityScores, profBonus);
   const quiveringPalm = quiveringPalmRider(classEntries, abilityScores, profBonus, activeEffects);
+  const assassinate = assassinateRider(classEntries, edition);
   return {
     ...(sneakAttack ? { sneakAttack } : {}),
     ...(stunningStrike ? { stunningStrike } : {}),
     ...(openHandTechnique ? { openHandTechnique } : {}),
     ...(quiveringPalm ? { quiveringPalm } : {}),
+    ...(assassinate ? { assassinate } : {}),
     // Battle Master maneuver save DC, folded into the rider contract (#1316) —
     // structurally the same shape as stunningStrike, just sourced from
     // deriveEntryScopedResources via buildResourcesView. maneuverChoiceCount/
     // toolProfChoiceCount stay in `resources` — they're choice counts,
     // load-bearing for the clamp-on-read in serialize/classes.ts. Named for
-    // the feature (`maneuvers`), like every other rider, not the field.
-    ...(maneuverSaveDC !== undefined ? { maneuvers: { saveDC: maneuverSaveDC } } : {}),
+    // the feature (`maneuvers`), like every other rider, not the field —
+    // `announcedSaveDC` (#1589) is the GENERIC ClassExtras field this rider
+    // happens to be the sole consumer of today; a future Cleric/Monk/
+    // Barbarian/Rogue rider would read the SAME field under its OWN rider
+    // name, never a second `maneuvers`-shaped consumer of it.
+    ...(announcedSaveDC !== undefined ? { maneuvers: { saveDC: announcedSaveDC } } : {}),
   };
 }
 
@@ -289,7 +316,7 @@ export async function serializeCharacter(rawRow: CharacterRow) {
     progress.proficiencyBonus,
   );
   const spellcasting = await decorateSpellcastingCatalog(row, spellcastingBase);
-  const { resources, maneuverSaveDC, classFeatureImprovements } = buildResourcesView(
+  const { resources, announcedSaveDC, classFeatureImprovements } = buildResourcesView(
     row,
     progress.level,
     abilityScoresMap,
@@ -310,8 +337,17 @@ export async function serializeCharacter(rawRow: CharacterRow) {
   //    effectiveMaxHp composes the feat bonus with exhaustion's PHB'14 p. 291
   //    tier-4 halving, so the feat layer needs the exhaustion level in hand.
   const conditions = normalizeConditionsMutable(row.conditions);
-  const { effectiveScores, hitPoints, effectiveInitBonus, clampedAdvancements, advSlotTotal, usedSlots, fightingStyleSlotTotal, usedFightingStyleSlots } =
-    applyAdvancementClamp(row, progress.level, normalizedHitPoints);
+  const {
+    effectiveScores,
+    hitPoints,
+    effectiveInitBonus,
+    clampedAdvancements,
+    advSlotTotal,
+    usedSlots,
+    fightingStyleSlotTotal,
+    usedFightingStyleSlots,
+    fightingStyleGrantingClasses,
+  } = applyAdvancementClamp(row, progress.level, normalizedHitPoints);
   const { featBonuses, effectiveMaxHp, featProficiencies } = applyFeatLayer(
     clampedAdvancements,
     classFeatureImprovements,
@@ -319,6 +355,8 @@ export async function serializeCharacter(rawRow: CharacterRow) {
     hitDice.total,
     hitPoints.max,
     conditions.exhaustion,
+    row.classEntries,
+    progress.level,
     editionOf(row),
   );
 
@@ -329,6 +367,16 @@ export async function serializeCharacter(rawRow: CharacterRow) {
   const weaponGrants = buildMergedWeaponProficiencies(row.classEntries, featProficiencies.weapons);
   const activeEffects = normalizeActiveEffectsMutable(row.activeEffects);
   const buffTargets = buildTargetModifiers(row, activeEffects);
+  // The immune-condition set (#1121) — Mindless Rage/Beguiling Defenses/
+  // Nature's Ward — through the SAME shared rule function the conditions
+  // write-guard calls (deriveImmuneConditions, lib/combat/conditions.ts), so
+  // the sheet can never show a condition as available that the endpoint
+  // would actually reject.
+  const immuneConditions = deriveImmuneConditions(
+    immuneConditionEntryRows(row.classEntries, progress.level),
+    editionOf(row),
+    activeEffects,
+  );
   const { itemGrants, itemSkillProfs, itemSaveProfs } = buildItemGrantsView(row);
   // Archery Fighting Style feat (#1137): +2 to ranged attack rolls, summed from
   // the kept advancements' rangedAttackRoll improvements.
@@ -363,6 +411,16 @@ export async function serializeCharacter(rawRow: CharacterRow) {
   // or Shield. Computed once here — `deriveActions` is the first consumer, but
   // the flag is generic (`requiresUnarmored`) so future gated features share it.
   const unarmoredUnshielded = bestArmor == null && !hasShield;
+  // Eldritch Knight Weapon Bond (#1854): clamp-on-read half of the
+  // reconciler/clamp pair — weaponBondEligible is the SAME rule function
+  // reconcileWeaponBond (level-reconciliation.ts) and the bond/unbond
+  // transaction op (weapon-bond.ts) call. A stale `weaponBonded` flag on a
+  // character who's since lost eligibility (level-down, lost the subclass)
+  // reads as 0 here until reconcileWeaponBond physically clears it on the
+  // next XP transaction.
+  const bondedWeaponCount = weaponBondEligible(row.classEntries, progress.level, editionOf(row)).eligible
+    ? row.inventoryItems.filter((item) => item.weaponBonded).length
+    : 0;
   const { armorClass, armorClassBreakdown } = buildArmorClassView(
     row,
     effectiveScores,
@@ -373,7 +431,16 @@ export async function serializeCharacter(rawRow: CharacterRow) {
     buffTargets,
     editionOf(row),
   );
-  const speed = buildSpeedView(row, bestArmor, hasShield, featBonuses, buffTargets, conditions.exhaustion, editionOf(row));
+  const { speed, flySpeed } = buildSpeedView(
+    row,
+    bestArmor,
+    hasShield,
+    featBonuses,
+    buffTargets,
+    conditions.exhaustion,
+    progress.level,
+    editionOf(row),
+  );
   const unarmedAttacks = buildUnarmedAttacksView(
     row,
     effectiveScores,
@@ -387,7 +454,14 @@ export async function serializeCharacter(rawRow: CharacterRow) {
   const attackRows = buildAttackRowsView(inventory, unarmedAttacks, clampedAdvancements);
 
   // Riders (#1316) — each key present only when the character has it.
-  const riders = buildRiderView(row.classEntries, effectiveScores, progress.proficiencyBonus, activeEffects, maneuverSaveDC);
+  const riders = buildRiderView(
+    row.classEntries,
+    effectiveScores,
+    progress.proficiencyBonus,
+    activeEffects,
+    announcedSaveDC,
+    editionOf(row),
+  );
 
   // 6. Final assembly — one field per line, each fed by a builder above.
   return {
@@ -418,6 +492,12 @@ export async function serializeCharacter(rawRow: CharacterRow) {
     armorClassBreakdown,
     initiativeBonus: effectiveInitBonus + featBonuses.initiative,
     speed,
+    // Dragon Wings (#1123) — 2014 only (PHB'14 p.107; the 2024 form is a
+    // resource-gated activated ability, withheld — see
+    // deriveDragonWingsFlySpeed's header), present only while unarmored at
+    // Draconic L14. Absent (never 0) when not flying, same "key present only
+    // when the character has it" convention as the riders above.
+    flySpeed,
     proficiencyBonus: progress.proficiencyBonus,
 
     experiencePoints: row.experiencePoints,
@@ -442,7 +522,7 @@ export async function serializeCharacter(rawRow: CharacterRow) {
       featProficiencies.savingThrows,
       itemSaveProfs,
     ),
-    skills: buildSkillsView(row, featProficiencies, itemSkillProfs, buffTargets),
+    skills: buildSkillsView(row, featProficiencies, itemSkillProfs, buffTargets, resources),
     toolProficiencies: buildToolProficienciesView(row, resources, itemGrants),
     // Armor/weapon proficiencies — derived fully at read time from class,
     // species-trait, and feat grants (species grants arrive feat-sourced since
@@ -464,6 +544,10 @@ export async function serializeCharacter(rawRow: CharacterRow) {
     // attune path's 409 rejects on — the sheet used to re-type the literal in
     // four places.
     attunementCap: ATTUNEMENT_LIMIT,
+    // Weapon Bond's 2-weapon cap (#1854), same served-constant shape as
+    // attunementCap above — the bond endpoint's 409 rejects on the same
+    // WEAPON_BOND_LIMIT.
+    weaponBondCap: WEAPON_BOND_LIMIT,
     spellcasting,
     resources,
     // Active status conditions + exhaustion level. Normalized on read (unknown
@@ -477,6 +561,11 @@ export async function serializeCharacter(rawRow: CharacterRow) {
     // into `conditions`: that object is also the write shape and the audit
     // before/after payload, and a derived string has no business being persisted.
     exhaustionEffectText: exhaustionEffectText(conditions.exhaustion, editionOf(row)),
+    // Condition keys the character is currently immune to (#1121) — Mindless
+    // Rage/Beguiling Defenses/Nature's Ward — so the sheet can show WHY a
+    // condition is unavailable. NOT folded into `conditions` for the same
+    // reason exhaustionEffectText isn't: derived, never persisted.
+    immuneConditions,
     // Active cast-granted passive modifiers (buffs). Normalized on read; each is
     // also summed into its target skill/stat's tempModifier above.
     activeEffects,
@@ -508,10 +597,33 @@ export async function serializeCharacter(rawRow: CharacterRow) {
       total: fightingStyleSlotTotal,
       used: usedFightingStyleSlots,
     },
+    // #1495: the class names that have EARNED the Fighting Style feature at
+    // this level (fightingStyleGrantingClassNames — the level-gated subset,
+    // never `character.classes` as a whole) — the picker and level-up
+    // ceremony pass this straight through as GET /api/feats?classes=' scope,
+    // matching exactly what the write path (resolveCatalogFeat) enforces so
+    // a served option can never 400. CLAUDE.md: the frontend consumes this
+    // resolved value rather than re-deriving the level-threshold rule.
+    fightingStyleGrantingClasses,
 
     // Class-specific available actions for the turn tracker (universal ones ride
-    // GET /api/reference instead, resolved per edition — #1430).
-    availableActions: buildAvailableActionsView(row.classEntries, progress.level, resources, unarmoredUnshielded, editionOf(row)),
+    // GET /api/reference instead, resolved per edition — #1430). bondedWeaponCount
+    // (#1854) is the clamp-on-read half of the reconciler/clamp pair — see its
+    // own computation above.
+    availableActions: buildAvailableActionsView(
+      row.classEntries,
+      progress.level,
+      resources,
+      unarmoredUnshielded,
+      editionOf(row),
+      effectiveScores,
+      // Off-hand eligibility input (#1435): the light flags of the equipped
+      // weapons, read off the SAME serialized inventory the attack rows use.
+      inventory
+        .filter((item) => item.category === "weapon" && item.equipped && item.weapon)
+        .map((item) => ({ light: Boolean(item.weapon?.light) })),
+      bondedWeaponCount,
+    ),
 
     // Combat attack rows — derived at read time so the session turn sheets render
     // served numbers instead of recomputing attack math on the client (#1434).
@@ -538,7 +650,8 @@ export async function serializeCharacter(rawRow: CharacterRow) {
     // weapon's die, while this one says nothing may occupy the off-hand at all.
     offHandLocked: isOffHandLocked(row.inventoryItems),
     // Riders (#1316): sneakAttack/stunningStrike/openHandTechnique/
-    // quiveringPalm/maneuvers, each present only when the character has it.
+    // quiveringPalm/maneuvers/assassinate, each present only when the
+    // character has it.
     ...riders,
 
     // Species-granted information (#1682): name + cited trait text for the

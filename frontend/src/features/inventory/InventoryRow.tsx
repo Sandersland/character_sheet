@@ -1,16 +1,16 @@
-import { ChevronDown } from "lucide-react";
 import { useReducer } from "react";
 
 import { hasItemProse, itemDetailParts } from "@/lib/itemDetails";
 import type { InventoryItem, InventoryOperation } from "@/types/character";
 import OverflowMenu from "@/components/ui/OverflowMenu";
 import ActivateControl from "@/features/inventory/ActivateControl";
-import AttuneToggle from "@/features/inventory/AttuneToggle";
-import EquipToggle from "@/features/inventory/EquipToggle";
 import InventoryEditForm from "@/features/inventory/InventoryEditForm";
+import InventoryRowControls from "@/features/inventory/InventoryRowControls";
+import InventoryRowExpandToggle from "@/features/inventory/InventoryRowExpandToggle";
+import InventoryRowRemoveConfirm from "@/features/inventory/InventoryRowRemoveConfirm";
 import ItemProse from "@/features/inventory/ItemProse";
 import ItemSummary from "@/features/inventory/ItemSummary";
-import UseConsumableButton from "@/features/inventory/UseConsumableButton";
+import { NULL_WEAPON_BOND_PROPS, type WeaponBondProps } from "@/lib/weaponBond";
 
 interface InventoryRowProps {
   item: InventoryItem;
@@ -21,6 +21,10 @@ interface InventoryRowProps {
   onSubmit: (operations: InventoryOperation[]) => Promise<void>;
   // True when 3 items are already attuned — gates a new attune (5e cap).
   atCap?: boolean;
+  // Bundled Weapon Bond props (#1854) — see WeaponBondProps' own comment.
+  // Defaults to an ineligible no-op so callers that never touch Weapon Bond
+  // (most InventoryRow.test.tsx cases) don't have to pass it.
+  bond?: WeaponBondProps;
   // Multi-select sell mode: a leading checkbox replaces the per-row actions.
   selectMode?: boolean;
   selected?: boolean;
@@ -54,6 +58,7 @@ export default function InventoryRow({
   onCancel,
   onSubmit,
   atCap = false,
+  bond = NULL_WEAPON_BOND_PROPS,
   selectMode = false,
   selected = false,
   onToggleSelect,
@@ -65,43 +70,33 @@ export default function InventoryRow({
   }
 
   const details = itemDetailParts(item);
+
+  // Multi-select sell mode: the row is just a checkbox + summary — none of
+  // the per-item controls/remove-confirm/activate/prose below apply, so this
+  // returns early rather than gating each of them on `!selectMode` (#1854:
+  // one branch here replaces four repeated `!selectMode &&` checks, keeping
+  // the view-mode body's own cyclomatic/cognitive score under the fallow gate).
+  if (selectMode) {
+    return (
+      <li className="flex flex-col gap-1.5 py-2">
+        <div className="flex items-start justify-between gap-3">
+          <ItemSummary item={item} details={details} selectMode selected={selected} onToggleSelect={onToggleSelect} />
+        </div>
+      </li>
+    );
+  }
+
   const hasProse = hasItemProse(item);
 
   return (
     <li className="flex flex-col gap-1.5 py-2">
       <div className="flex items-start justify-between gap-3">
-        <ItemSummary
-          item={item}
-          details={details}
-          selectMode={selectMode}
-          selected={selected}
-          onToggleSelect={onToggleSelect}
-        />
-        {!selectMode && (
+        <ItemSummary item={item} details={details} selectMode={false} selected={false} />
         <div className="flex shrink-0 items-center gap-1.5 pt-0.5">
           {hasProse && (
-            <button
-              type="button"
-              aria-expanded={state.expanded}
-              aria-label={state.expanded ? "Hide details" : "Show details"}
-              onClick={() => dispatch("toggleExpand")}
-              className="flex h-7 w-7 items-center justify-center rounded-control text-parchment-500 transition-colors hover:bg-parchment-200 hover:text-parchment-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600"
-            >
-              <ChevronDown
-                aria-hidden="true"
-                className={`h-4 w-4 transition-transform ${state.expanded ? "rotate-180" : ""}`}
-              />
-            </button>
+            <InventoryRowExpandToggle expanded={state.expanded} onToggle={() => dispatch("toggleExpand")} />
           )}
-          {item.category === "consumable" && (
-            <UseConsumableButton item={item} pending={pending} onSubmit={onSubmit} />
-          )}
-          {item.equippable && (
-            <EquipToggle item={item} pending={pending} onSubmit={onSubmit} />
-          )}
-          {item.requiresAttunement && (
-            <AttuneToggle item={item} pending={pending} atCap={atCap} onSubmit={onSubmit} />
-          )}
+          <InventoryRowControls item={item} pending={pending} atCap={atCap} onSubmit={onSubmit} bond={bond} />
           <OverflowMenu
             label={`Actions for ${item.name}`}
             items={[
@@ -115,36 +110,20 @@ export default function InventoryRow({
             ]}
           />
         </div>
-        )}
       </div>
 
-      {!selectMode && state.confirming && (
-        <div className="flex items-center justify-end gap-3 text-xs">
-          <span className="text-parchment-700">Remove {item.name}?</span>
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => onSubmit([{ type: "remove", inventoryItemId: item.id }])}
-            className="font-semibold text-garnet-700 hover:underline disabled:opacity-40"
-          >
-            Confirm
-          </button>
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => dispatch("cancelRemove")}
-            className="font-semibold text-parchment-600 hover:underline disabled:opacity-40"
-          >
-            Cancel
-          </button>
-        </div>
+      {state.confirming && (
+        <InventoryRowRemoveConfirm
+          itemName={item.name}
+          pending={pending}
+          onConfirm={() => onSubmit([{ type: "remove", inventoryItemId: item.id }])}
+          onCancel={() => dispatch("cancelRemove")}
+        />
       )}
 
-      {!selectMode && item.activated && (
-        <ActivateControl item={item} pending={pending} onSubmit={onSubmit} />
-      )}
+      {item.activated && <ActivateControl item={item} pending={pending} onSubmit={onSubmit} />}
 
-      {!selectMode && state.expanded && hasProse && <ItemProse item={item} />}
+      {state.expanded && hasProse && <ItemProse item={item} />}
     </li>
   );
 }

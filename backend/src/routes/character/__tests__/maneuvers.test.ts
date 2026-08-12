@@ -121,7 +121,7 @@ describe("POST /api/characters/:id/abilities/maneuvers/transactions", () => {
       create: { name: CLASS_NAME, hitDie: "d10", savingThrows: ["strength", "constitution"], skillChoiceCount: 2, skillChoices: ["athletics"], isSpellcaster: false, subclassLevel: 3 },
       update: { subclassLevel: 3 },
     });
-    // #1546 Part B-ii: Battle Master's superiority-dice pool + maneuverSaveDC
+    // #1546 Part B-ii: Battle Master's superiority-dice pool + announcedSaveDC
     // are ROW-driven now (fighter.ts's resourceFn/deriveExtras are gone) — a
     // bespoke Subclass row with no ClassFeature children would silently lose
     // both, same failure mode fighterResourceRowsData's own header describes
@@ -191,7 +191,7 @@ describe("POST /api/characters/:id/abilities/maneuvers/transactions", () => {
         "When you hit a creature with a weapon attack, expend a superiority die and add it to the damage roll. " +
         "If the target is Large or smaller, it must make a Strength saving throw or be knocked prone.",
     }];
-    const base = { maneuversKnown: known, toolProficienciesKnown: [], choicesKnown: {}, advancements: [] };
+    const base = { maneuversKnown: known, toolProficienciesKnown: [], expertiseKnown: [], choicesKnown: {}, advancements: [] };
 
     expect(await readPinnedEvents(FIXTURE_ID, ["castManeuver", "spendResource"])).toEqual([
       {

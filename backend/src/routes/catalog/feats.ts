@@ -2,9 +2,10 @@ import { Router } from "express";
 
 import { prisma } from "@/lib/core/prisma.js";
 import { parseAsiLevelOr400 } from "@/lib/http/parse-asi-level-param.js";
+import { parseClassesParam } from "@/lib/http/parse-class-param.js";
 import { requireEditionOr400 } from "@/lib/http/parse-edition-param.js";
 import { resolveEditionCatalog } from "@/lib/rules/catalog-edition.js";
-import { featOfferedForAsiSlot, type FeatCategory } from "@/lib/srd/feats.js";
+import { featOfferedForAsiSlot, fightingStyleFeatOfferedForClasses, type FeatCategory } from "@/lib/srd/feats.js";
 
 export const featsRouter = Router();
 
@@ -27,6 +28,22 @@ export const featsRouter = Router();
 // need rows the ASI gate rejects by design — the Fighting Style picker reads
 // fighting_style, and the level-up review step resolves an id to a name for an
 // already-committed pick.
+//
+// `?classes=` is OPTIONAL (#1495): a comma-separated class-name list gating
+// the offered set to fightingStyleFeatOfferedForClasses — the picker's only
+// gate now that the frontend never re-derives PHB'14's per-class Fighting
+// Style subset. Applied to every row (not just fighting_style ones), in JS
+// over the resolved catalog, same layer as the asiLevel filter above (#1495's
+// own refinement note: a class-scope param follows that pattern rather than
+// splitting filtering across layers) — harmless for every other category,
+// since their Feat.classes is always `[]` (unrestricted).
+//
+// `?classes=` and `?asiLevel=` together 400 rather than silently combining:
+// featOfferedForAsiSlot always rejects fighting_style (Origin/Fighting Style
+// come from backgrounds/classes, never an ASI slot), so asiLevel's own filter
+// strips every fighting_style row before classes ever runs — the two params
+// serve disjoint feat categories, and letting them compose would return a
+// response that looks class-scoped but silently ignores that scope.
 featsRouter.get("/feats", async (req, res) => {
   const edition = requireEditionOr400(req, res);
   if (edition === undefined) return;
@@ -35,6 +52,17 @@ featsRouter.get("/feats", async (req, res) => {
   if (!parsedAsiLevel.ok) return;
   const { asiLevel } = parsedAsiLevel;
 
+  const parsedClasses = parseClassesParam(req, res);
+  if (!parsedClasses.ok) return;
+  const { classNames } = parsedClasses;
+
+  if (asiLevel !== undefined && classNames !== undefined) {
+    res.status(400).json({
+      error: "Invalid classes: cannot be combined with asiLevel — asiLevel never offers a Fighting Style row",
+    });
+    return;
+  }
+
   const feats = await prisma.feat.findMany({
     orderBy: { name: "asc" },
   });
@@ -42,7 +70,7 @@ featsRouter.get("/feats", async (req, res) => {
   // Gate the raw row, not the mapped payload below: the payload turns a NULL
   // levelPrerequisite into `undefined`, which the rule reads the same way today
   // but needn't forever — the rule's input is the catalog row.
-  const offered =
+  const asiFiltered =
     asiLevel === undefined
       ? resolved
       : resolved.filter((row) =>
@@ -51,6 +79,10 @@ featsRouter.get("/feats", async (req, res) => {
             asiLevel,
           ),
         );
+  const offered =
+    classNames === undefined
+      ? asiFiltered
+      : asiFiltered.filter((row) => fightingStyleFeatOfferedForClasses(row, classNames, edition));
 
   res.json(
     offered.map((row) => ({

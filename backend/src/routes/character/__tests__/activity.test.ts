@@ -55,6 +55,7 @@ import { authCookie } from "@/test-support/auth.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 import { fighterResourceRowsData } from "@/test-support/fighter-resource-rows.js";
 import { readInventorySnapshot } from "@/lib/inventory/inventory-snapshot-read.js";
+import { startSoloSession } from "@/lib/session/sessions.js";
 
 // Sessions are campaign-level (#245): create a throwaway campaign to host a
 // Session row when a test only needs a valid sessionId to tag events with.
@@ -416,6 +417,106 @@ describe("POST /:id/events/:batchId/revert — Wizard scenarios", () => {
     // Both the HP change and the slot spend are undone together.
     expect(res.body.hitPoints.current).toBe(8);
     expect(res.body.spellcasting.slots.find((s: { level: number }) => s.level === 1).used).toBe(0);
+  });
+
+  // ── standalone rolls are their own trivially-undoable batches (#1861) ──────
+  //
+  // #1861 collapsed the last "two paths": checkRoll/saveRoll/initiativeRoll and
+  // the tally-resolve damage roll no longer go through the fire-and-forget
+  // POST .../sessions/:id/roll route — they commit through the SAME
+  // resolve-action resolver as a `logRoll` op, writing a real batched,
+  // trivially-undoable roll-category event. That let the `category: { not:
+  // "roll" }` LIFO-undo skip in revertPreflight be DELETED: a standalone roll
+  // never blocks a real batch's undo because the roll is itself the next
+  // undoable batch in the LIFO chain (its before/after are null, so reversing
+  // it restores nothing and just marks the batch reverted), not a dead
+  // non-undoable log entry stuck at the top.
+  describe("standalone rolls as trivially-undoable batches (#1861)", () => {
+    function weaponResolveOp(actionId = "twf-action-1") {
+      return {
+        type: "resolveAction" as const,
+        actionId,
+        source: "Dagger (off-hand)",
+        cost: { kind: "bonus" as const },
+        toHit: { faces: [15], kept: 15, nat20: false, bonus: 5, total: 20, verdict: "hit" as const },
+        effect: { spec: "1d4+3", faces: [3], total: 6, type: "piercing", kind: "damage" as const, crit: false },
+      };
+    }
+
+    function checkRollOp(source = "Athletics") {
+      return {
+        type: "logRoll" as const,
+        kind: "check" as const,
+        source,
+        total: 14,
+        ability: "strength",
+        faces: [12],
+      };
+    }
+
+    function postOps(op: Record<string, unknown>) {
+      return supertest.agent(app).set("Cookie", COOKIE)
+        .post(`/api/characters/${WIZARD_ID}/resolve-action/transactions`)
+        .send({ operations: [op] });
+    }
+
+    it("a logRoll op writes a roll-category event that reverts cleanly on its own", async () => {
+      await startSoloSession(WIZARD_ID);
+      const res = await postOps(checkRollOp());
+      expect(res.status).toBe(200);
+
+      const batchId = await latestBatchId(WIZARD_ID);
+      const event = await prisma.characterEvent.findFirst({ where: { characterId: WIZARD_ID, batchId } });
+      expect(event?.category).toBe("roll");
+      expect(event?.type).toBe("checkRoll");
+      // No state delta — a check roll snapshots nothing.
+      expect(event?.before).toBeNull();
+      expect(event?.after).toBeNull();
+
+      const revertRes = await revert(WIZARD_ID, batchId);
+      expect(revertRes.status).toBe(200);
+      const reverted = await prisma.characterEvent.findFirst({ where: { characterId: WIZARD_ID, batchId } });
+      expect(reverted?.reverted).toBe(true);
+    });
+
+    it("a standalone roll is the most-recent batch and is undoable BEFORE the real batch under it (LIFO, no skip)", async () => {
+      await startSoloSession(WIZARD_ID);
+
+      const resolveRes = await postOps(weaponResolveOp("twf-action-2"));
+      expect(resolveRes.status).toBe(200);
+      const weaponBatch = await latestBatchId(WIZARD_ID);
+
+      // A later, unrelated ability check — its own fresh batchId, category "roll".
+      const rollRes = await postOps(checkRollOp("Perception"));
+      expect(rollRes.status).toBe(200);
+      const rollBatch = await latestBatchId(WIZARD_ID);
+      expect(rollBatch).not.toBe(weaponBatch);
+
+      // With the skip GONE, the roll IS the most-recent action: it must undo
+      // first (this 409s while the skip is present — the roll was excluded from
+      // the LIFO scan, so the weapon batch was still "most recent" and the roll
+      // batch could never be reverted).
+      const undoRoll = await revert(WIZARD_ID, rollBatch);
+      expect(undoRoll.status).toBe(200);
+      // …then the real batch under it undoes cleanly.
+      const undoWeapon = await revert(WIZARD_ID, weaponBatch);
+      expect(undoWeapon.status).toBe(200);
+    });
+
+    it("undoing the newest real batch is clean when only OLDER standalone rolls precede it", async () => {
+      await startSoloSession(WIZARD_ID);
+
+      const rollRes = await postOps(checkRollOp("Insight"));
+      expect(rollRes.status).toBe(200);
+
+      const resolveRes = await postOps(weaponResolveOp("twf-action-3"));
+      expect(resolveRes.status).toBe(200);
+      const weaponBatch = await latestBatchId(WIZARD_ID);
+
+      // The roll is OLDER, so the real batch is most-recent and undoes directly.
+      const undoWeapon = await revert(WIZARD_ID, weaponBatch);
+      expect(undoWeapon.status).toBe(200);
+    });
   });
 });
 

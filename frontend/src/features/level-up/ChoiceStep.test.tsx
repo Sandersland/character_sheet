@@ -152,6 +152,67 @@ describe("ChoiceStep", () => {
     });
   });
 
+  // #1495: the picker's class-name scope is the union of the character's
+  // ALREADY-EARNED Fighting Style classes (fightingStyleGrantingClasses,
+  // server-computed) plus the level-up target's className (a brand-new
+  // multiclass entry, or a class earning FS for the first time at THIS
+  // level-up, isn't in that pre-level-up set yet) — both must reach
+  // fetchFeats so the server can apply fightingStyleFeatOfferedForClasses.
+  it("forwards the character's earned Fighting Style classes plus the target's className to fetchFeats' class gate", async () => {
+    const character = {
+      rulesEdition: "EDITION_2014",
+      classes: [{ id: "entry-0", name: "Fighter", level: 1 }],
+      fightingStyleGrantingClasses: ["Fighter"],
+      resources: {},
+      advancements: [],
+    } as unknown as Character;
+    const planWithPaladinTarget: LevelUpPlanResponse = {
+      target: { className: "Paladin", subclass: null, newLevel: 2, isPrimary: true },
+      steps: [],
+      grantedSpells: [],
+    };
+    render(
+      <Harness step={{ kind: "fightingStyleFeat" }} character={character} plan={planWithPaladinTarget} />,
+    );
+
+    await screen.findByText("Archery");
+    await waitFor(() =>
+      expect(vi.mocked(fetchFeats)).toHaveBeenCalledWith("EDITION_2014", undefined, ["Fighter", "Paladin"]),
+    );
+  });
+
+  // The differentiating case (review finding): a Fighter1/Ranger1 multiclass
+  // has BOTH classes in `classes`, but Ranger hasn't earned Fighting Style
+  // yet (grant at L2, entry only L1) — using `classes` here (the pre-fix
+  // bug) would offer Ranger's styles in the ceremony and the write path
+  // would 400 the pick.
+  it("excludes a class on `classes` that hasn't earned Fighting Style, even mid-multiclass", async () => {
+    const character = {
+      rulesEdition: "EDITION_2014",
+      classes: [
+        { id: "entry-0", name: "Fighter", level: 1 },
+        { id: "entry-1", name: "Ranger", level: 1 },
+      ],
+      // Ranger's own entry is only L1 — its L2 Fighting Style grant is unmet.
+      fightingStyleGrantingClasses: ["Fighter"],
+      resources: {},
+      advancements: [],
+    } as unknown as Character;
+    const planWithFighterTarget: LevelUpPlanResponse = {
+      target: { className: "Fighter", subclass: null, newLevel: 2, isPrimary: true },
+      steps: [],
+      grantedSpells: [],
+    };
+    render(
+      <Harness step={{ kind: "fightingStyleFeat" }} character={character} plan={planWithFighterTarget} />,
+    );
+
+    await screen.findByText("Archery");
+    await waitFor(() =>
+      expect(vi.mocked(fetchFeats)).toHaveBeenCalledWith("EDITION_2014", undefined, ["Fighter"]),
+    );
+  });
+
   it("has no axe violations once loaded", async () => {
     const { container } = render(<Harness step={{ kind: "maneuvers", count: 2 }} />);
     await screen.findByText("Riposte");

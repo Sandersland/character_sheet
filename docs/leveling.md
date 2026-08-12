@@ -26,7 +26,7 @@ A feature that is just "choose N options from a catalog" with no extra mechanics
 
 - Declare `choices: [{ key, label, catalogSource, count: (level) => n }]` on the subclass in `lib/classes/<class>.ts`.
 - Options are seeded `GrantedAbility` rows keyed by `source = catalogSource` (`prisma/seed/subclass-choices.ts`); `GET /api/subclass-choices/:source` lists them.
-- Selections persist in the generic `resources.choicesKnown[key]` map, mutated via the existing resources endpoint (`learn`/`forgetSubclassChoice`).
+- Selections persist in the generic `resources.choicesKnown[key]` map. `learnSubclassChoice` is unrestricted (bounded only by the level-derived cap) via the resources endpoint at any time; `forgetSubclassChoice` (#1516: PHB'14 p.80/p.73 bound a choose-N replacement to learn-time) is reachable only through a validated level-up ceremony step, never the generic endpoint.
 - `reconcileSubclassChoices` and one read-clamp loop cover every such choice generically.
 
 Hand-rolled reconcilers remain only for features with extra mechanics (maneuvers/tool profs — save DCs, cast/swap ops, validation).

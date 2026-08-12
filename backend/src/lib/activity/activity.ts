@@ -357,6 +357,78 @@ async function revertClassEvent(ctx: RevertContext): Promise<void> {
   return revertSubclassChange(ctx);
 }
 
+// Lift the per-turn bonus-action interlock a reverted spell cast recorded
+// (#1439 review) — the SessionParticipant field the resolveAction transaction
+// set (recordTurnSpellCast) is not part of the event's character `before`/
+// `after`, so undo must clear it explicitly or the block reappears on the next
+// poll. No-op for a weapon swing (no entryId), a reaction cast, or a cast
+// outside a session.
+//
+// MIRRORS recordTurnSpellCast's downgrade guard (#1439 review): reverting a
+// CANTRIP cast must only clear a cantrip record — never a `leveled` one that an
+// earlier leveled cast set on the same economy slot this turn (Action Surge:
+// leveled Action spell, then a cantrip; the record correctly kept `leveled`, so
+// undoing the cantrip must NOT lift that block). The reverted event's own
+// `slotLevel` (present ⇒ leveled) distinguishes the two: a leveled revert clears
+// unconditionally (it IS the leveled record being undone); a cantrip revert
+// clears only a null-or-cantrip field.
+type ParticipantScope = { sessionId: string; characterId: string };
+
+// The where for clearing one interlock field: a leveled revert clears
+// unconditionally; a cantrip revert clears only a null-or-cantrip field (mirrors
+// recordTurnSpellCast's downgrade guard). Split out to keep the caller under the
+// complexity gate.
+function clearWhere(
+  scope: ParticipantScope,
+  field: "spellCastAsAction" | "spellCastAsBonus",
+  revertedCantrip: boolean,
+): Prisma.SessionParticipantWhereInput {
+  if (!revertedCantrip) return scope;
+  return field === "spellCastAsAction"
+    ? { ...scope, OR: [{ spellCastAsAction: null }, { spellCastAsAction: "cantrip" }] }
+    : { ...scope, OR: [{ spellCastAsBonus: null }, { spellCastAsBonus: "cantrip" }] };
+}
+
+async function clearRevertedSpellCastInterlock(
+  tx: Prisma.TransactionClient,
+  event: CharacterEvent,
+): Promise<void> {
+  const data = event.data as { entryId?: string | null; slotLevel?: number | null; cost?: { kind?: string } } | null;
+  const economy = data?.cost?.kind;
+  if (event.sessionId == null || data?.entryId == null) return;
+  if (economy !== "action" && economy !== "bonus") return;
+  const scope: ParticipantScope = { sessionId: event.sessionId, characterId: event.characterId };
+  const revertedCantrip = data.slotLevel == null;
+  const field = economy === "action" ? "spellCastAsAction" : "spellCastAsBonus";
+  await tx.sessionParticipant.updateMany({
+    where: clearWhere(scope, field, revertedCantrip),
+    data: field === "spellCastAsAction" ? { spellCastAsAction: null } : { spellCastAsBonus: null },
+  });
+}
+
+// resolveAction (#1829): the only combat-category event that carries a
+// `before` snapshot — combatStarted/combatEnded/combatRoundAdvanced carry
+// none, so they never reach this handler (reverseEvent's `if (!before)
+// return` guard runs first). A resolution's cost is either a spent spell
+// slot (spellcasting) or, in a future slice, a class resource pool — restore
+// whichever column its before snapshot carries, identical in shape to
+// revertSpellcastingEvent/revertResourcesEvent. A cantrip/weapon resolution
+// snapshots neither column, so this is a no-op for it — the batch is still
+// marked reverted by applyBatchReversal regardless.
+async function revertCombatEvent(ctx: RevertContext): Promise<void> {
+  const { tx, characterId, before } = ctx;
+  const beforeSpellcasting = before.spellcasting as Record<string, unknown> | undefined;
+  const beforeResources = before.resources as Record<string, unknown> | undefined;
+  const updateData: Record<string, unknown> = {};
+  if (beforeSpellcasting !== undefined) updateData.spellcasting = beforeSpellcasting;
+  if (beforeResources !== undefined) updateData.resources = beforeResources;
+  if (Object.keys(updateData).length === 0) return;
+  await tx.character.update({
+    where: { id: characterId },
+    data: updateData as Prisma.CharacterUpdateInput,
+  });
+}
+
 async function revertAdvancementEvent(ctx: RevertContext): Promise<void> {
   const { tx, characterId, before } = ctx;
   // Restore ability scores, hit points, initiative, and resources from
@@ -375,10 +447,13 @@ async function revertAdvancementEvent(ctx: RevertContext): Promise<void> {
 }
 
 /**
- * Per-category revert dispatch. Categories with no handler (roll, session,
- * combat — and inventory, which is dispatched before the `before` guard) are
+ * Per-category revert dispatch. Categories with no handler (roll, session —
+ * and inventory, which is dispatched before the `before` guard) are
  * intentionally absent: reverseEvent no-ops for them, matching prior behavior.
- * `hitPoints` and `experience` share one handler.
+ * `hitPoints` and `experience` share one handler. `combat`'s handler
+ * (revertCombatEvent, #1829) only ever fires for a resolveAction event —
+ * combatStarted/combatEnded/combatRoundAdvanced carry no `before` snapshot,
+ * so they never reach it.
  */
 const REVERT_HANDLERS: Partial<Record<CharacterEventCategory, RevertHandler>> = {
   hitPoints: revertHitPointsEvent,
@@ -390,6 +465,7 @@ const REVERT_HANDLERS: Partial<Record<CharacterEventCategory, RevertHandler>> = 
   effects: revertEffectsEvent,
   class: revertClassEvent,
   advancement: revertAdvancementEvent,
+  combat: revertCombatEvent,
 };
 
 // Restore one event's `before` sub-state. Inventory is shape-driven and runs
@@ -407,6 +483,14 @@ async function reverseEvent(
   if (event.category === "inventory") {
     await revertInventoryEvent(tx, characterId, event);
     return;
+  }
+
+  // Undoing a spell cast must also lift the per-turn interlock it recorded
+  // (#1439 review) — BEFORE the `before` guard, because a cantrip cast has no
+  // slot `before` snapshot yet still set the interlock. A leveled cast falls
+  // through to restore its spent slot via revertCombatEvent below.
+  if (event.category === "combat" && event.type === "resolveAction") {
+    await clearRevertedSpellCastInterlock(tx, event);
   }
 
   const before = event.before as Record<string, unknown> | null;
@@ -444,9 +528,11 @@ async function revertPreflight(
       characterId,
       reverted: false,
       type: { not: "revert" },
-      // Roll events (attack/damage/check/save/initiative) are non-undoable log
-      // entries — skip them so they neither undo themselves nor block a real undo.
-      category: { not: "roll" },
+      // No category is excluded here: a standalone roll (check/save/initiative/
+      // tally-damage, #1861) is now a real batched roll-category event committed
+      // through the resolve-action resolver, so it IS the most-recent action
+      // when it's the newest — trivially undoable (before/after null → reversing
+      // it restores nothing), never a dead log entry that blocks a real undo.
       // Don't look through events whose session has been ended.
       OR: [
         { sessionId: null },

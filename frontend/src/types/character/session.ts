@@ -20,6 +20,7 @@ export type {
   SessionSummary,
   SessionSummaryAdvancement,
   SessionSummaryItem,
+  SpellEconomyState,
 } from "@character-sheet/shared-types";
 
 /** Session types — live-play lifecycle + end-of-session summary shapes. */

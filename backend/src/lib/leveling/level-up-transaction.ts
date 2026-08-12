@@ -41,6 +41,7 @@ import type {
 import { editionOf } from "@/lib/rules/edition.js";
 import { crossEditionRejection } from "@/lib/rules/catalog-edition.js";
 import { subclassGateLevel } from "./effective-levels.js";
+import type { SubclassCasterRef } from "@/lib/srd/spellcasting-tables.js";
 import type { RulesEdition } from "@character-sheet/shared-types";
 import type { ClassFeatureRow } from "@/lib/classes/class-feature-rows.js";
 import { FEATURE_ROWS_CLASS_FEATURES, FEATURE_ROWS_SUBCLASS_FEATURES } from "@/lib/classes/feature-rows-select.js";
@@ -69,6 +70,13 @@ export interface LevelUpContext {
   // to resolveLevelUpPlan by every caller of this context (the commit path
   // and the GET /plan route) so the re-plan splice carries the matching rows.
   pickedSubclassFeatureRows: ClassFeatureRow[] | null;
+  // #1531: the not-yet-committed pick's own casterFraction/spellcastingAbility
+  // — the "picked" half of the persisted/picked pair mirrored on
+  // targetEntry.subclassCasterRef, same rationale as pickedSubclassFeatureRows
+  // above. Fed to resolveLevelUpPlan's chosenSubclassCasterRef parameter so a
+  // level-3 Fighter/Rogue picking Eldritch Knight/Arcane Trickster for the
+  // FIRST time resolves its own newSpells step correctly on re-plan.
+  chosenSubclassCasterRef: SubclassCasterRef | null;
 }
 
 const TARGET_ENTRY_SELECT = {
@@ -88,16 +96,26 @@ const TARGET_ENTRY_SELECT = {
       features: FEATURE_ROWS_CLASS_FEATURES,
       // #1497: effectiveMaxHitPointsForRow's featSlotCap inputs (every class
       // entry, not just the target) — the same two columns buildHpOpContext
-      // selects for its own row.classEntries.
+      // selects for its own row.classEntries. `subclassLevel` (#1123):
+      // draconicResilienceMaxHpTerm's 2014-gate input, same composition.
+      // `name` (#1148): characterFightingStyleFeatSlots' resolveSubclassSlug
+      // input — the CANONICAL class name, same #1495 rationale as elsewhere.
+      name: true,
       extraAsiLevels: true,
       fightingStyleFeatLevel: true,
+      subclassLevel: true,
     },
   },
   // #1546 Part B-i: the PERSISTED subclass's own feature rows. Absent
   // (relation null) when no subclass is set yet. `id` (#1631): the catalog
   // Subclass row's own id, so resolveLevelUpContext can load its
   // SubclassSpellListExpansion rows without re-resolving by name.
-  subclassRef: { select: { id: true, features: FEATURE_ROWS_SUBCLASS_FEATURES } },
+  // `slug` (#1123): draconicResilienceMaxHpTerm's FK identity input.
+  // `casterFraction`/`spellcastingAbility` (#1531): newSpellsStep's
+  // third-caster resolution — see TargetClassEntry.subclassCasterRef.
+  subclassRef: {
+    select: { id: true, slug: true, casterFraction: true, spellcastingAbility: true, features: FEATURE_ROWS_SUBCLASS_FEATURES },
+  },
 } satisfies Prisma.CharacterClassEntrySelect;
 
 // Fetch the target class's catalog subclassLevel/extraAsiLevels/
@@ -138,6 +156,16 @@ type TargetEntryRow = Prisma.CharacterClassEntryGetPayload<{ select: typeof TARG
 interface ResolvedTargetEntry {
   targetClassName: string;
   persistedSubclass: string | null;
+  // #1148 review finding: the PERSISTED subclass's own FK slug — resolveSubclassSlug's
+  // preferred identity path (#1277), alongside targetClassName above (its
+  // classKey input). Without this, fightingStyleFeatStep's resolveSubclassSlug
+  // call had only the exact-name fallback, silently missing a Champion whose
+  // CharacterClassEntry.subclass text had drifted from "Champion".
+  persistedSubclassRef: { slug: string } | null;
+  // #1531: the PERSISTED subclass's own casterFraction/spellcastingAbility —
+  // fed to newSpellsStep via TargetClassEntry.subclassCasterRef, same "FK
+  // over free-text name" reasoning as persistedSubclassRef above.
+  persistedSubclassCasterRef: SubclassCasterRef | null;
   // #1631: the PERSISTED subclass's own catalog id (subclassRef.id) — null
   // when no subclass is chosen yet. Distinct from persistedSubclass (a name)
   // because loadSubclassSpellListExpansionIds keys on id, mirroring
@@ -159,11 +187,34 @@ interface ResolvedTargetEntry {
   subclassFeatureRows: ClassFeatureRow[];
 }
 
-// #1631: split out of resolveExistingTargetEntry purely to keep that
-// function's own cyclomatic count from crossing the CI health gate (mirrors
-// this file's own targetClassCatalogFor/resolveTargetEntry split reasoning).
-function persistedSubclassIdOf(entry: TargetEntryRow): string | null {
-  return entry.subclassRef?.id ?? null;
+// #1148 review finding: the CANONICAL catalog class name (entry.class.name),
+// never entry.name — CharacterClassEntry's own `name` column is a
+// free-to-diverge display name (#1495's same rationale), and
+// resolveSubclassSlug's FK-first path requires the classKey it's called
+// with to match SUBCLASS_IDENTITY's classKey or the FK is silently
+// rejected (subclass-slug.ts's own class-mismatch guard). Split out of
+// resolveExistingTargetEntry purely to keep that function's own cyclomatic
+// count from crossing the CI health gate (mirrors this file's own
+// targetClassCatalogFor/resolveTargetEntry split reasoning).
+function canonicalClassNameOf(entry: TargetEntryRow): string {
+  return entry.class?.name ?? entry.name;
+}
+
+// The three PERSISTED-subclass facts resolveExistingTargetEntry needs, bundled
+// behind ONE null guard (review finding 4 — id/ref/casterRef used to be three
+// separate one-liners, each re-testing `entry.subclassRef` for null): the
+// catalog id (#1631, loadSubclassSpellListExpansionIds' key), the FK slug
+// (#1148, resolveSubclassSlug's preferred identity path over the drift-prone
+// free-text name), and the third-caster identity (#1531, newSpellsStep's
+// TargetClassEntry.subclassCasterRef input). All three are null together —
+// there is no "some persisted, some not" state a CharacterClassEntry can be
+// in — so one guard is the honest shape, not three coincidentally-matching ones.
+function persistedSubclassDataOf(
+  entry: TargetEntryRow,
+): { id: string | null; ref: { slug: string } | null; casterRef: SubclassCasterRef | null } {
+  if (!entry.subclassRef) return { id: null, ref: null, casterRef: null };
+  const { id, slug, casterFraction, spellcastingAbility } = entry.subclassRef;
+  return { id, ref: { slug }, casterRef: { casterFraction, spellcastingAbility } };
 }
 
 function resolveExistingTargetEntry(
@@ -174,10 +225,13 @@ function resolveExistingTargetEntry(
 ): ResolvedTargetEntry {
   const entry = classEntries.find((e) => e.id === target.classEntryId);
   if (!entry) throw new InvalidLevelUpError(`Class entry not found: ${target.classEntryId}`);
+  const subclassData = persistedSubclassDataOf(entry);
   return {
-    targetClassName: entry.name,
+    targetClassName: canonicalClassNameOf(entry),
     persistedSubclass: entry.subclass,
-    persistedSubclassId: persistedSubclassIdOf(entry),
+    persistedSubclassRef: subclassData.ref,
+    persistedSubclassCasterRef: subclassData.casterRef,
+    persistedSubclassId: subclassData.id,
     newLevel: isMulticlass ? entry.level + 1 : hitDiceTotal + 1,
     classId: entry.classId,
     targetIsPrimary: entry.position === 0,
@@ -196,6 +250,8 @@ async function resolveNewTargetEntry(target: Extract<LevelUpTarget, { kind: "new
   return {
     targetClassName: catalog.name,
     persistedSubclass: null,
+    persistedSubclassRef: null, // a brand new entry has no persisted subclass
+    persistedSubclassCasterRef: null, // a brand new entry has no persisted subclass
     persistedSubclassId: null, // a brand new entry has no persisted subclass
     newLevel: 1,
     classId: target.classId,
@@ -227,8 +283,12 @@ function resolveTargetEntry(
 async function resolvePickedSubclass(
   subclassId: string | undefined,
   edition: RulesEdition,
-): Promise<{ chosenSubclassName: string | null; pickedSubclassFeatureRows: ClassFeatureRow[] | null }> {
-  if (!subclassId) return { chosenSubclassName: null, pickedSubclassFeatureRows: null };
+): Promise<{
+  chosenSubclassName: string | null;
+  pickedSubclassFeatureRows: ClassFeatureRow[] | null;
+  chosenSubclassCasterRef: SubclassCasterRef | null;
+}> {
+  if (!subclassId) return { chosenSubclassName: null, pickedSubclassFeatureRows: null, chosenSubclassCasterRef: null };
   // Cross-edition before membership: a wrong-edition row is "not in this
   // character's catalog at all" (#1414), the ordering applySetSubclass also
   // carries. Reuses the `edition` const bound at the call site — never
@@ -237,15 +297,20 @@ async function resolvePickedSubclass(
   // id → name. `features` (#1546 Part B-i): this pick's own rows, so a
   // re-plan (the subclass hasn't been committed to the character yet) still
   // resolves its subclass-derived choices — one line added to an existing
-  // lookup, no new query.
+  // lookup, no new query. `casterFraction`/`spellcastingAbility` (#1531):
+  // this pick's own third-caster identity, same rationale.
   const sub = await prisma.subclass.findUnique({
     where: { id: subclassId },
-    select: { name: true, edition: true, features: FEATURE_ROWS_SUBCLASS_FEATURES },
+    select: { name: true, edition: true, casterFraction: true, spellcastingAbility: true, features: FEATURE_ROWS_SUBCLASS_FEATURES },
   });
   if (!sub) throw new InvalidLevelUpError(`Subclass not found: ${subclassId}`);
   const mismatch = crossEditionRejection(sub, `Subclass "${sub.name}"`, edition);
   if (mismatch) throw new InvalidLevelUpError(mismatch);
-  return { chosenSubclassName: sub.name, pickedSubclassFeatureRows: sub.features as unknown as ClassFeatureRow[] };
+  return {
+    chosenSubclassName: sub.name,
+    pickedSubclassFeatureRows: sub.features as unknown as ClassFeatureRow[],
+    chosenSubclassCasterRef: { casterFraction: sub.casterFraction, spellcastingAbility: sub.spellcastingAbility },
+  };
 }
 
 // #1631: the EFFECTIVE subclass id this level-up's newSpells step should
@@ -287,13 +352,13 @@ export async function resolveLevelUpContext(
   });
   if (!character) throw new InvalidLevelUpError(`Character not found: ${characterId}`);
   const edition = editionOf(character);
-  const { hp: baselineHp, featMaxHpBonus, exhaustionLevel } = effectiveMaxHitPointsForRow(character);
+  const { hp: baselineHp, maxHpBonus, exhaustionLevel } = effectiveMaxHitPointsForRow(character);
 
   const isMulticlass = character.classEntries.length > 1;
   const hitDice = normalizeHitDice(character.hitDice);
 
   const {
-    targetClassName, persistedSubclass, persistedSubclassId, newLevel, classId, targetIsPrimary,
+    targetClassName, persistedSubclass, persistedSubclassRef, persistedSubclassCasterRef, persistedSubclassId, newLevel, classId, targetIsPrimary,
     catalogHitDie, classFeatureRows, subclassFeatureRows,
   } = await resolveTargetEntry(target, character.classEntries, isMulticlass, hitDice.total);
 
@@ -303,7 +368,7 @@ export async function resolveLevelUpContext(
 
   const { subclassLevel, extraAsiLevels, fightingStyleFeatLevel } = await targetClassCatalogFor(classId, targetClassName, edition);
 
-  const { chosenSubclassName, pickedSubclassFeatureRows } = await resolvePickedSubclass(subclassId, edition);
+  const { chosenSubclassName, pickedSubclassFeatureRows, chosenSubclassCasterRef } = await resolvePickedSubclass(subclassId, edition);
   // #1631: widen the newSpells step's choosable pool against the EFFECTIVE
   // subclass — see effectiveSubclassId's own comment.
   const subclassSpellListExpansionIds = await loadSubclassSpellListExpansionIds(
@@ -318,11 +383,13 @@ export async function resolveLevelUpContext(
       // #1101: the known-spell list the validator checks a swap forget against.
       spellEntries: normalizeSpellcastingMutable(character.spellcasting).spells.map((s) => ({ id: s.id, level: s.level, source: s.source ?? null })),
       edition,
-      hpBaseline: { rawMax: baselineHp.max, featMaxHpBonus, exhaustionLevel },
+      hpBaseline: { rawMax: baselineHp.max, maxHpBonus, exhaustionLevel },
     },
     targetEntry: {
       name: targetClassName,
       subclass: persistedSubclass,
+      subclassRef: persistedSubclassRef,
+      subclassCasterRef: persistedSubclassCasterRef,
       newLevel,
       subclassLevel,
       hitDie,
@@ -335,6 +402,7 @@ export async function resolveLevelUpContext(
     chosenSubclassName,
     targetIsPrimary,
     pickedSubclassFeatureRows,
+    chosenSubclassCasterRef,
   };
 }
 
@@ -348,8 +416,12 @@ const STEP_OP_BUILDERS: Record<LevelUpStepKind, (submission: LevelUpSubmission, 
   subclass: (s) => [{ domain: "class", op: { type: "setSubclass", subclassId: s.subclassId! } }],
   // #1137: force the fs slot so the pick lands in the fightingStyle partition.
   fightingStyleFeat: (s) => [{ domain: "advancement", op: { ...s.fightingStyleFeat!, slot: "fightingStyle" } }],
-  maneuvers: (s) => (s.maneuvers ?? []).map((op) => ({ domain: "resources", op })),
+  // #1516: forgets apply BEFORE learns (ops run sequentially in tx order),
+  // mirroring subclassChoice's own forget-before-learn ordering above.
+  maneuvers: (s) =>
+    [...(s.maneuversForgotten ?? []), ...(s.maneuvers ?? [])].map((op) => ({ domain: "resources", op })),
   toolProficiency: (s) => (s.toolProficiencies ?? []).map((op) => ({ domain: "resources", op })),
+  expertise: (s) => (s.expertise ?? []).map((op) => ({ domain: "resources", op })),
   // #1503: forgets apply BEFORE learns (ops run sequentially in tx order),
   // mirroring #1101's newSpells ordering — resolveChoiceOption's dup guard
   // reads the CURRENT known list, so a forget-first ordering lets a swap
@@ -380,12 +452,17 @@ const LEVEL_UP_OP_APPLIERS: Record<
   hp: (tx, id, op, batchId, sessionId) => applyLevelUpHpInTx(tx, id, op as LevelUpOperation, batchId, sessionId),
   advancement: (tx, id, op, batchId, sessionId) => applyAdvancementOpInTx(tx, id, op as AdvancementOperation, batchId, sessionId),
   class: (tx, id, op, batchId, sessionId) => setSubclassInTx(tx, id, op as SetSubclassOperation, batchId, sessionId),
-  resources: (tx, id, op, batchId, sessionId) => applyResourceOpInTx(tx, id, op as ResourceOperation, batchId, sessionId),
+  // #1516: allowChooseNForget=true — every resources op reaching this call
+  // site was already projected from steps validateLevelUpSubmission proved
+  // legal (assertManeuverForgets/assertSubclassChoiceForgets ran first), so a
+  // forgetManeuver/forgetSubclassChoice op here is always pre-validated.
+  resources: (tx, id, op, batchId, sessionId) =>
+    applyResourceOpInTx(tx, id, op as ResourceOperation, batchId, sessionId, true),
   spellcasting: (tx, id, op, batchId, sessionId, userId) =>
     applySpellcastingOpInTx(tx, id, op as SpellcastingOperation, batchId, sessionId, userId),
 };
 
-type SpellPickRow = { id: string; name: string; level: number; classes: string[] };
+type SpellPickRow = { id: string; name: string; level: number; classes: string[]; school: string };
 
 // One catalog read validates every id list before the tx opens (the count
 // check in validateLevelUpSubmission can't see spell levels/classes). Returns
@@ -399,7 +476,7 @@ async function loadPickCatalogRows(
   const rows = ids.length
     ? await prisma.spell.findMany({
         where: { id: { in: ids } },
-        select: { id: true, name: true, level: true, edition: true, ...SPELL_CLASS_MEMBERSHIP_SELECT },
+        select: { id: true, name: true, level: true, edition: true, school: true, ...SPELL_CLASS_MEMBERSHIP_SELECT },
       })
     : [];
   // #1712: reject an id that's provably the WRONG edition's fork before it
@@ -412,7 +489,8 @@ async function loadPickCatalogRows(
   // Flattened to SpellPickRow's `classes: string[]` here (#1711) so the
   // eligibility checks below (assertOnSpellList, assertCantripEligibility)
   // never see the join shape — one seam resolves membership, not two.
-  const rowById = new Map(rows.map((r) => [r.id, { id: r.id, name: r.name, level: r.level, classes: classesOf(r) }]));
+  // `school` (#1855): the Eldritch Knight spell-school gate's own input.
+  const rowById = new Map(rows.map((r) => [r.id, { id: r.id, name: r.name, level: r.level, classes: classesOf(r), school: r.school }]));
   const levelOf = (op: LearnSpellOperation): number | undefined => rowById.get(op.spellId)?.level;
   return { rowById, levelOf };
 }
@@ -444,6 +522,17 @@ function capitalizeClassName(name: string): string {
   return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
+// Oxford-comma "a, b, or c" join shared by classListPhrase and
+// schoolListPhrase below — the one piece actually duplicated between them
+// (fallow-flagged); each caller keeps its own surrounding "the ... list(s)"
+// wrapping, which differs per caller.
+function oxfordOr(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? "";
+  return names.length === 2
+    ? `${names[0]} or ${names[1]}`
+    : `${names.slice(0, -1).join(", ")}, or ${names[names.length - 1]}`;
+}
+
 // Message-only phrasing for the leveled-spell rejection below: names the single
 // class list normally, or the full served list — capitalized, Oxford-comma
 // "or"-joined — when Magical Secrets widened it (2024 Bard 10+,
@@ -455,16 +544,17 @@ function capitalizeClassName(name: string): string {
 // Druid, or Wizard". Deliberately duplicated here rather than imported:
 // spellListsLabel lives in a frontend module, and backend rules code must not
 // depend across that tier boundary. Keep the two phrasings in sync by hand.
-function classListPhrase(spellLists: string[]): string {
-  const names = spellLists.map(capitalizeClassName);
-  // Defensive, not reachable today: magicalSecretsSpellLists always returns at
-  // least [key], never [] — mirrors the identical guard in spellListsLabel (frontend).
-  if (names.length === 0) return "the spell list";
-  if (names.length <= 1) return `the ${names[0]} spell list`;
-  const joined = names.length === 2
-    ? `${names[0]} or ${names[1]}`
-    : `${names.slice(0, -1).join(", ")}, or ${names[names.length - 1]}`;
-  return `the ${joined} spell lists`;
+// `noun` is "spell" for a leveled pick and "cantrip" for a cantrip pick — the
+// two facets name different lists (#1440: an Eldritch Knight's cantripLists is
+// ["wizard"], not its base class), so the rejection must read "the Wizard
+// cantrip list", never the base class name.
+function classListPhrase(lists: string[], noun: "spell" | "cantrip" = "spell"): string {
+  const names = lists.map(capitalizeClassName);
+  // Defensive, not reachable today: spellListsFor always returns at least
+  // [key], never [] — mirrors the identical guard in spellListsLabel (frontend).
+  if (names.length === 0) return `the ${noun} list`;
+  if (names.length <= 1) return `the ${names[0]} ${noun} list`;
+  return `the ${oxfordOr(names)} ${noun} lists`;
 }
 
 // #1440: the served ceiling (meta.maxSpellLevel) applies to every leveled pick.
@@ -486,7 +576,44 @@ function assertOnSpellList(row: SpellPickRow, spellLists: string[] | null, expan
   }
 }
 
-// #1440: leveled picks must clear both assertWithinCeiling and assertOnSpellList.
+// #1855: Oxford-comma phrase for the Eldritch Knight spell-school gate's
+// rejection message ("Abjuration or Evocation") — same join shape as
+// classListPhrase, kept separate since it names schools, never a class list.
+function schoolListPhrase(schools: string[]): string {
+  return oxfordOr(schools.map(capitalizeClassName));
+}
+
+// #1855: PHB'14 p. 74 Eldritch Knight Spellcasting — every leveled pick
+// (spellOps only; cantrips are unrestricted) must be on `spellSchools`,
+// except up to `freeSchoolPicks` of them, consumed in submission order. This
+// is order-independent-correct for the RAW rule regardless of which specific
+// pick is "the free one" — at most `freeSchoolPicks` off-list picks are ever
+// legal, matching e.g. the 3rd-level grant's "two of these three must be
+// Abjuration or Evocation" (freeSchoolPicks 1 of 3) exactly. A swap's
+// replacement pick rides the same `spellsLearned` array (STEP_OP_BUILDERS'
+// newSpells projection) and is gated identically — no separate accounting.
+function assertSpellSchoolEligibility(
+  spellOps: LearnSpellOperation[],
+  rowById: Map<string, SpellPickRow>,
+  spellSchools: string[] | null,
+  freeSchoolPicks: number,
+): void {
+  if (spellSchools === null) return;
+  let freeRemaining = freeSchoolPicks;
+  for (const op of spellOps) {
+    const row = rowById.get(op.spellId);
+    if (!row) continue; // unknown id — fall through to applyLearnSpellOp's not-found error
+    if (spellSchools.includes(row.school)) continue;
+    if (freeRemaining > 0) {
+      freeRemaining -= 1;
+      continue;
+    }
+    throw new InvalidLevelUpError(`${row.name} must be an ${schoolListPhrase(spellSchools)} spell.`);
+  }
+}
+
+// #1440: leveled picks must clear assertWithinCeiling, assertOnSpellList, and
+// (#1855) the Eldritch Knight spell-school gate.
 // Unknown ids `continue` so applyLearnSpellOp's own not-found error stays the
 // one thrown when the tx runs (the atomicity test depends on this: a bogus id
 // must reach the tx, not be pre-empted here).
@@ -509,25 +636,21 @@ function assertLeveledSpellEligibility(
 // served value from spellLists, because 2024 Magical Secrets broadens spells
 // but not cantrips (the trigger is the Prepared Spells number, level 1+ only)
 // while a qualifying 2014 Bard is unrestricted on both (PHB'14 p. 54 "...or a
-// cantrip"). The `.some()` check below handles a multi-entry cantripLists
-// correctly regardless; per the current magicalSecretsSpellLists
-// implementation cantripLists is always a single class or null, so the
-// rejection message never needs to name more than one list — but that's an
-// implementation fact, not a type guarantee. If a future subclass seam (2024
-// College of Lore Magical Discoveries, PHB'14 Additional Magical Secrets)
-// widens it to several, this message needs the same treatment as the leveled
-// pick's rejection message (assertOnSpellList, via classListPhrase).
+// cantrip"). The rejection names cantripLists via classListPhrase — the SAME
+// treatment assertOnSpellList gives the leveled pick — so an Eldritch Knight's
+// message reads "the Wizard cantrip list", not its base "fighter" list, and a
+// future multi-entry cantripLists (2024 College of Lore Magical Discoveries,
+// PHB'14 Additional Magical Secrets) is phrased correctly for free.
 function assertCantripEligibility(
   cantripOps: LearnSpellOperation[],
   rowById: Map<string, SpellPickRow>,
   cantripLists: string[] | null,
-  lowerClass: string,
 ): void {
   for (const op of cantripOps) {
     const row = rowById.get(op.spellId);
     if (!row) continue; // unknown id — fall through to applyLearnSpellOp's not-found error
     if (cantripLists !== null && !row.classes.some((c) => cantripLists.includes(c))) {
-      throw new InvalidLevelUpError(`${row.name} is not on the ${lowerClass} cantrip list.`);
+      throw new InvalidLevelUpError(`${row.name} is not on ${classListPhrase(cantripLists, "cantrip")}.`);
     }
   }
 }
@@ -539,18 +662,31 @@ interface NewSpellsGate {
   // #1631: leveled-pick ids the subclass's list-expansion admits, alongside
   // spellLists — see newSpellsStep (level-up-plan.ts)'s own comment.
   expandedSpellIds: string[];
+  // #1855: Eldritch Knight (2014) leveled-pick school gate — null/0 for every
+  // other class/edition, see newSpellsStep's own ekSpellSchoolGate comment.
+  spellSchools: string[] | null;
+  freeSchoolPicks: number;
 }
 
 // Reads the served eligibility facts off the newSpells step — the server-BUILT
 // plan step, never a client-supplied field (CLAUDE.md: never let a
 // client-computed value be trusted by a transaction endpoint), and never
-// re-deriving magicalSecretsSpellLists here. Returns null when the level-up has
+// re-deriving spellListsFor here. Returns null when the level-up has
 // no newSpells step (assertNoExcess/assertCantrips already rejected any pick in
 // that case, so there's nothing left to gate).
 // #1631: split out of resolveNewSpellsGate purely to keep that function's own
 // cyclomatic count from crossing the CI health gate.
 function expandedSpellIdsOf(step: LevelUpStep): string[] {
   return (step.meta?.expandedSpellIds as string[] | undefined) ?? [];
+}
+
+// #1855: split out of resolveNewSpellsGate for the same #1631 cyclomatic
+// reason as expandedSpellIdsOf just above.
+function spellSchoolGateOf(step: LevelUpStep): Pick<NewSpellsGate, "spellSchools" | "freeSchoolPicks"> {
+  return {
+    spellSchools: (step.meta?.spellSchools as string[] | null | undefined) ?? null,
+    freeSchoolPicks: typeof step.meta?.freeSchoolPicks === "number" ? step.meta.freeSchoolPicks : 0,
+  };
 }
 
 function resolveNewSpellsGate(steps: LevelUpStep[]): NewSpellsGate | null {
@@ -561,6 +697,7 @@ function resolveNewSpellsGate(steps: LevelUpStep[]): NewSpellsGate | null {
     spellLists: (step.meta?.spellLists as string[] | null | undefined) ?? null,
     cantripLists: (step.meta?.cantripLists as string[] | null | undefined) ?? null,
     expandedSpellIds: expandedSpellIdsOf(step),
+    ...spellSchoolGateOf(step),
   };
 }
 
@@ -570,7 +707,6 @@ function resolveNewSpellsGate(steps: LevelUpStep[]): NewSpellsGate | null {
 async function assertPickSpellEligibility(
   submission: LevelUpSubmission,
   steps: LevelUpStep[],
-  className: string,
   edition: RulesEdition,
 ): Promise<void> {
   const cantripOps = submission.cantripsLearned ?? [];
@@ -581,9 +717,9 @@ async function assertPickSpellEligibility(
   const gate = resolveNewSpellsGate(steps);
   if (!gate) return;
 
-  const lowerClass = className.toLowerCase();
   assertLeveledSpellEligibility(spellOps, rowById, gate.maxSpellLevel, gate.spellLists, gate.expandedSpellIds);
-  assertCantripEligibility(cantripOps, rowById, gate.cantripLists, lowerClass);
+  assertSpellSchoolEligibility(spellOps, rowById, gate.spellSchools, gate.freeSchoolPicks);
+  assertCantripEligibility(cantripOps, rowById, gate.cantripLists);
 }
 
 /**
@@ -603,11 +739,11 @@ export async function applyLevelUpTransaction(
   submission: LevelUpSubmission,
   userId: string,
 ): Promise<void> {
-  const { planCharacter, targetEntry, chosenSubclassName, pickedSubclassFeatureRows } =
+  const { planCharacter, targetEntry, chosenSubclassName, pickedSubclassFeatureRows, chosenSubclassCasterRef } =
     await resolveLevelUpContext(characterId, submission.target, submission.subclassId);
 
-  const steps = validateLevelUpSubmission(planCharacter, targetEntry, chosenSubclassName, submission, pickedSubclassFeatureRows);
-  await assertPickSpellEligibility(submission, steps, targetEntry.name, planCharacter.edition);
+  const steps = validateLevelUpSubmission(planCharacter, targetEntry, chosenSubclassName, submission, pickedSubclassFeatureRows, chosenSubclassCasterRef);
+  await assertPickSpellEligibility(submission, steps, planCharacter.edition);
 
   const ops = buildLevelUpOps(steps, submission);
 

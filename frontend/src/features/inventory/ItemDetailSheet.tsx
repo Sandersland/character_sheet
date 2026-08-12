@@ -7,19 +7,23 @@ import SellPanel from "@/features/inventory/SellPanel";
 import { buildSellOperations, type SellLine } from "@/lib/bulkSell";
 import { itemDetailParts } from "@/lib/itemDetails";
 import type { Currency, InventoryItem, InventoryOperation } from "@/types/character";
+import type { WeaponBondProps } from "@/lib/weaponBond";
 
 interface ItemDetailSheetProps {
   item: InventoryItem;
   pending: boolean;
   atCap: boolean;
   onSubmit: (operations: InventoryOperation[]) => Promise<void>;
+  // Bundled (#1854) — see WeaponBondProps' own comment.
+  bond: WeaponBondProps;
   onClose: () => void;
 }
 
 // The mobile row-tap surface (#1029): the per-item actions that live inline on
 // desktop, collected into one bottom sheet with edit + sell sub-views. Every
-// action funnels through the same onSubmit transaction.
-export default function ItemDetailSheet({ item, pending, atCap, onSubmit, onClose }: ItemDetailSheetProps) {
+// action funnels through the same onSubmit transaction (bond/unbond through
+// the separate bond.onSubmit — a different transaction endpoint, #1854).
+export default function ItemDetailSheet({ item, pending, atCap, onSubmit, bond, onClose }: ItemDetailSheetProps) {
   const [mode, setMode] = useState<"view" | "edit" | "sell">("view");
   const details = itemDetailParts(item).join(" · ");
 
@@ -48,6 +52,7 @@ export default function ItemDetailSheet({ item, pending, atCap, onSubmit, onClos
           pending={pending}
           atCap={atCap}
           onSubmit={onSubmit}
+          bond={bond}
           onClose={onClose}
           onEdit={() => setMode("edit")}
           onSell={() => setMode("sell")}

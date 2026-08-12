@@ -157,3 +157,23 @@ export const useHandOfUltimateMercyOpSchema = z.object({
 });
 export type UseHandOfUltimateMercyOperation = z.infer<typeof useHandOfUltimateMercyOpSchema>;
 export type HandOfUltimateMercyOperation = UseHandOfUltimateMercyOperation;
+
+/**
+ * Eldritch Knight Weapon Bond (2014, PHB'14 p.75, #1854): `inventoryItemId`
+ * is the character's own InventoryItem row. bondWeapon enforces the L3+ EK
+ * (2014) gate and the 2-weapon cap server-side; unbondWeapon is always legal
+ * (mirrors unattune) so a stuck row can clear.
+ */
+export const bondWeaponOpSchema = z.object({
+  type: z.literal("bondWeapon"),
+  inventoryItemId: z.string().min(1),
+});
+export type BondWeaponOperation = z.infer<typeof bondWeaponOpSchema>;
+
+export const unbondWeaponOpSchema = z.object({
+  type: z.literal("unbondWeapon"),
+  inventoryItemId: z.string().min(1),
+});
+export type UnbondWeaponOperation = z.infer<typeof unbondWeaponOpSchema>;
+
+export type WeaponBondOperation = BondWeaponOperation | UnbondWeaponOperation;

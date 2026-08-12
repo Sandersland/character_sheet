@@ -52,7 +52,9 @@ describe.each(EDITIONS)("buildLevelUpPlan — the PERSISTED subclass FK path car
     };
     const steps = buildLevelUpPlan(char(2, edition, "battle master"), target);
 
-    expect(stepsByKind(steps, "maneuvers")).toEqual({ kind: "maneuvers", count: 3 });
+    // #1516: canSwap rides the "maneuvers" step unconditionally whenever it
+    // exists (PHB'14 Battle Master p.73 / SRD 5.2 equivalent).
+    expect(stepsByKind(steps, "maneuvers")).toEqual({ kind: "maneuvers", count: 3, meta: { canSwap: true } });
     expect(stepsByKind(steps, "toolProficiency")).toEqual({ kind: "toolProficiency", count: 1 });
   });
 
@@ -67,7 +69,7 @@ describe.each(EDITIONS)("buildLevelUpPlan — the PERSISTED subclass FK path car
     };
     const steps = buildLevelUpPlan(char(6, edition, "battle master"), target);
 
-    expect(stepsByKind(steps, "maneuvers")).toEqual({ kind: "maneuvers", count: 2 });
+    expect(stepsByKind(steps, "maneuvers")).toEqual({ kind: "maneuvers", count: 2, meta: { canSwap: true } });
     expect(stepsByKind(steps, "toolProficiency")).toBeUndefined();
   });
 });
@@ -88,7 +90,7 @@ describe.each(EDITIONS)("resolveLevelUpPlan — the ?subclassId= RE-PLAN FK path
 
     const kinds = steps.map((s) => s.kind);
     expect(kinds).toContain("subclass");
-    expect(stepsByKind(steps, "maneuvers")).toEqual({ kind: "maneuvers", count: 3 });
+    expect(stepsByKind(steps, "maneuvers")).toEqual({ kind: "maneuvers", count: 3, meta: { canSwap: true } });
     expect(stepsByKind(steps, "toolProficiency")).toEqual({ kind: "toolProficiency", count: 1 });
     // Canonical order (KIND_ORDER, level-up-submission.ts): subclass before
     // maneuvers/toolProficiency, both before review.

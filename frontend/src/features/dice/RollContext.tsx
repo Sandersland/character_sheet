@@ -12,12 +12,15 @@
  *   initiative affordances. Honors the Dice-rolls preference (#945): `animated`
  *   plays the 3D `DiceRollModal` which, at settle, hands off to the shared
  *   `RollResultSeal`; `quick` publishes the same seal instantly. Both log the
- *   roll (when `log` is set and a session is active) via `logRoll` and hand the
- *   settled result to `onSettled`.
+ *   roll (when `log` is set and a session is active) via `logRollAction` and
+ *   hand the settled result to `onSettled`.
  *
  * `logSessionRoll` is the shared best-effort logging path — a no-op outside an
  * active session — used by `rollAnimated` and directly by the concentration-save
- * modal so every player-driven roll reaches the Session Log the same way.
+ * modal so every player-driven roll reaches the Session Log the same way. Since
+ * #1861 it commits the roll through the resolve-action resolver (`logRollAction`,
+ * the `logRoll` op) as a real batched, trivially-undoable event, not the retired
+ * fire-and-forget session-roll route.
  */
 
 import {
@@ -31,7 +34,7 @@ import {
   type ReactNode,
 } from "react";
 
-import { logRoll } from "@/api/client";
+import { logRollAction } from "@/api/client";
 import {
   formatRollSpec,
   rollSpec,
@@ -132,8 +135,10 @@ function useSessionRollLog({
 
   return useCallback((input: RollLogInput) => {
     const { characterId: cid, sessionId: sid, onRollLogged: onLogged } = sessionRef.current;
+    // Still gated on an active session (the resolver derives the sessionId from
+    // it) — a roll outside a session isn't logged, matching prior behavior.
     if (!cid || !sid) return;
-    logRoll(cid, sid, input)
+    logRollAction(cid, input)
       .then(() => onLogged?.())
       .catch((e) => console.error("roll log failed", e));
   }, []);

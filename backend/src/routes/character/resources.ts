@@ -1,5 +1,5 @@
 // Owns POST /characters/:id/resources/transactions (spend/restore class
-// resources, learn/forget maneuvers + tool profs). Like every mutation router
+// resources, learn/forget maneuvers + tool profs + Expertise). Like every mutation router
 // here, it validates a Zod op union, applies it atomically in the lib layer,
 // then re-fetches with characterInclude and returns serializeCharacter(updated)
 // so the response carries the full, freshly-derived character.
@@ -45,7 +45,11 @@ export const learnManeuverOpSchema = z
     message: "Provide exactly one of maneuverId or custom",
   });
 
-const forgetManeuverOpSchema = z.object({
+// Exported (#1516) so the level-up ceremony's own submission schema
+// (routes/character/level-up.ts) can reuse it verbatim for
+// maneuversForgotten — same "one op schema, two call sites" pattern as
+// forgetSubclassChoiceOpSchema below.
+export const forgetManeuverOpSchema = z.object({
   type: z.literal("forgetManeuver"),
   entryId: z.string().min(1),
 });
@@ -80,6 +84,26 @@ export const forgetSubclassChoiceOpSchema = z.object({
   entryId: z.string().min(1),
 });
 
+// #1588: skill proficiency + the level-derived pick cap are validated in the
+// applier (applyLearnExpertiseOp) — never trust a client-supplied legality.
+// Exported so the level-up ceremony's own submission schema
+// (routes/character/level-up.ts) can reuse it verbatim for the "expertise"
+// step, same "one op schema, two call sites" pattern as
+// learnToolProficiencyOpSchema above.
+export const learnExpertiseOpSchema = z.object({
+  type: z.literal("learnExpertise"),
+  skill: z.string().min(1),
+});
+
+// Freely reversible — no learn-time ceremony gate like forgetManeuver/
+// forgetSubclassChoice above (#1588's own decision: Expertise carries no RAW
+// swap-only text, so there's nothing to gate). Not exported — mirrors
+// forgetToolProficiencyOpSchema above: only the LEARN op needs ceremony reuse.
+const forgetExpertiseOpSchema = z.object({
+  type: z.literal("forgetExpertise"),
+  entryId: z.string().min(1),
+});
+
 const operationSchema = z.discriminatedUnion("type", [
   spendResourceOpSchema,
   restoreResourceOpSchema,
@@ -90,6 +114,8 @@ const operationSchema = z.discriminatedUnion("type", [
   forgetToolProficiencyOpSchema,
   learnSubclassChoiceOpSchema,
   forgetSubclassChoiceOpSchema,
+  learnExpertiseOpSchema,
+  forgetExpertiseOpSchema,
 ]);
 
 const transactionsRequestSchema = z.object({
@@ -104,11 +130,20 @@ const transactionsRequestSchema = z.object({
  *   restoreResource       — restore spent units (undo mis-click or Relentless trigger)
  *   rollInitiative        — regain resources on combat start (onInitiative pools, #1239)
  *   learnManeuver         — add a maneuver from catalog or custom payload
- *   forgetManeuver        — remove a known maneuver by entry id
+ *   forgetManeuver        — 400s here (#1516): both editions bound a maneuver
+ *                           replacement to learn-time (PHB'14 Battle Master
+ *                           p.73; SRD 5.2 equivalent) — only reachable through
+ *                           a validated level-up ceremony step, never this
+ *                           generic route.
  *   learnToolProficiency  — choose an artisan's tool (Student of War, level 3+)
  *   forgetToolProficiency — undo a tool proficiency choice by entry id
  *   learnSubclassChoice   — pick an option for a generic subclass choose-N (#899)
- *   forgetSubclassChoice  — undo a subclass-choice pick by entry id
+ *   forgetSubclassChoice  — 400s here (#1516): same learn-time bound as
+ *                           forgetManeuver above (PHB'14 Way of the Four
+ *                           Elements p.81 is the other cited text) — only
+ *                           reachable through a validated level-up step.
+ *   learnExpertise        — double proficiency bonus on a proficient skill (#1588)
+ *   forgetExpertise       — undo an Expertise pick by entry id, freely reversible
  *
  * Returns the full updated character on success, plus a top-level `results`
  * array (one ResourceOpAudit per op) so a roll-driven op's outcome — today,

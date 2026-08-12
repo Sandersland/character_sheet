@@ -42,10 +42,10 @@ export interface HpOpContext {
   hd: HitDice;
   conMod: number;
   faces: number;
-  /** effectiveMaxHitPoints(hp.max, featMaxHpBonus, exhaustionLevel, row.rulesEdition) — the effective max AT CONTEXT-BUILD TIME. A consumer that changes exhaustion mid-op (applyLongRestOp, decision 6) must recompute via the two fields below rather than reuse this stale value. */
+  /** effectiveMaxHitPoints(hp.max, maxHpBonus, exhaustionLevel, row.rulesEdition) — the effective max AT CONTEXT-BUILD TIME. A consumer that changes exhaustion mid-op (applyLongRestOp, decision 6) must recompute via the two fields below rather than reuse this stale value. */
   effMax: number;
-  /** The feat-bonus half of effMax's composition (e.g. Tough), exposed so a consumer can recompute effMax against a NEW exhaustion level without re-deriving it (#1321). */
-  featMaxHpBonus: number;
+  /** The pre-halving bonus half of effMax's composition — feat bonuses (e.g. Tough, #1321) plus Draconic Resilience (#1123) — exposed so a consumer can recompute effMax against a NEW exhaustion level without re-deriving it. */
+  maxHpBonus: number;
   /** conditions.exhaustion at context-build time — see effMax's own comment. */
   exhaustionLevel: number;
   primaryEntry: ClassEntryRow | undefined;
@@ -75,12 +75,17 @@ export interface ClassEntryRow {
   // deriveRestPools' ClassFeatureRowsCarrier so isSubclassActive no longer
   // depends on a lib/classes/<class>.ts module being present.
   class: {
+    name: string;
     hitDie: string;
     extraAsiLevels: number[];
     subclassLevel: number;
     features: ClassFeatureRow[];
   } | null;
-  subclassRef: { features: ClassFeatureRow[] } | null;
+  // `slug` (#1123): draconicResilienceMaxHpTerm's FK identity input
+  // (effectiveMaxHitPointsForRow) — the select below carries it too.
+  // `casterFraction`/`spellcastingAbility` (#1531): restoreWarlockPactSlots'
+  // deriveMulticlassSpellcasting call (rest.ts) needs the third-caster columns.
+  subclassRef: { slug: string; features: ClassFeatureRow[]; casterFraction: "third" | null; spellcastingAbility: string | null } | null;
 }
 
 export interface HpOpResult {
@@ -142,11 +147,14 @@ export async function buildHpOpContext(
           // `extraAsiLevels` (#1529): the featSlotCap read below
           // (characterAdvancementSlots). `fightingStyleFeatLevel` (#1321):
           // effectiveMaxHitPointsForRow's fs-cap arg (characterFightingStyleFeatSlots).
+          // `name` (#1148): characterFightingStyleFeatSlots' resolveSubclassSlug
+          // input — the CANONICAL class name, same #1495 rationale as elsewhere.
           // `subclassLevel` (#1576): deriveRestPools' carrier needs it so a
           // 2014 Cleric/Sorcerer/Warlock/Druid/Wizard's subclass pools still
           // gate at their PHB'14 level once the class module is gone.
           class: {
             select: {
+              name: true,
               hitDie: true,
               extraAsiLevels: true,
               fightingStyleFeatLevel: true,
@@ -154,7 +162,9 @@ export async function buildHpOpContext(
               features: FEATURE_ROWS_CLASS_FEATURES,
             },
           },
-          subclassRef: { select: { features: FEATURE_ROWS_SUBCLASS_FEATURES } },
+          subclassRef: {
+            select: { slug: true, casterFraction: true, spellcastingAbility: true, features: FEATURE_ROWS_SUBCLASS_FEATURES },
+          },
         },
       },
     },
@@ -163,10 +173,10 @@ export async function buildHpOpContext(
     throw new InvalidHitPointOperationError(`Character not found: ${characterId}`);
   }
 
-  // #1321: hp/hd/featMaxHpBonus/exhaustionLevel/effMax all come from ONE call
+  // #1321: hp/hd/maxHpBonus/exhaustionLevel/effMax all come from ONE call
   // — effectiveMaxHitPointsForRow (conditions.ts) — so this and applyHealInTx
   // (hp-in-tx.ts) never repeat the composition inline.
-  const { hp, hd, featMaxHpBonus, exhaustionLevel, effMax } = effectiveMaxHitPointsForRow(row);
+  const { hp, hd, maxHpBonus, exhaustionLevel, effMax } = effectiveMaxHitPointsForRow(row);
   const abilityScores = row.abilityScores as Record<string, number>;
   const conMod = abilityModifier(abilityScores.constitution ?? 10);
   const faces = hitDieFace(hd.die);
@@ -203,7 +213,7 @@ export async function buildHpOpContext(
     conMod,
     faces,
     effMax,
-    featMaxHpBonus,
+    maxHpBonus,
     exhaustionLevel,
     primaryEntry,
     beforeClassLevel: primaryEntry?.level ?? null,

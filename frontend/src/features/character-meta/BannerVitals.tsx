@@ -57,6 +57,9 @@ export default function BannerVitals() {
 
       <StatChip label="Speed" value={`${character.speed} ft`} />
 
+      {/* Dragon Wings (#1123) — present only while unarmored at Draconic L14. */}
+      {character.flySpeed !== undefined && <StatChip label="Fly Speed" value={`${character.flySpeed} ft`} />}
+
       <StatChip label="Proficiency" value={formatModifier(character.proficiencyBonus)} />
     </div>
   );

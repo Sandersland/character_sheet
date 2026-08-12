@@ -32,12 +32,6 @@ interface Props {
   run: (send: () => Promise<Character>) => void;
 }
 
-// Remaining Focus from the character's derived resource pools — mirrors the
-// identical local helper in ShadowArtsSection/WarriorOfElementsSection.
-function focusRemaining(character: Character): number {
-  return character.resources?.pools.find((p) => p.key === "focus")?.remaining ?? 0;
-}
-
 // The entitlement-gated resource/subclass feature blocks, split out of the
 // orchestrator to keep each render function under the complexity budget.
 export default function ClassResourceBlocks({ view, busy, run }: Props) {
@@ -64,7 +58,6 @@ export default function ClassResourceBlocks({ view, busy, run }: Props) {
           maneuverKnownIds={view.maneuverKnownIds}
           busy={busy}
           onLearn={(op) => resourceOp(op)}
-          onForget={(entryId) => run(() => applyResourceTransactions(character.id, [{ type: "forgetManeuver", entryId }]))}
         />
       )}
 
@@ -110,7 +103,6 @@ export default function ClassResourceBlocks({ view, busy, run }: Props) {
 
       {view.hasCloakOfShadows && (
         <CloakOfShadowsSection
-          focusAvailable={focusRemaining(character)}
           busy={busy}
           onActivate={() =>
             run(() =>

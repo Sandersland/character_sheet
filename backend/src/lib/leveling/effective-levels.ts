@@ -10,6 +10,30 @@ export function effectiveEntryLevel(entryLevel: number, entryCount: number, deri
   return entryCount <= 1 ? derivedLevel : entryLevel;
 }
 
+// The post-level-down per-entry class levels (#124's LIFO trim as a pure
+// rule): the highest-position (most-recently-added) class loses levels first;
+// the position-0 base class is floored at 1, every other entry at 0 — a 0
+// means "entry deleted". Input MUST be ordered by position ascending. The ONE
+// allocation both reconcileClassEntryLevels (which persists it) and
+// computeLevelDownState (which must PROJECT it — its HP clamp runs BEFORE the
+// reconciler chain, when the rows still hold pre-down levels, #1123) resolve
+// through — never two inline copies of the trim.
+export function levelDownEntryLevels(
+  entryLevels: readonly number[],
+  newDerivedLevel: number,
+): number[] {
+  const result = [...entryLevels];
+  let excess = result.reduce((sum, level) => sum + level, 0) - newDerivedLevel;
+  for (let i = result.length - 1; i >= 0 && excess > 0; i--) {
+    const floor = i === 0 ? 1 : 0;
+    const reducible = Math.min(result[i] - floor, excess);
+    if (reducible <= 0) continue;
+    result[i] -= reducible;
+    excess -= reducible;
+  }
+  return result;
+}
+
 // A subclass's grant gate. 2024 (SRD 5.2): every class gains its subclass at
 // level 3, so the catalog column is ignored. 2014 (PHB'14): the catalog column
 // carries the per-class gate — Cleric/Sorcerer/Warlock 1, Druid/Wizard 2, rest 3.
@@ -20,12 +44,30 @@ export function effectiveEntryLevel(entryLevel: number, entryCount: number, deri
 // (the reconciler in level-reconciliation.ts and the clamp-on-read in
 // serialize/classes.ts alike), which is exactly the coupling this function
 // exists to centralize.
+//
+// The pattern-setter (#1527) for an edition-forked rule: a `switch` over
+// `edition` with an `assertNever`-shaped default, never `if (edition ===
+// "EDITION_2024") … else …`. The if/else shape let an unrecognized third
+// edition silently fall into the `else` branch — 2014's `subclassLevel ?? 3`
+// — instead of failing loudly. This file stays a pure, zero-project-import
+// module (imports `RulesEdition` straight from `@character-sheet/shared-types`
+// rather than `ALL_RULES_EDITIONS` from `lib/rules/edition.ts`, to stay
+// cycle-safe), so the unhandled case is caught by the switch itself, not by
+// membership-testing an imported array.
 export function subclassGateLevel(
   subclassLevel: number | null | undefined,
   edition: RulesEdition,
 ): number {
-  if (edition === "EDITION_2024") return 3;
-  return subclassLevel ?? 3;
+  switch (edition) {
+    case "EDITION_2024":
+      return 3;
+    case "EDITION_2014":
+      return subclassLevel ?? 3;
+    default: {
+      const exhaustive: never = edition;
+      throw new Error(`subclassGateLevel: unhandled edition ${String(exhaustive)}`);
+    }
+  }
 }
 
 // Whether a subclass's level-gated grants are active at this effective level.

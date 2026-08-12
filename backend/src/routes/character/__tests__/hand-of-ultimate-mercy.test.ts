@@ -100,7 +100,7 @@ describe("POST /api/characters/:id/abilities/hand-of-ultimate-mercy/transactions
       .send({ operations: [{ type: "useHandOfUltimateMercy", roll: 27 }] });
     expect(res.status).toBe(200);
 
-    const base = { maneuversKnown: [], toolProficienciesKnown: [], choicesKnown: {}, advancements: [] };
+    const base = { maneuversKnown: [], toolProficienciesKnown: [], expertiseKnown: [], choicesKnown: {}, advancements: [] };
 
     expect(await readPinnedEvents(FIXTURE_ID)).toEqual([
       {

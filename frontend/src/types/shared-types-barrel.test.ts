@@ -18,9 +18,11 @@ import type {
   CastElementalBurstOperation,
   ElementalDamageType,
   ElementalStrikeOperation,
+  ForgetExpertiseOperation,
   ForgetManeuverOperation,
   ForgetSubclassChoiceOperation,
   ForgetToolProficiencyOperation,
+  LearnExpertiseOperation,
   LearnManeuverOperation,
   LearnSubclassChoiceOperation,
   LearnToolProficiencyOperation,
@@ -109,9 +111,11 @@ describe("@/types/character barrel", () => {
     expectTypeOf<CastElementalBurstOperation>().toEqualTypeOf<Shared.CastElementalBurstOperation>();
     expectTypeOf<ElementalDamageType>().toEqualTypeOf<Shared.ElementalDamageType>();
     expectTypeOf<ElementalStrikeOperation>().toEqualTypeOf<Shared.ElementalStrikeOperation>();
+    expectTypeOf<ForgetExpertiseOperation>().toEqualTypeOf<Shared.ForgetExpertiseOperation>();
     expectTypeOf<ForgetManeuverOperation>().toEqualTypeOf<Shared.ForgetManeuverOperation>();
     expectTypeOf<ForgetSubclassChoiceOperation>().toEqualTypeOf<Shared.ForgetSubclassChoiceOperation>();
     expectTypeOf<ForgetToolProficiencyOperation>().toEqualTypeOf<Shared.ForgetToolProficiencyOperation>();
+    expectTypeOf<LearnExpertiseOperation>().toEqualTypeOf<Shared.LearnExpertiseOperation>();
     expectTypeOf<LearnManeuverOperation>().toEqualTypeOf<Shared.LearnManeuverOperation>();
     expectTypeOf<LearnSubclassChoiceOperation>().toEqualTypeOf<Shared.LearnSubclassChoiceOperation>();
     expectTypeOf<LearnToolProficiencyOperation>().toEqualTypeOf<Shared.LearnToolProficiencyOperation>();

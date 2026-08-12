@@ -17,10 +17,14 @@ import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/exp
 import { logEvent } from "@/lib/activity/events.js";
 import { deriveEntryScopedResources, type DerivedClassInfo } from "./class-features.js";
 import { FEATURE_ROWS_ENTRY_SELECT, featureRowsOf } from "./feature-rows-select.js";
+import { inventoryItemDetailInclude, resolveInventoryItem } from "@/lib/inventory/inventory-types.js";
 import { editionOf } from "@/lib/rules/edition.js";
 import { crossEditionRejection } from "@/lib/rules/catalog-edition.js";
 import type { RulesEdition } from "@character-sheet/shared-types";
 import { toolsByCategory } from "@/lib/srd/srd.js";
+import { SKILL_KEYS } from "@/lib/srd/alignments.js";
+import { deriveFeatProficiencies } from "@/lib/srd/feats.js";
+import { deriveItemGrants, type GrantItem } from "@/lib/inventory/capabilities.js";
 import { rollDie } from "@/lib/core/dice.js";
 // Cross-domain HP heal for Uncanny Metabolism's bonusHeal (#1243) — precedented
 // by lib/spellcasting/ability-cast.ts, which also composes applyHealInTx from a
@@ -40,15 +44,18 @@ import {
   splitAdvancementsBySlotCap,
   type AdvancementEntry,
   type ChoiceEntry,
+  type ExpertiseEntry,
   type FeatImprovement,
   type ManeuverEntry,
   type ResourcesMutableState,
   type ToolProfEntry,
 } from "./resources-state.js";
 import type {
+  ForgetExpertiseOperation,
   ForgetManeuverOperation,
   ForgetSubclassChoiceOperation,
   ForgetToolProficiencyOperation,
+  LearnExpertiseOperation,
   LearnManeuverOperation,
   LearnSubclassChoiceOperation,
   LearnToolProficiencyOperation,
@@ -63,7 +70,13 @@ import type {
 // submission/transaction, ability-cost, the actions + resources routes) keep
 // resolving them unchanged.
 export type {
+  ForgetManeuverOperation,
   ForgetSubclassChoiceOperation,
+  // #1588: LearnExpertiseOperation only — no ceremony ever reuses
+  // ForgetExpertiseOperation (freely reversible, no ceremony-scoped forget
+  // list), so it stays imported-but-not-re-exported, mirroring
+  // ForgetToolProficiencyOperation below.
+  LearnExpertiseOperation,
   LearnManeuverOperation,
   LearnSubclassChoiceOperation,
   LearnToolProficiencyOperation,
@@ -86,6 +99,7 @@ export {
 export type {
   AdvancementEntry,
   ChoiceEntry,
+  ExpertiseEntry,
   FeatImprovement,
   ManeuverEntry,
   ResourcesMutableState,
@@ -406,10 +420,25 @@ async function applyLearnManeuverOp(
   };
 }
 
+// #1516: "Each time you learn new maneuvers, you can also replace one
+// maneuver you know with a different one" (PHB'14 Battle Master p.73; SRD 5.2
+// carries the equivalent grant) — RAW bounds a maneuver replacement to
+// learn-time, so this primitive is unreachable outside a validated level-up
+// step (ctx.allowChooseNForget), same guard shape as
+// applyForgetSubclassChoiceOp below. The reconciler (level-reconciliation.ts)
+// trims maneuversKnown directly, never through this op, so it is unaffected —
+// gating HERE (the op boundary), not inside a shared trim primitive, is what
+// keeps level-down reconciliation working (#1516 decision).
 function applyForgetManeuverOp(
   state: ResourcesMutableState,
   op: ForgetManeuverOperation,
+  allowChooseNForget: boolean,
 ): ResourceOpAudit {
+  if (!allowChooseNForget) {
+    throw new InvalidResourceOperationError(
+      "Forgetting a maneuver is only allowed while learning new maneuvers (level-up ceremony)",
+    );
+  }
   const idx = state.maneuversKnown.findIndex((m) => m.id === op.entryId);
   if (idx === -1) {
     throw new InvalidResourceOperationError(
@@ -478,6 +507,87 @@ function applyForgetToolProficiencyOp(
     eventType: "forgetToolProficiency",
     summary: `Forgot tool proficiency: ${forgottenTool.name}`,
     eventData: { entryId: op.entryId, toolName: forgottenTool.name },
+  };
+}
+
+/**
+ * Learn Expertise in a skill (#1588) — doubles proficiency bonus on that
+ * skill's checks (buildSkillsView, serialize/proficiencies.ts). Validates
+ * BOTH the skill key is real and the character is actually proficient in it
+ * (`proficientSkillsOf`'s own scoped read, the same way the read path
+ * resolves proficiency — base skill rows + feat/class-feature-row + item
+ * grants — never trusted from the client) and the level-derived
+ * expertiseChoiceCount cap. Takes `tx`/`characterId` (mirrors
+ * applyLearnManeuverOp's own tx.grantedAbility.findUnique) so the
+ * skills/inventory query stays scoped to THIS op, not RESOURCES_SELECT's
+ * every-op read (#1588 perf review — spendResource/restoreResource are the
+ * combat hot path and never need this). Freely reversible
+ * (applyForgetExpertiseOp below carries no learn-time gate, unlike
+ * applyForgetManeuverOp/applyForgetSubclassChoiceOp): Expertise has no RAW
+ * swap-only text to bound it to a ceremony step.
+ */
+async function applyLearnExpertiseOp(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  state: ResourcesMutableState,
+  op: LearnExpertiseOperation,
+  derivedInfo: DerivedClassInfo | null,
+): Promise<ResourceOpAudit> {
+  if (!SKILL_KEYS.includes(op.skill)) {
+    throw new InvalidResourceOperationError(`"${op.skill}" is not a known skill.`);
+  }
+  const proficientSkills = await proficientSkillsOf(tx, characterId, state);
+  if (!proficientSkills.has(op.skill)) {
+    throw new InvalidResourceOperationError(
+      `Cannot take Expertise in "${op.skill}": not proficient in that skill.`
+    );
+  }
+
+  // #1588 (Opus review): undefined (no grantor class at all) is treated as
+  // cap 0 here, NOT skipped — deliberately diverging from
+  // applyLearnToolProficiencyOp/applyLearnManeuverOp's `!== undefined &&`
+  // pattern above, which leaves an undefined cap unlimited. That's a live
+  // exploit for Expertise specifically: FOUR classes grant it, so a crafted
+  // op on any character (e.g. a pure Fighter) could otherwise take Expertise
+  // in any proficient skill via a direct API call the UI never offers.
+  // Matches the clamp-on-read's own undefined -> 0 treatment
+  // (buildResourcesPayload, serialize/classes.ts) so learn/clamp/reconcile
+  // all agree a non-grantor class holds zero Expertise, never "however many
+  // happen to already be stored."
+  const expertiseChoiceCount = derivedInfo?.expertiseChoiceCount ?? 0;
+  if (state.expertiseKnown.length >= expertiseChoiceCount) {
+    throw new InvalidResourceOperationError(
+      `Cannot take more Expertise: already have ${state.expertiseKnown.length}/${expertiseChoiceCount}`
+    );
+  }
+
+  if (state.expertiseKnown.some((e) => e.skill === op.skill)) {
+    throw new InvalidResourceOperationError(`Expertise already taken in: ${op.skill}`);
+  }
+
+  const newEntry: ExpertiseEntry = { id: randomUUID(), skill: op.skill };
+  state.expertiseKnown.push(newEntry);
+  return {
+    eventType: "learnExpertise",
+    summary: `Took Expertise in: ${op.skill}`,
+    eventData: { entryId: newEntry.id, skill: op.skill },
+  };
+}
+
+function applyForgetExpertiseOp(
+  state: ResourcesMutableState,
+  op: ForgetExpertiseOperation,
+): ResourceOpAudit {
+  const idx = state.expertiseKnown.findIndex((e) => e.id === op.entryId);
+  if (idx === -1) {
+    throw new InvalidResourceOperationError(`Expertise entry not found: ${op.entryId}`);
+  }
+  const forgotten = state.expertiseKnown[idx];
+  state.expertiseKnown.splice(idx, 1);
+  return {
+    eventType: "forgetExpertise",
+    summary: `Removed Expertise in: ${forgotten.skill}`,
+    eventData: { entryId: op.entryId, skill: forgotten.skill },
   };
 }
 
@@ -557,10 +667,28 @@ async function applyLearnSubclassChoiceOp(
   };
 }
 
+// #1516: both editions bound a choose-N replacement to learn-time (PHB'14
+// Battle Master maneuvers p.73, Way of the Four Elements disciplines p.81;
+// SRD 5.2 carries the equivalent grants) — this primitive is unreachable
+// outside a validated level-up step (ctx.allowChooseNForget), which itself
+// only carries a forget when subclassChoiceSwapCadence resolved "onLevelUp"
+// for that catalogSource (assertSubclassChoiceForgets, level-up-submission.ts)
+// — so a non-swappable choice (e.g. Hunter's Prey) is rejected at the
+// ceremony layer before it would ever reach here. The reconciler
+// (reconcileSubclassChoices) trims choicesKnown directly via
+// clampChoicesToCaps, never through this op, so it is unaffected — gating
+// HERE (the op boundary), not inside that shared trim primitive, is what
+// keeps level-down reconciliation working (#1516 decision).
 function applyForgetSubclassChoiceOp(
   state: ResourcesMutableState,
   op: ForgetSubclassChoiceOperation,
+  allowChooseNForget: boolean,
 ): ResourceOpAudit {
+  if (!allowChooseNForget) {
+    throw new InvalidResourceOperationError(
+      "Forgetting a subclass choice is only allowed while learning a new one (level-up ceremony)",
+    );
+  }
   const known = state.choicesKnown[op.choiceKey] ?? [];
   const idx = known.findIndex((e) => e.id === op.entryId);
   if (idx === -1) {
@@ -588,13 +716,25 @@ interface ResourceOpContext {
   tx: Prisma.TransactionClient;
   state: ResourcesMutableState;
   derivedInfo: DerivedClassInfo | null;
-  /** Only rollInitiative reads these — its bonusHeal composes applyHealInTx
-   *  in the same tx/batch (#1243). */
+  /** rollInitiative's bonusHeal composes applyHealInTx in the same tx/batch
+   *  (#1243); applyLearnExpertiseOp's own scoped proficient-skill read
+   *  (#1588) also uses both — see proficientSkillsOf. */
   characterId: string;
   batchId: string;
   sessionId: string | null;
   /** Gates a client-supplied maneuverId/optionId against the row's edition (#1345). */
   edition: RulesEdition;
+  /**
+   * #1516: whether this call site is a validated level-up ceremony step
+   * (level-up-transaction.ts, after validateLevelUpSubmission's
+   * assertManeuverForgets/assertSubclassChoiceForgets already proved the
+   * forgetManeuver/forgetSubclassChoice op belongs to a canSwap-carrying
+   * step) — false for every other caller, including the generic
+   * POST .../resources/transactions route, so a choose-N forget is
+   * unreachable outside learn-time. The client never sets this: it is
+   * server-computed per call site, never a client-supplied op field.
+   */
+  allowChooseNForget: boolean;
 }
 
 // The handler-map return type — async ops return a Promise. Unrelated to the
@@ -613,11 +753,13 @@ const RESOURCE_OP_HANDLERS: {
   rollInitiative: (ctx) =>
     applyRollInitiativeOp(ctx.tx, ctx.characterId, ctx.state, ctx.derivedInfo, ctx.batchId, ctx.sessionId),
   learnManeuver: (ctx, op) => applyLearnManeuverOp(ctx.tx, ctx.state, op, ctx.derivedInfo, ctx.edition),
-  forgetManeuver: (ctx, op) => applyForgetManeuverOp(ctx.state, op),
+  forgetManeuver: (ctx, op) => applyForgetManeuverOp(ctx.state, op, ctx.allowChooseNForget),
   learnToolProficiency: (ctx, op) => applyLearnToolProficiencyOp(ctx.state, op, ctx.derivedInfo),
   forgetToolProficiency: (ctx, op) => applyForgetToolProficiencyOp(ctx.state, op),
   learnSubclassChoice: (ctx, op) => applyLearnSubclassChoiceOp(ctx.tx, ctx.state, op, ctx.derivedInfo, ctx.edition),
-  forgetSubclassChoice: (ctx, op) => applyForgetSubclassChoiceOp(ctx.state, op),
+  forgetSubclassChoice: (ctx, op) => applyForgetSubclassChoiceOp(ctx.state, op, ctx.allowChooseNForget),
+  learnExpertise: (ctx, op) => applyLearnExpertiseOp(ctx.tx, ctx.characterId, ctx.state, op, ctx.derivedInfo),
+  forgetExpertise: (ctx, op) => applyForgetExpertiseOp(ctx.state, op),
 };
 
 function dispatchResourceOp(ctx: ResourceOpContext, op: ResourceOperation): ResourceOpResult {
@@ -640,7 +782,15 @@ function snapshotResourcesState(state: ResourcesMutableState): {
 // scaffold row is an existence-only { id: true } check. Every entry (not just
 // the primary) + its level is selected so deriveEntryScopedResources can derive
 // each entry's own choice-cap fields (#1177).
-const RESOURCES_SELECT = {
+//
+// Deliberately LEAN (#1588 perf review): this select re-runs on EVERY resource
+// op, including spendResource/restoreResource — the combat hot path. `skills`/
+// `inventoryItems` (needed only by applyLearnExpertiseOp's proficient-skill
+// validation) do NOT live here; they're a scoped follow-on read inside that one
+// applier (see EXPERTISE_PROFICIENCY_SELECT/proficientSkillsOf below), the same
+// "extra read only on the path that needs it" shape applyLearnManeuverOp's own
+// tx.grantedAbility.findUnique already uses.
+export const RESOURCES_SELECT = {
   resources: true,
   experiencePoints: true,
   abilityScores: true,
@@ -651,6 +801,50 @@ const RESOURCES_SELECT = {
   },
 } satisfies Prisma.CharacterSelect;
 
+// applyLearnExpertiseOp's own scoped read (#1588 perf review) — `skills` +
+// `inventoryItems` (via inventoryItemDetailInclude, the same fan-in every op
+// applier's live-row read uses, #1649) live ONLY here, not in RESOURCES_SELECT,
+// so spendResource/restoreResource and every other op never pay this cost.
+const EXPERTISE_PROFICIENCY_SELECT = {
+  skills: true,
+  inventoryItems: { include: inventoryItemDetailInclude },
+} satisfies Prisma.CharacterSelect;
+
+// The character's proficient skill set (#1588) — base skill rows +
+// feat-granted (deriveFeatProficiencies over the UNCLAMPED state.advancements;
+// an over-cap feat is a transient not-yet-reconciled state that the next XP
+// op self-heals, same tolerance clamp-on-read already extends elsewhere) +
+// item-granted (deriveItemGrants over the resolved inventory). Re-reads its
+// own narrow row (EXPERTISE_PROFICIENCY_SELECT) rather than taking one from
+// the caller, so only applyLearnExpertiseOp ever pays the skills/inventory
+// query cost — never the RESOURCES_SELECT read every other op shares.
+async function proficientSkillsOf(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  state: ResourcesMutableState,
+): Promise<Set<string>> {
+  const row = await tx.character.findUnique({ where: { id: characterId }, select: EXPERTISE_PROFICIENCY_SELECT });
+  if (!row) throw new InvalidResourceOperationError(`Character not found: ${characterId}`);
+  const baseProficient = (row.skills as { name: string; proficient: boolean }[])
+    .filter((s) => s.proficient)
+    .map((s) => s.name);
+  const featProficiencies = deriveFeatProficiencies(state.advancements);
+  const resolvedItems = row.inventoryItems.map(resolveInventoryItem);
+  const itemGrants = deriveItemGrants(
+    resolvedItems.map(
+      (i): GrantItem => ({
+        name: i.name,
+        equipped: i.equippedSlot != null,
+        attuned: i.attuned,
+        requiresAttunement: i.requiresAttunement,
+        capabilities: i.capabilities,
+      }),
+    ),
+  );
+  const itemSkillProfs = itemGrants.proficiencies.filter((p) => p.profType === "skill").map((p) => p.value);
+  return new Set([...baseProficient, ...featProficiencies.skills, ...itemSkillProfs]);
+}
+
 /**
  * Applies one resource op inside a caller-supplied transaction/batchId, so the
  * unified level-up endpoint (#885) and the actions orchestrator can compose a
@@ -658,6 +852,13 @@ const RESOURCES_SELECT = {
  * `tx` on every call (a batch of spends sees each prior result), dispatches via
  * dispatchResourceOp → writes back → logs its own event (the single copy of the
  * logic; applySpendResourceInTx is a thin, spend-typed delegate over this).
+ *
+ * `allowChooseNForget` (#1516) defaults false: only level-up-transaction.ts's
+ * caller — after validateLevelUpSubmission already proved a
+ * forgetManeuver/forgetSubclassChoice op belongs to a canSwap-carrying step —
+ * passes true. Every other caller (the generic resources route, the actions
+ * orchestrator's spend/restore composition) leaves it false, which is what
+ * makes a choose-N forget unreachable outside learn-time.
  */
 export async function applyResourceOpInTx(
   tx: Prisma.TransactionClient,
@@ -665,6 +866,7 @@ export async function applyResourceOpInTx(
   op: ResourceOperation,
   batchId: string,
   sessionId: string | null,
+  allowChooseNForget = false,
 ): Promise<ResourceOpAudit> {
   const row = await tx.character.findUnique({
     where: { id: characterId },
@@ -693,7 +895,10 @@ export async function applyResourceOpInTx(
   const state = normalizeResourcesMutable(row.resources);
   const beforeState = snapshotResourcesState(state);
 
-  const audit = await dispatchResourceOp({ tx, state, derivedInfo, characterId, batchId, sessionId, edition }, op);
+  const audit = await dispatchResourceOp(
+    { tx, state, derivedInfo, characterId, batchId, sessionId, edition, allowChooseNForget },
+    op,
+  );
 
   // Write the updated state back — always via serializeResourcesState so
   // all keys round-trip (prevents clobbering toolProficienciesKnown when

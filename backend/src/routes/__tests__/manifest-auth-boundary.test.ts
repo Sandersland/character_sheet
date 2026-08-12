@@ -42,6 +42,7 @@ import { preferencesRouter } from "@/routes/platform/preferences.js";
 import { subclassChoicesRouter } from "@/routes/character/subclass-choices.js";
 import { channelDivinityRouter } from "@/routes/character/channel-divinity.js";
 import { referenceRouter } from "@/routes/catalog/reference.js";
+import { resolveActionRouter } from "@/routes/character/resolve-action.js";
 import { resourcesRouter } from "@/routes/character/resources.js";
 import { customSpellsRouter } from "@/routes/catalog/custom-spells.js";
 import { spellsRouter } from "@/routes/catalog/spells.js";
@@ -134,6 +135,12 @@ const ROUTER_ENTRIES: RouterEntry[] = [
     name: "resourcesRouter",
     router: resourcesRouter,
     probe: { method: "post", path: `/api/characters/${FAKE_ID}/resources/transactions` },
+  },
+  // No GET on resolveActionRouter — only POST /transactions (#1829).
+  {
+    name: "resolveActionRouter",
+    router: resolveActionRouter,
+    probe: { method: "post", path: `/api/characters/${FAKE_ID}/resolve-action/transactions` },
   },
   // No GET on conditionsRouter — only POST /transactions.
   {

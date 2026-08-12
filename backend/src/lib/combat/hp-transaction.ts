@@ -8,7 +8,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import {
   clearBuffsForRestInTx,
   clearWhileActiveBuffsInTx,
-} from "./active-effects.js";
+} from "./buff-end.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { resetActivatedUsesForRestInTx } from "@/lib/inventory/item-recharge.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
@@ -245,6 +245,8 @@ async function applyHpOpFollowOns(
 
   // A long rest or falling unconscious (0 HP) ends all "while-active" durable
   // self-buffs (e.g. Rage) — the turn-hook covers the "no attack/no damage" case.
+  // Restoring a condition Mindless Rage suspended against a cleared buff
+  // (#1121) happens inside the clear itself, same as every buff-end path.
   if (op.type === "longRest" || (op.type === "damage" && hp.current === 0)) {
     await clearWhileActiveBuffsInTx(
       tx,

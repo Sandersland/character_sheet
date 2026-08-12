@@ -2,6 +2,7 @@ import type { InventoryOperation } from "@/types/character";
 import LoadoutList from "@/features/inventory/LoadoutList";
 import InventorySections from "@/features/inventory/InventorySections";
 import { type InventorySection } from "@/lib/inventorySections";
+import type { WeaponBondProps } from "@/lib/weaponBond";
 
 interface InventoryContentProps {
   view: "bag" | "worn";
@@ -12,6 +13,8 @@ interface InventoryContentProps {
   selectMode: boolean;
   selectedIds: Set<string>;
   onSubmit: (operations: InventoryOperation[]) => Promise<void>;
+  // Bundled (#1854) — see WeaponBondProps' own comment.
+  bond: WeaponBondProps;
   onEdit: (id: string) => void;
   onCancelEdit: () => void;
   onToggleSelect: (id: string) => void;
@@ -27,6 +30,7 @@ export default function InventoryContent({
   selectMode,
   selectedIds,
   onSubmit,
+  bond,
   onEdit,
   onCancelEdit,
   onToggleSelect,
@@ -45,6 +49,7 @@ export default function InventoryContent({
       onEdit={onEdit}
       onCancelEdit={onCancelEdit}
       onSubmit={onSubmit}
+      bond={bond}
       onToggleSelect={onToggleSelect}
     />
   );

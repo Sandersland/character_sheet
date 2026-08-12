@@ -48,6 +48,8 @@ export interface ActiveBuff {
   restType?: "short" | "long";
   /** Damage types this buff makes the character resistant to (halved on take), e.g. Rage's b/p/s (#456). */
   resistDamageTypes?: string[];
+  /** Condition keys this buff makes the character immune to while active (#1121) — mirrors resistDamageTypes. No production buff sets this yet (Mindless Rage's immunity is subclass-gated, so it rides ClassFeatureRow.conditionImmunities instead, see deriveImmuneConditions); a universally-immune buff (any character granted it, no subclass gate) is this field's consumer. */
+  conditionImmunities?: string[];
   /** State-driven advantage/disadvantage grants (#486), e.g. Rage's advantage on Strength checks & saves. */
   rollEffects?: RollEffect[];
   /**
@@ -114,6 +116,7 @@ function parseRollEffects(value: unknown): RollEffect[] | undefined {
 function buildBuff(entry: Record<string, unknown>, key: string, target: string, modifier: number): ActiveBuff {
   const restType = parseRestType(entry.restType);
   const resistDamageTypes = parseStringArray(entry.resistDamageTypes);
+  const conditionImmunities = parseStringArray(entry.conditionImmunities);
   const rollEffects = parseRollEffects(entry.rollEffects);
   const clearOn = parseStringArray(entry.clearOn);
   return {
@@ -126,6 +129,7 @@ function buildBuff(entry: Record<string, unknown>, key: string, target: string, 
     duration: parseBuffDuration(entry.duration),
     ...(restType ? { restType } : {}),
     ...(resistDamageTypes ? { resistDamageTypes } : {}),
+    ...(conditionImmunities ? { conditionImmunities } : {}),
     ...(rollEffects ? { rollEffects } : {}),
     ...(clearOn ? { clearOn } : {}),
   };
@@ -167,6 +171,7 @@ const OPTIONAL_BUFF_FIELDS: ReadonlyArray<{ key: keyof ActiveBuff; include: (b: 
   { key: "duration", include: (b) => b.duration !== "concentration" },
   { key: "restType", include: (b) => Boolean(b.restType) },
   { key: "resistDamageTypes", include: (b) => Boolean(b.resistDamageTypes?.length) },
+  { key: "conditionImmunities", include: (b) => Boolean(b.conditionImmunities?.length) },
   { key: "rollEffects", include: (b) => Boolean(b.rollEffects?.length) },
   { key: "clearOn", include: (b) => Boolean(b.clearOn?.length) },
 ];
@@ -216,8 +221,25 @@ export function activeResistedDamageTypes(state: ActiveEffectsMutableState): Set
   return out;
 }
 
+/**
+ * Self-scoped condition-immunity registry (#1121): the set of condition keys
+ * the character's active buffs currently grant immunity to. Mirrors
+ * activeResistedDamageTypes exactly — fed purely by buff data, no hardcoded
+ * class rules. deriveImmuneConditions (lib/combat/conditions.ts) is the ONE
+ * caller that unions this with the row-declared half
+ * (conditionImmunitiesFromRows, class-feature-rows.ts) into the immune set
+ * the write-guard and the wire both read.
+ */
+export function activeImmuneConditions(state: ActiveEffectsMutableState): Set<string> {
+  const out = new Set<string>();
+  for (const b of state.buffs) {
+    for (const c of b.conditionImmunities ?? []) out.add(c);
+  }
+  return out;
+}
+
 /** Snapshot of the state under the `activeEffects` key, for event before/after. */
-function snapshot(state: ActiveEffectsMutableState): { activeEffects: ActiveEffectsMutableState } {
+export function snapshotActiveEffects(state: ActiveEffectsMutableState): { activeEffects: ActiveEffectsMutableState } {
   return { activeEffects: { buffs: state.buffs.map((b) => ({ ...b })) } };
 }
 
@@ -251,7 +273,7 @@ export async function appendActiveBuffInTx(
   if (!row) return;
 
   const state = normalizeActiveEffectsMutable(row.activeEffects);
-  const before = snapshot(state);
+  const before = snapshotActiveEffects(state);
   // Dedupe by key — re-casting replaces the prior instance.
   state.buffs = state.buffs.filter((b) => b.key !== buff.key);
   state.buffs.push({ id: randomUUID(), ...buff });
@@ -267,171 +289,9 @@ export async function appendActiveBuffInTx(
     type: "buffApplied",
     summary: `${buff.source}: ${buff.modifier >= 0 ? "+" : ""}${buff.modifier} to ${buff.target}`,
     before,
-    after: snapshot(state),
+    after: snapshotActiveEffects(state),
     data: { key: buff.key, target: buff.target, modifier: buff.modifier, sourceEntryId: buff.sourceEntryId ?? null },
     batchId,
     sessionId,
   });
-}
-
-// Plural buff count phrase, e.g. "1 buff" / "3 buffs".
-function buffCount(n: number): string {
-  return `${n} buff${n !== 1 ? "s" : ""}`;
-}
-
-// Builds the `buffCleared` event's summary + data from the buffs it dropped.
-interface BuffClearDescribe {
-  summary: (dropped: ActiveBuff[]) => string;
-  data: (dropped: ActiveBuff[]) => Record<string, unknown>;
-}
-
-/**
- * Shared core for every clear* wrapper: read → filter by `predicate` → (no-op +
- * no event when nothing matches) → write → log one `buffCleared` event under the
- * "effects" category. `describe` supplies the wrapper-specific summary + data
- * keys so the exact event payload each caller has always written is preserved.
- */
-async function clearBuffsMatchingInTx(
-  tx: Prisma.TransactionClient,
-  characterId: string,
-  predicate: (b: ActiveBuff) => boolean,
-  describe: BuffClearDescribe,
-  batchId: string,
-  sessionId: string | null,
-): Promise<void> {
-  const row = await tx.character.findUnique({
-    where: { id: characterId },
-    select: { activeEffects: true },
-  });
-  if (!row) return;
-
-  const state = normalizeActiveEffectsMutable(row.activeEffects);
-  const dropped = state.buffs.filter(predicate);
-  if (dropped.length === 0) return;
-  const before = snapshot(state);
-  state.buffs = state.buffs.filter((b) => !predicate(b));
-
-  await tx.character.update({
-    where: { id: characterId },
-    data: { activeEffects: serializeActiveEffectsState(state) },
-  });
-
-  await logEvent(tx, {
-    characterId,
-    category: "effects",
-    type: "buffCleared",
-    summary: describe.summary(dropped),
-    before,
-    after: snapshot(state),
-    data: describe.data(dropped),
-    batchId,
-    sessionId,
-  });
-}
-
-/**
- * Clear every buff granted by `sourceEntryId` (the concentration that just
- * ended). No-op + no event when none match. Logs a `buffCleared` event under
- * the "effects" category so batch revert restores the dropped buffs.
- */
-export async function clearBuffsForSourceInTx(
-  tx: Prisma.TransactionClient,
-  characterId: string,
-  sourceEntryId: string,
-  batchId: string,
-  sessionId: string | null,
-  reason: string,
-): Promise<void> {
-  // Only concentration-duration buffs clear when a concentration ends; durable
-  // (while-active / until-rest) buffs survive concentration changes (#455).
-  await clearBuffsMatchingInTx(
-    tx,
-    characterId,
-    (b) => b.sourceEntryId === sourceEntryId && b.duration === "concentration",
-    {
-      summary: (dropped) => `Cleared ${buffCount(dropped.length)} (${reason})`,
-      data: (dropped) => ({ sourceEntryId, reason, clearedKeys: dropped.map((b) => b.key) }),
-    },
-    batchId,
-    sessionId,
-  );
-}
-
-/**
- * Clear the buff with the given `key` (toggle off a durable self-buff, e.g. end
- * Rage). No-op + no event when none match. Logs a `buffCleared` event under the
- * "effects" category so batch revert restores it.
- */
-export async function clearBuffByKeyInTx(
-  tx: Prisma.TransactionClient,
-  characterId: string,
-  key: string,
-  batchId: string,
-  sessionId: string | null,
-  reason: string,
-): Promise<void> {
-  // Durable-only toggle: never clear a concentration buff (those end via
-  // clearBuffsForSourceInTx). Dedup-by-key keeps one buff per key today, but the
-  // guard makes the "durable only" contract machine-readable if that ever relaxes.
-  await clearBuffsMatchingInTx(
-    tx,
-    characterId,
-    (b) => b.key === key && b.duration !== "concentration",
-    {
-      summary: (dropped) => `Cleared ${dropped[0].source} (${reason})`,
-      data: (dropped) => ({ key, reason, clearedKeys: dropped.map((b) => b.key) }),
-    },
-    batchId,
-    sessionId,
-  );
-}
-
-/**
- * Clear every "while-active" durable buff (e.g. Rage). Called when a blanket
- * event ends all combat self-buffs — falling unconscious (0 HP) or a long rest.
- * No-op + no event when none match. Logs a `buffCleared` event under "effects".
- */
-export async function clearWhileActiveBuffsInTx(
-  tx: Prisma.TransactionClient,
-  characterId: string,
-  batchId: string,
-  sessionId: string | null,
-  reason: string,
-): Promise<void> {
-  await clearBuffsMatchingInTx(
-    tx,
-    characterId,
-    (b) => b.duration === "while-active",
-    {
-      summary: (dropped) => `Cleared ${buffCount(dropped.length)} (${reason})`,
-      data: (dropped) => ({ reason, clearedKeys: dropped.map((b) => b.key) }),
-    },
-    batchId,
-    sessionId,
-  );
-}
-
-/**
- * Clear every "until-rest" buff the given rest ends. A long rest clears both
- * "short" and "long" restType buffs; a short rest clears only "short". No-op +
- * no event when none match. Logs a `buffCleared` event under "effects".
- */
-export async function clearBuffsForRestInTx(
-  tx: Prisma.TransactionClient,
-  characterId: string,
-  restType: "short" | "long",
-  batchId: string,
-  sessionId: string | null,
-): Promise<void> {
-  await clearBuffsMatchingInTx(
-    tx,
-    characterId,
-    (b) => b.duration === "until-rest" && (restType === "long" || b.restType === "short"),
-    {
-      summary: (dropped) => `Cleared ${buffCount(dropped.length)} (${restType} rest)`,
-      data: (dropped) => ({ restType, reason: `${restType}Rest`, clearedKeys: dropped.map((b) => b.key) }),
-    },
-    batchId,
-    sessionId,
-  );
 }

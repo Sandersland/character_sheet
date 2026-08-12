@@ -11,8 +11,11 @@ import {
   preparedSpellCountAt,
   maxSpellLevelForClass,
   magicalSecretsSpellLists,
+  spellListsFor,
   level1SpellPicksFor,
+  eldritchKnightSpellSchoolGate,
 } from "@/lib/srd/spellcasting-tables.js";
+import { ELDRITCH_KNIGHT, ARCANE_TRICKSTER } from "./third-caster.fixture.js";
 
 describe("levelUpSpellPicks — 2024 new-spell pick count on level-up", () => {
   it("Wizard scribes 6 at level 1 — its spellbook size, not its prepared count (#1513) — then a flat 2 per level", () => {
@@ -70,9 +73,9 @@ describe("levelUpSpellPicks — 2024 new-spell pick count on level-up", () => {
   });
 
   it("Eldritch Knight / Arcane Trickster offer the third-caster delta from level 3", () => {
-    expect(levelUpSpellPicks("fighter", 3, "Eldritch Knight", "EDITION_2024")).toBe(3); // first prepared: 0 → 3
-    expect(levelUpSpellPicks("fighter", 4, "Eldritch Knight", "EDITION_2024")).toBe(1); // 3 → 4
-    expect(levelUpSpellPicks("rogue", 12, "Arcane Trickster", "EDITION_2024")).toBe(0); // 8 → 8
+    expect(levelUpSpellPicks("fighter", 3, ELDRITCH_KNIGHT, "EDITION_2024")).toBe(3); // first prepared: 0 → 3
+    expect(levelUpSpellPicks("fighter", 4, ELDRITCH_KNIGHT, "EDITION_2024")).toBe(1); // 3 → 4
+    expect(levelUpSpellPicks("rogue", 12, ARCANE_TRICKSTER, "EDITION_2024")).toBe(0); // 8 → 8
   });
 });
 
@@ -127,7 +130,7 @@ describe("levelUpSpellPicks — 2014 known-caster new-spell pick count on level-
   });
 
   it("EK/AT's identical 18-number table gives the same delta in both editions", () => {
-    expect(levelUpSpellPicks("fighter", 4, "Eldritch Knight", "EDITION_2014")).toBe(levelUpSpellPicks("fighter", 4, "Eldritch Knight", "EDITION_2024"));
+    expect(levelUpSpellPicks("fighter", 4, ELDRITCH_KNIGHT, "EDITION_2014")).toBe(levelUpSpellPicks("fighter", 4, ELDRITCH_KNIGHT, "EDITION_2024"));
   });
 });
 
@@ -140,8 +143,8 @@ describe("level1SpellPicksFor — spellbookSize marks the Wizard's spellbook/pre
     for (const cls of ["bard", "cleric", "sorcerer", "warlock", "paladin", "ranger"]) {
       expect(level1SpellPicksFor(cls, null, "EDITION_2024")?.spellbookSize).toBeUndefined();
     }
-    expect(level1SpellPicksFor("fighter", "Eldritch Knight", "EDITION_2024")?.spellbookSize).toBeUndefined();
-    expect(level1SpellPicksFor("rogue", "Arcane Trickster", "EDITION_2024")?.spellbookSize).toBeUndefined();
+    expect(level1SpellPicksFor("fighter", ELDRITCH_KNIGHT, "EDITION_2024")?.spellbookSize).toBeUndefined();
+    expect(level1SpellPicksFor("rogue", ARCANE_TRICKSTER, "EDITION_2024")?.spellbookSize).toBeUndefined();
   });
 });
 
@@ -165,8 +168,8 @@ describe("levelUpCantripPicks — 2024 cantrip pick count on level-up (#1131)", 
   });
 
   it("third casters (EK/AT) gain 2 at level 3 and 1 more at level 10", () => {
-    expect(levelUpCantripPicks("fighter", 3, "Eldritch Knight")).toBe(2); // 0 → 2
-    expect(levelUpCantripPicks("rogue", 10, "Arcane Trickster")).toBe(1); // 2 → 3
+    expect(levelUpCantripPicks("fighter", 3, ELDRITCH_KNIGHT)).toBe(2); // 0 → 2
+    expect(levelUpCantripPicks("rogue", 10, ARCANE_TRICKSTER)).toBe(1); // 2 → 3
   });
 
   it("is 0 for a non-caster at every level", () => {
@@ -263,5 +266,100 @@ describe("magicalSecretsSpellLists — Bard Magical Secrets, edition-forked", ()
       spells: ["warlock"],
       cantrips: ["warlock"],
     });
+  });
+});
+
+// #1825: spellListsFor is the single resolver "which spell list(s) may this
+// character pick from" — it owns the plain single-class default, the EK/AT →
+// wizard redirect, AND Bard Magical Secrets (magicalSecretsSpellLists folds
+// into it, kept as a delegate above so its own describe block stays green
+// unchanged). The live bug: the class's own default branch used to assume the
+// spell-list key equals the lowercased class name, which for a third-caster
+// subclass (Eldritch Knight / Arcane Trickster) is "fighter"/"rogue" — no
+// catalog spell is ever on those lists, so the New Spells step served an
+// empty picker. EK/AT actually draw from the WIZARD list — PHB'14 p. 75
+// (Eldritch Knight) / p. 98 (Arcane Trickster), byte-identical in PHB'24.
+describe("spellListsFor — the single class+subclass+edition spell-list resolver (#1825)", () => {
+  it("redirects Eldritch Knight to the wizard list on both facets, in both editions", () => {
+    for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {
+      expect(spellListsFor("fighter", 3, ELDRITCH_KNIGHT, edition)).toEqual({
+        spells: ["wizard"],
+        cantrips: ["wizard"],
+      });
+    }
+  });
+
+  it("redirects Arcane Trickster to the wizard list on both facets, in both editions", () => {
+    for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {
+      expect(spellListsFor("rogue", 3, ARCANE_TRICKSTER, edition)).toEqual({
+        spells: ["wizard"],
+        cantrips: ["wizard"],
+      });
+    }
+  });
+
+  it("the redirect holds at every level, resolved off subclassRef alone — no display-name match involved (#1531)", () => {
+    expect(spellListsFor("fighter", 12, ELDRITCH_KNIGHT, "EDITION_2024")).toEqual({
+      spells: ["wizard"],
+      cantrips: ["wizard"],
+    });
+  });
+
+  it("a plain class with no third-caster subclass keeps its own list, unchanged", () => {
+    expect(spellListsFor("wizard", 5, null, "EDITION_2024")).toEqual({ spells: ["wizard"], cantrips: ["wizard"] });
+    expect(spellListsFor("fighter", 5, undefined, "EDITION_2024")).toEqual({ spells: ["fighter"], cantrips: ["fighter"] });
+  });
+
+  it("folds in Bard Magical Secrets with the edition-forked concrete outputs", () => {
+    // Below the level-10 gate: the plain Bard list on both facets, both editions.
+    expect(spellListsFor("bard", 9, null, "EDITION_2014")).toEqual({ spells: ["bard"], cantrips: ["bard"] });
+    expect(spellListsFor("bard", 9, null, "EDITION_2024")).toEqual({ spells: ["bard"], cantrips: ["bard"] });
+    // 2014 (PHB'14 p. 54): unrestricted on both facets from level 10.
+    expect(spellListsFor("bard", 10, null, "EDITION_2014")).toEqual({ spells: null, cantrips: null });
+    expect(spellListsFor("bard", 20, null, "EDITION_2014")).toEqual({ spells: null, cantrips: null });
+    // 2024 (SRD 5.2 / PHB'24 p. 53): spells widen to Bard/Cleric/Druid/Wizard,
+    // cantrips do NOT (the Prepared Spells trigger is level 1+ only).
+    expect(spellListsFor("bard", 10, null, "EDITION_2024")).toEqual({ spells: ["bard", "cleric", "druid", "wizard"], cantrips: ["bard"] });
+    expect(spellListsFor("bard", 14, null, "EDITION_2024")).toEqual({ spells: ["bard", "cleric", "druid", "wizard"], cantrips: ["bard"] });
+  });
+
+  it("magicalSecretsSpellLists now delegates to spellListsFor, so EK/AT are fixed through the old call name too", () => {
+    expect(magicalSecretsSpellLists("fighter", 3, ELDRITCH_KNIGHT, "EDITION_2024")).toEqual({
+      spells: ["wizard"],
+      cantrips: ["wizard"],
+    });
+  });
+});
+
+// #1855: PHB'14 p. 74 "Eldritch Knight Spellcasting" — the leveled-spell school
+// restriction. Two of the 3rd-level grant's three spells (and every ordinary
+// level-up pick after) must be Abjuration or Evocation; the 3rd/8th/14th/20th
+// level grants each include exactly one "any school" pick — a single free
+// pick per qualifying level, which is why THIRD_CASTER_PREPARED's own delta at
+// each of those four levels is exactly 1 (no separate count to track). SRD 5.1
+// has no Eldritch Knight; PHB'24 dropped the restriction entirely.
+describe("eldritchKnightSpellSchoolGate — the 2014 Abjuration/Evocation gate (#1855)", () => {
+  it("restricts to Abjuration/Evocation with no free pick at an ordinary fighter level (2014)", () => {
+    for (const level of [4, 5, 6, 7, 9, 10, 11, 12, 13, 15, 16, 17, 18, 19]) {
+      expect(eldritchKnightSpellSchoolGate(level, "EDITION_2014")).toEqual({
+        schools: ["abjuration", "evocation"],
+        freePicks: 0,
+      });
+    }
+  });
+
+  it("grants exactly one free any-school pick at fighter level 3, 8, 14, and 20 (2014)", () => {
+    for (const level of [3, 8, 14, 20]) {
+      expect(eldritchKnightSpellSchoolGate(level, "EDITION_2014")).toEqual({
+        schools: ["abjuration", "evocation"],
+        freePicks: 1,
+      });
+    }
+  });
+
+  it("2024 Eldritch Knight is unrestricted at every level — the whole wizard list, no school gate", () => {
+    for (const level of [3, 4, 8, 14, 20]) {
+      expect(eldritchKnightSpellSchoolGate(level, "EDITION_2024")).toEqual({ schools: null, freePicks: 0 });
+    }
   });
 });

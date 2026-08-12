@@ -76,6 +76,23 @@ export interface ForgetSubclassChoiceOperation {
   entryId: string;
 }
 
+/**
+ * Learn Expertise in a skill (#1588) — doubles proficiency bonus on that
+ * skill's checks. `skill` must be a skill the character is already
+ * proficient in (including feat/item-granted proficiencies); the applier
+ * validates this and the level-derived pick cap, never the client.
+ */
+export interface LearnExpertiseOperation {
+  type: "learnExpertise";
+  skill: string; // camelCase skill key, e.g. "stealth"
+}
+
+/** Remove a chosen Expertise skill by its per-character entry id. */
+export interface ForgetExpertiseOperation {
+  type: "forgetExpertise";
+  entryId: string;
+}
+
 export type ResourceOperation =
   | SpendResourceOperation
   | RestoreResourceOperation
@@ -85,7 +102,9 @@ export type ResourceOperation =
   | LearnToolProficiencyOperation
   | ForgetToolProficiencyOperation
   | LearnSubclassChoiceOperation
-  | ForgetSubclassChoiceOperation;
+  | ForgetSubclassChoiceOperation
+  | LearnExpertiseOperation
+  | ForgetExpertiseOperation;
 
 /**
  * Per-op audit payload the dispatcher writes to the event log and echoes back on

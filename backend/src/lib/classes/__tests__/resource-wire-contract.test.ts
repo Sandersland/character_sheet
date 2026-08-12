@@ -17,9 +17,11 @@ import type {
   ElementalBurstResult,
   ElementalDamageType,
   ElementalStrikeResult,
+  ForgetExpertiseOperation,
   ForgetManeuverOperation,
   ForgetSubclassChoiceOperation,
   ForgetToolProficiencyOperation,
+  LearnExpertiseOperation,
   LearnManeuverOperation,
   LearnSubclassChoiceOperation,
   LearnToolProficiencyOperation,
@@ -46,6 +48,8 @@ describe("class-resource wire contract", () => {
       | ForgetToolProficiencyOperation
       | LearnSubclassChoiceOperation
       | ForgetSubclassChoiceOperation
+      | LearnExpertiseOperation
+      | ForgetExpertiseOperation
     >();
   });
 

@@ -20,7 +20,7 @@ import { randomUUID } from "node:crypto";
 
 import { Prisma, type Spell } from "@/generated/prisma/client.js";
 import { castAbilityInTx, type CastAbilityInput, type OpOutcome } from "./ability-cast.js";
-import { clearBuffByKeyInTx, clearBuffsForSourceInTx } from "@/lib/combat/active-effects.js";
+import { clearBuffByKeyInTx, clearBuffsForSourceInTx } from "@/lib/combat/buff-end.js";
 import { InvalidSpellcastingOperationError, type AbilityCost, type PayCostContext } from "./ability-cost.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
 import { applyResourceOpInTx } from "@/lib/classes/resources.js";
@@ -46,7 +46,7 @@ import type {
   SpellComponents,
   SpellcastingMutableState,
 } from "./spell-state.js";
-import { deriveSpellcasting, derivePreparedSpellLimit, casterModelForEntries } from "@/lib/srd/srd.js";
+import { deriveSpellcasting, derivePreparedSpellLimit, casterModelForEntries, type SubclassCasterRef } from "@/lib/srd/srd.js";
 import { deriveResources } from "@/lib/classes/class-features.js";
 import { FEATURE_ROWS_CLASS_FEATURES, FEATURE_ROWS_SUBCLASS_FEATURES, featureRowsOf } from "@/lib/classes/feature-rows-select.js";
 import { editionOf } from "@/lib/rules/edition.js";
@@ -885,10 +885,11 @@ async function logSpellcastingEvent(
   });
 }
 
-// Character columns castAbilityWithSlotInTx needs to derive slot/arcana
-// totals from scratch — a lean subset of SPELLCASTING_SELECT for a caller
-// (the row-driven ability dispatcher, routes/character/actions.ts) with no
-// SpellOpContext of its own.
+// Character columns loadSlotPayContext needs to derive slot/arcana totals
+// from scratch — a lean subset of SPELLCASTING_SELECT for a caller (the
+// row-driven ability dispatcher, routes/character/actions.ts, and
+// resolveAction, lib/combat/resolve-action.ts, #1829) with no SpellOpContext
+// of its own.
 const SLOT_PAY_SELECT = {
   experiencePoints: true,
   abilityScores: true,
@@ -896,39 +897,39 @@ const SLOT_PAY_SELECT = {
   spellcasting: true,
   classEntries: {
     orderBy: { position: "asc" as const },
-    select: { name: true, subclass: true },
+    select: { name: true, subclassRef: { select: { casterFraction: true, spellcastingAbility: true } } },
   },
 } satisfies Prisma.CharacterSelect;
 
 /**
- * Pays + logs a `{kind:"slot"}` ability cost for a caller with no
- * SpellOpContext of its own (#1687) — the row-driven ability dispatcher's
- * counterpart to applySpellcastingOpInTx's own load → pay → persist → log
- * sequence for a spell cast. Before this, a row-driven cost could only be
- * "pool" or "none": `costKind:"slot"` on a ClassFeature row typed, but
- * nothing loaded the slot/arcanum maps `payAbilityCostInTx` requires, and the
- * cast's OpOutcome was discarded (no event logged), so a spend would have
- * mutated nothing durable and left no undo trail.
+ * Loads the character, derives its slot/arcana totals, and assembles the
+ * `PayCostContext` a `{kind:"slot"}` payment needs — the "load → derive →
+ * build cost context" preamble `castAbilityWithSlotInTx` and
+ * `applyResolveActionOperations` (lib/combat/resolve-action.ts, #1829) both
+ * run before paying a slot cost. Extracted so the two callers can never
+ * compute slotTotals/arcanaTotals two different ways (fallow dup:0f5f60c3).
+ *
+ * `onMissing` is the ONE thing this helper does NOT unify: each caller keeps
+ * its own not-found semantics (castAbilityWithSlotInTx's 5xx internal
+ * invariant vs a domain's 400 op error) by supplying its own error to throw.
+ * The caller also owns its own before/after snapshot (cloneSpellState vs
+ * snapshotSpellcasting — equivalent shapes, kept as each call site already
+ * had them) since that isn't part of the shared preamble either.
  *
  * Mirrors buildSpellcastingOp's own derivation exactly: primary class only,
- * XP-derived TOTAL level — a pre-existing scope limit shared by both callers
+ * XP-derived TOTAL level — a pre-existing scope limit shared by every caller
  * (a spell cast has never combined multiclass slot tables here either), not
  * something this widens.
  */
-export async function castAbilityWithSlotInTx(
+export async function loadSlotPayContext(
   tx: Prisma.TransactionClient,
   characterId: string,
   batchId: string,
   sessionId: string | null,
-  input: CastAbilityInput,
-): Promise<OpOutcome> {
+  onMissing: (characterId: string) => Error,
+): Promise<{ state: SpellcastingMutableState; costCtx: PayCostContext }> {
   const row = await tx.character.findUnique({ where: { id: characterId }, select: SLOT_PAY_SELECT });
-  if (!row) {
-    // Internal invariant, not a client error: the character was already loaded
-    // in this same transaction (applyRowDrivenActionInTx) — a miss here is a
-    // server fault (5xx), so a plain Error, not the 400-mapped op error.
-    throw new Error(`Character not found: ${characterId}`);
-  }
+  if (!row) throw onMissing(characterId);
 
   const level = levelForExperience(row.experiencePoints);
   const profBonus = proficiencyBonusForLevel(level);
@@ -938,13 +939,11 @@ export async function castAbilityWithSlotInTx(
     level,
     row.abilityScores as Record<string, number>,
     profBonus,
-    primary?.subclass ?? undefined,
+    primary?.subclassRef,
     editionOf(row),
   );
   const { slotTotals, arcanaTotals } = computeSlotTables(row.spellcasting, derived);
-
   const state = normalizeSpellcastingMutable(row.spellcasting);
-  const before = cloneSpellState(state);
 
   const costCtx: PayCostContext = {
     tx,
@@ -957,6 +956,38 @@ export async function castAbilityWithSlotInTx(
     arcanaTotals,
   };
 
+  return { state, costCtx };
+}
+
+/**
+ * Pays + logs a `{kind:"slot"}` ability cost for a caller with no
+ * SpellOpContext of its own (#1687) — the row-driven ability dispatcher's
+ * counterpart to applySpellcastingOpInTx's own load → pay → persist → log
+ * sequence for a spell cast. Before this, a row-driven cost could only be
+ * "pool" or "none": `costKind:"slot"` on a ClassFeature row typed, but
+ * nothing loaded the slot/arcanum maps `payAbilityCostInTx` requires, and the
+ * cast's OpOutcome was discarded (no event logged), so a spend would have
+ * mutated nothing durable and left no undo trail.
+ */
+export async function castAbilityWithSlotInTx(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  batchId: string,
+  sessionId: string | null,
+  input: CastAbilityInput,
+): Promise<OpOutcome> {
+  const { state, costCtx } = await loadSlotPayContext(
+    tx,
+    characterId,
+    batchId,
+    sessionId,
+    // Internal invariant, not a client error: the character was already loaded
+    // in this same transaction (applyRowDrivenActionInTx) — a miss here is a
+    // server fault (5xx), so a plain Error, not the 400-mapped op error.
+    (id) => new Error(`Character not found: ${id}`),
+  );
+  const before = cloneSpellState(state);
+
   const outcome = await castAbilityInTx(
     { tx, characterId, batchId, sessionId, cost: costCtx, concentrationHost: state },
     input,
@@ -965,6 +996,69 @@ export async function castAbilityWithSlotInTx(
   await persistSpellState(tx, characterId, state);
   await logSpellcastingEvent(tx, { characterId, batchId, sessionId }, outcome, before, cloneSpellState(state));
   return outcome;
+}
+
+// Shared "load row → build op context" preamble both applySpellcastingOpInTx
+// and castSpellForResolutionInTx run before dispatching an op (fallow
+// dup:534687ad) — the one not-found error is a client-facing domain error in
+// both callers, so it's safe to centralize here too.
+async function loadSpellOpContext(
+  ids: { tx: Prisma.TransactionClient; characterId: string; batchId: string; sessionId: string | null; casterUserId: string },
+): Promise<{ ctx: SpellOpContext; state: SpellcastingMutableState; beforeState: SpellStateSnapshot }> {
+  const row = await ids.tx.character.findUnique({ where: { id: ids.characterId }, select: SPELLCASTING_SELECT });
+  if (!row) {
+    throw new InvalidSpellcastingOperationError(`Character not found: ${ids.characterId}`);
+  }
+  return buildSpellcastingOp(ids, row);
+}
+
+/**
+ * Runs a `castSpell` op's full side-effect sequence (pay slot/arcanum cost,
+ * concentration set/displace, self-buff append, self/ally apply —
+ * castAbilityInTx) and persists the resulting spell state, but returns the
+ * outcome + before/after snapshot INSTEAD OF logging a "castSpell" event
+ * (#1833, epic #1827 slice 6). `applyCastSpellOp`'s callees each log their
+ * OWN event under the caller's batchId (concentrationDropped, an
+ * appendActiveBuffInTx effects event, an applyHealInTx hitPoints event) —
+ * `resolveAction` (lib/combat/resolve-action.ts) is the caller, and logs its
+ * OWN consolidated combat-rail event (toHit/save/effect/riders) under that
+ * SAME batchId instead of a second "Cast X: N damage" row, so LIFO undo
+ * reverts every sub-effect together as one batch (activity.ts's
+ * revertBatch iterates every event sharing a batchId — no special-casing
+ * needed here). Mirrors applySpellcastingOpInTx's own load → dispatch →
+ * persist sequence; the one difference is the caller owns logging.
+ */
+export async function castSpellForResolutionInTx(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  batchId: string,
+  sessionId: string | null,
+  casterUserId: string,
+  op: CastSpellOperation,
+): Promise<{ outcome: OpOutcome; before: SpellStateSnapshot; after: SpellStateSnapshot }> {
+  const { ctx, state, beforeState } = await loadSpellOpContext({ tx, characterId, batchId, sessionId, casterUserId });
+  // Deliberately calls applyCastSpellOp directly, NOT dispatchSpellOp
+  // (#1848 review) — two reasons, not an oversight:
+  //   1. This function only ever handles op.type "castSpell" (its own
+  //      parameter is typed CastSpellOperation, not the general
+  //      SpellcastingOperation union dispatchSpellOp dispatches over) — going
+  //      through dispatchSpellOp would need a redundant cast/widen here with
+  //      no dispatch actually happening (there is exactly one handler this
+  //      call could ever reach).
+  //   2. dispatchSpellOp's return type is nullable (a no-op op like
+  //      learnSpell/prepareSpell can return null); applyCastSpellOp's is not
+  //      (a cast always produces a real OpOutcome). Routing through the
+  //      dispatcher would force a null-check here that can never actually
+  //      fire, for a case this function structurally cannot hit.
+  // The tradeoff this accepts: a future cross-cutting wrapper around
+  // dispatchSpellOp (metrics, pre/post hooks) would need to ALSO wrap
+  // applyCastSpellOp directly (or wrap SPELL_OP_HANDLERS itself, the actual
+  // single choke point both this and dispatchSpellOp read from) to cover the
+  // resolveAction path — noted here so that wrapper's author finds this
+  // comment instead of silently missing the spell-resolution entry point.
+  const outcome = await applyCastSpellOp(ctx, op);
+  await persistSpellState(tx, characterId, state);
+  return { outcome, before: beforeState, after: cloneSpellState(state) };
 }
 
 /**
@@ -1028,9 +1122,13 @@ const SPELLCASTING_SELECT = {
       // widening the fetched columns further — `name` is kept explicitly since
       // injectDerivedSpells' GrantedSpellSource (granted-spells.ts) reads it
       // (an `include` used to carry every scalar column along for free).
+      // `casterFraction`/`spellcastingAbility` (#1531): limitEntries' third-caster
+      // resolution below (derivePreparedSpellLimit/casterModelForEntries).
       subclassRef: {
         select: {
           name: true,
+          casterFraction: true,
+          spellcastingAbility: true,
           grantedSpells: { orderBy: { gateLevel: "asc" }, include: { spell: true } },
           features: FEATURE_ROWS_SUBCLASS_FEATURES,
         },
@@ -1103,9 +1201,9 @@ function buildSpellcastingOp(
   const derived = deriveSpellcasting(className, level, abilityScores, profBonus, undefined, edition);
   // Single-class uses the XP-derived level (per-class column can be stale) so the
   // enforced cap matches the serialized limit; multiclass uses per-entry levels.
-  const limitEntries = row.classEntries.length === 1
-    ? [{ name: className, level, subclass: row.classEntries[0]?.subclass ?? null }]
-    : row.classEntries.map((e) => ({ name: e.name, level: e.level, subclass: e.subclass }));
+  const limitEntries: Array<{ name: string; level: number; subclassRef?: SubclassCasterRef | null }> = row.classEntries.length === 1
+    ? [{ name: className, level, subclassRef: row.classEntries[0]?.subclassRef ?? null }]
+    : row.classEntries.map((e) => ({ name: e.name, level: e.level, subclassRef: e.subclassRef }));
   // Deliberate-coupling latch (#1507 D2/D3): resolves through the same
   // derivePreparedSpellLimit as buildSpellcastingView's clamp-on-read and
   // reconcilePreparedSpells — never a second inline copy of the cap.
@@ -1167,18 +1265,7 @@ export async function applySpellcastingOpInTx(
   sessionId: string | null,
   casterUserId: string,
 ): Promise<void> {
-  const row = await tx.character.findUnique({
-    where: { id: characterId },
-    select: SPELLCASTING_SELECT,
-  });
-  if (!row) {
-    throw new InvalidSpellcastingOperationError(`Character not found: ${characterId}`);
-  }
-
-  const { ctx, state, beforeState } = buildSpellcastingOp(
-    { tx, characterId, batchId, sessionId, casterUserId },
-    row,
-  );
+  const { ctx, state, beforeState } = await loadSpellOpContext({ tx, characterId, batchId, sessionId, casterUserId });
 
   const outcome = await dispatchSpellOp(ctx, op);
   if (outcome === null) return;

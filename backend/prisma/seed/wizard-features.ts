@@ -242,11 +242,17 @@ const WIZARD_BASE_RAW: RawWizardFeature[] = [
     name: "Scholar",
     level: 2,
     edition: "EDITION_2024",
-    // SRD 5.2. NEW in 2024 — no 2014 counterpart. The Expertise mechanic
-    // itself has no backend representation yet (no `lib/` skill-expertise
-    // axis) — text only here, per the issue's own deferral.
+    // SRD 5.2. NEW in 2024 — no 2014 counterpart.
     description:
       "Choose one skill in which you're proficient from Arcana, History, Investigation, Medicine, Nature, or Religion. You have Expertise in the chosen skill.",
+    // #1588: 1 pick at L2. The six-skill restriction this description states
+    // is NOT enforced by the expertiseKnown pick validator — the pick cap is
+    // per-character (shared across every grantor), not a per-feature allowed-
+    // skill list, so a Wizard can pick expertise in any skill they're
+    // proficient in (over-permissive relative to RAW, disclosed rather than
+    // silently narrower).
+    derivedStat: "expertiseChoiceCount",
+    derivedStatTiers: [{ minLevel: 2, value: 1 }],
   },
   {
     subclassSlug: null,

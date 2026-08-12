@@ -2,11 +2,12 @@
 // meta, filters the catalog to the spells this level can scribe, and toggles the
 // draft's learnSpell ops under a hard cap. The spell-level ceiling and the class
 // lists (#1440: spellLists/cantripLists, Magical Secrets-aware and edition-forked
-// via magicalSecretsSpellLists) are both derived on the backend and ride in
+// via spellListsFor) are both derived on the backend and ride in
 // step.meta — never re-encoded here. This module is a display filter over a
 // server-authoritative decision; the real enforcement is
 // assertPickSpellEligibility on the transaction endpoint.
-import type { CatalogSpell, ForgetSpellOperation, LearnSpellOperation, LevelUpStep, Spell } from "@/types/character";
+import { schoolLabel } from "@/lib/spellMeta";
+import type { CatalogSpell, ForgetSpellOperation, LearnSpellOperation, LevelUpStep, Spell, SpellSchool } from "@/types/character";
 
 export interface NewSpellsMeta {
   count: number;
@@ -18,7 +19,7 @@ export interface NewSpellsMeta {
   cantrips: number;
   /**
    * #1440: class lists a leveled pick may come from, served by
-   * magicalSecretsSpellLists (backend). `null` = unrestricted (PHB'14 Bard "from
+   * spellListsFor (backend). `null` = unrestricted (PHB'14 Bard "from
    * any class"). Branch on `=== null`, never truthiness — `[]` is truthy.
    */
   spellLists: string[] | null;
@@ -43,6 +44,30 @@ export interface NewSpellsMeta {
    * seeded expansion list grants a cantrip today).
    */
   expandedSpellIds: string[];
+  /**
+   * #1855: the Eldritch Knight (2014) leveled-spell school gate, served by
+   * eldritchKnightSpellSchoolGate (backend) — a SEPARATE facet from
+   * spellLists (which gates CLASS membership; this gates the wizard-list
+   * pick's own SCHOOL). `null` = unrestricted (every non-EK caster, and a
+   * 2024 Eldritch Knight). Never applies to cantripLists — PHB'14 names only
+   * "the wizard spells you know", not cantrips.
+   */
+  spellSchools: string[] | null;
+  /** #1855: how many of THIS level-up's leveled picks may ignore spellSchools
+   * — the PHB'14 p. 74 free "any school" grant at fighter level 3/8/14/20. 0
+   * when spellSchools is null or the level grants no free pick. */
+  freeSchoolPicks: number;
+}
+
+// #1855: split out of readNewSpellsMeta purely to keep that function's own
+// cyclomatic count under the fallow health gate (mirrors this module's own
+// expandedSpellIdsMeta-style splits elsewhere in the level-up plan/gate).
+function readSpellSchoolMeta(step: LevelUpStep): Pick<NewSpellsMeta, "spellSchools" | "freeSchoolPicks"> {
+  const freeSchoolPicks = step.meta?.freeSchoolPicks;
+  return {
+    spellSchools: (step.meta?.spellSchools as string[] | null | undefined) ?? null,
+    freeSchoolPicks: typeof freeSchoolPicks === "number" ? freeSchoolPicks : 0,
+  };
 }
 
 /** Safe reads of the newSpells step: count, the derived ceiling, secrets, swap, cantrip count, the served lists, and the caster model. */
@@ -60,6 +85,7 @@ export function readNewSpellsMeta(step: LevelUpStep): NewSpellsMeta {
     cantripLists: (step.meta?.cantripLists as string[] | null | undefined) ?? null,
     casterModel: casterModel === "known" || casterModel === "prepared" ? casterModel : null,
     expandedSpellIds: (step.meta?.expandedSpellIds as string[] | undefined) ?? [],
+    ...readSpellSchoolMeta(step),
   };
 }
 
@@ -97,7 +123,7 @@ export function toggleForgetSpell(
  * class (PHB'14 unrestricted Bard Magical Secrets) — OR on the served
  * `expandedSpellIds` (#1631: a subclass's list-expansion, e.g. The Fiend's
  * Expanded Spell List). This is a DISPLAY FILTER over a server-authoritative
- * list computed by `magicalSecretsSpellLists`/`loadSubclassSpellListExpansionIds`
+ * list computed by `spellListsFor`/`loadSubclassSpellListExpansionIds`
  * (backend) and enforced by `assertPickSpellEligibility`; it never originates
  * the rule.
  */
@@ -126,6 +152,46 @@ export function eligibleNewCantrips(
 }
 
 /**
+ * #1855: whether a spellSchools-restricted row may still be picked — its
+ * school is on the restricted list, OR the level's free "any school" pick(s)
+ * (freeSchoolPicks) haven't all been spent by the OTHER already-selected
+ * off-list picks (offListSelectedCount). `spellSchools === null` (every
+ * non-EK caster, and a 2024 Eldritch Knight) always admits. A display gate
+ * mirroring assertSpellSchoolEligibility's (backend) own free-pick counting —
+ * never re-deriving WHICH schools or how many free picks, only consuming the
+ * served numbers, same posture as eligibleNewSpells above.
+ */
+export function spellSchoolEligible(
+  spell: { school: string },
+  spellSchools: string[] | null,
+  freeSchoolPicks: number,
+  offListSelectedCount: number,
+): boolean {
+  if (spellSchools === null || spellSchools.includes(spell.school)) return true;
+  return offListSelectedCount < freeSchoolPicks;
+}
+
+/**
+ * #1855: how many of `selectedIds` sit off `spellSchools` — the running count
+ * spellSchoolEligible's `offListSelectedCount` parameter needs to decide
+ * whether the free-pick budget is exhausted. `spellSchools === null` (or a
+ * still-loading `catalog === null`) is vacuously 0 — nothing is "off-list"
+ * when there's no restricted list to be off of.
+ */
+export function offListSelectedCount(
+  selectedIds: string[],
+  catalog: CatalogSpell[] | null,
+  spellSchools: string[] | null,
+): number {
+  if (spellSchools === null || !catalog) return 0;
+  const schoolById = new Map(catalog.map((s) => [s.id, s.school]));
+  return selectedIds.filter((id) => {
+    const school = schoolById.get(id);
+    return school !== undefined && !spellSchools.includes(school);
+  }).length;
+}
+
+/**
  * #1509 D5: the served noun the ceremony's swap copy renders — "known spell"
  * for a 2014 Bard/Sorcerer/Warlock/Ranger (+ EK/AT), "prepared spell"
  * otherwise, including when `casterModel` is absent/null (no newSpells step
@@ -147,7 +213,7 @@ const capitalize = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1)
 export function spellListsLabel(lists: string[] | null): string {
   if (lists === null) return "any class's";
   const names = lists.map(capitalize);
-  // Defensive, not reachable today: magicalSecretsSpellLists (backend) always
+  // Defensive, not reachable today: spellListsFor (backend) always
   // returns at least [key] for a served list, never [] — but the signature
   // accepts any string[], so a future caller (or test) hitting this shouldn't
   // silently get ", or undefined".
@@ -155,6 +221,20 @@ export function spellListsLabel(lists: string[] | null): string {
   if (names.length === 1) return names[0];
   if (names.length === 2) return `${names[0]} or ${names[1]}`;
   return `${names.slice(0, -1).join(", ")}, or ${names[names.length - 1]}`;
+}
+
+/**
+ * #1855: Oxford-comma display label for the Eldritch Knight spell-school gate
+ * ("Abjuration or Evocation") — same join shape as spellListsLabel, but routed
+ * through schoolLabel (never a bare capitalize) so this stays in sync with the
+ * canonical SpellSchool display names, not a coincidentally-identical copy.
+ */
+export function spellSchoolsLabel(schools: string[]): string {
+  const names = schools.map((s) => schoolLabel(s as SpellSchool));
+  if (names.length <= 1) return names[0] ?? "";
+  return names.length === 2
+    ? `${names[0]} or ${names[1]}`
+    : `${names.slice(0, -1).join(", ")}, or ${names[names.length - 1]}`;
 }
 
 /** Toggle a catalog spell in the draft's learnSpell ops; refuses to add past `cap`. */

@@ -199,3 +199,14 @@ export function resolveSubclassSlug(
   if (!name) return undefined;
   return IDENTITY_TO_SLUG.get(`${classKey.trim().toLowerCase()}::${name.trim().toLowerCase()}`);
 }
+
+// #1855: a small convenience predicate over the SUBCLASS_SLUGS vocabulary so
+// a caller resolving "is this the Eldritch Knight subclass" (e.g. the spell-
+// school gate, level-up-plan.ts) never spells out the identity string itself
+// — every other such literal lives in an already-allowlisted module
+// (weapon-bond.ts's eldritchKnightEntry, advancement-slots.ts's Champion
+// check), and this file is the canonical, zero-imports home for the
+// vocabulary those literals name.
+export function isEldritchKnightSlug(slug: SubclassSlug | undefined): boolean {
+  return slug === "fighter-eldritch-knight";
+}

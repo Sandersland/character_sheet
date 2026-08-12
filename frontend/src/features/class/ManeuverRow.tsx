@@ -1,7 +1,9 @@
 /**
- * ManeuverRow — renders a single known maneuver with an expandable description
- * and a "Forget" action. Purely presentational: no API calls, receives all
- * callbacks from the ClassFeaturesSection orchestrator. Renders through
+ * ManeuverRow — renders a single known maneuver with an expandable
+ * description. Purely presentational: no API calls, no forget action — a
+ * maneuver replacement is bound to learn-time (#1516: PHB'14 Battle Master
+ * p.73 / SRD 5.2 equivalent), so the only forget affordance lives inside the
+ * level-up ceremony's own maneuvers step, never on the sheet. Renders through
  * AbilityRowShell (shared with ShadowArtRow).
  */
 
@@ -10,16 +12,9 @@ import type { ManeuverEntry } from "@/types/character";
 
 interface Props {
   entry: ManeuverEntry;
-  busy: boolean;
-  onForget: (entryId: string) => void;
 }
 
-export default function ManeuverRow({ entry, busy, onForget }: Props) {
-  function handleForget() {
-    if (!confirm(`Forget "${entry.name}"?`)) return;
-    onForget(entry.id);
-  }
-
+export default function ManeuverRow({ entry }: Props) {
   // #1381: the served superiority-die faces (deriveManeuverEffect, backend) —
   // pure chrome over a resolved value, never re-derived here.
   const dieFaces = entry.effect?.dice?.faces;
@@ -37,17 +32,6 @@ export default function ManeuverRow({ entry, busy, onForget }: Props) {
             <span className="sr-only">Superiority die d{dieFaces}</span>
           </span>
         ) : undefined
-      }
-      actions={
-        <button
-          type="button"
-          disabled={busy}
-          onClick={handleForget}
-          className="rounded-control bg-garnet-50 px-2 py-0.5 text-[11px] font-semibold text-garnet-700 hover:bg-garnet-100 disabled:opacity-30"
-          title={`Forget ${entry.name}`}
-        >
-          Forget
-        </button>
       }
     >
       <p className="text-xs leading-relaxed text-parchment-600">{entry.description}</p>

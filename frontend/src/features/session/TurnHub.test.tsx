@@ -7,6 +7,7 @@ import { useTurnState } from "@/features/session/useTurnState";
 import { RollProvider } from "@/features/dice/RollContext";
 import {
   applyActionTransactions,
+  applyResolveActionOperations,
   applyResourceTransactions,
   castManeuverTransaction,
   revertBatch,
@@ -15,7 +16,7 @@ import {
   advanceCombatRound,
   fetchCombatState,
   applyInventoryTransactions,
-  logRoll,
+  logRollAction,
   rollInitiativeTransaction,
 } from "@/api/client";
 import { seedUniversalActions } from "@/test/universalActions";
@@ -23,10 +24,14 @@ import { axe } from "@/test/axe";
 import { cachedCharacter, renderWithCharacter } from "@/test/renderWithCharacter";
 import { IMPROVISED_ROW, UNARMED_ROW, attackRow } from "@/test/attackRowFixtures";
 import type { AttackRow } from "@character-sheet/shared-types";
-import type { Character } from "@/types/character";
+import type { Character, SpellEconomyState } from "@/types/character";
+
+// The cleared 5e interlock every combat mock returns (#1439).
+const NO_ECON: SpellEconomyState = { bonusActionBlockedByActionSpell: false, bonusActionLimitedToCantrips: false, actionLimitedToCantrips: false };
 
 vi.mock("@/api/client", () => ({
   applyActionTransactions: vi.fn(),
+  applyResolveActionOperations: vi.fn(),
   applyResourceTransactions: vi.fn(),
   castManeuverTransaction: vi.fn(),
   revertBatch: vi.fn(),
@@ -35,7 +40,7 @@ vi.mock("@/api/client", () => ({
   advanceCombatRound: vi.fn(),
   fetchCombatState: vi.fn(),
   applyInventoryTransactions: vi.fn(),
-  logRoll: vi.fn(),
+  logRollAction: vi.fn(),
   rollInitiativeTransaction: vi.fn(),
   // Must be present even though every test seeds the reference cache directly
   // and never calls it (#1430): useTurnActions' useUniversalActions imports it
@@ -155,6 +160,7 @@ beforeEach(() => {
   seedUniversalActions("EDITION_2024");
   seedUniversalActions("EDITION_2014");
   vi.mocked(applyActionTransactions).mockImplementation(async () => echoCharacter());
+  vi.mocked(applyResolveActionOperations).mockImplementation(async () => echoCharacter());
   vi.mocked(applyResourceTransactions).mockImplementation(async () => echoCharacter());
   vi.mocked(castManeuverTransaction).mockImplementation(async () => ({
     character: echoCharacter(),
@@ -167,10 +173,10 @@ beforeEach(() => {
   // increasing updatedAt per lifecycle stage — syncCombat drops a sync whose
   // updatedAt doesn't strictly advance past the last one applied, so a real
   // start→round-advance→end sequence must never tie.
-  vi.mocked(startCombat).mockResolvedValue({ round: 1, combatActive: true, updatedAt: "2026-01-01T00:00:01.000Z" });
-  vi.mocked(advanceCombatRound).mockResolvedValue({ round: 2, combatActive: true, updatedAt: "2026-01-01T00:00:02.000Z" });
-  vi.mocked(endCombat).mockResolvedValue({ round: 0, combatActive: false, updatedAt: "2026-01-01T00:00:03.000Z" });
-  vi.mocked(logRoll).mockResolvedValue(undefined);
+  vi.mocked(startCombat).mockResolvedValue({ round: 1, combatActive: true, updatedAt: "2026-01-01T00:00:01.000Z", spellEconomy: NO_ECON });
+  vi.mocked(advanceCombatRound).mockResolvedValue({ round: 2, combatActive: true, updatedAt: "2026-01-01T00:00:02.000Z", spellEconomy: NO_ECON });
+  vi.mocked(endCombat).mockResolvedValue({ round: 0, combatActive: false, updatedAt: "2026-01-01T00:00:03.000Z", spellEconomy: NO_ECON });
+  vi.mocked(logRollAction).mockResolvedValue(undefined as never);
   // No onInitiative pools on this fixture (a Fighter) — a real rollInitiative
   // call would report an empty regen, same as this default (#1239/#1243).
   vi.mocked(rollInitiativeTransaction).mockImplementation(async () => ({
@@ -231,6 +237,7 @@ describe("TurnHub — combat lifecycle", () => {
       round: 1,
       combatActive: true,
       updatedAt: "2026-01-01T00:00:01.000Z",
+      spellEconomy: NO_ECON,
     });
 
     await user.click(screen.getByRole("button", { name: "End combat" }));
@@ -251,6 +258,7 @@ describe("TurnHub — combat lifecycle", () => {
       round: 0,
       combatActive: false,
       updatedAt: "2026-01-01T00:00:00.500Z",
+      spellEconomy: NO_ECON,
     });
 
     await user.click(screen.getByRole("button", { name: /Start combat/ }));
@@ -347,6 +355,40 @@ describe("TurnHub — action economy", () => {
     );
     // The action slot's Use button returns once the surge refunds the slot.
     expect(screen.getByRole("button", { name: "Use Action" })).toBeInTheDocument();
+  });
+
+  // Arcane Charge (#1852): the backend attaches the teleport reminder to the
+  // served actionSurge card for a 2014 Eldritch Knight L15+ only — the surge
+  // press surfaces whatever reminder the wire carries and shows nothing when
+  // the card carries none, so no rule is re-derived client-side.
+  it("Action Surge surfaces the served Arcane Charge reminder after a successful surge", async () => {
+    const user = userEvent.setup();
+    const reminder =
+      "Arcane Charge: teleport up to 30 ft to an unoccupied space you can see (before or after the additional action).";
+    const base = makeCharacter();
+    renderHub({
+      ...base,
+      availableActions: [
+        ...(base.availableActions ?? []),
+        { key: "actionSurge", name: "Action Surge", cost: "special", enabled: true, resolverKind: "simple-confirm", reminder },
+      ],
+    } as Character);
+    await startTurn(user);
+
+    await user.click(screen.getByRole("button", { name: /Action Surge/ }));
+
+    await waitFor(() => expect(screen.getByText(reminder)).toBeInTheDocument());
+  });
+
+  it("Action Surge surfaces no reminder when the served card carries none", async () => {
+    const user = userEvent.setup();
+    renderHub();
+    await startTurn(user);
+
+    await user.click(screen.getByRole("button", { name: /Action Surge/ }));
+
+    await waitFor(() => expect(applyActionTransactions).toHaveBeenCalled());
+    expect(screen.queryByText(/Arcane Charge/)).not.toBeInTheDocument();
   });
 
   it("Lay on Hands opens the input and heals for the entered amount", async () => {
@@ -749,7 +791,7 @@ describe("TurnHub — live multi-attack counter (#757)", () => {
     ).toBeInTheDocument();
   });
 
-  it("opens at 2 of 2, decrements per attack (skip path), and exhausts at 0 of 2", async () => {
+  it("opens at 2 of 2, decrements per attack as each swing is rolled, and exhausts at 0 of 2", async () => {
     vi.spyOn(Math, "random").mockReturnValue(0.5); // deterministic: no nat 20/1 auto-verdicts
     const user = userEvent.setup();
     renderHub(extraAttackFighter());
@@ -759,16 +801,21 @@ describe("TurnHub — live multi-attack counter (#757)", () => {
 
     expect(sheet().getByText(/Attacks · 2 of 2 remaining/)).toBeInTheDocument();
 
+    // Rewired to the shared resolver (#1827 Slice 5, #1832): a swing now
+    // resolves fully (roll to hit → implicit-hit damage → Done) before the
+    // rail re-arms itself for the next one — the old "Skip" escape hatch
+    // (leave a row unresolved) doesn't exist on ResolutionRail (#1831).
     await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
     expect(sheet().getByText(/Attacks · 1 of 2 remaining/)).toBeInTheDocument();
+    await user.click(sheet().getByRole("button", { name: /^Roll damage$/ }));
+    await user.click(sheet().getByRole("button", { name: /^Done$/ }));
 
-    // The unresolved row's ungated path to the next attack is the quiet Skip link (#811).
-    await user.click(sheet().getByRole("button", { name: /Skip — roll next attack/ }));
-    await user.click(sheet().getByRole("button", { name: /Roll to hit — attack 2 of 2/ }));
+    await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
     expect(sheet().getByText(/Attacks · 0 of 2 remaining/)).toBeInTheDocument();
-    // Exhausted: no further Roll-to-hit affordance; the bound row's damage stays rollable.
+    await user.click(sheet().getByRole("button", { name: /^Roll damage$/ }));
+    // Exhausted after this swing's own Done — no further Roll-to-hit affordance.
+    await user.click(sheet().getByRole("button", { name: /^Done$/ }));
     expect(sheet().queryByRole("button", { name: /Roll to hit/ })).not.toBeInTheDocument();
-    expect(sheet().getByRole("button", { name: /Roll (crit )?damage/ })).not.toBeDisabled();
     vi.restoreAllMocks();
   });
 
@@ -787,12 +834,15 @@ describe("TurnHub — live multi-attack counter (#757)", () => {
     expect(closeButtons.length).toBeGreaterThan(0);
     expect(sheet().queryByRole("button", { name: /Cancel — refund action/ })).not.toBeInTheDocument();
 
-    // Resolve attack 1 (damage = implicit hit) → the full-width "Next" button
-    // appears, re-arming step 1 for the two-tap next roll (#834).
+    // Resolve attack 1 (damage = implicit hit) and tap the rail's own Done —
+    // it re-arms the SAME rail for attack 2 (#1832), no separate "Next" tap.
     await user.click(sheet().getByRole("button", { name: /^Roll damage$/ }));
-    await user.click(sheet().getByRole("button", { name: "Next" }));
-    await user.click(sheet().getByRole("button", { name: /Roll to hit — attack 2 of 2/ }));
-    // Both spent — now Done.
+    await user.click(sheet().getByRole("button", { name: /^Done$/ }));
+    await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
+    await user.click(sheet().getByRole("button", { name: /^Roll damage$/ }));
+    // Both spent — now Done (the FOOTER's, since the rail's own Done hides
+    // once its swing completes with no attacks left to re-arm for).
+    await user.click(sheet().getByRole("button", { name: /^Done$/ }));
     expect(sheet().getByRole("button", { name: /^Done$/ })).toBeInTheDocument();
     vi.restoreAllMocks();
   });
@@ -826,8 +876,12 @@ describe("TurnHub — live multi-attack counter (#757)", () => {
 
     await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
     await user.click(sheet().getByRole("button", { name: /^Roll damage$/ }));
-    await user.click(sheet().getByRole("button", { name: "Next" }));
-    await user.click(sheet().getByRole("button", { name: /Roll to hit — attack 2 of 2/ }));
+    await user.click(sheet().getByRole("button", { name: /^Done$/ })); // rail's own Done re-arms for attack 2
+    await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
+    await user.click(sheet().getByRole("button", { name: /^Roll damage$/ }));
+    await user.click(sheet().getByRole("button", { name: /^Done$/ })); // rail's own Done — commits attack 2
+    // Both spent — the footer's OWN Done (separate from the rail's per-swing
+    // one) is what actually closes the sheet and fires finishAttack().
     await user.click(sheet().getByRole("button", { name: /^Done$/ }));
 
     expect(screen.getByText("Turn summary")).toBeInTheDocument();
@@ -841,46 +895,39 @@ describe("TurnHub — live multi-attack counter (#757)", () => {
     vi.restoreAllMocks();
   });
 
-  it("banner inline resolve (#811): a skipped attack asks 'hit or miss?', Hit grows Roll damage on the line", async () => {
+  // Pre-#1832 this exercised the banner's OWN "hit or miss?" inline-resolve
+  // affordance for a row left unresolved via AttackStepCard's "Skip" link.
+  // ResolutionRail (#1831) has no such escape hatch — every swing settles a
+  // verdict (implicit hit, called miss, or a die-forced crit/miss) before
+  // "Done" ever advances — so a row reaching the banner unresolved is no
+  // longer reachable from the Attack sheet. What's left to cover here: the
+  // banner renders both RESOLVED lines correctly, and the still-reachable
+  // "Change verdict" mistaken-verdict recovery keeps working off a resolved row.
+  it("Turn-summary banner renders resolved hit/miss lines and still offers Change verdict recovery", async () => {
     vi.spyOn(Math, "random").mockReturnValue(0.5); // d20 face 11 → 11+6 = 17 to hit; d8 face 5
     const user = userEvent.setup();
     renderHub(extraAttackFighter());
     await openAttackPicker(user);
     const sheet = () => within(screen.getByRole("dialog"));
 
-    // Roll both attacks without resolving either (skip path), then close.
+    // Swing 1: implicit hit via a damage roll (d8 face 5 + modifier 3 = 8).
     await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
-    await user.click(sheet().getByRole("button", { name: /Skip — roll next attack/ }));
-    await user.click(sheet().getByRole("button", { name: /Roll to hit — attack 2 of 2/ }));
+    await user.click(sheet().getByRole("button", { name: /^Roll damage$/ }));
+    await user.click(sheet().getByRole("button", { name: /^Done$/ })); // rail's own Done re-arms for attack 2
+
+    // Swing 2: called miss.
+    await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
+    await user.click(sheet().getByRole("button", { name: /it Missed/ }));
+    await user.click(sheet().getByRole("button", { name: /^Done$/ })); // rail's own Done — commits attack 2
+    // Both spent — the footer's own Done closes the sheet + fires finishAttack().
     await user.click(sheet().getByRole("button", { name: /^Done$/ }));
 
-    // The banner never claims a hit for an unresolved row (#811).
-    const banner = screen.getByText("Turn summary").closest("div")!.parentElement!;
-    expect(within(banner).queryByText(/: hit/)).not.toBeInTheDocument();
-    const questions = screen.getAllByRole("button", { name: "hit or miss?" });
-    expect(questions).toHaveLength(2);
-
-    // Resolve line 1 as a Hit → an inline Roll-damage button grows on the line.
-    await user.click(questions[0]);
-    await user.click(screen.getByRole("button", { name: /^Hit — / }));
-    const rollDamage = screen.getByRole("button", { name: /^Roll damage — / });
-    await user.click(rollDamage);
-
-    // Damage landed on the line (d8 face 5 + modifier 3 → "8 damage"), logged to the session.
     expect(screen.getByText(/17 — 8 damage/)).toBeInTheDocument();
-    expect(vi.mocked(logRoll)).toHaveBeenCalledWith(
-      "char-1",
-      "sess-1",
-      expect.objectContaining({ kind: "damage" }),
-    );
-
-    // Resolve line 2 as a Miss → reads as a miss, no damage affordance.
-    await user.click(screen.getByRole("button", { name: "hit or miss?" }));
-    await user.click(screen.getByRole("button", { name: /^Miss — / }));
     expect(screen.getByText(/miss \(to-hit 17\)/)).toBeInTheDocument();
+    expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(2);
 
-    // Mistaken-verdict recovery: tapping the resolved miss line reveals the quiet
-    // Change row (both lines are resolved now — take the miss line, rendered last).
+    // Mistaken-verdict recovery: tapping a resolved line reveals the quiet
+    // Change row (take the miss line, rendered last).
     const changeTargets = screen.getAllByRole("button", { name: /Change verdict — / });
     await user.click(changeTargets[changeTargets.length - 1]);
     expect(screen.getByText(/Change ·/)).toBeInTheDocument();
@@ -1141,6 +1188,10 @@ describe("TurnHub — Bonus Unarmed Strike (Martial Arts, #1218)", () => {
     await user.click(screen.getByRole("button", { name: /Roll to hit/ }));
     expect(applyActionTransactions).not.toHaveBeenCalled();
 
+    // The shared resolver (#1845) requires the swing fully resolved — hit
+    // and damaged, or missed — before "Done" appears (no mid-swing "Skip"
+    // affordance, matching the main Attack sheet's own #1832 shape).
+    await user.click(screen.getByRole("button", { name: /^Roll damage$/ }));
     await user.click(screen.getByRole("button", { name: /^Done$/ }));
 
     // Bonus action is spent; exclusivity blocks re-opening the menu.
@@ -1190,8 +1241,17 @@ describe("TurnHub — Deflect Attacks reaction (#1241)", () => {
           // overrides this to "any damage type" itself, the same way the real
           // backend would, instead of the client re-deriving the threshold.
           damageTypeClause: "bludgeoning, piercing, or slashing damage",
+          // Reduction spec resolved server-side (#1435): Dex +3 + monk level 5 = 8.
+          effect: { effectType: "utility", dice: { count: 1, faces: 10, modifier: 8 }, scaling: { mode: "none" } },
         },
-        { key: "deflectAttacksRedirect", name: "Deflect Attacks — Redirect", cost: "free", enabled: true, resourceKey: "focus" },
+        {
+          key: "deflectAttacksRedirect",
+          name: "Deflect Attacks — Redirect",
+          cost: "free",
+          enabled: true,
+          resourceKey: "focus",
+          effect: { effectType: "damage", dice: { count: 2, faces: 8, modifier: 3 }, scaling: { mode: "none" } },
+        },
       ],
       resources: {
         features: [],
@@ -1249,6 +1309,7 @@ describe("TurnHub — Deflect Attacks reaction (#1241)", () => {
             name: "Deflect Attacks",
             cost: "reaction",
             enabled: true,
+            effect: { effectType: "utility", dice: { count: 1, faces: 10, modifier: 8 }, scaling: { mode: "none" } },
           },
           { key: "deflectAttacksRedirect", name: "Deflect Attacks — Redirect", cost: "free", enabled: false, disabledReason: "No focus remaining" },
         ],
@@ -1280,8 +1341,17 @@ describe("TurnHub — Deflect Attacks reaction (#1241)", () => {
             cost: "reaction",
             enabled: true,
             damageTypeClause: "any damage type",
+            // Dex +3 + monk level 13 = 16.
+            effect: { effectType: "utility", dice: { count: 1, faces: 10, modifier: 16 }, scaling: { mode: "none" } },
           },
-          { key: "deflectAttacksRedirect", name: "Deflect Attacks — Redirect", cost: "free", enabled: true, resourceKey: "focus" },
+          {
+            key: "deflectAttacksRedirect",
+            name: "Deflect Attacks — Redirect",
+            cost: "free",
+            enabled: true,
+            resourceKey: "focus",
+            effect: { effectType: "damage", dice: { count: 2, faces: 10, modifier: 3 }, scaling: { mode: "none" } },
+          },
         ],
       } as unknown as Partial<Character>),
     );

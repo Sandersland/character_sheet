@@ -23,6 +23,20 @@ export interface ChoiceLoadContext {
   targetLevel: number;
   /** The advancing character's edition — every catalog fetch below is edition-scoped (#1325, #1412). */
   edition: RulesEdition;
+  /**
+   * The character's own class names plus the level-up target's className
+   * (#1495) — fed straight through to fetchFeats' class-scope gate. Only
+   * fightingStyleFeat reads this; maneuvers/toolProficiency/subclassChoice
+   * ignore it.
+   */
+  classNames?: string[];
+  /**
+   * The character's proficient skills (id = skill key, name via skillLabel —
+   * CLAUDE.md: never render a raw skill key) (#1588). Only `expertise` reads
+   * this: unlike every other kind, its option list has no catalog fetch — the
+   * character's own proficient-skill set IS the catalog.
+   */
+  proficientSkills?: ChoiceOption[];
 }
 
 export interface ChoiceKindConfig {
@@ -55,8 +69,11 @@ const maneuvers: ChoiceKindConfig = {
 
 const fightingStyleFeat: ChoiceKindConfig = {
   single: true,
+  // classNames (#1495): the server applies PHB'14's per-class subset via
+  // fightingStyleFeatOfferedForClasses — this config never re-derives it,
+  // only forwards the context's class-name scope.
   loadOptions: (ctx) =>
-    fetchFeats(ctx.edition).then((list) =>
+    fetchFeats(ctx.edition, undefined, ctx.classNames).then((list) =>
       list
         .filter((f) => f.category === "fighting_style")
         .map((f) => ({ id: f.id, name: f.name, description: f.description })),
@@ -85,10 +102,23 @@ const toolProficiency: ChoiceKindConfig = {
   }),
 };
 
+// #1588: no catalog fetch — the option list is the character's own
+// proficient-skill set (ctx.proficientSkills), computed by useChoiceOptions
+// from the character's skills[] the same way the read path resolves
+// "proficient" (#438: feat/item grants included, mirrors buildSkillsView).
+const expertise: ChoiceKindConfig = {
+  loadOptions: (ctx) => Promise.resolve(ctx.proficientSkills ?? []),
+  fromCharacter: (character) =>
+    new Set((character.resources?.expertiseKnown ?? []).map((e) => e.skill)),
+  selected: (draft) => (draft.expertise ?? []).map((op) => op.skill),
+  select: (_draft, ids) => ({ expertise: ids.map((skill) => ({ type: "learnExpertise", skill })) }),
+};
+
 export const CHOICE_KIND_CONFIGS: Partial<Record<LevelUpStepKind, ChoiceKindConfig>> = {
   maneuvers,
   fightingStyleFeat,
   toolProficiency,
+  expertise,
 };
 
 // Per-step, not per-kind: a subclass's several tiers share one

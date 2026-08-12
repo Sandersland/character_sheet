@@ -35,7 +35,7 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 
 import { Prisma } from "@/generated/prisma/client.js";
 import { proficiencyBonusForLevel } from "./experience.js";
-import { effectiveEntryLevel, subclassActiveAt, subclassGateLevel } from "./effective-levels.js";
+import { effectiveEntryLevel, levelDownEntryLevels, subclassActiveAt, subclassGateLevel } from "./effective-levels.js";
 import { logEvent, type EventType } from "@/lib/activity/events.js";
 import {
   clampChoicesToCaps,
@@ -43,12 +43,15 @@ import {
   serializeResourcesState,
   snapshotResources,
   splitAdvancementsBySlotCap,
+  type ExpertiseEntry,
   type ManeuverEntry,
   type ResourcesMutableState,
   type ToolProfEntry,
 } from "@/lib/classes/resources.js";
 import { characterAdvancementSlots, characterFightingStyleFeatSlots, derivePreparedSpellLimit, deriveFeatBonuses } from "@/lib/srd/srd.js";
 import { deriveEntryScopedResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
+import { draconicResilienceMaxHpTerm } from "@/lib/classes/draconic-bloodline.js";
+import { weaponBondEligible } from "@/lib/classes/weapon-bond.js";
 import { FEATURE_ROWS_ENTRY_SELECT, featureRowsOf } from "@/lib/classes/feature-rows-select.js";
 import { reverseAdvancementEffects } from "./advancement.js";
 import { effectiveMaxHitPoints, normalizeHitDice, normalizeHitPoints } from "@/lib/combat/hitpoints.js";
@@ -118,6 +121,55 @@ async function reconcileSubclass(ctx: ReconcileContext): Promise<void> {
       before: { subclassId: entry.subclassId ?? null, subclass: entry.subclass ?? null },
       after: { subclassId: null, subclass: null },
       data: { classEntryId: entry.id },
+      batchId,
+    });
+  }
+}
+
+// Eldritch Knight Weapon Bond (2014, PHB'14 p.75, #1854): the bonded set's
+// legal cap depends on level (WEAPON_BOND_LIMIT while an EK L3+ 2014, else 0)
+// — CLAUDE.md's level-gated-state rule. Runs AFTER reconcileSubclass so a
+// just-cleared EK subclass is already reflected. weaponBondEligible is the
+// SAME rule function the bond/unbond transaction op and the clamp-on-read in
+// character-serialize.ts both call. Removing a bonded item from inventory
+// needs no reconciler here — the `weaponBonded` flag lives ON the InventoryItem
+// row, so deleting the row deletes the flag with it; this reconciler only
+// handles the character-level-down/lost-subclass case.
+async function reconcileWeaponBond(ctx: ReconcileContext): Promise<void> {
+  const { tx, characterId, newDerivedLevel, edition, batchId } = ctx;
+
+  const row = await tx.character.findUnique({
+    where: { id: characterId },
+    select: {
+      classEntries: {
+        orderBy: { position: "asc" as const },
+        select: { name: true, level: true, subclass: true, subclassId: true, subclassRef: { select: { slug: true } } },
+      },
+    },
+  });
+  if (!row) return;
+
+  const { eligible } = weaponBondEligible(row.classEntries, newDerivedLevel, edition);
+  if (eligible) return;
+
+  const bonded = await tx.inventoryItem.findMany({
+    where: { characterId, weaponBonded: true },
+    select: { id: true, name: true },
+  });
+  if (bonded.length === 0) return;
+
+  await tx.inventoryItem.updateMany({ where: { characterId, weaponBonded: true }, data: { weaponBonded: false } });
+
+  for (const item of bonded) {
+    await logEvent(tx, {
+      characterId,
+      category: "inventory",
+      type: "weaponUnbonded",
+      summary: `${item.name} unbonded (level dropped below Weapon Bond's requirement)`,
+      entityType: "InventoryItem",
+      entityId: item.id,
+      before: { weaponBonded: true },
+      after: { weaponBonded: false },
       batchId,
     });
   }
@@ -260,7 +312,14 @@ async function reconcilePreparedSpells(ctx: ReconcileContext): Promise<void> {
       abilityScores: true,
       classEntries: {
         orderBy: { position: "asc" as const },
-        select: { name: true, level: true, subclass: true },
+        // `subclassRef` (#1531): derivePreparedSpellLimit resolves third-caster
+        // identity off the Subclass row's casterFraction/spellcastingAbility
+        // columns, not the free-text `subclass` name — this select must carry
+        // it or this write-side reconciler and buildSpellcastingView's
+        // clamp-on-read (which reads it through characterInclude) would
+        // resolve DIFFERENT caps for the same Eldritch Knight/Arcane
+        // Trickster character (CLAUDE.md's "one shared rule function" clause).
+        select: { name: true, level: true, subclassRef: { select: { casterFraction: true, spellcastingAbility: true } } },
       },
     },
   });
@@ -270,7 +329,7 @@ async function reconcilePreparedSpells(ctx: ReconcileContext): Promise<void> {
   const entries = row.classEntries.map((e) => ({
     name: e.name,
     level: effectiveEntryLevel(e.level, row.classEntries.length, newDerivedLevel),
-    subclass: e.subclass,
+    subclassRef: e.subclassRef,
   }));
   // Deliberate-coupling latch (#1507 D2/D3): resolves through the same
   // derivePreparedSpellLimit as buildSpellcastingView's clamp-on-read
@@ -329,8 +388,8 @@ async function reconcilePreparedSpells(ctx: ReconcileContext): Promise<void> {
 // Uses `resources`-category events so the existing undo branch in activity.ts
 // restores the full before.resources JSON with no new undo code.
 
-type KnownListKey = "maneuversKnown" | "toolProficienciesKnown";
-type KnownEntry = ManeuverEntry | ToolProfEntry;
+type KnownListKey = "maneuversKnown" | "toolProficienciesKnown" | "expertiseKnown";
+type KnownEntry = ManeuverEntry | ToolProfEntry | ExpertiseEntry;
 
 interface KnownListConfig {
   /** Which ResourcesMutableState array this reconciler trims. */
@@ -471,6 +530,24 @@ async function reconcileToolProficiencies(ctx: ReconcileContext): Promise<void> 
   });
 }
 
+// Trims expertiseKnown when the level-derived pick count drops (Rogue L6->L5,
+// or a class removed). expertiseChoiceCount resolves through the SAME
+// deriveEntryScopedResources the clamp-on-read (buildResourcesPayload) uses —
+// CLAUDE.md's one-shared-function rule. See reconcileKnownList for the shared
+// trim/audit flow.
+async function reconcileExpertise(ctx: ReconcileContext): Promise<void> {
+  return reconcileKnownList(ctx, {
+    listKey: "expertiseKnown",
+    allowed: (derived) => derived?.expertiseChoiceCount ?? 0,
+    eventType: "expertiseReconciled",
+    summary: (removedCount, allowed) =>
+      allowed === 0
+        ? `${removedCount} Expertise skill${removedCount > 1 ? "s" : ""} removed — no longer granted at this level`
+        : `${removedCount} Expertise skill${removedCount > 1 ? "s" : ""} removed — level cap reduced to ${allowed}`,
+    snapshot: (state) => ({ resources: snapshotResources(state) }),
+  });
+}
+
 // Generic level-down trim for every subclass "choose N" feature (#899). One
 // reconciler serves all declared choices: for each key in choicesKnown it caps
 // the list to the level-derived count (0 when the subclass no longer grants that
@@ -566,8 +643,21 @@ async function reconcileAdvancements(ctx: ReconcileContext): Promise<void> {
         // not just the primary. `class` (#1529): the reconciler's half of the
         // reconciler/clamp-on-read pair CLAUDE.md governs — must resolve
         // extraAsiLevels/fightingStyleFeatLevel through the SAME columns
-        // applyAdvancementClamp reads via characterInclude.
-        select: { name: true, level: true, class: { select: { extraAsiLevels: true, fightingStyleFeatLevel: true } } },
+        // applyAdvancementClamp reads via characterInclude. subclass/
+        // subclassRef.slug/class.subclassLevel (#1123):
+        // draconicResilienceMaxHpTerm's identity inputs — without them the
+        // term silently resolves 0 and the clamp below writes `current` up to
+        // the Draconic bonus too low.
+        select: {
+          name: true,
+          level: true,
+          subclass: true,
+          subclassRef: { select: { slug: true } },
+          // `class.name` (#1148): characterFightingStyleFeatSlots' resolveSubclassSlug
+          // input — the CANONICAL class name, same #1495 rationale as
+          // applyAdvancementClamp's own select.
+          class: { select: { name: true, extraAsiLevels: true, fightingStyleFeatLevel: true, subclassLevel: true } },
+        },
       },
     },
   });
@@ -577,7 +667,10 @@ async function reconcileAdvancements(ctx: ReconcileContext): Promise<void> {
   if (state.advancements.length === 0) return; // nothing to trim
 
   const allowed = characterAdvancementSlots(row.classEntries, newDerivedLevel);
-  const fightingStyleAllowed = characterFightingStyleFeatSlots(row.classEntries, newDerivedLevel);
+  // edition (#1148): Champion's Additional Fighting Style second slot forks
+  // 7 (2024) vs 10 (2014) — must resolve through the SAME
+  // characterFightingStyleFeatSlots applyAdvancementClamp reads.
+  const fightingStyleAllowed = characterFightingStyleFeatSlots(row.classEntries, newDerivedLevel, edition);
 
   // Origin feats are exempt from both caps and never reversed (#1130); ASI feats
   // trim beyond `allowed`, Fighting Style feats beyond `fightingStyleAllowed`
@@ -603,16 +696,24 @@ async function reconcileAdvancements(ctx: ReconcileContext): Promise<void> {
   const reversed = reverseAdvancementEffects(scores, hp, initBonus, toRemove);
   state.advancements = kept;
 
-  // #1321: reverseAdvancementEffects' own internal clamp is against the RAW
-  // max (harmless there — it's an intermediate value this function always
-  // re-clamps below); the persisted current must clamp against the EFFECTIVE
-  // max instead — the same shared function serializeCharacter's clamp-on-read
-  // resolves through (CLAUDE.md: reconciler and clamp-on-read must agree).
-  // `kept` is the POST-reconcile advancement list, matching applyFeatLayer's
-  // own use of the clamped (in-cap) slice.
-  const featMaxHpBonus = deriveFeatBonuses(kept, hd.total).maxHp;
+  // #1321: reverseAdvancementEffects subtracts exact deltas and never clamps
+  // (its raw `max` excludes feat/subclass bonuses — see its header); the
+  // persisted current clamps HERE against the EFFECTIVE max — the same shared
+  // function serializeCharacter's clamp-on-read resolves through (CLAUDE.md:
+  // reconciler and clamp-on-read must agree). `kept` is the POST-reconcile
+  // advancement list, matching applyFeatLayer's own use of the clamped
+  // (in-cap) slice.
+  // #1123: the Draconic Resilience term joins the feat bonus in the SAME
+  // pre-halving composition serializeCharacter's applyFeatLayer serves, via
+  // the ONE shared function (draconicResilienceMaxHpTerm) — omitting it
+  // clamped a Draconic sorcerer's stored `current` up to the bonus too low on
+  // level-down. newDerivedLevel is the POST-level-down XP level, matching the
+  // clamp-on-read's own progress.level input.
+  const maxHpBonus =
+    deriveFeatBonuses(kept, hd.total).maxHp +
+    draconicResilienceMaxHpTerm(row.classEntries, newDerivedLevel, edition);
   const exhaustionLevel = normalizeConditionsMutable(row.conditions).exhaustion;
-  const newEffMax = effectiveMaxHitPoints(reversed.hitPoints.max, featMaxHpBonus, exhaustionLevel, edition);
+  const newEffMax = effectiveMaxHitPoints(reversed.hitPoints.max, maxHpBonus, exhaustionLevel, edition);
   const newHp = {
     ...reversed.hitPoints,
     current: Math.min(reversed.hitPoints.current, newEffMax),
@@ -704,16 +805,16 @@ async function reconcileClassEntryLevels(ctx: ReconcileContext): Promise<void> {
   if (sum <= newDerivedLevel) return; // within the derived total, nothing to trim
 
   const before = entries.map((e) => ({ ...e }));
-  let excess = sum - newDerivedLevel;
   const removedNames: string[] = [];
 
-  for (let i = entries.length - 1; i >= 0 && excess > 0; i--) {
+  // The trim itself is the shared pure rule (levelDownEntryLevels,
+  // effective-levels.ts) so computeLevelDownState can project this exact
+  // outcome before it has run (#1123); this function only persists it.
+  const newLevels = levelDownEntryLevels(entries.map((e) => e.level), newDerivedLevel);
+  for (let i = entries.length - 1; i >= 0; i--) {
     const entry = entries[i];
-    const floor = entry.position === 0 ? 1 : 0; // never delete the base class
-    const reducible = Math.min(entry.level - floor, excess);
-    if (reducible <= 0) continue;
-    const newLevel = entry.level - reducible;
-    excess -= reducible;
+    const newLevel = newLevels[i];
+    if (newLevel === entry.level) continue;
     if (newLevel <= 0) {
       await tx.characterClassEntry.delete({ where: { id: entry.id } });
       removedNames.push(entry.name);
@@ -773,10 +874,12 @@ async function reconcileClassEntryLevels(ctx: ReconcileContext): Promise<void> {
 const LEVEL_GATED_RECONCILERS: Reconciler[] = [
   reconcileClassEntryLevels,
   reconcileSubclass,
+  reconcileWeaponBond,
   reconcileGrantedSpells,
   reconcilePreparedSpells,
   reconcileManeuvers,
   reconcileToolProficiencies,
+  reconcileExpertise,
   reconcileSubclassChoices,
   reconcileAdvancements,
 ];

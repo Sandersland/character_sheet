@@ -49,7 +49,8 @@ backend/src/lib/classes/channel-divinity.ts:resolveChannelDivinityCast:guarded b
 backend/src/lib/classes/maneuvers.ts:loadManeuver:persisted id, deliberately unguarded — see the why-comment at loadManeuver (#1345 R2)
 backend/src/lib/classes/disciplines.ts:loadKnownDiscipline:persisted id, deliberately unguarded — same shape as loadManeuver (#1345 R2), see the why-comment at loadKnownDiscipline (#1503)
 backend/src/lib/leveling/level-up-transaction.ts:resolvePickedSubclass:guarded by crossEditionRejection (Subclass, #1414)
-backend/src/routes/character/level-up.ts:pickedGrantSource:reachable only after resolveLevelUpContext admitted the id — see the why-comment at pickedGrantSource (#1414)"
+backend/src/routes/character/level-up.ts:pickedGrantSource:reachable only after resolveLevelUpContext admitted the id — see the why-comment at pickedGrantSource (#1414)
+backend/src/routes/catalog/spells.ts:resolveSubclassCasterRef:guarded by crossEditionRejection (Subclass, #1825, renamed #1531)"
 
 MIN_OCCURRENCES=9
 PATTERN='\.(feat|subclass|grantedAbility|background|action)\.(findUnique|findFirst)\('

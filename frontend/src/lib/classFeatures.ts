@@ -75,13 +75,6 @@ function hasElementsWarriorToggle(character: Character): boolean {
   return (character.availableActions ?? []).some((a) => a.key === "elementalAttunement" && a.resolverKind === "toggle");
 }
 
-// "shadowArts"/"cloakOfShadows" collide across editions (#1505) with no per-row
-// signal to tell them apart (neither is row-driven), so gate on the character's own
-// edition — the 2024-shaped UI must never reach a 2014 sheet (2014's cast UI is #1738).
-function has2024ShadowAction(character: Character, key: string): boolean {
-  return character.rulesEdition === "EDITION_2024" && (character.availableActions ?? []).some((a) => a.key === key);
-}
-
 function deriveFlags(character: Character): ClassFeatureFlags {
   // Fighting Style is a feat partition (#1137): entitlement follows the slot
   // total, and the taken feats are the fightingStyle-slot advancements — both
@@ -89,8 +82,13 @@ function deriveFlags(character: Character): ClassFeatureFlags {
   const hasFightingStyle = (character.fightingStyleSlots?.total ?? 0) > 0;
   const fightingStyleFeats = (character.advancements ?? []).filter((a) => a.slot === "fightingStyle");
   const hasElementsWarrior = hasElementsWarriorToggle(character);
-  const hasShadowArts = has2024ShadowAction(character, "shadowArts");
-  const hasCloakOfShadows = has2024ShadowAction(character, "cloakOfShadows");
+  // "shadowArts"/"cloakOfShadows" collide across editions (same keys, #1505),
+  // but unlike elementalAttunement above, both editions now have a correct,
+  // fully wire-driven UI (ShadowArtsSection/CloakOfShadowsSection, #1738 —
+  // pool label, cost and reminder text all come off the served row), so bare
+  // key-presence is the right gate for both.
+  const hasShadowArts = hasAction(character, "shadowArts");
+  const hasCloakOfShadows = hasAction(character, "cloakOfShadows");
   const hasFourElements = hasAction(character, "castDiscipline");
   const resources: CharacterResources | undefined = character.resources;
   if (!resources) {

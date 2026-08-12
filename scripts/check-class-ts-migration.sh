@@ -36,7 +36,7 @@ NOT_YET_MIGRATED="bard cleric druid monk paladin ranger sorcerer warlock wizard"
 # check below, which fails loudly the moment a file in that directory is
 # neither here nor in ALL_CLASSES, rather than silently scanning it as
 # "migrated" (a thirteenth class's module would otherwise land unclassified).
-NON_CLASS_MODULES="ability-registry actions activation-requires channel-divinity class class-feature-rows class-features disciplines feature-rows-select focus-cast hand-of-harm hand-of-ultimate-mercy maneuver-effect maneuvers open-hand-technique quivering-palm registry resources resources-state shadow-arts sneak-attack stunning-strike subclass-slug types warrior-of-elements"
+NON_CLASS_MODULES="ability-registry actions activation-requires arcane-charge assassinate channel-divinity class class-feature-rows class-features disciplines draconic-bloodline feature-rows-select focus-cast hand-of-harm hand-of-ultimate-mercy maneuver-effect maneuvers open-hand-technique quivering-palm registry resources resources-state shadow-arts sneak-attack stunning-strike subclass-slug types warrior-of-elements weapon-bond"
 
 # Reverse check: every backend/src/lib/classes/*.ts file's basename must be
 # classified as EITHER a class (ALL_CLASSES) or shared infrastructure
@@ -167,11 +167,43 @@ fi
 #     leaves NOT_YET_MIGRATED and this file's own `\brogue\b` hits (the
 #     "Only a rogue (level 1+) has Sneak Attack" error string, the
 #     `name.toLowerCase() === "rogue"` lookup) would otherwise flag red.
+#   - classes/assassinate.ts: PERMANENT (#1526). Same shape as the
+#     sneak-attack.ts entry directly above: assassinateEligible is a rule
+#     function keyed off the rogue class entry's own level (plus its
+#     subclass slug), never routed through rogue.ts's AuthoredFeature/
+#     resourceFn machinery — ClassFeature has no descriptor column for a
+#     hit-to-crit-conversion eligibility predicate. Its own
+#     name.toLowerCase() === "rogue" lookup would otherwise flag red now
+#     that "rogue" is MIGRATED.
+#   - classes/weapon-bond.ts: PERMANENT (#1854). Eldritch Knight Weapon
+#     Bond's eligibility gate (weaponBondEligible/eldritchKnightEntry) is a
+#     computed rule function keyed off the fighter class entry's own level —
+#     the bonded-weapon selection is InventoryItem state (a boolean column),
+#     never ClassFeature/resourceFn machinery, so there is no descriptor
+#     column this could have migrated onto. Sneak Attack's own FILE_ALLOWLIST
+#     entry above is the direct precedent: same shape (a MIGRATED class name
+#     literal — "fighter" — read only to find the right class entry), same
+#     reason (NON_CLASS_MODULES above already classifies this file as shared
+#     infrastructure, not a per-class module).
+#   - srd/advancement-slots.ts: PERMANENT (#1148). fightingStyleFeatSlots'
+#     Champion branch reads the "fighter-champion" SUBCLASS_SLUGS identity
+#     string (#1277's join-key vocabulary, subclass-slug.ts's own PERMANENT
+#     entry above) to gate the Additional Fighting Style second-slot
+#     threshold — a computed rule function keyed off subclass identity +
+#     level + edition, never routed through fighter's retired
+#     AuthoredFeature/resourceFn machinery. ClassFeature has no descriptor
+#     column for "how many Fighting Style feat slots this entry carries";
+#     the slot-count threshold (7 in 2024, 10 in 2014) is exactly the rule
+#     arithmetic CLAUDE.md keeps in lib/, same shape as armor-class.ts and
+#     character/serialize/combat.ts above.
 FILE_ALLOWLIST="backend/src/lib/classes/subclass-slug.ts
 backend/src/lib/classes/actions.ts
 backend/src/lib/character/serialize/combat.ts
 backend/src/lib/srd/armor-class.ts
-backend/src/lib/classes/sneak-attack.ts"
+backend/src/lib/classes/sneak-attack.ts
+backend/src/lib/classes/assassinate.ts
+backend/src/lib/classes/weapon-bond.ts
+backend/src/lib/srd/advancement-slots.ts"
 
 is_allowlisted_file() {
   target="$1"

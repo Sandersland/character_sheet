@@ -139,6 +139,7 @@ export interface DeletedInventoryItemSnapshot {
   requiresAttunement: boolean;
   attunementPrereqKind: AttunementPrereqKind | null;
   attunementPrereqValue: string | null;
+  weaponBonded: boolean;
   notes: string | null;
   position: number;
   usesRemaining: number | null;
@@ -167,6 +168,7 @@ export function snapshotInventoryItemForUndo(item: InventoryItemWithDetails): De
     requiresAttunement: item.requiresAttunement,
     attunementPrereqKind: item.attunementPrereqKind,
     attunementPrereqValue: item.attunementPrereqValue,
+    weaponBonded: item.weaponBonded,
     notes: item.notes,
     position: item.position,
     usesRemaining: item.usesRemaining,

@@ -150,7 +150,7 @@ export function useTurnActions({
   };
   const bonusSheetModel = {
     classBonusOptions: classBonusActions.map(enrich),
-    bonusSpells: bonusSpellOptions(character, turnState.spellCastThisTurn),
+    bonusSpells: bonusSpellOptions(character, turnState.spellEconomy),
     twfHintText: twfHint(character),
     offHandSummary: offHandSummary(character),
   };
@@ -201,6 +201,9 @@ export function useTurnActions({
     try {
       await undoBatch(top.batchId);
       undo();
+      // The caller re-reads combat state after this resolves (#1439 review):
+      // undoing a spell cast lifts the interlock it recorded server-side
+      // (revertCombatEvent), and the block must not linger until the next poll.
     } catch {
       // error already carries the message via useTurnActionMutations.
     }
@@ -263,8 +266,10 @@ export function useTurnActions({
   }
 
   // No-server-effect reminder actions (e.g. Shadow Step): the rule text is the
-  // whole deliverable, so surface it on use.
-  function surfaceReminder(key: string, cost: "action" | "bonusAction" | "reaction") {
+  // whole deliverable, so surface it on use. Takes the served card's own cost
+  // (Action Surge's is "special", #1852) — only "reaction" routes to the
+  // reaction strip, everything else to the effect strip.
+  function surfaceReminder(key: string, cost: AvailableAction["cost"]) {
     const reminder = availableActions.find((a) => a.key === key)?.reminder;
     if (!reminder) return;
     if (cost === "reaction") setReactionMessage(reminder);
@@ -342,6 +347,10 @@ export function useTurnActions({
     try {
       await spendActionSurge();
       grantExtraAction();
+      // The served actionSurge card carries a reminder only when the backend
+      // attached one (Arcane Charge, #1852 — an Eldritch Knight L15+ under
+      // 2014 rules); surfaceReminder is a no-op without it.
+      surfaceReminder("actionSurge", "special");
     } catch {
       // error already carries the message via useTurnActionMutations.
     }
@@ -360,7 +369,7 @@ export function useTurnActions({
   async function reconcileCombatAfterFailure() {
     try {
       const state = await fetchCombatState(character.id, sessionId);
-      reconcileCombat(state.round, state.combatActive, state.updatedAt);
+      reconcileCombat(state.round, state.combatActive, state.updatedAt, state.spellEconomy);
     } catch (e) {
       console.error("combat reconcile failed after mutation failure", e);
     }
@@ -391,7 +400,7 @@ export function useTurnActions({
       // participant started it first), this reconciles round/combatActive to
       // the REAL server state rather than trusting this client's optimistic 1.
       const state = await startCombat(character.id, sessionId);
-      syncCombat(state.round, state.combatActive, state.updatedAt);
+      syncCombat(state.round, state.combatActive, state.updatedAt, state.spellEconomy);
       onLogChanged();
     } catch (e) {
       console.error("combat log failed (startCombat)", e);
@@ -412,7 +421,7 @@ export function useTurnActions({
     resetErrors();
     try {
       const state = await endCombat(character.id, sessionId);
-      syncCombat(state.round, state.combatActive, state.updatedAt);
+      syncCombat(state.round, state.combatActive, state.updatedAt, state.spellEconomy);
       onLogChanged();
     } catch (e) {
       console.error("combat log failed (endCombat)", e);
@@ -460,7 +469,7 @@ export function useTurnActions({
     if (wasInCombat) {
       try {
         const state = await advanceCombatRound(character.id, sessionId);
-        syncCombat(state.round, state.combatActive, state.updatedAt);
+        syncCombat(state.round, state.combatActive, state.updatedAt, state.spellEconomy);
         onLogChanged();
       } catch (e) {
         console.error("combat log failed (advanceCombatRound)", e);

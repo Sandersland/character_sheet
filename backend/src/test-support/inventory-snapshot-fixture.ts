@@ -28,6 +28,7 @@ export interface InventoryItemFixtureInput {
   requiresAttunement?: boolean;
   attunementPrereqKind?: AttunementPrereqKind | null;
   attunementPrereqValue?: string | null;
+  weaponBonded?: boolean;
   notes?: string | null;
   position?: number;
   activatedUsesSpent?: number;
@@ -98,6 +99,7 @@ function fixturePlacement(input: InventoryItemFixtureInput, consumableDetail: Re
     requiresAttunement: input.requiresAttunement ?? false,
     attunementPrereqKind: input.attunementPrereqKind ?? undefined,
     attunementPrereqValue: input.attunementPrereqValue ?? undefined,
+    weaponBonded: input.weaponBonded ?? false,
     activatedUsesSpent: input.activatedUsesSpent ?? undefined,
     usesRemaining: consumableDetail?.usesRemaining ?? null,
   };

@@ -18,13 +18,12 @@ import {
   endCombat,
   advanceCombatRound,
   getCombatState,
-  logRollEvent,
   SessionError,
 } from "@/lib/session/sessions.js";
 import { getSessionDoorway } from "@/lib/session/doorway.js";
 import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
-import { parseRollInput, requireCharacterId } from "./session-route-helpers.js";
+import { requireCharacterId } from "./session-route-helpers.js";
 
 export const sessionsRouter = Router();
 
@@ -507,23 +506,11 @@ sessionsRouter.get("/characters/:id/sessions/:sessionId/combat", async (req, res
     return;
   }
 
-  const state = await getCombatState(req.params.sessionId);
+  const state = await getCombatState(req.params.sessionId, req.params.id);
   if (!state) {
     res.status(404).json({ error: "Session not found" });
     return;
   }
   res.json(state);
 });
-
-/** POST /api/characters/:id/sessions/:sessionId/roll — logs a roll event (character-scoped). */
-sessionsRouter.post(
-  "/characters/:id/sessions/:sessionId/roll",
-  async (req, res) => {
-    await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
-    const roll = parseRollInput(req, res);
-    if (roll === null) return;
-    await logRollEvent(req.params.id, req.params.sessionId, roll);
-    res.status(201).json({ ok: true });
-  },
-);
 

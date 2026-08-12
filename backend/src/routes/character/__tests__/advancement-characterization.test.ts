@@ -130,6 +130,7 @@ const EMPTY_RESOURCES = {
   used: {},
   maneuversKnown: [],
   toolProficienciesKnown: [],
+  expertiseKnown: [],
   choicesKnown: {},
   advancements: [],
 };
@@ -386,11 +387,15 @@ describe("advancement transaction event-stream characterization (#682)", () => {
     expect(removeAsi.summary).toBe("Removed advancement: ASI: dexterity +1, constitution +1");
     expect(removeAsi.data).toEqual({ entryId: asiEntryId, label: "ASI: dexterity +1, constitution +1" });
 
-    // Final state: scores/init restored; HP max restored but current clamped to
-    // the restored max (reverseAdvancementEffects clamps, it does not subtract).
+    // Final state: scores/init restored; HP max AND current both back at the
+    // exact pre-take values (60/66) — reverseAdvancementEffects subtracts the
+    // stored hpDelta from current, mirroring the take side. Its old
+    // min-against-raw-max clamp instead left current at the restored max (66)
+    // here: a free 6-HP heal for a damaged character round-tripping a Con ASI,
+    // and destructive to feat/subclass headroom (#1123 write-seam fix).
     expect(removeAsi.after).toEqual({
       abilityScores: BASE_ABILITY,
-      hitPoints: { current: 66, max: 66, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+      hitPoints: { current: 60, max: 66, temp: 0, deathSaves: { successes: 0, failures: 0 } },
       initiativeBonus: 1,
       resources: EMPTY_RESOURCES,
     });

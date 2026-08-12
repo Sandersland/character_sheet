@@ -191,14 +191,38 @@ export interface DerivedFeature {
 export interface ClassExtras {
   /** How many picks the character may hold from a level-gated "choose N" cap at this level. */
   maneuverChoiceCount?: number;
-  /** DC an announced effect from that cap is rolled against: 8 + proficiency + max(Str, Dex) mod. */
-  maneuverSaveDC?: number;
+  /**
+   * A closed-form save DC a class/subclass row announces (#1589, renamed from
+   * the Fighter-specific `maneuverSaveDC`): 8 + proficiency + max of the
+   * row's `saveDcAbilities` modifiers — Battle Master maneuvers today, Cleric
+   * Turn Undead/Channel Divinity or a future Monk/Barbarian/Rogue retab
+   * tomorrow (deriveAnnouncedSaveDC, lib/srd/announced-save-dc.ts). Populated
+   * from EITHER a base-class row or an active subclass row (registry.ts's
+   * deriveRowExtras runs over both) — but stays a SINGLE scalar overlaid
+   * across every class entry (deriveEntryScopedResources), so two DIFFERENT
+   * entries each declaring one is a real collision, not two independent
+   * values. On the read path `assignAnnouncedSaveDC` degrades rather than
+   * throwing (logs a warning, keeps the primary/first-declaring entry's DC) so
+   * a content/homebrew misconfiguration never 500s serializeCharacter; a loud
+   * rejection is reserved for a future write/validation path. No production
+   * character can hit the collision today — see cleric-features.ts's own header
+   * for why Cleric deliberately still leaves `saveDcAbilities` unset despite
+   * this column now being reachable.
+   */
+  announcedSaveDC?: number;
   /**
    * Tool-proficiency choices granted by a subclass feature at this level.
    * Undefined when no subclass feature grants a tool choice — assignDefined
    * and entryContributesExtras both branch on exactly that.
    */
   toolProfChoiceCount?: number;
+  /**
+   * How many skills the character may hold Expertise in (double proficiency
+   * bonus) at this level (#1588) — Rogue/Bard/Ranger(2024)/Wizard(2024)
+   * grantor rows. Resolved the same way as maneuverChoiceCount/
+   * toolProfChoiceCount (derivedStatFromRows), never a second inline copy.
+   */
+  expertiseChoiceCount?: number;
 }
 
 export interface DerivedClassInfo extends ClassExtras {
@@ -269,11 +293,13 @@ export interface DerivedSubclassChoice {
  * replace one you know" (PHB'14 p.80, Way of the Four Elements' Disciple of
  * the Elements). `edition` last (subclassGateLevel's pattern, #1499) even
  * though only one source/edition pair currently answers "onLevelUp" — future
- * choose-N features (#1516) extend this function, never duplicate it. Gates
- * only the LEVEL-UP CEREMONY's own swap path (LevelUpSubmission.subclassChoicesForgotten);
- * the generic forgetSubclassChoice op on POST .../resources/transactions
- * stays unrestricted, same as every other choose-N feature's forget — #1516
- * is the tracked follow-up for a global choose-N forget policy.
+ * choose-N features extend this function, never duplicate it. This function
+ * only decides WHICH choices carry the swap privilege; #1516 is what makes
+ * the privilege exclusive — `forgetSubclassChoice` (resources.ts) now 400s
+ * unless the call site is a validated level-up step (ctx.allowChooseNForget),
+ * so a "never" catalogSource is unreachable end to end, and an "onLevelUp"
+ * one is reachable only through LevelUpSubmission.subclassChoicesForgotten,
+ * never the generic POST .../resources/transactions route.
  */
 export function subclassChoiceSwapCadence(catalogSource: string, edition: RulesEdition): "onLevelUp" | "never" {
   return catalogSource === "discipline" && edition === "EDITION_2014" ? "onLevelUp" : "never";

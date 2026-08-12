@@ -3,13 +3,19 @@
 import type { RulesEdition } from "@character-sheet/shared-types";
 
 import {
+  abilityModifier,
+  bothWeaponsLight,
   characterAdvancementSlots,
   characterFightingStyleFeatSlots,
+  fightingStyleGrantingClassNames,
+  deriveDeflectSpec,
   deriveImprovementBonuses,
   deriveImprovementProficiencies,
 } from "@/lib/srd/srd.js";
+import type { EffectSpec } from "@/lib/combat/effects.js";
 import { deriveEntryScopedResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
 import { featureRowsOf } from "@/lib/classes/feature-rows-select.js";
+import { draconicResilienceMaxHpTerm } from "@/lib/classes/draconic-bloodline.js";
 import type { DerivedFeature } from "@/lib/classes/types.js";
 import type { FeatImprovement } from "@/lib/classes/resources-state.js";
 import { deriveEntryScopedActions, type AvailableAction } from "@/lib/classes/actions.js";
@@ -26,19 +32,24 @@ export type PrimaryClass = CharacterWithRelations["classEntries"][number] | unde
 // Resources clamp-on-read: derive class/subclass pools + level-gated caps, then
 // layer stored `used` counts and known lists (clamped to caps). Returns the
 // resources view (undefined for classes with no pools) plus the raw
-// maneuverSaveDC number — serializeCharacter folds it into the top-level
-// `maneuvers` rider (#1316), so it isn't part of the resources payload.
-// Fighting Style is a feat now (#1137) — surfaced via top-level
-// fightingStyleSlots + advancements, not here. The choice-cap fields are
-// entry-scoped (#1177) via deriveEntryScopedResources — mirrors
-// loadResourcesReconcileState (level-reconciliation.ts) so both sides compute
-// the legal limit through the one shared rule function.
+// announcedSaveDC number (#1589, renamed from the Fighter-specific
+// maneuverSaveDC) — serializeCharacter folds it into the top-level `maneuvers`
+// rider (#1316), so it isn't part of the resources payload. Fighting Style is
+// a feat now (#1137) — surfaced via top-level fightingStyleSlots +
+// advancements, not here. The choice-cap fields are entry-scoped (#1177) via
+// deriveEntryScopedResources — mirrors loadResourcesReconcileState
+// (level-reconciliation.ts) so both sides compute the legal limit through the
+// one shared rule function.
 export function buildResourcesView(
   row: CharacterWithRelations,
   level: number,
   abilityScores: Record<string, number>,
   proficiencyBonus: number,
-): { resources: object | undefined; maneuverSaveDC: number | undefined; classFeatureImprovements: FeatImprovement[] } {
+): {
+  resources: ReturnType<typeof buildResourcesPayload> | undefined;
+  announcedSaveDC: number | undefined;
+  classFeatureImprovements: FeatImprovement[];
+} {
   // The ONE production caller that supplies real ClassFeature rows (#1524):
   // characterInclude loaded entry.class.features (already subclassId:null
   // filtered) and entry.subclassRef.features — featuresFromRows/poolsFromRows
@@ -64,7 +75,7 @@ export function buildResourcesView(
   // own per-entry loop); applyFeatLayer merges this with advancement-sourced
   // improvements through the shared deriveImprovementBonuses/
   // deriveImprovementProficiencies evaluator.
-  return { resources, maneuverSaveDC: derivedRes?.maneuverSaveDC, classFeatureImprovements: derivedRes?.improvements ?? [] };
+  return { resources, announcedSaveDC: derivedRes?.announcedSaveDC, classFeatureImprovements: derivedRes?.improvements ?? [] };
 }
 
 // #1272/#1374: DerivedFeature.edition is a server-side selector (which of a
@@ -81,10 +92,15 @@ export function toWireFeatures(
 // Assemble the wire `resources` payload from the derived caps + stored mutable
 // state, clamping each level-gated list to its derived count (defense-in-depth
 // for characters who haven't had a reconciling XP op since their level dropped).
+// No explicit return type (#1588 review): was a widened `object`, which forced
+// every downstream reader (buildSkillsView) into an `"x" in resources` guard +
+// an `as {...}` cast to reach a single field — inferring the literal return
+// shape here instead lets ReturnType<typeof buildResourcesPayload> (used by
+// buildResourcesView below) carry every field, incl. expertiseKnown, precisely.
 function buildResourcesPayload(
   derivedRes: DerivedClassInfo,
   stored: ReturnType<typeof normalizeResourcesMutable>,
-): object {
+) {
   const clampedManeuversKnown =
     derivedRes.maneuverChoiceCount !== undefined
       ? stored.maneuversKnown.slice(0, derivedRes.maneuverChoiceCount)
@@ -93,6 +109,17 @@ function buildResourcesPayload(
     derivedRes.toolProfChoiceCount !== undefined
       ? stored.toolProficienciesKnown.slice(0, derivedRes.toolProfChoiceCount)
       : stored.toolProficienciesKnown;
+  // #1588 (Opus review): deliberately NOT clampedToolProfsKnown's `!==
+  // undefined ? slice : full` shape — an undefined expertiseChoiceCount (no
+  // grantor class at all) clamps to ZERO here, matching applyLearnExpertiseOp's
+  // own undefined -> 0 treatment (resources.ts) so learn/clamp/reconcile all
+  // agree. toolProficienciesKnown/maneuversKnown stay on the permissive
+  // pattern (out of scope, pre-existing) — Expertise is the more exploitable
+  // case (four grantor classes) and reconcileExpertise (level-reconciliation.ts)
+  // already treats `derived?.expertiseChoiceCount ?? 0` as the allowed count,
+  // so this was already the reconciler's behavior; the clamp-on-read was the
+  // one site out of step with it.
+  const clampedExpertiseKnown = stored.expertiseKnown.slice(0, derivedRes.expertiseChoiceCount ?? 0);
   // Generic subclass "choose N" clamp-on-read (#899): keep only keys the derived
   // subclassChoices still grant, each capped to its count — defense-in-depth
   // mirroring reconcileSubclassChoices for characters not yet reconciled.
@@ -107,6 +134,7 @@ function buildResourcesPayload(
     features: toWireFeatures(derivedRes.features),
     maneuverChoiceCount: derivedRes.maneuverChoiceCount,
     toolProfChoiceCount: derivedRes.toolProfChoiceCount,
+    expertiseChoiceCount: derivedRes.expertiseChoiceCount,
     pools: derivedRes.resources.map((pool) => ({
       key: pool.key,
       label: pool.label,
@@ -121,6 +149,7 @@ function buildResourcesPayload(
       ? clampedManeuversKnown.map((m) => ({ ...m, effect: maneuverEffect }))
       : clampedManeuversKnown,
     toolProficienciesKnown: clampedToolProfsKnown,
+    expertiseKnown: clampedExpertiseKnown,
     // Generic subclass "choose N" surface (#899): the derived choices (key/label/
     // count/catalogSource) tell the level-up Choose-N step which pickers to render;
     // choicesKnown holds the (clamped) selections.
@@ -147,11 +176,22 @@ export function applyAdvancementClamp(
   usedSlots: number;
   fightingStyleSlotTotal: number;
   usedFightingStyleSlots: number;
+  fightingStyleGrantingClasses: string[];
 } {
   const storedForAdv = normalizeResourcesMutable(row.resources);
   const advSlotTotal = characterAdvancementSlots(row.classEntries, level);
+  const edition = editionOf(row);
   // Fighting Style feat cap across all class entries (#1137) — its own partition.
-  const fightingStyleSlotTotal = characterFightingStyleFeatSlots(row.classEntries, level);
+  // edition (#1148): Champion's Additional Fighting Style second slot forks 7
+  // (2024) vs 10 (2014).
+  const fightingStyleSlotTotal = characterFightingStyleFeatSlots(row.classEntries, level, edition);
+  // #1495: the class names that have actually EARNED the Fighting Style
+  // feature at this level — served so the picker/level-up ceremony ask the
+  // server which classes to pass to GET /api/feats?classes=/the takeFeat
+  // write path, rather than re-deriving the level threshold client-side
+  // (CLAUDE.md: rules logic is backend-owned). Same shared rule
+  // resolveCatalogFeat's own gate reads (advancement.ts).
+  const fightingStyleGrantingClasses = fightingStyleGrantingClassNames(row.classEntries, level, edition);
   let effectiveScores = row.abilityScores as Record<string, number>;
   let effectiveInitBonus = row.initiativeBonus;
   let effectiveHitPoints = hitPoints;
@@ -177,7 +217,17 @@ export function applyAdvancementClamp(
     effectiveInitBonus = reversed.initiativeBonus;
   }
 
-  return { effectiveScores, hitPoints: effectiveHitPoints, effectiveInitBonus, clampedAdvancements, advSlotTotal, usedSlots, fightingStyleSlotTotal, usedFightingStyleSlots };
+  return {
+    effectiveScores,
+    hitPoints: effectiveHitPoints,
+    effectiveInitBonus,
+    clampedAdvancements,
+    advSlotTotal,
+    usedSlots,
+    fightingStyleSlotTotal,
+    usedFightingStyleSlots,
+    fightingStyleGrantingClasses,
+  };
 }
 
 // Improvement modifier layer: sum structured improvements from the kept
@@ -209,6 +259,8 @@ export function applyFeatLayer(
   // so this needs both to route through effectiveMaxHitPoints (the composition
   // shared with buildHpOpContext/applyHealInTx — never a fourth inline copy).
   exhaustionLevel: number,
+  classEntries: CharacterWithRelations["classEntries"],
+  totalLevel: number,
   edition: RulesEdition,
 ): {
   featBonuses: ReturnType<typeof deriveImprovementBonuses>;
@@ -221,7 +273,15 @@ export function applyFeatLayer(
     ...speciesTraitImprovements,
   ];
   const featBonuses = deriveImprovementBonuses(improvements, hitDiceTotal);
-  const effectiveMaxHp = effectiveMaxHitPoints(maxHp, featBonuses.maxHp, exhaustionLevel, edition);
+  // #1123: the subclass term composes into the SAME effectiveMaxHitPoints call
+  // as the feat bonus — added to the base BEFORE exhaustion's tier-4 halving,
+  // never a second inline `+ subclassBonus` after the fact (see #1123's own
+  // composition-order acceptance case, mirroring #1321's decision 2).
+  // draconicResilienceMaxHpTerm is the ONE shared function this clamp-on-read,
+  // the write seam (effectiveMaxHitPointsForRow), and the reconciler
+  // (reconcileAdvancements) all resolve the subclass term through.
+  const subclassMaxHpBonus = draconicResilienceMaxHpTerm(classEntries, totalLevel, edition);
+  const effectiveMaxHp = effectiveMaxHitPoints(maxHp, featBonuses.maxHp + subclassMaxHpBonus, exhaustionLevel, edition);
   // Proficiency grants from feats + class feature rows (skills + saving
   // throws + armor + weapons). Merged with stored proficiencies by the
   // caller using OR — existing proficiency is never removed.
@@ -243,15 +303,91 @@ export function buildAvailableActionsView(
   // gates the Monk's Bonus Unarmed Strike (requiresUnarmored in DERIVED_ACTIONS).
   unarmoredUnshielded: boolean,
   edition: RulesEdition,
+  effectiveScores: Record<string, number>,
+  // Light flags of the currently-equipped weapons — the off-hand eligibility
+  // input (#1435), computed by the caller from the already-serialized inventory.
+  equippedWeaponLight: ReadonlyArray<{ light: boolean }>,
+  // Eldritch Knight Weapon Bond (#1854): count of `weaponBonded` inventory
+  // rows, ALREADY clamped by the caller through weaponBondEligible (the
+  // clamp-on-read half — a stale bonded flag on a disqualified character
+  // reads as 0 here until reconcileWeaponBond physically clears it). Folded
+  // into a synthetic "weaponBond" pool rather than a bespoke enablement path,
+  // reusing DERIVED_ACTIONS' existing resourceKey/resourceAmount gate.
+  bondedWeaponCount: number,
 ): AvailableAction[] {
-  const pools =
-    resources && "pools" in resources
+  const pools = [
+    ...(resources && "pools" in resources
       ? (resources as { pools: { key: string; remaining: number }[] }).pools
-      : [];
+      : []),
+    { key: "weaponBond", remaining: bondedWeaponCount },
+  ];
   // featureRowsOf (#1528 chunk 0): a Fighter entry's row-driven actions
   // (Second Wind/Action Surge) surface here through the SAME carrier
   // buildResourcesView passes for its pools/features.
-  return deriveEntryScopedActions(classEntries, level, pools, unarmoredUnshielded, edition, featureRowsOf);
+  const actions = deriveEntryScopedActions(classEntries, level, pools, unarmoredUnshielded, edition, featureRowsOf);
+  return [
+    ...withDeflectSpecs(actions, classEntries, level, effectiveScores, edition),
+    // Off-hand / Two-Weapon Fighting eligibility (#1435) — served for EVERY
+    // character (TWF is not class-gated), enabled only when both equipped
+    // weapons are Light (`bothWeaponsLight`; the Two-Weapon Fighting style
+    // grants off-hand DAMAGE only and never waives this, #1496/#1640, so no
+    // `hasOffHandAbilityDamage` clause here). Distinct from `offHandBusy` (a
+    // shield OR two weapons) — the distinction this row exists to make.
+    offHandActionRow(equippedWeaponLight),
+  ];
+}
+
+// The off-hand bonus-action eligibility row (#1435): `enabled` is the pure
+// two-Light-weapons rule; when disabled, the reason names that requirement
+// (the frontend's twfHint adds the concrete item-name suggestion on top).
+function offHandActionRow(equippedWeaponLight: ReadonlyArray<{ light: boolean }>): AvailableAction {
+  const enabled = bothWeaponsLight(equippedWeaponLight);
+  return {
+    key: "offHandAttack",
+    name: "Off-Hand Attack",
+    cost: "bonusAction",
+    enabled,
+    ...(enabled ? {} : { disabledReason: "Off-hand attack needs two Light weapons equipped." }),
+  };
+}
+
+// Attaches the resolved Deflect Attacks / Deflect Missiles roll specs (#1435)
+// onto the served rows via the #1381 `effect` field: the base row carries the
+// reduction spec, the redirect / throw-back row its own. Both resolve off the
+// Monk entry's effective level (`effectiveEntryLevel`) and the character's Dex
+// mod, via the ONE edition-forked `deriveDeflectSpec` rule. A no-op for a
+// non-Monk (no deflect row is present to annotate).
+function withDeflectSpecs(
+  actions: AvailableAction[],
+  classEntries: CharacterWithRelations["classEntries"],
+  level: number,
+  effectiveScores: Record<string, number>,
+  edition: RulesEdition,
+): AvailableAction[] {
+  const monkEntry = classEntries.find((e) => e.name?.toLowerCase() === "monk");
+  if (!monkEntry) return actions;
+  const monkLevel = effectiveEntryLevel(monkEntry.level, classEntries.length, level);
+  const dexMod = abilityModifier(effectiveScores.dexterity ?? 10);
+  const { reduction, redirect } = deriveDeflectSpec(monkLevel, dexMod, edition);
+  return actions.map((a) => {
+    if (a.key === "deflectAttacks" || a.key === "deflectMissiles") {
+      return { ...a, effect: rollAsEffect(reduction, "utility") };
+    }
+    if (a.key === "deflectAttacksRedirect" || a.key === "deflectMissilesThrow") {
+      return { ...a, effect: rollAsEffect(redirect, "damage") };
+    }
+    return a;
+  });
+}
+
+// Wrap a resolved roll as a minimal EffectSpec — the same "utility kind carries
+// dice" shape a maneuver's served effect uses (deriveManeuverEffect), so the
+// frontend reads `action.effect.dice` verbatim as its RollSpec.
+function rollAsEffect(
+  dice: { count: number; faces: number; modifier: number },
+  effectType: EffectSpec["effectType"],
+): EffectSpec {
+  return { effectType, dice, scaling: { mode: "none" } };
 }
 
 // Structured, multiclass-aware view alongside the flattened class/subclass.

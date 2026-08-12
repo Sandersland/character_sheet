@@ -226,6 +226,14 @@ enum RulesEdition {
   EDITION_2024
 }
 
+// Domain for Subclass.casterFraction (#1531) — see that column's own comment
+// for why this is an enum rather than a plain string. Single member today:
+// only a third-caster subclass (Eldritch Knight / Arcane Trickster) grants
+// spellcasting of its own in 5e.
+enum SubclassCasterFraction {
+  third
+}
+
 model CampaignMembership {
   id         String       @id @default(uuid())
   campaignId String
@@ -658,6 +666,28 @@ model Subclass {
   // NULLS NOT DISTINCT on the migration's unique index — see resolveEditionRow,
   // the single place the exact/NULL fallback ordering is expressed.
   edition     RulesEdition?
+  // Third-caster identity (#1531): NULL for every subclass that grants no
+  // spellcasting of its own (the vast majority — Champion, Battle Master, …).
+  // "third" for Eldritch Knight / Arcane Trickster today. A Prisma enum
+  // (review finding 1), not a plain string like SubclassGrantedSpell.
+  // castingAbility below: THIS column feeds thirdCasterAbilityOf's
+  // `!== "third"` gate directly, so an unrecognized value must be a compile
+  // error at every call site, not a silently-false runtime comparison — the
+  // same failure shape #1339 already taught this codebase to close at
+  // compile time, just for a value instead of a name. Extend the enum (never
+  // add a second column) if a half/full-caster subclass ever needs one.
+  // Replaces the retired THIRD_CASTER_SUBCLASSES name-keyed lookup
+  // (spellcasting-tables.ts) — a renamed or homebrew subclass now carries its
+  // own mechanics on this row instead of matching a display name.
+  casterFraction       SubclassCasterFraction?
+  // Governing ability for this subclass's granted spellcasting ("intelligence"
+  // for EK/AT) — NULL alongside casterFraction for a non-caster subclass.
+  // Plain string (unlike casterFraction): the value space is 5e's six ability
+  // names, already used loosely as strings everywhere in this codebase
+  // (SPELLCASTING_ABILITY, SubclassGrantedSpell.castingAbility above) — no
+  // single call site branches on it the way thirdCasterAbilityOf branches on
+  // casterFraction, so there's no compile-time gate to buy with an enum here.
+  spellcastingAbility  String?
 
   selections          CharacterClassEntry[]
   grantedSpells       SubclassGrantedSpell[]
@@ -843,22 +873,25 @@ model ClassFeature {
   derivedStat      String?
   derivedStatTiers Json? // [{ minLevel, value }] — ASCENDING by minLevel, last-match-wins
 
-  // A closed-form save DC a subclass announces from the abilities named here
-  // (#1546): 8 + proficiency bonus + the higher of these abilities' modifiers
-  // (Battle Master maneuvers, PHB'14 p.73 / PHB'24 p.83). Genuinely generic in
-  // FORMULA — Monk's focus DC, Cleric's turn DC, Barbarian's frighten DC and
-  // Rogue's assassin DC are the same closed form hardcoded into class TS
-  // strings today — not a Fighter special case, but NOT YET a live path for
-  // any of them: deriveAnnouncedSaveDC (registry.ts's deriveRowExtras) is
-  // only ever called with subclassRows, gated on the subclass being active —
-  // a BASE-CLASS row (subclassId: null, e.g. Cleric's Turn Undead/Channel
-  // Divinity) populating this column would be read by nothing. Only Combat
-  // Superiority (a SUBCLASS row) is a genuinely live consumer today (#1225
-  // research, cleric-features.ts's own RESOURCE POOL header block) — every
-  // other class's DC stays prose in its row's own `description` until
-  // deriveAnnouncedSaveDC is generalised to base-class rows and
-  // ClassExtras.maneuverSaveDC is renamed to something non-Fighter-specific
-  // (#1589). Deliberately NOT layered
+  // A closed-form save DC a class/subclass row announces from the abilities
+  // named here (#1546): 8 + proficiency bonus + the higher of these
+  // abilities' modifiers (Battle Master maneuvers, PHB'14 p.73 / PHB'24
+  // p.83). Genuinely generic in FORMULA — Monk's focus DC, Cleric's turn DC,
+  // Barbarian's frighten DC and Rogue's assassin DC are the same closed form
+  // hardcoded into class TS strings today — not a Fighter special case, and
+  // (#1589) now a genuinely live path for a BASE-CLASS row too: registry.ts's
+  // deriveRowExtras runs over both classRows (unconditional) and an active
+  // subclass's subclassRows, feeding ClassExtras.announcedSaveDC (renamed
+  // from the Fighter-specific `maneuverSaveDC`). Still only Combat Superiority
+  // (a SUBCLASS row) actually sets this column in production — Cleric's Turn
+  // Undead/Channel Divinity deliberately still don't (cleric-features.ts's own
+  // header): `announcedSaveDC` stays a SINGLE scalar overlaid across every
+  // class entry (deriveEntryScopedResources), so two entries each declaring
+  // one is a real collision — registry.ts's overlay throws on it rather than
+  // silently letting one clobber the other, and Cleric already serves its own
+  // DC through a fully independent, already-correct path
+  // (channelDivinitySaveDC, lib/classes/channel-divinity.ts) with no need to
+  // risk that collision for zero consumer benefit. Deliberately NOT layered
   // onto derivedStat/derivedStatTiers: the DC is per-character ability math,
   // not a level tier, and Combat Superiority's own derivedStat slot is
   // already claimed by maneuverChoiceCount's tiers on the SAME row — one
@@ -901,6 +934,30 @@ model ClassFeature {
   // "acUnarmoredBase" -> clearOn ["equipBodyArmor"], set at cast time via
   // BUFF_TARGET_CLEAR_ON).
   effectBuffs Json?
+
+  // Condition keys this feature grants immunity to, once its own level/
+  // edition gate is met (#1121) — read together with the two columns below.
+  // A plain String[] (mirrors saveDcAbilities), not nested in effectBuffs:
+  // Beguiling Defenses/Nature's Ward are UNCONDITIONAL (no gating buff), so
+  // forcing them through the buff-only effectBuffs list would need a fake
+  // always-active buff for a feature the player never toggles.
+  conditionImmunities String[] @default([])
+  // Gates `conditionImmunities` on a buff of this key currently being active
+  // (#1121) — e.g. Mindless Rage names "rage" (the Barbarian base-class Rage
+  // row's own effectBuffs key), so the immunity applies only while raging.
+  // Absent/null = unconditional (Beguiling Defenses, Nature's Ward).
+  conditionImmunitiesRequireActiveBuff String?
+  // What happens to an EXISTING matching condition when the gating buff above
+  // STARTS (#1121, PHB'14 p.49 / SRD 5.2): "clear" permanently removes it
+  // (2024 Mindless Rage — entering Rage ends Charmed/Frightened outright);
+  // "suspend" removes it but restores it when the gating buff ENDS (2014
+  // Mindless Rage — the condition is suspended, not cured, for the rage's
+  // duration). Meaningless without conditionImmunitiesRequireActiveBuff;
+  // applyRowDrivenActionInTx's toggle branch (routes/character/actions.ts) is
+  // the one place this vocabulary is interpreted, alongside
+  // conditionImmunitiesFromRows (lib/classes/class-feature-rows.ts) for the
+  // read-time immune SET itself.
+  conditionImmunitiesOnBuffStart String?
 
   // NULLS NOT DISTINCT is hand-written in the migration (Prisma's DSL cannot
   // express it) — subclassId is nullable and base-class features are the
@@ -1559,6 +1616,16 @@ model Feat {
   // name are still rejected — see resolveEditionRow, the single place the
   // exact/NULL fallback ordering is expressed.
   edition           RulesEdition?
+  // Class-name scope (#1495): [] = any class with the feature may take this
+  // feat (2024's Fighting Style feats, and every non-fighting_style feat).
+  // Non-empty restricts it to those classes, matched case-insensitively —
+  // PHB'14's per-class Fighting Style subset (Fighter all six; Paladin
+  // Defense/Dueling/Great Weapon Fighting/Protection; Ranger
+  // Archery/Defense/Dueling/Two-Weapon Fighting). Read through
+  // fightingStyleFeatOfferedForClasses (lib/srd/feats.ts), the one
+  // edition-parameterized rule function — never a second column and never
+  // `=== "EDITION_…"` (subclassGateLevel precedent, #1527).
+  classes           String[]      @default([])
 
   // Backgrounds that grant this feat as their Origin feat (PHB'24).
   originForBackgrounds Background[]
@@ -2046,6 +2113,14 @@ model InventoryItem {
   requiresAttunement    Boolean               @default(false)
   attunementPrereqKind  AttunementPrereqKind?
   attunementPrereqValue String?
+  // Eldritch Knight Weapon Bond (2014, PHB'14 p.75, #1854): persisted boolean,
+  // mirrors `attuned` — the WEAPON_BOND_LIMIT-item cap (lib/classes/weapon-bond.ts)
+  // is DERIVED (counted), never stored. bond/unbond go through
+  // POST …/abilities/weapon-bond/transactions, never PATCH. Item removal
+  // self-reconciles (the flag lives ON the row, so a deleted row needs no
+  // separate cleanup); a character no longer eligible (level-down, lost
+  // subclass) is handled by reconcileWeaponBond (level-reconciliation.ts).
+  weaponBonded          Boolean               @default(false)
   notes                 String?
   position              Int                   @default(0)
   // Uses spent on an activatedEffect capability since its last recharge (#543).
@@ -2188,6 +2263,10 @@ enum CharacterEventType {
   learnToolProficiency
   forgetToolProficiency
   toolProficienciesReconciled
+  // Expertise (#1588): choose/undo a skill's double proficiency bonus.
+  learnExpertise
+  forgetExpertise
+  expertiseReconciled
   learnSubclassChoice
   forgetSubclassChoice
   subclassChoicesReconciled
@@ -2203,6 +2282,9 @@ enum CharacterEventType {
   // inventory attunement (#545)
   attuned
   unattuned
+  // Eldritch Knight Weapon Bond (2014, #1854)
+  weaponBonded
+  weaponUnbonded
   // inventory activated effects (#543)
   activated
   deactivated
@@ -2214,6 +2296,12 @@ enum CharacterEventType {
   combatStarted
   combatEnded
   combatRoundAdvanced
+  // combat action resolution (#1829, epic #1827) — one undoable event per
+  // resolved weapon swing / spell cast, carrying its rolls in `data`
+  // (replaces the separate attackRoll/damageRoll/castSpell rows a resolution
+  // used to write; those event types stay for the standalone roll-log paths
+  // until the adapter slices #1832/#1833 retire them).
+  resolveAction
   // conditions
   conditionApplied
   conditionRemoved
@@ -2324,9 +2412,37 @@ model SessionParticipant {
   joinedAt    DateTime  @default(now())
   leftAt      DateTime?
   summary     Json?
+  // Per-turn spell-cast kind (#1439) — the SECOND deliberate DERIVE-DON'T-PERSIST
+  // EXCEPTION, alongside Session.combatActive/round (#1030). The 5e bonus-action
+  // spellcasting interlock (a leveled spell cast with your Action blocks a
+  // bonus-action spell; a leveled bonus-action spell limits the Action to
+  // cantrips) is a function of the TURN, not the character, so it cannot be
+  // derived from any character column. It is shared state two clients viewing
+  // this participant must agree on and that must survive a reload — which a
+  // client-only reducer cannot provide (the reason this became server state,
+  // #1439). Per-participant, not on Session: a shared field would let one PC's
+  // cast wrongly block another's. Recorded when a spell resolves (resolveAction),
+  // reset to null at every turn boundary (startCombat/endCombat/advanceCombatRound).
+  // Null = nothing of that economy kind cast this turn. The resolved interlock
+  // flags are computed from these via the one shared rule fn (spellEconomyRestrictions).
+  spellCastAsAction SpellCastKind?
+  spellCastAsBonus  SpellCastKind?
+  // Bumped on every cast-record/reset above so the combat-state payload's
+  // `updatedAt` (max of this and Session.updatedAt) advances on a
+  // participant-only change, keeping the client's monotonic sync guard correct
+  // for the interlock flags, not just for round (#1439).
+  updatedAt   DateTime  @updatedAt @default(now())
 
   @@unique([sessionId, characterId])
   @@index([sessionId])
+}
+
+// Whether the spell cast in a given economy slot this turn was a cantrip or a
+// leveled spell — the raw per-turn record behind the 5e bonus-action interlock
+// (#1439). Mirrors the client's SpellCastKind union.
+enum SpellCastKind {
+  cantrip
+  leveled
 }
 
 // kind distinguishes the two capture surfaces sharing this table: full ENTRY

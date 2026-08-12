@@ -12,7 +12,7 @@ import { useTallyResolve } from "@/features/session/useTallyResolve";
 import type { AttackTallyRow } from "@/lib/attackTallySummary";
 import type { Character } from "@/types/character";
 
-vi.mock("@/api/client", () => ({ logRoll: vi.fn().mockResolvedValue(undefined) }));
+vi.mock("@/api/client", () => ({ logRollAction: vi.fn().mockResolvedValue(undefined) }));
 
 function makeCharacter(overrides: Partial<Character> = {}): Character {
   return {
@@ -58,7 +58,6 @@ function setup(character: Character) {
     () =>
       useTallyResolve({
         character,
-        sessionId: "s1",
         setTallyVerdict: vi.fn(),
         setTallyDamageAt: vi.fn(),
         onLogChanged: vi.fn(),
@@ -70,7 +69,7 @@ function setup(character: Character) {
 
 describe("useTallyResolve.rollDamageFor — #1354 swingId correlation", () => {
   it("logs the damage roll carrying the row's own swingId", async () => {
-    const { logRoll } = await import("@/api/client");
+    const { logRollAction } = await import("@/api/client");
     const character = makeCharacter();
     const row: AttackTallyRow = {
       id: "row-1",
@@ -84,8 +83,8 @@ describe("useTallyResolve.rollDamageFor — #1354 swingId correlation", () => {
     const result = setup(character);
     result.current.rollDamageFor(0, row);
 
-    expect(logRoll).toHaveBeenCalledTimes(1);
-    const payload = vi.mocked(logRoll).mock.calls[0][2];
+    expect(logRollAction).toHaveBeenCalledTimes(1);
+    const payload = vi.mocked(logRollAction).mock.calls[0][1];
     expect(payload.swingId).toBe("swing-abc");
   });
 });

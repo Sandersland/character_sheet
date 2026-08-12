@@ -170,6 +170,66 @@ describe("NewSpellsStep", () => {
   });
 });
 
+// #1826: an EMPTY eligible list (a resolver bug, e.g. the Eldritch Knight
+// case) must read as distinctly different from a search that just matched
+// nothing — the latter is normal, the former blocks the ceremony silently.
+describe("NewSpellsStep — empty eligible list vs. search miss (#1826)", () => {
+  it("shows a misconfiguration message when the served spell list has no eligible spells", async () => {
+    // spellLists: ["druid"] — none of the CATALOG entries are on the druid list.
+    render(
+      <Harness
+        step={newSpellsStep(2, { maxSpellLevel: 2, spellLists: ["druid"], cantripLists: ["wizard"] })}
+        character={caster()}
+      />,
+    );
+    expect(await screen.findByText(/no spells are available to choose here/i)).toBeInTheDocument();
+    expect(screen.getByText(/configuration problem/i)).toBeInTheDocument();
+    expect(screen.queryByText("No spells match your filter.")).not.toBeInTheDocument();
+  });
+
+  it("still shows the ordinary search-miss copy when a NON-empty eligible list is searched to zero", async () => {
+    const user = userEvent.setup();
+    render(<Harness step={newSpellsStep()} character={caster()} />);
+    await screen.findByText("Shield");
+    await user.type(screen.getByLabelText("Search spells"), "zzzznomatch");
+
+    expect(await screen.findByText("No spells match your filter.")).toBeInTheDocument();
+    expect(screen.queryByText(/configuration problem/i)).not.toBeInTheDocument();
+  });
+
+  it("shows the misconfiguration message for a required cantrip pick with an empty eligible list", async () => {
+    // cantripLists: ["druid"] — Firebolt is wizard-only, so no eligible cantrips.
+    render(
+      <Harness
+        step={newSpellsStep(1, { maxSpellLevel: 2, spellLists: ["wizard"], cantrips: 1, cantripLists: ["druid"] })}
+        character={caster()}
+      />,
+    );
+    expect(await screen.findByText(/Choose 1 cantrip/)).toBeInTheDocument();
+    expect(await screen.findByText(/no spells are available to choose here/i)).toBeInTheDocument();
+  });
+
+  it("still shows the ordinary search-miss copy for a non-empty cantrip list searched to zero", async () => {
+    const user = userEvent.setup();
+    render(<Harness step={newSpellsStep(1, { maxSpellLevel: 2, spellLists: ["wizard"], cantrips: 1, cantripLists: ["wizard"] })} character={caster()} />);
+    await screen.findByRole("button", { name: "Add Firebolt" });
+    await user.type(screen.getByLabelText("Search cantrips"), "zzzznomatch");
+
+    expect(await screen.findByText("No spells match your filter.")).toBeInTheDocument();
+    expect(screen.queryByText(/configuration problem/i)).not.toBeInTheDocument();
+  });
+
+  // A level granting BOTH cantrips and leveled spells drives both sections from
+  // the one useSpellCatalog fetch; a fetch failure must render the shared error
+  // ONCE (SpellFetchStatus at the step level), not once per section.
+  it("renders the shared fetch error once on a level with both cantrips and leveled spells", async () => {
+    fetchMock.mockRejectedValue(new Error("boom"));
+    render(<Harness step={newSpellsStep(2, { maxSpellLevel: 2, spellLists: ["wizard"], cantrips: 1, cantripLists: ["wizard"] })} character={caster()} />);
+    expect(await screen.findByText("Couldn't load spell catalog.")).toBeInTheDocument();
+    expect(screen.getAllByText("Couldn't load spell catalog.")).toHaveLength(1);
+  });
+});
+
 describe("NewSpellsStep — cantrip picks (#1131)", () => {
   it("shows a cantrip section alongside the leveled picker and records a cantrip pick", async () => {
     const user = userEvent.setup();
@@ -316,5 +376,72 @@ describe("NewSpellsStep — swap selection (#1101)", () => {
 
     expect(await screen.findByText(/Choose 1 \(swap replacement\)/)).toBeInTheDocument();
     expect(screen.queryByText(/0 \+ 1 swap/)).not.toBeInTheDocument();
+  });
+});
+
+// #1855: Eldritch Knight (2014) leveled-spell school gate — this is a DISPLAY
+// filter over the served spellSchools/freeSchoolPicks; the hard enforcement is
+// assertSpellSchoolEligibility on the transaction endpoint. School-varied
+// catalog, distinct from the shared CATALOG (which is all-evocation).
+const SCHOOL_CATALOG: CatalogSpell[] = [
+  spell("MageArmor", 1, ["wizard"]),
+  { ...spell("DetectMagic", 1, ["wizard"]), school: "divination" },
+  { ...spell("CharmPerson", 1, ["wizard"]), school: "enchantment" },
+];
+
+function ekStep(freeSchoolPicks = 0, count = 2): LevelUpStep {
+  return newSpellsStep(count, {
+    maxSpellLevel: 2, spellLists: ["wizard"], cantripLists: ["wizard"],
+    spellSchools: ["abjuration", "evocation"], ...(freeSchoolPicks ? { freeSchoolPicks } : {}),
+  });
+}
+
+describe("NewSpellsStep — Eldritch Knight (2014) spell-school gate (#1855)", () => {
+  it("renders the school-gate note naming the restricted schools", async () => {
+    fetchMock.mockResolvedValueOnce(SCHOOL_CATALOG);
+    render(<Harness step={ekStep()} character={caster()} />);
+    expect(await screen.findByText(/Eldritch Knight/)).toBeInTheDocument();
+    expect(screen.getByText(/Abjuration or Evocation/)).toBeInTheDocument();
+  });
+
+  it("with NO free pick, an off-school spell is disabled and an on-school spell is pickable", async () => {
+    fetchMock.mockResolvedValueOnce(SCHOOL_CATALOG);
+    render(<Harness step={ekStep(0)} character={caster()} />);
+    expect(await screen.findByRole("button", { name: "Add MageArmor" })).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: "Add DetectMagic" })).toBeDisabled();
+  });
+
+  it("with ONE free pick, an off-school spell is selectable — and using it disables further off-school picks", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValueOnce(SCHOOL_CATALOG);
+    render(<Harness step={ekStep(1, 2)} character={caster()} />);
+    const detectMagic = await screen.findByRole("button", { name: "Add DetectMagic" });
+    expect(detectMagic).not.toBeDisabled();
+
+    await user.click(detectMagic);
+
+    // The free-school budget (1) is spent — a SECOND off-school spell disables,
+    // even though the overall cap (2) isn't reached yet.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Add CharmPerson" })).toBeDisabled());
+    // The on-school spell stays pickable — only the school gate, not the cap, moved.
+    expect(screen.getByRole("button", { name: "Add MageArmor" })).not.toBeDisabled();
+  });
+
+  it("cantrips are never school-gated even when every leveled pick is restricted", async () => {
+    const cantripCatalog: CatalogSpell[] = [
+      ...SCHOOL_CATALOG,
+      { ...spell("MageHand", 0, ["wizard"]), school: "conjuration" },
+    ];
+    fetchMock.mockResolvedValueOnce(cantripCatalog);
+    render(
+      <Harness
+        step={newSpellsStep(1, {
+          maxSpellLevel: 2, spellLists: ["wizard"], cantripLists: ["wizard"], cantrips: 1,
+          spellSchools: ["abjuration", "evocation"],
+        })}
+        character={caster()}
+      />,
+    );
+    expect(await screen.findByRole("button", { name: "Add MageHand" })).not.toBeDisabled();
   });
 });

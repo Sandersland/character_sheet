@@ -1,3 +1,7 @@
+// #1516: no forget affordance here — a maneuver replacement is bound to
+// learn-time (PHB'14 Battle Master p.73 / SRD 5.2 equivalent) and only
+// reachable through the level-up ceremony's own "maneuvers" step, which
+// serves its own canSwap entitlement; the sheet never renders one.
 import type { CharacterResources, LearnManeuverOperation } from "@/types/character";
 import AddManeuverPanel from "@/features/class/AddManeuverPanel";
 import ManeuverRow from "@/features/class/ManeuverRow";
@@ -9,7 +13,6 @@ interface Props {
   maneuverKnownIds: string[];
   busy: boolean;
   onLearn: (op: LearnManeuverOperation) => void;
-  onForget: (entryId: string) => void;
 }
 
 export default function ManeuversSection({
@@ -18,7 +21,6 @@ export default function ManeuversSection({
   maneuverKnownIds,
   busy,
   onLearn,
-  onForget,
 }: Props) {
   return (
     <div>
@@ -41,7 +43,7 @@ export default function ManeuversSection({
       ) : (
         <ul className="mb-3 divide-y divide-parchment-200">
           {resources.maneuversKnown.map((entry) => (
-            <ManeuverRow key={entry.id} entry={entry} busy={busy} onForget={onForget} />
+            <ManeuverRow key={entry.id} entry={entry} />
           ))}
         </ul>
       )}

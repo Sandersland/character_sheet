@@ -152,8 +152,7 @@ export function deriveOffHandDamage<T extends OffHandDamageInput>(
  * wielding a weapon that has the Light property in each hand"). The editions
  * agree, so this takes no `edition` parameter (#1640).
  *
- * Mirrors the frontend's `canTwoWeaponFight` (turnRules.ts, post-#1496) —
- * both weapons of the pair, not just one, must be Light. There are never more
+ * BOTH weapons of the pair, not just one, must be Light. There are never more
  * than two equipped weapons (weapon placement is MAIN_HAND/OFF_HAND only), so
  * `every` over the full array is exactly the two-weapon check.
  */

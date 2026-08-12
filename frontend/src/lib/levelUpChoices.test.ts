@@ -77,7 +77,7 @@ describe("CHOICE_KIND_CONFIGS", () => {
     });
 
     it("loads only the catalog's fighting_style feats", async () => {
-      const opts = await cfg.loadOptions({ targetLevel: 1, edition: "EDITION_2024" });
+      const opts = await cfg.loadOptions({ targetLevel: 1, edition: "EDITION_2024", classNames: ["Fighter"] });
       expect(opts).toEqual([
         { id: "archery", name: "Archery", description: "arch" },
         { id: "defense", name: "Defense", description: "def" },
@@ -88,8 +88,16 @@ describe("CHOICE_KIND_CONFIGS", () => {
     // wire — the mock ignores its argument — and the picker silently offers the
     // other edition's styles (#1411).
     it("passes the context edition through to fetchFeats", async () => {
-      await cfg.loadOptions({ targetLevel: 1, edition: "EDITION_2014" });
-      expect(vi.mocked(fetchFeats)).toHaveBeenCalledWith("EDITION_2014");
+      await cfg.loadOptions({ targetLevel: 1, edition: "EDITION_2014", classNames: ["Ranger"] });
+      expect(vi.mocked(fetchFeats)).toHaveBeenCalledWith("EDITION_2014", undefined, ["Ranger"]);
+    });
+
+    // #1495: the server, not this hook, decides which styles a class offers
+    // (fightingStyleFeatOfferedForClasses) — this config's only job is to
+    // forward the context's class-name scope, unfiltered on its end.
+    it("forwards the context's classNames through to fetchFeats, for the class gate", async () => {
+      await cfg.loadOptions({ targetLevel: 1, edition: "EDITION_2014", classNames: ["Fighter", "Paladin"] });
+      expect(vi.mocked(fetchFeats)).toHaveBeenCalledWith("EDITION_2014", undefined, ["Fighter", "Paladin"]);
     });
 
     it("writes a slot:fightingStyle takeFeat op and replaces on re-pick", () => {
@@ -141,6 +149,40 @@ describe("CHOICE_KIND_CONFIGS", () => {
         toolProficienciesKnown: [{ id: "t1", name: "Smith's Tools" }],
       } as Character["resources"]);
       expect([...cfg.fromCharacter(character)]).toEqual(["Smith's Tools"]);
+    });
+  });
+
+  describe("expertise", () => {
+    const cfg = CHOICE_KIND_CONFIGS.expertise!;
+
+    // #1588: unlike maneuvers/toolProficiency (own catalog fetch), the option
+    // list IS the character's proficient skills — no server round-trip.
+    it("options are the context's proficientSkills, no catalog fetch", async () => {
+      const proficientSkills = [{ id: "stealth", name: "Stealth" }, { id: "perception", name: "Perception" }];
+      expect(await cfg.loadOptions({ targetLevel: 1, edition: "EDITION_2014", proficientSkills })).toEqual(proficientSkills);
+      expect(fetchManeuvers).not.toHaveBeenCalled();
+    });
+
+    it("defaults to no options when proficientSkills is absent from the context", async () => {
+      expect(await cfg.loadOptions({ targetLevel: 1, edition: "EDITION_2014" })).toEqual([]);
+    });
+
+    it("round-trips select → selected as learnExpertise ops", () => {
+      const patch = cfg.select(baseDraft, ["stealth", "perception"]);
+      expect(patch).toEqual({
+        expertise: [
+          { type: "learnExpertise", skill: "stealth" },
+          { type: "learnExpertise", skill: "perception" },
+        ],
+      });
+      expect(cfg.selected(patch as LevelUpDraft)).toEqual(["stealth", "perception"]);
+    });
+
+    it("fromCharacter reads already-chosen expertise skills", () => {
+      const character = characterWith({
+        expertiseKnown: [{ id: "e1", skill: "stealth" }],
+      } as Character["resources"]);
+      expect([...cfg.fromCharacter(character)]).toEqual(["stealth"]);
     });
   });
 

@@ -7,17 +7,21 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 import { deriveResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
 import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "@/lib/classes/class-feature-rows.js";
 import { subclassChoiceSwapCadence } from "@/lib/classes/types.js";
+import { isEldritchKnightSlug, resolveSubclassSlug } from "@/lib/classes/subclass-slug.js";
 import { effectiveMaxHitPoints, fixedAverageForDie, levelUpHpGain } from "@/lib/combat/hitpoints.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 import { abilityModifier, advancementSlotsForLevel, fightingStyleFeatSlots, hitDieFace } from "@/lib/srd/srd.js";
 import {
   bardMagicalSecretsAt,
   casterModelFor,
+  eldritchKnightSpellSchoolGate,
   levelUpCantripPicks,
   levelUpSpellPicks,
-  magicalSecretsSpellLists,
   maxSpellLevelForClass,
+  spellListsFor,
   swapCadenceFor,
+  type SpellSchoolGate,
+  type SubclassCasterRef,
 } from "@/lib/srd/spellcasting-tables.js";
 
 export type LevelUpStepKind =
@@ -27,6 +31,7 @@ export type LevelUpStepKind =
   | "maneuvers"
   | "fightingStyleFeat"
   | "toolProficiency"
+  | "expertise"
   | "subclassChoice"
   | "newSpells"
   | "review";
@@ -59,7 +64,7 @@ export interface LevelUpPlanCharacter {
   // all-zero default (hitPointsStep) — matches extraAsiLevels/subclassLevel's
   // own optional-with-fallback pattern above — so the many existing plan
   // fixtures that never touch exhaustion don't need updating.
-  hpBaseline?: { rawMax: number; featMaxHpBonus: number; exhaustionLevel: number };
+  hpBaseline?: { rawMax: number; maxHpBonus: number; exhaustionLevel: number };
 }
 
 // The class entry AFTER this level-up. subclassLevel is passed in ALREADY
@@ -71,6 +76,24 @@ export interface LevelUpPlanCharacter {
 export interface TargetClassEntry {
   name: string;
   subclass?: string | null;
+  // #1148 review finding: the FK identity resolveSubclassSlug prefers over
+  // the (drift-prone) `subclass` display name — resolveLevelUpContext
+  // resolves this from the PERSISTED entry's subclassRef (mirroring
+  // persistedSubclassId's own comment), `null` when no subclass is chosen
+  // yet or the target is a brand-new entry. Without this field,
+  // fightingStyleFeatStep's resolveSubclassSlug call had no FK path at all —
+  // only the exact-name fallback, silently missing a Champion whose
+  // CharacterClassEntry.name or .subclass text had drifted from the catalog.
+  subclassRef?: { slug: string } | null;
+  // #1531: the same PERSISTED (or re-plan PICKED, mirroring subclassRef's own
+  // comment) subclass's casterFraction/spellcastingAbility — the caller
+  // resolves this from the Subclass row alongside subclassRef.slug, since a
+  // pure planner has no DB relation to read it from itself. Every third-caster
+  // check below (newSpells' levelUpSpellPicks/swapCadenceFor/
+  // maxSpellLevelForClass/spellListsFor/casterModelFor) reads THIS field, never
+  // `subclass`/`subclassRef.slug` — replaces the retired THIRD_CASTER_SUBCLASSES
+  // name-keyed lookup (spellcasting-tables.ts).
+  subclassCasterRef?: SubclassCasterRef | null;
   newLevel: number;
   subclassLevel?: number;
   // The hit die THIS level-up rolls, already resolved through advancingHitDie by
@@ -118,12 +141,12 @@ interface PlanContext {
   abilityScores: Record<string, number>;
   now: DerivedClassInfo | null;
   prev: DerivedClassInfo | null;
-  // Threaded to newSpellsStep's magicalSecretsSpellLists call — Magical Secrets
-  // resolves differently per edition (#1440).
+  // Threaded to newSpellsStep's spellListsFor call — Magical Secrets resolves
+  // differently per edition (#1440).
   edition: RulesEdition;
   // hitPointsStep's effective-max preview inputs — see
   // LevelUpPlanCharacter.hpBaseline's own comment.
-  hpBaseline?: { rawMax: number; featMaxHpBonus: number; exhaustionLevel: number };
+  hpBaseline?: { rawMax: number; maxHpBonus: number; exhaustionLevel: number };
 }
 
 // deriveResources at a given per-class level, holding the target subclass fixed.
@@ -138,7 +161,8 @@ function derivedAt(
   // subclassFeatureRows, resolved by the caller — see TargetClassEntry's own
   // comment), replacing the `undefined` this call passed before. #1546 Part
   // B-ii is what makes it load-bearing: Battle Master's maneuverChoiceCount/
-  // toolProfChoiceCount/maneuverSaveDC moved OFF SubclassDefinition.deriveExtras
+  // toolProfChoiceCount/announcedSaveDC (#1589, renamed from maneuverSaveDC)
+  // moved OFF SubclassDefinition.deriveExtras
   // (code) onto these rows (registry.ts's deriveRowExtras), so choiceCountStep
   // below now genuinely diffs row-driven counts, not a coincidental `?? 0` over
   // two absent code-authored values. That also opens a null-flip channel this
@@ -198,9 +222,9 @@ function derivedAt(
 function hitPointsStep({ target, abilityScores, hpBaseline, edition }: PlanContext): LevelUpStep {
   const faces = hitDieFace(target.hitDie);
   const conMod = abilityModifier(abilityScores.constitution ?? 10);
-  const baseline = hpBaseline ?? { rawMax: 0, featMaxHpBonus: 0, exhaustionLevel: 0 };
+  const baseline = hpBaseline ?? { rawMax: 0, maxHpBonus: 0, exhaustionLevel: 0 };
   const effectiveMaxForGain = (gain: number) =>
-    effectiveMaxHitPoints(baseline.rawMax + gain, baseline.featMaxHpBonus, baseline.exhaustionLevel, edition);
+    effectiveMaxHitPoints(baseline.rawMax + gain, baseline.maxHpBonus, baseline.exhaustionLevel, edition);
   const averageGain = levelUpHpGain(faces, conMod, "average");
   return {
     kind: "hitPoints",
@@ -234,21 +258,40 @@ function subclassStep({ target }: PlanContext): LevelUpStep | null {
 }
 
 // A Fighting Style feat pick (#1137): Fighter's arrives with a new level-1 entry,
-// Paladin's and Ranger's at level 2. Derived from the fightingStyleFeatSlots delta.
-function fightingStyleFeatStep({ target }: PlanContext): LevelUpStep | null {
+// Paladin's and Ranger's at level 2, and a Champion's second slot at 7 (2024) /
+// 10 (2014) — #1148. Derived from the fightingStyleFeatSlots delta. `target.subclass`
+// is resolved via resolveSubclassSlug (never a raw string comparison, #1277) —
+// this is the CURRENTLY-KNOWN persisted subclass (see buildLevelUpPlan's own
+// comment), so a level-up that PICKS Champion this same step doesn't yet see
+// the extra slot, matching subclassStep's own persisted-only gate.
+function fightingStyleFeatStep({ target, edition }: PlanContext): LevelUpStep | null {
   const fightingStyleFeatLevel = target.fightingStyleFeatLevel ?? null;
-  const delta = fightingStyleFeatSlots(fightingStyleFeatLevel, target.newLevel) - fightingStyleFeatSlots(fightingStyleFeatLevel, target.newLevel - 1);
+  const subclass = resolveSubclassSlug(target.name, target);
+  const delta =
+    fightingStyleFeatSlots(fightingStyleFeatLevel, target.newLevel, subclass, edition) -
+    fightingStyleFeatSlots(fightingStyleFeatLevel, target.newLevel - 1, subclass, edition);
   return delta > 0 ? { kind: "fightingStyleFeat", count: delta } : null;
 }
 
 // Diff one bespoke choose-N count (maneuvers/tools) across N vs N-1.
+// #1516: maneuvers carries meta.canSwap unconditionally whenever the step
+// exists — "Each time you learn new maneuvers, you can also replace one
+// maneuver you know with a different one" (PHB'14 Battle Master p.73; SRD 5.2
+// carries the equivalent grant). Unlike subclassChoiceSwapCadence (per
+// catalogSource, since most choose-N features carry no such text), EVERY
+// source of maneuverChoiceCount grants this, and the condition is exactly
+// "new maneuvers were just learned" — the same delta>0 that already gates
+// this step's existence — so no separate swap-only step is needed, mirroring
+// subclassChoiceSteps' own reasoning. Tool proficiency choices carry no such
+// text, so they never get canSwap.
 function choiceCountStep(
   { now, prev }: PlanContext,
   kind: LevelUpStepKind,
-  field: "maneuverChoiceCount" | "toolProfChoiceCount",
+  field: "maneuverChoiceCount" | "toolProfChoiceCount" | "expertiseChoiceCount",
 ): LevelUpStep | null {
   const delta = (now?.[field] ?? 0) - (prev?.[field] ?? 0);
-  return delta > 0 ? { kind, count: delta } : null;
+  if (delta <= 0) return null;
+  return { kind, count: delta, ...(kind === "maneuvers" ? { meta: { canSwap: true } } : {}) };
 }
 
 // Generic subclass "choose N from a catalog" (#899): one step per key that
@@ -294,6 +337,10 @@ function subclassChoiceSteps({ now, prev, edition }: PlanContext): LevelUpStep[]
 // Warlock/Ranger (+ EK/AT in either edition), "prepared" for every SRD 5.2
 // caster and every 2014 re-prepare class — so level-up-submission.ts's swap
 // messages and the frontend never re-derive it from className/edition.
+// spellLists/cantripLists (#1825) resolve through spellListsFor — the same
+// resolver GET /api/spells (routes/catalog/spells.ts) uses — so the EK/AT →
+// wizard redirect and Bard Magical Secrets can never diverge between the
+// level-up gate and the catalog picker.
 // #1631: split out of newSpellsStep purely to keep that function's own
 // cyclomatic count from crossing the CI health gate (mirrors this file's own
 // split reasoning elsewhere, e.g. subclassChoiceSteps). Never applies to
@@ -302,15 +349,39 @@ function expandedSpellIdsMeta(target: TargetClassEntry): { expandedSpellIds: str
   return target.subclassSpellListExpansionIds?.length ? { expandedSpellIds: target.subclassSpellListExpansionIds } : {};
 }
 
+// #1855: the Eldritch Knight leveled-spell school gate (PHB'14 p. 74) — resolved
+// through resolveSubclassSlug (#1277), never a name literal, mirroring this
+// file's own subclassChoiceSteps/fightingStyleFeatStep identity checks. `null`
+// for every non-EK target (including Arcane Trickster, out of #1855's scope)
+// so newSpellsStep's meta spread below omits spellSchools entirely for them.
+function ekSpellSchoolGate(target: TargetClassEntry, edition: RulesEdition): SpellSchoolGate | null {
+  const slug = resolveSubclassSlug(target.name, { subclass: target.subclass, subclassRef: target.subclassRef });
+  return isEldritchKnightSlug(slug) ? eldritchKnightSpellSchoolGate(target.newLevel, edition) : null;
+}
+
+// #1855: split out of newSpellsStep purely to keep that function's own
+// cyclomatic count under the fallow health gate — same #1631 reasoning as
+// expandedSpellIdsMeta just above.
+function schoolGateMeta(schoolGate: SpellSchoolGate | null): Record<string, unknown> {
+  return {
+    // `schools` is `string[] | null` (SpellSchoolGate) — branch on `!== null`,
+    // never truthiness, matching level-up-transaction.ts's assertOnSpellList
+    // convention for the identically-shaped `spellLists`/`cantripLists`.
+    ...(schoolGate !== null && schoolGate.schools !== null ? { spellSchools: schoolGate.schools } : {}),
+    ...(schoolGate?.freePicks ? { freeSchoolPicks: schoolGate.freePicks } : {}),
+  };
+}
+
 function newSpellsStep({ target, edition }: PlanContext): LevelUpStep | null {
-  const count = levelUpSpellPicks(target.name, target.newLevel, target.subclass, edition);
-  const cantrips = levelUpCantripPicks(target.name, target.newLevel, target.subclass);
-  const canSwap = swapCadenceFor(target.name, target.subclass, edition) === "onLevelUp" && target.newLevel >= 2;
+  const count = levelUpSpellPicks(target.name, target.newLevel, target.subclassCasterRef, edition);
+  const cantrips = levelUpCantripPicks(target.name, target.newLevel, target.subclassCasterRef);
+  const canSwap = swapCadenceFor(target.name, target.subclassCasterRef, edition) === "onLevelUp" && target.newLevel >= 2;
   if (count <= 0 && cantrips <= 0 && !canSwap) return null;
   const magicalSecrets = bardMagicalSecretsAt(target.name, target.newLevel);
-  const maxSpellLevel = maxSpellLevelForClass(target.name, target.newLevel, target.subclass, edition);
-  const lists = magicalSecretsSpellLists(target.name, target.newLevel, target.subclass, edition);
-  const casterModel = casterModelFor(target.name, target.subclass, edition);
+  const maxSpellLevel = maxSpellLevelForClass(target.name, target.newLevel, target.subclassCasterRef, edition);
+  const lists = spellListsFor(target.name, target.newLevel, target.subclassCasterRef, edition);
+  const casterModel = casterModelFor(target.name, target.subclassCasterRef, edition);
+  const schoolGate = ekSpellSchoolGate(target, edition);
   return {
     kind: "newSpells",
     count,
@@ -322,6 +393,7 @@ function newSpellsStep({ target, edition }: PlanContext): LevelUpStep | null {
       ...(canSwap ? { canSwap: true } : {}),
       ...(cantrips > 0 ? { cantrips } : {}),
       ...(casterModel ? { casterModel } : {}),
+      ...schoolGateMeta(schoolGate),
       ...expandedSpellIdsMeta(target),
     },
   };
@@ -354,6 +426,7 @@ export function buildLevelUpPlan(character: LevelUpPlanCharacter, target: Target
     choiceCountStep(ctx, "maneuvers", "maneuverChoiceCount"),
     fightingStyleFeatStep(ctx),
     choiceCountStep(ctx, "toolProficiency", "toolProfChoiceCount"),
+    choiceCountStep(ctx, "expertise", "expertiseChoiceCount"),
     ...subclassChoiceSteps(ctx),
     newSpellsStep(ctx),
     { kind: "review" },

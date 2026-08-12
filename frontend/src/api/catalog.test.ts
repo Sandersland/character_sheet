@@ -156,6 +156,30 @@ describe("fetchFeats", () => {
 
     await expect(fetchFeats("EDITION_2024")).rejects.toThrow();
   });
+
+  // #1495: the Fighting Style class gate — the server filters the offered
+  // set via ?classes=, so the frontend never re-derives PHB'14's per-class
+  // subset (CLAUDE.md: rules logic is backend-owned).
+  it("appends ?classes= only when a non-empty class name list is given", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => [] });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchFeats("EDITION_2014", undefined, ["Fighter", "Paladin"]);
+    await fetchFeats("EDITION_2014", undefined, []);
+    await fetchFeats("EDITION_2014", undefined, undefined);
+
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/feats\?edition=EDITION_2014&classes=Fighter%2CPaladin$/);
+    expect(fetchMock.mock.calls[1][0]).toMatch(/\/feats\?edition=EDITION_2014$/);
+    expect(fetchMock.mock.calls[2][0]).toMatch(/\/feats\?edition=EDITION_2014$/);
+  });
+
+  // No "combines ?asiLevel= and ?classes=" test: the route now 400s that
+  // combination (asiLevel's own gate always strips fighting_style rows
+  // first, making classes a silent no-op — see feats.ts's route comment and
+  // feats.test.ts's "cannot be combined" case). No real caller sends both —
+  // AdvancementPanel passes asiLevel only, the Fighting Style picker and
+  // level-up ceremony pass classNames only — so this unit doesn't need to
+  // document a request shape that's illegal on the wire.
 });
 
 // #1801, epic #1795 6/6: share (grant) + fork API coverage.

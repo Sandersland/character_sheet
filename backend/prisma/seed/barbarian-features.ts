@@ -101,6 +101,11 @@ interface RawBarbarianFeature {
   costPoolKey?: string;
   costBase?: number;
   effectBuffs?: EffectBuffRow[];
+  // Mindless Rage's own while-raging condition immunity (#1121) — see this
+  // file's own header for why only its two rows below ever set these.
+  conditionImmunities?: string[];
+  conditionImmunitiesRequireActiveBuff?: string;
+  conditionImmunitiesOnBuffStart?: "clear" | "suspend";
 }
 
 function expand(raw: RawBarbarianFeature): ClassFeatureSeedRow[] {
@@ -122,6 +127,9 @@ function expand(raw: RawBarbarianFeature): ClassFeatureSeedRow[] {
     costPoolKey: raw.costPoolKey,
     costBase: raw.costBase,
     effectBuffs: raw.effectBuffs,
+    conditionImmunities: raw.conditionImmunities,
+    conditionImmunitiesRequireActiveBuff: raw.conditionImmunitiesRequireActiveBuff,
+    conditionImmunitiesOnBuffStart: raw.conditionImmunitiesOnBuffStart,
   };
   const editions: SeedEdition[] = raw.edition ? [raw.edition] : ["EDITION_2014", "EDITION_2024"];
   return editions.map((edition) => ({ ...base, edition }));
@@ -568,6 +576,15 @@ const BERSERKER_RAW: RawBarbarianFeature[] = [
     level: 6,
     edition: "EDITION_2014",
     description: "You can't be charmed or frightened while raging. If charmed or frightened when you rage, the effect is suspended for the duration.",
+    // #1121, PHB'14 p.49: "you can't be charmed or frightened while raging.
+    // If you are charmed or frightened when you enter your rage, the effect
+    // is suspended for the duration of the rage" — suspend-and-restore, not
+    // clear. `conditionImmunitiesRequireActiveBuff: "rage"` names Rage's own
+    // effectBuffs key (rageBuff() above); syncConditionImmunityOnBuffToggleInTx
+    // (lib/combat/conditions.ts) is where "suspend" is interpreted.
+    conditionImmunities: ["charmed", "frightened"],
+    conditionImmunitiesRequireActiveBuff: "rage",
+    conditionImmunitiesOnBuffStart: "suspend",
   },
   {
     subclassSlug: BERSERKER_SLUG,
@@ -578,6 +595,11 @@ const BERSERKER_RAW: RawBarbarianFeature[] = [
     // condition), and entering Rage ENDS an existing Charmed/Frightened
     // condition rather than merely pausing it.
     description: "You have Immunity to the Charmed and Frightened conditions while your Rage is active, and entering your Rage ends either condition on you.",
+    // #1121 — "clear" (not "suspend"): 2024 ends the condition outright, RAW
+    // has no restore-on-rage-end clause (contrast the 2014 row above).
+    conditionImmunities: ["charmed", "frightened"],
+    conditionImmunitiesRequireActiveBuff: "rage",
+    conditionImmunitiesOnBuffStart: "clear",
   },
   {
     subclassSlug: BERSERKER_SLUG,

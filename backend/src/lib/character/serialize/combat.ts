@@ -5,6 +5,7 @@ import {
   deriveArmorClass,
   deriveArmorClassParts,
   deriveArmoredArmorClassParts,
+  deriveDragonWingsFlySpeed,
   deriveFastMovement,
   deriveFeatBonuses,
   deriveImprovisedAttack,
@@ -18,7 +19,7 @@ import { exhaustionSpeedPenalty } from "@/lib/srd/condition-data.js";
 import type { AdvancementEntry } from "@/lib/classes/resources.js";
 import type { CharacterWithRelations } from "@/lib/character/character-include.js";
 import { editionOf } from "@/lib/rules/edition.js";
-import { resolveSubclassSlug } from "@/lib/classes/subclass-slug.js";
+import { draconicBloodlineEntry, draconicBloodlineLevel } from "@/lib/classes/draconic-bloodline.js";
 import type { TargetModifierMap } from "./effects.js";
 
 // The best equipped body armor snapshot (or null when unarmored) in the shape
@@ -56,19 +57,38 @@ export function selectEquippedBodyArmor(
 }
 
 // Draconic Resilience (Draconic Bloodline L1, #1122): the character's Sorcerer
-// class entry resolved onto the subclass slug vocabulary (#1277) — FK-preferred,
-// exact-name fallback, same resolution openHandMonkEntry uses for Open Hand.
-// No level gate here: sorcerer.ts's `grantLevel: 1` already gates when the
-// subclass itself becomes choosable, and the AC clause carries no separate one.
+// class entry resolved onto the subclass slug vocabulary (#1277) via
+// draconicBloodlineEntry (draconic-bloodline.ts) — the one slug-gated
+// resolution this, draconicWingsFlySpeed below, and
+// draconicResilienceMaxHpTerm all share. No level gate here: sorcerer.ts's
+// `grantLevel: 1` already gates when the subclass itself becomes choosable,
+// and the AC clause carries no separate one.
 function draconicResilienceOverride(
   classEntries: CharacterWithRelations["classEntries"],
   edition: RulesEdition,
 ): { label: string; value: number } | undefined {
-  const sorcerer = classEntries.find((e) => e.name.toLowerCase() === "sorcerer");
-  if (!sorcerer) return undefined;
-  return resolveSubclassSlug("sorcerer", sorcerer) === "sorcerer-draconic-bloodline"
-    ? draconicResilienceBase(edition)
-    : undefined;
+  return draconicBloodlineEntry(classEntries) ? draconicResilienceBase(edition) : undefined;
+}
+
+// Dragon Wings (Draconic Bloodline L14, #1123): same slug-gated resolution as
+// draconicResilienceOverride above. `edition` gates here because
+// deriveDragonWingsFlySpeed itself withholds 2024 (flat 60ft, 1hr,
+// resource-gated — out of this derived-value's scope; see that function's own
+// header). draconicBloodlineLevel is the SAME entry+level resolution the HP
+// half (draconicResilienceMaxHpTerm) uses — XP-derived, not the raw
+// `classEntry.level` column, which can lag behind a pending level-up ceremony
+// and would otherwise let the HP bonus and flySpeed disagree about whether
+// L14 has been reached.
+function draconicWingsFlySpeed(
+  classEntries: CharacterWithRelations["classEntries"],
+  isUnarmored: boolean,
+  walkingSpeed: number,
+  totalLevel: number,
+  edition: RulesEdition,
+): number | undefined {
+  const resolved = draconicBloodlineLevel(classEntries, totalLevel);
+  if (!resolved) return undefined;
+  return deriveDragonWingsFlySpeed({ draconicLevel: resolved.level, isUnarmored, walkingSpeed }, edition);
 }
 
 // AC assembly: labeled addends whose exact sum is armorClass (single source of
@@ -153,6 +173,9 @@ function classEntryLevel(row: CharacterWithRelations, className: string): number
 // (e.g. Boots of Speed, #543), then reduced by exhaustion — 2024: −5 ft×level
 // (SRD 5.2); 2014: halved at levels 2-4, floored to 0 at level 5+ (PHB'14
 // p. 291) — either way floored at 0 here as a final non-negative clamp.
+// `flySpeed` (#1123) rides alongside as an optional sibling — Dragon Wings
+// equals the character's own final walking speed (post-exhaustion, the same
+// number served as `speed`), never a second independent derivation.
 export function buildSpeedView(
   row: CharacterWithRelations,
   bestArmor: BestBodyArmor,
@@ -160,8 +183,12 @@ export function buildSpeedView(
   featBonuses: ReturnType<typeof deriveFeatBonuses>,
   buffTargets: TargetModifierMap,
   exhaustionLevel: number,
+  // XP-derived total level (#1123) — draconicWingsFlySpeed's L14 gate needs
+  // it, same as draconicResilienceMaxHpTerm; see draconicBloodlineLevel's
+  // comment for why the raw classEntry.level column isn't enough.
+  totalLevel: number,
   edition: RulesEdition,
-): number {
+): { speed: number; flySpeed?: number } {
   const unarmoredMovementBonus = deriveUnarmoredMovement({
     monkLevel: classEntryLevel(row, "monk"),
     isUnarmored: bestArmor === null,
@@ -177,7 +204,9 @@ export function buildSpeedView(
     unarmoredMovementBonus +
     fastMovementBonus +
     (buffTargets["speed"] ?? []).reduce((sum, b) => sum + b.modifier, 0);
-  return Math.max(0, sum - exhaustionSpeedPenalty(exhaustionLevel, sum, edition));
+  const speed = Math.max(0, sum - exhaustionSpeedPenalty(exhaustionLevel, sum, edition));
+  const flySpeed = draconicWingsFlySpeed(row.classEntries, bestArmor === null, speed, totalLevel, edition);
+  return { speed, flySpeed };
 }
 
 // Unarmed strike + improvised weapon rows. Derived from the same clamped

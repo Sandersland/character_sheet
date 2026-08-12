@@ -5,6 +5,7 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 
 import { levelForExperience, proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 import { effectiveEntryLevel, subclassActiveAt } from "@/lib/leveling/effective-levels.js";
+import { logger } from "@/lib/core/logger.js";
 import { editionOf } from "@/lib/rules/edition.js";
 import { deriveAnnouncedSaveDC } from "@/lib/srd/srd.js";
 
@@ -280,31 +281,55 @@ function deriveSubclassClassExtras(
 // Row-driven counterpart to deriveSubclassClassExtras above (#1546) — the
 // generic EXTRAS_FIELDS reader chunk B2 asks for. maneuverChoiceCount/
 // toolProfChoiceCount resolve via derivedStatFromRows, the same tiered-value
-// mechanism #1530 uses for attacksPerAction; maneuverSaveDC is a closed-form
+// mechanism #1530 uses for attacksPerAction; announcedSaveDC is a closed-form
 // formula, not a tier, so it resolves separately through
 // deriveAnnouncedSaveDC (lib/srd) keyed off `saveDcAbilities`'s own presence,
 // never a `derivedStat` name match — Combat Superiority's single
 // `derivedStat` column already names "maneuverChoiceCount" on the SAME row,
-// so a second field can't also claim that slot for "maneuverSaveDC". Gated
-// by `sub.active` to mirror deriveSubclassClassExtras' own gate (a below-gate
-// subclass contributes nothing, even if its rows are loaded).
+// so a second field can't also claim that slot for "announcedSaveDC".
+// UNGATED on subclass-active (#1589) — unlike deriveSubclassClassExtras, this
+// reader runs over ANY row set a caller hands it: `rows` may be a class's own
+// base-class rows (always in effect once their own level gate is met, e.g.
+// Cleric's Turn Undead/Channel Divinity, subclassId: null) or an active
+// subclass's rows (Combat Superiority) — the caller decides which, and gates
+// the subclass call itself on `sub.active` (see deriveResources below). A
+// base-class row needs no such gate: it has no subclass to be inactive.
 function deriveRowExtras(
-  sub: SubclassLayer,
   rows: readonly ClassFeatureRow[],
   level: number,
   edition: RulesEdition,
   abilityScores: Record<string, number>,
   profBonus: number,
 ): ClassExtras | undefined {
-  if (!sub.active) return undefined;
   const extras: ClassExtras = {};
   const maneuverChoiceCount = derivedStatFromRows(rows, level, edition, "maneuverChoiceCount");
   if (maneuverChoiceCount !== undefined) extras.maneuverChoiceCount = maneuverChoiceCount;
   const toolProfChoiceCount = derivedStatFromRows(rows, level, edition, "toolProfChoiceCount");
   if (toolProfChoiceCount !== undefined) extras.toolProfChoiceCount = toolProfChoiceCount;
-  const maneuverSaveDC = deriveAnnouncedSaveDC(rows, level, edition, abilityScores, profBonus);
-  if (maneuverSaveDC !== undefined) extras.maneuverSaveDC = maneuverSaveDC;
+  // Expertise pick count (#1588). Base-class feature, so deriveRowExtras' ungated
+  // pass over base rows resolves it (Rogue PHB'14 p.96 / Bard p.53 / Ranger &
+  // Wizard SRD 5.2). Same derivedStat mechanism as maneuverChoiceCount.
+  const expertiseChoiceCount = derivedStatFromRows(rows, level, edition, "expertiseChoiceCount");
+  if (expertiseChoiceCount !== undefined) extras.expertiseChoiceCount = expertiseChoiceCount;
+  const announcedSaveDC = deriveAnnouncedSaveDC(rows, level, edition, abilityScores, profBonus);
+  if (announcedSaveDC !== undefined) extras.announcedSaveDC = announcedSaveDC;
   return Object.keys(extras).length > 0 ? extras : undefined;
+}
+
+// Merges one class entry's base-row extras with its own (possibly inactive,
+// already-undefined-when-so) active subclass's row extras (#1589) — subclass
+// wins on a same-key collision, mirroring deriveSubclassClassExtras/
+// mergeLayers' subclass-overrides-base intuition. No shipped row set today
+// populates the SAME field from both halves of one class entry — the closest
+// candidate would be a future Cleric whose base Turn Undead row activates
+// saveDcAbilities (currently deliberately unset, cleric-features.ts's own
+// header) while an active subclass row also declares one; neither of today's
+// Cleric subclasses (Life, Trickery) does, so which side wins is currently
+// untested by production data — documented rather than silently arbitrary.
+function combineRowExtras(fromClassRows: ClassExtras | undefined, fromSubclassRows: ClassExtras | undefined): ClassExtras | undefined {
+  if (!fromClassRows && !fromSubclassRows) return undefined;
+  const merged = { ...fromClassRows, ...fromSubclassRows };
+  return Object.keys(merged).length > 0 ? merged : undefined;
 }
 
 // Merges the code-authored (ExtrasFn) and row-authored extras for one
@@ -385,9 +410,17 @@ export function deriveResources(
   // actually empty for a known class — would silently drop a subclass's
   // deriveExtras/choices contribution for exactly those classes, so `hasExtras`
   // must be computed BEFORE the null check below, never folded into it.
+  // #1589: base-class rows (Cleric's Turn Undead/Channel Divinity, subclassId:
+  // null) now feed deriveRowExtras too, unconditionally — combineRowExtras
+  // folds that in ALONGSIDE the pre-existing subclass-row read (still gated
+  // on `sub.active`, unchanged from before this issue).
+  const rowExtras = combineRowExtras(
+    deriveRowExtras(featureRows?.classRows ?? [], level, edition, abilityScores, profBonus),
+    sub.active ? deriveRowExtras(featureRows?.subclassRows ?? [], level, edition, abilityScores, profBonus) : undefined,
+  );
   const extras = combineExtras(
     deriveSubclassClassExtras(sub, level, abilityScores, profBonus, edition),
-    deriveRowExtras(sub, featureRows?.subclassRows ?? [], level, edition, abilityScores, profBonus),
+    rowExtras,
   );
   const subclassChoices = deriveSubclassChoiceList(sub, level);
   const hasExtras = extras !== undefined || subclassChoices !== undefined;
@@ -482,8 +515,9 @@ export function deriveEntryScopedResourcesForCharacterRow<E extends EntryScopedC
 // exhaustiveness check below is what keeps this list and ClassExtras in sync (#1317).
 const EXTRAS_FIELDS = [
   "maneuverChoiceCount",
-  "maneuverSaveDC",
+  "announcedSaveDC",
   "toolProfChoiceCount",
+  "expertiseChoiceCount",
 ] as const satisfies readonly (keyof ClassExtras)[];
 
 // Compile-time latch: a ClassExtras field missing from EXTRAS_FIELDS makes this
@@ -508,13 +542,73 @@ function assignDefined<T, K extends keyof T>(target: T, key: K, value: T[K] | un
   if (value !== undefined) target[key] = value;
 }
 
+// `announcedSaveDC` (#1589) is the one EXTRAS_FIELDS member where "a class
+// appears at most once in classEntries" does NOT bound this to one
+// contributor per character: unlike maneuverChoiceCount/toolProfChoiceCount
+// (Battle Master only, today), two DIFFERENT classes can each declare their
+// own saveDcAbilities (a future Cleric retab's Turn Undead DC alongside a
+// Fighter/Battle Master's maneuver DC). A second declaring class is a real
+// misconfiguration — one shared ClassExtras field can't carry two per-feature
+// DCs and #1589 exists to retire exactly that clobber. But this runs on the GET
+// READ path (deriveEntryScopedResources → serializeCharacter), so throwing here
+// would 500 the ENTIRE character load — unopenable — instead of degrading one
+// field (#1875 review). So the read path DEGRADES: keep a deterministic winner
+// (FIRST declaring entry — classEntries is primary-first, so the primary class's
+// DC wins) and drop the collision, logging a warning so the misconfiguration is
+// still visible. If a WRITE/validation path is ever added (homebrew authoring),
+// that is where the loud #1589 rejection belongs — not the read path every
+// serialize traverses. No production character can hit this today (Cleric's rows
+// deliberately leave saveDcAbilities unset, cleric-features.ts's own header).
+function assignAnnouncedSaveDC(target: DerivedClassInfo, value: number | undefined): void {
+  if (value === undefined) return;
+  if (target.announcedSaveDC !== undefined) {
+    logger.warn(
+      { existing: target.announcedSaveDC, dropped: value },
+      "deriveEntryScopedResources: multiple class entries declared an announced save DC — keeping the first (primary-class) DC and dropping the collision; announcedSaveDC needs per-feature scoping on the wire, not one shared ClassExtras field (#1589/#1875)",
+    );
+    return;
+  }
+  target.announcedSaveDC = value;
+}
+
+// `expertiseChoiceCount` (#1588) is the OTHER EXTRAS_FIELDS member where "a
+// class appears at most once in classEntries" does NOT bound this to one
+// contributor per character — but unlike announcedSaveDC's collision above
+// (a misconfiguration to degrade), a second Expertise-granting entry is
+// EXPECTED RAW behavior: FOUR classes grant Expertise (Rogue/Bard/Ranger/
+// Wizard), so a real multiclass character can hold two grantor entries at
+// once and RAW sums their picks (e.g. 2014 Rogue 6 / Bard 3 = 4 + 2 = 6, not
+// whichever entry's count happened to overlay last). So this SUMS across
+// entries instead of picking a winner — assignDefined's defined-wins shape
+// would silently clobber the larger count down to the last-applied entry's
+// own value, corrupting the learn cap, the clamp-on-read
+// (buildResourcesPayload, serialize/classes.ts), and the reconciler
+// (reconcileExpertise, level-reconciliation.ts), all three of which read
+// this one summed field and so inherit the corrected total automatically.
+function addExpertiseChoiceCount(target: DerivedClassInfo, value: number | undefined): void {
+  if (value === undefined) return;
+  target.expertiseChoiceCount = (target.expertiseChoiceCount ?? 0) + value;
+}
+
 // Defined-wins overlay of one entry's extras fields onto the accumulator (a
-// class appears at most once in classEntries, so no cross-entry collision).
-// Creates an empty resources/features shell on first contribution if `derived`
-// is still null (e.g. an empty-featured primary with a capped secondary).
+// class appears at most once in classEntries, so no cross-entry collision for
+// the REMAINING fields) — EXCEPT announcedSaveDC (assignAnnouncedSaveDC
+// above, degrades a collision) and expertiseChoiceCount (addExpertiseChoiceCount
+// above, sums a collision — see its own comment for why the two exceptions
+// resolve differently). Creates an empty resources/features shell on first
+// contribution if `derived` is still null (e.g. an empty-featured primary
+// with a capped secondary).
 function overlayExtrasFields(acc: DerivedClassInfo | null, info: DerivedClassInfo): DerivedClassInfo {
   const target = acc ?? { resources: [], features: [] };
   for (const field of EXTRAS_FIELDS) {
+    if (field === "announcedSaveDC") {
+      assignAnnouncedSaveDC(target, info.announcedSaveDC);
+      continue;
+    }
+    if (field === "expertiseChoiceCount") {
+      addExpertiseChoiceCount(target, info.expertiseChoiceCount);
+      continue;
+    }
     assignDefined(target, field, info[field]);
   }
   if (info.subclassChoices) {

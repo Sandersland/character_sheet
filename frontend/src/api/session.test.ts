@@ -13,7 +13,6 @@ import {
   fetchSessions,
   joinSession,
   leaveSession,
-  logRoll,
   startCampaignSession,
   startCombat,
   startSoloSession,
@@ -257,6 +256,7 @@ const combatStateBody = (over: Partial<{ round: number; combatActive: boolean }>
   round: 1,
   combatActive: true,
   updatedAt: "2026-07-26T00:00:00.000Z",
+  spellEconomy: { bonusActionBlockedByActionSpell: false, bonusActionLimitedToCantrips: false, actionLimitedToCantrips: false },
   ...over,
 });
 
@@ -330,25 +330,6 @@ describe("fetchCombatState", () => {
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("/characters/char-1/sessions/s1/combat"),
       expect.anything(),
-    );
-  });
-});
-
-describe("logRoll", () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it("POSTs the roll payload to /roll", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
-    vi.stubGlobal("fetch", fetchMock);
-
-    const payload = { kind: "attack" as const, source: "Longsword", total: 15 };
-    await logRoll("char-1", "s1", payload);
-
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining("/characters/char-1/sessions/s1/roll"),
-      expect.objectContaining({ body: JSON.stringify(payload) })
     );
   });
 });

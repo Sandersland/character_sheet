@@ -49,6 +49,7 @@ import { effectiveEntryLevel } from "@/lib/leveling/effective-levels.js";
 import { resolveSubclassSlug, type SubclassSlug, type SubclassIdentityInput } from "./subclass-slug.js";
 import { effectBuffsFromRow, type ClassFeatureRow, type ClassFeatureRowsCarrier, type ResourceTotalContext } from "./class-feature-rows.js";
 import { monkPoolKey } from "./monk.js";
+import { appendArcaneChargeReminder, hasArcaneCharge } from "./arcane-charge.js";
 import { DEFAULT_RULES_EDITION } from "@/lib/rules/edition.js";
 
 export type ActionCost = "action" | "bonusAction" | "reaction" | "free" | "special";
@@ -201,6 +202,15 @@ export interface AvailableAction {
   /** Resolved damage-type clause (#1505) — see DerivedActionRecord.damageTypeClause. */
   damageTypeClause?: string;
   /**
+   * A resolved roll spec for this action (#1435) — the #1381 resolved-spec-on-a-
+   * row field (`ManeuverEntry.effect`), reused here rather than a second bespoke
+   * field. Attached by buildAvailableActionsView (serialize/classes.ts): the
+   * Deflect Attacks / Deflect Missiles base row carries its reduction spec and
+   * the redirect / throw-back row carries its own, both resolved from the monk's
+   * effective level + Dex so the client never re-derives them.
+   */
+  effect?: EffectSpec;
+  /**
    * Which inline resolution tool the client renders for this action (#1528) —
    * served only for a row-driven action (`actionsFromRows` below); a
    * DERIVED_ACTIONS row leaves this undefined, and the frontend's
@@ -267,6 +277,25 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // both are now row-driven (actionsFromRows below), read off Fighter's own
   // ClassFeature rows (activationCost/resolverKind/cost*/effect* columns,
   // prisma/seed/fighter-features.ts) instead of a DERIVED_ACTIONS entry.
+  //
+  // Eldritch Knight — Weapon Bond (2014, PHB'14 p.75, #1854): `enabled` reads
+  // a synthetic "weaponBond" pool (character-serialize.ts) built from
+  // weapon-bond.ts's weaponBondEligible + a live count of `weaponBonded`
+  // inventory rows — never a resource spend (bonding/unbonding is its own
+  // "weapon-bond" ability, not this action). 2014-only: 2024 Eldritch Knight
+  // text is unverified/PARKED (#1531), so this stays 2014 until that lands.
+  {
+    key: "summonBondedWeapon",
+    name: "Summon Bonded Weapon",
+    cost: "bonusAction",
+    grantClass: "fighter",
+    grantLevel: 3,
+    grantSubclassSlugs: ["fighter-eldritch-knight"],
+    resourceKey: "weaponBond",
+    resourceAmount: 1,
+    edition: "EDITION_2014",
+    reminder: "Drop what you're holding and summon one bonded weapon into your hand. Bonded weapons can't be disarmed.",
+  },
 
   // Monk
   // Martial Arts (#1218): a free Unarmed Strike as a Bonus Action from L1 — no
@@ -998,7 +1027,7 @@ export function deriveEntryScopedActions<E extends SubclassIdentityInput & { nam
       ...deriveActions(entry.name, slug, effLevel, pools, unarmoredUnshielded, edition),
       ...actionsFromRows(rows?.classRows ?? [], effLevel, edition, poolMap, unarmoredUnshielded),
       ...actionsFromRows(rows?.subclassRows ?? [], effLevel, edition, poolMap, unarmoredUnshielded),
-    ];
+    ].map((action) => withArcaneChargeReminder(action, slug, effLevel, edition));
     for (const action of entryActions) {
       if (seenKeys.has(action.key)) continue;
       seenKeys.add(action.key);
@@ -1006,6 +1035,26 @@ export function deriveEntryScopedActions<E extends SubclassIdentityInput & { nam
     }
   }
   return actions;
+}
+
+/**
+ * Arcane Charge (2014, PHB'14 p.75, #1852) rides the row-driven Action Surge
+ * action rather than getting its own row: an Eldritch Knight L15+ (2014)
+ * sees its teleport clause appended to Action Surge's own reminder (empty
+ * today — Action Surge carries no `effectKind`, see describeRowReminder).
+ * Applied here, not inside actionsFromRows/buildRowAction, because those only
+ * see one row at a time and never the resolved subclass slug — this is the
+ * one place per entry that already has both.
+ */
+function withArcaneChargeReminder(
+  action: AvailableAction,
+  slug: SubclassSlug | undefined,
+  entryLevel: number,
+  edition: RulesEdition,
+): AvailableAction {
+  if (action.key !== "actionSurge") return action;
+  if (!hasArcaneCharge(entryLevel, slug === "fighter-eldritch-knight", edition)) return action;
+  return { ...action, reminder: appendArcaneChargeReminder(action.reminder) };
 }
 
 /**
@@ -1466,6 +1515,7 @@ export function toggleRowOps(row: ClassFeatureRow, ctx: ResourceTotalContext, is
       duration: b.duration,
       ...(b.clearOn ? { clearOn: b.clearOn } : {}),
       ...(b.resistDamageTypes ? { resistDamageTypes: b.resistDamageTypes } : {}),
+      ...(b.conditionImmunities ? { conditionImmunities: b.conditionImmunities } : {}),
       ...(b.rollEffects ? { rollEffects: b.rollEffects } : {}),
     },
   }));

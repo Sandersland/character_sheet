@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { effectiveEntryLevel, subclassActiveAt, subclassGateLevel } from "../effective-levels.js";
+import { effectiveEntryLevel, levelDownEntryLevels, subclassActiveAt, subclassGateLevel } from "../effective-levels.js";
 
 describe("effectiveEntryLevel", () => {
   it("uses the XP-derived level for a single-class character (stale entry.level ignored)", () => {
@@ -11,6 +11,29 @@ describe("effectiveEntryLevel", () => {
   it("uses the per-entry level for a multiclass character", () => {
     expect(effectiveEntryLevel(3, 2, 8)).toBe(3);
     expect(effectiveEntryLevel(6, 3, 12)).toBe(6);
+  });
+});
+
+describe("levelDownEntryLevels", () => {
+  it("trims LIFO from the highest position first", () => {
+    expect(levelDownEntryLevels([10, 1], 3)).toEqual([3, 0]); // fighter deleted, then sorcerer 10→3
+    expect(levelDownEntryLevels([2, 3], 3)).toEqual([2, 1]); // tail entry absorbs all of it
+  });
+
+  it("floors the position-0 base class at 1, later entries at 0", () => {
+    expect(levelDownEntryLevels([4, 4], 1)).toEqual([1, 0]);
+  });
+
+  it("returns the input unchanged when the sum is already within the target", () => {
+    expect(levelDownEntryLevels([3, 2], 5)).toEqual([3, 2]);
+    expect(levelDownEntryLevels([3, 2], 6)).toEqual([3, 2]);
+  });
+
+  // A per-entry `min(level, target)` would give [1, 3] here — the LIFO trim
+  // takes the tail entry below the target-level bound instead. This is why
+  // computeLevelDownState projects through THIS function, not a min().
+  it("can trim a tail entry below min(level, target) — LIFO, not a per-entry cap", () => {
+    expect(levelDownEntryLevels([1, 4], 3)).toEqual([1, 2]);
   });
 });
 

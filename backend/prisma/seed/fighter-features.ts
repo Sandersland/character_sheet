@@ -95,10 +95,11 @@ interface RawFighterFeature {
   // each row's own comment.
   derivedStat?: string;
   derivedStatTiers?: { minLevel: number; value: number | string }[];
-  // #1546 Part B: the ability list Combat Superiority's maneuverSaveDC is
-  // computed from (8 + PB + max of these). Deliberately NOT matched against
-  // `derivedStat` by name — see class-feature-rows.ts's
-  // saveDcAbilitiesFromRows for why the same row needs both axes at once.
+  // #1546 Part B: the ability list Combat Superiority's announcedSaveDC
+  // (#1589, renamed from maneuverSaveDC) is computed from (8 + PB + max of
+  // these). Deliberately NOT matched against `derivedStat` by name — see
+  // class-feature-rows.ts's saveDcAbilitiesFromRows for why the same row
+  // needs both axes at once.
   saveDcAbilities?: string[];
 }
 
@@ -755,23 +756,29 @@ const BATTLE_MASTER_RAW: RawFighterFeature[] = [
   },
 ];
 
-// ---- Eldritch Knight — PARKED (#1531) --------------------------------------
+// ---- Eldritch Knight — TEXT still PARKED; third-caster identity SHIPPED (#1531) --
 // Research could not verify PHB'24's Eldritch Knight text against any
 // first-party source (unlike Battle Master, no independent mirrors agreed).
 // Authoring unverified text as "real 2024 content" is exactly the failure
-// this issue exists to end, so no EDITION_2024-tagged row is authored here —
-// every row below is UNTAGGED (`edition` omitted), meaning expand() seeds the
-// SAME (byte-identical, from fighter.ts's old ELDRITCH_KNIGHT_FEATURES) text
-// for both editions. This is the one Fighter subclass EDITIONS_STILL_IDENTICAL's
+// #1227 exists to end, so no EDITION_2024-tagged row is authored here — every
+// row below is UNTAGGED (`edition` omitted), meaning expand() seeds the SAME
+// (byte-identical, from fighter.ts's old ELDRITCH_KNIGHT_FEATURES) text for
+// both editions. This is the one Fighter subclass EDITIONS_STILL_IDENTICAL's
 // removal comment (seed-class-features.ts) discloses as a residual — do not
 // read Fighter's removal from that ratchet as "all of Fighter's 2024 text is
-// verified". #1531 owns authoring EK's real 2024 text. Every row below also
-// leaves every descriptor column NULL — NOT DONE YET for all six, not NO SUCH
-// AXIS: unlike Champion/Battle Master above, EK's own rows (Eldritch Strike's
-// on-hit rider, War Magic/Improved War Magic's bonus-action attack trigger)
-// plausibly need real resource/activation/effect columns of their own, so
-// #1531 owns descriptor population here too, alongside EK's verified 2024
-// text — none of it is authored ahead of that pass.
+// verified". #1531's arbiter pre-flight ruled that authoring EK's real 2024
+// text and populating its OTHER FIVE rows' descriptor columns (Weapon Bond,
+// War Magic, Eldritch Strike, Arcane Charge, Improved War Magic — all still
+// NOT DONE YET, not NO SUCH AXIS: their on-hit riders and bonus-action
+// triggers plausibly need real resource/activation/effect columns) stays
+// PARKED for a future issue with a citable source; #1531 does not author
+// either here. What #1531 DID ship: the third-caster identity mechanic
+// itself moved off a lowercase-name-keyed lookup (THIRD_CASTER_SUBCLASSES,
+// spellcasting-tables.ts — the last one in lib/srd/, #1339's failure shape)
+// onto this subclass's own catalog row (Subclass.casterFraction /
+// .spellcastingAbility, seeded "third" / "intelligence" in subclasses.ts) —
+// see the "Eldritch Knight Spellcasting" row below for the resulting axis
+// distinction on ITS OWN descriptor columns.
 const ELDRITCH_KNIGHT_SLUG = slug("fighter-eldritch-knight");
 const ELDRITCH_KNIGHT_RAW: RawFighterFeature[] = [
   {
@@ -780,6 +787,14 @@ const ELDRITCH_KNIGHT_RAW: RawFighterFeature[] = [
     level: 3,
     description:
       "You learn spells from the wizard list (primarily abjuration and evocation), casting with Intelligence. Third-caster progression: spell slots start at level 3. You know cantrips and a limited number of spells.",
+    // Unlike the other five EK rows below (still NOT DONE YET — real content
+    // debt), this ONE row's descriptor columns are NO SUCH AXIS (#1531): the
+    // mechanic this feature grants — third-caster fraction + spellcasting
+    // ability — is entirely carried by the Subclass row's own
+    // casterFraction/spellcastingAbility columns (subclasses.ts), read
+    // through deriveSpellcasting/derivePreparedSpellLimit/etc.
+    // (spellcasting-tables.ts), not a resource/activation/effect descriptor
+    // on THIS row. There is nothing here for a future pass to populate.
   },
   {
     subclassSlug: ELDRITCH_KNIGHT_SLUG,

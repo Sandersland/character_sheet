@@ -1,4 +1,6 @@
-import { useRef, type KeyboardEvent } from "react";
+import { useCallback } from "react";
+
+import { useRovingRadioGroup } from "@/hooks/useRovingRadioGroup";
 
 interface SegmentedOption<T extends string> {
   value: T;
@@ -14,6 +16,8 @@ interface SegmentedProps<T extends string> {
 }
 
 // Single-select segmented control (WAI-ARIA radiogroup), styled like Tabs.tsx.
+// Roving tabindex + arrow/Home/End keyboard behavior comes from the shared
+// useRovingRadioGroup hook (#1111/#1324).
 export default function Segmented<T extends string>({
   options,
   value,
@@ -21,20 +25,9 @@ export default function Segmented<T extends string>({
   label,
   className = "",
 }: SegmentedProps<T>) {
-  const refs = useRef<(HTMLButtonElement | null)[]>([]);
-
-  function handleKeyDown(e: KeyboardEvent<HTMLButtonElement>, index: number) {
-    const count = options.length;
-    let next = index;
-    if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (index + 1) % count;
-    else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = (index - 1 + count) % count;
-    else if (e.key === "Home") next = 0;
-    else if (e.key === "End") next = count - 1;
-    else return;
-    e.preventDefault();
-    refs.current[next]?.focus();
-    onChange(options[next].value);
-  }
+  const checkedIndex = options.findIndex((opt) => opt.value === value);
+  const selectOption = useCallback((index: number) => onChange(options[index].value), [onChange, options]);
+  const { itemRef, tabIndexFor, keyDownFor } = useRovingRadioGroup(options.length, checkedIndex, selectOption);
 
   return (
     <div
@@ -50,12 +43,10 @@ export default function Segmented<T extends string>({
             role="radio"
             type="button"
             aria-checked={isActive}
-            tabIndex={isActive ? 0 : -1}
-            ref={(el) => {
-              refs.current[i] = el;
-            }}
+            tabIndex={tabIndexFor(i)}
+            ref={itemRef(i)}
             onClick={() => onChange(opt.value)}
-            onKeyDown={(e) => handleKeyDown(e, i)}
+            onKeyDown={keyDownFor(i)}
             className={[
               "flex flex-1 items-center justify-center rounded-control px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600",
               isActive

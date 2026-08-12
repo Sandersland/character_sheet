@@ -1,377 +1,337 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+// InlineSpellPicker tests (epic #1827 Slice 6, #1833) — the Cast-a-Spell
+// picker rewired onto the shared resolver (useResolution/ResolutionRail,
+// mirrors InlineAttackPicker.test.tsx's own coverage style, #1832). Exercises
+// each of the five spell shapes committing ONE resolveAction op with the
+// mapped cost, the 5e economy interlock (onCommitSlot), and that a heal's
+// self/ally apply is built while a damage spell's never is (self-or-announce).
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import InlineSpellPicker from "@/features/session/InlineSpellPicker";
 import { RollProvider } from "@/features/dice/RollContext";
-import { applySpellcastingTransactions, logRoll } from "@/api/client";
-import { getQueryClient } from "@/api/queryClient";
-import { characterKeys } from "@/api/queryKeys";
-import { cachedCharacter, renderWithCharacter } from "@/test/renderWithCharacter";
+import { applyResolveActionOperations } from "@/api/client";
+import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character, Spell } from "@/types/character";
 
 vi.mock("@/api/client", () => ({
-  applySpellcastingTransactions: vi.fn(),
-  logRoll: vi.fn().mockResolvedValue(undefined),
+  applyResolveActionOperations: vi.fn(),
 }));
 
-const mockApply = vi.mocked(applySpellcastingTransactions);
-const mockLogRoll = vi.mocked(logRoll);
+function seedMid() {
+  return vi.spyOn(Math, "random").mockReturnValue(0.5);
+}
 
-// #1381: effectRolls carries the served rolls the picker now looks up (rules
-// resolve backend-side) — one entry per slot level a test actually casts at.
-const cantrip: Spell = {
-  id: "sp-cantrip",
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.mocked(applyResolveActionOperations).mockResolvedValue({} as Character);
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+const FIRE_BOLT: Spell = {
+  id: "entry-fire-bolt",
+  name: "Fire Bolt",
+  level: 0,
+  school: "evocation",
+  prepared: true,
+  castingTime: "1 action",
+  range: "120 feet",
+  duration: "Instantaneous",
+  description: "A bolt of fire.",
+  attackType: "attack",
+  damageType: "fire",
+  effectKind: "damage",
+  castCost: "action",
+  effectRolls: [{ slotLevel: 0, roll: { count: 1, faces: 10, modifier: 0 } }],
+};
+
+const SACRED_FLAME: Spell = {
+  id: "entry-sacred-flame",
   name: "Sacred Flame",
   level: 0,
   school: "evocation",
+  prepared: true,
   castingTime: "1 action",
   range: "60 feet",
   duration: "Instantaneous",
   description: "",
-  effectKind: "damage",
-  damageType: "radiant",
   attackType: "save",
   saveAbility: "dexterity",
+  damageType: "radiant",
+  effectKind: "damage",
+  castCost: "action",
   effectRolls: [{ slotLevel: 0, roll: { count: 1, faces: 8, modifier: 0 } }],
 };
 
-const attackSpell: Spell = {
-  id: "sp-attack",
-  name: "Chromatic Orb",
+const MAGIC_MISSILE: Spell = {
+  id: "entry-magic-missile",
+  name: "Magic Missile",
   level: 1,
+  school: "evocation",
   prepared: true,
-  school: "conjuration",
   castingTime: "1 action",
-  range: "90 feet",
+  range: "120 feet",
   duration: "Instantaneous",
   description: "",
   effectKind: "damage",
-  damageType: "fire",
-  attackType: "attack",
-  effectRolls: [{ slotLevel: 1, roll: { count: 3, faces: 8, modifier: 0 } }],
+  damageType: "force",
+  castCost: "action",
+  effectRolls: [{ slotLevel: 1, roll: { count: 3, faces: 4, modifier: 3 } }],
 };
 
-const healSpell: Spell = {
-  id: "sp-heal",
+const CURE_WOUNDS: Spell = {
+  id: "entry-cure-wounds",
   name: "Cure Wounds",
   level: 1,
-  prepared: true,
   school: "evocation",
+  prepared: true,
   castingTime: "1 action",
   range: "Touch",
   duration: "Instantaneous",
   description: "",
   effectKind: "heal",
-  effectRolls: [
-    { slotLevel: 1, roll: { count: 1, faces: 8, modifier: 0 } },
-    { slotLevel: 2, roll: { count: 2, faces: 8, modifier: 0 } },
-  ],
+  castCost: "action",
+  effectRolls: [{ slotLevel: 1, roll: { count: 1, faces: 8, modifier: 4 } }],
 };
 
-const ALL_SPELLS = [cantrip, attackSpell, healSpell];
+const DRUIDCRAFT: Spell = {
+  id: "entry-druidcraft",
+  name: "Druidcraft",
+  level: 0,
+  school: "transmutation",
+  prepared: true,
+  castingTime: "1 action",
+  range: "30 feet",
+  duration: "Instantaneous",
+  description: "",
+  castCost: "action",
+  effectRolls: [],
+};
 
-function makeCharacter(spells: Spell[] = ALL_SPELLS): Character {
+const CONCENTRATION_SPELL: Spell = {
+  id: "entry-bless",
+  name: "Bless",
+  level: 1,
+  school: "enchantment",
+  prepared: true,
+  castingTime: "1 action",
+  range: "30 feet",
+  duration: "Concentration, up to 1 minute",
+  description: "",
+  concentration: true,
+  castCost: "action",
+  effectRolls: [],
+};
+
+function makeCharacter(spells: Spell[]): Character {
   return {
     id: "char-1",
     name: "Tester",
-    level: 1,
-    abilityScores: {
-      strength: 10,
-      dexterity: 10,
-      constitution: 10,
-      intelligence: 16,
-      wisdom: 10,
-      charisma: 10,
-    },
+    inventory: [],
     spellcasting: {
       ability: "intelligence",
       spellSaveDC: 14,
-      spellAttackBonus: 5,
+      spellAttackBonus: 6,
       slots: [
-        { level: 1, total: 2, used: 0 },
-        { level: 2, total: 1, used: 0 },
+        { level: 1, total: 3, used: 0 },
+        { level: 2, total: 2, used: 0 },
       ],
       arcana: [],
       spells,
+      concentratingOn: null,
     },
   } as unknown as Character;
 }
 
-const updatedChar = makeCharacter();
-
-interface Spies {
-  onClose: ReturnType<typeof vi.fn>;
-  onLogChanged: ReturnType<typeof vi.fn>;
-  onCommitSlot: ReturnType<typeof vi.fn>;
-  onCastSettled: ReturnType<typeof vi.fn>;
-  /** Re-render with a new `character` prop — simulates the real parent
-   *  re-rendering after the cache write lands (structural-sharing pin lives
-   *  elsewhere; this harness's rerender doesn't happen automatically). */
-  rerenderWithCharacter: (character: Character) => void;
+interface RenderOpts {
+  slotAvailable?: boolean;
+  onCommitSlot?: ReturnType<typeof vi.fn>;
+  onCastSettled?: ReturnType<typeof vi.fn>;
 }
 
-function renderPicker(
-  character: Character,
-  opts: {
-    castingTimeFilter?: string;
-    slotAvailable?: boolean;
-    focusSpellId?: string;
-    slot?: "action" | "bonusAction" | "reaction";
-  } = {},
-): Spies {
-  const spies = {
-    onClose: vi.fn(),
-    onLogChanged: vi.fn(),
-    onCommitSlot: vi.fn(),
-    onCastSettled: vi.fn(),
-  };
-  // InlineSpellPicker reads the character live from the cache (#1284), so this
-  // view no longer varies by character — rerenderWithCharacter just forces a
-  // React re-render after a test writes a new value into the cache directly.
-  const view = () => (
+function renderPicker(character: Character, opts: RenderOpts = {}) {
+  const onCommitSlot = opts.onCommitSlot ?? vi.fn();
+  const onClose = vi.fn();
+  const onLogChanged = vi.fn();
+  renderWithCharacter(
     <RollProvider>
       <InlineSpellPicker
         sessionId="sess-1"
-        onClose={spies.onClose}
-        onLogChanged={spies.onLogChanged}
-        slot={opts.slot ?? "action"}
+        onClose={onClose}
+        onLogChanged={onLogChanged}
+        slot="action"
         slotAvailable={opts.slotAvailable ?? true}
-        onCommitSlot={spies.onCommitSlot}
-        spellCastThisTurn={{}}
+        onCommitSlot={onCommitSlot}
+        spellEconomy={{ bonusActionBlockedByActionSpell: false, bonusActionLimitedToCantrips: false, actionLimitedToCantrips: false }}
+        castingTimeFilter="1 action"
         allies={[]}
-        castingTimeFilter={opts.castingTimeFilter ?? "1 action"}
-        focusSpellId={opts.focusSpellId}
-        onCastSettled={spies.onCastSettled}
+        onCastSettled={opts.onCastSettled}
       />
-    </RollProvider>
+    </RollProvider>,
+    character,
   );
-  const { rerender } = renderWithCharacter(view(), character);
-  return {
-    ...spies,
-    rerenderWithCharacter: (c: Character) => {
-      getQueryClient().setQueryData(characterKeys.detail(c.id), c);
-      rerender(view());
-    },
-  };
+  return { onClose, onLogChanged, onCommitSlot };
 }
 
-beforeEach(() => {
-  vi.clearAllMocks();
-  mockApply.mockResolvedValue(updatedChar);
-  mockLogRoll.mockResolvedValue(undefined);
-  vi.spyOn(Math, "random").mockReturnValue(0);
-});
+function lastOp() {
+  const calls = vi.mocked(applyResolveActionOperations).mock.calls;
+  const [, ops] = calls[calls.length - 1];
+  return ops[0];
+}
 
-describe("InlineSpellPicker — characterization", () => {
-  it("renders every castable spell", () => {
-    renderPicker(makeCharacter());
-    expect(screen.getByText("Sacred Flame")).toBeInTheDocument();
-    expect(screen.getByText("Chromatic Orb")).toBeInTheDocument();
-    expect(screen.getByText("Cure Wounds")).toBeInTheDocument();
-  });
+describe("InlineSpellPicker — attack-roll shape (Fire Bolt)", () => {
+  it("rolls to hit, rolls damage, and commits ONE resolveAction op carrying entryId + toHit + effect", async () => {
+    const user = userEvent.setup();
+    seedMid();
+    const { onCommitSlot } = renderPicker(makeCharacter([FIRE_BOLT]));
 
-  it("shows the empty state when the casting-time filter matches nothing", () => {
-    renderPicker(makeCharacter(), { castingTimeFilter: "1 bonus action" });
-    expect(screen.getByText(/No prepared spells available to cast right now/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Done" })).toBeInTheDocument();
-  });
+    await user.click(screen.getByRole("button", { name: /^Fire Bolt/ }));
+    await user.click(screen.getByRole("button", { name: "Roll to hit" }));
+    // A mid-face d20 (seedMid) always lands ambiguous under a literal-20 crit
+    // range (#1120: spell attacks never widen), so Roll damage is armed the
+    // instant the die resolves — no separate "call it" tap needed here.
+    const damageBtn = await screen.findByRole("button", { name: /Roll (crit )?damage/ });
+    await user.click(damageBtn);
+    await user.click(screen.getByRole("button", { name: "Done" }));
 
-  it("casts a save cantrip: fires the op, commits the slot at level 0, refreshes", async () => {
-    const spies = renderPicker(makeCharacter([cantrip]));
-
-    await userEvent.click(screen.getByRole("button", { name: /^Cast/ }));
-
-    expect(mockApply).toHaveBeenCalledWith("char-1", [
-      expect.objectContaining({ type: "castSpell", entryId: "sp-cantrip" }),
-    ]);
-    expect(spies.onCommitSlot).toHaveBeenCalledWith(0);
-    await waitFor(() => expect(cachedCharacter("char-1")).toEqual(updatedChar));
-  });
-
-  // #1163: upcasting moved into the big spell card — the compact row carries
-  // no slot picker of its own.
-  it("upcasts a leveled spell at the chosen slot level via the big spell card", async () => {
-    renderPicker(makeCharacter([healSpell]));
-
-    await userEvent.click(screen.getByRole("button", { name: "Cure Wounds details" }));
-    await userEvent.click(screen.getByRole("button", { name: /^L2/ }));
-    await userEvent.click(screen.getByRole("button", { name: /^Cast Cure Wounds/ }));
-
-    expect(mockApply).toHaveBeenCalledWith("char-1", [
-      expect.objectContaining({ type: "castSpell", entryId: "sp-heal", slotLevel: 2 }),
-    ]);
-  });
-
-  it("self-targeted heal passes an apply payload to the backend", async () => {
-    const spies = renderPicker(makeCharacter([healSpell]));
-
-    await userEvent.click(screen.getByRole("button", { name: /^Cast/ }));
-
-    expect(mockApply).toHaveBeenCalledWith("char-1", [
-      expect.objectContaining({
-        type: "castSpell",
-        entryId: "sp-heal",
-        slotLevel: 1,
-        apply: expect.objectContaining({ target: "self", kind: "heal", amount: expect.any(Number) }),
-      }),
-    ]);
-    expect(spies.onCommitSlot).toHaveBeenCalledWith(1);
-  });
-
-  it("attack spell is a two-step: Attack commits the slot + logs, then Cast fires the op without re-committing", async () => {
-    const spies = renderPicker(makeCharacter([attackSpell]));
-
-    // Cast is gated until the attack is rolled.
-    expect(screen.getByRole("button", { name: /^Cast/ })).toBeDisabled();
-
-    await userEvent.click(screen.getByRole("button", { name: /^Attack/ }));
-
-    expect(spies.onCommitSlot).toHaveBeenCalledTimes(1);
-    expect(spies.onCommitSlot).toHaveBeenCalledWith(1);
-    expect(mockLogRoll).toHaveBeenCalled();
-
-    const castBtn = screen.getByRole("button", { name: /^Cast/ });
-    expect(castBtn).toBeEnabled();
-    await userEvent.click(castBtn);
-
-    expect(mockApply).toHaveBeenCalledWith("char-1", [
-      expect.objectContaining({ type: "castSpell", entryId: "sp-attack", slotLevel: 1 }),
-    ]);
-    // Slot must not be committed a second time on cast.
-    expect(spies.onCommitSlot).toHaveBeenCalledTimes(1);
-    await waitFor(() => expect(cachedCharacter("char-1")).toEqual(updatedChar));
-  });
-
-  it("Done closes the panel", async () => {
-    const spies = renderPicker(makeCharacter());
-    await userEvent.click(screen.getByRole("button", { name: "Done" }));
-    expect(spies.onClose).toHaveBeenCalled();
+    expect(applyResolveActionOperations).toHaveBeenCalledTimes(1);
+    const op = lastOp();
+    expect(op).toMatchObject({ type: "resolveAction", source: "Fire Bolt", entryId: "entry-fire-bolt" });
+    expect(op.cost).toEqual({ kind: "action" });
+    expect(op.toHit).toBeTruthy();
+    expect(op.effect).toMatchObject({ type: "fire", kind: "damage" });
+    expect(op.slotLevel).toBeUndefined();
+    expect(op.apply).toBeUndefined();
+    // Deferred to the mutation's success (#1848 review fix), not synchronous.
+    await waitFor(() => expect(onCommitSlot).toHaveBeenCalled());
   });
 });
 
-describe("InlineSpellPicker — post-cast feedback (#1164)", () => {
-  it("the result well is a dashed placeholder before any cast", () => {
-    renderPicker(makeCharacter());
-    expect(screen.getByText(/its roll and what to announce land here/i)).toBeInTheDocument();
-  });
+describe("InlineSpellPicker — saving-throw shape (Sacred Flame)", () => {
+  it("shows the announce-save step (no to-hit) and commits an op with save set", async () => {
+    const user = userEvent.setup();
+    seedMid();
+    renderPicker(makeCharacter([SACRED_FLAME]));
 
-  it("casting fills the result well, dims the cast row, and shows the economy strip", async () => {
-    // InlineSpellPicker now reads the character live from the cache (#1284), so
-    // the mutation's resolved value must keep this test's single-cantrip
-    // roster — the shared default `updatedChar` carries ALL_SPELLS and would
-    // introduce extra castable rows once it landed, making "Cast" ambiguous.
-    mockApply.mockResolvedValueOnce(makeCharacter([cantrip]));
-    const spies = renderPicker(makeCharacter([cantrip]));
+    await user.click(screen.getByRole("button", { name: /^Sacred Flame/ }));
+    expect(screen.queryByText("Roll to hit")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Roll damage" }));
+    await user.click(screen.getByRole("button", { name: "Done" }));
 
-    await userEvent.click(screen.getByRole("button", { name: /^Cast/ }));
-
-    // Well fills with the cast's result — no more dashed placeholder.
-    expect(screen.queryByText(/its roll and what to announce land here/i)).not.toBeInTheDocument();
-    expect(screen.getByText("Result · Sacred Flame")).toBeInTheDocument();
-
-    // The row swaps to a dimmed receipt instead of its Cast control.
-    expect(screen.getByText("cast")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Cast" })).not.toBeInTheDocument();
-
-    // "Action spent…" economy acknowledgment appears once something is cast.
-    expect(screen.getByText("Action spent. Bonus action & movement remain.")).toBeInTheDocument();
-
-    expect(spies.onCastSettled).toHaveBeenCalledWith(expect.objectContaining({ spellName: "Sacred Flame" }));
-  });
-
-  it("labels the economy strip per economy slot", async () => {
-    renderPicker(makeCharacter([cantrip]), { slot: "bonusAction", castingTimeFilter: "1 action" });
-    await userEvent.click(screen.getByRole("button", { name: /^Cast/ }));
-    expect(screen.getByText("Bonus action spent. Action & movement remain.")).toBeInTheDocument();
-  });
-
-  it("sheet never auto-closes after a cast — Done stays explicit", async () => {
-    const spies = renderPicker(makeCharacter([cantrip]));
-    await userEvent.click(screen.getByRole("button", { name: /^Cast/ }));
-    expect(spies.onClose).not.toHaveBeenCalled();
-    await userEvent.click(screen.getByRole("button", { name: "Done" }));
-    expect(spies.onClose).toHaveBeenCalled();
-  });
-
-  // Regression: casting the LAST leveled spell with no cantrips prepared
-  // leaves nothing castable — picker.isEmpty flips true the instant the
-  // updated character (0 slots remaining) lands. The empty-state early return
-  // must not swap out PickerContent (and its CastResultWell) in that case, or
-  // #1164's durable post-cast feedback vanishes right after it appears.
-  it("keeps the result well visible after casting the last leveled spell with no cantrips remaining", async () => {
-    const before = makeCharacter([healSpell]);
-    before.spellcasting!.slots = [{ level: 1, total: 1, used: 0 }];
-    const after = makeCharacter([healSpell]);
-    after.spellcasting!.slots = [{ level: 1, total: 1, used: 1 }];
-    mockApply.mockResolvedValueOnce(after);
-
-    const spies = renderPicker(before);
-    await userEvent.click(screen.getByRole("button", { name: /^Cast/ }));
-    await waitFor(() => expect(cachedCharacter("char-1")).toEqual(after));
-
-    // The parent re-renders with the updated (now slot-exhausted) character.
-    spies.rerenderWithCharacter(after);
-
-    expect(screen.getByText("Result · Cure Wounds")).toBeInTheDocument();
-    expect(screen.queryByText(/No prepared spells available to cast right now/i)).not.toBeInTheDocument();
+    const op = lastOp();
+    expect(op.toHit).toBeFalsy();
+    expect(op.save).toEqual({ dc: 14, ability: "dexterity" });
+    expect(op.effect).toMatchObject({ type: "radiant" });
   });
 });
 
-describe("InlineSpellPicker — level sections", () => {
-  it("groups spells under level headers with slot pips (sr-only, never color-only)", () => {
-    renderPicker(makeCharacter());
+describe("InlineSpellPicker — leveled damage spell (Magic Missile)", () => {
+  it("commits with the chosen slotLevel and no apply (announce-only, no target model)", async () => {
+    const user = userEvent.setup();
+    seedMid();
+    renderPicker(makeCharacter([MAGIC_MISSILE]));
 
-    expect(screen.getByText("Cantrips · at will")).toBeInTheDocument();
-    expect(screen.getByText("Level 1")).toBeInTheDocument();
-    // Level-1 fixture: 2 of 2 slots remaining.
-    expect(screen.getByText("2 of 2 slots remaining")).toBeInTheDocument();
-    // No Level-2 spells prepared → no Level 2 section despite the L2 slot.
-    expect(screen.queryByText("Level 2")).not.toBeInTheDocument();
-  });
+    await user.click(screen.getByRole("button", { name: /^Magic Missile/ }));
+    await user.click(screen.getByRole("button", { name: "Roll damage" }));
+    await user.click(screen.getByRole("button", { name: "Done" }));
 
-  it("hides levels with no affordable slot and explains via the footer note", () => {
-    const spiritualWeapon: Spell = {
-      id: "sp-sw",
-      name: "Spiritual Weapon",
-      level: 2,
-      prepared: true,
-      school: "evocation",
-      castingTime: "1 action",
-      range: "60 feet",
-      duration: "1 minute",
-      description: "",
-    };
-    const character = makeCharacter([healSpell, spiritualWeapon]);
-    character.spellcasting!.slots = [{ level: 1, total: 2, used: 0 }];
-
-    renderPicker(character);
-
-    expect(screen.queryByText("Spiritual Weapon")).not.toBeInTheDocument();
-    expect(screen.getByText("Level 2+ hidden — no slots remaining")).toBeInTheDocument();
+    const op = lastOp();
+    expect(op.slotLevel).toBe(1);
+    expect(op.entryId).toBe("entry-magic-missile");
+    expect(op.apply).toBeUndefined();
   });
 });
 
-describe("InlineSpellPicker — focusSpellId pre-selection", () => {
-  it("renders only the focused spell with a Show-all escape hatch", async () => {
-    renderPicker(makeCharacter(), { focusSpellId: "sp-heal" });
+describe("InlineSpellPicker — heal shape (Cure Wounds)", () => {
+  it("shows healing labels and commits with a self apply payload", async () => {
+    const user = userEvent.setup();
+    seedMid();
+    renderPicker(makeCharacter([CURE_WOUNDS]));
 
-    expect(screen.getByText("Cure Wounds")).toBeInTheDocument();
-    expect(screen.queryByText("Sacred Flame")).not.toBeInTheDocument();
-    expect(screen.queryByText("Chromatic Orb")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^Cure Wounds/ }));
+    expect(screen.getByRole("button", { name: "Roll healing" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Roll healing" }));
+    await user.click(screen.getByRole("button", { name: "Done" }));
 
-    await userEvent.click(screen.getByRole("button", { name: "Show all spells" }));
+    const op = lastOp();
+    expect(op.effect?.kind).toBe("heal");
+    expect(op.apply).toMatchObject({ target: "self", kind: "heal" });
+    expect(op.apply?.amount).toBeGreaterThan(0);
+  });
+});
 
-    expect(screen.getByText("Sacred Flame")).toBeInTheDocument();
-    expect(screen.getByText("Chromatic Orb")).toBeInTheDocument();
-    expect(screen.getByText("Cure Wounds")).toBeInTheDocument();
+describe("InlineSpellPicker — no-roll utility shape (Druidcraft)", () => {
+  it("one tap resolves it — toHit/save/effect all absent", async () => {
+    const user = userEvent.setup();
+    renderPicker(makeCharacter([DRUIDCRAFT]));
+
+    await user.click(screen.getByRole("button", { name: /^Druidcraft/ }));
+    await user.click(screen.getByRole("button", { name: "Resolve" }));
+
+    const op = lastOp();
+    expect(op.toHit ?? null).toBeNull();
+    expect(op.save ?? null).toBeNull();
+    expect(op.effect ?? null).toBeNull();
+    expect(op.entryId).toBe("entry-druidcraft");
+  });
+});
+
+describe("InlineSpellPicker — economy interlock + single spend", () => {
+  it("commits exactly once per resolution and fires onCommitSlot (deferred to mutation success)", async () => {
+    const user = userEvent.setup();
+    const { onCommitSlot } = renderPicker(makeCharacter([DRUIDCRAFT]));
+
+    await user.click(screen.getByRole("button", { name: /^Druidcraft/ }));
+    const resolve = screen.getByRole("button", { name: "Resolve" });
+    await user.click(resolve);
+
+    expect(applyResolveActionOperations).toHaveBeenCalledTimes(1);
+    // onCommitSlot fires only once the mutation's promise resolves (#1848
+    // review fix) — not synchronously alongside the mutate() call.
+    await waitFor(() => expect(onCommitSlot).toHaveBeenCalledTimes(1));
+    // The rail's own completion button disappears once completed — no second tap possible.
+    expect(screen.queryByRole("button", { name: "Resolve" })).not.toBeInTheDocument();
   });
 
-  it("falls back to the full list when the focused spell is not castable", () => {
-    renderPicker(makeCharacter(), { focusSpellId: "sp-unknown" });
+  it("disables the resolver once the economy slot is unavailable", async () => {
+    const user = userEvent.setup();
+    renderPicker(makeCharacter([DRUIDCRAFT]), { slotAvailable: false });
 
-    expect(screen.getByText("Sacred Flame")).toBeInTheDocument();
-    expect(screen.getByText("Cure Wounds")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Show all spells" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^Druidcraft/ }));
+    expect(screen.getByRole("button", { name: "Resolve" })).toBeDisabled();
+  });
+
+  // #1848 review (CRITICAL): a rejected resolveAction mutation must NOT spend
+  // the turn-state economy slot — the pre-fix code called onCommitSlot
+  // synchronously, fire-and-forget alongside the mutation, so a server error
+  // still permanently marked the slot spent with no retry path.
+  it("does NOT call onCommitSlot when the resolveAction mutation rejects", async () => {
+    const user = userEvent.setup();
+    vi.mocked(applyResolveActionOperations).mockRejectedValueOnce(new Error("network blip"));
+    const { onCommitSlot } = renderPicker(makeCharacter([DRUIDCRAFT]));
+
+    await user.click(screen.getByRole("button", { name: /^Druidcraft/ }));
+    await user.click(screen.getByRole("button", { name: "Resolve" }));
+
+    // Let the rejected mutation settle — the failure surfaces as an error message.
+    await screen.findByText("network blip");
+    expect(onCommitSlot).not.toHaveBeenCalled();
+  });
+});
+
+describe("InlineSpellPicker — entryId routes concentration through the same castAbilityInTx sequence", () => {
+  it("a concentration spell's op carries the entry id the backend needs to set/displace concentration", async () => {
+    const user = userEvent.setup();
+    renderPicker(makeCharacter([CONCENTRATION_SPELL]));
+
+    await user.click(screen.getByRole("button", { name: /^Bless/ }));
+    await user.click(screen.getByRole("button", { name: "Resolve" }));
+
+    const op = lastOp();
+    expect(op.entryId).toBe("entry-bless");
+    expect(op.slotLevel).toBe(1);
   });
 });

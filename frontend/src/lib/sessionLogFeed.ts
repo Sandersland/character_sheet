@@ -1,22 +1,28 @@
 /**
- * Pure event → chat-line transform for the Session Log (#1237). No JSX here —
- * SessionLog maps the FeedItem[] this produces onto `<li>`/`<details>`, and
- * resolves each segment's `tone`/`damageType` to a Tailwind class via
+ * Pure event → chat-line transform for the Session Log (#1237, rewritten for
+ * the unified combat resolver #1830). No JSX here — SessionLog maps the
+ * FeedItem[] this produces onto `<li>`/`<details>`, and resolves each
+ * segment's `tone`/`damageType` to a Tailwind class via
  * `logToneClass`/`damageTypeTone`.
  *
- * Pipeline: filter reverted/revert → tag rounds → merge attack+damage swings
- * (by `swingId`, #1235) → reverse to oldest-first (chat convention: newest at
- * the bottom) → collapse same-kind, same-round roll runs (#983) → insert round
- * separators.
+ * Pipeline: filter reverted/revert → tag rounds → build one row per event
+ * (a `resolveAction` event is ALREADY one consolidated roll — no attack+damage
+ * pairing to do, #1827 model B) → reverse to oldest-first (chat convention:
+ * newest at the bottom) → collapse same-kind, same-round roll runs (#983) →
+ * insert round separators.
  */
 
 import { abilityLabel } from "@/lib/abilities";
 import { formatRollBreakdown } from "@/lib/dice";
 import type { CharacterEvent } from "@/types/character";
 import type {
+  ResolveActionEventData,
+  ResolveActionEventEffect,
+  ResolveActionEventToHit,
+  ResolveActionEventSave,
   RollEventAttackComponents,
-  RollEventData,
   RollEventDamageComponents,
+  RollEventData,
   RollEventMode,
   RollEventModeSource,
 } from "@character-sheet/shared-types";
@@ -73,10 +79,10 @@ export function visibleLogEvents(events: CharacterEvent[]): CharacterEvent[] {
 
 /**
  * The "N events" badge (CombatLogRow) and the rendered feed (SessionLog) both
- * derive their count from this — merged swings count once (buildRows already
- * folds an attack+damage pair into one FeedRow), rows hidden inside a
- * collapsed run still count (they're still log content), round separators
- * never do (#1237 §4 — the two counts drifted when each rolled its own).
+ * derive their count from this — a resolution counts once (it was always one
+ * event, #1827 model B), rows hidden inside a collapsed run still count
+ * (they're still log content), round separators never do (#1237 §4 — the two
+ * counts drifted when each rolled its own).
  */
 export function feedItemRowCount(items: FeedItem[]): number {
   return items.reduce((n, item) => {
@@ -109,16 +115,17 @@ function buildRoundMap(activeEvents: CharacterEvent[]): Map<string, number> {
   return roundById;
 }
 
-// Shared by the attack/damage/ability-roll builders below, e.g. "+ 3 (Proficiency)".
+// Shared by the to-hit/effect/ability-roll builders below, e.g. "+ 3 (Proficiency)".
 function signedAddend(value: number, label: string): string {
   const sign = value >= 0 ? "+" : "−";
   return `${sign} ${Math.abs(value)} (${label})`;
 }
 
 // "Advantage (flanking)" / "Disadvantage (Prone)" — modeSources is only
-// POPULATED for attack rolls (#1235's producer, useAttackRolls); the type
-// itself carries no such restriction, check/save/initiative just never set
-// it, so those fall back to the bare mode word.
+// POPULATED for the standalone check/save/initiative roll producer; a
+// resolveAction's toHit carries no mode-source list (its `bonus` is already
+// the resolved flat total, not a decomposed breakdown), so this stays scoped
+// to buildAbilityRollRow below.
 function rollModeNote(
   rollMode: RollEventMode | undefined,
   modeSources: RollEventModeSource[] | undefined,
@@ -127,45 +134,6 @@ function rollModeNote(
   const label = rollMode === "advantage" ? "Advantage" : "Disadvantage";
   const names = [...new Set((modeSources ?? []).filter((m) => m.mode === rollMode).map((m) => m.source))];
   return names.length > 0 ? `${label} (${names.join(", ")})` : label;
-}
-
-// (component key, display label) pairs, in mockup render order — a lookup
-// instead of one `if` per field, shared by the attack/damage drill-in
-// builders below to keep each a flat, low-branching function (#1237). Only
-// NON-ZERO addends render, per the mockup spec's explicit note. "abilityMod"'s
-// label here is the fallback for an event logged before #1361 added `ability`
-// to the wire type — labeledAddends swaps in the named ability via
-// `abilityLabel` whenever the component carries one.
-const ATTACK_ADDEND_LABELS: [keyof RollEventAttackComponents, string][] = [
-  ["abilityMod", "Ability"],
-  ["proficiencyBonus", "Proficiency"],
-  ["rangedBonus", "Ranged"],
-  ["attackRollBonus", "Bonus"],
-];
-
-const DAMAGE_ADDEND_LABELS: [keyof RollEventDamageComponents, string][] = [
-  ["abilityMod", "Ability"],
-  ["meleeDamageBonus", "Melee bonus"],
-];
-
-// `T`'s fields are all-number component records (RollEventAttackComponents /
-// RollEventDamageComponents) but neither declares a string index signature,
-// so `keyof T` is indexed via a cast rather than widening T's own type.
-// `ability` is read off `components` directly (never through the cast Record,
-// which is number-only) and resolved to display text via `abilityLabel` —
-// never the raw key (ad-hoc capitalization of ability keys has shipped twice).
-function labeledAddends<T extends { ability?: string }>(
-  components: T | undefined,
-  labels: [keyof T, string][],
-): string[] {
-  if (!components) return [];
-  const values = components as unknown as Record<keyof T, number>;
-  return labels
-    .filter(([key]) => values[key])
-    .map(([key, label]) => {
-      const resolvedLabel = key === "abilityMod" && components.ability ? abilityLabel(components.ability) : label;
-      return signedAddend(values[key], resolvedLabel);
-    });
 }
 
 // `RollEventData.total` is typed as required, but old/malformed persisted
@@ -178,192 +146,6 @@ function hasNumericTotal(data: RollEventData): boolean {
 
 function summaryFallbackRow(e: CharacterEvent, round: number | undefined): FeedRow {
   return { id: e.id, round, tone: "default", segments: [{ text: e.summary }] };
-}
-
-// The leading "1d20 (...)" token for an attack roll. Plain "1d20 (12)" when
-// there's no dropped die (normal roll, or a pre-#1359 event that never
-// carried droppedFaces); "1d20 (5, 9 — lower kept)" when there is one, "lower"
-// vs "higher" decided by comparing the two recorded face VALUES — never
-// re-derived from `rollMode`, which is a separate field absent on old events.
-function attackDieToken(data: RollEventData): string | null {
-  if (!data.faces || data.faces.length === 0) return null;
-  const keptLabel = data.nat20 ? "nat 20" : `${data.faces[0]}`;
-  const dropped = data.droppedFaces?.[0];
-  if (dropped === undefined) return `1d20 (${keptLabel})`;
-  const keptWord =
-    data.faces[0] < dropped ? "lower kept" : data.faces[0] > dropped ? "higher kept" : "kept";
-  return `1d20 (${keptLabel}, ${dropped} — ${keptWord})`;
-}
-
-function buildAttackDrillRow(e: CharacterEvent): DrillInRow {
-  const data = (e.data ?? {}) as RollEventData;
-  const dieToken = attackDieToken(data);
-  const parts = [dieToken, ...labeledAddends(data.attackComponents, ATTACK_ADDEND_LABELS)].filter(
-    (p): p is string => p !== null,
-  );
-  return {
-    label: "Attack",
-    // Undefined rather than "" when nothing decomposed: DrillInLine keys off
-    // `formula === undefined` to tell a formula row from an aside, so an empty
-    // string would render a bare "= 17".
-    formula: parts.length > 0 ? parts.join(" ") : undefined,
-    total: `${data.total}`,
-    note: rollModeNote(data.rollMode, data.modeSources) ?? undefined,
-  };
-}
-
-// The leading `NdM` token plus its kept faces, e.g. "2d6 (5, 6 — dice doubled)".
-// Null when specLabel isn't a recognizable dice spec or faces are missing.
-function diceToken(specLabel: string | undefined, faces: number[] | undefined, doubled: boolean): string | null {
-  const match = specLabel?.match(/^(\d+d\d+)/);
-  if (!match || !faces || faces.length === 0) return null;
-  return `${match[1]} (${faces.join(", ")}${doubled ? " — dice doubled" : ""})`;
-}
-
-function buildDamageDrillRow(e: CharacterEvent, label = "Damage"): DrillInRow {
-  const data = (e.data ?? {}) as RollEventData;
-  const dice = diceToken(data.specLabel, data.faces, data.crit === true) ?? data.specLabel;
-  const parts = [dice, ...labeledAddends(data.damageComponents, DAMAGE_ADDEND_LABELS)].filter((p): p is string =>
-    Boolean(p),
-  );
-  return {
-    label,
-    // Undefined rather than "", same contract as buildAttackDrillRow: DrillInLine
-    // keys off `formula === undefined` to tell a formula row from an aside.
-    formula: parts.length > 0 ? parts.join(" ") : undefined,
-    total: data.damageType ? `${data.total} ${data.damageType}` : `${data.total}`,
-  };
-}
-
-function damageWordSegment(damageType: string | undefined, trailingWord: boolean): LogSegment {
-  const text = damageType ? (trailingWord ? `${damageType} damage.` : `${damageType}.`) : trailingWord ? "damage." : ".";
-  return { text, damageType };
-}
-
-// An attackRoll with no damage partner: either a confirmed miss, or a solo
-// attack roll that never gets one (a spell attack, which carries no swingId
-// — #1237 §3). Both branches still render the full sentence + drill-in from
-// whatever RollEventData the event carries; only the total-missing guard above
-// degrades to the raw summary.
-function buildAttackOnlyRow(e: CharacterEvent, round: number | undefined): FeedRow {
-  const data = (e.data ?? {}) as RollEventData;
-  if (!hasNumericTotal(data)) return summaryFallbackRow(e, round);
-
-  const source = data.source || e.summary;
-  if (data.verdict === "miss") {
-    const note = rollModeNote(data.rollMode, data.modeSources);
-    return {
-      id: e.id,
-      round,
-      tone: "muted",
-      italic: true,
-      runKind: "swing",
-      segments: [
-        { text: source, bold: true, italic: false },
-        { text: " — missed." },
-        ...(note ? [{ text: ` ${note}` }] : []),
-      ],
-      drillIn: [buildAttackDrillRow(e), { label: "", note: "Called a miss — no damage rolled." }],
-    };
-  }
-
-  return {
-    id: e.id,
-    round,
-    tone: "default",
-    runKind: "swing",
-    segments: [
-      { text: "Rolled " },
-      { text: source, bold: true },
-      { text: " — " },
-      { text: `${data.total}`, bold: true },
-      { text: "." },
-    ],
-    drillIn: [buildAttackDrillRow(e)],
-  };
-}
-
-function critSwingSegments(source: string, dmgData: RollEventData): LogSegment[] {
-  return [
-    { text: source, bold: true },
-    { text: " — " },
-    { text: "critical hit!", tone: "harm" },
-    { text: " " },
-    { text: `${dmgData.total}`, bold: true },
-    { text: " " },
-    damageWordSegment(dmgData.damageType, true),
-  ];
-}
-
-function hitSwingSegments(source: string, dmgData: RollEventData): LogSegment[] {
-  return [
-    { text: source, bold: true },
-    { text: " — hit for " },
-    { text: `${dmgData.total}`, bold: true },
-    { text: " " },
-    damageWordSegment(dmgData.damageType, false),
-  ];
-}
-
-// The attack partner's own total can independently be missing (old data) —
-// omit just its drill-in line rather than losing the whole (otherwise-valid) row.
-function attackDrillInFor(attackEvent: CharacterEvent | undefined): DrillInRow[] {
-  if (!attackEvent || !hasNumericTotal((attackEvent.data ?? {}) as RollEventData)) return [];
-  return [buildAttackDrillRow(attackEvent)];
-}
-
-// Forward-compat (#1237): RollEventData.target/outcome are reserved but never
-// populated (no enemy/target model — self-or-announce, CLAUDE.md). A future
-// "→ Goblin hit" continuation just appends one more LogSegment to `segments`
-// below — no restructuring needed when that data eventually exists.
-function buildSwingRow(
-  attackEvent: CharacterEvent | undefined,
-  damageEvent: CharacterEvent,
-  round: number | undefined,
-): FeedRow {
-  const dmgData = (damageEvent.data ?? {}) as RollEventData;
-  if (!hasNumericTotal(dmgData)) return summaryFallbackRow(damageEvent, round);
-
-  const atkData = (attackEvent?.data ?? {}) as RollEventData;
-  const source = dmgData.source || atkData.source || damageEvent.summary;
-  const isCrit = dmgData.crit === true || dmgData.verdict === "crit";
-
-  return {
-    id: damageEvent.id,
-    round,
-    tone: "default",
-    runKind: "swing",
-    segments: isCrit ? critSwingSegments(source, dmgData) : hitSwingSegments(source, dmgData),
-    drillIn: [...attackDrillInFor(attackEvent), buildDamageDrillRow(damageEvent)],
-  };
-}
-
-function buildDamageOnlyRow(e: CharacterEvent, round: number | undefined): FeedRow {
-  const data = (e.data ?? {}) as RollEventData;
-  if (!hasNumericTotal(data)) return summaryFallbackRow(e, round);
-
-  const source = data.source || e.summary;
-  return {
-    id: e.id,
-    round,
-    tone: "default",
-    runKind: "damageRoll",
-    segments: [
-      { text: source, bold: true },
-      { text: " — " },
-      { text: `${data.total}`, bold: true },
-      { text: " " },
-      damageWordSegment(data.damageType, true),
-    ],
-    drillIn: [buildDamageDrillRow(e)],
-  };
-}
-
-// The backend normalizes every unset optional RollEventData field to `null`
-// (a JSON column can't hold `undefined`), not just leaving it absent — a
-// strict `!== undefined` check here rendered a literal "(DC null)" (#1237).
-function dcSuffix(dc: number | undefined | null): string {
-  return dc != null ? ` (DC ${dc})` : "";
 }
 
 function abilityRollFormula(data: RollEventData): string {
@@ -403,6 +185,364 @@ function buildAbilityRollRow(e: CharacterEvent, round: number | undefined): Feed
       },
     ],
   };
+}
+
+// The backend normalizes every unset optional RollEventData field to `null`
+// (a JSON column can't hold `undefined`), not just leaving it absent — a
+// strict `!== undefined` check here rendered a literal "(DC null)" (#1237).
+function dcSuffix(dc: number | undefined | null): string {
+  return dc != null ? ` (DC ${dc})` : "";
+}
+
+// The bare type word for one damage/heal term, colored by damage type — no
+// trailing punctuation of its own (effectTailSegments appends the single
+// shared "damage."/"." ending once, after the LAST term). `damageType`
+// undefined/empty degrades to an empty word (old/malformed persisted rows —
+// the schema requires a non-empty `type`, so this is unreachable through the
+// validated write path, kept defensive like the rest of this file's #1237 §5
+// guards).
+function typeWordSegment(damageType: string | undefined): LogSegment {
+  return { text: damageType ?? "", damageType };
+}
+
+// The trailing "N type[ + N type…][ damage]." — sums the primary `effect`
+// with every typed rider (#1843: Flame Tongue +2d6 fire, Divine Smite
+// radiant, Hunter's Mark, sneak attack) into ONE consolidated sentence tail
+// instead of a second feed row (#1822 regression fix): each term after the
+// first is prefixed " + <total> ", and the single shared "damage."/"." ending
+// attaches once, to the LAST term — identical output to the pre-riders
+// single-term case when `riders` is empty. Shared by the attack-hit, save,
+// and auto-hit resolution builders below. A heal never carries a rider
+// (riders are dice-valued weapon on-hit damage only) so keeps its own fixed
+// " HP." ending untouched.
+function effectTailSegments(
+  effect: ResolveActionEventEffect,
+  riders: ResolveActionEventEffect[],
+  trailingWord: boolean,
+): LogSegment[] {
+  if (effect.kind === "heal") return [{ text: " HP." }];
+  const segments: LogSegment[] = [];
+  [effect, ...riders].forEach((term, i) => {
+    segments.push({ text: i === 0 ? " " : " + " });
+    if (i > 0) segments.push({ text: `${term.total}`, bold: true }, { text: " " });
+    segments.push(typeWordSegment(term.type));
+  });
+  segments[segments.length - 1].text += trailingWord ? " damage." : ".";
+  return segments;
+}
+
+// The leading "1d20 (...)" token for a resolution's to-hit roll. Plain
+// "1d20 (12)" when there's no dropped die (a normal roll, or a single-entry
+// `faces`); "1d20 (5, 9 — lower kept)" when advantage/disadvantage rolled a
+// second die — "lower" vs "higher" decided by comparing the two recorded face
+// VALUES, never re-derived from a rollMode (resolveAction carries no such field).
+function toHitDieToken(toHit: ResolveActionEventToHit): string {
+  const keptLabel = toHit.nat20 ? "nat 20" : `${toHit.kept}`;
+  if (toHit.faces.length < 2) return `1d20 (${keptLabel})`;
+  const dropped = toHit.faces.find((face) => face !== toHit.kept) ?? toHit.faces[0];
+  const keptWord = toHit.kept < dropped ? "lower kept" : toHit.kept > dropped ? "higher kept" : "kept";
+  return `1d20 (${keptLabel}, ${dropped} — ${keptWord})`;
+}
+
+// (component key, display label) pairs, in mockup render order — a lookup
+// instead of one `if` per field, shared by the to-hit/effect drill-in
+// builders below. Only NON-ZERO addends render, per the mockup spec's
+// explicit note. Reused unchanged from the pre-#1830 attackRoll/damageRoll
+// renderer (#1237) — an adapter (#1832/#1833) populates `components` on the
+// resolveAction event with this same shape.
+const ATTACK_ADDEND_LABELS: [keyof RollEventAttackComponents, string][] = [
+  ["abilityMod", "Ability"],
+  ["proficiencyBonus", "Proficiency"],
+  ["rangedBonus", "Ranged"],
+  ["attackRollBonus", "Bonus"],
+];
+
+const DAMAGE_ADDEND_LABELS: [keyof RollEventDamageComponents, string][] = [
+  ["abilityMod", "Ability"],
+  ["meleeDamageBonus", "Melee bonus"],
+];
+
+// `T`'s fields are all-number component records (RollEventAttackComponents /
+// RollEventDamageComponents) but neither declares a string index signature,
+// so `keyof T` is indexed via a cast rather than widening T's own type.
+// `ability` is read off `components` directly (never through the cast Record,
+// which is number-only) and resolved to display text via `abilityLabel` —
+// never the raw key (ad-hoc capitalization of ability keys has shipped twice).
+function labeledAddends<T extends { ability?: string }>(
+  components: T | undefined,
+  labels: [keyof T, string][],
+): string[] {
+  if (!components) return [];
+  const values = components as unknown as Record<keyof T, number>;
+  return labels
+    .filter(([key]) => values[key])
+    .map(([key, label]) => {
+      const resolvedLabel = key === "abilityMod" && components.ability ? abilityLabel(components.ability) : label;
+      return signedAddend(values[key], resolvedLabel);
+    });
+}
+
+function unlabeledAddend(value: number): string {
+  const sign = value >= 0 ? "+" : "−";
+  return `${sign} ${Math.abs(value)}`;
+}
+
+// Floor for when a resolution's effect carries no decomposed `components`
+// (pre-adapter — #1832/#1833 populate it): pulls the trailing flat modifier
+// straight off the served `spec` text ("1d6 + 4" → 4, "3d4+3" → 3) so the
+// drill-in's addend still reconciles `formula` to `total` even with no
+// labeled breakdown. `null` when `spec` has no trailing modifier (e.g. "1d8").
+function parseSpecModifier(spec: string): number | null {
+  const match = spec.match(/([+-])\s*(\d+)\s*$/);
+  if (!match) return null;
+  return (match[1] === "-" ? -1 : 1) * Number(match[2]);
+}
+
+// resolveAction's `toHit.bonus` is the server-resolved flat total (rules
+// logic is backend-owned). When an adapter has attached the decomposed
+// `components` breakdown, render THAT instead — same labeled-addend
+// treatment the pre-#1830 attackRoll drill-in used; otherwise fall back to
+// the one flat "+N (Bonus)" line, which still reconciles the formula to
+// `total` on its own.
+function buildToHitDrillRow(toHit: ResolveActionEventToHit): DrillInRow {
+  const dieToken = toHitDieToken(toHit);
+  const addends = toHit.components
+    ? labeledAddends(toHit.components, ATTACK_ADDEND_LABELS)
+    : toHit.bonus !== 0
+      ? [signedAddend(toHit.bonus, "Bonus")]
+      : [];
+  return { label: "Attack", formula: [dieToken, ...addends].join(" "), total: `${toHit.total}` };
+}
+
+// The leading `NdM` token plus its kept faces, e.g. "2d6 (5, 6 — dice doubled)".
+// Reused for an effect's `spec`/`faces`, same as the old damage drill-in.
+function diceToken(spec: string | undefined, faces: number[] | undefined, doubled: boolean): string | null {
+  const match = spec?.match(/^(\d+d\d+)/);
+  if (!match || !faces || faces.length === 0) return null;
+  return `${match[1]} (${faces.join(", ")}${doubled ? " — dice doubled" : ""})`;
+}
+
+// The formula must always reconcile to `total` (a mismatch reads as a live
+// bug to a player): with `components`, render the labeled addends; without
+// them, floor to `spec`'s own trailing modifier (`parseSpecModifier`) as one
+// unlabeled addend — either way the dice + addends sum to `total`.
+//
+// `doubled` keys the "— dice doubled" suffix; it defaults to the effect's own
+// `effect.crit` (a rider's own roll-time crit, via buildRiderDrillRow) but the
+// primary effect passes the resolution row's already-computed `isCrit`
+// instead — `toHit.verdict === "crit"` (a DM-ruled crit call) can be true
+// while `effect.crit` is false, and the drill-in must match the summary's
+// "critical hit!" wording rather than re-deciding doubling on its own.
+function buildEffectDrillRow(effect: ResolveActionEventEffect, doubled: boolean = effect.crit): DrillInRow {
+  const label = effect.kind === "heal" ? "Healing" : "Damage";
+  const dice = diceToken(effect.spec, effect.faces, doubled) ?? effect.spec;
+  const addends = effect.components
+    ? labeledAddends(effect.components, DAMAGE_ADDEND_LABELS)
+    : (() => {
+        const modifier = parseSpecModifier(effect.spec);
+        return modifier ? [unlabeledAddend(modifier)] : [];
+      })();
+  return {
+    label,
+    formula: [dice, ...addends].join(" "),
+    total: effect.kind === "heal" ? `${effect.total}` : `${effect.total} ${effect.type}`,
+  };
+}
+
+function capitalize(word: string): string {
+  return word.length === 0 ? word : word[0].toUpperCase() + word.slice(1);
+}
+
+// A rider's own drill-in line (#1843) — same formula/total reconciliation as
+// the primary effect (buildEffectDrillRow), labeled by its OWN damage type
+// ("Fire") rather than the generic "Damage" so a multi-term drill-in reads as
+// separate typed rolls, not two identically-labeled "Damage" rows.
+function buildRiderDrillRow(effect: ResolveActionEventEffect): DrillInRow {
+  return { ...buildEffectDrillRow(effect), label: capitalize(effect.type) };
+}
+
+// A saving throw is announced to the DM, not rolled by the caster (no enemy/
+// target model, self-or-announce, CLAUDE.md) — so its drill-in carries no dice
+// formula, just the DC the DM rolls against.
+function buildSaveDrillRow(save: ResolveActionEventSave): DrillInRow {
+  return { label: "Save", total: `DC ${save.dc} ${abilityLabel(save.ability)}` };
+}
+
+// A miss carries no effect roll — mirrors the pre-#1830 miss line exactly
+// (italic, muted, weapon name un-italicized inside it).
+function buildMissResolutionRow(e: CharacterEvent, toHit: ResolveActionEventToHit, source: string, round: number | undefined): FeedRow {
+  return {
+    id: e.id,
+    round,
+    tone: "muted",
+    italic: true,
+    runKind: "resolveAction",
+    segments: [{ text: source, bold: true, italic: false }, { text: " — missed." }],
+    drillIn: [buildToHitDrillRow(toHit), { label: "", note: "Called a miss — no damage rolled." }],
+  };
+}
+
+// A hit/crit with no effect data is unreachable from the backend's own
+// schema (a hit always carries the rolled effect) but old/malformed events
+// could still lack one — degrade to a bare roll line rather than throwing.
+function buildBareToHitRow(e: CharacterEvent, toHit: ResolveActionEventToHit, source: string, round: number | undefined): FeedRow {
+  return {
+    id: e.id,
+    round,
+    tone: "default",
+    runKind: "resolveAction",
+    segments: [{ text: "Rolled " }, { text: source, bold: true }, { text: " — " }, { text: `${toHit.total}`, bold: true }, { text: "." }],
+    drillIn: [buildToHitDrillRow(toHit)],
+  };
+}
+
+// Attack-roll resolution (weapon swing, Fire Bolt): to-hit die, then effect
+// on anything but a miss. Forward-compat (#1237): a future "→ Goblin hit"
+// continuation just appends one more LogSegment — no restructuring needed.
+// `riders` (#1843) sums into the SAME sentence/drill-in as the primary
+// effect — a Flame Tongue swing is still exactly one row (#1822 regression
+// fix) and the rider is undoable only as part of this one event (#1823).
+function buildAttackResolutionRow(
+  e: CharacterEvent,
+  data: ResolveActionEventData,
+  source: string,
+  riders: ResolveActionEventEffect[],
+  round: number | undefined,
+): FeedRow {
+  const toHit = data.toHit!;
+  if (toHit.verdict === "miss") return buildMissResolutionRow(e, toHit, source, round);
+  if (!data.effect) return buildBareToHitRow(e, toHit, source, round);
+
+  const effect = data.effect;
+  const isCrit = toHit.verdict === "crit" || effect.crit === true;
+  const isHeal = effect.kind === "heal";
+  // Assassinate (#1526): a crit this app can't itself verify against a
+  // target/AC still needs a legible CAUSE in the log, not just "critical
+  // hit!" — the same requirement `data.assassinate` exists to satisfy, per
+  // ResolveActionEventData's own contract comment.
+  const critLabel = data.assassinate ? "critical hit — Assassinate!" : "critical hit!";
+  const segments: LogSegment[] = isCrit
+    ? [
+        { text: source, bold: true },
+        { text: " — " },
+        { text: critLabel, tone: "harm" },
+        { text: " " },
+        { text: `${effect.total}`, bold: true },
+        ...effectTailSegments(effect, riders, true),
+      ]
+    : isHeal
+      ? [
+          { text: source, bold: true },
+          { text: " — healed " },
+          { text: `${effect.total}`, bold: true },
+          { text: " HP." },
+        ]
+      : [
+          { text: source, bold: true },
+          { text: " — hit for " },
+          { text: `${effect.total}`, bold: true },
+          ...effectTailSegments(effect, riders, false),
+        ];
+
+  return {
+    id: e.id,
+    round,
+    tone: isHeal ? "heal" : "default",
+    runKind: "resolveAction",
+    segments,
+    drillIn: [buildToHitDrillRow(toHit), buildEffectDrillRow(effect, isCrit), ...riders.map(buildRiderDrillRow)],
+  };
+}
+
+// Saving-throw resolution (Sacred Flame): DC announced, no roll of the
+// caster's own — effect (if any), plus any typed rider (#1843), follows the
+// DC in one sentence.
+function buildSaveResolutionRow(
+  e: CharacterEvent,
+  data: ResolveActionEventData,
+  source: string,
+  riders: ResolveActionEventEffect[],
+  round: number | undefined,
+): FeedRow {
+  const save = data.save!;
+  const effect = data.effect;
+  const isHeal = effect?.kind === "heal";
+  const segments: LogSegment[] = [
+    { text: source, bold: true },
+    { text: ` — DC ${save.dc} ${abilityLabel(save.ability)} save` },
+  ];
+  if (effect) {
+    segments.push({ text: ", " }, { text: `${effect.total}`, bold: true }, ...effectTailSegments(effect, riders, false));
+  } else {
+    segments.push({ text: "." });
+  }
+
+  const drillIn: DrillInRow[] = [buildSaveDrillRow(save)];
+  if (effect) drillIn.push(buildEffectDrillRow(effect), ...riders.map(buildRiderDrillRow));
+
+  return { id: e.id, round, tone: isHeal ? "heal" : "default", runKind: "resolveAction", segments, drillIn };
+}
+
+// Auto-hit (Magic Missile) or a self-targeted heal with neither a to-hit nor
+// a save: the effect lands unconditionally. Multi-die effects (Magic
+// Missile's 3 darts) are ONE `effect` roll whose `faces` already carries the
+// per-dart breakdown — buildEffectDrillRow reads it with no instances model.
+// `riders` (#1843) sums in the same way the attack-roll shape does.
+function buildEffectOnlyResolutionRow(
+  e: CharacterEvent,
+  data: ResolveActionEventData,
+  source: string,
+  riders: ResolveActionEventEffect[],
+  round: number | undefined,
+): FeedRow {
+  const effect = data.effect!;
+  const isHeal = effect.kind === "heal";
+  const segments: LogSegment[] = isHeal
+    ? [{ text: source, bold: true }, { text: " — healed " }, { text: `${effect.total}`, bold: true }, { text: " HP." }]
+    : [
+        { text: source, bold: true },
+        { text: " — " },
+        { text: `${effect.total}`, bold: true },
+        ...effectTailSegments(effect, riders, true),
+      ];
+
+  return {
+    id: e.id,
+    round,
+    tone: isHeal ? "heal" : "default",
+    runKind: "resolveAction",
+    segments,
+    drillIn: [buildEffectDrillRow(effect), ...riders.map(buildRiderDrillRow)],
+  };
+}
+
+// No-roll utility resolution (Druidcraft): one tap, done — no drill-in.
+function buildNoRollResolutionRow(e: CharacterEvent, source: string, round: number | undefined): FeedRow {
+  return {
+    id: e.id,
+    round,
+    tone: "default",
+    runKind: "resolveAction",
+    segments: [{ text: `Cast ${source}.` }],
+  };
+}
+
+// Dispatches a `resolveAction` event to its shape — toHit/save/effect are
+// mutually exclusive-ish by design (see ResolveActionEventData): a weapon
+// swing or attack-roll spell sets toHit, a saving-throw spell sets save, an
+// auto-hit or heal-only spell sets only effect, and a no-roll utility spell
+// (Druidcraft) sets none of the three. `riders` (#1843) rides along
+// regardless of shape — every shape builder sums it into its own sentence/
+// drill-in the same way.
+function buildResolveActionRow(e: CharacterEvent, round: number | undefined): FeedRow {
+  const data = (e.data ?? {}) as ResolveActionEventData;
+  const source = data.source || e.summary;
+  const riders = data.riders ?? [];
+
+  if (data.toHit) return buildAttackResolutionRow(e, data, source, riders, round);
+  if (data.save) return buildSaveResolutionRow(e, data, source, riders, round);
+  if (data.effect) return buildEffectOnlyResolutionRow(e, data, source, riders, round);
+  return buildNoRollResolutionRow(e, source, round);
 }
 
 // Exact mockup copy for the session/combat lifecycle events; buildPlainRow
@@ -514,75 +654,14 @@ function buildPlainRow(e: CharacterEvent, round: number | undefined): FeedRow {
   };
 }
 
-interface SwingPairing {
-  /** damage event id → its paired attack event, for swingIds with a partner. */
-  attackForDamage: Map<string, CharacterEvent>;
-  /** Attack event ids consumed as a swing partner — these render nothing on
-   *  their own; they surface inside the paired damage row instead. */
-  consumedAttackIds: Set<string>;
-}
-
-// Pairs at MOST one attack with one damage per swingId (#1237 §6): a bug in
-// useAttackRolls' swingIdRef (never cleared between damage calls) can log two
-// damage events under the same swingId, or — more rarely — two attacks. Every
-// event beyond the first pairing must still render as its own standalone row;
-// none may vanish. Walks oldest-first so "first attack, first damage" wins
-// the pairing regardless of the feed's own (newest-first) order.
-function buildSwingPairing(events: CharacterEvent[]): SwingPairing {
-  const chronological = [...events].reverse();
-  const pendingAttackBySwing = new Map<string, CharacterEvent>();
-  const attackForDamage = new Map<string, CharacterEvent>();
-  const consumedAttackIds = new Set<string>();
-  for (const e of chronological) {
-    const data = e.data as RollEventData | undefined;
-    if (!data?.swingId) continue;
-    if (e.type === "attackRoll") {
-      if (!pendingAttackBySwing.has(data.swingId)) pendingAttackBySwing.set(data.swingId, e);
-    } else if (e.type === "damageRoll") {
-      const pendingAttack = pendingAttackBySwing.get(data.swingId);
-      if (pendingAttack) {
-        attackForDamage.set(e.id, pendingAttack);
-        consumedAttackIds.add(pendingAttack.id);
-        pendingAttackBySwing.delete(data.swingId);
-      }
-    }
-  }
-  return { attackForDamage, consumedAttackIds };
-}
-
-// Returns null when this attack's damage partner will render the merged swing
-// row instead (rendered at the damage event's position, see handleDamageRollEvent).
-function handleAttackRollEvent(
-  e: CharacterEvent,
-  pairing: SwingPairing,
-  round: number | undefined,
-): FeedRow | null {
-  return pairing.consumedAttackIds.has(e.id) ? null : buildAttackOnlyRow(e, round);
-}
-
-function handleDamageRollEvent(e: CharacterEvent, pairing: SwingPairing, round: number | undefined): FeedRow {
-  const data = (e.data ?? {}) as RollEventData;
-  if (!data.swingId) {
-    // A rider (Flame Tongue +2d6) or a spell damage roll — neither carries
-    // swingId today (#1235 gap), so it can't be folded into a parent swing
-    // line; render it as its own roll row instead of guessing a correlation.
-    return buildDamageOnlyRow(e, round);
-  }
-  return buildSwingRow(pairing.attackForDamage.get(e.id), e, round);
-}
-
 const ABILITY_ROLL_TYPES = new Set(["checkRoll", "saveRoll", "initiativeRoll"]);
 
 function buildRows(events: CharacterEvent[], roundById: Map<string, number>): FeedRow[] {
-  const pairing = buildSwingPairing(events);
   const rows: FeedRow[] = [];
   for (const e of events) {
     const round = roundById.get(e.id);
-    if (e.type === "attackRoll") {
-      const row = handleAttackRollEvent(e, pairing, round);
-      if (row) rows.push(row);
-    } else if (e.type === "damageRoll") {
-      rows.push(handleDamageRollEvent(e, pairing, round));
+    if (e.type === "resolveAction") {
+      rows.push(buildResolveActionRow(e, round));
     } else if (ABILITY_ROLL_TYPES.has(e.type)) {
       rows.push(buildAbilityRollRow(e, round));
     } else {
@@ -593,8 +672,6 @@ function buildRows(events: CharacterEvent[], roundById: Map<string, number>): Fe
 }
 
 const RUN_KIND_LABEL: Record<string, string> = {
-  swing: "weapon",
-  damageRoll: "damage",
   checkRoll: "check",
   saveRoll: "save",
   initiativeRoll: "initiative",
@@ -612,9 +689,11 @@ const RUN_VISIBLE_COUNT = 3;
 // Singular is reachable, not theoretical: the smallest collapsing run is
 // RUN_COLLAPSE_THRESHOLD rows with RUN_VISIBLE_COUNT shown, hiding one.
 function runLabel(runKind: string, hiddenCount: number): string {
+  if (runKind === "resolveAction") {
+    return `${hiddenCount} earlier ${hiddenCount === 1 ? "resolution" : "resolutions"}`;
+  }
   const noun = RUN_KIND_LABEL[runKind] ?? runKind;
-  const unit = runKind === "swing" ? "swing" : "roll";
-  return `${hiddenCount} earlier ${noun} ${hiddenCount === 1 ? unit : `${unit}s`}`;
+  return `${hiddenCount} earlier ${noun} ${hiddenCount === 1 ? "roll" : "rolls"}`;
 }
 
 function collapseRuns(rows: FeedRow[]): FeedItem[] {

@@ -10,6 +10,7 @@ import {
   casterModelFor,
   casterModelForEntries,
 } from "@/lib/srd/srd.js";
+import { ELDRITCH_KNIGHT, ARCANE_TRICKSTER } from "./third-caster.fixture.js";
 
 // SRD 5.2 prepared-spell counts (2024). Spot checks at L1/5/12/17/20 per class,
 // plus the third-caster (EK/AT) column keyed by subclass from class level 3.
@@ -58,8 +59,8 @@ describe("preparedSpellCountAt — per-class SRD 5.2 tables", () => {
     }
   });
 
-  it("Eldritch Knight / Arcane Trickster (third caster, keyed by subclass from L3)", () => {
-    for (const sub of ["Eldritch Knight", "Arcane Trickster"]) {
+  it("Eldritch Knight / Arcane Trickster (third caster, keyed by subclassRef from L3)", () => {
+    for (const sub of [ELDRITCH_KNIGHT, ARCANE_TRICKSTER]) {
       expect(preparedSpellCountAt("fighter", 2, sub, {}, "EDITION_2024")).toBeNull(); // subclass not active yet
       expect(preparedSpellCountAt("fighter", 3, sub, {}, "EDITION_2024")).toBe(3);
       expect(preparedSpellCountAt("fighter", 5, sub, {}, "EDITION_2024")).toBe(4);
@@ -82,8 +83,8 @@ describe("preparedSpellCountAt — per-class SRD 5.2 tables", () => {
 
   it("third-caster column is monotonically non-decreasing over levels 3-20", () => {
     for (let level = 4; level <= 20; level++) {
-      expect(preparedSpellCountAt("fighter", level, "Eldritch Knight", {}, "EDITION_2024")).toBeGreaterThanOrEqual(
-        preparedSpellCountAt("fighter", level - 1, "Eldritch Knight", {}, "EDITION_2024") ?? 0,
+      expect(preparedSpellCountAt("fighter", level, ELDRITCH_KNIGHT, {}, "EDITION_2024")).toBeGreaterThanOrEqual(
+        preparedSpellCountAt("fighter", level - 1, ELDRITCH_KNIGHT, {}, "EDITION_2024") ?? 0,
       );
     }
   });
@@ -115,7 +116,7 @@ describe("preparedSpellCountAt — SRD 5.1 (2014) tables and formulas", () => {
   });
 
   it("Eldritch Knight / Arcane Trickster are identical between editions from level 3 (no-fork proof)", () => {
-    for (const sub of ["Eldritch Knight", "Arcane Trickster"]) {
+    for (const sub of [ELDRITCH_KNIGHT, ARCANE_TRICKSTER]) {
       for (let level = 3; level <= 20; level++) {
         expect(preparedSpellCountAt("fighter", level, sub, {}, "EDITION_2014")).toBe(
           preparedSpellCountAt("fighter", level, sub, {}, "EDITION_2024"),
@@ -159,17 +160,17 @@ describe("cantripsKnownAtLevel — SRD 5.2 cantrip columns (data only, #1131 wir
   });
 
   it("Eldritch Knight / Arcane Trickster: 2 from L3, 3 from L10", () => {
-    expect(cantripsKnownAtLevel("fighter", 2, "Eldritch Knight")).toBe(0);
-    expect(cantripsKnownAtLevel("fighter", 3, "Eldritch Knight")).toBe(2);
-    expect(cantripsKnownAtLevel("rogue", 10, "Arcane Trickster")).toBe(3);
+    expect(cantripsKnownAtLevel("fighter", 2, ELDRITCH_KNIGHT)).toBe(0);
+    expect(cantripsKnownAtLevel("fighter", 3, ELDRITCH_KNIGHT)).toBe(2);
+    expect(cantripsKnownAtLevel("rogue", 10, ARCANE_TRICKSTER)).toBe(3);
   });
 });
 
 describe("swapCadenceFor — per-edition spell-swap cadence", () => {
   it("onLevelUp for Bard/Sorcerer/Warlock + EK/AT", () => {
     for (const cls of ["bard", "sorcerer", "warlock"]) expect(swapCadenceFor(cls, null, "EDITION_2024")).toBe("onLevelUp");
-    expect(swapCadenceFor("fighter", "Eldritch Knight", "EDITION_2024")).toBe("onLevelUp");
-    expect(swapCadenceFor("rogue", "Arcane Trickster", "EDITION_2024")).toBe("onLevelUp");
+    expect(swapCadenceFor("fighter", ELDRITCH_KNIGHT, "EDITION_2024")).toBe("onLevelUp");
+    expect(swapCadenceFor("rogue", ARCANE_TRICKSTER, "EDITION_2024")).toBe("onLevelUp");
   });
 
   it("oneOnLongRest for Paladin/Ranger", () => {
@@ -192,7 +193,7 @@ describe("swapCadenceFor — per-edition spell-swap cadence", () => {
 
   it("2014 Bard/Sorcerer/Warlock/EK/AT agree with 2024 (onLevelUp)", () => {
     for (const cls of ["bard", "sorcerer", "warlock"]) expect(swapCadenceFor(cls, null, "EDITION_2014")).toBe("onLevelUp");
-    expect(swapCadenceFor("fighter", "Eldritch Knight", "EDITION_2014")).toBe("onLevelUp");
+    expect(swapCadenceFor("fighter", ELDRITCH_KNIGHT, "EDITION_2014")).toBe("onLevelUp");
   });
 });
 
@@ -228,8 +229,8 @@ describe("2014 half-casters cast from level 2, not level 1 (#1507 D4)", () => {
 
 describe("spellcastingStartLevel", () => {
   it("is 3 for a third-caster subclass in both editions", () => {
-    expect(spellcastingStartLevel("fighter", "Eldritch Knight", "EDITION_2014")).toBe(3);
-    expect(spellcastingStartLevel("rogue", "Arcane Trickster", "EDITION_2024")).toBe(3);
+    expect(spellcastingStartLevel("fighter", ELDRITCH_KNIGHT, "EDITION_2014")).toBe(3);
+    expect(spellcastingStartLevel("rogue", ARCANE_TRICKSTER, "EDITION_2024")).toBe(3);
   });
 
   it("is 2 for a 2014 Paladin/Ranger and 1 for a 2024 one", () => {
@@ -250,8 +251,8 @@ describe("casterModelFor / casterModelForEntries (#1507 D5)", () => {
     for (const cls of ["bard", "sorcerer", "warlock", "ranger"]) {
       expect(casterModelFor(cls, null, "EDITION_2014")).toBe("known");
     }
-    expect(casterModelFor("fighter", "Eldritch Knight", "EDITION_2014")).toBe("known");
-    expect(casterModelFor("rogue", "Arcane Trickster", "EDITION_2014")).toBe("known");
+    expect(casterModelFor("fighter", ELDRITCH_KNIGHT, "EDITION_2014")).toBe("known");
+    expect(casterModelFor("rogue", ARCANE_TRICKSTER, "EDITION_2014")).toBe("known");
   });
 
   it("2014: prepared for Cleric/Druid/Wizard/Paladin", () => {
@@ -275,8 +276,8 @@ describe("casterModelFor / casterModelForEntries (#1507 D5)", () => {
     expect(
       casterModelForEntries(
         [
-          { name: "bard", subclass: null },
-          { name: "cleric", subclass: null },
+          { name: "bard", subclassRef: null },
+          { name: "cleric", subclassRef: null },
         ],
         "EDITION_2014",
       ),
@@ -287,8 +288,8 @@ describe("casterModelFor / casterModelForEntries (#1507 D5)", () => {
     expect(
       casterModelForEntries(
         [
-          { name: "bard", subclass: null },
-          { name: "warlock", subclass: null },
+          { name: "bard", subclassRef: null },
+          { name: "warlock", subclassRef: null },
         ],
         "EDITION_2014",
       ),
@@ -299,8 +300,8 @@ describe("casterModelFor / casterModelForEntries (#1507 D5)", () => {
     expect(
       casterModelForEntries(
         [
-          { name: "fighter", subclass: null },
-          { name: "barbarian", subclass: null },
+          { name: "fighter", subclassRef: null },
+          { name: "barbarian", subclassRef: null },
         ],
         "EDITION_2014",
       ),

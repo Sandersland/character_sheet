@@ -33,12 +33,13 @@ import {
   type FeatImprovement,
   type ResourcesMutableState,
 } from "@/lib/classes/resources.js";
-import { characterAdvancementSlots, abilityModifier, characterFightingStyleFeatSlots, deriveFeatBonuses } from "@/lib/srd/srd.js";
-import { featOfferedForAsiSlot, type FeatCategory } from "@/lib/srd/feats.js";
+import { characterAdvancementSlots, abilityModifier, characterFightingStyleFeatSlots, fightingStyleGrantingClassNames, deriveFeatBonuses } from "@/lib/srd/srd.js";
+import { featOfferedForAsiSlot, fightingStyleFeatOfferedForClasses, type FeatCategory } from "@/lib/srd/feats.js";
 import { effectiveMaxHitPoints, normalizeHitPoints, normalizeHitDice, type HitPoints, type HitDice } from "@/lib/combat/hitpoints.js";
 import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
+import { draconicResilienceMaxHpTerm } from "@/lib/classes/draconic-bloodline.js";
 import { editionOf } from "@/lib/rules/edition.js";
-import { crossEditionRejection } from "@/lib/rules/catalog-edition.js";
+import { crossEditionRejection, resolveEditionRow } from "@/lib/rules/catalog-edition.js";
 import type { RulesEdition } from "@character-sheet/shared-types";
 
 export class InvalidAdvancementOperationError extends Error {}
@@ -83,6 +84,14 @@ function computeAdvancementEffect(
  * Reverses a list of AdvancementEntry values against the current column values,
  * subtracting each entry's stored deltas in LIFO order. Returns the restored
  * column values (does not write anything).
+ *
+ * Deliberately does NOT clamp `current` — the raw `max` column excludes feat
+ * (Tough) and Draconic Resilience (#1123) bonuses, so a legal `current` can sit
+ * ABOVE it and a raw-max Math.min here would destroy that headroom (min only
+ * lowers; a later effective-max clamp can't restore). Every caller clamps
+ * against effectiveMaxHitPoints instead: reconcileAdvancements,
+ * applyAdvancementOpInTx's shared tail, and serializeCharacter's own
+ * `Math.min(current, effectiveMaxHp)` after applyAdvancementClamp.
  */
 export function reverseAdvancementEffects(
   scores: Record<string, number>,
@@ -106,7 +115,9 @@ export function reverseAdvancementEffects(
     newHp = {
       ...newHp,
       max: newHp.max - entry.hpDelta,
-      current: Math.min(newHp.current, newHp.max - entry.hpDelta),
+      // Exact mirror of the take side (`current: hp.current + hpDelta`),
+      // floored at 0 for a low-current character losing a Con-raising entry.
+      current: Math.max(0, newHp.current - entry.hpDelta),
     };
     newInit = newInit - entry.initDelta;
   }
@@ -172,6 +183,15 @@ interface AdvancementOpContext {
   totalSlots: number;
   /** Fighting Style feat cap across all class entries (#1137). */
   fightingStyleSlotTotal: number;
+  /**
+   * Names of class entries that grant the Fighting Style feature (#1495) —
+   * `class.fightingStyleFeatLevel != null` — fed to
+   * fightingStyleFeatOfferedForClasses so a multiclass character's offered
+   * set is the union across every style-granting entry, not just the
+   * primary. `[]` for a homebrew-only character, which offers unrestricted
+   * (empty-classes) rows only under the 2014 branch and everything under 2024.
+   */
+  fightingStyleClassNames: string[];
   /** This character's edition — gates a client-supplied featId (#1345). */
   edition: RulesEdition;
 }
@@ -272,6 +292,7 @@ function resolveHalfFeatBump(args: {
 }
 
 /** Validates a takeAsi op's increases (count, sum, ability names, per-ability cap). */
+// fallow-ignore-next-line complexity -- pre-existing guard-clause validator, untouched by and out of scope for #1495
 function validateAsiIncreases(op: TakeAsiOperation, scores: Record<string, number>): void {
   if (!op.increases || op.increases.length === 0 || op.increases.length > 2) {
     throw new InvalidAdvancementOperationError(
@@ -349,6 +370,48 @@ interface ResolvedFeat {
   abilityDeltas: Record<string, number>;
 }
 
+// Slot eligibility for a catalog feat (#1137/#1310/#1495): a fightingStyle-slot
+// op must be a fighting_style feat offered to one of the character's
+// style-granting classes; an ASI-slot op must satisfy featOfferedForAsiSlot at
+// `level`. Split out of resolveCatalogFeat so that function's own branching
+// stays around the fetch/cross-edition/half-feat-resolution steps, not this
+// block's two independent throw-shaped rules.
+function assertFeatSlotEligible(
+  catalogFeat: { name: string; category: FeatCategory; classes: readonly string[]; levelPrerequisite: number | null },
+  isFightingStyleSlot: boolean,
+  level: number,
+  edition: RulesEdition,
+  fightingStyleClassNames: readonly string[],
+): void {
+  if (isFightingStyleSlot) {
+    // The fightingStyle slot (#1137) takes only fighting_style feats — never a
+    // General/Origin/Epic Boon feat routed through it.
+    if (catalogFeat.category !== "fighting_style") {
+      throw new InvalidAdvancementOperationError(
+        `takeFeat: "${catalogFeat.name}" (${catalogFeat.category}) is not a Fighting Style feat`,
+      );
+    }
+    // Hard enforcement (#1495): PHB'14's per-class subset applies at the write
+    // path too, not just the GET /api/feats?classes= picker filter — a client
+    // can't originate the rule, so a non-conforming pick 400s here even if the
+    // caller bypassed the query param entirely.
+    if (!fightingStyleFeatOfferedForClasses(catalogFeat, fightingStyleClassNames, edition)) {
+      throw new InvalidAdvancementOperationError(
+        `takeFeat: "${catalogFeat.name}" is not an offered Fighting Style for ${fightingStyleClassNames.join("/") || "this character"}`,
+      );
+    }
+    return;
+  }
+  // Edition-invariant (#1310): only General/Epic Boon feats the character's
+  // level satisfies may be taken via an ASI slot — Origin (backgrounds) and
+  // Fighting Style (class) can't, in either edition.
+  if (!featOfferedForAsiSlot(catalogFeat, level)) {
+    throw new InvalidAdvancementOperationError(
+      `takeFeat: "${catalogFeat.name}" (${catalogFeat.category}) is not available at level ${level}`,
+    );
+  }
+}
+
 async function resolveCatalogFeat(
   tx: Prisma.TransactionClient,
   op: TakeFeatOperation,
@@ -356,6 +419,7 @@ async function resolveCatalogFeat(
   level: number,
   isFightingStyleSlot: boolean,
   edition: RulesEdition,
+  fightingStyleClassNames: readonly string[],
 ): Promise<ResolvedFeat> {
   const catalogFeat = await tx.feat.findUnique({ where: { id: op.featId } });
   if (!catalogFeat) {
@@ -371,22 +435,13 @@ async function resolveCatalogFeat(
   const mismatch = crossEditionRejection(catalogFeat, `Feat "${catalogFeat.name}"`, edition);
   if (mismatch) throw new InvalidAdvancementOperationError(`takeFeat: ${mismatch}`);
   const category = catalogFeat.category as FeatCategory;
-  if (isFightingStyleSlot) {
-    // The fightingStyle slot (#1137) takes only fighting_style feats — never a
-    // General/Origin/Epic Boon feat routed through it.
-    if (category !== "fighting_style") {
-      throw new InvalidAdvancementOperationError(
-        `takeFeat: "${catalogFeat.name}" (${category}) is not a Fighting Style feat`,
-      );
-    }
-  } else if (!featOfferedForAsiSlot({ category, levelPrerequisite: catalogFeat.levelPrerequisite }, level)) {
-    // Edition-invariant (#1310): only General/Epic Boon feats the character's
-    // level satisfies may be taken via an ASI slot — Origin (backgrounds) and
-    // Fighting Style (class) can't, in either edition.
-    throw new InvalidAdvancementOperationError(
-      `takeFeat: "${catalogFeat.name}" (${category}) is not available at level ${level}`,
-    );
-  }
+  assertFeatSlotEligible(
+    { name: catalogFeat.name, category, classes: catalogFeat.classes, levelPrerequisite: catalogFeat.levelPrerequisite },
+    isFightingStyleSlot,
+    level,
+    edition,
+    fightingStyleClassNames,
+  );
   return {
     featName: catalogFeat.name,
     featDescription: catalogFeat.description,
@@ -406,12 +461,54 @@ async function resolveCatalogFeat(
   };
 }
 
-function resolveCustomFeat(op: TakeFeatOperation, scores: Record<string, number>): ResolvedFeat {
+// #1495: a custom feat placed in the fightingStyle slot whose NAME matches a
+// catalog Fighting Style row is a pick of that style through the custom
+// channel, not genuine homebrew — the class gate must apply identically, or
+// a rejected catalog pick could be routed around by retyping it as `custom`.
+// A name matching no catalog row is untouched (real homebrew is unaffected).
+//
+// findMany (unfiltered by edition) + resolveEditionRow, not a findFirst with
+// an `OR: [{edition},{edition:null}]` where clause: the SAME name can carry
+// BOTH an exact-edition row and a shared/other-edition row (e.g. "Great
+// Weapon Fighting" is tagged both EDITION_2014 and EDITION_2024, with
+// different `classes`) — an unordered findFirst leaves Postgres free to
+// return either one, silently admitting the wrong edition's (and wrong
+// class-scope's) row. resolveEditionRow is the SAME exact-then-null-fallback
+// resolution GET /api/feats itself runs (resolveEditionCatalog), so this
+// reads the same row that route would ultimately have offered.
+async function assertCustomFightingStyleNameEligible(
+  tx: Prisma.TransactionClient,
+  featName: string,
+  edition: RulesEdition,
+  fightingStyleClassNames: readonly string[],
+): Promise<void> {
+  const candidates = await tx.feat.findMany({
+    where: { category: "fighting_style", name: { equals: featName, mode: "insensitive" } },
+  });
+  const matching = resolveEditionRow(candidates, edition);
+  if (matching && !fightingStyleFeatOfferedForClasses(matching, fightingStyleClassNames, edition)) {
+    throw new InvalidAdvancementOperationError(
+      `takeFeat: "${featName}" is not an offered Fighting Style for ${fightingStyleClassNames.join("/") || "this character"}`,
+    );
+  }
+}
+
+async function resolveCustomFeat(
+  tx: Prisma.TransactionClient,
+  op: TakeFeatOperation,
+  scores: Record<string, number>,
+  isFightingStyleSlot: boolean,
+  edition: RulesEdition,
+  fightingStyleClassNames: readonly string[],
+): Promise<ResolvedFeat> {
   const c = op.custom!;
   if (!c.name?.trim()) {
     throw new InvalidAdvancementOperationError("takeFeat: custom feat name is required");
   }
   const featName = c.name.trim();
+  if (isFightingStyleSlot) {
+    await assertCustomFightingStyleNameEligible(tx, featName, edition, fightingStyleClassNames);
+  }
   return {
     featName,
     featDescription: c.description ?? "",
@@ -444,8 +541,8 @@ async function applyTakeFeat(ctx: AdvancementOpContext, op: TakeFeatOperation): 
 
   const { featName, featDescription, featId: resolvedFeatId, improvements: featImprovements, abilityDeltas } =
     op.featId
-      ? await resolveCatalogFeat(tx, op, scores, level, isFightingStyleSlot, ctx.edition)
-      : resolveCustomFeat(op, scores);
+      ? await resolveCatalogFeat(tx, op, scores, level, isFightingStyleSlot, ctx.edition, ctx.fightingStyleClassNames)
+      : await resolveCustomFeat(tx, op, scores, isFightingStyleSlot, ctx.edition, ctx.fightingStyleClassNames);
 
   // A character can't hold the same Fighting Style twice (#1137) — dedup by
   // catalog id, else by snapshot name (custom / migrated styles carry no featId).
@@ -570,7 +667,21 @@ const ADVANCEMENT_SELECT = {
     // `class` (#1529): a seventh reconciler/clamp-on-read query site beyond the
     // issue's own enumerated six — found via the signature change + typecheck,
     // resolving the SAME extraAsiLevels/fightingStyleFeatLevel columns.
-    select: { name: true, level: true, class: { select: { extraAsiLevels: true, fightingStyleFeatLevel: true } } },
+    // subclass/subclassRef.slug/class.subclassLevel (#1123):
+    // draconicResilienceMaxHpTerm's identity inputs for the shared-tail clamp.
+    // `class.name` (#1495): the canonical catalog class name, read by
+    // fightingStyleGrantingClassNames — never the entry's own `name` column,
+    // which is a free-to-diverge display name (see CharacterClassEntry's own
+    // schema comment), the wrong source for a rule keyed on Feat.classes.
+    select: {
+      name: true,
+      level: true,
+      subclass: true,
+      subclassRef: { select: { slug: true } },
+      class: {
+        select: { name: true, extraAsiLevels: true, fightingStyleFeatLevel: true, subclassLevel: true },
+      },
+    },
   },
 } satisfies Prisma.CharacterSelect;
 
@@ -598,6 +709,7 @@ export async function applyAdvancementOpInTx(
 
   const level = levelForExperience(character.experiencePoints);
   proficiencyBonusForLevel(level); // validate level is reachable (side-effect-free)
+  const edition = editionOf(character);
 
   const ctx: AdvancementOpContext = {
     tx,
@@ -608,8 +720,14 @@ export async function applyAdvancementOpInTx(
     state: normalizeResourcesMutable(character.resources),
     level,
     totalSlots: characterAdvancementSlots(character.classEntries, level),
-    fightingStyleSlotTotal: characterFightingStyleFeatSlots(character.classEntries, level),
-    edition: editionOf(character),
+    // edition (#1148): Champion's Additional Fighting Style second slot forks
+    // 7 (2024) vs 10 (2014).
+    fightingStyleSlotTotal: characterFightingStyleFeatSlots(character.classEntries, level, edition),
+    // #1495: only entries that have actually EARNED the Fighting Style feature
+    // (not merely belong to a granting class — a Fighter1/Ranger1 multiclass
+    // hasn't reached Ranger's own L2 grant yet) feed the offered-style union.
+    fightingStyleClassNames: fightingStyleGrantingClassNames(character.classEntries, level, edition),
+    edition,
   };
 
   const before = snapshotAdvancementState(ctx.scores, ctx.hp, ctx.initBonus, ctx.state);
@@ -617,14 +735,19 @@ export async function applyAdvancementOpInTx(
 
   // #1321: one shared-tail clamp covers takeAsi/takeFeat (which raise max+current
   // by the same hpDelta — at exhaustion 4+ the effective max grows by LESS) and
-  // removeAdvancement (which lowers max — reverseAdvancementEffects' own clamp
-  // is against the RAW max, superseded here). ctx.state.advancements already
+  // removeAdvancement (which lowers max — reverseAdvancementEffects subtracts
+  // exact deltas without clamping, so this is the ONLY clamp on that path).
+  // ctx.state.advancements already
   // reflects the op's push/splice, so the feat-slot-cap dance below sees the
   // POST-op advancement list — a just-taken Tough immediately counts.
   const { kept: inCapForHpClamp } = splitAdvancementsBySlotCap(ctx.state.advancements, ctx.totalSlots, ctx.fightingStyleSlotTotal);
-  const featMaxHpBonusForClamp = deriveFeatBonuses(inCapForHpClamp, ctx.hitDice.total).maxHp;
+  // #1123: the Draconic Resilience term joins the feat bonus via the ONE
+  // shared function, matching serializeCharacter's applyFeatLayer composition.
+  const maxHpBonusForClamp =
+    deriveFeatBonuses(inCapForHpClamp, ctx.hitDice.total).maxHp +
+    draconicResilienceMaxHpTerm(character.classEntries, ctx.level, ctx.edition);
   const exhaustionLevel = normalizeConditionsMutable(character.conditions).exhaustion;
-  const newEffMax = effectiveMaxHitPoints(outcome.newHp.max, featMaxHpBonusForClamp, exhaustionLevel, ctx.edition);
+  const newEffMax = effectiveMaxHitPoints(outcome.newHp.max, maxHpBonusForClamp, exhaustionLevel, ctx.edition);
   outcome.newHp = { ...outcome.newHp, current: Math.min(outcome.newHp.current, newEffMax) };
 
   await tx.character.update({

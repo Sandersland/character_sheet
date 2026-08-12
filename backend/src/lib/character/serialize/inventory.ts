@@ -93,6 +93,12 @@ function buildInventoryItemPlacement(row: CharacterWithRelations["inventoryItems
     attunementPrereqText: row.attunementPrereqKind
       ? describeAttunementPrereq({ kind: row.attunementPrereqKind, value: row.attunementPrereqValue })
       : undefined,
+    // Eldritch Knight Weapon Bond (2014, #1854) — raw persisted flag, NOT
+    // clamped here (a per-item builder has no class/level/edition context).
+    // The pool-driven Summon Bonded Weapon action IS clamped, in
+    // character-serialize.ts's bondedWeaponCount — see that computation's
+    // own comment for why this row can still show a stale `true`.
+    weaponBonded: row.weaponBonded,
     notes: row.notes ?? undefined,
   };
 }

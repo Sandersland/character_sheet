@@ -5,6 +5,7 @@ import {
   derivePreparedSpellLimit,
   casterModelForEntries,
   CASTER_MODEL_LABELS,
+  type SubclassCasterRef,
 } from "@/lib/srd/srd.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spellcasting.js";
 import { clampPreparedToLimit, type SpellEntry } from "@/lib/spellcasting/spell-state.js";
@@ -15,6 +16,7 @@ import {
   type AbilityScores,
 } from "@/lib/spellcasting/granted-spells.js";
 import { readEffectSpec, resolveEffectSpec, type EffectRoll } from "@/lib/combat/effects.js";
+import { deriveSpellCastCost } from "@/lib/spellcasting/cast-cost.js";
 import { SHADOW_ART_CONCENTRATION_PREFIX } from "@/lib/classes/shadow-arts.js";
 import { effectiveEntryLevel } from "@/lib/leveling/effective-levels.js";
 import { editionOf } from "@/lib/rules/edition.js";
@@ -258,6 +260,10 @@ function castableSlotLevels(spell: SpellEntry, view: CastableLevelsView): number
 // ability-modifier) resolve here so the client never re-derives them. A spec
 // with no dice (a utility spell) yields effectRolls: [], matching the prior
 // client-side computeCastSpec/effectPreview behaviour of returning null.
+// `castCost` (epic #1827 Slice 1, #1828) is the same promotion for the
+// spell's action-economy category — deriveSpellCastCost classifies the raw
+// castingTime text server-side so a TurnResolution's `cost.kind` is a served
+// enum, never a client-side parse.
 function decorateSpellEffects(
   spells: SpellEntry[],
   view: CastableLevelsView,
@@ -272,7 +278,8 @@ function decorateSpellEffects(
       const roll = resolveEffectSpec(effect, effectiveStep, { characterLevel, abilityMod });
       if (roll) effectRolls.push({ slotLevel, roll });
     }
-    return { ...spell, effect, effectRolls };
+    const castCost = deriveSpellCastCost(spell.castingTime);
+    return { ...spell, effect, effectRolls, castCost };
   });
 }
 
@@ -328,14 +335,14 @@ function preparedLimitEntries(
   row: CharacterWithRelations,
   primaryClass: PrimaryClass,
   level: number,
-): Array<{ name: string; level: number; subclass: string | null }> {
+): Array<{ name: string; level: number; subclassRef: SubclassCasterRef | null }> {
   if (row.classEntries.length === 0) {
-    return [{ name: primaryClass?.name ?? "", level, subclass: primaryClass?.subclass ?? null }];
+    return [{ name: primaryClass?.name ?? "", level, subclassRef: primaryClass?.subclassRef ?? null }];
   }
   return row.classEntries.map((e) => ({
     name: e.name,
     level: effectiveEntryLevel(e.level, row.classEntries.length, level),
-    subclass: e.subclass,
+    subclassRef: e.subclassRef,
   }));
 }
 
@@ -432,7 +439,7 @@ function buildSingleClassSpellcastingView(
     level,
     abilityScores,
     proficiencyBonus,
-    primaryClass?.subclass ?? undefined,
+    primaryClass?.subclassRef,
     editionOf(row),
   );
   const edition = editionOf(row);
@@ -463,7 +470,7 @@ function buildMulticlassSpellcastingView(
   proficiencyBonus: number,
 ): object | undefined {
   const multi = deriveMulticlassSpellcasting(
-    row.classEntries.map((e) => ({ name: e.name, level: e.level, subclass: e.subclass })),
+    row.classEntries.map((e) => ({ name: e.name, level: e.level, subclass: e.subclass, subclassRef: e.subclassRef })),
     abilityScores,
     proficiencyBonus,
     editionOf(row),

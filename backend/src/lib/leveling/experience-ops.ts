@@ -3,6 +3,7 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 
 import { Prisma } from "@/generated/prisma/client.js";
 import { levelForExperience } from "./experience.js";
+import { levelDownEntryLevels } from "./effective-levels.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { reconcileLevelGatedState } from "./level-reconciliation.js";
 import {
@@ -19,6 +20,7 @@ import {
   normalizeHitPoints,
 } from "@/lib/combat/hitpoints.js";
 import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
+import { draconicResilienceMaxHpTerm } from "@/lib/classes/draconic-bloodline.js";
 import { abilityModifier, characterFightingStyleFeatSlots, deriveFeatBonuses, hitDieFace } from "@/lib/srd/srd.js";
 import { recomputeSummaries } from "@/lib/session/sessions.js";
 
@@ -45,7 +47,16 @@ function computeLevelDownState(
     abilityScores: Prisma.JsonValue;
     resources: Prisma.JsonValue;
     conditions: Prisma.JsonValue;
-    classEntries: { id: string; level: number; class: { extraAsiLevels: number[]; fightingStyleFeatLevel: number | null } | null }[];
+    classEntries: {
+      id: string;
+      level: number;
+      name: string;
+      subclass: string | null;
+      subclassRef: { slug: string } | null;
+      // `name` (#1148): characterFightingStyleFeatSlots' resolveSubclassSlug
+      // input — the CANONICAL class name, same #1495 rationale as elsewhere.
+      class: { name: string; extraAsiLevels: number[]; fightingStyleFeatLevel: number | null; subclassLevel: number } | null;
+    }[];
   },
   levelUpEvents: { data: Prisma.JsonValue }[],
   levelsToReverse: number,
@@ -71,9 +82,25 @@ function computeLevelDownState(
   // The feat-bonus half of that composition is evaluated once, at the FINAL
   // (post-reversal) advancement-slot cap, mirroring how deriveFeatBonuses'
   // appliedLevel argument tracks hd.total inside the loop below.
-  const fightingStyleSlotTotal = characterFightingStyleFeatSlots(character.classEntries, targetLevel);
+  const fightingStyleSlotTotal = characterFightingStyleFeatSlots(character.classEntries, targetLevel, edition);
   const inCapAdvancements = inCapAdvancementsAt(character.resources, character.classEntries, targetLevel, fightingStyleSlotTotal);
   const exhaustionLevel = normalizeConditionsMutable(character.conditions).exhaustion;
+  // #1123: Draconic Resilience joins the feat bonus in the clamp's pre-halving
+  // composition via the ONE shared function. This runs BEFORE the reconciler
+  // chain, so the rows still hold PRE-level-down per-entry levels — a
+  // multiclass sorcerer's term must not read the stale column, so entries are
+  // PROJECTED through levelDownEntryLevels (the exact allocation
+  // reconcileClassEntryLevels persists right after; a 0 projection matches
+  // its delete) and the derived total covers single-class via
+  // effectiveEntryLevel. The feat-cap reads above intentionally stay on the
+  // live rows: an over-cap advancement kept by a stale cap is trimmed and
+  // re-clamped by reconcileAdvancements later in the same transaction,
+  // whereas nothing downstream re-clamps the Draconic term.
+  const projectedLevels = levelDownEntryLevels(character.classEntries.map((e) => e.level), targetLevel);
+  const projectedEntries = character.classEntries
+    .map((entry, i) => ({ ...entry, level: projectedLevels[i] }))
+    .filter((entry) => entry.level > 0);
+  const subclassMaxHpBonus = draconicResilienceMaxHpTerm(projectedEntries, targetLevel, edition);
 
   for (let i = 0; i < levelsToReverse; i++) {
     const event = levelUpEvents[i];
@@ -85,8 +112,8 @@ function computeLevelDownState(
 
     hp.max = Math.max(1, hp.max - hpGain);
     hd.total = Math.max(0, hd.total - 1);
-    const featMaxHpBonus = deriveFeatBonuses(inCapAdvancements, hd.total).maxHp;
-    hp.current = Math.min(hp.current, effectiveMaxHitPoints(hp.max, featMaxHpBonus, exhaustionLevel, edition));
+    const maxHpBonus = deriveFeatBonuses(inCapAdvancements, hd.total).maxHp + subclassMaxHpBonus;
+    hp.current = Math.min(hp.current, effectiveMaxHitPoints(hp.max, maxHpBonus, exhaustionLevel, edition));
     hd.spent = Math.min(hd.spent, hd.total);
   }
 
@@ -126,7 +153,18 @@ async function revertLevelUps(
       conditions: true,
       classEntries: {
         orderBy: { position: "asc" as const },
-        select: { id: true, level: true, class: { select: { extraAsiLevels: true, fightingStyleFeatLevel: true } } },
+        // name/subclass/subclassRef.slug/class.subclassLevel (#1123):
+        // draconicResilienceMaxHpTerm's identity inputs.
+        select: {
+          id: true,
+          level: true,
+          name: true,
+          subclass: true,
+          subclassRef: { select: { slug: true } },
+          // `name` (#1148): characterFightingStyleFeatSlots' resolveSubclassSlug
+          // input — the CANONICAL class name, same #1495 rationale as elsewhere.
+          class: { select: { name: true, extraAsiLevels: true, fightingStyleFeatLevel: true, subclassLevel: true } },
+        },
       },
     },
   });

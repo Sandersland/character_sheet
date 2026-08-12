@@ -9,7 +9,9 @@ import type { LevelUpTarget } from "@character-sheet/contracts";
 import type { AdvancementOperation, TakeFeatOperation } from "@/lib/leveling/advancement.js";
 import type { ClassFeatureRow } from "@/lib/classes/class-feature-rows.js";
 import type {
+  ForgetManeuverOperation,
   ForgetSubclassChoiceOperation,
+  LearnExpertiseOperation,
   LearnManeuverOperation,
   LearnToolProficiencyOperation,
   LearnSubclassChoiceOperation,
@@ -22,6 +24,7 @@ import {
   type LevelUpStepKind,
   type TargetClassEntry,
 } from "./level-up-plan.js";
+import type { SubclassCasterRef } from "@/lib/srd/spellcasting-tables.js";
 
 // Untyped status → the transactions-endpoint scaffold defaults domain errors to
 // 400 (the #1007 typed-error system), so no `status` field here.
@@ -42,7 +45,15 @@ export interface LevelUpSubmission {
   // slot:"fightingStyle" server-side so it lands in the fs partition.
   fightingStyleFeat?: TakeFeatOperation;
   maneuvers?: LearnManeuverOperation[];
+  // #1516: a swap for a maneuver — one forgotten entry offset by one extra
+  // learn under the SAME step, mirroring subclassChoicesForgotten's/
+  // spellsForgotten's own shape/assert (assertManeuverForgets below).
+  maneuversForgotten?: ForgetManeuverOperation[];
   toolProficiencies?: LearnToolProficiencyOperation[];
+  // #1588: Expertise skill picks — freely reversible (no forget/swap
+  // counterpart in the ceremony, unlike maneuvers/subclassChoices above),
+  // so there is no expertiseForgotten field.
+  expertise?: LearnExpertiseOperation[];
   subclassChoices?: LearnSubclassChoiceOperation[];
   // #1503: a swap for a choose-N choice whose swapCadence is "onLevelUp"
   // (today: Way of the Four Elements' disciplines) — one forgotten entry
@@ -62,7 +73,7 @@ export interface LevelUpSubmission {
 // subclass step is spliced back at this rank after a re-plan (which omits it).
 const KIND_ORDER: LevelUpStepKind[] = [
   "hitPoints", "advancement", "subclass", "maneuvers", "fightingStyleFeat",
-  "toolProficiency", "subclassChoice", "newSpells", "review",
+  "toolProficiency", "expertise", "subclassChoice", "newSpells", "review",
 ];
 
 // One count-checkable submission domain that maps 1:1 to a plan step kind.
@@ -80,6 +91,7 @@ const SIMPLE_DOMAINS: SimpleDomain[] = [
   { kind: "fightingStyleFeat", provided: (s) => (s.fightingStyleFeat ? 1 : 0), noun: "fighting style", absentMessage: "this level-up does not include a fighting style choice" },
   { kind: "maneuvers", provided: (s) => s.maneuvers?.length ?? 0, noun: "maneuvers", absentMessage: "this level-up does not grant maneuvers" },
   { kind: "toolProficiency", provided: (s) => s.toolProficiencies?.length ?? 0, noun: "tool proficiencies", absentMessage: "this level-up does not grant a tool proficiency" },
+  { kind: "expertise", provided: (s) => s.expertise?.length ?? 0, noun: "Expertise picks", absentMessage: "this level-up does not grant Expertise" },
   { kind: "newSpells", provided: (s) => s.spellsLearned?.length ?? 0, noun: "new spells", absentMessage: "this level-up does not grant new spells" },
 ];
 
@@ -111,6 +123,14 @@ export function resolveLevelUpPlan(
   // spells. Absent/undefined whenever chosenSubclassName is null (no pick
   // submitted, so the re-plan branch below never runs).
   pickedSubclassFeatureRows?: ClassFeatureRow[] | null,
+  // #1531: the PICKED subclass's own casterFraction/spellcastingAbility —
+  // trailing/optional (appended after pickedSubclassFeatureRows, not inserted
+  // before it) so every existing caller/fixture that never chooses a
+  // third-caster subclass mid-level-up keeps compiling unchanged. Required for
+  // a level-3 Fighter/Rogue picking Eldritch Knight/Arcane Trickster for the
+  // FIRST time to still resolve its own newSpells step correctly on re-plan —
+  // target.subclassCasterRef alone would carry the OLD (pre-pick) value here.
+  chosenSubclassCasterRef?: SubclassCasterRef | null,
 ): LevelUpStep[] {
   const basePlan = buildLevelUpPlan(character, target);
   if (!chosenSubclassName || !basePlan.some((step) => step.kind === "subclass")) {
@@ -119,6 +139,7 @@ export function resolveLevelUpPlan(
   const replan = buildLevelUpPlan(character, {
     ...target,
     subclass: chosenSubclassName,
+    subclassCasterRef: chosenSubclassCasterRef ?? null,
     // The PICKED subclass's own rows, not target's (there is none — the
     // subclass step being present is exactly what "not yet chosen" means).
     subclassFeatureRows: pickedSubclassFeatureRows ?? [],
@@ -134,8 +155,9 @@ function resolveEffectivePlan(
   chosenSubclassName: string | null,
   submission: LevelUpSubmission,
   pickedSubclassFeatureRows?: ClassFeatureRow[] | null,
+  chosenSubclassCasterRef?: SubclassCasterRef | null,
 ): LevelUpStep[] {
-  const plan = resolveLevelUpPlan(character, target, chosenSubclassName, pickedSubclassFeatureRows);
+  const plan = resolveLevelUpPlan(character, target, chosenSubclassName, pickedSubclassFeatureRows, chosenSubclassCasterRef);
   const needsSubclass = plan.some((step) => step.kind === "subclass");
   if (needsSubclass && !chosenSubclassName) {
     throw new InvalidLevelUpError("this level-up requires choosing a subclass");
@@ -156,11 +178,27 @@ function assertCounts(plan: LevelUpStep[], chosenSubclassName: string | null, su
     if (provided !== expected) {
       // A negative net only happens when a swap forget outnumbers the learns.
       if (provided < 0) {
-        throw new InvalidLevelUpError("You must learn a replacement spell for every spell you swap out.");
+        const unit = swapUnitNoun(step);
+        throw new InvalidLevelUpError(`You must learn a replacement ${unit} for every ${unit} you swap out.`);
       }
       throw new InvalidLevelUpError(`expected ${expected} ${noun} for this level-up, got ${provided}`);
     }
   }
+}
+
+// The negative-net message (assertCounts above) names the swappable UNIT
+// being forgotten, singular — distinct from stepProvided's noun, which is
+// plural/label-shaped for the "expected N <noun>" message (e.g. "new
+// spells", "maneuvers", "fourElementsDisciplines choices"). Only step kinds
+// with a swap mechanism can go negative (a forget outnumbering its
+// replacement learn): newSpells, subclassChoice, maneuvers. #1516 found this
+// wrong for maneuvers (a hardcoded "spell" leaked into every domain's
+// message) — fixed by keying the unit off the step itself, one function, not
+// a copy per domain.
+function swapUnitNoun(step: LevelUpStep): string {
+  if (step.kind === "maneuvers") return "maneuver";
+  if (step.kind === "subclassChoice") return `${String(step.meta?.key)} choice`;
+  return "spell";
 }
 
 // #1101: learns net of the one optional swap forget.
@@ -175,6 +213,13 @@ function netSubclassChoiceLearned(key: unknown, submission: LevelUpSubmission): 
   const learned = (submission.subclassChoices ?? []).filter((c) => c.choiceKey === key).length;
   const forgotten = (submission.subclassChoicesForgotten ?? []).filter((c) => c.choiceKey === key).length;
   return learned - forgotten;
+}
+
+// #1516: same shape as netSpellsLearned/netSubclassChoiceLearned — a maneuver
+// swap (forget one, learn a different one) offsets, so the NET learn count
+// must equal the "maneuvers" step's own count.
+function netManeuversLearned(submission: LevelUpSubmission): number {
+  return (submission.maneuvers?.length ?? 0) - (submission.maneuversForgotten?.length ?? 0);
 }
 
 function stepProvided(
@@ -193,6 +238,10 @@ function stepProvided(
   // step count (spellsLearned.length === step.count + spellsForgotten.length).
   if (step.kind === "newSpells") {
     return { provided: netSpellsLearned(submission), noun: "new spells" };
+  }
+  // #1516: same net-of-forgets treatment as newSpells, above.
+  if (step.kind === "maneuvers") {
+    return { provided: netManeuversLearned(submission), noun: "maneuvers" };
   }
   const domain = SIMPLE_DOMAINS.find((d) => d.kind === step.kind)!;
   return { provided: domain.provided(submission), noun: domain.noun };
@@ -289,6 +338,31 @@ function assertSubclassChoiceForgets(plan: LevelUpStep[], submission: LevelUpSub
   }
 }
 
+// #1516: a maneuver swap forgets at most one entry, only on a "maneuvers" step
+// whose meta.canSwap is true (unconditional whenever the step exists — see
+// choiceCountStep, level-up-plan.ts) — sibling of assertForgets/
+// assertSubclassChoiceForgets above, same shape. Entry-existence is NOT
+// re-checked here — applyForgetManeuverOp (resources.ts) already rejects an
+// unknown entryId at apply time, the same "second bespoke guard" avoidance
+// assertSubclassChoiceForgets documents.
+//
+// canSwap is checked BEFORE the length>1 guard (unlike this function's first
+// cut, which checked length first): on a level that disallows swapping
+// entirely (no "maneuvers" step, e.g. a no-growth level), 2 forgets must
+// still say "does not allow swapping a maneuver" — "you may swap at most
+// one" would wrongly imply exactly one forget IS legal there.
+function assertManeuverForgets(plan: LevelUpStep[], submission: LevelUpSubmission): void {
+  const forgets = submission.maneuversForgotten ?? [];
+  if (forgets.length === 0) return;
+  const step = plan.find((s) => s.kind === "maneuvers");
+  if (step?.meta?.canSwap !== true) {
+    throw new InvalidLevelUpError("this level-up does not allow swapping a maneuver");
+  }
+  if (forgets.length > 1) {
+    throw new InvalidLevelUpError("You may swap at most one maneuver per level-up.");
+  }
+}
+
 // #1131: new cantrips ride the newSpells step's meta.cantrips, counted separately
 // from leveled picks (a cantrip never offsets a swap forget). A level with no
 // newSpells step — or one granting no cantrips — rejects any cantripsLearned.
@@ -318,12 +392,14 @@ export function validateLevelUpSubmission(
   chosenSubclassName: string | null,
   submission: LevelUpSubmission,
   pickedSubclassFeatureRows?: ClassFeatureRow[] | null,
+  chosenSubclassCasterRef?: SubclassCasterRef | null,
 ): LevelUpStep[] {
-  const plan = resolveEffectivePlan(character, target, chosenSubclassName, submission, pickedSubclassFeatureRows);
+  const plan = resolveEffectivePlan(character, target, chosenSubclassName, submission, pickedSubclassFeatureRows, chosenSubclassCasterRef);
   assertCounts(plan, chosenSubclassName, submission);
   assertNoExcess(plan, submission);
   assertForgets(plan, character, submission);
   assertSubclassChoiceForgets(plan, submission);
+  assertManeuverForgets(plan, submission);
   assertCantrips(plan, submission);
   return plan;
 }

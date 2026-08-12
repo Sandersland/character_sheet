@@ -8,11 +8,11 @@ import {
 import type { ConditionsMutableState } from "@/lib/combat/conditions.js";
 import type { ActiveEffectsMutableState } from "@/lib/combat/active-effects.js";
 
-const noConditions: ConditionsMutableState = { active: [], exhaustion: 0 };
+const noConditions: ConditionsMutableState = { active: [], exhaustion: 0, suspended: [] };
 const noEffects: ActiveEffectsMutableState = { buffs: [] };
 
 function condition(key: string): ConditionsMutableState {
-  return { active: [{ key: key as never, appliedAt: "2026-01-01T00:00:00.000Z" }], exhaustion: 0 };
+  return { active: [{ key: key as never, appliedAt: "2026-01-01T00:00:00.000Z" }], exhaustion: 0, suspended: [] };
 }
 
 describe("buildRollModifiers (#486)", () => {
@@ -193,7 +193,7 @@ describe("buildRollModifiers — 2014 divergent conditions (#1309, PHB'14 pp. 29
 
 describe("buildRollModifiers exhaustion — 2024 flat penalty (#1136)", () => {
   function exhaustion(level: number): ConditionsMutableState {
-    return { active: [], exhaustion: level };
+    return { active: [], exhaustion: level, suspended: [] };
   }
 
   // 2024 (SRD 5.2): each exhaustion level is a flat −2 to every d20 Test —
@@ -228,6 +228,7 @@ describe("buildRollModifiers exhaustion — 2024 flat penalty (#1136)", () => {
     const state: ConditionsMutableState = {
       active: [{ key: "poisoned" as never, appliedAt: "2026-01-01T00:00:00.000Z" }],
       exhaustion: 1,
+      suspended: [],
     };
     const mods = buildRollModifiers(state, noEffects, "EDITION_2024");
     expect(mods.map((m) => m.source)).toEqual([
@@ -247,7 +248,7 @@ describe("buildRollModifiers exhaustion — 2024 flat penalty (#1136)", () => {
 // roll effects — so both editions are asserted here side by side.
 describe("buildRollModifiers exhaustion — 2014 tiered disadvantage (#1307, PHB'14 p. 291)", () => {
   function exhaustion(level: number): ConditionsMutableState {
-    return { active: [], exhaustion: level };
+    return { active: [], exhaustion: level, suspended: [] };
   }
 
   it("level 0 grants no roll effects", () => {
@@ -283,6 +284,7 @@ describe("buildRollModifiers exhaustion — 2014 tiered disadvantage (#1307, PHB
     const state: ConditionsMutableState = {
       active: [{ key: "poisoned" as never, appliedAt: "2026-01-01T00:00:00.000Z" }],
       exhaustion: 1,
+      suspended: [],
     };
     const mods = buildRollModifiers(state, noEffects, "EDITION_2014");
     expect(mods.map((m) => m.source)).toEqual([

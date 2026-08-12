@@ -299,8 +299,9 @@ function isPopulatedBladesingerRow(row: RowKey): boolean {
 // ignore the field.
 type RowKey = { className: string; subclassSlug: string | null; name: string; edition: string };
 
-// #1546 Part B: the ability list Combat Superiority's maneuverSaveDC is
-// computed from — the one row that sets it, both editions.
+// #1546 Part B: the ability list Combat Superiority's announcedSaveDC (#1589,
+// renamed from maneuverSaveDC) is computed from — the one row that sets it,
+// both editions.
 function isSaveDcRow(row: RowKey): boolean {
   return isPopulatedBattleMasterPoolRow(row);
 }
@@ -387,6 +388,14 @@ const DERIVED_STAT_ROW_KEYS = new Set([
   "Wizard::wizard-bladesinging::Extra Attack",
   // #1120: Champion's crit-range axis (critRange), both editions.
   "Fighter::fighter-champion::Improved Critical",
+  // #1588: Expertise pick-count ladder (expertiseChoiceCount) — Rogue/Bard
+  // base-class Expertise rows (both editions), Ranger's Deft Explorer
+  // (2024 only — the whole ladder rides this ONE row, not the L9 Expertise
+  // row too), Wizard's Scholar (2024 only).
+  "Rogue::null::Expertise",
+  "Bard::null::Expertise",
+  "Ranger::null::Deft Explorer",
+  "Wizard::null::Scholar",
 ]);
 
 function isDerivedStatRow(row: RowKey): boolean {
@@ -579,7 +588,12 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
     // (no 2024 successor, #1676), unlike every other keyed row here — see
     // isPopulatedBladesingerRow's own comment. A future asymmetric addition
     // needs this same correction, not a silent re-multiply.
-    const populatedDerivedStatTiersCount = DERIVED_STAT_ROW_KEYS.size * 2 - 1;
+    // #1588 adds TWO more asymmetric keys: "Ranger::null::Deft Explorer" and
+    // "Wizard::null::Scholar" are EDITION_2024 only (no 2014 counterpart) —
+    // same one-row-not-two shape as Bladesinger's key above, hence -2 more
+    // (Rogue's and Bard's new "Expertise" keys ARE two-edition, no correction
+    // needed for those).
+    const populatedDerivedStatTiersCount = DERIVED_STAT_ROW_KEYS.size * 2 - 1 - 2;
     for (const column of ["resourceTotals", "resourceDieTiers", "derivedStatTiers"] as const) {
       const expectedDbNull =
         column === "resourceTotals"

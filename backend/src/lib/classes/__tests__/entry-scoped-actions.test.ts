@@ -159,4 +159,69 @@ describe("deriveEntryScopedActions", () => {
       expect(card?.enabled).toBe(false);
     });
   });
+
+  // Eldritch Knight Arcane Charge (2014, PHB'14 p.75, #1852): reminder text
+  // riding the row-driven Action Surge action, not a new action row — pure
+  // self-or-announce (#416: positional teleport, no target/positioning
+  // model). Mutation-proofs all three gates (subclass, level, edition)
+  // independently, mirroring shadowArts'/cloakOfShadows' own per-gate style
+  // above.
+  describe("Arcane Charge — reminder on Action Surge (2014, #1852)", () => {
+    it("an Eldritch Knight L15+ (2014) sees the Arcane Charge reminder on actionSurge", () => {
+      const entries = [{ name: "fighter", subclass: "eldritch knight", level: 15 }];
+      const actions = deriveEntryScopedActions(entries, 15, [], true, "EDITION_2014", getFeatureRows);
+      const card = actions.find((a) => a.key === "actionSurge");
+      expect(card?.reminder).toMatch(/Arcane Charge/);
+      expect(card?.reminder).toMatch(/teleport/);
+    });
+
+    it("a non-Eldritch-Knight fighter L15+ (2014) sees no Arcane Charge reminder", () => {
+      const entries = [{ name: "fighter", subclass: "champion", level: 15 }];
+      const actions = deriveEntryScopedActions(entries, 15, [], true, "EDITION_2014", getFeatureRows);
+      const card = actions.find((a) => a.key === "actionSurge");
+      expect(card).toBeDefined();
+      expect(card?.reminder).toBeUndefined();
+    });
+
+    it("an Eldritch Knight below level 15 (2014) sees no Arcane Charge reminder", () => {
+      const entries = [{ name: "fighter", subclass: "eldritch knight", level: 14 }];
+      const actions = deriveEntryScopedActions(entries, 14, [], true, "EDITION_2014", getFeatureRows);
+      const card = actions.find((a) => a.key === "actionSurge");
+      expect(card).toBeDefined();
+      expect(card?.reminder).toBeUndefined();
+    });
+
+    it("an Eldritch Knight L15+ in 2024 sees no Arcane Charge reminder", () => {
+      const entries = [{ name: "fighter", subclass: "eldritch knight", level: 15 }];
+      const actions = deriveEntryScopedActions(entries, 15, [], true, "EDITION_2024", getFeatureRows);
+      const card = actions.find((a) => a.key === "actionSurge");
+      expect(card).toBeDefined();
+      expect(card?.reminder).toBeUndefined();
+    });
+
+    it("an Eldritch Knight L15+ (2014), secondary entry: reminder keyed off the entry's own level, not total level", () => {
+      const entries = [
+        { name: "wizard", subclass: undefined, level: 10 },
+        { name: "fighter", subclass: "eldritch knight", level: 15 },
+      ];
+      const actions = deriveEntryScopedActions(entries, 25, [], true, "EDITION_2014", getFeatureRows);
+      const card = actions.find((a) => a.key === "actionSurge");
+      expect(card?.reminder).toMatch(/Arcane Charge/);
+    });
+
+    // The discriminating negative: total level (25) clears the L15 gate but
+    // the fighter ENTRY's own level (14) does not — a gate reading total
+    // level would wrongly attach the reminder here, so this test FAILS if
+    // withArcaneChargeReminder is ever fed totalLevel instead of effLevel.
+    it("a multiclass Eldritch Knight below Fighter 15 gets no reminder even when total level clears 15", () => {
+      const entries = [
+        { name: "wizard", subclass: undefined, level: 11 },
+        { name: "fighter", subclass: "eldritch knight", level: 14 },
+      ];
+      const actions = deriveEntryScopedActions(entries, 25, [], true, "EDITION_2014", getFeatureRows);
+      const card = actions.find((a) => a.key === "actionSurge");
+      expect(card).toBeDefined();
+      expect(card?.reminder).toBeUndefined();
+    });
+  });
 });

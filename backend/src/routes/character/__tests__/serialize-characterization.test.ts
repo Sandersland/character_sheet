@@ -302,7 +302,7 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
     ]);
     expect(a.resources.toolProficienciesKnown).toEqual([{ id: "tp1", name: "Smith's Tools" }]);
 
-    expect(a.conditions).toEqual({ active: [], exhaustion: 1 });
+    expect(a.conditions).toEqual({ active: [], exhaustion: 1, suspended: [] });
     expect(a.advancementSlots).toEqual({ total: 1, used: 0 });
 
     // Multiclass-aware classes view + subclass visibility (level 5 ≥ subclassLevel 3).
@@ -335,7 +335,7 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
 
     // Single class, no subclass — gate passed (L5) and unchosen, so needsSubclass (#1598).
     expect(b.classes).toEqual([{ id: "ce-b", name: "wizard", level: 5, needsSubclass: true, subclassUnavailable: false }]);
-    expect(b.conditions).toEqual({ active: [], exhaustion: 0 });
+    expect(b.conditions).toEqual({ active: [], exhaustion: 0, suspended: [] });
   });
 
   // Clamp-on-read (#1127): an over-cap prepared blob renders exactly `limit`
@@ -567,6 +567,7 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
         equippedSlot: "MAIN_HAND",
         rarity: "RARE",
         attuned: true,
+        weaponBonded: false,
         requiresAttunement: true,
         attunementPrereqKind: "class",
         attunementPrereqValue: "Fighter",
@@ -605,6 +606,7 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
         equipped: false,
         slot: "FEET",
         attuned: false,
+        weaponBonded: false,
         requiresAttunement: false,
         // Worn gear: placeable but not equippable — the two flags are separate rules.
         equippable: false,
@@ -618,6 +620,7 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
         quantity: 1,
         equipped: false,
         attuned: false,
+        weaponBonded: false,
         requiresAttunement: false,
         equippable: true,
         allowedSlots: ["BODY"],
@@ -633,6 +636,7 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
         quantity: 3,
         equipped: false,
         attuned: false,
+        weaponBonded: false,
         requiresAttunement: false,
         equippable: false,
         allowedSlots: [],

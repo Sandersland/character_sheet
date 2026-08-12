@@ -16,6 +16,7 @@ import Card from "@/components/ui/Card";
 import { ChevronRight, ScrollText, Zap } from "@/components/ui/icons";
 import { useIsBelowMd } from "@/hooks/useIsBelowMd";
 import { useTurnActions } from "@/features/session/useTurnActions";
+import { useUndoWithCombatRefresh } from "@/features/session/useUndoWithCombatRefresh";
 import { useDeflectAttacksReaction } from "@/features/session/useDeflectAttacksReaction";
 import ActionSlot from "@/features/session/ActionSlot";
 import BonusActionSlot from "@/features/session/BonusActionSlot";
@@ -413,7 +414,9 @@ export default function TurnHub({ sessionId, turnState, onLogChanged, allies, ov
   const turn = useTurnActions({ character, sessionId, turnState, onLogChanged });
   // Grouped for readability; also keeps this destructure from cloning
   // useTurnActions' flat return block (a benign hook-bag mirror).
-  const { busy, error, reactionMessage, effectMessage, send, handleUndo } = turn;
+  const { busy, error, reactionMessage, effectMessage, send } = turn;
+  // Undo, wrapped to re-read the interlock a reverted cast cleared (#1439 review).
+  const handleUndo = useUndoWithCombatRefresh(turn.handleUndo);
   const {
     showActionMenu, setShowActionMenu, showBonusMenu, setShowBonusMenu,
     showReactionMenu, setShowReactionMenu, setReactionMessage, activeResolution, closeResolution,
@@ -455,7 +458,6 @@ export default function TurnHub({ sessionId, turnState, onLogChanged, allies, ov
   // skipped attacks, shared-shaped with the in-sheet strip's rule.
   const tallyResolve = useTallyResolve({
     character,
-    sessionId,
     setTallyVerdict: turnState.setTallyVerdict,
     setTallyDamageAt: turnState.setTallyDamageAt,
     onLogChanged,

@@ -7,7 +7,16 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { derivedStatFromRows, evaluateBuffModifier, evaluateResourceTotal, featuresFromRows, improvementsFromRows, poolsFromRows, type ClassFeatureRow } from "@/lib/classes/class-feature-rows.js";
+import {
+  conditionImmunitiesFromRows,
+  derivedStatFromRows,
+  evaluateBuffModifier,
+  evaluateResourceTotal,
+  featuresFromRows,
+  improvementsFromRows,
+  poolsFromRows,
+  type ClassFeatureRow,
+} from "@/lib/classes/class-feature-rows.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 
 function row(overrides: Partial<ClassFeatureRow> = {}): ClassFeatureRow {
@@ -184,6 +193,63 @@ describe("improvementsFromRows (#1691) — same edition/level truth table as fea
 
   it("an empty row list produces an empty improvements list (the no-carrier default every narrow-select caller falls back to)", () => {
     expect(improvementsFromRows([], 20, "EDITION_2024")).toEqual([]);
+  });
+});
+
+describe("conditionImmunitiesFromRows (#1121) — same edition/level truth table as featuresFromRows, plus the requireActiveBuff gate", () => {
+  it("a row tagged for the matching edition, at or below level, with no requireActiveBuff, is unconditional (Beguiling Defenses/Nature's Ward's shape)", () => {
+    const rows = [row({ name: "Nature's Ward", level: 10, conditionImmunities: ["poisoned"] })];
+    expect(conditionImmunitiesFromRows(rows, 9, "EDITION_2014", new Set())).toEqual([]);
+    expect(conditionImmunitiesFromRows(rows, 10, "EDITION_2014", new Set())).toEqual(["poisoned"]);
+  });
+
+  it("a row tagged for the OTHER edition is excluded — never falls back", () => {
+    const rows = [row({ edition: "EDITION_2014", conditionImmunities: ["charmed"] })];
+    expect(conditionImmunitiesFromRows(rows, 20, "EDITION_2024", new Set())).toEqual([]);
+  });
+
+  it("a row naming requireActiveBuff contributes ONLY while that buff key is active (Mindless Rage's shape)", () => {
+    const rows = [
+      row({
+        name: "Mindless Rage",
+        level: 6,
+        conditionImmunities: ["charmed", "frightened"],
+        conditionImmunitiesRequireActiveBuff: "rage",
+      }),
+    ];
+    expect(conditionImmunitiesFromRows(rows, 6, "EDITION_2014", new Set())).toEqual([]);
+    expect(conditionImmunitiesFromRows(rows, 6, "EDITION_2014", new Set(["rage"]))).toEqual(["charmed", "frightened"]);
+    // A different active buff key doesn't satisfy the gate.
+    expect(conditionImmunitiesFromRows(rows, 6, "EDITION_2014", new Set(["bardicInspiration"]))).toEqual([]);
+  });
+
+  it("below the row's own level, contributes nothing even while the gating buff is active (a raging Berserker under L6)", () => {
+    const rows = [
+      row({
+        name: "Mindless Rage",
+        level: 6,
+        conditionImmunities: ["charmed", "frightened"],
+        conditionImmunitiesRequireActiveBuff: "rage",
+      }),
+    ];
+    expect(conditionImmunitiesFromRows(rows, 5, "EDITION_2014", new Set(["rage"]))).toEqual([]);
+  });
+
+  it("unions across multiple qualifying rows, deduped", () => {
+    const rows = [
+      row({ name: "A", level: 1, conditionImmunities: ["poisoned"] }),
+      row({ name: "B", level: 1, conditionImmunities: ["poisoned", "charmed"] }),
+    ];
+    expect(conditionImmunitiesFromRows(rows, 1, "EDITION_2014", new Set())).toEqual(["poisoned", "charmed"]);
+  });
+
+  it("a row with no conditionImmunities contributes nothing, even when active", () => {
+    const rows = [row({ level: 1 })];
+    expect(conditionImmunitiesFromRows(rows, 20, "EDITION_2014", new Set())).toEqual([]);
+  });
+
+  it("an empty row list produces an empty immunity list", () => {
+    expect(conditionImmunitiesFromRows([], 20, "EDITION_2024", new Set())).toEqual([]);
   });
 });
 

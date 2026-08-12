@@ -487,9 +487,17 @@ function recoverExhaustionOnLongRest(row: HpOpContext["row"]): {
 } | null {
   const state = normalizeConditionsMutable(row.conditions);
   if (state.exhaustion <= 0) return null;
-  const beforeConditionsState = { active: state.active.map((e) => ({ ...e })), exhaustion: state.exhaustion };
+  const beforeConditionsState = {
+    active: state.active.map((e) => ({ ...e })),
+    exhaustion: state.exhaustion,
+    suspended: state.suspended.map((e) => ({ ...e })),
+  };
   state.exhaustion -= 1;
-  const afterConditionsState = { active: state.active.map((e) => ({ ...e })), exhaustion: state.exhaustion };
+  const afterConditionsState = {
+    active: state.active.map((e) => ({ ...e })),
+    exhaustion: state.exhaustion,
+    suspended: state.suspended.map((e) => ({ ...e })),
+  };
   return {
     beforeConditionsState,
     afterConditionsState,
@@ -499,7 +507,7 @@ function recoverExhaustionOnLongRest(row: HpOpContext["row"]): {
 }
 
 export async function applyLongRestOp(ctx: HpOpContext): Promise<HpOpResult> {
-  const { tx, characterId, row, hp, hd, featMaxHpBonus, exhaustionLevel } = ctx;
+  const { tx, characterId, row, hp, hd, maxHpBonus, exhaustionLevel } = ctx;
   const prevCurrent = hp.current;
   hp.temp = 0;
   hp.deathSaves = { successes: 0, failures: 0 };
@@ -518,7 +526,7 @@ export async function applyLongRestOp(ctx: HpOpContext): Promise<HpOpResult> {
   // and must not be used here.
   const exhaustion = recoverExhaustionOnLongRest(row);
   const postRestExhaustionLevel = exhaustion ? exhaustion.afterConditionsState.exhaustion : exhaustionLevel;
-  const postRestEffMax = effectiveMaxHitPoints(hp.max, featMaxHpBonus, postRestExhaustionLevel, row.rulesEdition);
+  const postRestEffMax = effectiveMaxHitPoints(hp.max, maxHpBonus, postRestExhaustionLevel, row.rulesEdition);
   hp.current = postRestEffMax;
   const items = await runItemRestResets(ctx, "long");
   const consumables = await rechargeConsumables(tx, characterId);

@@ -28,19 +28,17 @@ export interface TallyResolve {
 
 export function useTallyResolve({
   character,
-  sessionId,
   setTallyVerdict,
   setTallyDamageAt,
   onLogChanged,
 }: {
   character: Character;
-  sessionId: string;
   setTallyVerdict: (index: number, verdict: TallyVerdict | undefined) => void;
   setTallyDamageAt: (index: number, damage: number) => void;
   onLogChanged: () => void;
 }): TallyResolve {
   const { roll } = useRoll();
-  const logRollSafe = useRollLogger(character.id, sessionId, onLogChanged);
+  const logRollSafe = useRollLogger(character.id, onLogChanged);
 
   // A bonusAction row resolves against the off-hand entry (its served damage has
   // the ability mod already dropped) — never the main-hand form, which carries the

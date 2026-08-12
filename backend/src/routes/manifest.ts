@@ -32,6 +32,7 @@ import { preferencesRouter } from "@/routes/platform/preferences.js";
 import { subclassChoicesRouter } from "@/routes/character/subclass-choices.js";
 import { channelDivinityRouter } from "@/routes/character/channel-divinity.js";
 import { referenceRouter } from "@/routes/catalog/reference.js";
+import { resolveActionRouter } from "@/routes/character/resolve-action.js";
 import { resourcesRouter } from "@/routes/character/resources.js";
 import { customSpellsRouter } from "@/routes/catalog/custom-spells.js";
 import { spellsRouter } from "@/routes/catalog/spells.js";
@@ -81,6 +82,10 @@ export const routeManifest: RouteMount[] = [
   { router: inventoryRouter, mount: "/api/characters/:id/inventory", scope: "authed" },
   { router: experienceRouter, mount: "/api/characters/:id/experience", scope: "authed" },
   { router: spellcastingRouter, mount: "/api/characters/:id/spellcasting", scope: "authed" },
+  // Unified combat action resolution (#1829, epic #1827) — one undoable
+  // resolveAction event per weapon swing / spell cast. Not yet called by the
+  // frontend (adapter slices #1832/#1833 migrate useAttackRolls/useSpellPicker).
+  { router: resolveActionRouter, mount: "/api/characters/:id/resolve-action", scope: "authed" },
   { router: resourcesRouter, mount: "/api/characters/:id/resources", scope: "authed" },
   { router: conditionsRouter, mount: "/api/characters/:id/conditions", scope: "authed" },
   { router: classRouter, mount: "/api/characters/:id/class", scope: "authed" },

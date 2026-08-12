@@ -1,5 +1,5 @@
 import { Prisma } from "@/generated/prisma/client.js";
-import { clearBuffsForSourceInTx } from "./active-effects.js";
+import { clearBuffsForSourceInTx } from "./buff-end.js";
 import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/experience.js";
 import { logEvent } from "@/lib/activity/events.js";
 import {

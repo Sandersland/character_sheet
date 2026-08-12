@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { useDelayedFlag } from "@/hooks/useDelayedFlag";
+import { skillLabel } from "@/lib/abilities";
 import {
   emptyChoiceText,
   filterChoiceOptions,
@@ -24,12 +25,19 @@ function useChoiceOptions(
   config: ChoiceKindConfig | undefined,
   targetLevel: number,
   edition: RulesEdition,
+  classNames: string[],
+  proficientSkills: ChoiceOption[],
 ): {
   options: ChoiceOption[] | null;
   loadError: boolean;
 } {
   const [options, setOptions] = useState<ChoiceOption[] | null>(null);
   const [loadError, setLoadError] = useState(false);
+  const classNamesKey = classNames.join(",");
+  // #1588: only `expertise` reads proficientSkills, but every kind shares this
+  // one effect — a stable key (like classNamesKey) so the array's fresh
+  // identity each render doesn't refetch on every render for the other kinds.
+  const proficientSkillsKey = proficientSkills.map((s) => s.id).join(",");
 
   useEffect(() => {
     if (!config) return;
@@ -37,7 +45,7 @@ function useChoiceOptions(
     setOptions(null);
     setLoadError(false);
     config
-      .loadOptions({ targetLevel, edition })
+      .loadOptions({ targetLevel, edition, classNames, proficientSkills })
       .then((opts) => {
         if (!ignore) setOptions(opts);
       })
@@ -47,7 +55,8 @@ function useChoiceOptions(
     return () => {
       ignore = true;
     };
-  }, [config, targetLevel, edition]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- classNamesKey/proficientSkillsKey are the real dependency signals; classNames/proficientSkills are fresh arrays each render (see useChoiceCatalog's useMemo, and #1495's useFeatCatalog for the same pattern)
+  }, [config, targetLevel, edition, classNamesKey, proficientSkillsKey]);
 
   return { options, loadError };
 }
@@ -70,8 +79,31 @@ export function useChoiceCatalog(
   config: ChoiceKindConfig | undefined,
   character: Character,
   targetLevel: number,
+  targetClassName: string,
 ): ChoiceCatalog {
-  const { options, loadError } = useChoiceOptions(config, targetLevel, character.rulesEdition);
+  // #1495: the union of the character's ALREADY-EARNED Fighting Style classes
+  // (fightingStyleGrantingClasses — the level-gated subset served by
+  // serializeCharacter, never `character.classes` as a whole, which would
+  // wrongly include a class that hasn't reached its OWN grant level yet)
+  // plus the level-up target's own className: the fightingStyleFeat step
+  // only appears when THIS level-up is what grants the target class its
+  // Fighting Style feature, so the pre-level-up served set can't include it
+  // yet. Other kinds ignore this. Fed to fightingStyleFeat's class gate.
+  const classNames = useMemo(
+    () => Array.from(new Set([...(character.fightingStyleGrantingClasses ?? []), targetClassName])),
+    [character.fightingStyleGrantingClasses, targetClassName],
+  );
+  // #1588: the character's proficient skills — only `expertise` reads this,
+  // but it's built here (character is in scope) rather than inside the
+  // config, matching classNames' own shape. skillLabel resolves display text
+  // (CLAUDE.md: never render a raw skill key). `?? []` mirrors
+  // fightingStyleGrantingClasses above — many existing test fixtures build a
+  // minimal Character via an `as unknown as Character` cast that omits skills.
+  const proficientSkills = useMemo(
+    () => (character.skills ?? []).filter((s) => s.proficient).map((s) => ({ id: s.name, name: skillLabel(s.name) })),
+    [character.skills],
+  );
+  const { options, loadError } = useChoiceOptions(config, targetLevel, character.rulesEdition, classNames, proficientSkills);
   const showSpinner = useDelayedFlag(options === null && !loadError);
   const [search, setSearch] = useState("");
   useEffect(() => setSearch(""), [config]);
