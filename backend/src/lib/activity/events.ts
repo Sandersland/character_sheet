@@ -92,6 +92,10 @@ export type EventType =
   | "learnToolProficiency"
   | "forgetToolProficiency"
   | "toolProficienciesReconciled"
+  // Expertise (#1588)
+  | "learnExpertise"
+  | "forgetExpertise"
+  | "expertiseReconciled"
   | "learnSubclassChoice"
   | "forgetSubclassChoice"
   | "subclassChoicesReconciled"

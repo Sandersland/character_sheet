@@ -16,9 +16,11 @@ export type {
   CastElementalBurstOperation,
   ElementalDamageType,
   ElementalStrikeOperation,
+  ForgetExpertiseOperation,
   ForgetManeuverOperation,
   ForgetSubclassChoiceOperation,
   ForgetToolProficiencyOperation,
+  LearnExpertiseOperation,
   LearnManeuverOperation,
   LearnSubclassChoiceOperation,
   LearnToolProficiencyOperation,
@@ -277,6 +279,12 @@ export interface ToolProfEntry {
   name: string; // matches a TOOLS entry name
 }
 
+/** Level-gated Expertise skill entry within the resources JSON (#1588). */
+export interface ExpertiseEntry {
+  id: string;    // per-character entry UUID
+  skill: string; // camelCase skill key, e.g. "stealth"
+}
+
 /** One picked option of a subclass "choose N" feature (#899) — a snapshot, not mechanics. */
 export interface ChoiceEntry {
   id: string;
@@ -291,10 +299,14 @@ export interface CharacterResources {
   maneuverChoiceCount?: number;
   /** Number of artisan's-tool proficiency choices from a subclass feature. */
   toolProfChoiceCount?: number;
+  /** Number of Expertise skill picks at this level (#1588 — Rogue/Bard/Ranger/Wizard). */
+  expertiseChoiceCount?: number;
   pools: ResourcePool[];
   maneuversKnown: ManeuverEntry[];
   /** Level-gated tool proficiency choices (e.g. Student of War). */
   toolProficienciesKnown: ToolProfEntry[];
+  /** Level-gated Expertise skill choices (#1588). */
+  expertiseKnown: ExpertiseEntry[];
   // buildResourcesPayload always sends both of these (subclassChoices defaults
   // to [] server-side), so required here — optional would let the drift these
   // two fields close (#1422) reopen.

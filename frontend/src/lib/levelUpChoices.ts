@@ -30,6 +30,13 @@ export interface ChoiceLoadContext {
    * ignore it.
    */
   classNames?: string[];
+  /**
+   * The character's proficient skills (id = skill key, name via skillLabel —
+   * CLAUDE.md: never render a raw skill key) (#1588). Only `expertise` reads
+   * this: unlike every other kind, its option list has no catalog fetch — the
+   * character's own proficient-skill set IS the catalog.
+   */
+  proficientSkills?: ChoiceOption[];
 }
 
 export interface ChoiceKindConfig {
@@ -95,10 +102,23 @@ const toolProficiency: ChoiceKindConfig = {
   }),
 };
 
+// #1588: no catalog fetch — the option list is the character's own
+// proficient-skill set (ctx.proficientSkills), computed by useChoiceOptions
+// from the character's skills[] the same way the read path resolves
+// "proficient" (#438: feat/item grants included, mirrors buildSkillsView).
+const expertise: ChoiceKindConfig = {
+  loadOptions: (ctx) => Promise.resolve(ctx.proficientSkills ?? []),
+  fromCharacter: (character) =>
+    new Set((character.resources?.expertiseKnown ?? []).map((e) => e.skill)),
+  selected: (draft) => (draft.expertise ?? []).map((op) => op.skill),
+  select: (_draft, ids) => ({ expertise: ids.map((skill) => ({ type: "learnExpertise", skill })) }),
+};
+
 export const CHOICE_KIND_CONFIGS: Partial<Record<LevelUpStepKind, ChoiceKindConfig>> = {
   maneuvers,
   fightingStyleFeat,
   toolProficiency,
+  expertise,
 };
 
 // Per-step, not per-kind: a subclass's several tiers share one

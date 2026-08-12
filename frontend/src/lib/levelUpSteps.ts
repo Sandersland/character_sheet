@@ -75,6 +75,7 @@ const PRUNABLE_DRAFT_KEYS = {
   fightingStyleFeat: "fightingStyleFeat",
   maneuvers: "maneuvers",
   toolProficiencies: "toolProficiency",
+  expertise: "expertise",
   spellsLearned: "newSpells",
   cantripsLearned: "newSpells",
   spellsForgotten: "newSpells",
@@ -180,6 +181,7 @@ const STEP_LABELS: Record<LevelUpStepKind, string> = {
   maneuvers: "Maneuvers",
   fightingStyleFeat: "Fighting Style",
   toolProficiency: "Tool Proficiency",
+  expertise: "Expertise",
   subclassChoice: "Subclass Choice",
   newSpells: "New Spells",
   review: "Review",
@@ -199,6 +201,7 @@ const LIST_ENTRIES: Partial<
 > = {
   maneuvers: (_step, draft) => draft.maneuvers,
   toolProficiency: (_step, draft) => draft.toolProficiencies,
+  expertise: (_step, draft) => draft.expertise,
   subclassChoice: (step, draft) => draft.subclassChoices?.filter((c) => c.choiceKey === step.meta?.key),
   newSpells: (_step, draft) => draft.spellsLearned,
 };

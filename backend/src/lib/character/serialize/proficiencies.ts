@@ -6,7 +6,7 @@ import {
   type ToolProficiencyEntry,
 } from "@/lib/srd/srd.js";
 import { deriveItemGrants } from "@/lib/inventory/capabilities.js";
-import type { ToolProfEntry } from "@/lib/classes/resources.js";
+import type { ExpertiseEntry, ToolProfEntry } from "@/lib/classes/resources.js";
 import type { CharacterWithRelations } from "@/lib/character/character-include.js";
 import type { TargetModifierMap } from "./effects.js";
 
@@ -145,18 +145,30 @@ export function buildSavingThrowProficiencies(
 // Merge feat/item-granted skill proficiencies (proficient stays true if already
 // true; grants only add) and overlay any active buff as an optional
 // tempModifier + labeled breakdown (#438). Additive term, derived on read.
+// `resources` (#1588) carries the already-clamped expertiseKnown list
+// (buildResourcesView's buildResourcesPayload) — this sets `expertise: true`
+// on exactly those skills; the frontend's skillBonus() doubles proficiency
+// bonus off that flag (already shipped before this feature, per the plan).
+// Narrowed to exactly the one field this reads (#1588 review) — was
+// `object | undefined`, which forced an `"expertiseKnown" in resources` guard
+// plus an `as {...}` cast below; buildResourcesPayload's own return type is
+// now precise enough that the caller (character-serialize.ts) passes this
+// shape directly, no cast needed at either end.
 export function buildSkillsView(
   row: CharacterWithRelations,
   featProficiencies: ReturnType<typeof deriveFeatProficiencies>,
   itemSkillProfs: Set<string>,
   buffTargets: TargetModifierMap,
+  resources: { expertiseKnown: ExpertiseEntry[] } | undefined,
 ) {
+  const expertSkills = new Set((resources?.expertiseKnown ?? []).map((e) => e.skill));
   return (row.skills as { name: string; ability: string; proficient: boolean }[]).map((s) => {
     const buffs = buffTargets[s.name] ?? [];
     const tempModifier = buffs.reduce((sum, b) => sum + b.modifier, 0);
     return {
       ...s,
       proficient: s.proficient || featProficiencies.skills.has(s.name) || itemSkillProfs.has(s.name),
+      expertise: expertSkills.has(s.name),
       ...(tempModifier !== 0
         ? {
             tempModifier,

@@ -130,6 +130,7 @@ const EMPTY_RESOURCES = {
   used: {},
   maneuversKnown: [],
   toolProficienciesKnown: [],
+  expertiseKnown: [],
   choicesKnown: {},
   advancements: [],
 };

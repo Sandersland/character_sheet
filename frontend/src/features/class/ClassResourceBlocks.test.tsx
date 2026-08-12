@@ -16,6 +16,7 @@ const resources: CharacterResources = {
   pools: [],
   maneuversKnown: [],
   toolProficienciesKnown: [],
+  expertiseKnown: [],
   choicesKnown: {},
   subclassChoices: [],
 };

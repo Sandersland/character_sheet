@@ -102,7 +102,7 @@ describe("POST /api/characters/:id/abilities/stunning-strike/transactions", () =
     expect(res.status).toBe(200);
     const { roll, outcome, summary } = res.body.results[0];
     const noResourcesUsed = {
-      resources: { used: {}, maneuversKnown: [], toolProficienciesKnown: [], choicesKnown: {}, advancements: [] },
+      resources: { used: {}, maneuversKnown: [], toolProficienciesKnown: [], expertiseKnown: [], choicesKnown: {}, advancements: [] },
     };
 
     expect(await readPinnedEvents(FIXTURE_ID)).toEqual([

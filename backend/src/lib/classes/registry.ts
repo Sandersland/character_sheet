@@ -306,6 +306,11 @@ function deriveRowExtras(
   if (maneuverChoiceCount !== undefined) extras.maneuverChoiceCount = maneuverChoiceCount;
   const toolProfChoiceCount = derivedStatFromRows(rows, level, edition, "toolProfChoiceCount");
   if (toolProfChoiceCount !== undefined) extras.toolProfChoiceCount = toolProfChoiceCount;
+  // Expertise pick count (#1588). Base-class feature, so deriveRowExtras' ungated
+  // pass over base rows resolves it (Rogue PHB'14 p.96 / Bard p.53 / Ranger &
+  // Wizard SRD 5.2). Same derivedStat mechanism as maneuverChoiceCount.
+  const expertiseChoiceCount = derivedStatFromRows(rows, level, edition, "expertiseChoiceCount");
+  if (expertiseChoiceCount !== undefined) extras.expertiseChoiceCount = expertiseChoiceCount;
   const announcedSaveDC = deriveAnnouncedSaveDC(rows, level, edition, abilityScores, profBonus);
   if (announcedSaveDC !== undefined) extras.announcedSaveDC = announcedSaveDC;
   return Object.keys(extras).length > 0 ? extras : undefined;
@@ -512,6 +517,7 @@ const EXTRAS_FIELDS = [
   "maneuverChoiceCount",
   "announcedSaveDC",
   "toolProfChoiceCount",
+  "expertiseChoiceCount",
 ] as const satisfies readonly (keyof ClassExtras)[];
 
 // Compile-time latch: a ClassExtras field missing from EXTRAS_FIELDS makes this
@@ -565,16 +571,42 @@ function assignAnnouncedSaveDC(target: DerivedClassInfo, value: number | undefin
   target.announcedSaveDC = value;
 }
 
+// `expertiseChoiceCount` (#1588) is the OTHER EXTRAS_FIELDS member where "a
+// class appears at most once in classEntries" does NOT bound this to one
+// contributor per character — but unlike announcedSaveDC's collision above
+// (a misconfiguration to degrade), a second Expertise-granting entry is
+// EXPECTED RAW behavior: FOUR classes grant Expertise (Rogue/Bard/Ranger/
+// Wizard), so a real multiclass character can hold two grantor entries at
+// once and RAW sums their picks (e.g. 2014 Rogue 6 / Bard 3 = 4 + 2 = 6, not
+// whichever entry's count happened to overlay last). So this SUMS across
+// entries instead of picking a winner — assignDefined's defined-wins shape
+// would silently clobber the larger count down to the last-applied entry's
+// own value, corrupting the learn cap, the clamp-on-read
+// (buildResourcesPayload, serialize/classes.ts), and the reconciler
+// (reconcileExpertise, level-reconciliation.ts), all three of which read
+// this one summed field and so inherit the corrected total automatically.
+function addExpertiseChoiceCount(target: DerivedClassInfo, value: number | undefined): void {
+  if (value === undefined) return;
+  target.expertiseChoiceCount = (target.expertiseChoiceCount ?? 0) + value;
+}
+
 // Defined-wins overlay of one entry's extras fields onto the accumulator (a
-// class appears at most once in classEntries, so no cross-entry collision) —
-// EXCEPT announcedSaveDC, see assignAnnouncedSaveDC above. Creates an empty
-// resources/features shell on first contribution if `derived` is still null
-// (e.g. an empty-featured primary with a capped secondary).
+// class appears at most once in classEntries, so no cross-entry collision for
+// the REMAINING fields) — EXCEPT announcedSaveDC (assignAnnouncedSaveDC
+// above, degrades a collision) and expertiseChoiceCount (addExpertiseChoiceCount
+// above, sums a collision — see its own comment for why the two exceptions
+// resolve differently). Creates an empty resources/features shell on first
+// contribution if `derived` is still null (e.g. an empty-featured primary
+// with a capped secondary).
 function overlayExtrasFields(acc: DerivedClassInfo | null, info: DerivedClassInfo): DerivedClassInfo {
   const target = acc ?? { resources: [], features: [] };
   for (const field of EXTRAS_FIELDS) {
     if (field === "announcedSaveDC") {
       assignAnnouncedSaveDC(target, info.announcedSaveDC);
+      continue;
+    }
+    if (field === "expertiseChoiceCount") {
+      addExpertiseChoiceCount(target, info.expertiseChoiceCount);
       continue;
     }
     assignDefined(target, field, info[field]);

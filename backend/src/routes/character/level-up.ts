@@ -24,6 +24,7 @@ import { takeAsiOpSchema, takeFeatOpSchema } from "@/routes/character/advancemen
 import {
   forgetManeuverOpSchema,
   forgetSubclassChoiceOpSchema,
+  learnExpertiseOpSchema,
   learnManeuverOpSchema,
   learnToolProficiencyOpSchema,
   learnSubclassChoiceOpSchema,
@@ -163,6 +164,8 @@ const levelUpSubmissionSchema = z.object({
   // meta.canSwap by assertManeuverForgets.
   maneuversForgotten: z.array(forgetManeuverOpSchema).optional(),
   toolProficiencies: z.array(learnToolProficiencyOpSchema).optional(),
+  // #1588: Expertise skill picks — freely reversible, no forget/swap field.
+  expertise: z.array(learnExpertiseOpSchema).optional(),
   subclassChoices: z.array(learnSubclassChoiceOpSchema).optional(),
   // #1503: a choose-N swap (e.g. Way of the Four Elements) — validated
   // against its step's meta.canSwap by assertSubclassChoiceForgets.

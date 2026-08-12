@@ -421,6 +421,7 @@ const STEP_OP_BUILDERS: Record<LevelUpStepKind, (submission: LevelUpSubmission, 
   maneuvers: (s) =>
     [...(s.maneuversForgotten ?? []), ...(s.maneuvers ?? [])].map((op) => ({ domain: "resources", op })),
   toolProficiency: (s) => (s.toolProficiencies ?? []).map((op) => ({ domain: "resources", op })),
+  expertise: (s) => (s.expertise ?? []).map((op) => ({ domain: "resources", op })),
   // #1503: forgets apply BEFORE learns (ops run sequentially in tx order),
   // mirroring #1101's newSpells ordering — resolveChoiceOption's dup guard
   // reads the CURRENT known list, so a forget-first ordering lets a swap

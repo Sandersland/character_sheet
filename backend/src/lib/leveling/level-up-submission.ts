@@ -11,6 +11,7 @@ import type { ClassFeatureRow } from "@/lib/classes/class-feature-rows.js";
 import type {
   ForgetManeuverOperation,
   ForgetSubclassChoiceOperation,
+  LearnExpertiseOperation,
   LearnManeuverOperation,
   LearnToolProficiencyOperation,
   LearnSubclassChoiceOperation,
@@ -49,6 +50,10 @@ export interface LevelUpSubmission {
   // spellsForgotten's own shape/assert (assertManeuverForgets below).
   maneuversForgotten?: ForgetManeuverOperation[];
   toolProficiencies?: LearnToolProficiencyOperation[];
+  // #1588: Expertise skill picks — freely reversible (no forget/swap
+  // counterpart in the ceremony, unlike maneuvers/subclassChoices above),
+  // so there is no expertiseForgotten field.
+  expertise?: LearnExpertiseOperation[];
   subclassChoices?: LearnSubclassChoiceOperation[];
   // #1503: a swap for a choose-N choice whose swapCadence is "onLevelUp"
   // (today: Way of the Four Elements' disciplines) — one forgotten entry
@@ -68,7 +73,7 @@ export interface LevelUpSubmission {
 // subclass step is spliced back at this rank after a re-plan (which omits it).
 const KIND_ORDER: LevelUpStepKind[] = [
   "hitPoints", "advancement", "subclass", "maneuvers", "fightingStyleFeat",
-  "toolProficiency", "subclassChoice", "newSpells", "review",
+  "toolProficiency", "expertise", "subclassChoice", "newSpells", "review",
 ];
 
 // One count-checkable submission domain that maps 1:1 to a plan step kind.
@@ -86,6 +91,7 @@ const SIMPLE_DOMAINS: SimpleDomain[] = [
   { kind: "fightingStyleFeat", provided: (s) => (s.fightingStyleFeat ? 1 : 0), noun: "fighting style", absentMessage: "this level-up does not include a fighting style choice" },
   { kind: "maneuvers", provided: (s) => s.maneuvers?.length ?? 0, noun: "maneuvers", absentMessage: "this level-up does not grant maneuvers" },
   { kind: "toolProficiency", provided: (s) => s.toolProficiencies?.length ?? 0, noun: "tool proficiencies", absentMessage: "this level-up does not grant a tool proficiency" },
+  { kind: "expertise", provided: (s) => s.expertise?.length ?? 0, noun: "Expertise picks", absentMessage: "this level-up does not grant Expertise" },
   { kind: "newSpells", provided: (s) => s.spellsLearned?.length ?? 0, noun: "new spells", absentMessage: "this level-up does not grant new spells" },
 ];
 

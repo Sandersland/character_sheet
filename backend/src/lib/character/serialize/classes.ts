@@ -45,7 +45,11 @@ export function buildResourcesView(
   level: number,
   abilityScores: Record<string, number>,
   proficiencyBonus: number,
-): { resources: object | undefined; announcedSaveDC: number | undefined; classFeatureImprovements: FeatImprovement[] } {
+): {
+  resources: ReturnType<typeof buildResourcesPayload> | undefined;
+  announcedSaveDC: number | undefined;
+  classFeatureImprovements: FeatImprovement[];
+} {
   // The ONE production caller that supplies real ClassFeature rows (#1524):
   // characterInclude loaded entry.class.features (already subclassId:null
   // filtered) and entry.subclassRef.features — featuresFromRows/poolsFromRows
@@ -88,10 +92,15 @@ export function toWireFeatures(
 // Assemble the wire `resources` payload from the derived caps + stored mutable
 // state, clamping each level-gated list to its derived count (defense-in-depth
 // for characters who haven't had a reconciling XP op since their level dropped).
+// No explicit return type (#1588 review): was a widened `object`, which forced
+// every downstream reader (buildSkillsView) into an `"x" in resources` guard +
+// an `as {...}` cast to reach a single field — inferring the literal return
+// shape here instead lets ReturnType<typeof buildResourcesPayload> (used by
+// buildResourcesView below) carry every field, incl. expertiseKnown, precisely.
 function buildResourcesPayload(
   derivedRes: DerivedClassInfo,
   stored: ReturnType<typeof normalizeResourcesMutable>,
-): object {
+) {
   const clampedManeuversKnown =
     derivedRes.maneuverChoiceCount !== undefined
       ? stored.maneuversKnown.slice(0, derivedRes.maneuverChoiceCount)
@@ -100,6 +109,17 @@ function buildResourcesPayload(
     derivedRes.toolProfChoiceCount !== undefined
       ? stored.toolProficienciesKnown.slice(0, derivedRes.toolProfChoiceCount)
       : stored.toolProficienciesKnown;
+  // #1588 (Opus review): deliberately NOT clampedToolProfsKnown's `!==
+  // undefined ? slice : full` shape — an undefined expertiseChoiceCount (no
+  // grantor class at all) clamps to ZERO here, matching applyLearnExpertiseOp's
+  // own undefined -> 0 treatment (resources.ts) so learn/clamp/reconcile all
+  // agree. toolProficienciesKnown/maneuversKnown stay on the permissive
+  // pattern (out of scope, pre-existing) — Expertise is the more exploitable
+  // case (four grantor classes) and reconcileExpertise (level-reconciliation.ts)
+  // already treats `derived?.expertiseChoiceCount ?? 0` as the allowed count,
+  // so this was already the reconciler's behavior; the clamp-on-read was the
+  // one site out of step with it.
+  const clampedExpertiseKnown = stored.expertiseKnown.slice(0, derivedRes.expertiseChoiceCount ?? 0);
   // Generic subclass "choose N" clamp-on-read (#899): keep only keys the derived
   // subclassChoices still grant, each capped to its count — defense-in-depth
   // mirroring reconcileSubclassChoices for characters not yet reconciled.
@@ -114,6 +134,7 @@ function buildResourcesPayload(
     features: toWireFeatures(derivedRes.features),
     maneuverChoiceCount: derivedRes.maneuverChoiceCount,
     toolProfChoiceCount: derivedRes.toolProfChoiceCount,
+    expertiseChoiceCount: derivedRes.expertiseChoiceCount,
     pools: derivedRes.resources.map((pool) => ({
       key: pool.key,
       label: pool.label,
@@ -128,6 +149,7 @@ function buildResourcesPayload(
       ? clampedManeuversKnown.map((m) => ({ ...m, effect: maneuverEffect }))
       : clampedManeuversKnown,
     toolProficienciesKnown: clampedToolProfsKnown,
+    expertiseKnown: clampedExpertiseKnown,
     // Generic subclass "choose N" surface (#899): the derived choices (key/label/
     // count/catalogSource) tell the level-up Choose-N step which pickers to render;
     // choicesKnown holds the (clamped) selections.

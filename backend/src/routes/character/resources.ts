@@ -1,5 +1,5 @@
 // Owns POST /characters/:id/resources/transactions (spend/restore class
-// resources, learn/forget maneuvers + tool profs). Like every mutation router
+// resources, learn/forget maneuvers + tool profs + Expertise). Like every mutation router
 // here, it validates a Zod op union, applies it atomically in the lib layer,
 // then re-fetches with characterInclude and returns serializeCharacter(updated)
 // so the response carries the full, freshly-derived character.
@@ -84,6 +84,26 @@ export const forgetSubclassChoiceOpSchema = z.object({
   entryId: z.string().min(1),
 });
 
+// #1588: skill proficiency + the level-derived pick cap are validated in the
+// applier (applyLearnExpertiseOp) — never trust a client-supplied legality.
+// Exported so the level-up ceremony's own submission schema
+// (routes/character/level-up.ts) can reuse it verbatim for the "expertise"
+// step, same "one op schema, two call sites" pattern as
+// learnToolProficiencyOpSchema above.
+export const learnExpertiseOpSchema = z.object({
+  type: z.literal("learnExpertise"),
+  skill: z.string().min(1),
+});
+
+// Freely reversible — no learn-time ceremony gate like forgetManeuver/
+// forgetSubclassChoice above (#1588's own decision: Expertise carries no RAW
+// swap-only text, so there's nothing to gate). Not exported — mirrors
+// forgetToolProficiencyOpSchema above: only the LEARN op needs ceremony reuse.
+const forgetExpertiseOpSchema = z.object({
+  type: z.literal("forgetExpertise"),
+  entryId: z.string().min(1),
+});
+
 const operationSchema = z.discriminatedUnion("type", [
   spendResourceOpSchema,
   restoreResourceOpSchema,
@@ -94,6 +114,8 @@ const operationSchema = z.discriminatedUnion("type", [
   forgetToolProficiencyOpSchema,
   learnSubclassChoiceOpSchema,
   forgetSubclassChoiceOpSchema,
+  learnExpertiseOpSchema,
+  forgetExpertiseOpSchema,
 ]);
 
 const transactionsRequestSchema = z.object({
@@ -120,6 +142,8 @@ const transactionsRequestSchema = z.object({
  *                           forgetManeuver above (PHB'14 Way of the Four
  *                           Elements p.81 is the other cited text) — only
  *                           reachable through a validated level-up step.
+ *   learnExpertise        — double proficiency bonus on a proficient skill (#1588)
+ *   forgetExpertise       — undo an Expertise pick by entry id, freely reversible
  *
  * Returns the full updated character on success, plus a top-level `results`
  * array (one ResourceOpAudit per op) so a roll-driven op's outcome — today,
