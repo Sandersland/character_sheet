@@ -8,11 +8,9 @@ import {
   characterAdvancementSlots,
   characterFightingStyleFeatSlots,
   fightingStyleGrantingClassNames,
-  deriveDeflectSpec,
   deriveImprovementBonuses,
   deriveImprovementProficiencies,
 } from "@/lib/srd/srd.js";
-import type { EffectSpec } from "@/lib/combat/effects.js";
 import { deriveEntryScopedResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
 import { featureRowsOf } from "@/lib/classes/feature-rows-select.js";
 import { draconicResilienceMaxHpTerm } from "@/lib/classes/draconic-bloodline.js";
@@ -321,12 +319,19 @@ export function buildAvailableActionsView(
       : []),
     { key: "weaponBond", remaining: bondedWeaponCount },
   ];
+  // Ability modifiers (#1910) — the announce-augmentor registry's abilityMods
+  // input (announce-augmentors.ts's AugmentorContext), e.g. the Deflect
+  // Attacks/Missiles descriptor's Dex modifier. Computed once here, keyed the
+  // same as effectiveScores, rather than each augmentor re-deriving its own.
+  const abilityMods = Object.fromEntries(
+    Object.entries(effectiveScores).map(([key, score]) => [key, abilityModifier(score)]),
+  );
   // featureRowsOf (#1528 chunk 0): a Fighter entry's row-driven actions
   // (Second Wind/Action Surge) surface here through the SAME carrier
   // buildResourcesView passes for its pools/features.
-  const actions = deriveEntryScopedActions(classEntries, level, pools, unarmoredUnshielded, edition, featureRowsOf);
+  const actions = deriveEntryScopedActions(classEntries, level, pools, unarmoredUnshielded, edition, featureRowsOf, abilityMods);
   return [
-    ...withDeflectSpecs(actions, classEntries, level, effectiveScores, edition),
+    ...actions,
     // Off-hand / Two-Weapon Fighting eligibility (#1435) — served for EVERY
     // character (TWF is not class-gated), enabled only when both equipped
     // weapons are Light (`bothWeaponsLight`; the Two-Weapon Fighting style
@@ -349,45 +354,6 @@ function offHandActionRow(equippedWeaponLight: ReadonlyArray<{ light: boolean }>
     enabled,
     ...(enabled ? {} : { disabledReason: "Off-hand attack needs two Light weapons equipped." }),
   };
-}
-
-// Attaches the resolved Deflect Attacks / Deflect Missiles roll specs (#1435)
-// onto the served rows via the #1381 `effect` field: the base row carries the
-// reduction spec, the redirect / throw-back row its own. Both resolve off the
-// Monk entry's effective level (`effectiveEntryLevel`) and the character's Dex
-// mod, via the ONE edition-forked `deriveDeflectSpec` rule. A no-op for a
-// non-Monk (no deflect row is present to annotate).
-function withDeflectSpecs(
-  actions: AvailableAction[],
-  classEntries: CharacterWithRelations["classEntries"],
-  level: number,
-  effectiveScores: Record<string, number>,
-  edition: RulesEdition,
-): AvailableAction[] {
-  const monkEntry = classEntries.find((e) => e.name?.toLowerCase() === "monk");
-  if (!monkEntry) return actions;
-  const monkLevel = effectiveEntryLevel(monkEntry.level, classEntries.length, level);
-  const dexMod = abilityModifier(effectiveScores.dexterity ?? 10);
-  const { reduction, redirect } = deriveDeflectSpec(monkLevel, dexMod, edition);
-  return actions.map((a) => {
-    if (a.key === "deflectAttacks" || a.key === "deflectMissiles") {
-      return { ...a, effect: rollAsEffect(reduction, "utility") };
-    }
-    if (a.key === "deflectAttacksRedirect" || a.key === "deflectMissilesThrow") {
-      return { ...a, effect: rollAsEffect(redirect, "damage") };
-    }
-    return a;
-  });
-}
-
-// Wrap a resolved roll as a minimal EffectSpec — the same "utility kind carries
-// dice" shape a maneuver's served effect uses (deriveManeuverEffect), so the
-// frontend reads `action.effect.dice` verbatim as its RollSpec.
-function rollAsEffect(
-  dice: { count: number; faces: number; modifier: number },
-  effectType: EffectSpec["effectType"],
-): EffectSpec {
-  return { effectType, dice, scaling: { mode: "none" } };
 }
 
 // Structured, multiclass-aware view alongside the flattened class/subclass.

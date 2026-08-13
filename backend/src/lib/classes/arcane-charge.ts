@@ -14,6 +14,8 @@
  */
 import type { RulesEdition } from "@character-sheet/shared-types";
 
+import type { AnnounceAugmentor } from "./announce-augmentors.js";
+
 /** PHB'14 p.75 — Arcane Charge's own grant level. */
 export const ARCANE_CHARGE_LEVEL = 15;
 
@@ -48,10 +50,16 @@ export function hasArcaneCharge(entryLevel: number, isEldritchKnight: boolean, e
 }
 
 /**
- * Arcane Charge appended after whatever reminder the Action Surge card
- * already carries (none today — Action Surge has no `effectKind`, see
- * describeRowReminder — but a future served reminder must not be clobbered).
+ * Arcane Charge (#1910) rides the row-driven Action Surge action rather than
+ * getting its own row: an Eldritch Knight L15+ (2014) sees its teleport
+ * clause appended to Action Surge's own reminder. Registered in
+ * ANNOUNCE_AUGMENTORS (announce-augmentors.ts) — the one fold point
+ * (deriveEntryScopedActions, actions.ts) already resolves the entry's own
+ * subclass slug and effective level, which is all appliesTo needs; the
+ * pipeline (not this descriptor) does the actual text concatenation.
  */
-export function appendArcaneChargeReminder(existing: string | undefined): string {
-  return existing ? `${existing} ${ARCANE_CHARGE_REMINDER}` : ARCANE_CHARGE_REMINDER;
-}
+export const arcaneChargeAugmentor: AnnounceAugmentor = {
+  targetKeys: ["actionSurge"],
+  appliesTo: (ctx) => hasArcaneCharge(ctx.entryLevel, ctx.slug === "fighter-eldritch-knight", ctx.edition),
+  augment: () => ({ reminderAppend: ARCANE_CHARGE_REMINDER }),
+};
