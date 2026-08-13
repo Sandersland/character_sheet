@@ -36,8 +36,17 @@ export const CHANNEL_DIVINITIES: ChannelDivinitySeed[] = [
     description:
       "As an action, create an illusory duplicate of yourself within 30 ft for 1 minute (concentration). Gain advantage on attack rolls against a creature within 5 ft of the duplicate, and you can cast spells as though from the duplicate's space.",
   },
+  // #1590: retagged EDITION_2014 (was shared, `edition: undefined`) — SRD 5.2
+  // drops this option outright, replaced by Trickster's Transposition
+  // (cleric-features.ts). A 2014 Trickery Cleric still casts this exactly as
+  // before; a 2024 Trickery Cleric no longer sees it (GET /channel-divinity
+  // narrows by edition, routes/character/channel-divinity.ts). See
+  // seedChannelDivinities in prisma/seed.ts for the matching prune this retag
+  // requires (it already runs generically over every row in this list, so no
+  // separate code change is needed there).
   {
     name: "Channel Divinity: Cloak of Shadows",
+    edition: "EDITION_2014",
     description:
       "As an action, become invisible until the end of your next turn. You gain no benefit while in an area of bright light.",
   },

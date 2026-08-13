@@ -159,7 +159,6 @@ describe("Channel Divinity cast endpoint", () => {
       "Channel Divinity: Preserve Life",
       "Channel Divinity: Invoke Duplicity",
       "Channel Divinity: Sacred Weapon",
-      "Channel Divinity: Cloak of Shadows",
       "Channel Divinity: Vow of Enmity",
       // "Channel Divinity: Abjure Enemy" removed (#1229): no longer a shared
       // (edition: null) row — it retagged EDITION_2014, so loadOption's
@@ -167,10 +166,16 @@ describe("Channel Divinity cast endpoint", () => {
       // file reads optionId for it (the one test that names it checks the GET
       // response body's own `name` field, not this map) — the edition-scoped
       // Paladin describe block below loads it explicitly where it's needed.
+      //
+      // "Channel Divinity: Cloak of Shadows" removed (#1590): same reasoning
+      // — it retagged EDITION_2014 (no 2024 successor, replaced outright by
+      // Trickster's Transposition), so it now loads below with the other
+      // edition-scoped rows.
     ].map(loadOption));
     await Promise.all([
       loadEditionOption("Channel Divinity: Turn the Unholy", "EDITION_2014"),
       loadEditionOption("Channel Divinity: Abjure Enemy", "EDITION_2014"),
+      loadEditionOption("Channel Divinity: Cloak of Shadows", "EDITION_2014"),
       loadEditionOption("Channel Divinity: Divine Sense", "EDITION_2024"),
       loadEditionOption("Abjure Foes", "EDITION_2024"),
     ]);
@@ -202,7 +207,10 @@ describe("Channel Divinity cast endpoint", () => {
 
   // #1275 byte-identity oracle: captured on the per-feature URL before the move to
   // the shared ability endpoint, so a green run afterwards is evidence the audit
-  // trail is unchanged.
+  // trail is unchanged. #1590 updated the reminder string on purpose: Turn
+  // Undead's default announce text used to be the generic "turned/affected"
+  // line even for a 2024 character, which is wrong — SRD 5.2 p.37 grants
+  // Frightened AND Incapacitated, not a plain "turned" state.
   it("pins the audit trail of one Turn Undead channel", async () => {
     await createCharacter(XP_L2, "cleric", null);
     const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Turn Undead"] }]);
@@ -225,7 +233,8 @@ describe("Channel Divinity cast endpoint", () => {
           kind: "announce",
           saveAbility: "wisdom",
           saveDc: 13,
-          reminder: "Targets make a wisdom save (DC 13) or are turned/affected for 1 minute.",
+          reminder:
+            "Targets make a wisdom save (DC 13) or gain the Frightened and Incapacitated conditions for 1 minute (ends early if they take damage, you have the Incapacitated condition, or you die).",
         },
       },
       {
@@ -260,8 +269,10 @@ describe("Channel Divinity cast endpoint", () => {
   });
 
   it("Trickery Cloak of Shadows (L6) self-applies the invisible condition", async () => {
-    await createCharacter(XP_L6, "cleric", "trickery domain");
-    const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Cloak of Shadows"] }]);
+    // #1590: Cloak of Shadows is EDITION_2014-only (no 2024 successor), so
+    // this fixture must be a 2014 character or the row would not resolve.
+    await createCharacter(XP_L6, "cleric", "trickery domain", "EDITION_2014");
+    const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Cloak of Shadows::EDITION_2014"] }]);
     expect(res.status).toBe(200);
     const row = await prisma.character.findUnique({ where: { id: FIXTURE_ID }, select: { conditions: true } });
     const active = (row!.conditions as { active: { key: string }[] }).active;
@@ -308,6 +319,102 @@ describe("Channel Divinity cast endpoint", () => {
     expect(res.body.error).toMatch(/level 3/);
   });
 
+  // ── #1590: the gate table had no edition axis, so a 2014 Cleric was held to
+  // the 2024 grant level (3) for both domain options. PHB'14 p.59 (Preserve
+  // Life) and p.63 (Invoke Duplicity) both grant at Cleric level 2, alongside
+  // Channel Divinity itself; SRD 5.2 p.40 shifts both to level 3, alongside
+  // the subclass grant.
+
+  it("(#1590) a 2014 Life Domain Cleric IS entitled to Preserve Life at level 2", async () => {
+    await createCharacter(XP_L2, "cleric", "life domain", "EDITION_2014");
+    const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Preserve Life"] }]);
+    expect(res.status).toBe(200);
+    const cd = (await activity()).find((e) => e.type === "castChannelDivinity")!;
+    // Level 2 → 10 HP pool (5x cleric level).
+    expect(cd.data!.reminder).toMatch(/10 HP/);
+  });
+
+  it("(#1590) a 2014 Trickery Domain Cleric IS entitled to Invoke Duplicity at level 2", async () => {
+    await createCharacter(XP_L2, "cleric", "trickery domain", "EDITION_2014");
+    const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Invoke Duplicity"] }]);
+    expect(res.status).toBe(200);
+  });
+
+  it("(#1590 regression) a 2024 Life Domain Cleric is still held to level 3 for Preserve Life", async () => {
+    await createCharacter(XP_L2, "cleric", "life domain", "EDITION_2024");
+    const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Preserve Life"] }]);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/level 3/);
+  });
+
+  it("(#1590 regression) a 2024 Trickery Domain Cleric is still held to level 3 for Invoke Duplicity", async () => {
+    await createCharacter(XP_L2, "cleric", "trickery domain", "EDITION_2024");
+    const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Invoke Duplicity"] }]);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/level 3/);
+  });
+
+  // ── #1590 follow-on: Invoke Duplicity/Turn Undead reminder text differs by
+  // edition (PHB'14 p.63 vs PHB'24 pp.75-76; PHB'14 p.57 vs SRD 5.2 p.37).
+
+  it("(#1590) a 2014 Invoke Duplicity reminder still names Concentration", async () => {
+    await createCharacter(XP_L3, "cleric", "trickery domain", "EDITION_2014");
+    const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Invoke Duplicity"] }]);
+    expect(res.status).toBe(200);
+    const cd = (await activity()).find((e) => e.type === "castChannelDivinity")!;
+    expect(cd.data!.reminder).toMatch(/concentration/i);
+    expect(cd.data!.reminder).not.toMatch(/no concentration/i);
+  });
+
+  it("(#1590) a 2024 Invoke Duplicity reminder says no Concentration and names the Bonus Action move", async () => {
+    await createCharacter(XP_L3, "cleric", "trickery domain", "EDITION_2024");
+    const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Invoke Duplicity"] }]);
+    expect(res.status).toBe(200);
+    const cd = (await activity()).find((e) => e.type === "castChannelDivinity")!;
+    expect(cd.data!.reminder).toMatch(/no concentration/i);
+    expect(cd.data!.reminder).toMatch(/bonus action/i);
+  });
+
+  it("(#1590) a 2014 Turn Undead reminder still says 'turned', not Frightened/Incapacitated", async () => {
+    await createCharacter(XP_L2, "cleric", null, "EDITION_2014");
+    const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Turn Undead"] }]);
+    expect(res.status).toBe(200);
+    const cd = (await activity()).find((e) => e.type === "castChannelDivinity")!;
+    expect(cd.data!.reminder).toMatch(/turned/i);
+    expect(cd.data!.reminder).not.toMatch(/frightened/i);
+  });
+
+  it("(#1590) a 2024 Turn Undead reminder names the Frightened and Incapacitated conditions", async () => {
+    await createCharacter(XP_L2, "cleric", null, "EDITION_2024");
+    const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Turn Undead"] }]);
+    expect(res.status).toBe(200);
+    const cd = (await activity()).find((e) => e.type === "castChannelDivinity")!;
+    expect(cd.data!.reminder).toMatch(/frightened/i);
+    expect(cd.data!.reminder).toMatch(/incapacitated/i);
+  });
+
+  // ── #1590 follow-on: Cloak of Shadows (Trickery) has no 2024 successor
+  // (SRD 5.2/mirror sources replace it outright with Trickster's
+  // Transposition, cleric-features.ts) — its catalog row retags EDITION_2014
+  // so a 2024 character never sees or can cast it, same pattern as the
+  // Paladin oath options #1229 already retagged.
+
+  it("(#1590) a 2024 Trickery Cleric no longer sees Cloak of Shadows on the GET list", async () => {
+    await createCharacter(XP_L6, "cleric", "trickery domain", "EDITION_2024");
+    const get = await agent().get(`/api/characters/${FIXTURE_ID}/channel-divinity`);
+    expect(get.status).toBe(200);
+    const names = (get.body as { name: string }[]).map((o) => o.name);
+    expect(names).not.toContain("Channel Divinity: Cloak of Shadows");
+  });
+
+  it("(#1590) a 2014 Trickery Cleric still sees and can cast Cloak of Shadows", async () => {
+    await createCharacter(XP_L6, "cleric", "trickery domain", "EDITION_2014");
+    const get = await agent().get(`/api/characters/${FIXTURE_ID}/channel-divinity`);
+    expect(get.status).toBe(200);
+    const names = (get.body as { name: string }[]).map((o) => o.name);
+    expect(names).toContain("Channel Divinity: Cloak of Shadows");
+  });
+
   // ── Gating (the non-happy paths) ────────────────────────────────────────────
 
   it("rejects a domain option the cleric's subclass doesn't grant", async () => {
@@ -317,9 +424,10 @@ describe("Channel Divinity cast endpoint", () => {
     expect(res.body.error).toMatch(/life domain/i);
   });
 
-  it("rejects an oath option below the granting level (Cloak of Shadows needs L6)", async () => {
-    await createCharacter(XP_L3, "cleric", "trickery domain");
-    const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Cloak of Shadows"] }]);
+  it("rejects a domain option below the granting level (Cloak of Shadows needs L6)", async () => {
+    // #1590: Cloak of Shadows is EDITION_2014-only — see the fixture above.
+    await createCharacter(XP_L3, "cleric", "trickery domain", "EDITION_2014");
+    const res = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Cloak of Shadows::EDITION_2014"] }]);
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/level 6/);
   });

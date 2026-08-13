@@ -59,8 +59,8 @@ channelDivinityRouter.get<{ id: string }>("/", async (req, res) => {
 
   const options = rows
     .map((row) => ({ row, gate: CHANNEL_DIVINITY_OPTIONS[row.name] }))
-    .filter((o) => o.gate && isEntitled(o.gate, entries, level))
-    .map(({ row, gate }) => describeChannelDivinity(row, gate, { abilityScores, profBonus, classLevel: level }));
+    .filter((o) => o.gate && isEntitled(o.gate, entries, level, edition))
+    .map(({ row, gate }) => describeChannelDivinity(row, gate, { abilityScores, profBonus, classLevel: level, edition }));
 
   res.json(options);
 });
