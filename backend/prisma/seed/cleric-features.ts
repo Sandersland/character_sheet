@@ -284,10 +284,12 @@ const CLERIC_BASE_RAW: RawClericFeature[] = [
     // not the generic "Channel Divinity" the retired DERIVED_ACTIONS row
     // hardcoded — a DELIBERATE, disclosed delta (this is the row's actual
     // PHB'14 p.60 feature name; 2024's carrier above is genuinely named
-    // "Channel Divinity"). A Cleric/Paladin multiclass never sees this: its
-    // dedupe (deriveEntryScopedActions) can equally surface Paladin's own
-    // "Channel Divinity"-named row instead, and either entry's reminder text
-    // is byte-identical (see this row's own reminder below).
+    // "Channel Divinity"). A Cleric/Paladin multiclass still gets exactly ONE
+    // card and one merged pool, but which name shows follows primary-entry-wins
+    // dedupe (deriveEntryScopedActions): a Cleric-primary multiclass surfaces
+    // this row ("...: Turn Undead"), a Paladin-primary one surfaces Paladin's
+    // "Channel Divinity" row. Either entry's reminder text is byte-identical
+    // (see this row's own reminder below), so only the card label differs.
     activationCost: "action",
     costKind: "pool",
     costPoolKey: "channelDivinity",
