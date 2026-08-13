@@ -319,3 +319,97 @@ if [ -n "$bad" ]; then
   echo "Move the content back to seed data (backend/prisma/seed/), or add a reasoned FILE_ALLOWLIST entry if it's a genuine identity/join reference." >&2
   exit 1
 fi
+
+# check-class-ts-migration.sh's second job (#1903/#1911): actions.ts guards
+# TWO growth vectors that reappear class-specific action content the same
+# way a MIGRATED class name would, but neither is a class-name literal so
+# the scan above is blind to both:
+#   1. a new hand-authored DERIVED_ACTIONS row (content-is-data violation —
+#      new class actions belong on seeded ClassFeature activation rows, not
+#      here).
+#   2. a new hardcoded-key `.map()` decorator grafted into the derive
+#      pipeline (the shape #1910's announce-augmentor registry replaced
+#      withDeflectSpecs/withArcaneChargeReminder with).
+# DERIVED_ACTIONS_MAX is a RATCHET, same convention as NOT_YET_MIGRATED
+# above (only ever lowered, never raised): 35 is the live count verified at
+# HEAD after #1909 moved 8 cross-class rows onto ClassFeature rows (was 43
+# before #1909). #1912 (4/4) must lower this constant in the same PR that
+# shrinks the array further.
+DERIVED_ACTIONS_MAX=35
+
+# awk range, same portable shape as the class-name scan above: from the
+# array's declaration to its closing `];` — stops at the FIRST such line
+# after the start, which is DERIVED_ACTIONS' own closing bracket (actions.ts
+# has a second, unrelated `];` further down for a different array).
+derived_actions_block=$(awk '/^const DERIVED_ACTIONS: DerivedActionRecord\[\] = \[/,/^\];/' backend/src/lib/classes/actions.ts)
+derived_actions_count=$(printf '%s\n' "$derived_actions_block" | grep -c 'key:' || true)
+
+# Anti-vacuity: if the array's own declaration line ever changes shape (a
+# rename, a reformat), the awk range silently matches nothing and the count
+# reads 0 — that must fail loudly, not read as "0 <= 35, pass" (same
+# rationale as anti-vacuity checks 2 and 3 above).
+if [ "$derived_actions_count" -lt 1 ]; then
+  echo "error: check-class-ts-migration.sh found 0 DERIVED_ACTIONS entries in backend/src/lib/classes/actions.ts — the awk range is broken (anti-vacuity)" >&2
+  exit 1
+fi
+
+if [ "$derived_actions_count" -gt "$DERIVED_ACTIONS_MAX" ]; then
+  echo "error: DERIVED_ACTIONS grew to $derived_actions_count entries, exceeding this script's DERIVED_ACTIONS_MAX ratchet of $DERIVED_ACTIONS_MAX (#1903/#1911)." >&2
+  echo "New class actions are authored as seeded ClassFeature activation rows, not DERIVED_ACTIONS TS entries. If this growth is a sanctioned exception, lower is the only direction this ratchet moves — raising it here defeats the point." >&2
+  exit 1
+fi
+
+# Zero hardcoded-key decorator check (#1903/#1911): after #1910 replaced
+# withDeflectSpecs/withArcaneChargeReminder with the announce-augmentor
+# registry, neither deriveEntryScopedActions' per-entry pipeline nor
+# buildAvailableActionsView's file should ever again compare an action's
+# `key` against a literal to decide whether to graft on behavior — that
+# per-feature `.map()` decorator shape is exactly what the registry exists
+# to replace. A comparison against a variable (e.g. actionGrantLevel's
+# `a.key === key` lookup by parameter, elsewhere in actions.ts) is not this
+# pattern and is out of scope by construction below, not by allowlist.
+KEY_LITERAL_PATTERN='\.key ===|\.key !=='
+
+# Anti-vacuity: prove the pattern itself still matches an obvious decorator
+# shape before trusting a zero-hit result from it — a typo'd regex must
+# read red, not silently stop matching anything (same rationale as
+# anti-vacuity checks 2 and 3 above).
+if ! printf '%s\n' 'a.key === "x"' | grep -qE "$KEY_LITERAL_PATTERN"; then
+  echo "error: check-class-ts-migration.sh's KEY_LITERAL_PATTERN no longer matches its own probe string — the decorator-check regex is broken (anti-vacuity)" >&2
+  exit 1
+fi
+
+# Scoped to deriveEntryScopedActions' own function body, not the whole
+# file — decorator grafts of this shape live inside its per-entry `.map()`
+# chain (the entryActions pipeline), and a whole-file scope would also
+# catch actionGrantLevel's unrelated variable comparison further down,
+# forcing a needless allowlist entry for a non-violation.
+actions_key_hits=$(awk '/^export function deriveEntryScopedActions/,/^}/ { print NR": "$0 }' backend/src/lib/classes/actions.ts | grep -E "$KEY_LITERAL_PATTERN" || true)
+# buildAvailableActionsView's whole file, per #1911's scope — the file is
+# announce-composition around actions, not a general-purpose module, so a
+# stray literal comparison anywhere in it is in scope.
+classes_key_hits=$(grep -nE "$KEY_LITERAL_PATTERN" backend/src/lib/character/serialize/classes.ts || true)
+
+key_literal_bad=""
+if [ -n "$actions_key_hits" ]; then
+  key_literal_bad="$key_literal_bad
+$(printf '%s\n' "$actions_key_hits" | while IFS= read -r hit; do
+  [ -z "$hit" ] && continue
+  is_comment_line "$hit" || echo "backend/src/lib/classes/actions.ts:$hit"
+done)"
+fi
+if [ -n "$classes_key_hits" ]; then
+  key_literal_bad="$key_literal_bad
+$(printf '%s\n' "$classes_key_hits" | while IFS= read -r hit; do
+  [ -z "$hit" ] && continue
+  is_comment_line "$hit" || echo "backend/src/lib/character/serialize/classes.ts:$hit"
+done)"
+fi
+key_literal_bad=$(printf '%s\n' "$key_literal_bad" | grep -v '^$' || true)
+
+if [ -n "$key_literal_bad" ]; then
+  echo "error: a hardcoded action-key literal comparison (.key === / .key !==) reappeared in deriveEntryScopedActions or serialize/classes.ts (#1903/#1911):" >&2
+  printf '%s\n' "$key_literal_bad" >&2
+  echo "Register a descriptor in the announce-augmentor registry (announce-augmentors.ts) instead of grafting a per-feature .map() decorator back into the derive pipeline." >&2
+  exit 1
+fi
