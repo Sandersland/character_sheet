@@ -35,6 +35,9 @@ const DESCRIPTOR_RESET = {
   resolverKind: null,
   requiresUnarmored: false,
   regrants: [] as string[],
+  // #1909 — plain String? column, "populated nowhere" reset is null like the
+  // other scalar descriptor columns above.
+  reminder: null,
   costKind: null,
   costPoolKey: null,
   costBase: null,

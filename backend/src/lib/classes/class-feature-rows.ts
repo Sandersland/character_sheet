@@ -232,6 +232,10 @@ export interface ActivationColumns {
   requiresUnarmored?: boolean | null;
   regrants?: string[] | null;
   activationRequires?: ActivationRequirement[] | null;
+  // Static in-play announce text (#1909) — distinct from `description` (the
+  // feature prose). `buildRowAction` (lib/classes/actions.ts) serves it only
+  // when `describeRowReminder`'s derived heal text yields nothing.
+  reminder?: string | null;
 }
 
 /**

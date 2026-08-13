@@ -86,16 +86,21 @@
 // RANGER_BASE_ROWS' own comment for why its base class needs a mirror where
 // Rogue's doesn't.
 //
-// BARD (#1224) IS THE SECOND CLASS TAKING ROGUE'S EXEMPTION: neither the base
-// class nor either college (bard-features.ts) declares a resourceKey — Bardic
-// Inspiration's pool stays wholly in bard.ts's resourceFn, called directly by
-// registry.ts independent of this fixture — and College of Valor's Extra
-// Attack is the only derivedStat row, which srd.test.ts/subclass-grant-level
-// tests never probe through a null-vs-object check the way Cleric's domains
-// are. So `bard` is dropped from TEST_CLASSES below entirely (not merely left
-// featureless): `testFeatureRowsFor("bard", …)` falls through to
-// `toRows(undefined?.features ?? [])` -> `[]` for both classRows and
-// subclassRows, identical to Rogue's own shape.
+// BARD (#1224) TAKES ROGUE'S EXEMPTION FOR EVERYTHING BUT ONE ROW: neither the
+// base class nor either college (bard-features.ts) declares a resourceKey —
+// Bardic Inspiration's POOL stays wholly in bard.ts's resourceFn, called
+// directly by registry.ts independent of this fixture — and College of
+// Valor's Extra Attack is the only derivedStat row, which srd.test.ts/
+// subclass-grant-level tests never probe through a null-vs-object check the
+// way Cleric's domains are. So `bard` is dropped from TEST_CLASSES below
+// entirely (not merely left featureless): `testFeatureRowsFor("bard", …)`
+// falls through to `toRows(undefined?.features ?? [])` -> `[]` for
+// subclassRows, identical to Rogue's own shape. classRows is the ONE
+// exception (#1909): `bard` DOES have a LITERAL_CLASS_ROWS entry
+// (BARD_BARDIC_INSPIRATION_ROWS, below) carrying Bardic Inspiration's
+// row-driven ACTION columns alone — its identity-only resourceKey mints no
+// phantom pool (poolFromRow requires resourceTotals), so the "no pool from
+// this fixture" invariant above is unaffected.
 import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "@/lib/classes/class-feature-rows.js";
 import { paladin } from "@/lib/classes/paladin.js";
 import { ranger } from "@/lib/classes/ranger.js";
@@ -105,6 +110,13 @@ import { wizard } from "@/lib/classes/wizard.js";
 const TEST_CLASSES: Record<string, ClassDefinition> = {
   paladin, ranger, sorcerer, wizard,
 };
+
+// Channel Divinity's row-driven action reminder (#1909) — the SAME text on
+// cleric's and paladin's own carrier rows below (PHB'14 p.164: one feature,
+// one pool, shared across both granting classes), mirroring
+// cleric-features.ts's/paladin-features.ts's own byte-identical duplication.
+const CHANNEL_DIVINITY_REMINDER =
+  "Spend 1 use for any Channel Divinity effect you have — a Cleric's Turn Undead and Divine Domain options and a Paladin's Oath options all draw on this one pool.";
 
 // Flat map keyed by subclass name ACROSS all twelve classes, mirroring
 // registry.ts's SUBCLASSES table — so testFeatureRowsFor("fighter", "life
@@ -1288,6 +1300,11 @@ export const SORCERER_BASE_ROWS: ClassFeatureRow[] = [
     edition: "EDITION_2014",
     description:
       "Choose 2 Metamagic options (3 at L10, 4 at L17) to twist your spells: Careful (protect allies in AoE), Distant (double range), Empowered (reroll damage dice), Extended (double duration), Heightened (impose disadvantage on target's first save), Quickened (cast as bonus action), Subtle (no verbal/somatic), or Twinned (target two creatures).",
+    resourceKey: "metamagic",
+    activationCost: "free",
+    costKind: "pool",
+    costPoolKey: "sorceryPoints",
+    costBase: 1,
   },
   {
     name: "Metamagic",
@@ -1295,6 +1312,11 @@ export const SORCERER_BASE_ROWS: ClassFeatureRow[] = [
     edition: "EDITION_2024",
     description:
       "You gain 2 Metamagic options of your choice (2 more at level 10, 2 more at level 17), letting you twist your spells by spending Sorcery Points: Careful Spell (1 SP, protect chosen creatures from your own area spell), Distant Spell (1 SP, double range or make a touch spell reach 30 feet), Empowered Spell (1 SP, reroll damage dice up to your Charisma modifier), Extended Spell (1 SP, double a non-instantaneous duration), Heightened Spell (2 SP, Disadvantage on one target's first save against the spell), Quickened Spell (2 SP, cast an action spell as a Bonus Action), Seeking Spell (1 SP, reroll a missed spell attack roll), Subtle Spell (1 SP, cast without Verbal or Somatic components), Transmuted Spell (1 SP, change a spell's damage type to another type it can deal), or Twinned Spell (SP cost equal to the spell's level, minimum 1, target a second creature).",
+    resourceKey: "metamagic",
+    activationCost: "free",
+    costKind: "pool",
+    costPoolKey: "sorceryPoints",
+    costBase: 1,
   },
   {
     name: "Sorcerous Origin",
@@ -1507,6 +1529,47 @@ export const WILD_MAGIC_ROWS: ClassFeatureRow[] = [
     resourceTotals: [{ minLevel: 18, total: 1 }],
   },
 ];
+
+// BARD's Bardic Inspiration row (#1909) — a NARROW mirror, not a full
+// base-class one: unlike every other LITERAL_ROW_CLASSES member, bard-
+// features.ts sets no resourceKey ANYWHERE else (Bardic Inspiration's own
+// POOL stays wholly in bard.ts's resourceFn — see that file's own RESOURCE
+// POOL header block), so this fixture used to drop bard from TEST_CLASSES
+// entirely (Rogue's own exemption, see this file's header). #1909 gives
+// Bardic Inspiration's two rows an IDENTITY-ONLY resourceKey (no
+// resourceTotals) so each can carry a row-driven ACTION — that is now real,
+// testable behavior (actions.test.ts/entry-scoped-actions.test.ts), so this
+// one feature needs a mirror even though nothing else in the class does.
+// Every other Bard feature still falls through the `toRows(classDef?.features
+// ?? [])` -> `[]` path (bard stays absent from TEST_CLASSES), so this array
+// carries ONLY Bardic Inspiration, not a full BARD_BASE_ROWS.
+export const BARD_BARDIC_INSPIRATION_ROWS: ClassFeatureRow[] = [
+  {
+    name: "Bardic Inspiration",
+    level: 1,
+    edition: "EDITION_2014",
+    description:
+      "As a bonus action, give one creature within 60 ft a Bardic Inspiration die (d6, becoming d8 at L5, d10 at L10, d12 at L15). They add it to one ability check, attack roll, or saving throw within 10 minutes.",
+    resourceKey: "bardicInspiration",
+    activationCost: "bonusAction",
+    costKind: "pool",
+    costPoolKey: "bardicInspiration",
+    costBase: 1,
+  },
+  {
+    name: "Bardic Inspiration",
+    level: 1,
+    edition: "EDITION_2024",
+    description:
+      "As a Bonus Action, give one creature within 60 feet that can see or hear you a Bardic Inspiration die (d6, becoming d8 at level 5, d10 at level 10, d12 at level 15). Within the next hour, that creature can roll the die and add the number rolled to one D20 Test it makes, potentially turning the failure into a success.",
+    resourceKey: "bardicInspiration",
+    activationCost: "bonusAction",
+    costKind: "pool",
+    costPoolKey: "bardicInspiration",
+    costBase: 1,
+  },
+];
+
 // CLERIC's base class + both domains (#1225): mirrors cleric-features.ts's
 // real SRD 5.2/mirror-sourced content exactly — the SAME rootDir boundary
 // FIGHTER_BASE_ROWS'/WARLOCK_BASE_ROWS' comments explain. Added in commit 1
@@ -1563,6 +1626,11 @@ export const CLERIC_BASE_ROWS: ClassFeatureRow[] = [
       { minLevel: 6, total: 3, shortRestRegain: 1 },
       { minLevel: 18, total: 4, shortRestRegain: 1 },
     ],
+    activationCost: "action",
+    costKind: "pool",
+    costPoolKey: "channelDivinity",
+    costBase: 1,
+    reminder: CHANNEL_DIVINITY_REMINDER,
   },
   {
     name: "Channel Divinity: Divine Spark",
@@ -1585,6 +1653,11 @@ export const CLERIC_BASE_ROWS: ClassFeatureRow[] = [
       { minLevel: 6, total: 2 },
       { minLevel: 18, total: 3 },
     ],
+    activationCost: "action",
+    costKind: "pool",
+    costPoolKey: "channelDivinity",
+    costBase: 1,
+    reminder: CHANNEL_DIVINITY_REMINDER,
   },
   {
     name: "Channel Divinity: Turn Undead",
@@ -1869,6 +1942,11 @@ export const DRUID_BASE_ROWS: ClassFeatureRow[] = [
     edition: "EDITION_2014",
     description:
       "As an action, transform into a beast you have seen. Max CR: 1/4 at L2 (no flying or swimming speed); 1/2 at L4 (no flying speed); 1 at L8. You retain your mental stats and class features but use the beast's physical stats. Lasts up to half your druid level in hours (minimum 1). Reverts when reduced to 0 HP.",
+    resourceKey: "wildShape",
+    activationCost: "action",
+    costKind: "pool",
+    costPoolKey: "wildShape",
+    costBase: 1,
   },
   {
     name: "Wild Shape",
@@ -1884,6 +1962,10 @@ export const DRUID_BASE_ROWS: ClassFeatureRow[] = [
       { minLevel: 6, total: 3, shortRestRegain: 1 },
       { minLevel: 17, total: 4, shortRestRegain: 1 },
     ],
+    activationCost: "bonusAction",
+    costKind: "pool",
+    costPoolKey: "wildShape",
+    costBase: 1,
   },
   {
     name: "Primal Order",
@@ -2148,6 +2230,11 @@ export const PALADIN_BASE_ROWS: ClassFeatureRow[] = [
     edition: "EDITION_2014",
     description:
       "As an action, sense the presence of celestials, fiends, and undead within 60 ft until the end of your next turn (they aren't hidden from this sense). You can also detect consecrated or desecrated places/objects. Uses = 1 + Charisma modifier per long rest.",
+    resourceKey: "divineSense",
+    activationCost: "action",
+    costKind: "pool",
+    costPoolKey: "divineSense",
+    costBase: 1,
   },
   {
     name: "Lay on Hands",
@@ -2155,6 +2242,12 @@ export const PALADIN_BASE_ROWS: ClassFeatureRow[] = [
     edition: "EDITION_2014",
     description:
       "Touch to restore HP from a pool of 5 × your paladin level. Alternatively, spend 5 HP from the pool to cure one disease or neutralize one poison. The pool replenishes on a long rest.",
+    resourceKey: "layOnHands",
+    activationCost: "action",
+    costKind: "pool",
+    costPoolKey: "layOnHands",
+    costBase: 5,
+    reminder: "Touch a creature to restore HP; alternatively, spend 5 HP to cure one disease or neutralize one poison.",
   },
   {
     name: "Lay on Hands",
@@ -2162,6 +2255,12 @@ export const PALADIN_BASE_ROWS: ClassFeatureRow[] = [
     edition: "EDITION_2024",
     description:
       "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
+    resourceKey: "layOnHands",
+    activationCost: "bonusAction",
+    costKind: "pool",
+    costPoolKey: "layOnHands",
+    costBase: 5,
+    reminder: "Touch a creature to restore HP; alternatively, spend 5 HP to remove the Poisoned condition instead of healing.",
   },
   {
     name: "Fighting Style",
@@ -2221,6 +2320,11 @@ export const PALADIN_BASE_ROWS: ClassFeatureRow[] = [
     resourceLabel: "Channel Divinity",
     resourceRecharge: "short-or-long",
     resourceTotals: [{ minLevel: 3, total: 1 }],
+    activationCost: "action",
+    costKind: "pool",
+    costPoolKey: "channelDivinity",
+    costBase: 1,
+    reminder: CHANNEL_DIVINITY_REMINDER,
   },
   {
     name: "Channel Divinity",
@@ -2235,6 +2339,11 @@ export const PALADIN_BASE_ROWS: ClassFeatureRow[] = [
       { minLevel: 3, total: 2, shortRestRegain: 1 },
       { minLevel: 11, total: 3, shortRestRegain: 1 },
     ],
+    activationCost: "action",
+    costKind: "pool",
+    costPoolKey: "channelDivinity",
+    costBase: 1,
+    reminder: CHANNEL_DIVINITY_REMINDER,
   },
   {
     name: "Channel Divinity: Divine Sense",
@@ -2828,6 +2937,9 @@ export const WARRIOR_OF_THE_ELEMENTS_ROWS: ClassFeatureRow[] = (["EDITION_2024"]
 export const LITERAL_CLASS_ROWS: Record<string, ClassFeatureRow[]> = {
   fighter: FIGHTER_BASE_ROWS,
   barbarian: BARBARIAN_BASE_ROWS,
+  // Narrow mirror (#1909) — see BARD_BARDIC_INSPIRATION_ROWS' own comment for
+  // why this is one feature, not a full base-class array.
+  bard: BARD_BARDIC_INSPIRATION_ROWS,
   ranger: RANGER_BASE_ROWS,
   warlock: WARLOCK_BASE_ROWS,
   wizard: WIZARD_BASE_ROWS,
