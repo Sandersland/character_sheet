@@ -4,15 +4,18 @@
  * roll spec, Arcane Charge's reminder append) is a descriptor object here,
  * not a bespoke `.map()` bolted onto deriveEntryScopedActions. Adding a new
  * announce-rider is one descriptor file + one line in ANNOUNCE_AUGMENTORS,
- * never a pipeline edit — deflect.ts's deflectAugmentor and arcane-charge.ts's
- * arcaneChargeAugmentor are the only two entries, and deriveEntryScopedActions
- * (actions.ts) carries no feature-specific code for either.
+ * never a pipeline edit — deriveEntryScopedActions (actions.ts) carries no
+ * feature-specific code for any of them.
  *
  * Self-or-announce replaceability (owner, 2026-08-10 — deferred, not never,
  * per #416): a descriptor returns a STRUCTURED payload and never mutates or
  * concatenates onto the action itself — applyAnnounceAugmentors below is the
  * only place that folds a payload onto an action. A future target model
  * attaches at this same registry and consumes the same payload shape.
+ *
+ * #1912 adds four monk-only descriptors (epic #1903's four R entries):
+ * Heightened Focus, Improved Shadow Step, Physician's Touch, Deflect Energy —
+ * see ANNOUNCE_AUGMENTORS below for the full six-entry registry.
  */
 import type { EffectSpec } from "@/lib/combat/effects.js";
 import type { RulesEdition } from "@character-sheet/shared-types";
@@ -20,7 +23,10 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 import type { AvailableAction } from "./actions.js";
 import type { SubclassSlug } from "./subclass-slug.js";
 import { arcaneChargeAugmentor } from "./arcane-charge.js";
-import { deflectAugmentor } from "@/lib/srd/deflect.js";
+import { deflectAugmentor, deflectEnergyAugmentor } from "@/lib/srd/deflect.js";
+import { heightenedFocusAugmentor } from "./heightened-focus.js";
+import { improvedShadowStepAugmentor } from "./improved-shadow-step.js";
+import { physiciansTouchAugmentor } from "./physicians-touch.js";
 
 /**
  * Per-entry context an augmentor's `appliesTo`/`augment` reads — resolved
@@ -63,7 +69,14 @@ export interface AnnounceAugmentor {
   augment(action: AvailableAction, ctx: AugmentorContext): AugmentPayload | null;
 }
 
-export const ANNOUNCE_AUGMENTORS: readonly AnnounceAugmentor[] = [deflectAugmentor, arcaneChargeAugmentor];
+export const ANNOUNCE_AUGMENTORS: readonly AnnounceAugmentor[] = [
+  deflectAugmentor,
+  arcaneChargeAugmentor,
+  deflectEnergyAugmentor,
+  heightenedFocusAugmentor,
+  improvedShadowStepAugmentor,
+  physiciansTouchAugmentor,
+];
 
 /**
  * The ONE fold point (deriveEntryScopedActions, actions.ts): for each

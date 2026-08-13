@@ -84,3 +84,25 @@ export const deflectAugmentor: AnnounceAugmentor = {
     return null;
   },
 };
+
+/** SRD 5.2 / PHB'24 p.89 — Deflect Energy's own grant level. */
+export const DEFLECT_ENERGY_LEVEL = 13;
+
+/**
+ * Deflect Attacks' damage-type clause (#1505/#1912): "bludgeoning, piercing,
+ * or slashing damage" below Deflect Energy (Monk L13), "any damage type"
+ * from L13 on — SRD 5.1's Deflect Missiles carries no such clause at all, so
+ * this descriptor targets only `deflectAttacks`. Unlike `deflectAugmentor`
+ * above, this is the SOLE source of `damageTypeClause` — the deflectAttacks
+ * row itself sets none — so `appliesTo` gates on edition alone (matching the
+ * row's own L3 grant, not L13) and `augment` carries the L13 branch
+ * internally, so it always resolves a clause once the row is granted at
+ * all, exactly like the pre-#1912 DERIVED_ACTIONS function did.
+ */
+export const deflectEnergyAugmentor: AnnounceAugmentor = {
+  targetKeys: ["deflectAttacks"],
+  appliesTo: (ctx) => ctx.edition === "EDITION_2024",
+  augment: (_action, ctx) => ({
+    damageTypeClause: ctx.entryLevel >= DEFLECT_ENERGY_LEVEL ? "any damage type" : "bludgeoning, piercing, or slashing damage",
+  }),
+};

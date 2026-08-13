@@ -28,9 +28,9 @@
  *                             2024, L17: 3 focus, 1 minute, frees Flurry of
  *                             Blows while it lasts).
  *
- * Both level gates (3/17 for 2024, 3/6/11/17 for 2014) live as DERIVED_ACTIONS
- * rows (actions.ts) — this file never hardcodes a level, only reads whether
- * the entry-scoped action key is present.
+ * Both level gates (3/17 for 2024, 3/6/11/17 for 2014) live as ClassFeature
+ * rows (monk-features.ts, #1912) — this file never hardcodes a level, only
+ * reads whether the entry-scoped action key is present.
  */
 
 import type { CastShadowArtOperation, ShadowArtOperation } from "@character-sheet/contracts";
@@ -43,6 +43,7 @@ import { editionOf } from "@/lib/rules/edition.js";
 import { crossEditionRejection } from "@/lib/rules/catalog-edition.js";
 import type { RulesEdition } from "@character-sheet/shared-types";
 import { deriveEntryScopedActions } from "./actions.js";
+import { featureRowsOf } from "./feature-rows-select.js";
 import { catalogEffectSpec, type EffectSpec } from "@/lib/combat/effects.js";
 import { normalizeSpellcastingMutable, snapshotSpellcasting } from "@/lib/spellcasting/spell-state.js";
 import { applyConditionInTx } from "@/lib/combat/conditions.js";
@@ -254,7 +255,7 @@ export async function applyShadowArtsOperations(
       // pools instead of widening this comment.
       const level = levelForExperience(row.experiencePoints);
       const edition = editionOf(row);
-      const actions = deriveEntryScopedActions(row.classEntries, level, [], true, edition);
+      const actions = deriveEntryScopedActions(row.classEntries, level, [], true, edition, featureRowsOf);
       // Error text names the edition-correct subclass and level — 2014's Way
       // of Shadow gates Cloak of Shadows at L11, not 2024's L17 (PHB'14 p.80
       // vs PHB'24 p.91); Shadow Arts gates at L3 in both.

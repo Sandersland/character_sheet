@@ -236,6 +236,15 @@ export interface ActivationColumns {
   // feature prose). `buildRowAction` (lib/classes/actions.ts) serves it only
   // when `describeRowReminder`'s derived heal text yields nothing.
   reminder?: string | null;
+  // A resolved numeric fact (#1912) — see ClassFeature.count's own
+  // schema.prisma comment. `buildRowAction` serves it verbatim.
+  count?: number | null;
+  // Marks a row invisible outside `availableActions[]` (#1912) — see
+  // ClassFeature.actionOnly's own schema.prisma comment. Read only by
+  // `featuresFromRows` below (the filter) and the seed's own assertion
+  // (classFeatureSeedSchema); every other #1528 reader (poolFromRow,
+  // actionsFromRows, …) treats an actionOnly row identically to any other.
+  actionOnly?: boolean | null;
 }
 
 /**
@@ -364,7 +373,10 @@ export function featuresFromRows(
   edition: RulesEdition,
 ): DerivedFeature[] {
   return rows
-    .filter((row) => row.edition === edition && row.level <= level)
+    // `actionOnly` (#1912) excludes a row from the feature-card projection —
+    // it exists solely to carry one action variant's activation columns
+    // (identity resourceKey/activationCost/cost*), never player-facing text.
+    .filter((row) => row.edition === edition && row.level <= level && !row.actionOnly)
     .map((row) => ({ name: row.name, level: row.level, description: row.description, source, edition: row.edition }));
 }
 

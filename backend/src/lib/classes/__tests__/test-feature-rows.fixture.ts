@@ -387,6 +387,82 @@ export const BARBARIAN_BASE_ROWS: ClassFeatureRow[] = [
     costBase: 1,
     effectBuffs: rageBuffFixture(),
   },
+  // Reckless Attack's row-driven action columns (#1912) — P-shaped
+  // (identity-only resourceKey, no cost columns), mirroring
+  // barbarian-features.ts's own two rows exactly.
+  {
+    name: "Reckless Attack",
+    level: 2,
+    edition: "EDITION_2014",
+    description:
+      "When making your first attack on your turn, you may attack recklessly: you have advantage on melee weapon attack rolls using Strength this turn, but attack rolls against you also have advantage until your next turn.",
+    resourceKey: "recklessAttack",
+    activationCost: "free",
+  },
+  {
+    name: "Reckless Attack",
+    level: 2,
+    edition: "EDITION_2024",
+    description:
+      "When you make your first attack roll on your turn, you can attack recklessly, giving you Advantage on attack rolls using Strength until the start of your next turn — but attack rolls against you also have Advantage during that time.",
+    resourceKey: "recklessAttack",
+    activationCost: "free",
+  },
+];
+
+// ROGUE's row-driven action columns (#1912) — Rogue itself is EXEMPT from
+// this fixture's general "mirror the class" convention (see this file's own
+// header, "ROGUE NEEDS NO MIRROR AT ALL"): rogue.ts is deleted, and no
+// surviving test needed a null-vs-object distinction against it — until
+// Cunning Action/Fast Hands moved off DERIVED_ACTIONS onto rows. This is a
+// NARROW mirror (mirrors BARD_BARDIC_INSPIRATION_ROWS' own shape below): just
+// the two rows actions.test.ts's atRows() helper needs, not a full base-class
+// transcription.
+export const ROGUE_CUNNING_ACTION_ROWS: ClassFeatureRow[] = [
+  {
+    name: "Cunning Action",
+    level: 2,
+    edition: "EDITION_2014",
+    description: "As a bonus action, take the Dash, Disengage, or Hide action.",
+    resourceKey: "cunningAction",
+    activationCost: "bonusAction",
+    regrants: ["dash", "disengage", "hide"],
+  },
+  {
+    name: "Cunning Action",
+    level: 2,
+    edition: "EDITION_2024",
+    description:
+      "Your quick thinking and agility allow you to move and act quickly. On your turn, you can take one of the following actions as a Bonus Action: Dash, Disengage, or Hide.",
+    resourceKey: "cunningAction",
+    activationCost: "bonusAction",
+    regrants: ["dash", "disengage", "hide"],
+  },
+];
+
+export const ROGUE_THIEF_ROWS: ClassFeatureRow[] = [
+  {
+    name: "Fast Hands",
+    level: 3,
+    edition: "EDITION_2014",
+    description:
+      "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+    resourceKey: "fastHands",
+    activationCost: "bonusAction",
+    regrants: ["useObject"],
+    reminder: "Uses Cunning Action's Bonus Action, not an extra one — Sleight of Hand or Thieves' Tools.",
+  },
+  {
+    name: "Fast Hands",
+    level: 3,
+    edition: "EDITION_2024",
+    description:
+      "As a Bonus Action, you can do one of the following. Sleight of Hand: make a Dexterity (Sleight of Hand) check to pick a lock or disarm a trap with Thieves' Tools or to pick a pocket. Use an Object: take the Utilize action, or take the Magic action to use a magic item that requires that action.",
+    resourceKey: "fastHands",
+    activationCost: "bonusAction",
+    regrants: ["useObject"],
+    reminder: "Uses Cunning Action's Bonus Action, not an extra one — Sleight of Hand or Thieves' Tools.",
+  },
 ];
 
 // Applies Arcane Recovery's / Illusory Self's resource-pool descriptor
@@ -2525,6 +2601,10 @@ const MONK_BASE_ROWS_2014: ClassFeatureRow[] = [
     edition: "EDITION_2014",
     description:
       "Use your reaction to reduce damage from a ranged weapon attack that hits you by 1d10 + Dexterity modifier + monk level. If this reduces the damage to 0 and the missile is small enough to hold in one hand with a hand free, you catch it. You can then spend 1 ki to make a ranged attack with it as part of the same reaction — range 20/60 ft, always made with proficiency — dealing 1d6 + Dexterity modifier bludgeoning damage to one creature within range on a hit.",
+    resourceKey: "deflectMissiles",
+    activationCost: "reaction",
+    reminder:
+      "Reaction: when hit by a ranged weapon attack, reduce the damage by 1d10 + Dex modifier + monk level. If this reduces it to 0 and you have a free hand, catch the missile.",
   },
   {
     name: "Stunning Strike",
@@ -2616,6 +2696,10 @@ const MONK_BASE_ROWS_2024: ClassFeatureRow[] = [
     edition: "EDITION_2024",
     description:
       "Use your reaction to reduce bludgeoning, piercing, or slashing damage from a melee or ranged attack that hits you by 1d10 + Dexterity modifier + monk level. If this reduces the damage to 0, spend 1 focus to redirect it: the attacker (melee, within 5 ft) or another creature (ranged, within 60 ft) must succeed on a Dexterity save or take damage equal to two rolls of your Martial Arts die + your Dexterity modifier.",
+    resourceKey: "deflectAttacks",
+    activationCost: "reaction",
+    reminder:
+      "Reaction: when hit by a melee or ranged attack dealing bludgeoning, piercing, or slashing damage (any damage type at L13, Deflect Energy), reduce the damage by 1d10 + Dex modifier + monk level.",
   },
   {
     name: "Stunning Strike",
@@ -2681,10 +2765,98 @@ const MONK_BASE_ROWS_2024: ClassFeatureRow[] = [
   },
 ];
 
+// The base-class actionOnly rows #1912's 34-row sweep added — mirrors
+// monk-features.ts's own new MONK_BASE_RAW entries exactly (name/level/
+// edition/description/resourceKey/activationCost/cost*/count/regrants/
+// requiresUnarmored/reminder/actionOnly). Kept as its own array (not folded
+// into MONK_BASE_ROWS_2014/2024 above) so the "which rows are real feature
+// text vs. action-only" split stays visually obvious in this file too.
+const MONK_BASE_ROWS_ACTION_ONLY: ClassFeatureRow[] = [
+  {
+    name: "Bonus Unarmed Strike", level: 1, edition: "EDITION_2014",
+    description: "A free Unarmed Strike as a Bonus Action — no resource cost, gated on Martial Arts' unarmored/no-shield condition (see the Martial Arts feature).",
+    resourceKey: "bonusUnarmedStrike", activationCost: "bonusAction", requiresUnarmored: true, actionOnly: true,
+  },
+  {
+    name: "Bonus Unarmed Strike", level: 1, edition: "EDITION_2024",
+    description: "A free Unarmed Strike as a Bonus Action — no resource cost, gated on Martial Arts' unarmored/no-shield condition (see the Martial Arts feature).",
+    resourceKey: "bonusUnarmedStrike", activationCost: "bonusAction", requiresUnarmored: true, actionOnly: true,
+  },
+  {
+    name: "Flurry of Blows", level: 2, edition: "EDITION_2024",
+    description: "Immediately after the Attack action, spend 1 focus to make two Unarmed Strikes as a Bonus Action (three at Heightened Focus, monk L10).",
+    resourceKey: "flurryOfBlows", activationCost: "bonusAction", costKind: "pool", costPoolKey: "focus", costBase: 1, count: 2, actionOnly: true,
+  },
+  {
+    name: "Flurry of Blows", level: 2, edition: "EDITION_2014",
+    description: "Immediately after taking the Attack action, spend 1 ki to make two unarmed strikes as a bonus action.",
+    resourceKey: "flurryOfBlows", activationCost: "bonusAction", costKind: "pool", costPoolKey: "ki", costBase: 1, count: 2,
+    reminder: "Immediately after taking the Attack action, spend 1 ki to make two unarmed strikes as a bonus action.", actionOnly: true,
+  },
+  {
+    name: "Patient Defense", level: 2, edition: "EDITION_2024",
+    description: "Take the Dodge action as a free Bonus Action (or, for 1 Focus, Disengage + Dodge together).",
+    resourceKey: "patientDefense", activationCost: "bonusAction", regrants: ["disengage"], reminder: "Disengage (free bonus action).", actionOnly: true,
+  },
+  {
+    name: "Patient Defense (1 Focus)", level: 2, edition: "EDITION_2024",
+    description: "Spend 1 Focus to take Disengage + Dodge together as a Bonus Action (also grants temporary hit points at Heightened Focus, monk L10).",
+    resourceKey: "patientDefenseFocus", activationCost: "bonusAction", costKind: "pool", costPoolKey: "focus", costBase: 1,
+    regrants: ["disengage", "dodge"], reminder: "Disengage + Dodge (spend 1 Focus).", actionOnly: true,
+  },
+  {
+    name: "Step of the Wind", level: 2, edition: "EDITION_2024",
+    description: "Take the Dash action as a free Bonus Action (or, for 1 Focus, Disengage + Dash with jump distance doubled).",
+    resourceKey: "stepOfTheWind", activationCost: "bonusAction", regrants: ["dash"], reminder: "Dash (free bonus action).", actionOnly: true,
+  },
+  {
+    name: "Step of the Wind (1 Focus)", level: 2, edition: "EDITION_2024",
+    description: "Spend 1 Focus to take Disengage + Dash together as a Bonus Action, jump distance doubled this turn (also brings a willing creature along at Heightened Focus, monk L10).",
+    resourceKey: "stepOfTheWindFocus", activationCost: "bonusAction", costKind: "pool", costPoolKey: "focus", costBase: 1,
+    regrants: ["disengage", "dash"], reminder: "Disengage + Dash, jump distance doubled this turn (spend 1 Focus).", actionOnly: true,
+  },
+  {
+    name: "Patient Defense", level: 2, edition: "EDITION_2014",
+    description: "Spend 1 ki to take the Dodge action as a bonus action.",
+    resourceKey: "patientDefenseKi", activationCost: "bonusAction", costKind: "pool", costPoolKey: "ki", costBase: 1,
+    regrants: ["dodge"], reminder: "Spend 1 ki to take the Dodge action as a bonus action.", actionOnly: true,
+  },
+  {
+    name: "Step of the Wind", level: 2, edition: "EDITION_2014",
+    description: "Spend 1 ki to take the Disengage or Dash action as a bonus action; your jump distance is doubled for the turn.",
+    resourceKey: "stepOfTheWindKi", activationCost: "bonusAction", costKind: "pool", costPoolKey: "ki", costBase: 1,
+    regrants: ["disengage", "dash"], reminder: "Spend 1 ki to take the Disengage or Dash action as a bonus action; your jump distance is doubled for the turn.", actionOnly: true,
+  },
+  {
+    name: "Deflect Attacks — Redirect", level: 3, edition: "EDITION_2024",
+    description: "Once Deflect Attacks reduces a hit to 0, spend 1 Focus to redirect the damage at the attacker (melee) or another creature within range (ranged), forcing a Dexterity save.",
+    resourceKey: "deflectAttacksRedirect", activationCost: "free", costKind: "pool", costPoolKey: "focus", costBase: 1, actionOnly: true,
+  },
+  {
+    name: "Deflect Missiles — Throw Back", level: 3, edition: "EDITION_2014",
+    description: "Once Deflect Missiles catches a missile, spend 1 ki to make a ranged attack with it — range 20/60 ft, always proficient — dealing 1d6 + Dex modifier bludgeoning on a hit.",
+    resourceKey: "deflectMissilesThrow", activationCost: "free", costKind: "pool", costPoolKey: "ki", costBase: 1,
+    reminder: "Spend 1 ki to make a ranged attack with the caught missile (range 20/60, always proficient) — 1d6 + Dex modifier bludgeoning on a hit.", actionOnly: true,
+  },
+  {
+    name: "Empty Body — Invisibility", level: 18, edition: "EDITION_2014",
+    description: "Spend 4 ki points to become invisible for 1 minute; during that time you also have resistance to all damage but force damage.",
+    resourceKey: "emptyBody", activationCost: "action", costKind: "pool", costPoolKey: "ki", costBase: 4,
+    reminder: "Spend 4 ki to become invisible for 1 minute, with resistance to all damage but force damage during that time.", actionOnly: true,
+  },
+  {
+    name: "Empty Body — Astral Projection", level: 18, edition: "EDITION_2014",
+    description: "Spend 8 ki points to cast astral projection on yourself without a material component; you can't take other creatures with you.",
+    resourceKey: "emptyBodyAstralProjection", activationCost: "action", costKind: "pool", costPoolKey: "ki", costBase: 8,
+    reminder: "Spend 8 ki to cast astral projection on yourself without a material component; you can't take other creatures with you.", actionOnly: true,
+  },
+];
+
 export const MONK_BASE_ROWS: ClassFeatureRow[] = [
   ...MONK_BASE_ROWS_SHARED,
   ...MONK_BASE_ROWS_2014,
   ...MONK_BASE_ROWS_2024,
+  ...MONK_BASE_ROWS_ACTION_ONLY,
 ];
 
 // MONK's four 2024 subclasses (#1675) — each mirrors its own
@@ -2715,6 +2887,7 @@ export const WARRIOR_OF_THE_OPEN_HAND_ROWS: ClassFeatureRow[] = [
     edition: "EDITION_2024",
     description:
       "As a bonus action, roll your Martial Arts die and regain that many hit points plus your Wisdom modifier (minimum 1). Usable a number of times equal to your Wisdom modifier (minimum once); regain all expended uses on a long rest.",
+    resourceKey: "wholenessOfBody", activationCost: "bonusAction", costKind: "pool", costPoolKey: "wholenessOfBody", costBase: 1,
   },
   {
     name: "Fleet Step",
@@ -2722,6 +2895,8 @@ export const WARRIOR_OF_THE_OPEN_HAND_ROWS: ClassFeatureRow[] = [
     edition: "EDITION_2024",
     description:
       "When you take a bonus action other than Step of the Wind, you can also take the Step of the Wind bonus action immediately afterward.",
+    resourceKey: "fleetStep", activationCost: "free",
+    reminder: "When you take a bonus action other than Step of the Wind, you can also take Step of the Wind immediately afterward (no extra cost).",
   },
   {
     name: "Quivering Palm",
@@ -2763,6 +2938,8 @@ export const WAY_OF_THE_OPEN_HAND_ROWS: ClassFeatureRow[] = [
     edition: "EDITION_2014",
     description:
       "At the end of a long rest, you gain the effect of a sanctuary spell that lasts until the start of your next long rest (the spell can end early as normal). The saving throw DC equals your ki save DC.",
+    resourceKey: "tranquility", activationCost: "free",
+    reminder: "At the end of a long rest, you gain the effect of sanctuary (DC = your ki save DC) until the start of your next long rest.",
   },
   {
     name: "Quivering Palm",
@@ -2770,6 +2947,15 @@ export const WAY_OF_THE_OPEN_HAND_ROWS: ClassFeatureRow[] = [
     edition: "EDITION_2014",
     description:
       "When you hit a creature with an unarmed strike, you can spend 3 ki points to start imperceptible vibrations in its body, lasting a number of days equal to your monk level. You can have only one creature under this effect at a time, and you can end the vibrations harmlessly without using an action. To end them harmfully, you and the target must be on the same plane of existence — use your action to force a Constitution save: on a failure the target drops to 0 hit points; on a success it takes 10d10 necrotic damage.",
+  },
+  // Wholeness of Body's actionOnly served-identity sibling (#1912) — see
+  // monk-features.ts's own row for why it can't ride the "Wholeness of
+  // Body" row above (resourceKey there is already claimed by the row-owned
+  // pool).
+  {
+    name: "Wholeness of Body — Action", level: 6, edition: "EDITION_2014",
+    description: "As an action, spend 1 use of Wholeness of Body to regain hit points equal to three times your monk level.",
+    resourceKey: "wholenessOfBodyAction", activationCost: "action", costKind: "pool", costPoolKey: "wholenessOfBody", costBase: 1, actionOnly: true,
   },
 ];
 
@@ -2787,6 +2973,8 @@ export const WARRIOR_OF_SHADOW_ROWS: ClassFeatureRow[] = (["EDITION_2024"] as co
     edition,
     description:
       "While in dim light or darkness, teleport as a bonus action to an unoccupied space you can see that is also in dim light or darkness (up to 60 ft), then make one unarmed strike as part of the same bonus action. You have advantage on the first melee attack you make before the end of the turn.",
+    resourceKey: "shadowStep", activationCost: "bonusAction",
+    reminder: "Teleport up to 60 ft between areas of dim light or darkness; advantage on your first melee attack before the end of this turn. Make one unarmed strike immediately after teleporting.",
   },
   {
     name: "Improved Shadow Step",
@@ -2801,6 +2989,16 @@ export const WARRIOR_OF_SHADOW_ROWS: ClassFeatureRow[] = (["EDITION_2024"] as co
     edition,
     description:
       "Spend 3 focus and use your action to become invisible and able to move through other creatures and objects as if they were difficult terrain, for 1 minute or until you're incapacitated. The invisibility ends early if you attack or cast a spell. While it lasts, Flurry of Blows costs no focus.",
+    resourceKey: "cloakOfShadows", activationCost: "action", costKind: "pool", costPoolKey: "focus", costBase: 3,
+    reminder: "Magic action, entirely within dim light or darkness: spend 3 focus to become invisible and move through creatures/objects as difficult terrain for 1 minute (or until incapacitated, or you end your turn in bright light). Flurry of Blows costs no focus while it lasts.",
+  },
+  // "Shadow Arts" above stays pure feature text — its served action identity
+  // needs a DIFFERENT name (#1912, see monk-features.ts's own row).
+  {
+    name: "Shadow Arts (Darkness)", level: 3, edition,
+    description: "Spend 1 focus to cast Darkness without material components; you can see through it and move it up to 30 ft as a bonus action while it persists.",
+    resourceKey: "shadowArts", activationCost: "action", costKind: "pool", costPoolKey: "focus", costBase: 1,
+    reminder: "Spend 1 focus to cast Darkness without material components; you can see through it and move it up to 30 ft as a bonus action while it persists.", actionOnly: true,
   },
 ]);
 
@@ -2813,6 +3011,8 @@ export const WAY_OF_SHADOW_ROWS: ClassFeatureRow[] = (["EDITION_2014"] as const)
     edition,
     description:
       "Starting when you choose this tradition at 3rd level, you can use your ki to duplicate the effects of certain spells. As an action, you can spend 2 ki points to cast darkness, darkvision, pass without trace, or silence, without providing material components. Additionally, you gain the minor illusion cantrip if you don't already know it (PHB'14 pp.79-80 — not in SRD 5.1).",
+    resourceKey: "shadowArts", activationCost: "action", costKind: "pool", costPoolKey: "ki", costBase: 2,
+    reminder: "Spend 2 ki to cast darkness, darkvision, pass without trace, or silence, without material components (PHB'14 pp.79-80 — not in SRD 5.1).",
   },
   {
     name: "Shadow Step",
@@ -2820,6 +3020,8 @@ export const WAY_OF_SHADOW_ROWS: ClassFeatureRow[] = (["EDITION_2014"] as const)
     edition,
     description:
       "At 6th level, you gain the ability to step from one shadow to another. When you are in dim light or darkness, as a bonus action you can teleport up to 60 feet to an unoccupied space you can see that is also in dim light or darkness. You then have advantage on the first melee attack you make before the end of the current turn (PHB'14 p.80 — not in SRD 5.1).",
+    resourceKey: "shadowStep", activationCost: "bonusAction",
+    reminder: "While in dim light or darkness, teleport as a bonus action up to 60 ft to an unoccupied space you can see that is also in dim light or darkness; you then have advantage on the first melee attack you make before the end of the turn.",
   },
   {
     name: "Cloak of Shadows",
@@ -2827,6 +3029,8 @@ export const WAY_OF_SHADOW_ROWS: ClassFeatureRow[] = (["EDITION_2014"] as const)
     edition,
     description:
       "By 11th level, you have learned to become one with the shadows. When you are in an area of dim light or darkness, you can use your action to become invisible. You remain invisible until you make an attack, cast a spell, or are in an area of bright light (PHB'14 p.80 — not in SRD 5.1).",
+    resourceKey: "cloakOfShadows", activationCost: "action",
+    reminder: "While in dim light or darkness, use your action to become invisible; you remain invisible until you make an attack, cast a spell, or are in an area of bright light. No ki cost, no duration cap.",
   },
   {
     name: "Opportunist",
@@ -2834,6 +3038,8 @@ export const WAY_OF_SHADOW_ROWS: ClassFeatureRow[] = (["EDITION_2014"] as const)
     edition,
     description:
       "Beginning at 17th level, you can exploit a creature's momentary distraction when it is hit by an attack. When a creature within 5 feet of you is hit by an attack made by a creature other than you, you can use your reaction to make a melee attack against that creature (PHB'14 p.80 — not in SRD 5.1).",
+    resourceKey: "opportunist", activationCost: "reaction",
+    reminder: "When a creature within 5 ft of you is hit by an attack made by a creature other than you, use your reaction to make a melee attack against that creature.",
   },
 ]);
 
@@ -2857,6 +3063,8 @@ export const WARRIOR_OF_MERCY_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITI
     edition,
     description:
       "As a Magic action, expend 1 focus to touch a creature and restore hit points equal to one Martial Arts die plus your Wisdom modifier. When you use Flurry of Blows, you can replace one of its unarmed strikes with this effect without spending the extra focus for the heal — Flurry's own focus cost still applies.",
+    resourceKey: "handOfHealing", activationCost: "action", costKind: "pool", costPoolKey: "focus", costBase: 1,
+    reminder: "Magic action: expend 1 Focus to heal a creature you touch (Martial Arts die + Wis mod).",
   },
   {
     name: "Physician's Touch",
@@ -2878,6 +3086,13 @@ export const WARRIOR_OF_MERCY_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITI
     edition,
     description:
       "As a Magic action, expend 5 focus to touch a creature that died no more than 24 hours ago and return it to life with 4d10 plus your Wisdom modifier hit points, ending the Blinded, Deafened, Paralyzed, Poisoned, and Stunned conditions on it. Usable once per long rest.",
+  },
+  {
+    name: "Hand of Healing (Flurry replacement)", level: 3, edition,
+    description: "Replace one Unarmed Strike from Flurry of Blows with Hand of Healing at no extra Focus cost.",
+    resourceKey: "handOfHealingFlurry", activationCost: "bonusAction",
+    reminder: "Replace one Unarmed Strike from Flurry of Blows with Hand of Healing at no extra Focus cost. Flurry of Healing and Harm (L11): replace every strike this way.",
+    actionOnly: true,
   },
 ]);
 
@@ -2918,6 +3133,8 @@ export const WARRIOR_OF_THE_ELEMENTS_ROWS: ClassFeatureRow[] = (["EDITION_2024"]
     edition,
     description:
       "As a Magic action, you can expend 2 Focus Points to create a 20-foot-radius sphere of elemental energy centered on a point within 120 ft. Choose Acid, Cold, Fire, Lightning, or Thunder. Each creature in the sphere makes a Dexterity saving throw (your focus save DC), taking damage equal to three rolls of your Martial Arts die of the chosen type on a failure, or half as much on a success.",
+    resourceKey: "elementalBurst", activationCost: "action", costKind: "pool", costPoolKey: "focus", costBase: 2,
+    reminder: "Magic action, 2 focus: 20-ft-radius sphere within 120 ft, chosen damage type. Each creature makes a Dexterity save (focus DC) — 3 Martial Arts dice on a failure, half as much on a success.",
   },
   {
     name: "Stride of the Elements",
@@ -2934,12 +3151,39 @@ export const WARRIOR_OF_THE_ELEMENTS_ROWS: ClassFeatureRow[] = (["EDITION_2024"]
   },
 ]);
 
+// Way of the Four Elements — EDITION_2014-only (#1503), no fixture entry
+// before #1912 (neither of its two rows carried a descriptor column until
+// Elemental Attunement's own action identity + the new "Elemental
+// Discipline" actionOnly row landed). Mirrors monk-features.ts's
+// WAY_OF_THE_FOUR_ELEMENTS_RAW.
+export const WAY_OF_THE_FOUR_ELEMENTS_ROWS: ClassFeatureRow[] = [
+  {
+    name: "Disciple of the Elements", level: 3, edition: "EDITION_2014",
+    description: "You learn magical disciplines that harness the power of the four elements. You know Elemental Attunement plus one other elemental discipline of your choice, learning one more at 6th, 11th, and 17th level (2/3/4/5 known total). A discipline requires you to spend ki points each time you use it, and some disciplines require you to reach a specified monk level before you can use them. Whenever you learn a new elemental discipline, you can also replace one you already know with a different discipline. PHB'14 pp. 78, 80.",
+  },
+  {
+    name: "Elemental Attunement", level: 3, edition: "EDITION_2014",
+    description: "You always know this elemental discipline, and it doesn't count against the number of elemental disciplines you know. As an action, you can briefly control elemental forces within 30 ft of you, causing one of the following effects: create a harmless, sensory elemental effect; instantaneously light or snuff out a candle, torch, or small campfire; chill or warm up to 1 pound of nonliving material for up to 1 hour; or shape a small amount of nonliving earth, fire, water, or mist for up to 1 minute. PHB'14 p.80.",
+    resourceKey: "elementalAttunement", activationCost: "action",
+    reminder: "Briefly control elemental forces within 30 ft: create a harmless sensory effect; light or snuff a small flame; chill or warm up to 1 lb of nonliving material for 1 hour; or shape a small amount of nonliving earth, fire, water, or mist for 1 minute. Free — always known, no ki cost.",
+  },
+  {
+    name: "Elemental Discipline", level: 3, edition: "EDITION_2014",
+    description: "Spend ki to cast a known elemental discipline (2-6 ki, capped by your monk level).",
+    resourceKey: "castDiscipline", activationCost: "action", costKind: "pool", costPoolKey: "ki", costBase: 1,
+    reminder: "Spend ki to cast a known elemental discipline (2-6 ki, capped by your monk level).", actionOnly: true,
+  },
+];
+
 export const LITERAL_CLASS_ROWS: Record<string, ClassFeatureRow[]> = {
   fighter: FIGHTER_BASE_ROWS,
   barbarian: BARBARIAN_BASE_ROWS,
   // Narrow mirror (#1909) — see BARD_BARDIC_INSPIRATION_ROWS' own comment for
   // why this is one feature, not a full base-class array.
   bard: BARD_BARDIC_INSPIRATION_ROWS,
+  // Narrow mirror (#1912) — see ROGUE_CUNNING_ACTION_ROWS' own comment above
+  // for why Rogue rejoins this map after being deliberately absent.
+  rogue: ROGUE_CUNNING_ACTION_ROWS,
   ranger: RANGER_BASE_ROWS,
   warlock: WARLOCK_BASE_ROWS,
   wizard: WIZARD_BASE_ROWS,
@@ -2952,6 +3196,7 @@ export const LITERAL_CLASS_ROWS: Record<string, ClassFeatureRow[]> = {
 
 export const LITERAL_SUBCLASS_ROWS: Record<string, ClassFeatureRow[]> = {
   "battle master": BATTLE_MASTER_ROWS,
+  thief: ROGUE_THIEF_ROWS,
   "circle of the land": CIRCLE_OF_THE_LAND_ROWS,
   "circle of the moon": CIRCLE_OF_THE_MOON_ROWS,
   "warrior of the open hand": WARRIOR_OF_THE_OPEN_HAND_ROWS,
@@ -2960,6 +3205,7 @@ export const LITERAL_SUBCLASS_ROWS: Record<string, ClassFeatureRow[]> = {
   "way of shadow": WAY_OF_SHADOW_ROWS,
   "warrior of mercy": WARRIOR_OF_MERCY_ROWS,
   "warrior of the elements": WARRIOR_OF_THE_ELEMENTS_ROWS,
+  "way of the four elements": WAY_OF_THE_FOUR_ELEMENTS_ROWS,
   "school of evocation": WIZARD_EVOCATION_ROWS,
   "school of abjuration": WIZARD_ABJURATION_ROWS,
   "school of illusion": WIZARD_ILLUSION_ROWS,
@@ -2974,8 +3220,13 @@ export const LITERAL_SUBCLASS_ROWS: Record<string, ClassFeatureRow[]> = {
 
 /** The featureRows carrier for a (className, subclass) pair, sourced from the TS modules. */
 export function testFeatureRowsFor(className: string, subclass: string | undefined): ClassFeatureRowsCarrier {
-  const classKey = (className ?? "").toLowerCase();
-  const subclassKey = (subclass ?? "").toLowerCase();
+  // .trim() (#1912) mirrors resolveSubclassSlug's own normalization
+  // (subclass-slug.ts) — a caller exercising the case/whitespace-insensitive
+  // gate through a row-driven action needs this fixture's OWN lookup to
+  // tolerate the same input, since production's real lookup (featureRowsOf,
+  // a DB FK relation) never depends on the display-name string at all.
+  const classKey = (className ?? "").trim().toLowerCase();
+  const subclassKey = (subclass ?? "").trim().toLowerCase();
   const classDef = TEST_CLASSES[classKey];
   const subDef = subclass ? TEST_SUBCLASSES[subclassKey] : undefined;
   return {

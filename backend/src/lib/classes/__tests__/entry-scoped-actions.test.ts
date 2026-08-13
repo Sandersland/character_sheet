@@ -18,13 +18,21 @@ import { deriveDeflectSpec } from "@/lib/srd/deflect.js";
 const getFeatureRows = (entry: { name: string; subclass?: string }) => testFeatureRowsFor(entry.name, entry.subclass);
 
 describe("deriveEntryScopedActions", () => {
-  it("single-class parity: output is identical to a bare deriveActions call", () => {
-    const entries = [{ name: "monk", subclass: "warrior of shadow", level: 6 }];
-    const entryScoped = deriveEntryScopedActions(entries, 6, [], true, "EDITION_2024", getFeatureRows);
-    // deriveActions is slug-native (#1277) — "warrior of shadow" resolves to
+  // Every monk subclass now carries at least one row-driven action (#1912),
+  // so no real class/subclass combo stays bare-DERIVED_ACTIONS-only any more
+  // to compare against — this proves the underlying claim directly instead:
+  // when the row carrier contributes nothing (an explicit empty callback,
+  // not testFeatureRowsFor's real content), entryScoped degenerates to
+  // exactly a bare deriveActions call. `summonBondedWeapon` (the one
+  // surviving DERIVED_ACTIONS row) is still the fixture.
+  it("single-class parity: output is identical to a bare deriveActions call when the row carrier contributes nothing", () => {
+    const entries = [{ name: "fighter", subclass: "eldritch knight", level: 3 }];
+    const emptyRows = () => ({ classRows: [], subclassRows: [] });
+    const entryScoped = deriveEntryScopedActions(entries, 3, [], true, "EDITION_2014", emptyRows);
+    // deriveActions is slug-native (#1277) — "eldritch knight" resolves to
     // this slug via resolveSubclassSlug, which deriveEntryScopedActions calls
     // internally; this bare comparison passes the resolved slug directly.
-    const bare = deriveActions("monk", "monk-warrior-of-shadow", 6, [], true, "EDITION_2024");
+    const bare = deriveActions("fighter", "fighter-eldritch-knight", 3, [], true, "EDITION_2014");
     expect(entryScoped).toEqual(bare);
   });
 

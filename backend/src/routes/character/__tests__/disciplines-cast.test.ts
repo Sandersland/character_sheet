@@ -68,6 +68,7 @@ async function activity(): Promise<ActivityEvent[]> {
 }
 
 let classId: string;
+let subclassId: string;
 let disciplinesByName: Record<string, { id: string }>;
 
 // Seeds resources.choicesKnown.fourElementsDisciplines directly — bypasses
@@ -78,10 +79,6 @@ function knownDiscipline(entryId: string, name: string) {
 }
 
 async function createMonk(experiencePoints: number, known: ReturnType<typeof knownDiscipline>[]) {
-  const sub = await prisma.subclass.findFirst({
-    where: { classId, name: { equals: "Way of the Four Elements", mode: "insensitive" } },
-    select: { id: true },
-  });
   await prisma.character.create({
     data: {
       ...FIXTURE_BASE,
@@ -95,7 +92,7 @@ async function createMonk(experiencePoints: number, known: ReturnType<typeof kno
         advancements: [],
       } as unknown as Prisma.InputJsonValue,
       classEntries: {
-        create: [{ name: "monk", subclass: "way of the four elements", subclassId: sub?.id, classId, position: 0 }],
+        create: [{ name: "monk", subclass: "way of the four elements", subclassId, classId, position: 0 }],
       },
     },
   });
@@ -116,6 +113,37 @@ describe("Discipline cast endpoint (#1503)", () => {
       update: {},
     });
     classId = cls.id;
+
+    // castDiscipline is row-driven now (#1912) — assertFourElementsMonk's
+    // guard (disciplines.ts) reads the entry's OWN subclassRef.features, a
+    // real DB relation, unlike the retired DERIVED_ACTIONS gate (which
+    // resolved off the subclass DISPLAY NAME alone and needed no such row).
+    // Mirrors warrior-of-elements.test.ts's own bespoke-subclass-plus-row
+    // pattern: a throwaway Subclass row under THIS bespoke class, carrying
+    // just the one ClassFeature row this file's casts need.
+    const sub = await prisma.subclass.findFirst({ where: { classId, name: "Way of the Four Elements Test Subclass" } });
+    const subRow =
+      sub ??
+      (await prisma.subclass.create({
+        data: { classId, name: "Way of the Four Elements Test Subclass", description: "Test fixture subclass.", slug: "way-of-the-four-elements-discipline-cast-test" },
+      }));
+    subclassId = subRow.id;
+    await prisma.classFeature.deleteMany({ where: { classId, subclassId } });
+    await prisma.classFeature.create({
+      data: {
+        classId,
+        subclassId,
+        name: "Elemental Discipline",
+        level: 3,
+        edition: "EDITION_2014",
+        description: "Spend ki to cast a known elemental discipline (2-6 ki, capped by your monk level).",
+        resourceKey: "castDiscipline",
+        activationCost: "action",
+        costKind: "pool",
+        costPoolKey: "ki",
+        costBase: 1,
+      },
+    });
 
     const rows = await prisma.grantedAbility.findMany({ where: { source: "discipline" } });
     if (rows.length !== 16) throw new Error(`discipline catalog not seeded (${rows.length}/16) — run \`prisma db seed\``);

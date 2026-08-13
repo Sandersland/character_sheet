@@ -36,7 +36,7 @@ NOT_YET_MIGRATED="bard cleric druid monk paladin ranger sorcerer warlock wizard"
 # check below, which fails loudly the moment a file in that directory is
 # neither here nor in ALL_CLASSES, rather than silently scanning it as
 # "migrated" (a thirteenth class's module would otherwise land unclassified).
-NON_CLASS_MODULES="ability-registry actions activation-requires announce-augmentors arcane-charge assassinate channel-divinity class class-feature-rows class-features disciplines draconic-bloodline feature-rows-select focus-cast hand-of-harm hand-of-ultimate-mercy maneuver-effect maneuvers open-hand-technique quivering-palm registry resources resources-state shadow-arts sneak-attack stunning-strike subclass-slug types warrior-of-elements weapon-bond"
+NON_CLASS_MODULES="ability-registry actions activation-requires announce-augmentors arcane-charge assassinate channel-divinity class class-feature-rows class-features disciplines draconic-bloodline feature-rows-select focus-cast hand-of-harm hand-of-ultimate-mercy heightened-focus improved-shadow-step maneuver-effect maneuvers open-hand-technique physicians-touch quivering-palm registry resources resources-state shadow-arts sneak-attack stunning-strike subclass-slug types warrior-of-elements weapon-bond"
 
 # Reverse check: every backend/src/lib/classes/*.ts file's basename must be
 # classified as EITHER a class (ALL_CLASSES) or shared infrastructure
@@ -131,18 +131,22 @@ fi
 #     mechanics — only a key that must be type-checked"). After #1546 Part A
 #     it also carries subclass REGISTRATION, which strengthens rather than
 #     weakens the ruling.
-#   - classes/actions.ts: PERMANENT (#1231; was ALSO #1223 until #1686 moved
-#     Rage's DERIVED_ACTIONS "rage"/"endRage" pair onto its ClassFeature rows
-#     as a "toggle" resolverKind — the buff's resistDamageTypes/rollEffects/
-#     tiered modifier now DO have descriptor columns, `effectBuffs`, so that
-#     half of the #1223 exemption is retired, not merely moved). What remains
-#     is Rogue's own DERIVED_ACTIONS entries — "cunningAction" (grantClass:
-#     "rogue") and "fastHands" (grantSubclassSlugs: ["rogue-thief"]) — an
-#     action-economy grant with no resource pool of its own, so
-#     ClassFeature's descriptor columns have nothing to populate for either.
-#     Unlike starting-equipment.ts above, there is no follow-up issue that
-#     retires any of this — it is the same permanent gap a class-keyed
-#     DERIVED_ACTIONS entry always had, not migration debt.
+#   - classes/actions.ts: PERMANENT, but its reason changed shape at #1912
+#     (4/4 of epic #1903): every Barbarian/Rogue/Monk DERIVED_ACTIONS row
+#     (recklessAttack, cunningAction, fastHands, and the whole 31-row monk
+#     block) moved onto seeded ClassFeature rows — the "cunningAction"/
+#     "fastHands" PERMANENT-gap ruling this entry used to carry is retired,
+#     not merely moved, the same way #1686 retired Rage's own half of the
+#     #1223 exemption. What remains is `summonBondedWeapon`'s Eldritch
+#     Knight row alone (`grantClass: "fighter"`, `grantSubclassSlugs:
+#     ["fighter-eldritch-knight"]`) — sanctioned PERMANENT residency (#1854):
+#     its `enabled` reads a synthetic pool built from a LIVE COUNT of
+#     `weaponBonded` inventory rows, which no ClassFeature descriptor column
+#     can express, so it has no row-driven destination to move to. If a
+#     future change ever moves that row too, DERIVED_ACTIONS empties
+#     entirely and this entry's own anti-vacuity check (3, below) forces its
+#     deletion — never leave it as a stale exemption once its last hit is
+#     gone.
 #     routes/character/actions.ts DROPPED OFF this list in the same #1686
 #     diff that deleted its last "barbarian" occurrence
 #     (computeRageDamageBonus's classEntries lookup) — the generic toggle
@@ -331,11 +335,13 @@ fi
 #      pipeline (the shape #1910's announce-augmentor registry replaced
 #      withDeflectSpecs/withArcaneChargeReminder with).
 # DERIVED_ACTIONS_MAX is a RATCHET, same convention as NOT_YET_MIGRATED
-# above (only ever lowered, never raised): 35 is the live count verified at
-# HEAD after #1909 moved 8 cross-class rows onto ClassFeature rows (was 43
-# before #1909). #1912 (4/4) must lower this constant in the same PR that
-# shrinks the array further.
-DERIVED_ACTIONS_MAX=35
+# above (only ever lowered, never raised): 1 is the live count verified at
+# HEAD after #1912 moved the 34-row monk/rogue/barbarian residue onto
+# ClassFeature rows (was 35 after #1909's 8-row move, 43 before that). The
+# one survivor is `summonBondedWeapon` (#1854, sanctioned PERMANENT — see
+# its own FILE_ALLOWLIST comment above): no further class action content
+# should ever land here again, so 1 is this ratchet's floor, not a waypoint.
+DERIVED_ACTIONS_MAX=1
 
 # awk range, same portable shape as the class-name scan above: from the
 # array's declaration to its closing `];` — stops at the FIRST such line

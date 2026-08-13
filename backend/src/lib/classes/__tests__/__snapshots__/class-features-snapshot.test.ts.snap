@@ -15213,79 +15213,117 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "level": 1,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 2,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 3,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 4,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 5,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 6,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 7,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 8,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 9,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 10,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 11,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 12,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 13,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 14,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 15,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 16,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 17,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 18,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 19,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 20,
   },
 ]
@@ -15298,79 +15336,117 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "level": 1,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 2,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 3,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 4,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 5,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 6,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 7,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 8,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 9,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 10,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 11,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 12,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 13,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 14,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 15,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 16,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 17,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 18,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 19,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 20,
   },
 ]
@@ -15383,79 +15459,117 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "level": 1,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 2,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 3,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 4,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 5,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 6,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 7,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 8,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 9,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 10,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 11,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 12,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 13,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 14,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 15,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 16,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 17,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 18,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 19,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 20,
   },
 ]
@@ -15468,79 +15582,117 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "level": 1,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 2,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 3,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 4,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 5,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 6,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 7,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 8,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 9,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 10,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 11,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 12,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 13,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 14,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 15,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 16,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 17,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 18,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 19,
   },
   {
-    "info": null,
+    "info": {
+      "resources": [],
+    },
     "level": 20,
   },
 ]

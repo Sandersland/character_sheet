@@ -702,6 +702,43 @@ const EXPECTED_EDITION_TAGGED_FEATURES = [
   ["monk", "way of the four elements", "Stunning Strike"],
   ["monk", "warrior of mercy", "Martial Arts"],
   ["monk", "warrior of mercy", "Stunning Strike"],
+  // #1912's 34-row DERIVED_ACTIONS sweep added three more base-class names
+  // that genuinely fork per edition — Flurry of Blows (2024 free/paid pair's
+  // text differs from 2014's flat 1-ki row), Patient Defense and Step of the
+  // Wind (each has its OWN row per edition: a 2024 actionOnly row plus a
+  // DIFFERENTLY-NAMED-BY-KEY-but-SAME-display-name 2014 actionOnly row —
+  // "Patient Defense" and "Step of the Wind" are the served action NAMEs,
+  // not the resourceKey, so the raw-row scanner sees two same-named,
+  // different-description rows same as any other fork). This scanner reads
+  // RAW rows (loadDbFeatureRows), not featuresFromRows' actionOnly filter,
+  // so these three names are "tagged" here even though none of them ever
+  // renders as a feature card. Same 8-context fan-out as Martial Arts/
+  // Stunning Strike above (collectTaggedFeatureKeys combines classRows,
+  // always ALL of them, with each context's own subclassRows).
+  ["monk", "undefined", "Flurry of Blows"],
+  ["monk", "undefined", "Patient Defense"],
+  ["monk", "undefined", "Step of the Wind"],
+  ["monk", "warrior of the open hand", "Flurry of Blows"],
+  ["monk", "warrior of the open hand", "Patient Defense"],
+  ["monk", "warrior of the open hand", "Step of the Wind"],
+  ["monk", "way of the open hand", "Flurry of Blows"],
+  ["monk", "way of the open hand", "Patient Defense"],
+  ["monk", "way of the open hand", "Step of the Wind"],
+  ["monk", "warrior of shadow", "Flurry of Blows"],
+  ["monk", "warrior of shadow", "Patient Defense"],
+  ["monk", "warrior of shadow", "Step of the Wind"],
+  ["monk", "way of shadow", "Flurry of Blows"],
+  ["monk", "way of shadow", "Patient Defense"],
+  ["monk", "way of shadow", "Step of the Wind"],
+  ["monk", "warrior of the elements", "Flurry of Blows"],
+  ["monk", "warrior of the elements", "Patient Defense"],
+  ["monk", "warrior of the elements", "Step of the Wind"],
+  ["monk", "way of the four elements", "Flurry of Blows"],
+  ["monk", "way of the four elements", "Patient Defense"],
+  ["monk", "way of the four elements", "Step of the Wind"],
+  ["monk", "warrior of mercy", "Flurry of Blows"],
+  ["monk", "warrior of mercy", "Patient Defense"],
+  ["monk", "warrior of mercy", "Step of the Wind"],
 ] as const;
 
 // A (class, subclass, name) is "tagged" if its two seeded rows carry

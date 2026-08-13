@@ -104,7 +104,13 @@ async function resolveClassAndSubclass(subclass: string | undefined): Promise<{ 
           effectBuffs: [{ key: "elementalAttunement", target: "elementalAttunement", modifier: 0, duration: "while-active" }],
         },
         { classId: cls.id, subclassId: sub.id, name: "Manipulate Elements", level: 3, edition: "EDITION_2024", description: "You know the Elementalism cantrip. Wisdom is your spellcasting ability for it." },
-        { classId: cls.id, subclassId: sub.id, name: "Elemental Burst", level: 6, edition: "EDITION_2024", description: "As a Magic action, you can expend 2 Focus Points to create a 20-foot-radius sphere of elemental energy centered on a point within 120 ft. Choose Acid, Cold, Fire, Lightning, or Thunder. Each creature in the sphere makes a Dexterity saving throw (your focus save DC), taking damage equal to three rolls of your Martial Arts die of the chosen type on a failure, or half as much on a success." },
+        {
+          classId: cls.id, subclassId: sub.id, name: "Elemental Burst", level: 6, edition: "EDITION_2024",
+          description: "As a Magic action, you can expend 2 Focus Points to create a 20-foot-radius sphere of elemental energy centered on a point within 120 ft. Choose Acid, Cold, Fire, Lightning, or Thunder. Each creature in the sphere makes a Dexterity saving throw (your focus save DC), taking damage equal to three rolls of your Martial Arts die of the chosen type on a failure, or half as much on a success.",
+          // Row-driven action (#1912) — S, identity == pool. The save-DC
+          // damage op stays in warrior-of-elements.ts's own endpoint.
+          resourceKey: "elementalBurst", activationCost: "action", costKind: "pool", costPoolKey: "focus", costBase: 2,
+        },
         { classId: cls.id, subclassId: sub.id, name: "Stride of the Elements", level: 11, edition: "EDITION_2024", description: "While your Elemental Attunement is active, you have a Fly Speed and a Swim Speed each equal to your Speed." },
         { classId: cls.id, subclassId: sub.id, name: "Elemental Epitome", level: 17, edition: "EDITION_2024", description: "While your Elemental Attunement is active you gain: Resistance to Acid, Cold, Fire, Lightning, or Thunder damage (choose one at the start of each of your turns); Destructive Stride (when you use Step of the Wind, your Speed increases by 20 ft that turn, and the first creature you move within 5 ft of takes one roll of your Martial Arts die of your chosen resistance type); and Empowered Strikes (once per turn, one Unarmed Strike deals an extra Martial Arts die of your chosen resistance type on a hit)." },
       ],

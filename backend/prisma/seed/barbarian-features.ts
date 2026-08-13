@@ -286,6 +286,10 @@ const BARBARIAN_BASE_RAW: RawBarbarianFeature[] = [
     edition: "EDITION_2014",
     description:
       "When making your first attack on your turn, you may attack recklessly: you have advantage on melee weapon attack rolls using Strength this turn, but attack rolls against you also have advantage until your next turn.",
+    // Row-driven action (#1912) — a pure economy reminder, no resource cost
+    // (advantage/disadvantage is tracked by the table, not this app).
+    resourceKey: "recklessAttack",
+    activationCost: "free",
   },
   {
     subclassSlug: null,
@@ -298,6 +302,8 @@ const BARBARIAN_BASE_RAW: RawBarbarianFeature[] = [
     // never mentions this delta).
     description:
       "When you make your first attack roll on your turn, you can attack recklessly, giving you Advantage on attack rolls using Strength until the start of your next turn — but attack rolls against you also have Advantage during that time.",
+    resourceKey: "recklessAttack",
+    activationCost: "free",
   },
   {
     subclassSlug: null,

@@ -12,7 +12,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildAvailableActionsView } from "../classes.js";
-import { FIGHTER_BASE_ROWS } from "@/lib/classes/__tests__/test-feature-rows.fixture.js";
+import { FIGHTER_BASE_ROWS, MONK_BASE_ROWS } from "@/lib/classes/__tests__/test-feature-rows.fixture.js";
 import { deriveDeflectSpec } from "@/lib/srd/deflect.js";
 import { abilityModifier } from "@/lib/srd/srd.js";
 import { ARCANE_CHARGE_REMINDER } from "@/lib/classes/arcane-charge.js";
@@ -21,9 +21,13 @@ import type { CharacterWithRelations } from "@/lib/character/character-include.j
 const SCORES = { strength: 10, dexterity: 16, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 };
 const DEX_MOD = abilityModifier(SCORES.dexterity);
 
+// Deflect Attacks/Missiles moved off DERIVED_ACTIONS onto ClassFeature rows
+// (#1912) — `class: { features: [] }` no longer surfaces them at all, so
+// this fixture needs MONK_BASE_ROWS' real content (test-feature-rows
+// .fixture.ts, kept in parity with the seed by literal-fixture-parity.test.ts).
 function monkEntries(level: number): CharacterWithRelations["classEntries"] {
   return [
-    { name: "monk", subclass: undefined, level, class: { features: [] }, subclassRef: undefined },
+    { name: "monk", subclass: undefined, level, class: { features: MONK_BASE_ROWS }, subclassRef: undefined },
   ] as unknown as CharacterWithRelations["classEntries"];
 }
 
