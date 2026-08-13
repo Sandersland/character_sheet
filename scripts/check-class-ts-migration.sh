@@ -36,7 +36,7 @@ NOT_YET_MIGRATED="bard cleric druid monk paladin ranger sorcerer warlock wizard"
 # check below, which fails loudly the moment a file in that directory is
 # neither here nor in ALL_CLASSES, rather than silently scanning it as
 # "migrated" (a thirteenth class's module would otherwise land unclassified).
-NON_CLASS_MODULES="ability-registry actions activation-requires arcane-charge assassinate channel-divinity class class-feature-rows class-features disciplines draconic-bloodline feature-rows-select focus-cast hand-of-harm hand-of-ultimate-mercy maneuver-effect maneuvers open-hand-technique quivering-palm registry resources resources-state shadow-arts sneak-attack stunning-strike subclass-slug types warrior-of-elements weapon-bond"
+NON_CLASS_MODULES="ability-registry actions activation-requires announce-augmentors arcane-charge assassinate channel-divinity class class-feature-rows class-features disciplines draconic-bloodline feature-rows-select focus-cast hand-of-harm hand-of-ultimate-mercy maneuver-effect maneuvers open-hand-technique quivering-palm registry resources resources-state shadow-arts sneak-attack stunning-strike subclass-slug types warrior-of-elements weapon-bond"
 
 # Reverse check: every backend/src/lib/classes/*.ts file's basename must be
 # classified as EITHER a class (ALL_CLASSES) or shared infrastructure
@@ -196,6 +196,15 @@ fi
 #     the slot-count threshold (7 in 2024, 10 in 2014) is exactly the rule
 #     arithmetic CLAUDE.md keeps in lib/, same shape as armor-class.ts and
 #     character/serialize/combat.ts above.
+#   - classes/arcane-charge.ts: PERMANENT (#1910). arcaneChargeAugmentor's
+#     appliesTo gate reads the "fighter-eldritch-knight" SUBCLASS_SLUGS
+#     identity string (subclass-slug.ts's own PERMANENT entry above) — the
+#     exact same string classes/actions.ts's now-deleted withArcaneChargeReminder
+#     used to read before #1910 relocated the descriptor into its own file
+#     (the registry's per-feature-file convention). Same reasoning as
+#     advancement-slots.ts's own entry directly above: a computed rule
+#     function keyed off subclass identity + level + edition, never routed
+#     through fighter's retired AuthoredFeature/resourceFn machinery.
 FILE_ALLOWLIST="backend/src/lib/classes/subclass-slug.ts
 backend/src/lib/classes/actions.ts
 backend/src/lib/character/serialize/combat.ts
@@ -203,6 +212,7 @@ backend/src/lib/srd/armor-class.ts
 backend/src/lib/classes/sneak-attack.ts
 backend/src/lib/classes/assassinate.ts
 backend/src/lib/classes/weapon-bond.ts
+backend/src/lib/classes/arcane-charge.ts
 backend/src/lib/srd/advancement-slots.ts"
 
 is_allowlisted_file() {

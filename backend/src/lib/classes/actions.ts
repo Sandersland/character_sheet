@@ -49,7 +49,7 @@ import { effectiveEntryLevel } from "@/lib/leveling/effective-levels.js";
 import { resolveSubclassSlug, type SubclassSlug, type SubclassIdentityInput } from "./subclass-slug.js";
 import { effectBuffsFromRow, type ClassFeatureRow, type ClassFeatureRowsCarrier, type ResourceTotalContext } from "./class-feature-rows.js";
 import { monkPoolKey } from "./monk.js";
-import { appendArcaneChargeReminder, hasArcaneCharge } from "./arcane-charge.js";
+import { applyAnnounceAugmentors, type AugmentorContext } from "./announce-augmentors.js";
 import { DEFAULT_RULES_EDITION } from "@/lib/rules/edition.js";
 
 export type ActionCost = "action" | "bonusAction" | "reaction" | "free" | "special";
@@ -1015,6 +1015,12 @@ export function deriveEntryScopedActions<E extends SubclassIdentityInput & { nam
   unarmoredUnshielded = true,
   edition: RulesEdition,
   getFeatureRows?: (entry: E) => ClassFeatureRowsCarrier | undefined,
+  // Ability modifiers (#1910) — supplied ONLY by buildAvailableActionsView
+  // (serialize/classes.ts, which has effectiveScores); the cast-guard callers
+  // (shadow-arts.ts, disciplines.ts, warrior-of-elements.ts) read gates only,
+  // never announce text, and omit it. See AugmentorContext's own doc comment
+  // (announce-augmentors.ts) for the "absent means no-op" contract.
+  abilityMods?: Readonly<Record<string, number>>,
 ): AvailableAction[] {
   const poolMap = new Map(pools.map((p) => [p.key, p.remaining]));
   const seenKeys = new Set<string>();
@@ -1023,11 +1029,12 @@ export function deriveEntryScopedActions<E extends SubclassIdentityInput & { nam
     const effLevel = effectiveEntryLevel(entry.level, classEntries.length, totalLevel);
     const slug = resolveSubclassSlug(entry.name, entry);
     const rows = getFeatureRows?.(entry);
+    const ctx: AugmentorContext = { slug, entryLevel: effLevel, edition, abilityMods };
     const entryActions = [
       ...deriveActions(entry.name, slug, effLevel, pools, unarmoredUnshielded, edition),
       ...actionsFromRows(rows?.classRows ?? [], effLevel, edition, poolMap, unarmoredUnshielded),
       ...actionsFromRows(rows?.subclassRows ?? [], effLevel, edition, poolMap, unarmoredUnshielded),
-    ].map((action) => withArcaneChargeReminder(action, slug, effLevel, edition));
+    ].map((action) => applyAnnounceAugmentors(action, ctx));
     for (const action of entryActions) {
       if (seenKeys.has(action.key)) continue;
       seenKeys.add(action.key);
@@ -1035,26 +1042,6 @@ export function deriveEntryScopedActions<E extends SubclassIdentityInput & { nam
     }
   }
   return actions;
-}
-
-/**
- * Arcane Charge (2014, PHB'14 p.75, #1852) rides the row-driven Action Surge
- * action rather than getting its own row: an Eldritch Knight L15+ (2014)
- * sees its teleport clause appended to Action Surge's own reminder (empty
- * today — Action Surge carries no `effectKind`, see describeRowReminder).
- * Applied here, not inside actionsFromRows/buildRowAction, because those only
- * see one row at a time and never the resolved subclass slug — this is the
- * one place per entry that already has both.
- */
-function withArcaneChargeReminder(
-  action: AvailableAction,
-  slug: SubclassSlug | undefined,
-  entryLevel: number,
-  edition: RulesEdition,
-): AvailableAction {
-  if (action.key !== "actionSurge") return action;
-  if (!hasArcaneCharge(entryLevel, slug === "fighter-eldritch-knight", edition)) return action;
-  return { ...action, reminder: appendArcaneChargeReminder(action.reminder) };
 }
 
 /**
