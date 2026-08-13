@@ -137,6 +137,9 @@ export interface ClassFeatureSeedRow {
   // own schema.prisma comment for the vocabulary/evaluator. `ActivationRequirement`
   // is a type-only import, same reasoning as `ResourceTotalFormula` above.
   activationRequires?: ActivationRequirement[];
+  // Static in-play announce text (#1909) — see ClassFeature.reminder's own
+  // schema.prisma comment for what distinguishes it from `description`.
+  reminder?: string;
   costKind?: string;
   costPoolKey?: string;
   costBase?: number;
@@ -365,6 +368,7 @@ export const classFeatureSeedSchema = z.object({
   improvements: z.array(featImprovementSchema).nullable().optional(),
   effectBuffs: effectBuffsSchema.nullable().optional(),
   activationRequires: activationRequiresSchema.nullable().optional(),
+  reminder: z.string().min(1).nullable().optional(),
   // #1121 — see ClassFeature.conditionImmunities/conditionImmunitiesRequireActiveBuff/
   // conditionImmunitiesOnBuffStart's own schema.prisma comments for the vocabulary.
   conditionImmunities: z.array(z.string().min(1)).optional(),

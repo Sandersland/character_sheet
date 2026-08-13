@@ -247,31 +247,23 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // Second Wind/Action Surge's own #1528 retirement.
   { key: "recklessAttack", name: "Reckless Attack", cost: "free", grantClass: "barbarian", grantLevel: 2 },
 
-  // Bard
-  { key: "bardicInspiration", name: "Bardic Inspiration", cost: "bonusAction", grantClass: "bard", grantLevel: 1, resourceKey: "bardicInspiration", resourceAmount: 1 },
+  // Bard — bardicInspiration retired from this table (#1909): row-driven now
+  // (bard-features.ts's two Bardic Inspiration rows, identity-only
+  // resourceKey), synthesized by actionFromRow — the pool itself stays in
+  // bard.ts's resourceFn (unchanged).
 
-  // Cleric / Paladin — ONE Channel Divinity row for both classes, not one per
-  // class. PHB'14 p.164 (multiclassing): gaining the feature from a second
-  // class grants that class's effects but no additional uses — so cleric 2 and
-  // paladin 3 share one pool (SHARED_POOL_MERGE, registry.ts) and one
-  // affordance. deriveEntryScopedActions dedupes by key, so a Cleric/Paladin
-  // multiclass surfaces exactly one card (#1340).
-  {
-    key: "channelDivinity",
-    name: "Channel Divinity",
-    cost: "action",
-    grantClasses: [
-      { className: "cleric", minLevel: 2 },
-      { className: "paladin", minLevel: 3 },
-    ],
-    resourceKey: "channelDivinity",
-    resourceAmount: 1,
-    reminder:
-      "Spend 1 use for any Channel Divinity effect you have — a Cleric's Turn Undead and Divine Domain options and a Paladin's Oath options all draw on this one pool.",
-  },
+  // Cleric / Paladin — channelDivinity retired from this table (#1909):
+  // row-driven now, onto TWO rows (cleric-features.ts L2 + paladin-features.ts
+  // L3, both editions, resourceKey "channelDivinity") rather than one merged
+  // TS row. PHB'14 p.164 (multiclassing): gaining the feature from a second
+  // class grants that class's effects but no additional uses — so cleric 2
+  // and paladin 3 still share one pool (SHARED_POOL_MERGE, registry.ts) and
+  // deriveEntryScopedActions still dedupes by key, so a Cleric/Paladin
+  // multiclass still surfaces exactly one card (#1340) — see
+  // entry-scoped-actions.test.ts's own coverage.
 
-  // Druid
-  { key: "wildShape", name: "Wild Shape", cost: "action", grantClass: "druid", grantLevel: 2, resourceKey: "wildShape", resourceAmount: 1 },
+  // Druid — wildShape retired from this table (#1909): row-driven now
+  // (druid-features.ts's two Wild Shape rows).
 
   // Fighter — Second Wind / Action Surge retired from this table (#1528):
   // both are now row-driven (actionsFromRows below), read off Fighter's own
@@ -818,39 +810,15 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     reminder: "Replace one Unarmed Strike from Flurry of Blows with Hand of Healing at no extra Focus cost. Flurry of Healing and Harm (L11): replace every strike this way.",
   },
 
-  // Paladin — divineSense is EDITION_2014-only (#1229): 2024 removed Divine
-  // Sense as its own resource pool/action (see paladin.ts's resourceFn); its
-  // job moves to the "Channel Divinity: Divine Sense" catalog option
-  // (channel-divinity.ts), which spends the channelDivinity pool through the
-  // ability-cast path, not this actions dispatch. Untagging this row would
-  // leave it permanently `enabled: false` on every 2024 Paladin's sheet
-  // ("No divineSense remaining") since the pool it checks no longer exists.
-  { key: "divineSense", name: "Divine Sense", cost: "action", grantClass: "paladin", grantLevel: 1, resourceKey: "divineSense", resourceAmount: 1, edition: "EDITION_2014" },
-  // Lay on Hands' cost forks to a Bonus Action in 2024 (SRD 5.2) — same-key
-  // edition fork, mirroring Metamagic's/Flurry of Blows' own shape above.
-  {
-    key: "layOnHands",
-    name: "Lay on Hands",
-    cost: "action",
-    grantClass: "paladin",
-    grantLevel: 1,
-    resourceKey: "layOnHands",
-    resourceAmount: 5,
-    edition: "EDITION_2014",
-    reminder: "Touch a creature to restore HP; alternatively, spend 5 HP to cure one disease or neutralize one poison.",
-  },
-  {
-    key: "layOnHands",
-    name: "Lay on Hands",
-    cost: "bonusAction",
-    grantClass: "paladin",
-    grantLevel: 1,
-    resourceKey: "layOnHands",
-    resourceAmount: 5,
-    edition: "EDITION_2024",
-    reminder: "Touch a creature to restore HP; alternatively, spend 5 HP to remove the Poisoned condition instead of healing.",
-  },
-  // Channel Divinity is a single cross-class row — see channelDivinity above (PHB'14 p.164).
+  // Paladin — divineSense/layOnHands/channelDivinity retired from this table
+  // (#1909): row-driven now (paladin-features.ts's own rows). divineSense
+  // stays EDITION_2014-only there too (#1229: 2024 removed it as its own
+  // resource pool — its job moves to the "Channel Divinity: Divine Sense"
+  // catalog option, channel-divinity.ts, which spends the channelDivinity
+  // pool through the ability-cast path, not this actions dispatch). Lay on
+  // Hands' cost still forks to a Bonus Action in 2024 (SRD 5.2), same-key
+  // edition fork as before, now expressed as each edition row's own
+  // activationCost.
 
   // Rogue
   // Cunning Action carries no reminder on purpose: its `regrants` ARE the rule,
@@ -884,11 +852,12 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     reminder: "Uses Cunning Action's Bonus Action, not an extra one — Sleight of Hand or Thieves' Tools.",
   },
 
-  // Sorcerer — SRD 5.2 grants Metamagic at level 2, not PHB'14's level 3
-  // (#1232 commit 2b), so this is a same-key edition fork (ActionSeed's own
-  // comment sanctions the shape) rather than one row.
-  { key: "metamagic", name: "Metamagic", cost: "free", grantClass: "sorcerer", grantLevel: 3, resourceKey: "sorceryPoints", resourceAmount: 1, edition: "EDITION_2014" },
-  { key: "metamagic", name: "Metamagic", cost: "free", grantClass: "sorcerer", grantLevel: 2, resourceKey: "sorceryPoints", resourceAmount: 1, edition: "EDITION_2024" },
+  // Sorcerer — metamagic retired from this table (#1909): row-driven now
+  // (sorcerer-features.ts's two Metamagic rows) — the identity≠pool spend
+  // (identity "metamagic", cost pool "sorceryPoints") is the enablement-fix
+  // consumer (actionFromRow, above). SRD 5.2 still grants it at level 2, not
+  // PHB'14's level 3 (#1232 commit 2b), now expressed as each row's own
+  // `level`.
 ];
 
 // Class/subclass/level gate for one DERIVED_ACTIONS row — no pool/enabled state.
@@ -1374,7 +1343,11 @@ function buildRowAction(
   enabled: boolean,
   disabledReason: string | undefined,
 ): AvailableAction {
-  const reminder = describeRowReminder(row, level);
+  // Derived heal text wins over the row's own static `reminder` column
+  // (#1909) — a row with an effectKind (Second Wind) keeps its computed
+  // "Regain NdM HP" subtitle; a row with no derived text (Lay on Hands,
+  // Metamagic, …) falls through to `row.reminder`.
+  const reminder = describeRowReminder(row, level) ?? row.reminder ?? undefined;
   return {
     key: row.resourceKey as string,
     name: row.name,
@@ -1396,8 +1369,17 @@ function actionFromRow(
 ): AvailableAction | null {
   if (!rowIsAnAvailableAction(row, level, edition)) return null;
   const cost = readAbilityCost(row);
+  // Gates on the COST pool (cost.key/cost.base), not row.resourceKey (the
+  // row's own IDENTITY) — mirrors toggleActionsFromRow's own EnablementInput
+  // (#1909). The two coincide for an identity==pool row (Fighter's Second
+  // Wind: costPoolKey "secondWind" === resourceKey "secondWind"), but diverge
+  // for an identity≠pool spender (Metamagic: resourceKey "metamagic" serves
+  // the card, costPoolKey "sorceryPoints" is what's actually spent) — reading
+  // resourceKey here would check a pool that doesn't exist and render the
+  // action permanently disabled. `row.resourceKey` still supplies the SERVED
+  // action key (buildRowAction), unaffected by this gate.
   const record: EnablementInput = {
-    resourceKey: row.resourceKey as string,
+    resourceKey: cost.kind === "pool" ? cost.key : undefined,
     resourceAmount: cost.kind === "pool" ? cost.base : undefined,
     requiresUnarmored: row.requiresUnarmored ?? false,
   };

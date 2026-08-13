@@ -196,6 +196,16 @@ function isPopulatedWarlockRow(row: { className: string; subclassSlug: string | 
   return POPULATED_WARLOCK_ROW_KEYS.has(`${row.className}::${row.subclassSlug ?? "null"}::${row.name}`);
 }
 
+// #1909: Bardic Inspiration's two rows — IDENTITY-ONLY resourceKey (no
+// resourceTotals; the pool itself stays wholly in bard.ts's resourceFn, see
+// bard-features.ts's own RESOURCE POOL header block) plus the row-driven
+// ACTION columns (activationCost/costKind/costPoolKey/costBase).
+const POPULATED_BARD_ROW_KEYS = new Set(["Bard::null::Bardic Inspiration::EDITION_2014", "Bard::null::Bardic Inspiration::EDITION_2024"]);
+
+function isPopulatedBardRow(row: RowKey): boolean {
+  return POPULATED_BARD_ROW_KEYS.has(`${row.className}::${row.subclassSlug ?? "null"}::${row.name}::${row.edition}`);
+}
+
 // #1230: Ranger's three Wisdom-tier-or-formula pools. Keyed on the 4-tuple
 // INCLUDING edition (unlike POPULATED_WARLOCK_ROW_KEYS' 3-tuple) because
 // Favored Enemy is the asymmetric case the RowKey comment below names: its
@@ -223,6 +233,9 @@ function isPopulatedRangerRow(row: RowKey): boolean {
 // sharing one name), Dragon Wings (Draconic Bloodline)/Tamed Surge (Wild
 // Magic). `sorceryPoints` stays in lib/classes/sorcerer.ts's resourceFn (a
 // formula, not a tier table) so it is deliberately absent from this set.
+// #1909 adds Metamagic (both editions) — an IDENTITY-ONLY resourceKey
+// ("metamagic", no resourceTotals: it spends the sorceryPoints pool above,
+// never declares its own) plus the row-driven ACTION columns.
 const POPULATED_SORCERER_ROW_KEYS = new Set([
   "Sorcerer::null::Innate Sorcery::EDITION_2024",
   "Sorcerer::null::Sorcerous Restoration::EDITION_2024",
@@ -230,6 +243,8 @@ const POPULATED_SORCERER_ROW_KEYS = new Set([
   "Sorcerer::sorcerer-wild-magic::Tides of Chaos::EDITION_2024",
   "Sorcerer::sorcerer-draconic-bloodline::Dragon Wings::EDITION_2024",
   "Sorcerer::sorcerer-wild-magic::Tamed Surge::EDITION_2024",
+  "Sorcerer::null::Metamagic::EDITION_2014",
+  "Sorcerer::null::Metamagic::EDITION_2024",
 ]);
 
 function isPopulatedSorcererRow(row: RowKey): boolean {
@@ -258,8 +273,13 @@ function isPopulatedClericRow(row: RowKey): boolean {
 // of the Moon's Moonlight Step (2024) row also declares resourceKey — it used
 // to deliberately OMIT resourceTotals (a Wisdom-modifier formula, then
 // supplied by druid.ts's subclass resourceFn), but #1685's
-// `{ abilityMod, min }` tier now populates it directly on the row.
+// `{ abilityMod, min }` tier now populates it directly on the row. #1909 adds
+// the EDITION_2014 Wild Shape row too — IDENTITY-ONLY resourceKey (still no
+// resourceTotals, the pool itself is still resourceFn-derived) plus the
+// row-driven ACTION columns; the 2024 row's own action columns ride the same
+// pool-carrying row already in this set.
 const POPULATED_DRUID_ROW_KEYS = new Set([
+  "Druid::null::Wild Shape::EDITION_2014",
   "Druid::null::Wild Shape::EDITION_2024",
   "Druid::druid-circle-of-the-moon::Moonlight Step::EDITION_2024",
 ]);
@@ -274,9 +294,16 @@ function isPopulatedDruidRow(row: RowKey): boolean {
 // Channel Divinity has no feature of its own by that name) — Paladin already
 // had a base-class row literally named "Channel Divinity" in both editions
 // pre-migration, so each edition's pool rides its own same-named row. See
-// paladin-features.ts's own RESOURCE POOL header block.
+// paladin-features.ts's own RESOURCE POOL header block. #1909 adds Divine
+// Sense (EDITION_2014 only — 2024 has no such pool, #1229) and Lay on Hands
+// (both editions) — both IDENTITY-ONLY resourceKey (no resourceTotals, both
+// pools stay resourceFn-derived) plus the row-driven ACTION columns.
+const POPULATED_PALADIN_ROW_NAMES = new Set(["Channel Divinity", "Lay on Hands"]);
+
 function isPopulatedPaladinRow(row: RowKey): boolean {
-  return row.className === "Paladin" && row.subclassSlug === null && row.name === "Channel Divinity";
+  if (row.className !== "Paladin" || row.subclassSlug !== null) return false;
+  if (POPULATED_PALADIN_ROW_NAMES.has(row.name)) return true;
+  return row.name === "Divine Sense" && row.edition === "EDITION_2014";
 }
 
 // #1676: Bladesinger's two resourceKey-carrying rows — Bladesong (the
@@ -344,6 +371,7 @@ const POPULATED_ROW_PREDICATES: ((row: RowKey) => boolean)[] = [
   isPopulatedWarlockRow,
   isPopulatedWizardRow,
   isPopulatedIllusorySelfRow,
+  isPopulatedBardRow,
   isPopulatedRangerRow,
   isPopulatedSorcererRow,
   isPopulatedClericRow,
@@ -508,7 +536,7 @@ function expectRowDescriptors(row: DescriptorRow & RowKey): void {
 }
 
 describe("ClassFeature migration — every descriptor column is NULL/default, except the rows isPopulatedRow names", () => {
-  it("no row has a populated descriptor column, except Fighter's (#1528/#1546), Barbarian's Rage (#1223), Wizard's (#1234), Warlock's (#1233), Ranger's (#1230), Sorcerer's (#1232), Cleric's (#1225), Paladin's (#1229) and Wizard's Bladesinger (#1676)", async () => {
+  it("no row has a populated descriptor column, except Fighter's (#1528/#1546), Barbarian's Rage (#1223), Wizard's (#1234), Warlock's (#1233), Ranger's (#1230), Sorcerer's (#1232), Cleric's (#1225), Paladin's (#1229), Wizard's Bladesinger (#1676) and Bard's/Druid's/Sorcerer's Metamagic/Paladin's/Cleric's row-driven actions (#1909)", async () => {
     const rows = await prisma.classFeature.findMany({
       select: { name: true, edition: true, class: { select: { name: true } }, subclass: { select: { slug: true } },
         resourceKey: true, resourceLabel: true, resourceRecharge: true, resourceTotals: true, resourceDieTiers: true,

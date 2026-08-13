@@ -142,6 +142,17 @@ interface RawPaladinFeature {
   resourceLabel?: string;
   resourceRecharge?: string;
   resourceTotals?: { minLevel: number; total: number; shortRestRegain?: number }[];
+  // Activation block (#1909) — Divine Sense/Lay on Hands/Channel Divinity's
+  // row-driven actions moved off actions.ts's DERIVED_ACTIONS onto their own
+  // rows. Divine Sense's and Lay on Hands' resourceKey is IDENTITY-ONLY (no
+  // resourceTotals — both pools stay wholly in paladin.ts's resourceFn, see
+  // this file's own header); Channel Divinity's two rows already carry the
+  // real pool (resourceTotals above), so the action rides the SAME rows.
+  activationCost?: string;
+  costKind?: string;
+  costPoolKey?: string;
+  costBase?: number;
+  reminder?: string;
 }
 
 function expand(raw: RawPaladinFeature): ClassFeatureSeedRow[] {
@@ -159,6 +170,11 @@ function expand(raw: RawPaladinFeature): ClassFeatureSeedRow[] {
       resourceLabel: raw.resourceLabel,
       resourceRecharge: raw.resourceRecharge,
       resourceTotals: raw.resourceTotals,
+      activationCost: raw.activationCost,
+      costKind: raw.costKind,
+      costPoolKey: raw.costPoolKey,
+      costBase: raw.costBase,
+      reminder: raw.reminder,
     },
   ];
 }
@@ -181,19 +197,30 @@ const BASE_RAW: RawPaladinFeature[] = [
     edition: "EDITION_2014",
     description:
       "As an action, sense the presence of celestials, fiends, and undead within 60 ft until the end of your next turn (they aren't hidden from this sense). You can also detect consecrated or desecrated places/objects. Uses = 1 + Charisma modifier per long rest.",
+    // Row-driven action (#1909, moved off actions.ts's DERIVED_ACTIONS,
+    // EDITION_2014-only — 2024 has no such pool, see the comment below).
+    // Identity-only resourceKey — see RawPaladinFeature's own comment.
+    resourceKey: "divineSense",
+    activationCost: "action",
+    costKind: "pool",
+    costPoolKey: "divineSense",
+    costBase: 1,
   },
   // Divine Sense has NO EDITION_2024 row — it stops being its own base-class
   // resource pool and becomes the base Channel Divinity option "Channel
   // Divinity: Divine Sense" below (a DIFFERENT name), gated at L3 rather than
   // L1.
-  // Neither row below sets resourceKey (#1685 stretch goal, declined): its
-  // total fits the `{ levelTimes: 5 }` shape, but each row's own description
-  // states the formula IN WORDS ("5 × your paladin level" / "five times your
-  // Paladin level") while lib/classes/paladin.ts's resourceFn description
-  // states the COMPUTED NUMBER — moving onto the row would change what a
-  // player actually reads, failing #1685's byte-identical AC; excluded
-  // alongside Bardic Inspiration (bard-features.ts) rather than migrated —
-  // see paladin.ts's own header for the full reasoning.
+  // Neither Lay on Hands row below sets resourceTotals (#1685 stretch goal,
+  // declined): its total fits the `{ levelTimes: 5 }` shape, but each row's
+  // own description states the formula IN WORDS ("5 × your paladin level" /
+  // "five times your Paladin level") while lib/classes/paladin.ts's
+  // resourceFn description states the COMPUTED NUMBER — moving the POOL onto
+  // the row would change what a player actually reads, failing #1685's
+  // byte-identical AC; excluded alongside Bardic Inspiration (bard-features.ts)
+  // rather than migrated — see paladin.ts's own header for the full
+  // reasoning. Both rows DO set an identity-only `resourceKey` (#1909, no
+  // resourceTotals) so each can carry its own row-driven ACTION — see
+  // RawPaladinFeature's own comment.
   {
     subclassSlug: null,
     name: "Lay on Hands",
@@ -201,6 +228,14 @@ const BASE_RAW: RawPaladinFeature[] = [
     edition: "EDITION_2014",
     description:
       "Touch to restore HP from a pool of 5 × your paladin level. Alternatively, spend 5 HP from the pool to cure one disease or neutralize one poison. The pool replenishes on a long rest.",
+    // Row-driven action (#1909, moved off actions.ts's DERIVED_ACTIONS).
+    // Identity-only resourceKey — see RawPaladinFeature's own comment.
+    resourceKey: "layOnHands",
+    activationCost: "action",
+    costKind: "pool",
+    costPoolKey: "layOnHands",
+    costBase: 5,
+    reminder: "Touch a creature to restore HP; alternatively, spend 5 HP to cure one disease or neutralize one poison.",
   },
   {
     subclassSlug: null,
@@ -214,6 +249,12 @@ const BASE_RAW: RawPaladinFeature[] = [
     // wrong feature name — see the file header's own warning).
     description:
       "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
+    resourceKey: "layOnHands",
+    activationCost: "bonusAction",
+    costKind: "pool",
+    costPoolKey: "layOnHands",
+    costBase: 5,
+    reminder: "Touch a creature to restore HP; alternatively, spend 5 HP to remove the Poisoned condition instead of healing.",
   },
   {
     subclassSlug: null,
@@ -308,6 +349,17 @@ const BASE_RAW: RawPaladinFeature[] = [
     resourceLabel: "Channel Divinity",
     resourceRecharge: "short-or-long",
     resourceTotals: [{ minLevel: 3, total: 1 }],
+    // Row-driven action (#1909, moved off actions.ts's DERIVED_ACTIONS) — the
+    // SAME reminder text as cleric-features.ts's own two Channel Divinity
+    // rows (PHB'14 p.164: one feature, one pool, shared across both granting
+    // classes), so a Cleric/Paladin multiclass sees identical text regardless
+    // of which entry's row wins the dedupe (#1340).
+    activationCost: "action",
+    costKind: "pool",
+    costPoolKey: "channelDivinity",
+    costBase: 1,
+    reminder:
+      "Spend 1 use for any Channel Divinity effect you have — a Cleric's Turn Undead and Divine Domain options and a Paladin's Oath options all draw on this one pool.",
   },
   {
     subclassSlug: null,
@@ -330,6 +382,12 @@ const BASE_RAW: RawPaladinFeature[] = [
     resourceKey: "channelDivinity",
     resourceLabel: "Channel Divinity",
     resourceRecharge: "longRest",
+    activationCost: "action",
+    costKind: "pool",
+    costPoolKey: "channelDivinity",
+    costBase: 1,
+    reminder:
+      "Spend 1 use for any Channel Divinity effect you have — a Cleric's Turn Undead and Divine Domain options and a Paladin's Oath options all draw on this one pool.",
     resourceTotals: [
       { minLevel: 3, total: 2, shortRestRegain: 1 },
       { minLevel: 11, total: 3, shortRestRegain: 1 },

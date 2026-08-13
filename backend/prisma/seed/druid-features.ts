@@ -82,6 +82,16 @@ interface RawDruidFeature {
   // Nature's Ward's unconditional Poisoned immunity (#1121) — see this file's
   // own header for the two rows that set this.
   conditionImmunities?: string[];
+  // Activation block (#1909) — Wild Shape's row-driven action moved off
+  // actions.ts's DERIVED_ACTIONS onto its own rows (both editions). The 2014
+  // row's resourceKey is IDENTITY-ONLY (no resourceTotals — its pool stays
+  // wholly in druid.ts's resourceFn); the 2024 row's resourceKey already
+  // carries the real pool (resourceTotals above), so the action rides the
+  // SAME row rather than a second one.
+  activationCost?: string;
+  costKind?: string;
+  costPoolKey?: string;
+  costBase?: number;
 }
 
 function expand(raw: RawDruidFeature): ClassFeatureSeedRow[] {
@@ -96,6 +106,10 @@ function expand(raw: RawDruidFeature): ClassFeatureSeedRow[] {
     resourceRecharge: raw.resourceRecharge,
     resourceTotals: raw.resourceTotals,
     conditionImmunities: raw.conditionImmunities,
+    activationCost: raw.activationCost,
+    costKind: raw.costKind,
+    costPoolKey: raw.costPoolKey,
+    costBase: raw.costBase,
   };
   const editions: SeedEdition[] = raw.edition ? [raw.edition] : ["EDITION_2014", "EDITION_2024"];
   return editions.map((edition) => ({ ...base, edition }));
@@ -157,6 +171,14 @@ const DRUID_BASE_RAW: RawDruidFeature[] = [
     edition: "EDITION_2014",
     description:
       "As an action, transform into a beast you have seen. Max CR: 1/4 at L2 (no flying or swimming speed); 1/2 at L4 (no flying speed); 1 at L8. You retain your mental stats and class features but use the beast's physical stats. Lasts up to half your druid level in hours (minimum 1). Reverts when reduced to 0 HP.",
+    // Row-driven action (#1909, moved off actions.ts's DERIVED_ACTIONS) —
+    // identity-only resourceKey, see RawDruidFeature's own comment. SRD 5.1 /
+    // PHB'14 p.66: "As an action, you can magically transform..." — an Action.
+    resourceKey: "wildShape",
+    activationCost: "action",
+    costKind: "pool",
+    costPoolKey: "wildShape",
+    costBase: 1,
   },
   {
     subclassSlug: null,
@@ -182,6 +204,16 @@ const DRUID_BASE_RAW: RawDruidFeature[] = [
       { minLevel: 6, total: 3, shortRestRegain: 1 },
       { minLevel: 17, total: 4, shortRestRegain: 1 },
     ],
+    // Row-driven action (#1909, moved off actions.ts's DERIVED_ACTIONS). SRD
+    // 5.2 / PHB'24 p.70: "As a Bonus Action, you shape-shift..." — a Bonus
+    // Action, DIFFERENT from 2014's Action above (this row's own description,
+    // transcribed from SRD 5.2, already states "As a Bonus Action" — the
+    // DERIVED_ACTIONS row this replaces served `cost: "action"` to BOTH
+    // editions, an undisclosed drift #1909 corrects).
+    activationCost: "bonusAction",
+    costKind: "pool",
+    costPoolKey: "wildShape",
+    costBase: 1,
   },
   {
     subclassSlug: null,

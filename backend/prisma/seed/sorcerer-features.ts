@@ -100,6 +100,16 @@ interface RawSorcererFeature {
   resourceLabel?: string;
   resourceRecharge?: string;
   resourceTotals?: { minLevel: number; total: number; shortRestRegain?: number }[];
+  // Activation block (#1909) — Metamagic's row-driven action moved off
+  // actions.ts's DERIVED_ACTIONS onto its own rows (both editions).
+  // `resourceKey` here is the action's IDENTITY ("metamagic"), distinct from
+  // the cost POOL it spends ("sorceryPoints", Font of Magic's own row above)
+  // — the enablement-fix consumer (#1909): actionFromRow gates on the cost
+  // pool, never this identity key.
+  activationCost?: string;
+  costKind?: string;
+  costPoolKey?: string;
+  costBase?: number;
 }
 
 function expand(raw: RawSorcererFeature): ClassFeatureSeedRow[] {
@@ -113,6 +123,10 @@ function expand(raw: RawSorcererFeature): ClassFeatureSeedRow[] {
     resourceLabel: raw.resourceLabel,
     resourceRecharge: raw.resourceRecharge,
     resourceTotals: raw.resourceTotals,
+    activationCost: raw.activationCost,
+    costKind: raw.costKind,
+    costPoolKey: raw.costPoolKey,
+    costBase: raw.costBase,
   };
   const editions: SeedEdition[] = raw.edition ? [raw.edition] : ["EDITION_2014", "EDITION_2024"];
   return editions.map((edition) => ({ ...base, edition }));
@@ -191,6 +205,15 @@ const SORCERER_BASE_RAW: RawSorcererFeature[] = [
     edition: "EDITION_2014",
     description:
       "Choose 2 Metamagic options (3 at L10, 4 at L17) to twist your spells: Careful (protect allies in AoE), Distant (double range), Empowered (reroll damage dice), Extended (double duration), Heightened (impose disadvantage on target's first save), Quickened (cast as bonus action), Subtle (no verbal/somatic), or Twinned (target two creatures).",
+    // Row-driven action (#1909, moved off actions.ts's DERIVED_ACTIONS) — the
+    // grant LEVEL forks per edition (this row's own `level`, unchanged); the
+    // identity/cost-pool split is the enablement-fix consumer, see
+    // RawSorcererFeature's own comment.
+    resourceKey: "metamagic",
+    activationCost: "free",
+    costKind: "pool",
+    costPoolKey: "sorceryPoints",
+    costBase: 1,
   },
   {
     subclassSlug: null,
@@ -204,6 +227,11 @@ const SORCERER_BASE_RAW: RawSorcererFeature[] = [
     // a flat cost, per the SRD 5.2 PDF's own table).
     description:
       "You gain 2 Metamagic options of your choice (2 more at level 10, 2 more at level 17), letting you twist your spells by spending Sorcery Points: Careful Spell (1 SP, protect chosen creatures from your own area spell), Distant Spell (1 SP, double range or make a touch spell reach 30 feet), Empowered Spell (1 SP, reroll damage dice up to your Charisma modifier), Extended Spell (1 SP, double a non-instantaneous duration), Heightened Spell (2 SP, Disadvantage on one target's first save against the spell), Quickened Spell (2 SP, cast an action spell as a Bonus Action), Seeking Spell (1 SP, reroll a missed spell attack roll), Subtle Spell (1 SP, cast without Verbal or Somatic components), Transmuted Spell (1 SP, change a spell's damage type to another type it can deal), or Twinned Spell (SP cost equal to the spell's level, minimum 1, target a second creature).",
+    resourceKey: "metamagic",
+    activationCost: "free",
+    costKind: "pool",
+    costPoolKey: "sorceryPoints",
+    costBase: 1,
   },
   {
     subclassSlug: null,

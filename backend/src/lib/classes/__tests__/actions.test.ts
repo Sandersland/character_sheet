@@ -57,6 +57,27 @@ const at = (
   edition: "EDITION_2014" | "EDITION_2024" = "EDITION_2024",
 ) => deriveEntryScopedActions([{ name: cls, subclass, level }], level, pools, unarmored, edition);
 
+// Row-aware variant of `at` (#1909) — threads testFeatureRowsFor's
+// getFeatureRows carrier (mirrors entry-scoped-actions.test.ts's own
+// `getFeatureRows`), so a caller that needs to see a row-driven action
+// (bardicInspiration/wildShape/divineSense/layOnHands/metamagic/
+// channelDivinity, all moved off DERIVED_ACTIONS onto their class's own
+// ClassFeature rows) uses this instead of bare `at`. `at` itself deliberately
+// stays row-BLIND (its own doc comment, and the "Fighter has no DERIVED_
+// ACTIONS entries" test right below, depend on that isolation to prove a row-
+// driven action is ABSENT from the hand-rolled table).
+const atRows = (
+  cls: string,
+  subclass: string | undefined,
+  level: number,
+  pools: ResourcePool[] = [],
+  unarmored = true,
+  edition: "EDITION_2014" | "EDITION_2024" = "EDITION_2024",
+) =>
+  deriveEntryScopedActions([{ name: cls, subclass, level }], level, pools, unarmored, edition, (entry) =>
+    testFeatureRowsFor(entry.name, entry.subclass),
+  );
+
 // ── deriveActions ─────────────────────────────────────────────────────────────
 
 describe("deriveActions — class gates", () => {
@@ -92,13 +113,20 @@ describe("deriveActions — class gates", () => {
     expect(keys(at("monk", undefined, 1, []))).toContain("bonusUnarmedStrike");
   });
 
-  it("Paladin L1 gets divineSense/layOnHands (EDITION_2014); L3 adds channelDivinity", () => {
-    const l1 = keys(at("paladin", undefined, 1, [], true, "EDITION_2014"));
+  it("Paladin has no DERIVED_ACTIONS entries left for divineSense/layOnHands/channelDivinity (#1909 — row-driven now)", () => {
+    const l3 = keys(at("paladin", undefined, 3, [], true, "EDITION_2014"));
+    expect(l3).not.toContain("divineSense");
+    expect(l3).not.toContain("layOnHands");
+    expect(l3).not.toContain("channelDivinity");
+  });
+
+  it("Paladin L1 gets divineSense/layOnHands (EDITION_2014, row-driven, #1909); L3 adds channelDivinity", () => {
+    const l1 = keys(atRows("paladin", undefined, 1, [], true, "EDITION_2014"));
     expect(l1).toContain("divineSense");
     expect(l1).toContain("layOnHands");
     expect(l1).not.toContain("channelDivinity");
 
-    const l3 = keys(at("paladin", undefined, 3, [], true, "EDITION_2014"));
+    const l3 = keys(atRows("paladin", undefined, 3, [], true, "EDITION_2014"));
     expect(l3).toContain("channelDivinity");
   });
 
@@ -106,21 +134,21 @@ describe("deriveActions — class gates", () => {
   // Channel Divinity option "Channel Divinity: Divine Sense" instead (cast
   // through the abilities endpoint, not this actions dispatch). layOnHands
   // survives in both editions.
-  it("Paladin L1 (EDITION_2024): layOnHands present, divineSense absent", () => {
-    const l1 = keys(at("paladin", undefined, 1, [], true, "EDITION_2024"));
+  it("Paladin L1 (EDITION_2024, row-driven, #1909): layOnHands present, divineSense absent", () => {
+    const l1 = keys(atRows("paladin", undefined, 1, [], true, "EDITION_2024"));
     expect(l1).toContain("layOnHands");
     expect(l1).not.toContain("divineSense");
   });
 
-  it("Bard L1 gets bardicInspiration; Cleric L2 gets channelDivinity", () => {
-    expect(keys(at("bard", undefined, 1, []))).toContain("bardicInspiration");
-    expect(keys(at("cleric", undefined, 2, []))).toContain("channelDivinity");
+  it("Bard L1 gets bardicInspiration; Cleric L2 gets channelDivinity (row-driven, #1909)", () => {
+    expect(keys(atRows("bard", undefined, 1, []))).toContain("bardicInspiration");
+    expect(keys(atRows("cleric", undefined, 2, []))).toContain("channelDivinity");
   });
 
-  it("Druid L2 gets wildShape; Rogue L2 gets cunningAction; Sorcerer L3 gets metamagic", () => {
-    expect(keys(at("druid", undefined, 2, []))).toContain("wildShape");
+  it("Druid L2 gets wildShape (row-driven, #1909); Rogue L2 gets cunningAction; Sorcerer L3 gets metamagic (row-driven, #1909)", () => {
+    expect(keys(atRows("druid", undefined, 2, []))).toContain("wildShape");
     expect(keys(at("rogue", undefined, 2, []))).toContain("cunningAction");
-    expect(keys(at("sorcerer", undefined, 3, []))).toContain("metamagic");
+    expect(keys(atRows("sorcerer", undefined, 3, []))).toContain("metamagic");
   });
 
   it("class gate: fighter result contains no barbarian-only actions", () => {
@@ -131,13 +159,13 @@ describe("deriveActions — class gates", () => {
   });
 
   // #1232 commit 2b: SRD 5.2 grants Metamagic at Sorcerer level 2, not
-  // PHB'14's level 3 — DERIVED_ACTIONS' metamagic row forks its grantLevel
-  // per edition (matchesActionGate filters on edition before the class/level
-  // gate; ActionSeed.edition's comment sanctions same-key forks).
+  // PHB'14's level 3 — sorcerer-features.ts's metamagic row forks its `level`
+  // per edition (row-driven now, #1909; featuresFromRows-style filters on
+  // edition before the class/level gate).
   it("Metamagic level fork (#1232): 2024 grants at L2, 2014 still grants at L3", () => {
-    expect(keys(at("sorcerer", undefined, 2, [], true, "EDITION_2024"))).toContain("metamagic");
-    expect(keys(at("sorcerer", undefined, 2, [], true, "EDITION_2014"))).not.toContain("metamagic");
-    expect(keys(at("sorcerer", undefined, 3, [], true, "EDITION_2014"))).toContain("metamagic");
+    expect(keys(atRows("sorcerer", undefined, 2, [], true, "EDITION_2024"))).toContain("metamagic");
+    expect(keys(atRows("sorcerer", undefined, 2, [], true, "EDITION_2014"))).not.toContain("metamagic");
+    expect(keys(atRows("sorcerer", undefined, 3, [], true, "EDITION_2014"))).toContain("metamagic");
   });
 });
 
@@ -187,8 +215,8 @@ describe("deriveActions — regrants (#1431)", () => {
 
   it("a row with no regrants omits the field entirely", () => {
     // Second Wind (formerly this test's fixture) is row-driven now (#1528) —
-    // wildShape is any other DERIVED_ACTIONS row with no `regrants` key.
-    const wildShape = at("druid", undefined, 2, []).find((a) => a.key === "wildShape");
+    // wildShape is row-driven too now (#1909), with no `regrants` column set.
+    const wildShape = atRows("druid", undefined, 2, []).find((a) => a.key === "wildShape");
     expect(wildShape).toBeDefined();
     expect(wildShape).not.toHaveProperty("regrants");
   });
@@ -224,11 +252,13 @@ describe("deriveActions — case-insensitivity", () => {
     // left (#1528 — row-driven now); paladin/barbarian cover the same gate.
     // #1229: divineSense is EDITION_2014-only now, so this case-insensitivity
     // check passes the edition explicitly rather than relying on the
-    // (still-2024) default. Barbarian's own case here checks recklessAttack,
-    // not rage — rage is row-driven now (#1686) and bare `at()` (no
-    // featureRows carrier) can never see it; recklessAttack is untouched.
-    expect(keys(at("Paladin", undefined, 1, [], true, "EDITION_2014"))).toContain("divineSense");
-    expect(keys(at("PALADIN", undefined, 3, []))).toContain("channelDivinity");
+    // (still-2024) default. divineSense/channelDivinity are row-driven now
+    // (#1909), so this uses `atRows`; Barbarian's own case here checks
+    // recklessAttack, not rage — rage is row-driven now (#1686) and bare
+    // `at()` (no featureRows carrier) can never see it; recklessAttack is
+    // untouched (still a bare DERIVED_ACTIONS row, `at` stays correct there).
+    expect(keys(atRows("Paladin", undefined, 1, [], true, "EDITION_2014"))).toContain("divineSense");
+    expect(keys(atRows("PALADIN", undefined, 3, []))).toContain("channelDivinity");
     expect(keys(at("Barbarian", undefined, 2, []))).toContain("recklessAttack");
   });
 });
@@ -261,11 +291,10 @@ describe("deriveActions — resource gating", () => {
 
   it("empty pools default to 0 remaining (action disabled)", () => {
     // No pool entry for "wildShape" → defaults to remaining=0 → disabled.
-    // (Second Wind, formerly this test's fixture, is row-driven now — #1528 —
-    // its own enablement gate is covered by deriveEntryScopedActions'
-    // "a row-driven Fighter action (actionSurge) is disabled when its pool is
-    // exhausted" case in entry-scoped-actions.test.ts.)
-    const actions = at("druid", undefined, 2, []);
+    // wildShape is row-driven now (#1909) — uses `atRows`; this is also the
+    // enablement-fix's own regression pin, since wildShape's identity key
+    // ("wildShape") happens to equal its cost pool key, unlike Metamagic.
+    const actions = atRows("druid", undefined, 2, []);
     const wildShape = actions.find((a) => a.key === "wildShape");
     expect(wildShape?.enabled).toBe(false);
     expect(wildShape?.disabledReason).toBe("No wildShape remaining");
@@ -1442,27 +1471,29 @@ describe("Warrior of the Elements — Elemental Attunement / Elemental Burst cat
 // (classGatesOf normalizes both the legacy grantClass/grantLevel shape and the
 // new grantClasses shape).
 describe("Channel Divinity — one merged row, gated cleric≥2 OR paladin≥3 (#1340)", () => {
+  // Row-driven now (#1909, onto cleric-features.ts's + paladin-features.ts's
+  // own rows) — every case below uses `atRows`.
   it("granted class gate: cleric reaches it at L2, paladin at L3, in isolation", () => {
-    expect(keys(at("cleric", undefined, 1, []))).not.toContain("channelDivinity");
-    expect(keys(at("cleric", undefined, 2, []))).toContain("channelDivinity");
-    expect(keys(at("paladin", undefined, 2, []))).not.toContain("channelDivinity");
-    expect(keys(at("paladin", undefined, 3, []))).toContain("channelDivinity");
+    expect(keys(atRows("cleric", undefined, 1, []))).not.toContain("channelDivinity");
+    expect(keys(atRows("cleric", undefined, 2, []))).toContain("channelDivinity");
+    expect(keys(atRows("paladin", undefined, 2, []))).not.toContain("channelDivinity");
+    expect(keys(atRows("paladin", undefined, 3, []))).toContain("channelDivinity");
   });
 
   it("no other class gets it at any level", () => {
-    expect(keys(at("fighter", undefined, 20, []))).not.toContain("channelDivinity");
-    expect(keys(at("bard", undefined, 20, []))).not.toContain("channelDivinity");
+    expect(keys(atRows("fighter", undefined, 20, []))).not.toContain("channelDivinity");
+    expect(keys(atRows("bard", undefined, 20, []))).not.toContain("channelDivinity");
   });
 
   it("the reminder names both classes' effect menus", () => {
-    const cleric = at("cleric", undefined, 2, []).find((a) => a.key === "channelDivinity");
+    const cleric = atRows("cleric", undefined, 2, []).find((a) => a.key === "channelDivinity");
     expect(cleric?.reminder).toMatch(/Cleric/);
     expect(cleric?.reminder).toMatch(/Paladin/);
   });
 
   it("spends the channelDivinity pool, gated on the merged remaining count", () => {
     expect(ACTION_EFFECT_FN.channelDivinity({})).toEqual([{ type: "spendResource", key: "channelDivinity" }]);
-    const disabled = at("cleric", undefined, 2, [pool("channelDivinity", 0)]).find(
+    const disabled = atRows("cleric", undefined, 2, [pool("channelDivinity", 0)]).find(
       (a) => a.key === "channelDivinity",
     );
     expect(disabled?.enabled).toBe(false);
@@ -1600,12 +1631,14 @@ describe("subclass gate resolves via slug — FK preferred, exact name as fallba
 });
 
 // Standing invariant (#1340 scope item 3): discharges the action half of the
-// audit — Channel Divinity must stay the only cross-class DERIVED_ACTIONS
-// name/row-set. Loops every class × its subclasses (mirrors class-features-
-// snapshot.test.ts's CLASS_SUBCLASSES table) at the max level so the next
-// action a second class grants under the same display name fails THIS test
-// instead of silently shipping two identical cards.
-describe("no two DERIVED_ACTIONS rows from different classes share a display name (#1340)", () => {
+// audit — Channel Divinity must stay the only cross-class action name/row-set,
+// whether hand-rolled (DERIVED_ACTIONS) or row-driven (#1909's
+// channelDivinity migration onto cleric-features.ts's/paladin-features.ts's
+// own rows — `atRows` sees both). Loops every class × its subclasses (mirrors
+// class-features-snapshot.test.ts's CLASS_SUBCLASSES table) at the max level
+// so the next action a second class grants under the same display name fails
+// THIS test instead of silently shipping two identical cards.
+describe("no two actions from different classes share a display name (#1340)", () => {
   const CLASS_SUBCLASSES: Record<string, (string | undefined)[]> = {
     barbarian: [undefined, "totem warrior", "berserker"],
     bard: [undefined, "college of lore", "college of valor"],
@@ -1625,7 +1658,7 @@ describe("no two DERIVED_ACTIONS rows from different classes share a display nam
     const classesByName = new Map<string, Set<string>>();
     for (const [className, subclasses] of Object.entries(CLASS_SUBCLASSES)) {
       for (const subclass of subclasses) {
-        for (const action of at(className, subclass, 20, [])) {
+        for (const action of atRows(className, subclass, 20, [])) {
           const classes = classesByName.get(action.name) ?? new Set<string>();
           classes.add(className);
           classesByName.set(action.name, classes);

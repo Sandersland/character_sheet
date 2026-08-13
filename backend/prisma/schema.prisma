@@ -830,6 +830,14 @@ model ClassFeature {
   // and Elemental Attunement's burst/strike ops are the follow-ons. Validated
   // seed-time (classFeatureSeedSchema).
   activationRequires Json?
+  // Static in-play announce text (#1909) — distinct from `description` (the
+  // feature prose): this is what a player reads when they actually USE the
+  // action, e.g. Lay on Hands' "touch a creature to restore HP" line.
+  // `buildRowAction` (lib/classes/actions.ts) serves it only when
+  // `describeRowReminder`'s derived heal text yields nothing, so a row with
+  // an effectKind (Second Wind) keeps its computed "Regain NdM HP" subtitle
+  // over this column. Validated seed-time (classFeatureSeedSchema).
+  reminder String?
 
   // Cost block — GrantedAbility's columns verbatim (AbilityCostColumns is
   // exactly these four, all optional) so readAbilityCost reads them unchanged.

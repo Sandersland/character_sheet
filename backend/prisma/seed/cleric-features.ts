@@ -142,6 +142,16 @@ interface RawClericFeature {
   // schema.prisma comment. Only Life Domain's 2014 "Bonus Proficiency" row
   // sets this today.
   improvements?: FeatImprovement[];
+  // Activation block (#1909) — Channel Divinity's row-driven action moved off
+  // actions.ts's DERIVED_ACTIONS onto its two pool-carrier rows above (same
+  // rows resourceKey/resourceTotals already ride, not a third row — see this
+  // file's own RESOURCE POOL header block for why an extra 2014 row isn't
+  // allowed).
+  activationCost?: string;
+  costKind?: string;
+  costPoolKey?: string;
+  costBase?: number;
+  reminder?: string;
 }
 
 function expand(raw: RawClericFeature): ClassFeatureSeedRow[] {
@@ -158,6 +168,11 @@ function expand(raw: RawClericFeature): ClassFeatureSeedRow[] {
       resourceRecharge: raw.resourceRecharge,
       resourceTotals: raw.resourceTotals,
       improvements: raw.improvements,
+      activationCost: raw.activationCost,
+      costKind: raw.costKind,
+      costPoolKey: raw.costPoolKey,
+      costBase: raw.costBase,
+      reminder: raw.reminder,
     },
   ];
 }
@@ -222,6 +237,17 @@ const CLERIC_BASE_RAW: RawClericFeature[] = [
       { minLevel: 6, total: 3, shortRestRegain: 1 },
       { minLevel: 18, total: 4, shortRestRegain: 1 },
     ],
+    // Row-driven action (#1909, moved off actions.ts's DERIVED_ACTIONS) — the
+    // SAME reminder text as paladin-features.ts's own two Channel Divinity
+    // rows (PHB'14 p.164: one feature, one pool, shared across both granting
+    // classes), so a Cleric/Paladin multiclass sees identical text regardless
+    // of which entry's row wins the dedupe (#1340).
+    activationCost: "action",
+    costKind: "pool",
+    costPoolKey: "channelDivinity",
+    costBase: 1,
+    reminder:
+      "Spend 1 use for any Channel Divinity effect you have — a Cleric's Turn Undead and Divine Domain options and a Paladin's Oath options all draw on this one pool.",
   },
   {
     subclassSlug: null,
@@ -251,6 +277,25 @@ const CLERIC_BASE_RAW: RawClericFeature[] = [
       { minLevel: 6, total: 2 },
       { minLevel: 18, total: 3 },
     ],
+    // Row-driven action (#1909, moved off actions.ts's DERIVED_ACTIONS) — the
+    // same forced placement as the pool above means the served card's own
+    // `name` (buildRowAction reads row.name verbatim, #1528's no-second-
+    // string rule) is "Channel Divinity: Turn Undead" for a SOLO 2014 Cleric,
+    // not the generic "Channel Divinity" the retired DERIVED_ACTIONS row
+    // hardcoded — a DELIBERATE, disclosed delta (this is the row's actual
+    // PHB'14 p.60 feature name; 2024's carrier above is genuinely named
+    // "Channel Divinity"). A Cleric/Paladin multiclass still gets exactly ONE
+    // card and one merged pool, but which name shows follows primary-entry-wins
+    // dedupe (deriveEntryScopedActions): a Cleric-primary multiclass surfaces
+    // this row ("...: Turn Undead"), a Paladin-primary one surfaces Paladin's
+    // "Channel Divinity" row. Either entry's reminder text is byte-identical
+    // (see this row's own reminder below), so only the card label differs.
+    activationCost: "action",
+    costKind: "pool",
+    costPoolKey: "channelDivinity",
+    costBase: 1,
+    reminder:
+      "Spend 1 use for any Channel Divinity effect you have — a Cleric's Turn Undead and Divine Domain options and a Paladin's Oath options all draw on this one pool.",
   },
   {
     subclassSlug: null,
