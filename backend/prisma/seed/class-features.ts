@@ -140,6 +140,13 @@ export interface ClassFeatureSeedRow {
   // Static in-play announce text (#1909) — see ClassFeature.reminder's own
   // schema.prisma comment for what distinguishes it from `description`.
   reminder?: string;
+  // A resolved numeric fact (#1912) — see ClassFeature.count's own
+  // schema.prisma comment.
+  count?: number;
+  // Marks a row invisible outside `availableActions[]` (#1912) — see
+  // ClassFeature.actionOnly's own schema.prisma comment. `true` requires
+  // `activationCost` + `resourceKey`, enforced below (classFeatureSeedSchema).
+  actionOnly?: boolean;
   costKind?: string;
   costPoolKey?: string;
   costBase?: number;
@@ -351,27 +358,41 @@ const activationRequiresSchema = z.array(activationRequirementSchema);
 // this migration actually populates are required; the descriptor fields are
 // declared (using the tier schemas above) so a future population pass is
 // validated by the SAME schema, not a second one authored later.
-export const classFeatureSeedSchema = z.object({
-  className: z.string().min(1),
-  subclassSlug: z.enum(SUBCLASS_SLUGS).nullable(),
-  name: z.string().min(1),
-  level: z.number().int().positive(),
-  description: z.string().min(1),
-  edition: z.enum(["EDITION_2014", "EDITION_2024"]),
-  resourceTotals: resourceTotalsTierSchema.nullable().optional(),
-  resourceDieTiers: resourceDieTiersSchema.nullable().optional(),
-  derivedStatTiers: derivedStatTiersSchema.nullable().optional(),
-  saveDcAbilities: z.array(z.string().min(1)).optional(),
-  // Reuses featImprovementSchema (lib/srd/feats.ts) — the SAME zod a taken
-  // feat's improvements snapshot validates against (#1691) — rather than a
-  // second declaration.
-  improvements: z.array(featImprovementSchema).nullable().optional(),
-  effectBuffs: effectBuffsSchema.nullable().optional(),
-  activationRequires: activationRequiresSchema.nullable().optional(),
-  reminder: z.string().min(1).nullable().optional(),
-  // #1121 — see ClassFeature.conditionImmunities/conditionImmunitiesRequireActiveBuff/
-  // conditionImmunitiesOnBuffStart's own schema.prisma comments for the vocabulary.
-  conditionImmunities: z.array(z.string().min(1)).optional(),
-  conditionImmunitiesRequireActiveBuff: z.string().min(1).optional(),
-  conditionImmunitiesOnBuffStart: z.enum(["clear", "suspend"]).optional(),
-});
+export const classFeatureSeedSchema = z
+  .object({
+    className: z.string().min(1),
+    subclassSlug: z.enum(SUBCLASS_SLUGS).nullable(),
+    name: z.string().min(1),
+    level: z.number().int().positive(),
+    description: z.string().min(1),
+    edition: z.enum(["EDITION_2014", "EDITION_2024"]),
+    resourceTotals: resourceTotalsTierSchema.nullable().optional(),
+    resourceDieTiers: resourceDieTiersSchema.nullable().optional(),
+    derivedStatTiers: derivedStatTiersSchema.nullable().optional(),
+    saveDcAbilities: z.array(z.string().min(1)).optional(),
+    // Reuses featImprovementSchema (lib/srd/feats.ts) — the SAME zod a taken
+    // feat's improvements snapshot validates against (#1691) — rather than a
+    // second declaration.
+    improvements: z.array(featImprovementSchema).nullable().optional(),
+    effectBuffs: effectBuffsSchema.nullable().optional(),
+    activationRequires: activationRequiresSchema.nullable().optional(),
+    reminder: z.string().min(1).nullable().optional(),
+    // #1121 — see ClassFeature.conditionImmunities/conditionImmunitiesRequireActiveBuff/
+    // conditionImmunitiesOnBuffStart's own schema.prisma comments for the vocabulary.
+    conditionImmunities: z.array(z.string().min(1)).optional(),
+    conditionImmunitiesRequireActiveBuff: z.string().min(1).optional(),
+    conditionImmunitiesOnBuffStart: z.enum(["clear", "suspend"]).optional(),
+    // #1912 — declared here (not just on ClassFeatureSeedRow) so the
+    // `.refine` below can see them: an `actionOnly` row with no
+    // activationCost/resourceKey is dead data, invisible everywhere
+    // (featuresFromRows excludes actionOnly rows from feature cards;
+    // rowIsAnAvailableAction/eligibleRowActions require both to serve it as
+    // an action either).
+    activationCost: z.string().min(1).optional(),
+    resourceKey: z.string().min(1).optional(),
+    count: z.number().int().optional(),
+    actionOnly: z.boolean().optional(),
+  })
+  .refine((row) => !row.actionOnly || (Boolean(row.activationCost) && Boolean(row.resourceKey)), {
+    message: "an actionOnly row must declare both activationCost and resourceKey",
+  });

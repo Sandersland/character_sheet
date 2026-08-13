@@ -20,6 +20,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
 import { seededSpeciesAnchor } from "@/test-support/species.js";
+import { resolveSubclassSlug } from "@/lib/classes/subclass-slug.js";
 
 const OWNER_ID = "owner-regrants-served";
 const EDITIONS = ["EDITION_2014", "EDITION_2024"] as const;
@@ -50,8 +51,17 @@ async function makeCharacter(
   const id = res.body.id as string;
   createdIds.push(id);
 
+  // Fast Hands (Thief) is row-driven now (#1912) — its guard reads
+  // subclassRef.features, a real subclassId FK relation, so a raw `subclass`
+  // display-name update (the pre-#1912 shape here, sufficient when the
+  // subclass gate resolved off the name string alone) is no longer enough;
+  // resolveSubclassSlug + a real Subclass lookup is what production's own
+  // subclass-selection path does.
+  const subclassId = subclass
+    ? (await prisma.subclass.findFirstOrThrow({ where: { slug: resolveSubclassSlug(className, { subclass }) ?? "" } })).id
+    : undefined;
   await prisma.character.update({ where: { id }, data: { experiencePoints: XP_BY_LEVEL[level] } });
-  await prisma.characterClassEntry.updateMany({ where: { characterId: id }, data: { level, subclass } });
+  await prisma.characterClassEntry.updateMany({ where: { characterId: id }, data: { level, subclass, subclassId } });
   return id;
 }
 

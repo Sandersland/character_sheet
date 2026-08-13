@@ -102,11 +102,10 @@ function monkEntry(row: WarriorOfElementsRow) {
  * itself), never `.enabled`; the actual focus spend is validated by
  * applySpendResourceInTx below, so a future `.enabled` check here would
  * wrongly reject every call. `featureRowsOf` (#1686) is threaded through so
- * a row-driven key (Elemental Attunement's own "elementalAttunement", now
- * off DERIVED_ACTIONS) resolves through the SAME gate a hand-authored
- * DERIVED_ACTIONS key (Elemental Burst) does — elementalStrike's own
- * "elementalAttunement" gate check is what makes this load-bearing, not
- * just cosmetic.
+ * a row-driven key (Elemental Attunement's own "elementalAttunement", and
+ * Elemental Burst too as of #1912) resolves through the SAME gate a
+ * DERIVED_ACTIONS key used to — elementalStrike's own "elementalAttunement"
+ * gate check is what makes this load-bearing, not just cosmetic.
  */
 function assertWarriorOfElements(row: WarriorOfElementsRow, actionKey: string, feature: string): number {
   const monk = monkEntry(row);
@@ -114,8 +113,16 @@ function assertWarriorOfElements(row: WarriorOfElementsRow, actionKey: string, f
   const edition = editionOf(row);
   const granted = deriveEntryScopedActions(row.classEntries, totalLevel, [], true, edition, featureRowsOf).some((a) => a.key === actionKey);
   if (!monk || !granted) {
+    // actionGrantLevel (#1912) is row-aware — Elemental Burst moved off
+    // DERIVED_ACTIONS onto its own row, so the error text's level now
+    // resolves from THIS row's own class+subclass feature rows, never a
+    // second hardcoded copy of the gate (CLAUDE.md's level-gated rule).
+    const rows = row.classEntries.flatMap((e) => {
+      const carrier = featureRowsOf(e);
+      return [...carrier.classRows, ...carrier.subclassRows];
+    });
     throw new InvalidWarriorOfElementsOperationError(
-      `Only a Warrior of the Elements monk (level ${actionGrantLevel(actionKey, edition) ?? "?"}+) has ${feature}`,
+      `Only a Warrior of the Elements monk (level ${actionGrantLevel(actionKey, edition, rows) ?? "?"}+) has ${feature}`,
     );
   }
   return monk.level;

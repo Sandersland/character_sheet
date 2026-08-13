@@ -838,6 +838,25 @@ model ClassFeature {
   // an effectKind (Second Wind) keeps its computed "Regain NdM HP" subtitle
   // over this column. Validated seed-time (classFeatureSeedSchema).
   reminder String?
+  // A resolved numeric fact about this action the client renders verbatim
+  // (#1912) — the row-authored counterpart to DERIVED_ACTIONS' retired
+  // `count` field (actions.ts), e.g. Flurry of Blows' strike count (2
+  // normally, 3 at Heightened Focus, monk L10). `buildRowAction` serves it
+  // verbatim; a level-gated bump is an announce-augmentor payload (#1910),
+  // never a second row.
+  count Int?
+  // Marks a row that exists ONLY to carry one action VARIANT of a feature
+  // that grants several (Patient Defense free vs. 1-Focus, Step of the
+  // Wind's pair, Empty Body's two ki options, the Deflect riders, Hand of
+  // Healing's Flurry variant, #1912/epic #1903 decision 4) — or, more
+  // generally, any action identity with no feature-card text of its own.
+  // `featuresFromRows` (lib/classes/class-feature-rows.ts) filters an
+  // `actionOnly` row out, so it never surfaces as a feature card, in the
+  // level-up ceremony's feature list, or anywhere else `DerivedFeature` is
+  // projected — ONLY in `availableActions[]`. Requires `activationCost` +
+  // `resourceKey` (enforced at seed time, classFeatureSeedSchema): a row
+  // with neither is dead data, invisible everywhere.
+  actionOnly Boolean @default(false)
 
   // Cost block — GrantedAbility's columns verbatim (AbilityCostColumns is
   // exactly these four, all optional) so readAbilityCost reads them unchanged.

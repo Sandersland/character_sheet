@@ -41,7 +41,13 @@ const FOUR_ELEMENTS = "monk-way-of-the-four-elements";
 
 describe("Per-partition counts: base 17(2014)/18(2024); open hand (#1501), shadow (#1502), and the elements (#1503) each fork into two EDITION-EXCLUSIVE subclasses; mercy 6 is the one remaining subclass still identical for 2014/2024", () => {
   it("counts match exactly (33 total 2014, 37 total 2024)", () => {
-    const count = (slug: string | null, edition: Edition) => MONK_FEATURES.filter((r) => r.subclassSlug === slug && r.edition === edition).length;
+    // `!r.actionOnly` (#1912) excludes every action-only row the 34-row
+    // DERIVED_ACTIONS sweep added — this describe block counts FEATURES
+    // (feature-card text), and actionOnly rows carry none (featuresFromRows
+    // filters them the same way). The comprehensive DB-backed count
+    // (features + actionOnly rows together) is class-feature-migration
+    // .test.ts's "row count (#1523)" describe block.
+    const count = (slug: string | null, edition: Edition) => MONK_FEATURES.filter((r) => r.subclassSlug === slug && r.edition === edition && !r.actionOnly).length;
     expect(count(BASE, "EDITION_2014")).toBe(17);
     expect(count(BASE, "EDITION_2024")).toBe(18);
     // Open Hand forked (#1501): "Warrior of the Open Hand" is 2024-only,
@@ -69,11 +75,18 @@ describe("Per-partition counts: base 17(2014)/18(2024); open hand (#1501), shado
     expect(count(ELEMENTS, "EDITION_2024")).toBe(5);
     expect(count(FOUR_ELEMENTS, "EDITION_2014")).toBe(2);
     expect(count(FOUR_ELEMENTS, "EDITION_2024")).toBe(0);
-    const total2014 = MONK_FEATURES.filter((r) => r.edition === "EDITION_2014").length;
-    const total2024 = MONK_FEATURES.filter((r) => r.edition === "EDITION_2024").length;
+    const total2014 = MONK_FEATURES.filter((r) => r.edition === "EDITION_2014" && !r.actionOnly).length;
+    const total2024 = MONK_FEATURES.filter((r) => r.edition === "EDITION_2024" && !r.actionOnly).length;
     expect(total2014).toBe(33);
     expect(total2024).toBe(37);
-    expect(MONK_FEATURES).toHaveLength(70);
+    expect(MONK_FEATURES.filter((r) => !r.actionOnly)).toHaveLength(70);
+    // The RAW row count (features + actionOnly action-identity rows
+    // together) is what actually lands in the DB — #1912's 34-row sweep
+    // added 10 new EDITION_2014 rows and 9 new EDITION_2024 rows onto the
+    // 33/37 feature-only counts above (43/46, 89 total).
+    expect(MONK_FEATURES.filter((r) => r.edition === "EDITION_2014")).toHaveLength(43);
+    expect(MONK_FEATURES.filter((r) => r.edition === "EDITION_2024")).toHaveLength(46);
+    expect(MONK_FEATURES).toHaveLength(89);
   });
 });
 
@@ -125,29 +138,17 @@ describe("Elemental Attunement (#1686): the toggle descriptor block transcribed 
     ]);
   });
 
-  it("every OTHER row leaves every descriptor column undefined", () => {
-    for (const r of MONK_FEATURES) {
-      if (isExemptDescriptorRow(r)) continue;
-      expect(r.resourceKey, `${r.subclassSlug ?? "base"}/${r.name}`).toBeUndefined();
-      expect(r.derivedStat, `${r.subclassSlug ?? "base"}/${r.name}`).toBeUndefined();
-    }
-  });
+  // "every OTHER row leaves every descriptor column undefined" retired here
+  // (#1912): this suite's premise — that only Elemental Attunement/Extra
+  // Attack/Wholeness of Body carry a descriptor column — is exactly what
+  // epic #1903's 4/4 slice makes false on purpose (31 monk DERIVED_ACTIONS
+  // rows moved onto their ClassFeature rows' resourceKey/activationCost/
+  // cost* columns). class-feature-migration.test.ts's DB-backed
+  // isPopulatedRow/POPULATED_MONK_ROW_KEYS sweep is the exhaustive,
+  // still-current version of this invariant (which row is populated and
+  // which stays null/default) — keeping a second, now-inverted copy here
+  // would double-maintain the same fact from two places.
 });
-
-// The three rows populated elsewhere in this suite — pulled out of the loop
-// above to keep that test's own cyclomatic/cognitive score flat (mirrors
-// class-feature-migration.test.ts's own POPULATED_ROW_PREDICATES pattern).
-function isExemptDescriptorRow(r: (typeof MONK_FEATURES)[number]): boolean {
-  if (r.name === "Extra Attack" && r.subclassSlug === null) return true;
-  if (r.name === "Elemental Attunement" && r.subclassSlug === ELEMENTS) return true;
-  // #1501: Way of the Open Hand's Wholeness of Body is the third row-owned
-  // descriptor block — a row-owned FIXED pool total (resourceKey/
-  // resourceRecharge/resourceTotals), not the toggle shape the other two
-  // exemptions above carry. See monk-2014-open-hand.test.ts for its own
-  // dedicated assertions on this row's exact descriptor values.
-  if (r.name === "Wholeness of Body" && r.subclassSlug === WAY_OPEN_HAND) return true;
-  return false;
-}
 
 const ABILITY_SCORES = {
   strength: 10,
@@ -214,6 +215,6 @@ describe("integration (#1503): a real seeded L17 Way of the Four Elements monk h
 
 describe("#1500: the 2014 base-class row count reflects real SRD 5.1 content (17, not 2024's 18)", () => {
   it("the 2014 base-class row count is 17", () => {
-    expect(MONK_FEATURES.filter((r) => r.subclassSlug === null && r.edition === "EDITION_2014")).toHaveLength(17);
+    expect(MONK_FEATURES.filter((r) => r.subclassSlug === null && r.edition === "EDITION_2014" && !r.actionOnly)).toHaveLength(17);
   });
 });

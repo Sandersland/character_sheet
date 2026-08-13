@@ -113,6 +113,14 @@ interface RawMonkFeature {
   costPoolKey?: string;
   costBase?: number;
   effectBuffs?: EffectBuffRow[];
+  // ---- #1912 (epic #1903, 4/4) — the 34-row monk/rogue/barbarian sweep.
+  // Every field below mirrors ClassFeatureSeedRow's own vocabulary; see each
+  // consuming row's own comment for why it needs the field.
+  regrants?: string[];
+  requiresUnarmored?: boolean;
+  reminder?: string;
+  count?: number;
+  actionOnly?: boolean;
 }
 
 function expand(raw: RawMonkFeature): ClassFeatureSeedRow[] {
@@ -136,6 +144,11 @@ function expand(raw: RawMonkFeature): ClassFeatureSeedRow[] {
     costPoolKey: raw.costPoolKey,
     costBase: raw.costBase,
     effectBuffs: raw.effectBuffs,
+    regrants: raw.regrants,
+    requiresUnarmored: raw.requiresUnarmored,
+    reminder: raw.reminder,
+    count: raw.count,
+    actionOnly: raw.actionOnly,
   };
   const editions: SeedEdition[] = raw.edition ? [raw.edition] : ["EDITION_2014", "EDITION_2024"];
   return editions.map((edition) => ({ ...base, edition }));
@@ -258,6 +271,14 @@ const MONK_BASE_RAW: RawMonkFeature[] = [
     edition: "EDITION_2014",
     description:
       "Use your reaction to reduce damage from a ranged weapon attack that hits you by 1d10 + Dexterity modifier + monk level. If this reduces the damage to 0 and the missile is small enough to hold in one hand with a hand free, you catch it. You can then spend 1 ki to make a ranged attack with it as part of the same reaction — range 20/60 ft, always made with proficiency — dealing 1d6 + Dexterity modifier bludgeoning damage to one creature within range on a hit.",
+    // Row-driven action (#1912) — P: free, narrated, no resourceKey-gated
+    // cost (the client rolls 1d10 + Dex + monk level directly, see
+    // ACTION_EFFECT_FN's comment in actions.ts). The throw-back rider is its
+    // own actionOnly row below ("Deflect Missiles — Throw Back").
+    resourceKey: "deflectMissiles",
+    activationCost: "reaction",
+    reminder:
+      "Reaction: when hit by a ranged weapon attack, reduce the damage by 1d10 + Dex modifier + monk level. If this reduces it to 0 and you have a free hand, catch the missile.",
   },
   {
     subclassSlug: null,
@@ -266,6 +287,15 @@ const MONK_BASE_RAW: RawMonkFeature[] = [
     edition: "EDITION_2024",
     description:
       "Use your reaction to reduce bludgeoning, piercing, or slashing damage from a melee or ranged attack that hits you by 1d10 + Dexterity modifier + monk level. If this reduces the damage to 0, spend 1 focus to redirect it: the attacker (melee, within 5 ft) or another creature (ranged, within 60 ft) must succeed on a Dexterity save or take damage equal to two rolls of your Martial Arts die + your Dexterity modifier.",
+    // Row-driven action (#1912) — P: the base reduction costs nothing (the
+    // client rolls it directly); the redirect rider is its own actionOnly
+    // row below ("Deflect Attacks — Redirect"). `damageTypeClause` is
+    // resolved entirely by the Deflect Energy announce augmentor
+    // (lib/srd/deflect.ts) — this row sets none.
+    resourceKey: "deflectAttacks",
+    activationCost: "reaction",
+    reminder:
+      "Reaction: when hit by a melee or ranged attack dealing bludgeoning, piercing, or slashing damage (any damage type at L13, Deflect Energy), reduce the damage by 1d10 + Dex modifier + monk level.",
   },
 
   // Stunning Strike (L5, SRD 5.1 p.46 / PHB'14 p.77) — 2014 has no
@@ -449,6 +479,223 @@ const MONK_BASE_RAW: RawMonkFeature[] = [
     edition: "EDITION_2014",
     description: "When you roll initiative and have no ki points remaining, you regain 4 ki points.",
   },
+
+  // ---- #1912 (epic #1903, 4/4) — actionOnly rows: base-class action
+  // identities with no feature-card text of their own (Martial Arts/Ki/Focus
+  // already carry the player-facing prose above). `actionOnly: true` keeps
+  // every one of these invisible to featuresFromRows (no new card) — only
+  // `availableActions[]` ever surfaces them, matching the pre-migration
+  // DERIVED_ACTIONS shape exactly (#1912's own "zero cards gained" AC).
+  {
+    subclassSlug: null,
+    name: "Bonus Unarmed Strike",
+    level: 1,
+    description: "A free Unarmed Strike as a Bonus Action — no resource cost, gated on Martial Arts' unarmored/no-shield condition (see the Martial Arts feature).",
+    resourceKey: "bonusUnarmedStrike",
+    activationCost: "bonusAction",
+    requiresUnarmored: true,
+    actionOnly: true,
+  },
+  // `count` (#1505/#1912): resolved strike count the client renders
+  // verbatim. 2 normally, 3 at Heightened Focus (monk L10, #1244) — the
+  // bump is an announce-augmentor payload (heightened-focus.ts), not a
+  // second row.
+  {
+    subclassSlug: null,
+    name: "Flurry of Blows",
+    level: 2,
+    edition: "EDITION_2024",
+    description: "Immediately after the Attack action, spend 1 focus to make two Unarmed Strikes as a Bonus Action (three at Heightened Focus, monk L10).",
+    resourceKey: "flurryOfBlows",
+    activationCost: "bonusAction",
+    costKind: "pool",
+    costPoolKey: "focus",
+    costBase: 1,
+    count: 2,
+    actionOnly: true,
+  },
+  // 2014 (SRD 5.1 / PHB'14 p.77): flat 1-ki cost, no Heightened Focus
+  // three-strike upgrade (2024-only). Same served key as the row above
+  // (mirrors Lay on Hands' own same-key edition fork) — safe because
+  // ACTION_EFFECT_FN.flurryOfBlows resolves its pool through ctx.edition
+  // (monkPoolKey) rather than a hardcoded key.
+  {
+    subclassSlug: null,
+    name: "Flurry of Blows",
+    level: 2,
+    edition: "EDITION_2014",
+    description: "Immediately after taking the Attack action, spend 1 ki to make two unarmed strikes as a bonus action.",
+    resourceKey: "flurryOfBlows",
+    activationCost: "bonusAction",
+    costKind: "pool",
+    costPoolKey: "ki",
+    costBase: 1,
+    count: 2,
+    reminder: "Immediately after taking the Attack action, spend 1 ki to make two unarmed strikes as a bonus action.",
+    actionOnly: true,
+  },
+  // Patient Defense / Step of the Wind (PHB'24 p.98, SRD 5.2, #1240) each
+  // grant TWO menu entries — a free variant and a 1-Focus variant — rather
+  // than the 2014 SRD's flat "always costs 1 ki" shape (both compete for the
+  // same bonus action). Heightened Focus (monk L10, #1244) upgrades both
+  // *Focus entries in place (heightened-focus.ts), never the free ones.
+  {
+    subclassSlug: null,
+    name: "Patient Defense",
+    level: 2,
+    edition: "EDITION_2024",
+    description: "Take the Dodge action as a free Bonus Action (or, for 1 Focus, Disengage + Dodge together).",
+    resourceKey: "patientDefense",
+    activationCost: "bonusAction",
+    regrants: ["disengage"],
+    reminder: "Disengage (free bonus action).",
+    actionOnly: true,
+  },
+  {
+    subclassSlug: null,
+    name: "Patient Defense (1 Focus)",
+    level: 2,
+    edition: "EDITION_2024",
+    description: "Spend 1 Focus to take Disengage + Dodge together as a Bonus Action (also grants temporary hit points at Heightened Focus, monk L10).",
+    resourceKey: "patientDefenseFocus",
+    activationCost: "bonusAction",
+    costKind: "pool",
+    costPoolKey: "focus",
+    costBase: 1,
+    regrants: ["disengage", "dodge"],
+    reminder: "Disengage + Dodge (spend 1 Focus).",
+    actionOnly: true,
+  },
+  {
+    subclassSlug: null,
+    name: "Step of the Wind",
+    level: 2,
+    edition: "EDITION_2024",
+    description: "Take the Dash action as a free Bonus Action (or, for 1 Focus, Disengage + Dash with jump distance doubled).",
+    resourceKey: "stepOfTheWind",
+    activationCost: "bonusAction",
+    regrants: ["dash"],
+    reminder: "Dash (free bonus action).",
+    actionOnly: true,
+  },
+  {
+    subclassSlug: null,
+    name: "Step of the Wind (1 Focus)",
+    level: 2,
+    edition: "EDITION_2024",
+    description: "Spend 1 Focus to take Disengage + Dash together as a Bonus Action, jump distance doubled this turn (also brings a willing creature along at Heightened Focus, monk L10).",
+    resourceKey: "stepOfTheWindFocus",
+    activationCost: "bonusAction",
+    costKind: "pool",
+    costPoolKey: "focus",
+    costBase: 1,
+    regrants: ["disengage", "dash"],
+    reminder: "Disengage + Dash, jump distance doubled this turn (spend 1 Focus).",
+    actionOnly: true,
+  },
+  // 2014 (SRD 5.1 / PHB'14 p.77): ONE row apiece, not the 2024 free/paid
+  // pair — a flat 1-ki cost with no free variant. Distinct served keys from
+  // the 2024 rows above (NOT `patientDefense`/`stepOfTheWind`): those exact
+  // keys are pinned `serverEffect: false` in the frontend's ACTION_RESOLVERS
+  // table (actionResolvers.ts) for the FREE 2024 variant, so a 2014 1-ki row
+  // reusing either key would render but silently never spend.
+  {
+    subclassSlug: null,
+    name: "Patient Defense",
+    level: 2,
+    edition: "EDITION_2014",
+    description: "Spend 1 ki to take the Dodge action as a bonus action.",
+    resourceKey: "patientDefenseKi",
+    activationCost: "bonusAction",
+    costKind: "pool",
+    costPoolKey: "ki",
+    costBase: 1,
+    regrants: ["dodge"],
+    reminder: "Spend 1 ki to take the Dodge action as a bonus action.",
+    actionOnly: true,
+  },
+  {
+    subclassSlug: null,
+    name: "Step of the Wind",
+    level: 2,
+    edition: "EDITION_2014",
+    description: "Spend 1 ki to take the Disengage or Dash action as a bonus action; your jump distance is doubled for the turn.",
+    resourceKey: "stepOfTheWindKi",
+    activationCost: "bonusAction",
+    costKind: "pool",
+    costPoolKey: "ki",
+    costBase: 1,
+    regrants: ["disengage", "dash"],
+    reminder: "Spend 1 ki to take the Disengage or Dash action as a bonus action; your jump distance is doubled for the turn.",
+    actionOnly: true,
+  },
+  // Redirect rider: only meaningful once a ranged hit is reduced to 0 — a
+  // "free" follow-up decision within the same reaction (mirrors Stunning
+  // Strike's shape), not its own action-economy slot. Spends the persisted
+  // Focus resource, unlike the free base reduction (the "Deflect Attacks"
+  // row above).
+  {
+    subclassSlug: null,
+    name: "Deflect Attacks — Redirect",
+    level: 3,
+    edition: "EDITION_2024",
+    description: "Once Deflect Attacks reduces a hit to 0, spend 1 Focus to redirect the damage at the attacker (melee) or another creature within range (ranged), forcing a Dexterity save.",
+    resourceKey: "deflectAttacksRedirect",
+    activationCost: "free",
+    costKind: "pool",
+    costPoolKey: "focus",
+    costBase: 1,
+    actionOnly: true,
+  },
+  // Throw-back rider: a catch + ranged attack, not a save-forcing redirect,
+  // so it's a real 1-ki spend (unlike the free base reduction above).
+  {
+    subclassSlug: null,
+    name: "Deflect Missiles — Throw Back",
+    level: 3,
+    edition: "EDITION_2014",
+    description: "Once Deflect Missiles catches a missile, spend 1 ki to make a ranged attack with it — range 20/60 ft, always proficient — dealing 1d6 + Dex modifier bludgeoning on a hit.",
+    resourceKey: "deflectMissilesThrow",
+    activationCost: "free",
+    costKind: "pool",
+    costPoolKey: "ki",
+    costBase: 1,
+    reminder: "Spend 1 ki to make a ranged attack with the caught missile (range 20/60, always proficient) — 1d6 + Dex modifier bludgeoning on a hit.",
+    actionOnly: true,
+  },
+  // Empty Body's two independent ki-spend options (SRD 5.1 / PHB'14 p.79,
+  // L18, #1500) — no server effect beyond the spend itself (no buff/
+  // condition model for the astral-projection clause, and invisibility has
+  // no target model to persist against). The base "Empty Body" feature-card
+  // row above stays untouched; both action variants are actionOnly siblings.
+  {
+    subclassSlug: null,
+    name: "Empty Body — Invisibility",
+    level: 18,
+    edition: "EDITION_2014",
+    description: "Spend 4 ki points to become invisible for 1 minute; during that time you also have resistance to all damage but force damage.",
+    resourceKey: "emptyBody",
+    activationCost: "action",
+    costKind: "pool",
+    costPoolKey: "ki",
+    costBase: 4,
+    reminder: "Spend 4 ki to become invisible for 1 minute, with resistance to all damage but force damage during that time.",
+    actionOnly: true,
+  },
+  {
+    subclassSlug: null,
+    name: "Empty Body — Astral Projection",
+    level: 18,
+    edition: "EDITION_2014",
+    description: "Spend 8 ki points to cast astral projection on yourself without a material component; you can't take other creatures with you.",
+    resourceKey: "emptyBodyAstralProjection",
+    activationCost: "action",
+    costKind: "pool",
+    costPoolKey: "ki",
+    costBase: 8,
+    reminder: "Spend 8 ki to cast astral projection on yourself without a material component; you can't take other creatures with you.",
+    actionOnly: true,
+  },
 ];
 
 // ---- Warrior of the Open Hand — SRD 5.2 p. 90 (#1501: tagged EDITION_2024,
@@ -485,6 +732,15 @@ const WARRIOR_OF_THE_OPEN_HAND_RAW: RawMonkFeature[] = [
     edition: "EDITION_2024",
     description:
       "As a bonus action, roll your Martial Arts die and regain that many hit points plus your Wisdom modifier (minimum 1). Usable a number of times equal to your Wisdom modifier (minimum once); regain all expended uses on a long rest.",
+    // Row-driven action (#1912) — S, identity == pool: the pool ITSELF
+    // still comes from monk.ts's own resourceFn (Wis-mod-dependent), so this
+    // row sets no resourceTotals (poolFromRow requires them to mint a pool —
+    // absent here, so this mints no phantom one).
+    resourceKey: "wholenessOfBody",
+    activationCost: "bonusAction",
+    costKind: "pool",
+    costPoolKey: "wholenessOfBody",
+    costBase: 1,
   },
   {
     subclassSlug: slug("monk-warrior-of-the-open-hand"),
@@ -493,6 +749,11 @@ const WARRIOR_OF_THE_OPEN_HAND_RAW: RawMonkFeature[] = [
     edition: "EDITION_2024",
     description:
       "When you take a bonus action other than Step of the Wind, you can also take the Step of the Wind bonus action immediately afterward.",
+    // Row-driven action (#1912) — P: not a discrete spend, just a rider
+    // (like Reckless Attack/Metamagic's cost:"free" reminders).
+    resourceKey: "fleetStep",
+    activationCost: "free",
+    reminder: "When you take a bonus action other than Step of the Wind, you can also take Step of the Wind immediately afterward (no extra cost).",
   },
   {
     subclassSlug: slug("monk-warrior-of-the-open-hand"),
@@ -544,6 +805,11 @@ const WAY_OF_THE_OPEN_HAND_RAW: RawMonkFeature[] = [
     edition: "EDITION_2014",
     description:
       "At the end of a long rest, you gain the effect of a sanctuary spell that lasts until the start of your next long rest (the spell can end early as normal). The saving throw DC equals your ki save DC.",
+    // Row-driven action (#1912) — P: a passive gained at the end of a long
+    // rest, not a mid-turn spend (no resourceKey-gated cost).
+    resourceKey: "tranquility",
+    activationCost: "free",
+    reminder: "At the end of a long rest, you gain the effect of sanctuary (DC = your ki save DC) until the start of your next long rest.",
   },
   {
     subclassSlug: slug("monk-way-of-the-open-hand"),
@@ -552,6 +818,33 @@ const WAY_OF_THE_OPEN_HAND_RAW: RawMonkFeature[] = [
     edition: "EDITION_2014",
     description:
       "When you hit a creature with an unarmed strike, you can spend 3 ki points to start imperceptible vibrations in its body, lasting a number of days equal to your monk level. You can have only one creature under this effect at a time, and you can end the vibrations harmlessly without using an action. To end them harmfully, you and the target must be on the same plane of existence — use your action to force a Constitution save: on a failure the target drops to 0 hit points; on a success it takes 10d10 necrotic damage.",
+  },
+  // Wholeness of Body needs its OWN served action identity
+  // ("wholenessOfBodyAction", not the 2024 sibling's "wholenessOfBody")
+  // because its shape genuinely differs — an action, not a bonus action,
+  // healing a FLAT 3 x monk level with no die roll at all — mirrors
+  // patientDefenseKi/stepOfTheWindKi's own same-feature-different-key
+  // precedent above. It can't ride the "Wholeness of Body" row above
+  // (#1912): that row's own `resourceKey` is already claimed by its
+  // row-owned POOL identity ("wholenessOfBody", resourceTotals set two rows
+  // up), and `@@unique([classId, subclassId, name, edition])` forbids a
+  // second row named "Wholeness of Body" in this same partition — so this
+  // is an actionOnly sibling under its own name, spending the SAME pool via
+  // costPoolKey. `name` deliberately differs from the served action's own
+  // "Wholeness of Body" name (a disclosed, unavoidable delta — see the
+  // #1912 PR body).
+  {
+    subclassSlug: slug("monk-way-of-the-open-hand"),
+    name: "Wholeness of Body — Action",
+    level: 6,
+    edition: "EDITION_2014",
+    description: "As an action, spend 1 use of Wholeness of Body to regain hit points equal to three times your monk level.",
+    resourceKey: "wholenessOfBodyAction",
+    activationCost: "action",
+    costKind: "pool",
+    costPoolKey: "wholenessOfBody",
+    costBase: 1,
+    actionOnly: true,
   },
 ];
 
@@ -578,6 +871,13 @@ const WARRIOR_OF_SHADOW_RAW: RawMonkFeature[] = [
     edition: "EDITION_2024",
     description:
       "While in dim light or darkness, teleport as a bonus action to an unoccupied space you can see that is also in dim light or darkness (up to 60 ft), then make one unarmed strike as part of the same bonus action. You have advantage on the first melee attack you make before the end of the turn.",
+    // Row-driven action (#1912) — P: no resourceKey-gated cost, no server
+    // effect; reminder is the deliverable. Improved Shadow Step (L11) rider
+    // is an announce-augmentor payload (improved-shadow-step.ts), never a
+    // second row.
+    resourceKey: "shadowStep",
+    activationCost: "bonusAction",
+    reminder: "Teleport up to 60 ft between areas of dim light or darkness; advantage on your first melee attack before the end of this turn. Make one unarmed strike immediately after teleporting.",
   },
   {
     subclassSlug: slug("monk-warrior-of-shadow"),
@@ -594,6 +894,33 @@ const WARRIOR_OF_SHADOW_RAW: RawMonkFeature[] = [
     edition: "EDITION_2024",
     description:
       "Spend 3 focus and use your action to become invisible and able to move through other creatures and objects as if they were difficult terrain, for 1 minute or until you're incapacitated. The invisibility ends early if you attack or cast a spell. While it lasts, Flurry of Blows costs no focus.",
+    // Row-driven action (#1912) — S, identity == pool.
+    resourceKey: "cloakOfShadows",
+    activationCost: "action",
+    costKind: "pool",
+    costPoolKey: "focus",
+    costBase: 3,
+    reminder: "Magic action, entirely within dim light or darkness: spend 3 focus to become invisible and move through creatures/objects as difficult terrain for 1 minute (or until incapacitated, or you end your turn in bright light). Flurry of Blows costs no focus while it lasts.",
+  },
+  // "Shadow Arts" above stays a pure feature-text row — its served action
+  // identity needs a DIFFERENT name ("Shadow Arts (Darkness)", the
+  // pre-migration DERIVED_ACTIONS name, disambiguating it from Way of
+  // Shadow's own 2014 "Shadow Arts" cast) — so it rides its own actionOnly
+  // sibling rather than the text row (#1912: attaching to a differently-
+  // named row would change the served action's `name`, an avoidable delta).
+  {
+    subclassSlug: slug("monk-warrior-of-shadow"),
+    name: "Shadow Arts (Darkness)",
+    level: 3,
+    edition: "EDITION_2024",
+    description: "Spend 1 focus to cast Darkness without material components; you can see through it and move it up to 30 ft as a bonus action while it persists.",
+    resourceKey: "shadowArts",
+    activationCost: "action",
+    costKind: "pool",
+    costPoolKey: "focus",
+    costBase: 1,
+    reminder: "Spend 1 focus to cast Darkness without material components; you can see through it and move it up to 30 ft as a bonus action while it persists.",
+    actionOnly: true,
   },
 ];
 
@@ -618,6 +945,13 @@ const WAY_OF_SHADOW_RAW: RawMonkFeature[] = [
     edition: "EDITION_2014",
     description:
       "Starting when you choose this tradition at 3rd level, you can use your ki to duplicate the effects of certain spells. As an action, you can spend 2 ki points to cast darkness, darkvision, pass without trace, or silence, without providing material components. Additionally, you gain the minor illusion cantrip if you don't already know it (PHB'14 pp.79-80 — not in SRD 5.1).",
+    // Row-driven action (#1912) — S, identity == pool.
+    resourceKey: "shadowArts",
+    activationCost: "action",
+    costKind: "pool",
+    costPoolKey: "ki",
+    costBase: 2,
+    reminder: "Spend 2 ki to cast darkness, darkvision, pass without trace, or silence, without material components (PHB'14 pp.79-80 — not in SRD 5.1).",
   },
   {
     subclassSlug: slug("monk-way-of-shadow"),
@@ -626,6 +960,11 @@ const WAY_OF_SHADOW_RAW: RawMonkFeature[] = [
     edition: "EDITION_2014",
     description:
       "At 6th level, you gain the ability to step from one shadow to another. When you are in dim light or darkness, as a bonus action you can teleport up to 60 feet to an unoccupied space you can see that is also in dim light or darkness. You then have advantage on the first melee attack you make before the end of the current turn (PHB'14 p.80 — not in SRD 5.1).",
+    // Row-driven action (#1912) — P: no resourceKey-gated cost, no server
+    // effect, never upgrades (no Improved Shadow Step in 2014).
+    resourceKey: "shadowStep",
+    activationCost: "bonusAction",
+    reminder: "While in dim light or darkness, teleport as a bonus action up to 60 ft to an unoccupied space you can see that is also in dim light or darkness; you then have advantage on the first melee attack you make before the end of the turn.",
   },
   {
     subclassSlug: slug("monk-way-of-shadow"),
@@ -634,6 +973,11 @@ const WAY_OF_SHADOW_RAW: RawMonkFeature[] = [
     edition: "EDITION_2014",
     description:
       "By 11th level, you have learned to become one with the shadows. When you are in an area of dim light or darkness, you can use your action to become invisible. You remain invisible until you make an attack, cast a spell, or are in an area of bright light (PHB'14 p.80 — not in SRD 5.1).",
+    // Row-driven action (#1912) — P: no ki cost, no duration cap (unlike the
+    // 2024 sibling's 3-focus/1-minute shape).
+    resourceKey: "cloakOfShadows",
+    activationCost: "action",
+    reminder: "While in dim light or darkness, use your action to become invisible; you remain invisible until you make an attack, cast a spell, or are in an area of bright light. No ki cost, no duration cap.",
   },
   {
     subclassSlug: slug("monk-way-of-shadow"),
@@ -642,6 +986,11 @@ const WAY_OF_SHADOW_RAW: RawMonkFeature[] = [
     edition: "EDITION_2014",
     description:
       "Beginning at 17th level, you can exploit a creature's momentary distraction when it is hit by an attack. When a creature within 5 feet of you is hit by an attack made by a creature other than you, you can use your reaction to make a melee attack against that creature (PHB'14 p.80 — not in SRD 5.1).",
+    // Row-driven action (#1912) — P: no 2024 equivalent (retired there in
+    // favor of Cloak of Shadows).
+    resourceKey: "opportunist",
+    activationCost: "reaction",
+    reminder: "When a creature within 5 ft of you is hit by an attack made by a creature other than you, use your reaction to make a melee attack against that creature.",
   },
 ];
 
@@ -675,6 +1024,17 @@ const WARRIOR_OF_MERCY_RAW: RawMonkFeature[] = [
     level: 3,
     description:
       "As a Magic action, expend 1 focus to touch a creature and restore hit points equal to one Martial Arts die plus your Wisdom modifier. When you use Flurry of Blows, you can replace one of its unarmed strikes with this effect without spending the extra focus for the heal — Flurry's own focus cost still applies.",
+    // Row-driven action (#1912) — S, identity == pool. Physician's Touch
+    // (L6) upgrades this in place — an announce-augmentor payload
+    // (physicians-touch.ts), never a second row. The Flurry-replacement
+    // variant is its own actionOnly sibling below (no Focus cost of its
+    // own, since Flurry already spent 1 Focus via its own action).
+    resourceKey: "handOfHealing",
+    activationCost: "action",
+    costKind: "pool",
+    costPoolKey: "focus",
+    costBase: 1,
+    reminder: "Magic action: expend 1 Focus to heal a creature you touch (Martial Arts die + Wis mod).",
   },
   {
     subclassSlug: slug("monk-warrior-of-mercy"),
@@ -696,6 +1056,21 @@ const WARRIOR_OF_MERCY_RAW: RawMonkFeature[] = [
     level: 17,
     description:
       "As a Magic action, expend 5 focus to touch a creature that died no more than 24 hours ago and return it to life with 4d10 plus your Wisdom modifier hit points, ending the Blinded, Deafened, Paralyzed, Poisoned, and Stunned conditions on it. Usable once per long rest.",
+  },
+  // Flurry-replacement variant: swaps in for one of Flurry of Blows' own
+  // unarmed strikes, so it costs no Focus of its own (Flurry already spent
+  // its 1 Focus via the separate flurryOfBlows action) — hence no cost
+  // columns. actionOnly (#1912): "Hand of Healing (Flurry replacement)" is
+  // this variant's own served name, never a feature card of its own.
+  {
+    subclassSlug: slug("monk-warrior-of-mercy"),
+    name: "Hand of Healing (Flurry replacement)",
+    level: 3,
+    description: "Replace one Unarmed Strike from Flurry of Blows with Hand of Healing at no extra Focus cost.",
+    resourceKey: "handOfHealingFlurry",
+    activationCost: "bonusAction",
+    reminder: "Replace one Unarmed Strike from Flurry of Blows with Hand of Healing at no extra Focus cost. Flurry of Healing and Harm (L11): replace every strike this way.",
+    actionOnly: true,
   },
 ];
 
@@ -756,6 +1131,14 @@ const WARRIOR_OF_THE_ELEMENTS_RAW: RawMonkFeature[] = [
     edition: "EDITION_2024",
     description:
       "As a Magic action, you can expend 2 Focus Points to create a 20-foot-radius sphere of elemental energy centered on a point within 120 ft. Choose Acid, Cold, Fire, Lightning, or Thunder. Each creature in the sphere makes a Dexterity saving throw (your focus save DC), taking damage equal to three rolls of your Martial Arts die of the chosen type on a failure, or half as much on a success.",
+    // Row-driven action (#1912) — S, identity == pool. The save-DC damage op
+    // itself stays in warrior-of-elements.ts's own endpoint (castElementalBurst).
+    resourceKey: "elementalBurst",
+    activationCost: "action",
+    costKind: "pool",
+    costPoolKey: "focus",
+    costBase: 2,
+    reminder: "Magic action, 2 focus: 20-ft-radius sphere within 120 ft, chosen damage type. Each creature makes a Dexterity save (focus DC) — 3 Martial Arts dice on a failure, half as much on a success.",
   },
   {
     subclassSlug: slug("monk-warrior-of-the-elements"),
@@ -802,6 +1185,35 @@ const WAY_OF_THE_FOUR_ELEMENTS_RAW: RawMonkFeature[] = [
     edition: "EDITION_2014",
     description:
       "You always know this elemental discipline, and it doesn't count against the number of elemental disciplines you know. As an action, you can briefly control elemental forces within 30 ft of you, causing one of the following effects: create a harmless, sensory elemental effect; instantaneously light or snuff out a candle, torch, or small campfire; chill or warm up to 1 pound of nonliving material for up to 1 hour; or shape a small amount of nonliving earth, fire, water, or mist for up to 1 minute. PHB'14 p.80.",
+    // Row-driven action (#1912) — P: free/uncapped, no resourceKey-gated
+    // cost at all (unlike 2024's Focus-fuelled buff toggle — a materially
+    // different feature, not a text variant of it).
+    resourceKey: "elementalAttunement",
+    activationCost: "action",
+    reminder: "Briefly control elemental forces within 30 ft: create a harmless sensory effect; light or snuff a small flame; chill or warm up to 1 lb of nonliving material for 1 hour; or shape a small amount of nonliving earth, fire, water, or mist for 1 minute. Free — always known, no ki cost.",
+  },
+  // castDiscipline is a discoverability/gate tile only — no ACTION_EFFECT_FN
+  // entry (the real cast is one ABILITY_REGISTRY entry, disciplines.ts,
+  // dispatched through POST /api/characters/:id/abilities/disciplines/
+  // transactions, not this table's generic action-execute path). actionOnly
+  // (#1912): no "Elemental Discipline" feature-text row exists — "Disciple
+  // of the Elements" above is the mechanism feature text, a different name.
+  // Identity ≠ pool (both happen to be named "ki"-adjacent strings, but
+  // resourceKey "castDiscipline" and costPoolKey "ki" are genuinely
+  // different keys) — the disciplines.ts guard reads THIS row's own key.
+  {
+    subclassSlug: slug("monk-way-of-the-four-elements"),
+    name: "Elemental Discipline",
+    level: 3,
+    edition: "EDITION_2014",
+    description: "Spend ki to cast a known elemental discipline (2-6 ki, capped by your monk level).",
+    resourceKey: "castDiscipline",
+    activationCost: "action",
+    costKind: "pool",
+    costPoolKey: "ki",
+    costBase: 1,
+    reminder: "Spend ki to cast a known elemental discipline (2-6 ki, capped by your monk level).",
+    actionOnly: true,
   },
 ];
 

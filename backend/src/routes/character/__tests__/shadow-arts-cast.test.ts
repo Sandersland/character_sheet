@@ -123,6 +123,25 @@ describe("Shadow Arts cast endpoint", () => {
       { gateLevel: 3, castingAbility: "wisdom" },
     );
 
+    // shadowArts/cloakOfShadows are row-driven now (#1912) — the guard
+    // (shadow-arts.ts) reads subclassRef.features, a real subclassId FK
+    // relation, so this bespoke subclass needs its own ClassFeature rows.
+    await prisma.classFeature.deleteMany({ where: { classId, subclassId: shadow.id } });
+    await prisma.classFeature.createMany({
+      data: [
+        {
+          classId, subclassId: shadow.id, name: "Shadow Arts (Darkness)", level: 3, edition: "EDITION_2024",
+          description: "Spend 1 focus to cast Darkness without material components.",
+          resourceKey: "shadowArts", activationCost: "action", costKind: "pool", costPoolKey: "focus", costBase: 1,
+        },
+        {
+          classId, subclassId: shadow.id, name: "Cloak of Shadows", level: 17, edition: "EDITION_2024",
+          description: "Spend 3 focus and use your action to become invisible.",
+          resourceKey: "cloakOfShadows", activationCost: "action", costKind: "pool", costPoolKey: "focus", costBase: 3,
+        },
+      ],
+    });
+
     // This suite's fixtures default to EDITION_2024 (rulesEdition unset) — the
     // real "Shadow Arts: Darkness" name now exists once per edition (#1502),
     // so the lookup must pin the 2024 row explicitly or a bare findFirst is
@@ -403,6 +422,35 @@ describe("2014 Way of Shadow — real edition-tagged cast mechanics (#1502)", ()
       { gateLevel: 3, castingAbility: "wisdom" },
     );
 
+    // shadowArts/shadowStep/cloakOfShadows/opportunist are row-driven now
+    // (#1912) — see the 2024 fixture's own comment above for why this
+    // bespoke subclass needs its own ClassFeature rows.
+    await prisma.classFeature.deleteMany({ where: { classId: wayClassId, subclassId: way.id } });
+    await prisma.classFeature.createMany({
+      data: [
+        {
+          classId: wayClassId, subclassId: way.id, name: "Shadow Arts", level: 3, edition: "EDITION_2014",
+          description: "Spend 2 ki to cast darkness, darkvision, pass without trace, or silence.",
+          resourceKey: "shadowArts", activationCost: "action", costKind: "pool", costPoolKey: "ki", costBase: 2,
+        },
+        {
+          classId: wayClassId, subclassId: way.id, name: "Shadow Step", level: 6, edition: "EDITION_2014",
+          description: "Teleport as a bonus action while in dim light or darkness.",
+          resourceKey: "shadowStep", activationCost: "bonusAction",
+        },
+        {
+          classId: wayClassId, subclassId: way.id, name: "Cloak of Shadows", level: 11, edition: "EDITION_2014",
+          description: "Use your action to become invisible while in dim light or darkness.",
+          resourceKey: "cloakOfShadows", activationCost: "action",
+        },
+        {
+          classId: wayClassId, subclassId: way.id, name: "Opportunist", level: 17, edition: "EDITION_2014",
+          description: "Use your reaction to make a melee attack against a creature hit by another attack.",
+          resourceKey: "opportunist", activationCost: "reaction",
+        },
+      ],
+    });
+
     for (const name of ["Shadow Arts: Darkness", "Shadow Arts: Darkvision", "Shadow Arts: Pass without Trace", "Shadow Arts: Silence"]) {
       const row = await prisma.grantedAbility.findFirst({ where: { name, edition: "EDITION_2014" } });
       if (!row) throw new Error(`${name} (EDITION_2014) not seeded — run \`prisma db seed\` before tests`);
@@ -555,7 +603,10 @@ describe("2014 Way of Shadow — real edition-tagged cast mechanics (#1502)", ()
 describe("GET availableActions — entry-scoped for multiclass (#1315)", () => {
   const MC2_ID = "test-shadow-mc-actions-1";
   const MC2_CLASS_NAME = "Shadow MC Actions Test Class";
+  const MC2_MONK_CLASS_NAME = "Shadow MC Actions Test Monk Class";
   let mc2ClassId: string;
+  let mc2MonkClassId: string;
+  let mc2MonkSubclassId: string;
 
   beforeAll(async () => {
     await ensureTestOwner(OWNER_ID);
@@ -572,11 +623,49 @@ describe("GET availableActions — entry-scoped for multiclass (#1315)", () => {
     // assertion below.
     await prisma.classFeature.deleteMany({ where: { classId: mc2ClassId } });
     await prisma.classFeature.createMany({ data: fighterResourceRowsData(mc2ClassId) });
+
+    // shadowArts is row-driven now too (#1912) and tied to a real subclassId
+    // FK (featureRowsOf reads subclassRef.features), unlike the retired
+    // DERIVED_ACTIONS gate this fixture's own comment used to describe
+    // ("Monk needs no classId here … resolves off entry.name/subclass").
+    // The monk entry gets its OWN bespoke class/subclass (not mc2ClassId,
+    // which is the fighter's) so its classRows never collide with the
+    // fighter's Second Wind/Action Surge base rows above.
+    const monkCls = await prisma.characterClass.upsert({
+      where: { name: MC2_MONK_CLASS_NAME },
+      create: { name: MC2_MONK_CLASS_NAME, hitDie: "d8", savingThrows: ["strength", "dexterity"], skillChoiceCount: 2, skillChoices: ["acrobatics", "stealth"], isSpellcaster: false },
+      update: {},
+    });
+    mc2MonkClassId = monkCls.id;
+    const monkSub = await prisma.subclass.findFirst({ where: { classId: mc2MonkClassId, name: "Warrior of Shadow" } });
+    const monkSubRow =
+      monkSub ??
+      (await prisma.subclass.create({
+        data: { classId: mc2MonkClassId, name: "Warrior of Shadow", description: "Test subclass.", slug: "warrior-of-shadow-mc-actions-test" },
+      }));
+    mc2MonkSubclassId = monkSubRow.id;
+    await prisma.classFeature.deleteMany({ where: { classId: mc2MonkClassId, subclassId: mc2MonkSubclassId } });
+    await prisma.classFeature.create({
+      data: {
+        classId: mc2MonkClassId,
+        subclassId: mc2MonkSubclassId,
+        name: "Shadow Arts (Darkness)",
+        level: 3,
+        edition: "EDITION_2024",
+        description: "Spend 1 focus to cast Darkness without material components.",
+        resourceKey: "shadowArts",
+        activationCost: "action",
+        costKind: "pool",
+        costPoolKey: "focus",
+        costBase: 1,
+      },
+    });
   });
 
   afterAll(async () => {
     await prisma.character.deleteMany({ where: { id: MC2_ID } });
     await prisma.characterClass.deleteMany({ where: { name: MC2_CLASS_NAME } });
+    await prisma.characterClass.deleteMany({ where: { name: MC2_MONK_CLASS_NAME } });
   });
 
   afterEach(async () => {
@@ -600,17 +689,18 @@ describe("GET availableActions — entry-scoped for multiclass (#1315)", () => {
         classEntries: {
           create: [
             { name: "fighter", subclass: null, classId: mc2ClassId, level: 8 - monkLevel, position: 0 },
-            // classId: null (#1528) — this entry previously shared mc2ClassId
-            // with the fighter entry above, which was harmless while
-            // resourceFn dispatched by className string alone; now that
-            // Second Wind/Action Surge are row-driven (classId-scoped
-            // ClassFeature rows, keyed independent of entry.name), sharing
-            // one classId across two logically-different class entries
-            // makes BOTH entries see the fighter rows — an unsanctioned
-            // "secondWind"/"actionSurge" pool-key collision 500s in
-            // collectEntryScopedPools. Monk needs no classId here (its own
-            // gates resolve off entry.name/subclass, never entry.classId).
-            { name: "monk", subclass: "warrior of shadow", classId: null, level: monkLevel, position: 1 },
+            // Its OWN bespoke classId/subclassId (#1912), not mc2ClassId —
+            // sharing one classId across two logically-different class
+            // entries makes BOTH entries see the OTHER'S base classRows
+            // (Second Wind/Action Surge for the monk, or vice versa) since
+            // classRows are scoped by classId alone, independent of
+            // entry.name — an unsanctioned "secondWind"/"actionSurge" pool-key
+            // collision 500s in collectEntryScopedPools. shadowArts is
+            // row-driven now too and needs a real subclassId FK
+            // (featureRowsOf reads subclassRef.features) — the retired
+            // DERIVED_ACTIONS gate this comment used to describe needed
+            // neither.
+            { name: "monk", subclass: "warrior of shadow", classId: mc2MonkClassId, subclassId: mc2MonkSubclassId, level: monkLevel, position: 1 },
           ],
         },
       },
@@ -745,6 +835,7 @@ describe("Shadow Arts source guard", () => {
   const FIXTURE_ID_2 = "test-shadow-source-monk-1";
   let nonShadowId: string;
   let sourceClassId: string;
+  let sourceSubclassId: string;
 
   beforeAll(async () => {
     await ensureTestOwner(OWNER_ID);
@@ -755,6 +846,27 @@ describe("Shadow Arts source guard", () => {
       update: {},
     });
     sourceClassId = cls.id;
+
+    // shadowArts is row-driven now (#1912) — the guard (shadow-arts.ts) reads
+    // subclassRef.features, a real subclassId FK relation; this fixture's
+    // characters need one to reach the catalog-lookup logic these tests
+    // actually exercise.
+    const sourceSub = await prisma.subclass.findFirst({ where: { classId: sourceClassId, name: "Warrior of Shadow" } });
+    const sourceSubRow =
+      sourceSub ??
+      (await prisma.subclass.create({
+        data: { classId: sourceClassId, name: "Warrior of Shadow", description: "Test subclass.", slug: "warrior-of-shadow-source-test" },
+      }));
+    sourceSubclassId = sourceSubRow.id;
+    await prisma.classFeature.deleteMany({ where: { classId: sourceClassId, subclassId: sourceSubclassId } });
+    await prisma.classFeature.create({
+      data: {
+        classId: sourceClassId, subclassId: sourceSubclassId, name: "Shadow Arts (Darkness)", level: 3, edition: "EDITION_2024",
+        description: "Spend 1 focus to cast Darkness without material components.",
+        resourceKey: "shadowArts", activationCost: "action", costKind: "pool", costPoolKey: "focus", costBase: 1,
+      },
+    });
+
     const row = await upsertEditionRow(
       prisma.grantedAbility,
       { name: NON_SHADOW_NAME, edition: null },
@@ -829,7 +941,7 @@ describe("Shadow Arts source guard", () => {
         experiencePoints: XP_L3,
         ownerId: OWNER_ID,
         resources: Prisma.JsonNull,
-        classEntries: { create: [{ name: "monk", subclass: "warrior of shadow", classId: sourceClassId, position: 0 }] },
+        classEntries: { create: [{ name: "monk", subclass: "warrior of shadow", classId: sourceClassId, subclassId: sourceSubclassId, position: 0 }] },
       },
     });
     const res = await agent()
@@ -869,7 +981,7 @@ describe("Shadow Arts source guard", () => {
           experiencePoints: XP_L3,
           ownerId: OWNER_ID,
           resources: Prisma.JsonNull,
-          classEntries: { create: [{ name: "monk", subclass: "warrior of shadow", classId: sourceClassId, position: 0 }] },
+          classEntries: { create: [{ name: "monk", subclass: "warrior of shadow", classId: sourceClassId, subclassId: sourceSubclassId, position: 0 }] },
         },
       });
       const res = await agent()

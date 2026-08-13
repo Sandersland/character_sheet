@@ -233,49 +233,26 @@ export interface ResourcePool {
 // header's "Adding a new mechanical action" note (#1315): prisma/seed.ts's
 // ACTIONS class rows are not consumed by any route and don't need to stay in
 // sync (its universal rows are, via referenceRouter).
+//
+// #1912 (epic #1903, 4/4): every monk/rogue/barbarian row that lived here
+// moved onto its class's own ClassFeature rows (prisma/seed/{monk,rogue,
+// barbarian}-features.ts), the same #1528 mechanism #1909 moved the eight
+// cross-class rows onto. `summonBondedWeapon` is the ONE row left, and stays
+// TS permanently (not "not yet migrated"): its `enabled` reads a synthetic
+// "weaponBond" pool built from a LIVE COUNT of `weaponBonded` inventory rows
+// (#1854) — no ClassFeature descriptor column expresses a live-inventory
+// gate (poolFromRow's resourceTotals are a level-tiered formula, never an
+// inventory query), so this row has no row-driven destination to move to.
+// check-class-ts-migration.sh's DERIVED_ACTIONS_MAX ratchet is pinned to 1
+// for exactly this reason.
 const DERIVED_ACTIONS: DerivedActionRecord[] = [
-  // Universal actions are intentionally NOT included in `availableActions` on the
-  // character: TurnHub gets them from GET /api/reference's universalActions,
-  // resolved per edition (#1430), so including them here would duplicate them —
-  // and would put ~105 lines of static rules copy on every character payload.
-  // Only class-specific (non-universal) actions go in availableActions.
-
-  // Barbarian
-  // Rage/endRage retired from this table (#1686) — row-driven now
-  // (barbarian-features.ts's Rage rows, resolverKind "toggle"), synthesized
-  // by toggleActionsFromRow instead of a hand-authored pair here — mirrors
-  // Second Wind/Action Surge's own #1528 retirement.
-  { key: "recklessAttack", name: "Reckless Attack", cost: "free", grantClass: "barbarian", grantLevel: 2 },
-
-  // Bard — bardicInspiration retired from this table (#1909): row-driven now
-  // (bard-features.ts's two Bardic Inspiration rows, identity-only
-  // resourceKey), synthesized by actionFromRow — the pool itself stays in
-  // bard.ts's resourceFn (unchanged).
-
-  // Cleric / Paladin — channelDivinity retired from this table (#1909):
-  // row-driven now, onto TWO rows (cleric-features.ts L2 + paladin-features.ts
-  // L3, both editions, resourceKey "channelDivinity") rather than one merged
-  // TS row. PHB'14 p.164 (multiclassing): gaining the feature from a second
-  // class grants that class's effects but no additional uses — so cleric 2
-  // and paladin 3 still share one pool (SHARED_POOL_MERGE, registry.ts) and
-  // deriveEntryScopedActions still dedupes by key, so a Cleric/Paladin
-  // multiclass still surfaces exactly one card (#1340) — see
-  // entry-scoped-actions.test.ts's own coverage.
-
-  // Druid — wildShape retired from this table (#1909): row-driven now
-  // (druid-features.ts's two Wild Shape rows).
-
-  // Fighter — Second Wind / Action Surge retired from this table (#1528):
-  // both are now row-driven (actionsFromRows below), read off Fighter's own
-  // ClassFeature rows (activationCost/resolverKind/cost*/effect* columns,
-  // prisma/seed/fighter-features.ts) instead of a DERIVED_ACTIONS entry.
-  //
-  // Eldritch Knight — Weapon Bond (2014, PHB'14 p.75, #1854): `enabled` reads
-  // a synthetic "weaponBond" pool (character-serialize.ts) built from
-  // weapon-bond.ts's weaponBondEligible + a live count of `weaponBonded`
-  // inventory rows — never a resource spend (bonding/unbonding is its own
-  // "weapon-bond" ability, not this action). 2014-only: 2024 Eldritch Knight
-  // text is unverified/PARKED (#1531), so this stays 2014 until that lands.
+  // Fighter / Eldritch Knight — Weapon Bond (2014, PHB'14 p.75, #1854):
+  // `enabled` reads a synthetic "weaponBond" pool (character-serialize.ts)
+  // built from weapon-bond.ts's weaponBondEligible + a live count of
+  // `weaponBonded` inventory rows — never a resource spend (bonding/
+  // unbonding is its own "weapon-bond" ability, not this action). 2014-only:
+  // 2024 Eldritch Knight text is unverified/PARKED (#1531), so this stays
+  // 2014 until that lands.
   {
     key: "summonBondedWeapon",
     name: "Summon Bonded Weapon",
@@ -288,576 +265,6 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
     edition: "EDITION_2014",
     reminder: "Drop what you're holding and summon one bonded weapon into your hand. Bonded weapons can't be disarmed.",
   },
-
-  // Monk
-  // Martial Arts (#1218): a free Unarmed Strike as a Bonus Action from L1 — no
-  // resource cost, gated only on the Martial Arts blanket condition (no armor
-  // or Shield). SRD 5.2 / PHB'24 p.88 grants this with no Attack-action
-  // prerequisite; SRD 5.1 / PHB'14 p.78 DOES require the Attack action first —
-  // this comment used to assert the 2024 reading as if it were universal
-  // (corrected by #1499). The row stays SHARED across editions regardless:
-  // both editions gate on the identical unarmored/no-shield condition, and the
-  // Attack-action difference is reminder TEXT, not a gate. DEFERRED (#1500):
-  // forking this row's reminder is still not worth doing — the frontend's
-  // static ACTION_RESOLVERS.bonusUnarmedStrike.subtitle (dice-math text) wins
-  // over any served `reminder` in classActionOption's priority order
-  // (turnOptions.ts), so an edition-forked reminder here would never actually
-  // render; the substantive 2014 text lives on the Martial Arts ClassFeature
-  // row instead (monk-features.ts), which #1500 DID rewrite from SRD 5.1.
-  // Distinct from Flurry of Blows (#1217, the two-strike Focus version,
-  // tagged EDITION_2024 below, with a 2014 counterpart under monkPoolKey's
-  // "ki" pool authored alongside it, #1500).
-  { key: "bonusUnarmedStrike", name: "Bonus Unarmed Strike", cost: "bonusAction", grantClass: "monk", grantLevel: 1, requiresUnarmored: true },
-  // `count` (#1505): resolved strike count the client renders verbatim,
-  // instead of re-deriving Heightened Focus from a level threshold
-  // (frontend/src/lib/attackMath.ts's retired flurryStrikeCount). 2 normally,
-  // 3 at Heightened Focus (monk L10, #1244).
-  {
-    key: "flurryOfBlows",
-    name: "Flurry of Blows",
-    cost: "bonusAction",
-    grantClass: "monk",
-    grantLevel: 2,
-    resourceKey: "focus",
-    resourceAmount: 1,
-    count: (level) => (level >= 10 ? 3 : 2),
-    edition: "EDITION_2024",
-  },
-  // 2014 (SRD 5.1 / PHB'14 p.77): flat 1-ki cost, no Heightened Focus
-  // three-strike upgrade (2024-only) — same key as the row above (mirrors
-  // Lay on Hands' same-key edition fork), safe to reuse because
-  // ACTION_EFFECT_FN.flurryOfBlows resolves its pool through ctx.edition
-  // (monkPoolKey) rather than a hardcoded key — see that entry below. `count`
-  // is a flat 2 at every level — SRD 5.1 has no three-strike upgrade at all.
-  {
-    key: "flurryOfBlows",
-    name: "Flurry of Blows",
-    cost: "bonusAction",
-    grantClass: "monk",
-    grantLevel: 2,
-    resourceKey: "ki",
-    resourceAmount: 1,
-    count: 2,
-    reminder: "Immediately after taking the Attack action, spend 1 ki to make two unarmed strikes as a bonus action.",
-    edition: "EDITION_2014",
-  },
-  // Patient Defense / Step of the Wind (PHB'24 p.98, SRD 5.2, #1240) each grant
-  // TWO menu entries — a free variant and a 1-Focus variant — rather than the
-  // 2014 SRD's flat "always costs 1 ki" shape. Both compete for the same bonus
-  // action, so both are cost:"bonusAction"; the free entry has no resourceKey
-  // (always enabled, like Dodge/Dash themselves) while the Focus entry gates
-  // on the focus pool like any other spend. Heightened Focus (monk L10,
-  // #1244) upgrades both *Focus entries without touching the free ones:
-  // patientDefenseFocus's reminder + ACTION_EFFECT_FN entry gain a level-gated
-  // temp-HP roll; stepOfTheWindFocus's reminder gains a narrated move-a-
-  // willing-creature rider (no server state — this app has no ally/NPC
-  // combatant model to move).
-  // These four rows' `regrants` (#1431) now render on the card too (#1505,
-  // ActionSheetBody's regrantNames-first precedence) — the curated reminders
-  // stay in the toast/drill-in, they just no longer win the subtitle over the
-  // resolved regrant names. All four are tagged edition: "EDITION_2024"
-  // (#1499): SRD 5.1 Patient Defense buys DODGE for a flat 1 ki (no free
-  // variant), and SRD 5.1 Step of the Wind buys Disengage-or-Dash for a flat
-  // 1 ki the same way — neither 2014 shape is these two-menu-entries-per-
-  // feature rows, so serving them to a 2014 monk would be wrong. #1500
-  // authors the 2014-keyed equivalents under monkPoolKey's "ki" pool, below.
-  { key: "patientDefense", name: "Patient Defense", cost: "bonusAction", grantClass: "monk", grantLevel: 2, regrants: ["disengage"], reminder: "Disengage (free bonus action).", edition: "EDITION_2024" },
-  {
-    key: "patientDefenseFocus",
-    name: "Patient Defense (1 Focus)",
-    cost: "bonusAction",
-    grantClass: "monk",
-    grantLevel: 2,
-    resourceKey: "focus",
-    resourceAmount: 1,
-    regrants: ["disengage", "dodge"],
-    reminder: (level) =>
-      level >= 10
-        ? "Disengage + Dodge (spend 1 Focus). Heightened Focus (L10): also gain temporary hit points equal to two Martial Arts die rolls."
-        : "Disengage + Dodge (spend 1 Focus).",
-    edition: "EDITION_2024",
-  },
-  { key: "stepOfTheWind", name: "Step of the Wind", cost: "bonusAction", grantClass: "monk", grantLevel: 2, regrants: ["dash"], reminder: "Dash (free bonus action).", edition: "EDITION_2024" },
-  {
-    key: "stepOfTheWindFocus",
-    name: "Step of the Wind (1 Focus)",
-    cost: "bonusAction",
-    grantClass: "monk",
-    grantLevel: 2,
-    resourceKey: "focus",
-    resourceAmount: 1,
-    regrants: ["disengage", "dash"],
-    reminder: (level) =>
-      level >= 10
-        ? "Disengage + Dash, jump distance doubled this turn (spend 1 Focus). Heightened Focus (L10): also bring one willing creature within 5 ft along with you, moving it up to your Speed — it doesn't provoke opportunity attacks."
-        : "Disengage + Dash, jump distance doubled this turn (spend 1 Focus).",
-    edition: "EDITION_2024",
-  },
-  // 2014 (SRD 5.1 / PHB'14 p.77): ONE row apiece, not the 2024 free/paid
-  // pair — a flat 1-ki cost with no free variant. Distinct keys from the
-  // 2024 rows above (NOT `patientDefense`/`stepOfTheWind`): those exact keys
-  // are pinned `serverEffect: false` in the frontend's ACTION_RESOLVERS
-  // table (actionResolvers.ts) for the FREE 2024 variant, so a 2014 1-ki row
-  // reusing either key would render but silently never spend.
-  {
-    key: "patientDefenseKi",
-    name: "Patient Defense",
-    cost: "bonusAction",
-    grantClass: "monk",
-    grantLevel: 2,
-    resourceKey: "ki",
-    resourceAmount: 1,
-    regrants: ["dodge"],
-    reminder: "Spend 1 ki to take the Dodge action as a bonus action.",
-    edition: "EDITION_2014",
-  },
-  {
-    key: "stepOfTheWindKi",
-    name: "Step of the Wind",
-    cost: "bonusAction",
-    grantClass: "monk",
-    grantLevel: 2,
-    resourceKey: "ki",
-    resourceAmount: 1,
-    regrants: ["disengage", "dash"],
-    reminder: "Spend 1 ki to take the Disengage or Dash action as a bonus action; your jump distance is doubled for the turn.",
-    edition: "EDITION_2014",
-  },
-  // Stunning Strike (L5) is NOT a selectable action — it's a post-hit rider
-  // (spend + Con save + fail/success outcome), built as its own dedicated
-  // vertical in stunning-strike.ts, exactly like Sneak Attack bypasses this
-  // catalog entirely (#1242 supersedes the #392 bare-spend stub formerly here).
-  // Deflect Attacks (#1241, SRD 5.2 L3, renamed from 2014 Deflect Missiles): the base
-  // reduction (1d10 + Dex + monk level) costs nothing, so — like the Warrior of Shadow
-  // reminders below — it carries no resourceKey and the client rolls it directly (see
-  // ACTION_EFFECT_FN comment). Deflect Energy (L13) just widens the damage-type clause
-  // in the reminder text; it isn't a separate action key. Tagged EDITION_2024 (#1499):
-  // PHB'14's Deflect Missiles is ranged-weapon-attacks-only, a materially different
-  // feature under a different name, not a text variant of this one — #1500 authors it
-  // as its own row rather than forking this one.
-  {
-    key: "deflectAttacks",
-    name: "Deflect Attacks",
-    cost: "reaction",
-    grantClass: "monk",
-    grantLevel: 3,
-    reminder:
-      "Reaction: when hit by a melee or ranged attack dealing bludgeoning, piercing, or slashing damage (any damage type at L13, Deflect Energy), reduce the damage by 1d10 + Dex modifier + monk level.",
-    // Resolved for the toast (frontend/src/lib/deflectAttacks.ts, #1505) so
-    // the client never re-derives the L13 Deflect Energy threshold itself.
-    damageTypeClause: (level) => (level >= 13 ? "any damage type" : "bludgeoning, piercing, or slashing damage"),
-    edition: "EDITION_2024",
-  },
-  // Redirect rider: only meaningful once a ranged hit is reduced to 0 — a "free"
-  // follow-up decision within the same reaction (mirrors Stunning Strike's shape),
-  // not its own action-economy slot. Spends the persisted Focus resource, unlike
-  // the free base reduction above. Tagged EDITION_2024 alongside deflectAttacks —
-  // PHB'14's Deflect Missiles has no redirect rider at all.
-  { key: "deflectAttacksRedirect", name: "Deflect Attacks — Redirect", cost: "free", grantClass: "monk", grantLevel: 3, resourceKey: "focus", resourceAmount: 1, edition: "EDITION_2024" },
-
-  // Deflect Missiles (SRD 5.1 / PHB'14 p.77, #1500) — the 2014 counterpart to
-  // Deflect Attacks above: RANGED WEAPON ATTACKS ONLY (no melee), same base
-  // reduction formula, no resourceKey on the base row (free, narrated —
-  // mirrors deflectAttacks' own shape). The throw-back rider is a catch +
-  // ranged attack, not a save-forcing redirect, so it's a real 1-ki spend.
-  {
-    key: "deflectMissiles",
-    name: "Deflect Missiles",
-    cost: "reaction",
-    grantClass: "monk",
-    grantLevel: 3,
-    reminder:
-      "Reaction: when hit by a ranged weapon attack, reduce the damage by 1d10 + Dex modifier + monk level. If this reduces it to 0 and you have a free hand, catch the missile.",
-    edition: "EDITION_2014",
-  },
-  {
-    key: "deflectMissilesThrow",
-    name: "Deflect Missiles — Throw Back",
-    cost: "free",
-    grantClass: "monk",
-    grantLevel: 3,
-    resourceKey: "ki",
-    resourceAmount: 1,
-    reminder: "Spend 1 ki to make a ranged attack with the caught missile (range 20/60, always proficient) — 1d6 + Dex modifier bludgeoning on a hit.",
-    edition: "EDITION_2014",
-  },
-
-  // Empty Body (SRD 5.1 / PHB'14 p.79, L18, #1500) — two independent
-  // ki-spend options with no server effect beyond the spend itself (no
-  // buff/condition model for the astral-projection clause, and invisibility
-  // has no target model to persist against — mirrors Cloak of Shadows/Shadow
-  // Arts below: gating + reminder rows only, no dedicated cast vertical yet).
-  {
-    key: "emptyBody",
-    name: "Empty Body — Invisibility",
-    cost: "action",
-    grantClass: "monk",
-    grantLevel: 18,
-    resourceKey: "ki",
-    resourceAmount: 4,
-    reminder: "Spend 4 ki to become invisible for 1 minute, with resistance to all damage but force damage during that time.",
-    edition: "EDITION_2014",
-  },
-  {
-    key: "emptyBodyAstralProjection",
-    name: "Empty Body — Astral Projection",
-    cost: "action",
-    grantClass: "monk",
-    grantLevel: 18,
-    resourceKey: "ki",
-    resourceAmount: 8,
-    reminder: "Spend 8 ki to cast astral projection on yourself without a material component; you can't take other creatures with you.",
-    edition: "EDITION_2014",
-  },
-
-  // Every row below is subclass-gated via grantSubclassSlugs. Warrior of the
-  // Elements / Warrior of Mercy stay deliberately UNTAGGED (#1499):
-  // SUBCLASS_SLUGS still contains no 2014 slug for either, so
-  // matchesSubclassGate already excludes every one of their rows for a 2014
-  // monk — an edition tag would add no observable behaviour, pending #1503.
-  // Warrior of Shadow (#1502) and Warrior of the Open Hand (#1501) are BOTH
-  // now explicitly tagged EDITION_2024, for the same underlying reason:
-  // SUBCLASS_SLUGS gained a real 2014 sibling for each (monk-way-of-shadow,
-  // monk-way-of-the-open-hand), so slug-gating alone already isolates the
-  // 2024 rows below, but the edition tag is now load-bearing defence-in-depth
-  // rather than a no-op. The two siblings diverge on KEY REUSE, not just
-  // content: Way of Shadow's rows reuse the SAME keys as Warrior of Shadow
-  // (shadowArts/shadowStep/cloakOfShadows — see the 2014 block further down,
-  // disambiguated by edition + grantSubclassSlugs alone), while Way of the
-  // Open Hand's Wholeness of Body needs its OWN key
-  // ("wholenessOfBodyAction", not this block's "wholenessOfBody") because its
-  // shape differs enough that reusing the key would blur two client-side
-  // resolvers — see that row's own comment. Both retags are bound in the
-  // same commit as their Subclass row's own edition tag (subclasses.ts).
-  // Warrior of Shadow reminder action (2024 rewrite, #1246) — no resourceKey, no
-  // server effect; reminder is the deliverable. Improved Shadow Step (L11)
-  // upgrades the SAME bonus action (ignore the dim/dark destination requirement
-  // for 1 focus) rather than adding a competing catalog row — mirrors how
-  // Heightened Focus upgrades patientDefenseFocus/stepOfTheWindFocus in place.
-  // Opportunist (2014 L17 reaction) is retired for THIS (2024) subclass —
-  // replaced by Cloak of Shadows (shadow-arts.ts activateCloakOfShadows), a
-  // real resourceKey-gated cast, not a catalog reminder. The 2014 Way of
-  // Shadow fork below reinstates Opportunist under its own slug (#1502).
-  {
-    key: "shadowStep",
-    name: "Shadow Step",
-    cost: "bonusAction",
-    grantClass: "monk",
-    edition: "EDITION_2024",
-    grantSubclassSlugs: ["monk-warrior-of-shadow"],
-    grantLevel: 6,
-    reminder: (level) =>
-      level >= 11
-        ? "Teleport up to 60 ft between areas of dim light or darkness (or, for 1 focus, ignore the dim/dark destination requirement); advantage on your first melee attack before the end of this turn. Make one unarmed strike immediately after teleporting."
-        : "Teleport up to 60 ft between areas of dim light or darkness; advantage on your first melee attack before the end of this turn. Make one unarmed strike immediately after teleporting.",
-  },
-  // Warrior of Shadow (PHB'24 p.91 — not in SRD 5.2, which ships only Warrior
-  // of the Open Hand for monk) Shadow Arts (L3) / Cloak of Shadows (L17) —
-  // migrated off a pair of DerivedClassInfo availability booleans onto rows
-  // here (#1315), same as shadowStep above: the actual cast/activate stays in
-  // the dedicated shadow-arts.ts vertical (its own transactions endpoint), so
-  // neither row gets an ACTION_EFFECT_FN entry. Darkness's normal casting
-  // time is an action (SRD 5.2 — Darkness itself IS core-rules content);
-  // Cloak of Shadows (PHB'24 p.91) is explicitly a Magic action (also
-  // "action" here — this app doesn't distinguish Magic action from a bare
-  // action in the cost enum).
-  {
-    key: "shadowArts",
-    name: "Shadow Arts (Darkness)",
-    cost: "action",
-    grantClass: "monk",
-    edition: "EDITION_2024",
-    grantSubclassSlugs: ["monk-warrior-of-shadow"],
-    grantLevel: 3,
-    resourceKey: "focus",
-    resourceAmount: 1,
-    reminder: "Spend 1 focus to cast Darkness without material components; you can see through it and move it up to 30 ft as a bonus action while it persists.",
-  },
-  {
-    key: "cloakOfShadows",
-    name: "Cloak of Shadows",
-    cost: "action",
-    grantClass: "monk",
-    edition: "EDITION_2024",
-    grantSubclassSlugs: ["monk-warrior-of-shadow"],
-    grantLevel: 17,
-    resourceKey: "focus",
-    resourceAmount: 3,
-    reminder: "Magic action, entirely within dim light or darkness: spend 3 focus to become invisible and move through creatures/objects as difficult terrain for 1 minute (or until incapacitated, or you end your turn in bright light). Flurry of Blows costs no focus while it lasts.",
-  },
-
-  // 2014 Way of Shadow (PHB'14 pp.79-80 — not in SRD 5.1, #1502): a
-  // materially different fork from the 2024 rewrite above, not a retab —
-  // Shadow Arts is a flat 4-spell 2-ki menu (Darkness/Darkvision/Pass without
-  // Trace/Silence, the exact per-spell menu resolved from the GrantedAbility
-  // catalog by shadow-arts.ts, not this row), Shadow Step grants no free
-  // unarmed strike, Cloak of Shadows moves to L11 with NO resource cost (no
-  // resourceKey at all — action only), and Opportunist returns at L17 as a
-  // pure reminder reaction (no 2024 equivalent). Same KEY NAMES as the 2024
-  // rows above (shadowArts/shadowStep/cloakOfShadows) — the edition tag plus
-  // grantSubclassSlugs disambiguates, never a second vocabulary; opportunist
-  // is the one 2014-only key with no 2024 counterpart.
-  {
-    key: "shadowArts",
-    name: "Shadow Arts",
-    cost: "action",
-    grantClass: "monk",
-    edition: "EDITION_2014",
-    grantSubclassSlugs: ["monk-way-of-shadow"],
-    grantLevel: 3,
-    resourceKey: "ki",
-    resourceAmount: 2,
-    reminder: "Spend 2 ki to cast darkness, darkvision, pass without trace, or silence, without material components (PHB'14 pp.79-80 — not in SRD 5.1).",
-  },
-  {
-    key: "shadowStep",
-    name: "Shadow Step",
-    cost: "bonusAction",
-    grantClass: "monk",
-    edition: "EDITION_2014",
-    grantSubclassSlugs: ["monk-way-of-shadow"],
-    grantLevel: 6,
-    reminder: "While in dim light or darkness, teleport as a bonus action up to 60 ft to an unoccupied space you can see that is also in dim light or darkness; you then have advantage on the first melee attack you make before the end of the turn.",
-  },
-  {
-    key: "cloakOfShadows",
-    name: "Cloak of Shadows",
-    cost: "action",
-    grantClass: "monk",
-    edition: "EDITION_2014",
-    grantSubclassSlugs: ["monk-way-of-shadow"],
-    grantLevel: 11,
-    reminder: "While in dim light or darkness, use your action to become invisible; you remain invisible until you make an attack, cast a spell, or are in an area of bright light. No ki cost, no duration cap.",
-  },
-  {
-    key: "opportunist",
-    name: "Opportunist",
-    cost: "reaction",
-    grantClass: "monk",
-    edition: "EDITION_2014",
-    grantSubclassSlugs: ["monk-way-of-shadow"],
-    grantLevel: 17,
-    reminder: "When a creature within 5 ft of you is hit by an attack made by a creature other than you, use your reaction to make a melee attack against that creature.",
-  },
-
-  // Warrior of the Elements (PHB'24 p.90 — not in SRD 5.2, which ships only
-  // Warrior of the Open Hand for monk). Elemental Attunement retired from
-  // this table (#1686) — row-driven now (monk.ts's AuthoredFeature entry,
-  // resolverKind "toggle"), synthesizing its own "elementalAttunement"/
-  // "endElementalAttunement" pair via toggleActionsFromRow; the buff/spend
-  // ops route through the generic toggle dispatcher
-  // (routes/character/actions.ts), NOT warrior-of-elements.ts's own endpoint
-  // any more. Elemental Burst stays here and in that endpoint — it's a
-  // save-DC damage op, not a buff.
-  {
-    key: "elementalBurst",
-    name: "Elemental Burst",
-    cost: "action",
-    grantClass: "monk",
-    grantSubclassSlugs: ["monk-warrior-of-the-elements"],
-    grantLevel: 6,
-    resourceKey: "focus",
-    resourceAmount: 2,
-    reminder: "Magic action, 2 focus: 20-ft-radius sphere within 120 ft, chosen damage type. Each creature makes a Dexterity save (focus DC) — 3 Martial Arts dice on a failure, half as much on a success.",
-  },
-
-  // Way of the Four Elements (2014-only, PHB'14 pp.78/80-81, #1503). Both
-  // rows tagged EDITION_2014 and gated to the 2014-only slug — pre-blessed
-  // safe to reuse the "elementalAttunement" key against the 2024 row above
-  // (actionGrantLevel filters by edition BEFORE matching by key, and the two
-  // rows' grantSubclassSlugs are disjoint slugs regardless — #1503's own
-  // execution-decision comment names this the FIRST same-key-different-
-  // edition collision this table has ever carried, #1499's own comment
-  // anticipated it). Elemental Attunement here is free/uncapped and carries
-  // no resourceKey — unlike 2024's Focus-fuelled buff toggle, PHB'14's
-  // version is a flat reminder action with no persisted state at all.
-  // castDiscipline is a discoverability/gate tile only — no ACTION_EFFECT_FN
-  // entry, same shape as shadowArts below: the real cast is one
-  // ABILITY_REGISTRY entry (lib/classes/disciplines.ts, "disciplines"),
-  // dispatched through POST /api/characters/:id/abilities/disciplines/
-  // transactions, not this table's generic action-execute path.
-  {
-    key: "elementalAttunement",
-    name: "Elemental Attunement",
-    cost: "action",
-    grantClass: "monk",
-    grantSubclassSlugs: ["monk-way-of-the-four-elements"],
-    grantLevel: 3,
-    edition: "EDITION_2014",
-    reminder:
-      "Briefly control elemental forces within 30 ft: create a harmless sensory effect; light or snuff a small flame; chill or warm up to 1 lb of nonliving material for 1 hour; or shape a small amount of nonliving earth, fire, water, or mist for 1 minute. Free — always known, no ki cost.",
-  },
-  {
-    key: "castDiscipline",
-    name: "Elemental Discipline",
-    cost: "action",
-    grantClass: "monk",
-    grantSubclassSlugs: ["monk-way-of-the-four-elements"],
-    grantLevel: 3,
-    edition: "EDITION_2014",
-    resourceKey: "ki",
-    resourceAmount: 1,
-    reminder: "Spend ki to cast a known elemental discipline (2-6 ki, capped by your monk level).",
-  },
-
-  // Warrior of the Open Hand (#1245): Open Hand Technique (Flurry-hit rider)
-  // and Quivering Palm (set/trigger) are post-hit riders with their own
-  // dedicated verticals (open-hand-technique.ts / quivering-palm.ts), exactly
-  // like Stunning Strike bypasses this catalog — neither is a selectable action.
-  // Wholeness of Body IS a selectable action: a Bonus Action heal, spending the
-  // #1228 wholenessOfBody pool (Martial Arts die + Wis mod, client-rolled).
-  // Tagged EDITION_2024 (#1501) now that a real 2014 sibling exists below.
-  {
-    key: "wholenessOfBody",
-    name: "Wholeness of Body",
-    cost: "bonusAction",
-    grantClass: "monk",
-    grantSubclassSlugs: ["monk-warrior-of-the-open-hand"],
-    grantLevel: 6,
-    resourceKey: "wholenessOfBody",
-    resourceAmount: 1,
-    edition: "EDITION_2024",
-  },
-  // Fleet Step (L11): not a discrete action — it lets you ALSO take Step of the
-  // Wind after any OTHER bonus action, so it carries no resourceKey/slot (like
-  // Reckless Attack/Metamagic's cost:"free" reminders) rather than competing
-  // with Wholeness of Body/Flurry/Bonus Unarmed Strike for the same bonus
-  // action. Full automation of "which bonus action did you just take" is heavy
-  // for a one-line rider — the reminder is the deliverable (ticket #1245).
-  // Tagged EDITION_2024 (#1501) — 2014's Way of the Open Hand has Tranquility
-  // at L11 instead (below), not Fleet Step.
-  {
-    key: "fleetStep",
-    name: "Fleet Step",
-    cost: "free",
-    grantClass: "monk",
-    grantSubclassSlugs: ["monk-warrior-of-the-open-hand"],
-    grantLevel: 11,
-    reminder: "When you take a bonus action other than Step of the Wind, you can also take Step of the Wind immediately afterward (no extra cost).",
-    edition: "EDITION_2024",
-  },
-
-  // Way of the Open Hand (SRD 5.1 / PHB'14 p.78, #1501) — 2014's counterpart,
-  // a SEPARATE subclass from Warrior of the Open Hand above (see
-  // subclass-slug.ts's SUBCLASS_IDENTITY). Open Hand Technique and Quivering
-  // Palm stay post-hit-rider/set-trigger verticals with no catalog row here,
-  // same as the 2024 subclass. Wholeness of Body needs its OWN key
-  // ("wholenessOfBodyAction", not the 2024 row's "wholenessOfBody") because
-  // its shape genuinely differs — an action, not a bonus action, healing a
-  // FLAT 3 x monk level with no die roll at all, vs. 2024's Martial Arts die
-  // + Wis mod — mirrors patientDefenseKi/stepOfTheWindKi's own same-feature-
-  // different-key precedent above. Both spend the same "wholenessOfBody"
-  // resource key and pool total (row-owned, monk-features.ts), so
-  // ACTION_EFFECT_FN.wholenessOfBodyAction is a thin duplicate of
-  // .wholenessOfBody's spend+client-rolled-heal shape, registered under the
-  // new key; the frontend resolver (actionResolvers.ts) computes the flat
-  // total from the MONK entry's own level (not total character level) —
-  // see that entry's own comment for why that's safe here specifically.
-  {
-    key: "wholenessOfBodyAction",
-    name: "Wholeness of Body",
-    cost: "action",
-    grantClass: "monk",
-    grantSubclassSlugs: ["monk-way-of-the-open-hand"],
-    grantLevel: 6,
-    resourceKey: "wholenessOfBody",
-    resourceAmount: 1,
-    edition: "EDITION_2014",
-  },
-  // Tranquility (L11): a passive gained at the end of a long rest (sanctuary
-  // until the next long rest), not a mid-turn action — reminder-only, like
-  // Fleet Step's own shape, with no resourceKey (nothing is spent to gain it).
-  {
-    key: "tranquility",
-    name: "Tranquility",
-    cost: "free",
-    grantClass: "monk",
-    grantSubclassSlugs: ["monk-way-of-the-open-hand"],
-    grantLevel: 11,
-    reminder: "At the end of a long rest, you gain the effect of sanctuary (DC = your ki save DC) until the start of your next long rest.",
-    edition: "EDITION_2014",
-  },
-  // Warrior of Mercy (#1248): Hand of Healing is a Magic-action heal spending
-  // 1 Focus (mirrors Wholeness of Body's shape) plus a free Flurry-strike
-  // replacement variant. Hand of Harm and Hand of Ultimate Mercy are their
-  // own dedicated verticals (hand-of-harm.ts / hand-of-ultimate-mercy.ts) —
-  // like Stunning Strike / Quivering Palm — since they carry once-per-turn /
-  // once-per-long-rest mechanics this catalog doesn't model.
-  {
-    key: "handOfHealing",
-    name: "Hand of Healing",
-    cost: "action",
-    grantClass: "monk",
-    grantSubclassSlugs: ["monk-warrior-of-mercy"],
-    grantLevel: 3,
-    resourceKey: "focus",
-    resourceAmount: 1,
-    reminder: (level) =>
-      level >= 6
-        ? "Magic action: expend 1 Focus to heal a creature you touch (Martial Arts die + Wis mod). Physician's Touch (L6): also ends one of Blinded/Deafened/Paralyzed/Poisoned/Stunned."
-        : "Magic action: expend 1 Focus to heal a creature you touch (Martial Arts die + Wis mod).",
-  },
-  // The Flurry-replacement variant swaps in for one of Flurry of Blows' own
-  // unarmed strikes, so it costs no Focus of its own (Flurry already spent
-  // its 1 Focus via the separate flurryOfBlows action) — hence no resourceKey.
-  {
-    key: "handOfHealingFlurry",
-    name: "Hand of Healing (Flurry replacement)",
-    cost: "bonusAction",
-    grantClass: "monk",
-    grantSubclassSlugs: ["monk-warrior-of-mercy"],
-    grantLevel: 3,
-    reminder: "Replace one Unarmed Strike from Flurry of Blows with Hand of Healing at no extra Focus cost. Flurry of Healing and Harm (L11): replace every strike this way.",
-  },
-
-  // Paladin — divineSense/layOnHands/channelDivinity retired from this table
-  // (#1909): row-driven now (paladin-features.ts's own rows). divineSense
-  // stays EDITION_2014-only there too (#1229: 2024 removed it as its own
-  // resource pool — its job moves to the "Channel Divinity: Divine Sense"
-  // catalog option, channel-divinity.ts, which spends the channelDivinity
-  // pool through the ability-cast path, not this actions dispatch). Lay on
-  // Hands' cost still forks to a Bonus Action in 2024 (SRD 5.2), same-key
-  // edition fork as before, now expressed as each edition row's own
-  // activationCost.
-
-  // Rogue
-  // Cunning Action carries no reminder on purpose: its `regrants` ARE the rule,
-  // and the three names are identical in SRD 5.1 and SRD 5.2 (Dash, Disengage,
-  // Hide), so the client can name them from the served rows for either edition
-  // without the caveat the monk rows above carry (#1431).
-  { key: "cunningAction", name: "Cunning Action", cost: "bonusAction", grantClass: "rogue", grantLevel: 2, regrants: ["dash", "disengage", "hide"] },
-  // Thief's Fast Hands (SRD 5.1 / SRD 5.2, Thief: Fast Hands) — a MODE of
-  // Cunning Action, not a second Bonus Action: both editions spend "the Bonus
-  // Action granted by your Cunning Action", so a Thief L3 sees two sibling
-  // bonus-action cards that compete for the one slot. The reminder says so,
-  // because nothing in the action economy can express "these two share a slot".
-  // The object-use grant is the edition-invariant half and is the `regrants`
-  // link; the reminder deliberately does not NAME that action, since SRD 5.1
-  // calls it Use an Object and SRD 5.2 Utilize. #1240's edition-blind service
-  // of this row is why the name has to come off the wire, not out of here.
-  // The prose feature description stays in rogue.ts's THIEF_FEATURES — that is
-  // the feature; this is the action.
-  {
-    key: "fastHands",
-    name: "Fast Hands",
-    cost: "bonusAction",
-    grantClass: "rogue",
-    grantSubclassSlugs: ["rogue-thief"],
-    grantLevel: 3,
-    regrants: ["useObject"],
-    // Kept under ~90 chars so it does not ellipsis-clip in the card subtitle
-    // (OptionCard truncates to one line). The lock/trap detail and the
-    // object-use option are the THIEF_FEATURES prose and the `regrants` link
-    // respectively — neither is lost by leaving them out of the in-play prompt.
-    reminder: "Uses Cunning Action's Bonus Action, not an extra one — Sleight of Hand or Thieves' Tools.",
-  },
-
-  // Sorcerer — metamagic retired from this table (#1909): row-driven now
-  // (sorcerer-features.ts's two Metamagic rows) — the identity≠pool spend
-  // (identity "metamagic", cost pool "sorceryPoints") is the enablement-fix
-  // consumer (actionFromRow, above). SRD 5.2 still grants it at level 2, not
-  // PHB'14's level 3 (#1232 commit 2b), now expressed as each row's own
-  // `level`.
 ];
 
 // Class/subclass/level gate for one DERIVED_ACTIONS row — no pool/enabled state.
@@ -1014,23 +421,38 @@ export function deriveEntryScopedActions<E extends SubclassIdentityInput & { nam
 }
 
 /**
- * A DERIVED_ACTIONS row's `grantLevel` (undefined if the key doesn't exist or
- * carries none) — lets a caller building "level N+" error text (e.g.
+ * A row's own grant level (undefined if the key doesn't resolve to anything)
+ * — lets a caller building "level N+" error text (e.g.
  * warrior-of-elements.ts's assertWarriorOfElements) read the single source of
  * truth instead of hardcoding the number a second time, which is exactly the
  * kind of drift deriveEntryScopedActions itself exists to prevent (#1315).
+ *
+ * Row-aware (#1912): checks the (now nearly-empty) DERIVED_ACTIONS table
+ * first, then falls back to `rows` — a ClassFeature row whose own identity
+ * `resourceKey` matches `key`, for the right edition. Both branches resolve
+ * through THIS one function; a caller never hand-rolls a second "find the
+ * row that grants this key" lookup (CLAUDE.md's level-gated-registry rule).
+ * `rows` is optional so every existing DERIVED_ACTIONS-only caller/test
+ * keeps compiling unedited.
  */
-export function actionGrantLevel(key: string, edition: RulesEdition): number | undefined {
+export function actionGrantLevel(
+  key: string,
+  edition: RulesEdition,
+  rows?: readonly ClassFeatureRow[],
+): number | undefined {
   // Filters on edition BEFORE find (#1499) — a no-op today since no key is
   // duplicated across editions, but written this way anyway: #1500 adds
   // same-key 2014 monk rows, and a lookup that's only silently correct
   // because no collision exists yet is exactly what breaks then.
   const row = DERIVED_ACTIONS.find((a) => a.key === key && (a.edition === undefined || a.edition === edition));
-  if (!row) return undefined;
-  // Min across gates so a row two classes grant (channelDivinity) reports the
-  // earliest level any of them grants it, rather than undefined.
-  const levels = classGatesOf(row).map((g) => g.minLevel).filter((l) => l > 0);
-  return levels.length > 0 ? Math.min(...levels) : undefined;
+  if (row) {
+    // Min across gates so a row two classes grant (channelDivinity) reports the
+    // earliest level any of them grants it, rather than undefined.
+    const levels = classGatesOf(row).map((g) => g.minLevel).filter((l) => l > 0);
+    return levels.length > 0 ? Math.min(...levels) : undefined;
+  }
+  const featureRow = rows?.find((r) => r.edition === edition && r.resourceKey === key);
+  return featureRow?.level;
 }
 
 // The subset of a DERIVED_ACTIONS row (or a row-driven action, actionFromRow
@@ -1333,10 +755,30 @@ function rowIsAnAvailableAction(row: ClassFeatureRow, level: number, edition: Ru
   return row.edition === edition && row.level <= level && Boolean(row.activationCost) && Boolean(row.resourceKey);
 }
 
+// The optional AvailableAction fields a row may or may not populate —
+// isolated from buildRowAction so ITS OWN branching budget covers only the
+// gate/reminder-precedence logic (fallow's cyclomatic/CRAP gate; five
+// conditional-spread fields is what pushed this over as one function, #1912
+// adding `count` as the fifth).
+function optionalRowActionFields(
+  row: ClassFeatureRow,
+  reminder: string | undefined,
+  disabledReason: string | undefined,
+): Pick<AvailableAction, "disabledReason" | "reminder" | "resolverKind" | "regrants" | "count"> {
+  return {
+    ...(disabledReason ? { disabledReason } : {}),
+    ...(reminder ? { reminder } : {}),
+    ...(row.resolverKind ? { resolverKind: row.resolverKind } : {}),
+    ...(row.regrants && row.regrants.length > 0 ? { regrants: [...row.regrants] } : {}),
+    // Resolved numeric fact (#1912) — see ClassFeatureRow.count's own
+    // comment. A level-gated bump (Heightened Focus) folds in afterward via
+    // an announce-augmentor payload, never a second row.
+    ...(row.count !== undefined && row.count !== null ? { count: row.count } : {}),
+  };
+}
+
 // Assembles the AvailableAction object once enablement is known — pulled out
-// of actionFromRow to keep its own branching budget for the gate check
-// (fallow's cyclomatic/CRAP gate; the four conditional-spread fields below
-// are what pushed this over as one function).
+// of actionFromRow to keep its own branching budget for the gate check.
 function buildRowAction(
   row: ClassFeatureRow,
   level: number,
@@ -1353,10 +795,7 @@ function buildRowAction(
     name: row.name,
     cost: row.activationCost as ActionCost,
     enabled,
-    ...(disabledReason ? { disabledReason } : {}),
-    ...(reminder ? { reminder } : {}),
-    ...(row.resolverKind ? { resolverKind: row.resolverKind } : {}),
-    ...(row.regrants && row.regrants.length > 0 ? { regrants: [...row.regrants] } : {}),
+    ...optionalRowActionFields(row, reminder, disabledReason),
   };
 }
 

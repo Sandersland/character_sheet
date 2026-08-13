@@ -1,8 +1,10 @@
-// Pure (no DB) tests for the announce-augmentor fold pipeline (#1910, epic
-// #1903 decision 2): applyAnnounceAugmentors is the ONE place a payload gets
-// folded onto a served action — descriptors (deflect.ts's deflectAugmentor,
-// arcane-charge.ts's arcaneChargeAugmentor) return structured payloads only,
-// never touching the action themselves. This suite calls the REAL exported
+// Pure (no DB) tests for the announce-augmentor fold pipeline (#1910/#1912,
+// epic #1903 decision 2): applyAnnounceAugmentors is the ONE place a payload
+// gets folded onto a served action — descriptors (deflect.ts's
+// deflectAugmentor/deflectEnergyAugmentor, arcane-charge.ts's
+// arcaneChargeAugmentor, heightened-focus.ts/improved-shadow-step.ts/
+// physicians-touch.ts) return structured payloads only, never touching the
+// action themselves. This suite calls the REAL exported
 // applyAnnounceAugmentors with a synthetic augmentor list (its optional third
 // parameter — the production call site in deriveEntryScopedActions never
 // passes one, defaulting to the real ANNOUNCE_AUGMENTORS), so the fold
@@ -17,8 +19,11 @@ const BASE_ACTION: AvailableAction = { key: "testAction", name: "Test Action", c
 const BASE_CTX: AugmentorContext = { slug: undefined, entryLevel: 1, edition: "EDITION_2024" };
 
 describe("ANNOUNCE_AUGMENTORS registry", () => {
-  it("is populated with the two migrated descriptors (deflect, arcane charge)", () => {
-    expect(ANNOUNCE_AUGMENTORS.length).toBe(2);
+  // #1912 (epic #1903's 4/4) adds four more: deflectEnergyAugmentor,
+  // heightenedFocusAugmentor, improvedShadowStepAugmentor,
+  // physiciansTouchAugmentor — six total.
+  it("is populated with the six migrated descriptors (deflect, arcane charge, deflect energy, heightened focus, improved shadow step, physician's touch)", () => {
+    expect(ANNOUNCE_AUGMENTORS.length).toBe(6);
   });
 });
 

@@ -10,11 +10,40 @@ import type { CharacterWithRelations } from "@/lib/character/character-include.j
 
 type ClassEntries = CharacterWithRelations["classEntries"];
 
-// Minimal class entries — featureRowsOf tolerates the absent class/subclassRef
-// relations (returns empty rows), so a bare {name, level} suffices for the
-// DERIVED_ACTIONS-driven rows this test asserts on.
+// Deflect Attacks/Missiles moved off DERIVED_ACTIONS onto ClassFeature rows
+// (#1912) — buildAvailableActionsView reaches them through featureRowsOf's
+// class.features/subclassRef.features relations, so a bare {name, level}
+// entry (the pre-#1912 shape) no longer surfaces them at all. Minimal inline
+// mirrors of monk-features.ts's own base-class rows (not the whole
+// test-feature-rows.fixture.ts, which this deliberately-DB-free suite has
+// never depended on) — just the four rows this describe block asserts on.
+const MONK_DEFLECT_ROWS = [
+  {
+    name: "Deflect Attacks", level: 3, edition: "EDITION_2024", description: "",
+    resourceKey: "deflectAttacks", activationCost: "reaction",
+  },
+  {
+    name: "Deflect Attacks — Redirect", level: 3, edition: "EDITION_2024", description: "",
+    resourceKey: "deflectAttacksRedirect", activationCost: "free", costKind: "pool", costPoolKey: "focus", costBase: 1,
+  },
+  {
+    name: "Deflect Missiles", level: 3, edition: "EDITION_2014", description: "",
+    resourceKey: "deflectMissiles", activationCost: "reaction",
+  },
+  {
+    name: "Deflect Missiles — Throw Back", level: 3, edition: "EDITION_2014", description: "",
+    resourceKey: "deflectMissilesThrow", activationCost: "free", costKind: "pool", costPoolKey: "ki", costBase: 1,
+  },
+];
+
+// featureRowsOf tolerates the absent class/subclassRef relations (returns
+// empty rows) for a non-monk entry; a "monk" entry gets the inline deflect
+// rows above so this suite's own assertions still exercise the real
+// row-driven path.
 function entries(list: { name: string; level: number }[]): ClassEntries {
-  return list as unknown as ClassEntries;
+  return list.map((e) =>
+    e.name === "monk" ? { ...e, class: { features: MONK_DEFLECT_ROWS }, subclassRef: undefined } : e,
+  ) as unknown as ClassEntries;
 }
 
 const DEX16 = { dexterity: 16 };

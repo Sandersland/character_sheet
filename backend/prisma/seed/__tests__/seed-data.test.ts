@@ -34,6 +34,7 @@ import { cantripsKnownAtLevel, preparedSpellCountAt } from "@/lib/srd/srd.js";
 import { subclassGateLevel } from "@/lib/leveling/effective-levels.js";
 import { SUBCLASS_SLUGS, SUBCLASS_IDENTITY, type SubclassSlug } from "@/lib/classes/subclass-slug.js";
 import { REGRANTED_UNIVERSAL_KEYS } from "@/lib/classes/actions.js";
+import { CLASS_FEATURES } from "../class-features.js";
 
 // The values that repeat when a list has a duplicate on `key`.
 const duplicates = <T>(values: T[]): T[] =>
@@ -229,7 +230,7 @@ describe("per-domain business-key uniqueness", () => {
     expect(keys2014.filter((k) => !keys2024.includes(k))).toEqual([]);
   });
 
-  // #1431: a DERIVED_ACTIONS row re-costs universal actions by KEY, and the
+  // #1431: a re-costing row references a universal action by KEY, and the
   // client resolves each key against the row referenceRouter serves for the
   // character's OWN edition — so a key with no counterpart in one edition would
   // render an empty grant for exactly the characters that edition serves. The
@@ -237,10 +238,20 @@ describe("per-domain business-key uniqueness", () => {
   // action for my cost instead of its own", which is only meaningful if the
   // universal row still costs an action. Closes a different gap from #1315's
   // (class-row-vs-seed-class-row drift) — this one is class row → universal row.
-  it("every REGRANTED_UNIVERSAL_KEYS entry is a universal, action-cost row in BOTH editions (#1431)", () => {
-    expect(REGRANTED_UNIVERSAL_KEYS.length).toBeGreaterThan(0);
+  //
+  // Every `regrants` key, from BOTH sources (#1912): DERIVED_ACTIONS'
+  // REGRANTED_UNIVERSAL_KEYS (today just `summonBondedWeapon`'s empty list —
+  // it regrants nothing) UNION every CLASS_FEATURES row's own `regrants`
+  // array (Cunning Action, Fast Hands, Patient Defense/Step of the Wind's
+  // four rows, both moved off DERIVED_ACTIONS onto seeded rows this slice).
+  // A row-level drift gate lived nowhere before #1912 because no #1909 row
+  // used `regrants` at all.
+  it("every regranted universal key (DERIVED_ACTIONS + CLASS_FEATURES rows) is a universal, action-cost row in BOTH editions (#1431)", () => {
+    const rowRegrantedKeys = new Set(CLASS_FEATURES.flatMap((r) => r.regrants ?? []));
+    const allRegrantedKeys = new Set([...REGRANTED_UNIVERSAL_KEYS, ...rowRegrantedKeys]);
+    expect(allRegrantedKeys.size).toBeGreaterThan(0);
     for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {
-      for (const key of REGRANTED_UNIVERSAL_KEYS) {
+      for (const key of allRegrantedKeys) {
         const row = ACTIONS.find((a) => a.key === key && a.universal && a.edition === edition);
         expect(row, `regranted key "${key}" has no universal ${edition} row`).toBeDefined();
         expect(row!.cost, `regranted key "${key}" (${edition}) must still cost an action`).toBe("action");

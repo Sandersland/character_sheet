@@ -130,26 +130,84 @@ function isPopulatedFighterRow(row: { className: string; subclassSlug: string | 
 
 // #1223: Rage's resource pool (base Barbarian, both editions — 2 rows) is the
 // second class to populate a resource descriptor column after Fighter's #1528
-// pilot. No activation/cost/effect columns — Rage's activation stays in
-// classes/actions.ts's DERIVED_ACTIONS (this migration moves the pool only).
+// pilot. #1912 adds Reckless Attack's row-driven ACTION columns (both
+// editions) — P-shaped (identity-only resourceKey, no cost columns).
+const POPULATED_BARBARIAN_ROW_NAMES = new Set(["Rage", "Reckless Attack"]);
+
 function isPopulatedBarbarianRow(row: { className: string; subclassSlug: string | null; name: string }): boolean {
-  return row.className === "Barbarian" && row.subclassSlug === null && row.name === "Rage";
+  return row.className === "Barbarian" && row.subclassSlug === null && POPULATED_BARBARIAN_ROW_NAMES.has(row.name);
 }
 
-// #1686: Elemental Attunement's toggle block (activationCost/resolverKind/
-// resourceKey/costKind/costPoolKey/costBase/effectBuffs) — the first Monk
-// row to populate a descriptor column, transcribed unchanged onto its
-// literal row by #1675. Elemental Burst/Elemental Strike stay text-only
-// rows; their real ops live in warrior-of-elements.ts's own endpoint
-// (save-DC damage, not a buff), same as before this migration.
-function isPopulatedMonkRow(row: { className: string; subclassSlug: string | null; name: string }): boolean {
-  if (row.className !== "Monk") return false;
-  if (row.subclassSlug === "monk-warrior-of-the-elements" && row.name === "Elemental Attunement") return true;
-  // #1501: Way of the Open Hand's Wholeness of Body — a row-owned FIXED
-  // resource pool (resourceKey/resourceRecharge/resourceTotals), not a
-  // toggle like Elemental Attunement above.
-  if (row.subclassSlug === "monk-way-of-the-open-hand" && row.name === "Wholeness of Body") return true;
+// #1912: Cunning Action (base, both editions) and Fast Hands (Thief, both
+// editions) moved off actions.ts's DERIVED_ACTIONS onto these rows — both
+// P-shaped (identity-only resourceKey, no cost columns).
+function isPopulatedRogueRow(row: { className: string; subclassSlug: string | null; name: string }): boolean {
+  if (row.className !== "Rogue") return false;
+  if (row.subclassSlug === null && row.name === "Cunning Action") return true;
+  if (row.subclassSlug === "rogue-thief" && row.name === "Fast Hands") return true;
   return false;
+}
+
+// Every Monk row #1912 (epic #1903, 4/4) populated moving the 31-row
+// DERIVED_ACTIONS block onto ClassFeature rows — keyed on
+// `${subclassSlug}::${name}::${edition}` since several names repeat across
+// subclasses/editions (Shadow Step, Cloak of Shadows, Patient Defense, Step
+// of the Wind, Wholeness of Body, Hand of Healing) with genuinely different
+// descriptor columns per row. Includes the two rows #1686/#1501 already
+// populated (Elemental Attunement's toggle block, Way of the Open Hand's
+// Wholeness of Body pool) — folded into this one set rather than kept split.
+const POPULATED_MONK_ROW_KEYS = new Set([
+  // Base class (subclassSlug null).
+  "null::Deflect Attacks::EDITION_2024",
+  "null::Deflect Missiles::EDITION_2014",
+  "null::Bonus Unarmed Strike::EDITION_2014",
+  "null::Bonus Unarmed Strike::EDITION_2024",
+  "null::Flurry of Blows::EDITION_2024",
+  "null::Flurry of Blows::EDITION_2014",
+  "null::Patient Defense::EDITION_2024",
+  "null::Patient Defense (1 Focus)::EDITION_2024",
+  "null::Step of the Wind::EDITION_2024",
+  "null::Step of the Wind (1 Focus)::EDITION_2024",
+  "null::Patient Defense::EDITION_2014",
+  "null::Step of the Wind::EDITION_2014",
+  "null::Deflect Attacks — Redirect::EDITION_2024",
+  "null::Deflect Missiles — Throw Back::EDITION_2014",
+  "null::Empty Body — Invisibility::EDITION_2014",
+  "null::Empty Body — Astral Projection::EDITION_2014",
+  // Warrior of the Open Hand (2024).
+  "monk-warrior-of-the-open-hand::Wholeness of Body::EDITION_2024",
+  "monk-warrior-of-the-open-hand::Fleet Step::EDITION_2024",
+  // Way of the Open Hand (2014) — Wholeness of Body's FIXED resource pool
+  // (#1501) plus its actionOnly served-identity sibling (#1912).
+  "monk-way-of-the-open-hand::Wholeness of Body::EDITION_2014",
+  "monk-way-of-the-open-hand::Tranquility::EDITION_2014",
+  "monk-way-of-the-open-hand::Wholeness of Body — Action::EDITION_2014",
+  // Warrior of Shadow (2024).
+  "monk-warrior-of-shadow::Shadow Step::EDITION_2024",
+  "monk-warrior-of-shadow::Cloak of Shadows::EDITION_2024",
+  "monk-warrior-of-shadow::Shadow Arts (Darkness)::EDITION_2024",
+  // Way of Shadow (2014).
+  "monk-way-of-shadow::Shadow Arts::EDITION_2014",
+  "monk-way-of-shadow::Shadow Step::EDITION_2014",
+  "monk-way-of-shadow::Cloak of Shadows::EDITION_2014",
+  "monk-way-of-shadow::Opportunist::EDITION_2014",
+  // Warrior of the Elements (2024) — Elemental Attunement's toggle block
+  // (#1686) plus Elemental Burst (#1912).
+  "monk-warrior-of-the-elements::Elemental Attunement::EDITION_2024",
+  "monk-warrior-of-the-elements::Elemental Burst::EDITION_2024",
+  // Way of the Four Elements (2014).
+  "monk-way-of-the-four-elements::Elemental Attunement::EDITION_2014",
+  "monk-way-of-the-four-elements::Elemental Discipline::EDITION_2014",
+  // Warrior of Mercy (untagged — shared both editions).
+  "monk-warrior-of-mercy::Hand of Healing::EDITION_2014",
+  "monk-warrior-of-mercy::Hand of Healing::EDITION_2024",
+  "monk-warrior-of-mercy::Hand of Healing (Flurry replacement)::EDITION_2014",
+  "monk-warrior-of-mercy::Hand of Healing (Flurry replacement)::EDITION_2024",
+]);
+
+function isPopulatedMonkRow(row: RowKey): boolean {
+  if (row.className !== "Monk") return false;
+  return POPULATED_MONK_ROW_KEYS.has(`${row.subclassSlug ?? "null"}::${row.name}::${row.edition}`);
 }
 
 // #1234: Arcane Recovery's resource pool (base Wizard, both editions — 2
@@ -367,6 +425,7 @@ const POPULATED_ROW_PREDICATES: ((row: RowKey) => boolean)[] = [
   isPopulatedFighterRow,
   isPopulatedBattleMasterPoolRow,
   isPopulatedBarbarianRow,
+  isPopulatedRogueRow,
   isPopulatedMonkRow,
   isPopulatedWarlockRow,
   isPopulatedWizardRow,

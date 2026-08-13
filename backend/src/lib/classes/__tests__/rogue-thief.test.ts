@@ -70,7 +70,17 @@ describe("Rogue Thief subclass (#909)", () => {
   // so it needed no edit for #1231's deletion of rogue.ts.
   it("Fast Hands is both a rogue-features.ts prose row and a bonus-action row (#1431)", async () => {
     expect(await thiefFeatureNames(3)).toContain("Fast Hands");
-    const actions = deriveEntryScopedActions([{ name: "rogue", subclass: "Thief", level: 3 }], 3, [], true, "EDITION_2024");
+    // Fast Hands moved off DERIVED_ACTIONS onto its own row (#1912) — needs
+    // the real seeded featureRows carrier now, not a bare call.
+    const featureRows = await loadDbFeatureRows("rogue", "thief");
+    const actions = deriveEntryScopedActions(
+      [{ name: "rogue", subclass: "Thief", level: 3 }],
+      3,
+      [],
+      true,
+      "EDITION_2024",
+      () => featureRows,
+    );
     const row = actions.find((a) => a.key === "fastHands");
     expect(row?.name).toBe("Fast Hands");
     expect(row?.cost).toBe("bonusAction");
