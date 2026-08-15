@@ -1174,6 +1174,12 @@ describe("TurnHub — Bonus Unarmed Strike (Martial Arts, #1218)", () => {
   });
 
   it("resolves one Unarmed Strike (no weapon toggle), marks the bonus action used, and fires no server effect", async () => {
+    // #1889: an unmocked to-hit roll occasionally lands nat 1 (auto-miss,
+    // skips the damage step entirely) or nat 20 (button reads "Roll crit
+    // damage"), and either way `/^Roll damage$/` isn't found — pin the same
+    // mid-roll the sibling multi-attack tests use so this can't land on a
+    // die-locked verdict.
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
     const user = userEvent.setup();
     renderHub(monkWithBonusUnarmedStrike());
     await startTurn(user);
@@ -1196,6 +1202,7 @@ describe("TurnHub — Bonus Unarmed Strike (Martial Arts, #1218)", () => {
 
     // Bonus action is spent; exclusivity blocks re-opening the menu.
     expect(screen.queryByRole("button", { name: "Use Bonus" })).not.toBeInTheDocument();
+    vi.restoreAllMocks();
   });
 
   it("is disabled with 'Requires no armor or Shield' when the backend gate fails", async () => {
