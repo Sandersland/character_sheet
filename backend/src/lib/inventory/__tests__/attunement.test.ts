@@ -126,6 +126,31 @@ describe("attune / unattune operations (#545)", () => {
     expect((await prisma.inventoryItem.findUniqueOrThrow({ where: { id: ids[3] } })).attuned).toBe(false);
   });
 
+  // TOCTOU regression (#1888, identical shape to the weapon-bond cap race fixed
+  // in #1854): two concurrent attune calls each read the pre-write attuned count,
+  // so without a lock inside the transaction both can pass `< ATTUNEMENT_LIMIT`
+  // and both commit, landing a 4th attuned item past the cap. Fires two real
+  // concurrent transactions (separate connections, like two browser tabs) via
+  // Promise.all rather than sequential awaits, which would never exercise the race.
+  it("attuning two items concurrently at 1-away-from-cap never exceeds the 3-item cap", async () => {
+    const [already1, already2, b, c] = await Promise.all(
+      ["Already 1", "Already 2", "B", "C"].map((n) => makeItem(characterId, `Item ${n}`)),
+    );
+    await applyInventoryOperations(characterId, [{ type: "attune", inventoryItemId: already1 }]);
+    await applyInventoryOperations(characterId, [{ type: "attune", inventoryItemId: already2 }]);
+
+    const results = await Promise.allSettled([
+      applyInventoryOperations(characterId, [{ type: "attune", inventoryItemId: b }]),
+      applyInventoryOperations(characterId, [{ type: "attune", inventoryItemId: c }]),
+    ]);
+
+    const statuses = results.map((r) => r.status).sort();
+    expect(statuses).toEqual(["fulfilled", "rejected"]);
+
+    const attunedCount = await prisma.inventoryItem.count({ where: { characterId, attuned: true } });
+    expect(attunedCount).toBe(3);
+  });
+
   it("blocks attune when a class/species/alignment prerequisite is unmet, with a clear error", async () => {
     const itemId = await makeItem(characterId, "Holy Avenger", {
       attunementPrereqKind: "class",
