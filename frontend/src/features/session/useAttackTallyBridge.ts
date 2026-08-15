@@ -28,6 +28,19 @@
 // get overwritten by that trailing setCompleted(true) in the same batch.
 // Deferring to an effect lets the "completed" render land first, then
 // re-arms in the render after.
+//
+// `commitPending` (#1857): the resolveAction mutation and `completedSwings`
+// (advanced only on mutation SUCCESS, #1857) settle asynchronously, one or
+// more renders after `resolutionView.completed` flips true on the SAME
+// synchronous tap. Without this gate, the render right after Done — commit
+// in flight, `completedSwings` not yet advanced — satisfies
+// `completed && completedSwings < totalSwings` and re-arms for a phantom
+// next swing before the mutation has even settled, on every commit (not just
+// multi-swing ones). Gating on `!commitPending` closes that window: the
+// re-arm only runs once the mutation has settled, by which point a SUCCESS
+// has advanced `completedSwings` (re-arms only if more swings remain, the
+// original behavior) and a REJECT has left it unchanged (re-arms the SAME
+// swing — the retry affordance).
 
 import { useEffect } from "react";
 
@@ -43,6 +56,8 @@ export function useAttackTallyBridge(
   completedSwings: number,
   totalSwings: number,
   reset: () => void,
+  /** True while this swing's resolveAction mutation hasn't settled — see the re-arm effect below. */
+  commitPending: boolean,
   source: TallyRowSource = "action",
   record: (recorded?: RecordedAttack) => void = turnState.recordAttack,
 ): { currentRow: AttackTallyRow | null } {
@@ -91,9 +106,9 @@ export function useAttackTallyBridge(
   // re-arms the SAME useResolution instance for the next swing once one
   // completes with this slot's swings still unspent.
   useEffect(() => {
-    if (resolutionView.completed && completedSwings < totalSwings) reset();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `reset` is a fresh closure every render (useResolution doesn't memoize it); gating on resolutionView.completed/completedSwings/totalSwings alone is what keeps this effect idempotent
-  }, [resolutionView.completed, completedSwings, totalSwings]);
+    if (resolutionView.completed && !commitPending && completedSwings < totalSwings) reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `reset` is a fresh closure every render (useResolution doesn't memoize it); gating on resolutionView.completed/commitPending/completedSwings/totalSwings alone is what keeps this effect idempotent
+  }, [resolutionView.completed, commitPending, completedSwings, totalSwings]);
 
   return { currentRow };
 }

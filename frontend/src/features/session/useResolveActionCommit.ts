@@ -6,6 +6,14 @@
 // duplicated. `onCommitted` is the caller's own post-commit bookkeeping
 // (advance completedSwings, clear local rider state) — this hook owns only
 // the wire op + the mutation, never turnState.
+//
+// `onCommitted` is deferred to the mutation's SUCCESS (#1857, mirroring the
+// spell-side `onCommitSlot` fix, #1833/#1848): a rejected resolveAction must
+// not advance the local swing tally — the pre-fix code called `mutation.mutate`
+// fire-and-forget and `onCommitted()` synchronously alongside it, so a server
+// error still advanced the count with no way to retry short of a reload. The
+// `.catch` here only stops the rejection from surfacing as an unhandled
+// promise rejection; `error` (below) is what the caller renders.
 
 import { applyResolveActionOperations } from "@/api/client";
 import type { ResolveActionOperation } from "@/api/client";
@@ -53,9 +61,11 @@ export function useResolveActionCommit({
     assassinate?: boolean,
   ) {
     const riders = rolls.toHit?.verdict === "miss" ? [] : Object.values(riderEffects);
-    mutation.mutate(buildResolveActionOp(resolution, rolls, { riders, assassinate }));
-    onCommitted();
+    mutation
+      .mutateAsync(buildResolveActionOp(resolution, rolls, { riders, assassinate }))
+      .then(onCommitted)
+      .catch(() => {});
   }
 
-  return { commit };
+  return { commit, pending: mutation.isPending, error: mutation.error };
 }

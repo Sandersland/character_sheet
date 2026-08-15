@@ -59,7 +59,7 @@ export default function InlineOffHandPicker({
   const entry = buildBonusSwingEntry(character, variant);
   const totalSwings = 1;
 
-  const { resolutionView, riderTotals, onDamageRider, completedSwings, tallyStrip, maneuversDisclosure } =
+  const { resolutionView, riderTotals, onDamageRider, completedSwings, tallyStrip, maneuversDisclosure, commitError } =
     useBonusAttackSheet({
       character,
       turnState,
@@ -112,6 +112,7 @@ export default function InlineOffHandPicker({
         riderTotals={riderTotals}
         onDamageRider={onDamageRider}
       />
+      {commitError && <p className="text-xs font-semibold text-garnet-700">{commitError}</p>}
     </div>
   );
 

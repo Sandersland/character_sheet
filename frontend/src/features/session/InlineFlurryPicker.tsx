@@ -56,8 +56,16 @@ export default function InlineFlurryPicker({
   const attack = turnState.bonusAttack;
   const totalSwings = attack?.total ?? flurryStrikeCount(character);
 
-  const { currentRow, resolutionView, riderTotals, onDamageRider, completedSwings, tallyStrip, maneuversDisclosure } =
-    useBonusAttackSheet({
+  const {
+    currentRow,
+    resolutionView,
+    riderTotals,
+    onDamageRider,
+    completedSwings,
+    tallyStrip,
+    maneuversDisclosure,
+    commitError,
+  } = useBonusAttackSheet({
       character,
       turnState,
       entry,
@@ -92,6 +100,7 @@ export default function InlineFlurryPicker({
         riderTotals={riderTotals}
         onDamageRider={onDamageRider}
       />
+      {commitError && <p className="text-xs font-semibold text-garnet-700">{commitError}</p>}
     </div>
   );
   // Mirrors InlineAttackPicker's own footer-timing comment: keyed off

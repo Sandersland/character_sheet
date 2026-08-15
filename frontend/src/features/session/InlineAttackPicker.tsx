@@ -319,7 +319,7 @@ export default function InlineAttackPicker({
   // `currentRow` DURING the swing, not just after it commits, mirroring the
   // pre-#1832 useAttackRolls timing. `clearRiders` always fires so a swing's
   // rider state never bleeds into the NEXT Extra Attack swing, rolled or not.
-  const { commit } = useResolveActionCommit({
+  const { commit, pending: commitPending, error: commitError } = useResolveActionCommit({
     characterId: character.id,
     onLogChanged,
     onCommitted: () => {
@@ -353,6 +353,7 @@ export default function InlineAttackPicker({
     local.completedSwings,
     attackTotal,
     reset,
+    commitPending,
   );
 
   const { roll } = useRoll();
@@ -451,6 +452,7 @@ export default function InlineAttackPicker({
       <AttackFormSummary selected={armedEntry} />
       <ResolutionRail view={resolutionView} />
       {damageRiders}
+      {commitError && <p className="text-xs font-semibold text-garnet-700">{commitError}</p>}
     </div>
   );
   // The footer's own two flags — keyed off `completedSwings`, NOT
