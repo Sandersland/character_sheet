@@ -656,6 +656,9 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
         entryId: "fixture-conc-1",
         spellName: "Fixture Bless",
       });
+      // #1849: the displacing cast's slot must also be refunded — only the
+      // first cast's slot should still show spent.
+      expect(undo.body.spellcasting.slots.find((s: { level: number }) => s.level === 1).used).toBe(1);
     });
   });
 });

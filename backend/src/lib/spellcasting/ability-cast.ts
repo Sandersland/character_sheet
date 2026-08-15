@@ -101,14 +101,15 @@ async function handleConcentrationOnCast(ctx: CastAbilityContext, next: Concentr
   const host = ctx.concentrationHost;
   const prior = host.concentratingOn;
   if (prior && prior.entryId !== next.entryId) {
-    const dropBefore = {
-      spellcasting: {
-        slotsUsed: { ...host.slotsUsed },
-        arcanumUsed: { ...host.arcanumUsed },
-        spells: [...host.spells],
-        concentratingOn: { ...prior },
-      },
-    };
+    // #1849: this event's `before` is captured AFTER payAbilityCostInTx already
+    // spent the displacing cast's slot, so it must snapshot ONLY concentratingOn —
+    // never slotsUsed/arcanumUsed/spells. Both events share one batch and LIFO
+    // revert runs the cast's own revert first (correctly restoring the pre-spend
+    // slot count), then this event's revert last; a full-state snapshot here would
+    // replay the post-spend slot count and clobber that refund. See
+    // revertSpellcastingEvent's concentrationDropped branch, which merges this
+    // narrowed snapshot instead of replacing the whole spellcasting column.
+    const dropBefore = { spellcasting: { concentratingOn: { ...prior } } };
     // No intermediate DB write: the caller's common write-back persists the final
     // state (with the new concentration spell), so clearing the in-memory flag is
     // enough for this drop event's before/after payloads.
@@ -121,14 +122,7 @@ async function handleConcentrationOnCast(ctx: CastAbilityContext, next: Concentr
       type: "concentrationDropped",
       summary: `Concentration on ${prior.spellName} dropped (cast ${next.spellName})`,
       before: dropBefore,
-      after: {
-        spellcasting: {
-          slotsUsed: { ...host.slotsUsed },
-          arcanumUsed: { ...host.arcanumUsed },
-          spells: [...host.spells],
-          concentratingOn: null,
-        },
-      },
+      after: { spellcasting: { concentratingOn: null } },
       data: { droppedEntryId: prior.entryId, droppedSpellName: prior.spellName, reason: "newCast", castEntryId: next.entryId },
       batchId: ctx.batchId,
       sessionId: ctx.sessionId,
