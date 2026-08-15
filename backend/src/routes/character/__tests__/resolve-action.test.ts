@@ -578,20 +578,11 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     const revertRes = await revert(FIXTURE_ID, batchId);
     expect(revertRes.status).toBe(200);
     expect(revertRes.body.spellcasting.concentratingOn).toMatchObject({ entryId: CONCENTRATION_SPELL_A.id });
-    // NOT asserting slots.used here: a batch whose resolveAction event ALSO
-    // displaced a prior concentration logs a second `concentrationDropped`
-    // event ahead of it in the same batch (handleConcentrationOnCast,
-    // ability-cast.ts) — LIFO-reverting both replays the OLDER
-    // concentrationDropped event's own (mid-cast, already-post-slot-spend)
-    // spellcasting snapshot LAST, clobbering the correct slot-count restore
-    // the resolveAction event's own revert already applied. Pre-existing:
-    // the identical two-event shape (concentrationDropped + castSpell) exists
-    // on the OLD castSpell op path today (spellcasting.test.ts "undo restores
-    // concentration dropped by casting a second spell" only asserts
-    // concentratingOn, never slots, for the same reason) — not introduced by
-    // #1833, not fixed here; flagged in the slice report as a found,
-    // pre-existing undo-composition bug in ability-cast.ts, out of scope for
-    // the spell-adapter slice.
+    // #1849: the displacing cast's slot must also be refunded — the batch's
+    // LIFO revert order (resolveAction event first, then the older
+    // concentrationDropped event) must not let concentrationDropped's revert
+    // clobber the slot-count restore resolveAction's own revert just applied.
+    expect(revertRes.body.spellcasting.slots.find((s: { level: number }) => s.level === 1).used).toBe(1);
   });
 
   it("a heal spell's self-apply lands on the caster's own HP in the same batch", async () => {
