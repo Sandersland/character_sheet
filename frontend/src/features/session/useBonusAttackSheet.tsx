@@ -152,7 +152,7 @@ function useBonusResolution({
   // useResolveActionCommit). The tally row + the real bonusAttack advance
   // already happened earlier, at roll-to-hit time, via the tally bridge's
   // `record` call below.
-  const { commit } = useResolveActionCommit({
+  const { commit, pending: commitPending, error: commitError } = useResolveActionCommit({
     characterId: character.id,
     onLogChanged,
     onCommitted: () => setLocal((s) => ({ ...s, completedSwings: s.completedSwings + 1, riderEffects: {} })),
@@ -186,6 +186,7 @@ function useBonusResolution({
     local.completedSwings,
     totalSwings,
     reset,
+    commitPending,
     "bonusAction",
     record,
   );
@@ -225,6 +226,7 @@ function useBonusResolution({
     riderTotals: riderTotalsOf(local.riderEffects),
     onDamageRider: handleDamageRider,
     completedSwings: local.completedSwings,
+    commitError,
   };
 }
 

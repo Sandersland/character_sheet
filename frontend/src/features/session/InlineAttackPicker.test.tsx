@@ -508,6 +508,57 @@ describe("InlineAttackPicker — Extra Attack loop (#1832)", () => {
   });
 });
 
+// #1857 (weapon-side analogue of the spell onCommitSlot fix, #1833/#1848): a
+// rejected resolveAction must not advance the local swing tally — the pre-fix
+// code called local.recordSwingComplete() synchronously alongside the
+// fire-and-forget mutation, so a server error still advanced the count with
+// no way to retry short of a reload.
+describe("InlineAttackPicker — deferred swing tally on resolveAction reject (#1857)", () => {
+  it("does not advance the swing count and surfaces the error + a retry affordance when resolveAction rejects", async () => {
+    seedMid();
+    const character = makeCharacter({ attackRows: [weaponRow("Longsword", "inv-1", { damageRiders: [] })] });
+    vi.mocked(applyResolveActionOperations).mockRejectedValueOnce(new Error("network blip"));
+    renderWithCharacter(<LiveHarness character={character} />, character);
+
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Roll damage$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
+
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(1));
+    await screen.findByText("network blip");
+
+    // Retry affordance: the rail re-arms to a fresh, rollable state for the
+    // SAME (never-completed) swing rather than staying stuck on "Done".
+    expect(await screen.findByRole("button", { name: /Roll to hit/ })).not.toBeDisabled();
+  });
+
+  it("does not auto-advance to swing 2 of an Extra Attack sequence when swing 1's resolveAction rejects", async () => {
+    seedMid();
+    const character = makeCharacter({
+      attacksPerAction: 2,
+      attackRows: [weaponRow("Longsword", "inv-1", { damageRiders: [] })],
+    });
+    vi.mocked(applyResolveActionOperations).mockRejectedValueOnce(new Error("network blip"));
+    renderWithCharacter(<LiveHarness character={character} />, character);
+
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Roll damage$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(1));
+    await screen.findByText("network blip");
+
+    // A retried, SUCCESSFUL swing-1 commit is still swing 1, not swing 2 — a
+    // premature auto-advance would have already consumed the retry as swing 2.
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Roll damage$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(2));
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /Roll to hit/ })).not.toBeDisabled());
+    expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe("InlineAttackPicker — crit-upgrade guard (#1831 review NICE)", () => {
   it("a 'Crit!' tap AFTER damage is already rolled does not flag effect.crit or change the total", async () => {
     seedMid(); // non-crit, non-miss to-hit
