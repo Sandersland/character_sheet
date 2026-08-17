@@ -73,8 +73,6 @@ export async function runCharacterTransaction<S extends Prisma.CharacterSelect, 
     if (opts.afterOps) await opts.afterOps({ tx, characterId, batchId, sessionId });
   });
 
-  // The batch these ops shared — returned so an endpoint can hand it to the
-  // client for a LIFO turn undo (#758): reverting a resolveAction cast needs
-  // its batchId on the wire, the same way the class-action endpoint returns one.
+  // Returned so endpoints can hand the client the batch to revert on turn undo (#758).
   return batchId;
 }

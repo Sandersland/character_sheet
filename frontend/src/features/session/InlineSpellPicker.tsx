@@ -72,6 +72,7 @@ function buildHealApply(
   amount: number,
 ): { target: "self" | { characterId: string }; kind: "heal"; amount: number } | undefined {
   if (amount <= 0) return NO_APPLY;
+  // Unreachable today (heals never offer "other") but load-bearing: a heal-other must relay to the DM, never silently heal the caster.
   if (target === "other") return NO_APPLY;
   if (isAllyTarget(target)) return { target: { characterId: target.characterId }, kind: "heal", amount };
   return { target: "self", kind: "heal", amount };

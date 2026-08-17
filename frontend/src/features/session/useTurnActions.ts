@@ -201,12 +201,7 @@ export function useTurnActions({
     try {
       await undoBatch(top.batchId);
       undo();
-      // Refresh the Session Log so the now-reverted event leaves the feed
-      // immediately (#758): a resolveAction cast/swing that changed no
-      // persisted column (a buff-less cantrip, a weapon swing) returns a
-      // reference-identical character, so the character-write bump never
-      // fires and the log would otherwise show the reverted line until the
-      // next unrelated write.
+      // Eager refresh (#758): a no-persisted-change cast returns a reference-identical character, so the character-write bump alone would leave the reverted line in the log.
       onLogChanged();
       // The caller re-reads combat state after this resolves (#1439 review):
       // undoing a spell cast lifts the interlock it recorded server-side

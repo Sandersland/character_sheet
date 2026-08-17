@@ -8,6 +8,7 @@ describe("stepRail (#811)", () => {
       rollToHit: "active",
       callIt: "pending",
       damage: "pending",
+      damageSettled: false,
     });
   });
 
@@ -16,6 +17,7 @@ describe("stepRail (#811)", () => {
       rollToHit: "done",
       callIt: "active",
       damage: "active",
+      damageSettled: false,
     });
   });
 
@@ -24,6 +26,7 @@ describe("stepRail (#811)", () => {
       rollToHit: "done",
       callIt: "done",
       damage: "active",
+      damageSettled: false,
     });
   });
 
@@ -32,6 +35,7 @@ describe("stepRail (#811)", () => {
       rollToHit: "done",
       callIt: "done",
       damage: "pending",
+      damageSettled: true,
     });
   });
 
@@ -40,6 +44,7 @@ describe("stepRail (#811)", () => {
       rollToHit: "done",
       callIt: "done",
       damage: "done",
+      damageSettled: true,
     });
   });
 });

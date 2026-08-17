@@ -32,11 +32,7 @@ export function computeResolutionSteps(
       { kind: "callIt", state: rail.callIt, settled: rail.callIt === "done" },
     ];
     if (resolution.effect) {
-      steps.push({
-        kind: "damage",
-        state: rail.damage,
-        settled: rail.damage === "done" || state.verdict === "miss",
-      });
+      steps.push({ kind: "damage", state: rail.damage, settled: rail.damageSettled });
     }
     return steps;
   }
