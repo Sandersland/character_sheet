@@ -8,6 +8,7 @@ export type ResolutionStepKind = "toHit" | "callIt" | "announceSave" | "damage";
 export interface ResolutionStep {
   kind: ResolutionStepKind;
   state: StepState;
+  settled: boolean;
 }
 
 export interface ResolutionRollState {
@@ -27,35 +28,38 @@ export function computeResolutionSteps(
       hasDamage: state.effect !== null,
     });
     const steps: ResolutionStep[] = [
-      { kind: "toHit", state: rail.rollToHit },
-      { kind: "callIt", state: rail.callIt },
+      { kind: "toHit", state: rail.rollToHit, settled: rail.rollToHit === "done" },
+      { kind: "callIt", state: rail.callIt, settled: rail.callIt === "done" },
     ];
-    if (resolution.effect) steps.push({ kind: "damage", state: rail.damage });
+    if (resolution.effect) {
+      steps.push({
+        kind: "damage",
+        state: rail.damage,
+        settled: rail.damage === "done" || state.verdict === "miss",
+      });
+    }
     return steps;
   }
 
   if (resolution.save) {
-    const steps: ResolutionStep[] = [{ kind: "announceSave", state: "done" }];
+    const steps: ResolutionStep[] = [{ kind: "announceSave", state: "done", settled: true }];
     if (resolution.effect) {
-      steps.push({ kind: "damage", state: state.effect !== null ? "done" : "active" });
+      const rolled = state.effect !== null;
+      steps.push({ kind: "damage", state: rolled ? "done" : "active", settled: rolled });
     }
     return steps;
   }
 
   if (resolution.effect) {
-    return [{ kind: "damage", state: state.effect !== null ? "done" : "active" }];
+    const rolled = state.effect !== null;
+    return [{ kind: "damage", state: rolled ? "done" : "active", settled: rolled }];
   }
 
   return [];
 }
 
 export function resolutionComplete(steps: ResolutionStep[]): boolean {
-  if (steps.length === 0) return false;
-  return steps.every((step, i) => {
-    if (step.state === "done") return true;
-    const isLast = i === steps.length - 1;
-    return isLast && step.kind === "damage" && step.state === "pending";
-  });
+  return steps.length > 0 && steps.every((step) => step.settled);
 }
 
 export function resolutionReady(steps: ResolutionStep[]): boolean {
