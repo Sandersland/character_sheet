@@ -196,7 +196,6 @@ describe("InlineSpellPicker — attack-roll shape (Fire Bolt)", () => {
     expect(op.effect).toMatchObject({ type: "fire", kind: "damage" });
     expect(op.slotLevel).toBeUndefined();
     expect(op.apply).toBeUndefined();
-    // Deferred to the mutation's success (#1848 review fix), not synchronous.
     await waitFor(() => expect(onCommitSlot).toHaveBeenCalled());
   });
 });
@@ -303,7 +302,7 @@ describe("InlineSpellPicker — economy interlock + single spend", () => {
     expect(screen.queryByRole("button", { name: "Cast" })).not.toBeInTheDocument();
   });
 
-  it("does NOT call onCommitSlot when the resolveAction mutation rejects", async () => {
+  it("a rejected resolveAction leaves the slot unspent so the cast can be retried (#1848)", async () => {
     const user = userEvent.setup();
     vi.mocked(applyResolveActionOperations).mockRejectedValueOnce(new Error("network blip"));
     const { onCommitSlot } = renderPicker(makeCharacter([DRUIDCRAFT]));
@@ -313,6 +312,13 @@ describe("InlineSpellPicker — economy interlock + single spend", () => {
 
     await screen.findByText("network blip");
     expect(onCommitSlot).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Cast another spell" }));
+    await user.click(screen.getByRole("button", { name: /^Druidcraft/ }));
+    await user.click(screen.getByRole("button", { name: "Cast" }));
+
+    await waitFor(() => expect(onCommitSlot).toHaveBeenCalledTimes(1));
+    expect(onCommitSlot).toHaveBeenCalledWith("test-batch");
   });
 });
 
