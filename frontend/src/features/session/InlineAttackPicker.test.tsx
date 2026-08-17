@@ -1,9 +1,3 @@
-// InlineAttackPicker tests (rewired to the shared resolver, epic #1827 Slice
-// 5 / #1832) — ports the pre-#1832 useAttackRolls/AttackStepCard-era
-// scenarios onto ResolutionRail/useResolution, and adds coverage for what
-// changed: the resolveAction commit (incl. cost-kind mapping), the Extra
-// Attack loop driving the SAME resolver instance without double-spending the
-// economy, and the crit-upgrade guard (#1831 review NICE).
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { useEffect } from "react";
 import { screen, waitFor, within } from "@testing-library/react";
@@ -29,9 +23,6 @@ vi.mock("@/api/client", () => ({
   logRollAction: vi.fn().mockResolvedValue(undefined),
 }));
 
-// Fixed mid-face d20 (11 kept) — non-crit, non-miss, so "Roll to hit" resolves
-// to an ambiguous "hit or miss?" call every time it's used, matching the old
-// suite's own `seedMid` convention.
 function seedMid() {
   return vi.spyOn(Math, "random").mockReturnValue(0.5);
 }
@@ -44,19 +35,14 @@ function seedNat1() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // Resolved value is unused — weapons never call the roll logger (asserted below).
   vi.mocked(logRollAction).mockResolvedValue(undefined as never);
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
-  // useTurnState persists to localStorage keyed by sessionId — every
-  // LiveHarness-based test below reuses "sess-crit"/"sess-spend", so a prior
-  // test's economy would otherwise rehydrate into the next one.
   window.localStorage.clear();
 });
 
-// Minimal turn state: an Attack action in progress with one attack available.
 const turnState = {
   attack: { total: 1, used: 0 },
   attackTally: [],
@@ -69,11 +55,6 @@ const turnState = {
   consumeReaction: vi.fn(),
 } as unknown as TurnState & TurnStateActions;
 
-// The picker renders `character.attackRows` (#1434) plus the always-served
-// unarmed/improvised rows, and `critRange` (real Character type: required,
-// never optional) — the OLD useAttackRolls hook covered a missing fixture
-// value with its own default(20) parameter; weaponToResolution (#1832) takes
-// no default, so a fixture omitting it would silently break auto-crit.
 function makeCharacter(overrides: Partial<Character> = {}): Character {
   return {
     id: "char-1",
@@ -280,16 +261,8 @@ describe("InlineAttackPicker — on-hit dice riders (#1843: routed into resolveA
   });
 });
 
-// Live turn state — a real useTurnState so the tally / economy actually flow,
-// needed for the resolveAction commit + Extra Attack loop + crit-upgrade tests.
-// Resolves applyResolveActionOperations with the SAME character back (rather
-// than the beforeEach leaving it unmocked/undefined): useCharacterMutation
-// writes whatever it resolves straight into the query cache, and
-// useCurrentCharacter re-renders InlineAttackPicker off that same cache — an
-// empty/undefined resolved value would crash the next render's
-// buildAttackForms on a missing attackRows.
 function LiveHarness({ character }: { character: Character }) {
-  vi.mocked(applyResolveActionOperations).mockResolvedValue({ ...character, batchId: "test-batch" });
+  vi.mocked(applyResolveActionOperations).mockResolvedValue({ character, batchId: "test-batch" });
   const liveTurnState = useTurnState(character, "sess-crit");
   useEffect(() => {
     liveTurnState.startCombat();
@@ -466,7 +439,7 @@ describe("InlineAttackPicker — Extra Attack loop (#1832)", () => {
       attackRows: [weaponRow("Longsword", "inv-1", { damageRiders: [] })],
     });
     function Harness() {
-      vi.mocked(applyResolveActionOperations).mockResolvedValue({ ...character, batchId: "test-batch" });
+      vi.mocked(applyResolveActionOperations).mockResolvedValue({ character, batchId: "test-batch" });
       const live = useTurnState(character, "sess-spend");
       useEffect(() => {
         live.startCombat();
@@ -508,11 +481,6 @@ describe("InlineAttackPicker — Extra Attack loop (#1832)", () => {
   });
 });
 
-// #1857 (weapon-side analogue of the spell onCommitSlot fix, #1833/#1848): a
-// rejected resolveAction must not advance the local swing tally — the pre-fix
-// code called local.recordSwingComplete() synchronously alongside the
-// fire-and-forget mutation, so a server error still advanced the count with
-// no way to retry short of a reload.
 describe("InlineAttackPicker — deferred swing tally on resolveAction reject (#1857)", () => {
   it("does not advance the swing count and surfaces the error + a retry affordance when resolveAction rejects", async () => {
     seedMid();
@@ -656,11 +624,6 @@ describe("InlineAttackPicker — 'it Missed' re-arms the next attack (#811)", ()
   });
 });
 
-// #809/#1831 review: ManeuversDisclosure reads useResolution's live roll state
-// (toHitRoll/effectRoll) via buildManeuverView, not useAttackRolls. As of #1844
-// the maneuver boost also reaches the committed resolveAction op — the Precision
-// (to-hit) half through useResolution's boostToHit seam, the damage half through
-// the existing riders[] seam (#1843) — so the audit log matches the tally.
 describe("InlineAttackPicker — Precision Attack under the attack card (#809, boost logged #1844)", () => {
   const SERVER_ROLL = 5;
 
@@ -760,15 +723,6 @@ describe("InlineAttackPicker — Precision Attack under the attack card (#809, b
   });
 });
 
-// #1526: the "target is surprised" toggle on the attack card, gated on the
-// backend-computed `character.assassinate` rider — a 2014 Assassin L3+ only.
-// Absence covers EVERY ineligible case at once (2024 Assassin, sub-L3, a
-// non-Assassin rogue): the backend already tests each gate individually
-// (assassinate.test.ts, character-serialize-assassinate.test.ts,
-// resolve-action-assassinate.test.ts's mutation-proof case) — at the wire
-// level they all collapse to `character.assassinate` being absent, and this
-// component only ever checks presence (never re-derives edition/subclass/
-// level itself, per CLAUDE.md's rules-are-backend-owned).
 describe("InlineAttackPicker — Assassinate toggle (2014 Assassin L3+, #1526)", () => {
   it("shows the toggle for a 2014 Assassin L3+ character (character.assassinate present)", () => {
     renderPicker(makeCharacter({ assassinate: true, attackRows: [weaponRow("Dagger", "inv-1")] }));

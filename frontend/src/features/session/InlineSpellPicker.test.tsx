@@ -18,7 +18,7 @@ function seedMid() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(applyResolveActionOperations).mockResolvedValue({ batchId: "test-batch" } as never);
+  vi.mocked(applyResolveActionOperations).mockResolvedValue({ character: {}, batchId: "test-batch" } as never);
 });
 
 afterEach(() => {
@@ -285,7 +285,7 @@ describe("InlineSpellPicker — economy interlock + single spend", () => {
 
   it("passes the cast's batchId to onCommitSlot so turn undo can revert it (#758)", async () => {
     const user = userEvent.setup();
-    vi.mocked(applyResolveActionOperations).mockResolvedValueOnce({ batchId: "batch-cast-1" } as never);
+    vi.mocked(applyResolveActionOperations).mockResolvedValueOnce({ character: {}, batchId: "batch-cast-1" } as never);
     const { onCommitSlot } = renderPicker(makeCharacter([DRUIDCRAFT]));
 
     await user.click(screen.getByRole("button", { name: /^Druidcraft/ }));

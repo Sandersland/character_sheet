@@ -235,10 +235,7 @@ function SpellResolver({
   const resolveActionMutation = useCharacterMutation({
     characterId: character.id,
     mutationFn: (op: ResolveActionOperation) => applyResolveActionOperations(character.id, [op]),
-    toCharacter: ({ batchId, ...character }) => {
-      void batchId;
-      return character;
-    },
+    toCharacter: (result) => result.character,
     fallbackMessage: "Failed to resolve cast",
     onCharacterWritten: onLogChanged,
   });

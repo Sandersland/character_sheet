@@ -3,8 +3,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { applyResolveActionOperations } from "@/api/combat";
 import type { ResolveActionOperation } from "@/api/combat";
 
-// #1832: the first frontend caller of POST .../resolve-action/transactions
-// (route + op schema shipped backend-only in #1829/#1830).
 describe("applyResolveActionOperations", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -19,8 +17,8 @@ describe("applyResolveActionOperations", () => {
     effect: { spec: "1d8+3", faces: [6], total: 9, type: "piercing", kind: "damage", crit: false },
   };
 
-  it("sends a POST with the operations batch and returns the updated character", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ id: "1" }) });
+  it("sends a POST and splits the wire shape into character + batchId", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ id: "1", batchId: "batch-1" }) });
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await applyResolveActionOperations("1", [op]);
@@ -29,7 +27,7 @@ describe("applyResolveActionOperations", () => {
       expect.stringContaining("/characters/1/resolve-action/transactions"),
       expect.objectContaining({ method: "POST", body: JSON.stringify({ operations: [op] }) }),
     );
-    expect(result).toEqual({ id: "1" });
+    expect(result).toEqual({ character: { id: "1" }, batchId: "batch-1" });
   });
 
   it("throws the server's error message on a non-ok response", async () => {

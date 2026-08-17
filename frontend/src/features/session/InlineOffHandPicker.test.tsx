@@ -163,7 +163,7 @@ describe("InlineOffHandPicker (#813 redesign, rewired onto the shared resolver #
   it("commits ONE resolveAction op with cost.kind bonus when the off-hand swing resolves", async () => {
     seedMid();
     const turnState = makeTurnState({ total: 1, used: 0 });
-    vi.mocked(applyResolveActionOperations).mockResolvedValue({ ...twoWeaponCharacter(), batchId: "test-batch" });
+    vi.mocked(applyResolveActionOperations).mockResolvedValue({ character: twoWeaponCharacter(), batchId: "test-batch" });
     renderPicker(twoWeaponCharacter(), turnState);
 
     await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
@@ -193,7 +193,7 @@ describe("InlineOffHandPicker (#813 redesign, rewired onto the shared resolver #
   it("never calls logRoll for the off-hand swing's attack/damage rolls (retired #1845)", async () => {
     seedMid();
     const turnState = makeTurnState({ total: 1, used: 0 });
-    vi.mocked(applyResolveActionOperations).mockResolvedValue({ ...twoWeaponCharacter(), batchId: "test-batch" });
+    vi.mocked(applyResolveActionOperations).mockResolvedValue({ character: twoWeaponCharacter(), batchId: "test-batch" });
     renderPicker(twoWeaponCharacter(), turnState);
 
     await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
@@ -214,7 +214,7 @@ describe("InlineOffHandPicker (#813 redesign, rewired onto the shared resolver #
   it("shows Done and disables Roll to hit once the swing has been committed", async () => {
     seedMid();
     const turnState = makeTurnState({ total: 1, used: 0 });
-    vi.mocked(applyResolveActionOperations).mockResolvedValue({ ...twoWeaponCharacter(), batchId: "test-batch" });
+    vi.mocked(applyResolveActionOperations).mockResolvedValue({ character: twoWeaponCharacter(), batchId: "test-batch" });
     renderPicker(twoWeaponCharacter(), turnState);
 
     await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));

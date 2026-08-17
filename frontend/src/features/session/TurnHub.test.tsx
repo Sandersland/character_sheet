@@ -79,10 +79,6 @@ function makeCharacter(overrides: Partial<Character> = {}, weaponRows: AttackRow
     availableActions: [
       { key: "divineSense", name: "Divine Sense", cost: "action", enabled: true },
       { key: "layOnHands", name: "Lay on Hands", cost: "action", enabled: true },
-      // resolverKind (#1528) — Second Wind is row-driven now; without this,
-      // resolverFor's fallback synthesis never fires and the card silently
-      // drops out of partitionClassActions (the exact "vanishes with no test
-      // failure" hazard the ordering matters for).
       { key: "secondWind", name: "Second Wind", cost: "bonusAction", enabled: true, resolverKind: "heal-roll" },
       { key: "opportunityAttack", name: "Opportunity Attack", cost: "reaction", enabled: true },
     ],
@@ -136,19 +132,11 @@ function renderHub(character: Character = makeCharacter(), onOpenLog?: () => voi
   return { ...result, onLogChanged };
 }
 
-// Drive the hub from "Not in Combat" through to an active turn.
 async function startTurn(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: /Start combat/ }));
   await user.click(screen.getByRole("button", { name: "Start my turn" }));
 }
 
-// TurnHub now reads the character via useCurrentCharacter() (#1284) rather than
-// a frozen prop, so it re-renders off whatever's in the cache after every
-// mutation. A mock that resolved with a hardcoded fresh makeCharacter() would
-// silently stomp a test's specific setup (e.g. downed(), a Battle Master's
-// resources) the instant any mutation landed — echo the currently-cached
-// character by default instead; a test simulating a REAL server-side change
-// overrides with mockResolvedValueOnce for that one call.
 function echoCharacter(): Character {
   return cachedCharacter("char-1") ?? makeCharacter();
 }
@@ -156,11 +144,10 @@ function echoCharacter(): Character {
 beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
-  // Both editions, so a test can render either without re-seeding.
   seedUniversalActions("EDITION_2024");
   seedUniversalActions("EDITION_2014");
   vi.mocked(applyActionTransactions).mockImplementation(async () => echoCharacter());
-  vi.mocked(applyResolveActionOperations).mockImplementation(async () => ({ ...echoCharacter(), batchId: "test-batch" }));
+  vi.mocked(applyResolveActionOperations).mockImplementation(async () => ({ character: echoCharacter(), batchId: "test-batch" }));
   vi.mocked(applyResourceTransactions).mockImplementation(async () => echoCharacter());
   vi.mocked(castManeuverTransaction).mockImplementation(async () => ({
     character: echoCharacter(),
@@ -168,17 +155,10 @@ beforeEach(() => {
   }));
   vi.mocked(applyInventoryTransactions).mockImplementation(async () => echoCharacter());
   vi.mocked(revertBatch).mockImplementation(async () => echoCharacter());
-  // #1030: these resolve the server's authoritative CombatState, which
-  // useTurnActions dispatches into the tracker via syncCombat. Distinct,
-  // increasing updatedAt per lifecycle stage — syncCombat drops a sync whose
-  // updatedAt doesn't strictly advance past the last one applied, so a real
-  // start→round-advance→end sequence must never tie.
   vi.mocked(startCombat).mockResolvedValue({ round: 1, combatActive: true, updatedAt: "2026-01-01T00:00:01.000Z", spellEconomy: NO_ECON });
   vi.mocked(advanceCombatRound).mockResolvedValue({ round: 2, combatActive: true, updatedAt: "2026-01-01T00:00:02.000Z", spellEconomy: NO_ECON });
   vi.mocked(endCombat).mockResolvedValue({ round: 0, combatActive: false, updatedAt: "2026-01-01T00:00:03.000Z", spellEconomy: NO_ECON });
   vi.mocked(logRollAction).mockResolvedValue(undefined as never);
-  // No onInitiative pools on this fixture (a Fighter) — a real rollInitiative
-  // call would report an empty regen, same as this default (#1239/#1243).
   vi.mocked(rollInitiativeTransaction).mockImplementation(async () => ({
     ...echoCharacter(),
     results: [],
@@ -220,9 +200,6 @@ describe("TurnHub — combat lifecycle", () => {
     await waitFor(() => expect(screen.getByText(/Round 2/)).toBeInTheDocument());
   });
 
-  // #1030 finding #1: a failed startCombat/endCombat must not strand the
-  // client on its optimistic guess — it re-fetches and reconciles onto the
-  // server's real state instead.
   it("a failed endCombat reconciles onto the server's real (still-active) state instead of sticking on the optimistic 'ended'", async () => {
     const user = userEvent.setup();
     renderHub();
@@ -281,9 +258,6 @@ describe("TurnHub — combat lifecycle", () => {
     await user.click(screen.getByRole("button", { name: "End combat" }));
 
     await waitFor(() => expect(fetchCombatState).toHaveBeenCalledWith("char-1", "sess-1"));
-    // Both calls failed: the client is left on its last-applied (optimistic)
-    // value rather than a freshly-guessed one — see reconcileCombatAfterFailure's
-    // why-comment in useTurnActions.ts.
     expect(screen.getByText("Not in combat")).toBeInTheDocument();
     consoleError.mockRestore();
   });
@@ -357,10 +331,6 @@ describe("TurnHub — action economy", () => {
     expect(screen.getByRole("button", { name: "Use Action" })).toBeInTheDocument();
   });
 
-  // Arcane Charge (#1852): the backend attaches the teleport reminder to the
-  // served actionSurge card for a 2014 Eldritch Knight L15+ only — the surge
-  // press surfaces whatever reminder the wire carries and shows nothing when
-  // the card carries none, so no rule is re-derived client-side.
   it("Action Surge surfaces the served Arcane Charge reminder after a successful surge", async () => {
     const user = userEvent.setup();
     const reminder =
@@ -523,8 +493,6 @@ describe("TurnHub — server-effect undo (#758)", () => {
     await user.click(screen.getByRole("button", { name: "Use Bonus" }));
     await user.click(screen.getByRole("button", { name: "Second Wind" }));
 
-    // No `roll` (#1528) — Second Wind is server-rolled now; the client sends
-    // a bare executeAction and the server reports the roll back in `results`.
     await waitFor(() =>
       expect(applyActionTransactions).toHaveBeenCalledWith("char-1", [
         { type: "executeAction", actionKey: "secondWind" },
@@ -690,9 +658,6 @@ describe("TurnHub — bonus-spell cards", () => {
 
     await user.click(screen.getByRole("button", { name: /Undo/ }));
 
-    // The cast batch reverts server-side and its receipt leaves with it —
-    // the pre-#758-fix rationale ("a cast already committed server-side")
-    // no longer holds now that undo actually reverts the cast.
     await waitFor(() => expect(revertBatch).toHaveBeenCalledWith("char-1", "test-batch"));
     expect(screen.queryByText("Spells cast")).not.toBeInTheDocument();
     expect(await screen.findByRole("button", { name: "Use Bonus" })).toBeInTheDocument();
@@ -829,10 +794,6 @@ describe("TurnHub — live multi-attack counter (#757)", () => {
 
     expect(sheet().getByText(/Attacks · 2 of 2 remaining/)).toBeInTheDocument();
 
-    // Rewired to the shared resolver (#1827 Slice 5, #1832): a swing now
-    // resolves fully (roll to hit → implicit-hit damage → Done) before the
-    // rail re-arms itself for the next one — the old "Skip" escape hatch
-    // (leave a row unresolved) doesn't exist on ResolutionRail (#1831).
     await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
     expect(sheet().getByText(/Attacks · 1 of 2 remaining/)).toBeInTheDocument();
     await user.click(sheet().getByRole("button", { name: /^Roll damage$/ }));
@@ -862,14 +823,10 @@ describe("TurnHub — live multi-attack counter (#757)", () => {
     expect(closeButtons.length).toBeGreaterThan(0);
     expect(sheet().queryByRole("button", { name: /Cancel — refund action/ })).not.toBeInTheDocument();
 
-    // Resolve attack 1 (damage = implicit hit) and tap the rail's own Done —
-    // it re-arms the SAME rail for attack 2 (#1832), no separate "Next" tap.
     await user.click(sheet().getByRole("button", { name: /^Roll damage$/ }));
     await user.click(sheet().getByRole("button", { name: /^Done$/ }));
     await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
     await user.click(sheet().getByRole("button", { name: /^Roll damage$/ }));
-    // Both spent — now Done (the FOOTER's, since the rail's own Done hides
-    // once its swing completes with no attacks left to re-arm for).
     await user.click(sheet().getByRole("button", { name: /^Done$/ }));
     expect(sheet().getByRole("button", { name: /^Done$/ })).toBeInTheDocument();
     vi.restoreAllMocks();
@@ -916,8 +873,6 @@ describe("TurnHub — live multi-attack counter (#757)", () => {
     await user.click(screen.getByRole("button", { name: /Dismiss/ }));
     expect(screen.queryByText("Turn summary")).not.toBeInTheDocument();
 
-    // Dismiss is durable against undo (#812): popping the last recordAttack
-    // restores the economy but must not resurrect stale banner rows.
     await user.click(screen.getByRole("button", { name: /Undo/ }));
     expect(screen.queryByText("Turn summary")).not.toBeInTheDocument();
     vi.restoreAllMocks();
@@ -926,7 +881,7 @@ describe("TurnHub — live multi-attack counter (#757)", () => {
   it("Undo of a committed swing reverts its batch server-side (#758)", async () => {
     vi.spyOn(Math, "random").mockReturnValue(0.5);
     vi.mocked(applyResolveActionOperations).mockResolvedValueOnce({
-      ...extraAttackFighter(),
+      character: extraAttackFighter(),
       batchId: "batch-swing-1",
     });
     const user = userEvent.setup();
@@ -950,8 +905,8 @@ describe("TurnHub — live multi-attack counter (#757)", () => {
   it("Undo unwinds multiple swings' batches in LIFO order", async () => {
     vi.spyOn(Math, "random").mockReturnValue(0.5);
     vi.mocked(applyResolveActionOperations)
-      .mockResolvedValueOnce({ ...extraAttackFighter(), batchId: "batch-swing-1" })
-      .mockResolvedValueOnce({ ...extraAttackFighter(), batchId: "batch-swing-2" });
+      .mockResolvedValueOnce({ character: extraAttackFighter(), batchId: "batch-swing-1" })
+      .mockResolvedValueOnce({ character: extraAttackFighter(), batchId: "batch-swing-2" });
     const user = userEvent.setup();
     renderHub(extraAttackFighter());
     await openAttackPicker(user);
@@ -979,14 +934,6 @@ describe("TurnHub — live multi-attack counter (#757)", () => {
     vi.restoreAllMocks();
   });
 
-  // Pre-#1832 this exercised the banner's OWN "hit or miss?" inline-resolve
-  // affordance for a row left unresolved via AttackStepCard's "Skip" link.
-  // ResolutionRail (#1831) has no such escape hatch — every swing settles a
-  // verdict (implicit hit, called miss, or a die-forced crit/miss) before
-  // "Done" ever advances — so a row reaching the banner unresolved is no
-  // longer reachable from the Attack sheet. What's left to cover here: the
-  // banner renders both RESOLVED lines correctly, and the still-reachable
-  // "Change verdict" mistaken-verdict recovery keeps working off a resolved row.
   it("Turn-summary banner renders resolved hit/miss lines and still offers Change verdict recovery", async () => {
     vi.spyOn(Math, "random").mockReturnValue(0.5); // d20 face 11 → 11+6 = 17 to hit; d8 face 5
     const user = userEvent.setup();
@@ -1130,7 +1077,6 @@ describe("TurnHub — mid-turn weapon change (#815, interaction-budget model #11
       quantity: 1,
       equipped: false,
       equippable: true,
-      // Served (#1433) — bagItemsForSlot filters on it, so a cast omitting it throws.
       allowedSlots: ["MAIN_HAND", "OFF_HAND"],
       proficient: true,
       weapon: { twoHanded: false, damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 0, damageType: "slashing" },
@@ -1144,17 +1090,11 @@ describe("TurnHub — mid-turn weapon change (#815, interaction-budget model #11
     renderHub(makeCharacter({ inventory: [dagger] }));
     await startTurn(user);
 
-    // Spend the Action — no standalone strip exists any more (#1165); the
-    // slot button itself must stay tappable to reach the free interaction,
-    // but must stop announcing "Use Action" once there's no action to use
-    // (a11y — a screen-reader user shouldn't hear an offer that isn't real).
     await user.click(screen.getByRole("button", { name: /Use Action/ }));
     await user.click(screen.getByRole("button", { name: "Dodge" }));
     expect(screen.queryByRole("button", { name: "Use Action" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Interaction options" })).toBeInTheDocument();
 
-    // Reopen — the menu opens in free-only mode, Change weapons is still the
-    // way in, and the turn's free interaction still covers a bare draw.
     await user.click(screen.getByRole("button", { name: "Interaction options" }));
     await user.click(screen.getByRole("button", { name: "Change weapons" }));
     const sheet = within(screen.getByRole("dialog"));
@@ -1258,11 +1198,6 @@ describe("TurnHub — Bonus Unarmed Strike (Martial Arts, #1218)", () => {
   });
 
   it("resolves one Unarmed Strike (no weapon toggle), marks the bonus action used, and fires no server effect", async () => {
-    // #1889: an unmocked to-hit roll occasionally lands nat 1 (auto-miss,
-    // skips the damage step entirely) or nat 20 (button reads "Roll crit
-    // damage"), and either way `/^Roll damage$/` isn't found — pin the same
-    // mid-roll the sibling multi-attack tests use so this can't land on a
-    // die-locked verdict.
     vi.spyOn(Math, "random").mockReturnValue(0.5);
     const user = userEvent.setup();
     renderHub(monkWithBonusUnarmedStrike());
@@ -1278,9 +1213,6 @@ describe("TurnHub — Bonus Unarmed Strike (Martial Arts, #1218)", () => {
     await user.click(screen.getByRole("button", { name: /Roll to hit/ }));
     expect(applyActionTransactions).not.toHaveBeenCalled();
 
-    // The shared resolver (#1845) requires the swing fully resolved — hit
-    // and damaged, or missed — before "Done" appears (no mid-swing "Skip"
-    // affordance, matching the main Attack sheet's own #1832 shape).
     await user.click(screen.getByRole("button", { name: /^Roll damage$/ }));
     await user.click(screen.getByRole("button", { name: /^Done$/ }));
 
@@ -1328,9 +1260,6 @@ describe("TurnHub — Deflect Attacks reaction (#1241)", () => {
           enabled: true,
           reminder:
             "Reaction: when hit by a melee or ranged attack dealing bludgeoning, piercing, or slashing damage (any damage type at L13, Deflect Energy), reduce the damage by 1d10 + Dex modifier + monk level.",
-          // Server-resolved (#1505) — below L13 by default; the L13 test below
-          // overrides this to "any damage type" itself, the same way the real
-          // backend would, instead of the client re-deriving the threshold.
           damageTypeClause: "bludgeoning, piercing, or slashing damage",
           // Reduction spec resolved server-side (#1435): Dex +3 + monk level 5 = 8.
           effect: { effectType: "utility", dice: { count: 1, faces: 10, modifier: 8 }, scaling: { mode: "none" } },
@@ -1455,8 +1384,6 @@ describe("TurnHub — Deflect Attacks reaction (#1241)", () => {
   });
 });
 
-// #1430: the universal cards are served per edition now, not held client-side.
-// These are the surfaces where the 2014/2024 divergence is actually visible.
 describe("TurnHub — universal actions come from GET /api/reference (#1430)", () => {
   const openActionSheet = async (character: Character) => {
     const user = userEvent.setup();
@@ -1466,11 +1393,6 @@ describe("TurnHub — universal actions come from GET /api/reference (#1430)", (
     return user;
   };
 
-  // slotView takes ["Attack", …class actions, …served action-cost rows except
-  // attack].slice(0, 4). With no class actions that is Attack plus the first
-  // three served names — and because the route sorts by name AFTER resolution,
-  // the 2024 rename moves "Magic" out of the window entirely while 2014's "Cast
-  // a Spell" sits inside it. That asymmetry IS the rename reaching the UI.
   it("the collapsed Action-slot preview uses the SERVED names and order — 2024 has no Cast a Spell", async () => {
     const user = userEvent.setup();
     renderHub(makeCharacter({ availableActions: [] } as unknown as Partial<Character>));
