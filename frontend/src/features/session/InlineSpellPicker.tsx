@@ -65,12 +65,14 @@ function spellResolutionTurnState(slotKind: EconomySlot, slotAvailable: boolean)
   };
 }
 
+const NO_APPLY = undefined;
+
 function buildHealApply(
   target: Target,
   amount: number,
 ): { target: "self" | { characterId: string }; kind: "heal"; amount: number } | undefined {
-  if (amount <= 0) return undefined;
-  if (target === "other") return undefined;
+  if (amount <= 0) return NO_APPLY;
+  if (target === "other") return NO_APPLY;
   if (isAllyTarget(target)) return { target: { characterId: target.characterId }, kind: "heal", amount };
   return { target: "self", kind: "heal", amount };
 }
