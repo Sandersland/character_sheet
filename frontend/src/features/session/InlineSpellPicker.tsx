@@ -233,8 +233,6 @@ function SpellResolver({
   const resolveActionMutation = useCharacterMutation({
     characterId: character.id,
     mutationFn: (op: ResolveActionOperation) => applyResolveActionOperations(character.id, [op]),
-    // Strip the additive batchId before it caches (#1283 §1) — it rides the
-    // response only to thread turn undo (below), never onto the character.
     toCharacter: ({ batchId, ...character }) => {
       void batchId;
       return character;
@@ -243,10 +241,6 @@ function SpellResolver({
     onCharacterWritten: onLogChanged,
   });
 
-  // onCommitSlot receives the cast's batchId (#758) so the caller can tag the
-  // turn-history entry it just pushed — without it, undo of a cast finds no
-  // batch and only pops the economy locally, leaving the server cast (its log
-  // line + the 5e interlock) un-reverted.
   function handleCommit(rolls: ResolutionRolls) {
     const apply = isHeal ? buildHealApply(target, rolls.effect?.total ?? 0) : undefined;
     const op = buildSpellResolveOp(resolution, rolls, spell, effectiveSlot, apply);
@@ -384,13 +378,7 @@ function deriveSpellList(
   const slotUsedHint = slotRestrictionHint(slot, economy);
 
   const hiddenNote = hiddenLevelsNote(
-    hiddenSpellLevels(spellcasting.spells, {
-      castingTimeFilter,
-      slotLevels,
-      arcanaLevels,
-      bonusActionBlockedByActionSpell: false,
-      actionLimitedToCantrips: false,
-    }),
+    hiddenSpellLevels(spellcasting.spells, { castingTimeFilter, slotLevels, arcanaLevels }),
   );
   return { slotLevels, arcanaLevels, sortedSpells, slotUsedHint, hiddenNote };
 }
