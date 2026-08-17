@@ -16,16 +16,29 @@ export interface ResolveActionOperation extends ResolveActionEventData {
 }
 
 /**
+ * The full updated character plus the `batchId` this cast/swing wrote (#758) —
+ * the client threads that id into the turn-undo history so undo can revert
+ * exactly this resolveAction event. The caller strips `batchId` before caching
+ * (it must never land on the cached character, #1283 §1).
+ */
+export type ResolveActionResponse = Character & { batchId: string };
+
+/**
  * Commits one resolved weapon swing or spell cast as a single undoable
  * `resolveAction` CharacterEvent (epic #1827). Mirrors
  * `applySpellcastingTransactions` — POST .../resolve-action/transactions,
- * full updated Character on success.
+ * the updated Character plus its `batchId` on success.
  */
 export async function applyResolveActionOperations(
   characterId: string,
   operations: ResolveActionOperation[],
-): Promise<Character> {
-  return postTransactions(characterId, "resolve-action", operations, "Failed to resolve action");
+): Promise<ResolveActionResponse> {
+  return postTransactions<ResolveActionOperation, ResolveActionResponse>(
+    characterId,
+    "resolve-action",
+    operations,
+    "Failed to resolve action",
+  );
 }
 
 /**

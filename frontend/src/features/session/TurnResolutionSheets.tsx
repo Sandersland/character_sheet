@@ -288,10 +288,13 @@ function SpellResolutionSheet({
         : !turnState.reactionUsed;
   const refreshCombat = useTurnStateContext()?.refreshCombat;
 
-  const onCommitSlot = () => {
+  const onCommitSlot = (batchId?: string) => {
     if (slot === "action") turnState.commitActionSpell();
     else if (slot === "bonusAction") turnState.commitBonusActionSpell();
     else turnState.commitReactionSpell();
+    // Tag the history entry the commit above just pushed with the cast's batch
+    // so turn undo reverts the server cast (#758), not just the local economy.
+    if (batchId) turnState.attachBatchId(batchId);
     void refreshCombat?.();
   };
 

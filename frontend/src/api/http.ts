@@ -67,13 +67,13 @@ export const jsonBody = (body: unknown, method = "POST"): RequestInit => ({
 // itself, not an { operations } batch. Class/subclass abilities go through
 // applyAbilityTransactions instead (#1275): extra abilityKey URL segment,
 // heterogeneous response type.)
-export async function postTransactions<TOp>(
+export async function postTransactions<TOp, TResponse = Character>(
   characterId: string,
   domain: string,
   operations: TOp[],
   errorLabel: string,
-): Promise<Character> {
-  return request<Character>(
+): Promise<TResponse> {
+  return request<TResponse>(
     `/characters/${characterId}/${domain}/transactions`,
     jsonBody({ operations }),
     errorLabel,

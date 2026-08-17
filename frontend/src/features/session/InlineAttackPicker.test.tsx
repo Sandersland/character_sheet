@@ -289,7 +289,7 @@ describe("InlineAttackPicker — on-hit dice riders (#1843: routed into resolveA
 // empty/undefined resolved value would crash the next render's
 // buildAttackForms on a missing attackRows.
 function LiveHarness({ character }: { character: Character }) {
-  vi.mocked(applyResolveActionOperations).mockResolvedValue(character);
+  vi.mocked(applyResolveActionOperations).mockResolvedValue({ ...character, batchId: "test-batch" });
   const liveTurnState = useTurnState(character, "sess-crit");
   useEffect(() => {
     liveTurnState.startCombat();
@@ -466,7 +466,7 @@ describe("InlineAttackPicker — Extra Attack loop (#1832)", () => {
       attackRows: [weaponRow("Longsword", "inv-1", { damageRiders: [] })],
     });
     function Harness() {
-      vi.mocked(applyResolveActionOperations).mockResolvedValue(character);
+      vi.mocked(applyResolveActionOperations).mockResolvedValue({ ...character, batchId: "test-batch" });
       const live = useTurnState(character, "sess-spend");
       useEffect(() => {
         live.startCombat();

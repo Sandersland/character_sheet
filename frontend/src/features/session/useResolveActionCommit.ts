@@ -34,13 +34,21 @@ export function useResolveActionCommit({
 }: {
   characterId: string;
   onLogChanged: () => void;
-  /** Fires after the mutation is queued — the caller's own post-commit local-state advance. */
-  onCommitted: () => void;
+  /** Fires on the mutation's success with the swing's audit batchId (#758) —
+   *  the caller's post-commit local-state advance, plus its chance to tag the
+   *  turn-history entry (`attachBatchId`) so undo reverts this exact swing
+   *  server-side instead of only popping the local economy. */
+  onCommitted: (batchId: string) => void;
 }) {
   const mutation = useCharacterMutation({
     characterId,
     mutationFn: (op: ResolveActionOperation) => applyResolveActionOperations(characterId, [op]),
-    toCharacter: (c) => c,
+    // Strip the additive batchId before it caches (#1283 §1) — it rides the
+    // response only for `onCommitted`'s undo tagging, never onto the character.
+    toCharacter: ({ batchId, ...character }) => {
+      void batchId;
+      return character;
+    },
     fallbackMessage: "Failed to resolve attack",
     onCharacterWritten: onLogChanged,
   });
@@ -63,7 +71,7 @@ export function useResolveActionCommit({
     const riders = rolls.toHit?.verdict === "miss" ? [] : Object.values(riderEffects);
     mutation
       .mutateAsync(buildResolveActionOp(resolution, rolls, { riders, assassinate }))
-      .then(onCommitted)
+      .then((res) => onCommitted(res.batchId))
       .catch(() => {});
   }
 

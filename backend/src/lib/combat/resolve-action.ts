@@ -222,8 +222,8 @@ export async function applyResolveActionOperations(
   characterId: string,
   operations: ResolveActionRequestOperation[],
   casterUserId: string,
-): Promise<void> {
-  await runCharacterTransaction(characterId, operations, {
+): Promise<string> {
+  return runCharacterTransaction(characterId, operations, {
     select: RESOLVE_ACTION_SELECT,
     notFound: (id) => new InvalidResolveActionOperationError(`Character not found: ${id}`),
     applyOp: async ({ tx, row, op, characterId: id, batchId, sessionId }) => {

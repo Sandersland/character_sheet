@@ -47,7 +47,7 @@ interface InlineSpellPickerProps {
   onLogChanged: () => void;
   slot: EconomySlot;
   slotAvailable: boolean;
-  onCommitSlot: () => void;
+  onCommitSlot: (batchId?: string) => void;
 
   spellEconomy: SpellEconomyState;
   allies: AllyOption[];
@@ -195,7 +195,7 @@ interface SpellResolverProps {
   slotLevels: number[];
   arcanaLevels: number[];
   allies: AllyOption[];
-  onCommitSlot: () => void;
+  onCommitSlot: (batchId?: string) => void;
   onCastSettled?: (recorded: RecordedSpellCast) => void;
   onLogChanged: () => void;
   onBack: () => void;
@@ -233,18 +233,27 @@ function SpellResolver({
   const resolveActionMutation = useCharacterMutation({
     characterId: character.id,
     mutationFn: (op: ResolveActionOperation) => applyResolveActionOperations(character.id, [op]),
-    toCharacter: (c) => c,
+    // Strip the additive batchId before it caches (#1283 §1) — it rides the
+    // response only to thread turn undo (below), never onto the character.
+    toCharacter: ({ batchId, ...character }) => {
+      void batchId;
+      return character;
+    },
     fallbackMessage: "Failed to resolve cast",
     onCharacterWritten: onLogChanged,
   });
 
+  // onCommitSlot receives the cast's batchId (#758) so the caller can tag the
+  // turn-history entry it just pushed — without it, undo of a cast finds no
+  // batch and only pops the economy locally, leaving the server cast (its log
+  // line + the 5e interlock) un-reverted.
   function handleCommit(rolls: ResolutionRolls) {
     const apply = isHeal ? buildHealApply(target, rolls.effect?.total ?? 0) : undefined;
     const op = buildSpellResolveOp(resolution, rolls, spell, effectiveSlot, apply);
     resolveActionMutation
       .mutateAsync(op)
-      .then(() => {
-        onCommitSlot();
+      .then((res) => {
+        onCommitSlot(res.batchId);
         onCastSettled?.(castSettledEntry(spell, isHeal, effectiveSlot, rolls, spellcasting.spellSaveDC));
       })
       .catch(() => {});

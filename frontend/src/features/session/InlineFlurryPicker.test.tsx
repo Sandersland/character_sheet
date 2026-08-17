@@ -138,7 +138,7 @@ describe("InlineFlurryPicker (#1217, rewired onto the shared resolver #1845)", (
   it("never calls logRoll for a strike's attack/damage rolls (retired #1845)", async () => {
     seedMid();
     const turnState = makeTurnState({ total: 2, used: 0 });
-    vi.mocked(applyResolveActionOperations).mockResolvedValue(monkCharacter());
+    vi.mocked(applyResolveActionOperations).mockResolvedValue({ ...monkCharacter(), batchId: "test-batch" });
     renderPicker(monkCharacter(), turnState);
 
     await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
@@ -174,7 +174,7 @@ describe("InlineFlurryPicker (#1217, rewired onto the shared resolver #1845)", (
     seedMid();
     const turnState = makeTurnState({ total: 2, used: 0 });
     const onCommitFocusSpend = vi.fn();
-    vi.mocked(applyResolveActionOperations).mockResolvedValue(monkCharacter());
+    vi.mocked(applyResolveActionOperations).mockResolvedValue({ ...monkCharacter(), batchId: "test-batch" });
     renderPicker(monkCharacter(), turnState, { onCommitFocusSpend });
 
     await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
@@ -196,7 +196,7 @@ describe("InlineFlurryPicker (#1217, rewired onto the shared resolver #1845)", (
   it("shows Close (not Done) after one of two strikes commits — the second is still pending", async () => {
     seedMid();
     const turnState = makeTurnState({ total: 2, used: 0 });
-    vi.mocked(applyResolveActionOperations).mockResolvedValue(monkCharacter());
+    vi.mocked(applyResolveActionOperations).mockResolvedValue({ ...monkCharacter(), batchId: "test-batch" });
     renderPicker(monkCharacter(), turnState);
 
     await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
@@ -231,7 +231,7 @@ describe("InlineFlurryPicker (#1217, rewired onto the shared resolver #1845)", (
 // strike-loop re-arm without double-spending the bonus action (mirrors
 // InlineAttackPicker.test.tsx's own LiveHarness for the Extra Attack loop).
 function LiveHarness({ character }: { character: Character }) {
-  vi.mocked(applyResolveActionOperations).mockResolvedValue(character);
+  vi.mocked(applyResolveActionOperations).mockResolvedValue({ ...character, batchId: "test-batch" });
   const liveTurnState = useTurnState(character, "sess-flurry");
   useEffect(() => {
     liveTurnState.startCombat();

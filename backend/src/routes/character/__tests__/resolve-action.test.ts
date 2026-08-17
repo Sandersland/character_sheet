@@ -372,6 +372,9 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     expect(resolveEvents).toHaveLength(1);
     expect(resolveEvents[0].category).toBe("combat");
     expect(resolveEvents[0].data).toMatchObject({ actionId: "action-1", source: "Longbow", slotLevel: null });
+    // The response returns the batch id the client threads into turn undo (#758),
+    // and it's the batch this event was written under.
+    expect(res.body.batchId).toBe(resolveEvents[0].batchId);
     // No companion spellcasting/resources event rides this batch — one row per resolution.
     const sameBatch = events.filter((e) => e.batchId === resolveEvents[0].batchId);
     expect(sameBatch).toHaveLength(1);

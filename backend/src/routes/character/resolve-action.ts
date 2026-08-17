@@ -34,4 +34,8 @@ makeTransactionsEndpoint({
   schema: transactionsRequestSchema,
   apply: (characterId, data, userId) => applyResolveActionOperations(characterId, data.operations, userId),
   domainErrors: [InvalidResolveActionOperationError, InvalidSpellcastingOperationError],
+  // batchId is additive alongside the serialized character so the client can
+  // revert this exact cast/swing on turn undo (#758) — the same shape the
+  // class-action endpoint returns. The caller strips it before caching.
+  respond: (character, batchId) => ({ ...character, batchId }),
 });

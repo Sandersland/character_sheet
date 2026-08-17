@@ -322,10 +322,15 @@ export default function InlineAttackPicker({
   const { commit, pending: commitPending, error: commitError } = useResolveActionCommit({
     characterId: character.id,
     onLogChanged,
-    onCommitted: () => {
+    onCommitted: (batchId) => {
       local.recordSwingComplete();
       local.clearRiders();
       local.clearAssassinateSurprised();
+      // Tag this swing's recordAttack history entry with its audit batch so
+      // turn undo reverts the swing server-side (#758) — without it the undo
+      // was local-only, stranding the swing event and deadlocking the LIFO
+      // revert of anything committed before it.
+      turnState.attachBatchId(batchId);
     },
   });
   // Only true when the toggle was actually checked AND it's what this swing's

@@ -18,7 +18,7 @@ function seedMid() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(applyResolveActionOperations).mockResolvedValue({} as Character);
+  vi.mocked(applyResolveActionOperations).mockResolvedValue({ batchId: "test-batch" } as never);
 });
 
 afterEach(() => {
@@ -282,6 +282,17 @@ describe("InlineSpellPicker — economy interlock + single spend", () => {
     expect(applyResolveActionOperations).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(onCommitSlot).toHaveBeenCalledTimes(1));
     expect(screen.queryByRole("button", { name: "Cast" })).not.toBeInTheDocument();
+  });
+
+  it("passes the cast's batchId to onCommitSlot so turn undo can revert it (#758)", async () => {
+    const user = userEvent.setup();
+    vi.mocked(applyResolveActionOperations).mockResolvedValueOnce({ batchId: "batch-cast-1" } as never);
+    const { onCommitSlot } = renderPicker(makeCharacter([DRUIDCRAFT]));
+
+    await user.click(screen.getByRole("button", { name: /^Druidcraft/ }));
+    await user.click(screen.getByRole("button", { name: "Cast" }));
+
+    await waitFor(() => expect(onCommitSlot).toHaveBeenCalledWith("batch-cast-1"));
   });
 
   it("guards the whole picker when the economy slot is already spent — no dead-end resolver", () => {

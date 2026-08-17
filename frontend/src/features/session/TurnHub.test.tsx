@@ -160,7 +160,7 @@ beforeEach(() => {
   seedUniversalActions("EDITION_2024");
   seedUniversalActions("EDITION_2014");
   vi.mocked(applyActionTransactions).mockImplementation(async () => echoCharacter());
-  vi.mocked(applyResolveActionOperations).mockImplementation(async () => echoCharacter());
+  vi.mocked(applyResolveActionOperations).mockImplementation(async () => ({ ...echoCharacter(), batchId: "test-batch" }));
   vi.mocked(applyResourceTransactions).mockImplementation(async () => echoCharacter());
   vi.mocked(castManeuverTransaction).mockImplementation(async () => ({
     character: echoCharacter(),
@@ -639,11 +639,12 @@ describe("TurnHub — bonus-spell cards", () => {
             id: "sp-hw", name: "Healing Word", level: 1, school: "evocation", prepared: true,
             castingTime: "1 bonus action", range: "60 feet", duration: "Instantaneous",
             description: "", effectKind: "heal", effectDiceCount: 1, effectDiceFaces: 4,
+            castCost: "bonusAction",
           },
           {
             id: "sp-sw", name: "Spiritual Weapon", level: 2, school: "evocation", prepared: true,
             castingTime: "1 bonus action", range: "60 feet", duration: "1 minute",
-            description: "",
+            description: "", castCost: "bonusAction",
           },
         ],
       },
@@ -668,6 +669,33 @@ describe("TurnHub — bonus-spell cards", () => {
     // The escape hatch reveals the full grouped list.
     await user.click(screen.getByRole("button", { name: "Show all spells" }));
     expect(screen.getByText("Spiritual Weapon")).toBeInTheDocument();
+  });
+
+  it("Undo of a settled cast reverts its batch and removes its Spells-cast row", async () => {
+    const user = userEvent.setup();
+    renderHub(caster());
+    await startTurn(user);
+
+    await user.click(screen.getByRole("button", { name: "Use Bonus" }));
+    await user.click(screen.getByRole("button", { name: "Healing Word" }));
+    // The fixture's spell carries no served effectRolls → no-roll shape, one "Cast" tap.
+    await user.click(screen.getByRole("button", { name: "Cast" }));
+    await waitFor(() => expect(applyResolveActionOperations).toHaveBeenCalledTimes(1));
+    const closeBtns = within(screen.getByRole("dialog")).getAllByRole("button", { name: "Close" });
+    await user.click(closeBtns[closeBtns.length - 1]); // footer Close (grab-handle + header share the name)
+
+    // The cast's receipt shows on the turn card.
+    expect(await screen.findByText("Spells cast")).toBeInTheDocument();
+    expect(screen.getByText(/Healing Word/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Undo/ }));
+
+    // The cast batch reverts server-side and its receipt leaves with it —
+    // the pre-#758-fix rationale ("a cast already committed server-side")
+    // no longer holds now that undo actually reverts the cast.
+    await waitFor(() => expect(revertBatch).toHaveBeenCalledWith("char-1", "test-batch"));
+    expect(screen.queryByText("Spells cast")).not.toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Use Bonus" })).toBeInTheDocument();
   });
 });
 
@@ -892,6 +920,62 @@ describe("TurnHub — live multi-attack counter (#757)", () => {
     // restores the economy but must not resurrect stale banner rows.
     await user.click(screen.getByRole("button", { name: /Undo/ }));
     expect(screen.queryByText("Turn summary")).not.toBeInTheDocument();
+    vi.restoreAllMocks();
+  });
+
+  it("Undo of a committed swing reverts its batch server-side (#758)", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    vi.mocked(applyResolveActionOperations).mockResolvedValueOnce({
+      ...extraAttackFighter(),
+      batchId: "batch-swing-1",
+    });
+    const user = userEvent.setup();
+    renderHub(extraAttackFighter());
+    await openAttackPicker(user);
+    const sheet = () => within(screen.getByRole("dialog"));
+
+    await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
+    await user.click(sheet().getByRole("button", { name: /^Roll damage$/ }));
+    await user.click(sheet().getByRole("button", { name: /^Done$/ }));
+    await waitFor(() => expect(applyResolveActionOperations).toHaveBeenCalledTimes(1));
+    const closeBtns = sheet().getAllByRole("button", { name: /^Close$/ });
+    await user.click(closeBtns[closeBtns.length - 1]);
+
+    await user.click(screen.getByRole("button", { name: /Undo/ }));
+
+    await waitFor(() => expect(revertBatch).toHaveBeenCalledWith("char-1", "batch-swing-1"));
+    vi.restoreAllMocks();
+  });
+
+  it("Undo unwinds multiple swings' batches in LIFO order", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    vi.mocked(applyResolveActionOperations)
+      .mockResolvedValueOnce({ ...extraAttackFighter(), batchId: "batch-swing-1" })
+      .mockResolvedValueOnce({ ...extraAttackFighter(), batchId: "batch-swing-2" });
+    const user = userEvent.setup();
+    renderHub(extraAttackFighter());
+    await openAttackPicker(user);
+    const sheet = () => within(screen.getByRole("dialog"));
+
+    await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
+    await user.click(sheet().getByRole("button", { name: /^Roll damage$/ }));
+    await user.click(sheet().getByRole("button", { name: /^Done$/ }));
+    await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
+    await user.click(sheet().getByRole("button", { name: /^Roll damage$/ }));
+    await user.click(sheet().getByRole("button", { name: /^Done$/ }));
+    await waitFor(() => expect(applyResolveActionOperations).toHaveBeenCalledTimes(2));
+    await user.click(sheet().getByRole("button", { name: /^Done$/ })); // footer Done — finishAttack
+
+    // Undo #1 pops the local finishAttack entry (no server batch on it).
+    await user.click(screen.getByRole("button", { name: /Undo/ }));
+    expect(revertBatch).not.toHaveBeenCalled();
+
+    // Undo #2/#3 revert the swings newest-first — LIFO against the server's
+    // "only the most recent batch" guard.
+    await user.click(screen.getByRole("button", { name: /Undo/ }));
+    await waitFor(() => expect(revertBatch).toHaveBeenNthCalledWith(1, "char-1", "batch-swing-2"));
+    await user.click(screen.getByRole("button", { name: /Undo/ }));
+    await waitFor(() => expect(revertBatch).toHaveBeenNthCalledWith(2, "char-1", "batch-swing-1"));
     vi.restoreAllMocks();
   });
 

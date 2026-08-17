@@ -1328,17 +1328,29 @@ describe("cast tally", () => {
     expect(result.current.castTally).toHaveLength(0);
   });
 
-  it("does not push an undo snapshot — undo leaves the cast receipt in place", () => {
+  it("undo of the cast's economy commit removes its receipt too (#758)", () => {
     const { result } = inActiveTurn();
     act(() => { result.current.commitActionSpell(); });
     act(() => { result.current.recordSpellCast({ spellName: "Burning Hands", level: 1, total: 14 }); });
     expect(result.current.actionsRemaining).toBe(0);
     act(() => { result.current.undo(); });
-    // Undo restores the pre-commitActionSpell economy snapshot (the last CONSUMING
-    // action)...
+    // Undo restores the pre-commitActionSpell economy snapshot (the last
+    // CONSUMING action) — and the cast tally with it: undo now reverts the
+    // server cast (the entry carries its batchId), so the receipt leaves too.
     expect(result.current.actionsRemaining).toBe(1);
-    // ...but the cast tally isn't part of that snapshot, so the receipt survives.
-    expect(result.current.castTally).toHaveLength(1);
+    expect(result.current.castTally).toHaveLength(0);
+  });
+
+  it("dismissing the cast banner is durable against undo (#812 pattern)", () => {
+    const { result } = inActiveTurn();
+    act(() => { result.current.commitActionSpell(); });
+    act(() => { result.current.recordSpellCast({ spellName: "Burning Hands", level: 1, total: 14 }); });
+    act(() => { result.current.consumeBonusAction(); });
+    act(() => { result.current.clearCastTally(); });
+    // Popping the bonus-action entry (whose snapshot held the receipt) must
+    // not resurrect a dismissed banner.
+    act(() => { result.current.undo(); });
+    expect(result.current.castTally).toHaveLength(0);
   });
 });
 
@@ -1520,6 +1532,7 @@ describe("localStorage persistence", () => {
       attack: null,
       bonusAttack: null,
       attackTally: [],
+      castTally: [],
       attackEquipCredits: 0,
       freeInteractionUsed: false,
     };
