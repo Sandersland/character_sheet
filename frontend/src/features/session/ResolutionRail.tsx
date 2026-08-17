@@ -1,17 +1,3 @@
-// ResolutionRail (epic #1827 Slice 4, #1831) — generalizes AttackStepCard into
-// a presentational rail that renders from a `ResolutionView` instead of the
-// weapon-specific AttackEntryView/AttackTallyRow pair. AttackStepCard's own
-// behavior/API is unchanged — the weapon adapter migrates its callers to this
-// component and retires it in #1832; this is new, additive UI. The two share
-// the numbered-dot rail shell and the verdict/crit widgets via
-// `railPrimitives` (fallow-flagged clone, extracted rather than copied) —
-// AttackStepCard's rendered output is byte-identical to before.
-//
-// The save/auto-hit/no-roll variants are just WHICH steps `view.steps` emits
-// (design spec) — this component has no shape-specific branch of its own,
-// only a switch over each step's `kind`. An empty step list (no-roll) renders
-// no numbered steps at all, just the completion button every shape ends on.
-
 import AttackResultLine from "@/features/session/AttackResultLine";
 import { CritButton, RailStep, VerdictChip } from "@/features/session/railPrimitives";
 import { abilityLabel } from "@/lib/abilities";
@@ -24,10 +10,6 @@ const STEP_LABEL: Record<Exclude<ResolutionStepKind, "damage">, string> = {
   announceSave: "Announce the save",
 };
 
-// The "damage" step's own label is keyed off view.effect?.kind (#1831
-// review): a heal-shaped resolution (Cure Wounds) reads "Healing"/"Roll
-// healing", never "Damage"/"Roll damage" — a flat STEP_LABEL entry can't
-// branch on the view, so this is a function, not a table lookup.
 function damageStepLabel(view: ResolutionView): string {
   return view.effect?.kind === "heal" ? "Healing" : "Damage";
 }
@@ -110,10 +92,6 @@ function AnnounceSaveStepContent({ view }: { view: ResolutionView }) {
   );
 }
 
-// crit doubling only ever applies to a damage roll (never a heal — see
-// useResolution's isCrit/critDamageSpec, which a heal-shaped resolution has
-// no toHit die to ever set), but this still branches on view.effect?.kind
-// first so "Roll healing" never momentarily reads "Roll crit healing".
 function damageButtonLabel(view: ResolutionView): string {
   if (view.effect?.kind === "heal") return "Roll healing";
   return view.isCrit ? "Roll crit damage" : "Roll damage";
@@ -166,12 +144,7 @@ function stepContent(step: ResolutionStep, view: ResolutionView): React.ReactNod
   }
 }
 
-/** The completion tap every shape ends on: "Resolve" for a no-roll
- *  resolution (nothing was rolled — this IS the whole interaction), "Done"
- *  once every real step is settled. Hidden once `completed`. */
-function CompleteButton({ view }: { view: ResolutionView }) {
-  if (view.completed) return null;
-  if (!view.readyToComplete) return null;
+function CompleteButton({ view, completeLabel }: { view: ResolutionView; completeLabel: string }) {
   return (
     <button
       type="button"
@@ -180,12 +153,21 @@ function CompleteButton({ view }: { view: ResolutionView }) {
       title={view.disabled ? "No action economy remaining" : undefined}
       className="min-h-11 w-full rounded-control bg-garnet-soft-surface px-3 text-sm font-semibold text-garnet-on-surface transition-colors hover:bg-garnet-soft-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
     >
-      {view.steps.length === 0 ? "Resolve" : "Done"}
+      {view.steps.length === 0 ? completeLabel : "Done"}
     </button>
   );
 }
 
-export default function ResolutionRail({ view }: { view: ResolutionView }) {
+export default function ResolutionRail({
+  view,
+  completeLabel = "Confirm",
+}: {
+  view: ResolutionView;
+  completeLabel?: string;
+}) {
+  const canComplete = !view.completed && view.readyToComplete;
+
+  if (view.steps.length === 0 && !canComplete) return null;
   return (
     <div className="flex flex-col gap-3 rounded-card border border-garnet-200 bg-parchment-50 p-3">
       {view.steps.length > 0 && (
@@ -203,7 +185,7 @@ export default function ResolutionRail({ view }: { view: ResolutionView }) {
           ))}
         </div>
       )}
-      <CompleteButton view={view} />
+      {canComplete && <CompleteButton view={view} completeLabel={completeLabel} />}
     </div>
   );
 }
