@@ -94,12 +94,8 @@ export async function autoCloseIfStale(sessionId: string): Promise<void> {
   if (session) await maybeAutoClose(session);
 }
 
-/**
- * The campaign's active session (with participants), or null — running
- * maybeAutoClose first so a stale/orphaned session settles instead of
- * reporting active. The campaign-delete guard reads through this, never a raw
- * status query, so an unresumable session can't block deletion forever.
- */
+/** The campaign's active session (with participants), or null — runs
+ *  maybeAutoClose so a stale session never reports as active. */
 export async function activeSessionForCampaign(campaignId: string) {
   const session = await prisma.session.findFirst({
     where: { campaignId, status: "active" },
@@ -121,31 +117,32 @@ async function activeSoloSessionForCharacter(characterId: string) {
 }
 
 /**
- * Closes an active session whose every participant left at least SESSION_GRACE_MS
- * ago, dating endedAt to max(leftAt) + grace. Reused on every active-session read
- * so an abandoned session settles itself without an explicit end.
+ * Closes an active session that can no longer resume — emptied of participants
+ * entirely, or abandoned past the grace period. Reused on every active-session
+ * read so a stale session settles itself without an explicit end.
  */
 async function maybeAutoClose(
   session: SessionWithParticipants,
 ): Promise<SessionWithParticipants> {
   if (session.status !== "active") return session;
-  const { participants } = session;
-  // Participant rows cascade-delete with their character, so a participantless
-  // active session is unresumable (nobody can rejoin or end it) and would stay
-  // active forever, deadlocking the campaign-delete guard. Close it now, no grace.
-  if (participants.length === 0) {
-    const endedAt = new Date();
-    await closeSession(session, endedAt);
-    return { ...session, status: "ended", endedAt };
-  }
-  if (!participants.every((p) => p.leftAt !== null)) return session;
-
-  const maxLeftMs = Math.max(...participants.map((p) => p.leftAt!.getTime()));
-  if (Date.now() - maxLeftMs < SESSION_GRACE_MS) return session;
-
-  const endedAt = new Date(maxLeftMs + SESSION_GRACE_MS);
+  const endedAt = autoCloseEndTime(session.participants);
+  if (!endedAt) return session;
   await closeSession(session, endedAt);
   return { ...session, status: "ended", endedAt };
+}
+
+function autoCloseEndTime(
+  participants: SessionWithParticipants["participants"],
+): Date | null {
+  const emptiedByCharacterDeletion = participants.length === 0;
+  if (emptiedByCharacterDeletion) return new Date();
+
+  const everyoneLeft = participants.every((p) => p.leftAt !== null);
+  if (!everyoneLeft) return null;
+
+  const lastLeftMs = Math.max(...participants.map((p) => p.leftAt!.getTime()));
+  const graceExpired = Date.now() - lastLeftMs >= SESSION_GRACE_MS;
+  return graceExpired ? new Date(lastLeftMs + SESSION_GRACE_MS) : null;
 }
 
 /**
