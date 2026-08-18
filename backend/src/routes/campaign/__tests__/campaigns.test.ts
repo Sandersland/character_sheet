@@ -14,6 +14,7 @@ const CHAR_A = "test-campaigns-char-a";
 const CHAR_B = "test-campaigns-char-b";
 const CHAR_C = "test-campaigns-char-c"; // owned by A, used for the reassignment guard
 const CHAR_D = "test-campaigns-char-d"; // owned by A, used for the PC-entity attach test
+const CHAR_E = "test-campaigns-char-e"; // owned by A, used for the campaign-delete survival test
 
 async function makeCharacter(id: string, ownerId: string) {
   await prisma.character.deleteMany({ where: { id } });
@@ -49,10 +50,11 @@ describe("campaigns (#246)", () => {
     await makeCharacter(CHAR_B, OWNER_B);
     await makeCharacter(CHAR_C, OWNER_A);
     await makeCharacter(CHAR_D, OWNER_A);
+    await makeCharacter(CHAR_E, OWNER_A);
   });
 
   afterAll(async () => {
-    await prisma.character.deleteMany({ where: { id: { in: [CHAR_A, CHAR_B, CHAR_C, CHAR_D] } } });
+    await prisma.character.deleteMany({ where: { id: { in: [CHAR_A, CHAR_B, CHAR_C, CHAR_D, CHAR_E] } } });
     await prisma.campaign.deleteMany({ where: { ownerId: { in: [OWNER_A, OWNER_B] } } });
     await prisma.user.deleteMany({ where: { id: { in: [OWNER_A, OWNER_B] } } });
   });
@@ -444,6 +446,80 @@ describe("campaigns (#246)", () => {
       .set("Cookie", cookieB);
     expect(list.status).toBe(200);
     expect((list.body as { name: string }[]).some((e) => e.name === `Char ${CHAR_D}`)).toBe(true);
+  });
+
+  describe("DELETE /api/campaigns/:id", () => {
+    async function makeCampaign(name: string): Promise<{ id: string; inviteCode: string }> {
+      const created = await supertest(app)
+        .post("/api/campaigns")
+        .set("Cookie", cookieA)
+        .send({ name });
+      expect(created.status).toBe(201);
+      return created.body as { id: string; inviteCode: string };
+    }
+
+    it("404s a nonexistent campaign and 403s non-owners", async () => {
+      const missing = await supertest(app)
+        .delete("/api/campaigns/00000000-0000-0000-0000-000000000000")
+        .set("Cookie", cookieA);
+      expect(missing.status).toBe(404);
+
+      const { id, inviteCode } = await makeCampaign("Not Yours To Delete");
+
+      const nonMember = await supertest(app).delete(`/api/campaigns/${id}`).set("Cookie", cookieB);
+      expect(nonMember.status).toBe(403);
+
+      await supertest(app).post("/api/campaigns/join").set("Cookie", cookieB).send({ inviteCode });
+      const player = await supertest(app).delete(`/api/campaigns/${id}`).set("Cookie", cookieB);
+      expect(player.status).toBe(403);
+
+      await expect(
+        prisma.campaign.findUniqueOrThrow({ where: { id } }),
+      ).resolves.toMatchObject({ id });
+    });
+
+    it("deletes the campaign; characters survive detached, sessions and memberships die", async () => {
+      const { id } = await makeCampaign("Doomed Campaign");
+      const attach = await supertest(app)
+        .post(`/api/campaigns/${id}/characters`)
+        .set("Cookie", cookieA)
+        .send({ characterId: CHAR_E });
+      expect(attach.status).toBe(200);
+      const endedSession = await prisma.session.create({
+        data: { campaignId: id, status: "ended", endedAt: new Date() },
+      });
+
+      const res = await supertest(app).delete(`/api/campaigns/${id}`).set("Cookie", cookieA);
+      expect(res.status).toBe(204);
+
+      expect(await prisma.campaign.findUnique({ where: { id } })).toBeNull();
+      expect(await prisma.session.findUnique({ where: { id: endedSession.id } })).toBeNull();
+      expect(await prisma.campaignMembership.findMany({ where: { campaignId: id } })).toHaveLength(0);
+      const survivor = await prisma.character.findUniqueOrThrow({
+        where: { id: CHAR_E },
+        select: { campaignId: true },
+      });
+      expect(survivor.campaignId).toBeNull();
+    });
+
+    it("409s while a session is active, then deletes once it has ended", async () => {
+      const { id } = await makeCampaign("Mid-Session Campaign");
+      const active = await prisma.session.create({ data: { campaignId: id, status: "active" } });
+
+      const blocked = await supertest(app).delete(`/api/campaigns/${id}`).set("Cookie", cookieA);
+      expect(blocked.status).toBe(409);
+      expect(blocked.body.error).toMatch(/active session/i);
+      await expect(
+        prisma.campaign.findUniqueOrThrow({ where: { id } }),
+      ).resolves.toMatchObject({ id });
+
+      await prisma.session.update({
+        where: { id: active.id },
+        data: { status: "ended", endedAt: new Date() },
+      });
+      const res = await supertest(app).delete(`/api/campaigns/${id}`).set("Cookie", cookieA);
+      expect(res.status).toBe(204);
+    });
   });
 
   it("409s attaching a character already in a different campaign", async () => {

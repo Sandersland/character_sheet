@@ -24,6 +24,7 @@ vi.mock("@/api/client", () => ({
   unmergeEntityMerge: vi.fn(),
   fetchCampaignItems: vi.fn(),
   fetchItems: vi.fn(),
+  deleteCampaign: vi.fn(),
   // Listed only so the edition-badge spec can prove it is NEVER called — the
   // badge reads the label served with the campaign row (#1436).
   fetchEditions: vi.fn(),
@@ -334,5 +335,15 @@ describe("CampaignDetailPage Manage tab (#379)", () => {
     renderDetail("/campaigns/camp-1/manage");
 
     expect(await screen.findByText("Identity merges")).toBeInTheDocument();
+  });
+
+  it("shows the danger zone with the delete-campaign action at the bottom of /manage", async () => {
+    vi.mocked(client.fetchCampaign).mockResolvedValue(makeCampaign({ role: "OWNER" }));
+    vi.mocked(client.fetchCharacters).mockResolvedValue([]);
+
+    renderDetail("/campaigns/camp-1/manage");
+
+    expect(await screen.findByRole("heading", { name: "Danger zone" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete campaign" })).toBeInTheDocument();
   });
 });

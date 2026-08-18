@@ -7,8 +7,13 @@ import {
   joinCampaignSchema,
 } from "@character-sheet/contracts";
 
-import { assertCampaignMembership, assertCharacterAccess } from "@/lib/auth/access.js";
+import {
+  assertCampaignMembership,
+  assertCampaignOwner,
+  assertCharacterAccess,
+} from "@/lib/auth/access.js";
 import { attachCharacterUpdate } from "@/lib/campaign/campaign-attach.js";
+import { deletePortraitBlobBestEffort } from "@/lib/storage/portrait-blob.js";
 import { parseBodyOr400 } from "@/lib/http/parse-body.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { characterInclude } from "@/lib/character/character-include.js";
@@ -119,6 +124,47 @@ campaignsRouter.get("/campaigns/:id", async (req, res) => {
   });
 
   res.json({ ...withEditionLabel(campaign), role });
+});
+
+/**
+ * DELETE /api/campaigns/:id
+ * Owner-only. One atomic row delete — every campaign child is onDelete: Cascade
+ * except Character.campaignId (SetNull: characters survive, detached). Blocked
+ * while a session is active so a delete can't silently end live play (#1081
+ * precedent). Entity portrait blobs live outside the DB, so their keys are
+ * collected first and best-effort-deleted after the row is gone (same ordering
+ * as the entity delete).
+ */
+campaignsRouter.delete("/campaigns/:id", async (req, res) => {
+  const campaignId = req.params.id;
+  await assertCampaignOwner(
+    prisma,
+    req.user!.id,
+    campaignId,
+    "edit",
+    "Only the campaign owner may delete the campaign",
+  );
+
+  const activeSession = await prisma.session.findFirst({
+    where: { campaignId, status: "active" },
+    select: { id: true },
+  });
+  if (activeSession) {
+    res.status(409).json({ error: "End the campaign's active session before deleting it" });
+    return;
+  }
+
+  const entities = await prisma.campaignEntity.findMany({
+    where: { campaignId, portraitKey: { not: null } },
+    select: { portraitKey: true },
+  });
+
+  await prisma.campaign.delete({ where: { id: campaignId } });
+
+  for (const { portraitKey } of entities) {
+    await deletePortraitBlobBestEffort(portraitKey);
+  }
+  res.status(204).end();
 });
 
 /**
