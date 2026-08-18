@@ -153,14 +153,34 @@ campaignsRouter.delete("/campaigns/:id", async (req, res) => {
     return;
   }
 
-  const entities = await prisma.campaignEntity.findMany({
-    where: { campaignId, portraitKey: { not: null } },
-    select: { portraitKey: true },
-  });
+  // Re-check + delete in one transaction so a startCampaignSession committing
+  // after the settle above can't be silently cascade-killed — same shape as
+  // that function's own in-tx conflict guard. The raw findFirst is enough here:
+  // anything auto-closeable was settled by the read above. Entity portrait keys
+  // are collected inside the tx so the set matches exactly what the delete
+  // removes; the blobs themselves are deleted after commit, best-effort.
+  const deletedEntities = await prisma.$transaction(
+    async (tx): Promise<{ portraitKey: string | null }[] | "activeSession"> => {
+      const conflict = await tx.session.findFirst({
+        where: { campaignId, status: "active" },
+        select: { id: true },
+      });
+      if (conflict) return "activeSession";
 
-  await prisma.campaign.delete({ where: { id: campaignId } });
+      const entities = await tx.campaignEntity.findMany({
+        where: { campaignId, portraitKey: { not: null } },
+        select: { portraitKey: true },
+      });
+      await tx.campaign.delete({ where: { id: campaignId } });
+      return entities;
+    },
+  );
+  if (deletedEntities === "activeSession") {
+    res.status(409).json({ error: "End the campaign's active session before deleting it" });
+    return;
+  }
 
-  for (const { portraitKey } of entities) {
+  for (const { portraitKey } of deletedEntities) {
     await deletePortraitBlobBestEffort(portraitKey);
   }
   res.status(204).end();

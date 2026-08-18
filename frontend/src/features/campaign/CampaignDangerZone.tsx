@@ -18,7 +18,8 @@ export default function CampaignDangerZone({ campaignId, campaignName }: Campaig
       <div className="flex flex-wrap items-center gap-3 p-4">
         <p className="min-w-0 flex-1 text-xs text-parchment-600">
           Deleting this campaign removes its sessions, codex, campaign items, and homebrew for
-          every member. Characters are kept and simply leave the campaign.
+          every member. Characters are kept — they simply leave the campaign, along with their
+          journals.
         </p>
         <button
           type="button"
