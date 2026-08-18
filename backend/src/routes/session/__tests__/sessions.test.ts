@@ -227,6 +227,24 @@ describe("auto-close after the grace period", () => {
     expect(session.summary).not.toBeNull();
   });
 
+  it("auto-closes immediately when character deletion has emptied the participant list", async () => {
+    const campaignId = await setupCampaign();
+    const start = await agent(cookieOwner).post(startUrl(campaignId)).send({ characterId: CHAR_OWNER });
+    const sessionId = start.body.session.id as string;
+
+    // Deleting the sole participant's character cascades its participant row,
+    // leaving an active session nobody can rejoin or end.
+    await prisma.character.delete({ where: { id: CHAR_OWNER } });
+
+    const active = await agent(cookiePlayer).get(`/api/characters/${CHAR_PLAYER}/sessions/active`);
+    expect(active.status).toBe(200);
+    expect(active.body).toBeNull();
+
+    const session = await prisma.session.findUniqueOrThrow({ where: { id: sessionId } });
+    expect(session.status).toBe("ended");
+    expect(session.endedAt).not.toBeNull();
+  });
+
   it("stays open if someone rejoined before the grace elapsed", async () => {
     const campaignId = await setupCampaign();
     const start = await agent(cookieOwner).post(startUrl(campaignId)).send({ characterId: CHAR_OWNER });

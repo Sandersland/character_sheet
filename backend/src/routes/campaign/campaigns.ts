@@ -19,7 +19,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
 import { RULES_EDITION_LABELS } from "@/lib/rules/edition.js";
-import { getActiveSession } from "@/lib/session/sessions.js";
+import { activeSessionForCampaign, getActiveSession } from "@/lib/session/sessions.js";
 import type { RulesEdition } from "@character-sheet/shared-types";
 
 // Shared-campaign backbone (#246). Plain-REST (like journal.ts): no audit log,
@@ -145,10 +145,9 @@ campaignsRouter.delete("/campaigns/:id", async (req, res) => {
     "Only the campaign owner may delete the campaign",
   );
 
-  const activeSession = await prisma.session.findFirst({
-    where: { campaignId, status: "active" },
-    select: { id: true },
-  });
+  // Through the auto-close-aware read, never a raw status query: a session
+  // orphaned by character deletion settles here instead of 409ing forever.
+  const activeSession = await activeSessionForCampaign(campaignId);
   if (activeSession) {
     res.status(409).json({ error: "End the campaign's active session before deleting it" });
     return;

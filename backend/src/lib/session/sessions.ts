@@ -94,7 +94,13 @@ export async function autoCloseIfStale(sessionId: string): Promise<void> {
   if (session) await maybeAutoClose(session);
 }
 
-async function activeSessionForCampaign(campaignId: string) {
+/**
+ * The campaign's active session (with participants), or null — running
+ * maybeAutoClose first so a stale/orphaned session settles instead of
+ * reporting active. The campaign-delete guard reads through this, never a raw
+ * status query, so an unresumable session can't block deletion forever.
+ */
+export async function activeSessionForCampaign(campaignId: string) {
   const session = await prisma.session.findFirst({
     where: { campaignId, status: "active" },
     include: sessionWithParticipants,
@@ -124,7 +130,14 @@ async function maybeAutoClose(
 ): Promise<SessionWithParticipants> {
   if (session.status !== "active") return session;
   const { participants } = session;
-  if (participants.length === 0) return session;
+  // Participant rows cascade-delete with their character, so a participantless
+  // active session is unresumable (nobody can rejoin or end it) and would stay
+  // active forever, deadlocking the campaign-delete guard. Close it now, no grace.
+  if (participants.length === 0) {
+    const endedAt = new Date();
+    await closeSession(session, endedAt);
+    return { ...session, status: "ended", endedAt };
+  }
   if (!participants.every((p) => p.leftAt !== null)) return session;
 
   const maxLeftMs = Math.max(...participants.map((p) => p.leftAt!.getTime()));

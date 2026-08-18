@@ -502,9 +502,32 @@ describe("campaigns (#246)", () => {
       expect(survivor.campaignId).toBeNull();
     });
 
+    it("deletes despite an active session orphaned by character deletion (auto-settles it)", async () => {
+      const { id } = await makeCampaign("Orphaned Session Campaign");
+      const orphanChar = "test-campaigns-char-orphan";
+      await makeCharacter(orphanChar, OWNER_A);
+      const attach = await supertest(app)
+        .post(`/api/campaigns/${id}/characters`)
+        .set("Cookie", cookieA)
+        .send({ characterId: orphanChar });
+      expect(attach.status).toBe(200);
+      await prisma.session.create({
+        data: { campaignId: id, status: "active", participants: { create: { characterId: orphanChar } } },
+      });
+      await prisma.character.delete({ where: { id: orphanChar } });
+
+      const res = await supertest(app).delete(`/api/campaigns/${id}`).set("Cookie", cookieA);
+      expect(res.status).toBe(204);
+      expect(await prisma.campaign.findUnique({ where: { id } })).toBeNull();
+    });
+
     it("409s while a session is active, then deletes once it has ended", async () => {
       const { id } = await makeCampaign("Mid-Session Campaign");
-      const active = await prisma.session.create({ data: { campaignId: id, status: "active" } });
+      // A live session has a present participant — a participantless one would
+      // auto-settle in the guard instead of 409ing.
+      const active = await prisma.session.create({
+        data: { campaignId: id, status: "active", participants: { create: { characterId: CHAR_A } } },
+      });
 
       const blocked = await supertest(app).delete(`/api/campaigns/${id}`).set("Cookie", cookieA);
       expect(blocked.status).toBe(409);
