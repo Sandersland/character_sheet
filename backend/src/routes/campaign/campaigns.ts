@@ -128,12 +128,9 @@ campaignsRouter.get("/campaigns/:id", async (req, res) => {
 
 /**
  * DELETE /api/campaigns/:id
- * Owner-only. One atomic row delete — every campaign child is onDelete: Cascade
- * except Character.campaignId (SetNull: characters survive, detached). Blocked
- * while a session is active so a delete can't silently end live play (#1081
- * precedent). Entity portrait blobs live outside the DB, so their keys are
- * collected first and best-effort-deleted after the row is gone (same ordering
- * as the entity delete).
+ * Owner-only. One atomic row delete: every campaign child cascades except
+ * characters, which survive detached (Character.campaignId is SetNull). 409s
+ * while a session is active so a delete can't silently end live play.
  */
 campaignsRouter.delete("/campaigns/:id", async (req, res) => {
   const campaignId = req.params.id;
@@ -145,27 +142,19 @@ campaignsRouter.delete("/campaigns/:id", async (req, res) => {
     "Only the campaign owner may delete the campaign",
   );
 
-  // Through the auto-close-aware read, never a raw status query: a session
-  // orphaned by character deletion settles here instead of 409ing forever.
   const activeSession = await activeSessionForCampaign(campaignId);
   if (activeSession) {
     res.status(409).json({ error: "End the campaign's active session before deleting it" });
     return;
   }
 
-  // Re-check + delete in one transaction so a startCampaignSession committing
-  // after the settle above can't be silently cascade-killed — same shape as
-  // that function's own in-tx conflict guard. The raw findFirst is enough here:
-  // anything auto-closeable was settled by the read above. Entity portrait keys
-  // are collected inside the tx so the set matches exactly what the delete
-  // removes; the blobs themselves are deleted after commit, best-effort.
   const deletedEntities = await prisma.$transaction(
     async (tx): Promise<{ portraitKey: string | null }[] | "activeSession"> => {
-      const conflict = await tx.session.findFirst({
+      const sessionStartedMeanwhile = await tx.session.findFirst({
         where: { campaignId, status: "active" },
         select: { id: true },
       });
-      if (conflict) return "activeSession";
+      if (sessionStartedMeanwhile) return "activeSession";
 
       const entities = await tx.campaignEntity.findMany({
         where: { campaignId, portraitKey: { not: null } },
