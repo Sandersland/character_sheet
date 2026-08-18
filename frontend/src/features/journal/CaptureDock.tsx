@@ -19,11 +19,28 @@ interface CaptureDockProps {
   onClose: () => void;
   feed: React.ReactNode;
   composer: React.ReactNode;
+  /** Note count — changes re-anchor the feed to the bottom (open + after save). */
+  anchorKey: number;
 }
 
-export default function CaptureDock({ session, composerRef, onClose, feed, composer }: CaptureDockProps) {
+export default function CaptureDock({
+  session,
+  composerRef,
+  onClose,
+  feed,
+  composer,
+  anchorKey,
+}: CaptureDockProps) {
   const dockRef = useRef<HTMLDivElement>(null);
+  const feedRef = useRef<HTMLDivElement>(null);
   useDockChrome(dockRef, composerRef, onClose);
+
+  // Anchor to the newest note on open and after each save — the feed scrolls
+  // freely in between, so only an anchorKey change may yank it back down.
+  useEffect(() => {
+    const el = feedRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [anchorKey]);
   const elapsed = useElapsed(session?.status === "active" ? session.startedAt : undefined);
   const sessionMeta = session ? [session.title, elapsed].filter(Boolean).join(" · ") : "";
 
@@ -61,10 +78,16 @@ export default function CaptureDock({ session, composerRef, onClose, feed, compo
         </button>
       </header>
 
-      {/* Feed grows to fill; justify-end keeps the newest note pinned to the bottom,
-          just above the composer, until there's enough to scroll. */}
-      <div className="flex flex-1 flex-col justify-end overflow-y-auto py-2 pl-[26px] pr-[18px]">
-        {feed}
+      {/* Feed grows to fill. Bottom-pinning a short feed must be mt-auto on the
+          content, NOT justify-end on this scrollport — end-aligning a scrollport
+          clips start-edge overflow with no scroll range, so older notes become
+          unreachable. */}
+      <div
+        ref={feedRef}
+        data-dock-feed=""
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto py-2 pl-[26px] pr-[18px]"
+      >
+        <div className="mt-auto">{feed}</div>
       </div>
 
       <div className="border-t border-parchment-100 py-3.5 pl-[26px] pr-[18px]">{composer}</div>
