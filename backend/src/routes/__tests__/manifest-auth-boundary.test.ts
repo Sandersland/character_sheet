@@ -177,7 +177,7 @@ const ROUTER_ENTRIES: RouterEntry[] = [
   {
     name: "abilitiesRouter",
     router: abilitiesRouter,
-    probe: { method: "post", path: `/api/characters/${FAKE_ID}/abilities/sneak-attack/transactions` },
+    probe: { method: "post", path: `/api/characters/${FAKE_ID}/abilities/stunning-strike/transactions` },
   },
   { name: "activityRouter", router: activityRouter, probe: { method: "get", path: `/api/characters/${FAKE_ID}/activity` } },
   { name: "maneuversRouter", router: maneuversRouter, probe: { method: "get", path: "/api/maneuvers" } },

@@ -358,7 +358,8 @@ function capitalize(word: string): string {
 // ("Fire") rather than the generic "Damage" so a multi-term drill-in reads as
 // separate typed rolls, not two identically-labeled "Damage" rows.
 function buildRiderDrillRow(effect: ResolveActionEventEffect): DrillInRow {
-  return { ...buildEffectDrillRow(effect), label: capitalize(effect.type) };
+  // Riders persisted before `source` existed fall back to the type label.
+  return { ...buildEffectDrillRow(effect), label: effect.source ?? capitalize(effect.type) };
 }
 
 // A saving throw is announced to the DM, not rolled by the caster (no enemy/

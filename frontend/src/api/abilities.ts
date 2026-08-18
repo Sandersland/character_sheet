@@ -11,10 +11,8 @@ import type {
   OpenHandRider,
   OpenHandRiderResult,
   QuiveringPalmResult,
-  RollSneakAttackOperation,
   SetQuiveringPalmOperation,
   ShadowArtOperation,
-  SneakAttackRollResult,
   StunningStrikeAttemptResult,
   TriggerQuiveringPalmOperation,
   WarriorOfElementsOperation,
@@ -140,22 +138,6 @@ export async function castManeuverTransaction(
     "maneuvers",
     operations,
     "Failed to cast maneuver",
-  );
-}
-
-// Rolls the rogue's level-derived Nd6 Sneak Attack server-side (enforcing the
-// once-per-turn + eligibility guard) and returns the updated Character plus the
-// roll so the caller folds it into the attack's damage total.
-export async function rollSneakAttackTransaction(
-  characterId: string,
-  eligible: boolean,
-  usedThisTurn: boolean,
-): Promise<{ character: Character; results: SneakAttackRollResult[] }> {
-  return applyAbilityTransactions<RollSneakAttackOperation, { character: Character; results: SneakAttackRollResult[] }>(
-    characterId,
-    "sneak-attack",
-    [{ type: "rollSneakAttack", eligible, usedThisTurn }],
-    "Failed to roll Sneak Attack",
   );
 }
 

@@ -16,6 +16,8 @@ import {
   critDamageSpec,
   flurryStrikeCount,
   hasSuperiorityDice,
+  SNEAK_ATTACK_RIDER_ID,
+  sneakAttackDamageRider,
   unarmedDamageDisplay,
   weaponGripLabel,
 } from "@/lib/attackMath";
@@ -493,5 +495,17 @@ describe("critDamageSpec", () => {
     const spec = { count: 2, faces: 6, modifier: 1 };
     critDamageSpec(spec);
     expect(spec).toEqual({ count: 2, faces: 6, modifier: 1 });
+  });
+});
+
+describe("sneakAttackDamageRider", () => {
+  it("builds a DamageRider from the served DiceRider, leaving damageType to the weapon fallback", () => {
+    expect(sneakAttackDamageRider({ dice: { count: 2, faces: 6 } })).toEqual({
+      id: SNEAK_ATTACK_RIDER_ID,
+      spec: { count: 2, faces: 6, modifier: 0 },
+      label: "+2d6",
+      rollLabel: "Sneak Attack: +2d6",
+      logSource: "Sneak Attack",
+    });
   });
 });

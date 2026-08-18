@@ -23,7 +23,6 @@ import {
   castShadowArtOpSchema,
   dealHandOfHarmOpSchema,
   imposeOpenHandRiderOpSchema,
-  rollSneakAttackOpSchema,
   setQuiveringPalmOpSchema,
   triggerQuiveringPalmOpSchema,
   useHandOfUltimateMercyOpSchema,
@@ -46,7 +45,6 @@ describe("ability-op wire contract", () => {
     expectTypeOf<z.input<typeof attemptStunningStrikeOpSchema>>().toEqualTypeOf<
       z.output<typeof attemptStunningStrikeOpSchema>
     >();
-    expectTypeOf<z.input<typeof rollSneakAttackOpSchema>>().toEqualTypeOf<z.output<typeof rollSneakAttackOpSchema>>();
     expectTypeOf<z.input<typeof imposeOpenHandRiderOpSchema>>().toEqualTypeOf<
       z.output<typeof imposeOpenHandRiderOpSchema>
     >();

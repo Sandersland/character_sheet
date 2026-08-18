@@ -95,7 +95,6 @@ const EXPECTED_EXPORTS = [
   "revertBatch",
   "revokeCampaignItem",
   "rollInitiativeTransaction",
-  "rollSneakAttackTransaction",
   "setQuiveringPalmTransaction",
   "setUnauthorizedHandler",
   "shareCatalogEntry",

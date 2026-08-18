@@ -393,6 +393,21 @@ describe("buildFeedItems resolveAction typed damage riders (#1843 — additive r
     expect(rows[0].drillIn![3]).toMatchObject({ label: "Force" });
   });
 
+  it("labels a rider's drill-in line by its source when the wire carries one", () => {
+    const events = [
+      resolveEvent("swing", {
+        source: "Rapier",
+        toHit: { faces: [12], kept: 12, nat20: false, bonus: 5, total: 17, verdict: "hit" },
+        effect: { spec: "1d8 + 3", faces: [2], total: 5, type: "piercing", kind: "damage", crit: false },
+        riders: [
+          { spec: "1d6", faces: [1], total: 1, type: "piercing", kind: "damage", crit: false, source: "Sneak Attack" },
+        ],
+      }),
+    ];
+    const rows = buildFeedItems(events).map(rowOf);
+    expect(rows[0].drillIn![2]).toMatchObject({ label: "Sneak Attack", total: "1 piercing" });
+  });
+
   it("appends ' damage.' once, after the LAST term, on a critical hit with a rider", () => {
     const events = [
       resolveEvent("swing", {

@@ -334,7 +334,7 @@ describe("InlineAttackPicker — typed damage riders route into the single resol
     const [, ops] = vi.mocked(applyResolveActionOperations).mock.calls[0];
     expect(ops[0].effect).toMatchObject({ type: "slashing", kind: "damage" });
     expect(ops[0].riders).toHaveLength(1);
-    expect(ops[0].riders?.[0]).toMatchObject({ type: "fire", kind: "damage" });
+    expect(ops[0].riders?.[0]).toMatchObject({ type: "fire", kind: "damage", source: "Flame Tongue" });
     expect(vi.mocked(logRollAction)).not.toHaveBeenCalled();
   });
 
@@ -391,6 +391,103 @@ describe("InlineAttackPicker — typed damage riders route into the single resol
     const [, ops] = vi.mocked(applyResolveActionOperations).mock.calls[0];
     expect(ops[0].toHit).toMatchObject({ verdict: "miss" });
     expect(ops[0].riders ?? []).toHaveLength(0);
+  });
+});
+
+describe("InlineAttackPicker — Sneak Attack rides the swing's resolveAction op (#902 rider migration)", () => {
+  function rogueCharacter(overrides: Partial<Character> = {}): Character {
+    return makeCharacter({
+      sneakAttack: { dice: { count: 1, faces: 6 } },
+      attackRows: [weaponRow("Rapier", "inv-rapier", { damageType: "piercing", damageRiders: [] })],
+      ...overrides,
+    } as Partial<Character>);
+  }
+
+  async function rollSneak() {
+    await userEvent.click(screen.getByRole("checkbox"));
+    await userEvent.click(screen.getByRole("button", { name: /Roll Sneak Attack/ }));
+  }
+
+  it("puts the sneak roll into ops[0].riders typed with the weapon's damage type, with no separate log call", async () => {
+    seedMid();
+    const character = rogueCharacter();
+    renderWithCharacter(<LiveHarness character={character} />, character);
+
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    await rollSneak();
+    await userEvent.click(screen.getByRole("button", { name: /^Roll damage$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
+
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(1));
+    const [, ops] = vi.mocked(applyResolveActionOperations).mock.calls[0];
+    expect(ops[0].effect).toMatchObject({ type: "piercing", kind: "damage" });
+    expect(ops[0].riders).toHaveLength(1);
+    expect(ops[0].riders?.[0]).toMatchObject({ type: "piercing", kind: "damage", source: "Sneak Attack" });
+    expect(vi.mocked(logRollAction)).not.toHaveBeenCalled();
+  });
+
+  it("doubles the sneak dice when the hit is already a crit", async () => {
+    seedTopFace();
+    const character = rogueCharacter();
+    renderWithCharacter(<LiveHarness character={character} />, character);
+
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    await rollSneak();
+    await userEvent.click(screen.getByRole("button", { name: /Roll crit damage/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
+
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(1));
+    const [, ops] = vi.mocked(applyResolveActionOperations).mock.calls[0];
+    expect(ops[0].riders?.[0]).toMatchObject({ crit: true });
+    expect(ops[0].riders?.[0].faces).toHaveLength(2);
+  });
+
+  it("drops the sneak rider when the swing is ultimately called a miss", async () => {
+    seedMid();
+    const character = rogueCharacter();
+    renderWithCharacter(<LiveHarness character={character} />, character);
+
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    await rollSneak();
+    await userEvent.click(screen.getByRole("button", { name: /it Missed/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
+
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(1));
+    const [, ops] = vi.mocked(applyResolveActionOperations).mock.calls[0];
+    expect(ops[0].toHit).toMatchObject({ verdict: "miss" });
+    expect(ops[0].riders ?? []).toHaveLength(0);
+  });
+
+  it("does not carry the sneak rider into swing 2 and shows the once-per-turn guard (Extra Attack)", async () => {
+    seedMid();
+    const character = rogueCharacter({ attacksPerAction: 2 });
+    renderWithCharacter(<LiveHarness character={character} />, character);
+
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    await rollSneak();
+    await userEvent.click(screen.getByRole("button", { name: /^Roll damage$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(1));
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /Roll to hit/ })).not.toBeDisabled());
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    expect(screen.getByText(/Used this turn/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Roll Sneak Attack/ })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: /^Roll damage$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
+
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(2));
+    const [, op2] = vi.mocked(applyResolveActionOperations).mock.calls[1];
+    expect(op2[0].riders ?? []).toHaveLength(0);
+  });
+
+  it("keeps the roll button disabled until eligibility is confirmed", async () => {
+    seedMid();
+    const character = rogueCharacter();
+    renderWithCharacter(<LiveHarness character={character} />, character);
+
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    expect(screen.getByRole("button", { name: /Roll Sneak Attack/ })).toBeDisabled();
   });
 });
 

@@ -56,7 +56,6 @@ export type {
   ImposeOpenHandRiderOperation,
   ManeuverOperation,
   OpenHandRider,
-  RollSneakAttackOperation,
   SetQuiveringPalmOperation,
   ShadowArtOperation,
   TriggerQuiveringPalmOperation,
@@ -188,14 +187,6 @@ export interface CatalogManeuver {
 export interface ManeuverCastResult {
   roll: number;
   saveDc: number | null;
-  summary: string;
-}
-
-/** Per-op result from POST …/sneak-attack/transactions — the server-rolled Nd6. */
-export interface SneakAttackRollResult {
-  roll: number;
-  dice: number;
-  faces: number;
   summary: string;
 }
 
