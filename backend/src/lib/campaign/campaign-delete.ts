@@ -1,10 +1,8 @@
 import type { Prisma } from "@/generated/prisma/client.js";
 
 /**
- * The campaign-delete transaction body: re-checks for a session started since
- * the caller's auto-close-aware guard, collects the entity portrait keys the
- * cascade is about to orphan, and deletes the campaign row. Extracted so
- * campaigns.test.ts can pin the loser of a double-delete race directly.
+ * The campaign-delete transaction body — extracted so the double-delete
+ * loser's already-gone path is directly testable.
  */
 export async function deleteCampaignRows(
   tx: Prisma.TransactionClient,

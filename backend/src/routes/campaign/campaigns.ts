@@ -133,6 +133,8 @@ campaignsRouter.get("/campaigns/:id", async (req, res) => {
  * characters, which survive detached (Character.campaignId is SetNull). 409s
  * while a session is active so a delete can't silently end live play.
  */
+const ACTIVE_SESSION_CONFLICT = "End the campaign's active session before deleting it";
+
 campaignsRouter.delete("/campaigns/:id", async (req, res) => {
   const campaignId = req.params.id;
   await assertCampaignOwner(
@@ -145,13 +147,13 @@ campaignsRouter.delete("/campaigns/:id", async (req, res) => {
 
   const activeSession = await activeSessionForCampaign(campaignId);
   if (activeSession) {
-    res.status(409).json({ error: "End the campaign's active session before deleting it" });
+    res.status(409).json({ error: ACTIVE_SESSION_CONFLICT });
     return;
   }
 
   const deletedEntities = await prisma.$transaction((tx) => deleteCampaignRows(tx, campaignId));
   if (deletedEntities === "activeSession") {
-    res.status(409).json({ error: "End the campaign's active session before deleting it" });
+    res.status(409).json({ error: ACTIVE_SESSION_CONFLICT });
     return;
   }
 
