@@ -4,6 +4,7 @@ import supertest from "supertest";
 import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
+import { deleteCampaignRows } from "@/lib/campaign/campaign-delete.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { seededSpeciesAnchor } from "@/test-support/species.js";
 
@@ -518,6 +519,30 @@ describe("campaigns (#246)", () => {
 
       const res = await supertest(app).delete(`/api/campaigns/${id}`).set("Cookie", cookieA);
       expect(res.status).toBe(204);
+      expect(await prisma.campaign.findUnique({ where: { id } })).toBeNull();
+    });
+
+    // The double-delete race pin: the loser reaches the tx after the winner's
+    // commit, so its view is "campaign already gone" — which must resolve as a
+    // success, not throw P2025 into a 500. Deterministic via the extracted tx
+    // body; the concurrent-requests spec below is the end-to-end net.
+    it("resolves already-gone as success in the delete tx body", async () => {
+      const result = await prisma.$transaction((tx) =>
+        deleteCampaignRows(tx, "00000000-0000-0000-0000-000000000000"),
+      );
+      expect(result).toEqual([]);
+    });
+
+    it("never 500s when two deletes race — the loser gets an idempotent 204 or a 404", async () => {
+      const { id } = await makeCampaign("Double Delete Campaign");
+
+      const [first, second] = await Promise.all([
+        supertest(app).delete(`/api/campaigns/${id}`).set("Cookie", cookieA),
+        supertest(app).delete(`/api/campaigns/${id}`).set("Cookie", cookieA),
+      ]);
+
+      expect([204, 404]).toContain(first.status);
+      expect([204, 404]).toContain(second.status);
       expect(await prisma.campaign.findUnique({ where: { id } })).toBeNull();
     });
 

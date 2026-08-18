@@ -13,6 +13,7 @@ import {
   assertCharacterAccess,
 } from "@/lib/auth/access.js";
 import { attachCharacterUpdate } from "@/lib/campaign/campaign-attach.js";
+import { deleteCampaignRows } from "@/lib/campaign/campaign-delete.js";
 import { deletePortraitBlobBestEffort } from "@/lib/storage/portrait-blob.js";
 import { parseBodyOr400 } from "@/lib/http/parse-body.js";
 import { prisma } from "@/lib/core/prisma.js";
@@ -148,22 +149,7 @@ campaignsRouter.delete("/campaigns/:id", async (req, res) => {
     return;
   }
 
-  const deletedEntities = await prisma.$transaction(
-    async (tx): Promise<{ portraitKey: string | null }[] | "activeSession"> => {
-      const sessionStartedMeanwhile = await tx.session.findFirst({
-        where: { campaignId, status: "active" },
-        select: { id: true },
-      });
-      if (sessionStartedMeanwhile) return "activeSession";
-
-      const entities = await tx.campaignEntity.findMany({
-        where: { campaignId, portraitKey: { not: null } },
-        select: { portraitKey: true },
-      });
-      await tx.campaign.delete({ where: { id: campaignId } });
-      return entities;
-    },
-  );
+  const deletedEntities = await prisma.$transaction((tx) => deleteCampaignRows(tx, campaignId));
   if (deletedEntities === "activeSession") {
     res.status(409).json({ error: "End the campaign's active session before deleting it" });
     return;
