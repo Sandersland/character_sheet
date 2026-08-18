@@ -28,27 +28,27 @@ function state(overrides: Partial<ResolutionRollState> = {}): ResolutionRollStat
 describe("computeResolutionSteps — attack-roll shape", () => {
   const resolution: Descriptor = { toHit: TO_HIT, save: undefined, effect: EFFECT };
 
-  it("pre-roll: toHit active, callIt/damage pending", () => {
+  it("pre-roll: toHit active, callIt/damage pending, nothing settled", () => {
     expect(computeResolutionSteps(resolution, state())).toEqual([
-      { kind: "toHit", state: "active" },
-      { kind: "callIt", state: "pending" },
-      { kind: "damage", state: "pending" },
+      { kind: "toHit", state: "active", settled: false },
+      { kind: "callIt", state: "pending", settled: false },
+      { kind: "damage", state: "pending", settled: false },
     ]);
   });
 
   it("rolled, unresolved: callIt AND damage both active (implicit hit, #811)", () => {
     expect(computeResolutionSteps(resolution, state({ toHit: ROLL }))).toEqual([
-      { kind: "toHit", state: "done" },
-      { kind: "callIt", state: "active" },
-      { kind: "damage", state: "active" },
+      { kind: "toHit", state: "done", settled: true },
+      { kind: "callIt", state: "active", settled: false },
+      { kind: "damage", state: "active", settled: false },
     ]);
   });
 
-  it("miss verdict: damage stays pending", () => {
+  it("miss verdict parks damage as pending yet settled — a missed attack deals no damage", () => {
     expect(computeResolutionSteps(resolution, state({ toHit: ROLL, verdict: "miss" }))).toEqual([
-      { kind: "toHit", state: "done" },
-      { kind: "callIt", state: "done" },
-      { kind: "damage", state: "pending" },
+      { kind: "toHit", state: "done", settled: true },
+      { kind: "callIt", state: "done", settled: true },
+      { kind: "damage", state: "pending", settled: true },
     ]);
   });
 
@@ -56,17 +56,17 @@ describe("computeResolutionSteps — attack-roll shape", () => {
     expect(
       computeResolutionSteps(resolution, { toHit: ROLL, verdict: "crit", effect: ROLL }),
     ).toEqual([
-      { kind: "toHit", state: "done" },
-      { kind: "callIt", state: "done" },
-      { kind: "damage", state: "done" },
+      { kind: "toHit", state: "done", settled: true },
+      { kind: "callIt", state: "done", settled: true },
+      { kind: "damage", state: "done", settled: true },
     ]);
   });
 
   it("omits the damage step entirely when the resolution has no effect", () => {
     const noEffect: Descriptor = { toHit: TO_HIT, save: undefined, effect: undefined };
     expect(computeResolutionSteps(noEffect, state({ toHit: ROLL, verdict: "hit" }))).toEqual([
-      { kind: "toHit", state: "done" },
-      { kind: "callIt", state: "done" },
+      { kind: "toHit", state: "done", settled: true },
+      { kind: "callIt", state: "done", settled: true },
     ]);
   });
 });
@@ -75,19 +75,19 @@ describe("computeResolutionSteps — saving-throw shape", () => {
   it("announce is immediately done; damage active until rolled", () => {
     const resolution: Descriptor = { toHit: undefined, save: SAVE, effect: EFFECT };
     expect(computeResolutionSteps(resolution, state())).toEqual([
-      { kind: "announceSave", state: "done" },
-      { kind: "damage", state: "active" },
+      { kind: "announceSave", state: "done", settled: true },
+      { kind: "damage", state: "active", settled: false },
     ]);
     expect(computeResolutionSteps(resolution, state({ effect: ROLL }))).toEqual([
-      { kind: "announceSave", state: "done" },
-      { kind: "damage", state: "done" },
+      { kind: "announceSave", state: "done", settled: true },
+      { kind: "damage", state: "done", settled: true },
     ]);
   });
 
   it("a save with no effect (condition-only) emits just the announce step", () => {
     const resolution: Descriptor = { toHit: undefined, save: SAVE, effect: undefined };
     expect(computeResolutionSteps(resolution, state())).toEqual([
-      { kind: "announceSave", state: "done" },
+      { kind: "announceSave", state: "done", settled: true },
     ]);
   });
 });
@@ -95,9 +95,11 @@ describe("computeResolutionSteps — saving-throw shape", () => {
 describe("computeResolutionSteps — auto-hit shape", () => {
   it("straight to damage, no toHit/callIt/announce", () => {
     const resolution: Descriptor = { toHit: undefined, save: undefined, effect: EFFECT };
-    expect(computeResolutionSteps(resolution, state())).toEqual([{ kind: "damage", state: "active" }]);
+    expect(computeResolutionSteps(resolution, state())).toEqual([
+      { kind: "damage", state: "active", settled: false },
+    ]);
     expect(computeResolutionSteps(resolution, state({ effect: ROLL }))).toEqual([
-      { kind: "damage", state: "done" },
+      { kind: "damage", state: "done", settled: true },
     ]);
   });
 });
@@ -114,43 +116,32 @@ describe("resolutionComplete", () => {
     expect(resolutionComplete([])).toBe(false);
   });
 
-  it("false while any non-trailing step isn't done", () => {
+  it("false while any step is unsettled", () => {
     expect(
       resolutionComplete([
-        { kind: "toHit", state: "active" },
-        { kind: "callIt", state: "pending" },
-        { kind: "damage", state: "pending" },
+        { kind: "toHit", state: "done", settled: true },
+        { kind: "callIt", state: "active", settled: false },
+        { kind: "damage", state: "active", settled: false },
       ]),
     ).toBe(false);
   });
 
-  it("true when every step is done", () => {
+  it("true when every step is settled", () => {
     expect(
       resolutionComplete([
-        { kind: "toHit", state: "done" },
-        { kind: "callIt", state: "done" },
-        { kind: "damage", state: "done" },
+        { kind: "toHit", state: "done", settled: true },
+        { kind: "callIt", state: "done", settled: true },
+        { kind: "damage", state: "done", settled: true },
       ]),
     ).toBe(true);
   });
 
-  it("true for a settled miss — trailing damage pending is the miss shape, not unfinished work", () => {
-    expect(
-      resolutionComplete([
-        { kind: "toHit", state: "done" },
-        { kind: "callIt", state: "done" },
-        { kind: "damage", state: "pending" },
-      ]),
-    ).toBe(true);
-  });
-
-  it("a NON-trailing pending damage step (shouldn't occur, but stays false defensively) is not complete", () => {
-    expect(
-      resolutionComplete([
-        { kind: "damage", state: "pending" },
-        { kind: "toHit", state: "done" },
-      ]),
-    ).toBe(false);
+  it("a called miss settles the whole rail, its parked damage step included", () => {
+    const steps = computeResolutionSteps(
+      { toHit: TO_HIT, save: undefined, effect: EFFECT },
+      state({ toHit: ROLL, verdict: "miss" }),
+    );
+    expect(resolutionComplete(steps)).toBe(true);
   });
 });
 
@@ -160,7 +151,7 @@ describe("resolutionReady", () => {
   });
 
   it("mirrors resolutionComplete for a non-empty list", () => {
-    expect(resolutionReady([{ kind: "damage", state: "active" }])).toBe(false);
-    expect(resolutionReady([{ kind: "damage", state: "done" }])).toBe(true);
+    expect(resolutionReady([{ kind: "damage", state: "active", settled: false }])).toBe(false);
+    expect(resolutionReady([{ kind: "damage", state: "done", settled: true }])).toBe(true);
   });
 });

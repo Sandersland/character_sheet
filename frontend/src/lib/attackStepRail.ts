@@ -14,6 +14,7 @@ export interface StepRailModel {
   rollToHit: StepState;
   callIt: StepState;
   damage: StepState;
+  damageSettled: boolean;
 }
 
 export function stepRail({
@@ -26,11 +27,12 @@ export function stepRail({
   hasDamage: boolean;
 }): StepRailModel {
   if (!hasRoll) {
-    return { rollToHit: "active", callIt: "pending", damage: "pending" };
+    return { rollToHit: "active", callIt: "pending", damage: "pending", damageSettled: false };
   }
   return {
     rollToHit: "done",
     callIt: verdict !== undefined ? "done" : "active",
     damage: verdict === "miss" ? "pending" : hasDamage ? "done" : "active",
+    damageSettled: verdict === "miss" || hasDamage,
   };
 }

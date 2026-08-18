@@ -155,7 +155,12 @@ function useBonusResolution({
   const { commit, pending: commitPending, error: commitError } = useResolveActionCommit({
     characterId: character.id,
     onLogChanged,
-    onCommitted: () => setLocal((s) => ({ ...s, completedSwings: s.completedSwings + 1, riderEffects: {} })),
+    onCommitted: (batchId) => {
+      setLocal((s) => ({ ...s, completedSwings: s.completedSwings + 1, riderEffects: {} }));
+      // Same undo tagging as InlineAttackPicker's onCommitted (#758): the
+      // recordTwfAttack/recordFlurryAttack entry gets this strike's batch.
+      turnState.attachBatchId(batchId);
+    },
   });
   function handleCommit(rolls: ResolutionRolls) {
     commit(resolution, rolls, local.riderEffects);

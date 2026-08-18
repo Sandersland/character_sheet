@@ -1,17 +1,7 @@
-/**
- * spellPicker.ts — pure selection/slot predicates for InlineSpellPicker.
- *
- * No React, no JSX, no side effects — deterministic given the inputs. Owns the
- * "which spells are castable / at which slot levels" logic so the session panel
- * (and its hook) can stay presentational.
- */
-
 import type { Spell, SpellSlots, SpellEconomyState } from "@/types/character";
 
-/** Economy slot the picker is managing. */
 export type EconomySlot = "action" | "bonusAction" | "reaction";
 
-/** Slot levels (ascending) that still have a use remaining. */
 export function availableSlotLevels(slots: SpellSlots[]): number[] {
   return slots
     .filter((s) => s.used < s.total)
@@ -19,17 +9,14 @@ export function availableSlotLevels(slots: SpellSlots[]): number[] {
     .sort((a, b) => a - b);
 }
 
-/** Mystic Arcanum levels (6th–9th) with a charge remaining. */
 export function availableArcanaLevels(arcana: SpellSlots[]): number[] {
   return arcana.filter((a) => a.used < a.total).map((a) => a.level);
 }
 
-/** True when a cast at this level draws from a Mystic Arcanum charge, not a slot. */
 export function isArcanumLevel(level: number | undefined, arcanaLevels: number[]): boolean {
   return level !== undefined && arcanaLevels.includes(level);
 }
 
-/** Available slot levels for a leveled spell (incl. a Mystic Arcanum charge). */
 export function availableSlotsForSpell(
   spell: Spell,
   slotLevels: number[],
@@ -43,7 +30,6 @@ export function availableSlotsForSpell(
   return levels.sort((a, b) => a - b);
 }
 
-/** Resolved slot level: the chosen level, else the lowest available. */
 export function resolvedSlot(
   spell: Spell,
   chosenSlotLevel: number | undefined,
@@ -55,25 +41,11 @@ export function resolvedSlot(
   return availableSlotsForSpell(spell, slotLevels, arcanaLevels)[0];
 }
 
-/**
- * Project the SERVER-RESOLVED 5e bonus-action interlock (#1439) onto the
- * CastableFilter flags for one economy slot. The rule is resolved server-side
- * (edition-specific, #1439) and arrives as `SpellEconomyState`; this only routes
- * the served booleans to the picker slot they gate — never re-deriving the rule.
- * `filterCastableSpells`'s two flags are picker-neutral primitives:
- * `bonusActionBlockedByActionSpell` drops ALL spells, `actionLimitedToCantrips`
- * drops leveled ones (keeps cantrips). Both spell-picker surfaces
- * (InlineSpellPicker's deriveSpellList and turnOptions' bonusSpellOptions) call
- * THIS, so they share one projection and can never disagree — the seam that used
- * to need the "mirror" latch. A reaction cast is never gated.
- */
 export function restrictionFlagsForSlot(
   slot: EconomySlot,
   economy: SpellEconomyState,
 ): { bonusActionBlockedByActionSpell: boolean; actionLimitedToCantrips: boolean } {
   if (slot === "bonusAction") {
-    // SRD 5.1: a leveled Action spell blocks the bonus action outright (drop
-    // all). SRD 5.2: it only limits it to cantrips (drop leveled).
     return {
       bonusActionBlockedByActionSpell: economy.bonusActionBlockedByActionSpell,
       actionLimitedToCantrips: economy.bonusActionLimitedToCantrips,
@@ -85,9 +57,6 @@ export function restrictionFlagsForSlot(
   return { bonusActionBlockedByActionSpell: false, actionLimitedToCantrips: false };
 }
 
-/** Economy hint shown when the interlock restricts further casts in this slot.
- *  Slot-aware (#1439): the bonus picker's cantrips-only case (2024) reads
- *  differently from the action picker's. Chrome only — the RULE is server-side. */
 export function slotRestrictionHint(slot: EconomySlot, economy: SpellEconomyState): string | null {
   if (slot === "bonusAction") {
     if (economy.bonusActionBlockedByActionSpell) {
@@ -104,16 +73,17 @@ export function slotRestrictionHint(slot: EconomySlot, economy: SpellEconomyStat
   return null;
 }
 
-/** Options for filtering the spellbook down to spells castable right now. */
-export interface CastableFilter {
+export interface SlotAffordabilityFilter {
   castingTimeFilter?: string;
   slotLevels: number[];
   arcanaLevels: number[];
+}
+
+export interface CastableFilter extends SlotAffordabilityFilter {
   bonusActionBlockedByActionSpell: boolean;
   actionLimitedToCantrips: boolean;
 }
 
-/** Prepared/known spells castable now: slot available, casting-time + 5e rule OK. */
 export function filterCastableSpells(spells: Spell[], opts: CastableFilter): Spell[] {
   return spells.filter((spell) => {
     if (!spell.prepared && spell.level > 0) return false;
@@ -133,19 +103,15 @@ export function filterCastableSpells(spells: Spell[], opts: CastableFilter): Spe
   });
 }
 
-/** Sort: cantrips first, then ascending level, then alphabetically. */
 export function sortSpells(spells: Spell[]): Spell[] {
   return [...spells].sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
 }
 
-/** One spell-level section of the cast sheet. Input must already be sorted
- *  (sortSpells) so sections and rows come out in display order. */
 export interface SpellLevelGroup {
   level: number;
   spells: Spell[];
 }
 
-/** Group a sorted spell list into level sections (cantrips = level 0 first). */
 export function groupSpellsByLevel(spells: Spell[]): SpellLevelGroup[] {
   const groups: SpellLevelGroup[] = [];
   for (const spell of spells) {
@@ -156,13 +122,7 @@ export function groupSpellsByLevel(spells: Spell[]): SpellLevelGroup[] {
   return groups;
 }
 
-/**
- * Spell levels that are entirely hidden from the cast sheet: prepared spells
- * that match the casting-time filter but were dropped by filterCastableSpells
- * for lack of an affordable slot. Drives the "Level 2+ hidden" footer so the
- * existing slot-gating filter is visible instead of silent.
- */
-export function hiddenSpellLevels(spells: Spell[], opts: CastableFilter): number[] {
+export function hiddenSpellLevels(spells: Spell[], opts: SlotAffordabilityFilter): number[] {
   const levels = new Set<number>();
   for (const spell of spells) {
     if (spell.level === 0 || (!spell.prepared && spell.level > 0)) continue;
@@ -179,7 +139,6 @@ export function hiddenSpellLevels(spells: Spell[], opts: CastableFilter): number
   return [...levels].sort((a, b) => a - b);
 }
 
-/** Slot pips for a level-section header, or null for cantrips / no such slots. */
 export function slotPipsForLevel(
   slots: SpellSlots[],
   level: number,
@@ -189,7 +148,6 @@ export function slotPipsForLevel(
   return slot ? { total: slot.total, used: slot.used } : null;
 }
 
-/** Footer note for hidden levels: "Level 2+ hidden — no slots remaining". */
 export function hiddenLevelsNote(levels: number[]): string | null {
   if (levels.length === 0) return null;
   const contiguous = levels.every((l, i) => i === 0 || l === levels[i - 1] + 1);
@@ -197,7 +155,6 @@ export function hiddenLevelsNote(levels: number[]): string | null {
   return `${label} hidden — no slots remaining`;
 }
 
-/** Right-aligned cost badge for a spell row: "free · action", "1 slot · bonus action". */
 export function castCostBadge(spell: Spell): string {
   const t = (spell.castingTime ?? "").toLowerCase();
   const costWord = t.startsWith("1 bonus action")

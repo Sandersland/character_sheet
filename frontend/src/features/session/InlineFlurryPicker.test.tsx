@@ -41,8 +41,6 @@ function makeTurnState(bonusAttack: { total: number; used: number } | null) {
   } as unknown as TurnState & TurnStateActions;
 }
 
-// A monk with an equipped weapon — Flurry must never offer it as a form, even
-// though the served attackRows (#1434) carry a row for it.
 function monkCharacter(overrides: Partial<Character> = {}): Character {
   return {
     id: "char-1",
@@ -138,7 +136,7 @@ describe("InlineFlurryPicker (#1217, rewired onto the shared resolver #1845)", (
   it("never calls logRoll for a strike's attack/damage rolls (retired #1845)", async () => {
     seedMid();
     const turnState = makeTurnState({ total: 2, used: 0 });
-    vi.mocked(applyResolveActionOperations).mockResolvedValue(monkCharacter());
+    vi.mocked(applyResolveActionOperations).mockResolvedValue({ character: monkCharacter(), batchId: "test-batch" });
     renderPicker(monkCharacter(), turnState);
 
     await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
@@ -156,9 +154,6 @@ describe("InlineFlurryPicker (#1217, rewired onto the shared resolver #1845)", (
     expect(screen.queryByRole("button", { name: /^Done$/ })).not.toBeInTheDocument();
   });
 
-  // Review finding (#1256): opening the sheet must not spend Focus — only a
-  // rolled strike commits it. Otherwise "Cancel — refund bonus action" would
-  // lie: the bonus action comes back, but an already-spent Focus Point can't.
   it("cancelling before any strike is rolled spends no Focus", async () => {
     const onCancel = vi.fn();
     const onCommitFocusSpend = vi.fn();
@@ -174,7 +169,7 @@ describe("InlineFlurryPicker (#1217, rewired onto the shared resolver #1845)", (
     seedMid();
     const turnState = makeTurnState({ total: 2, used: 0 });
     const onCommitFocusSpend = vi.fn();
-    vi.mocked(applyResolveActionOperations).mockResolvedValue(monkCharacter());
+    vi.mocked(applyResolveActionOperations).mockResolvedValue({ character: monkCharacter(), batchId: "test-batch" });
     renderPicker(monkCharacter(), turnState, { onCommitFocusSpend });
 
     await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
@@ -196,7 +191,7 @@ describe("InlineFlurryPicker (#1217, rewired onto the shared resolver #1845)", (
   it("shows Close (not Done) after one of two strikes commits — the second is still pending", async () => {
     seedMid();
     const turnState = makeTurnState({ total: 2, used: 0 });
-    vi.mocked(applyResolveActionOperations).mockResolvedValue(monkCharacter());
+    vi.mocked(applyResolveActionOperations).mockResolvedValue({ character: monkCharacter(), batchId: "test-batch" });
     renderPicker(monkCharacter(), turnState);
 
     await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
@@ -227,11 +222,8 @@ describe("InlineFlurryPicker (#1217, rewired onto the shared resolver #1845)", (
   });
 });
 
-// Live turn state — needed to prove a full resolveAction commit + the
-// strike-loop re-arm without double-spending the bonus action (mirrors
-// InlineAttackPicker.test.tsx's own LiveHarness for the Extra Attack loop).
 function LiveHarness({ character }: { character: Character }) {
-  vi.mocked(applyResolveActionOperations).mockResolvedValue(character);
+  vi.mocked(applyResolveActionOperations).mockResolvedValue({ character, batchId: "test-batch" });
   const liveTurnState = useTurnState(character, "sess-flurry");
   useEffect(() => {
     liveTurnState.startCombat();

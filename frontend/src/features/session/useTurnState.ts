@@ -127,9 +127,9 @@ export interface TurnState {
   /**
    * Turn-card "Spells cast" tally (#1164): one row per settled cast this turn,
    * appended by InlineSpellPicker's `onCastSettled`. Cleared by endTurn/startTurn
-   * and by the banner's dismiss, mirroring attackTally's lifecycle — but NOT
-   * part of the undo snapshot: a cast already committed server-side, so `undo`
-   * (which reverts only local economy spend) leaves its receipt in place.
+   * and by the banner's dismiss, mirroring attackTally's lifecycle — including
+   * the undo snapshot: undo of a cast now reverts the server cast too (its
+   * entry carries the batchId, #758), so the receipt leaves with it.
    */
   castTally: CastTallyRow[];
   /**
@@ -185,14 +185,16 @@ export type EconomySnapshot = Pick<
   | "attack"
   | "bonusAttack"
   | "attackTally"
+  | "castTally"
   | "attackEquipCredits"
   | "freeInteractionUsed"
 >;
 
 /**
- * An undo-stack entry: the pre-mutation economy snapshot plus, for a server-effect
- * action (Second Wind, Rage, …), the audit batchId to revert on undo (#758). A
- * local-only entry (Dodge, Dash, attack-mode) has no batchId.
+ * An undo-stack entry: the pre-mutation economy snapshot plus, for a mutation
+ * that wrote a server effect — Second Wind, Rage, a resolveAction swing/cast
+ * (#758) — the audit batchId to revert on undo. A local-only entry (Dodge,
+ * Dash, enter-attack-mode) has no batchId.
  */
 export interface HistoryEntry extends EconomySnapshot {
   batchId?: string;
@@ -431,6 +433,7 @@ function economyOf(s: TurnState): EconomySnapshot {
     attack: s.attack,
     bonusAttack: s.bonusAttack,
     attackTally: s.attackTally,
+    castTally: s.castTally,
     attackEquipCredits: s.attackEquipCredits,
     freeInteractionUsed: s.freeInteractionUsed,
   };
@@ -453,6 +456,7 @@ function hydrateTurnState(loaded: TurnState): TurnState {
     history: (base.history ?? []).map((h) => ({
       ...h,
       attackTally: backfillRows(h.attackTally),
+      castTally: h.castTally ?? [],
       attackEquipCredits: h.attackEquipCredits ?? 0,
       freeInteractionUsed: h.freeInteractionUsed ?? false,
     })),
@@ -614,8 +618,15 @@ const recordSpellCastState = (s: TurnState, recorded: RecordedSpellCast): TurnSt
   castTally: [...s.castTally, { ...recorded, id: nextRowId() }],
 });
 
-const clearCastTallyState = (s: TurnState): TurnState =>
-  s.castTally.length === 0 ? s : { ...s, castTally: [] };
+// Same dismiss durability as clearAttackTallyState (#812): scrub history snapshots too, so undo can't resurrect a dismissed banner's rows.
+const clearCastTallyState = (s: TurnState): TurnState => {
+  if (s.castTally.length === 0 && s.history.every((h) => h.castTally.length === 0)) return s;
+  return {
+    ...s,
+    castTally: [],
+    history: s.history.map((h) => (h.castTally.length === 0 ? h : { ...h, castTally: [] })),
+  };
+};
 
 function cancelAttackState(s: TurnState): TurnState {
   // Only refund if no attacks have been rolled yet — once rolled, the action

@@ -201,6 +201,8 @@ export function useTurnActions({
     try {
       await undoBatch(top.batchId);
       undo();
+      // Eager refresh (#758): a no-persisted-change cast returns a reference-identical character, so the character-write bump alone would leave the reverted line in the log.
+      onLogChanged();
       // The caller re-reads combat state after this resolves (#1439 review):
       // undoing a spell cast lifts the interlock it recorded server-side
       // (revertCombatEvent), and the block must not linger until the next poll.
