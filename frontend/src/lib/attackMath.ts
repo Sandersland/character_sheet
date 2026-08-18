@@ -12,6 +12,7 @@ import type {
   AttackRollSpec,
   AttackRow,
   AttackRowKind,
+  DiceRider,
   RollEventAttackComponents,
   RollEventDamageComponents,
   WeaponGrip,
@@ -84,6 +85,24 @@ function decorateRider(sourceName: string, rider: AttackDamageRider): DamageRide
     rollLabel: `${sourceName}: ${label}`,
     logSource: sourceName,
     ...(rider.condition ? { condition: rider.condition } : {}),
+  };
+}
+
+export const SNEAK_ATTACK_RIDER_ID = "sneak-attack";
+
+// Sneak Attack as a swing damage rider (#902, routed through the #1843
+// riders[] seam). `damageType` stays unset: the extra damage is the same type
+// as the weapon's (SRD 5.2 "Sneak Attack"; PHB'14 p. 96 agrees — edition-
+// invariant), which is exactly handleDamageRider's `?? armedEntry.damageType`
+// fallback.
+export function sneakAttackDamageRider(sneak: DiceRider): DamageRider {
+  const label = damageRiderLabel(sneak.dice.count, sneak.dice.faces);
+  return {
+    id: SNEAK_ATTACK_RIDER_ID,
+    spec: { count: sneak.dice.count, faces: sneak.dice.faces, modifier: 0 },
+    label,
+    rollLabel: `Sneak Attack: ${label}`,
+    logSource: "Sneak Attack",
   };
 }
 

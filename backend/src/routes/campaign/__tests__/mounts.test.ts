@@ -56,7 +56,7 @@ describe("character-scoped routes resolve to their handler with :id merged", () 
     ["POST /actions/transactions", () => post("/actions/transactions")],
     // One representative ability key; the full per-key matrix is registry-driven
     // in the abilities route tests.
-    ["POST /abilities/:key/transactions", () => post("/abilities/sneak-attack/transactions")],
+    ["POST /abilities/:key/transactions", () => post("/abilities/stunning-strike/transactions")],
     ["GET /channel-divinity", () => get("/channel-divinity")],
     ["GET /activity", () => get("/activity")],
     ["POST /events/:batchId/revert", () => agent().post(`/api/characters/${MISSING_ID}/events/some-batch/revert`).send()],

@@ -94,20 +94,19 @@ describe("POST /api/characters/:id/abilities/:abilityKey/transactions", () => {
 
   it("401s without a session (the endpoint sits behind the /api requireAuth gate)", async () => {
     const res = await supertest(app)
-      .post(abilityUrl(FIXTURE_ID, "sneak-attack"))
+      .post(abilityUrl(FIXTURE_ID, "stunning-strike"))
       .send({ operations: [] });
     expect(res.status).toBe(401);
   });
 
-  it("rolls Sneak Attack end to end on the shared URL", async () => {
+  // A schema-valid op on the wrong class proves dispatch reaches the handler's
+  // apply (past zod), not just the envelope validation the matrix below covers.
+  it("dispatches a valid op batch through to the ability's own handler", async () => {
     const res = await agent()
-      .post(abilityUrl(FIXTURE_ID, "sneak-attack"))
-      .send({ operations: [{ type: "rollSneakAttack", eligible: true, usedThisTurn: false }] });
-    expect(res.status).toBe(200);
-    const result = res.body.results[0];
-    expect(result.dice).toBe(4);
-    expect(result.faces).toBe(6);
-    expect(res.body.character.id).toBe(FIXTURE_ID);
+      .post(abilityUrl(FIXTURE_ID, "stunning-strike"))
+      .send({ operations: [{ type: "attemptStunningStrike", usedThisTurn: false }] });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/monk/i);
   });
 });
 

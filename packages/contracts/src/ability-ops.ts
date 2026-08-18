@@ -73,8 +73,8 @@ export type ActivateCloakOfShadowsOperation = z.infer<typeof activateCloakOfShad
 export type ShadowArtOperation = CastShadowArtOperation | ActivateCloakOfShadowsOperation;
 
 /**
- * `usedThisTurn` is once-per-turn, client-asserted (mirrors rollSneakAttack) —
- * the server has no session turn state to cross-check it against.
+ * `usedThisTurn` is once-per-turn, client-asserted — the server has no session
+ * turn state to cross-check it against.
  */
 export const attemptStunningStrikeOpSchema = z.object({
   type: z.literal("attemptStunningStrike"),
@@ -82,19 +82,6 @@ export const attemptStunningStrikeOpSchema = z.object({
 });
 export type AttemptStunningStrikeOperation = z.infer<typeof attemptStunningStrikeOpSchema>;
 export type StunningStrikeOperation = AttemptStunningStrikeOperation;
-
-/**
- * `eligible` is the player's manual advantage-or-adjacent-ally assertion, never
- * auto-detected; `usedThisTurn` is the client turn tracker's guard state. Both
- * are unverifiable server-side — there is no session turn state to check.
- */
-export const rollSneakAttackOpSchema = z.object({
-  type: z.literal("rollSneakAttack"),
-  eligible: z.boolean(),
-  usedThisTurn: z.boolean(),
-});
-export type RollSneakAttackOperation = z.infer<typeof rollSneakAttackOpSchema>;
-export type SneakAttackOperation = RollSneakAttackOperation;
 
 // Shared by open-hand-technique.ts (the rider a Flurry hit imposes) and
 // frontend/src/types/character/classes.ts (api/abilities.ts's rider param) —

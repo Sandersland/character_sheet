@@ -20,7 +20,6 @@ import type {
   ImposeOpenHandRiderOperation,
   ManeuverOperation,
   OpenHandRider,
-  RollSneakAttackOperation,
   SetQuiveringPalmOperation,
   ShadowArtOperation,
   TriggerQuiveringPalmOperation,
@@ -34,7 +33,6 @@ describe("@/types/character barrel — contracts re-exports", () => {
     expectTypeOf<ShadowArtOperation>().toEqualTypeOf<Contracts.ShadowArtOperation>();
     expectTypeOf<ManeuverOperation>().toEqualTypeOf<Contracts.ManeuverOperation>();
     expectTypeOf<AttemptStunningStrikeOperation>().toEqualTypeOf<Contracts.AttemptStunningStrikeOperation>();
-    expectTypeOf<RollSneakAttackOperation>().toEqualTypeOf<Contracts.RollSneakAttackOperation>();
     expectTypeOf<ImposeOpenHandRiderOperation>().toEqualTypeOf<Contracts.ImposeOpenHandRiderOperation>();
     expectTypeOf<OpenHandRider>().toEqualTypeOf<Contracts.OpenHandRider>();
     expectTypeOf<SetQuiveringPalmOperation>().toEqualTypeOf<Contracts.SetQuiveringPalmOperation>();

@@ -9,7 +9,6 @@ import {
   castShadowArtOpSchema,
   dealHandOfHarmOpSchema,
   imposeOpenHandRiderOpSchema,
-  rollSneakAttackOpSchema,
   setQuiveringPalmOpSchema,
   triggerQuiveringPalmOpSchema,
   unbondWeaponOpSchema,
@@ -36,7 +35,6 @@ import {
 import { applyQuiveringPalmOperations, InvalidQuiveringPalmOperationError } from "./quivering-palm.js";
 import { InvalidResourceOperationError } from "./resources.js";
 import { applyShadowArtsOperations, InvalidShadowArtOperationError } from "./shadow-arts.js";
-import { applySneakAttackOperations, InvalidSneakAttackOperationError } from "./sneak-attack.js";
 import { applyStunningStrikeOperations, InvalidStunningStrikeOperationError } from "./stunning-strike.js";
 import {
   applyWarriorOfElementsOperations,
@@ -167,17 +165,6 @@ export const ABILITY_REGISTRY: Record<string, TransactionHandler> = {
     schema: opBatch(castShadowArtOpSchema, activateCloakOfShadowsOpSchema),
     apply: (characterId, data) => applyShadowArtsOperations(characterId, data.operations),
     domainErrors: [InvalidShadowArtOperationError],
-  }),
-
-  // Rolls the rogue's level-derived Nd6 Sneak Attack server-side, enforcing the
-  // once-per-turn + eligibility guard, and logs the roll. Returns the updated
-  // character plus per-op { roll, dice, faces } so the client folds the roll into
-  // the attack's damage tally.
-  "sneak-attack": defineAbility({
-    schema: opBatch(rollSneakAttackOpSchema),
-    apply: (characterId, data) => applySneakAttackOperations(characterId, data.operations),
-    domainErrors: [InvalidSneakAttackOperationError],
-    respond: (character, results) => ({ character, results }),
   }),
 
   // Spends 1 focus and rolls the target's Constitution save (flat d20) against
