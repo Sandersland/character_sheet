@@ -91,6 +91,7 @@ export function buildManeuverView(
           type: armedEntry.damageType,
           kind: "damage",
           crit: false,
+          source: "Maneuver",
         });
       }
     },

@@ -68,6 +68,14 @@ export interface ResolveActionEventEffect {
   kind: "damage" | "heal";
   crit: boolean;
   components?: RollEventDamageComponents;
+  /**
+   * Attributing display name for a riders[] term ("Sneak Attack", the item's
+   * own name) — what the drill-in labels the line with instead of the bare
+   * damage type. Absent on the primary effect (the op-level `source` already
+   * names it) and on riders persisted before the field existed, which fall
+   * back to the type label.
+   */
+  source?: string;
 }
 
 /** `data` on a `resolveAction` CharacterEvent (category "combat"). */

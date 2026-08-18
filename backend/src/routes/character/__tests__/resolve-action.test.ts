@@ -449,6 +449,17 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     ]);
   });
 
+  it("stores a rider's attributing source verbatim when the op carries one", async () => {
+    const op = riderSwingOp();
+    const rider = { ...op.riders[0], spec: "1d6", faces: [2], total: 2, type: "slashing", source: "Sneak Attack" };
+    const res = await post([{ ...op, riders: [rider] }]);
+    expect(res.status).toBe(200);
+
+    const events = (await activity(FIXTURE_ID)).body as Array<{ type: string; data: Record<string, unknown> }>;
+    const resolveEvent = events.find((e) => e.type === "resolveAction");
+    expect(resolveEvent?.data.riders).toEqual([rider]);
+  });
+
   it("defaults riders to an empty array when the op omits it", async () => {
     const res = await post([weaponOp()]);
     expect(res.status).toBe(200);

@@ -419,6 +419,7 @@ export default function InlineAttackPicker({
       type: rider.damageType ?? armedEntry.damageType,
       kind: "damage",
       crit: resolutionView.isCrit,
+      source: rider.logSource,
     });
     if (currentRow) turnState.addTallyDamageRider(currentRow.id, result.total);
   }

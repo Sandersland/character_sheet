@@ -334,7 +334,7 @@ describe("InlineAttackPicker — typed damage riders route into the single resol
     const [, ops] = vi.mocked(applyResolveActionOperations).mock.calls[0];
     expect(ops[0].effect).toMatchObject({ type: "slashing", kind: "damage" });
     expect(ops[0].riders).toHaveLength(1);
-    expect(ops[0].riders?.[0]).toMatchObject({ type: "fire", kind: "damage" });
+    expect(ops[0].riders?.[0]).toMatchObject({ type: "fire", kind: "damage", source: "Flame Tongue" });
     expect(vi.mocked(logRollAction)).not.toHaveBeenCalled();
   });
 
@@ -422,7 +422,7 @@ describe("InlineAttackPicker — Sneak Attack rides the swing's resolveAction op
     const [, ops] = vi.mocked(applyResolveActionOperations).mock.calls[0];
     expect(ops[0].effect).toMatchObject({ type: "piercing", kind: "damage" });
     expect(ops[0].riders).toHaveLength(1);
-    expect(ops[0].riders?.[0]).toMatchObject({ type: "piercing", kind: "damage" });
+    expect(ops[0].riders?.[0]).toMatchObject({ type: "piercing", kind: "damage", source: "Sneak Attack" });
     expect(vi.mocked(logRollAction)).not.toHaveBeenCalled();
   });
 

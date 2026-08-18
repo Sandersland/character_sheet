@@ -214,6 +214,7 @@ function useBonusResolution({
           type: rider.damageType ?? armedEntry.damageType,
           kind: "damage",
           crit: resolutionView.isCrit,
+          source: rider.logSource,
         },
       },
     }));
