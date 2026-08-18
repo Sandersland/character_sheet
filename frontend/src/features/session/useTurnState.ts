@@ -618,8 +618,7 @@ const recordSpellCastState = (s: TurnState, recorded: RecordedSpellCast): TurnSt
   castTally: [...s.castTally, { ...recorded, id: nextRowId() }],
 });
 
-// Same dismiss durability as clearAttackTallyState (#812): scrub history
-// snapshots too, so undo can't resurrect a dismissed banner's rows.
+// Same dismiss durability as clearAttackTallyState (#812): scrub history snapshots too, so undo can't resurrect a dismissed banner's rows.
 const clearCastTallyState = (s: TurnState): TurnState => {
   if (s.castTally.length === 0 && s.history.every((h) => h.castTally.length === 0)) return s;
   return {
