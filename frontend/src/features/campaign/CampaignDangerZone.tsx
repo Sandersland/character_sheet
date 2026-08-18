@@ -8,8 +8,7 @@ interface CampaignDangerZoneProps {
   campaignName: string;
 }
 
-// Owner-only destructive actions, at the bottom of the Manage tab. Rendered only
-// inside the owner-gated manage branch, so no role check of its own.
+// No role check of its own — only rendered inside the owner-gated Manage branch.
 export default function CampaignDangerZone({ campaignId, campaignName }: CampaignDangerZoneProps) {
   const [confirming, setConfirming] = useState(false);
 

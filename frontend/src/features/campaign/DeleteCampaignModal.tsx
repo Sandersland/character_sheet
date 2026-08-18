@@ -13,11 +13,9 @@ interface DeleteCampaignModalProps {
 }
 
 /**
- * Confirmation dialog before permanently deleting a campaign (owner-only; the
- * server 409s while a session is active, surfaced verbatim below). On success
- * every campaign-scoped cache entry is removed and character queries are
- * invalidated — members' characters just had campaignId nulled server-side —
- * then navigation replaces history so Back can't reach the dead campaign URL.
+ * Confirmation dialog before permanently deleting a campaign. Navigates to
+ * /campaigns after a successful delete — replacing history so the now-dead
+ * campaign URL can't be reached by pressing Back.
  */
 export default function DeleteCampaignModal({
   campaignId,
@@ -36,6 +34,7 @@ export default function DeleteCampaignModal({
       const queryClient = getQueryClient();
       queryClient.removeQueries({ queryKey: campaignKeys.scope(campaignId) });
       queryClient.removeQueries({ queryKey: sessionKeys.campaignList(campaignId) });
+      // Members' characters just had campaignId nulled server-side.
       await queryClient.invalidateQueries({ queryKey: characterKeys.all });
       navigate("/campaigns", { replace: true });
     } catch (err) {
