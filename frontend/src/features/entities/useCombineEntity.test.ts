@@ -3,7 +3,7 @@ import { renderHook, act, waitFor } from "@testing-library/react";
 
 import { combineEntities } from "@/api/client";
 import { getQueryClient } from "@/api/queryClient";
-import { campaignKeys, inboxKeys, sessionKeys } from "@/api/queryKeys";
+import { campaignKeys, characterKeys, inboxKeys } from "@/api/queryKeys";
 import { useCombineEntity } from "@/features/entities/useCombineEntity";
 import type { CampaignEntity } from "@/types/character";
 
@@ -41,10 +41,10 @@ describe("useCombineEntity (#1943)", () => {
     expect(vi.mocked(combineEntities)).toHaveBeenCalledWith(CAMPAIGN_ID, "surv-1", ["dup-1"]);
   });
 
-  it("invalidates entities, merges, the app-level inbox, and the campaign's chronicle on success (#1949: previously left the inbox bell and chronicle stale)", async () => {
+  it("invalidates entities, merges, the app-level inbox, and every open character's detail cache on success (#1949: previously left the inbox bell and any open character's rewritten mention tokens stale)", async () => {
     vi.mocked(combineEntities).mockResolvedValue(survivor);
     getQueryClient().setQueryData(inboxKeys.all, []);
-    getQueryClient().setQueryData(sessionKeys.chronicle(CAMPAIGN_ID, "char-1"), { arcs: [], sessions: [] });
+    getQueryClient().setQueryData(characterKeys.detail("char-1"), { id: "char-1" });
     const { result } = renderHook(() => useCombineEntity(CAMPAIGN_ID));
 
     act(() => {
@@ -59,9 +59,7 @@ describe("useCombineEntity (#1943)", () => {
       getQueryClient().getQueryState(campaignKeys.merges(CAMPAIGN_ID))?.isInvalidated,
     ).toBe(true);
     expect(getQueryClient().getQueryState(inboxKeys.all)?.isInvalidated).toBe(true);
-    expect(
-      getQueryClient().getQueryState(sessionKeys.chronicle(CAMPAIGN_ID, "char-1"))?.isInvalidated,
-    ).toBe(true);
+    expect(getQueryClient().getQueryState(characterKeys.detail("char-1"))?.isInvalidated).toBe(true);
   });
 
   it("surfaces the backend's error message on a 409 conflict", async () => {

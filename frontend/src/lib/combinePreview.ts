@@ -1,19 +1,33 @@
-// Pure preview logic for "what is lost by a combine" (#1943/#1946/#1949):
-// the single source of truth both the entity-detail Combine dialog
+// Pure preview logic for "what is lost by a combine" (#1943/#1946): the
+// single source of truth both the entity-detail Combine dialog
 // (CombineConfirmDialog, one duplicate) and the inbox's Review-duplicates
 // modal (ReviewDuplicatesModal, an N-way cluster) render from. `losers` is
 // every entity being absorbed into `survivor` and deleted — a pair-combine
 // passes a 1-length array. Genuinely N-way-only preview pieces (the live
-// summary line and its private-notes hedge, the redacted-mention warning,
-// the prepared-merge item's labeling) stay in inboxCombinePreview.ts — their
-// wording and inputs differ enough from the single-duplicate dialog that
-// folding them in here would just move the fork, not remove it.
+// summary line and its private-notes hedge, the redacted-mention warning)
+// stay in inboxCombinePreview.ts — their wording and inputs differ enough
+// from the single-duplicate dialog that folding them in here would just move
+// the fork, not remove it.
 
 import { ENTITY_TYPE_LABELS } from "@/lib/mentions";
 import type { CampaignEntity, CampaignEntityMerge } from "@/types/character";
 
+// Closed so a new category can't collide with an existing one under a typo'd
+// string — these are React list keys drawn from more than one producer
+// (combineDiscardedItems and preparedMergeDiscardedItem below,
+// hiddenSurvivorRedactsRevealedMentions in inboxCombinePreview.ts) rendered
+// into the same list by GoldWarningBox's DiscardedItemsBox.
+export type CombineDiscardedItemKey =
+  | "notes"
+  | "aliases"
+  | "portrait"
+  | "type"
+  | "visibility"
+  | "merge"
+  | "redacted-until-revealed";
+
 export interface CombineDiscardedItem {
-  key: string;
+  key: CombineDiscardedItemKey;
   label: string;
 }
 
@@ -21,24 +35,27 @@ export function losersOf<T extends { id: string }>(entities: T[], survivorId: st
   return entities.filter((e) => e.id !== survivorId);
 }
 
+// "solo": the surrounding dialog already names the one loser in its own
+// heading (e.g. "Discarded with lili") — CombineConfirmDialog only, always
+// called with a 1-length `losers`. "named": no such heading exists, so every
+// label must name which losers it's about — ReviewDuplicatesModal, for ANY
+// cluster size including a 2-entity cluster (1 loser). The caller passes
+// this explicitly rather than it being inferred from `losers.length`: a
+// 1-loser cluster combine still renders under a bare "Discarded" heading, so
+// an unnamed label there would be just as ambiguous as a 3-loser one, and
+// re-picking the survivor radio would silently change the unnamed label's
+// referent with no visual change to the label itself.
+export type DiscardLabelVoice = "solo" | "named";
+
 // What's lost when every entity in `losers` is combined into `survivor`:
 // only the categories some loser actually carries — an empty list means the
-// gold warning box doesn't render at all. A single loser's label states its
-// own value directly (the dialog around it already names that one entity,
-// e.g. "Discarded with lili"); more than one loser's label names WHICH
-// losers carry the category instead, since there's no single subject left
-// to imply it.
+// gold warning box doesn't render at all.
 export function combineDiscardedItems(
   losers: CampaignEntity[],
   survivor: CampaignEntity,
+  voice: DiscardLabelVoice,
 ): CombineDiscardedItem[] {
-  // Whether there's a single subject the surrounding dialog already names
-  // (e.g. "Discarded with lili") — NOT whether a given category happens to
-  // affect only one of several losers. Once there's more than one loser, no
-  // label can drop names: "Type — currently Location" would be ambiguous
-  // about which loser it describes even if only one of three has a
-  // differing type.
-  const solo = losers.length === 1;
+  const solo = voice === "solo";
   const items: CombineDiscardedItem[] = [];
 
   const described = losers.filter((e) => e.notes?.trim());
@@ -49,13 +66,17 @@ export function combineDiscardedItems(
     });
   }
 
+  // Named mode can't just list loser names here (as visibility/portrait do)
+  // — "Aliases — Lil, lili" reads as two alias VALUES in solo mode, so the
+  // same shape naming two near-identical LOSERS would be genuinely
+  // ambiguous. Naming each loser next to its own alias values disambiguates.
   const aliased = losers.filter((e) => e.aliases.length > 0);
   if (aliased.length > 0) {
     items.push({
       key: "aliases",
       label: solo
         ? `Aliases — ${aliased[0]!.aliases.join(", ")}`
-        : `Aliases — ${aliased.map((e) => e.name).join(", ")}`,
+        : `Aliases — ${aliased.map((e) => `${e.name} (${e.aliases.join(", ")})`).join("; ")}`,
     });
   }
 
@@ -73,7 +94,7 @@ export function combineDiscardedItems(
       key: "type",
       label: solo
         ? `Type — currently ${ENTITY_TYPE_LABELS[retyped[0]!.type]}`
-        : `Type — ${retyped.map((e) => e.name).join(", ")}`,
+        : `Type — ${retyped.map((e) => `${e.name} (${ENTITY_TYPE_LABELS[e.type]})`).join(", ")}`,
     });
   }
 
@@ -117,6 +138,26 @@ export function duplicateHasPreparedMerge(
     (m) =>
       m.status === "PREPARED" && (m.mergedEntityId === duplicateId || m.survivorEntityId === duplicateId),
   );
+}
+
+// The discarded-item form of duplicateHasPreparedMerge above, folded into
+// the same gold list combineDiscardedItems feeds — both CombineConfirmDialog
+// and ReviewDuplicatesModal render one consequence-preview list, not a gold
+// box plus a separately-styled warning for this one case.
+export function preparedMergeDiscardedItem(
+  losers: { id: string; name: string }[],
+  merges: CampaignEntityMerge[],
+  voice: DiscardLabelVoice,
+): CombineDiscardedItem | null {
+  const affected = losers.filter((loser) => duplicateHasPreparedMerge(merges, loser.id));
+  if (affected.length === 0) return null;
+  return {
+    key: "merge",
+    label:
+      voice === "solo"
+        ? "Prepared identity merge — combining drops it"
+        : `Prepared identity merges — ${affected.map((e) => e.name).join(", ")}`,
+  };
 }
 
 // A REVEALED duplicate's mentions move onto a HIDDEN survivor: those journal

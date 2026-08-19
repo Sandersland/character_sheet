@@ -15,8 +15,8 @@ interface CombineClusterInput {
 // rejection leaves every entity untouched, so there is no partial-landing
 // state to track here; the caller just re-shows the error and lets the DM
 // retry the same combine. invalidateCombineCaches (shared with #1943's
-// useCombineEntity — #1949) covers why each cache goes stale, including the
-// chronicle rewrite.
+// useCombineEntity) covers why each cache goes stale, including the
+// mention-token rewrite on Character.journal.
 export function useCombineCluster() {
   const queryClient = useQueryClient();
 

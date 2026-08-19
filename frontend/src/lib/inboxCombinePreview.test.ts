@@ -3,9 +3,8 @@ import { describe, it, expect } from "vitest";
 import {
   combineSummaryLine,
   hiddenSurvivorRedactsRevealedMentions,
-  preparedMergeDiscardedItem,
 } from "@/lib/inboxCombinePreview";
-import type { CampaignEntityMerge, InboxDuplicateEntity } from "@/types/character";
+import type { InboxDuplicateEntity } from "@/types/character";
 
 function inboxEntity(overrides: Partial<InboxDuplicateEntity> = {}): InboxDuplicateEntity {
   return {
@@ -14,20 +13,6 @@ function inboxEntity(overrides: Partial<InboxDuplicateEntity> = {}): InboxDuplic
     type: "NPC",
     visibility: "REVEALED",
     mentionCount: 0,
-    ...overrides,
-  };
-}
-
-function merge(overrides: Partial<CampaignEntityMerge> = {}): CampaignEntityMerge {
-  return {
-    id: "m1",
-    campaignId: "camp-1",
-    mergedEntityId: "a",
-    survivorEntityId: "b",
-    status: "PREPARED",
-    note: null,
-    preparedAt: "",
-    executedAt: null,
     ...overrides,
   };
 }
@@ -115,41 +100,5 @@ describe("hiddenSurvivorRedactsRevealedMentions", () => {
     expect(hiddenSurvivorRedactsRevealedMentions(entities, "e3")?.label).toBe(
       'Mentions from Lil, lili will render as "Hidden" until Lili is revealed',
     );
-  });
-});
-
-describe("preparedMergeDiscardedItem", () => {
-  it("names losers that own a PREPARED identity merge, either side of it", () => {
-    const losers = [
-      { id: "e1", name: "Lil" },
-      { id: "e2", name: "lili" },
-    ];
-    const merges = [merge({ mergedEntityId: "e1" })];
-    expect(preparedMergeDiscardedItem(losers, merges)).toEqual({
-      key: "merge",
-      label: "Prepared identity merges — Lil",
-    });
-  });
-
-  it("names every affected loser, not just one", () => {
-    const losers = [
-      { id: "e1", name: "Lil" },
-      { id: "e2", name: "lili" },
-    ];
-    const merges = [merge({ mergedEntityId: "e1" }), merge({ survivorEntityId: "e2" })];
-    expect(preparedMergeDiscardedItem(losers, merges)?.label).toBe(
-      "Prepared identity merges — Lil, lili",
-    );
-  });
-
-  it("is null when no loser is in a PREPARED merge", () => {
-    const losers = [{ id: "e1", name: "Lil" }];
-    expect(preparedMergeDiscardedItem(losers, [])).toBeNull();
-  });
-
-  it("ignores an EXECUTED merge — only a PREPARED one is a real loss (reuses duplicateHasPreparedMerge's own status filter)", () => {
-    const losers = [{ id: "e1", name: "Lil" }];
-    const merges = [merge({ mergedEntityId: "e1", status: "EXECUTED" })];
-    expect(preparedMergeDiscardedItem(losers, merges)).toBeNull();
   });
 });

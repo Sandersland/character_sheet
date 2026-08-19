@@ -1,17 +1,22 @@
 import type { QueryClient } from "@tanstack/react-query";
 
-import { campaignKeys, inboxKeys, sessionKeys } from "@/api/queryKeys";
+import { campaignKeys, characterKeys, inboxKeys } from "@/api/queryKeys";
 
 // The one set of caches any combine (#1942's shared endpoint) can go stale,
 // shared by both call sites: entity-detail's single-duplicate combine
 // (#1943, useCombineEntity) and the inbox's N-way cluster combine (#1946,
-// useCombineCluster). Before this was unified, useCombineEntity only
-// invalidated entities+merges — combining from the entity-detail page left a
-// stale inbox bell and a stale chronicle cache, since combineEntities also
-// REWRITES journal entry bodies server-side (every @[loserId] mention token
-// becomes @[survivorId]), which a cached chronicle still holding the old
-// tokens can't resolve once the loser is gone from the (now-invalidated)
-// entities list.
+// useCombineCluster).
+//
+// combineEntities REWRITES journal entry bodies server-side (every
+// @[loserId] mention token becomes @[survivorId]) — those bodies live on
+// Character.journal (rendered via MentionText), not on sessionKeys.chronicle
+// (arcs + session metadata only, no note bodies — see useChronicle's own
+// comment). A cached character detail still holding the old token can't
+// resolve it once the loser is gone from the (now-invalidated) entities
+// list — MentionText renders it as an unresolved/redacted mention instead of
+// the survivor's name. The mutation only knows `campaignId`, not which
+// characters' journals actually mention a loser, so this invalidates the
+// whole characterKeys family rather than enumerating characterIds.
 //
 // Backlinks/activity (useEntityDetail/useCodexActivity) carry the same
 // staleness risk but AREN'T on TanStack Query at all — plain fetch+useEffect
@@ -23,5 +28,5 @@ export function invalidateCombineCaches(queryClient: QueryClient, campaignId: st
   // Prefix match covers entitiesWithStats — entities() is its key prefix.
   void queryClient.invalidateQueries({ queryKey: campaignKeys.entities(campaignId) });
   void queryClient.invalidateQueries({ queryKey: campaignKeys.merges(campaignId) });
-  void queryClient.invalidateQueries({ queryKey: sessionKeys.chronicleForCampaign(campaignId) });
+  void queryClient.invalidateQueries({ queryKey: characterKeys.all });
 }

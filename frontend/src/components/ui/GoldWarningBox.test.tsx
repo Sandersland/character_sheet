@@ -8,6 +8,23 @@ describe("GoldWarningBox", () => {
     render(<GoldWarningBox>Heads up.</GoldWarningBox>);
     expect(screen.getByText("Heads up.")).toBeInTheDocument();
   });
+
+  it("accepts a custom icon in place of the default TriangleAlert", () => {
+    render(
+      <GoldWarningBox icon={<svg data-testid="custom-icon" />}>Heads up.</GoldWarningBox>,
+    );
+    expect(screen.getByTestId("custom-icon")).toBeInTheDocument();
+  });
+
+  it("'row' variant renders a circled icon badge beside its children, not the bare 'callout' icon", () => {
+    const { container } = render(
+      <GoldWarningBox variant="row" icon={<svg data-testid="row-icon" />}>
+        <div>Poisoned</div>
+      </GoldWarningBox>,
+    );
+    expect(screen.getByTestId("row-icon")).toBeInTheDocument();
+    expect(container.querySelector(".rounded-control.bg-gold-400")).toBeInTheDocument();
+  });
 });
 
 describe("DiscardedItemsBox", () => {

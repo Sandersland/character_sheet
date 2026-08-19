@@ -1,18 +1,13 @@
 // Preview logic specific to the Review-duplicates modal's N-way cluster
-// combine (#1946) — the pieces that genuinely differ from #1943's
-// single-duplicate dialog: the live summary line (fed the inbox row's own
+// combine (#1946): the live summary line (fed the inbox row's own
 // lightweight entities, not a full-entity fetch) and its private-notes
-// hedge, the redacted-mention warning, and the prepared-merge item's
-// labeling. "What is lost by a combine" itself — notes/aliases/portrait/
-// type/visibility, generalized over a losers array — lives in
-// combinePreview.ts; this file reuses it rather than re-deriving it.
+// hedge, plus the redacted-mention warning. "What is lost by a combine"
+// itself — notes/aliases/portrait/type/visibility/a prepared merge,
+// generalized over a losers array — lives in combinePreview.ts; this file
+// reuses it rather than re-deriving it.
 
-import {
-  duplicateHasPreparedMerge,
-  losersOf,
-  type CombineDiscardedItem,
-} from "@/lib/combinePreview";
-import type { CampaignEntityMerge, InboxDuplicateEntity } from "@/types/character";
+import { losersOf, type CombineDiscardedItem } from "@/lib/combinePreview";
+import type { InboxDuplicateEntity } from "@/types/character";
 
 interface MentionSummaryEntity {
   id: string;
@@ -63,22 +58,5 @@ export function hiddenSurvivorRedactsRevealedMentions(
   return {
     key: "redacted-until-revealed",
     label: `Mentions from ${revealedLosers.map((e) => e.name).join(", ")} will render as "Hidden" until ${survivor.name} is revealed`,
-  };
-}
-
-// A cluster's own "lost" category that combineDiscardedItems can't cover: it
-// takes only `survivor: CampaignEntity`, but a PREPARED merge is a fact
-// about a loser's participation in CampaignEntityMerge, not about the entity
-// row itself. Reuses duplicateHasPreparedMerge per loser rather than
-// re-deriving the PREPARED-status check inline.
-export function preparedMergeDiscardedItem(
-  losers: { id: string; name: string }[],
-  merges: CampaignEntityMerge[],
-): CombineDiscardedItem | null {
-  const affected = losers.filter((loser) => duplicateHasPreparedMerge(merges, loser.id));
-  if (affected.length === 0) return null;
-  return {
-    key: "merge",
-    label: `Prepared identity merges — ${affected.map((e) => e.name).join(", ")}`,
   };
 }

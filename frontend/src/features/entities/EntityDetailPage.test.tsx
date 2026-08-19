@@ -759,7 +759,9 @@ describe("EntityDetailPage (#248)", () => {
       await user.click(await screen.findByRole("button", { name: /combine into/i }));
       await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /Lili/ }));
 
-      expect(screen.getByText(/has a prepared identity merge/i)).toBeInTheDocument();
+      // Folded into the same gold Discarded list as every other loss (#1949)
+      // rather than a separately-styled garnet warning.
+      expect(screen.getByText("Prepared identity merge — combining drops it")).toBeInTheDocument();
     });
 
     it("renders a 409 conflict inline in the dialog instead of a toast", async () => {

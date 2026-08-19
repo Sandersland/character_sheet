@@ -5,7 +5,7 @@ import {
   combineItemLinkTransferWarning,
   combineMentionSummary,
   combineRedactedMentionWarning,
-  duplicateHasPreparedMerge,
+  preparedMergeDiscardedItem,
 } from "@/lib/combinePreview";
 import { errorMessage } from "@/lib/errorMessage";
 import type { CampaignEntity, CampaignEntityMerge, CampaignItem } from "@/types/character";
@@ -43,8 +43,11 @@ export default function CombineConfirmDialog({
   onCancel,
   onCombined,
 }: CombineConfirmDialogProps) {
-  const discarded = combineDiscardedItems([duplicate], survivor);
-  const preparedMergeWarning = duplicateHasPreparedMerge(merges, duplicate.id);
+  const mergeItem = preparedMergeDiscardedItem([duplicate], merges, "solo");
+  const discarded = [
+    ...combineDiscardedItems([duplicate], survivor, "solo"),
+    ...(mergeItem ? [mergeItem] : []),
+  ];
   const redactedMentionWarning = combineRedactedMentionWarning(duplicate, survivor);
   const itemLinkWarning = combineItemLinkTransferWarning(duplicate.type, survivor, duplicateItem !== null);
 
@@ -85,12 +88,6 @@ export default function CombineConfirmDialog({
           {survivor.name} becomes {duplicate.name}'s campaign item entry — deleting that item will
           delete {survivor.name} too.
         </GoldWarningBox>
-      )}
-
-      {preparedMergeWarning && (
-        <p className="text-xs font-semibold text-garnet-700">
-          {duplicate.name} has a prepared identity merge — combining drops it.
-        </p>
       )}
 
       {mutation.isError && (

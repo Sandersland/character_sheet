@@ -201,6 +201,51 @@ describe("ReviewDuplicatesModal", () => {
     });
   });
 
+  describe("2-entity cluster (1 loser) — review finding #1", () => {
+    const TWO_ENTITY_ROW: InboxDuplicateClusterRow = {
+      ...ROW,
+      entities: [
+        { id: "e1", name: "Lil", type: "NPC", visibility: "HIDDEN", mentionCount: 1 },
+        { id: "e3", name: "Lili", type: "NPC", visibility: "REVEALED", mentionCount: 3 },
+      ],
+      defaultSurvivorId: "e3",
+    };
+    const TWO_ENTITY_FULL: CampaignEntity[] = [
+      fullEntity({ id: "e1", name: "Lil", visibility: "HIDDEN" }),
+      fullEntity({ id: "e3", name: "Lili" }),
+    ];
+
+    // A single loser still renders under the bare "Discarded" heading (no
+    // "Discarded with X" the way CombineConfirmDialog has) — an unnamed
+    // label here would be exactly as ambiguous as a 3-loser one, and would
+    // silently point at a different entity once the survivor radio flips.
+    it("still names the loser — labels aren't unnamed just because the cluster happens to have only one loser", async () => {
+      fetchEntities.mockResolvedValue(TWO_ENTITY_FULL);
+      render(
+        <ReviewDuplicatesModal row={TWO_ENTITY_ROW} onClose={vi.fn()} onDisregard={vi.fn()} disregarding={false} />,
+      );
+
+      await waitFor(() => expect(screen.getByText("Hidden visibility — Lil")).toBeInTheDocument());
+      expect(screen.queryByText(/^Hidden visibility$/)).not.toBeInTheDocument();
+    });
+  });
+
+  it("waits on a still-pending merges fetch, not just the entities fetch, before treating the preview as complete (review finding #4)", async () => {
+    let resolveMerges!: (v: unknown[]) => void;
+    fetchEntityMerges.mockReturnValue(new Promise((r) => { resolveMerges = r; }));
+    render(<ReviewDuplicatesModal row={ROW} onClose={vi.fn()} onDisregard={vi.fn()} disregarding={false} />);
+
+    // Entities have already landed (FULL_ENTITIES resolves synchronously in
+    // beforeEach), but merges hasn't — the fuller categories must not
+    // render yet, or the box would look complete while still missing a
+    // possible "Prepared identity merges" item.
+    await waitFor(() => expect(fetchEntities).toHaveBeenCalled());
+    expect(screen.queryByText(/Hidden visibility — Lil/)).not.toBeInTheDocument();
+
+    resolveMerges([]);
+    await waitFor(() => expect(screen.getByText(/Hidden visibility — Lil/)).toBeInTheDocument());
+  });
+
   it("surfaces a cross-loser 409 (two character-linked losers, round-2 hardening) readably", async () => {
     combineEntities.mockRejectedValueOnce(new Error("Both entities are linked to a character"));
     render(<ReviewDuplicatesModal row={ROW} onClose={vi.fn()} onDisregard={vi.fn()} disregarding={false} />);

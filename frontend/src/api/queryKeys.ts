@@ -66,14 +66,6 @@ export const sessionKeys = {
   // useChronicle always fetches both in parallel and treats them as one unit).
   chronicle: (campaignId: string | null | undefined, characterId: string | null | undefined) =>
     [...sessionKeys.all, "chronicle", campaignId, characterId] as const,
-  // The campaign-wide PREFIX of `chronicle` above, omitting characterId — for
-  // a mutation (e.g. a #1942 combine) that needs to invalidate every open
-  // character's chronicle in the campaign at once. invalidateQueries matches
-  // any registered key that STARTS WITH the array given it, so this shorter
-  // key catches every `chronicle(campaignId, <any characterId>)` without the
-  // caller having to enumerate characterIds.
-  chronicleForCampaign: (campaignId: string | null | undefined) =>
-    [...sessionKeys.all, "chronicle", campaignId] as const,
 };
 
 // App-level inbox (#1945/#1946): one flat list across every campaign the
