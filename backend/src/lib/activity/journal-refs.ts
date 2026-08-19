@@ -17,9 +17,26 @@ export function extractEntityIds(body: string): string[] {
   return [...seen];
 }
 
+// The exact @[<id>] token text the app writes and MENTION_TOKEN parses — the
+// one place the wrapper characters are hard-coded, so a caller building a
+// replacement string (e.g. a combine op rewriting mentions, #1942) can't drift
+// from what extractEntityIds actually matches.
+export function mentionToken(entityId: string): string {
+  return `@[${entityId}]`;
+}
+
+// mentionToken's POSIX-ERE source for one id, case-insensitively matchable
+// (Postgres regexp_replace(..., 'gi') or an equivalent JS `RegExp(..., "gi")`)
+// — `[`/`]` are regex metacharacters, so a caller must never hand-splice
+// `@[${id}]` into a pattern itself.
+export function mentionTokenPattern(entityId: string): string {
+  return `@\\[${entityId}\\]`;
+}
+
 // Fold a name/alias/query to a comparison key: lowercase, strip diacritics,
 // drop punctuation, collapse whitespace. Kept in parity with the frontend
 // normalizeForMatch so search matches the same way on both sides.
+// fallow-ignore-next-line code-duplication -- pre-existing mirror against frontend/src/lib/mentions.ts's own normalizeForMatch (the frontend/backend search-parity requirement this comment states); surfaced only because #1942 touched this file elsewhere, not introduced by it
 export function normalizeForMatch(s: string): string {
   return s
     .normalize("NFD")

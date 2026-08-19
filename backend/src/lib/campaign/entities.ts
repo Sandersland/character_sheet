@@ -1,7 +1,7 @@
 // Campaign-entity domain logic: stats, merge lifecycle, backlinks,
 // connections, activity feed, and attribution. HTTP-free; routes pass `db`.
 
-import type { PrismaClient } from "@/generated/prisma/client.js";
+import { Prisma, type PrismaClient } from "@/generated/prisma/client.js";
 import { collectMergedInIdentities, wouldCreateCycle } from "@/lib/activity/entity-merges.js";
 import {
   aggregateEntityStats,
@@ -12,6 +12,8 @@ import {
   type EntityStatsAggregate,
   type StatRef,
 } from "@/lib/activity/entity-stats.js";
+import { mentionToken, mentionTokenPattern } from "@/lib/activity/journal-refs.js";
+import { deletePortraitBlobBestEffort } from "@/lib/storage/portrait-blob.js";
 
 // Session context resolver for mention refs: title + startedAt-ordinal (#839).
 async function loadSessionContext(db: PrismaClient, campaignId: string) {
@@ -197,6 +199,310 @@ export async function deleteMerge(
 
   await db.campaignEntityMerge.delete({ where: { id: merge.id } });
   return { ok: true };
+}
+
+type CombinedEntity = Prisma.CampaignEntityGetPayload<{
+  include: { characterLink: { select: { characterId: true } } };
+}>;
+
+export type CombineResult =
+  | { ok: true; entity: CombinedEntity }
+  | { ok: false; status: 400 | 404 | 409; error: string };
+
+const duplicateSurvivorSelect = {
+  id: true,
+  campaignId: true,
+  type: true,
+  portraitKey: true,
+  characterLink: true,
+  itemLink: true,
+} satisfies Prisma.CampaignEntitySelect;
+
+type LinkedEntity = Prisma.CampaignEntityGetPayload<{ select: typeof duplicateSurvivorSelect }>;
+
+type Tx = Prisma.TransactionClient;
+
+// Signals a validated guard failure from inside the combine transaction so
+// combineEntities can map it back to the ok:false result shape after the
+// transaction unwinds (Prisma rolls back automatically on a thrown error).
+class CombineGuardError extends Error {
+  constructor(
+    public status: 400 | 404 | 409,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+// Rewrites every @[<dupId>] mention token to @[<survivorId>] across ALL of the
+// campaign's journal entries, regardless of author or visibility — unlike
+// visibleEntryWhere (used everywhere else in this file), a combine must not
+// leave a dangling token behind an author's own private note. One set-based
+// UPDATE, not a per-entry round trip: regexp_replace's 'gi' flag rewrites
+// every case variant in a single pass (tokens are app-generated lowercase
+// uuids, but nothing stops a hand-typed uppercase one), and the ILIKE
+// prefilter keeps untouched rows out of the write.
+async function rewriteMentionTokens(
+  tx: Tx,
+  campaignId: string,
+  duplicateId: string,
+  survivorEntityId: string,
+): Promise<void> {
+  const literalToken = mentionToken(duplicateId);
+  const regexToken = mentionTokenPattern(duplicateId);
+  const replacement = mentionToken(survivorEntityId);
+
+  await tx.$executeRaw`
+    UPDATE "JournalEntry" AS e
+    SET body = regexp_replace(e.body, ${regexToken}, ${replacement}, 'gi')
+    FROM "Character" AS c
+    WHERE e."characterId" = c.id
+      AND c."campaignId" = ${campaignId}
+      AND e.body ILIKE ${`%${literalToken}%`}
+  `;
+
+  // Ref rows move independently of body text — never re-derived from it. A
+  // prior version reconciled from extractEntityIds(rewrittenBody), which both
+  // 500'd on a stale token (an id extractEntityIds finds but no CampaignEntity
+  // row backs any more) and silently re-created refs the hidden-entity guard
+  // (syncEntryRefs, routes/session/journal.ts, #379) had deliberately
+  // suppressed. Collapse first: an entry already carrying both the dup's and
+  // the survivor's ref keeps only the survivor's (the @@unique constraint the
+  // second query below relies on being clear). Then move what's left.
+  await tx.journalEntryRef.deleteMany({
+    where: {
+      entityId: duplicateId,
+      entry: { refs: { some: { entityId: survivorEntityId } } },
+    },
+  });
+  await tx.journalEntryRef.updateMany({
+    where: { entityId: duplicateId },
+    data: { entityId: survivorEntityId },
+  });
+}
+
+// Re-points merge rows where the duplicate stood in as the survivor (A → dup)
+// to the real survivor (A → S). A row that would become self-referential OR
+// would close a cycle against the rest of the graph is dropped instead —
+// wouldCreateCycle already covers the self-reference case (mergedId ===
+// survivorId short-circuits true), so one check does both. Rows where the
+// duplicate is mergedEntityId cascade-delete with the duplicate row the
+// caller deletes after this returns, UNLESS that row is EXECUTED — the
+// caller rejects that case before this ever runs (a public reveal doesn't
+// silently disappear). Re-pointing an EXECUTED row mirrors executeMerge's own
+// invariant: the survivor must stay REVEALED, or the reveal vanishes from
+// listVisibleMerges for players.
+async function repointMergeChains(
+  tx: Tx,
+  campaignId: string,
+  duplicateId: string,
+  survivorEntityId: string,
+): Promise<void> {
+  const asSurvivor = await tx.campaignEntityMerge.findMany({
+    where: { campaignId, survivorEntityId: duplicateId },
+    select: { id: true, mergedEntityId: true, status: true },
+  });
+  if (asSurvivor.length === 0) return;
+
+  const allEdges = await tx.campaignEntityMerge.findMany({
+    where: { campaignId },
+    select: { id: true, mergedEntityId: true, survivorEntityId: true, status: true },
+  });
+  let revealSurvivor = false;
+  for (const row of asSurvivor) {
+    const otherEdges = allEdges.filter((e) => e.id !== row.id);
+    if (wouldCreateCycle(otherEdges, row.mergedEntityId, survivorEntityId)) {
+      await tx.campaignEntityMerge.delete({ where: { id: row.id } });
+      continue;
+    }
+    await tx.campaignEntityMerge.update({ where: { id: row.id }, data: { survivorEntityId } });
+    if (row.status === "EXECUTED") revealSurvivor = true;
+  }
+  if (revealSurvivor) {
+    await tx.campaignEntity.update({
+      where: { id: survivorEntityId },
+      data: { visibility: "REVEALED" },
+    });
+  }
+}
+
+// Moves a CampaignCharacterLink/CampaignItemLink from the duplicate to the
+// survivor when only the duplicate carries it — the caller has already
+// rejected the both-linked case, and the item-link/survivor-type mismatch, as
+// a 409 before the transaction opens.
+async function moveSoleLinks(
+  tx: Tx,
+  duplicate: LinkedEntity,
+  survivor: LinkedEntity,
+  duplicateId: string,
+  survivorEntityId: string,
+): Promise<void> {
+  if (duplicate.characterLink && !survivor.characterLink) {
+    await tx.campaignCharacterLink.update({
+      where: { campaignEntityId: duplicateId },
+      data: { campaignEntityId: survivorEntityId },
+    });
+  }
+  if (duplicate.itemLink && !survivor.itemLink) {
+    await tx.campaignItemLink.update({
+      where: { campaignEntityId: duplicateId },
+      data: { campaignEntityId: survivorEntityId },
+    });
+  }
+}
+
+// Reads both targets and confirms they exist in this campaign — the first
+// half of loadAndGuardCombineTargets' guard, split out to keep each check's
+// own complexity small.
+async function fetchCombineTargets(
+  tx: Tx,
+  campaignId: string,
+  duplicateId: string,
+  survivorEntityId: string,
+): Promise<{ duplicate: LinkedEntity; survivor: LinkedEntity }> {
+  const [duplicate, survivor] = await Promise.all([
+    tx.campaignEntity.findUnique({ where: { id: duplicateId }, select: duplicateSurvivorSelect }),
+    tx.campaignEntity.findUnique({ where: { id: survivorEntityId }, select: duplicateSurvivorSelect }),
+  ]);
+  if (
+    !duplicate ||
+    duplicate.campaignId !== campaignId ||
+    !survivor ||
+    survivor.campaignId !== campaignId
+  ) {
+    throw new CombineGuardError(404, "Entity not found");
+  }
+  return { duplicate, survivor };
+}
+
+// Two backed entities are two real things, not a typo (#1942): reject before
+// any write when both sides carry a link of the same kind, or when the
+// survivor's type can't inherit the duplicate's item link — the item
+// lifecycle owns its fronting entity (routes/campaign/campaign-items.ts
+// deletes the linked entity when the item is deleted) and the codex only
+// renders item data for ITEM-typed entities, so moving the link onto a
+// non-ITEM survivor would orphan that contract.
+function assertNoLinkConflicts(duplicate: LinkedEntity, survivor: LinkedEntity): void {
+  if (duplicate.characterLink && survivor.characterLink) {
+    throw new CombineGuardError(409, "Both entities are linked to a character");
+  }
+  if (duplicate.itemLink && survivor.itemLink) {
+    throw new CombineGuardError(409, "Both entities are linked to an item");
+  }
+  if (duplicate.itemLink && !survivor.itemLink && survivor.type !== "ITEM") {
+    throw new CombineGuardError(
+      409,
+      "The survivor must be an ITEM entity to inherit the duplicate's item link",
+    );
+  }
+}
+
+// The duplicate having been PUBLICLY revealed to be someone else (an EXECUTED
+// merge where it's the merged/non-survivor side) is a real fact players may
+// already know; cascade-deleting that row while also silently moving its
+// mentions is not acceptable. A PREPARED row is still secret DM prep, so it
+// keeps the spec'd behavior of dying with the cascade in repointMergeChains.
+async function assertNotPubliclyRevealed(
+  tx: Tx,
+  campaignId: string,
+  duplicateId: string,
+): Promise<void> {
+  const revealedAsMerged = await tx.campaignEntityMerge.findFirst({
+    where: { campaignId, mergedEntityId: duplicateId, status: "EXECUTED" },
+    select: { id: true },
+  });
+  if (revealedAsMerged) {
+    throw new CombineGuardError(
+      409,
+      "This entity is a publicly revealed identity merge — unmerge it before combining",
+    );
+  }
+}
+
+// Every guard combineEntities must hold before it writes anything, run from
+// INSIDE the transaction (not before it opens) so a concurrent combine can't
+// race past them (#1942 TOCTOU fix). Throws CombineGuardError; never returns
+// a result the caller could accidentally treat as success.
+async function loadAndGuardCombineTargets(
+  tx: Tx,
+  campaignId: string,
+  duplicateId: string,
+  survivorEntityId: string,
+): Promise<{ duplicate: LinkedEntity; survivor: LinkedEntity }> {
+  const targets = await fetchCombineTargets(tx, campaignId, duplicateId, survivorEntityId);
+  assertNoLinkConflicts(targets.duplicate, targets.survivor);
+  await assertNotPubliclyRevealed(tx, campaignId, duplicateId);
+  return targets;
+}
+
+// Destructive typo-dedup (#1942), the counterpart to the non-destructive
+// identity merge above: absorbs `duplicateId` into `survivorEntityId` and
+// deletes the duplicate. Survivor's fields always win — nothing is folded
+// from the duplicate (decided 2026-08-18). Cross-type combines are allowed.
+// No audit row and no undo (also decided on #1942): journal writes are
+// already deliberately plain-REST with no audit log (routes/session/journal.ts)
+// — this follows that precedent, not an absence of any event model elsewhere
+// (campaign-item-award.ts logs undoable CharacterEvents; the merge ops above
+// persist the CampaignEntityMerge row itself). The client-side confirm dialog
+// is the gate here.
+export async function combineEntities(
+  db: PrismaClient,
+  campaignId: string,
+  duplicateId: string,
+  survivorEntityId: string,
+): Promise<CombineResult> {
+  if (duplicateId === survivorEntityId) {
+    return { ok: false, status: 400, error: "An entity cannot be combined with itself" };
+  }
+
+  let duplicatePortraitKey: string | null = null;
+  try {
+    const entity = await db.$transaction(
+      async (tx) => {
+        const { duplicate, survivor } = await loadAndGuardCombineTargets(
+          tx,
+          campaignId,
+          duplicateId,
+          survivorEntityId,
+        );
+        duplicatePortraitKey = duplicate.portraitKey;
+
+        await rewriteMentionTokens(tx, campaignId, duplicateId, survivorEntityId);
+        await repointMergeChains(tx, campaignId, duplicateId, survivorEntityId);
+        await moveSoleLinks(tx, duplicate, survivor, duplicateId, survivorEntityId);
+        await tx.campaignEntity.delete({ where: { id: duplicateId } });
+
+        return tx.campaignEntity.findUniqueOrThrow({
+          where: { id: survivorEntityId },
+          include: { characterLink: { select: { characterId: true } } },
+        });
+      },
+      // Generous timeout: the rewrite is now O(1) queries, but a large
+      // campaign's journal table still means real row-lock contention on a
+      // busy server, and this is a destructive op we don't want timing out
+      // partway through.
+      { timeout: 30_000 },
+    );
+
+    await deletePortraitBlobBestEffort(duplicatePortraitKey);
+    return { ok: true, entity };
+  } catch (err) {
+    if (err instanceof CombineGuardError) {
+      return { ok: false, status: err.status, error: err.message };
+    }
+    // A concurrent combine/link change lost the race the in-transaction
+    // guards otherwise close (#1942 TOCTOU fix): P2025 means a row the
+    // transaction expected (e.g. a link) vanished underneath it; P2002 means
+    // a unique constraint (e.g. a link's campaignEntityId) collided with a
+    // concurrent write. Both are the caller's problem, not a 500.
+    if (err instanceof Prisma.PrismaClientKnownRequestError) {
+      if (err.code === "P2025") return { ok: false, status: 404, error: "Entity not found" };
+      if (err.code === "P2002") {
+        return { ok: false, status: 409, error: "Combine conflicts with a concurrent change" };
+      }
+    }
+    throw err;
+  }
 }
 
 type ListedEntity = { id: string; notes: string | null };
