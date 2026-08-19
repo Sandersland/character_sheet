@@ -6,6 +6,7 @@ import {
   combineMentionSummary,
   combineRedactedMentionWarning,
   duplicateHasPreparedMerge,
+  losersOf,
 } from "@/lib/combinePreview";
 import type { CampaignEntity, CampaignEntityMerge } from "@/types/character";
 
@@ -24,6 +25,13 @@ function entity(overrides: Partial<CampaignEntity> = {}): CampaignEntity {
   };
 }
 
+describe("losersOf", () => {
+  it("returns every entity except the chosen survivor", () => {
+    const entities = [entity({ id: "e1" }), entity({ id: "e2" }), entity({ id: "e3" })];
+    expect(losersOf(entities, "e2").map((e) => e.id)).toEqual(["e1", "e3"]);
+  });
+});
+
 function merge(overrides: Partial<CampaignEntityMerge> = {}): CampaignEntityMerge {
   return {
     id: "m1",
@@ -41,46 +49,46 @@ function merge(overrides: Partial<CampaignEntityMerge> = {}): CampaignEntityMerg
 describe("combineDiscardedItems", () => {
   const survivor = entity({ id: "surv-1", name: "Lili", type: "NPC" });
 
-  it("is empty when the duplicate has no discardable content", () => {
-    expect(combineDiscardedItems(entity(), survivor)).toEqual([]);
+  it("is empty when the sole loser has no discardable content", () => {
+    expect(combineDiscardedItems([entity()], survivor)).toEqual([]);
   });
 
-  it("lists notes when present", () => {
-    expect(combineDiscardedItems(entity({ notes: "A sellsword." }), survivor)).toEqual([
+  it("lists notes when present, naming no one — the dialog already names the sole loser", () => {
+    expect(combineDiscardedItems([entity({ notes: "A sellsword." })], survivor)).toEqual([
       { key: "notes", label: "Description/notes" },
     ]);
   });
 
   it("ignores whitespace-only notes", () => {
-    expect(combineDiscardedItems(entity({ notes: "   " }), survivor)).toEqual([]);
+    expect(combineDiscardedItems([entity({ notes: "   " })], survivor)).toEqual([]);
   });
 
-  it("lists aliases with their values", () => {
-    expect(combineDiscardedItems(entity({ aliases: ["Lil", "Lilith"] }), survivor)).toEqual([
+  it("lists a sole loser's aliases with their values", () => {
+    expect(combineDiscardedItems([entity({ aliases: ["Lil", "Lilith"] })], survivor)).toEqual([
       { key: "aliases", label: "Aliases — Lil, Lilith" },
     ]);
   });
 
   it("lists a portrait", () => {
-    expect(combineDiscardedItems(entity({ portraitUrl: "/portrait.png" }), survivor)).toEqual([
+    expect(combineDiscardedItems([entity({ portraitUrl: "/portrait.png" })], survivor)).toEqual([
       { key: "portrait", label: "Portrait" },
     ]);
   });
 
   it("lists a differing type but not a matching one", () => {
-    expect(combineDiscardedItems(entity({ type: "LOCATION" }), survivor)).toEqual([
+    expect(combineDiscardedItems([entity({ type: "LOCATION" })], survivor)).toEqual([
       { key: "type", label: "Type — currently Location" },
     ]);
-    expect(combineDiscardedItems(entity({ type: "NPC" }), survivor)).toEqual([]);
+    expect(combineDiscardedItems([entity({ type: "NPC" })], survivor)).toEqual([]);
   });
 
   it("lists hidden visibility", () => {
-    expect(combineDiscardedItems(entity({ visibility: "HIDDEN" }), survivor)).toEqual([
+    expect(combineDiscardedItems([entity({ visibility: "HIDDEN" })], survivor)).toEqual([
       { key: "visibility", label: "Hidden visibility" },
     ]);
   });
 
-  it("lists every applicable item together, in order", () => {
+  it("lists every applicable item together, in order, for a single loser", () => {
     const loaded = entity({
       notes: "A sellsword.",
       aliases: ["Lil"],
@@ -88,13 +96,51 @@ describe("combineDiscardedItems", () => {
       type: "LOCATION",
       visibility: "HIDDEN",
     });
-    expect(combineDiscardedItems(loaded, survivor).map((i) => i.key)).toEqual([
+    expect(combineDiscardedItems([loaded], survivor).map((i) => i.key)).toEqual([
       "notes",
       "aliases",
       "portrait",
       "type",
       "visibility",
     ]);
+  });
+
+  it("names WHICH losers carry each category once there's more than one — no single subject left to imply it", () => {
+    const losers = [
+      entity({ id: "l1", name: "Lil", visibility: "HIDDEN" }),
+      entity({ id: "l2", name: "lili", notes: "A hedge witch." }),
+      entity({ id: "l3", name: "Lilith" }),
+    ];
+    expect(combineDiscardedItems(losers, survivor)).toEqual([
+      { key: "notes", label: "Descriptions — lili" },
+      { key: "visibility", label: "Hidden visibility — Lil" },
+    ]);
+  });
+
+  it("names every affected loser for a category, not just one", () => {
+    const losers = [
+      entity({ id: "l1", name: "Lil", portraitUrl: "/a.png" }),
+      entity({ id: "l2", name: "lili", portraitUrl: "/b.png" }),
+    ];
+    expect(combineDiscardedItems(losers, survivor)).toEqual([
+      { key: "portrait", label: "Portraits — Lil, lili" },
+    ]);
+  });
+
+  it("names losers with a differing type, N-way", () => {
+    const losers = [
+      entity({ id: "l1", name: "Lil", type: "LOCATION" }),
+      entity({ id: "l2", name: "lili", type: "NPC" }),
+    ];
+    expect(combineDiscardedItems(losers, survivor)).toEqual([{ key: "type", label: "Type — Lil" }]);
+  });
+
+  it("names losers with aliases, N-way, without spelling out every value", () => {
+    const losers = [
+      entity({ id: "l1", name: "Lil", aliases: ["The Fox"] }),
+      entity({ id: "l2", name: "lili", aliases: [] }),
+    ];
+    expect(combineDiscardedItems(losers, survivor)).toEqual([{ key: "aliases", label: "Aliases — Lil" }]);
   });
 });
 

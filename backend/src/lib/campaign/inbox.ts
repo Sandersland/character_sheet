@@ -100,7 +100,8 @@ function toDuplicateRow(
 // unrelated near-duplicate (#1945 review); removing it from the input
 // entirely closes that gap at any chain depth (A->B->C all drop, since each
 // is a mergedEntityId of some EXECUTED edge). needs-chronicling needs no
-// equivalent filter: its own mentionCount is already 0 post-attribution.
+// equivalent filter: its own mentionCount is already 0 post-attribution —
+// see buildNeedsChroniclingRow below for why that's safe to rely on.
 function excludeExecutedMergedAway<E extends { id: string }>(
   entities: E[],
   merges: { mergedEntityId: string; status: string }[],
@@ -120,6 +121,17 @@ function buildDuplicateRows(
   return clusters.map((ids) => toDuplicateRow(campaign, ids, byId));
 }
 
+// Unlike buildDuplicateRows, this is handed `enriched` — every entity,
+// including an EXECUTED-merged-away one — with no excludeExecutedMergedAway
+// call of its own. That's safe only because of an ORDERING invariant this
+// function doesn't itself enforce: buildCampaignInboxRows always runs
+// foldMentionStats(refs, survivorOf) BEFORE enrichEntities, and
+// foldMentionStats redirects every ref of a merged-away entity onto its
+// EXECUTED survivor (buildSurvivorMap) rather than leaving it stranded on
+// the old id. So a merged-away entity's own `mentionCount` here is always 0,
+// and the `e.mentionCount > 0` filter below excludes it for free. If
+// foldMentionStats ever stopped redirecting, or callers started building
+// `enriched` some other way, this filter would stop being a safety net too.
 function buildNeedsChroniclingRow(
   campaign: { id: string; name: string },
   entities: EnrichedEntity[],

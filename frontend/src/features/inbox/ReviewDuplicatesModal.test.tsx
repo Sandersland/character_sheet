@@ -47,6 +47,10 @@ const FULL_ENTITIES: CampaignEntity[] = [
     id: "e1",
     name: "Lil",
     visibility: "HIDDEN",
+    // combineDiscardedItems' "notes" category reads notes directly
+    // (hasDescription(notes) === notes trimmed non-empty on the backend, the
+    // same invariant) — real text here, not just a stats flag.
+    notes: "A hedge witch.",
     stats: { mentionCount: 1, firstMentioned: null, lastMentioned: null, chroniclers: [], hasDescription: true },
   }),
   fullEntity({

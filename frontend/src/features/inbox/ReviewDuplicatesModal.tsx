@@ -1,16 +1,17 @@
 import { useMemo, useState } from "react";
 
 import BottomSheet from "@/components/ui/BottomSheet";
-import DiscardedBox from "@/features/inbox/DiscardedBox";
+import { DiscardedItemsBox } from "@/components/ui/GoldWarningBox";
 import ReviewFooter from "@/features/inbox/ReviewFooter";
 import SurvivorPicker from "@/features/inbox/SurvivorPicker";
 import { useCombineCluster } from "@/features/inbox/useCombineCluster";
 import { useReviewClusterEntities } from "@/features/inbox/useReviewClusterEntities";
+import { combineDiscardedItems, losersOf, type CombineDiscardedItem } from "@/lib/combinePreview";
 import { errorMessage } from "@/lib/errorMessage";
 import {
-  combineDiscardedItems,
   combineSummaryLine,
   hiddenSurvivorRedactsRevealedMentions,
+  preparedMergeDiscardedItem,
 } from "@/lib/inboxCombinePreview";
 import type { InboxDuplicateClusterRow } from "@/types/character";
 
@@ -55,7 +56,7 @@ export default function ReviewDuplicatesModal({
   const previewReady = !isLoading && clusterEntities.length === row.entities.length;
 
   const loserIds = useMemo(
-    () => row.entities.filter((e) => e.id !== survivorId).map((e) => e.id),
+    () => losersOf(row.entities, survivorId).map((e) => e.id),
     [row.entities, survivorId],
   );
 
@@ -79,13 +80,27 @@ export default function ReviewDuplicatesModal({
     () => hiddenSurvivorRedactsRevealedMentions(row.entities, survivorId),
     [row.entities, survivorId],
   );
-  const discardedItems = useMemo(
-    () => [
-      ...(redactionWarning ? [redactionWarning] : []),
-      ...(previewReady ? combineDiscardedItems(clusterEntities, survivorId, merges) : []),
-    ],
-    [redactionWarning, previewReady, clusterEntities, survivorId, merges],
+  // The full-entity/merge fetch's own losers/survivor, used by both
+  // combineDiscardedItems (the same "what's lost" categories the entity-
+  // detail Combine dialog shows — #1949 was under-warning on aliases,
+  // portraits, and a differing type) and preparedMergeDiscardedItem below.
+  const clusterLosers = useMemo(() => losersOf(clusterEntities, survivorId), [clusterEntities, survivorId]);
+  const survivorEntity = useMemo(
+    () => clusterEntities.find((e) => e.id === survivorId),
+    [clusterEntities, survivorId],
   );
+
+  const discardedItems = useMemo((): CombineDiscardedItem[] => {
+    if (!previewReady || !survivorEntity) {
+      return redactionWarning ? [redactionWarning] : [];
+    }
+    const mergeItem = preparedMergeDiscardedItem(clusterLosers, merges);
+    return [
+      ...(redactionWarning ? [redactionWarning] : []),
+      ...combineDiscardedItems(clusterLosers, survivorEntity),
+      ...(mergeItem ? [mergeItem] : []),
+    ];
+  }, [redactionWarning, previewReady, survivorEntity, clusterLosers, merges]);
 
   return (
     <BottomSheet title="Review duplicates" onClose={onClose}>
@@ -104,7 +119,7 @@ export default function ReviewDuplicatesModal({
 
         <p className="text-sm font-semibold text-parchment-800">{summaryLine}</p>
 
-        <DiscardedBox items={discardedItems} />
+        <DiscardedItemsBox heading="Discarded" items={discardedItems} />
 
         {combineMutation.isError && (
           <p className="text-xs font-semibold text-garnet-700">

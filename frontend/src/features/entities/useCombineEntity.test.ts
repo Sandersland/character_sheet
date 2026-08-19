@@ -3,7 +3,7 @@ import { renderHook, act, waitFor } from "@testing-library/react";
 
 import { combineEntities } from "@/api/client";
 import { getQueryClient } from "@/api/queryClient";
-import { campaignKeys } from "@/api/queryKeys";
+import { campaignKeys, inboxKeys, sessionKeys } from "@/api/queryKeys";
 import { useCombineEntity } from "@/features/entities/useCombineEntity";
 import type { CampaignEntity } from "@/types/character";
 
@@ -41,8 +41,10 @@ describe("useCombineEntity (#1943)", () => {
     expect(vi.mocked(combineEntities)).toHaveBeenCalledWith(CAMPAIGN_ID, "surv-1", ["dup-1"]);
   });
 
-  it("invalidates the entities and merges caches on success", async () => {
+  it("invalidates entities, merges, the app-level inbox, and the campaign's chronicle on success (#1949: previously left the inbox bell and chronicle stale)", async () => {
     vi.mocked(combineEntities).mockResolvedValue(survivor);
+    getQueryClient().setQueryData(inboxKeys.all, []);
+    getQueryClient().setQueryData(sessionKeys.chronicle(CAMPAIGN_ID, "char-1"), { arcs: [], sessions: [] });
     const { result } = renderHook(() => useCombineEntity(CAMPAIGN_ID));
 
     act(() => {
@@ -55,6 +57,10 @@ describe("useCombineEntity (#1943)", () => {
     ).toBe(true);
     expect(
       getQueryClient().getQueryState(campaignKeys.merges(CAMPAIGN_ID))?.isInvalidated,
+    ).toBe(true);
+    expect(getQueryClient().getQueryState(inboxKeys.all)?.isInvalidated).toBe(true);
+    expect(
+      getQueryClient().getQueryState(sessionKeys.chronicle(CAMPAIGN_ID, "char-1"))?.isInvalidated,
     ).toBe(true);
   });
 

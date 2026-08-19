@@ -1,7 +1,13 @@
-// Pure preview logic for the "Combine into…" confirm dialog (#1943), the
-// entity-detail sibling of identity merges: absorbs a mistaken duplicate into
-// its survivor rather than recording a secret "revealed to be" link. Every
-// number here comes off the entity already on the wire — no new endpoint.
+// Pure preview logic for "what is lost by a combine" (#1943/#1946/#1949):
+// the single source of truth both the entity-detail Combine dialog
+// (CombineConfirmDialog, one duplicate) and the inbox's Review-duplicates
+// modal (ReviewDuplicatesModal, an N-way cluster) render from. `losers` is
+// every entity being absorbed into `survivor` and deleted — a pair-combine
+// passes a 1-length array. Genuinely N-way-only preview pieces (the live
+// summary line and its private-notes hedge, the redacted-mention warning,
+// the prepared-merge item's labeling) stay in inboxCombinePreview.ts — their
+// wording and inputs differ enough from the single-duplicate dialog that
+// folding them in here would just move the fork, not remove it.
 
 import { ENTITY_TYPE_LABELS } from "@/lib/mentions";
 import type { CampaignEntity, CampaignEntityMerge } from "@/types/character";
@@ -11,25 +17,74 @@ export interface CombineDiscardedItem {
   label: string;
 }
 
-// What's lost when `duplicate` is combined into `survivor`: only the fields
-// the duplicate actually carries — an empty list means the gold warning box
-// in the dialog doesn't render at all.
+export function losersOf<T extends { id: string }>(entities: T[], survivorId: string): T[] {
+  return entities.filter((e) => e.id !== survivorId);
+}
+
+// What's lost when every entity in `losers` is combined into `survivor`:
+// only the categories some loser actually carries — an empty list means the
+// gold warning box doesn't render at all. A single loser's label states its
+// own value directly (the dialog around it already names that one entity,
+// e.g. "Discarded with lili"); more than one loser's label names WHICH
+// losers carry the category instead, since there's no single subject left
+// to imply it.
 export function combineDiscardedItems(
-  duplicate: CampaignEntity,
+  losers: CampaignEntity[],
   survivor: CampaignEntity,
 ): CombineDiscardedItem[] {
+  // Whether there's a single subject the surrounding dialog already names
+  // (e.g. "Discarded with lili") — NOT whether a given category happens to
+  // affect only one of several losers. Once there's more than one loser, no
+  // label can drop names: "Type — currently Location" would be ambiguous
+  // about which loser it describes even if only one of three has a
+  // differing type.
+  const solo = losers.length === 1;
   const items: CombineDiscardedItem[] = [];
-  if (duplicate.notes?.trim()) items.push({ key: "notes", label: "Description/notes" });
-  if (duplicate.aliases.length > 0) {
-    items.push({ key: "aliases", label: `Aliases — ${duplicate.aliases.join(", ")}` });
+
+  const described = losers.filter((e) => e.notes?.trim());
+  if (described.length > 0) {
+    items.push({
+      key: "notes",
+      label: solo ? "Description/notes" : `Descriptions — ${described.map((e) => e.name).join(", ")}`,
+    });
   }
-  if (duplicate.portraitUrl) items.push({ key: "portrait", label: "Portrait" });
-  if (duplicate.type !== survivor.type) {
-    items.push({ key: "type", label: `Type — currently ${ENTITY_TYPE_LABELS[duplicate.type]}` });
+
+  const aliased = losers.filter((e) => e.aliases.length > 0);
+  if (aliased.length > 0) {
+    items.push({
+      key: "aliases",
+      label: solo
+        ? `Aliases — ${aliased[0]!.aliases.join(", ")}`
+        : `Aliases — ${aliased.map((e) => e.name).join(", ")}`,
+    });
   }
-  if (duplicate.visibility === "HIDDEN") {
-    items.push({ key: "visibility", label: "Hidden visibility" });
+
+  const portrayed = losers.filter((e) => e.portraitUrl);
+  if (portrayed.length > 0) {
+    items.push({
+      key: "portrait",
+      label: solo ? "Portrait" : `Portraits — ${portrayed.map((e) => e.name).join(", ")}`,
+    });
   }
+
+  const retyped = losers.filter((e) => e.type !== survivor.type);
+  if (retyped.length > 0) {
+    items.push({
+      key: "type",
+      label: solo
+        ? `Type — currently ${ENTITY_TYPE_LABELS[retyped[0]!.type]}`
+        : `Type — ${retyped.map((e) => e.name).join(", ")}`,
+    });
+  }
+
+  const hidden = losers.filter((e) => e.visibility === "HIDDEN");
+  if (hidden.length > 0) {
+    items.push({
+      key: "visibility",
+      label: solo ? "Hidden visibility" : `Hidden visibility — ${hidden.map((e) => e.name).join(", ")}`,
+    });
+  }
+
   return items;
 }
 
