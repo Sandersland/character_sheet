@@ -185,8 +185,8 @@ export async function unmergeEntityMerge(campaignId: string, mergeId: string): P
 
 // Destructive typo-dedup (#1942): absorbs `entityId` (the duplicate) into
 // `survivorEntityId` and deletes it. Owner-only server-side; no undo — the
-// confirm dialog calling this is the gate.
-// fallow-ignore-next-line unused-export -- wired up by the combine UI landing in #1943, not this backend-scoped issue
+// confirm dialog calling this is the gate. Consumed by the inbox's Review-
+// duplicates modal (#1946), one call per absorbed entity in a cluster.
 export async function combineEntities(
   campaignId: string,
   entityId: string,

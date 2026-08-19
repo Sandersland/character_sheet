@@ -1,0 +1,72 @@
+// Pure preview logic for the Review-duplicates modal (#1946): the N-way
+// sibling of #1943's combinePreview.ts pair-combine preview. A cluster
+// combines by absorbing every non-survivor entity into the chosen survivor —
+// one #1942 call per loser — so every number here is computed over "the
+// losers" rather than a single duplicate.
+
+import type { CampaignEntity, CampaignEntityMerge } from "@/types/character";
+
+export function losersOf(entities: CampaignEntity[], survivorId: string): CampaignEntity[] {
+  return entities.filter((e) => e.id !== survivorId);
+}
+
+// Placeholder summary line while the full-entity fetch (mention totals) is
+// still loading: just the row count, which the inbox row's own summary shape
+// already carries.
+export function pendingRowsSummary(remainingCount: number): string {
+  return `${remainingCount} ${remainingCount === 1 ? "row" : "rows"} deleted`;
+}
+
+// "1 mention moves to Lili · 2 rows deleted" — the live summary line. Mention
+// totals come from `stats.mentionCount` (absent when the caller didn't fetch
+// with `includeStats`, treated as 0).
+export function combineSummaryLine(entities: CampaignEntity[], survivorId: string): string {
+  const survivor = entities.find((e) => e.id === survivorId);
+  const losers = losersOf(entities, survivorId);
+  const mentionsMoving = losers.reduce((sum, e) => sum + (e.stats?.mentionCount ?? 0), 0);
+  const mentionWord = mentionsMoving === 1 ? "mention" : "mentions";
+  const mentionVerb = mentionsMoving === 1 ? "moves" : "move";
+  const rowWord = losers.length === 1 ? "row" : "rows";
+  return `${mentionsMoving} ${mentionWord} ${mentionVerb} to ${survivor?.name ?? "?"} · ${losers.length} ${rowWord} deleted`;
+}
+
+export interface InboxDiscardedItem {
+  key: "visibility" | "notes" | "merge";
+  label: string;
+}
+
+// What's lost when every non-survivor entity in the cluster is combined away:
+// only the categories some loser actually carries, each naming which losers —
+// an empty list means the gold warning box in the modal doesn't render at all.
+export function combineDiscardedItems(
+  entities: CampaignEntity[],
+  survivorId: string,
+  merges: CampaignEntityMerge[],
+): InboxDiscardedItem[] {
+  const losers = losersOf(entities, survivorId);
+  const items: InboxDiscardedItem[] = [];
+
+  const hidden = losers.filter((e) => e.visibility === "HIDDEN");
+  if (hidden.length > 0) {
+    items.push({ key: "visibility", label: `Hidden visibility — ${hidden.map((e) => e.name).join(", ")}` });
+  }
+
+  const described = losers.filter((e) => e.stats?.hasDescription);
+  if (described.length > 0) {
+    items.push({ key: "notes", label: `Descriptions — ${described.map((e) => e.name).join(", ")}` });
+  }
+
+  const preparedMerge = losers.filter((loser) =>
+    merges.some(
+      (m) => m.status === "PREPARED" && (m.mergedEntityId === loser.id || m.survivorEntityId === loser.id),
+    ),
+  );
+  if (preparedMerge.length > 0) {
+    items.push({
+      key: "merge",
+      label: `Prepared identity merges — ${preparedMerge.map((e) => e.name).join(", ")}`,
+    });
+  }
+
+  return items;
+}

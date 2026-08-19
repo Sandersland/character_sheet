@@ -8,9 +8,11 @@ vi.mock("@/api/client", () => ({
   logout: vi.fn(),
   setUnauthorizedHandler: vi.fn(),
   fetchAuthProviders: vi.fn(),
+  // AppHeader mounts InboxBell (#1946), which queries the inbox on every render.
+  fetchInbox: vi.fn(),
 }));
 
-import { fetchMe, logout as clientLogout, fetchAuthProviders } from "@/api/client";
+import { fetchMe, logout as clientLogout, fetchAuthProviders, fetchInbox } from "@/api/client";
 import { AuthProvider } from "@/features/auth/AuthProvider";
 import AuthGate from "@/features/auth/AuthGate";
 import AppHeader from "@/features/auth/AppHeader";
@@ -38,6 +40,7 @@ describe("AuthGate + AppHeader", () => {
     vi.mocked(fetchMe).mockReset();
     vi.mocked(clientLogout).mockReset();
     vi.mocked(fetchAuthProviders).mockReset().mockResolvedValue([]);
+    vi.mocked(fetchInbox).mockReset().mockResolvedValue([]);
   });
 
   it("hides children while loading, then reveals them once authenticated", async () => {
