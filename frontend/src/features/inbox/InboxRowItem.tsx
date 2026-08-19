@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 
 import { Copy, ScrollText } from "@/components/ui/icons";
+import { formatRelativeDay } from "@/lib/formatJournalDate";
 import { inboxRowMessage } from "@/lib/inboxMessages";
 import type { InboxDuplicateClusterRow, InboxRow } from "@/types/character";
 
@@ -23,12 +24,10 @@ const mobileDisregard =
 
 // One inbox row (#1946): a small stroke icon (Copy for a duplicate cluster,
 // ScrollText for needs-chronicling — reused from the session log, both read
-// as "an entry wants your attention"), the row's message, and its actions.
-//
-// No relative-time meta here: GET /api/inbox derives a `signalAt` internally
-// for sort order (lib/campaign/inbox.ts) but doesn't serialize it onto the
-// wire InboxRow — there's nothing to format. Needs a backend follow-up
-// (surface signalAt) before this row can carry one.
+// as "an entry wants your attention"), the row's message with a trailing
+// relative-time stamp off signalAt (reusing formatRelativeDay — journal's
+// own "today"/"yesterday"/"N days ago" bucketing, not a bespoke formatter),
+// and its actions.
 export default function InboxRowItem({
   row,
   mobile,
@@ -47,9 +46,12 @@ export default function InboxRowItem({
 
   return (
     <li className="flex flex-col gap-2 px-3 py-3">
-      <div className="flex items-start gap-2">
-        <Icon aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-parchment-500" />
-        <p className="text-sm text-parchment-800">{inboxRowMessage(row)}</p>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start gap-2">
+          <Icon aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-parchment-500" />
+          <p className="text-sm text-parchment-800">{inboxRowMessage(row)}</p>
+        </div>
+        <span className="shrink-0 pl-2 text-[11px] text-parchment-400">{formatRelativeDay(row.signalAt)}</span>
       </div>
       <div className={mobile ? "flex gap-2" : "flex items-center gap-4 pl-6"}>
         {row.kind === "DUPLICATE_CLUSTER" ? (

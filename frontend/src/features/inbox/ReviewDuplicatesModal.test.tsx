@@ -25,6 +25,7 @@ const ROW: InboxDuplicateClusterRow = {
     { id: "e3", name: "Lili", type: "NPC", visibility: "REVEALED", mentionCount: 3 },
   ],
   defaultSurvivorId: "e3",
+  signalAt: "2026-08-18T12:00:00.000Z",
 };
 
 function fullEntity(over: Partial<CampaignEntity> & { id: string }): CampaignEntity {

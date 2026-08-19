@@ -23,7 +23,14 @@ describe("useInbox", () => {
 
   it("returns the fetched rows on success", async () => {
     const rows: InboxRow[] = [
-      { kind: "NEEDS_CHRONICLING", campaignId: "camp-1", campaignName: "Strahd", signature: "camp-1", count: 2 },
+      {
+        kind: "NEEDS_CHRONICLING",
+        campaignId: "camp-1",
+        campaignName: "Strahd",
+        signature: "camp-1",
+        count: 2,
+        signalAt: "2026-08-18T12:00:00.000Z",
+      },
     ];
     fetchInbox.mockResolvedValue(rows);
     const { result } = renderHook(() => useInbox());

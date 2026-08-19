@@ -12,7 +12,14 @@ vi.mock("@/api/client", () => ({
 }));
 
 const ROWS: InboxRow[] = [
-  { kind: "NEEDS_CHRONICLING", campaignId: "camp-1", campaignName: "Strahd", signature: "camp-1", count: 2 },
+  {
+    kind: "NEEDS_CHRONICLING",
+    campaignId: "camp-1",
+    campaignName: "Strahd",
+    signature: "camp-1",
+    count: 2,
+    signalAt: "2026-08-18T12:00:00.000Z",
+  },
   {
     kind: "DUPLICATE_CLUSTER",
     campaignId: "camp-1",
@@ -20,6 +27,7 @@ const ROWS: InboxRow[] = [
     signature: "sig-dupe",
     entities: [],
     defaultSurvivorId: "e1",
+    signalAt: "2026-08-17T12:00:00.000Z",
   },
 ];
 

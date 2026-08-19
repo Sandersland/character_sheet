@@ -15,6 +15,7 @@ function duplicateRow(overrides: Partial<InboxDuplicateClusterRow> = {}): InboxD
       { id: "e3", name: "Lili", type: "NPC", visibility: "REVEALED", mentionCount: 3 },
     ],
     defaultSurvivorId: "e3",
+    signalAt: "2026-08-18T12:00:00.000Z",
     ...overrides,
   };
 }
@@ -26,6 +27,7 @@ function chroniclingRow(overrides: Partial<InboxNeedsChroniclingRow> = {}): Inbo
     campaignName: "Curse of Strahd",
     signature: "camp-1",
     count: 4,
+    signalAt: "2026-08-18T12:00:00.000Z",
     ...overrides,
   };
 }

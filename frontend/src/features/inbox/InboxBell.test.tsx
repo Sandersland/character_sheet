@@ -19,6 +19,15 @@ vi.mock("@/api/client", () => ({
   combineEntities: (...args: unknown[]) => combineEntities(...args),
 }));
 
+// Freshly "now" (not a fixed fixture date): formatRelativeDay's calendar-day
+// diff against Date.now() lands on "today" for any signalAt this close to
+// test execution, without pinning down system time and risking a userEvent +
+// fake-timer interaction (see CampaignInviteLink.test.tsx's own note on that).
+// Exact bucket wording ("yesterday", "N days ago") is formatRelativeDay's own
+// unit-tested territory (lib/formatJournalDate.test.ts) — this file only
+// checks that signalAt actually reaches the row.
+const NOW_ISO = new Date().toISOString();
+
 const DUPLICATE_ROW: InboxRow = {
   kind: "DUPLICATE_CLUSTER",
   campaignId: "camp-1",
@@ -30,6 +39,7 @@ const DUPLICATE_ROW: InboxRow = {
     { id: "e3", name: "Lili", type: "NPC", visibility: "REVEALED", mentionCount: 3 },
   ],
   defaultSurvivorId: "e3",
+  signalAt: NOW_ISO,
 };
 
 const CHRONICLING_ROW: InboxRow = {
@@ -38,6 +48,7 @@ const CHRONICLING_ROW: InboxRow = {
   campaignName: "Curse of Strahd",
   signature: "camp-1",
   count: 4,
+  signalAt: NOW_ISO,
 };
 
 function renderBell() {
@@ -107,6 +118,8 @@ describe("InboxBell", () => {
     expect(
       within(panel).getByText("4 entries have been mentioned but have no description yet."),
     ).toBeInTheDocument();
+    // Trailing relative-time meta off signalAt (#1946 follow-up).
+    expect(within(panel).getAllByText("today")).toHaveLength(2);
   });
 
   it("opens the Review-duplicates modal from a row and closes the popover", async () => {
