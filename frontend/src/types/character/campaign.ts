@@ -255,6 +255,8 @@ export interface InboxDuplicateClusterRow {
   entities: InboxDuplicateEntity[];
   /** Most-mentioned entity, oldest as tiebreak — the pre-selected keeper in the combine UI. */
   defaultSurvivorId: string;
+  /** ISO timestamp this row was sorted by (#1946: relative-time meta for the UI). */
+  signalAt: string;
 }
 
 export interface InboxNeedsChroniclingRow {
@@ -264,6 +266,8 @@ export interface InboxNeedsChroniclingRow {
   signature: string;
   /** Entities with >=1 mention and no description in this campaign. */
   count: number;
+  /** ISO timestamp this row was sorted by (#1946: relative-time meta for the UI). */
+  signalAt: string;
 }
 
 export type InboxRow = InboxDuplicateClusterRow | InboxNeedsChroniclingRow;
