@@ -68,11 +68,18 @@ describe("entity combine-duplicates (#1942)", () => {
     return entry.id;
   }
 
-  async function combine(entityId: string, survivorEntityId: string, cookie = cookieOwner) {
+  // The atomic batch endpoint (#1942 round 3): POST /entities/combine with
+  // { survivorEntityId, loserEntityIds }. `combine` is the 1-length-array
+  // convenience wrapper every pre-existing single-duplicate test still uses.
+  async function combineBatch(loserEntityIds: string[], survivorEntityId: string, cookie = cookieOwner) {
     return supertest(app)
-      .post(`/api/campaigns/${campaignId}/entities/${entityId}/combine`)
+      .post(`/api/campaigns/${campaignId}/entities/combine`)
       .set("Cookie", cookie)
-      .send({ survivorEntityId });
+      .send({ survivorEntityId, loserEntityIds });
+  }
+
+  async function combine(entityId: string, survivorEntityId: string, cookie = cookieOwner) {
+    return combineBatch([entityId], survivorEntityId, cookie);
   }
 
   beforeAll(async () => {
@@ -116,6 +123,19 @@ describe("entity combine-duplicates (#1942)", () => {
   it("400s a self-combine", async () => {
     const solo = await makeEntity(campaignId, "Solo");
     const res = await combine(solo, solo);
+    expect(res.status).toBe(400);
+  });
+
+  it("400s an empty loserEntityIds array", async () => {
+    const surv = await makeEntity(campaignId, "Empty Batch Survivor");
+    const res = await combineBatch([], surv);
+    expect(res.status).toBe(400);
+  });
+
+  it("400s loserEntityIds containing a duplicate id", async () => {
+    const dup = await makeEntity(campaignId, "lili Dup Ids");
+    const surv = await makeEntity(campaignId, "Lili Dup Ids Survivor");
+    const res = await combineBatch([dup, dup], surv);
     expect(res.status).toBe(400);
   });
 
@@ -286,6 +306,40 @@ describe("entity combine-duplicates (#1942)", () => {
     const postRefs = await prisma.journalEntryRef.findMany({ where: { entryId } });
     expect(postRefs.map((r) => r.entityId)).toEqual([surv]);
     expect(postRefs.some((r) => r.entityId === hidden)).toBe(false);
+  });
+
+  it("rewrites the body AND moves the ref for an entry authored by a character who has since left the campaign", async () => {
+    await prisma.character.deleteMany({ where: { id: "combine-leaver-char" } });
+    await createTestCharacter(OWNER, { id: "combine-leaver-char", campaignId });
+
+    const dup = await makeEntity(campaignId, "lili Leaver");
+    const surv = await makeEntity(campaignId, "Lili Leaver");
+
+    const entryId = await seedEntry({
+      characterId: "combine-leaver-char",
+      body: `@[${dup}] before I left.`,
+      entityIds: [dup],
+    });
+
+    // The character leaves the campaign (campaignId nulled). A prior version
+    // scoped the body rewrite by the AUTHOR's current character.campaignId —
+    // this entry's join would then miss it while the ref move (unscoped,
+    // keyed only on entityId) still repointed the ref, leaving a dangling
+    // @[dupId] token behind a moved ref. The fix scopes by the token itself
+    // (duplicateId is a globally-unique CampaignEntity id), so leaving the
+    // campaign can't desync body from ref.
+    await prisma.character.update({ where: { id: "combine-leaver-char" }, data: { campaignId: null } });
+
+    const res = await combine(dup, surv);
+    expect(res.status).toBe(200);
+
+    const after = await prisma.journalEntry.findUniqueOrThrow({ where: { id: entryId } });
+    expect(after.body).toBe(`@[${surv}] before I left.`);
+
+    const refs = await prisma.journalEntryRef.findMany({ where: { entryId } });
+    expect(refs.map((r) => r.entityId)).toEqual([surv]);
+
+    await prisma.character.deleteMany({ where: { id: "combine-leaver-char" } });
   });
 
   it("re-points a merge chain through the duplicate as survivor (A -> dup, dup absorbed into S) into A -> S", async () => {
@@ -706,6 +760,149 @@ describe("entity combine-duplicates (#1942)", () => {
     expect(gone).toBeNull();
     const danglingRefs = await prisma.journalEntryRef.findMany({ where: { entityId: dup } });
     expect(danglingRefs).toHaveLength(0);
+  });
+
+  describe("atomic batch combine (#1942)", () => {
+    it("combines multiple duplicates into one survivor in a single call, all mentions moved and all duplicates gone", async () => {
+      const dupA = await makeEntity(campaignId, "lili Batch A");
+      const dupB = await makeEntity(campaignId, "lili Batch B");
+      const surv = await makeEntity(campaignId, "Lili Batch");
+
+      const entryA = await seedEntry({ body: `@[${dupA}] said hi.`, entityIds: [dupA] });
+      const entryB = await seedEntry({ body: `@[${dupB}] said hi too.`, entityIds: [dupB] });
+
+      const res = await combineBatch([dupA, dupB], surv);
+      expect(res.status).toBe(200);
+
+      const afterA = await prisma.journalEntry.findUniqueOrThrow({ where: { id: entryA } });
+      const afterB = await prisma.journalEntry.findUniqueOrThrow({ where: { id: entryB } });
+      expect(afterA.body).toBe(`@[${surv}] said hi.`);
+      expect(afterB.body).toBe(`@[${surv}] said hi too.`);
+
+      const refs = await prisma.journalEntryRef.findMany({ where: { entryId: { in: [entryA, entryB] } } });
+      expect(refs.map((r) => r.entityId)).toEqual([surv, surv]);
+
+      expect(await prisma.campaignEntity.findUnique({ where: { id: dupA } })).toBeNull();
+      expect(await prisma.campaignEntity.findUnique({ where: { id: dupB } })).toBeNull();
+    });
+
+    it("409s up front on a cross-loser link conflict, applying ZERO writes to any loser in the batch", async () => {
+      await prisma.character.deleteMany({
+        where: { id: { in: ["combine-batch-char-a", "combine-batch-char-b"] } },
+      });
+      await createTestCharacter(OWNER, { id: "combine-batch-char-a" });
+      await createTestCharacter(OWNER, { id: "combine-batch-char-b" });
+      await supertest(app)
+        .post(`/api/campaigns/${campaignId}/characters`)
+        .set("Cookie", cookieOwner)
+        .send({ characterId: "combine-batch-char-a" });
+      await supertest(app)
+        .post(`/api/campaigns/${campaignId}/characters`)
+        .set("Cookie", cookieOwner)
+        .send({ characterId: "combine-batch-char-b" });
+      const linkA = await prisma.campaignCharacterLink.findUniqueOrThrow({
+        where: { characterId: "combine-batch-char-a" },
+      });
+      const linkB = await prisma.campaignCharacterLink.findUniqueOrThrow({
+        where: { characterId: "combine-batch-char-b" },
+      });
+
+      const surv = await makeEntity(campaignId, "Batch Conflict Survivor", "PC");
+      // A third, unrelated loser with its own mention — proves the guard
+      // fires BEFORE any loser's own writes apply, not partway through.
+      const dupC = await makeEntity(campaignId, "lili Batch C");
+      const entryC = await seedEntry({ body: `@[${dupC}] noted.`, entityIds: [dupC] });
+
+      const res = await combineBatch([linkA.campaignEntityId, linkB.campaignEntityId, dupC], surv);
+      expect(res.status).toBe(409);
+
+      const stillA = await prisma.campaignCharacterLink.findUniqueOrThrow({
+        where: { characterId: "combine-batch-char-a" },
+      });
+      expect(stillA.campaignEntityId).toBe(linkA.campaignEntityId);
+      const stillB = await prisma.campaignCharacterLink.findUniqueOrThrow({
+        where: { characterId: "combine-batch-char-b" },
+      });
+      expect(stillB.campaignEntityId).toBe(linkB.campaignEntityId);
+      expect(await prisma.campaignEntity.findUnique({ where: { id: linkA.campaignEntityId } })).not.toBeNull();
+      expect(await prisma.campaignEntity.findUnique({ where: { id: linkB.campaignEntityId } })).not.toBeNull();
+      expect(await prisma.campaignEntity.findUnique({ where: { id: dupC } })).not.toBeNull();
+
+      const entryAfter = await prisma.journalEntry.findUniqueOrThrow({ where: { id: entryC } });
+      expect(entryAfter.body).toBe(`@[${dupC}] noted.`);
+      const refsAfter = await prisma.journalEntryRef.findMany({ where: { entryId: entryC } });
+      expect(refsAfter.map((r) => r.entityId)).toEqual([dupC]);
+
+      await prisma.character.deleteMany({
+        where: { id: { in: ["combine-batch-char-a", "combine-batch-char-b"] } },
+      });
+    });
+
+    it("409s a cross-loser link conflict regardless of loserEntityIds order", async () => {
+      await prisma.character.deleteMany({
+        where: { id: { in: ["combine-order-char-a", "combine-order-char-b"] } },
+      });
+      await createTestCharacter(OWNER, { id: "combine-order-char-a" });
+      await createTestCharacter(OWNER, { id: "combine-order-char-b" });
+      await supertest(app)
+        .post(`/api/campaigns/${campaignId}/characters`)
+        .set("Cookie", cookieOwner)
+        .send({ characterId: "combine-order-char-a" });
+      await supertest(app)
+        .post(`/api/campaigns/${campaignId}/characters`)
+        .set("Cookie", cookieOwner)
+        .send({ characterId: "combine-order-char-b" });
+      const linkA = await prisma.campaignCharacterLink.findUniqueOrThrow({
+        where: { characterId: "combine-order-char-a" },
+      });
+      const linkB = await prisma.campaignCharacterLink.findUniqueOrThrow({
+        where: { characterId: "combine-order-char-b" },
+      });
+      const surv = await makeEntity(campaignId, "Order Conflict Survivor", "PC");
+
+      const forward = await combineBatch([linkA.campaignEntityId, linkB.campaignEntityId], surv);
+      expect(forward.status).toBe(409);
+      const reverse = await combineBatch([linkB.campaignEntityId, linkA.campaignEntityId], surv);
+      expect(reverse.status).toBe(409);
+
+      await prisma.character.deleteMany({
+        where: { id: { in: ["combine-order-char-a", "combine-order-char-b"] } },
+      });
+    });
+
+    it("produces the same final state regardless of loserEntityIds order, for independent duplicates", async () => {
+      const dupX = await makeEntity(campaignId, "lili Order X");
+      const dupY = await makeEntity(campaignId, "lili Order Y");
+      const survForward = await makeEntity(campaignId, "Order Survivor Forward");
+      const entryXf = await seedEntry({ body: `@[${dupX}] forward.`, entityIds: [dupX] });
+      const entryYf = await seedEntry({ body: `@[${dupY}] forward.`, entityIds: [dupY] });
+      const resForward = await combineBatch([dupX, dupY], survForward);
+      expect(resForward.status).toBe(200);
+
+      const dupX2 = await makeEntity(campaignId, "lili Order X2");
+      const dupY2 = await makeEntity(campaignId, "lili Order Y2");
+      const survReverse = await makeEntity(campaignId, "Order Survivor Reverse");
+      const entryXr = await seedEntry({ body: `@[${dupX2}] reverse.`, entityIds: [dupX2] });
+      const entryYr = await seedEntry({ body: `@[${dupY2}] reverse.`, entityIds: [dupY2] });
+      const resReverse = await combineBatch([dupY2, dupX2], survReverse);
+      expect(resReverse.status).toBe(200);
+
+      expect(await prisma.campaignEntity.findUnique({ where: { id: dupX } })).toBeNull();
+      expect(await prisma.campaignEntity.findUnique({ where: { id: dupY } })).toBeNull();
+      expect(await prisma.campaignEntity.findUnique({ where: { id: dupX2 } })).toBeNull();
+      expect(await prisma.campaignEntity.findUnique({ where: { id: dupY2 } })).toBeNull();
+
+      const forwardBodies = [
+        (await prisma.journalEntry.findUniqueOrThrow({ where: { id: entryXf } })).body,
+        (await prisma.journalEntry.findUniqueOrThrow({ where: { id: entryYf } })).body,
+      ];
+      const reverseBodies = [
+        (await prisma.journalEntry.findUniqueOrThrow({ where: { id: entryXr } })).body,
+        (await prisma.journalEntry.findUniqueOrThrow({ where: { id: entryYr } })).body,
+      ];
+      expect(forwardBodies).toEqual([`@[${survForward}] forward.`, `@[${survForward}] forward.`]);
+      expect(reverseBodies).toEqual([`@[${survReverse}] reverse.`, `@[${survReverse}] reverse.`]);
+    });
   });
 
   describe("portrait cleanup (#1942)", () => {
