@@ -19,7 +19,7 @@ interface CaptureDockProps {
   onClose: () => void;
   feed: React.ReactNode;
   composer: React.ReactNode;
-  /** Note count — changes re-anchor the feed to the bottom (open + after save). */
+  /** Opaque change-detector — any change re-anchors the feed to the bottom. */
   anchorKey: number;
 }
 

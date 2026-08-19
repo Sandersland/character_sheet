@@ -457,7 +457,9 @@ describe("CapturePalette (#247)", () => {
       expect(scrollport).not.toBeNull();
       expect(scrollport!.className).toContain("overflow-y-auto");
       expect(scrollport!.className).not.toContain("justify-end");
-      expect(scrollport!.firstElementChild!.className).toContain("mt-auto");
+      const inner = scrollport!.firstElementChild;
+      expect(inner).not.toBeNull();
+      expect(inner!.className).toContain("mt-auto");
     });
 
     it("mobile: the capture feed scrollport bottom-pins via mt-auto, not justify-end", () => {
@@ -465,7 +467,9 @@ describe("CapturePalette (#247)", () => {
       const scrollport = document.querySelector("[data-mobile-capture-feed]");
       expect(scrollport).not.toBeNull();
       expect(scrollport!.className).not.toContain("justify-end");
-      expect(scrollport!.firstElementChild!.className).toContain("mt-auto");
+      const inner = scrollport!.firstElementChild;
+      expect(inner).not.toBeNull();
+      expect(inner!.className).toContain("mt-auto");
     });
 
     it("md+: the dock anchors the feed to the newest note on open", async () => {
