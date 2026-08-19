@@ -46,13 +46,13 @@ describe("GET/POST /api/inbox (#1945)", () => {
     return res.body.id as string;
   }
 
-  async function mention(entityId: string, body?: string): Promise<void> {
+  async function mention(entityId: string, body?: string, date?: string): Promise<void> {
     // NOTE (not ENTRY) so `date` defaults to today — createJournalSchema
     // requires an explicit date for ENTRY.
     const res = await supertest(app)
       .post(`/api/characters/${CHAR_OWNER}/journal`)
       .set("Cookie", cookieOwner)
-      .send({ kind: "NOTE", body: body ?? `Met with @[${entityId}] today.` });
+      .send({ kind: "NOTE", body: body ?? `Met with @[${entityId}] today.`, date });
     if (res.status !== 201) throw new Error(`journal POST failed: ${res.status} ${JSON.stringify(res.body)}`);
   }
 
@@ -117,6 +117,8 @@ describe("GET/POST /api/inbox (#1945)", () => {
       [lil, lili1, lili2].sort(),
     );
     expect(cluster.defaultSurvivorId).toBe(lili2);
+    expect(typeof cluster.signalAt).toBe("string");
+    expect(Number.isNaN(Date.parse(cluster.signalAt))).toBe(false);
 
     await prisma.campaignEntity.deleteMany({ where: { id: { in: [lil, lili1, lili2] } } });
   });
@@ -150,8 +152,39 @@ describe("GET/POST /api/inbox (#1945)", () => {
     expect(row).toBeDefined();
     expect(row.campaignId).toBe(campaignId);
     expect(row.count).toBeGreaterThanOrEqual(1);
+    expect(typeof row.signalAt).toBe("string");
+    expect(Number.isNaN(Date.parse(row.signalAt))).toBe(false);
 
     await prisma.campaignEntity.deleteMany({ where: { id: bare } });
+  });
+
+  it("serializes signalAt on every row, and orders rows newest-signal-first (#1946)", async () => {
+    const oldEntity = await makeEntity(campaignId, "Ancient Note Subject");
+    const newEntity = await makeEntity(campaignId, "Fresh Note Subject");
+    await mention(oldEntity, `Old note about @[${oldEntity}].`, "2020-01-01");
+    await mention(newEntity, `Fresh note about @[${newEntity}].`);
+
+    const res = await supertest(app).get("/api/inbox").set("Cookie", cookieOwner);
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBeGreaterThan(0);
+
+    for (const row of res.body as { signalAt: string }[]) {
+      expect(typeof row.signalAt).toBe("string");
+      expect(Number.isNaN(Date.parse(row.signalAt))).toBe(false);
+    }
+    const times = (res.body as { signalAt: string }[]).map((r) => Date.parse(r.signalAt));
+    expect(times).toEqual([...times].sort((a, b) => b - a));
+
+    // Both entities are mentioned + undescribed, so needs-chronicling flags
+    // both; its signalAt is the MAX across them (today's mention), not
+    // pinned to the 2020 one — proves signalAt reflects the real sort key.
+    const chronicling = res.body.find(
+      (r: { kind: string }) => r.kind === "NEEDS_CHRONICLING",
+    ) as { signalAt: string } | undefined;
+    expect(chronicling).toBeDefined();
+    expect(Date.parse(chronicling!.signalAt)).toBeGreaterThan(Date.parse("2020-06-01"));
+
+    await prisma.campaignEntity.deleteMany({ where: { id: { in: [oldEntity, newEntity] } } });
   });
 
   it("a campaign where the caller is a mere member contributes nothing", async () => {

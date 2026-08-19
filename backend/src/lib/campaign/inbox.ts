@@ -29,6 +29,8 @@ export interface InboxDuplicateClusterRow {
   signature: string;
   entities: InboxDuplicateEntity[];
   defaultSurvivorId: string;
+  /** ISO timestamp this row was sorted by (#1946: relative-time meta for the UI). */
+  signalAt: string;
 }
 
 export interface InboxNeedsChroniclingRow {
@@ -37,6 +39,8 @@ export interface InboxNeedsChroniclingRow {
   campaignName: string;
   signature: string;
   count: number;
+  /** ISO timestamp this row was sorted by (#1946: relative-time meta for the UI). */
+  signalAt: string;
 }
 
 export type InboxRow = InboxDuplicateClusterRow | InboxNeedsChroniclingRow;
@@ -76,7 +80,9 @@ function toWireDuplicateEntity(e: EnrichedEntity): InboxDuplicateEntity {
 
 interface SignaledRow {
   row: InboxRow;
-  signalAt: Date;
+  // Sort key ONLY — the wire-facing timestamp lives on row.signalAt (string);
+  // this stays a Date so the final cross-campaign sort needs no re-parsing.
+  sortAt: Date;
 }
 
 function toDuplicateRow(
@@ -85,6 +91,7 @@ function toDuplicateRow(
   byId: Map<string, EnrichedEntity>,
 ): SignaledRow {
   const clusterEntities = ids.map((id) => byId.get(id)!);
+  const sortAt = latestOf(clusterEntities.map(entitySignalDate));
   const row: InboxDuplicateClusterRow = {
     kind: "DUPLICATE_CLUSTER",
     campaignId: campaign.id,
@@ -92,8 +99,9 @@ function toDuplicateRow(
     signature: clusterSignature(ids),
     entities: clusterEntities.map(toWireDuplicateEntity),
     defaultSurvivorId: pickDefaultSurvivor(clusterEntities),
+    signalAt: sortAt.toISOString(),
   };
-  return { row, signalAt: latestOf(clusterEntities.map(entitySignalDate)) };
+  return { row, sortAt };
 }
 
 function buildDuplicateRows(
@@ -114,14 +122,16 @@ function buildNeedsChroniclingRow(
 ): SignaledRow | null {
   const flagged = entities.filter((e) => e.mentionCount > 0 && !hasDescription(e.notes));
   if (flagged.length === 0) return null;
+  const sortAt = latestOf(flagged.map(entitySignalDate));
   const row: InboxNeedsChroniclingRow = {
     kind: "NEEDS_CHRONICLING",
     campaignId: campaign.id,
     campaignName: campaign.name,
     signature: campaign.id,
     count: flagged.length,
+    signalAt: sortAt.toISOString(),
   };
-  return { row, signalAt: latestOf(flagged.map(entitySignalDate)) };
+  return { row, sortAt };
 }
 
 async function loadCampaignStats(
@@ -191,7 +201,7 @@ export async function buildInboxRows(db: PrismaClient, userId: string): Promise<
   const perCampaign = await Promise.all(campaigns.map((c) => buildCampaignInboxRows(db, c, userId)));
   return perCampaign
     .flat()
-    .sort((a, b) => b.signalAt.getTime() - a.signalAt.getTime())
+    .sort((a, b) => b.sortAt.getTime() - a.sortAt.getTime())
     .map((x) => x.row);
 }
 
