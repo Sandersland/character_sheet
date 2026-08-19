@@ -242,6 +242,44 @@ entitiesRouter.delete("/campaigns/:id/entities/merges/:mergeId", async (req, res
 });
 
 /**
+ * POST /api/campaigns/:id/entities/combine
+ * Destructive typo-dedup (#1942), the sibling of /merges above: absorbs
+ * every body.loserEntityIds duplicate into body.survivorEntityId in ONE
+ * transaction, atomically — mention tokens rewritten, merge chains
+ * re-pointed, character/item links moved, then every loser deleted. A single
+ * combine is a 1-length loserEntityIds array, not a separate route. OWNER
+ * only. No :entityId param (unlike the merge lifecycle above) since a batch
+ * doesn't have a single subject; registered before the generic :entityId
+ * routes below so the /combine segment can't be shadowed.
+ */
+entitiesRouter.post("/campaigns/:id/entities/combine", async (req, res) => {
+  await assertCampaignOwner(
+    prisma,
+    req.user!.id,
+    req.params.id,
+    "edit",
+    "Only the campaign owner may combine entities",
+  );
+
+  const data = parseBodyOr400(combineEntitiesSchema, req.body, res);
+  if (data === undefined) return;
+
+  const result = await combineEntities(
+    prisma,
+    req.params.id,
+    data.loserEntityIds,
+    data.survivorEntityId,
+  );
+  if (!result.ok) {
+    res.status(result.status).json({ error: result.error });
+    return;
+  }
+
+  const { characterLink, ...entity } = result.entity;
+  res.json({ ...toWireEntity(entity), characterId: characterLink?.characterId ?? null });
+});
+
+/**
  * PATCH /api/campaigns/:id/entities/:entityId
  * Edit an entity. Any member; 404 if the entity isn't in this campaign.
  */
@@ -304,42 +342,6 @@ entitiesRouter.delete("/campaigns/:id/entities/:entityId", async (req, res) => {
   await prisma.campaignEntity.delete({ where: { id: req.params.entityId } });
   await deletePortraitBlobBestEffort(existing.portraitKey);
   res.status(204).end();
-});
-
-/**
- * POST /api/campaigns/:id/entities/:entityId/combine
- * Destructive typo-dedup (#1942), the sibling of /merges above: absorbs
- * :entityId (the duplicate) into body.survivorEntityId in one transaction —
- * mention tokens rewritten, merge chains re-pointed, character/item links
- * moved, then the duplicate deleted. OWNER only; same runOwnerMergeOp shape
- * (assert owner, run the op, unwrap the error) as the merge lifecycle, just
- * without a shared mergeId param to generalize over.
- */
-entitiesRouter.post("/campaigns/:id/entities/:entityId/combine", async (req, res) => {
-  await assertCampaignOwner(
-    prisma,
-    req.user!.id,
-    req.params.id,
-    "edit",
-    "Only the campaign owner may combine entities",
-  );
-
-  const data = parseBodyOr400(combineEntitiesSchema, req.body, res);
-  if (data === undefined) return;
-
-  const result = await combineEntities(
-    prisma,
-    req.params.id,
-    req.params.entityId,
-    data.survivorEntityId,
-  );
-  if (!result.ok) {
-    res.status(result.status).json({ error: result.error });
-    return;
-  }
-
-  const { characterLink, ...entity } = result.entity;
-  res.json({ ...toWireEntity(entity), characterId: characterLink?.characterId ?? null });
 });
 
 // Entity portraits (#1617): the same pipeline as the character portraitRouter

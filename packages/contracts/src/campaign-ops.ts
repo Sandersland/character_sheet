@@ -75,10 +75,26 @@ export const updateEntitySchema = z
   .strict();
 export type UpdateEntityInput = z.input<typeof updateEntitySchema>;
 
-// Destructive typo-dedup (#1942): absorbs the :entityId duplicate into
-// survivorEntityId. Owner-only, no note field — unlike prepareMergeSchema
-// this isn't reversible prep, so there's nothing to annotate.
-export const combineEntitiesSchema = z.object({ survivorEntityId: z.string().uuid() }).strict();
+// Destructive typo-dedup (#1942): absorbs every loserEntityIds duplicate into
+// survivorEntityId, atomically (POST /campaigns/:id/entities/combine — no
+// :entityId param, since a batch has more than one). Owner-only, no note
+// field — unlike prepareMergeSchema this isn't reversible prep, so there's
+// nothing to annotate. A single combine is a 1-length loserEntityIds array,
+// not a separate shape.
+export const combineEntitiesSchema = z
+  .object({
+    survivorEntityId: z.string().uuid(),
+    loserEntityIds: z.array(z.string().uuid()).min(1),
+  })
+  .strict()
+  .refine((v) => !v.loserEntityIds.includes(v.survivorEntityId), {
+    message: "loserEntityIds must not include survivorEntityId",
+    path: ["loserEntityIds"],
+  })
+  .refine((v) => new Set(v.loserEntityIds).size === v.loserEntityIds.length, {
+    message: "loserEntityIds must not contain duplicates",
+    path: ["loserEntityIds"],
+  });
 export type CombineEntitiesInput = z.input<typeof combineEntitiesSchema>;
 
 // --- arcs.ts ---

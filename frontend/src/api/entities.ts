@@ -183,18 +183,20 @@ export async function unmergeEntityMerge(campaignId: string, mergeId: string): P
   );
 }
 
-// Destructive typo-dedup (#1942): absorbs `entityId` (the duplicate) into
-// `survivorEntityId` and deletes it. Owner-only server-side; no undo — the
-// confirm dialog calling this is the gate. Consumed by the inbox's Review-
-// duplicates modal (#1946), one call per absorbed entity in a cluster.
+// Destructive typo-dedup (#1942): absorbs every `loserEntityIds` duplicate
+// into `survivorEntityId` in one atomic combine and deletes them — all or
+// nothing, so a failure leaves every entity untouched. Owner-only server-
+// side; no undo — the confirm dialog calling this is the gate. Consumed by
+// the inbox's Review-duplicates modal (#1946): one call per cluster, the
+// whole loser list at once, not one call per absorbed entity.
 export async function combineEntities(
   campaignId: string,
-  entityId: string,
   survivorEntityId: string,
+  loserEntityIds: string[],
 ): Promise<CampaignEntity> {
   return request<CampaignEntity>(
-    `/campaigns/${campaignId}/entities/${entityId}/combine`,
-    jsonBody({ survivorEntityId }),
+    `/campaigns/${campaignId}/entities/combine`,
+    jsonBody({ survivorEntityId, loserEntityIds }),
     "Failed to combine entities",
   );
 }
