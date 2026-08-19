@@ -56,6 +56,17 @@ describe("GET/POST /api/inbox (#1945)", () => {
     if (res.status !== 201) throw new Error(`journal POST failed: ${res.status} ${JSON.stringify(res.body)}`);
   }
 
+  async function mergeExecuted(mergedEntityId: string, survivorEntityId: string): Promise<void> {
+    const prep = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/entities/merges`)
+      .set("Cookie", cookieOwner)
+      .send({ mergedEntityId, survivorEntityId });
+    const exec = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/entities/merges/${prep.body.id}/execute`)
+      .set("Cookie", cookieOwner);
+    if (exec.status !== 200) throw new Error(`merge execute failed: ${exec.status} ${JSON.stringify(exec.body)}`);
+  }
+
   beforeAll(async () => {
     await ensureTestOwner(OWNER);
     await ensureTestOwner(MEMBER);
@@ -219,13 +230,7 @@ describe("GET/POST /api/inbox (#1945)", () => {
     await mention(captainRok, `About @[${captainRok}], first.`);
     await mention(captainRok, `About @[${captainRok}], second.`);
 
-    const prep = await supertest(app)
-      .post(`/api/campaigns/${campaignId}/entities/merges`)
-      .set("Cookie", cookieOwner)
-      .send({ mergedEntityId: oldRook, survivorEntityId: captainRook });
-    await supertest(app)
-      .post(`/api/campaigns/${campaignId}/entities/merges/${prep.body.id}/execute`)
-      .set("Cookie", cookieOwner);
+    await mergeExecuted(oldRook, captainRook);
 
     const res = await supertest(app).get("/api/inbox").set("Cookie", cookieOwner);
     const cluster = res.body.find(
@@ -240,6 +245,54 @@ describe("GET/POST /api/inbox (#1945)", () => {
 
     await prisma.campaignEntityMerge.deleteMany({ where: { mergedEntityId: oldRook } });
     await prisma.campaignEntity.deleteMany({ where: { id: { in: [oldRook, captainRook, captainRok] } } });
+  });
+
+  it("removes an EXECUTED-merged-away entity from clustering entirely, even against an unrelated near-duplicate (#1945 review)", async () => {
+    const lili = await makeEntity(campaignId, "Lili");
+    const concierge = await makeEntity(campaignId, "The Concierge"); // unrelated name, the survivor
+    const lily = await makeEntity(campaignId, "Lily"); // near-dup of "Lili" by distance, NOT itself merge-linked
+
+    await mergeExecuted(lili, concierge);
+
+    const res = await supertest(app).get("/api/inbox").set("Cookie", cookieOwner);
+    const clusters = res.body.filter((r: { kind: string }) => r.kind === "DUPLICATE_CLUSTER");
+    const involvesLili = clusters.some((c: { entities: { id: string }[] }) =>
+      c.entities.some((e) => e.id === lili),
+    );
+    expect(involvesLili).toBe(false);
+    // Lily's only near-duplicate partner (Lili) is gone, so Lily forms no
+    // cluster either — pairwise exclusion alone would have missed this,
+    // since Lili/Lily were never themselves a merge pair.
+    const involvesLily = clusters.some((c: { entities: { id: string }[] }) =>
+      c.entities.some((e) => e.id === lily),
+    );
+    expect(involvesLily).toBe(false);
+
+    await prisma.campaignEntityMerge.deleteMany({ where: { mergedEntityId: lili } });
+    await prisma.campaignEntity.deleteMany({ where: { id: { in: [lili, concierge, lily] } } });
+  });
+
+  it("removes every entity along a transitive EXECUTED merge chain (A->B->C) from clustering (#1945 review)", async () => {
+    const jenkins = await makeEntity(campaignId, "Jenkins");
+    const vecna = await makeEntity(campaignId, "Vecna");
+    const whispered = await makeEntity(campaignId, "Whispered One");
+    const jankins = await makeEntity(campaignId, "Jankins"); // near-dup of Jenkins (chain link A)
+    const vecra = await makeEntity(campaignId, "Vecra"); // near-dup of Vecna (chain link B)
+
+    await mergeExecuted(jenkins, vecna);
+    await mergeExecuted(vecna, whispered);
+
+    const res = await supertest(app).get("/api/inbox").set("Cookie", cookieOwner);
+    const clusters = res.body.filter((r: { kind: string }) => r.kind === "DUPLICATE_CLUSTER");
+    const involvesEitherChainLink = clusters.some((c: { entities: { id: string }[] }) =>
+      c.entities.some((e) => e.id === jenkins || e.id === vecna),
+    );
+    expect(involvesEitherChainLink).toBe(false);
+
+    await prisma.campaignEntityMerge.deleteMany({ where: { mergedEntityId: { in: [jenkins, vecna] } } });
+    await prisma.campaignEntity.deleteMany({
+      where: { id: { in: [jenkins, vecna, whispered, jankins, vecra] } },
+    });
   });
 
   it("needs-chronicling resurfaces after dismissal when a new undescribed mention joins the flagged set (#1945 review)", async () => {

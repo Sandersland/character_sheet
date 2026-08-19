@@ -240,8 +240,11 @@ model InboxDismissal {
   signature  String
   createdAt  DateTime      @default(now())
 
-  @@unique([userId, kind, signature])
-  @@index([userId, campaignId])
+  // campaignId is part of the identity (not just an FK) so the stored column
+  // actually governs suppression, matching filterDismissed's match key — a
+  // dismissal never silently applies across campaigns. Covers the old
+  // [userId, campaignId] index as a prefix, so that index is gone.
+  @@unique([userId, campaignId, kind, signature])
 }
 
 enum CampaignRole {
