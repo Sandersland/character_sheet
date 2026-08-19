@@ -6,7 +6,6 @@ import {
   clusterSignature,
   editDistance,
   isDuplicatePair,
-  pairKey,
   pickDefaultSurvivor,
   type ClusterableEntity,
 } from "@/lib/campaign/inbox-clustering.js";
@@ -59,28 +58,45 @@ describe("isDuplicatePair", () => {
   });
 });
 
-describe("pairKey", () => {
-  it("is order-independent", () => {
-    expect(pairKey("a", "b")).toBe(pairKey("b", "a"));
+// #1945 review: unbounded distance pairing false-positived on any two
+// single-letter names, and on a differing trailing number ("Guard 1"/"Guard
+// 2" are 1 apart, well within threshold).
+describe("isDuplicatePair — digit-conflict guard", () => {
+  it("never pairs names whose digit runs differ, however close by distance", () => {
+    expect(isDuplicatePair("Guard 1", "Guard 2")).toBe(false);
+    expect(isDuplicatePair("Guard 1", "Guard 3")).toBe(false);
+    expect(isDuplicatePair("Room 101", "Room 102")).toBe(false);
   });
 
-  it("distinguishes different pairs", () => {
-    expect(pairKey("a", "b")).not.toBe(pairKey("a", "c"));
+  it("does not block a genuine typo that carries the SAME digits", () => {
+    expect(isDuplicatePair("Room 101", "Rom 101")).toBe(true);
+  });
+
+  it("leaves a distance match alone when neither name has digits", () => {
+    expect(isDuplicatePair("Aramil", "Aramyl")).toBe(true);
+  });
+});
+
+describe("isDuplicatePair — short-name guard", () => {
+  it("never pairs two different single-letter names by distance alone", () => {
+    expect(isDuplicatePair("A", "B")).toBe(false);
+    expect(isDuplicatePair("X", "Y")).toBe(false);
+  });
+
+  it("still matches an EXACT single-letter fold", () => {
+    expect(isDuplicatePair("A", "a")).toBe(true);
   });
 });
 
 describe("buildMergeExclusionSet", () => {
-  it("keys every merge pair regardless of status", () => {
-    const set = buildMergeExclusionSet([
-      { mergedEntityId: "petarus", survivorEntityId: "potaras" },
-    ]);
-    expect(set.has(pairKey("petarus", "potaras"))).toBe(true);
-    expect(set.has(pairKey("potaras", "petarus"))).toBe(true);
+  it("produces one order-independent entry per merge pair", () => {
+    const set = buildMergeExclusionSet([{ mergedEntityId: "petarus", survivorEntityId: "potaras" }]);
+    expect(set.size).toBe(1);
   });
 });
 
 describe("buildDuplicateClusters", () => {
-  const noExclusions = () => false;
+  const noExclusions = new Set<string>();
 
   it("unions a transitive chain of near-duplicate names into one cluster", () => {
     const entities: ClusterableEntity[] = [
@@ -116,8 +132,7 @@ describe("buildDuplicateClusters", () => {
     const exclusionSet = buildMergeExclusionSet([
       { mergedEntityId: "petarus", survivorEntityId: "potaras" },
     ]);
-    const isExcludedPair = (a: string, b: string) => exclusionSet.has(pairKey(a, b));
-    expect(buildDuplicateClusters(entities, isExcludedPair)).toEqual([]);
+    expect(buildDuplicateClusters(entities, exclusionSet)).toEqual([]);
   });
 
   it("forms separate clusters for unrelated near-duplicate groups", () => {
@@ -131,6 +146,34 @@ describe("buildDuplicateClusters", () => {
     expect(clusters).toHaveLength(2);
     expect(clusters).toContainEqual(["1", "2"]);
     expect(clusters).toContainEqual(["3", "4"]);
+  });
+
+  // #1945 review: the blocker-grade product trap — a DM's "Guard 1/Guard
+  // 2/Guard 3" or "Room 101/Room 102" naming scheme must never surface a
+  // destructive one-click combine offer.
+  it("never clusters Guard 1/Guard 2/Guard 3 despite each pair being distance 1 apart", () => {
+    const entities: ClusterableEntity[] = [
+      { id: "1", name: "Guard 1" },
+      { id: "2", name: "Guard 2" },
+      { id: "3", name: "Guard 3" },
+    ];
+    expect(buildDuplicateClusters(entities, noExclusions)).toEqual([]);
+  });
+
+  it("never clusters Room 101/Room 102", () => {
+    const entities: ClusterableEntity[] = [
+      { id: "1", name: "Room 101" },
+      { id: "2", name: "Room 102" },
+    ];
+    expect(buildDuplicateClusters(entities, noExclusions)).toEqual([]);
+  });
+
+  it("still clusters a genuine typo pair that carries the same digits", () => {
+    const entities: ClusterableEntity[] = [
+      { id: "1", name: "Room 101" },
+      { id: "2", name: "Rom 101" },
+    ];
+    expect(buildDuplicateClusters(entities, noExclusions)[0].sort()).toEqual(["1", "2"]);
   });
 });
 
