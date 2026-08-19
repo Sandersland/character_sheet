@@ -75,6 +75,12 @@ export const updateEntitySchema = z
   .strict();
 export type UpdateEntityInput = z.input<typeof updateEntitySchema>;
 
+// Destructive typo-dedup (#1942): absorbs the :entityId duplicate into
+// survivorEntityId. Owner-only, no note field — unlike prepareMergeSchema
+// this isn't reversible prep, so there's nothing to annotate.
+export const combineEntitiesSchema = z.object({ survivorEntityId: z.string().uuid() }).strict();
+export type CombineEntitiesInput = z.input<typeof combineEntitiesSchema>;
+
 // --- arcs.ts ---
 
 export const createArcSchema = z.object({ name: z.string().min(1) }).strict();

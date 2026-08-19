@@ -1,7 +1,7 @@
 // Campaign-entity domain logic: stats, merge lifecycle, backlinks,
 // connections, activity feed, and attribution. HTTP-free; routes pass `db`.
 
-import type { PrismaClient } from "@/generated/prisma/client.js";
+import type { Prisma, PrismaClient } from "@/generated/prisma/client.js";
 import { collectMergedInIdentities, wouldCreateCycle } from "@/lib/activity/entity-merges.js";
 import {
   aggregateEntityStats,
@@ -12,6 +12,7 @@ import {
   type EntityStatsAggregate,
   type StatRef,
 } from "@/lib/activity/entity-stats.js";
+import { extractEntityIds, reconcileEntryRefs } from "@/lib/activity/journal-refs.js";
 
 // Session context resolver for mention refs: title + startedAt-ordinal (#839).
 async function loadSessionContext(db: PrismaClient, campaignId: string) {
@@ -197,6 +198,168 @@ export async function deleteMerge(
 
   await db.campaignEntityMerge.delete({ where: { id: merge.id } });
   return { ok: true };
+}
+
+type CombinedEntity = Prisma.CampaignEntityGetPayload<{
+  include: { characterLink: { select: { characterId: true } } };
+}>;
+
+export type CombineResult =
+  | { ok: true; entity: CombinedEntity }
+  | { ok: false; status: 400 | 404 | 409; error: string };
+
+type LinkedEntity = {
+  id: string;
+  campaignId: string;
+  characterLink: { campaignEntityId: string } | null;
+  itemLink: { campaignEntityId: string } | null;
+};
+
+type Tx = Prisma.TransactionClient;
+
+// Rewrites every @[<dupId>] mention token to @[<survivorId>] across ALL of the
+// campaign's journal entries, regardless of author or visibility — unlike
+// visibleEntryWhere (used everywhere else in this file), a combine must not
+// leave a dangling token behind an author's own private note.
+async function rewriteMentionTokens(
+  tx: Tx,
+  campaignId: string,
+  duplicateId: string,
+  survivorEntityId: string,
+): Promise<void> {
+  const taggedEntries = await tx.journalEntry.findMany({
+    where: {
+      character: { campaignId },
+      body: { contains: `@[${duplicateId}]`, mode: "insensitive" },
+    },
+    select: { id: true, body: true },
+  });
+  const token = new RegExp(`@\\[${duplicateId}\\]`, "gi");
+  for (const entry of taggedEntries) {
+    const newBody = entry.body.replace(token, `@[${survivorEntityId}]`);
+    if (newBody === entry.body) continue;
+    await tx.journalEntry.update({ where: { id: entry.id }, data: { body: newBody } });
+    await reconcileEntryRefs(tx, entry.id, extractEntityIds(newBody));
+  }
+}
+
+// Re-points merge rows where the duplicate stood in as the survivor (A → dup)
+// to the real survivor (A → S). A row that would become self-referential OR
+// would close a cycle against the rest of the graph is dropped instead —
+// wouldCreateCycle already covers the self-reference case (mergedId ===
+// survivorId short-circuits true), so one check does both. Rows where the
+// duplicate is mergedEntityId cascade-delete with the duplicate row the
+// caller deletes after this returns — the typo's secret identity disappears
+// with it.
+async function repointMergeChains(
+  tx: Tx,
+  campaignId: string,
+  duplicateId: string,
+  survivorEntityId: string,
+): Promise<void> {
+  const asSurvivor = await tx.campaignEntityMerge.findMany({
+    where: { campaignId, survivorEntityId: duplicateId },
+    select: { id: true, mergedEntityId: true },
+  });
+  if (asSurvivor.length === 0) return;
+
+  const allEdges = await tx.campaignEntityMerge.findMany({
+    where: { campaignId },
+    select: { id: true, mergedEntityId: true, survivorEntityId: true, status: true },
+  });
+  for (const row of asSurvivor) {
+    const otherEdges = allEdges.filter((e) => e.id !== row.id);
+    if (wouldCreateCycle(otherEdges, row.mergedEntityId, survivorEntityId)) {
+      await tx.campaignEntityMerge.delete({ where: { id: row.id } });
+      continue;
+    }
+    await tx.campaignEntityMerge.update({ where: { id: row.id }, data: { survivorEntityId } });
+  }
+}
+
+// Moves a CampaignCharacterLink/CampaignItemLink from the duplicate to the
+// survivor when only the duplicate carries it — the caller has already
+// rejected the both-linked case as a 409 before the transaction opens.
+async function moveSoleLinks(
+  tx: Tx,
+  duplicate: LinkedEntity,
+  survivor: LinkedEntity,
+  duplicateId: string,
+  survivorEntityId: string,
+): Promise<void> {
+  if (duplicate.characterLink && !survivor.characterLink) {
+    await tx.campaignCharacterLink.update({
+      where: { campaignEntityId: duplicateId },
+      data: { campaignEntityId: survivorEntityId },
+    });
+  }
+  if (duplicate.itemLink && !survivor.itemLink) {
+    await tx.campaignItemLink.update({
+      where: { campaignEntityId: duplicateId },
+      data: { campaignEntityId: survivorEntityId },
+    });
+  }
+}
+
+// Destructive typo-dedup (#1942), the counterpart to the non-destructive
+// identity merge above: absorbs `duplicateId` into `survivorEntityId` and
+// deletes the duplicate. Survivor's fields always win — nothing is folded
+// from the duplicate (decided 2026-08-18). Cross-type combines are allowed.
+// No audit row and no undo: there is no campaign-side event model and the
+// existing merge ops persist nothing either; the client-side confirm dialog
+// is the gate.
+export async function combineEntities(
+  db: PrismaClient,
+  campaignId: string,
+  duplicateId: string,
+  survivorEntityId: string,
+): Promise<CombineResult> {
+  if (duplicateId === survivorEntityId) {
+    return { ok: false, status: 400, error: "An entity cannot be combined with itself" };
+  }
+
+  const linkSelect = { characterLink: true, itemLink: true } as const;
+  const [duplicate, survivor] = await Promise.all([
+    db.campaignEntity.findUnique({
+      where: { id: duplicateId },
+      select: { id: true, campaignId: true, ...linkSelect },
+    }),
+    db.campaignEntity.findUnique({
+      where: { id: survivorEntityId },
+      select: { id: true, campaignId: true, ...linkSelect },
+    }),
+  ]);
+  if (
+    !duplicate ||
+    duplicate.campaignId !== campaignId ||
+    !survivor ||
+    survivor.campaignId !== campaignId
+  ) {
+    return { ok: false, status: 404, error: "Entity not found" };
+  }
+
+  // Two backed entities are two real things, not a typo (#1942): reject before
+  // any write when both sides carry a link of the same kind.
+  if (duplicate.characterLink && survivor.characterLink) {
+    return { ok: false, status: 409, error: "Both entities are linked to a character" };
+  }
+  if (duplicate.itemLink && survivor.itemLink) {
+    return { ok: false, status: 409, error: "Both entities are linked to an item" };
+  }
+
+  const entity = await db.$transaction(async (tx) => {
+    await rewriteMentionTokens(tx, campaignId, duplicateId, survivorEntityId);
+    await repointMergeChains(tx, campaignId, duplicateId, survivorEntityId);
+    await moveSoleLinks(tx, duplicate, survivor, duplicateId, survivorEntityId);
+    await tx.campaignEntity.delete({ where: { id: duplicateId } });
+
+    return tx.campaignEntity.findUniqueOrThrow({
+      where: { id: survivorEntityId },
+      include: { characterLink: { select: { characterId: true } } },
+    });
+  });
+
+  return { ok: true, entity };
 }
 
 type ListedEntity = { id: string; notes: string | null };

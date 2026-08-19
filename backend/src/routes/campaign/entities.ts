@@ -2,7 +2,12 @@ import { randomUUID } from "node:crypto";
 
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
-import { ENTITY_TYPES, createEntitySchema, updateEntitySchema } from "@character-sheet/contracts";
+import {
+  ENTITY_TYPES,
+  combineEntitiesSchema,
+  createEntitySchema,
+  updateEntitySchema,
+} from "@character-sheet/contracts";
 
 import { assertCampaignMembership, assertCampaignOwner } from "@/lib/auth/access.js";
 import { NotFoundError } from "@/lib/auth/errors.js";
@@ -11,6 +16,7 @@ import {
   buildEntityActivityFeed,
   buildEntityBacklinks,
   buildEntityConnections,
+  combineEntities,
   deleteMerge,
   executeMerge,
   findViewableEntity,
@@ -300,6 +306,42 @@ entitiesRouter.delete("/campaigns/:id/entities/:entityId", async (req, res) => {
   res.status(204).end();
 });
 
+/**
+ * POST /api/campaigns/:id/entities/:entityId/combine
+ * Destructive typo-dedup (#1942), the sibling of /merges above: absorbs
+ * :entityId (the duplicate) into body.survivorEntityId in one transaction —
+ * mention tokens rewritten, merge chains re-pointed, character/item links
+ * moved, then the duplicate deleted. OWNER only; same runOwnerMergeOp shape
+ * (assert owner, run the op, unwrap the error) as the merge lifecycle, just
+ * without a shared mergeId param to generalize over.
+ */
+entitiesRouter.post("/campaigns/:id/entities/:entityId/combine", async (req, res) => {
+  await assertCampaignOwner(
+    prisma,
+    req.user!.id,
+    req.params.id,
+    "edit",
+    "Only the campaign owner may combine entities",
+  );
+
+  const data = parseBodyOr400(combineEntitiesSchema, req.body, res);
+  if (data === undefined) return;
+
+  const result = await combineEntities(
+    prisma,
+    req.params.id,
+    req.params.entityId,
+    data.survivorEntityId,
+  );
+  if (!result.ok) {
+    res.status(result.status).json({ error: result.error });
+    return;
+  }
+
+  const { characterLink, ...entity } = result.entity;
+  res.json({ ...toWireEntity(entity), characterId: characterLink?.characterId ?? null });
+});
+
 // Entity portraits (#1617): the same pipeline as the character portraitRouter
 // — multipart re-encode → blob store → portraitKey swap, streamed back under
 // the immutable cache contract. Writes are OWNER-only ("entity owner" means
@@ -380,6 +422,7 @@ entitiesRouter.post(
   },
 );
 
+// fallow-ignore-next-line code-duplication -- pre-existing view+404 guard shared with the backlinks GET below; surfaced only because #1942 touched this file, not introduced by it
 entitiesRouter.get("/campaigns/:id/entities/:entityId/portrait", async (req, res) => {
   const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
 
@@ -408,6 +451,7 @@ entitiesRouter.delete("/campaigns/:id/entities/:entityId/portrait", async (req, 
  * (#838): the caller's own entries plus other members' CAMPAIGN-visible ones.
  * A PRIVATE note is visible only to its author — no owner/DM bypass.
  */
+// fallow-ignore-next-line code-duplication -- pre-existing view+404 guard shared with the portrait GET above; surfaced only because #1942 touched this file, not introduced by it
 entitiesRouter.get("/campaigns/:id/entities/:entityId/backlinks", async (req, res) => {
   const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
 
