@@ -17,9 +17,35 @@ export function extractEntityIds(body: string): string[] {
   return [...seen];
 }
 
+// The exact @[<id>] token text the app writes and MENTION_TOKEN parses — the
+// one place the wrapper characters are hard-coded, so a caller building a
+// replacement string (e.g. a combine op rewriting mentions, #1942) can't drift
+// from what extractEntityIds actually matches.
+export function mentionToken(entityId: string): string {
+  return `@[${entityId}]`;
+}
+
+// Escapes every POSIX-ERE/JS-RegExp metacharacter in a literal string. Used by
+// mentionTokenPattern so an id containing regex-special characters can't
+// change what the pattern matches — CampaignEntity.id is a plain String
+// column, not (yet) enforced to be a uuid shape.
+function escapeRegexLiteral(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// mentionToken's POSIX-ERE source for one id, case-insensitively matchable
+// (Postgres regexp_replace(..., 'gi') or an equivalent JS `RegExp(..., "gi")`)
+// — `[`/`]` are regex metacharacters, so a caller must never hand-splice
+// `@[${id}]` into a pattern itself. The id itself is escaped too, so a
+// non-uuid-shaped id can't widen or break the match.
+export function mentionTokenPattern(entityId: string): string {
+  return `@\\[${escapeRegexLiteral(entityId)}\\]`;
+}
+
 // Fold a name/alias/query to a comparison key: lowercase, strip diacritics,
-// drop punctuation, collapse whitespace. Kept in parity with the frontend
-// normalizeForMatch so search matches the same way on both sides.
+// drop punctuation, collapse whitespace. Kept in parity with the frontend's
+// own normalizeForMatch so search matches the same way on both sides.
+// fallow-ignore-next-line code-duplication -- pre-existing mirror against the frontend's own normalizeForMatch (the search-parity requirement this comment states); surfaced only because #1942 touched this file elsewhere, not introduced by it
 export function normalizeForMatch(s: string): string {
   return s
     .normalize("NFD")

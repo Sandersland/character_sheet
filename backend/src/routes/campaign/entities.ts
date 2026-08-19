@@ -2,7 +2,12 @@ import { randomUUID } from "node:crypto";
 
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
-import { ENTITY_TYPES, createEntitySchema, updateEntitySchema } from "@character-sheet/contracts";
+import {
+  ENTITY_TYPES,
+  combineEntitiesSchema,
+  createEntitySchema,
+  updateEntitySchema,
+} from "@character-sheet/contracts";
 
 import { assertCampaignMembership, assertCampaignOwner } from "@/lib/auth/access.js";
 import { NotFoundError } from "@/lib/auth/errors.js";
@@ -11,6 +16,7 @@ import {
   buildEntityActivityFeed,
   buildEntityBacklinks,
   buildEntityConnections,
+  combineEntities,
   deleteMerge,
   executeMerge,
   findViewableEntity,
@@ -89,13 +95,21 @@ entitiesRouter.get("/campaigns/:id/entities", async (req, res) => {
       // Non-owners see only revealed entities (#379); the owner sees all.
       ...(isOwner ? {} : { visibility: "REVEALED" }),
     },
-    include: { characterLink: { select: { characterId: true } } },
+    include: {
+      characterLink: { select: { characterId: true } },
+      // itemId (#1942): otherwise an entity's item-link status is invisible
+      // on the wire, so the combine dialog/survivor picker (#1943) can't
+      // truthfully warn about a transfer it can't see.
+      itemLink: { select: { itemId: true } },
+    },
     orderBy: { name: "asc" },
   });
-  // Flatten the PC link (#842): characterId, never the nested relation object.
-  const entities = rows.map(({ characterLink, ...e }) => ({
+  // Flatten the PC/item links (#842/#1942): characterId/itemId, never the
+  // nested relation objects.
+  const entities = rows.map(({ characterLink, itemLink, ...e }) => ({
     ...toWireEntity(e),
     characterId: characterLink?.characterId ?? null,
+    itemId: itemLink?.itemId ?? null,
   }));
 
   const q = typeof req.query.q === "string" ? req.query.q : "";
@@ -233,6 +247,48 @@ entitiesRouter.delete("/campaigns/:id/entities/merges/:mergeId", async (req, res
     deleteMerge(prisma, cid, mid),
   );
   if (result) res.status(204).end();
+});
+
+/**
+ * POST /api/campaigns/:id/entities/combine
+ * Destructive typo-dedup (#1942), the sibling of /merges above: absorbs
+ * every body.loserEntityIds duplicate into body.survivorEntityId in ONE
+ * transaction, atomically — mention tokens rewritten, merge chains
+ * re-pointed, character/item links moved, then every loser deleted. A single
+ * combine is a 1-length loserEntityIds array, not a separate route. OWNER
+ * only. No :entityId param (unlike the merge lifecycle above) since a batch
+ * doesn't have a single subject; registered before the generic :entityId
+ * routes below so the /combine segment can't be shadowed.
+ */
+entitiesRouter.post("/campaigns/:id/entities/combine", async (req, res) => {
+  await assertCampaignOwner(
+    prisma,
+    req.user!.id,
+    req.params.id,
+    "edit",
+    "Only the campaign owner may combine entities",
+  );
+
+  const data = parseBodyOr400(combineEntitiesSchema, req.body, res);
+  if (data === undefined) return;
+
+  const result = await combineEntities(
+    prisma,
+    req.params.id,
+    data.loserEntityIds,
+    data.survivorEntityId,
+  );
+  if (!result.ok) {
+    res.status(result.status).json({ error: result.error });
+    return;
+  }
+
+  const { characterLink, itemLink, ...entity } = result.entity;
+  res.json({
+    ...toWireEntity(entity),
+    characterId: characterLink?.characterId ?? null,
+    itemId: itemLink?.itemId ?? null,
+  });
 });
 
 /**
@@ -380,6 +436,7 @@ entitiesRouter.post(
   },
 );
 
+// fallow-ignore-next-line code-duplication -- pre-existing view+404 guard shared with the backlinks GET below; surfaced only because #1942 touched this file, not introduced by it
 entitiesRouter.get("/campaigns/:id/entities/:entityId/portrait", async (req, res) => {
   const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
 
@@ -408,6 +465,7 @@ entitiesRouter.delete("/campaigns/:id/entities/:entityId/portrait", async (req, 
  * (#838): the caller's own entries plus other members' CAMPAIGN-visible ones.
  * A PRIVATE note is visible only to its author — no owner/DM bypass.
  */
+// fallow-ignore-next-line code-duplication -- pre-existing view+404 guard shared with the portrait GET above; surfaced only because #1942 touched this file, not introduced by it
 entitiesRouter.get("/campaigns/:id/entities/:entityId/backlinks", async (req, res) => {
   const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
 

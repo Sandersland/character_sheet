@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { extractEntityIds, normalizeForMatch } from "@/lib/activity/journal-refs.js";
+import {
+  extractEntityIds,
+  mentionToken,
+  mentionTokenPattern,
+  normalizeForMatch,
+} from "@/lib/activity/journal-refs.js";
 
 const A = "11111111-1111-1111-1111-111111111111";
 const B = "22222222-2222-2222-2222-222222222222";
@@ -32,6 +37,39 @@ describe("extractEntityIds", () => {
 
   it("lowercases an uppercase uuid", () => {
     expect(extractEntityIds(`@[${A.toUpperCase()}]`)).toEqual([A]);
+  });
+});
+
+describe("mentionToken", () => {
+  it("builds the exact @[<id>] wire token", () => {
+    expect(mentionToken(A)).toBe(`@[${A}]`);
+  });
+
+  it("round-trips through extractEntityIds", () => {
+    expect(extractEntityIds(`Met ${mentionToken(A)} today`)).toEqual([A]);
+  });
+});
+
+describe("mentionTokenPattern", () => {
+  it("matches a case-insensitive RegExp built from it against the same id", () => {
+    const re = new RegExp(mentionTokenPattern(A), "gi");
+    expect(mentionToken(A)).toMatch(re);
+    expect(mentionToken(A.toUpperCase())).toMatch(re);
+  });
+
+  it("does not match a different id", () => {
+    const re = new RegExp(mentionTokenPattern(A), "gi");
+    expect(mentionToken(B)).not.toMatch(re);
+  });
+
+  it("does not throw and does not widen the match for a non-uuid id with regex metacharacters", () => {
+    const weird = "a.b*c+d?e^f$g(h)i|j[k]l\\m";
+    // A well-formed RegExp constructor call (doesn't throw a syntax error).
+    const re = new RegExp(mentionTokenPattern(weird), "gi");
+    expect(mentionToken(weird)).toMatch(re);
+    // The metacharacters are literal, not live regex syntax: a token that
+    // would match if `.` etc. were unescaped must NOT match.
+    expect(mentionToken("aXbXcXdXeXfXgXhXiXjXkXlXm")).not.toMatch(re);
   });
 });
 

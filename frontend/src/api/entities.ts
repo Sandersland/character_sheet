@@ -182,3 +182,20 @@ export async function unmergeEntityMerge(campaignId: string, mergeId: string): P
     "Failed to unmerge",
   );
 }
+
+// Destructive typo-dedup (#1942): absorbs every `loserEntityIds` duplicate
+// into `survivorEntityId` in one atomic combine and deletes them. A single
+// combine is a 1-length loserEntityIds array. Owner-only server-side; no
+// undo — the confirm dialog calling this is the gate.
+// fallow-ignore-next-line unused-export -- wired up by the combine UI landing in #1943, not this backend-scoped issue
+export async function combineEntities(
+  campaignId: string,
+  survivorEntityId: string,
+  loserEntityIds: string[],
+): Promise<CampaignEntity> {
+  return request<CampaignEntity>(
+    `/campaigns/${campaignId}/entities/combine`,
+    jsonBody({ survivorEntityId, loserEntityIds }),
+    "Failed to combine entities",
+  );
+}

@@ -34,6 +34,7 @@ const EXPECTED_EXPORTS = [
   "castDisciplineTransaction",
   "castManeuverTransaction",
   "checkHealth",
+  "combineEntities",
   "createCampaign",
   "createCampaignItem",
   "createCharacter",
