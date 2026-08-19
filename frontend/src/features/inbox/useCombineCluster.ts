@@ -34,8 +34,8 @@ export function useCombineCluster() {
       combineEntities(campaignId, survivorId, loserIds),
     onSuccess: (_data, { campaignId }) => {
       void queryClient.invalidateQueries({ queryKey: inboxKeys.all });
+      // Prefix match covers entitiesWithStats — entities() is its key prefix.
       void queryClient.invalidateQueries({ queryKey: campaignKeys.entities(campaignId) });
-      void queryClient.invalidateQueries({ queryKey: campaignKeys.entitiesWithStats(campaignId) });
       void queryClient.invalidateQueries({ queryKey: campaignKeys.merges(campaignId) });
       void queryClient.invalidateQueries({ queryKey: sessionKeys.chronicleForCampaign(campaignId) });
     },
