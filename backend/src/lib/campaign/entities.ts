@@ -234,6 +234,17 @@ class CombineGuardError extends Error {
   }
 }
 
+// Shared by assertNotPubliclyRevealed and repointMergeChains' own
+// self-ref/cycle branch: both guard the same fact — an EXECUTED merge is a
+// reveal players may already know, so it can never just vanish underneath a
+// combine (dropped silently, or cascaded away with the deleted duplicate).
+function publiclyRevealedMergeError(): CombineGuardError {
+  return new CombineGuardError(
+    409,
+    "This entity is a publicly revealed identity merge — unmerge it before combining",
+  );
+}
+
 // Rewrites every @[<dupId>] mention token to @[<survivorId>] across ALL of the
 // campaign's journal entries, regardless of author or visibility — unlike
 // visibleEntryWhere (used everywhere else in this file), a combine must not
@@ -265,10 +276,10 @@ async function rewriteMentionTokens(
   // prior version reconciled from extractEntityIds(rewrittenBody), which both
   // 500'd on a stale token (an id extractEntityIds finds but no CampaignEntity
   // row backs any more) and silently re-created refs the hidden-entity guard
-  // (syncEntryRefs, routes/session/journal.ts, #379) had deliberately
-  // suppressed. Collapse first: an entry already carrying both the dup's and
-  // the survivor's ref keeps only the survivor's (the @@unique constraint the
-  // second query below relies on being clear). Then move what's left.
+  // (syncEntryRefs, #379) had deliberately suppressed. Collapse first: an
+  // entry already carrying both the dup's and the survivor's ref keeps only
+  // the survivor's (the @@unique constraint the second query below relies on
+  // being clear). Then move what's left.
   await tx.journalEntryRef.deleteMany({
     where: {
       entityId: duplicateId,
@@ -283,15 +294,17 @@ async function rewriteMentionTokens(
 
 // Re-points merge rows where the duplicate stood in as the survivor (A → dup)
 // to the real survivor (A → S). A row that would become self-referential OR
-// would close a cycle against the rest of the graph is dropped instead —
+// would close a cycle against the rest of the graph can't be re-pointed —
 // wouldCreateCycle already covers the self-reference case (mergedId ===
-// survivorId short-circuits true), so one check does both. Rows where the
-// duplicate is mergedEntityId cascade-delete with the duplicate row the
-// caller deletes after this returns, UNLESS that row is EXECUTED — the
-// caller rejects that case before this ever runs (a public reveal doesn't
-// silently disappear). Re-pointing an EXECUTED row mirrors executeMerge's own
-// invariant: the survivor must stay REVEALED, or the reveal vanishes from
-// listVisibleMerges for players.
+// survivorId short-circuits true), so one check does both. A PREPARED row on
+// that branch is still secret DM prep and is dropped silently; an EXECUTED
+// row is a public reveal, so it throws the same guard error
+// assertNotPubliclyRevealed uses rather than vanishing underneath a 200.
+// Rows where the duplicate is mergedEntityId cascade-delete with the
+// duplicate row the caller deletes after this returns, UNLESS that row is
+// EXECUTED — the caller rejects that case before this ever runs. Re-pointing
+// an EXECUTED row mirrors executeMerge's own invariant: the survivor must
+// stay REVEALED, or the reveal vanishes from listVisibleMerges for players.
 async function repointMergeChains(
   tx: Tx,
   campaignId: string,
@@ -312,6 +325,7 @@ async function repointMergeChains(
   for (const row of asSurvivor) {
     const otherEdges = allEdges.filter((e) => e.id !== row.id);
     if (wouldCreateCycle(otherEdges, row.mergedEntityId, survivorEntityId)) {
+      if (row.status === "EXECUTED") throw publiclyRevealedMergeError();
       await tx.campaignEntityMerge.delete({ where: { id: row.id } });
       continue;
     }
@@ -375,26 +389,56 @@ async function fetchCombineTargets(
   return { duplicate, survivor };
 }
 
-// Two backed entities are two real things, not a typo (#1942): reject before
-// any write when both sides carry a link of the same kind, or when the
-// survivor's type can't inherit the duplicate's item link — the item
-// lifecycle owns its fronting entity (routes/campaign/campaign-items.ts
-// deletes the linked entity when the item is deleted) and the codex only
-// renders item data for ITEM-typed entities, so moving the link onto a
-// non-ITEM survivor would orphan that contract.
-function assertNoLinkConflicts(duplicate: LinkedEntity, survivor: LinkedEntity): void {
+// Two backed entities of the SAME kind are two real things, not a typo
+// (#1942): reject before any write.
+function assertNoBothLinkedConflicts(duplicate: LinkedEntity, survivor: LinkedEntity): void {
   if (duplicate.characterLink && survivor.characterLink) {
     throw new CombineGuardError(409, "Both entities are linked to a character");
   }
   if (duplicate.itemLink && survivor.itemLink) {
     throw new CombineGuardError(409, "Both entities are linked to an item");
   }
+}
+
+// The item lifecycle owns its fronting entity (deleting a campaign item
+// deletes its linked CampaignEntity in the same transaction, cascading the
+// link) and the codex only renders item data for ITEM-typed entities, so an
+// item link only moves onto an ITEM-typed survivor.
+function assertItemLinkMovable(duplicate: LinkedEntity, survivor: LinkedEntity): void {
   if (duplicate.itemLink && !survivor.itemLink && survivor.type !== "ITEM") {
     throw new CombineGuardError(
       409,
       "The survivor must be an ITEM entity to inherit the duplicate's item link",
     );
   }
+}
+
+// Mirrors assertItemLinkMovable: a character link only moves onto a
+// PC-typed survivor carrying no item link — otherwise a later item delete
+// (see assertItemLinkMovable's own comment) would cascade away the player's
+// own codex entity along with it.
+function assertCharacterLinkMovable(duplicate: LinkedEntity, survivor: LinkedEntity): void {
+  if (!duplicate.characterLink || survivor.characterLink) return;
+  if (survivor.type !== "PC") {
+    throw new CombineGuardError(
+      409,
+      "The survivor must be a PC entity to inherit the duplicate's character link",
+    );
+  }
+  if (survivor.itemLink) {
+    throw new CombineGuardError(
+      409,
+      "The survivor already fronts a campaign item — combining would risk the character link being deleted along with it",
+    );
+  }
+}
+
+// Every link-safety guard combineEntities must hold before it writes
+// anything — split into small per-concern checks above so each stays simple.
+function assertNoLinkConflicts(duplicate: LinkedEntity, survivor: LinkedEntity): void {
+  assertNoBothLinkedConflicts(duplicate, survivor);
+  assertItemLinkMovable(duplicate, survivor);
+  assertCharacterLinkMovable(duplicate, survivor);
 }
 
 // The duplicate having been PUBLICLY revealed to be someone else (an EXECUTED
@@ -411,12 +455,7 @@ async function assertNotPubliclyRevealed(
     where: { campaignId, mergedEntityId: duplicateId, status: "EXECUTED" },
     select: { id: true },
   });
-  if (revealedAsMerged) {
-    throw new CombineGuardError(
-      409,
-      "This entity is a publicly revealed identity merge — unmerge it before combining",
-    );
-  }
+  if (revealedAsMerged) throw publiclyRevealedMergeError();
 }
 
 // Every guard combineEntities must hold before it writes anything, run from
@@ -440,11 +479,11 @@ async function loadAndGuardCombineTargets(
 // deletes the duplicate. Survivor's fields always win — nothing is folded
 // from the duplicate (decided 2026-08-18). Cross-type combines are allowed.
 // No audit row and no undo (also decided on #1942): journal writes are
-// already deliberately plain-REST with no audit log (routes/session/journal.ts)
-// — this follows that precedent, not an absence of any event model elsewhere
-// (campaign-item-award.ts logs undoable CharacterEvents; the merge ops above
-// persist the CampaignEntityMerge row itself). The client-side confirm dialog
-// is the gate here.
+// already deliberately plain-REST with no audit log (journalRouter) — this
+// follows that precedent, not an absence of any event model elsewhere
+// (awardCampaignItem/revokeCampaignItem log undoable CharacterEvents; the
+// merge ops above persist the CampaignEntityMerge row itself). The
+// client-side confirm dialog is the gate here.
 export async function combineEntities(
   db: PrismaClient,
   campaignId: string,
@@ -494,10 +533,13 @@ export async function combineEntities(
     // guards otherwise close (#1942 TOCTOU fix): P2025 means a row the
     // transaction expected (e.g. a link) vanished underneath it; P2002 means
     // a unique constraint (e.g. a link's campaignEntityId) collided with a
-    // concurrent write. Both are the caller's problem, not a 500.
+    // concurrent write; P2003 means a foreign key target (e.g. the survivor,
+    // deleted between the guard read and journalEntryRef.updateMany) vanished
+    // underneath a write that references it. All three are the caller's
+    // problem, not a 500.
     if (err instanceof Prisma.PrismaClientKnownRequestError) {
       if (err.code === "P2025") return { ok: false, status: 404, error: "Entity not found" };
-      if (err.code === "P2002") {
+      if (err.code === "P2002" || err.code === "P2003") {
         return { ok: false, status: 409, error: "Combine conflicts with a concurrent change" };
       }
     }

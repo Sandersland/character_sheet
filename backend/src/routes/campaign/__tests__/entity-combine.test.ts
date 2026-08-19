@@ -7,39 +7,21 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import sharp from "sharp";
 import supertest from "supertest";
 
+import { Prisma } from "@/generated/prisma/client.js";
 import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
+import { createTestCharacter } from "@/test-support/character.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { __resetBlobStoreForTests, createBlobStore } from "@/lib/storage/index.js";
 import { PORTRAIT_FIELD } from "@/lib/storage/portrait-http.js";
+import * as entityMergesModule from "@/lib/activity/entity-merges.js";
 
 // Unique fixture ids for this file (parallel-safe on the shared dev DB).
 const OWNER = "combine-owner";
 const PLAYER = "combine-player";
 const CHAR_OWNER = "combine-char-owner";
 const CHAR_PLAYER = "combine-char-player";
-
-async function makeCharacter(id: string, ownerId: string) {
-  await prisma.character.deleteMany({ where: { id } });
-  await prisma.character.create({
-    data: {
-      id,
-      name: `Char ${id}`,
-      alignment: "True Neutral",
-      ownerId,
-      initiativeBonus: 0,
-      speed: 30,
-      hitPoints: { current: 10, max: 10, temp: 0 },
-      hitDice: { total: 1, die: "d8" },
-      abilityScores: { strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 },
-      savingThrowProficiencies: [],
-      skills: [],
-      toolProficiencies: [],
-      currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
-    },
-  });
-}
 
 describe("entity combine-duplicates (#1942)", () => {
   let cookieOwner: string;
@@ -98,8 +80,6 @@ describe("entity combine-duplicates (#1942)", () => {
     await ensureTestOwner(PLAYER);
     cookieOwner = await authCookie(OWNER);
     cookiePlayer = await authCookie(PLAYER);
-    await makeCharacter(CHAR_OWNER, OWNER);
-    await makeCharacter(CHAR_PLAYER, PLAYER);
 
     const created = await supertest(app)
       .post("/api/campaigns")
@@ -108,8 +88,10 @@ describe("entity combine-duplicates (#1942)", () => {
     campaignId = created.body.id;
     const code = created.body.inviteCode as string;
     await supertest(app).post("/api/campaigns/join").set("Cookie", cookiePlayer).send({ inviteCode: code });
-    await prisma.character.update({ where: { id: CHAR_OWNER }, data: { campaignId } });
-    await prisma.character.update({ where: { id: CHAR_PLAYER }, data: { campaignId } });
+
+    await prisma.character.deleteMany({ where: { id: { in: [CHAR_OWNER, CHAR_PLAYER] } } });
+    await createTestCharacter(OWNER, { id: CHAR_OWNER, name: "Combine Char Owner", campaignId });
+    await createTestCharacter(PLAYER, { id: CHAR_PLAYER, name: "Combine Char Player", campaignId });
 
     const other = await supertest(app)
       .post("/api/campaigns")
@@ -282,8 +264,8 @@ describe("entity combine-duplicates (#1942)", () => {
     const surv = await makeEntity(campaignId, "Lili Hidden");
 
     // A real journal write, through the actual route, as a non-owner — the
-    // hidden-entity guard in syncEntryRefs (routes/session/journal.ts, #379)
-    // suppresses the hidden ref here, leaving the token as unbacked text.
+    // hidden-entity guard in syncEntryRefs (#379) suppresses the hidden ref
+    // here, leaving the token as unbacked text.
     const created = await supertest(app)
       .post(`/api/characters/${CHAR_PLAYER}/journal`)
       .set("Cookie", cookiePlayer)
@@ -326,11 +308,50 @@ describe("entity combine-duplicates (#1942)", () => {
     expect(after.survivorEntityId).toBe(surv);
   });
 
-  it("drops a merge row that would become self-referential when re-pointed", async () => {
+  // The realistic concurrent-combine race: the survivor row a caller-visible
+  // read confirmed present gets deleted by someone else before the write that
+  // references it lands, raising a Postgres foreign-key violation (P2003) —
+  // e.g. journalEntryRef.updateMany's FK to CampaignEntity. wouldCreateCycle
+  // only runs mid-transaction when a merge chain needs re-pointing, so it's a
+  // convenient, already-exported hook to force a real PrismaClientKnownRequestError
+  // out of the SAME transaction combineEntities runs, without mocking Prisma itself.
+  it("409s (not 500) on a mid-transaction foreign-key race (P2003)", async () => {
+    const a = await makeEntity(campaignId, "A P2003");
+    const dup = await makeEntity(campaignId, "lili P2003");
+    const surv = await makeEntity(campaignId, "Lili P2003");
+
+    const prep = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/entities/merges`)
+      .set("Cookie", cookieOwner)
+      .send({ mergedEntityId: a, survivorEntityId: dup });
+    expect(prep.status).toBe(201);
+    const mergeId = prep.body.id as string;
+
+    const spy = vi.spyOn(entityMergesModule, "wouldCreateCycle").mockImplementationOnce(() => {
+      throw new Prisma.PrismaClientKnownRequestError("Foreign key constraint violated", {
+        code: "P2003",
+        clientVersion: "test",
+      });
+    });
+    try {
+      const res = await combine(dup, surv);
+      expect(res.status).toBe(409);
+    } finally {
+      spy.mockRestore();
+    }
+
+    // The transaction rolled back — the merge row's original shape survives.
+    const after = await prisma.campaignEntityMerge.findUniqueOrThrow({ where: { id: mergeId } });
+    expect(after.mergedEntityId).toBe(a);
+    expect(after.survivorEntityId).toBe(dup);
+  });
+
+  it("drops a PREPARED merge row that would become self-referential when re-pointed", async () => {
     const dup = await makeEntity(campaignId, "lili F");
     const surv = await makeEntity(campaignId, "Lili F");
 
-    // "Lili F is secretly lili F" — survivor merged into the duplicate.
+    // "Lili F is secretly lili F" — survivor merged into the duplicate. Still
+    // PREPARED (never executed), so it's still secret DM prep — dies silently.
     const prep = await supertest(app)
       .post(`/api/campaigns/${campaignId}/entities/merges`)
       .set("Cookie", cookieOwner)
@@ -343,6 +364,33 @@ describe("entity combine-duplicates (#1942)", () => {
 
     const after = await prisma.campaignEntityMerge.findUnique({ where: { id: mergeId } });
     expect(after).toBeNull();
+  });
+
+  it("409s combining when a self-referential re-point would destroy an EXECUTED (publicly revealed) merge", async () => {
+    const dup = await makeEntity(campaignId, "lili F Exec");
+    const surv = await makeEntity(campaignId, "Lili F Exec");
+
+    // Same shape as the PREPARED case above, but EXECUTED: a public reveal
+    // players may already know, so it can't just vanish under a 200.
+    const prep = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/entities/merges`)
+      .set("Cookie", cookieOwner)
+      .send({ mergedEntityId: surv, survivorEntityId: dup });
+    expect(prep.status).toBe(201);
+    const mergeId = prep.body.id as string;
+    const exec = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/entities/merges/${mergeId}/execute`)
+      .set("Cookie", cookieOwner);
+    expect(exec.status).toBe(200);
+
+    const res = await combine(dup, surv);
+    expect(res.status).toBe(409);
+
+    // Nothing touched: the reveal survives, and the duplicate isn't deleted.
+    const stillMerge = await prisma.campaignEntityMerge.findUnique({ where: { id: mergeId } });
+    expect(stillMerge).not.toBeNull();
+    const stillDup = await prisma.campaignEntity.findUnique({ where: { id: dup } });
+    expect(stillDup).not.toBeNull();
   });
 
   it("drops a merge row that would close a cycle against the rest of the graph", async () => {
@@ -453,7 +501,8 @@ describe("entity combine-duplicates (#1942)", () => {
   });
 
   it("moves a character link from an unlinked duplicate onto the survivor", async () => {
-    await makeCharacter("combine-link-char-1", OWNER);
+    await prisma.character.deleteMany({ where: { id: "combine-link-char-1" } });
+    await createTestCharacter(OWNER, { id: "combine-link-char-1" });
     const attach = await supertest(app)
       .post(`/api/campaigns/${campaignId}/characters`)
       .set("Cookie", cookieOwner)
@@ -479,8 +528,11 @@ describe("entity combine-duplicates (#1942)", () => {
   });
 
   it("409s combining two entities that both carry a character link", async () => {
-    await makeCharacter("combine-link-char-2a", OWNER);
-    await makeCharacter("combine-link-char-2b", OWNER);
+    await prisma.character.deleteMany({
+      where: { id: { in: ["combine-link-char-2a", "combine-link-char-2b"] } },
+    });
+    await createTestCharacter(OWNER, { id: "combine-link-char-2a" });
+    await createTestCharacter(OWNER, { id: "combine-link-char-2b" });
     await supertest(app)
       .post(`/api/campaigns/${campaignId}/characters`)
       .set("Cookie", cookieOwner)
@@ -507,6 +559,77 @@ describe("entity combine-duplicates (#1942)", () => {
     await prisma.character.deleteMany({
       where: { id: { in: ["combine-link-char-2a", "combine-link-char-2b"] } },
     });
+  });
+
+  it("409s moving a character link onto a non-PC survivor", async () => {
+    await prisma.character.deleteMany({ where: { id: "combine-link-char-3" } });
+    await createTestCharacter(OWNER, { id: "combine-link-char-3" });
+    const attach = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/characters`)
+      .set("Cookie", cookieOwner)
+      .send({ characterId: "combine-link-char-3" });
+    expect(attach.status).toBe(200);
+
+    const linkRow = await prisma.campaignCharacterLink.findUniqueOrThrow({
+      where: { characterId: "combine-link-char-3" },
+    });
+    const dupPcId = linkRow.campaignEntityId;
+    const surv = await makeEntity(campaignId, "Not A PC", "NPC");
+
+    const res = await combine(dupPcId, surv);
+    expect(res.status).toBe(409);
+
+    const stillLinked = await prisma.campaignCharacterLink.findUniqueOrThrow({
+      where: { characterId: "combine-link-char-3" },
+    });
+    expect(stillLinked.campaignEntityId).toBe(dupPcId);
+    const stillDup = await prisma.campaignEntity.findUnique({ where: { id: dupPcId } });
+    expect(stillDup).not.toBeNull();
+
+    await prisma.character.deleteMany({ where: { id: "combine-link-char-3" } });
+  });
+
+  it("409s moving a character link onto a PC survivor that also fronts a campaign item", async () => {
+    await prisma.character.deleteMany({ where: { id: "combine-link-char-4" } });
+    await createTestCharacter(OWNER, { id: "combine-link-char-4" });
+    const attach = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/characters`)
+      .set("Cookie", cookieOwner)
+      .send({ characterId: "combine-link-char-4" });
+    expect(attach.status).toBe(200);
+
+    const linkRow = await prisma.campaignCharacterLink.findUniqueOrThrow({
+      where: { characterId: "combine-link-char-4" },
+    });
+    const dupPcId = linkRow.campaignEntityId;
+
+    // A PC-typed survivor that ALSO fronts a campaign item — not something the
+    // UI would normally construct, but the guard must hold regardless: a
+    // later item delete cascades away this entity, taking the character link
+    // (and the player's own codex row) with it.
+    const survEntity = await prisma.campaignEntity.create({
+      data: { campaignId, type: "PC", name: "PC Fronting An Item" },
+    });
+    await prisma.item.create({
+      data: {
+        scope: "CAMPAIGN",
+        scopeKey: `campaign:${campaignId}`,
+        campaignId,
+        name: "Item On A PC Entity",
+        category: "gear",
+        link: { create: { campaignEntityId: survEntity.id } },
+      },
+    });
+
+    const res = await combine(dupPcId, survEntity.id);
+    expect(res.status).toBe(409);
+
+    const stillLinked = await prisma.campaignCharacterLink.findUniqueOrThrow({
+      where: { characterId: "combine-link-char-4" },
+    });
+    expect(stillLinked.campaignEntityId).toBe(dupPcId);
+
+    await prisma.character.deleteMany({ where: { id: "combine-link-char-4" } });
   });
 
   async function makeItemEntity(name: string): Promise<{ entityId: string; itemId: string }> {
@@ -587,7 +710,8 @@ describe("entity combine-duplicates (#1942)", () => {
 
   describe("portrait cleanup (#1942)", () => {
     beforeAll(async () => {
-      // Same isolated fs-driven blob store as entities.test.ts's portrait suite.
+      // Isolated fs-driven blob store, the same __resetBlobStoreForTests/
+      // createBlobStore setup the other entity-portrait tests use.
       vi.stubEnv("BLOB_STORE_DRIVER", "fs");
       vi.stubEnv("BLOB_FS_DIR", await mkdtemp(path.join(os.tmpdir(), "entity-combine-portrait-test-")));
       __resetBlobStoreForTests();
