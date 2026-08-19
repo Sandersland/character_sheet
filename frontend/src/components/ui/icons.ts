@@ -85,6 +85,9 @@ export {
   Plus,
   Zap,
   VenetianMask,
+  // The typo-dedup "Combine into…" glyph (#1943) — deliberately not VenetianMask,
+  // which reads as identity-merge (a secret) rather than combine (a mistake).
+  Combine,
   ChevronDown,
   ChevronRight,
   ArrowLeft,

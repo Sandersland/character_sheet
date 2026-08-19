@@ -185,10 +185,10 @@ export async function unmergeEntityMerge(campaignId: string, mergeId: string): P
 
 // Destructive typo-dedup (#1942): absorbs every `loserEntityIds` duplicate
 // into `survivorEntityId` in one atomic combine and deletes them — all or
-// nothing, so a failure leaves every entity untouched. Owner-only server-
-// side; no undo — the confirm dialog calling this is the gate. Consumed by
-// the inbox's Review-duplicates modal (#1946): one call per cluster, the
-// whole loser list at once, not one call per absorbed entity.
+// nothing, so a failure leaves every entity untouched. A single combine is a
+// 1-length loserEntityIds array (CombineConfirmDialog); the inbox's
+// Review-duplicates modal passes a cluster's whole loser list in one call.
+// Owner-only server-side; no undo — the confirm surface calling this is the gate.
 export async function combineEntities(
   campaignId: string,
   survivorEntityId: string,
