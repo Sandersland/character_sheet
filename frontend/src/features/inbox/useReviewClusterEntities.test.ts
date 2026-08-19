@@ -56,4 +56,26 @@ describe("useReviewClusterEntities", () => {
     await waitFor(() => expect(result.current.merges).toEqual(primed));
     expect(fetchEntityMerges).not.toHaveBeenCalled();
   });
+
+  it("isLoading stays true while the merges fetch is still in flight, even after entities lands (#1949)", async () => {
+    fetchEntities.mockResolvedValue([]);
+    let resolveMerges!: (v: CampaignEntityMerge[]) => void;
+    fetchEntityMerges.mockReturnValue(new Promise((r) => { resolveMerges = r; }));
+
+    const { result } = renderHook(() => useReviewClusterEntities("camp-1"));
+    await waitFor(() => expect(result.current.entities).toEqual([]));
+    expect(result.current.isLoading).toBe(true);
+
+    resolveMerges([]);
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+  });
+
+  it("isError surfaces a merges fetch rejection", async () => {
+    fetchEntities.mockResolvedValue([]);
+    fetchEntityMerges.mockRejectedValue(new Error("boom"));
+
+    const { result } = renderHook(() => useReviewClusterEntities("camp-1"));
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+  });
 });

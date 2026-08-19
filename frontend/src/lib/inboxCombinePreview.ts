@@ -1,14 +1,13 @@
-// Pure preview logic for the Review-duplicates modal (#1946): the N-way
-// sibling of #1943's combinePreview.ts pair-combine preview. A cluster
-// combines by absorbing every non-survivor entity into the chosen survivor —
-// one atomic #1942 call carrying the whole loser list — so every number here
-// is computed over "the losers" rather than a single duplicate.
+// Preview logic specific to the Review-duplicates modal's N-way cluster
+// combine (#1946): the live summary line (fed the inbox row's own
+// lightweight entities, not a full-entity fetch) and its private-notes
+// hedge, plus the redacted-mention warning. "What is lost by a combine"
+// itself — notes/aliases/portrait/type/visibility/a prepared merge,
+// generalized over a losers array — lives in combinePreview.ts; this file
+// reuses it rather than re-deriving it.
 
-import type { CampaignEntity, CampaignEntityMerge, InboxDuplicateEntity } from "@/types/character";
-
-export function losersOf<T extends { id: string }>(entities: T[], survivorId: string): T[] {
-  return entities.filter((e) => e.id !== survivorId);
-}
+import { losersOf, type CombineDiscardedItem } from "@/lib/combinePreview";
+import type { InboxDuplicateEntity } from "@/types/character";
 
 interface MentionSummaryEntity {
   id: string;
@@ -39,66 +38,25 @@ export function combineSummaryLine(entities: MentionSummaryEntity[], survivorId:
   return `${mentionsMoving} ${mentionWord} ${mentionVerb} to ${survivor?.name ?? "?"}, plus any in players' private notes · ${losers.length} ${rowWord} deleted`;
 }
 
-export interface InboxDiscardedItem {
-  key: "visibility" | "notes" | "merge" | "redacted-until-revealed";
-  label: string;
-}
-
-// The inverse of the "Hidden visibility" item below: a REVEALED loser's
-// mentions moving onto a HIDDEN survivor doesn't drop anything, but it DOES
-// change how those mentions render to players — as a redacted "Hidden" chip —
-// until the survivor itself is revealed. Computable off the inbox row's own
-// lightweight entities (visibility only), no full-entity fetch needed, so the
-// caller can show this immediately rather than waiting on combineDiscardedItems'
-// richer data.
+// The inverse of combineDiscardedItems' "Hidden visibility" item: a REVEALED
+// loser's mentions moving onto a HIDDEN survivor doesn't drop anything, but
+// it DOES change how those mentions render to players — as a redacted
+// "Hidden" chip — until the survivor itself is revealed. Computable off the
+// inbox row's own lightweight entities (visibility only), no full-entity
+// fetch needed, so the caller can show this immediately rather than waiting
+// on combineDiscardedItems' richer data.
 export function hiddenSurvivorRedactsRevealedMentions(
   entities: InboxDuplicateEntity[],
   survivorId: string,
-): InboxDiscardedItem | null {
+): CombineDiscardedItem | null {
   const survivor = entities.find((e) => e.id === survivorId);
   if (survivor?.visibility !== "HIDDEN") return null;
 
-  const revealedLosers = entities.filter((e) => e.id !== survivorId && e.visibility === "REVEALED");
+  const revealedLosers = losersOf(entities, survivorId).filter((e) => e.visibility === "REVEALED");
   if (revealedLosers.length === 0) return null;
 
   return {
     key: "redacted-until-revealed",
     label: `Mentions from ${revealedLosers.map((e) => e.name).join(", ")} will render as "Hidden" until ${survivor.name} is revealed`,
   };
-}
-
-// What's lost when every non-survivor entity in the cluster is combined away:
-// only the categories some loser actually carries, each naming which losers —
-// an empty list means the gold warning box in the modal doesn't render at all.
-export function combineDiscardedItems(
-  entities: CampaignEntity[],
-  survivorId: string,
-  merges: CampaignEntityMerge[],
-): InboxDiscardedItem[] {
-  const losers = losersOf(entities, survivorId);
-  const items: InboxDiscardedItem[] = [];
-
-  const hidden = losers.filter((e) => e.visibility === "HIDDEN");
-  if (hidden.length > 0) {
-    items.push({ key: "visibility", label: `Hidden visibility — ${hidden.map((e) => e.name).join(", ")}` });
-  }
-
-  const described = losers.filter((e) => e.stats?.hasDescription);
-  if (described.length > 0) {
-    items.push({ key: "notes", label: `Descriptions — ${described.map((e) => e.name).join(", ")}` });
-  }
-
-  const preparedMerge = losers.filter((loser) =>
-    merges.some(
-      (m) => m.status === "PREPARED" && (m.mergedEntityId === loser.id || m.survivorEntityId === loser.id),
-    ),
-  );
-  if (preparedMerge.length > 0) {
-    items.push({
-      key: "merge",
-      label: `Prepared identity merges — ${preparedMerge.map((e) => e.name).join(", ")}`,
-    });
-  }
-
-  return items;
 }

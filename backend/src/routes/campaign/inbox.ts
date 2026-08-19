@@ -58,6 +58,17 @@ inboxRouter.post("/inbox/dismissals", async (req, res) => {
     return;
   }
 
+  // No check here for `kind` actually matching a real row of that kind: both
+  // kinds' signatures are clusterSignature (a sorted, comma-joined entity-id
+  // list) with no distinguishing shape, so a caller sending
+  // kind=NEEDS_CHRONICLING with a signature that's really a
+  // DUPLICATE_CLUSTER's ids (or vice versa) can't be caught by format alone
+  // — the only way to tell is recomputing buildInboxRows for this campaign
+  // and checking whether a (kind, signature) row actually exists there,
+  // which is more than a cheap validation. The consequence is contained: a
+  // mismatched dismissal just never matches a real row in filterDismissed
+  // (kind is part of its match key), so it's inert, not exploitable — it
+  // can't suppress a row of the OTHER kind.
   await prisma.inboxDismissal.upsert({
     where: {
       userId_campaignId_kind_signature: {

@@ -1,4 +1,5 @@
 import Card from "@/components/ui/Card";
+import GoldWarningBox from "@/components/ui/GoldWarningBox";
 import { Eye } from "@/components/ui/icons";
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { SpeciesTrait } from "@/types/character";
@@ -42,18 +43,10 @@ export default function SpeciesTraitsCard() {
 // plain trait list below — the owner asked for it visible, not buried.
 function DarkvisionRow({ trait }: { trait: SpeciesTrait }) {
   return (
-    <div className="flex items-center gap-2.5 rounded-card border border-gold-400 bg-gold-100 px-3 py-2">
-      <span
-        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-control bg-gold-400 text-gold-900"
-        aria-hidden="true"
-      >
-        <Eye className="h-3.5 w-3.5" />
-      </span>
-      <div className="min-w-0">
-        <div className="text-xs font-bold text-gold-900">{trait.name}</div>
-        <div className="text-[11px] font-medium text-gold-800">{trait.description}</div>
-      </div>
-    </div>
+    <GoldWarningBox variant="row" icon={<Eye className="h-3.5 w-3.5" />}>
+      <div className="text-xs font-bold text-gold-900">{trait.name}</div>
+      <div className="text-[11px] font-medium text-gold-800">{trait.description}</div>
+    </GoldWarningBox>
   );
 }
 

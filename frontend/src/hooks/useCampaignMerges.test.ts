@@ -84,4 +84,23 @@ describe("useCampaignMerges", () => {
 
     expect(getQueryClient().getQueryData(campaignKeys.merges("camp-1"))).toEqual(created);
   });
+
+  it("isPending is true while the fetch is in flight, false once it resolves (#1949: a caller gating completeness on isLoading alone can't see this)", async () => {
+    let resolve!: (v: CampaignEntityMerge[]) => void;
+    fetchEntityMerges.mockReturnValue(new Promise((r) => { resolve = r; }));
+    const { result } = renderHook(() => useCampaignMerges("camp-1"));
+
+    expect(result.current.isPending).toBe(true);
+
+    resolve([]);
+    await waitFor(() => expect(result.current.isPending).toBe(false));
+  });
+
+  it("isError surfaces a fetch rejection even though `merges` itself still falls back to []", async () => {
+    fetchEntityMerges.mockRejectedValue(new Error("boom"));
+    const { result } = renderHook(() => useCampaignMerges("camp-1"));
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.merges).toEqual([]);
+  });
 });

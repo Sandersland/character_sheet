@@ -1,12 +1,10 @@
 import { describe, it, expect } from "vitest";
 
 import {
-  combineDiscardedItems,
   combineSummaryLine,
   hiddenSurvivorRedactsRevealedMentions,
-  losersOf,
 } from "@/lib/inboxCombinePreview";
-import type { CampaignEntity, CampaignEntityMerge, InboxDuplicateEntity } from "@/types/character";
+import type { InboxDuplicateEntity } from "@/types/character";
 
 function inboxEntity(overrides: Partial<InboxDuplicateEntity> = {}): InboxDuplicateEntity {
   return {
@@ -18,28 +16,6 @@ function inboxEntity(overrides: Partial<InboxDuplicateEntity> = {}): InboxDuplic
     ...overrides,
   };
 }
-
-function entity(overrides: Partial<CampaignEntity> = {}): CampaignEntity {
-  return {
-    id: "e1",
-    campaignId: "camp-1",
-    type: "NPC",
-    name: "Lil",
-    aliases: [],
-    notes: null,
-    visibility: "REVEALED",
-    createdAt: "",
-    updatedAt: "",
-    ...overrides,
-  };
-}
-
-describe("losersOf", () => {
-  it("returns every entity except the chosen survivor", () => {
-    const entities = [entity({ id: "e1" }), entity({ id: "e2" }), entity({ id: "e3" })];
-    expect(losersOf(entities, "e2").map((e) => e.id)).toEqual(["e1", "e3"]);
-  });
-});
 
 describe("combineSummaryLine", () => {
   it("matches the spec example: singular mention, plural rows, plus the private-notes hedge — fed the inbox row's own lightweight entities", () => {
@@ -83,58 +59,6 @@ describe("combineSummaryLine", () => {
     expect(line).toContain("plus any in players' private notes");
     // No stray digit sits inside the hedge clause itself.
     expect(line.split("plus any in players' private notes")[1].split("·")[0]).not.toMatch(/\d/);
-  });
-});
-
-describe("combineDiscardedItems", () => {
-  it("lists hidden losers, described losers, and prepared-merge losers by name", () => {
-    const entities = [
-      entity({ id: "e1", name: "Lil", visibility: "HIDDEN", stats: { mentionCount: 0, firstMentioned: null, lastMentioned: null, chroniclers: [], hasDescription: true } }),
-      entity({ id: "e2", name: "lili" }),
-      entity({ id: "e3", name: "Lili" }),
-    ];
-    const merges: CampaignEntityMerge[] = [
-      {
-        id: "m1",
-        campaignId: "camp-1",
-        mergedEntityId: "e2",
-        survivorEntityId: "some-other",
-        status: "PREPARED",
-        note: null,
-        preparedAt: "",
-        executedAt: null,
-      },
-    ];
-
-    const items = combineDiscardedItems(entities, "e3", merges);
-
-    expect(items).toEqual([
-      { key: "visibility", label: "Hidden visibility — Lil" },
-      { key: "notes", label: "Descriptions — Lil" },
-      { key: "merge", label: "Prepared identity merges — lili" },
-    ]);
-  });
-
-  it("returns nothing to discard when the losers carry no real losses", () => {
-    const entities = [entity({ id: "e1", name: "Lil" }), entity({ id: "e2", name: "Lili" })];
-    expect(combineDiscardedItems(entities, "e2", [])).toEqual([]);
-  });
-
-  it("ignores an EXECUTED merge — only a PREPARED one is a real loss", () => {
-    const entities = [entity({ id: "e1", name: "Lil" }), entity({ id: "e2", name: "Lili" })];
-    const merges: CampaignEntityMerge[] = [
-      {
-        id: "m1",
-        campaignId: "camp-1",
-        mergedEntityId: "e1",
-        survivorEntityId: "x",
-        status: "EXECUTED",
-        note: null,
-        preparedAt: "",
-        executedAt: "2026-01-01",
-      },
-    ];
-    expect(combineDiscardedItems(entities, "e2", merges)).toEqual([]);
   });
 });
 
