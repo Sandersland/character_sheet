@@ -743,7 +743,7 @@ describe("EntityDetailPage (#248)", () => {
         within(screen.getByRole("dialog")).getByRole("button", { name: /combine and delete lili/i }),
       );
 
-      expect(vi.mocked(client.combineEntities)).toHaveBeenCalledWith(CAMPAIGN_ID, ENTITY_ID, "ent-2");
+      expect(vi.mocked(client.combineEntities)).toHaveBeenCalledWith(CAMPAIGN_ID, "ent-2", [ENTITY_ID]);
       expect(await screen.findByRole("heading", { name: "Lili" })).toBeInTheDocument();
       expect(await screen.findByText("lili combined into Lili.")).toBeInTheDocument();
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();

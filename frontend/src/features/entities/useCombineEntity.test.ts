@@ -38,7 +38,7 @@ describe("useCombineEntity (#1943)", () => {
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(vi.mocked(combineEntities)).toHaveBeenCalledWith(CAMPAIGN_ID, "dup-1", "surv-1");
+    expect(vi.mocked(combineEntities)).toHaveBeenCalledWith(CAMPAIGN_ID, "surv-1", ["dup-1"]);
   });
 
   it("invalidates the entities and merges caches on success", async () => {
