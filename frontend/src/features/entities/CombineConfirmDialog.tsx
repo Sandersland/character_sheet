@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 import { TriangleAlert } from "@/components/ui/icons";
-import { useCombineEntity } from "@/features/entities/useCombineEntity";
+import type { useCombineEntity } from "@/features/entities/useCombineEntity";
 import {
   combineDiscardedItems,
   combineItemLinkTransferWarning,
@@ -13,7 +13,6 @@ import { errorMessage } from "@/lib/errorMessage";
 import type { CampaignEntity, CampaignEntityMerge, CampaignItem } from "@/types/character";
 
 interface CombineConfirmDialogProps {
-  campaignId: string;
   duplicate: CampaignEntity;
   survivor: CampaignEntity;
   merges: CampaignEntityMerge[];
@@ -21,6 +20,11 @@ interface CombineConfirmDialogProps {
   // for the page being combined away, via fetchCampaignItemByEntity) — drives
   // the item-link-transfer warning below alongside survivor.itemId.
   duplicateItem: CampaignItem | null;
+  // Owned by CombineEntityAction, not created here — it needs the same
+  // instance to gate the Modal's own dismiss paths (Close link, overlay
+  // click, Escape) while pending, so a user can't make an irreversible
+  // combine look cancelled by dismissing the dialog mid-flight.
+  mutation: ReturnType<typeof useCombineEntity>;
   onCancel: () => void;
   onCombined: (survivorId: string, message: string) => void;
 }
@@ -45,15 +49,14 @@ function GoldWarning({ children }: { children: ReactNode }) {
 // and renders inline here, same treatment as any other failure — never a toast,
 // since the whole point is the dialog staying open for the DM to read why.
 export default function CombineConfirmDialog({
-  campaignId,
   duplicate,
   survivor,
   merges,
   duplicateItem,
+  mutation,
   onCancel,
   onCombined,
 }: CombineConfirmDialogProps) {
-  const mutation = useCombineEntity(campaignId);
   const discarded = combineDiscardedItems(duplicate, survivor);
   const preparedMergeWarning = duplicateHasPreparedMerge(merges, duplicate.id);
   const redactedMentionWarning = combineRedactedMentionWarning(duplicate, survivor);

@@ -650,6 +650,49 @@ describe("EntityDetailPage (#248)", () => {
       expect(within(dialog).getByText(/No entities match/i)).toBeInTheDocument();
     });
 
+    it("keeps ONE Modal instance across the picker → confirm step change — no unmount/remount (review finding #1)", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await user.click(await screen.findByRole("button", { name: /combine into/i }));
+
+      const pickerDialog = screen.getByRole("dialog");
+      await user.click(within(pickerDialog).getByRole("button", { name: /Lili/ }));
+
+      // Same underlying DOM node, not just "a dialog with the same role" —
+      // a remount would hand back a different element, which `toBe` (strict
+      // reference equality) catches even though both pass the same query.
+      const confirmDialog = screen.getByRole("dialog");
+      expect(confirmDialog).toBe(pickerDialog);
+      expect(within(confirmDialog).getByRole("heading", { name: "Combine into Lili" })).toBeInTheDocument();
+    });
+
+    it("won't dismiss via Escape while the combine is in flight (review finding #2)", async () => {
+      let resolveCombine: ((entity: CampaignEntity) => void) | undefined;
+      vi.mocked(client.combineEntities).mockImplementation(
+        () => new Promise((resolve) => { resolveCombine = resolve; }),
+      );
+      const user = userEvent.setup();
+      renderPage();
+      await user.click(await screen.findByRole("button", { name: /combine into/i }));
+      await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /Lili/ }));
+      await user.click(
+        within(screen.getByRole("dialog")).getByRole("button", { name: /combine and delete lili/i }),
+      );
+
+      // The mutation is deliberately left pending (resolveCombine never
+      // called) — Escape routes through useDialogChrome straight to Modal's
+      // onClose, the same path the Close link and an overlay click use, so
+      // this exercises all three at once.
+      await user.keyboard("{Escape}");
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+      expect(
+        within(screen.getByRole("dialog")).getByRole("button", { name: /combining/i }),
+      ).toBeInTheDocument();
+
+      resolveCombine?.(SURVIVOR);
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    });
+
     it("shows the consequence preview with real counts and the loss list", async () => {
       const user = userEvent.setup();
       renderPage();

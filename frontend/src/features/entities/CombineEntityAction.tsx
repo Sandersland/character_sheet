@@ -4,6 +4,7 @@ import { Combine } from "@/components/ui/icons";
 import Modal from "@/components/ui/Modal";
 import CombineConfirmDialog from "@/features/entities/CombineConfirmDialog";
 import CombineSurvivorPicker from "@/features/entities/CombineSurvivorPicker";
+import { useCombineEntity } from "@/features/entities/useCombineEntity";
 import { useCampaignEntities } from "@/hooks/useCampaignEntities";
 import { useCampaignMerges } from "@/hooks/useCampaignMerges";
 import type { CampaignEntity, CampaignItem } from "@/types/character";
@@ -22,9 +23,16 @@ interface CombineEntityActionProps {
 // CampaignManagePanel's identity-merge workflow: this is "this one's a
 // mistake" (destroys the duplicate outright), that is "this one's a secret"
 // (records a reveal, keeps both rows) — deliberately its own icon/copy/surface
-// rather than living next to Hide/Delete unlabeled. Two steps share one Modal
-// instance — pick a survivor, then confirm — so Cancel from either step always
-// lands back on the trigger, not a half-open dialog. campaignId comes off
+// rather than living next to Hide/Delete unlabeled. ONE Modal instance stays
+// mounted across both steps — the title and body swap on `survivor`, the
+// element itself never unmounts — so focus and any mount animation aren't
+// reset mid-flow, and Cancel from either step always lands back on the
+// trigger, not a half-open dialog. The mutation is owned HERE (not inside
+// CombineConfirmDialog) so `close` can consult `mutation.isPending` and
+// refuse to dismiss — Modal's onClose fires unconditionally on its Close
+// link, an overlay click, AND Escape (useDialogChrome), so gating only the
+// dialog's own Cancel button would leave those three paths free to make an
+// in-flight, irreversible combine look cancelled. campaignId comes off
 // `duplicate.campaignId` (a required wire field) rather than a separate prop,
 // so there is no truthiness guard upstream that could silently hide the action.
 export default function CombineEntityAction({
@@ -36,12 +44,15 @@ export default function CombineEntityAction({
   const campaignId = duplicate.campaignId;
   const { entities } = useCampaignEntities(campaignId);
   const { merges } = useCampaignMerges(campaignId);
+  const mutation = useCombineEntity(campaignId);
   const [survivor, setSurvivor] = useState<CampaignEntity | null>(null);
   const [open, setOpen] = useState(false);
 
   function close() {
+    if (mutation.isPending) return;
     setOpen(false);
     setSurvivor(null);
+    mutation.reset();
   }
 
   return (
@@ -56,26 +67,24 @@ export default function CombineEntityAction({
         Combine into…
       </button>
 
-      {open && !survivor && (
-        <Modal title="Combine into…" onClose={close}>
-          <CombineSurvivorPicker duplicateId={duplicate.id} entities={entities} onPick={setSurvivor} />
-        </Modal>
-      )}
-
-      {open && survivor && (
-        <Modal title={`Combine into ${survivor.name}`} onClose={close}>
-          <CombineConfirmDialog
-            campaignId={campaignId}
-            duplicate={duplicate}
-            survivor={survivor}
-            merges={merges}
-            duplicateItem={duplicateItem}
-            onCancel={close}
-            onCombined={(survivorId, message) => {
-              close();
-              onCombined(survivorId, message);
-            }}
-          />
+      {open && (
+        <Modal title={survivor ? `Combine into ${survivor.name}` : "Combine into…"} onClose={close}>
+          {!survivor ? (
+            <CombineSurvivorPicker duplicateId={duplicate.id} entities={entities} onPick={setSurvivor} />
+          ) : (
+            <CombineConfirmDialog
+              duplicate={duplicate}
+              survivor={survivor}
+              merges={merges}
+              duplicateItem={duplicateItem}
+              mutation={mutation}
+              onCancel={close}
+              onCombined={(survivorId, message) => {
+                close();
+                onCombined(survivorId, message);
+              }}
+            />
+          )}
         </Modal>
       )}
     </>
