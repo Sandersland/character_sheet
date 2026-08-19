@@ -2,7 +2,7 @@ import { Router } from "express";
 import { dismissInboxFlagSchema } from "@character-sheet/contracts";
 
 import { assertCampaignOwner } from "@/lib/auth/access.js";
-import { buildInboxRows, filterDismissed } from "@/lib/campaign/inbox.js";
+import { buildInboxRows, filterDismissed, signatureBelongsToCampaign } from "@/lib/campaign/inbox.js";
 import { parseBodyOr400 } from "@/lib/http/parse-body.js";
 import { prisma } from "@/lib/core/prisma.js";
 
@@ -33,7 +33,10 @@ inboxRouter.get("/inbox", async (req, res) => {
  * transaction-endpoint requirement. Idempotent on the (userId, kind,
  * signature) unique: dismissing an already-dismissed flag is a no-op.
  * Requires campaign OWNERSHIP (not mere membership) since every GET /api/inbox
- * row is itself owner-scoped.
+ * row is itself owner-scoped. Also requires every id in `signature` to
+ * actually belong to `campaignId` — otherwise an owner of two campaigns could
+ * file a dismissal FK'd to one whose signature suppresses a flag in the
+ * other (and whose cascade-cleanup would then target the wrong campaign).
  */
 inboxRouter.post("/inbox/dismissals", async (req, res) => {
   const data = parseBodyOr400(dismissInboxFlagSchema, req.body, res);
@@ -46,6 +49,11 @@ inboxRouter.post("/inbox/dismissals", async (req, res) => {
     "edit",
     "You do not have access to this campaign",
   );
+
+  if (!(await signatureBelongsToCampaign(prisma, data.campaignId, data.signature))) {
+    res.status(400).json({ error: "signature does not belong to campaignId" });
+    return;
+  }
 
   await prisma.inboxDismissal.upsert({
     where: {

@@ -187,6 +187,125 @@ describe("GET/POST /api/inbox (#1945)", () => {
     await prisma.campaignEntity.deleteMany({ where: { id: { in: [oldEntity, newEntity] } } });
   });
 
+  it("never clusters a Guard 1/Guard 2/Guard 3 naming scheme (#1945 review)", async () => {
+    const g1 = await makeEntity(campaignId, "Guard 1");
+    const g2 = await makeEntity(campaignId, "Guard 2");
+    const g3 = await makeEntity(campaignId, "Guard 3");
+
+    const res = await supertest(app).get("/api/inbox").set("Cookie", cookieOwner);
+    const clusters = res.body.filter((r: { kind: string }) => r.kind === "DUPLICATE_CLUSTER");
+    const involvesAny = clusters.some((c: { entities: { id: string }[] }) =>
+      c.entities.some((e) => [g1, g2, g3].includes(e.id)),
+    );
+    expect(involvesAny).toBe(false);
+
+    await prisma.campaignEntity.deleteMany({ where: { id: { in: [g1, g2, g3] } } });
+  });
+
+  it("attributes a merged-away identity's mentions to its survivor before picking the default (#1945 review)", async () => {
+    const oldRook = await makeEntity(campaignId, "Old Rook");
+    const captainRook = await makeEntity(campaignId, "Captain Rook");
+    const captainRok = await makeEntity(campaignId, "Captain Rok");
+
+    // Old Rook accrues 3 mentions of its own, THEN gets identity-merged into
+    // Captain Rook — those 3 must attribute to Captain Rook, not vanish.
+    await mention(oldRook, `Notes about @[${oldRook}], part one.`);
+    await mention(oldRook, `Notes about @[${oldRook}], part two.`);
+    await mention(oldRook, `Notes about @[${oldRook}], part three.`);
+    // Captain Rook: 1 direct mention. Captain Rok (typo): 2 direct mentions —
+    // MORE than Captain Rook's own direct count, so without attribution the
+    // typo would wrongly win pickDefaultSurvivor.
+    await mention(captainRook, `About @[${captainRook}].`);
+    await mention(captainRok, `About @[${captainRok}], first.`);
+    await mention(captainRok, `About @[${captainRok}], second.`);
+
+    const prep = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/entities/merges`)
+      .set("Cookie", cookieOwner)
+      .send({ mergedEntityId: oldRook, survivorEntityId: captainRook });
+    await supertest(app)
+      .post(`/api/campaigns/${campaignId}/entities/merges/${prep.body.id}/execute`)
+      .set("Cookie", cookieOwner);
+
+    const res = await supertest(app).get("/api/inbox").set("Cookie", cookieOwner);
+    const cluster = res.body.find(
+      (r: { kind: string; entities: { id: string }[] }) =>
+        r.kind === "DUPLICATE_CLUSTER" && r.entities.some((e) => e.id === captainRook),
+    );
+    expect(cluster).toBeDefined();
+    expect(cluster.defaultSurvivorId).toBe(captainRook);
+    const survivorEntity = cluster.entities.find((e: { id: string }) => e.id === captainRook);
+    // 1 direct + 3 attributed from the merged-away Old Rook.
+    expect(survivorEntity.mentionCount).toBe(4);
+
+    await prisma.campaignEntityMerge.deleteMany({ where: { mergedEntityId: oldRook } });
+    await prisma.campaignEntity.deleteMany({ where: { id: { in: [oldRook, captainRook, captainRok] } } });
+  });
+
+  it("needs-chronicling resurfaces after dismissal when a new undescribed mention joins the flagged set (#1945 review)", async () => {
+    const first = await makeEntity(campaignId, "Chronicle Subject One");
+    await mention(first);
+
+    let res = await supertest(app).get("/api/inbox").set("Cookie", cookieOwner);
+    let row = res.body.find((r: { kind: string }) => r.kind === "NEEDS_CHRONICLING");
+    expect(row).toBeDefined();
+
+    const dismiss = await supertest(app)
+      .post("/api/inbox/dismissals")
+      .set("Cookie", cookieOwner)
+      .send({ campaignId, kind: "NEEDS_CHRONICLING", signature: row.signature });
+    expect(dismiss.status).toBe(201);
+
+    res = await supertest(app).get("/api/inbox").set("Cookie", cookieOwner);
+    row = res.body.find((r: { kind: string }) => r.kind === "NEEDS_CHRONICLING");
+    expect(row).toBeUndefined();
+
+    const second = await makeEntity(campaignId, "Chronicle Subject Two");
+    await mention(second);
+
+    res = await supertest(app).get("/api/inbox").set("Cookie", cookieOwner);
+    row = res.body.find((r: { kind: string }) => r.kind === "NEEDS_CHRONICLING");
+    expect(row).toBeDefined();
+    expect(row.count).toBe(2);
+
+    await prisma.campaignEntity.deleteMany({ where: { id: { in: [first, second] } } });
+  });
+
+  it("400s a dismissal whose signature's entities don't belong to campaignId (#1945 review)", async () => {
+    const other = await supertest(app)
+      .post("/api/campaigns")
+      .set("Cookie", cookieOwner)
+      .send({ name: "Owner's Other Campaign" });
+    const otherCampaignId = other.body.id as string;
+    const otherChar = "inbox-cross-campaign-char";
+    await makeCharacter(otherChar, OWNER, otherCampaignId);
+
+    const entityId = await makeEntity(otherCampaignId, "Cross Campaign Subject");
+    const journalRes = await supertest(app)
+      .post(`/api/characters/${otherChar}/journal`)
+      .set("Cookie", cookieOwner)
+      .send({ kind: "NOTE", body: `About @[${entityId}].` });
+    expect(journalRes.status).toBe(201);
+
+    const res = await supertest(app).get("/api/inbox").set("Cookie", cookieOwner);
+    const row = res.body.find(
+      (r: { kind: string; campaignId: string }) =>
+        r.kind === "NEEDS_CHRONICLING" && r.campaignId === otherCampaignId,
+    );
+    expect(row).toBeDefined();
+
+    // The signature is real (belongs to otherCampaignId's flagged entity) but
+    // the request claims it belongs to campaignId (A) instead.
+    const dismiss = await supertest(app)
+      .post("/api/inbox/dismissals")
+      .set("Cookie", cookieOwner)
+      .send({ campaignId, kind: "NEEDS_CHRONICLING", signature: row.signature });
+    expect(dismiss.status).toBe(400);
+
+    await prisma.character.deleteMany({ where: { id: otherChar } });
+    await prisma.campaign.deleteMany({ where: { id: otherCampaignId } });
+  });
+
   it("a campaign where the caller is a mere member contributes nothing", async () => {
     const res = await supertest(app).get("/api/inbox").set("Cookie", cookieOwner);
     const rows = res.body.filter((r: { campaignId: string }) => r.campaignId === memberOnlyCampaignId);

@@ -208,8 +208,8 @@ const EMPTY_AGGREGATE: EntityStatsAggregate = {
   chroniclers: [],
 };
 
-// Shared with lib/campaign/inbox.ts's needs-chronicling flag (#1945) — one
-// definition of "described" for both the Codex card and the inbox.
+// Shared with buildNeedsChroniclingRow's flag (#1945) — one definition of
+// "described" for both the Codex card and the inbox.
 export function hasDescription(notes: string | null): boolean {
   return (notes ?? "").trim().length > 0;
 }
