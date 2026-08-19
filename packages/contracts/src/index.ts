@@ -35,6 +35,7 @@ export * from "./campaign-ops.js";
 export * from "./catalog-ops.js";
 export * from "./condition-ops.js";
 export * from "./hp-ops.js";
+export * from "./inbox-ops.js";
 export * from "./inventory-snapshot-capability.js";
 export * from "./inventory-snapshot.js";
 export * from "./item-vocabulary.js";

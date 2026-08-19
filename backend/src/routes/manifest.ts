@@ -21,6 +21,7 @@ import { forkRouter } from "@/routes/catalog/fork.js";
 import { grantsRouter } from "@/routes/catalog/grants.js";
 import { healthRouter } from "@/routes/platform/health.js";
 import { hitPointsRouter } from "@/routes/character/hitpoints.js";
+import { inboxRouter } from "@/routes/campaign/inbox.js";
 import { inventoryRouter } from "@/routes/character/inventory.js";
 import { itemsRouter } from "@/routes/catalog/items.js";
 import { journalRouter } from "@/routes/session/journal.js";
@@ -111,6 +112,7 @@ export const routeManifest: RouteMount[] = [
   { router: journalRouter, mount: "/api", scope: "authed" },
   { router: campaignsRouter, mount: "/api", scope: "authed" },
   { router: entitiesRouter, mount: "/api", scope: "authed" },
+  { router: inboxRouter, mount: "/api", scope: "authed" },
   { router: campaignItemsRouter, mount: "/api", scope: "authed" },
   { router: arcsRouter, mount: "/api", scope: "authed" },
 ];

@@ -146,6 +146,8 @@ model User {
   // homebrew content across every kind, not just Spell. Mirrors `characters`
   // — cascade-deleted with the user (CatalogEntry.ownerUser onDelete: Cascade).
   catalogEntries CatalogEntry[]
+  // Per-user dismissals of derived inbox flags (#1945).
+  inboxDismissals InboxDismissal[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -191,6 +193,8 @@ model Campaign {
   // and GLOBAL/USER entries granted into this campaign for its players to see.
   catalogEntries       CatalogEntry[]
   catalogGrants        CatalogGrant[]
+  // Per-user dismissals of this campaign's derived inbox flags (#1945).
+  inboxDismissals      InboxDismissal[]
 }
 
 // A named part/arc of a campaign's story (#863): the journal page groups
@@ -212,6 +216,32 @@ model CampaignArc {
   sessions Session[]
 
   @@index([campaignId, position])
+}
+
+// --- Inbox: derived DM housekeeping flags (#1945) --------------------------
+// GET /api/inbox recomputes duplicate-entity-cluster and needs-chronicling
+// flags at read time for every campaign the caller OWNS (derive-don't-
+// persist) — nothing about a flag itself is stored, only that a user
+// dismissed one. `signature` is the flag's stable identity (e.g. the sorted
+// entity ids of a duplicate cluster); a cluster whose membership changes gets
+// a new signature and resurfaces, which is intended.
+enum InboxFlagKind {
+  DUPLICATE_CLUSTER
+  NEEDS_CHRONICLING
+}
+
+model InboxDismissal {
+  id         String        @id @default(uuid())
+  userId     String
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaignId String
+  campaign   Campaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  kind       InboxFlagKind
+  signature  String
+  createdAt  DateTime      @default(now())
+
+  @@unique([userId, kind, signature])
+  @@index([userId, campaignId])
 }
 
 enum CampaignRole {
