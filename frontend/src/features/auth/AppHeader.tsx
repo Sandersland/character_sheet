@@ -1,6 +1,7 @@
 import { Link, useMatch } from "react-router-dom";
 
 import AccountMenu from "@/features/auth/AccountMenu";
+import InboxBell from "@/features/inbox/InboxBell";
 
 // Slim app chrome shown when signed in: top-level nav links plus an
 // avatar-triggered account menu (identity, theme toggle, logout).
@@ -32,7 +33,10 @@ export default function AppHeader() {
           Campaigns
         </Link>
       </nav>
-      <AccountMenu />
+      <div className="flex items-center gap-2">
+        <InboxBell />
+        <AccountMenu />
+      </div>
     </header>
   );
 }

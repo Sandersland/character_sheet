@@ -29,6 +29,14 @@ async function pinFonts(page: Page): Promise<void> {
   await page.route(/fonts\.(googleapis|gstatic)\.com/, (route) => route.abort());
 }
 
+// Pin the AppHeader inbox to empty so its bell (#1946) never enters a baseline:
+// the specs share one backend user, so real inbox rows — and the bell + badge
+// pixels they add to every header — depend on what campaign/entity state
+// earlier specs left behind. Inbox rendering has its own dedicated coverage.
+async function pinInbox(page: Page): Promise<void> {
+  await page.route("**/api/inbox", (route) => route.fulfill({ json: [] }));
+}
+
 // Pin the theme before the SPA boots so the pre-paint script in index.html reads
 // it (addInitScript runs before page scripts on the next navigation). Also pins
 // it server-side: every spec shares one backend user (dev-user-local), and
@@ -72,6 +80,7 @@ async function ready(page: Page): Promise<void> {
 test("visual: character sheet — light theme", async ({ page }) => {
   await login(page);
   await pinFonts(page);
+  await pinInbox(page);
   const id = await createCharacter(page.request, {
     name: uniqueName("Sheet Hero"),
     className: "Fighter",
@@ -93,6 +102,7 @@ test("visual: character sheet — light theme", async ({ page }) => {
 test("visual: character sheet — dark theme", async ({ page }) => {
   await login(page);
   await pinFonts(page);
+  await pinInbox(page);
   const id = await createCharacter(page.request, {
     name: uniqueName("Sheet Hero"),
     className: "Fighter",
@@ -114,6 +124,7 @@ test("visual: character sheet — dark theme", async ({ page }) => {
 test("visual: inventory section and ledger modal", async ({ page }) => {
   await login(page);
   await pinFonts(page);
+  await pinInbox(page);
   const id = await createCharacter(page.request, {
     name: uniqueName("Pack Hero"),
     className: "Fighter",
@@ -151,6 +162,7 @@ test("visual: inventory section and ledger modal", async ({ page }) => {
 test("visual: spells section", async ({ page }) => {
   await login(page);
   await pinFonts(page);
+  await pinInbox(page);
   const id = await createCharacter(page.request, {
     name: uniqueName("Spell Mage"),
     className: "Wizard",
@@ -175,6 +187,7 @@ test("visual: spells section", async ({ page }) => {
 test("visual: session / turn view", async ({ page }) => {
   await login(page);
   await pinFonts(page);
+  await pinInbox(page);
   const id = await createSessionCharacter(page.request, {
     name: uniqueName("Turn Fighter"),
     className: "Fighter",
@@ -197,6 +210,7 @@ test("visual: session / turn view", async ({ page }) => {
 test("visual: creation ceremony — steps", async ({ page }) => {
   await login(page);
   await pinFonts(page);
+  await pinInbox(page);
   await setTheme(page, "light");
 
   await page.getByRole("link", { name: "New Character" }).first().click();
@@ -237,6 +251,7 @@ test("visual: creation ceremony — steps", async ({ page }) => {
 test("visual: brand surfaces — dark, desktop", async ({ page }) => {
   await login(page);
   await pinFonts(page);
+  await pinInbox(page);
   const id = await createCharacter(page.request, {
     name: uniqueName("Brand Hero"),
     className: "Fighter",
@@ -272,6 +287,7 @@ test("visual: brand surfaces — dark, desktop", async ({ page }) => {
 test("visual: bottom nav — dark, mobile", async ({ page }) => {
   await login(page);
   await pinFonts(page);
+  await pinInbox(page);
   const id = await createCharacter(page.request, {
     name: uniqueName("Nav Hero"),
     className: "Fighter",

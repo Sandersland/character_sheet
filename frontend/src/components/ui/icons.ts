@@ -98,4 +98,8 @@ export {
   // #1682 — SpeciesTraitsCard's Darkvision accent (owner ruling: prominent,
   // visible info, not a derived combat stat).
   Eye,
+  // App inbox (#1946): AppHeader's bell trigger, and the duplicate-cluster
+  // row glyph — ScrollText above doubles as the needs-chronicling row glyph.
+  Bell,
+  Copy,
 } from "lucide-react";
