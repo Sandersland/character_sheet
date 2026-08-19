@@ -42,11 +42,14 @@ export default function InboxBell() {
     setDismissError(errorMessage(dismissMutation.error, "Failed to disregard."));
   }, [dismissMutation.error]);
 
+  // Timer keys on the error OBJECT, not the message string: a second failure
+  // with an identical message is a state no-op that would otherwise inherit
+  // the first toast's remaining time instead of a fresh window.
   useEffect(() => {
-    if (!dismissError) return;
+    if (!dismissMutation.error) return;
     const timer = setTimeout(() => setDismissError(null), DISMISS_ERROR_TOAST_MS);
     return () => clearTimeout(timer);
-  }, [dismissError]);
+  }, [dismissMutation.error]);
 
   function handleDisregard(row: InboxRow) {
     dismissMutation.mutate({ campaignId: row.campaignId, kind: row.kind, signature: row.signature });
@@ -96,10 +99,13 @@ export default function InboxBell() {
 
       {reviewRow && (
         <ReviewDuplicatesModal
+          // Remount on cluster change: survivorId state initializes from the
+          // row's default exactly once per mount.
+          key={reviewRow.signature}
           row={reviewRow}
           onClose={() => setReviewRow(null)}
           onDisregard={handleDisregardFromModal}
-          disregarding={dismissMutation.isPending}
+          disregarding={disregardingSignature === reviewRow.signature}
         />
       )}
     </div>

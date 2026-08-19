@@ -1,8 +1,8 @@
 // Pure preview logic for the Review-duplicates modal (#1946): the N-way
 // sibling of #1943's combinePreview.ts pair-combine preview. A cluster
 // combines by absorbing every non-survivor entity into the chosen survivor —
-// one #1942 call per loser — so every number here is computed over "the
-// losers" rather than a single duplicate.
+// one atomic #1942 call carrying the whole loser list — so every number here
+// is computed over "the losers" rather than a single duplicate.
 
 import type { CampaignEntity, CampaignEntityMerge, InboxDuplicateEntity } from "@/types/character";
 

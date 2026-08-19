@@ -100,8 +100,12 @@ describe("formatInboxSignalAge", () => {
     expect(formatInboxSignalAge(new Date(2026, 5, 11, 12, 0, 0).toISOString())).toBe("Jun 11, 2026");
   });
 
-  it("treats a future timestamp as today rather than counting negatively", () => {
-    expect(formatInboxSignalAge(new Date(2026, 6, 13, 0, 0, 0).toISOString())).toBe("today");
+  it("still says today for a future instant on the same local day (clock skew)", () => {
+    expect(formatInboxSignalAge(new Date(2026, 6, 12, 23, 59, 59).toISOString())).toBe("today");
+  });
+
+  it("shows the absolute date for a future local DAY instead of an indefinite today", () => {
+    expect(formatInboxSignalAge(new Date(2026, 6, 13, 0, 0, 0).toISOString())).toBe("Jul 13, 2026");
   });
 
   it("returns unparseable input verbatim", () => {

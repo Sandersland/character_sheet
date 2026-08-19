@@ -5,11 +5,18 @@ import type { InboxRow } from "@/types/character";
 // and their tests all read the same message text off one function.
 
 export function inboxRowMessage(row: InboxRow): string {
-  if (row.kind === "DUPLICATE_CLUSTER") {
-    return `${row.entities.map((e) => e.name).join(" · ")} look like duplicates of each other.`;
+  switch (row.kind) {
+    case "DUPLICATE_CLUSTER":
+      return `${row.entities.map((e) => e.name).join(" · ")} look like duplicates of each other.`;
+    case "NEEDS_CHRONICLING": {
+      const isOne = row.count === 1;
+      return `${row.count} ${isOne ? "entry has" : "entries have"} been mentioned but ${isOne ? "has" : "have"} no description yet.`;
+    }
+    default: {
+      const exhaustive: never = row;
+      return exhaustive;
+    }
   }
-  const isOne = row.count === 1;
-  return `${row.count} ${isOne ? "entry has" : "entries have"} been mentioned but ${isOne ? "has" : "have"} no description yet.`;
 }
 
 export interface InboxCampaignGroup {
@@ -54,7 +61,11 @@ export function formatInboxSignalAge(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   const days = Math.round((localMidnight(new Date()) - localMidnight(d)) / DAY_MS);
-  if (days <= 0) return "today";
+  // Strictly negative = a future local day (bad clock/data) — show the
+  // absolute date rather than an indefinite "today".
+  if (days < 0)
+    return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  if (days === 0) return "today";
   if (days === 1) return "yesterday";
   if (days <= 30) return `${days} days ago`;
   return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });

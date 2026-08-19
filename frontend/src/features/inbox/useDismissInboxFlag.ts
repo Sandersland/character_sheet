@@ -38,7 +38,9 @@ export function useDismissInboxFlag() {
     },
     onError: (_err, _input, context) => {
       if (context?.previous) queryClient.setQueryData(inboxKeys.all, context.previous);
-      void queryClient.invalidateQueries({ queryKey: inboxKeys.all });
+      // No context means onMutate itself threw before touching the cache —
+      // nothing to reconcile, so don't pay a clustering refetch for it.
+      if (context) void queryClient.invalidateQueries({ queryKey: inboxKeys.all });
     },
   });
 }
