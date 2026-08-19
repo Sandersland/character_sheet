@@ -5,7 +5,7 @@ import CombineEntityAction from "@/features/entities/CombineEntityAction";
 import EntityPortrait from "@/features/entities/EntityPortrait";
 import { formatJournalDate } from "@/lib/formatJournalDate";
 import { ENTITY_TYPE_LABELS } from "@/lib/mentions";
-import type { CampaignEntity, CampaignRole, EntityBacklink } from "@/types/character";
+import type { CampaignEntity, CampaignItem, CampaignRole, EntityBacklink } from "@/types/character";
 
 function firstMentionedLabel(entity: CampaignEntity): string {
   const ref = entity.stats?.firstMentioned;
@@ -42,6 +42,7 @@ function FactRow({ label, children }: { label: string; children: ReactNode }) {
 function OwnerQuietLinks({
   campaignId,
   entity,
+  duplicateItem,
   busy,
   onToggleVisibility,
   onDelete,
@@ -49,6 +50,7 @@ function OwnerQuietLinks({
 }: {
   campaignId?: string;
   entity: CampaignEntity;
+  duplicateItem: CampaignItem | null;
   busy: boolean;
   onToggleVisibility: () => void;
   onDelete: () => void;
@@ -76,6 +78,7 @@ function OwnerQuietLinks({
         <CombineEntityAction
           campaignId={campaignId}
           duplicate={entity}
+          duplicateItem={duplicateItem}
           busy={busy}
           onCombined={onCombined}
         />
@@ -94,6 +97,7 @@ export default function EntityInfobox({
   characters,
   viewerId,
   busy,
+  duplicateItem,
   onToggleVisibility,
   onDelete,
   onCombined,
@@ -106,6 +110,7 @@ export default function EntityInfobox({
   characters: { id: string; name: string; ownerId: string }[];
   viewerId?: string;
   busy: boolean;
+  duplicateItem: CampaignItem | null;
   onToggleVisibility: () => void;
   onDelete: () => void;
   onCombined: (survivorId: string, message: string) => void;
@@ -155,6 +160,7 @@ export default function EntityInfobox({
         <OwnerQuietLinks
           campaignId={campaignId}
           entity={entity}
+          duplicateItem={duplicateItem}
           busy={busy}
           onToggleVisibility={onToggleVisibility}
           onDelete={onDelete}

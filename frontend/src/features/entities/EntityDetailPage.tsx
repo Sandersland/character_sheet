@@ -169,6 +169,7 @@ function EntityArticle({
           characters={detail.characters}
           viewerId={viewerId}
           busy={detail.busy}
+          duplicateItem={detail.item}
           onToggleVisibility={detail.handleToggleVisibility}
           onDelete={detail.handleDelete}
           onCombined={onCombined}

@@ -6,11 +6,15 @@ import CombineConfirmDialog from "@/features/entities/CombineConfirmDialog";
 import CombineSurvivorPicker from "@/features/entities/CombineSurvivorPicker";
 import { useCampaignEntities } from "@/hooks/useCampaignEntities";
 import { useCampaignMerges } from "@/hooks/useCampaignMerges";
-import type { CampaignEntity } from "@/types/character";
+import type { CampaignEntity, CampaignItem } from "@/types/character";
 
 interface CombineEntityActionProps {
   campaignId: string;
   duplicate: CampaignEntity;
+  // The duplicate's own fronted campaign item, if any — see
+  // CombineConfirmDialog's duplicateItem prop for why this rides down from
+  // the entity-detail page's own read rather than a fresh fetch here.
+  duplicateItem: CampaignItem | null;
   busy: boolean;
   onCombined: (survivorId: string, message: string) => void;
 }
@@ -25,6 +29,7 @@ interface CombineEntityActionProps {
 export default function CombineEntityAction({
   campaignId,
   duplicate,
+  duplicateItem,
   busy,
   onCombined,
 }: CombineEntityActionProps) {
@@ -63,6 +68,7 @@ export default function CombineEntityAction({
             duplicate={duplicate}
             survivor={survivor}
             merges={merges}
+            duplicateItem={duplicateItem}
             onCancel={close}
             onCombined={(survivorId, message) => {
               close();

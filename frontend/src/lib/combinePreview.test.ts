@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   combineDiscardedItems,
+  combineItemLinkTransferWarning,
   combineMentionSummary,
+  combineRedactedMentionWarning,
   duplicateHasPreparedMerge,
 } from "@/lib/combinePreview";
 import type { CampaignEntity, CampaignEntityMerge } from "@/types/character";
@@ -113,6 +115,53 @@ describe("combineMentionSummary", () => {
 
   it("defaults to zero when stats are absent", () => {
     expect(combineMentionSummary(entity(), "Lili")).toBe("0 mentions in 0 journal entries move to Lili");
+  });
+});
+
+describe("combineRedactedMentionWarning", () => {
+  it("warns when a REVEALED duplicate combines into a HIDDEN survivor", () => {
+    expect(
+      combineRedactedMentionWarning(
+        entity({ visibility: "REVEALED" }),
+        entity({ visibility: "HIDDEN" }),
+      ),
+    ).toBe(true);
+  });
+
+  it("is silent when the survivor is already REVEALED", () => {
+    expect(
+      combineRedactedMentionWarning(
+        entity({ visibility: "REVEALED" }),
+        entity({ visibility: "REVEALED" }),
+      ),
+    ).toBe(false);
+  });
+
+  it("is silent when the duplicate is itself HIDDEN — nothing was visible to lose", () => {
+    expect(
+      combineRedactedMentionWarning(
+        entity({ visibility: "HIDDEN" }),
+        entity({ visibility: "HIDDEN" }),
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("combineItemLinkTransferWarning", () => {
+  it("warns when an ITEM duplicate fronting a campaign item combines into an ITEM survivor", () => {
+    expect(combineItemLinkTransferWarning("ITEM", "ITEM", true)).toBe(true);
+  });
+
+  it("is silent when the duplicate doesn't front a campaign item", () => {
+    expect(combineItemLinkTransferWarning("ITEM", "ITEM", false)).toBe(false);
+  });
+
+  it("is silent when the survivor isn't ITEM-typed", () => {
+    expect(combineItemLinkTransferWarning("ITEM", "NPC", true)).toBe(false);
+  });
+
+  it("is silent when the duplicate isn't ITEM-typed", () => {
+    expect(combineItemLinkTransferWarning("NPC", "ITEM", true)).toBe(false);
   });
 });
 

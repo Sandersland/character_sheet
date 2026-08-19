@@ -58,3 +58,37 @@ export function duplicateHasPreparedMerge(
       m.status === "PREPARED" && (m.mergedEntityId === duplicateId || m.survivorEntityId === duplicateId),
   );
 }
+
+// A REVEALED duplicate's mentions move onto a HIDDEN survivor: those journal
+// chips render as redacted "Hidden" text to players (routes/session/journal.ts
+// visibility rendering) until the survivor itself is revealed — surprising
+// since the mentions used to be readable. Both entities' `visibility` are
+// plain wire fields, no extra fetch needed.
+export function combineRedactedMentionWarning(
+  duplicate: Pick<CampaignEntity, "visibility">,
+  survivor: Pick<CampaignEntity, "visibility">,
+): boolean {
+  return duplicate.visibility === "REVEALED" && survivor.visibility === "HIDDEN";
+}
+
+// The duplicate's CampaignItemLink only moves onto an ITEM-typed survivor
+// (assertItemLinkMovable, backend/src/lib/campaign/entities.ts) — anything
+// else 409s, already surfaced by the generic error path. `duplicateFrontsItem`
+// is the entity-detail page's own `detail.item !== null`
+// (fetchCampaignItemByEntity), the one place that signal is already on the
+// wire for the page being combined away.
+//
+// Gap: the SURVIVOR's own item-link status isn't observable from anything
+// already fetched — the survivor picker's entity list carries no item-link
+// field, and checking it would mean a new per-candidate request. So this can't
+// distinguish "survivor is a bare ITEM entity" (the link transfers, this
+// warning is right) from "survivor already fronts its own item" (the combine
+// 409s instead — "Both entities are linked to an item" — rendered inline by
+// the same error path as any other conflict).
+export function combineItemLinkTransferWarning(
+  duplicateType: CampaignEntity["type"],
+  survivorType: CampaignEntity["type"],
+  duplicateFrontsItem: boolean,
+): boolean {
+  return duplicateType === "ITEM" && duplicateFrontsItem && survivorType === "ITEM";
+}

@@ -24,6 +24,7 @@ vi.mock("@/api/client", () => ({
   uploadEntityPortrait: vi.fn(),
   deleteEntityPortrait: vi.fn(),
   combineEntities: vi.fn(),
+  fetchCampaignItemByEntity: vi.fn(),
 }));
 
 vi.mock("@/hooks/useCampaignEntities", () => ({
@@ -127,6 +128,10 @@ beforeEach(() => {
   vi.mocked(client.fetchEntityBacklinks).mockResolvedValue([BACKLINK]);
   vi.mocked(client.fetchEntityConnections).mockResolvedValue([]);
   vi.mocked(client.fetchCampaign).mockResolvedValue(campaign("PLAYER"));
+  // Only reachable for an ITEM-typed entity (useEntityDetail's own type guard);
+  // default to "fronts no item" so a test that types an entity ITEM without
+  // caring about this signal doesn't hit an unhandled rejection.
+  vi.mocked(client.fetchCampaignItemByEntity).mockRejectedValue(new Error("no item"));
   vi.mocked(useCampaignEntities).mockReturnValue({
     entities: [ENTITY],
     byId: new Map([[ENTITY_ID, ENTITY]]),
@@ -742,6 +747,137 @@ describe("EntityDetailPage (#248)", () => {
       expect(await screen.findByRole("heading", { name: "Lili" })).toBeInTheDocument();
       expect(await screen.findByText("lili combined into Lili.")).toBeInTheDocument();
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+
+    it("renders the character-link/non-PC-survivor 409 inline (#1942 round 2)", async () => {
+      vi.mocked(client.combineEntities).mockRejectedValue(
+        new Error("The survivor must be a PC entity to inherit the duplicate's character link"),
+      );
+      const user = userEvent.setup();
+      renderPage();
+      await user.click(await screen.findByRole("button", { name: /combine into/i }));
+      await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /Lili/ }));
+      await user.click(
+        within(screen.getByRole("dialog")).getByRole("button", { name: /combine and delete lili/i }),
+      );
+
+      expect(
+        await within(screen.getByRole("dialog")).findByText(
+          "The survivor must be a PC entity to inherit the duplicate's character link",
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it("renders the survivor-already-fronts-an-item 409 inline (#1942 round 2)", async () => {
+      vi.mocked(client.combineEntities).mockRejectedValue(
+        new Error(
+          "The survivor already fronts a campaign item — combining would risk the character link being deleted along with it",
+        ),
+      );
+      const user = userEvent.setup();
+      renderPage();
+      await user.click(await screen.findByRole("button", { name: /combine into/i }));
+      await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /Lili/ }));
+      await user.click(
+        within(screen.getByRole("dialog")).getByRole("button", { name: /combine and delete lili/i }),
+      );
+
+      expect(
+        await within(screen.getByRole("dialog")).findByText(
+          "The survivor already fronts a campaign item — combining would risk the character link being deleted along with it",
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it("warns that mentions render redacted when a REVEALED duplicate combines into a HIDDEN survivor", async () => {
+      const revealedDuplicate: CampaignEntity = { ...DUPLICATE, visibility: "REVEALED" };
+      const hiddenSurvivor: CampaignEntity = { ...SURVIVOR, visibility: "HIDDEN" };
+      vi.mocked(client.fetchEntities).mockResolvedValue([revealedDuplicate, hiddenSurvivor]);
+      vi.mocked(useCampaignEntities).mockReturnValue({
+        entities: [revealedDuplicate, hiddenSurvivor],
+        byId: new Map([
+          [revealedDuplicate.id, revealedDuplicate],
+          [hiddenSurvivor.id, hiddenSurvivor],
+        ]),
+      });
+      const user = userEvent.setup();
+      renderPage();
+      await user.click(await screen.findByRole("button", { name: /combine into/i }));
+      await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /Lili/ }));
+
+      expect(
+        within(screen.getByRole("dialog")).getByText(/render as redacted "Hidden" chips/i),
+      ).toBeInTheDocument();
+    });
+
+    it("omits the redacted-mention warning when the survivor is already REVEALED", async () => {
+      const revealedDuplicate: CampaignEntity = { ...DUPLICATE, visibility: "REVEALED" };
+      vi.mocked(client.fetchEntities).mockResolvedValue([revealedDuplicate, SURVIVOR]);
+      vi.mocked(useCampaignEntities).mockReturnValue({
+        entities: [revealedDuplicate, SURVIVOR],
+        byId: new Map([
+          [revealedDuplicate.id, revealedDuplicate],
+          [SURVIVOR.id, SURVIVOR],
+        ]),
+      });
+      const user = userEvent.setup();
+      renderPage();
+      await user.click(await screen.findByRole("button", { name: /combine into/i }));
+      await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /Lili/ }));
+
+      expect(screen.queryByText(/render as redacted/i)).not.toBeInTheDocument();
+    });
+
+    it("warns that the survivor inherits the duplicate's campaign item when both are ITEM-typed", async () => {
+      const itemDuplicate: CampaignEntity = { ...DUPLICATE, type: "ITEM" };
+      const itemSurvivor: CampaignEntity = { ...SURVIVOR, type: "ITEM" };
+      vi.mocked(client.fetchEntities).mockResolvedValue([itemDuplicate, itemSurvivor]);
+      vi.mocked(useCampaignEntities).mockReturnValue({
+        entities: [itemDuplicate, itemSurvivor],
+        byId: new Map([
+          [itemDuplicate.id, itemDuplicate],
+          [itemSurvivor.id, itemSurvivor],
+        ]),
+      });
+      vi.mocked(client.fetchCampaignItemByEntity).mockResolvedValue({
+        id: "item-1",
+        campaignId: CAMPAIGN_ID,
+        name: "Ring of lili",
+        category: "gear",
+        requiresAttunement: false,
+        isUnique: true,
+        createdAt: "",
+        updatedAt: "",
+      });
+      const user = userEvent.setup();
+      renderPage();
+      await user.click(await screen.findByRole("button", { name: /combine into/i }));
+      await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /Lili/ }));
+
+      expect(
+        await within(screen.getByRole("dialog")).findByText(/becomes lili's campaign item entry/i),
+      ).toBeInTheDocument();
+    });
+
+    it("omits the item-link warning when the duplicate doesn't front a campaign item", async () => {
+      const itemDuplicate: CampaignEntity = { ...DUPLICATE, type: "ITEM" };
+      const itemSurvivor: CampaignEntity = { ...SURVIVOR, type: "ITEM" };
+      vi.mocked(client.fetchEntities).mockResolvedValue([itemDuplicate, itemSurvivor]);
+      vi.mocked(useCampaignEntities).mockReturnValue({
+        entities: [itemDuplicate, itemSurvivor],
+        byId: new Map([
+          [itemDuplicate.id, itemDuplicate],
+          [itemSurvivor.id, itemSurvivor],
+        ]),
+      });
+      // beforeEach's default fetchCampaignItemByEntity rejection stands: no item.
+      const user = userEvent.setup();
+      renderPage();
+      await user.click(await screen.findByRole("button", { name: /combine into/i }));
+      await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /Lili/ }));
+      await screen.findByRole("heading", { name: "Combine into Lili" });
+
+      expect(screen.queryByText(/campaign item entry/i)).not.toBeInTheDocument();
     });
   });
 });
