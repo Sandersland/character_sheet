@@ -40,7 +40,6 @@ function FactRow({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function OwnerQuietLinks({
-  campaignId,
   entity,
   duplicateItem,
   busy,
@@ -48,7 +47,6 @@ function OwnerQuietLinks({
   onDelete,
   onCombined,
 }: {
-  campaignId?: string;
   entity: CampaignEntity;
   duplicateItem: CampaignItem | null;
   busy: boolean;
@@ -74,15 +72,12 @@ function OwnerQuietLinks({
       >
         Delete entity
       </button>
-      {campaignId && (
-        <CombineEntityAction
-          campaignId={campaignId}
-          duplicate={entity}
-          duplicateItem={duplicateItem}
-          busy={busy}
-          onCombined={onCombined}
-        />
-      )}
+      <CombineEntityAction
+        duplicate={entity}
+        duplicateItem={duplicateItem}
+        busy={busy}
+        onCombined={onCombined}
+      />
     </div>
   );
 }
@@ -90,7 +85,6 @@ function OwnerQuietLinks({
 // The article's derived-facts panel (#842): portrait tile, fact rows, and the
 // owner's quiet Hide/Delete links. No fact here is persisted — all computed.
 export default function EntityInfobox({
-  campaignId,
   entity,
   role,
   backlinks,
@@ -103,7 +97,6 @@ export default function EntityInfobox({
   onCombined,
   onEdit,
 }: {
-  campaignId?: string;
   entity: CampaignEntity;
   role?: CampaignRole;
   backlinks: EntityBacklink[];
@@ -158,7 +151,6 @@ export default function EntityInfobox({
       </dl>
       {role === "OWNER" && (
         <OwnerQuietLinks
-          campaignId={campaignId}
           entity={entity}
           duplicateItem={duplicateItem}
           busy={busy}

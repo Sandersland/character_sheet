@@ -50,7 +50,10 @@ export default function CombineSurvivorPicker({
               <span className="min-w-0 grow truncate text-sm font-semibold text-parchment-900">
                 {e.name}
               </span>
-              <span className="shrink-0 text-xs text-parchment-500">{ENTITY_TYPE_LABELS[e.type]}</span>
+              <span className="shrink-0 text-xs text-parchment-500">
+                {ENTITY_TYPE_LABELS[e.type]}
+                {e.itemId && " · Fronts an item"}
+              </span>
             </button>
           </li>
         ))}

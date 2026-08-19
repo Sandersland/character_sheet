@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 
 import Spinner from "@/components/ui/Spinner";
 import { useAuth } from "@/features/auth/AuthProvider";
@@ -162,7 +162,6 @@ function EntityArticle({
 
       <div className="flex flex-col gap-6 xl:grid xl:grid-cols-[minmax(0,1fr)_280px] xl:items-start">
         <EntityInfobox
-          campaignId={campaignId}
           entity={entity}
           role={detail.role}
           backlinks={detail.backlinks}
@@ -196,6 +195,7 @@ function EntityArticle({
 export default function EntityDetailPage() {
   const { id: campaignId, entityId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const backTo = useEntityBackTo(campaignId);
   const detail = useEntityDetail(campaignId, entityId);
   const { entity } = detail;
@@ -214,11 +214,14 @@ export default function EntityDetailPage() {
   // The duplicate's own page is gone after a combine — land on the survivor's
   // instead, replacing history so Back can't return to a 404'd entity, and
   // carry the toast text through location.state (useCombinedToast reads it).
+  // Spreads the CURRENT state first so a `from` this page carried (see
+  // useEntityBackTo) survives onto the survivor's page too, instead of the
+  // combine silently resetting its back-link to the default Codex target.
   function handleCombined(survivorId: string, message: string) {
     if (!campaignId) return;
     navigate(`/campaigns/${campaignId}/entities/${survivorId}`, {
       replace: true,
-      state: { combinedToast: message },
+      state: { ...(location.state as Record<string, unknown> | null), combinedToast: message },
     });
   }
 

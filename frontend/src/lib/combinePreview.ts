@@ -34,14 +34,19 @@ export function combineDiscardedItems(
 }
 
 // "N mentions in M journal entries move to <Survivor>": JournalEntryRef is
-// unique per (entry, entity) (see backend combineEntities/rewriteMentionTokens),
-// so the mention count and the distinct-entry count are always the same number
-// here — one stat, read twice.
+// unique per (entry, entity) (see rewriteMentionTokens), so the mention count
+// and the distinct-entry count are always the same number here — one stat,
+// read twice. The trailing hedge is deliberate: rewriteMentionTokens touches
+// EVERY journal entry regardless of author or visibility, including players'
+// PRIVATE notes the DM can never read — so `count` (the viewer-scoped stat)
+// undercounts what actually moves. Naming an exact private count would leak
+// information the DM isn't supposed to have; the hedge says "some unknown
+// amount more" instead of a number.
 export function combineMentionSummary(duplicate: CampaignEntity, survivorName: string): string {
   const count = duplicate.stats?.mentionCount ?? 0;
   const mentionWord = count === 1 ? "mention" : "mentions";
   const entryWord = count === 1 ? "entry" : "entries";
-  return `${count} ${mentionWord} in ${count} journal ${entryWord} move to ${survivorName}`;
+  return `${count} ${mentionWord} in ${count} journal ${entryWord} move to ${survivorName}, plus any mentions in players' private notes`;
 }
 
 // The duplicate participates in a PREPARED identity merge on either side: as
@@ -60,10 +65,10 @@ export function duplicateHasPreparedMerge(
 }
 
 // A REVEALED duplicate's mentions move onto a HIDDEN survivor: those journal
-// chips render as redacted "Hidden" text to players (routes/session/journal.ts
-// visibility rendering) until the survivor itself is revealed — surprising
-// since the mentions used to be readable. Both entities' `visibility` are
-// plain wire fields, no extra fetch needed.
+// chips render as redacted "Hidden" text to players (MentionText) until the
+// survivor itself is revealed — surprising since the mentions used to be
+// readable. Both entities' `visibility` are plain wire fields, no extra fetch
+// needed.
 export function combineRedactedMentionWarning(
   duplicate: Pick<CampaignEntity, "visibility">,
   survivor: Pick<CampaignEntity, "visibility">,
@@ -71,24 +76,19 @@ export function combineRedactedMentionWarning(
   return duplicate.visibility === "REVEALED" && survivor.visibility === "HIDDEN";
 }
 
-// The duplicate's CampaignItemLink only moves onto an ITEM-typed survivor
-// (assertItemLinkMovable, backend/src/lib/campaign/entities.ts) — anything
-// else 409s, already surfaced by the generic error path. `duplicateFrontsItem`
-// is the entity-detail page's own `detail.item !== null`
-// (fetchCampaignItemByEntity), the one place that signal is already on the
-// wire for the page being combined away.
-//
-// Gap: the SURVIVOR's own item-link status isn't observable from anything
-// already fetched — the survivor picker's entity list carries no item-link
-// field, and checking it would mean a new per-candidate request. So this can't
-// distinguish "survivor is a bare ITEM entity" (the link transfers, this
-// warning is right) from "survivor already fronts its own item" (the combine
-// 409s instead — "Both entities are linked to an item" — rendered inline by
-// the same error path as any other conflict).
+// The duplicate's CampaignItemLink only moves onto an ITEM-typed survivor that
+// doesn't already front its own item (assertItemLinkMovable) — a survivor with
+// its own link 409s instead ("Both entities are linked to an item"), already
+// surfaced by the generic error path, so this only promises a transfer that
+// will actually happen. `duplicateFrontsItem` is the entity-detail page's own
+// `detail.item !== null` (fetchCampaignItemByEntity), the one place that
+// signal is already on the wire for the page being combined away;
+// `survivor.itemId` rides the entity list's own wire field (toWireEntity),
+// so no extra fetch is needed for either side.
 export function combineItemLinkTransferWarning(
   duplicateType: CampaignEntity["type"],
-  survivorType: CampaignEntity["type"],
+  survivor: Pick<CampaignEntity, "type" | "itemId">,
   duplicateFrontsItem: boolean,
 ): boolean {
-  return duplicateType === "ITEM" && duplicateFrontsItem && survivorType === "ITEM";
+  return duplicateType === "ITEM" && duplicateFrontsItem && survivor.type === "ITEM" && !survivor.itemId;
 }

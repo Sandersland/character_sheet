@@ -19,8 +19,7 @@ interface CombineConfirmDialogProps {
   merges: CampaignEntityMerge[];
   // The duplicate's own fronted campaign item, if any (already on the wire
   // for the page being combined away, via fetchCampaignItemByEntity) — drives
-  // the item-link-transfer warning below. See combineItemLinkTransferWarning's
-  // own comment for why the survivor's item-link status can't be checked too.
+  // the item-link-transfer warning below alongside survivor.itemId.
   duplicateItem: CampaignItem | null;
   onCancel: () => void;
   onCombined: (survivorId: string, message: string) => void;
@@ -58,11 +57,7 @@ export default function CombineConfirmDialog({
   const discarded = combineDiscardedItems(duplicate, survivor);
   const preparedMergeWarning = duplicateHasPreparedMerge(merges, duplicate.id);
   const redactedMentionWarning = combineRedactedMentionWarning(duplicate, survivor);
-  const itemLinkWarning = combineItemLinkTransferWarning(
-    duplicate.type,
-    survivor.type,
-    duplicateItem !== null,
-  );
+  const itemLinkWarning = combineItemLinkTransferWarning(duplicate.type, survivor, duplicateItem !== null);
 
   function handleConfirm() {
     mutation.mutate(

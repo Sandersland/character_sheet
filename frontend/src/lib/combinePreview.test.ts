@@ -99,22 +99,28 @@ describe("combineDiscardedItems", () => {
 });
 
 describe("combineMentionSummary", () => {
-  it("singularizes a count of one", () => {
+  it("singularizes a count of one and hedges toward private notes", () => {
     const dup = entity({
       stats: { mentionCount: 1, firstMentioned: null, lastMentioned: null, chroniclers: [], hasDescription: false },
     });
-    expect(combineMentionSummary(dup, "Lili")).toBe("1 mention in 1 journal entry move to Lili");
+    expect(combineMentionSummary(dup, "Lili")).toBe(
+      "1 mention in 1 journal entry move to Lili, plus any mentions in players' private notes",
+    );
   });
 
-  it("pluralizes a count above one", () => {
+  it("pluralizes a count above one and hedges toward private notes", () => {
     const dup = entity({
       stats: { mentionCount: 5, firstMentioned: null, lastMentioned: null, chroniclers: [], hasDescription: false },
     });
-    expect(combineMentionSummary(dup, "Lili")).toBe("5 mentions in 5 journal entries move to Lili");
+    expect(combineMentionSummary(dup, "Lili")).toBe(
+      "5 mentions in 5 journal entries move to Lili, plus any mentions in players' private notes",
+    );
   });
 
-  it("defaults to zero when stats are absent", () => {
-    expect(combineMentionSummary(entity(), "Lili")).toBe("0 mentions in 0 journal entries move to Lili");
+  it("defaults to zero when stats are absent, still hedging", () => {
+    expect(combineMentionSummary(entity(), "Lili")).toBe(
+      "0 mentions in 0 journal entries move to Lili, plus any mentions in players' private notes",
+    );
   });
 });
 
@@ -148,20 +154,27 @@ describe("combineRedactedMentionWarning", () => {
 });
 
 describe("combineItemLinkTransferWarning", () => {
-  it("warns when an ITEM duplicate fronting a campaign item combines into an ITEM survivor", () => {
-    expect(combineItemLinkTransferWarning("ITEM", "ITEM", true)).toBe(true);
+  const bareItemSurvivor = entity({ id: "surv-1", type: "ITEM", itemId: null });
+
+  it("warns when an ITEM duplicate fronting a campaign item combines into a bare ITEM survivor", () => {
+    expect(combineItemLinkTransferWarning("ITEM", bareItemSurvivor, true)).toBe(true);
   });
 
   it("is silent when the duplicate doesn't front a campaign item", () => {
-    expect(combineItemLinkTransferWarning("ITEM", "ITEM", false)).toBe(false);
+    expect(combineItemLinkTransferWarning("ITEM", bareItemSurvivor, false)).toBe(false);
   });
 
   it("is silent when the survivor isn't ITEM-typed", () => {
-    expect(combineItemLinkTransferWarning("ITEM", "NPC", true)).toBe(false);
+    expect(combineItemLinkTransferWarning("ITEM", entity({ type: "NPC" }), true)).toBe(false);
   });
 
   it("is silent when the duplicate isn't ITEM-typed", () => {
-    expect(combineItemLinkTransferWarning("NPC", "ITEM", true)).toBe(false);
+    expect(combineItemLinkTransferWarning("NPC", bareItemSurvivor, true)).toBe(false);
+  });
+
+  it("is silent when the survivor already fronts its own item — the combine 409s instead", () => {
+    const linkedSurvivor = entity({ id: "surv-1", type: "ITEM", itemId: "item-9" });
+    expect(combineItemLinkTransferWarning("ITEM", linkedSurvivor, true)).toBe(false);
   });
 });
 

@@ -9,7 +9,6 @@ import { useCampaignMerges } from "@/hooks/useCampaignMerges";
 import type { CampaignEntity, CampaignItem } from "@/types/character";
 
 interface CombineEntityActionProps {
-  campaignId: string;
   duplicate: CampaignEntity;
   // The duplicate's own fronted campaign item, if any — see
   // CombineConfirmDialog's duplicateItem prop for why this rides down from
@@ -25,14 +24,16 @@ interface CombineEntityActionProps {
 // (records a reveal, keeps both rows) — deliberately its own icon/copy/surface
 // rather than living next to Hide/Delete unlabeled. Two steps share one Modal
 // instance — pick a survivor, then confirm — so Cancel from either step always
-// lands back on the trigger, not a half-open dialog.
+// lands back on the trigger, not a half-open dialog. campaignId comes off
+// `duplicate.campaignId` (a required wire field) rather than a separate prop,
+// so there is no truthiness guard upstream that could silently hide the action.
 export default function CombineEntityAction({
-  campaignId,
   duplicate,
   duplicateItem,
   busy,
   onCombined,
 }: CombineEntityActionProps) {
+  const campaignId = duplicate.campaignId;
   const { entities } = useCampaignEntities(campaignId);
   const { merges } = useCampaignMerges(campaignId);
   const [survivor, setSurvivor] = useState<CampaignEntity | null>(null);

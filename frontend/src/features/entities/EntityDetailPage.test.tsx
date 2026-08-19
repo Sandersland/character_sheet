@@ -661,7 +661,11 @@ describe("EntityDetailPage (#248)", () => {
       expect(
         within(dialog).getByText(/prepare an identity merge instead/i),
       ).toBeInTheDocument();
-      expect(within(dialog).getByText("3 mentions in 3 journal entries move to Lili")).toBeInTheDocument();
+      expect(
+        within(dialog).getByText(
+          "3 mentions in 3 journal entries move to Lili, plus any mentions in players' private notes",
+        ),
+      ).toBeInTheDocument();
       expect(within(dialog).getByText("lili is deleted from the codex")).toBeInTheDocument();
       expect(within(dialog).getByText(/Discarded with lili/i)).toBeInTheDocument();
       expect(within(dialog).getByText("Description/notes")).toBeInTheDocument();
@@ -878,6 +882,141 @@ describe("EntityDetailPage (#248)", () => {
       await screen.findByRole("heading", { name: "Combine into Lili" });
 
       expect(screen.queryByText(/campaign item entry/i)).not.toBeInTheDocument();
+    });
+
+    it("omits the item-link warning when the survivor already fronts its own item — the combine 409s instead (#1942 itemId)", async () => {
+      const itemDuplicate: CampaignEntity = { ...DUPLICATE, type: "ITEM" };
+      const linkedSurvivor: CampaignEntity = { ...SURVIVOR, type: "ITEM", itemId: "item-9" };
+      vi.mocked(client.fetchEntities).mockResolvedValue([itemDuplicate, linkedSurvivor]);
+      vi.mocked(useCampaignEntities).mockReturnValue({
+        entities: [itemDuplicate, linkedSurvivor],
+        byId: new Map([
+          [itemDuplicate.id, itemDuplicate],
+          [linkedSurvivor.id, linkedSurvivor],
+        ]),
+      });
+      vi.mocked(client.fetchCampaignItemByEntity).mockResolvedValue({
+        id: "item-1",
+        campaignId: CAMPAIGN_ID,
+        name: "Ring of lili",
+        category: "gear",
+        requiresAttunement: false,
+        isUnique: true,
+        createdAt: "",
+        updatedAt: "",
+      });
+      const user = userEvent.setup();
+      renderPage();
+      await user.click(await screen.findByRole("button", { name: /combine into/i }));
+      await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /Lili/ }));
+      await screen.findByRole("heading", { name: "Combine into Lili" });
+
+      expect(screen.queryByText(/campaign item entry/i)).not.toBeInTheDocument();
+    });
+
+    it("badges an item-linked entity in the survivor picker", async () => {
+      const linkedSurvivor: CampaignEntity = { ...SURVIVOR, itemId: "item-9" };
+      vi.mocked(client.fetchEntities).mockResolvedValue([DUPLICATE, linkedSurvivor]);
+      vi.mocked(useCampaignEntities).mockReturnValue({
+        entities: [DUPLICATE, linkedSurvivor],
+        byId: new Map([
+          [DUPLICATE.id, DUPLICATE],
+          [linkedSurvivor.id, linkedSurvivor],
+        ]),
+      });
+      const user = userEvent.setup();
+      renderPage();
+      await user.click(await screen.findByRole("button", { name: /combine into/i }));
+
+      expect(
+        within(screen.getByRole("dialog")).getByText(/Fronts an item/i),
+      ).toBeInTheDocument();
+    });
+
+    it("resets stale item state on navigation — a false item-transfer warning doesn't survive ITEM-A → ITEM-B (#1943 staleness fix)", async () => {
+      const itemA: CampaignEntity = { ...DUPLICATE, id: "item-a", name: "Wand A", type: "ITEM" };
+      const itemB: CampaignEntity = { ...DUPLICATE, id: "item-b", name: "Wand B", type: "ITEM" };
+      const itemC: CampaignEntity = { ...SURVIVOR, id: "item-c", name: "Wand C", type: "ITEM" };
+      vi.mocked(client.fetchEntities).mockResolvedValue([itemA, itemB, itemC]);
+      vi.mocked(useCampaignEntities).mockReturnValue({
+        entities: [itemA, itemB, itemC],
+        byId: new Map([
+          [itemA.id, itemA],
+          [itemB.id, itemB],
+          [itemC.id, itemC],
+        ]),
+      });
+      // item-b's own fetch is deliberately left pending for the whole test —
+      // if `item` isn't reset synchronously on navigation, its stale value
+      // from item-a (which DOES front one) would still read non-null when the
+      // combine dialog opens for item-b.
+      let resolveBFetch: (() => void) | undefined;
+      vi.mocked(client.fetchCampaignItemByEntity).mockImplementation((_campaignId, entityId) => {
+        if (entityId === "item-a") {
+          return Promise.resolve({
+            id: "item-1",
+            campaignId: CAMPAIGN_ID,
+            name: "Ring of A",
+            category: "gear",
+            requiresAttunement: false,
+            isUnique: true,
+            createdAt: "",
+            updatedAt: "",
+          });
+        }
+        if (entityId === "item-b") {
+          return new Promise((resolve) => {
+            resolveBFetch = () => resolve({
+              id: "item-2",
+              campaignId: CAMPAIGN_ID,
+              name: "Ring of B",
+              category: "gear",
+              requiresAttunement: false,
+              isUnique: true,
+              createdAt: "",
+              updatedAt: "",
+            });
+          });
+        }
+        return Promise.reject(new Error("no item"));
+      });
+
+      const user = userEvent.setup();
+      renderPage({ pathname: `/campaigns/${CAMPAIGN_ID}/entities/item-a` });
+      await waitFor(() =>
+        expect(vi.mocked(client.fetchCampaignItemByEntity)).toHaveBeenCalledWith(CAMPAIGN_ID, "item-a"),
+      );
+      // CampaignItemCard's own heading ("Item") only renders once detail.item
+      // resolves non-null — the item's name doesn't appear on the card itself.
+      await screen.findByRole("heading", { name: "Item" });
+
+      const rail = await screen.findByRole("navigation", { name: /codex entries/i });
+      await user.click(within(rail).getByRole("link", { name: /Wand B/ }));
+      await screen.findByRole("heading", { name: "Wand B" });
+
+      await user.click(screen.getByRole("button", { name: /combine into/i }));
+      await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /Wand C/ }));
+
+      expect(screen.queryByText(/campaign item entry/i)).not.toBeInTheDocument();
+      expect(resolveBFetch).toBeDefined();
+    });
+
+    it("preserves the back-link (from) across a combine, in both the toast state and its clearing", async () => {
+      vi.mocked(client.combineEntities).mockResolvedValue(SURVIVOR);
+      const user = userEvent.setup();
+      renderPage({
+        pathname: ENTITY_PATH,
+        state: { from: `/campaigns/${CAMPAIGN_ID}/manage` },
+      });
+      await user.click(await screen.findByRole("button", { name: /combine into/i }));
+      await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /Lili/ }));
+      await user.click(
+        within(screen.getByRole("dialog")).getByRole("button", { name: /combine and delete lili/i }),
+      );
+
+      await screen.findByRole("heading", { name: "Lili" });
+      const back = await screen.findByRole("link", { name: "← Codex" });
+      expect(back).toHaveAttribute("href", `/campaigns/${CAMPAIGN_ID}/manage`);
     });
   });
 });
