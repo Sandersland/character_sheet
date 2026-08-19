@@ -283,19 +283,49 @@ async function rewriteMentionTokens(
   // prior version reconciled from extractEntityIds(rewrittenBody), which both
   // 500'd on a stale token (an id extractEntityIds finds but no CampaignEntity
   // row backs any more) and silently re-created refs the hidden-entity guard
-  // (syncEntryRefs, #379) had deliberately suppressed. Collapse first: an
-  // entry already carrying both the dup's and the survivor's ref keeps only
-  // the survivor's (the @@unique constraint the second query below relies on
-  // being clear). Then move what's left.
-  await tx.journalEntryRef.deleteMany({
-    where: {
-      entityId: duplicateId,
-      entry: { refs: { some: { entityId: survivorEntityId } } },
-    },
-  });
-  await tx.journalEntryRef.updateMany({
+  // (syncEntryRefs, #379) had deliberately suppressed. Delete-then-recreate,
+  // not delete-if-conflicting-then-update: a concurrent syncEntryRefs insert
+  // of (entryId, survivorEntityId) landing between our own two statements can
+  // never raise a unique-constraint violation this way — deleteMany
+  // unconditionally clears every one of the loser's own rows first, then
+  // createMany's skipDuplicates absorbs any (entryId, survivorEntityId) row
+  // that already exists, whether it predates this combine or was inserted by
+  // someone else's edit in between. An EARLIER version instead pre-filtered
+  // the delete to only "entries that already have a survivor ref" and
+  // followed with a plain updateMany — safe against a pre-existing dual-tag,
+  // but not a concurrently-created one: that updateMany could hit the
+  // @@unique(entryId, entityId) constraint and 409 spuriously.
+  const loserRefs = await tx.journalEntryRef.findMany({
     where: { entityId: duplicateId },
-    data: { entityId: survivorEntityId },
+    select: { entryId: true },
+  });
+  await tx.journalEntryRef.deleteMany({ where: { entityId: duplicateId } });
+  if (loserRefs.length > 0) {
+    await tx.journalEntryRef.createMany({
+      data: loserRefs.map((ref) => ({ entryId: ref.entryId, entityId: survivorEntityId })),
+      skipDuplicates: true,
+    });
+  }
+}
+
+type MergeEdgeRow = Prisma.CampaignEntityMergeGetPayload<{
+  select: { id: true; mergedEntityId: true; survivorEntityId: true; status: true };
+}>;
+
+// One merge-edge snapshot per BATCH, not one findMany per loser: fetched once
+// in applyBatchCombine before the apply loop starts, then threaded through
+// each repointMergeChains call, which hands back either the same array
+// (nothing changed) or a freshly re-fetched one (a write happened) for the
+// NEXT loser to use. Correctness this preserves: wouldCreateCycle must see
+// every write an EARLIER loser in this same transaction already made, or its
+// cycle detection reads stale data — re-fetching only after an actual write
+// (never on every call, and never once per loser regardless of whether that
+// loser had any merge rows at all) is what turns the old O(N-losers ×
+// M-queries) read pattern into effectively one shared read per batch.
+async function fetchMergeEdges(tx: Tx, campaignId: string): Promise<MergeEdgeRow[]> {
+  return tx.campaignEntityMerge.findMany({
+    where: { campaignId },
+    select: { id: true, mergedEntityId: true, survivorEntityId: true, status: true },
   });
 }
 
@@ -311,29 +341,21 @@ async function rewriteMentionTokens(
 // the caller deletes after this returns, UNLESS that row is EXECUTED — the
 // caller rejects that case before this ever runs. Re-pointing an EXECUTED row
 // mirrors executeMerge's own invariant: the survivor must stay REVEALED, or
-// the reveal vanishes from listVisibleMerges for players. Batch note: this is
-// called once per loser during the apply phase, always re-reading the graph
-// fresh from `tx`, so an earlier loser's re-point in the SAME transaction is
-// already visible to a later loser's own call. Classification (which rows
-// drop vs re-point) is pure in-memory work against ONE `allEdges` snapshot;
-// the writes are two batched calls (deleteMany/updateMany), not one
-// awaited call per row, inside this already-destructive transaction.
+// the reveal vanishes from listVisibleMerges for players. Classification
+// (which rows drop vs re-point) is pure in-memory work against the passed-in
+// snapshot; the writes are two batched calls (deleteMany/updateMany), not one
+// awaited call per row, inside this already-destructive transaction. Returns
+// `allEdges` unchanged when this loser has no asSurvivor rows (the common
+// case — no write, no re-fetch needed) or a fresh snapshot when it wrote.
 async function repointMergeChains(
   tx: Tx,
   campaignId: string,
   loserId: string,
   survivorEntityId: string,
-): Promise<void> {
-  const asSurvivor = await tx.campaignEntityMerge.findMany({
-    where: { campaignId, survivorEntityId: loserId },
-    select: { id: true, mergedEntityId: true, status: true },
-  });
-  if (asSurvivor.length === 0) return;
-
-  const allEdges = await tx.campaignEntityMerge.findMany({
-    where: { campaignId },
-    select: { id: true, mergedEntityId: true, survivorEntityId: true, status: true },
-  });
+  allEdges: MergeEdgeRow[],
+): Promise<MergeEdgeRow[]> {
+  const asSurvivor = allEdges.filter((e) => e.survivorEntityId === loserId);
+  if (asSurvivor.length === 0) return allEdges;
 
   const toDrop: string[] = [];
   const toRepoint: string[] = [];
@@ -364,6 +386,8 @@ async function repointMergeChains(
       data: { visibility: "REVEALED" },
     });
   }
+
+  return fetchMergeEdges(tx, campaignId);
 }
 
 // Moves a CampaignCharacterLink/CampaignItemLink from a loser to the survivor
@@ -414,6 +438,19 @@ async function lockCombineTargets(tx: Tx, ids: string[]): Promise<void> {
   `;
 }
 
+// This read (characterLink/itemLink included) is what the batch link guards
+// below act on. SAFE from a concurrent-insert race (verified against every
+// creation site, not assumed, #1942 review): CampaignCharacterLink is
+// created in exactly one place, campaignsRouter's join-campaign handler
+// (POST /campaigns/:id/characters), and CampaignItemLink in exactly one
+// place, campaignItemsRouter's create-item handler (POST
+// /campaigns/:id/items) — both always pair the new link's campaignEntityId
+// with a CampaignEntity row created via tx.campaignEntity.create in that
+// SAME transaction, never an existing one. No code path links an EXISTING
+// entity, so a concurrent request can never insert a link pointing at one of
+// this combine's already-existing losers; no extra lock is needed for that
+// case (contrast lockCombineTargets above, which guards a real race).
+//
 // Reads the survivor and every loser and confirms all of them exist in this
 // campaign — the first half of loadAndGuardCombineTargets' guard, split out
 // to keep each check's own complexity small. One query regardless of batch
@@ -534,20 +571,6 @@ async function loadAndGuardCombineTargets(
   return targets;
 }
 
-// Destructive typo-dedup (#1942), the counterpart to the non-destructive
-// identity merge above: absorbs every `loserEntityIds` duplicate into
-// `survivorEntityId`, atomically — all guards for every loser run up front,
-// against the WHOLE batch (including cross-loser link interactions), before
-// any loser is actually combined; then every loser is applied in the same
-// transaction, all-or-nothing. A single combine is a 1-length array, not a
-// separate code path. Survivor's fields always win — nothing is folded from
-// any loser (decided 2026-08-18). Cross-type combines are allowed. No audit
-// row and no undo (also decided on #1942): journal writes are already
-// deliberately plain-REST with no audit log (journalRouter) — this follows
-// that precedent, not an absence of any event model elsewhere
-// (awardCampaignItem/revokeCampaignItem log undoable CharacterEvents; the
-// merge ops above persist the CampaignEntityMerge row itself). The
-// client-side confirm dialog is the gate here.
 // The three pure, DB-free shape checks combineEntities must hold before it
 // even opens a transaction — mirror combineEntitiesSchema's own refinements,
 // kept here too as defense in depth for any non-HTTP caller.
@@ -586,9 +609,12 @@ async function applyBatchCombine(
   const loserPortraitKeys = losers.map((loser) => loser.portraitKey);
 
   let survivorState = survivor;
+  // One shared snapshot for the whole batch (fetchMergeEdges' own why-comment
+  // has the correctness argument for reusing/refreshing it per loser).
+  let mergeEdges = await fetchMergeEdges(tx, campaignId);
   for (const loser of losers) {
     await rewriteMentionTokens(tx, loser.id, survivorEntityId);
-    await repointMergeChains(tx, campaignId, loser.id, survivorEntityId);
+    mergeEdges = await repointMergeChains(tx, campaignId, loser.id, survivorEntityId, mergeEdges);
     await moveSoleLinks(tx, loser, survivorState, loser.id, survivorEntityId);
     await tx.campaignEntity.delete({ where: { id: loser.id } });
     survivorState = {
@@ -644,6 +670,20 @@ function mapCombineError(
   };
 }
 
+// Destructive typo-dedup (#1942), the counterpart to the non-destructive
+// identity merge above: absorbs every `loserEntityIds` duplicate into
+// `survivorEntityId`, atomically — all guards for every loser run up front,
+// against the WHOLE batch (including cross-loser link interactions), before
+// any loser is actually combined; then every loser is applied in the same
+// transaction, all-or-nothing. A single combine is a 1-length array, not a
+// separate code path. Survivor's fields always win — nothing is folded from
+// any loser (decided 2026-08-18). Cross-type combines are allowed. No audit
+// row and no undo (also decided on #1942): journal writes are already
+// deliberately plain-REST with no audit log (journalRouter) — this follows
+// that precedent, not an absence of any event model elsewhere
+// (awardCampaignItem/revokeCampaignItem log undoable CharacterEvents; the
+// merge ops above persist the CampaignEntityMerge row itself). The
+// client-side confirm dialog is the gate here.
 export async function combineEntities(
   db: PrismaClient,
   campaignId: string,
