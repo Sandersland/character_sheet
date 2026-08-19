@@ -4,7 +4,7 @@
 // one #1942 call per loser — so every number here is computed over "the
 // losers" rather than a single duplicate.
 
-import type { CampaignEntity, CampaignEntityMerge } from "@/types/character";
+import type { CampaignEntity, CampaignEntityMerge, InboxDuplicateEntity } from "@/types/character";
 
 export function losersOf(entities: CampaignEntity[], survivorId: string): CampaignEntity[] {
   return entities.filter((e) => e.id !== survivorId);
@@ -31,8 +31,31 @@ export function combineSummaryLine(entities: CampaignEntity[], survivorId: strin
 }
 
 export interface InboxDiscardedItem {
-  key: "visibility" | "notes" | "merge";
+  key: "visibility" | "notes" | "merge" | "redacted-until-revealed";
   label: string;
+}
+
+// The inverse of the "Hidden visibility" item below: a REVEALED loser's
+// mentions moving onto a HIDDEN survivor doesn't drop anything, but it DOES
+// change how those mentions render to players — as a redacted "Hidden" chip —
+// until the survivor itself is revealed. Computable off the inbox row's own
+// lightweight entities (visibility only), no full-entity fetch needed, so the
+// caller can show this immediately rather than waiting on combineDiscardedItems'
+// richer data.
+export function hiddenSurvivorRedactsRevealedMentions(
+  entities: InboxDuplicateEntity[],
+  survivorId: string,
+): InboxDiscardedItem | null {
+  const survivor = entities.find((e) => e.id === survivorId);
+  if (survivor?.visibility !== "HIDDEN") return null;
+
+  const revealedLosers = entities.filter((e) => e.id !== survivorId && e.visibility === "REVEALED");
+  if (revealedLosers.length === 0) return null;
+
+  return {
+    key: "redacted-until-revealed",
+    label: `Mentions from ${revealedLosers.map((e) => e.name).join(", ")} will render as "Hidden" until ${survivor.name} is revealed`,
+  };
 }
 
 // What's lost when every non-survivor entity in the cluster is combined away:

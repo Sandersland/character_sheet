@@ -7,7 +7,12 @@ import SurvivorPicker from "@/features/inbox/SurvivorPicker";
 import { useCombineCluster } from "@/features/inbox/useCombineCluster";
 import { useReviewClusterEntities } from "@/features/inbox/useReviewClusterEntities";
 import { deriveCombineProgress } from "@/lib/inboxCombineProgress";
-import { combineDiscardedItems, combineSummaryLine, pendingRowsSummary } from "@/lib/inboxCombinePreview";
+import {
+  combineDiscardedItems,
+  combineSummaryLine,
+  hiddenSurvivorRedactsRevealedMentions,
+  pendingRowsSummary,
+} from "@/lib/inboxCombinePreview";
 import type { InboxDuplicateClusterRow } from "@/types/character";
 
 interface ReviewDuplicatesModalProps {
@@ -60,6 +65,16 @@ export default function ReviewDuplicatesModal({
     ? combineSummaryLine(clusterEntities, survivorId)
     : pendingRowsSummary(remainingLoserIds.length);
 
+  // The redaction warning only needs visibility, already on the inbox row's
+  // own lightweight entities — shows immediately, no fetch wait. The rest
+  // (dropped descriptions, prepared merges) needs the full entity/merge
+  // fetch, so it joins once previewReady.
+  const redactionWarning = hiddenSurvivorRedactsRevealedMentions(row.entities, survivorId);
+  const discardedItems = [
+    ...(redactionWarning ? [redactionWarning] : []),
+    ...(previewReady ? combineDiscardedItems(clusterEntities, survivorId, merges) : []),
+  ];
+
   return (
     <BottomSheet title="Review duplicates" onClose={onClose}>
       <div className="flex flex-col gap-4">
@@ -79,7 +94,7 @@ export default function ReviewDuplicatesModal({
 
         <p className="text-sm font-semibold text-parchment-800">{summaryLine}</p>
 
-        {previewReady && <DiscardedBox items={combineDiscardedItems(clusterEntities, survivorId, merges)} />}
+        <DiscardedBox items={discardedItems} />
 
         {failedEntity && (
           <p className="text-xs font-semibold text-garnet-700">

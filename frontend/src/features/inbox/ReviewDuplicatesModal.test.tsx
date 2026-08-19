@@ -139,4 +139,63 @@ describe("ReviewDuplicatesModal", () => {
     await user.click(screen.getByRole("button", { name: "Disregard these" }));
     expect(onDisregard).toHaveBeenCalledWith(ROW);
   });
+
+  describe("HIDDEN survivor (#1946 follow-up)", () => {
+    const HIDDEN_SURVIVOR_ROW: InboxDuplicateClusterRow = {
+      ...ROW,
+      entities: [
+        { id: "e1", name: "Lil", type: "NPC", visibility: "REVEALED", mentionCount: 1 },
+        { id: "e2", name: "lili", type: "NPC", visibility: "HIDDEN", mentionCount: 0 },
+        { id: "e3", name: "Lili", type: "NPC", visibility: "HIDDEN", mentionCount: 3 },
+      ],
+      defaultSurvivorId: "e3",
+    };
+
+    it("warns that a REVEALED loser's mentions redact to Hidden, before the full-entity fetch resolves", async () => {
+      fetchEntities.mockReturnValue(new Promise(() => {})); // never resolves
+      render(
+        <ReviewDuplicatesModal row={HIDDEN_SURVIVOR_ROW} onClose={vi.fn()} onDisregard={vi.fn()} disregarding={false} />,
+      );
+
+      expect(
+        screen.getByText('Mentions from Lil will render as "Hidden" until Lili is revealed'),
+      ).toBeInTheDocument();
+    });
+
+    it("shows the redaction warning alongside the existing Hidden-visibility-dropped item, without conflating them", async () => {
+      fetchEntities.mockResolvedValue([
+        fullEntity({ id: "e1", name: "Lil", visibility: "REVEALED" }),
+        fullEntity({ id: "e2", name: "lili", visibility: "HIDDEN" }),
+        fullEntity({ id: "e3", name: "Lili", visibility: "HIDDEN" }),
+      ]);
+      render(
+        <ReviewDuplicatesModal row={HIDDEN_SURVIVOR_ROW} onClose={vi.fn()} onDisregard={vi.fn()} disregarding={false} />,
+      );
+
+      // Wait for a ready-state-only fact — "rows deleted" alone also matches
+      // the pending placeholder, so it would resolve before the fetch lands.
+      await waitFor(() => expect(screen.getByText("Hidden visibility — lili")).toBeInTheDocument());
+
+      // The REVEALED loser's mentions will redact once absorbed into the HIDDEN survivor…
+      expect(
+        screen.getByText('Mentions from Lil will render as "Hidden" until Lili is revealed'),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("surfaces a round-2 hardening 409 (character-link cross-kind guard) readably on partial failure", async () => {
+    combineEntities.mockRejectedValueOnce(
+      new Error("The survivor must be a PC entity to inherit the duplicate's character link"),
+    );
+    render(<ReviewDuplicatesModal row={ROW} onClose={vi.fn()} onDisregard={vi.fn()} disregarding={false} />);
+    await waitFor(() => expect(screen.getByText(/rows deleted/)).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole("button", { name: "Combine and delete 2 entries" }));
+
+    expect(
+      await screen.findByText(
+        "Lil failed to combine: The survivor must be a PC entity to inherit the duplicate's character link",
+      ),
+    ).toBeInTheDocument();
+  });
 });

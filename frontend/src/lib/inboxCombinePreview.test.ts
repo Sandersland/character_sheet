@@ -1,7 +1,24 @@
 import { describe, it, expect } from "vitest";
 
-import { combineDiscardedItems, combineSummaryLine, losersOf, pendingRowsSummary } from "@/lib/inboxCombinePreview";
-import type { CampaignEntity, CampaignEntityMerge } from "@/types/character";
+import {
+  combineDiscardedItems,
+  combineSummaryLine,
+  hiddenSurvivorRedactsRevealedMentions,
+  losersOf,
+  pendingRowsSummary,
+} from "@/lib/inboxCombinePreview";
+import type { CampaignEntity, CampaignEntityMerge, InboxDuplicateEntity } from "@/types/character";
+
+function inboxEntity(overrides: Partial<InboxDuplicateEntity> = {}): InboxDuplicateEntity {
+  return {
+    id: "e1",
+    name: "Lil",
+    type: "NPC",
+    visibility: "REVEALED",
+    mentionCount: 0,
+    ...overrides,
+  };
+}
 
 function entity(overrides: Partial<CampaignEntity> = {}): CampaignEntity {
   return {
@@ -93,6 +110,47 @@ describe("combineDiscardedItems", () => {
       },
     ];
     expect(combineDiscardedItems(entities, "e2", merges)).toEqual([]);
+  });
+});
+
+describe("hiddenSurvivorRedactsRevealedMentions", () => {
+  it("null when the survivor is REVEALED, whatever the losers' visibility", () => {
+    const entities = [
+      inboxEntity({ id: "e1", name: "Lil", visibility: "REVEALED" }),
+      inboxEntity({ id: "e2", name: "Lili", visibility: "REVEALED" }),
+    ];
+    expect(hiddenSurvivorRedactsRevealedMentions(entities, "e2")).toBeNull();
+  });
+
+  it("null when the survivor is HIDDEN but every loser is already HIDDEN too", () => {
+    const entities = [
+      inboxEntity({ id: "e1", name: "Lil", visibility: "HIDDEN" }),
+      inboxEntity({ id: "e2", name: "Lili", visibility: "HIDDEN" }),
+    ];
+    expect(hiddenSurvivorRedactsRevealedMentions(entities, "e2")).toBeNull();
+  });
+
+  it("warns, naming the REVEALED losers, when a HIDDEN survivor absorbs a REVEALED entity", () => {
+    const entities = [
+      inboxEntity({ id: "e1", name: "Lil", visibility: "REVEALED" }),
+      inboxEntity({ id: "e2", name: "lili", visibility: "HIDDEN" }),
+      inboxEntity({ id: "e3", name: "Lili", visibility: "HIDDEN" }),
+    ];
+    expect(hiddenSurvivorRedactsRevealedMentions(entities, "e3")).toEqual({
+      key: "redacted-until-revealed",
+      label: 'Mentions from Lil will render as "Hidden" until Lili is revealed',
+    });
+  });
+
+  it("names every REVEALED loser, not just one", () => {
+    const entities = [
+      inboxEntity({ id: "e1", name: "Lil", visibility: "REVEALED" }),
+      inboxEntity({ id: "e2", name: "lili", visibility: "REVEALED" }),
+      inboxEntity({ id: "e3", name: "Lili", visibility: "HIDDEN" }),
+    ];
+    expect(hiddenSurvivorRedactsRevealedMentions(entities, "e3")?.label).toBe(
+      'Mentions from Lil, lili will render as "Hidden" until Lili is revealed',
+    );
   });
 });
 
