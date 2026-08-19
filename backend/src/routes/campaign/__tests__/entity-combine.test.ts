@@ -1,10 +1,18 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { randomUUID } from "node:crypto";
+import { mkdtemp } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import sharp from "sharp";
 import supertest from "supertest";
 
 import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
+import { __resetBlobStoreForTests, createBlobStore } from "@/lib/storage/index.js";
+import { PORTRAIT_FIELD } from "@/lib/storage/portrait-http.js";
 
 // Unique fixture ids for this file (parallel-safe on the shared dev DB).
 const OWNER = "combine-owner";
@@ -245,6 +253,59 @@ describe("entity combine-duplicates (#1942)", () => {
     expect(ids).not.toContain(dup);
   });
 
+  it("does not 500 on a stale token in the same body and leaves it untouched", async () => {
+    const dup = await makeEntity(campaignId, "lili Stale");
+    const surv = await makeEntity(campaignId, "Lili Stale");
+    // No CampaignEntity backs this id — text left behind by, e.g., an entity
+    // deleted outright rather than combined. Re-deriving refs from the whole
+    // rewritten body (extractEntityIds) would try to insert a ref for it and
+    // hit the entityId foreign key; combine must never do that.
+    const staleId = randomUUID();
+    const entryId = await seedEntry({
+      body: `@[${staleId}] warned us about @[${dup}].`,
+      entityIds: [dup],
+    });
+
+    const res = await combine(dup, surv);
+    expect(res.status).toBe(200);
+
+    const after = await prisma.journalEntry.findUniqueOrThrow({ where: { id: entryId } });
+    expect(after.body).toBe(`@[${staleId}] warned us about @[${surv}].`);
+
+    const refs = await prisma.journalEntryRef.findMany({ where: { entryId } });
+    expect(refs.map((r) => r.entityId)).toEqual([surv]);
+  });
+
+  it("does not create a ref for a hidden entity's untouched token elsewhere in a rewritten body", async () => {
+    const hidden = await makeEntity(campaignId, "Ghost Hidden", "NPC", "HIDDEN");
+    const dup = await makeEntity(campaignId, "lili Hidden");
+    const surv = await makeEntity(campaignId, "Lili Hidden");
+
+    // A real journal write, through the actual route, as a non-owner — the
+    // hidden-entity guard in syncEntryRefs (routes/session/journal.ts, #379)
+    // suppresses the hidden ref here, leaving the token as unbacked text.
+    const created = await supertest(app)
+      .post(`/api/characters/${CHAR_PLAYER}/journal`)
+      .set("Cookie", cookiePlayer)
+      .send({ kind: "NOTE", body: `@[${hidden}] and @[${dup}] both showed up.`, visibility: "CAMPAIGN" });
+    expect(created.status).toBe(201);
+    const entryId = created.body.journal[0].id as string;
+
+    const preRefs = await prisma.journalEntryRef.findMany({ where: { entryId } });
+    expect(preRefs.map((r) => r.entityId)).toEqual([dup]);
+
+    const res = await combine(dup, surv);
+    expect(res.status).toBe(200);
+
+    const after = await prisma.journalEntry.findUniqueOrThrow({ where: { id: entryId } });
+    // The dup token rewrites; the hidden token, untouched by this combine, stays.
+    expect(after.body).toBe(`@[${hidden}] and @[${surv}] both showed up.`);
+
+    const postRefs = await prisma.journalEntryRef.findMany({ where: { entryId } });
+    expect(postRefs.map((r) => r.entityId)).toEqual([surv]);
+    expect(postRefs.some((r) => r.entityId === hidden)).toBe(false);
+  });
+
   it("re-points a merge chain through the duplicate as survivor (A -> dup, dup absorbed into S) into A -> S", async () => {
     const a = await makeEntity(campaignId, "A chain");
     const dup = await makeEntity(campaignId, "lili E");
@@ -334,6 +395,61 @@ describe("entity combine-duplicates (#1942)", () => {
 
     const after = await prisma.campaignEntityMerge.findUnique({ where: { id: mergeId } });
     expect(after).toBeNull();
+  });
+
+  it("forces the survivor REVEALED when re-pointing an EXECUTED merge chain onto it", async () => {
+    const a = await makeEntity(campaignId, "A Reveal");
+    const dup = await makeEntity(campaignId, "lili Reveal");
+    const surv = await makeEntity(campaignId, "Lili Reveal", "NPC", "HIDDEN");
+
+    const prep = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/entities/merges`)
+      .set("Cookie", cookieOwner)
+      .send({ mergedEntityId: a, survivorEntityId: dup });
+    expect(prep.status).toBe(201);
+    const mergeId = prep.body.id as string;
+    const exec = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/entities/merges/${mergeId}/execute`)
+      .set("Cookie", cookieOwner);
+    expect(exec.status).toBe(200);
+
+    const res = await combine(dup, surv);
+    expect(res.status).toBe(200);
+
+    const survivorRow = await prisma.campaignEntity.findUniqueOrThrow({ where: { id: surv } });
+    expect(survivorRow.visibility).toBe("REVEALED");
+    const after = await prisma.campaignEntityMerge.findUniqueOrThrow({ where: { id: mergeId } });
+    expect(after.survivorEntityId).toBe(surv);
+    expect(after.status).toBe("EXECUTED");
+  });
+
+  it("409s combining away a duplicate that is a publicly revealed (EXECUTED) merged identity", async () => {
+    const dup = await makeEntity(campaignId, "lili Revealed");
+    const surv = await makeEntity(campaignId, "Lili Revealed");
+    const trueName = await makeEntity(campaignId, "True Name Revealed");
+
+    // "lili Revealed is publicly revealed to be True Name Revealed" — dup is
+    // the MERGED (non-survivor) side of an EXECUTED row: a fact players may
+    // already know, so combining it away can't just cascade-delete the row.
+    const prep = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/entities/merges`)
+      .set("Cookie", cookieOwner)
+      .send({ mergedEntityId: dup, survivorEntityId: trueName });
+    expect(prep.status).toBe(201);
+    const mergeId = prep.body.id as string;
+    const exec = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/entities/merges/${mergeId}/execute`)
+      .set("Cookie", cookieOwner);
+    expect(exec.status).toBe(200);
+
+    const res = await combine(dup, surv);
+    expect(res.status).toBe(409);
+
+    // Nothing was touched.
+    const stillDup = await prisma.campaignEntity.findUnique({ where: { id: dup } });
+    expect(stillDup).not.toBeNull();
+    const stillMerge = await prisma.campaignEntityMerge.findUnique({ where: { id: mergeId } });
+    expect(stillMerge).not.toBeNull();
   });
 
   it("moves a character link from an unlinked duplicate onto the survivor", async () => {
@@ -429,6 +545,20 @@ describe("entity combine-duplicates (#1942)", () => {
     expect(res.status).toBe(409);
   });
 
+  it("409s moving an item link onto a non-ITEM survivor", async () => {
+    const { entityId: dupItem, itemId } = await makeItemEntity("Orphan-Risk Item");
+    const surv = await makeEntity(campaignId, "Not An Item", "NPC");
+
+    const res = await combine(dupItem, surv);
+    expect(res.status).toBe(409);
+
+    // Nothing moved: the item's link still fronts the duplicate entity.
+    const link = await prisma.campaignItemLink.findUniqueOrThrow({ where: { itemId } });
+    expect(link.campaignEntityId).toBe(dupItem);
+    const stillDup = await prisma.campaignEntity.findUnique({ where: { id: dupItem } });
+    expect(stillDup).not.toBeNull();
+  });
+
   it("allows a cross-type combine, survivor's type winning", async () => {
     const dup = await makeEntity(campaignId, "Shell NPC", "NPC");
     const surv = await makeEntity(campaignId, "Real PC", "PC");
@@ -453,5 +583,45 @@ describe("entity combine-duplicates (#1942)", () => {
     expect(gone).toBeNull();
     const danglingRefs = await prisma.journalEntryRef.findMany({ where: { entityId: dup } });
     expect(danglingRefs).toHaveLength(0);
+  });
+
+  describe("portrait cleanup (#1942)", () => {
+    beforeAll(async () => {
+      // Same isolated fs-driven blob store as entities.test.ts's portrait suite.
+      vi.stubEnv("BLOB_STORE_DRIVER", "fs");
+      vi.stubEnv("BLOB_FS_DIR", await mkdtemp(path.join(os.tmpdir(), "entity-combine-portrait-test-")));
+      __resetBlobStoreForTests();
+    });
+
+    afterAll(() => {
+      vi.unstubAllEnvs();
+      __resetBlobStoreForTests();
+    });
+
+    async function pngFixture(): Promise<Buffer> {
+      return sharp({ create: { width: 8, height: 8, channels: 4, background: "#1a8b2a" } })
+        .png()
+        .toBuffer();
+    }
+
+    it("deletes the duplicate's portrait blob after combining, exactly like entity delete", async () => {
+      const dup = await makeEntity(campaignId, "lili Portrait");
+      const surv = await makeEntity(campaignId, "Lili Portrait");
+
+      const uploaded = await supertest(app)
+        .post(`/api/campaigns/${campaignId}/entities/${dup}/portrait`)
+        .set("Cookie", cookieOwner)
+        .attach(PORTRAIT_FIELD, await pngFixture(), { filename: "upload.png", contentType: "image/png" });
+      expect(uploaded.status).toBe(200);
+      const key = (
+        await prisma.campaignEntity.findUniqueOrThrow({ where: { id: dup }, select: { portraitKey: true } })
+      ).portraitKey as string;
+      expect(await createBlobStore().exists(key)).toBe(true);
+
+      const res = await combine(dup, surv);
+      expect(res.status).toBe(200);
+
+      expect(await createBlobStore().exists(key)).toBe(false);
+    });
   });
 });
