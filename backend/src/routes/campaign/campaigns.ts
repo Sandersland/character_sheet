@@ -7,14 +7,20 @@ import {
   joinCampaignSchema,
 } from "@character-sheet/contracts";
 
-import { assertCampaignMembership, assertCharacterAccess } from "@/lib/auth/access.js";
+import {
+  assertCampaignMembership,
+  assertCampaignOwner,
+  assertCharacterAccess,
+} from "@/lib/auth/access.js";
 import { attachCharacterUpdate } from "@/lib/campaign/campaign-attach.js";
+import { deleteCampaignRows } from "@/lib/campaign/campaign-delete.js";
+import { deletePortraitBlobBestEffort } from "@/lib/storage/portrait-blob.js";
 import { parseBodyOr400 } from "@/lib/http/parse-body.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
 import { RULES_EDITION_LABELS } from "@/lib/rules/edition.js";
-import { getActiveSession } from "@/lib/session/sessions.js";
+import { activeSessionForCampaign, getActiveSession } from "@/lib/session/sessions.js";
 import type { RulesEdition } from "@character-sheet/shared-types";
 
 // Shared-campaign backbone (#246). Plain-REST (like journal.ts): no audit log,
@@ -119,6 +125,42 @@ campaignsRouter.get("/campaigns/:id", async (req, res) => {
   });
 
   res.json({ ...withEditionLabel(campaign), role });
+});
+
+/**
+ * DELETE /api/campaigns/:id
+ * Owner-only. One atomic row delete: every campaign child cascades except
+ * characters, which survive detached (Character.campaignId is SetNull). 409s
+ * while a session is active so a delete can't silently end live play.
+ */
+const ACTIVE_SESSION_CONFLICT = "End the campaign's active session before deleting it";
+
+campaignsRouter.delete("/campaigns/:id", async (req, res) => {
+  const campaignId = req.params.id;
+  await assertCampaignOwner(
+    prisma,
+    req.user!.id,
+    campaignId,
+    "edit",
+    "Only the campaign owner may delete the campaign",
+  );
+
+  const activeSession = await activeSessionForCampaign(campaignId);
+  if (activeSession) {
+    res.status(409).json({ error: ACTIVE_SESSION_CONFLICT });
+    return;
+  }
+
+  const deletedEntities = await prisma.$transaction((tx) => deleteCampaignRows(tx, campaignId));
+  if (deletedEntities === "activeSession") {
+    res.status(409).json({ error: ACTIVE_SESSION_CONFLICT });
+    return;
+  }
+
+  for (const { portraitKey } of deletedEntities) {
+    await deletePortraitBlobBestEffort(portraitKey);
+  }
+  res.status(204).end();
 });
 
 /**

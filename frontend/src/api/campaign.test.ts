@@ -5,6 +5,7 @@ import {
   awardCampaignItem,
   createCampaign,
   createCampaignItem,
+  deleteCampaign,
   deleteCampaignItem,
   fetchCampaign,
   fetchCampaignItemByEntity,
@@ -83,6 +84,24 @@ describe("joinCampaign", () => {
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("/campaigns/join"),
       expect.objectContaining({ method: "POST", body: JSON.stringify({ inviteCode: "ABC123" }) })
+    );
+  });
+});
+
+describe("deleteCampaign", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("DELETEs /campaigns/:id", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 204 });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await deleteCampaign("camp-1");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/campaigns/camp-1"),
+      expect.objectContaining({ method: "DELETE" })
     );
   });
 });

@@ -1,3 +1,4 @@
+import CampaignDangerZone from "@/features/campaign/CampaignDangerZone";
 import CampaignOverviewPanel from "@/features/campaign/CampaignOverviewPanel";
 import CampaignCodex from "@/features/entities/CampaignCodex";
 import CampaignItemsPanel from "@/features/entities/CampaignItemsPanel";
@@ -25,6 +26,7 @@ export default function CampaignTabPanels({ campaign, active, onCampaignChange }
           characters={campaign.characters ?? []}
           edition={campaign.rulesEdition}
         />
+        <CampaignDangerZone campaignId={campaign.id} campaignName={campaign.name} />
       </>
     );
   }
