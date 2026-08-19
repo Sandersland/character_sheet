@@ -82,6 +82,7 @@ export default function CapturePalette({
       session={session}
       composerRef={composerRef}
       onClose={onClose}
+      anchorKey={notes.length}
       composer={
         <GrowingComposer
           composerRef={composerRef}
