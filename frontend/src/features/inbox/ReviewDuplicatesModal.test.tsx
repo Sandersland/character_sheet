@@ -75,7 +75,9 @@ describe("ReviewDuplicatesModal", () => {
     render(<ReviewDuplicatesModal row={ROW} onClose={vi.fn()} onDisregard={vi.fn()} disregarding={false} />);
 
     expect(screen.getByRole("radio", { name: /Lili/ })).toBeChecked();
-    expect(screen.getByText("1 mention moves to Lili · 2 rows deleted")).toBeInTheDocument();
+    expect(
+      screen.getByText("1 mention moves to Lili, plus any in players' private notes · 2 rows deleted"),
+    ).toBeInTheDocument();
   });
 
   it("fills in the Discarded box's fuller categories once the full entity/merge fetch lands", async () => {
@@ -96,7 +98,11 @@ describe("ReviewDuplicatesModal", () => {
 
     await user.click(screen.getByRole("radio", { name: /^Lil\b/ }));
 
-    await waitFor(() => expect(screen.getByText("3 mentions move to Lil · 2 rows deleted")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(
+        screen.getByText("3 mentions move to Lil, plus any in players' private notes · 2 rows deleted"),
+      ).toBeInTheDocument(),
+    );
   });
 
   it("commits ONE atomic combineEntities call with every loser, and closes on success", async () => {

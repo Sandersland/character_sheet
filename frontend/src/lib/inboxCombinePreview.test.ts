@@ -42,13 +42,15 @@ describe("losersOf", () => {
 });
 
 describe("combineSummaryLine", () => {
-  it("matches the spec example: singular mention, plural rows — fed the inbox row's own lightweight entities", () => {
+  it("matches the spec example: singular mention, plural rows, plus the private-notes hedge — fed the inbox row's own lightweight entities", () => {
     const entities = [
       inboxEntity({ id: "e1", name: "Lil", mentionCount: 1 }),
       inboxEntity({ id: "e2", name: "lili", mentionCount: 0 }),
       inboxEntity({ id: "e3", name: "Lili", mentionCount: 3 }),
     ];
-    expect(combineSummaryLine(entities, "e3")).toBe("1 mention moves to Lili · 2 rows deleted");
+    expect(combineSummaryLine(entities, "e3")).toBe(
+      "1 mention moves to Lili, plus any in players' private notes · 2 rows deleted",
+    );
   });
 
   it("pluralizes mentions and singularizes a lone deleted row", () => {
@@ -56,7 +58,31 @@ describe("combineSummaryLine", () => {
       inboxEntity({ id: "e1", name: "Lil", mentionCount: 2 }),
       inboxEntity({ id: "e2", name: "Lili", mentionCount: 0 }),
     ];
-    expect(combineSummaryLine(entities, "e2")).toBe("2 mentions move to Lili · 1 row deleted");
+    expect(combineSummaryLine(entities, "e2")).toBe(
+      "2 mentions move to Lili, plus any in players' private notes · 1 row deleted",
+    );
+  });
+
+  it("still hedges even when the viewer-scoped mention count is zero — a loser can carry private mentions the DM's count says nothing about", () => {
+    const entities = [
+      inboxEntity({ id: "e1", name: "Lil", mentionCount: 0 }),
+      inboxEntity({ id: "e2", name: "Lili", mentionCount: 0 }),
+    ];
+    expect(combineSummaryLine(entities, "e2")).toBe(
+      "0 mentions move to Lili, plus any in players' private notes · 1 row deleted",
+    );
+  });
+
+  it("never shows an exact private-note count — only the fixed hedge phrase, regardless of cluster size", () => {
+    const entities = [
+      inboxEntity({ id: "e1", name: "Lil", mentionCount: 5 }),
+      inboxEntity({ id: "e2", name: "lili", mentionCount: 7 }),
+      inboxEntity({ id: "e3", name: "Lili", mentionCount: 0 }),
+    ];
+    const line = combineSummaryLine(entities, "e3");
+    expect(line).toContain("plus any in players' private notes");
+    // No stray digit sits inside the hedge clause itself.
+    expect(line.split("plus any in players' private notes")[1].split("·")[0]).not.toMatch(/\d/);
   });
 });
 
