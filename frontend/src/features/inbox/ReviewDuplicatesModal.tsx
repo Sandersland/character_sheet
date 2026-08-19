@@ -6,7 +6,7 @@ import ReviewFooter from "@/features/inbox/ReviewFooter";
 import SurvivorPicker from "@/features/inbox/SurvivorPicker";
 import { useCombineCluster } from "@/features/inbox/useCombineCluster";
 import { useReviewClusterEntities } from "@/features/inbox/useReviewClusterEntities";
-import { deriveCombineProgress } from "@/lib/inboxCombineProgress";
+import { errorMessage } from "@/lib/errorMessage";
 import {
   combineDiscardedItems,
   combineSummaryLine,
@@ -26,11 +26,13 @@ interface ReviewDuplicatesModalProps {
 // CombineConfirmDialog, and this feature's only confirm surface (no second
 // dialog): survivor radios default from the feed's defaultSurvivorId, a live
 // summary + gold Discarded box computed once the full entity/merge data
-// loads, then a sequential #1942 call per absorbed entity on commit.
-// BottomSheet (not Modal) because it's already the responsive Modal/
-// BottomSheet split this app uses everywhere else (centered dialog at md+,
-// bottom sheet on mobile) — matching the spec's "Modal/BottomSheet-
-// appropriate" instruction with one component instead of two.
+// loads, then ONE atomic #1942 call absorbing every loser at once. All-or-
+// nothing server-side, so a rejection leaves every entity untouched — the
+// radios stay live and the DM can just retry, no per-entity landed/locked
+// state to track. BottomSheet (not Modal) because it's already the
+// responsive Modal/BottomSheet split this app uses everywhere else (centered
+// dialog at md+, bottom sheet on mobile) — matching the spec's "Modal/
+// BottomSheet-appropriate" instruction with one component instead of two.
 export default function ReviewDuplicatesModal({
   row,
   onClose,
@@ -48,22 +50,18 @@ export default function ReviewDuplicatesModal({
   // own summary shape, just the preview line/box wait for the richer fetch.
   const previewReady = !isLoading && clusterEntities.length === row.entities.length;
 
-  const { remainingLoserIds, landedIds, failedEntity, failedError, survivorLocked } = deriveCombineProgress(
-    row.entities,
-    survivorId,
-    combineMutation.data ?? [],
-  );
+  const loserIds = row.entities.filter((e) => e.id !== survivorId).map((e) => e.id);
 
   function handleCombine() {
     combineMutation.mutate(
-      { campaignId: row.campaignId, loserIds: remainingLoserIds, survivorId },
-      { onSuccess: (result) => result.every((o) => o.ok) && onClose() },
+      { campaignId: row.campaignId, loserIds, survivorId },
+      { onSuccess: onClose },
     );
   }
 
   const summaryLine = previewReady
     ? combineSummaryLine(clusterEntities, survivorId)
-    : pendingRowsSummary(remainingLoserIds.length);
+    : pendingRowsSummary(loserIds.length);
 
   // The redaction warning only needs visibility, already on the inbox row's
   // own lightweight entities — shows immediately, no fetch wait. The rest
@@ -88,17 +86,15 @@ export default function ReviewDuplicatesModal({
           groupName={`inbox-survivor-${row.signature}`}
           survivorId={survivorId}
           onSelect={setSurvivorId}
-          locked={survivorLocked}
-          landedIds={landedIds}
         />
 
         <p className="text-sm font-semibold text-parchment-800">{summaryLine}</p>
 
         <DiscardedBox items={discardedItems} />
 
-        {failedEntity && (
+        {combineMutation.isError && (
           <p className="text-xs font-semibold text-garnet-700">
-            {failedEntity.name} failed to combine: {failedError}
+            {errorMessage(combineMutation.error, "Failed to combine entities.")}
           </p>
         )}
 
@@ -107,7 +103,7 @@ export default function ReviewDuplicatesModal({
           onCombine={handleCombine}
           disregarding={disregarding}
           combining={combineMutation.isPending}
-          remainingCount={remainingLoserIds.length}
+          loserCount={loserIds.length}
         />
       </div>
     </BottomSheet>

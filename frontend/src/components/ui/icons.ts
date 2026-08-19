@@ -99,5 +99,4 @@ export {
   // row glyph — ScrollText above doubles as the needs-chronicling row glyph.
   Bell,
   Copy,
-  Check,
 } from "lucide-react";

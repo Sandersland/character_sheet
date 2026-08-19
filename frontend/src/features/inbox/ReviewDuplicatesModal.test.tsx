@@ -90,7 +90,7 @@ describe("ReviewDuplicatesModal", () => {
     await waitFor(() => expect(screen.getByText("3 mentions move to Lil · 2 rows deleted")).toBeInTheDocument());
   });
 
-  it("commits sequential combineEntities calls, one per absorbed entity, and closes on full success", async () => {
+  it("commits ONE atomic combineEntities call with every loser, and closes on success", async () => {
     combineEntities.mockResolvedValue({});
     const onClose = vi.fn();
     const user = userEvent.setup();
@@ -100,14 +100,14 @@ describe("ReviewDuplicatesModal", () => {
     await user.click(screen.getByRole("button", { name: "Combine and delete 2 entries" }));
 
     await waitFor(() => expect(onClose).toHaveBeenCalled());
-    expect(combineEntities.mock.calls).toEqual([
-      ["camp-1", "e1", "e3"],
-      ["camp-1", "e2", "e3"],
-    ]);
+    expect(combineEntities).toHaveBeenCalledTimes(1);
+    expect(combineEntities).toHaveBeenCalledWith("camp-1", "e3", ["e1", "e2"]);
   });
 
-  it("on partial failure, shows which combine failed, keeps the modal open, and only retries the remainder", async () => {
-    combineEntities.mockResolvedValueOnce({}).mockRejectedValueOnce(new Error("Both entities are linked to an item"));
+  it("on rejection, shows the error, keeps the modal open with radios still live, and lets a plain retry resend the same combine", async () => {
+    combineEntities
+      .mockRejectedValueOnce(new Error("Both entities are linked to an item"))
+      .mockResolvedValueOnce({});
     const onClose = vi.fn();
     const user = userEvent.setup();
     render(<ReviewDuplicatesModal row={ROW} onClose={onClose} onDisregard={vi.fn()} disregarding={false} />);
@@ -115,20 +115,19 @@ describe("ReviewDuplicatesModal", () => {
 
     await user.click(screen.getByRole("button", { name: "Combine and delete 2 entries" }));
 
-    await waitFor(() => expect(screen.getByText(/failed to combine/i)).toBeInTheDocument());
-    expect(screen.getByText(/lili failed to combine: Both entities are linked to an item/)).toBeInTheDocument();
+    // Atomic combine: nothing landed, so there's no "which one failed" — just
+    // the backend's own message, verbatim.
+    expect(await screen.findByText("Both entities are linked to an item")).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
-    // e1 already landed — the survivor choice is now committed, so every radio locks.
-    for (const radio of screen.getAllByRole("radio")) expect(radio).toBeDisabled();
+    // No locking — a rejected atomic combine touched nothing, so the DM can
+    // still freely re-pick the survivor before retrying.
+    for (const radio of screen.getAllByRole("radio")) expect(radio).not.toBeDisabled();
 
-    combineEntities.mockClear();
-    combineEntities.mockResolvedValue({});
-    await user.click(screen.getByRole("button", { name: "Combine and delete 1 entry" }));
+    await user.click(screen.getByRole("button", { name: "Combine and delete 2 entries" }));
 
     await waitFor(() => expect(onClose).toHaveBeenCalled());
-    // Only the entity that never landed (e2) is retried — e1 already combined.
-    expect(combineEntities).toHaveBeenCalledTimes(1);
-    expect(combineEntities).toHaveBeenCalledWith("camp-1", "e2", "e3");
+    expect(combineEntities).toHaveBeenCalledTimes(2);
+    expect(combineEntities).toHaveBeenLastCalledWith("camp-1", "e3", ["e1", "e2"]);
   });
 
   it("Disregard these calls onDisregard with this row", async () => {
@@ -183,19 +182,13 @@ describe("ReviewDuplicatesModal", () => {
     });
   });
 
-  it("surfaces a round-2 hardening 409 (character-link cross-kind guard) readably on partial failure", async () => {
-    combineEntities.mockRejectedValueOnce(
-      new Error("The survivor must be a PC entity to inherit the duplicate's character link"),
-    );
+  it("surfaces a cross-loser 409 (two character-linked losers, round-2 hardening) readably", async () => {
+    combineEntities.mockRejectedValueOnce(new Error("Both entities are linked to a character"));
     render(<ReviewDuplicatesModal row={ROW} onClose={vi.fn()} onDisregard={vi.fn()} disregarding={false} />);
     await waitFor(() => expect(screen.getByText(/rows deleted/)).toBeInTheDocument());
 
     await userEvent.click(screen.getByRole("button", { name: "Combine and delete 2 entries" }));
 
-    expect(
-      await screen.findByText(
-        "Lil failed to combine: The survivor must be a PC entity to inherit the duplicate's character link",
-      ),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("Both entities are linked to a character")).toBeInTheDocument();
   });
 });

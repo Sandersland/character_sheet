@@ -3,19 +3,21 @@ interface ReviewFooterProps {
   onCombine: () => void;
   disregarding: boolean;
   combining: boolean;
-  remainingCount: number;
+  loserCount: number;
 }
 
 // The Review-duplicates modal's confirm footer (#1946) — this feature's only
 // confirm surface, so there is no second "are you sure" dialog behind it.
+// Combine is atomic (#1942): loserCount is always the full cluster minus the
+// survivor — it never shrinks after a failed attempt, since nothing landed.
 export default function ReviewFooter({
   onDisregard,
   onCombine,
   disregarding,
   combining,
-  remainingCount,
+  loserCount,
 }: ReviewFooterProps) {
-  const entryWord = remainingCount === 1 ? "entry" : "entries";
+  const entryWord = loserCount === 1 ? "entry" : "entries";
   return (
     <div className="flex flex-col gap-2">
       <p className="text-xs font-semibold text-garnet-700">This cannot be undone.</p>
@@ -31,10 +33,10 @@ export default function ReviewFooter({
         <button
           type="button"
           onClick={onCombine}
-          disabled={combining || remainingCount === 0}
+          disabled={combining || loserCount === 0}
           className="rounded-control bg-garnet-surface px-4 py-2 text-sm font-semibold text-garnet-on-surface transition-colors hover:bg-garnet-surface-hover disabled:opacity-50"
         >
-          {combining ? "Combining…" : `Combine and delete ${remainingCount} ${entryWord}`}
+          {combining ? "Combining…" : `Combine and delete ${loserCount} ${entryWord}`}
         </button>
       </div>
     </div>
