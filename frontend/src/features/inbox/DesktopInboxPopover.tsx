@@ -12,7 +12,11 @@ interface DesktopInboxPopoverProps {
 }
 
 // Desktop's inbox trigger (#1946): the bell anchors the existing Popover
-// primitive, which owns its own open/close state.
+// primitive, which owns its own open/close state. InboxBell only mounts this
+// when rows is non-empty (Popover has no close ANIMATION to protect, unlike
+// MobileInboxSheet's BottomSheet — an empty-but-still-labeled trigger button
+// left in the DOM to guard against that would be a real accessibility
+// regression for no real benefit here).
 export default function DesktopInboxPopover({
   rows,
   label,
@@ -26,13 +30,10 @@ export default function DesktopInboxPopover({
         <InboxPanel
           rows={rows}
           mobile={false}
-          onReviewDuplicates={(row) => {
-            close();
-            onReviewDuplicates(row);
-          }}
+          onReviewDuplicates={onReviewDuplicates}
           onDisregard={onDisregard}
           disregardingSignature={disregardingSignature}
-          onNavigated={close}
+          onRequestClose={close}
         />
       )}
     </Popover>

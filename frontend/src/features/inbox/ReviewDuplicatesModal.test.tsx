@@ -70,20 +70,29 @@ describe("ReviewDuplicatesModal", () => {
     fetchEntityMerges.mockResolvedValue([]);
   });
 
-  it("defaults the survivor radio from the feed's defaultSurvivorId and shows the live summary + discarded box", async () => {
+  it("shows the live summary IMMEDIATELY off the inbox row's own entities, before the full-entity fetch resolves", () => {
+    fetchEntities.mockReturnValue(new Promise(() => {})); // never resolves
     render(<ReviewDuplicatesModal row={ROW} onClose={vi.fn()} onDisregard={vi.fn()} disregarding={false} />);
 
     expect(screen.getByRole("radio", { name: /Lili/ })).toBeChecked();
-    await waitFor(() => expect(screen.getByText("1 mention moves to Lili · 2 rows deleted")).toBeInTheDocument());
+    expect(screen.getByText("1 mention moves to Lili · 2 rows deleted")).toBeInTheDocument();
+  });
+
+  it("fills in the Discarded box's fuller categories once the full entity/merge fetch lands", async () => {
+    render(<ReviewDuplicatesModal row={ROW} onClose={vi.fn()} onDisregard={vi.fn()} disregarding={false} />);
+
+    // "Hidden visibility"/"Descriptions" need stats.hasDescription off the
+    // full-entity fetch — a ready-state-only fact, unlike the summary line
+    // above, which is already showing from row.entities alone.
+    await waitFor(() => expect(screen.getByText(/Hidden visibility — Lil/)).toBeInTheDocument());
     expect(screen.getByText("Discarded")).toBeInTheDocument();
-    expect(screen.getByText(/Hidden visibility — Lil/)).toBeInTheDocument();
     expect(screen.getByText(/Descriptions — Lil/)).toBeInTheDocument();
   });
 
   it("re-picking the survivor updates the summary line and Kept/Combined labels", async () => {
     const user = userEvent.setup();
     render(<ReviewDuplicatesModal row={ROW} onClose={vi.fn()} onDisregard={vi.fn()} disregarding={false} />);
-    await waitFor(() => expect(screen.getByText(/rows deleted/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Hidden visibility — Lil/)).toBeInTheDocument());
 
     await user.click(screen.getByRole("radio", { name: /^Lil\b/ }));
 
@@ -95,7 +104,7 @@ describe("ReviewDuplicatesModal", () => {
     const onClose = vi.fn();
     const user = userEvent.setup();
     render(<ReviewDuplicatesModal row={ROW} onClose={onClose} onDisregard={vi.fn()} disregarding={false} />);
-    await waitFor(() => expect(screen.getByText(/rows deleted/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Hidden visibility — Lil/)).toBeInTheDocument());
 
     await user.click(screen.getByRole("button", { name: "Combine and delete 2 entries" }));
 
@@ -111,7 +120,7 @@ describe("ReviewDuplicatesModal", () => {
     const onClose = vi.fn();
     const user = userEvent.setup();
     render(<ReviewDuplicatesModal row={ROW} onClose={onClose} onDisregard={vi.fn()} disregarding={false} />);
-    await waitFor(() => expect(screen.getByText(/rows deleted/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Hidden visibility — Lil/)).toBeInTheDocument());
 
     await user.click(screen.getByRole("button", { name: "Combine and delete 2 entries" }));
 
@@ -185,7 +194,7 @@ describe("ReviewDuplicatesModal", () => {
   it("surfaces a cross-loser 409 (two character-linked losers, round-2 hardening) readably", async () => {
     combineEntities.mockRejectedValueOnce(new Error("Both entities are linked to a character"));
     render(<ReviewDuplicatesModal row={ROW} onClose={vi.fn()} onDisregard={vi.fn()} disregarding={false} />);
-    await waitFor(() => expect(screen.getByText(/rows deleted/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Hidden visibility — Lil/)).toBeInTheDocument());
 
     await userEvent.click(screen.getByRole("button", { name: "Combine and delete 2 entries" }));
 

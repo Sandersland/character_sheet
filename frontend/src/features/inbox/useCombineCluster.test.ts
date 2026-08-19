@@ -2,7 +2,7 @@ import { renderHook, act, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getQueryClient } from "@/api/queryClient";
-import { campaignKeys, inboxKeys } from "@/api/queryKeys";
+import { campaignKeys, inboxKeys, sessionKeys } from "@/api/queryKeys";
 import { useCombineCluster } from "@/features/inbox/useCombineCluster";
 
 const combineEntities = vi.fn();
@@ -42,12 +42,15 @@ describe("useCombineCluster", () => {
     expect(result.current.data).toBeUndefined();
   });
 
-  it("invalidates inbox + entities + merges caches on success", async () => {
+  it("invalidates inbox + entities + merges + every open character's chronicle for the campaign on success", async () => {
     combineEntities.mockResolvedValue({});
     const { result } = renderHook(() => useCombineCluster());
     getQueryClient().setQueryData(inboxKeys.all, []);
     getQueryClient().setQueryData(campaignKeys.entities("camp-1"), []);
     getQueryClient().setQueryData(campaignKeys.merges("camp-1"), []);
+    // A specific character's chronicle — the mutation only knows campaignId,
+    // so this proves the campaign-wide PARTIAL key actually catches it.
+    getQueryClient().setQueryData(sessionKeys.chronicle("camp-1", "char-1"), { arcs: [], sessions: [] });
 
     act(() => {
       result.current.mutate({ campaignId: "camp-1", loserIds: ["e1"], survivorId: "e2" });
@@ -57,6 +60,9 @@ describe("useCombineCluster", () => {
     expect(getQueryClient().getQueryState(inboxKeys.all)?.isInvalidated).toBe(true);
     expect(getQueryClient().getQueryState(campaignKeys.entities("camp-1"))?.isInvalidated).toBe(true);
     expect(getQueryClient().getQueryState(campaignKeys.merges("camp-1"))?.isInvalidated).toBe(true);
+    expect(
+      getQueryClient().getQueryState(sessionKeys.chronicle("camp-1", "char-1"))?.isInvalidated,
+    ).toBe(true);
   });
 
   it("does NOT invalidate any cache on failure — nothing landed, so nothing is stale", async () => {

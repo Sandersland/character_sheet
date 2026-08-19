@@ -1,59 +1,107 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import DesktopInboxPopover from "@/features/inbox/DesktopInboxPopover";
+import { useInbox } from "@/features/inbox/useInbox";
 import MobileInboxSheet from "@/features/inbox/MobileInboxSheet";
 import ReviewDuplicatesModal from "@/features/inbox/ReviewDuplicatesModal";
 import { useDismissInboxFlag } from "@/features/inbox/useDismissInboxFlag";
-import { useInbox } from "@/hooks/useInbox";
 import { useIsBelowMd } from "@/hooks/useIsBelowMd";
+import { errorMessage } from "@/lib/errorMessage";
 import type { InboxDuplicateClusterRow, InboxRow } from "@/types/character";
+
+// How long a failed-dismissal toast lingers before self-clearing — matches
+// this app's other self-dismissing status messages (CampaignInviteLink's
+// "Copied to clipboard" note uses the same state+timer shape).
+const DISMISS_ERROR_TOAST_MS = 4000;
 
 // AppHeader's inbox entry point (#1946): DM housekeeping derived across every
 // campaign the caller owns (duplicate-name clusters, needs-chronicling
-// counts — #1945). Hidden entirely when the feed is empty — this is the
-// first icon-only control in the app besides the avatar (deliberate, #1946),
-// so it only earns a permanent header slot by being invisible the rest of
-// the time. Desktop opens the existing Popover under the bell; mobile opens
-// the same responsive BottomSheet every other mobile picker in this app uses
-// — DesktopInboxPopover/MobileInboxSheet own that split so this component
-// only owns the state shared across both (the Review modal, the dismiss
-// mutation) rather than branching on viewport itself.
+// counts — #1945). The bell is hidden entirely when the feed is empty — this
+// is the first icon-only control in the app besides the avatar (deliberate,
+// #1946). But `rows` never unmounts the Review modal or a currently-open
+// mobile sheet: ReviewDuplicatesModal renders off its own `reviewRow` state,
+// independent of rows, and MobileInboxSheet stays mounted with only its
+// TRIGGER hidden (hideTrigger) so a BottomSheet mid drag-to-dismiss finishes
+// that animation instead of vanishing instantly if a background refetch
+// empties the inbox under it. DesktopInboxPopover has no such animation to
+// protect — by the time a row click opens the Review modal, InboxPanel has
+// already closed the popover itself — so it mounts plainly on rows.length,
+// same as before; forcing it to linger empty-but-labeled would be a real
+// accessibility regression for no real benefit.
 export default function InboxBell() {
   const { rows } = useInbox();
   const isMobile = useIsBelowMd();
   const [reviewRow, setReviewRow] = useState<InboxDuplicateClusterRow | null>(null);
   const dismissMutation = useDismissInboxFlag();
+  const [dismissError, setDismissError] = useState<string | null>(null);
 
-  if (rows.length === 0) return null;
+  // A failed dismissal is otherwise silent: the optimistic row removal rolls
+  // back invisibly, with nothing telling the DM why the row reappeared.
+  useEffect(() => {
+    if (!dismissMutation.error) return;
+    setDismissError(errorMessage(dismissMutation.error, "Failed to disregard."));
+  }, [dismissMutation.error]);
+
+  useEffect(() => {
+    if (!dismissError) return;
+    const timer = setTimeout(() => setDismissError(null), DISMISS_ERROR_TOAST_MS);
+    return () => clearTimeout(timer);
+  }, [dismissError]);
 
   function handleDisregard(row: InboxRow) {
     dismissMutation.mutate({ campaignId: row.campaignId, kind: row.kind, signature: row.signature });
   }
 
+  function handleDisregardFromModal(row: InboxDuplicateClusterRow) {
+    handleDisregard(row);
+    setReviewRow(null);
+  }
+
   const itemWord = rows.length === 1 ? "item" : "items";
-  const triggerProps = {
-    rows,
-    label: `Inbox, ${rows.length} ${itemWord}`,
-    onReviewDuplicates: setReviewRow,
-    onDisregard: handleDisregard,
-    disregardingSignature: dismissMutation.isPending ? (dismissMutation.variables?.signature ?? null) : null,
-  };
+  const label = `Inbox, ${rows.length} ${itemWord}`;
+  const disregardingSignature =
+    dismissMutation.isPending ? (dismissMutation.variables?.signature ?? null) : null;
 
   return (
-    <>
-      {isMobile ? <MobileInboxSheet {...triggerProps} /> : <DesktopInboxPopover {...triggerProps} />}
+    <div className="relative">
+      {isMobile ? (
+        <MobileInboxSheet
+          rows={rows}
+          label={label}
+          onReviewDuplicates={setReviewRow}
+          onDisregard={handleDisregard}
+          disregardingSignature={disregardingSignature}
+          hideTrigger={rows.length === 0}
+        />
+      ) : (
+        rows.length > 0 && (
+          <DesktopInboxPopover
+            rows={rows}
+            label={label}
+            onReviewDuplicates={setReviewRow}
+            onDisregard={handleDisregard}
+            disregardingSignature={disregardingSignature}
+          />
+        )
+      )}
+
+      {dismissError && (
+        <p
+          role="status"
+          className="absolute right-0 top-full z-10 mt-1 whitespace-nowrap rounded-control bg-garnet-surface px-2.5 py-1.5 text-xs font-semibold text-garnet-on-surface shadow-raised"
+        >
+          {dismissError}
+        </p>
+      )}
 
       {reviewRow && (
         <ReviewDuplicatesModal
           row={reviewRow}
           onClose={() => setReviewRow(null)}
-          onDisregard={(row) => {
-            handleDisregard(row);
-            setReviewRow(null);
-          }}
+          onDisregard={handleDisregardFromModal}
           disregarding={dismissMutation.isPending}
         />
       )}
-    </>
+    </div>
   );
 }

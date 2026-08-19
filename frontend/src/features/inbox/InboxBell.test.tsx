@@ -3,6 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { getQueryClient } from "@/api/queryClient";
+import { inboxKeys } from "@/api/queryKeys";
 import InboxBell from "@/features/inbox/InboxBell";
 import type { InboxRow } from "@/types/character";
 
@@ -19,13 +21,13 @@ vi.mock("@/api/client", () => ({
   combineEntities: (...args: unknown[]) => combineEntities(...args),
 }));
 
-// Freshly "now" (not a fixed fixture date): formatRelativeDay's calendar-day
-// diff against Date.now() lands on "today" for any signalAt this close to
-// test execution, without pinning down system time and risking a userEvent +
-// fake-timer interaction (see CampaignInviteLink.test.tsx's own note on that).
-// Exact bucket wording ("yesterday", "N days ago") is formatRelativeDay's own
-// unit-tested territory (lib/formatJournalDate.test.ts) — this file only
-// checks that signalAt actually reaches the row.
+// Freshly "now" (not a fixed fixture date): formatInboxSignalAge's calendar-
+// day diff against Date.now() lands on "today" for any signalAt this close
+// to test execution, without pinning down system time and risking a
+// userEvent + fake-timer interaction (see CampaignInviteLink.test.tsx's own
+// note on that). Exact bucket wording ("yesterday", "N days ago") is
+// formatInboxSignalAge's own unit-tested territory (lib/inboxMessages.test.ts)
+// — this file only checks that signalAt actually reaches the row.
 const NOW_ISO = new Date().toISOString();
 
 const DUPLICATE_ROW: InboxRow = {
@@ -89,11 +91,33 @@ describe("InboxBell", () => {
     vi.unstubAllGlobals();
   });
 
-  it("renders nothing when the inbox is empty", async () => {
+  it("hides the bell trigger when the inbox is empty — no accessible Inbox control to find or activate", async () => {
     fetchInbox.mockResolvedValue([]);
-    const { container } = renderBell();
+    renderBell();
     await waitFor(() => expect(fetchInbox).toHaveBeenCalled());
-    expect(container).toBeEmptyDOMElement();
+    // DesktopInboxPopover stays mounted (so an already-open popover survives
+    // rows going empty — see the "survives" test below); only ITS trigger
+    // content is hidden, which is what "hidden entirely" actually means here.
+    expect(screen.queryByRole("button", { name: /inbox/i })).not.toBeInTheDocument();
+  });
+
+  it("keeps an open Review-duplicates modal mounted even if a background refetch empties the inbox mid-interaction", async () => {
+    fetchInbox.mockResolvedValue([DUPLICATE_ROW]);
+    const user = userEvent.setup();
+    renderBell();
+    await user.click(await screen.findByRole("button", { name: /inbox/i }));
+    await user.click(screen.getByRole("button", { name: "Review duplicates" }));
+    expect(screen.getByRole("dialog", { name: "Review duplicates" })).toBeInTheDocument();
+
+    // Simulate the feed going empty out from under the open modal (e.g. some
+    // other tab dismissed/resolved the last flag) — only the trigger's
+    // visibility may depend on rows, per #1946 follow-up.
+    getQueryClient().setQueryData(inboxKeys.all, []);
+
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: /inbox/i })).not.toBeInTheDocument(),
+    );
+    expect(screen.getByRole("dialog", { name: "Review duplicates" })).toBeInTheDocument();
   });
 
   it("shows the bell with a badge counting the rows", async () => {
@@ -151,6 +175,38 @@ describe("InboxBell", () => {
         screen.queryByText("4 entries have been mentioned but have no description yet."),
       ).not.toBeInTheDocument(),
     );
+  });
+
+  it("surfaces a failed dismissal as a self-clearing status message, and rolls the row back", async () => {
+    fetchInbox.mockResolvedValue([CHRONICLING_ROW]);
+    dismissInboxFlag.mockRejectedValue(new Error("Failed to dismiss inbox flag"));
+    const user = userEvent.setup();
+    renderBell();
+    await user.click(await screen.findByRole("button", { name: /inbox/i }));
+    await user.click(screen.getByRole("button", { name: "Disregard" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent("Failed to dismiss inbox flag");
+    // Rolled back — the row is back and the trigger's badge count is intact.
+    expect(
+      await screen.findByText("4 entries have been mentioned but have no description yet."),
+    ).toBeInTheDocument();
+  });
+
+  it("mobile: an already-open sheet keeps rendering (and can still close itself) after a background refetch empties the inbox", async () => {
+    stubMatchMedia(false);
+    fetchInbox.mockResolvedValue([CHRONICLING_ROW]);
+    const user = userEvent.setup();
+    renderBell();
+    await user.click(await screen.findByRole("button", { name: /inbox/i }));
+    expect(screen.getByRole("dialog", { name: "Inbox" })).toBeInTheDocument();
+
+    getQueryClient().setQueryData(inboxKeys.all, []);
+
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: /inbox/i })).not.toBeInTheDocument(),
+    );
+    // The sheet itself — not just the (now-hidden) trigger — is unaffected.
+    expect(screen.getByRole("dialog", { name: "Inbox" })).toBeInTheDocument();
   });
 
   it("mobile: the same trigger opens a BottomSheet titled Inbox", async () => {

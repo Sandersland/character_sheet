@@ -6,24 +6,24 @@
 
 import type { CampaignEntity, CampaignEntityMerge, InboxDuplicateEntity } from "@/types/character";
 
-export function losersOf(entities: CampaignEntity[], survivorId: string): CampaignEntity[] {
+export function losersOf<T extends { id: string }>(entities: T[], survivorId: string): T[] {
   return entities.filter((e) => e.id !== survivorId);
 }
 
-// Placeholder summary line while the full-entity fetch (mention totals) is
-// still loading: just the row count, which the inbox row's own summary shape
-// already carries.
-export function pendingRowsSummary(remainingCount: number): string {
-  return `${remainingCount} ${remainingCount === 1 ? "row" : "rows"} deleted`;
+interface MentionSummaryEntity {
+  id: string;
+  name: string;
+  mentionCount: number;
 }
 
-// "1 mention moves to Lili · 2 rows deleted" — the live summary line. Mention
-// totals come from `stats.mentionCount` (absent when the caller didn't fetch
-// with `includeStats`, treated as 0).
-export function combineSummaryLine(entities: CampaignEntity[], survivorId: string): string {
+// "1 mention moves to Lili · 2 rows deleted" — the live summary line. Typed
+// over the minimal shape the inbox row's own InboxDuplicateEntity already
+// carries (id/name/mentionCount), not the full CampaignEntity — the caller
+// feeds row.entities directly so this renders on first paint, no fetch wait.
+export function combineSummaryLine(entities: MentionSummaryEntity[], survivorId: string): string {
   const survivor = entities.find((e) => e.id === survivorId);
   const losers = losersOf(entities, survivorId);
-  const mentionsMoving = losers.reduce((sum, e) => sum + (e.stats?.mentionCount ?? 0), 0);
+  const mentionsMoving = losers.reduce((sum, e) => sum + e.mentionCount, 0);
   const mentionWord = mentionsMoving === 1 ? "mention" : "mentions";
   const mentionVerb = mentionsMoving === 1 ? "moves" : "move";
   const rowWord = losers.length === 1 ? "row" : "rows";

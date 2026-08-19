@@ -1,7 +1,9 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useInbox } from "@/hooks/useInbox";
+import { getQueryClient } from "@/api/queryClient";
+import { inboxKeys } from "@/api/queryKeys";
+import { useInbox } from "@/features/inbox/useInbox";
 import type { InboxRow } from "@/types/character";
 
 const fetchInbox = vi.fn();
@@ -35,5 +37,17 @@ describe("useInbox", () => {
     fetchInbox.mockResolvedValue(rows);
     const { result } = renderHook(() => useInbox());
     await waitFor(() => expect(result.current.rows).toEqual(rows));
+  });
+
+  it("pins a 60s staleTime and disables refetch-on-window-focus — GET /api/inbox is a full server-side clustering scan, not worth re-firing on every remount/focus", async () => {
+    fetchInbox.mockResolvedValue([]);
+    renderHook(() => useInbox());
+
+    await waitFor(() => {
+      const query = getQueryClient().getQueryCache().find({ queryKey: inboxKeys.all });
+      const options = query?.options as { staleTime?: number; refetchOnWindowFocus?: boolean } | undefined;
+      expect(options?.staleTime).toBe(60_000);
+      expect(options?.refetchOnWindowFocus).toBe(false);
+    });
   });
 });

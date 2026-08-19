@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
-import { groupInboxRowsByCampaign, inboxRowMessage } from "@/lib/inboxMessages";
+import { formatInboxSignalAge, groupInboxRowsByCampaign, inboxRowMessage } from "@/lib/inboxMessages";
 import type { InboxDuplicateClusterRow, InboxNeedsChroniclingRow, InboxRow } from "@/types/character";
 
 function duplicateRow(overrides: Partial<InboxDuplicateClusterRow> = {}): InboxDuplicateClusterRow {
@@ -67,5 +67,44 @@ describe("groupInboxRowsByCampaign", () => {
 
   it("returns no groups for an empty inbox", () => {
     expect(groupInboxRowsByCampaign([])).toEqual([]);
+  });
+});
+
+describe("formatInboxSignalAge", () => {
+  // Anchored via the LOCAL Date constructor (not a UTC ISO literal) so the
+  // test is deterministic on any host timezone: "now" and every fixture below
+  // are built from the same local wall-clock frame.
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 6, 12, 15, 0, 0));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("says today for the current local day, any time of day", () => {
+    expect(formatInboxSignalAge(new Date(2026, 6, 12, 0, 1, 0).toISOString())).toBe("today");
+    expect(formatInboxSignalAge(new Date(2026, 6, 12, 23, 59, 0).toISOString())).toBe("today");
+  });
+
+  it("says yesterday for one local calendar day back, even minutes before now", () => {
+    expect(formatInboxSignalAge(new Date(2026, 6, 11, 23, 59, 0).toISOString())).toBe("yesterday");
+  });
+
+  it("counts local calendar days ago", () => {
+    expect(formatInboxSignalAge(new Date(2026, 6, 5, 12, 0, 0).toISOString())).toBe("7 days ago");
+  });
+
+  it("falls back to an absolute local date past 30 days", () => {
+    expect(formatInboxSignalAge(new Date(2026, 5, 11, 12, 0, 0).toISOString())).toBe("Jun 11, 2026");
+  });
+
+  it("treats a future timestamp as today rather than counting negatively", () => {
+    expect(formatInboxSignalAge(new Date(2026, 6, 13, 0, 0, 0).toISOString())).toBe("today");
+  });
+
+  it("returns unparseable input verbatim", () => {
+    expect(formatInboxSignalAge("not-a-date")).toBe("not-a-date");
   });
 });

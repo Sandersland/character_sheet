@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import BottomSheet from "@/components/ui/BottomSheet";
 import DiscardedBox from "@/features/inbox/DiscardedBox";
@@ -11,7 +11,6 @@ import {
   combineDiscardedItems,
   combineSummaryLine,
   hiddenSurvivorRedactsRevealedMentions,
-  pendingRowsSummary,
 } from "@/lib/inboxCombinePreview";
 import type { InboxDuplicateClusterRow } from "@/types/character";
 
@@ -25,14 +24,16 @@ interface ReviewDuplicatesModalProps {
 // The Review-duplicates modal (#1946) — the cluster sibling of #1943's
 // CombineConfirmDialog, and this feature's only confirm surface (no second
 // dialog): survivor radios default from the feed's defaultSurvivorId, a live
-// summary + gold Discarded box computed once the full entity/merge data
-// loads, then ONE atomic #1942 call absorbing every loser at once. All-or-
-// nothing server-side, so a rejection leaves every entity untouched — the
-// radios stay live and the DM can just retry, no per-entity landed/locked
-// state to track. BottomSheet (not Modal) because it's already the
-// responsive Modal/BottomSheet split this app uses everywhere else (centered
-// dialog at md+, bottom sheet on mobile) — matching the spec's "Modal/
-// BottomSheet-appropriate" instruction with one component instead of two.
+// summary line off the inbox row's own entities (no fetch wait — see
+// combineSummaryLine), a gold Discarded box that fills in once the fuller
+// entity/merge fetch lands, then ONE atomic #1942 call absorbing every loser
+// at once. All-or-nothing server-side, so a rejection leaves every entity
+// untouched — the radios stay live and the DM can just retry, no per-entity
+// landed/locked state to track. BottomSheet (not Modal) because it's already
+// the responsive Modal/BottomSheet split this app uses everywhere else
+// (centered dialog at md+, bottom sheet on mobile) — matching the spec's
+// "Modal/BottomSheet-appropriate" instruction with one component instead of
+// two.
 export default function ReviewDuplicatesModal({
   row,
   onClose,
@@ -43,14 +44,20 @@ export default function ReviewDuplicatesModal({
   const { entities: fullEntities, merges, isLoading } = useReviewClusterEntities(row.campaignId);
   const combineMutation = useCombineCluster();
 
-  const clusterIds = new Set(row.entities.map((e) => e.id));
-  const clusterEntities = fullEntities.filter((e) => clusterIds.has(e.id));
+  const clusterEntities = useMemo(() => {
+    const clusterIds = new Set(row.entities.map((e) => e.id));
+    return fullEntities.filter((e) => clusterIds.has(e.id));
+  }, [row.entities, fullEntities]);
   // Full data hasn't landed (or an entity was deleted out from under us
-  // concurrently) — the picker list below still renders from the inbox row's
-  // own summary shape, just the preview line/box wait for the richer fetch.
+  // concurrently) — the picker list and summary line below still render from
+  // the inbox row's own summary shape; only the Discarded box's fuller
+  // categories (dropped descriptions, prepared merges) wait on this.
   const previewReady = !isLoading && clusterEntities.length === row.entities.length;
 
-  const loserIds = row.entities.filter((e) => e.id !== survivorId).map((e) => e.id);
+  const loserIds = useMemo(
+    () => row.entities.filter((e) => e.id !== survivorId).map((e) => e.id),
+    [row.entities, survivorId],
+  );
 
   function handleCombine() {
     combineMutation.mutate(
@@ -59,19 +66,26 @@ export default function ReviewDuplicatesModal({
     );
   }
 
-  const summaryLine = previewReady
-    ? combineSummaryLine(clusterEntities, survivorId)
-    : pendingRowsSummary(loserIds.length);
+  // Typed over {id, name, mentionCount} — row.entities already carries that,
+  // so this renders on first paint rather than waiting on clusterEntities.
+  const summaryLine = useMemo(
+    () => combineSummaryLine(row.entities, survivorId),
+    [row.entities, survivorId],
+  );
 
-  // The redaction warning only needs visibility, already on the inbox row's
-  // own lightweight entities — shows immediately, no fetch wait. The rest
-  // (dropped descriptions, prepared merges) needs the full entity/merge
-  // fetch, so it joins once previewReady.
-  const redactionWarning = hiddenSurvivorRedactsRevealedMentions(row.entities, survivorId);
-  const discardedItems = [
-    ...(redactionWarning ? [redactionWarning] : []),
-    ...(previewReady ? combineDiscardedItems(clusterEntities, survivorId, merges) : []),
-  ];
+  // Only needs visibility, already on the inbox row's own lightweight
+  // entities — shows immediately, no fetch wait.
+  const redactionWarning = useMemo(
+    () => hiddenSurvivorRedactsRevealedMentions(row.entities, survivorId),
+    [row.entities, survivorId],
+  );
+  const discardedItems = useMemo(
+    () => [
+      ...(redactionWarning ? [redactionWarning] : []),
+      ...(previewReady ? combineDiscardedItems(clusterEntities, survivorId, merges) : []),
+    ],
+    [redactionWarning, previewReady, clusterEntities, survivorId, merges],
+  );
 
   return (
     <BottomSheet title="Review duplicates" onClose={onClose}>

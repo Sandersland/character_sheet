@@ -5,7 +5,6 @@ import {
   combineSummaryLine,
   hiddenSurvivorRedactsRevealedMentions,
   losersOf,
-  pendingRowsSummary,
 } from "@/lib/inboxCombinePreview";
 import type { CampaignEntity, CampaignEntityMerge, InboxDuplicateEntity } from "@/types/character";
 
@@ -43,19 +42,19 @@ describe("losersOf", () => {
 });
 
 describe("combineSummaryLine", () => {
-  it("matches the spec example: singular mention, plural rows", () => {
+  it("matches the spec example: singular mention, plural rows — fed the inbox row's own lightweight entities", () => {
     const entities = [
-      entity({ id: "e1", name: "Lil", stats: { mentionCount: 1, firstMentioned: null, lastMentioned: null, chroniclers: [], hasDescription: false } }),
-      entity({ id: "e2", name: "lili", stats: { mentionCount: 0, firstMentioned: null, lastMentioned: null, chroniclers: [], hasDescription: false } }),
-      entity({ id: "e3", name: "Lili" }),
+      inboxEntity({ id: "e1", name: "Lil", mentionCount: 1 }),
+      inboxEntity({ id: "e2", name: "lili", mentionCount: 0 }),
+      inboxEntity({ id: "e3", name: "Lili", mentionCount: 3 }),
     ];
     expect(combineSummaryLine(entities, "e3")).toBe("1 mention moves to Lili · 2 rows deleted");
   });
 
   it("pluralizes mentions and singularizes a lone deleted row", () => {
     const entities = [
-      entity({ id: "e1", name: "Lil", stats: { mentionCount: 2, firstMentioned: null, lastMentioned: null, chroniclers: [], hasDescription: false } }),
-      entity({ id: "e2", name: "Lili" }),
+      inboxEntity({ id: "e1", name: "Lil", mentionCount: 2 }),
+      inboxEntity({ id: "e2", name: "Lili", mentionCount: 0 }),
     ];
     expect(combineSummaryLine(entities, "e2")).toBe("2 mentions move to Lili · 1 row deleted");
   });
@@ -151,15 +150,5 @@ describe("hiddenSurvivorRedactsRevealedMentions", () => {
     expect(hiddenSurvivorRedactsRevealedMentions(entities, "e3")?.label).toBe(
       'Mentions from Lil, lili will render as "Hidden" until Lili is revealed',
     );
-  });
-});
-
-describe("pendingRowsSummary", () => {
-  it("singularizes a lone row", () => {
-    expect(pendingRowsSummary(1)).toBe("1 row deleted");
-  });
-
-  it("pluralizes multiple rows", () => {
-    expect(pendingRowsSummary(2)).toBe("2 rows deleted");
   });
 });

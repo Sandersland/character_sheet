@@ -4,11 +4,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getQueryClient } from "@/api/queryClient";
 import { inboxKeys } from "@/api/queryKeys";
 import { useDismissInboxFlag } from "@/features/inbox/useDismissInboxFlag";
+import { useInbox } from "@/features/inbox/useInbox";
 import type { InboxRow } from "@/types/character";
 
 const dismissInboxFlag = vi.fn();
+const fetchInbox = vi.fn();
 vi.mock("@/api/client", () => ({
   dismissInboxFlag: (...args: unknown[]) => dismissInboxFlag(...args),
+  fetchInbox: (...args: unknown[]) => fetchInbox(...args),
 }));
 
 const ROWS: InboxRow[] = [
@@ -34,6 +37,7 @@ const ROWS: InboxRow[] = [
 describe("useDismissInboxFlag", () => {
   beforeEach(() => {
     dismissInboxFlag.mockReset();
+    fetchInbox.mockReset();
     getQueryClient().clear();
     getQueryClient().setQueryData(inboxKeys.all, ROWS);
   });
@@ -61,5 +65,40 @@ describe("useDismissInboxFlag", () => {
 
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(getQueryClient().getQueryData<InboxRow[]>(inboxKeys.all)).toEqual(ROWS);
+  });
+
+  it("on success, invalidates WITHOUT an eager refetch — the optimistic removal is already exact", async () => {
+    fetchInbox.mockResolvedValue(ROWS);
+    dismissInboxFlag.mockResolvedValue(undefined);
+
+    const { result: inbox } = renderHook(() => useInbox());
+    await waitFor(() => expect(inbox.current.rows).toEqual(ROWS));
+    fetchInbox.mockClear();
+
+    const { result: dismiss } = renderHook(() => useDismissInboxFlag());
+    act(() => {
+      dismiss.current.mutate({ campaignId: "camp-1", kind: "NEEDS_CHRONICLING", signature: "camp-1" });
+    });
+
+    await waitFor(() => expect(dismiss.current.isSuccess).toBe(true));
+    expect(getQueryClient().getQueryState(inboxKeys.all)?.isInvalidated).toBe(true);
+    expect(fetchInbox).not.toHaveBeenCalled();
+  });
+
+  it("on failure, refetches eagerly to reconcile the rollback with the server", async () => {
+    fetchInbox.mockResolvedValue(ROWS);
+    dismissInboxFlag.mockRejectedValue(new Error("boom"));
+
+    const { result: inbox } = renderHook(() => useInbox());
+    await waitFor(() => expect(inbox.current.rows).toEqual(ROWS));
+    fetchInbox.mockClear();
+
+    const { result: dismiss } = renderHook(() => useDismissInboxFlag());
+    act(() => {
+      dismiss.current.mutate({ campaignId: "camp-1", kind: "NEEDS_CHRONICLING", signature: "camp-1" });
+    });
+
+    await waitFor(() => expect(dismiss.current.isError).toBe(true));
+    await waitFor(() => expect(fetchInbox).toHaveBeenCalled());
   });
 });

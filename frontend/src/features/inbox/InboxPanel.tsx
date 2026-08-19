@@ -9,7 +9,8 @@ interface InboxPanelProps {
   onReviewDuplicates: (row: InboxDuplicateClusterRow) => void;
   onDisregard: (row: InboxRow) => void;
   disregardingSignature: string | null;
-  onNavigated: () => void;
+  /** Closes whichever surface (Popover/BottomSheet) is hosting this panel. */
+  onRequestClose: () => void;
 }
 
 // Row list shared by the desktop popover and the mobile BottomSheet (#1946) —
@@ -17,15 +18,26 @@ interface InboxPanelProps {
 // (GET /api/inbox is owner-scoped), so the "DM only" badge is constant per
 // group rather than conditional: it's read as "this group is DM housekeeping",
 // not as a per-campaign role check.
+//
+// Owns the "close the host surface, then act" wrapping itself (both callers
+// used to duplicate it) — Review Duplicates opens a NEW modal, which reads
+// oddly stacked behind an already-open popover/sheet, so the host closes
+// first. Open Codex is a real navigation, and its own close request is just
+// onRequestClose passed straight through to InboxRowItem.
 export default function InboxPanel({
   rows,
   mobile,
   onReviewDuplicates,
   onDisregard,
   disregardingSignature,
-  onNavigated,
+  onRequestClose,
 }: InboxPanelProps) {
   const groups = groupInboxRowsByCampaign(rows);
+
+  function handleReviewDuplicates(row: InboxDuplicateClusterRow) {
+    onRequestClose();
+    onReviewDuplicates(row);
+  }
 
   return (
     <div className={mobile ? "flex flex-col" : "w-80"}>
@@ -44,10 +56,10 @@ export default function InboxPanel({
                 key={row.signature}
                 row={row}
                 mobile={mobile}
-                onReviewDuplicates={onReviewDuplicates}
+                onReviewDuplicates={handleReviewDuplicates}
                 onDisregard={onDisregard}
                 disregarding={disregardingSignature === row.signature}
-                onNavigated={onNavigated}
+                onRequestClose={onRequestClose}
               />
             ))}
           </ul>

@@ -2,6 +2,7 @@
  * Shared-campaign wire types: campaigns, entity registry, campaign items, and identity merges.
  */
 
+import type { INBOX_FLAG_KINDS } from "@character-sheet/contracts";
 import type { RulesEdition } from "@character-sheet/shared-types";
 
 import type { ArmorDetail, ArmorDetailInput, AttunementPrereqKind, ConsumableDetail, EquipSlot, ItemCapability, ItemCategory, ItemRarity, WeaponDetail, WeaponDetailInput } from "./inventory";
@@ -236,8 +237,11 @@ export interface CampaignEntityMerge {
  * persisted server-side except a dismissal. `kind` + `signature` together are
  * the flag's stable identity for POST /api/inbox/dismissals; a duplicate
  * cluster's signature changes (and it resurfaces) when its membership does.
+ * Derived from @character-sheet/contracts' INBOX_FLAG_KINDS (the zod schema's
+ * own source of truth) rather than hand-mirrored, so a new kind added there
+ * can't silently drift out of sync with this union.
  */
-export type InboxFlagKind = "DUPLICATE_CLUSTER" | "NEEDS_CHRONICLING";
+export type InboxFlagKind = (typeof INBOX_FLAG_KINDS)[number];
 
 export interface InboxDuplicateEntity {
   id: string;

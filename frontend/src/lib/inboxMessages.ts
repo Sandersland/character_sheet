@@ -35,3 +35,27 @@ export function groupInboxRowsByCampaign(rows: InboxRow[]): InboxCampaignGroup[]
   }
   return groups;
 }
+
+const DAY_MS = 86_400_000;
+
+function localMidnight(d: Date): number {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+
+// Relative "today"/"yesterday"/"N days ago" for a row's signalAt. Deliberately
+// NOT lib/formatJournalDate.ts's formatRelativeDay: that one buckets by UTC
+// calendar day, correct for a journal date (stored at UTC midnight, no real
+// time-of-day) but wrong here — signalAt is a real wall-clock instant, and
+// bucketing it by UTC day shows an off-by-one "yesterday" for any reader west
+// of UTC whose local evening is still UTC-tomorrow. This formatter buckets by
+// the READER's local calendar day instead. Falls back to an absolute local
+// date past 30 days; unparseable input returns verbatim.
+export function formatInboxSignalAge(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const days = Math.round((localMidnight(new Date()) - localMidnight(d)) / DAY_MS);
+  if (days <= 0) return "today";
+  if (days === 1) return "yesterday";
+  if (days <= 30) return `${days} days ago`;
+  return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}

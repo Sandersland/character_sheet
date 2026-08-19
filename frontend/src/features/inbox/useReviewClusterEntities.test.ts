@@ -2,6 +2,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getQueryClient } from "@/api/queryClient";
+import { campaignKeys } from "@/api/queryKeys";
 import { useReviewClusterEntities } from "@/features/inbox/useReviewClusterEntities";
 import type { CampaignEntity, CampaignEntityMerge } from "@/types/character";
 
@@ -32,5 +33,27 @@ describe("useReviewClusterEntities", () => {
     expect(fetchEntityMerges).toHaveBeenCalledWith("camp-1");
     expect(result.current.entities).toBe(entities);
     expect(result.current.merges).toBe(merges);
+  });
+
+  it("shares useCampaignMerges' own cache entry — a pre-primed merges cache is read straight off, no fetch", async () => {
+    fetchEntities.mockResolvedValue([]);
+    const primed: CampaignEntityMerge[] = [
+      {
+        id: "m1",
+        campaignId: "camp-1",
+        mergedEntityId: "e1",
+        survivorEntityId: "e2",
+        status: "PREPARED",
+        note: null,
+        preparedAt: "",
+        executedAt: null,
+      },
+    ];
+    getQueryClient().setQueryData(campaignKeys.merges("camp-1"), primed);
+
+    const { result } = renderHook(() => useReviewClusterEntities("camp-1"));
+
+    await waitFor(() => expect(result.current.merges).toEqual(primed));
+    expect(fetchEntityMerges).not.toHaveBeenCalled();
   });
 });
