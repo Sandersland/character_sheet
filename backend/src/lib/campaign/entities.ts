@@ -245,17 +245,23 @@ function publiclyRevealedMergeError(): CombineGuardError {
   );
 }
 
-// Rewrites every @[<dupId>] mention token to @[<survivorId>] across ALL of the
-// campaign's journal entries, regardless of author or visibility — unlike
-// visibleEntryWhere (used everywhere else in this file), a combine must not
-// leave a dangling token behind an author's own private note. One set-based
-// UPDATE, not a per-entry round trip: regexp_replace's 'gi' flag rewrites
-// every case variant in a single pass (tokens are app-generated lowercase
-// uuids, but nothing stops a hand-typed uppercase one), and the ILIKE
-// prefilter keeps untouched rows out of the write.
+// Rewrites every @[<dupId>] mention token to @[<survivorId>] wherever it
+// appears — the WHOLE JournalEntry table, not scoped to this campaign's
+// current membership. A prior version joined on the author's character and
+// filtered by character.campaignId; that breaks the instant a character
+// LEAVES a campaign (campaignId nulled) — their old entries about this
+// campaign's entities would stop matching the join, while the ref move below
+// (already unscoped, keyed only on entityId) still repoints them, leaving the
+// body's token and its ref out of sync. The predicate here is simplest-
+// correct instead: duplicateId is a globally-unique CampaignEntity id, so
+// matching on the token alone can't cross into another campaign's data by
+// construction — no join needed at all. One set-based UPDATE, not a
+// per-entry round trip: regexp_replace's 'gi' flag rewrites every case
+// variant in a single pass (tokens are app-generated lowercase uuids, but
+// nothing stops a hand-typed uppercase one), and the ILIKE prefilter keeps
+// untouched rows out of the write.
 async function rewriteMentionTokens(
   tx: Tx,
-  campaignId: string,
   duplicateId: string,
   survivorEntityId: string,
 ): Promise<void> {
@@ -264,12 +270,9 @@ async function rewriteMentionTokens(
   const replacement = mentionToken(survivorEntityId);
 
   await tx.$executeRaw`
-    UPDATE "JournalEntry" AS e
-    SET body = regexp_replace(e.body, ${regexToken}, ${replacement}, 'gi')
-    FROM "Character" AS c
-    WHERE e."characterId" = c.id
-      AND c."campaignId" = ${campaignId}
-      AND e.body ILIKE ${`%${literalToken}%`}
+    UPDATE "JournalEntry"
+    SET body = regexp_replace(body, ${regexToken}, ${replacement}, 'gi')
+    WHERE body ILIKE ${`%${literalToken}%`}
   `;
 
   // Ref rows move independently of body text — never re-derived from it. A
@@ -292,27 +295,30 @@ async function rewriteMentionTokens(
   });
 }
 
-// Re-points merge rows where the duplicate stood in as the survivor (A → dup)
-// to the real survivor (A → S). A row that would become self-referential OR
+// Re-points merge rows where a loser stood in as the survivor (A → loser) to
+// the real survivor (A → S). A row that would become self-referential OR
 // would close a cycle against the rest of the graph can't be re-pointed —
 // wouldCreateCycle already covers the self-reference case (mergedId ===
 // survivorId short-circuits true), so one check does both. A PREPARED row on
 // that branch is still secret DM prep and is dropped silently; an EXECUTED
 // row is a public reveal, so it throws the same guard error
 // assertNotPubliclyRevealed uses rather than vanishing underneath a 200.
-// Rows where the duplicate is mergedEntityId cascade-delete with the
-// duplicate row the caller deletes after this returns, UNLESS that row is
-// EXECUTED — the caller rejects that case before this ever runs. Re-pointing
-// an EXECUTED row mirrors executeMerge's own invariant: the survivor must
-// stay REVEALED, or the reveal vanishes from listVisibleMerges for players.
+// Rows where the loser is mergedEntityId cascade-delete with the loser row
+// the caller deletes after this returns, UNLESS that row is EXECUTED — the
+// caller rejects that case before this ever runs. Re-pointing an EXECUTED row
+// mirrors executeMerge's own invariant: the survivor must stay REVEALED, or
+// the reveal vanishes from listVisibleMerges for players. Batch note: this is
+// called once per loser during the apply phase, always re-reading the graph
+// fresh from `tx`, so an earlier loser's re-point in the SAME transaction is
+// already visible to a later loser's own call.
 async function repointMergeChains(
   tx: Tx,
   campaignId: string,
-  duplicateId: string,
+  loserId: string,
   survivorEntityId: string,
 ): Promise<void> {
   const asSurvivor = await tx.campaignEntityMerge.findMany({
-    where: { campaignId, survivorEntityId: duplicateId },
+    where: { campaignId, survivorEntityId: loserId },
     select: { id: true, mergedEntityId: true, status: true },
   });
   if (asSurvivor.length === 0) return;
@@ -340,62 +346,62 @@ async function repointMergeChains(
   }
 }
 
-// Moves a CampaignCharacterLink/CampaignItemLink from the duplicate to the
-// survivor when only the duplicate carries it — the caller has already
-// rejected the both-linked case, and the item-link/survivor-type mismatch, as
-// a 409 before the transaction opens.
+// Moves a CampaignCharacterLink/CampaignItemLink from a loser to the survivor
+// when only the loser carries it — the caller has already validated the
+// WHOLE batch's link safety (assertBatchLinkConflicts) before any loser in it
+// is applied, so `survivorState` here only needs to reflect what earlier
+// losers in this same batch already moved onto the survivor.
 async function moveSoleLinks(
   tx: Tx,
-  duplicate: LinkedEntity,
-  survivor: LinkedEntity,
-  duplicateId: string,
+  loser: LinkedEntity,
+  survivorState: LinkedEntity,
+  loserId: string,
   survivorEntityId: string,
 ): Promise<void> {
-  if (duplicate.characterLink && !survivor.characterLink) {
+  if (loser.characterLink && !survivorState.characterLink) {
     await tx.campaignCharacterLink.update({
-      where: { campaignEntityId: duplicateId },
+      where: { campaignEntityId: loserId },
       data: { campaignEntityId: survivorEntityId },
     });
   }
-  if (duplicate.itemLink && !survivor.itemLink) {
+  if (loser.itemLink && !survivorState.itemLink) {
     await tx.campaignItemLink.update({
-      where: { campaignEntityId: duplicateId },
+      where: { campaignEntityId: loserId },
       data: { campaignEntityId: survivorEntityId },
     });
   }
 }
 
-// Reads both targets and confirms they exist in this campaign — the first
-// half of loadAndGuardCombineTargets' guard, split out to keep each check's
-// own complexity small.
+// Reads the survivor and every loser and confirms all of them exist in this
+// campaign — the first half of loadAndGuardCombineTargets' guard, split out
+// to keep each check's own complexity small. One query regardless of batch
+// size.
 async function fetchCombineTargets(
   tx: Tx,
   campaignId: string,
-  duplicateId: string,
+  loserEntityIds: string[],
   survivorEntityId: string,
-): Promise<{ duplicate: LinkedEntity; survivor: LinkedEntity }> {
-  const [duplicate, survivor] = await Promise.all([
-    tx.campaignEntity.findUnique({ where: { id: duplicateId }, select: duplicateSurvivorSelect }),
-    tx.campaignEntity.findUnique({ where: { id: survivorEntityId }, select: duplicateSurvivorSelect }),
-  ]);
-  if (
-    !duplicate ||
-    duplicate.campaignId !== campaignId ||
-    !survivor ||
-    survivor.campaignId !== campaignId
-  ) {
+): Promise<{ survivor: LinkedEntity; losers: LinkedEntity[] }> {
+  const rows = await tx.campaignEntity.findMany({
+    where: { id: { in: [survivorEntityId, ...loserEntityIds] }, campaignId },
+    select: duplicateSurvivorSelect,
+  });
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const survivor = byId.get(survivorEntityId);
+  const losers = loserEntityIds.map((id) => byId.get(id));
+  if (!survivor || losers.some((loser) => !loser)) {
     throw new CombineGuardError(404, "Entity not found");
   }
-  return { duplicate, survivor };
+  return { survivor, losers: losers as LinkedEntity[] };
 }
 
 // Two backed entities of the SAME kind are two real things, not a typo
 // (#1942): reject before any write.
-function assertNoBothLinkedConflicts(duplicate: LinkedEntity, survivor: LinkedEntity): void {
-  if (duplicate.characterLink && survivor.characterLink) {
+function assertNoBothLinkedConflicts(loser: LinkedEntity, survivor: LinkedEntity): void {
+  if (loser.characterLink && survivor.characterLink) {
     throw new CombineGuardError(409, "Both entities are linked to a character");
   }
-  if (duplicate.itemLink && survivor.itemLink) {
+  if (loser.itemLink && survivor.itemLink) {
     throw new CombineGuardError(409, "Both entities are linked to an item");
   }
 }
@@ -404,8 +410,8 @@ function assertNoBothLinkedConflicts(duplicate: LinkedEntity, survivor: LinkedEn
 // deletes its linked CampaignEntity in the same transaction, cascading the
 // link) and the codex only renders item data for ITEM-typed entities, so an
 // item link only moves onto an ITEM-typed survivor.
-function assertItemLinkMovable(duplicate: LinkedEntity, survivor: LinkedEntity): void {
-  if (duplicate.itemLink && !survivor.itemLink && survivor.type !== "ITEM") {
+function assertItemLinkMovable(loser: LinkedEntity, survivor: LinkedEntity): void {
+  if (loser.itemLink && !survivor.itemLink && survivor.type !== "ITEM") {
     throw new CombineGuardError(
       409,
       "The survivor must be an ITEM entity to inherit the duplicate's item link",
@@ -417,8 +423,8 @@ function assertItemLinkMovable(duplicate: LinkedEntity, survivor: LinkedEntity):
 // PC-typed survivor carrying no item link — otherwise a later item delete
 // (see assertItemLinkMovable's own comment) would cascade away the player's
 // own codex entity along with it.
-function assertCharacterLinkMovable(duplicate: LinkedEntity, survivor: LinkedEntity): void {
-  if (!duplicate.characterLink || survivor.characterLink) return;
+function assertCharacterLinkMovable(loser: LinkedEntity, survivor: LinkedEntity): void {
+  if (!loser.characterLink || survivor.characterLink) return;
   if (survivor.type !== "PC") {
     throw new CombineGuardError(
       409,
@@ -433,97 +439,126 @@ function assertCharacterLinkMovable(duplicate: LinkedEntity, survivor: LinkedEnt
   }
 }
 
-// Every link-safety guard combineEntities must hold before it writes
-// anything — split into small per-concern checks above so each stays simple.
-function assertNoLinkConflicts(duplicate: LinkedEntity, survivor: LinkedEntity): void {
-  assertNoBothLinkedConflicts(duplicate, survivor);
-  assertItemLinkMovable(duplicate, survivor);
-  assertCharacterLinkMovable(duplicate, survivor);
+// Runs the three pairwise link guards above against an evolving "virtual
+// survivor" threaded across the whole loser list, in the given order — so a
+// SECOND loser that would conflict with a link the FIRST loser is about to
+// move onto the survivor is caught here too, up front, before any loser in
+// the batch is actually combined (#1942 batch combine). Order only changes
+// which loser is blamed for a real conflict, never whether one is reported.
+function assertBatchLinkConflicts(survivor: LinkedEntity, losers: LinkedEntity[]): void {
+  let virtualSurvivor = survivor;
+  for (const loser of losers) {
+    assertNoBothLinkedConflicts(loser, virtualSurvivor);
+    assertItemLinkMovable(loser, virtualSurvivor);
+    assertCharacterLinkMovable(loser, virtualSurvivor);
+    virtualSurvivor = {
+      ...virtualSurvivor,
+      characterLink: virtualSurvivor.characterLink ?? loser.characterLink,
+      itemLink: virtualSurvivor.itemLink ?? loser.itemLink,
+    };
+  }
 }
 
-// The duplicate having been PUBLICLY revealed to be someone else (an EXECUTED
-// merge where it's the merged/non-survivor side) is a real fact players may
-// already know; cascade-deleting that row while also silently moving its
-// mentions is not acceptable. A PREPARED row is still secret DM prep, so it
-// keeps the spec'd behavior of dying with the cascade in repointMergeChains.
-async function assertNotPubliclyRevealed(
-  tx: Tx,
-  campaignId: string,
-  duplicateId: string,
-): Promise<void> {
+// A loser having been PUBLICLY revealed to be someone else (an EXECUTED merge
+// where it's the merged/non-survivor side) is a real fact players may already
+// know; cascade-deleting that row while also silently moving its mentions is
+// not acceptable. A PREPARED row is still secret DM prep, so it keeps the
+// spec'd behavior of dying with the cascade in repointMergeChains.
+async function assertNotPubliclyRevealed(tx: Tx, campaignId: string, loserId: string): Promise<void> {
   const revealedAsMerged = await tx.campaignEntityMerge.findFirst({
-    where: { campaignId, mergedEntityId: duplicateId, status: "EXECUTED" },
+    where: { campaignId, mergedEntityId: loserId, status: "EXECUTED" },
     select: { id: true },
   });
   if (revealedAsMerged) throw publiclyRevealedMergeError();
 }
 
-// Every guard combineEntities must hold before it writes anything, run from
-// INSIDE the transaction (not before it opens) so a concurrent combine can't
-// race past them (#1942 TOCTOU fix). Throws CombineGuardError; never returns
-// a result the caller could accidentally treat as success.
+// Every guard combineEntities must hold before it writes ANYTHING for ANY
+// loser in the batch, run from INSIDE the transaction (not before it opens)
+// so a concurrent combine can't race past them (#1942 TOCTOU fix). Throws
+// CombineGuardError; never returns a result the caller could accidentally
+// treat as success.
 async function loadAndGuardCombineTargets(
   tx: Tx,
   campaignId: string,
-  duplicateId: string,
+  loserEntityIds: string[],
   survivorEntityId: string,
-): Promise<{ duplicate: LinkedEntity; survivor: LinkedEntity }> {
-  const targets = await fetchCombineTargets(tx, campaignId, duplicateId, survivorEntityId);
-  assertNoLinkConflicts(targets.duplicate, targets.survivor);
-  await assertNotPubliclyRevealed(tx, campaignId, duplicateId);
+): Promise<{ survivor: LinkedEntity; losers: LinkedEntity[] }> {
+  const targets = await fetchCombineTargets(tx, campaignId, loserEntityIds, survivorEntityId);
+  assertBatchLinkConflicts(targets.survivor, targets.losers);
+  for (const loser of targets.losers) {
+    await assertNotPubliclyRevealed(tx, campaignId, loser.id);
+  }
   return targets;
 }
 
 // Destructive typo-dedup (#1942), the counterpart to the non-destructive
-// identity merge above: absorbs `duplicateId` into `survivorEntityId` and
-// deletes the duplicate. Survivor's fields always win — nothing is folded
-// from the duplicate (decided 2026-08-18). Cross-type combines are allowed.
-// No audit row and no undo (also decided on #1942): journal writes are
-// already deliberately plain-REST with no audit log (journalRouter) — this
-// follows that precedent, not an absence of any event model elsewhere
+// identity merge above: absorbs every `loserEntityIds` duplicate into
+// `survivorEntityId`, atomically — all guards for every loser run up front,
+// against the WHOLE batch (including cross-loser link interactions), before
+// any loser is actually combined; then every loser is applied in the same
+// transaction, all-or-nothing. A single combine is a 1-length array, not a
+// separate code path. Survivor's fields always win — nothing is folded from
+// any loser (decided 2026-08-18). Cross-type combines are allowed. No audit
+// row and no undo (also decided on #1942): journal writes are already
+// deliberately plain-REST with no audit log (journalRouter) — this follows
+// that precedent, not an absence of any event model elsewhere
 // (awardCampaignItem/revokeCampaignItem log undoable CharacterEvents; the
 // merge ops above persist the CampaignEntityMerge row itself). The
 // client-side confirm dialog is the gate here.
 export async function combineEntities(
   db: PrismaClient,
   campaignId: string,
-  duplicateId: string,
+  loserEntityIds: string[],
   survivorEntityId: string,
 ): Promise<CombineResult> {
-  if (duplicateId === survivorEntityId) {
-    return { ok: false, status: 400, error: "An entity cannot be combined with itself" };
+  if (loserEntityIds.length === 0) {
+    return { ok: false, status: 400, error: "At least one duplicate must be provided" };
+  }
+  if (new Set(loserEntityIds).size !== loserEntityIds.length) {
+    return { ok: false, status: 400, error: "Duplicate ids must not repeat" };
+  }
+  if (loserEntityIds.includes(survivorEntityId)) {
+    return { ok: false, status: 400, error: "The survivor cannot also be a duplicate" };
   }
 
-  let duplicatePortraitKey: string | null = null;
+  let loserPortraitKeys: (string | null)[] = [];
   try {
     const entity = await db.$transaction(
       async (tx) => {
-        const { duplicate, survivor } = await loadAndGuardCombineTargets(
+        const { survivor, losers } = await loadAndGuardCombineTargets(
           tx,
           campaignId,
-          duplicateId,
+          loserEntityIds,
           survivorEntityId,
         );
-        duplicatePortraitKey = duplicate.portraitKey;
+        loserPortraitKeys = losers.map((loser) => loser.portraitKey);
 
-        await rewriteMentionTokens(tx, campaignId, duplicateId, survivorEntityId);
-        await repointMergeChains(tx, campaignId, duplicateId, survivorEntityId);
-        await moveSoleLinks(tx, duplicate, survivor, duplicateId, survivorEntityId);
-        await tx.campaignEntity.delete({ where: { id: duplicateId } });
+        let survivorState = survivor;
+        for (const loser of losers) {
+          await rewriteMentionTokens(tx, loser.id, survivorEntityId);
+          await repointMergeChains(tx, campaignId, loser.id, survivorEntityId);
+          await moveSoleLinks(tx, loser, survivorState, loser.id, survivorEntityId);
+          await tx.campaignEntity.delete({ where: { id: loser.id } });
+          survivorState = {
+            ...survivorState,
+            characterLink: survivorState.characterLink ?? loser.characterLink,
+            itemLink: survivorState.itemLink ?? loser.itemLink,
+          };
+        }
 
         return tx.campaignEntity.findUniqueOrThrow({
           where: { id: survivorEntityId },
           include: { characterLink: { select: { characterId: true } } },
         });
       },
-      // Generous timeout: the rewrite is now O(1) queries, but a large
-      // campaign's journal table still means real row-lock contention on a
-      // busy server, and this is a destructive op we don't want timing out
-      // partway through.
+      // Generous timeout: each loser's rewrite is O(1) queries, but a large
+      // campaign's journal table (or a large batch) still means real
+      // row-lock contention on a busy server, and this is a destructive op
+      // we don't want timing out partway through.
       { timeout: 30_000 },
     );
 
-    await deletePortraitBlobBestEffort(duplicatePortraitKey);
+    await Promise.all(loserPortraitKeys.map((key) => deletePortraitBlobBestEffort(key)));
     return { ok: true, entity };
   } catch (err) {
     if (err instanceof CombineGuardError) {
