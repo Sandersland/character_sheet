@@ -275,7 +275,13 @@ export function useEntityDetail(campaignId?: string, entityId?: string) {
   useEffect(() => {
     if (!campaignId || !entityId) return;
     // Pane navigation keeps the page mounted (#842): reset per-entity state.
+    // `item` resets here too (#1943 fix) — without it, navigating an ITEM
+    // entity away to a non-ITEM one left its stale CampaignItem sitting in
+    // state forever (the item-loading effect below never re-fires for a
+    // non-ITEM entity to correct it), which could render a false
+    // item-link-transfer warning in the combine dialog.
     setEntity(undefined);
+    setItem(null);
     setBacklinks([]);
     setConnections([]);
     setEditing(wantsEditRef.current);

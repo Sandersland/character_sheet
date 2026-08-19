@@ -1,5 +1,8 @@
 import type { RulesEdition } from "@character-sheet/shared-types";
 
+import type { AnnounceAugmentor } from "@/lib/classes/announce-augmentors.js";
+import type { EffectSpec } from "@/lib/combat/effects.js";
+
 import { deriveMartialArtsDie } from "./weapon-damage.js";
 
 /** A resolved dice roll — mirrors `EffectSpec.dice` / the frontend `RollSpec`. */
@@ -45,3 +48,61 @@ export function deriveDeflectSpec(
       : { count: 2, faces: deriveMartialArtsDie(monkLevel, edition), modifier: dexMod };
   return { reduction, redirect };
 }
+
+// Wrap a resolved roll as a minimal EffectSpec — the same "utility kind
+// carries dice" shape a maneuver's served effect uses (deriveManeuverEffect,
+// lib/classes/maneuver-effect.ts), so the frontend reads `action.effect.dice`
+// verbatim as its RollSpec.
+function rollAsEffect(dice: DeflectRoll, effectType: EffectSpec["effectType"]): EffectSpec {
+  return { effectType, dice, scaling: { mode: "none" } };
+}
+
+/**
+ * Deflect Attacks (SRD 5.2 L3) / Deflect Missiles (SRD 5.1 L3) announce
+ * augmentor (#1910): attaches the resolved reduction/redirect roll spec onto
+ * the served row via the #1381 `effect` field, using the granting Monk
+ * entry's OWN effective level (ctx.entryLevel — the per-entry fold in
+ * deriveEntryScopedActions gives this for free, unlike the pre-#1910
+ * withDeflectSpecs, which had to re-find the monk entry itself) and the
+ * character's Dex modifier (ctx.abilityMods.dexterity). No-ops when
+ * abilityMods is absent (the cast-guard callers, which never serve this
+ * action key anyway) — see AugmentorContext's own doc comment.
+ */
+export const deflectAugmentor: AnnounceAugmentor = {
+  targetKeys: ["deflectAttacks", "deflectMissiles", "deflectAttacksRedirect", "deflectMissilesThrow"],
+  appliesTo: (ctx) => ctx.abilityMods !== undefined,
+  augment: (action, ctx) => {
+    if (!ctx.abilityMods) return null;
+    const dexMod = ctx.abilityMods.dexterity ?? 0;
+    const { reduction, redirect } = deriveDeflectSpec(ctx.entryLevel, dexMod, ctx.edition);
+    if (action.key === "deflectAttacks" || action.key === "deflectMissiles") {
+      return { effect: rollAsEffect(reduction, "utility") };
+    }
+    if (action.key === "deflectAttacksRedirect" || action.key === "deflectMissilesThrow") {
+      return { effect: rollAsEffect(redirect, "damage") };
+    }
+    return null;
+  },
+};
+
+/** SRD 5.2 / PHB'24 p.89 — Deflect Energy's own grant level. */
+export const DEFLECT_ENERGY_LEVEL = 13;
+
+/**
+ * Deflect Attacks' damage-type clause (#1505/#1912): "bludgeoning, piercing,
+ * or slashing damage" below Deflect Energy (Monk L13), "any damage type"
+ * from L13 on — SRD 5.1's Deflect Missiles carries no such clause at all, so
+ * this descriptor targets only `deflectAttacks`. Unlike `deflectAugmentor`
+ * above, this is the SOLE source of `damageTypeClause` — the deflectAttacks
+ * row itself sets none — so `appliesTo` gates on edition alone (matching the
+ * row's own L3 grant, not L13) and `augment` carries the L13 branch
+ * internally, so it always resolves a clause once the row is granted at
+ * all, exactly like the pre-#1912 DERIVED_ACTIONS function did.
+ */
+export const deflectEnergyAugmentor: AnnounceAugmentor = {
+  targetKeys: ["deflectAttacks"],
+  appliesTo: (ctx) => ctx.edition === "EDITION_2024",
+  augment: (_action, ctx) => ({
+    damageTypeClause: ctx.entryLevel >= DEFLECT_ENERGY_LEVEL ? "any damage type" : "bludgeoning, piercing, or slashing damage",
+  }),
+};

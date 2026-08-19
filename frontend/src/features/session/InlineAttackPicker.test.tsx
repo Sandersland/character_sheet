@@ -1,9 +1,3 @@
-// InlineAttackPicker tests (rewired to the shared resolver, epic #1827 Slice
-// 5 / #1832) — ports the pre-#1832 useAttackRolls/AttackStepCard-era
-// scenarios onto ResolutionRail/useResolution, and adds coverage for what
-// changed: the resolveAction commit (incl. cost-kind mapping), the Extra
-// Attack loop driving the SAME resolver instance without double-spending the
-// economy, and the crit-upgrade guard (#1831 review NICE).
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { useEffect } from "react";
 import { screen, waitFor, within } from "@testing-library/react";
@@ -29,9 +23,6 @@ vi.mock("@/api/client", () => ({
   logRollAction: vi.fn().mockResolvedValue(undefined),
 }));
 
-// Fixed mid-face d20 (11 kept) — non-crit, non-miss, so "Roll to hit" resolves
-// to an ambiguous "hit or miss?" call every time it's used, matching the old
-// suite's own `seedMid` convention.
 function seedMid() {
   return vi.spyOn(Math, "random").mockReturnValue(0.5);
 }
@@ -44,19 +35,14 @@ function seedNat1() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // Resolved value is unused — weapons never call the roll logger (asserted below).
   vi.mocked(logRollAction).mockResolvedValue(undefined as never);
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
-  // useTurnState persists to localStorage keyed by sessionId — every
-  // LiveHarness-based test below reuses "sess-crit"/"sess-spend", so a prior
-  // test's economy would otherwise rehydrate into the next one.
   window.localStorage.clear();
 });
 
-// Minimal turn state: an Attack action in progress with one attack available.
 const turnState = {
   attack: { total: 1, used: 0 },
   attackTally: [],
@@ -69,11 +55,6 @@ const turnState = {
   consumeReaction: vi.fn(),
 } as unknown as TurnState & TurnStateActions;
 
-// The picker renders `character.attackRows` (#1434) plus the always-served
-// unarmed/improvised rows, and `critRange` (real Character type: required,
-// never optional) — the OLD useAttackRolls hook covered a missing fixture
-// value with its own default(20) parameter; weaponToResolution (#1832) takes
-// no default, so a fixture omitting it would silently break auto-crit.
 function makeCharacter(overrides: Partial<Character> = {}): Character {
   return {
     id: "char-1",
@@ -280,16 +261,8 @@ describe("InlineAttackPicker — on-hit dice riders (#1843: routed into resolveA
   });
 });
 
-// Live turn state — a real useTurnState so the tally / economy actually flow,
-// needed for the resolveAction commit + Extra Attack loop + crit-upgrade tests.
-// Resolves applyResolveActionOperations with the SAME character back (rather
-// than the beforeEach leaving it unmocked/undefined): useCharacterMutation
-// writes whatever it resolves straight into the query cache, and
-// useCurrentCharacter re-renders InlineAttackPicker off that same cache — an
-// empty/undefined resolved value would crash the next render's
-// buildAttackForms on a missing attackRows.
 function LiveHarness({ character }: { character: Character }) {
-  vi.mocked(applyResolveActionOperations).mockResolvedValue(character);
+  vi.mocked(applyResolveActionOperations).mockResolvedValue({ character, batchId: "test-batch" });
   const liveTurnState = useTurnState(character, "sess-crit");
   useEffect(() => {
     liveTurnState.startCombat();
@@ -361,7 +334,7 @@ describe("InlineAttackPicker — typed damage riders route into the single resol
     const [, ops] = vi.mocked(applyResolveActionOperations).mock.calls[0];
     expect(ops[0].effect).toMatchObject({ type: "slashing", kind: "damage" });
     expect(ops[0].riders).toHaveLength(1);
-    expect(ops[0].riders?.[0]).toMatchObject({ type: "fire", kind: "damage" });
+    expect(ops[0].riders?.[0]).toMatchObject({ type: "fire", kind: "damage", source: "Flame Tongue" });
     expect(vi.mocked(logRollAction)).not.toHaveBeenCalled();
   });
 
@@ -421,6 +394,103 @@ describe("InlineAttackPicker — typed damage riders route into the single resol
   });
 });
 
+describe("InlineAttackPicker — Sneak Attack rides the swing's resolveAction op (#902 rider migration)", () => {
+  function rogueCharacter(overrides: Partial<Character> = {}): Character {
+    return makeCharacter({
+      sneakAttack: { dice: { count: 1, faces: 6 } },
+      attackRows: [weaponRow("Rapier", "inv-rapier", { damageType: "piercing", damageRiders: [] })],
+      ...overrides,
+    } as Partial<Character>);
+  }
+
+  async function rollSneak() {
+    await userEvent.click(screen.getByRole("checkbox"));
+    await userEvent.click(screen.getByRole("button", { name: /Roll Sneak Attack/ }));
+  }
+
+  it("puts the sneak roll into ops[0].riders typed with the weapon's damage type, with no separate log call", async () => {
+    seedMid();
+    const character = rogueCharacter();
+    renderWithCharacter(<LiveHarness character={character} />, character);
+
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    await rollSneak();
+    await userEvent.click(screen.getByRole("button", { name: /^Roll damage$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
+
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(1));
+    const [, ops] = vi.mocked(applyResolveActionOperations).mock.calls[0];
+    expect(ops[0].effect).toMatchObject({ type: "piercing", kind: "damage" });
+    expect(ops[0].riders).toHaveLength(1);
+    expect(ops[0].riders?.[0]).toMatchObject({ type: "piercing", kind: "damage", source: "Sneak Attack" });
+    expect(vi.mocked(logRollAction)).not.toHaveBeenCalled();
+  });
+
+  it("doubles the sneak dice when the hit is already a crit", async () => {
+    seedTopFace();
+    const character = rogueCharacter();
+    renderWithCharacter(<LiveHarness character={character} />, character);
+
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    await rollSneak();
+    await userEvent.click(screen.getByRole("button", { name: /Roll crit damage/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
+
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(1));
+    const [, ops] = vi.mocked(applyResolveActionOperations).mock.calls[0];
+    expect(ops[0].riders?.[0]).toMatchObject({ crit: true });
+    expect(ops[0].riders?.[0].faces).toHaveLength(2);
+  });
+
+  it("drops the sneak rider when the swing is ultimately called a miss", async () => {
+    seedMid();
+    const character = rogueCharacter();
+    renderWithCharacter(<LiveHarness character={character} />, character);
+
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    await rollSneak();
+    await userEvent.click(screen.getByRole("button", { name: /it Missed/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
+
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(1));
+    const [, ops] = vi.mocked(applyResolveActionOperations).mock.calls[0];
+    expect(ops[0].toHit).toMatchObject({ verdict: "miss" });
+    expect(ops[0].riders ?? []).toHaveLength(0);
+  });
+
+  it("does not carry the sneak rider into swing 2 and shows the once-per-turn guard (Extra Attack)", async () => {
+    seedMid();
+    const character = rogueCharacter({ attacksPerAction: 2 });
+    renderWithCharacter(<LiveHarness character={character} />, character);
+
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    await rollSneak();
+    await userEvent.click(screen.getByRole("button", { name: /^Roll damage$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(1));
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /Roll to hit/ })).not.toBeDisabled());
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    expect(screen.getByText(/Used this turn/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Roll Sneak Attack/ })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: /^Roll damage$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
+
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(2));
+    const [, op2] = vi.mocked(applyResolveActionOperations).mock.calls[1];
+    expect(op2[0].riders ?? []).toHaveLength(0);
+  });
+
+  it("keeps the roll button disabled until eligibility is confirmed", async () => {
+    seedMid();
+    const character = rogueCharacter();
+    renderWithCharacter(<LiveHarness character={character} />, character);
+
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    expect(screen.getByRole("button", { name: /Roll Sneak Attack/ })).toBeDisabled();
+  });
+});
+
 describe("InlineAttackPicker — Extra Attack loop (#1832)", () => {
   it("drives the rail twice, firing one resolveAction op per swing, and finishes at N of N", async () => {
     seedMid();
@@ -466,7 +536,7 @@ describe("InlineAttackPicker — Extra Attack loop (#1832)", () => {
       attackRows: [weaponRow("Longsword", "inv-1", { damageRiders: [] })],
     });
     function Harness() {
-      vi.mocked(applyResolveActionOperations).mockResolvedValue(character);
+      vi.mocked(applyResolveActionOperations).mockResolvedValue({ character, batchId: "test-batch" });
       const live = useTurnState(character, "sess-spend");
       useEffect(() => {
         live.startCombat();
@@ -505,6 +575,52 @@ describe("InlineAttackPicker — Extra Attack loop (#1832)", () => {
     await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(2));
 
     expect(screen.getByTestId("actions-remaining")).toHaveTextContent("0");
+  });
+});
+
+describe("InlineAttackPicker — deferred swing tally on resolveAction reject (#1857)", () => {
+  it("does not advance the swing count and surfaces the error + a retry affordance when resolveAction rejects", async () => {
+    seedMid();
+    const character = makeCharacter({ attackRows: [weaponRow("Longsword", "inv-1", { damageRiders: [] })] });
+    vi.mocked(applyResolveActionOperations).mockRejectedValueOnce(new Error("network blip"));
+    renderWithCharacter(<LiveHarness character={character} />, character);
+
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Roll damage$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
+
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(1));
+    await screen.findByText("network blip");
+
+    // Retry affordance: the rail re-arms to a fresh, rollable state for the
+    // SAME (never-completed) swing rather than staying stuck on "Done".
+    expect(await screen.findByRole("button", { name: /Roll to hit/ })).not.toBeDisabled();
+  });
+
+  it("does not auto-advance to swing 2 of an Extra Attack sequence when swing 1's resolveAction rejects", async () => {
+    seedMid();
+    const character = makeCharacter({
+      attacksPerAction: 2,
+      attackRows: [weaponRow("Longsword", "inv-1", { damageRiders: [] })],
+    });
+    vi.mocked(applyResolveActionOperations).mockRejectedValueOnce(new Error("network blip"));
+    renderWithCharacter(<LiveHarness character={character} />, character);
+
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Roll damage$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(1));
+    await screen.findByText("network blip");
+
+    // A retried, SUCCESSFUL swing-1 commit is still swing 1, not swing 2 — a
+    // premature auto-advance would have already consumed the retry as swing 2.
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Roll damage$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Done$/ }));
+    await waitFor(() => expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(2));
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /Roll to hit/ })).not.toBeDisabled());
+    expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -605,11 +721,6 @@ describe("InlineAttackPicker — 'it Missed' re-arms the next attack (#811)", ()
   });
 });
 
-// #809/#1831 review: ManeuversDisclosure reads useResolution's live roll state
-// (toHitRoll/effectRoll) via buildManeuverView, not useAttackRolls. As of #1844
-// the maneuver boost also reaches the committed resolveAction op — the Precision
-// (to-hit) half through useResolution's boostToHit seam, the damage half through
-// the existing riders[] seam (#1843) — so the audit log matches the tally.
 describe("InlineAttackPicker — Precision Attack under the attack card (#809, boost logged #1844)", () => {
   const SERVER_ROLL = 5;
 
@@ -709,15 +820,6 @@ describe("InlineAttackPicker — Precision Attack under the attack card (#809, b
   });
 });
 
-// #1526: the "target is surprised" toggle on the attack card, gated on the
-// backend-computed `character.assassinate` rider — a 2014 Assassin L3+ only.
-// Absence covers EVERY ineligible case at once (2024 Assassin, sub-L3, a
-// non-Assassin rogue): the backend already tests each gate individually
-// (assassinate.test.ts, character-serialize-assassinate.test.ts,
-// resolve-action-assassinate.test.ts's mutation-proof case) — at the wire
-// level they all collapse to `character.assassinate` being absent, and this
-// component only ever checks presence (never re-derives edition/subclass/
-// level itself, per CLAUDE.md's rules-are-backend-owned).
 describe("InlineAttackPicker — Assassinate toggle (2014 Assassin L3+, #1526)", () => {
   it("shows the toggle for a 2014 Assassin L3+ character (character.assassinate present)", () => {
     renderPicker(makeCharacter({ assassinate: true, attackRows: [weaponRow("Dagger", "inv-1")] }));

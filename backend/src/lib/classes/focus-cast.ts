@@ -10,6 +10,7 @@
 import { Prisma } from "@/generated/prisma/client.js";
 import { logEvent, type EventType } from "@/lib/activity/events.js";
 import { snapshotSpellcasting, type SpellcastingMutableState } from "@/lib/spellcasting/spell-state.js";
+import { FEATURE_ROWS_CLASS_FEATURES, FEATURE_ROWS_SUBCLASS_FEATURES } from "./feature-rows-select.js";
 
 /**
  * Character columns both focus-cast handlers re-read per op. The per-subclass 5e
@@ -26,10 +27,25 @@ export const FOCUS_CAST_CHARACTER_SELECT = {
   // focus gate still resolves via deriveEntryScopedResources (#1072).
   // subclassRef.slug (#1277) is what deriveEntryScopedActions' cast guard
   // (shadow-arts.ts) resolves the subclass identity through — see
-  // resolveSubclassSlug.
+  // resolveSubclassSlug. class.features/subclassRef.features (#1912) are the
+  // UNFOLDED FEATURE_ROWS_CLASS_FEATURES/FEATURE_ROWS_SUBCLASS_FEATURES
+  // fragments, not the folded FEATURE_ROWS_ENTRY_SELECT (which collides with
+  // this select's own subclassRef.slug field, see feature-rows-select.ts's
+  // own comment on why some callers can't spread it) — WARRIOR_OF_ELEMENTS_SELECT
+  // (warrior-of-elements.ts) is the shipped precedent this copies: without
+  // this relation, a monk row moved onto ClassFeature (Shadow Arts, Cloak of
+  // Shadows, castDiscipline, #1912) is invisible to shadow-arts.ts's/
+  // disciplines.ts's cast guards even though the wire still shows its card,
+  // the #1528 chunk-0 failure class (#1912's issue).
   classEntries: {
     orderBy: { position: "asc" as const },
-    select: { name: true, subclass: true, level: true, subclassRef: { select: { slug: true } } },
+    select: {
+      name: true,
+      subclass: true,
+      level: true,
+      subclassRef: { select: { slug: true, features: FEATURE_ROWS_SUBCLASS_FEATURES } },
+      class: { select: { subclassLevel: true, features: FEATURE_ROWS_CLASS_FEATURES } },
+    },
   },
 } satisfies Prisma.CharacterSelect;
 

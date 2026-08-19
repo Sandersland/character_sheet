@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 
 import { deriveActions, deriveEntryScopedActions } from "@/lib/classes/actions.js";
 import { testFeatureRowsFor } from "@/lib/classes/__tests__/test-feature-rows.fixture.js";
+import { deriveDeflectSpec } from "@/lib/srd/deflect.js";
 
 // Fighter's Second Wind/Action Surge are row-driven now (#1528) — every
 // deriveEntryScopedActions call below that expects to see them needs this
@@ -17,13 +18,21 @@ import { testFeatureRowsFor } from "@/lib/classes/__tests__/test-feature-rows.fi
 const getFeatureRows = (entry: { name: string; subclass?: string }) => testFeatureRowsFor(entry.name, entry.subclass);
 
 describe("deriveEntryScopedActions", () => {
-  it("single-class parity: output is identical to a bare deriveActions call", () => {
-    const entries = [{ name: "monk", subclass: "warrior of shadow", level: 6 }];
-    const entryScoped = deriveEntryScopedActions(entries, 6, [], true, "EDITION_2024", getFeatureRows);
-    // deriveActions is slug-native (#1277) — "warrior of shadow" resolves to
+  // Every monk subclass now carries at least one row-driven action (#1912),
+  // so no real class/subclass combo stays bare-DERIVED_ACTIONS-only any more
+  // to compare against — this proves the underlying claim directly instead:
+  // when the row carrier contributes nothing (an explicit empty callback,
+  // not testFeatureRowsFor's real content), entryScoped degenerates to
+  // exactly a bare deriveActions call. `summonBondedWeapon` (the one
+  // surviving DERIVED_ACTIONS row) is still the fixture.
+  it("single-class parity: output is identical to a bare deriveActions call when the row carrier contributes nothing", () => {
+    const entries = [{ name: "fighter", subclass: "eldritch knight", level: 3 }];
+    const emptyRows = () => ({ classRows: [], subclassRows: [] });
+    const entryScoped = deriveEntryScopedActions(entries, 3, [], true, "EDITION_2014", emptyRows);
+    // deriveActions is slug-native (#1277) — "eldritch knight" resolves to
     // this slug via resolveSubclassSlug, which deriveEntryScopedActions calls
     // internally; this bare comparison passes the resolved slug directly.
-    const bare = deriveActions("monk", "monk-warrior-of-shadow", 6, [], true, "EDITION_2024");
+    const bare = deriveActions("fighter", "fighter-eldritch-knight", 3, [], true, "EDITION_2014");
     expect(entryScoped).toEqual(bare);
   });
 
@@ -222,6 +231,67 @@ describe("deriveEntryScopedActions", () => {
       const card = actions.find((a) => a.key === "actionSurge");
       expect(card).toBeDefined();
       expect(card?.reminder).toBeUndefined();
+    });
+  });
+
+  // Deflect Attacks (2024) / Deflect Missiles (2014) announce augmentor
+  // (#1910): deflectAugmentor (lib/srd/deflect.ts) attaches the resolved roll
+  // spec via the SAME fold point Arcane Charge uses above. `abilityMods` is
+  // the new optional parameter threaded through for this (#1910's scope item
+  // 3) — omitting it (as shadow-arts.ts/disciplines.ts/warrior-of-elements.ts
+  // do) must leave `effect` unset even though the gate action key is present,
+  // proving the augmentor no-ops rather than throwing.
+  describe("Deflect Attacks / Deflect Missiles — resolved effect via announce augmentor (#1910)", () => {
+    const abilityMods = { dexterity: 3 };
+
+    it("2024 monk L3: deflectAttacks carries the resolved reduction effect and the B/P/S damage-type clause", () => {
+      const entries = [{ name: "monk", subclass: undefined, level: 3 }];
+      const actions = deriveEntryScopedActions(entries, 3, [], true, "EDITION_2024", getFeatureRows, abilityMods);
+      const expected = deriveDeflectSpec(3, 3, "EDITION_2024");
+      const base = actions.find((a) => a.key === "deflectAttacks");
+      expect(base?.effect).toEqual({ effectType: "utility", dice: expected.reduction, scaling: { mode: "none" } });
+      expect(base?.damageTypeClause).toBe("bludgeoning, piercing, or slashing damage");
+      const redirect = actions.find((a) => a.key === "deflectAttacksRedirect");
+      expect(redirect?.effect).toEqual({ effectType: "damage", dice: expected.redirect, scaling: { mode: "none" } });
+    });
+
+    it("2024 monk L12: reduction/redirect dice scale with monk level, damage-type clause still B/P/S (below L13)", () => {
+      const entries = [{ name: "monk", subclass: undefined, level: 12 }];
+      const actions = deriveEntryScopedActions(entries, 12, [], true, "EDITION_2024", getFeatureRows, abilityMods);
+      const expected = deriveDeflectSpec(12, 3, "EDITION_2024");
+      const base = actions.find((a) => a.key === "deflectAttacks");
+      expect(base?.effect).toEqual({ effectType: "utility", dice: expected.reduction, scaling: { mode: "none" } });
+      expect(base?.damageTypeClause).toBe("bludgeoning, piercing, or slashing damage");
+      const redirect = actions.find((a) => a.key === "deflectAttacksRedirect");
+      expect(redirect?.effect).toEqual({ effectType: "damage", dice: expected.redirect, scaling: { mode: "none" } });
+    });
+
+    it("2024 monk L13: damage-type clause widens to 'any damage type' (Deflect Energy)", () => {
+      const entries = [{ name: "monk", subclass: undefined, level: 13 }];
+      const actions = deriveEntryScopedActions(entries, 13, [], true, "EDITION_2024", getFeatureRows, abilityMods);
+      const expected = deriveDeflectSpec(13, 3, "EDITION_2024");
+      const base = actions.find((a) => a.key === "deflectAttacks");
+      expect(base?.effect).toEqual({ effectType: "utility", dice: expected.reduction, scaling: { mode: "none" } });
+      expect(base?.damageTypeClause).toBe("any damage type");
+    });
+
+    it("2014 monk L3+: deflectMissiles carries the resolved reduction effect, deflectMissilesThrow the redirect (1d6+Dex)", () => {
+      const entries = [{ name: "monk", subclass: undefined, level: 5 }];
+      const actions = deriveEntryScopedActions(entries, 5, [], true, "EDITION_2014", getFeatureRows, abilityMods);
+      const expected = deriveDeflectSpec(5, 3, "EDITION_2014");
+      const base = actions.find((a) => a.key === "deflectMissiles");
+      expect(base?.effect).toEqual({ effectType: "utility", dice: expected.reduction, scaling: { mode: "none" } });
+      expect(base?.damageTypeClause).toBeUndefined();
+      const throwBack = actions.find((a) => a.key === "deflectMissilesThrow");
+      expect(throwBack?.effect).toEqual({ effectType: "damage", dice: expected.redirect, scaling: { mode: "none" } });
+    });
+
+    it("omitting abilityMods (the cast-guard callers' shape) leaves deflectAttacks unaugmented", () => {
+      const entries = [{ name: "monk", subclass: undefined, level: 3 }];
+      const actions = deriveEntryScopedActions(entries, 3, [], true, "EDITION_2024", getFeatureRows);
+      const base = actions.find((a) => a.key === "deflectAttacks");
+      expect(base).toBeDefined();
+      expect(base?.effect).toBeUndefined();
     });
   });
 });

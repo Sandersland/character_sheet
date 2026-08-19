@@ -4,6 +4,7 @@ import supertest from "supertest";
 import { app } from "@/test-support/app-server.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { authCookie } from "@/test-support/auth.js";
+import { deleteCampaignRows } from "@/lib/campaign/campaign-delete.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { seededSpeciesAnchor } from "@/test-support/species.js";
 
@@ -14,6 +15,7 @@ const CHAR_A = "test-campaigns-char-a";
 const CHAR_B = "test-campaigns-char-b";
 const CHAR_C = "test-campaigns-char-c"; // owned by A, used for the reassignment guard
 const CHAR_D = "test-campaigns-char-d"; // owned by A, used for the PC-entity attach test
+const CHAR_E = "test-campaigns-char-e"; // owned by A, used for the campaign-delete survival test
 
 async function makeCharacter(id: string, ownerId: string) {
   await prisma.character.deleteMany({ where: { id } });
@@ -49,10 +51,11 @@ describe("campaigns (#246)", () => {
     await makeCharacter(CHAR_B, OWNER_B);
     await makeCharacter(CHAR_C, OWNER_A);
     await makeCharacter(CHAR_D, OWNER_A);
+    await makeCharacter(CHAR_E, OWNER_A);
   });
 
   afterAll(async () => {
-    await prisma.character.deleteMany({ where: { id: { in: [CHAR_A, CHAR_B, CHAR_C, CHAR_D] } } });
+    await prisma.character.deleteMany({ where: { id: { in: [CHAR_A, CHAR_B, CHAR_C, CHAR_D, CHAR_E] } } });
     await prisma.campaign.deleteMany({ where: { ownerId: { in: [OWNER_A, OWNER_B] } } });
     await prisma.user.deleteMany({ where: { id: { in: [OWNER_A, OWNER_B] } } });
   });
@@ -444,6 +447,127 @@ describe("campaigns (#246)", () => {
       .set("Cookie", cookieB);
     expect(list.status).toBe(200);
     expect((list.body as { name: string }[]).some((e) => e.name === `Char ${CHAR_D}`)).toBe(true);
+  });
+
+  describe("DELETE /api/campaigns/:id", () => {
+    async function makeCampaign(name: string): Promise<{ id: string; inviteCode: string }> {
+      const created = await supertest(app)
+        .post("/api/campaigns")
+        .set("Cookie", cookieA)
+        .send({ name });
+      expect(created.status).toBe(201);
+      return created.body as { id: string; inviteCode: string };
+    }
+
+    it("404s a nonexistent campaign and 403s non-owners", async () => {
+      const missing = await supertest(app)
+        .delete("/api/campaigns/00000000-0000-0000-0000-000000000000")
+        .set("Cookie", cookieA);
+      expect(missing.status).toBe(404);
+
+      const { id, inviteCode } = await makeCampaign("Not Yours To Delete");
+
+      const nonMember = await supertest(app).delete(`/api/campaigns/${id}`).set("Cookie", cookieB);
+      expect(nonMember.status).toBe(403);
+
+      await supertest(app).post("/api/campaigns/join").set("Cookie", cookieB).send({ inviteCode });
+      const player = await supertest(app).delete(`/api/campaigns/${id}`).set("Cookie", cookieB);
+      expect(player.status).toBe(403);
+
+      await expect(
+        prisma.campaign.findUniqueOrThrow({ where: { id } }),
+      ).resolves.toMatchObject({ id });
+    });
+
+    it("deletes the campaign; characters survive detached, sessions and memberships die", async () => {
+      const { id } = await makeCampaign("Doomed Campaign");
+      const attach = await supertest(app)
+        .post(`/api/campaigns/${id}/characters`)
+        .set("Cookie", cookieA)
+        .send({ characterId: CHAR_E });
+      expect(attach.status).toBe(200);
+      const endedSession = await prisma.session.create({
+        data: { campaignId: id, status: "ended", endedAt: new Date() },
+      });
+
+      const res = await supertest(app).delete(`/api/campaigns/${id}`).set("Cookie", cookieA);
+      expect(res.status).toBe(204);
+
+      expect(await prisma.campaign.findUnique({ where: { id } })).toBeNull();
+      expect(await prisma.session.findUnique({ where: { id: endedSession.id } })).toBeNull();
+      expect(await prisma.campaignMembership.findMany({ where: { campaignId: id } })).toHaveLength(0);
+      const survivor = await prisma.character.findUniqueOrThrow({
+        where: { id: CHAR_E },
+        select: { campaignId: true },
+      });
+      expect(survivor.campaignId).toBeNull();
+    });
+
+    it("deletes despite an active session orphaned by character deletion (auto-settles it)", async () => {
+      const { id } = await makeCampaign("Orphaned Session Campaign");
+      const orphanChar = "test-campaigns-char-orphan";
+      await makeCharacter(orphanChar, OWNER_A);
+      const attach = await supertest(app)
+        .post(`/api/campaigns/${id}/characters`)
+        .set("Cookie", cookieA)
+        .send({ characterId: orphanChar });
+      expect(attach.status).toBe(200);
+      await prisma.session.create({
+        data: { campaignId: id, status: "active", participants: { create: { characterId: orphanChar } } },
+      });
+      await prisma.character.delete({ where: { id: orphanChar } });
+
+      const res = await supertest(app).delete(`/api/campaigns/${id}`).set("Cookie", cookieA);
+      expect(res.status).toBe(204);
+      expect(await prisma.campaign.findUnique({ where: { id } })).toBeNull();
+    });
+
+    // The double-delete race pin: the loser reaches the tx after the winner's
+    // commit, so its view is "campaign already gone" — which must resolve as a
+    // success, not throw P2025 into a 500. Deterministic via the extracted tx
+    // body; the concurrent-requests spec below is the end-to-end net.
+    it("resolves already-gone as success in the delete tx body", async () => {
+      const result = await prisma.$transaction((tx) =>
+        deleteCampaignRows(tx, "00000000-0000-0000-0000-000000000000"),
+      );
+      expect(result).toEqual([]);
+    });
+
+    it("never 500s when two deletes race — the loser gets an idempotent 204 or a 404", async () => {
+      const { id } = await makeCampaign("Double Delete Campaign");
+
+      const [first, second] = await Promise.all([
+        supertest(app).delete(`/api/campaigns/${id}`).set("Cookie", cookieA),
+        supertest(app).delete(`/api/campaigns/${id}`).set("Cookie", cookieA),
+      ]);
+
+      expect([204, 404]).toContain(first.status);
+      expect([204, 404]).toContain(second.status);
+      expect(await prisma.campaign.findUnique({ where: { id } })).toBeNull();
+    });
+
+    it("409s while a session is active, then deletes once it has ended", async () => {
+      const { id } = await makeCampaign("Mid-Session Campaign");
+      // A live session has a present participant — a participantless one would
+      // auto-settle in the guard instead of 409ing.
+      const active = await prisma.session.create({
+        data: { campaignId: id, status: "active", participants: { create: { characterId: CHAR_A } } },
+      });
+
+      const blocked = await supertest(app).delete(`/api/campaigns/${id}`).set("Cookie", cookieA);
+      expect(blocked.status).toBe(409);
+      expect(blocked.body.error).toMatch(/active session/i);
+      await expect(
+        prisma.campaign.findUniqueOrThrow({ where: { id } }),
+      ).resolves.toMatchObject({ id });
+
+      await prisma.session.update({
+        where: { id: active.id },
+        data: { status: "ended", endedAt: new Date() },
+      });
+      const res = await supertest(app).delete(`/api/campaigns/${id}`).set("Cookie", cookieA);
+      expect(res.status).toBe(204);
+    });
   });
 
   it("409s attaching a character already in a different campaign", async () => {

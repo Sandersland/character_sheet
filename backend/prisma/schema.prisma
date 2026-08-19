@@ -146,6 +146,8 @@ model User {
   // homebrew content across every kind, not just Spell. Mirrors `characters`
   // — cascade-deleted with the user (CatalogEntry.ownerUser onDelete: Cascade).
   catalogEntries CatalogEntry[]
+  // Per-user dismissals of derived inbox flags (#1945).
+  inboxDismissals InboxDismissal[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -191,6 +193,8 @@ model Campaign {
   // and GLOBAL/USER entries granted into this campaign for its players to see.
   catalogEntries       CatalogEntry[]
   catalogGrants        CatalogGrant[]
+  // Per-user dismissals of this campaign's derived inbox flags (#1945).
+  inboxDismissals      InboxDismissal[]
 }
 
 // A named part/arc of a campaign's story (#863): the journal page groups
@@ -212,6 +216,35 @@ model CampaignArc {
   sessions Session[]
 
   @@index([campaignId, position])
+}
+
+// --- Inbox: derived DM housekeeping flags (#1945) --------------------------
+// GET /api/inbox recomputes duplicate-entity-cluster and needs-chronicling
+// flags at read time for every campaign the caller OWNS (derive-don't-
+// persist) — nothing about a flag itself is stored, only that a user
+// dismissed one. `signature` is the flag's stable identity (e.g. the sorted
+// entity ids of a duplicate cluster); a cluster whose membership changes gets
+// a new signature and resurfaces, which is intended.
+enum InboxFlagKind {
+  DUPLICATE_CLUSTER
+  NEEDS_CHRONICLING
+}
+
+model InboxDismissal {
+  id         String        @id @default(uuid())
+  userId     String
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaignId String
+  campaign   Campaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  kind       InboxFlagKind
+  signature  String
+  createdAt  DateTime      @default(now())
+
+  // campaignId is part of the identity (not just an FK) so the stored column
+  // actually governs suppression, matching filterDismissed's match key — a
+  // dismissal never silently applies across campaigns. Covers the old
+  // [userId, campaignId] index as a prefix, so that index is gone.
+  @@unique([userId, campaignId, kind, signature])
 }
 
 enum CampaignRole {
@@ -830,6 +863,33 @@ model ClassFeature {
   // and Elemental Attunement's burst/strike ops are the follow-ons. Validated
   // seed-time (classFeatureSeedSchema).
   activationRequires Json?
+  // Static in-play announce text (#1909) — distinct from `description` (the
+  // feature prose): this is what a player reads when they actually USE the
+  // action, e.g. Lay on Hands' "touch a creature to restore HP" line.
+  // `buildRowAction` (lib/classes/actions.ts) serves it only when
+  // `describeRowReminder`'s derived heal text yields nothing, so a row with
+  // an effectKind (Second Wind) keeps its computed "Regain NdM HP" subtitle
+  // over this column. Validated seed-time (classFeatureSeedSchema).
+  reminder String?
+  // A resolved numeric fact about this action the client renders verbatim
+  // (#1912) — the row-authored counterpart to DERIVED_ACTIONS' retired
+  // `count` field (actions.ts), e.g. Flurry of Blows' strike count (2
+  // normally, 3 at Heightened Focus, monk L10). `buildRowAction` serves it
+  // verbatim; a level-gated bump is an announce-augmentor payload (#1910),
+  // never a second row.
+  count Int?
+  // Marks a row that exists ONLY to carry one action VARIANT of a feature
+  // that grants several (Patient Defense free vs. 1-Focus, Step of the
+  // Wind's pair, Empty Body's two ki options, the Deflect riders, Hand of
+  // Healing's Flurry variant, #1912/epic #1903 decision 4) — or, more
+  // generally, any action identity with no feature-card text of its own.
+  // `featuresFromRows` (lib/classes/class-feature-rows.ts) filters an
+  // `actionOnly` row out, so it never surfaces as a feature card, in the
+  // level-up ceremony's feature list, or anywhere else `DerivedFeature` is
+  // projected — ONLY in `availableActions[]`. Requires `activationCost` +
+  // `resourceKey` (enforced at seed time, classFeatureSeedSchema): a row
+  // with neither is dead data, invisible everywhere.
+  actionOnly Boolean @default(false)
 
   // Cost block — GrantedAbility's columns verbatim (AbilityCostColumns is
   // exactly these four, all optional) so readAbilityCost reads them unchanged.

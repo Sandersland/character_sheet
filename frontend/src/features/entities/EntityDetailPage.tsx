@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 
 import Spinner from "@/components/ui/Spinner";
 import { useAuth } from "@/features/auth/AuthProvider";
@@ -12,6 +12,7 @@ import EntityEditForm from "@/features/entities/EntityEditForm";
 import EntityInfobox from "@/features/entities/EntityInfobox";
 import { FormerIdentitiesCard, SurvivorBanner } from "@/features/entities/EntityMergeCards";
 import EntityPaneRail from "@/features/entities/EntityPaneRail";
+import { useCombinedToast } from "@/features/entities/useCombinedToast";
 import { useEntityBackTo } from "@/features/entities/useEntityBackTo";
 import { useEntityDetail } from "@/features/entities/useEntityDetail";
 import { useEntityMerges } from "@/features/entities/useEntityMerges";
@@ -121,6 +122,7 @@ function EntityArticle({
   formerIdentityIds,
   rarities,
   nameFor,
+  onCombined,
 }: {
   detail: Detail;
   entity: CampaignEntity;
@@ -132,6 +134,7 @@ function EntityArticle({
   formerIdentityIds: string[];
   rarities: ItemRarityOption[];
   nameFor: (id: string) => string;
+  onCombined: (survivorId: string, message: string) => void;
 }) {
   return (
     <div className="flex min-w-0 flex-col gap-6">
@@ -165,8 +168,10 @@ function EntityArticle({
           characters={detail.characters}
           viewerId={viewerId}
           busy={detail.busy}
+          duplicateItem={detail.item}
           onToggleVisibility={detail.handleToggleVisibility}
           onDelete={detail.handleDelete}
+          onCombined={onCombined}
           onEdit={detail.startEdit}
         />
         <ArticleBody
@@ -189,10 +194,13 @@ function EntityArticle({
 // not-found render inside the pane so the rail keeps its state across row nav.
 export default function EntityDetailPage() {
   const { id: campaignId, entityId } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
   const backTo = useEntityBackTo(campaignId);
   const detail = useEntityDetail(campaignId, entityId);
   const { entity } = detail;
   const { user } = useAuth();
+  const combinedToast = useCombinedToast();
   // The campaign's edition only picks a /reference cache slot here — the rarity
   // tiers it resolves are edition-invariant (#1437). Undefined until the campaign
   // read lands, which keeps the query skipped rather than fetching for a guess.
@@ -202,6 +210,20 @@ export default function EntityDetailPage() {
     entityId,
     detail.byId,
   );
+
+  // The duplicate's own page is gone after a combine — land on the survivor's
+  // instead, replacing history so Back can't return to a 404'd entity, and
+  // carry the toast text through location.state (useCombinedToast reads it).
+  // Spreads the CURRENT state first so a `from` this page carried (see
+  // useEntityBackTo) survives onto the survivor's page too, instead of the
+  // combine silently resetting its back-link to the default Codex target.
+  function handleCombined(survivorId: string, message: string) {
+    if (!campaignId) return;
+    navigate(`/campaigns/${campaignId}/entities/${survivorId}`, {
+      replace: true,
+      state: { ...(location.state as Record<string, unknown> | null), combinedToast: message },
+    });
+  }
 
   let pane: ReactNode;
   if (entity === undefined) pane = <Spinner variant="page" />;
@@ -219,6 +241,7 @@ export default function EntityDetailPage() {
         formerIdentityIds={formerIdentityIds}
         rarities={rarities}
         nameFor={nameFor}
+        onCombined={handleCombined}
       />
     );
 
@@ -230,7 +253,17 @@ export default function EntityDetailPage() {
           entities={detail.listed}
           currentEntityId={entityId}
         />
-        <div className="min-w-0">{pane}</div>
+        <div className="min-w-0 flex flex-col gap-3">
+          {combinedToast && (
+            <p
+              role="status"
+              className="rounded-control bg-parchment-800 px-3 py-1.5 text-center text-xs font-medium text-parchment-50"
+            >
+              {combinedToast}
+            </p>
+          )}
+          {pane}
+        </div>
       </main>
     </div>
   );

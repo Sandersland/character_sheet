@@ -58,12 +58,17 @@
 // bard.ts's resourceFn literal). #1528's no-second-string rule means a row's
 // `description` is read verbatim; a per-level interpolated string can't be
 // authored as one static row.
-// No row below sets resourceKey/resourceLabel/resourceRecharge/resourceTotals
-// — not even the resourceKey-without-resourceTotals documentation form
-// Ranger/Warlock use for their own Wisdom/Charisma-modifier pools, since
-// Ranger's/Warlock's pools have a SINGLE recharge value and Bard's doesn't; a
-// half-declared row would misstate Bard's recharge for levels 1-4. The whole
-// pool's shape is documented here in prose instead.
+// No row below sets resourceLabel/resourceRecharge/resourceTotals — not even
+// the resourceKey-without-resourceTotals documentation form Ranger/Warlock
+// use for their own Wisdom/Charisma-modifier pools, since Ranger's/Warlock's
+// pools have a SINGLE recharge value and Bard's doesn't; a half-declared row
+// would misstate Bard's recharge for levels 1-4. The whole pool's shape is
+// documented here in prose instead. Bardic Inspiration's two rows DO set
+// `resourceKey` alone (#1909, identity-only, no resourceTotals) so the row
+// can carry the row-driven ACTION (activationCost/costKind/costPoolKey/
+// costBase) — poolFromRow (class-feature-rows.ts) requires resourceTotals to
+// mint a pool, so this mints no phantom one; the real pool total still comes
+// wholly from bard.ts's resourceFn, described above.
 //
 // The rule itself is edition-invariant, verified against BOTH SRDs: SRD 5.1
 // ("Charisma modifier, a minimum of once"; die d6/d8/d10/d12 at L1/5/10/15;
@@ -100,6 +105,17 @@ interface RawBardFeature {
   // schema.prisma comment. Only College of Valor's 2014 "Bonus Proficiencies"
   // row sets this today.
   improvements?: FeatImprovement[];
+  // Activation block (#1909) — Bardic Inspiration's row-driven action moved
+  // off actions.ts's DERIVED_ACTIONS onto its own row. `resourceKey` here is
+  // IDENTITY-ONLY (no resourceTotals) — the pool itself stays wholly in
+  // bard.ts's resourceFn (see this file's own RESOURCE POOL header block for
+  // why); poolFromRow (class-feature-rows.ts) requires resourceTotals to mint
+  // a pool, so this mints no phantom one.
+  resourceKey?: string;
+  activationCost?: string;
+  costKind?: string;
+  costPoolKey?: string;
+  costBase?: number;
 }
 
 function expand(raw: RawBardFeature): ClassFeatureSeedRow[] {
@@ -114,6 +130,11 @@ function expand(raw: RawBardFeature): ClassFeatureSeedRow[] {
     derivedStat: raw.derivedStat,
     derivedStatTiers: raw.derivedStatTiers,
     improvements: raw.improvements,
+    resourceKey: raw.resourceKey,
+    activationCost: raw.activationCost,
+    costKind: raw.costKind,
+    costPoolKey: raw.costPoolKey,
+    costBase: raw.costBase,
   }));
 }
 
@@ -153,6 +174,13 @@ const BARD_BASE_RAW: RawBardFeature[] = [
     edition: "EDITION_2014",
     description:
       "As a bonus action, give one creature within 60 ft a Bardic Inspiration die (d6, becoming d8 at L5, d10 at L10, d12 at L15). They add it to one ability check, attack roll, or saving throw within 10 minutes.",
+    // Row-driven action (#1909, moved off actions.ts's DERIVED_ACTIONS) —
+    // identity-only resourceKey, see RawBardFeature's own comment.
+    resourceKey: "bardicInspiration",
+    activationCost: "bonusAction",
+    costKind: "pool",
+    costPoolKey: "bardicInspiration",
+    costBase: 1,
   },
   {
     subclassSlug: null,
@@ -165,6 +193,11 @@ const BARD_BASE_RAW: RawBardFeature[] = [
     // widens from 10 minutes to the next hour.
     description:
       "As a Bonus Action, give one creature within 60 feet that can see or hear you a Bardic Inspiration die (d6, becoming d8 at level 5, d10 at level 10, d12 at level 15). Within the next hour, that creature can roll the die and add the number rolled to one D20 Test it makes, potentially turning the failure into a success.",
+    resourceKey: "bardicInspiration",
+    activationCost: "bonusAction",
+    costKind: "pool",
+    costPoolKey: "bardicInspiration",
+    costBase: 1,
   },
   {
     subclassSlug: null,

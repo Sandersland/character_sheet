@@ -372,6 +372,9 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     expect(resolveEvents).toHaveLength(1);
     expect(resolveEvents[0].category).toBe("combat");
     expect(resolveEvents[0].data).toMatchObject({ actionId: "action-1", source: "Longbow", slotLevel: null });
+    // The response returns the batch id the client threads into turn undo (#758),
+    // and it's the batch this event was written under.
+    expect(res.body.batchId).toBe(resolveEvents[0].batchId);
     // No companion spellcasting/resources event rides this batch — one row per resolution.
     const sameBatch = events.filter((e) => e.batchId === resolveEvents[0].batchId);
     expect(sameBatch).toHaveLength(1);
@@ -444,6 +447,17 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     expect(resolveEvent?.data.riders).toEqual([
       { spec: "2d6", faces: [4, 5], total: 9, type: "fire", kind: "damage", crit: false },
     ]);
+  });
+
+  it("stores a rider's attributing source verbatim when the op carries one", async () => {
+    const op = riderSwingOp();
+    const rider = { ...op.riders[0], spec: "1d6", faces: [2], total: 2, type: "slashing", source: "Sneak Attack" };
+    const res = await post([{ ...op, riders: [rider] }]);
+    expect(res.status).toBe(200);
+
+    const events = (await activity(FIXTURE_ID)).body as Array<{ type: string; data: Record<string, unknown> }>;
+    const resolveEvent = events.find((e) => e.type === "resolveAction");
+    expect(resolveEvent?.data.riders).toEqual([rider]);
   });
 
   it("defaults riders to an empty array when the op omits it", async () => {
@@ -578,20 +592,11 @@ describe("POST /api/characters/:id/resolve-action/transactions", () => {
     const revertRes = await revert(FIXTURE_ID, batchId);
     expect(revertRes.status).toBe(200);
     expect(revertRes.body.spellcasting.concentratingOn).toMatchObject({ entryId: CONCENTRATION_SPELL_A.id });
-    // NOT asserting slots.used here: a batch whose resolveAction event ALSO
-    // displaced a prior concentration logs a second `concentrationDropped`
-    // event ahead of it in the same batch (handleConcentrationOnCast,
-    // ability-cast.ts) — LIFO-reverting both replays the OLDER
-    // concentrationDropped event's own (mid-cast, already-post-slot-spend)
-    // spellcasting snapshot LAST, clobbering the correct slot-count restore
-    // the resolveAction event's own revert already applied. Pre-existing:
-    // the identical two-event shape (concentrationDropped + castSpell) exists
-    // on the OLD castSpell op path today (spellcasting.test.ts "undo restores
-    // concentration dropped by casting a second spell" only asserts
-    // concentratingOn, never slots, for the same reason) — not introduced by
-    // #1833, not fixed here; flagged in the slice report as a found,
-    // pre-existing undo-composition bug in ability-cast.ts, out of scope for
-    // the spell-adapter slice.
+    // #1849: the displacing cast's slot must also be refunded — the batch's
+    // LIFO revert order (resolveAction event first, then the older
+    // concentrationDropped event) must not let concentrationDropped's revert
+    // clobber the slot-count restore resolveAction's own revert just applied.
+    expect(revertRes.body.spellcasting.slots.find((s: { level: number }) => s.level === 1).used).toBe(1);
   });
 
   it("a heal spell's self-apply lands on the caster's own HP in the same batch", async () => {

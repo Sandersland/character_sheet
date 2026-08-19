@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
+import CombineEntityAction from "@/features/entities/CombineEntityAction";
 import EntityPortrait from "@/features/entities/EntityPortrait";
 import { formatJournalDate } from "@/lib/formatJournalDate";
 import { ENTITY_TYPE_LABELS } from "@/lib/mentions";
-import type { CampaignEntity, CampaignRole, EntityBacklink } from "@/types/character";
+import type { CampaignEntity, CampaignItem, CampaignRole, EntityBacklink } from "@/types/character";
 
 function firstMentionedLabel(entity: CampaignEntity): string {
   const ref = entity.stats?.firstMentioned;
@@ -40,17 +41,21 @@ function FactRow({ label, children }: { label: string; children: ReactNode }) {
 
 function OwnerQuietLinks({
   entity,
+  duplicateItem,
   busy,
   onToggleVisibility,
   onDelete,
+  onCombined,
 }: {
   entity: CampaignEntity;
+  duplicateItem: CampaignItem | null;
   busy: boolean;
   onToggleVisibility: () => void;
   onDelete: () => void;
+  onCombined: (survivorId: string, message: string) => void;
 }) {
   return (
-    <div className="mt-3 flex items-center gap-4 border-t border-parchment-200 pt-3">
+    <div className="mt-3 flex flex-wrap items-center gap-4 border-t border-parchment-200 pt-3">
       <button
         type="button"
         disabled={busy}
@@ -67,6 +72,12 @@ function OwnerQuietLinks({
       >
         Delete entity
       </button>
+      <CombineEntityAction
+        duplicate={entity}
+        duplicateItem={duplicateItem}
+        busy={busy}
+        onCombined={onCombined}
+      />
     </div>
   );
 }
@@ -80,8 +91,10 @@ export default function EntityInfobox({
   characters,
   viewerId,
   busy,
+  duplicateItem,
   onToggleVisibility,
   onDelete,
+  onCombined,
   onEdit,
 }: {
   entity: CampaignEntity;
@@ -90,8 +103,10 @@ export default function EntityInfobox({
   characters: { id: string; name: string; ownerId: string }[];
   viewerId?: string;
   busy: boolean;
+  duplicateItem: CampaignItem | null;
   onToggleVisibility: () => void;
   onDelete: () => void;
+  onCombined: (survivorId: string, message: string) => void;
   onEdit: () => void;
 }) {
   const sheetPath = ownedSheetPath(entity, characters, viewerId);
@@ -137,9 +152,11 @@ export default function EntityInfobox({
       {role === "OWNER" && (
         <OwnerQuietLinks
           entity={entity}
+          duplicateItem={duplicateItem}
           busy={busy}
           onToggleVisibility={onToggleVisibility}
           onDelete={onDelete}
+          onCombined={onCombined}
         />
       )}
     </aside>

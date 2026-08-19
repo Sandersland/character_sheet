@@ -12,7 +12,6 @@ import {
   fetchShadowArts,
   fetchSubclassChoiceOptions,
   imposeOpenHandRiderTransaction,
-  rollSneakAttackTransaction,
   setQuiveringPalmTransaction,
   triggerQuiveringPalmTransaction,
 } from "@/api/abilities";
@@ -29,11 +28,11 @@ describe("applyAbilityTransactions", () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ id: "1" }) });
     vi.stubGlobal("fetch", fetchMock);
 
-    const operations = [{ type: "rollSneakAttack", eligible: true, usedThisTurn: false }];
-    await applyAbilityTransactions("1", "sneak-attack", operations, "Failed to roll Sneak Attack");
+    const operations = [{ type: "attemptStunningStrike", usedThisTurn: false }];
+    await applyAbilityTransactions("1", "stunning-strike", operations, "Failed to attempt Stunning Strike");
 
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining("/characters/1/abilities/sneak-attack/transactions"),
+      expect.stringContaining("/characters/1/abilities/stunning-strike/transactions"),
       expect.objectContaining({ method: "POST", body: JSON.stringify({ operations }) })
     );
   });
@@ -199,27 +198,6 @@ describe("castManeuverTransaction", () => {
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("/characters/1/abilities/maneuvers/transactions"),
       expect.objectContaining({ method: "POST" })
-    );
-  });
-});
-
-describe("rollSneakAttackTransaction", () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it("sends a single rollSneakAttack operation with the eligibility flags", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue({ ok: true, json: async () => ({ character: { id: "1" }, results: [] }) });
-    vi.stubGlobal("fetch", fetchMock);
-
-    await rollSneakAttackTransaction("1", true, false);
-
-    const operations = [{ type: "rollSneakAttack", eligible: true, usedThisTurn: false }];
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining("/characters/1/abilities/sneak-attack/transactions"),
-      expect.objectContaining({ body: JSON.stringify({ operations }) })
     );
   });
 });

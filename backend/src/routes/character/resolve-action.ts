@@ -34,4 +34,6 @@ makeTransactionsEndpoint({
   schema: transactionsRequestSchema,
   apply: (characterId, data, userId) => applyResolveActionOperations(characterId, data.operations, userId),
   domainErrors: [InvalidResolveActionOperationError, InvalidSpellcastingOperationError],
+  // batchId rides beside the character for turn undo (#758); the client API layer splits it off.
+  respond: (character, batchId) => ({ ...character, batchId }),
 });

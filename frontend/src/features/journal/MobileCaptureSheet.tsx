@@ -25,7 +25,7 @@ interface MobileCaptureSheetProps {
   onClose: () => void;
   feed: ReactNode;
   composer: ReactNode;
-  /** Note count — changes re-anchor the feed to the bottom (open + after save). */
+  /** Opaque change-detector — any change re-anchors the feed to the bottom. */
   anchorKey: number;
 }
 
@@ -70,14 +70,15 @@ export default function MobileCaptureSheet({
       >
         <CaptureHeader sessionTitle={sessionTitle} onClose={onClose} />
 
-        {/* justify-end keeps the newest note pinned to the bottom until the feed
-            overflows; then the anchor effect scrolls it into view. */}
+        {/* mt-auto (not justify-end) pins a short feed to the bottom — end-aligning
+            a scrollport clips start-edge overflow with no scroll range, which made
+            older notes unreachable and the anchor effect a no-op. */}
         <div
           ref={feedRef}
           data-mobile-capture-feed=""
-          className="flex min-h-0 flex-1 flex-col justify-end overflow-y-auto px-[18px] pb-1 pt-2"
+          className="flex min-h-0 flex-1 flex-col overflow-y-auto px-[18px] pb-1 pt-2"
         >
-          {feed}
+          <div className="mt-auto">{feed}</div>
         </div>
 
         <div className="shrink-0 border-t border-parchment-100 bg-parchment-50 px-3 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))]">

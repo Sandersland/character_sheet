@@ -7,6 +7,13 @@
 // byte-identity proof. Subclass rows are untouched by this slice (no 2014
 // monk subclass slug exists yet, #1501-#1503) and stay covered by
 // monk-2024-content.test.ts's per-partition counts instead.
+//
+// `!r.actionOnly` (#1912) excludes the base-class actionOnly rows the 34-row
+// DERIVED_ACTIONS sweep added (Bonus Unarmed Strike, both Flurry of Blows
+// rows, the Patient Defense/Step of the Wind pairs, both Deflect riders, both
+// Empty Body variants) — those carry no player-facing FEATURE text of their
+// own (featuresFromRows filters them the same way), so they are out of scope
+// for a snapshot that pins feature TEXT, not action identities.
 import { describe, expect, it } from "vitest";
 
 import { MONK_FEATURES } from "../monk-features.js";
@@ -124,7 +131,7 @@ function byName(rows: typeof MONK_FEATURES, name: string) {
 }
 
 describe("2014 Monk base class — real SRD 5.1 / PHB'14 content (#1500)", () => {
-  const base2014 = MONK_FEATURES.filter((r) => r.subclassSlug === null && r.edition === "EDITION_2014");
+  const base2014 = MONK_FEATURES.filter((r) => r.subclassSlug === null && r.edition === "EDITION_2014" && !r.actionOnly);
 
   it("has exactly the 17 pinned features, each at the pinned level with the pinned text", () => {
     expect(base2014).toHaveLength(PINNED_2014_BASE.length);
@@ -149,7 +156,7 @@ describe("2014 Monk base class — real SRD 5.1 / PHB'14 content (#1500)", () =>
   });
 
   it("2014-only base features have no EDITION_2024 row", () => {
-    const base2024 = MONK_FEATURES.filter((r) => r.subclassSlug === null && r.edition === "EDITION_2024");
+    const base2024 = MONK_FEATURES.filter((r) => r.subclassSlug === null && r.edition === "EDITION_2024" && !r.actionOnly);
     const names2024 = new Set(base2024.map((r) => r.name));
     for (const name of ["Stillness of Mind", "Purity of Body", "Tongue of the Sun and Moon", "Timeless Body", "Empty Body", "Perfect Self"]) {
       expect(names2024.has(name), name).toBe(false);
@@ -159,7 +166,7 @@ describe("2014 Monk base class — real SRD 5.1 / PHB'14 content (#1500)", () =>
   // Same-level, different-name pairs — the "one description can't cite two
   // documents" fork (#1430 precedent) for mechanics the editions otherwise agree on.
   it("forked same-level pairs carry DIFFERENT text between editions", () => {
-    const base2024 = MONK_FEATURES.filter((r) => r.subclassSlug === null && r.edition === "EDITION_2024");
+    const base2024 = MONK_FEATURES.filter((r) => r.subclassSlug === null && r.edition === "EDITION_2024" && !r.actionOnly);
     const pairs: Array<[string, string]> = [
       ["Martial Arts", "Martial Arts"],
       ["Ki", "Focus"],
@@ -179,7 +186,7 @@ describe("2014 Monk base class — real SRD 5.1 / PHB'14 content (#1500)", () =>
   // Genuinely invariant rows (SRD 5.1 and SRD 5.2 agree word-for-word) stay
   // byte-identical across editions — the "Do NOT fork" half of #1313's table.
   it("edition-invariant rows are byte-identical across editions", () => {
-    const base2024 = MONK_FEATURES.filter((r) => r.subclassSlug === null && r.edition === "EDITION_2024");
+    const base2024 = MONK_FEATURES.filter((r) => r.subclassSlug === null && r.edition === "EDITION_2024" && !r.actionOnly);
     for (const name of ["Unarmored Defense", "Unarmored Movement", "Slow Fall", "Extra Attack", "Evasion"]) {
       const row2014 = byName(base2014, name);
       const row2024 = byName(base2024, name);

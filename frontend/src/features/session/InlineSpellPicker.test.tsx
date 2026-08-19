@@ -1,9 +1,3 @@
-// InlineSpellPicker tests (epic #1827 Slice 6, #1833) — the Cast-a-Spell
-// picker rewired onto the shared resolver (useResolution/ResolutionRail,
-// mirrors InlineAttackPicker.test.tsx's own coverage style, #1832). Exercises
-// each of the five spell shapes committing ONE resolveAction op with the
-// mapped cost, the 5e economy interlock (onCommitSlot), and that a heal's
-// self/ally apply is built while a damage spell's never is (self-or-announce).
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -24,7 +18,7 @@ function seedMid() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(applyResolveActionOperations).mockResolvedValue({} as Character);
+  vi.mocked(applyResolveActionOperations).mockResolvedValue({ character: {}, batchId: "test-batch" } as never);
 });
 
 afterEach(() => {
@@ -190,9 +184,6 @@ describe("InlineSpellPicker — attack-roll shape (Fire Bolt)", () => {
 
     await user.click(screen.getByRole("button", { name: /^Fire Bolt/ }));
     await user.click(screen.getByRole("button", { name: "Roll to hit" }));
-    // A mid-face d20 (seedMid) always lands ambiguous under a literal-20 crit
-    // range (#1120: spell attacks never widen), so Roll damage is armed the
-    // instant the die resolves — no separate "call it" tap needed here.
     const damageBtn = await screen.findByRole("button", { name: /Roll (crit )?damage/ });
     await user.click(damageBtn);
     await user.click(screen.getByRole("button", { name: "Done" }));
@@ -205,7 +196,6 @@ describe("InlineSpellPicker — attack-roll shape (Fire Bolt)", () => {
     expect(op.effect).toMatchObject({ type: "fire", kind: "damage" });
     expect(op.slotLevel).toBeUndefined();
     expect(op.apply).toBeUndefined();
-    // Deferred to the mutation's success (#1848 review fix), not synchronous.
     await waitFor(() => expect(onCommitSlot).toHaveBeenCalled());
   });
 });
@@ -269,7 +259,7 @@ describe("InlineSpellPicker — no-roll utility shape (Druidcraft)", () => {
     renderPicker(makeCharacter([DRUIDCRAFT]));
 
     await user.click(screen.getByRole("button", { name: /^Druidcraft/ }));
-    await user.click(screen.getByRole("button", { name: "Resolve" }));
+    await user.click(screen.getByRole("button", { name: "Cast" }));
 
     const op = lastOp();
     expect(op.toHit ?? null).toBeNull();
@@ -285,40 +275,50 @@ describe("InlineSpellPicker — economy interlock + single spend", () => {
     const { onCommitSlot } = renderPicker(makeCharacter([DRUIDCRAFT]));
 
     await user.click(screen.getByRole("button", { name: /^Druidcraft/ }));
-    const resolve = screen.getByRole("button", { name: "Resolve" });
+    const resolve = screen.getByRole("button", { name: "Cast" });
     await user.click(resolve);
 
     expect(applyResolveActionOperations).toHaveBeenCalledTimes(1);
-    // onCommitSlot fires only once the mutation's promise resolves (#1848
-    // review fix) — not synchronously alongside the mutate() call.
     await waitFor(() => expect(onCommitSlot).toHaveBeenCalledTimes(1));
-    // The rail's own completion button disappears once completed — no second tap possible.
-    expect(screen.queryByRole("button", { name: "Resolve" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cast" })).not.toBeInTheDocument();
   });
 
-  it("disables the resolver once the economy slot is unavailable", async () => {
+  it("passes the cast's batchId to onCommitSlot so turn undo can revert it (#758)", async () => {
     const user = userEvent.setup();
-    renderPicker(makeCharacter([DRUIDCRAFT]), { slotAvailable: false });
+    vi.mocked(applyResolveActionOperations).mockResolvedValueOnce({ character: {}, batchId: "batch-cast-1" } as never);
+    const { onCommitSlot } = renderPicker(makeCharacter([DRUIDCRAFT]));
 
     await user.click(screen.getByRole("button", { name: /^Druidcraft/ }));
-    expect(screen.getByRole("button", { name: "Resolve" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Cast" }));
+
+    await waitFor(() => expect(onCommitSlot).toHaveBeenCalledWith("batch-cast-1"));
   });
 
-  // #1848 review (CRITICAL): a rejected resolveAction mutation must NOT spend
-  // the turn-state economy slot — the pre-fix code called onCommitSlot
-  // synchronously, fire-and-forget alongside the mutation, so a server error
-  // still permanently marked the slot spent with no retry path.
-  it("does NOT call onCommitSlot when the resolveAction mutation rejects", async () => {
+  it("guards the whole picker when the economy slot is already spent — no dead-end resolver", () => {
+    renderPicker(makeCharacter([DRUIDCRAFT]), { slotAvailable: false });
+
+    expect(screen.getByText("You've already taken your action this turn.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Druidcraft/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cast" })).not.toBeInTheDocument();
+  });
+
+  it("a rejected resolveAction leaves the slot unspent so the cast can be retried (#1848)", async () => {
     const user = userEvent.setup();
     vi.mocked(applyResolveActionOperations).mockRejectedValueOnce(new Error("network blip"));
     const { onCommitSlot } = renderPicker(makeCharacter([DRUIDCRAFT]));
 
     await user.click(screen.getByRole("button", { name: /^Druidcraft/ }));
-    await user.click(screen.getByRole("button", { name: "Resolve" }));
+    await user.click(screen.getByRole("button", { name: "Cast" }));
 
-    // Let the rejected mutation settle — the failure surfaces as an error message.
     await screen.findByText("network blip");
     expect(onCommitSlot).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Cast another spell" }));
+    await user.click(screen.getByRole("button", { name: /^Druidcraft/ }));
+    await user.click(screen.getByRole("button", { name: "Cast" }));
+
+    await waitFor(() => expect(onCommitSlot).toHaveBeenCalledTimes(1));
+    expect(onCommitSlot).toHaveBeenCalledWith("test-batch");
   });
 });
 
@@ -328,7 +328,7 @@ describe("InlineSpellPicker — entryId routes concentration through the same ca
     renderPicker(makeCharacter([CONCENTRATION_SPELL]));
 
     await user.click(screen.getByRole("button", { name: /^Bless/ }));
-    await user.click(screen.getByRole("button", { name: "Resolve" }));
+    await user.click(screen.getByRole("button", { name: "Cast" }));
 
     const op = lastOp();
     expect(op.entryId).toBe("entry-bless");

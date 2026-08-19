@@ -55,7 +55,7 @@ export async function runCharacterTransaction<S extends Prisma.CharacterSelect, 
   characterId: string,
   operations: Op[],
   opts: RunCharacterTransactionOptions<S, Op>,
-): Promise<void> {
+): Promise<string> {
   const batchId = randomUUID();
   const sessionId =
     opts.sessionId !== undefined ? opts.sessionId : await getActiveSessionId(characterId);
@@ -72,4 +72,7 @@ export async function runCharacterTransaction<S extends Prisma.CharacterSelect, 
     }
     if (opts.afterOps) await opts.afterOps({ tx, characterId, batchId, sessionId });
   });
+
+  // Returned so endpoints can hand the client the batch to revert on turn undo (#758).
+  return batchId;
 }

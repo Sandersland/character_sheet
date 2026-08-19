@@ -1,86 +1,53 @@
 // Rogue Sneak Attack on the attack card (#902): a manual eligibility toggle
-// (advantage OR an ally adjacent — never auto-detected) plus a roll button. The
-// server rolls the level-derived Nd6 and enforces the once-per-turn guard; the
-// roll folds into the current hit row's damage and is shown inline.
+// (advantage OR an ally adjacent — never auto-detected) plus a roll button.
+// The roll is client-side and rides the swing's single resolveAction op as a
+// damage rider (#1843) — the parent owns the roll (`onRoll`) and the rolled
+// total (`rolled`); once-per-turn is turnState's guard.
 
 import { useState } from "react";
 
-import { rollSneakAttackTransaction } from "@/api/client";
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
-import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { AttackTallyRow } from "@/lib/attackTallySummary";
-import type { Character } from "@/types/character";
 
 // Why the roll button is disabled, in priority order — surfaced as its tooltip.
-function rollBlockedReason(
-  currentRow: AttackTallyRow | null,
-  used: boolean,
-  eligible: boolean,
-): string | undefined {
-  if (currentRow === null) return "Roll a hit first";
+function rollBlockedReason(used: boolean, eligible: boolean): string | undefined {
   if (used) return "Already used this turn";
   if (!eligible) return "Confirm eligibility first";
   return undefined;
-}
-
-// Roll state + the server round-trip: the server rolls the Nd6 and enforces
-// once-per-turn; the result folds into the bound hit row's damage riders.
-function useSneakAttackRoll(
-  character: Character,
-  turnState: TurnState & TurnStateActions,
-  currentRow: AttackTallyRow | null,
-  eligible: boolean,
-) {
-  const [rolled, setRolled] = useState<number | null>(null);
-  const used = turnState.sneakAttackUsedThisTurn;
-
-  const mutation = useCharacterMutation({
-    characterId: character.id,
-    mutationFn: () => rollSneakAttackTransaction(character.id, eligible, used),
-    toCharacter: (r) => r.character,
-    fallbackMessage: "Failed to roll Sneak Attack",
-  });
-  const canRoll = eligible && !used && !mutation.isPending && currentRow !== null;
-
-  // No try/catch (unchanged from pre-#1283): this hook has never surfaced an
-  // error — a rejection propagates same as before.
-  async function handleRoll() {
-    if (!canRoll) return;
-    const { results } = await mutation.mutateAsync(undefined);
-    const roll = results[0]?.roll ?? 0;
-    setRolled(roll);
-    if (currentRow) turnState.addTallyDamageRider(currentRow.id, roll);
-    turnState.markSneakAttackUsed();
-  }
-
-  return { used, canRoll, rolled, handleRoll };
 }
 
 interface SneakAttackSectionProps {
   turnState: TurnState & TurnStateActions;
   /** The current hit row the roll folds into; null before a hit lands. */
   currentRow: AttackTallyRow | null;
+  /** Rolls the sneak dice into the swing's rider map and marks the turn's use. */
+  onRoll: () => void;
+  /** The rolled rider total for this swing, if any. */
+  rolled: number | null;
 }
 
 export default function SneakAttackSection({
   turnState,
   currentRow,
+  onRoll,
+  rolled,
 }: SneakAttackSectionProps) {
   const { character } = useCurrentCharacter();
   const { sneakAttack } = character;
   const [eligible, setEligible] = useState(false);
-  const { used, canRoll, rolled, handleRoll } = useSneakAttackRoll(
-    character,
-    turnState,
-    currentRow,
-    eligible,
-  );
+  const used = turnState.sneakAttackUsedThisTurn;
+  const canRoll = eligible && !used;
 
   // Only rogues have Sneak Attack; nothing to fold into until a hit lands.
-  if (!sneakAttack) return null;
+  if (!sneakAttack || !currentRow) return null;
 
   const label = `${sneakAttack.dice.count}d${sneakAttack.dice.faces}`;
+
+  function handleRoll() {
+    if (!canRoll) return;
+    onRoll();
+  }
 
   return (
     <div className="flex flex-col gap-1.5 rounded-control border border-gold-200 bg-gold-50 p-2">
@@ -107,7 +74,7 @@ export default function SneakAttackSection({
           type="button"
           disabled={!canRoll}
           onClick={handleRoll}
-          title={rollBlockedReason(currentRow, used, eligible)}
+          title={rollBlockedReason(used, eligible)}
           className="rounded-control border border-gold-300 bg-gold-100 px-2.5 py-1 text-xs font-semibold text-gold-800 transition-colors hover:bg-gold-200 disabled:cursor-not-allowed disabled:opacity-40"
         >
           Roll Sneak Attack ({label})

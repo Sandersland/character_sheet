@@ -108,6 +108,10 @@ const resolveActionEffectSchema = z.object({
   kind: z.enum(["damage", "heal"]),
   crit: z.boolean(),
   components: damageComponentsSchema.nullable().optional(),
+  // Attributing display name for a riders[] term ("Sneak Attack") — echoed
+  // verbatim into the event for the drill-in label; absent on the primary
+  // effect, whose attribution is the op-level `source`.
+  source: z.string().min(1).optional(),
 });
 
 const resolveActionOperationSchema = z

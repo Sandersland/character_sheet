@@ -64,9 +64,9 @@ export { buildRollModifiers };
 // null ones.
 
 // Sneak Attack: the Nd6 dice spec, undefined for a non-rogue. Scales with
-// rogue class levels, matching applySneakAttackOperations — both now go
-// through sneak-attack.ts's sneakAttackSpecForEntries (#1231 commit 3), which
-// is the one place the "which class entry is the rogue" lookup lives.
+// rogue class levels via sneak-attack.ts's sneakAttackSpecForEntries (#1231
+// commit 3), the one place the "which class entry is the rogue" lookup lives.
+// The client rolls this spec as a swing damage rider (#1843).
 function sneakAttackRider(classEntries: { name: string; level: number }[]): DiceRider | undefined {
   const spec = sneakAttackSpecForEntries(classEntries);
   return spec ? { dice: { count: spec.count, faces: spec.faces } } : undefined;

@@ -1,9 +1,3 @@
-// The active-turn resolution sheets (#737 extraction, no behavior change):
-// when an action opens a resolver, the matching picker renders in a BottomSheet.
-// Pulled out of TurnHub so that monolith stays under the complexity gate as the
-// turn surface grows (undo, concentration, death saves, …). One component per
-// resolver kind; TurnResolutionSheets itself is only the kind → sheet dispatch.
-
 import BottomSheet from "@/components/ui/BottomSheet";
 import { flurryStrikeCount } from "@/lib/attackMath";
 import InlineAttackPicker from "@/features/session/InlineAttackPicker";
@@ -35,19 +29,11 @@ const SPELL_CASTING_TIME: Record<SpellSlot, string> = {
   reaction: "1 reaction",
 };
 
-/** Attack-sheet kicker with the live Extra-Attack count (no counter → 1, e.g.
- *  opportunity attacks). The in-sheet footer deliberately carries no copy of it. */
 function attackKicker(attack: TurnState["attack"]): string {
   const count = attack?.total ?? 1;
   return `${count} attack${count === 1 ? "" : "s"} · no target AC tracked — read the roll to your DM`;
 }
 
-// Widened past LayOnHandsInput's own narrower onSend (#1676, Song of
-// Defense's slotLevel op) to the shape useTurnActions' real `send` carries —
-// a shared declaration rather than deriving from one consumer's props, since
-// TS's weak-type check rejects assigning between two ALL-optional object
-// types with no property names in common (LayOnHandsInput's `{roll?}` vs
-// SongOfDefenseInput's `{slotLevel?}`).
 type SendAction = (actionKey: string, opts?: { roll?: number; inventoryItemId?: string; slotLevel?: number }) => Promise<unknown>;
 
 interface TurnResolutionSheetsProps {
@@ -116,8 +102,6 @@ function AttackResolutionSheet({
   | "setShowActionMenu"
   | "onLogChanged"
 >) {
-  // Attacks all spent → finalize; attacks remain → leave the action LIVE so the
-  // Action slot can offer Resume (#802). cancelAttack still refunds pre-first-roll.
   const attack = turnState.attack;
   const exhausted = attack !== null && attack.used >= attack.total;
   const closeAttackSheet = () => {
@@ -155,9 +139,6 @@ function TwfResolutionSheet({
   | "setShowBonusMenu"
   | "onLogChanged"
 >) {
-  // Martial Arts Bonus Unarmed Strike (#1218) shares this sheet + the TWF
-  // single-swing bonusAttack path — only the entry built (buildUnarmedEntry vs
-  // buildOffHandEntry) and this title/subtitle differ.
   const isUnarmed = activeResolution?.resolver.key === "bonusUnarmedStrike";
   return (
     <BottomSheet
@@ -184,16 +165,6 @@ function TwfResolutionSheet({
   );
 }
 
-// Flurry of Blows (#1217): strikes remaining → finalize (like the Attack
-// sheet's Resume pattern); no strikes rolled yet → refund. Unlike TWF's always-
-// exactly-1 swing, Flurry's 2 strikes mean a mid-way close is reachable — it
-// just leaves the counter live with no explicit resume affordance (cosmetic
-// only: the bonus action stays correctly spent either way).
-//
-// The 1 Focus spend is deliberately deferred to the FIRST strike roll, not
-// opened here — `send` fires the same executeAction("flurryOfBlows") the
-// generic click path uses elsewhere, just wired as InlineFlurryPicker's
-// onCommitFocusSpend so a pre-roll cancel truly costs nothing.
 function FlurryResolutionSheet({
   turnState,
   closeResolution,
@@ -274,11 +245,6 @@ function HealResolutionSheet({
   );
 }
 
-// Song of Defense (#1676, TCoE p. 76) — Bladesinger's reaction, gated
-// server-side on Bladesong being active (#1688's requiresActiveBuff; a 400
-// surfaces via the mutation's error state if the player somehow opens this
-// with Bladesong down). Nothing is spent until a slot is picked and used —
-// same "commit at use-time" shape as Lay on Hands above.
 function SongOfDefenseResolutionSheet({
   turnState,
   closeResolution,
@@ -311,9 +277,7 @@ function SpellResolutionSheet({
   | "onLogChanged"
   | "allies"
 >) {
-  // Only rendered for the spell-picker kind, so the resolution is present.
   const slot = activeResolution!.resolver.slot as SpellSlot;
-  // Open focused on this spellbook entry (bonus-spell card pre-selection).
   const focusSpellId = activeResolution!.context?.spellId;
 
   const slotAvailable =
@@ -322,23 +286,20 @@ function SpellResolutionSheet({
       : slot === "bonusAction"
         ? !turnState.bonusActionUsed
         : !turnState.reactionUsed;
-
-  // refreshCombat lives on the turn-state context (not the reducer, which can't
-  // fetch) — pull it here so a successful cast re-reads the server-resolved
-  // interlock immediately (#1439), rather than waiting for the ~5s poll.
   const refreshCombat = useTurnStateContext()?.refreshCombat;
 
-  const onCommitSlot = () => {
+  const onCommitSlot = (batchId?: string) => {
     if (slot === "action") turnState.commitActionSpell();
     else if (slot === "bonusAction") turnState.commitBonusActionSpell();
     else turnState.commitReactionSpell();
-    // The cast recorded its interlock kind server-side (resolveAction, #1439);
-    // pull the resolved flags now so the block shows without a poll wait.
+    // Tag the history entry the commit above just pushed with the cast's batch
+    // so turn undo reverts the server cast (#758), not just the local economy.
+    if (batchId) turnState.attachBatchId(batchId);
     void refreshCombat?.();
   };
 
   return (
-    <BottomSheet title={SPELL_SHEET_TITLE[slot]} subtitle="Only what you can afford now" onClose={closeResolution}>
+    <BottomSheet title={SPELL_SHEET_TITLE[slot]} onClose={closeResolution}>
       <InlineSpellPicker
         sessionId={sessionId}
         onClose={closeResolution}

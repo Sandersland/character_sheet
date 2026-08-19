@@ -1,0 +1,12 @@
+-- Rename CatalogEntry's compound unique index to the name Prisma derives from
+-- the @@unique fields. #1796 hand-wrote the CREATE UNIQUE INDEX with the full
+-- name `..._name_edition_key`, which exceeds Postgres's 63-char identifier
+-- limit, so Postgres silently truncated it to `..._name_editio` (dropping the
+-- `_key` suffix). Prisma's own smart truncation keeps the suffix
+-- (`..._name_ed_key`), so every `migrate dev` saw the two names as drift and
+-- emitted a spurious RenameIndex. Aligning the DB name to Prisma's ends that.
+-- (#1571) The Spell_catalogEntryId_fkey DropForeignKey Prisma also generates
+-- here is stripped on purpose: that FK is hand-written onto a deliberately
+-- relationless scalar (see Spell.catalogEntryId), so Prisma can't see it and
+-- always proposes dropping it — applying that would destroy real integrity.
+ALTER INDEX "CatalogEntry_kind_scope_ownerUserId_ownerCampaignId_name_editio" RENAME TO "CatalogEntry_kind_scope_ownerUserId_ownerCampaignId_name_ed_key";

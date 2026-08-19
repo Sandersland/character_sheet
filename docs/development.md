@@ -48,6 +48,10 @@ npx prisma migrate deploy                    # apply pending (what containers do
 npx prisma db seed                           # idempotent upserts
 ```
 
+**`migrate dev` emits one known spurious line — strip it, don't apply it (#1571).** Every `migrate dev` diff proposes `ALTER TABLE "Spell" DROP CONSTRAINT "Spell_catalogEntryId_fkey"` on top of your real changes. That FK is hand-written onto a deliberately relationless scalar (`Spell.catalogEntryId`, the #1795 closed catalog supertype), so Prisma can't see it and always proposes dropping it — applying that would destroy real integrity. Generate with `--create-only`, delete that one line, then `migrate deploy`. It is the *only* invisible object left; everything else your change touches is now diffed correctly.
+
+**Never edit a migration file after it has been applied — not even a comment.** A migration's recorded checksum covers the whole file, so any edit makes Prisma report it "modified after it was applied" and refuses `migrate dev` until the recorded checksum is repaired. That is what broke the author-a-migration workflow for weeks (#1571). Fix a mistake with a *new* migration; treat applied ones as immutable.
+
 **Narrowing an enum: migrate the data, then the type.** Removing a value makes Prisma emit a `CREATE TYPE "X_new" AS ENUM (…)` swap whose `USING ("col"::text::"X_new")` cast **aborts on any row still holding a removed value** — and a failed migration then blocks every migration behind it (`docs/deployment.md`, "A failed migration blocks every later one"). So the same `migration.sql` must `UPDATE` those rows to a surviving value, or `DELETE` them as an explicit recorded decision, **above** the `CREATE TYPE`. `scripts/check-enum-narrowing.sh` enforces this in lefthook `pre-commit` and the CI `lint` job; where no row can hold a removed value, say why in the migration with a `-- enum-narrowing-reviewed: <reason>` line. Renaming a value counts as removing one. Widening is safe and ungated — Prisma emits `ALTER TYPE … ADD VALUE` for added values regardless of where they sit in the schema enum, never a swap.
 
 ## Verification data (`seed:verify`)

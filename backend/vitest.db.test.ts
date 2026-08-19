@@ -17,9 +17,6 @@ describe("per-worker test databases", () => {
     expect(templateDatabaseName(base)).toBe("character_sheet_test_template");
   });
 
-  // Permanent guard against a "tidy-up" that turns vitest.setup.ts's dynamic
-  // import of prisma back into a static one: that reverts every worker to the
-  // ambient shared database and every other test still passes (#1269).
   it("runs against its own worker database, cloned from the seeded template", async () => {
     const [row] = await prisma.$queryRaw<{ db: string }[]>`SELECT current_database() AS db`;
 

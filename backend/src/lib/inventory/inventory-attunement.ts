@@ -66,6 +66,17 @@ export async function applyAttune(
     }
   }
 
+  // Serializes concurrent applyAttune calls for the SAME character before the
+  // cap recount below: under Postgres' default READ COMMITTED, two concurrent
+  // requests can each read the pre-write attuned count while the other's
+  // UPDATE is still uncommitted, letting a 4th item attune past the cap
+  // (#1888, same shape as the weapon-bond cap race fixed in #1854). Locking
+  // the currently-attuned InventoryItem rows doesn't work here — the new row
+  // being attuned doesn't match the `attuned: true` predicate yet, so it's a
+  // phantom-read case; only a lock on the Character row itself blocks the
+  // second request until the first's count-then-update has committed.
+  await tx.$queryRaw`SELECT id FROM "Character" WHERE id = ${characterId} FOR UPDATE`;
+
   // Derived 3-item cap: count currently-attuned rows, reject the 4th with a 409.
   const attunedCount = await tx.inventoryItem.count({ where: { characterId, attuned: true } });
   if (attunedCount >= ATTUNEMENT_LIMIT) {

@@ -24,6 +24,12 @@ export async function joinCampaign(inviteCode: string): Promise<Campaign> {
   return request<Campaign>("/campaigns/join", jsonBody({ inviteCode }), "Failed to join campaign");
 }
 
+// Owner-only. Characters survive server-side (detached); everything else in the
+// campaign is deleted. 409s while a session is active.
+export async function deleteCampaign(campaignId: string): Promise<void> {
+  await send(`/campaigns/${campaignId}`, { method: "DELETE" }, "Failed to delete campaign");
+}
+
 export async function addCharacterToCampaign(
   characterId: string,
   campaignId: string,

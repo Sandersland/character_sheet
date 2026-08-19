@@ -95,6 +95,14 @@ interface RawRogueFeature {
   // see this file's own header for why every other row leaves this undefined.
   derivedStat?: string;
   derivedStatTiers?: { minLevel: number; value: number | string }[];
+  // Row-driven action (#1912) — Cunning Action/Fast Hands moved off
+  // actions.ts's DERIVED_ACTIONS onto these two rows, both P-shaped
+  // (identity-only resourceKey, no cost columns — always enabled, matching
+  // the old bare-reminder rows exactly).
+  resourceKey?: string;
+  activationCost?: string;
+  regrants?: string[];
+  reminder?: string;
 }
 
 function expand(raw: RawRogueFeature): ClassFeatureSeedRow[] {
@@ -106,6 +114,10 @@ function expand(raw: RawRogueFeature): ClassFeatureSeedRow[] {
     description: raw.description,
     derivedStat: raw.derivedStat,
     derivedStatTiers: raw.derivedStatTiers,
+    resourceKey: raw.resourceKey,
+    activationCost: raw.activationCost,
+    regrants: raw.regrants,
+    reminder: raw.reminder,
   };
   const editions: SeedEdition[] = raw.edition ? [raw.edition] : ["EDITION_2014", "EDITION_2024"];
   return editions.map((edition) => ({ ...base, edition }));
@@ -217,6 +229,13 @@ const ROGUE_BASE_RAW: RawRogueFeature[] = [
     level: 2,
     edition: "EDITION_2014",
     description: "As a bonus action, take the Dash, Disengage, or Hide action.",
+    // Row-driven action (#1912) — carries no reminder on purpose: its
+    // `regrants` ARE the rule, and the three names are identical in SRD 5.1
+    // and SRD 5.2, so the client can name them from the served rows for
+    // either edition without a caveat (#1431).
+    resourceKey: "cunningAction",
+    activationCost: "bonusAction",
+    regrants: ["dash", "disengage", "hide"],
   },
   {
     subclassSlug: null,
@@ -228,6 +247,9 @@ const ROGUE_BASE_RAW: RawRogueFeature[] = [
     // rule agrees (CLAUDE.md's ACTIONS precedent).
     description:
       "Your quick thinking and agility allow you to move and act quickly. On your turn, you can take one of the following actions as a Bonus Action: Dash, Disengage, or Hide.",
+    resourceKey: "cunningAction",
+    activationCost: "bonusAction",
+    regrants: ["dash", "disengage", "hide"],
   },
   {
     subclassSlug: null,
@@ -653,6 +675,21 @@ const THIEF_RAW: RawRogueFeature[] = [
     edition: "EDITION_2014",
     description:
       "Use the Cunning Action bonus action to make a Sleight of Hand check, use Thieves' Tools to disarm a trap or open a lock, or take the Use an Object action.",
+    // Row-driven action (#1912) — a MODE of Cunning Action, not a second
+    // Bonus Action: both editions spend "the Bonus Action granted by your
+    // Cunning Action", so a Thief L3 sees two sibling bonus-action cards
+    // that compete for the one slot. The reminder says so, because nothing
+    // in the action economy can express "these two share a slot". The
+    // object-use grant is the edition-invariant `regrants` link; the
+    // reminder deliberately does not NAME that action, since SRD 5.1 calls
+    // it Use an Object and SRD 5.2 Utilize — #1240's edition-blind service
+    // of this row is why the name has to come off the wire, not out of here.
+    resourceKey: "fastHands",
+    activationCost: "bonusAction",
+    regrants: ["useObject"],
+    // Kept under ~90 chars so it does not ellipsis-clip in the card subtitle
+    // (OptionCard truncates to one line).
+    reminder: "Uses Cunning Action's Bonus Action, not an extra one — Sleight of Hand or Thieves' Tools.",
   },
   {
     subclassSlug: THIEF_SLUG,
@@ -664,6 +701,10 @@ const THIEF_RAW: RawRogueFeature[] = [
     // for the old "Use an Object" action).
     description:
       "As a Bonus Action, you can do one of the following. Sleight of Hand: make a Dexterity (Sleight of Hand) check to pick a lock or disarm a trap with Thieves' Tools or to pick a pocket. Use an Object: take the Utilize action, or take the Magic action to use a magic item that requires that action.",
+    resourceKey: "fastHands",
+    activationCost: "bonusAction",
+    regrants: ["useObject"],
+    reminder: "Uses Cunning Action's Bonus Action, not an extra one — Sleight of Hand or Thieves' Tools.",
   },
   {
     subclassSlug: THIEF_SLUG,

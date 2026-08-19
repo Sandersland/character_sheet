@@ -1,5 +1,5 @@
 // Open Hand Technique (Warrior of the Open Hand L3, SRD 5.2 / PHB'24 p.90) —
-// the monk counterpart to applySneakAttackOperations / attemptStunningStrike.
+// the Flurry counterpart to attemptStunningStrike.
 // When a Flurry of Blows strike hits, impose ONE rider: Addle (no save — the
 // target can't take reactions until the start of your next turn), Push
 // (Strength save or pushed up to 15 ft), or Topple (Dexterity save or Prone).

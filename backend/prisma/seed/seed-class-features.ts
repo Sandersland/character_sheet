@@ -35,6 +35,13 @@ const DESCRIPTOR_RESET = {
   resolverKind: null,
   requiresUnarmored: false,
   regrants: [] as string[],
+  // #1909 — plain String? column, "populated nowhere" reset is null like the
+  // other scalar descriptor columns above.
+  reminder: null,
+  // #1912 — same reset shape as the two columns above (plain nullable
+  // scalar / plain-default boolean, no Prisma.DbNull sentinel needed).
+  count: null,
+  actionOnly: false,
   costKind: null,
   costPoolKey: null,
   costBase: null,

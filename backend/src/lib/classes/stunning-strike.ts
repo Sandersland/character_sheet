@@ -1,5 +1,5 @@
-// Stunning Strike (Monk L5) live-play automation — the monk counterpart to
-// applySneakAttackOperations. SRD 5.2 / PHB'24 p.88 (2024): once per turn,
+// Stunning Strike (Monk L5) live-play automation.
+// SRD 5.2 / PHB'24 p.88 (2024): once per turn,
 // after hitting with an Unarmed Strike or a monk weapon, spend 1 focus to
 // force a Constitution save against the monk's focus save DC (8 + prof +
 // Wis): fail → Stunned until the start of the monk's next turn; success → the
@@ -158,7 +158,7 @@ async function attemptStunningStrike(
 
 /**
  * Applies a batch of Stunning Strike operations atomically. Mirrors
- * applySneakAttackOperations: one batchId, state re-read per op. Returns one
+ * applyManeuverOperations: one batchId, state re-read per op. Returns one
  * result per op (client surfaces the DC/roll/outcome inline, per #1242's
  * target-rider modeling choice — see the module header).
  */

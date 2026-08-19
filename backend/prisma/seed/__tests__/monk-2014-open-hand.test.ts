@@ -55,7 +55,11 @@ function byName(rows: typeof MONK_FEATURES, name: string) {
 }
 
 describe("2014 Way of the Open Hand — real SRD 5.1 / PHB'14 content (#1501)", () => {
-  const rows2014 = MONK_FEATURES.filter((r) => r.subclassSlug === WAY_OPEN_HAND && r.edition === "EDITION_2014");
+  // `!r.actionOnly` (#1912) excludes "Wholeness of Body — Action" — the
+  // action-only sibling row Wholeness of Body's own served-identity fork
+  // needed (see that row's own comment, monk-features.ts) — out of scope for
+  // a snapshot pinning feature TEXT, not action identities.
+  const rows2014 = MONK_FEATURES.filter((r) => r.subclassSlug === WAY_OPEN_HAND && r.edition === "EDITION_2014" && !r.actionOnly);
 
   it("has exactly the 4 pinned features, each at the pinned level with the pinned text", () => {
     expect(rows2014).toHaveLength(PINNED_2014_WAY_OF_THE_OPEN_HAND.length);

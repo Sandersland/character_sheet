@@ -36,7 +36,7 @@ NOT_YET_MIGRATED="bard cleric druid monk paladin ranger sorcerer warlock wizard"
 # check below, which fails loudly the moment a file in that directory is
 # neither here nor in ALL_CLASSES, rather than silently scanning it as
 # "migrated" (a thirteenth class's module would otherwise land unclassified).
-NON_CLASS_MODULES="ability-registry actions activation-requires arcane-charge assassinate channel-divinity class class-feature-rows class-features disciplines draconic-bloodline feature-rows-select focus-cast hand-of-harm hand-of-ultimate-mercy maneuver-effect maneuvers open-hand-technique quivering-palm registry resources resources-state shadow-arts sneak-attack stunning-strike subclass-slug types warrior-of-elements weapon-bond"
+NON_CLASS_MODULES="ability-registry actions activation-requires announce-augmentors arcane-charge assassinate channel-divinity class class-feature-rows class-features disciplines draconic-bloodline feature-rows-select focus-cast hand-of-harm hand-of-ultimate-mercy heightened-focus improved-shadow-step maneuver-effect maneuvers open-hand-technique physicians-touch quivering-palm registry resources resources-state shadow-arts sneak-attack stunning-strike subclass-slug types warrior-of-elements weapon-bond"
 
 # Reverse check: every backend/src/lib/classes/*.ts file's basename must be
 # classified as EITHER a class (ALL_CLASSES) or shared infrastructure
@@ -131,18 +131,22 @@ fi
 #     mechanics — only a key that must be type-checked"). After #1546 Part A
 #     it also carries subclass REGISTRATION, which strengthens rather than
 #     weakens the ruling.
-#   - classes/actions.ts: PERMANENT (#1231; was ALSO #1223 until #1686 moved
-#     Rage's DERIVED_ACTIONS "rage"/"endRage" pair onto its ClassFeature rows
-#     as a "toggle" resolverKind — the buff's resistDamageTypes/rollEffects/
-#     tiered modifier now DO have descriptor columns, `effectBuffs`, so that
-#     half of the #1223 exemption is retired, not merely moved). What remains
-#     is Rogue's own DERIVED_ACTIONS entries — "cunningAction" (grantClass:
-#     "rogue") and "fastHands" (grantSubclassSlugs: ["rogue-thief"]) — an
-#     action-economy grant with no resource pool of its own, so
-#     ClassFeature's descriptor columns have nothing to populate for either.
-#     Unlike starting-equipment.ts above, there is no follow-up issue that
-#     retires any of this — it is the same permanent gap a class-keyed
-#     DERIVED_ACTIONS entry always had, not migration debt.
+#   - classes/actions.ts: PERMANENT, but its reason changed shape at #1912
+#     (4/4 of epic #1903): every Barbarian/Rogue/Monk DERIVED_ACTIONS row
+#     (recklessAttack, cunningAction, fastHands, and the whole 31-row monk
+#     block) moved onto seeded ClassFeature rows — the "cunningAction"/
+#     "fastHands" PERMANENT-gap ruling this entry used to carry is retired,
+#     not merely moved, the same way #1686 retired Rage's own half of the
+#     #1223 exemption. What remains is `summonBondedWeapon`'s Eldritch
+#     Knight row alone (`grantClass: "fighter"`, `grantSubclassSlugs:
+#     ["fighter-eldritch-knight"]`) — sanctioned PERMANENT residency (#1854):
+#     its `enabled` reads a synthetic pool built from a LIVE COUNT of
+#     `weaponBonded` inventory rows, which no ClassFeature descriptor column
+#     can express, so it has no row-driven destination to move to. If a
+#     future change ever moves that row too, DERIVED_ACTIONS empties
+#     entirely and this entry's own anti-vacuity check (3, below) forces its
+#     deletion — never leave it as a stale exemption once its last hit is
+#     gone.
 #     routes/character/actions.ts DROPPED OFF this list in the same #1686
 #     diff that deleted its last "barbarian" occurrence
 #     (computeRageDamageBonus's classEntries lookup) — the generic toggle
@@ -196,6 +200,15 @@ fi
 #     the slot-count threshold (7 in 2024, 10 in 2014) is exactly the rule
 #     arithmetic CLAUDE.md keeps in lib/, same shape as armor-class.ts and
 #     character/serialize/combat.ts above.
+#   - classes/arcane-charge.ts: PERMANENT (#1910). arcaneChargeAugmentor's
+#     appliesTo gate reads the "fighter-eldritch-knight" SUBCLASS_SLUGS
+#     identity string (subclass-slug.ts's own PERMANENT entry above) — the
+#     exact same string classes/actions.ts's now-deleted withArcaneChargeReminder
+#     used to read before #1910 relocated the descriptor into its own file
+#     (the registry's per-feature-file convention). Same reasoning as
+#     advancement-slots.ts's own entry directly above: a computed rule
+#     function keyed off subclass identity + level + edition, never routed
+#     through fighter's retired AuthoredFeature/resourceFn machinery.
 FILE_ALLOWLIST="backend/src/lib/classes/subclass-slug.ts
 backend/src/lib/classes/actions.ts
 backend/src/lib/character/serialize/combat.ts
@@ -203,6 +216,7 @@ backend/src/lib/srd/armor-class.ts
 backend/src/lib/classes/sneak-attack.ts
 backend/src/lib/classes/assassinate.ts
 backend/src/lib/classes/weapon-bond.ts
+backend/src/lib/classes/arcane-charge.ts
 backend/src/lib/srd/advancement-slots.ts"
 
 is_allowlisted_file() {
@@ -307,5 +321,101 @@ if [ -n "$bad" ]; then
   echo "error: a MIGRATED class ($MIGRATED) name reappeared as class-specific TS outside its data source (#1522/#1134/#1532):" >&2
   printf '%s\n' "$bad" >&2
   echo "Move the content back to seed data (backend/prisma/seed/), or add a reasoned FILE_ALLOWLIST entry if it's a genuine identity/join reference." >&2
+  exit 1
+fi
+
+# check-class-ts-migration.sh's second job (#1903/#1911): actions.ts guards
+# TWO growth vectors that reappear class-specific action content the same
+# way a MIGRATED class name would, but neither is a class-name literal so
+# the scan above is blind to both:
+#   1. a new hand-authored DERIVED_ACTIONS row (content-is-data violation —
+#      new class actions belong on seeded ClassFeature activation rows, not
+#      here).
+#   2. a new hardcoded-key `.map()` decorator grafted into the derive
+#      pipeline (the shape #1910's announce-augmentor registry replaced
+#      withDeflectSpecs/withArcaneChargeReminder with).
+# DERIVED_ACTIONS_MAX is a RATCHET, same convention as NOT_YET_MIGRATED
+# above (only ever lowered, never raised): 1 is the live count verified at
+# HEAD after #1912 moved the 34-row monk/rogue/barbarian residue onto
+# ClassFeature rows (was 35 after #1909's 8-row move, 43 before that). The
+# one survivor is `summonBondedWeapon` (#1854, sanctioned PERMANENT — see
+# its own FILE_ALLOWLIST comment above): no further class action content
+# should ever land here again, so 1 is this ratchet's floor, not a waypoint.
+DERIVED_ACTIONS_MAX=1
+
+# awk range, same portable shape as the class-name scan above: from the
+# array's declaration to its closing `];` — stops at the FIRST such line
+# after the start, which is DERIVED_ACTIONS' own closing bracket (actions.ts
+# has a second, unrelated `];` further down for a different array).
+derived_actions_block=$(awk '/^const DERIVED_ACTIONS: DerivedActionRecord\[\] = \[/,/^\];/' backend/src/lib/classes/actions.ts)
+derived_actions_count=$(printf '%s\n' "$derived_actions_block" | grep -c 'key:' || true)
+
+# Anti-vacuity: if the array's own declaration line ever changes shape (a
+# rename, a reformat), the awk range silently matches nothing and the count
+# reads 0 — that must fail loudly, not read as "0 <= 35, pass" (same
+# rationale as anti-vacuity checks 2 and 3 above).
+if [ "$derived_actions_count" -lt 1 ]; then
+  echo "error: check-class-ts-migration.sh found 0 DERIVED_ACTIONS entries in backend/src/lib/classes/actions.ts — the awk range is broken (anti-vacuity)" >&2
+  exit 1
+fi
+
+if [ "$derived_actions_count" -gt "$DERIVED_ACTIONS_MAX" ]; then
+  echo "error: DERIVED_ACTIONS grew to $derived_actions_count entries, exceeding this script's DERIVED_ACTIONS_MAX ratchet of $DERIVED_ACTIONS_MAX (#1903/#1911)." >&2
+  echo "New class actions are authored as seeded ClassFeature activation rows, not DERIVED_ACTIONS TS entries. If this growth is a sanctioned exception, lower is the only direction this ratchet moves — raising it here defeats the point." >&2
+  exit 1
+fi
+
+# Zero hardcoded-key decorator check (#1903/#1911): after #1910 replaced
+# withDeflectSpecs/withArcaneChargeReminder with the announce-augmentor
+# registry, neither deriveEntryScopedActions' per-entry pipeline nor
+# buildAvailableActionsView's file should ever again compare an action's
+# `key` against a literal to decide whether to graft on behavior — that
+# per-feature `.map()` decorator shape is exactly what the registry exists
+# to replace. A comparison against a variable (e.g. actionGrantLevel's
+# `a.key === key` lookup by parameter, elsewhere in actions.ts) is not this
+# pattern and is out of scope by construction below, not by allowlist.
+KEY_LITERAL_PATTERN='\.key ===|\.key !=='
+
+# Anti-vacuity: prove the pattern itself still matches an obvious decorator
+# shape before trusting a zero-hit result from it — a typo'd regex must
+# read red, not silently stop matching anything (same rationale as
+# anti-vacuity checks 2 and 3 above).
+if ! printf '%s\n' 'a.key === "x"' | grep -qE "$KEY_LITERAL_PATTERN"; then
+  echo "error: check-class-ts-migration.sh's KEY_LITERAL_PATTERN no longer matches its own probe string — the decorator-check regex is broken (anti-vacuity)" >&2
+  exit 1
+fi
+
+# Scoped to deriveEntryScopedActions' own function body, not the whole
+# file — decorator grafts of this shape live inside its per-entry `.map()`
+# chain (the entryActions pipeline), and a whole-file scope would also
+# catch actionGrantLevel's unrelated variable comparison further down,
+# forcing a needless allowlist entry for a non-violation.
+actions_key_hits=$(awk '/^export function deriveEntryScopedActions/,/^}/ { print NR": "$0 }' backend/src/lib/classes/actions.ts | grep -E "$KEY_LITERAL_PATTERN" || true)
+# buildAvailableActionsView's whole file, per #1911's scope — the file is
+# announce-composition around actions, not a general-purpose module, so a
+# stray literal comparison anywhere in it is in scope.
+classes_key_hits=$(grep -nE "$KEY_LITERAL_PATTERN" backend/src/lib/character/serialize/classes.ts || true)
+
+key_literal_bad=""
+if [ -n "$actions_key_hits" ]; then
+  key_literal_bad="$key_literal_bad
+$(printf '%s\n' "$actions_key_hits" | while IFS= read -r hit; do
+  [ -z "$hit" ] && continue
+  is_comment_line "$hit" || echo "backend/src/lib/classes/actions.ts:$hit"
+done)"
+fi
+if [ -n "$classes_key_hits" ]; then
+  key_literal_bad="$key_literal_bad
+$(printf '%s\n' "$classes_key_hits" | while IFS= read -r hit; do
+  [ -z "$hit" ] && continue
+  is_comment_line "$hit" || echo "backend/src/lib/character/serialize/classes.ts:$hit"
+done)"
+fi
+key_literal_bad=$(printf '%s\n' "$key_literal_bad" | grep -v '^$' || true)
+
+if [ -n "$key_literal_bad" ]; then
+  echo "error: a hardcoded action-key literal comparison (.key === / .key !==) reappeared in deriveEntryScopedActions or serialize/classes.ts (#1903/#1911):" >&2
+  printf '%s\n' "$key_literal_bad" >&2
+  echo "Register a descriptor in the announce-augmentor registry (announce-augmentors.ts) instead of grafting a per-feature .map() decorator back into the derive pipeline." >&2
   exit 1
 fi

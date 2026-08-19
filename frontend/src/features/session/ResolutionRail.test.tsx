@@ -38,24 +38,32 @@ function attackRoll(total: number): RollResult {
 }
 
 describe("ResolutionRail — no-roll shape", () => {
-  it("renders no numbered steps, just the Resolve tap", async () => {
+  it("renders no numbered steps, just the default Confirm tap", async () => {
     const onComplete = vi.fn();
     render(<ResolutionRail view={baseView({ steps: [], readyToComplete: true, onComplete })} />);
 
     expect(screen.queryByText("Roll to hit")).not.toBeInTheDocument();
-    const button = screen.getByRole("button", { name: "Resolve" });
+    const button = screen.getByRole("button", { name: "Confirm" });
     await userEvent.click(button);
     expect(onComplete).toHaveBeenCalledTimes(1);
   });
 
-  it("hides the completion button once completed", () => {
-    render(<ResolutionRail view={baseView({ steps: [], readyToComplete: true, completed: true })} />);
-    expect(screen.queryByRole("button", { name: /Resolve|Done/ })).not.toBeInTheDocument();
+  it("uses the caller's completeLabel for the no-roll tap", () => {
+    render(<ResolutionRail completeLabel="Cast" view={baseView({ steps: [], readyToComplete: true })} />);
+    expect(screen.getByRole("button", { name: "Cast" })).toBeInTheDocument();
+  });
+
+  it("renders nothing once completed — no empty bordered shell left behind", () => {
+    const { container } = render(
+      <ResolutionRail view={baseView({ steps: [], readyToComplete: true, completed: true })} />,
+    );
+    expect(screen.queryByRole("button", { name: /Confirm|Done/ })).not.toBeInTheDocument();
+    expect(container).toBeEmptyDOMElement();
   });
 
   it("disables the completion button while the economy slot is unavailable", () => {
     render(<ResolutionRail view={baseView({ steps: [], readyToComplete: true, disabled: true })} />);
-    expect(screen.getByRole("button", { name: "Resolve" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Confirm" })).toBeDisabled();
   });
 });
 
@@ -68,9 +76,9 @@ describe("ResolutionRail — attack-roll shape", () => {
       <ResolutionRail
         view={baseView({
           steps: [
-            { kind: "toHit", state: "active" },
-            { kind: "callIt", state: "pending" },
-            { kind: "damage", state: "pending" },
+            { kind: "toHit", state: "active", settled: false },
+            { kind: "callIt", state: "pending", settled: false },
+            { kind: "damage", state: "pending", settled: false },
           ],
           toHit,
           onRollToHit,
@@ -89,9 +97,9 @@ describe("ResolutionRail — attack-roll shape", () => {
       <ResolutionRail
         view={baseView({
           steps: [
-            { kind: "toHit", state: "done" },
-            { kind: "callIt", state: "active" },
-            { kind: "damage", state: "active" },
+            { kind: "toHit", state: "done", settled: true },
+            { kind: "callIt", state: "active", settled: false },
+            { kind: "damage", state: "active", settled: false },
           ],
           toHit,
           toHitRoll: attackRoll(17),
@@ -115,9 +123,9 @@ describe("ResolutionRail — attack-roll shape", () => {
       <ResolutionRail
         view={baseView({
           steps: [
-            { kind: "toHit", state: "done" },
-            { kind: "callIt", state: "active" },
-            { kind: "damage", state: "active" },
+            { kind: "toHit", state: "done", settled: true },
+            { kind: "callIt", state: "active", settled: false },
+            { kind: "damage", state: "active", settled: false },
           ],
           toHit,
           toHitRoll: attackRoll(17),
@@ -136,9 +144,9 @@ describe("ResolutionRail — attack-roll shape", () => {
       <ResolutionRail
         view={baseView({
           steps: [
-            { kind: "toHit", state: "done" },
-            { kind: "callIt", state: "done" },
-            { kind: "damage", state: "active" },
+            { kind: "toHit", state: "done", settled: true },
+            { kind: "callIt", state: "done", settled: true },
+            { kind: "damage", state: "active", settled: false },
           ],
           toHit,
           toHitRoll: attackRoll(17),
@@ -158,9 +166,9 @@ describe("ResolutionRail — attack-roll shape", () => {
       <ResolutionRail
         view={baseView({
           steps: [
-            { kind: "toHit", state: "done" },
-            { kind: "callIt", state: "done" },
-            { kind: "damage", state: "active" },
+            { kind: "toHit", state: "done", settled: true },
+            { kind: "callIt", state: "done", settled: true },
+            { kind: "damage", state: "active", settled: false },
           ],
           toHit,
           toHitRoll: attackRoll(17),
@@ -181,9 +189,9 @@ describe("ResolutionRail — attack-roll shape", () => {
       <ResolutionRail
         view={baseView({
           steps: [
-            { kind: "toHit", state: "done" },
-            { kind: "callIt", state: "done" },
-            { kind: "damage", state: "pending" },
+            { kind: "toHit", state: "done", settled: true },
+            { kind: "callIt", state: "done", settled: true },
+            { kind: "damage", state: "pending", settled: true },
           ],
           toHit,
           toHitRoll: attackRoll(2),
@@ -205,9 +213,9 @@ describe("ResolutionRail — attack-roll shape", () => {
       <ResolutionRail
         view={baseView({
           steps: [
-            { kind: "toHit", state: "done" },
-            { kind: "callIt", state: "done" },
-            { kind: "damage", state: "active" },
+            { kind: "toHit", state: "done", settled: true },
+            { kind: "callIt", state: "done", settled: true },
+            { kind: "damage", state: "active", settled: false },
           ],
           toHit,
           verdict: "crit",
@@ -226,8 +234,8 @@ describe("ResolutionRail — saving-throw shape", () => {
       <ResolutionRail
         view={baseView({
           steps: [
-            { kind: "announceSave", state: "done" },
-            { kind: "damage", state: "active" },
+            { kind: "announceSave", state: "done", settled: true },
+            { kind: "damage", state: "active", settled: false },
           ],
           save: { dc: 13, ability: "dexterity" },
           effect: { spec: { count: 1, faces: 8, modifier: 0 }, kind: "damage", damageType: "radiant" },
@@ -245,7 +253,7 @@ describe("ResolutionRail — auto-hit shape", () => {
     render(
       <ResolutionRail
         view={baseView({
-          steps: [{ kind: "damage", state: "active" }],
+          steps: [{ kind: "damage", state: "active", settled: false }],
           effect: { spec: { count: 3, faces: 4, modifier: 3 }, kind: "damage", damageType: "force" },
         })}
       />,
@@ -255,15 +263,12 @@ describe("ResolutionRail — auto-hit shape", () => {
   });
 });
 
-// #1831 review: a kind:"heal" effect must render "Roll healing"/"Healing",
-// never "Roll damage"/"Damage" — keyed off view.effect?.kind, not a
-// shape-specific component.
 describe("ResolutionRail — heal shape (#1831 review)", () => {
   it("labels the numbered step 'Healing' and the button 'Roll healing'", () => {
     render(
       <ResolutionRail
         view={baseView({
-          steps: [{ kind: "damage", state: "active" }],
+          steps: [{ kind: "damage", state: "active", settled: false }],
           effect: { spec: { count: 1, faces: 8, modifier: 4 }, kind: "heal" },
         })}
       />,
@@ -278,7 +283,7 @@ describe("ResolutionRail — heal shape (#1831 review)", () => {
     render(
       <ResolutionRail
         view={baseView({
-          steps: [{ kind: "damage", state: "active" }],
+          steps: [{ kind: "damage", state: "active", settled: false }],
           effect: { spec: { count: 1, faces: 8, modifier: 3 }, kind: "damage", damageType: "slashing" },
         })}
       />,

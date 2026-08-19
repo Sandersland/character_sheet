@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  canApplySneakAttack,
   resolveSneakAttackDie,
   sneakAttackDiceCount,
   sneakAttackSpec,
@@ -56,7 +55,7 @@ describe("sneakAttackSpec", () => {
   });
 });
 
-describe("sneakAttackSpecForEntries (#1231 commit 3: the shared class-entries lookup character-serialize.ts and this file's own rollSneakAttack both go through)", () => {
+describe("sneakAttackSpecForEntries (#1231 commit 3: the class-entries lookup character-serialize.ts goes through)", () => {
   it("finds the rogue entry among a multiclass list and scales off ITS level, not the total", () => {
     // 9 wizard + 5 rogue: total level 14 would resolve to 7d6 (Math.ceil(14/2))
     // if the lookup ever used total level by mistake; the rogue entry's own
@@ -74,16 +73,3 @@ describe("sneakAttackSpecForEntries (#1231 commit 3: the shared class-entries lo
   });
 });
 
-describe("canApplySneakAttack (once-per-turn + eligibility guard)", () => {
-  it("allows a first, eligible application", () => {
-    expect(canApplySneakAttack({ eligible: true, usedThisTurn: false })).toBe(true);
-  });
-
-  it("blocks a second application in the same turn", () => {
-    expect(canApplySneakAttack({ eligible: true, usedThisTurn: true })).toBe(false);
-  });
-
-  it("blocks an ineligible application (no advantage / no adjacent ally)", () => {
-    expect(canApplySneakAttack({ eligible: false, usedThisTurn: false })).toBe(false);
-  });
-});

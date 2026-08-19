@@ -84,6 +84,8 @@ export interface CampaignEntity {
   updatedAt: string;
   /** Linked character for PC entities (#842); null elsewhere, list-route only. */
   characterId?: string | null;
+  /** Linked campaign item this entity fronts (#380/#1942); null elsewhere, list-route and combine-response only. */
+  itemId?: string | null;
   /** Which field a `q=` search hit (#839); present only on searched lists. */
   matchedIn?: EntityMatchField;
   /** Derived mention stats (#839); present only with `?include=stats`. */
@@ -229,3 +231,47 @@ export interface CampaignEntityMerge {
   preparedAt: string;
   executedAt: string | null;
 }
+
+/**
+ * App-level inbox (#1945): derived DM housekeeping flags across every
+ * campaign the caller OWNS. Recomputed on every GET — nothing here is
+ * persisted server-side except a dismissal. `kind` + `signature` together are
+ * the flag's stable identity for POST /api/inbox/dismissals; a duplicate
+ * cluster's signature changes (and it resurfaces) when its membership does.
+ * `kind` is hardcoded per row below rather than drawn from a shared
+ * `InboxFlagKind` alias — the only place that needs the KIND-independent
+ * union is the dismiss request, which derives it from
+ * @character-sheet/contracts' DismissInboxFlagInput instead (#1949).
+ */
+export interface InboxDuplicateEntity {
+  id: string;
+  name: string;
+  type: EntityType;
+  visibility: EntityVisibility;
+  mentionCount: number;
+}
+
+export interface InboxDuplicateClusterRow {
+  kind: "DUPLICATE_CLUSTER";
+  campaignId: string;
+  campaignName: string;
+  signature: string;
+  entities: InboxDuplicateEntity[];
+  /** Most-mentioned entity, oldest as tiebreak — the pre-selected keeper in the combine UI. */
+  defaultSurvivorId: string;
+  /** ISO timestamp this row was sorted by (#1946: relative-time meta for the UI). */
+  signalAt: string;
+}
+
+export interface InboxNeedsChroniclingRow {
+  kind: "NEEDS_CHRONICLING";
+  campaignId: string;
+  campaignName: string;
+  signature: string;
+  /** Entities with >=1 mention and no description in this campaign. */
+  count: number;
+  /** ISO timestamp this row was sorted by (#1946: relative-time meta for the UI). */
+  signalAt: string;
+}
+
+export type InboxRow = InboxDuplicateClusterRow | InboxNeedsChroniclingRow;

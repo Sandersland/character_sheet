@@ -19,6 +19,11 @@ export const campaignKeys = {
   all: ["campaigns"] as const,
   scope: (id: string | null | undefined) => [...campaignKeys.all, id] as const,
   entities: (id: string | null | undefined) => [...campaignKeys.scope(id), "entities"] as const,
+  // Separate from `entities` above: this fetches with `?include=stats`
+  // (mentionCount/hasDescription), and priming the plain-list cache with a
+  // stats-shaped response would be a lie the next plain reader trusts.
+  entitiesWithStats: (id: string | null | undefined) =>
+    [...campaignKeys.scope(id), "entities", "stats"] as const,
   merges: (id: string | null | undefined) => [...campaignKeys.scope(id), "merges"] as const,
   items: (id: string | null | undefined) => [...campaignKeys.scope(id), "items"] as const,
 };
@@ -61,4 +66,10 @@ export const sessionKeys = {
   // useChronicle always fetches both in parallel and treats them as one unit).
   chronicle: (campaignId: string | null | undefined, characterId: string | null | undefined) =>
     [...sessionKeys.all, "chronicle", campaignId, characterId] as const,
+};
+
+// App-level inbox (#1945/#1946): one flat list across every campaign the
+// caller owns, so there is no per-id variant — `all` doubles as the query key.
+export const inboxKeys = {
+  all: ["inbox"] as const,
 };

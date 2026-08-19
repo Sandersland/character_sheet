@@ -91,10 +91,6 @@ describe("resolvedSlot", () => {
   });
 });
 
-// Pins the client's projection of the SERVER-resolved interlock (#1439): the
-// picker consumes the served SpellEconomyState (3 booleans), never re-derives
-// the rule. `filterCastableSpells`'s two flags are picker-neutral primitives —
-// bonusActionBlockedByActionSpell = drop all, actionLimitedToCantrips = drop leveled.
 describe("restrictionFlagsForSlot", () => {
   const econ = (over: Partial<SpellEconomyState> = {}): SpellEconomyState => ({
     bonusActionBlockedByActionSpell: false,
@@ -250,8 +246,6 @@ describe("hiddenSpellLevels", () => {
   const base = {
     slotLevels: [1],
     arcanaLevels: [] as number[],
-    bonusActionBlockedByActionSpell: false,
-    actionLimitedToCantrips: false,
   };
 
   it("reports prepared leveled spells whose level has no affordable slot", () => {

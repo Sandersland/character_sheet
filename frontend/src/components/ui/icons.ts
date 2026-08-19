@@ -85,6 +85,9 @@ export {
   Plus,
   Zap,
   VenetianMask,
+  // The typo-dedup "Combine into…" glyph (#1943) — deliberately not VenetianMask,
+  // which reads as identity-merge (a secret) rather than combine (a mistake).
+  Combine,
   ChevronDown,
   ChevronRight,
   ArrowLeft,
@@ -95,4 +98,8 @@ export {
   // #1682 — SpeciesTraitsCard's Darkvision accent (owner ruling: prominent,
   // visible info, not a derived combat stat).
   Eye,
+  // App inbox (#1946): AppHeader's bell trigger, and the duplicate-cluster
+  // row glyph — ScrollText above doubles as the needs-chronicling row glyph.
+  Bell,
+  Copy,
 } from "lucide-react";

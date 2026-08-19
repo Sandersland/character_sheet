@@ -38,6 +38,8 @@ import {
   buildAttackForms,
   critDamageSpec,
   hasSuperiorityDice,
+  SNEAK_ATTACK_RIDER_ID,
+  sneakAttackDamageRider,
   type AttackEntry,
   type DamageRider,
 } from "@/lib/attackMath";
@@ -138,12 +140,12 @@ function AttackFormSummary({ selected }: { selected: AttackEntry }) {
   );
 }
 
-// Post-hit rider sections (SneakAttackSection, StunningStrikeSection) share
-// the exact same "render only once a hit row exists" gate and prop shape —
-// one generic wrapper instead of two near-identical `currentRow && (<X .../>)`
-// JSX branches (fallow flagged InlineAttackPicker's own complexity, #1832
-// review: every inline `&&` in the component body is a decision point on
-// BOTH its cyclomatic and cognitive score).
+// Post-hit rider sections with the plain {turnState, currentRow} prop shape
+// (StunningStrikeSection) render only once a hit row exists — one generic
+// wrapper instead of a `currentRow && (<X .../>)` JSX branch (fallow flagged
+// InlineAttackPicker's own complexity, #1832 review: every inline `&&` in the
+// component body is a decision point on BOTH its cyclomatic and cognitive
+// score).
 function HitGatedSection({
   currentRow,
   turnState,
@@ -155,6 +157,42 @@ function HitGatedSection({
 }) {
   if (!currentRow) return null;
   return <Section turnState={turnState} currentRow={currentRow} />;
+}
+
+// Sneak Attack panel: client-rolls the served spec as a rider like any other
+// (#902) — the shared onDamageRider path gives it crit doubling, the 3D roll,
+// and a seat in the swing's single undoable op (the retired server roll had
+// none of those). Extracted alongside ManeuversPanel for the same reason: the
+// gate/fallback branches stay off InlineAttackPicker's own complexity score.
+// The per-swing `key` reproduces the old HitGatedSection unmount-between-
+// swings, so the eligibility checkbox resets each swing.
+function SneakAttackPanel({
+  turnState,
+  currentRow,
+  sneak,
+  riderEffects,
+  onDamageRider,
+}: {
+  turnState: TurnState & TurnStateActions;
+  currentRow: AttackTallyRow | null;
+  sneak: Character["sneakAttack"];
+  riderEffects: Record<string, ResolveActionEventEffect>;
+  onDamageRider: (rider: DamageRider) => void;
+}) {
+  if (!sneak) return null;
+  const rider = sneakAttackDamageRider(sneak);
+  return (
+    <SneakAttackSection
+      key={currentRow?.id ?? "pre-roll"}
+      turnState={turnState}
+      currentRow={currentRow}
+      onRoll={() => {
+        onDamageRider(rider);
+        turnState.markSneakAttackUsed();
+      }}
+      rolled={riderEffects[SNEAK_ATTACK_RIDER_ID]?.total ?? null}
+    />
+  );
 }
 
 // Battle Master maneuvers disclosure, gated on the character having a
@@ -319,13 +357,18 @@ export default function InlineAttackPicker({
   // `currentRow` DURING the swing, not just after it commits, mirroring the
   // pre-#1832 useAttackRolls timing. `clearRiders` always fires so a swing's
   // rider state never bleeds into the NEXT Extra Attack swing, rolled or not.
-  const { commit } = useResolveActionCommit({
+  const { commit, pending: commitPending, error: commitError } = useResolveActionCommit({
     characterId: character.id,
     onLogChanged,
-    onCommitted: () => {
+    onCommitted: (batchId) => {
       local.recordSwingComplete();
       local.clearRiders();
       local.clearAssassinateSurprised();
+      // Tag this swing's recordAttack history entry with its audit batch so
+      // turn undo reverts the swing server-side (#758) — without it the undo
+      // was local-only, stranding the swing event and deadlocking the LIFO
+      // revert of anything committed before it.
+      turnState.attachBatchId(batchId);
     },
   });
   // Only true when the toggle was actually checked AND it's what this swing's
@@ -353,6 +396,7 @@ export default function InlineAttackPicker({
     local.completedSwings,
     attackTotal,
     reset,
+    commitPending,
   );
 
   const { roll } = useRoll();
@@ -375,6 +419,7 @@ export default function InlineAttackPicker({
       type: rider.damageType ?? armedEntry.damageType,
       kind: "damage",
       crit: resolutionView.isCrit,
+      source: rider.logSource,
     });
     if (currentRow) turnState.addTallyDamageRider(currentRow.id, result.total);
   }
@@ -404,7 +449,15 @@ export default function InlineAttackPicker({
       attacksExhausted={view.attacksExhausted}
     />
   );
-  const sneakAttack = <HitGatedSection currentRow={currentRow} turnState={turnState} Section={SneakAttackSection} />;
+  const sneakAttack = (
+    <SneakAttackPanel
+      turnState={turnState}
+      currentRow={currentRow}
+      sneak={character.sneakAttack}
+      riderEffects={local.riderEffects}
+      onDamageRider={handleDamageRider}
+    />
+  );
   const stunningStrike = (
     <HitGatedSection currentRow={currentRow} turnState={turnState} Section={StunningStrikeSection} />
   );
@@ -451,6 +504,7 @@ export default function InlineAttackPicker({
       <AttackFormSummary selected={armedEntry} />
       <ResolutionRail view={resolutionView} />
       {damageRiders}
+      {commitError && <p className="text-xs font-semibold text-garnet-700">{commitError}</p>}
     </div>
   );
   // The footer's own two flags — keyed off `completedSwings`, NOT

@@ -11,6 +11,7 @@ import {
   revertInventoryEvent,
 } from "@/lib/inventory/inventory.js";
 import { mirrorCapabilityUsedSet, mirrorUsesRemaining } from "@/lib/inventory/inventory-capability-use.js";
+import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
 
 // Runtime-checkable set of every valid CharacterEventCategory, derived from the
 // Prisma-generated enum so it can never drift from the schema.
@@ -194,6 +195,38 @@ async function revertCurrencyEvent(ctx: RevertContext): Promise<void> {
   }
 }
 
+// #1849: a concentrationDropped event logged mid-cast (ability-cast.ts,
+// handleConcentrationOnCast) snapshots ONLY concentratingOn — its `before` is
+// captured after the displacing cast already spent a slot, and the two events
+// share a batch reverted LIFO (cast's own revert first, this one last), so a
+// full-column replace here would clobber the slot refund the cast's revert
+// just applied. Merge concentratingOn onto whatever the rest of the batch
+// already restored instead of overwriting the whole column.
+async function mergeConcentrationOnlyRevert(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  beforeSpellcasting: Record<string, unknown>,
+  beforeResources: Record<string, unknown> | undefined,
+): Promise<void> {
+  const current = await tx.character.findUnique({
+    where: { id: characterId },
+    select: { spellcasting: true },
+  });
+  const state = normalizeSpellcastingMutable(current?.spellcasting ?? null);
+  await tx.character.update({
+    where: { id: characterId },
+    data: {
+      spellcasting: {
+        slotsUsed: state.slotsUsed,
+        arcanumUsed: state.arcanumUsed,
+        spells: state.spells,
+        concentratingOn: (beforeSpellcasting.concentratingOn as typeof state.concentratingOn) ?? null,
+      } as unknown as Prisma.InputJsonValue,
+      ...(beforeResources !== undefined ? { resources: beforeResources as Prisma.InputJsonValue } : {}),
+    },
+  });
+}
+
 async function revertSpellcastingEvent(ctx: RevertContext): Promise<void> {
   const { tx, characterId, before } = ctx;
   // Restore the full spellcasting JSON from before snapshot. Arcane Recovery
@@ -201,7 +234,13 @@ async function revertSpellcastingEvent(ctx: RevertContext): Promise<void> {
   // counter lives there) — restore it so undo refunds the use.
   const beforeSpellcasting = before.spellcasting as Record<string, unknown> | undefined;
   const beforeResources = before.resources as Record<string, unknown> | undefined;
-  if (beforeSpellcasting !== undefined || beforeResources !== undefined) {
+  // A concentrationDropped event's narrowed snapshot has no `slotsUsed` key —
+  // every other spellcasting snapshot in the codebase carries the full
+  // compact-format shape (see normalizeSpellcastingMutable) — so its absence
+  // is the signal to merge instead of replace (see mergeConcentrationOnlyRevert).
+  if (beforeSpellcasting !== undefined && !("slotsUsed" in beforeSpellcasting)) {
+    await mergeConcentrationOnlyRevert(tx, characterId, beforeSpellcasting, beforeResources);
+  } else if (beforeSpellcasting !== undefined || beforeResources !== undefined) {
     await tx.character.update({
       where: { id: characterId },
       data: {

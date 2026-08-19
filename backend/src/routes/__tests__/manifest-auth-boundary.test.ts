@@ -31,6 +31,7 @@ import { forkRouter } from "@/routes/catalog/fork.js";
 import { grantsRouter } from "@/routes/catalog/grants.js";
 import { healthRouter } from "@/routes/platform/health.js";
 import { hitPointsRouter } from "@/routes/character/hitpoints.js";
+import { inboxRouter } from "@/routes/campaign/inbox.js";
 import { inventoryRouter } from "@/routes/character/inventory.js";
 import { itemsRouter } from "@/routes/catalog/items.js";
 import { journalRouter } from "@/routes/session/journal.js";
@@ -177,7 +178,7 @@ const ROUTER_ENTRIES: RouterEntry[] = [
   {
     name: "abilitiesRouter",
     router: abilitiesRouter,
-    probe: { method: "post", path: `/api/characters/${FAKE_ID}/abilities/sneak-attack/transactions` },
+    probe: { method: "post", path: `/api/characters/${FAKE_ID}/abilities/stunning-strike/transactions` },
   },
   { name: "activityRouter", router: activityRouter, probe: { method: "get", path: `/api/characters/${FAKE_ID}/activity` } },
   { name: "maneuversRouter", router: maneuversRouter, probe: { method: "get", path: "/api/maneuvers" } },
@@ -193,6 +194,7 @@ const ROUTER_ENTRIES: RouterEntry[] = [
   { name: "journalRouter", router: journalRouter, probe: { method: "post", path: `/api/characters/${FAKE_ID}/journal` } },
   { name: "campaignsRouter", router: campaignsRouter, probe: { method: "get", path: "/api/campaigns" } },
   { name: "entitiesRouter", router: entitiesRouter, probe: { method: "get", path: `/api/campaigns/${FAKE_ID}/entities` } },
+  { name: "inboxRouter", router: inboxRouter, probe: { method: "get", path: "/api/inbox" } },
   {
     name: "campaignItemsRouter",
     router: campaignItemsRouter,

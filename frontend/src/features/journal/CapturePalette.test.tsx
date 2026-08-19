@@ -434,4 +434,93 @@ describe("CapturePalette (#247)", () => {
       expect(await axe(baseElement)).toHaveNoViolations();
     });
   });
+
+  describe("feed scrollability", () => {
+    // jsdom has no layout engine, so the clipping itself can't be measured here;
+    // these pin the CSS contract instead. justify-end on a scrollport makes
+    // start-edge overflow unreachable (scrollHeight collapses to clientHeight,
+    // older notes clip above the top edge with no scroll range), so the
+    // bottom-pinning of a short feed must come from mt-auto on the content.
+    function stubScrollHeight(value: number) {
+      const original = Object.getOwnPropertyDescriptor(Element.prototype, "scrollHeight")!;
+      Object.defineProperty(Element.prototype, "scrollHeight", {
+        configurable: true,
+        get: () => value,
+      });
+      return () => Object.defineProperty(Element.prototype, "scrollHeight", original);
+    }
+
+    it("md+: the dock scrollport bottom-pins via mt-auto, not justify-end", () => {
+      useDesktopViewport();
+      render(<CapturePalette onClose={vi.fn()} />, makeCharacterWithNote());
+      const scrollport = document.querySelector("[data-dock-feed]");
+      expect(scrollport).not.toBeNull();
+      expect(scrollport!.className).toContain("overflow-y-auto");
+      expect(scrollport!.className).not.toContain("justify-end");
+      const inner = scrollport!.firstElementChild;
+      expect(inner).not.toBeNull();
+      expect(inner!.className).toContain("mt-auto");
+    });
+
+    it("mobile: the capture feed scrollport bottom-pins via mt-auto, not justify-end", () => {
+      render(<CapturePalette onClose={vi.fn()} />, makeCharacterWithNote());
+      const scrollport = document.querySelector("[data-mobile-capture-feed]");
+      expect(scrollport).not.toBeNull();
+      expect(scrollport!.className).not.toContain("justify-end");
+      const inner = scrollport!.firstElementChild;
+      expect(inner).not.toBeNull();
+      expect(inner!.className).toContain("mt-auto");
+    });
+
+    it("md+: the dock anchors the feed to the newest note on open", async () => {
+      useDesktopViewport();
+      const restore = stubScrollHeight(480);
+      try {
+        render(<CapturePalette onClose={vi.fn()} />, makeCharacterWithNote());
+        const scrollport = document.querySelector<HTMLElement>("[data-dock-feed]")!;
+        await waitFor(() => expect(scrollport.scrollTop).toBe(480));
+      } finally {
+        restore();
+      }
+    });
+
+    it("md+: saving a note re-anchors the dock feed to the bottom", async () => {
+      useDesktopViewport();
+      const restore = stubScrollHeight(480);
+      try {
+        const user = userEvent.setup();
+        vi.mocked(client.createJournalEntry).mockResolvedValue(
+          makeCampaignCharacter([
+            {
+              id: "note-1",
+              kind: "NOTE",
+              date: "2026-07-01T00:00:00.000Z",
+              loggedAt: "2026-07-01T20:00:00.000Z",
+              body: "older note",
+              visibility: "CAMPAIGN",
+            },
+            {
+              id: "note-2",
+              kind: "NOTE",
+              date: "2026-07-01T00:00:00.000Z",
+              loggedAt: "2026-07-01T20:30:00.000Z",
+              body: "fresh note",
+              visibility: "CAMPAIGN",
+            },
+          ]),
+        );
+        render(<CapturePalette onClose={vi.fn()} />, makeCharacterWithNote());
+        const scrollport = document.querySelector<HTMLElement>("[data-dock-feed]")!;
+        await waitFor(() => expect(scrollport.scrollTop).toBe(480));
+        scrollport.scrollTop = 0;
+
+        await user.type(screen.getByRole("textbox", { name: /quick note/i }), "fresh note");
+        await user.keyboard("{Enter}");
+
+        await waitFor(() => expect(scrollport.scrollTop).toBe(480));
+      } finally {
+        restore();
+      }
+    });
+  });
 });

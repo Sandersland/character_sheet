@@ -10,9 +10,6 @@ import type { TurnResolution } from "@character-sheet/shared-types";
 
 vi.mock("@/api/client", () => ({ logRoll: vi.fn().mockResolvedValue(undefined) }));
 
-// Deterministic dice: rollDie picks `1 + floor(random * faces)`. Centering the
-// mocked random value in the target face's bucket makes the intent obvious
-// without leaning on floating-point edges.
 function randomFor(face: number, faces: number): number {
   return (face - 0.5) / faces;
 }
@@ -30,9 +27,6 @@ const ATTACK_RESOLUTION: TurnResolution = {
   effect: { spec: { count: 1, faces: 8, modifier: 3 }, kind: "damage", damageType: "slashing" },
 };
 
-// Champion's widened crit range (#1120) served per-resolution via
-// TurnResolution.toHit.critRange — parameterizes ATTACK_RESOLUTION's own
-// critRange rather than copying the whole descriptor per test.
 function attackResolutionWithCritRange(critRange: number): TurnResolution {
   return { ...ATTACK_RESOLUTION, toHit: { ...ATTACK_RESOLUTION.toHit!, critRange } };
 }
@@ -107,9 +101,9 @@ describe("useResolution — attack-roll shape", () => {
     const { result, turnState, commit } = setup({ resolution: ATTACK_RESOLUTION });
 
     expect(result.current.view.steps).toEqual([
-      { kind: "toHit", state: "active" },
-      { kind: "callIt", state: "pending" },
-      { kind: "damage", state: "pending" },
+      { kind: "toHit", state: "active", settled: false },
+      { kind: "callIt", state: "pending", settled: false },
+      { kind: "damage", state: "pending", settled: false },
     ]);
 
     act(() => result.current.view.onRollToHit());
@@ -311,8 +305,8 @@ describe("useResolution — saving-throw shape", () => {
     const { result, commit, turnState } = setup({ resolution: SAVE_RESOLUTION });
 
     expect(result.current.view.steps).toEqual([
-      { kind: "announceSave", state: "done" },
-      { kind: "damage", state: "active" },
+      { kind: "announceSave", state: "done", settled: true },
+      { kind: "damage", state: "active", settled: false },
     ]);
     expect(result.current.view.readyToComplete).toBe(false);
 
@@ -331,7 +325,7 @@ describe("useResolution — saving-throw shape", () => {
     const noEffectSave: TurnResolution = { ...SAVE_RESOLUTION, effect: undefined };
     const { result, commit } = setup({ resolution: noEffectSave });
 
-    expect(result.current.view.steps).toEqual([{ kind: "announceSave", state: "done" }]);
+    expect(result.current.view.steps).toEqual([{ kind: "announceSave", state: "done", settled: true }]);
     expect(result.current.view.readyToComplete).toBe(true);
 
     act(() => result.current.view.onComplete());
@@ -346,7 +340,7 @@ describe("useResolution — auto-hit shape", () => {
     mockDice([{ face: 3, faces: 4 }, { face: 2, faces: 4 }, { face: 4, faces: 4 }]);
     const { result, commit } = setup({ resolution: AUTO_HIT_RESOLUTION });
 
-    expect(result.current.view.steps).toEqual([{ kind: "damage", state: "active" }]);
+    expect(result.current.view.steps).toEqual([{ kind: "damage", state: "active", settled: false }]);
     act(() => result.current.view.onRollEffect());
     expect(result.current.view.readyToComplete).toBe(true);
 
@@ -426,10 +420,6 @@ describe("useResolution — onComplete ordering (#1847 finding 3)", () => {
   });
 });
 
-// External to-hit boost seam (#1844): a Precision Attack maneuver spends a
-// superiority die and adds it to the attack roll AFTER the die lands. The boost
-// must reach the committed toHit event (the audit log), not just the transient
-// tally — folded into both `total` and `bonus` so kept + bonus === total holds.
 describe("useResolution — external to-hit boost seam (#1844)", () => {
   it("folds a boost into the committed toHit total and bonus (kept + bonus === total)", () => {
     mockDice([{ face: 15, faces: 20 }, { face: 6, faces: 8 }]);

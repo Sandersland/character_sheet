@@ -30,6 +30,7 @@ import { levelForExperience } from "@/lib/leveling/experience.js";
 import { effectiveEntryLevel } from "@/lib/leveling/effective-levels.js";
 import { editionOf } from "@/lib/rules/edition.js";
 import { deriveEntryScopedActions } from "./actions.js";
+import { featureRowsOf } from "./feature-rows-select.js";
 import { catalogEffectSpec, resolveEffectSpec, type EffectSpec } from "@/lib/combat/effects.js";
 import { normalizeResourcesMutable, type ChoiceEntry } from "./resources.js";
 import { normalizeSpellcastingMutable, snapshotSpellcasting } from "@/lib/spellcasting/spell-state.js";
@@ -130,7 +131,7 @@ function assertFourElementsMonk(row: DisciplineRow): number {
   const monk = fourElementsMonkEntry(row);
   const totalLevel = levelForExperience(row.experiencePoints);
   const edition = editionOf(row);
-  const granted = deriveEntryScopedActions(row.classEntries, totalLevel, [], true, edition).some(
+  const granted = deriveEntryScopedActions(row.classEntries, totalLevel, [], true, edition, featureRowsOf).some(
     (a) => a.key === "castDiscipline",
   );
   if (!monk || !granted) {
