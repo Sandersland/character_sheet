@@ -229,28 +229,39 @@ interface NoteRowProps {
   onEditStart: () => void;
 }
 
-// One display row of the feed: body, private lock, timestamp, edit/delete actions.
-function NoteRow({ note, entities, campaignId, busy, bodyClassName, ...actions }: NoteRowProps) {
+// One display row of the feed: full-width body over a muted meta line (time,
+// lock, edit/delete). At md+ the actions reveal on hover/focus only — a
+// pending delete-confirm stays visible so it can't vanish under a moving
+// pointer. Mobile has no hover, so actions stay always-visible there.
+function NoteRow({ note, entities, campaignId, busy, bodyClassName, confirmingDelete, ...actions }: NoteRowProps) {
   return (
-    <div className="flex items-start justify-between gap-3 py-2">
+    <div className="group -mx-2 flex flex-col gap-0.5 rounded-lg px-2 py-2 transition-colors md:hover:bg-parchment-100/70 md:focus-within:bg-parchment-100/70">
       <MentionText
         body={note.body}
         entities={entities}
         campaignId={campaignId}
-        className={`min-w-0 flex-1 whitespace-pre-wrap ${bodyClassName}`}
+        className={`whitespace-pre-wrap ${bodyClassName}`}
       />
-      <div className="flex shrink-0 items-center gap-3">
+      <div className="flex items-center gap-2">
+        <span className="whitespace-nowrap text-[11px] text-parchment-400">
+          {formatJournalTime(note.loggedAt)}
+        </span>
         {note.visibility === "PRIVATE" && (
           <Lock
             role="img"
             aria-label="Private note"
-            className="h-3.5 w-3.5 shrink-0 text-parchment-500"
+            className="h-3 w-3 shrink-0 text-parchment-400"
           />
         )}
-        <span className="whitespace-nowrap text-xs text-parchment-500">
-          {formatJournalTime(note.loggedAt)}
-        </span>
-        <RowActions busy={busy} {...actions} />
+        <div
+          className={`ml-auto flex items-center gap-3 transition-opacity ${
+            confirmingDelete
+              ? ""
+              : "md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
+          }`}
+        >
+          <RowActions busy={busy} confirmingDelete={confirmingDelete} {...actions} />
+        </div>
       </div>
     </div>
   );
