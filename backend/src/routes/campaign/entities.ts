@@ -95,13 +95,21 @@ entitiesRouter.get("/campaigns/:id/entities", async (req, res) => {
       // Non-owners see only revealed entities (#379); the owner sees all.
       ...(isOwner ? {} : { visibility: "REVEALED" }),
     },
-    include: { characterLink: { select: { characterId: true } } },
+    include: {
+      characterLink: { select: { characterId: true } },
+      // itemId (#1942): otherwise an entity's item-link status is invisible
+      // on the wire, so the combine dialog/survivor picker (#1943) can't
+      // truthfully warn about a transfer it can't see.
+      itemLink: { select: { itemId: true } },
+    },
     orderBy: { name: "asc" },
   });
-  // Flatten the PC link (#842): characterId, never the nested relation object.
-  const entities = rows.map(({ characterLink, ...e }) => ({
+  // Flatten the PC/item links (#842/#1942): characterId/itemId, never the
+  // nested relation objects.
+  const entities = rows.map(({ characterLink, itemLink, ...e }) => ({
     ...toWireEntity(e),
     characterId: characterLink?.characterId ?? null,
+    itemId: itemLink?.itemId ?? null,
   }));
 
   const q = typeof req.query.q === "string" ? req.query.q : "";
@@ -275,8 +283,12 @@ entitiesRouter.post("/campaigns/:id/entities/combine", async (req, res) => {
     return;
   }
 
-  const { characterLink, ...entity } = result.entity;
-  res.json({ ...toWireEntity(entity), characterId: characterLink?.characterId ?? null });
+  const { characterLink, itemLink, ...entity } = result.entity;
+  res.json({
+    ...toWireEntity(entity),
+    characterId: characterLink?.characterId ?? null,
+    itemId: itemLink?.itemId ?? null,
+  });
 });
 
 /**
