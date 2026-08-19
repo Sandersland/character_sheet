@@ -720,6 +720,12 @@ const EMPTY_AGGREGATE: EntityStatsAggregate = {
   chroniclers: [],
 };
 
+// Shared with buildNeedsChroniclingRow's flag (#1945) — one definition of
+// "described" for both the Codex card and the inbox.
+export function hasDescription(notes: string | null): boolean {
+  return (notes ?? "").trim().length > 0;
+}
+
 function statsPayload(
   agg: EntityStatsAggregate | undefined,
   notes: string | null,
@@ -731,7 +737,7 @@ function statsPayload(
     firstMentioned: mentionRef(a.firstMentioned, ctx),
     lastMentioned: mentionRef(a.lastMentioned, ctx),
     chroniclers: a.chroniclers,
-    hasDescription: (notes ?? "").trim().length > 0,
+    hasDescription: hasDescription(notes),
   };
 }
 
