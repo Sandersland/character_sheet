@@ -3,6 +3,8 @@ interface ReviewFooterProps {
   onCombine: () => void;
   disregarding: boolean;
   combining: boolean;
+  /** Hard-disables Combine when the consequence preview failed to load. */
+  combineDisabled?: boolean;
   loserCount: number;
 }
 
@@ -15,6 +17,7 @@ export default function ReviewFooter({
   onCombine,
   disregarding,
   combining,
+  combineDisabled = false,
   loserCount,
 }: ReviewFooterProps) {
   const entryWord = loserCount === 1 ? "entry" : "entries";
@@ -33,7 +36,7 @@ export default function ReviewFooter({
         <button
           type="button"
           onClick={onCombine}
-          disabled={combining || loserCount === 0}
+          disabled={combining || combineDisabled || loserCount === 0}
           className="rounded-control bg-garnet-surface px-4 py-2 text-sm font-semibold text-garnet-on-surface transition-colors hover:bg-garnet-surface-hover disabled:opacity-50"
         >
           {combining ? "Combining…" : `Combine and delete ${loserCount} ${entryWord}`}

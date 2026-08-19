@@ -128,6 +128,13 @@ export default function ReviewDuplicatesModal({
 
         <DiscardedItemsBox heading="Discarded" items={discardedItems} />
 
+        {isError && (
+          <p className="text-xs font-semibold text-garnet-700">
+            Couldn't load the full preview, so the Discarded warnings may be incomplete. Close and
+            reopen to retry — combining is disabled until the preview loads.
+          </p>
+        )}
+
         {combineMutation.isError && (
           <p className="text-xs font-semibold text-garnet-700">
             {errorMessage(combineMutation.error, "Failed to combine entities.")}
@@ -139,6 +146,9 @@ export default function ReviewDuplicatesModal({
           onCombine={handleCombine}
           disregarding={disregarding}
           combining={combineMutation.isPending}
+          // The gate can't stand behind warnings it failed to load — a broken
+          // preview blocks the no-undo commit, not just decorates it.
+          combineDisabled={isError}
           loserCount={loserIds.length}
         />
       </div>
