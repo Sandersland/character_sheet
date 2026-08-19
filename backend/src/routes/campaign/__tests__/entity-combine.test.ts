@@ -139,6 +139,17 @@ describe("entity combine-duplicates (#1942)", () => {
     expect(res.status).toBe(400);
   });
 
+  it("400s a non-uuid survivorEntityId or loserEntityIds element", async () => {
+    // uuid() at the schema boundary (#1942) makes CampaignEntity.id's
+    // "plain String column" hazard unreachable from a real request — the
+    // pattern-escaping in mentionTokenPattern is defense in depth beyond this.
+    const dup = await makeEntity(campaignId, "lili Boundary");
+    const badSurvivor = await combineBatch([dup], "not-a-uuid");
+    expect(badSurvivor.status).toBe(400);
+    const badLoser = await combineBatch(["not-a-uuid"], dup);
+    expect(badLoser.status).toBe(400);
+  });
+
   it("404s an unknown duplicate, an unknown survivor, and a cross-campaign entity", async () => {
     const unknownId = "00000000-0000-4000-8000-000000000000";
     const surv = await makeEntity(campaignId, "Survivor 404");
@@ -398,6 +409,80 @@ describe("entity combine-duplicates (#1942)", () => {
     const after = await prisma.campaignEntityMerge.findUniqueOrThrow({ where: { id: mergeId } });
     expect(after.mergedEntityId).toBe(a);
     expect(after.survivorEntityId).toBe(dup);
+  });
+
+  // The mechanism, proven deterministically. Hold a row lock on ONLY the
+  // SURVIVOR — not the loser — then fire a real combine(loser, survivor).
+  // This isolates exactly what lockCombineTargets adds: the loser's own
+  // eventual DELETE would naturally contend with a lock held on the LOSER
+  // (any transaction's delete does that, fix or no fix — not a useful
+  // discriminator), but nothing else in the combine ever writes the
+  // SURVIVOR row. Only an explicit up-front SELECT ... FOR UPDATE on the
+  // survivor too makes this block; a naive findMany-based guard reads
+  // straight past another transaction's row lock under READ COMMITTED and
+  // completes unaffected. Timing-luck tests (two Promise.all'd combine()
+  // calls with no controlled hold) turned out NOT to discriminate reliably
+  // in this environment — fast local Postgres often finishes one request's
+  // whole transaction before the other's guard read even starts, passing
+  // either way — so this test controls the interleaving directly instead.
+  it("blocks a combine on a row lock already held for its survivor alone (lockCombineTargets)", async () => {
+    const loser = await makeEntity(campaignId, "Lock Hold Loser");
+    const survivor = await makeEntity(campaignId, "Lock Hold Survivor");
+
+    let lockAcquired = false;
+    let releaseLock!: () => void;
+    const heldUntilReleased = new Promise<void>((resolve) => {
+      releaseLock = resolve;
+    });
+    const holderTxn = prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "CampaignEntity" WHERE id = ${survivor} FOR UPDATE`;
+      lockAcquired = true;
+      await heldUntilReleased;
+    });
+
+    for (let i = 0; i < 50 && !lockAcquired; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(lockAcquired).toBe(true);
+
+    const combinePromise = combine(loser, survivor);
+    try {
+      const raceResult = await Promise.race([
+        combinePromise.then(() => "resolved" as const),
+        new Promise<"pending">((resolve) => setTimeout(() => resolve("pending"), 200)),
+      ]);
+      // Still blocked on the held survivor-only row lock 200ms later — not
+      // raced past it, even though nothing else in combine writes that row.
+      expect(raceResult).toBe("pending");
+    } finally {
+      releaseLock();
+      await holderTxn;
+    }
+
+    const res = await combinePromise;
+    expect(res.status).toBe(200);
+  });
+
+  // Supplementary real-usage-shape check (kept alongside the deterministic
+  // test above, which is what actually proves the lock blocks): two genuinely
+  // concurrent requests, neither entity carrying a ref or link (so under the
+  // pre-fix code no Prisma error code would ever fire either way). Asserts
+  // the INVARIANT the lock exists to protect — never both succeeding, never
+  // both entities gone — even though this shape alone can't be trusted to
+  // discriminate the fix on every environment/timing.
+  it("never lets two concurrent inverse combines (A absorbs B; B absorbs A) both commit and delete both entities", async () => {
+    const a = await makeEntity(campaignId, "Inverse Race A");
+    const b = await makeEntity(campaignId, "Inverse Race B");
+
+    const [resAintoB, resBintoA] = await Promise.all([combine(a, b), combine(b, a)]);
+
+    const stillA = await prisma.campaignEntity.findUnique({ where: { id: a } });
+    const stillB = await prisma.campaignEntity.findUnique({ where: { id: b } });
+    const survivingCount = [stillA, stillB].filter((row) => row !== null).length;
+    // Never both gone (the bug this guards against) and never both present
+    // (combine did nothing) — exactly one direction's outcome held.
+    expect(survivingCount).toBe(1);
+    expect([resAintoB.status, resBintoA.status].sort()).toEqual([200, 404]);
   });
 
   it("drops a PREPARED merge row that would become self-referential when re-pointed", async () => {
@@ -703,15 +788,31 @@ describe("entity combine-duplicates (#1942)", () => {
     return { entityId: entity.id, itemId: item.id };
   }
 
-  it("moves an item link from an unlinked duplicate onto the survivor", async () => {
-    const { entityId: dupItem } = await makeItemEntity("Dup Item");
+  it("moves an item link from an unlinked duplicate onto the survivor, surfacing itemId on the wire", async () => {
+    const { entityId: dupItem, itemId } = await makeItemEntity("Dup Item");
     const surv = await makeEntity(campaignId, "Survivor Item", "ITEM");
 
     const res = await combine(dupItem, surv);
     expect(res.status).toBe(200);
+    // itemId on the combine response (#1942): the codex/dialog can't warn
+    // truthfully about an item-link transfer it can't observe on the wire.
+    expect(res.body.itemId).toBe(itemId);
 
     const link = await prisma.campaignItemLink.findUniqueOrThrow({ where: { campaignEntityId: surv } });
     expect(link.campaignEntityId).toBe(surv);
+  });
+
+  it("surfaces itemId: null on the wire for an entity with no item link, and the real itemId for one that has it", async () => {
+    const { entityId: itemEntityId, itemId } = await makeItemEntity("Wire Item Entity");
+    const plain = await makeEntity(campaignId, "Wire Plain Entity");
+
+    const list = await supertest(app)
+      .get(`/api/campaigns/${campaignId}/entities`)
+      .set("Cookie", cookieOwner);
+    expect(list.status).toBe(200);
+    const rows = list.body as { id: string; itemId: string | null }[];
+    expect(rows.find((e) => e.id === itemEntityId)?.itemId).toBe(itemId);
+    expect(rows.find((e) => e.id === plain)?.itemId).toBeNull();
   });
 
   it("409s combining two entities that both carry an item link", async () => {

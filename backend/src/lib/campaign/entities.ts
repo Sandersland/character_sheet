@@ -13,6 +13,7 @@ import {
   type StatRef,
 } from "@/lib/activity/entity-stats.js";
 import { mentionToken, mentionTokenPattern } from "@/lib/activity/journal-refs.js";
+import { logger } from "@/lib/core/logger.js";
 import { deletePortraitBlobBestEffort } from "@/lib/storage/portrait-blob.js";
 
 // Session context resolver for mention refs: title + startedAt-ordinal (#839).
@@ -202,7 +203,10 @@ export async function deleteMerge(
 }
 
 type CombinedEntity = Prisma.CampaignEntityGetPayload<{
-  include: { characterLink: { select: { characterId: true } } };
+  include: {
+    characterLink: { select: { characterId: true } };
+    itemLink: { select: { itemId: true } };
+  };
 }>;
 
 export type CombineResult =
@@ -310,7 +314,10 @@ async function rewriteMentionTokens(
 // the reveal vanishes from listVisibleMerges for players. Batch note: this is
 // called once per loser during the apply phase, always re-reading the graph
 // fresh from `tx`, so an earlier loser's re-point in the SAME transaction is
-// already visible to a later loser's own call.
+// already visible to a later loser's own call. Classification (which rows
+// drop vs re-point) is pure in-memory work against ONE `allEdges` snapshot;
+// the writes are two batched calls (deleteMany/updateMany), not one
+// awaited call per row, inside this already-destructive transaction.
 async function repointMergeChains(
   tx: Tx,
   campaignId: string,
@@ -327,16 +334,29 @@ async function repointMergeChains(
     where: { campaignId },
     select: { id: true, mergedEntityId: true, survivorEntityId: true, status: true },
   });
+
+  const toDrop: string[] = [];
+  const toRepoint: string[] = [];
   let revealSurvivor = false;
   for (const row of asSurvivor) {
     const otherEdges = allEdges.filter((e) => e.id !== row.id);
     if (wouldCreateCycle(otherEdges, row.mergedEntityId, survivorEntityId)) {
       if (row.status === "EXECUTED") throw publiclyRevealedMergeError();
-      await tx.campaignEntityMerge.delete({ where: { id: row.id } });
+      toDrop.push(row.id);
       continue;
     }
-    await tx.campaignEntityMerge.update({ where: { id: row.id }, data: { survivorEntityId } });
+    toRepoint.push(row.id);
     if (row.status === "EXECUTED") revealSurvivor = true;
+  }
+
+  if (toDrop.length > 0) {
+    await tx.campaignEntityMerge.deleteMany({ where: { id: { in: toDrop } } });
+  }
+  if (toRepoint.length > 0) {
+    await tx.campaignEntityMerge.updateMany({
+      where: { id: { in: toRepoint } },
+      data: { survivorEntityId },
+    });
   }
   if (revealSurvivor) {
     await tx.campaignEntity.update({
@@ -370,6 +390,28 @@ async function moveSoleLinks(
       data: { campaignEntityId: survivorEntityId },
     });
   }
+}
+
+// Row-locks the survivor + every loser at the very start of the transaction,
+// before ANY read that decides success/failure — closes the inverse-combine
+// race (#1942): two concurrent combines that touch the same two entities in
+// opposite directions (A absorbs B; B absorbs A) can both pass
+// fetchCombineTargets under Postgres's default READ COMMITTED isolation and
+// both commit, deleting BOTH entities, when neither carries any ref/link a
+// later write's P-code error would have caught. SELECT ... FOR UPDATE makes
+// the second transaction actually block on the first's row lock instead of
+// racing past it, then re-read a now-missing entity once it unblocks. Always
+// locked in SORTED id order, never the caller-supplied survivor/loser order —
+// two transactions requesting the SAME two ids in opposite roles then still
+// request their locks in the SAME order, which is what avoids a genuine
+// two-way deadlock (each holding one lock, waiting on the other's) rather
+// than just moving the race to lock acquisition itself. A missing id is
+// simply not locked; fetchCombineTargets's existence guard still 404s it.
+async function lockCombineTargets(tx: Tx, ids: string[]): Promise<void> {
+  const sortedIds = [...ids].sort();
+  await tx.$queryRaw`
+    SELECT id FROM "CampaignEntity" WHERE id IN (${Prisma.join(sortedIds)}) FOR UPDATE
+  `;
 }
 
 // Reads the survivor and every loser and confirms all of them exist in this
@@ -483,6 +525,7 @@ async function loadAndGuardCombineTargets(
   loserEntityIds: string[],
   survivorEntityId: string,
 ): Promise<{ survivor: LinkedEntity; losers: LinkedEntity[] }> {
+  await lockCombineTargets(tx, [survivorEntityId, ...loserEntityIds]);
   const targets = await fetchCombineTargets(tx, campaignId, loserEntityIds, survivorEntityId);
   assertBatchLinkConflicts(targets.survivor, targets.losers);
   for (const loser of targets.losers) {
@@ -505,79 +548,125 @@ async function loadAndGuardCombineTargets(
 // (awardCampaignItem/revokeCampaignItem log undoable CharacterEvents; the
 // merge ops above persist the CampaignEntityMerge row itself). The
 // client-side confirm dialog is the gate here.
+// The three pure, DB-free shape checks combineEntities must hold before it
+// even opens a transaction — mirror combineEntitiesSchema's own refinements,
+// kept here too as defense in depth for any non-HTTP caller.
+function validateBatchShape(
+  loserEntityIds: string[],
+  survivorEntityId: string,
+): CombineGuardError | null {
+  if (loserEntityIds.length === 0) {
+    return new CombineGuardError(400, "At least one duplicate must be provided");
+  }
+  if (new Set(loserEntityIds).size !== loserEntityIds.length) {
+    return new CombineGuardError(400, "Duplicate ids must not repeat");
+  }
+  if (loserEntityIds.includes(survivorEntityId)) {
+    return new CombineGuardError(400, "The survivor cannot also be a duplicate");
+  }
+  return null;
+}
+
+// Runs entirely inside the caller's transaction: the up-front batch guard,
+// then the apply loop over every loser in order, threading survivorState so
+// a later loser's link move sees what an earlier one already moved onto the
+// survivor in this SAME transaction.
+async function applyBatchCombine(
+  tx: Tx,
+  campaignId: string,
+  loserEntityIds: string[],
+  survivorEntityId: string,
+): Promise<{ entity: CombinedEntity; loserPortraitKeys: (string | null)[] }> {
+  const { survivor, losers } = await loadAndGuardCombineTargets(
+    tx,
+    campaignId,
+    loserEntityIds,
+    survivorEntityId,
+  );
+  const loserPortraitKeys = losers.map((loser) => loser.portraitKey);
+
+  let survivorState = survivor;
+  for (const loser of losers) {
+    await rewriteMentionTokens(tx, loser.id, survivorEntityId);
+    await repointMergeChains(tx, campaignId, loser.id, survivorEntityId);
+    await moveSoleLinks(tx, loser, survivorState, loser.id, survivorEntityId);
+    await tx.campaignEntity.delete({ where: { id: loser.id } });
+    survivorState = {
+      ...survivorState,
+      characterLink: survivorState.characterLink ?? loser.characterLink,
+      itemLink: survivorState.itemLink ?? loser.itemLink,
+    };
+  }
+
+  const entity = await tx.campaignEntity.findUniqueOrThrow({
+    where: { id: survivorEntityId },
+    include: {
+      characterLink: { select: { characterId: true } },
+      itemLink: { select: { itemId: true } },
+    },
+  });
+  return { entity, loserPortraitKeys };
+}
+
+// Maps a caught transaction error to a CombineResult, or null to signal "not
+// ours, rethrow" (an unexpected error stays a real 500). A concurrent
+// combine/link change lost the race the in-transaction guards otherwise
+// close (#1942 TOCTOU fix): P2025 means a row the transaction expected (e.g.
+// a link) vanished underneath it; P2002 means a unique constraint (e.g. a
+// link's campaignEntityId) collided with a concurrent write; P2003 means a
+// foreign key target (e.g. the survivor, deleted between the guard read and
+// journalEntryRef.updateMany) vanished underneath a write that references
+// it. All three are the caller's problem, not a 500 — but mapping them
+// silently would also hide a genuine coding bug (a wrong id, a bad query
+// shape) behind the same user-facing "conflict" response, so the original
+// error is logged at warn level BEFORE the mapping, not lost to it.
+function mapCombineError(
+  err: unknown,
+  ctx: { campaignId: string; survivorEntityId: string; loserEntityIds: string[] },
+): CombineResult | null {
+  if (err instanceof CombineGuardError) {
+    return { ok: false, status: err.status, error: err.message };
+  }
+  if (!(err instanceof Prisma.PrismaClientKnownRequestError)) return null;
+
+  const mappedStatus =
+    err.code === "P2025" ? 404 : err.code === "P2002" || err.code === "P2003" ? 409 : null;
+  if (mappedStatus === null) return null;
+
+  logger.warn(
+    { code: err.code, meta: err.meta, ...ctx },
+    "combineEntities: mapped a Prisma error to a client-facing response — check meta here before assuming a real race rather than a coding bug (#1942)",
+  );
+  return {
+    ok: false,
+    status: mappedStatus,
+    error: mappedStatus === 404 ? "Entity not found" : "Combine conflicts with a concurrent change",
+  };
+}
+
 export async function combineEntities(
   db: PrismaClient,
   campaignId: string,
   loserEntityIds: string[],
   survivorEntityId: string,
 ): Promise<CombineResult> {
-  if (loserEntityIds.length === 0) {
-    return { ok: false, status: 400, error: "At least one duplicate must be provided" };
-  }
-  if (new Set(loserEntityIds).size !== loserEntityIds.length) {
-    return { ok: false, status: 400, error: "Duplicate ids must not repeat" };
-  }
-  if (loserEntityIds.includes(survivorEntityId)) {
-    return { ok: false, status: 400, error: "The survivor cannot also be a duplicate" };
-  }
+  const shapeError = validateBatchShape(loserEntityIds, survivorEntityId);
+  if (shapeError) return { ok: false, status: shapeError.status, error: shapeError.message };
 
-  let loserPortraitKeys: (string | null)[] = [];
   try {
-    const entity = await db.$transaction(
-      async (tx) => {
-        const { survivor, losers } = await loadAndGuardCombineTargets(
-          tx,
-          campaignId,
-          loserEntityIds,
-          survivorEntityId,
-        );
-        loserPortraitKeys = losers.map((loser) => loser.portraitKey);
-
-        let survivorState = survivor;
-        for (const loser of losers) {
-          await rewriteMentionTokens(tx, loser.id, survivorEntityId);
-          await repointMergeChains(tx, campaignId, loser.id, survivorEntityId);
-          await moveSoleLinks(tx, loser, survivorState, loser.id, survivorEntityId);
-          await tx.campaignEntity.delete({ where: { id: loser.id } });
-          survivorState = {
-            ...survivorState,
-            characterLink: survivorState.characterLink ?? loser.characterLink,
-            itemLink: survivorState.itemLink ?? loser.itemLink,
-          };
-        }
-
-        return tx.campaignEntity.findUniqueOrThrow({
-          where: { id: survivorEntityId },
-          include: { characterLink: { select: { characterId: true } } },
-        });
-      },
+    const { entity, loserPortraitKeys } = await db.$transaction(
+      (tx) => applyBatchCombine(tx, campaignId, loserEntityIds, survivorEntityId),
       // Generous timeout: each loser's rewrite is O(1) queries, but a large
       // campaign's journal table (or a large batch) still means real
       // row-lock contention on a busy server, and this is a destructive op
       // we don't want timing out partway through.
       { timeout: 30_000 },
     );
-
     await Promise.all(loserPortraitKeys.map((key) => deletePortraitBlobBestEffort(key)));
     return { ok: true, entity };
   } catch (err) {
-    if (err instanceof CombineGuardError) {
-      return { ok: false, status: err.status, error: err.message };
-    }
-    // A concurrent combine/link change lost the race the in-transaction
-    // guards otherwise close (#1942 TOCTOU fix): P2025 means a row the
-    // transaction expected (e.g. a link) vanished underneath it; P2002 means
-    // a unique constraint (e.g. a link's campaignEntityId) collided with a
-    // concurrent write; P2003 means a foreign key target (e.g. the survivor,
-    // deleted between the guard read and journalEntryRef.updateMany) vanished
-    // underneath a write that references it. All three are the caller's
-    // problem, not a 500.
-    if (err instanceof Prisma.PrismaClientKnownRequestError) {
-      if (err.code === "P2025") return { ok: false, status: 404, error: "Entity not found" };
-      if (err.code === "P2002" || err.code === "P2003") {
-        return { ok: false, status: 409, error: "Combine conflicts with a concurrent change" };
-      }
-    }
+    const mapped = mapCombineError(err, { campaignId, survivorEntityId, loserEntityIds });
+    if (mapped) return mapped;
     throw err;
   }
 }
