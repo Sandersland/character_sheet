@@ -61,6 +61,16 @@ describe("mentionTokenPattern", () => {
     const re = new RegExp(mentionTokenPattern(A), "gi");
     expect(mentionToken(B)).not.toMatch(re);
   });
+
+  it("does not throw and does not widen the match for a non-uuid id with regex metacharacters", () => {
+    const weird = "a.b*c+d?e^f$g(h)i|j[k]l\\m";
+    // A well-formed RegExp constructor call (doesn't throw a syntax error).
+    const re = new RegExp(mentionTokenPattern(weird), "gi");
+    expect(mentionToken(weird)).toMatch(re);
+    // The metacharacters are literal, not live regex syntax: a token that
+    // would match if `.` etc. were unescaped must NOT match.
+    expect(mentionToken("aXbXcXdXeXfXgXhXiXjXkXlXm")).not.toMatch(re);
+  });
 });
 
 describe("normalizeForMatch", () => {
