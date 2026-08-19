@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
+import CombineEntityAction from "@/features/entities/CombineEntityAction";
 import EntityPortrait from "@/features/entities/EntityPortrait";
 import { formatJournalDate } from "@/lib/formatJournalDate";
 import { ENTITY_TYPE_LABELS } from "@/lib/mentions";
@@ -39,18 +40,22 @@ function FactRow({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function OwnerQuietLinks({
+  campaignId,
   entity,
   busy,
   onToggleVisibility,
   onDelete,
+  onCombined,
 }: {
+  campaignId?: string;
   entity: CampaignEntity;
   busy: boolean;
   onToggleVisibility: () => void;
   onDelete: () => void;
+  onCombined: (survivorId: string, message: string) => void;
 }) {
   return (
-    <div className="mt-3 flex items-center gap-4 border-t border-parchment-200 pt-3">
+    <div className="mt-3 flex flex-wrap items-center gap-4 border-t border-parchment-200 pt-3">
       <button
         type="button"
         disabled={busy}
@@ -67,6 +72,14 @@ function OwnerQuietLinks({
       >
         Delete entity
       </button>
+      {campaignId && (
+        <CombineEntityAction
+          campaignId={campaignId}
+          duplicate={entity}
+          busy={busy}
+          onCombined={onCombined}
+        />
+      )}
     </div>
   );
 }
@@ -74,6 +87,7 @@ function OwnerQuietLinks({
 // The article's derived-facts panel (#842): portrait tile, fact rows, and the
 // owner's quiet Hide/Delete links. No fact here is persisted — all computed.
 export default function EntityInfobox({
+  campaignId,
   entity,
   role,
   backlinks,
@@ -82,8 +96,10 @@ export default function EntityInfobox({
   busy,
   onToggleVisibility,
   onDelete,
+  onCombined,
   onEdit,
 }: {
+  campaignId?: string;
   entity: CampaignEntity;
   role?: CampaignRole;
   backlinks: EntityBacklink[];
@@ -92,6 +108,7 @@ export default function EntityInfobox({
   busy: boolean;
   onToggleVisibility: () => void;
   onDelete: () => void;
+  onCombined: (survivorId: string, message: string) => void;
   onEdit: () => void;
 }) {
   const sheetPath = ownedSheetPath(entity, characters, viewerId);
@@ -136,10 +153,12 @@ export default function EntityInfobox({
       </dl>
       {role === "OWNER" && (
         <OwnerQuietLinks
+          campaignId={campaignId}
           entity={entity}
           busy={busy}
           onToggleVisibility={onToggleVisibility}
           onDelete={onDelete}
+          onCombined={onCombined}
         />
       )}
     </aside>

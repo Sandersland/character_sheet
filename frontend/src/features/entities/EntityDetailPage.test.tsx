@@ -23,6 +23,7 @@ vi.mock("@/api/client", () => ({
   deleteEntity: vi.fn(),
   uploadEntityPortrait: vi.fn(),
   deleteEntityPortrait: vi.fn(),
+  combineEntities: vi.fn(),
 }));
 
 vi.mock("@/hooks/useCampaignEntities", () => ({
@@ -584,5 +585,163 @@ describe("EntityDetailPage (#248)", () => {
     renderPage({ pathname: ENTITY_PATH, state: { from: `/campaigns/${CAMPAIGN_ID}/manage` } });
     const back = await screen.findByRole("link", { name: /back to campaign/i });
     expect(back).toHaveAttribute("href", `/campaigns/${CAMPAIGN_ID}/manage`);
+  });
+
+  describe("Combine into… (#1943)", () => {
+    const SURVIVOR: CampaignEntity = {
+      ...ENTITY,
+      id: "ent-2",
+      name: "Lili",
+      aliases: [],
+      notes: null,
+      portraitUrl: null,
+      visibility: "REVEALED",
+    };
+    const DUPLICATE: CampaignEntity = {
+      ...ENTITY,
+      name: "lili",
+      aliases: ["Lil"],
+      notes: "A hedge witch.",
+      visibility: "HIDDEN",
+      stats: {
+        mentionCount: 3,
+        firstMentioned: null,
+        lastMentioned: null,
+        chroniclers: [],
+        hasDescription: true,
+      },
+    };
+
+    beforeEach(() => {
+      vi.mocked(client.fetchCampaign).mockResolvedValue(campaign("OWNER"));
+      vi.mocked(client.fetchEntities).mockResolvedValue([DUPLICATE, SURVIVOR]);
+      vi.mocked(useCampaignEntities).mockReturnValue({
+        entities: [DUPLICATE, SURVIVOR],
+        byId: new Map([
+          [DUPLICATE.id, DUPLICATE],
+          [SURVIVOR.id, SURVIVOR],
+        ]),
+      });
+    });
+
+    it("hides the action from a PLAYER", async () => {
+      vi.mocked(client.fetchCampaign).mockResolvedValue(campaign("PLAYER"));
+      renderPage();
+      await screen.findByRole("heading", { name: "lili" });
+      expect(screen.queryByRole("button", { name: /combine into/i })).not.toBeInTheDocument();
+    });
+
+    it("shows a searchable survivor picker that excludes the duplicate", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await user.click(await screen.findByRole("button", { name: /combine into/i }));
+
+      const dialog = screen.getByRole("dialog");
+      expect(within(dialog).getByRole("heading", { name: "Combine into…" })).toBeInTheDocument();
+      expect(within(dialog).getByRole("button", { name: /Lili/ })).toBeInTheDocument();
+
+      await user.type(within(dialog).getByRole("searchbox"), "xyz-no-match");
+      expect(within(dialog).queryByRole("button", { name: /Lili/ })).not.toBeInTheDocument();
+      expect(within(dialog).getByText(/No entities match/i)).toBeInTheDocument();
+    });
+
+    it("shows the consequence preview with real counts and the loss list", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await user.click(await screen.findByRole("button", { name: /combine into/i }));
+      await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /Lili/ }));
+
+      const dialog = screen.getByRole("dialog");
+      expect(within(dialog).getByRole("heading", { name: "Combine into Lili" })).toBeInTheDocument();
+      expect(
+        within(dialog).getByText(/prepare an identity merge instead/i),
+      ).toBeInTheDocument();
+      expect(within(dialog).getByText("3 mentions in 3 journal entries move to Lili")).toBeInTheDocument();
+      expect(within(dialog).getByText("lili is deleted from the codex")).toBeInTheDocument();
+      expect(within(dialog).getByText(/Discarded with lili/i)).toBeInTheDocument();
+      expect(within(dialog).getByText("Description/notes")).toBeInTheDocument();
+      expect(within(dialog).getByText("Aliases — Lil")).toBeInTheDocument();
+      expect(within(dialog).getByText("Hidden visibility")).toBeInTheDocument();
+      expect(within(dialog).queryByText("Portrait")).not.toBeInTheDocument();
+      expect(within(dialog).getByText("This cannot be undone.")).toBeInTheDocument();
+    });
+
+    it("omits the loss box when the duplicate has no discardable content", async () => {
+      const bareDuplicate: CampaignEntity = {
+        ...DUPLICATE,
+        aliases: [],
+        notes: null,
+        visibility: "REVEALED",
+      };
+      vi.mocked(client.fetchEntities).mockResolvedValue([bareDuplicate, SURVIVOR]);
+      vi.mocked(useCampaignEntities).mockReturnValue({
+        entities: [bareDuplicate, SURVIVOR],
+        byId: new Map([
+          [bareDuplicate.id, bareDuplicate],
+          [SURVIVOR.id, SURVIVOR],
+        ]),
+      });
+      const user = userEvent.setup();
+      renderPage();
+      await user.click(await screen.findByRole("button", { name: /combine into/i }));
+      await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /Lili/ }));
+
+      expect(screen.queryByText(/Discarded with/i)).not.toBeInTheDocument();
+    });
+
+    it("warns inline when the duplicate is in a PREPARED identity merge", async () => {
+      mergeState.merges = [
+        {
+          id: "m1",
+          campaignId: CAMPAIGN_ID,
+          mergedEntityId: ENTITY_ID,
+          survivorEntityId: "someone-else",
+          status: "PREPARED",
+          note: null,
+          preparedAt: "2026-01-01T00:00:00.000Z",
+          executedAt: null,
+        },
+      ];
+      const user = userEvent.setup();
+      renderPage();
+      await user.click(await screen.findByRole("button", { name: /combine into/i }));
+      await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /Lili/ }));
+
+      expect(screen.getByText(/has a prepared identity merge/i)).toBeInTheDocument();
+    });
+
+    it("renders a 409 conflict inline in the dialog instead of a toast", async () => {
+      vi.mocked(client.combineEntities).mockRejectedValue(
+        new Error("Both entities are linked to a character"),
+      );
+      const user = userEvent.setup();
+      renderPage();
+      await user.click(await screen.findByRole("button", { name: /combine into/i }));
+      await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /Lili/ }));
+      await user.click(
+        within(screen.getByRole("dialog")).getByRole("button", { name: /combine and delete lili/i }),
+      );
+
+      expect(
+        await within(screen.getByRole("dialog")).findByText("Both entities are linked to a character"),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+    });
+
+    it("combines, navigates to the survivor, and toasts on success", async () => {
+      vi.mocked(client.combineEntities).mockResolvedValue(SURVIVOR);
+      const user = userEvent.setup();
+      renderPage();
+      await user.click(await screen.findByRole("button", { name: /combine into/i }));
+      await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /Lili/ }));
+      await user.click(
+        within(screen.getByRole("dialog")).getByRole("button", { name: /combine and delete lili/i }),
+      );
+
+      expect(vi.mocked(client.combineEntities)).toHaveBeenCalledWith(CAMPAIGN_ID, ENTITY_ID, "ent-2");
+      expect(await screen.findByRole("heading", { name: "Lili" })).toBeInTheDocument();
+      expect(await screen.findByText("lili combined into Lili.")).toBeInTheDocument();
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
   });
 });
