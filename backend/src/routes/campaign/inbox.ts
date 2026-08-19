@@ -21,7 +21,10 @@ inboxRouter.get("/inbox", async (req, res) => {
   const userId = req.user!.id;
   const [rows, dismissed] = await Promise.all([
     buildInboxRows(prisma, userId),
-    prisma.inboxDismissal.findMany({ where: { userId }, select: { kind: true, signature: true } }),
+    prisma.inboxDismissal.findMany({
+      where: { userId },
+      select: { campaignId: true, kind: true, signature: true },
+    }),
   ]);
   res.json(filterDismissed(rows, dismissed));
 });
@@ -30,8 +33,8 @@ inboxRouter.get("/inbox", async (req, res) => {
  * POST /api/inbox/dismissals
  * User-scoped preference state, not character/campaign domain state — plain
  * REST is correct here (precedent: CampaignCharacterPreference), no
- * transaction-endpoint requirement. Idempotent on the (userId, kind,
- * signature) unique: dismissing an already-dismissed flag is a no-op.
+ * transaction-endpoint requirement. Idempotent on the (userId, campaignId,
+ * kind, signature) unique: dismissing an already-dismissed flag is a no-op.
  * Requires campaign OWNERSHIP (not mere membership) since every GET /api/inbox
  * row is itself owner-scoped. Also requires every id in `signature` to
  * actually belong to `campaignId` — otherwise an owner of two campaigns could
@@ -57,7 +60,12 @@ inboxRouter.post("/inbox/dismissals", async (req, res) => {
 
   await prisma.inboxDismissal.upsert({
     where: {
-      userId_kind_signature: { userId: req.user!.id, kind: data.kind, signature: data.signature },
+      userId_campaignId_kind_signature: {
+        userId: req.user!.id,
+        campaignId: data.campaignId,
+        kind: data.kind,
+        signature: data.signature,
+      },
     },
     create: {
       userId: req.user!.id,

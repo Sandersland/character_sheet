@@ -3,22 +3,22 @@
 // caller OWNS. Nothing about a flag is persisted — only that a user
 // dismissed one (InboxDismissal), filtered in by the route.
 
-import type { PrismaClient } from "@/generated/prisma/client.js";
-import { hasDescription } from "@/lib/campaign/entities.js";
-import { buildSurvivorMap, foldMentionStats, type MentionStats } from "@/lib/campaign/inbox-stats.js";
+import type { EntityType, EntityVisibility, PrismaClient } from "@/generated/prisma/client.js";
 import { visibleEntryWhere } from "@/lib/activity/entity-stats.js";
+import { hasDescription } from "./entities.js";
+import { buildSurvivorMap, foldMentionStats, type MentionRef, type MentionStats } from "./inbox-stats.js";
 import {
   buildDuplicateClusters,
   buildMergeExclusionSet,
   clusterSignature,
   pickDefaultSurvivor,
-} from "@/lib/campaign/inbox-clustering.js";
+} from "./inbox-clustering.js";
 
 export interface InboxDuplicateEntity {
   id: string;
   name: string;
-  type: string;
-  visibility: string;
+  type: EntityType;
+  visibility: EntityVisibility;
   mentionCount: number;
 }
 
@@ -48,8 +48,8 @@ export type InboxRow = InboxDuplicateClusterRow | InboxNeedsChroniclingRow;
 type EntityRow = {
   id: string;
   name: string;
-  type: string;
-  visibility: string;
+  type: EntityType;
+  visibility: EntityVisibility;
   notes: string | null;
   createdAt: Date;
 };
@@ -95,6 +95,20 @@ function toDuplicateRow(
   };
 }
 
+// An EXECUTED-merged-away entity is never a clustering candidate — pairwise
+// exclusion alone let it re-enter a cluster transitively through a THIRD,
+// unrelated near-duplicate (#1945 review); removing it from the input
+// entirely closes that gap at any chain depth (A->B->C all drop, since each
+// is a mergedEntityId of some EXECUTED edge). needs-chronicling needs no
+// equivalent filter: its own mentionCount is already 0 post-attribution.
+function excludeExecutedMergedAway<E extends { id: string }>(
+  entities: E[],
+  merges: { mergedEntityId: string; status: string }[],
+): E[] {
+  const mergedAway = new Set(merges.filter((m) => m.status === "EXECUTED").map((m) => m.mergedEntityId));
+  return entities.filter((e) => !mergedAway.has(e.id));
+}
+
 function buildDuplicateRows(
   campaign: { id: string; name: string },
   entities: EnrichedEntity[],
@@ -128,23 +142,21 @@ function buildNeedsChroniclingRow(
 
 // Lean projection: the inbox needs only a count + last-mention date per
 // entity, never the character/session join the Codex activity feed needs —
-// see inbox-stats.ts's own why-comment.
-async function loadCampaignStats(
+// see inbox-stats.ts's own why-comment. Returns raw refs (not yet folded):
+// folding needs survivorOf, which depends on the merges query this runs
+// alongside via Promise.all, not sequentially after it.
+async function loadCampaignRefs(
   db: PrismaClient,
   campaignId: string,
   userId: string,
   entityIds: string[],
-  survivorOf: ReadonlyMap<string, string>,
-): Promise<Map<string, MentionStats>> {
-  if (entityIds.length === 0) return new Map();
+): Promise<MentionRef[]> {
+  if (entityIds.length === 0) return [];
   const refRows = await db.journalEntryRef.findMany({
     where: { entityId: { in: entityIds }, entry: visibleEntryWhere(userId, campaignId) },
     select: { entityId: true, entry: { select: { date: true } } },
   });
-  return foldMentionStats(
-    refRows.map((r) => ({ entityId: r.entityId, date: r.entry.date })),
-    survivorOf,
-  );
+  return refRows.map((r) => ({ entityId: r.entityId, date: r.entry.date }));
 }
 
 async function buildCampaignInboxRows(
@@ -158,20 +170,28 @@ async function buildCampaignInboxRows(
   });
   if (entities.length === 0) return [];
 
-  const merges = await db.campaignEntityMerge.findMany({
-    where: { campaignId: campaign.id },
-    select: { mergedEntityId: true, survivorEntityId: true, status: true },
-  });
+  // merges and refs are independent reads once entityIds is known — running
+  // them together (not the ref query awaiting the merge query first) halves
+  // this function's DB round-trip latency.
   const entityIds = entities.map((e) => e.id);
+  const [merges, refs] = await Promise.all([
+    db.campaignEntityMerge.findMany({
+      where: { campaignId: campaign.id },
+      select: { mergedEntityId: true, survivorEntityId: true, status: true },
+    }),
+    loadCampaignRefs(db, campaign.id, userId, entityIds),
+  ]);
+
   // Codex parity (withEntityStats): a merged-away identity's mentions count
   // toward its ultimate EXECUTED survivor, not the shallow copy — otherwise
   // pickDefaultSurvivor could crown a copy that never itself absorbed the
   // campaign's real activity over the entity that actually did.
   const survivorOf = buildSurvivorMap(merges, entityIds);
-  const stats = await loadCampaignStats(db, campaign.id, userId, entityIds, survivorOf);
+  const stats = foldMentionStats(refs, survivorOf);
 
   const enriched = enrichEntities(entities, stats);
-  const rows = buildDuplicateRows(campaign, enriched, merges);
+  const clusterCandidates = excludeExecutedMergedAway(enriched, merges);
+  const rows = buildDuplicateRows(campaign, clusterCandidates, merges);
   const chronicling = buildNeedsChroniclingRow(campaign, enriched);
   return chronicling ? [...rows, chronicling] : rows;
 }
@@ -183,13 +203,16 @@ export async function buildInboxRows(db: PrismaClient, userId: string): Promise<
   return perCampaign.flat().sort((a, b) => Date.parse(b.signalAt) - Date.parse(a.signalAt));
 }
 
-// Drops rows this user already dismissed under this exact (kind, signature).
+// Drops rows this user already dismissed under this exact (campaignId, kind,
+// signature) — matching InboxDismissal's own @@unique, so the stored
+// campaignId column actually governs suppression instead of a dismissal
+// silently applying to a same-signature row in a DIFFERENT campaign.
 export function filterDismissed(
   rows: InboxRow[],
-  dismissed: { kind: string; signature: string }[],
+  dismissed: { campaignId: string; kind: string; signature: string }[],
 ): InboxRow[] {
-  const dismissedKeys = new Set(dismissed.map((d) => `${d.kind} ${d.signature}`));
-  return rows.filter((r) => !dismissedKeys.has(`${r.kind} ${r.signature}`));
+  const dismissedKeys = new Set(dismissed.map((d) => `${d.campaignId} ${d.kind} ${d.signature}`));
+  return rows.filter((r) => !dismissedKeys.has(`${r.campaignId} ${r.kind} ${r.signature}`));
 }
 
 // POST /api/inbox/dismissals cross-campaign guard (#1945 review): a
