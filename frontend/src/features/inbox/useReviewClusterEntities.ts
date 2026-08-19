@@ -32,6 +32,6 @@ export function useReviewClusterEntities(campaignId: string) {
     entities: entitiesQuery.data ?? NONE_ENTITIES,
     merges,
     isLoading: entitiesQuery.isLoading || mergesPending,
-    isError: mergesError,
+    isError: entitiesQuery.isError || mergesError,
   };
 }
