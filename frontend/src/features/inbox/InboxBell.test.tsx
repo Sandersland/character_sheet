@@ -127,7 +127,7 @@ describe("InboxBell", () => {
     expect(within(trigger).getByText("2")).toBeInTheDocument();
   });
 
-  it("opens a popover under the bell listing grouped rows with a DM only badge", async () => {
+  it("opens a popover under the bell listing grouped rows with no DM framing", async () => {
     fetchInbox.mockResolvedValue([DUPLICATE_ROW, CHRONICLING_ROW]);
     const user = userEvent.setup();
     renderBell();
@@ -135,7 +135,8 @@ describe("InboxBell", () => {
 
     const panel = screen.getByRole("dialog", { name: /inbox/i });
     expect(within(panel).getByText("Curse of Strahd")).toBeInTheDocument();
-    expect(within(panel).getByText("DM only")).toBeInTheDocument();
+    // Inbox rows are owner-scoped; no audience framing needed (#1954).
+    expect(within(panel).queryByText(/DM/)).not.toBeInTheDocument();
     expect(
       within(panel).getByText("Lil · lili · Lili look like duplicates of each other."),
     ).toBeInTheDocument();
@@ -217,7 +218,9 @@ describe("InboxBell", () => {
     await user.click(await screen.findByRole("button", { name: /inbox/i }));
 
     const sheet = screen.getByRole("dialog", { name: "Inbox" });
-    expect(within(sheet).getByText("1 for the DM")).toBeInTheDocument();
+    // Inbox rows are owner-scoped; no audience framing needed (#1954).
+    expect(within(sheet).getByText("1 item")).toBeInTheDocument();
+    expect(within(sheet).queryByText(/DM/)).not.toBeInTheDocument();
     // Full-width 44px mobile action targets.
     const openCodex = within(sheet).getByRole("button", { name: "Open codex" });
     expect(openCodex.className).toMatch(/min-h-11/);
