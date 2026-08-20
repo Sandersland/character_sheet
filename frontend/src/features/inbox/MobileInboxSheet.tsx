@@ -42,7 +42,11 @@ export default function MobileInboxSheet({
         </button>
       )}
       {open && (
-        <BottomSheet title="Inbox" subtitle={`${rows.length} for the DM`} onClose={() => setOpen(false)}>
+        <BottomSheet
+          title="Inbox"
+          subtitle={`${rows.length} ${rows.length === 1 ? "item" : "items"}`}
+          onClose={() => setOpen(false)}
+        >
           {(requestClose) => (
             <InboxPanel
               rows={rows}
