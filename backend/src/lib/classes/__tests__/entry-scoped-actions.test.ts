@@ -1,37 +1,21 @@
-// Pure (no DB) tests for deriveEntryScopedActions (#1315): the shared rule
-// function backing `availableActions[]` (serialize/classes.ts) that re-derives
-// each class entry's own DERIVED_ACTIONS rows at THAT entry's own effective
-// level, instead of only the primary entry at total level — mirrors
-// deriveEntryScopedResources (#1206/#1177). This is also the function
-// shadow-arts.ts's cast guards resolve through (shadow-arts.ts), so a secondary
-// Warrior of Shadow monk's shadowArts/cloakOfShadows gate the same way for both
-// the wire value and the cast guard — see CLAUDE.md's level-gated-registry rule.
+// Pure (no DB) tests for deriveEntryScopedActions: re-derives each class
+// entry's own DERIVED_ACTIONS rows at THAT entry's own effective level,
+// instead of only the primary entry at total level.
 import { describe, expect, it } from "vitest";
 
 import { deriveActions, deriveEntryScopedActions } from "@/lib/classes/actions.js";
 import { testFeatureRowsFor } from "@/lib/classes/__tests__/test-feature-rows.fixture.js";
 import { deriveDeflectSpec } from "@/lib/srd/deflect.js";
 
-// Fighter's Second Wind/Action Surge are row-driven now (#1528) — every
-// deriveEntryScopedActions call below that expects to see them needs this
-// carrier callback (mirrors production's featureRowsOf).
+// Mirrors production's featureRowsOf.
 const getFeatureRows = (entry: { name: string; subclass?: string }) => testFeatureRowsFor(entry.name, entry.subclass);
 
 describe("deriveEntryScopedActions", () => {
-  // Every monk subclass now carries at least one row-driven action (#1912),
-  // so no real class/subclass combo stays bare-DERIVED_ACTIONS-only any more
-  // to compare against — this proves the underlying claim directly instead:
-  // when the row carrier contributes nothing (an explicit empty callback,
-  // not testFeatureRowsFor's real content), entryScoped degenerates to
-  // exactly a bare deriveActions call. `summonBondedWeapon` (the one
-  // surviving DERIVED_ACTIONS row) is still the fixture.
   it("single-class parity: output is identical to a bare deriveActions call when the row carrier contributes nothing", () => {
     const entries = [{ name: "fighter", subclass: "eldritch knight", level: 3 }];
     const emptyRows = () => ({ classRows: [], subclassRows: [] });
     const entryScoped = deriveEntryScopedActions(entries, 3, [], true, "EDITION_2014", emptyRows);
-    // deriveActions is slug-native (#1277) — "eldritch knight" resolves to
-    // this slug via resolveSubclassSlug, which deriveEntryScopedActions calls
-    // internally; this bare comparison passes the resolved slug directly.
+    // deriveActions is slug-native — deriveEntryScopedActions resolves "eldritch knight" to this slug internally.
     const bare = deriveActions("fighter", "fighter-eldritch-knight", 3, [], true, "EDITION_2014");
     expect(entryScoped).toEqual(bare);
   });
@@ -43,8 +27,6 @@ describe("deriveEntryScopedActions", () => {
     ];
     const actions = deriveEntryScopedActions(entries, 8, [], true, "EDITION_2024", getFeatureRows);
     expect(actions.some((a) => a.key === "shadowArts")).toBe(true);
-    // cloakOfShadows needs monk entry level 17 — nowhere near reached at entry level 3,
-    // even though the (irrelevant) total level of 8 is well past shadowArts' own gate.
     expect(actions.some((a) => a.key === "cloakOfShadows")).toBe(false);
   });
 
@@ -58,9 +40,6 @@ describe("deriveEntryScopedActions", () => {
   });
 
   it("a secondary Fighter's actionSurge appears even though Fighter isn't the primary entry", () => {
-    // Generalizes the same fix beyond monk: buildAvailableActionsView used to
-    // derive only from the PRIMARY entry, so a secondary Fighter's actions never
-    // appeared regardless of its own level.
     const entries = [
       { name: "wizard", subclass: undefined, level: 5 },
       { name: "fighter", subclass: undefined, level: 2 },
@@ -69,13 +48,6 @@ describe("deriveEntryScopedActions", () => {
     expect(actions.some((a) => a.key === "actionSurge")).toBe(true);
   });
 
-  // #1528: actionFromRow (actions.ts) resolves a row-driven action's
-  // enabled/disabledReason through the SAME resolveEnablement function the
-  // DERIVED_ACTIONS path uses (proven generically by wildShape's test in
-  // actions.test.ts) — but nothing exercised that shared function actually
-  // getting called correctly off a Fighter row's own resourceKey/cost until
-  // this test (actions.test.ts's two references to a nonexistent
-  // "actionsFromRows.test.ts" claimed this coverage lived here; it didn't).
   it("a row-driven Fighter action (actionSurge) is disabled when its pool is exhausted", () => {
     const entries = [{ name: "fighter", subclass: undefined, level: 2 }];
     const actions = deriveEntryScopedActions(entries, 2, [{ key: "actionSurge", remaining: 0 }], true, "EDITION_2024", getFeatureRows);
@@ -93,11 +65,8 @@ describe("deriveEntryScopedActions", () => {
     expect(actions.filter((a) => a.key === "shadowStep")).toHaveLength(1);
   });
 
-  // #1340: cleric.ts (grantLevel 2) and paladin.ts (grantLevel 3) both grant
-  // "Channel Divinity" — one merged DERIVED_ACTIONS row (key "channelDivinity",
-  // grantClasses) must surface as exactly ONE card for a Cleric/Paladin
-  // multiclass, keyed off each entry's own effective level (mirrors
-  // deriveEntryScopedActions' existing dedupe-by-key policy).
+  // Cleric grants Channel Divinity at class level 2, Paladin at level 3; one
+  // merged row must surface as exactly one card for a multiclass.
   describe("channelDivinity — one row, two granting classes (#1340)", () => {
     it("cleric 2 / paladin 3: exactly one card, keyed channelDivinity (not the old per-class keys)", () => {
       const entries = [
@@ -169,12 +138,8 @@ describe("deriveEntryScopedActions", () => {
     });
   });
 
-  // Eldritch Knight Arcane Charge (2014, PHB'14 p.75, #1852): reminder text
-  // riding the row-driven Action Surge action, not a new action row — pure
-  // self-or-announce (#416: positional teleport, no target/positioning
-  // model). Mutation-proofs all three gates (subclass, level, edition)
-  // independently, mirroring shadowArts'/cloakOfShadows' own per-gate style
-  // above.
+  // PHB'14 p.75: Eldritch Knight's Arcane Charge is reminder text on the
+  // row-driven Action Surge action, not a new action row.
   describe("Arcane Charge — reminder on Action Surge (2014, #1852)", () => {
     it("an Eldritch Knight L15+ (2014) sees the Arcane Charge reminder on actionSurge", () => {
       const entries = [{ name: "fighter", subclass: "eldritch knight", level: 15 }];
@@ -218,10 +183,6 @@ describe("deriveEntryScopedActions", () => {
       expect(card?.reminder).toMatch(/Arcane Charge/);
     });
 
-    // The discriminating negative: total level (25) clears the L15 gate but
-    // the fighter ENTRY's own level (14) does not — a gate reading total
-    // level would wrongly attach the reminder here, so this test FAILS if
-    // withArcaneChargeReminder is ever fed totalLevel instead of effLevel.
     it("a multiclass Eldritch Knight below Fighter 15 gets no reminder even when total level clears 15", () => {
       const entries = [
         { name: "wizard", subclass: undefined, level: 11 },
@@ -234,13 +195,8 @@ describe("deriveEntryScopedActions", () => {
     });
   });
 
-  // Deflect Attacks (2024) / Deflect Missiles (2014) announce augmentor
-  // (#1910): deflectAugmentor (lib/srd/deflect.ts) attaches the resolved roll
-  // spec via the SAME fold point Arcane Charge uses above. `abilityMods` is
-  // the new optional parameter threaded through for this (#1910's scope item
-  // 3) — omitting it (as shadow-arts.ts/disciplines.ts/warrior-of-elements.ts
-  // do) must leave `effect` unset even though the gate action key is present,
-  // proving the augmentor no-ops rather than throwing.
+  // deflectAugmentor attaches the resolved roll spec via the same fold point
+  // Arcane Charge uses above; omitting abilityMods must leave `effect` unset rather than throw.
   describe("Deflect Attacks / Deflect Missiles — resolved effect via announce augmentor (#1910)", () => {
     const abilityMods = { dexterity: 3 };
 

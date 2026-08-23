@@ -1,11 +1,4 @@
-/**
- * Unit tests for deriveActions / ACTION_EFFECT_FN:
- *   - deriveActions: class/subclass/level gates, resource gating, case-insensitivity
- *   - ACTION_EFFECT_FN: per-key op arrays for every handler in the dispatch table
- *
- * Pure logic — no DB or HTTP layer. Mirrors lib/__tests__/experience.test.ts style.
- */
-
+// Unit tests for deriveActions / ACTION_EFFECT_FN. Pure logic — no DB or HTTP layer.
 import { describe, expect, it } from "vitest";
 
 import {
@@ -25,28 +18,17 @@ import { monk } from "@/lib/classes/monk.js";
 import { SUBCLASS_IDENTITY, type SubclassSlug } from "@/lib/classes/subclass-slug.js";
 import { testFeatureRowsFor } from "@/lib/classes/__tests__/test-feature-rows.fixture.js";
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
-
-/** Build a resource pool entry. */
 function pool(key: string, remaining: number) {
   return { key, remaining };
 }
 
-/** Pluck only the keys from an AvailableAction array. */
 function keys(actions: AvailableAction[]) {
   return actions.map((a) => a.key);
 }
 
-// deriveActions is slug-native now (#1277); `at` goes through the real
-// resolveSubclassSlug-backed resolver (deriveEntryScopedActions) so the
-// display-name fallback path is exercised too, not just the slug. Behaviour-
-// identical to the old bare deriveActions for one entry:
-// effectiveEntryLevel(l, 1, l) === l (effective-levels.ts:9-11) — a rename of
-// every call site below, not a semantic edit. A handful of calls stay direct
-// `deriveActions(cls, "monk-warrior-of-shadow", …)` further down so the
-// slug-native contract is asserted without going through the resolver too.
-// Defaults to EDITION_2024 (#1499) — every existing call in this file exercises
-// 2024 behavior, which is the byte-identical-output AC for this slice; the
+// Goes through the real resolveSubclassSlug-backed resolver
+// (deriveEntryScopedActions) for one entry, so the display-name fallback path
+// is exercised too, not just the slug. Defaults to EDITION_2024; the
 // edition-fork tests below pass "EDITION_2014" explicitly.
 const at = (
   cls: string,
@@ -57,15 +39,10 @@ const at = (
   edition: "EDITION_2014" | "EDITION_2024" = "EDITION_2024",
 ) => deriveEntryScopedActions([{ name: cls, subclass, level }], level, pools, unarmored, edition);
 
-// Row-aware variant of `at` (#1909) — threads testFeatureRowsFor's
-// getFeatureRows carrier (mirrors entry-scoped-actions.test.ts's own
-// `getFeatureRows`), so a caller that needs to see a row-driven action
-// (bardicInspiration/wildShape/divineSense/layOnHands/metamagic/
-// channelDivinity, all moved off DERIVED_ACTIONS onto their class's own
-// ClassFeature rows) uses this instead of bare `at`. `at` itself deliberately
-// stays row-BLIND (its own doc comment, and the "Fighter has no DERIVED_
-// ACTIONS entries" test right below, depend on that isolation to prove a row-
-// driven action is ABSENT from the hand-rolled table).
+// Row-aware variant of `at`, threading testFeatureRowsFor's getFeatureRows
+// carrier for a row-driven action. `at` stays row-BLIND on purpose — the
+// "Fighter has no DERIVED_ACTIONS entries" test below depends on that
+// isolation to prove a row-driven action is absent from the hand-rolled table.
 const atRows = (
   cls: string,
   subclass: string | undefined,
@@ -77,8 +54,6 @@ const atRows = (
   deriveEntryScopedActions([{ name: cls, subclass, level }], level, pools, unarmored, edition, (entry) =>
     testFeatureRowsFor(entry.name, entry.subclass),
   );
-
-// ── deriveActions ─────────────────────────────────────────────────────────────
 
 describe("deriveActions — class gates", () => {
   it("Fighter has no DERIVED_ACTIONS entries (#1528 — Second Wind/Action Surge are row-driven now; see entry-scoped-actions.test.ts's deriveEntryScopedActions coverage)", () => {
@@ -102,8 +77,6 @@ describe("deriveActions — class gates", () => {
     expect(l2).toContain("patientDefenseFocus");
     expect(l2).toContain("stepOfTheWind");
     expect(l2).toContain("stepOfTheWindFocus");
-    // Stunning Strike (L5) is a post-hit rider, not a catalog action — see
-    // stunning-strike.test.ts (#1242).
     expect(l2).not.toContain("stunningStrike");
     const l5 = keys(atRows("monk", undefined, 5, []));
     expect(l5).not.toContain("stunningStrike");
@@ -130,10 +103,7 @@ describe("deriveActions — class gates", () => {
     expect(l3).toContain("channelDivinity");
   });
 
-  // #1229: divineSense is EDITION_2014-only — 2024 folds it into the base
-  // Channel Divinity option "Channel Divinity: Divine Sense" instead (cast
-  // through the abilities endpoint, not this actions dispatch). layOnHands
-  // survives in both editions.
+  // 2024 folds divineSense into the base Channel Divinity option instead (cast through the abilities endpoint).
   it("Paladin L1 (EDITION_2024, row-driven, #1909): layOnHands present, divineSense absent", () => {
     const l1 = keys(atRows("paladin", undefined, 1, [], true, "EDITION_2024"));
     expect(l1).toContain("layOnHands");
@@ -158,10 +128,7 @@ describe("deriveActions — class gates", () => {
     expect(result).not.toContain("flurryOfBlows");
   });
 
-  // #1232 commit 2b: SRD 5.2 grants Metamagic at Sorcerer level 2, not
-  // PHB'14's level 3 — sorcerer-features.ts's metamagic row forks its `level`
-  // per edition (row-driven now, #1909; featuresFromRows-style filters on
-  // edition before the class/level gate).
+  // SRD 5.2 grants Metamagic at Sorcerer level 2; PHB'14 grants it at level 3.
   it("Metamagic level fork (#1232): 2024 grants at L2, 2014 still grants at L3", () => {
     expect(keys(atRows("sorcerer", undefined, 2, [], true, "EDITION_2024"))).toContain("metamagic");
     expect(keys(atRows("sorcerer", undefined, 2, [], true, "EDITION_2014"))).not.toContain("metamagic");
@@ -171,9 +138,6 @@ describe("deriveActions — class gates", () => {
 
 describe("deriveActions — universal actions excluded", () => {
   it("does not include generic actions like attack/dodge/dash", () => {
-    // Universal actions (attack, castSpell, dodge, etc.) are served per edition
-    // by referenceRouter's universalActions (#1430) and must NOT also appear in
-    // availableActions, or TurnHub would render each of them twice.
     const result = keys(atRows("fighter", undefined, 5, []));
     const universalKeys = ["attack", "castSpell", "dodge", "dash", "disengage", "help", "hide", "search", "ready"];
     for (const key of universalKeys) {
@@ -181,11 +145,9 @@ describe("deriveActions — universal actions excluded", () => {
     }
   });
 
-  // The exclusion above can only ever pass, because no DERIVED_ACTIONS row sets
-  // `universal` — so deleting matchesActionGate's guard would break nothing
-  // observable. This is the latch, asserted against a synthetic record: the SAME
-  // row with and without the flag, so a green "false" can only come from the
-  // universal branch and not from a class/level gate (#1431).
+  // No DERIVED_ACTIONS row actually sets `universal`, so this asserts against
+  // a synthetic record: the SAME row with and without the flag, so a green
+  // "false" can only come from the universal branch, not a class/level gate.
   it("matchesActionGate rejects a universal record that every other gate accepts (#1431)", () => {
     const row = { key: "syntheticUniversal", name: "Synthetic", cost: "action" as const, grantClass: "rogue", grantLevel: 1 };
     expect(matchesActionGate(row, "rogue", undefined, 20, "EDITION_2024")).toBe(true);
@@ -214,18 +176,11 @@ describe("deriveActions — regrants (#1431)", () => {
   });
 
   it("a row with no regrants omits the field entirely", () => {
-    // Second Wind (formerly this test's fixture) is row-driven now (#1528) —
-    // wildShape is row-driven too now (#1909), with no `regrants` column set.
     const wildShape = atRows("druid", undefined, 2, []).find((a) => a.key === "wildShape");
     expect(wildShape).toBeDefined();
     expect(wildShape).not.toHaveProperty("regrants");
   });
 
-  // Every regranting row moved onto seeded ClassFeature rows (#1912) —
-  // `summonBondedWeapon` (the one DERIVED_ACTIONS row left) regrants nothing,
-  // so this is legitimately empty now. The row-level equivalent (every
-  // ClassFeature row's own `regrants` union) is seed-data.test.ts's own drift
-  // gate — a seed-side check, not this pure-TS-table one.
   it("REGRANTED_UNIVERSAL_KEYS is empty — DERIVED_ACTIONS regrants nothing (#1912)", () => {
     expect([...REGRANTED_UNIVERSAL_KEYS]).toEqual([]);
   });
@@ -238,9 +193,7 @@ describe("deriveActions — Fast Hands (Thief L3, #1431)", () => {
     const row = thief.find((a) => a.key === "fastHands");
     expect(row?.cost).toBe("bonusAction");
     expect(row?.regrants).toEqual(["useObject"]);
-    // Both editions spend Cunning Action's OWN Bonus Action, and no action-economy
-    // field can express "these two cards share a slot" — so the reminder is the
-    // only place that rule can be stated (SRD 5.1 / SRD 5.2, Thief: Fast Hands).
+    // No action-economy field can express "shares Cunning Action's slot" — the reminder is the only place that fits.
     expect(row?.reminder).toMatch(/Cunning Action/);
   });
 
@@ -253,15 +206,6 @@ describe("deriveActions — Fast Hands (Thief L3, #1431)", () => {
 
 describe("deriveActions — case-insensitivity", () => {
   it("matches class name regardless of case", () => {
-    // Fighter (formerly this test's fixture) has no DERIVED_ACTIONS entries
-    // left (#1528 — row-driven now); paladin/barbarian cover the same gate.
-    // #1229: divineSense is EDITION_2014-only now, so this case-insensitivity
-    // check passes the edition explicitly rather than relying on the
-    // (still-2024) default. divineSense/channelDivinity are row-driven now
-    // (#1909), so this uses `atRows`; Barbarian's own case here checks
-    // recklessAttack, not rage — rage is row-driven now (#1686) and bare
-    // `atRows()` (no featureRows carrier) can never see it; recklessAttack is
-    // untouched (still a bare DERIVED_ACTIONS row, `at` stays correct there).
     expect(keys(atRows("Paladin", undefined, 1, [], true, "EDITION_2014"))).toContain("divineSense");
     expect(keys(atRows("PALADIN", undefined, 3, []))).toContain("channelDivinity");
     expect(keys(atRows("Barbarian", undefined, 2, []))).toContain("recklessAttack");
@@ -269,11 +213,6 @@ describe("deriveActions — case-insensitivity", () => {
 });
 
 describe("deriveActions — resource gating", () => {
-  // rage's own enable/disable-by-pool coverage moved to the "Rage —
-  // row-driven toggle (#1686)" describe block below (it's a row-driven
-  // action now, not a bare DERIVED_ACTIONS entry) — flurryOfBlows here
-  // already proves the SAME resolveEnablement mechanism against a
-  // DERIVED_ACTIONS row.
   it("flurryOfBlows needs 1 focus: disabled with 'No focus remaining' at 0 (#1217)", () => {
     const actions = atRows("monk", undefined, 2, [pool("focus", 0)]);
     const flurry = actions.find((a) => a.key === "flurryOfBlows");
@@ -288,17 +227,12 @@ describe("deriveActions — resource gating", () => {
   });
 
   it("actions without a resourceKey are always enabled", () => {
-    // recklessAttack has no resourceKey — should always be enabled.
     const actions = atRows("barbarian", undefined, 2, []);
     const reckless = actions.find((a) => a.key === "recklessAttack");
     expect(reckless?.enabled).toBe(true);
   });
 
   it("empty pools default to 0 remaining (action disabled)", () => {
-    // No pool entry for "wildShape" → defaults to remaining=0 → disabled.
-    // wildShape is row-driven now (#1909) — uses `atRows`; this is also the
-    // enablement-fix's own regression pin, since wildShape's identity key
-    // ("wildShape") happens to equal its cost pool key, unlike Metamagic.
     const actions = atRows("druid", undefined, 2, []);
     const wildShape = actions.find((a) => a.key === "wildShape");
     expect(wildShape?.enabled).toBe(false);
@@ -330,17 +264,11 @@ describe("deriveActions — requiresUnarmored gate (Bonus Unarmed Strike, #1218)
   });
 
   it("actions with no requiresUnarmored flag ignore the unarmoredUnshielded param", () => {
-    // flurryOfBlows carries no requiresUnarmored — armored/shielded is
-    // irrelevant to it (Rage, formerly this test's fixture, is row-driven
-    // now — #1686 — and carries no requiresUnarmored either, but bare
-    // `atRows()` can no longer see it at all).
     const actions = atRows("monk", undefined, 2, [pool("focus", 1)], false);
     const flurry = actions.find((a) => a.key === "flurryOfBlows");
     expect(flurry?.enabled).toBe(true);
   });
 });
-
-// ── ACTION_EFFECT_FN ──────────────────────────────────────────────────────────
 
 describe("ACTION_EFFECT_FN — no-op keys return []", () => {
   const noOpKeys = [
@@ -362,7 +290,7 @@ describe("ACTION_EFFECT_FN — single spendResource keys", () => {
     ["channelDivinity", "channelDivinity"],
     ["wildShape", "wildShape"],
     // actionSurge is row-driven now (#1528) — no ACTION_EFFECT_FN entry; its
-    // pure-counter spend is covered by actions-cast.test.ts (routes).
+    // pure-counter spend is covered by the route-level cast tests.
     ["divineSense", "divineSense"],
   ];
 
@@ -374,16 +302,8 @@ describe("ACTION_EFFECT_FN — single spendResource keys", () => {
   }
 });
 
-// Rage/endRage retired from DERIVED_ACTIONS/ACTION_EFFECT_FN (#1686) — now a
-// row-driven "toggle" (barbarian-features.ts), reached through
-// deriveEntryScopedActions (toggleActionsFromRow) + toggleRowOps, off the
-// SAME literal rows test-feature-rows.fixture.ts mirrors for barbarian-
-// features.ts (literal-fixture-parity.test.ts pins level/description parity;
-// this suite is the descriptor-column parity proof). Byte-identity with the
-// retired closures (modifier/resistDamageTypes/rollEffects/spend shape) is
-// also pinned end-to-end through the real HTTP route by
-// routes/character/__tests__/actions-rage.test.ts, unmodified by this
-// migration.
+// Rage/endRage are a row-driven "toggle", reached through
+// deriveEntryScopedActions (toggleActionsFromRow) + toggleRowOps.
 describe("Rage — row-driven toggle (#1686, retired from ACTION_EFFECT_FN)", () => {
   const rageRow = (edition: "EDITION_2014" | "EDITION_2024") =>
     testFeatureRowsFor("barbarian", undefined).classRows.find((r) => r.name === "Rage" && r.edition === edition)!;
@@ -581,9 +501,6 @@ describe("Heightened Focus (monk L10, #1244) — Patient Defense temp HP + remin
   });
 });
 
-// Stunning Strike (#392's bare-spend stub) is superseded by the dedicated
-// stunning-strike.ts vertical (#1242) — see stunning-strike.test.ts for its
-// once-per-turn guard, DC math, and fail/success outcome coverage.
 describe("Monk Stunning Strike — not a catalog action (#1242)", () => {
   it("has no DERIVED_ACTIONS entry at any level", () => {
     expect(keys(atRows("monk", undefined, 4, []))).not.toContain("stunningStrike");
@@ -629,13 +546,8 @@ describe("Warrior of Shadow — Shadow Step (2024 rewrite, #1246)", () => {
 
   it("class gate: a non-monk doesn't get shadowStep even with a Shadow-like subclass", () => {
     // An explicit empty row carrier, not atRows/testFeatureRowsFor: that
-    // fixture's subclass-name key is flat ACROSS all twelve classes (its own
-    // header warns "testFeatureRowsFor('fighter','life domain') would
-    // silently hand back Cleric rows"), so calling it with rogue + a monk
-    // subclass NAME would hit exactly that collision — a fixture artifact,
-    // not evidence about the real gate. Production's row-driven actions are
-    // scoped by the DB's classId FK, an entirely different mechanism from
-    // matchesActionGate's class-name check.
+    // fixture's subclass-name key is flat ACROSS all twelve classes, so
+    // calling it with rogue + a monk subclass NAME would collide.
     const emptyRows = () => ({ classRows: [], subclassRows: [] });
     const rogue = keys(
       deriveEntryScopedActions([{ name: "rogue", subclass: SHADOW, level: 20 }], 20, [], true, "EDITION_2024", emptyRows),
@@ -691,9 +603,6 @@ describe("Monk Deflect Attacks / Deflect Energy (#1241)", () => {
   });
 
   it("is a pure reminder action — no server effect fn for the base reduction", () => {
-    // Mirrors Warrior of Shadow's shadowStep (#1246): the client rolls
-    // 1d10 + Dex + monk level and never calls the transactions endpoint for the
-    // base reduction (nothing persisted). Only the redirect spends Focus.
     expect(ACTION_EFFECT_FN.deflectAttacks).toBeUndefined();
   });
 
@@ -738,7 +647,6 @@ describe("Monk Deflect Attacks / Deflect Energy (#1241)", () => {
       { name: "monk", level: 3 },
       { name: "fighter", level: 10 },
     ];
-    // deflectAttacks is row-driven now (#1912) — needs the featureRows carrier.
     const actions = deriveEntryScopedActions(entries, 13, [], true, "EDITION_2024", (e) =>
       testFeatureRowsFor(e.name, undefined),
     );
@@ -769,7 +677,6 @@ describe("Flurry of Blows strike count (#1505) — resolved server-side, never a
       { name: "monk", level: 10 },
       { name: "fighter", level: 5 },
     ];
-    // flurryOfBlows is row-driven now (#1912) — needs the featureRows carrier.
     const actions = deriveEntryScopedActions(entries, 15, [pool("focus", 1)], true, "EDITION_2024", (e) =>
       testFeatureRowsFor(e.name, undefined),
     );
@@ -900,13 +807,6 @@ describe("2014 Monk Empty Body (L18, #1500) — gating/reminder rows, no dedicat
   });
 });
 
-// #1499/#1500: the class-derivation layer's edition axis. Six base-class
-// monk rows are EDITION_2024-only (patientDefense/patientDefenseFocus/
-// stepOfTheWind/stepOfTheWindFocus/deflectAttacks/deflectAttacksRedirect —
-// no 2014 shape resembles the 2024 free/paid-pair or melee+ranged model);
-// flurryOfBlows is tagged for BOTH editions now under the SAME key (#1500,
-// mirrors Lay on Hands) rather than being 2024-exclusive; bonusUnarmedStrike
-// stays deliberately shared/untagged.
 describe("DERIVED_ACTIONS edition axis — 2014 Monk gets none of the six 2024-only rows (#1499/#1500)", () => {
   const TAGGED_2024_ONLY_ROWS = [
     "patientDefense",
@@ -947,9 +847,6 @@ describe("DERIVED_ACTIONS edition axis — 2014 Monk gets none of the six 2024-o
     expect(l20).not.toContain("stepOfTheWindKi");
   });
 
-  // Extends the #1431 synthetic-record test onto the edition axis: the SAME
-  // row with and without an edition tag, so a green "false" can only come from
-  // the edition branch and not from a class/level/subclass gate.
   it("matchesActionGate rejects a row tagged for the other edition (#1499)", () => {
     const row = { key: "synthetic2024", name: "Synthetic", cost: "action" as const, grantClass: "monk", grantLevel: 1 };
     expect(matchesActionGate(row, "monk", undefined, 20, "EDITION_2014")).toBe(true);
@@ -958,9 +855,6 @@ describe("DERIVED_ACTIONS edition axis — 2014 Monk gets none of the six 2024-o
   });
 
   it("actionGrantLevel resolves flurryOfBlows for BOTH editions now (#1500 — was EDITION_2014-undefined before this slice)", () => {
-    // flurryOfBlows/bonusUnarmedStrike/patientDefenseKi/stepOfTheWindKi are
-    // all row-driven now (#1912) — actionGrantLevel needs the row list as its
-    // 3rd argument to resolve a key that isn't in DERIVED_ACTIONS any more.
     const { classRows, subclassRows } = testFeatureRowsFor("monk", undefined);
     const rows = [...classRows, ...subclassRows];
     expect(actionGrantLevel("flurryOfBlows", "EDITION_2024", rows)).toBe(2);
@@ -976,9 +870,8 @@ describe("DERIVED_ACTIONS edition axis — 2014 Monk gets none of the six 2024-o
   });
 });
 
-// A synthetic Second Wind row (EDITION_2014 shape) matching
-// prisma/seed/fighter-features.ts's authored descriptor columns — the
-// row-driven counterpart to ACTION_CAST_FN's retired secondWind closure (#1528).
+// A synthetic Second Wind row (EDITION_2014 shape) matching the seeded
+// Fighter row's authored descriptor columns.
 function secondWindRow(): ClassFeatureRow {
   return {
     name: "Second Wind",
@@ -1021,11 +914,6 @@ describe("castSpecFromRow — Second Wind, row-driven (#1528, retired ACTION_CAS
     expect(spec.apply).toBeUndefined();
   });
 
-  // Mutation proof (#1528's own AC): changing the SEEDED modifierSource
-  // changes the served heal with no frontend edit — effectModifierSource is
-  // read purely off the row, so a level-14 cast with the axis REMOVED must
-  // roll noticeably lower than the SAME cast with it present, for the exact
-  // die roll fixed in both branches.
   it("mutation proof: removing the row's effectModifierSource drops the level term from the served roll", () => {
     const withAxis = castSpecFromRow(secondWindRow(), 14, () => 4);
     expect(withAxis.roll).toBe(18); // 4 (die) + 14 (level)
@@ -1038,9 +926,6 @@ describe("castSpecFromRow — Second Wind, row-driven (#1528, retired ACTION_CAS
 
 describe("Action Surge stays a counter, row-driven (#1528, retired ACTION_CAST_FN/ACTION_EFFECT_FN entries)", () => {
   it("has no ACTION_EFFECT_FN entry — the pure-counter spend is dispatched via the row's costKind, not this table", () => {
-    // The extra-action grant is client-side (grantExtraAction) — nothing to
-    // apply server-side; routes/character/__tests__/actions-cast.test.ts
-    // covers the end-to-end spend through the row-driven dispatcher.
     expect(ACTION_EFFECT_FN.actionSurge).toBeUndefined();
   });
 });
@@ -1289,14 +1174,7 @@ describe("ACTION_EFFECT_FN — useObject", () => {
   });
 });
 
-// #1315: migrates the Warrior of Shadow feature-availability gates off
-// DerivedClassInfo booleans and onto ClassFeature rows (#1912 moved them off
-// DERIVED_ACTIONS in turn). The dedicated endpoint (shadow-arts.ts) still
-// owns the actual cast/activate — these rows only express the level gate as
-// data. Uses `atRows()` with the display NAME now (row-driven, not a
-// DERIVED_ACTIONS slug literal) — the slug-vs-name resolution contract
-// itself is covered generically by the "subclass gate resolves via slug"
-// describe block further down (#1339, #1277).
+// The dedicated shadow-arts endpoint owns the actual cast/activate — these rows only express the level gate as data.
 describe("Warrior of Shadow — Shadow Arts / Cloak of Shadows catalog rows (#1315)", () => {
   it("Shadow monk gets shadowArts at L3, not L2", () => {
     expect(keys(atRows("monk", "Warrior of Shadow", 2, [], true, "EDITION_2024"))).not.toContain("shadowArts");
@@ -1343,12 +1221,9 @@ describe("Warrior of Shadow — Shadow Arts / Cloak of Shadows catalog rows (#13
   });
 });
 
-// #1502: 2014 Way of Shadow (PHB'14 pp. 79-80 — not in SRD 5.1) reinstates the
-// four-spell 2-ki Shadow Arts menu, Shadow Step without the free unarmed
-// strike, Cloak of Shadows at L11 with no resource cost, and Opportunist at
-// L17 — under the SAME action keys as the 2024 Warrior of Shadow rows
-// (shadowArts/shadowStep/cloakOfShadows), disambiguated by `edition` +
-// its own subclassId (#1912, was `grantSubclassSlugs` before the row move).
+// PHB'14 pp.79-80 (not in SRD 5.1): the four-spell 2-ki Shadow Arts menu,
+// Shadow Step without the free unarmed strike, Cloak of Shadows at L11 with
+// no resource cost, and Opportunist at L17.
 describe("Way of Shadow (2014) — Shadow Arts / Shadow Step / Cloak of Shadows / Opportunist (#1502)", () => {
 
   it("gets shadowArts at L3, not L2, gated on 2 ki", () => {
@@ -1403,10 +1278,6 @@ describe("Way of Shadow (2014) — Shadow Arts / Shadow Step / Cloak of Shadows 
   });
 
   it("subclass gate: the 2024 Warrior of Shadow slug never gets Opportunist, even under EDITION_2014", () => {
-    // opportunist has no 2024 counterpart at all, so it's the one key here
-    // that isolates the subclass gate cleanly (shadowArts/shadowStep/
-    // cloakOfShadows share their KEY NAME with the 2024 rows, so a same-slug
-    // mismatch on those is already covered by the edition-gate test above).
     const warriorOfShadow2014 = keys(
       deriveActions("monk", "monk-warrior-of-shadow", 20, [pool("ki", 5)], true, "EDITION_2014"),
     );
@@ -1417,11 +1288,6 @@ describe("Way of Shadow (2014) — Shadow Arts / Shadow Step / Cloak of Shadows 
 describe("Warrior of the Elements — Elemental Attunement / Elemental Burst catalog rows (#1315)", () => {
   const ELEMENTS = "Warrior of the Elements";
 
-  // Elemental Attunement is row-driven now (#1686) — a bare `atRows()` call (no
-  // featureRows carrier) can never see it, since Monk's own module carries no
-  // DERIVED_ACTIONS entry for it any more. Mirrors monk.ts's real
-  // AuthoredFeature entry exactly (the row-driven counterpart of every other
-  // literal-class fixture row in test-feature-rows.fixture.ts).
   const ELEMENTAL_ATTUNEMENT_ROW: ClassFeatureRow = {
     name: "Elemental Attunement",
     level: 3,
@@ -1487,18 +1353,9 @@ describe("Warrior of the Elements — Elemental Attunement / Elemental Burst cat
   });
 });
 
-// #1340: cleric.ts and paladin.ts both grant a feature named "Channel
-// Divinity" (cleric at L2, paladin at L3) drawing on the same channelDivinity
-// pool. Before the fix, DERIVED_ACTIONS carried two rows (channelDivinityCleric/
-// channelDivinityPaladin) — a single-class read only ever sees its own class's
-// row, but a multiclass read surfaced both as duplicate cards. PHB'14 p.164:
-// one feature, one pool, one card — merged via the single-class-gate-or-class
-// grantClasses array so matchesActionGate keeps one class-gate code path
-// (classGatesOf normalizes both the legacy grantClass/grantLevel shape and the
-// new grantClasses shape).
+// PHB'14 p.164: Cleric (L2) and Paladin (L3) both grant "Channel Divinity",
+// drawing on the same pool — one feature, one pool, one card, not two duplicate cards.
 describe("Channel Divinity — one merged row, gated cleric≥2 OR paladin≥3 (#1340)", () => {
-  // Row-driven now (#1909, onto cleric-features.ts's + paladin-features.ts's
-  // own rows) — every case below uses `atRows`.
   it("granted class gate: cleric reaches it at L2, paladin at L3, in isolation", () => {
     expect(keys(atRows("cleric", undefined, 1, []))).not.toContain("channelDivinity");
     expect(keys(atRows("cleric", undefined, 2, []))).toContain("channelDivinity");
@@ -1532,13 +1389,6 @@ describe("Channel Divinity — one merged row, gated cleric≥2 OR paladin≥3 (
   });
 });
 
-// #1339 fixed this ONE gate's substring bleed (a 2014 "Way of Shadow" monk
-// passing the 2024 "Warrior of Shadow" gate purely because "shadow" ⊂ "way of
-// shadow") by matching the display name EXACTLY. #1277 replaces that exact-
-// name table with resolveSubclassSlug (FK preferred, exact name as fallback)
-// — this block now exercises the fallback path via `atRows()`, which resolves
-// through the real resolver, so a display-name gate and a slug gate are
-// asserted by the SAME mechanism.
 describe("subclass gate resolves via slug — FK preferred, exact name as fallback, never substring (#1339, #1277)", () => {
   it('a 2014 "Way of Shadow" monk gets none of the Warrior of Shadow rows at L20', () => {
     const wayOfShadow = keys(atRows("monk", "Way of Shadow", 20, [pool("focus", 5)]));
@@ -1577,8 +1427,6 @@ describe("subclass gate resolves via slug — FK preferred, exact name as fallba
   });
 
   it("the other three families still match their registry names exactly", () => {
-    // elementalAttunement is row-driven (#1686) — bare atRows() can't reach it;
-    // elementalBurst alone still proves the slug match for this subclass.
     const elements = keys(atRows("monk", "warrior of the elements", 6, [pool("focus", 2)]));
     expect(elements).toContain("elementalBurst");
 
@@ -1591,29 +1439,13 @@ describe("subclass gate resolves via slug — FK preferred, exact name as fallba
     expect(mercy).toContain("handOfHealingFlurry");
   });
 
-  // Drift latch, RETARGETED for #1277: was a hand-maintained
-  // Record<string, string[]> keyed by display name (DERIVED_ACTIONS being
-  // unexported meant a new subclass-gated row needed adding here by hand or
-  // the latch silently stopped covering it). The key type now widens to
-  // Record<Extract<SubclassSlug, `monk-${string}`>, string[]> — exhaustive
-  // over EVERY monk slug, so a fifth monk subclass fails TYPECHECK instead of
-  // silently escaping the latch (strictly stronger than the old hand-
-  // maintained table). Still exercises the name-fallback path at runtime: for
-  // each slug, resolve its accepted NAME via SUBCLASS_IDENTITY and call
-  // through `atRows()`, so this is the same mechanism the FK path uses, minus the FK.
-  // elementalAttunement is deliberately absent from the 2024 Warrior of the
-  // Elements/Warrior of Shadow/Warrior of the Open Hand lists here — it's
-  // row-driven (#1686) and unreachable through the bare atRows() this test uses;
-  // elementalBurst alone still proves the slug match for that subclass. The
-  // 2014 Way of the Four Elements elementalAttunement is a PLAIN
-  // DERIVED_ACTIONS reminder row (#1503, not row-driven), so it IS reachable
-  // and listed. Each entry carries its OWN `edition` (#1501/#1502/#1503):
-  // "monk-way-of-the-open-hand", "monk-way-of-shadow", and
-  // "monk-way-of-the-four-elements" are each EDITION_2014-only, so a blanket
-  // EDITION_2024 loop (the shape before these three slices) would wrongly
-  // report their rows unreachable — `atRows()`'s own default (EDITION_2024)
-  // would silently exclude them, the exact same-key-different-edition trap
-  // #1499 anticipated.
+  // Exhaustive over EVERY monk slug (Record<Extract<SubclassSlug,
+  // `monk-${string}`>, ...>), so a fifth monk subclass fails typecheck instead
+  // of silently escaping this latch. elementalAttunement is deliberately
+  // absent from the 2024 lists — it's row-driven and unreachable through the
+  // bare atRows() this test uses. Each entry carries its own `edition`, since
+  // three of these slugs are EDITION_2014-only and atRows()'s default
+  // (EDITION_2024) would otherwise silently exclude them.
   const MONK_SUBCLASS_GRANT_KEYS: Record<
     Extract<SubclassSlug, `monk-${string}`>,
     { edition: "EDITION_2014" | "EDITION_2024"; keys: string[] }
@@ -1641,13 +1473,6 @@ describe("subclass gate resolves via slug — FK preferred, exact name as fallba
     }
   });
 
-  // Ties the DERIVED_ACTIONS vocabulary to the subclasses-registry vocabulary
-  // (monk.ts's `subclasses` map) — RETARGETED for #1277: was "every accepted
-  // NAME is a registry key" (validity was runtime-checked here); now every
-  // grantSubclassSlugs entry must be a monk SubclassDefinition's OWN slug, and
-  // the *validity* half (is it a real SubclassSlug at all) is the compiler's
-  // job via the Record type above — this test keeps only the "agrees with the
-  // resource/feature gate's identity" half, which the compiler can't check.
   it("every grantSubclassSlugs entry is a monk subclass definition's slug (#1339, retargeted #1277)", () => {
     const monkDefSlugs = Object.values(monk.subclasses ?? {}).map((sub) => sub.slug);
     for (const slug of Object.keys(MONK_SUBCLASS_GRANT_KEYS) as SubclassSlug[]) {
@@ -1656,14 +1481,9 @@ describe("subclass gate resolves via slug — FK preferred, exact name as fallba
   });
 });
 
-// Standing invariant (#1340 scope item 3): discharges the action half of the
-// audit — Channel Divinity must stay the only cross-class action name/row-set,
-// whether hand-rolled (DERIVED_ACTIONS) or row-driven (#1909's
-// channelDivinity migration onto cleric-features.ts's/paladin-features.ts's
-// own rows — `atRows` sees both). Loops every class × its subclasses (mirrors
-// class-features-snapshot.test.ts's CLASS_SUBCLASSES table) at the max level
-// so the next action a second class grants under the same display name fails
-// THIS test instead of silently shipping two identical cards.
+// Loops every class x its subclasses at the max level, so the next action a
+// second class grants under the same display name fails THIS test instead of
+// silently shipping two identical cards.
 describe("no two actions from different classes share a display name (#1340)", () => {
   const CLASS_SUBCLASSES: Record<string, (string | undefined)[]> = {
     barbarian: [undefined, "totem warrior", "berserker"],
