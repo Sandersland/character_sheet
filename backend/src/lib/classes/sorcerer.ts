@@ -4,29 +4,32 @@ import type { ClassDefinition } from "./types.js";
 // (prisma/seed/sorcerer-features.ts, commits 1-2) and every movable resource
 // pool moved onto its row (commit 3, this one — see that file's own header
 // for the pool-by-pool inventory). This module is NOT deletable, unlike
-// fighter.ts/barbarian.ts, for THREE reasons that all survive this commit:
+// fighter.ts/barbarian.ts, for TWO reasons that survive this commit:
 //
-// (1) `grantLevel: 1` on both subclasses below is PHB'14 p.99's real
-// Sorcerous Origin gate, not the 3 every SUBCLASS_IDENTITY-seeded,
-// not-yet-deleted module falls back to (subclassGateLevel(undefined,
-// "EDITION_2014") === 3) — deleting this module would silently move every
-// 2014 Sorcerer's subclass gate to 3. #1576 tracks moving this gate onto
-// data so this module can finally go.
+// (1) BINDING REASON: `sorceryPoints`' total is `level` for every level 2-20
+// — a formula, not a level-tiered total ClassFeature.resourceTotals'
+// tier-array schema can express (that column's own schema.prisma comment
+// names exactly this case, alongside Bardic Inspiration/Lay on Hands, as the
+// "stays in resourceFn" shape). Only its DESCRIPTION is edition-branched
+// below — the 2024 Font of Magic ClassFeature row now also carries its own
+// feature text (sorcerer-features.ts), and the two editions' Font of Magic
+// text genuinely differs (SRD 5.2's Creating Spell Slots table adds a Min.
+// Sorcerer Level column) — pinned agreeing with that row's own text by
+// sorcerer-resource-pools.test.ts, mirroring warlock.ts's former Dark One's
+// Own Luck residue (warlock.ts is deleted outright now, #1576).
 //
-// (2) `sorceryPoints`' total is `level` for every level 2-20 — a formula,
-// not a level-tiered total ClassFeature.resourceTotals' tier-array schema
-// can express (that column's own schema.prisma comment names exactly this
-// case, alongside Bardic Inspiration/Lay on Hands, as the "stays in
-// resourceFn" shape). Only its DESCRIPTION is edition-branched below — the
-// 2024 Font of Magic ClassFeature row now also carries its own feature text
-// (sorcerer-features.ts), and the two editions' Font of Magic text genuinely
-// differs (SRD 5.2's Creating Spell Slots table adds a Min. Sorcerer Level
-// column) — pinned agreeing with that row's own text by
-// sorcerer-resource-pools.test.ts, mirroring warlock.ts's Dark One's Own
-// Luck residue.
-//
-// (3) FONT_OF_MAGIC_MAX_SLOT_LEVEL/sorceryPointCostForSlot have a real
+// (2) FONT_OF_MAGIC_MAX_SLOT_LEVEL/sorceryPointCostForSlot have a real
 // consumer in lib/spellcasting/spellcasting.ts.
+//
+// RETIRED REASON: `grantLevel: 1` on both subclasses below is PHB'14 p.99's
+// real Sorcerous Origin gate, not the 3 every SUBCLASS_IDENTITY-seeded module
+// falls back to — this used to be a THIRD, independent reason blocking
+// deletion, identical in shape to Cleric's/Warlock's/Wizard's own (all three
+// deleted outright, #1576). #1576's seeded CharacterClass.subclassLevel is
+// now live and gives isSubclassActive a data source that survives a module's
+// deletion (ClassFeatureRowsCarrier.subclassLevel's own doc comment has the
+// mechanism), so this reason alone no longer blocks deleting this file — it
+// stays open only for reasons (1)/(2) above.
 //
 // The wild-magic subclass's OWN resourceFn (tidesOfChaos) is DELETED here,
 // not merely emptied — its flat, level-gated total moved onto both editions'

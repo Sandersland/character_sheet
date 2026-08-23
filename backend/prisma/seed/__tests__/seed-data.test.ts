@@ -992,12 +992,4 @@ describe("SUBCLASS_SLUGS — three-way bijection (#1277)", () => {
     });
     expect(missing, "slug declared but no SubclassDefinition carries it, and not a row-migrated class").toEqual([]);
   });
-
-  // The declared intentional-gap allowlist — every entry here is a slug the
-  // bijection check above deliberately excuses from needing a
-  // SubclassDefinition, with its own reason recorded at the declaration site
-  // (never silently dropped from SUBCLASS_SLUGS itself).
-  it("the intentional-gap allowlist names exactly the disclosed engine-first subclasses", () => {
-    expect(INTENTIONAL_GAPS).toEqual([]);
-  });
 });

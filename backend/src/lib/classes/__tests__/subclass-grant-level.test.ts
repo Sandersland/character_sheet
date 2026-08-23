@@ -98,11 +98,21 @@ describe("subclass grant level is 3 for all classes (#1128)", () => {
 // #1546 Part A: the full twelve non-3 `grantLevel` subclasses (the arbiter's
 // verified list — everything else gates at 3, including all three Fighter
 // subclasses via their identity-only SUBCLASS_IDENTITY entry, #1546). Part A's
-// registration change is behaviour-preserving by construction (the TS overlay
-// always wins for a class still on the migration path), so these twelve stay
-// exactly as gated as before — this is the exhaustive version of the
-// GATE_1/GATE_2 spot-checks below, closing the gap between "5 representative
-// subclasses" and "all twelve the issue names".
+// registration change is behaviour-preserving by construction, so these
+// twelve stay exactly as gated as before — this is the exhaustive version of
+// the GATE_1/GATE_2 spot-checks below, closing the gap between "5
+// representative subclasses" and "all twelve the issue names".
+//
+// #1576 later deleted eight of these twelve's TS modules outright (Cleric's
+// two, Warlock's three, Wizard's three) — testFeatureRowsFor's own
+// SUBCLASS_LEVEL_BY_CLASS map now supplies the seeded gate for every one of
+// these twelve, module or not, which is why the assertions below stay green
+// through that data-source switch: this describe block pins the GATE VALUE
+// (1 or 2), not which mechanism (a TS module's `grantLevel` vs. the seeded
+// `subclassLevel`) produces it — that distinction, and the one place the TS
+// `?? def.grantLevel` fallback is still exercised (Sorcerer/Druid, the four
+// of these twelve whose module survives), is subclass-gate-data-source.test.ts's
+// job.
 describe("subclass grant level is edition-aware for 2014 (#1291) — full twelve", () => {
   const GATE_1: Array<[string, string]> = [
     ["cleric", "life domain"],

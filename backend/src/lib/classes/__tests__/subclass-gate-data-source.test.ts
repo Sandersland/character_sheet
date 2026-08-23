@@ -9,9 +9,13 @@
 // moved the gate to 3, so a 2014 Cleric at level 1 kept its subclass NAME
 // (seeded column) and lost every subclass FEATURE (module gone).
 //
-// subclass-grant-level.test.ts covers the same gate through the TS module —
-// i.e. the `?? def.grantLevel` fallback this issue deliberately preserves. This
-// file covers the seeded path and, crucially, which of the two WINS.
+// subclass-grant-level.test.ts's GATE_1/GATE_2 cases now resolve through the
+// SEEDED path too (testFeatureRowsFor supplies `subclassLevel` for every
+// class, not only Cleric/Warlock/Wizard) — eight of its twelve subclasses
+// (Cleric's two, Warlock's three, Wizard's three) have no TS module left to
+// fall back to at all; only Sorcerer's two and Druid's two still have one.
+// This file's own STILL_ON_TS_PATH cases below are what actually still pin
+// the `?? def.grantLevel` fallback — the only place left that exercises it.
 import { describe, expect, it } from "vitest";
 
 import type { RulesEdition } from "@character-sheet/shared-types";

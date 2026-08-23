@@ -211,17 +211,24 @@ fi
 #     advancement-slots.ts's own entry directly above: a computed rule
 #     function keyed off subclass identity + level + edition, never routed
 #     through fighter's retired AuthoredFeature/resourceFn machinery.
-#   - srd/spellcasting-tables.ts: PERMANENT (#1576, first triggered here —
-#     Cleric/Warlock/Wizard are this guard's first MIGRATED classes that are
-#     also full/Pact-Magic casters). SPELLCASTING_ABILITY/FULL_CASTER_CLASSES/
-#     the slot-progression tables are closed-form 5e RAW (PHB p.114 / Basic
-#     Rules), edition-invariant and shared across every caster — never part of
-#     any lib/classes/<class>.ts registration or the ClassFeature-row
-#     migration, same category as the XP/proficiency tables CLAUDE.md keeps in
-#     code where editions agree. Sorcerer's and Druid's own names already sit
-#     here unflagged only because those two classes are still NOT_YET_MIGRATED
-#     — nothing about this file changed when Cleric/Warlock/Wizard's modules
-#     were deleted.
+#   - srd/spellcasting-tables.ts: EXEMPTED pending #1529 (first triggered
+#     here — Cleric/Warlock/Wizard are this guard's first MIGRATED classes
+#     that are also full/Pact-Magic casters, surfacing a gap that predates
+#     this deletion). schema.prisma's #1529 block names its migration target
+#     as "the last class-table content still keyed by class NAME in lib/srd/
+#     Record<string,...> literals" — this file's class-name-keyed Records
+#     (SPELLCASTING_ABILITY, CASTER_FRACTION_BY_CLASS, PREPARED_SPELLS_BY_CLASS,
+#     CANTRIP_BREAKPOINTS, SWAP_CADENCE_BY_CLASS, FULL_CASTER_CLASSES/
+#     HALF_CASTER_CLASSES) are exactly that content, still awaiting the move
+#     onto CharacterClass columns #1529 tracks. The slot-COUNT tables
+#     (FULL_CASTER_SLOTS/HALF_CASTER_SLOTS/PACT_MAGIC_SLOTS/THIRD_CASTER_SLOTS,
+#     keyed by character level, never by class name) are a SEPARATE, genuinely
+#     SHARED-RULE-PERMANENT category within the same file — closed-form 5e RAW
+#     (PHB p.114 / Basic Rules), edition-invariant across every caster, same
+#     category as the XP/proficiency tables CLAUDE.md keeps in code where
+#     editions agree — and would stay allowlisted even after #1529 lands.
+#     Sorcerer's and Druid's own names already sit here unflagged only because
+#     those two classes are still NOT_YET_MIGRATED.
 #   - classes/channel-divinity.ts: PERMANENT (#419, first triggered by #1576).
 #     CHANNEL_DIVINITY_OPTIONS is the shared Cleric+Paladin Channel Divinity
 #     dispatch gate table (class/subclass/level per option) — independent of
@@ -232,18 +239,26 @@ fi
 #     recharge rule (its slots regain differently from every other caster's) —
 #     a computed rule function never routed through warlock.ts's
 #     AuthoredFeature/resourceFn machinery.
-#   - character/character-create.ts: PERMANENT (#1130, first triggered by
-#     #1576). MAGIC_INITIATE_CLASS_BY_BACKGROUND is a creation-time snapshot
-#     rule (which class's spell list a background's Magic Initiate feat
-#     draws from) — independent of any lib/classes/<class>.ts registration.
+#   - character/character-create.ts: NO DESTINATION COLUMN TODAY (first
+#     triggered by #1576) — not structurally exempt like the entries above,
+#     just nowhere else to put it yet. MAGIC_INITIATE_CLASS_BY_BACKGROUND is
+#     CONTENT (which class's spell list a background's Magic Initiate feat
+#     draws from) with an obvious seed-row destination (a column on
+#     Background, or a join row) that simply doesn't exist yet — a future
+#     background-content retab is the natural place to move it.
 #   - frontend/src/features/entities/CampaignItemFields.tsx: PERMANENT (first
-#     triggered by #1576). "e.g. Wizard" is UI placeholder copy on a free-text
-#     prerequisite-value input, not rule code.
-#   - frontend/src/lib/spellList.ts: PERMANENT (first triggered by #1576).
-#     deriveSpellList's `=== "warlock"` check picks a display LABEL ("Pact
-#     Magic" vs. a merged slot block) for a single-class Warlock off the wire's
-#     already-server-computed class name — a UI display branch, not a
-#     frontend-originated rule (CLAUDE.md).
+#     triggered by #1576) — whole-file allowlist for exactly ONE hit: the
+#     `placeholder="e.g. Wizard"` UI copy on the free-text prerequisite-value
+#     input (the item-prereq-value field). Not rule code. Self-retires via
+#     anti-vacuity check 3 if that placeholder copy ever stops naming a class.
+#   - frontend/src/lib/spellList.ts: ALLOWLISTED WHILE #1383's MIRROR DEBT
+#     STANDS, not PERMANENT (first triggered by #1576). deriveSpellList's
+#     `=== "warlock"` check picks a display LABEL ("Pact Magic" vs. a merged
+#     slot block) for a single-class Warlock off the wire's already-server-
+#     computed class name — a UI display branch, not a frontend-originated
+#     rule (CLAUDE.md) — but this file is one of #1383's tracked surviving
+#     frontend rule mirrors, so the exemption is debt, not a certified-forever
+#     shape.
 FILE_ALLOWLIST="backend/src/lib/classes/subclass-slug.ts
 backend/src/lib/classes/actions.ts
 backend/src/lib/character/serialize/combat.ts

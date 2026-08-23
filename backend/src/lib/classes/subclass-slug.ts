@@ -66,9 +66,16 @@ export const SUBCLASS_SLUGS = [
   "wizard-school-of-abjuration",
   "wizard-school-of-evocation",
   "wizard-school-of-illusion",
-] as const; // 35 members — the seed's row count (#1277 F1) and the
-// lib/classes/*.ts subclass-definition count (#1277 F2) are already a
-// perfect bijection; this list is exhaustive over both. Bladesinging
+] as const; // 35 members — the seed's row count (#1277 F1), and this list is
+// exhaustive over it (every seeded Subclass row's slug is one of these 35).
+// At filing (#1277) that also equalled the lib/classes/*.ts subclass-
+// definition count (#1277 F2) in a perfect bijection; F2's count has since
+// shrunk on its own as classes migrated fully onto seeded rows — Fighter/
+// Barbarian/Rogue (#1532/#1223/#1231), then Cleric/Warlock/Wizard (#1576) —
+// so it is 18 of these 35 today, not 35 (registry.ts's own SUBCLASSES
+// comment carries the up-to-date count; this file doesn't re-track it, since
+// F1's half — SUBCLASS_SLUGS itself — is what stays exhaustive regardless of
+// how many slugs still also have a TS definition). Bladesinging
 // (#1676, TCoE p.76) is identity-only like Fighter's subclasses — no
 // lib/classes/wizard.ts subclass registration exists or is needed, since its
 // mechanics ride the F1-F5 engine's seed-row vocabulary, not a
