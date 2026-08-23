@@ -18,11 +18,12 @@
 // 4. Reduced lib/classes/wizard.ts to its irreducible residue: its
 //    `grantLevel: 2` on every subclass was PHB'14's actual Arcane Tradition
 //    gate, and `subclassGateLevel`'s undefined-grantLevel fallback is 3, so
-//    deleting the module would have silently moved every 2014 Wizard's
-//    subclass gate — until #1576's seeded CharacterClass.subclassLevel gave
-//    isSubclassActive a data source that survives the module's deletion. That
-//    tracked follow-up is what let lib/classes/wizard.ts be deleted outright;
-//    ClassFeatureRowsCarrier.subclassLevel's own doc comment has the mechanism.
+//    deleting the module at that point would have silently moved every 2014
+//    Wizard's subclass gate. #1576's seeded CharacterClass.subclassLevel
+//    later gave isSubclassActive a data source that survives a module's
+//    deletion — that tracked follow-up is what let lib/classes/wizard.ts be
+//    deleted outright too; ClassFeatureRowsCarrier.subclassLevel's own doc
+//    comment has the mechanism.
 // class-features.ts concatenates WIZARD_FEATURES onto the still-derived
 // classes' rows to build CLASS_FEATURES; see its LITERAL_ROW_CLASSES export
 // for the set of classes whose rows tests must not compare against a

@@ -1487,7 +1487,7 @@ describe("Warrior of the Elements — Elemental Attunement / Elemental Burst cat
   });
 });
 
-// #1340: cleric.ts and paladin.ts both grant a feature named "Channel
+// #1340: Cleric and Paladin both grant a feature named "Channel
 // Divinity" (cleric at L2, paladin at L3) drawing on the same channelDivinity
 // pool. Before the fix, DERIVED_ACTIONS carried two rows (channelDivinityCleric/
 // channelDivinityPaladin) — a single-class read only ever sees its own class's

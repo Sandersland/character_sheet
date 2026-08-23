@@ -40,31 +40,52 @@
 // a class whose rows a real test exercises that way cannot skip the mirror
 // even where `.features` content itself is never asserted (#1225).
 //
-// Six different end states sit behind that one list. `lib/classes/
-// fighter.ts`, `barbarian.ts`, `rogue.ts`, `cleric.ts`, `warlock.ts` and
-// `wizard.ts` are all deleted outright — the last three's sole survival
-// reason (a subclass `grantLevel` of 1 for Warlock's patrons/Cleric's Divine
-// Domain, 2 for Wizard's schools, that no seeded row could express while
-// subclassGateLevel's undefined fallback is 3) is now covered by this
-// fixture's own SUBCLASS_LEVEL_BY_CLASS map below, mirroring the seeded
-// CharacterClass.subclassLevel column every production carrier already
-// supplies (#1576). `sorcerer.ts` and `druid.ts` carry the SAME grantLevel
-// reason (Sorcerous Origin/Druid Circle, also 1/2) but survive for OTHER,
-// independent reasons their own file headers name: Sorcerer's `sorceryPoints`
-// is a `level` formula no resourceTotals tier array can express, plus a real
+// Five different end states sit behind that one list.
+//
+// `lib/classes/fighter.ts`, `barbarian.ts`, `rogue.ts`, `cleric.ts`,
+// `warlock.ts` and `wizard.ts` are all deleted outright — the last three's
+// sole survival reason (a subclass `grantLevel` of 1 for Warlock's patrons/
+// Cleric's Divine Domain, 2 for Wizard's schools, that no seeded row could
+// express while subclassGateLevel's undefined fallback is 3) is now covered
+// by this fixture's own SUBCLASS_LEVEL_BY_CLASS map below, mirroring the
+// seeded CharacterClass.subclassLevel column every production carrier
+// already supplies (#1576).
+//
+// `sorcerer.ts` and `druid.ts` carried the SAME grantLevel reason (Sorcerous
+// Origin/Druid Circle, also 1/2) — RETIRED by the same #1576 mechanism, same
+// as Cleric/Warlock/Wizard's — but survive for OTHER, independent reasons
+// their own file headers now name as binding: Sorcerer's `sorceryPoints` is a
+// `level` formula no resourceTotals tier array can express, plus a real
 // lib/spellcasting/spellcasting.ts consumer; Druid's 2014 Wild Shape CR cap
 // and duration interpolate `level`/`subclassKey` INSIDE the description text,
 // which #1528's no-second-string rule (poolFromRow reads only the row's own
-// `description`) rules out for a row. `ranger.ts` and `bard.ts` survive for a
-// DIFFERENT reason still — each own header names it: Ranger's Hunter `choices` catalog
-// (#899/#1353 — its EDITION_2024 Wisdom-modifier resourceFn was retired to a
-// row by #1685); Bard's Cha-modifier/level-tiered-recharge resourceFn (#1224) — both subclasses'
-// `grantLevel: 3` already equal the fallback, so unlike the first five that
-// isn't why either module stays. `monk.ts` survives for yet another reason
-// (#1675): its own resourceFn (the base Focus/Ki pool) plus three subclasses'
-// resourceFn's (Wholeness of Body, Flurry of Healing and Harm, Hand of
-// Ultimate Mercy) — all four subclasses' `grantLevel: 3` already equal the
-// fallback too, same as Ranger/Bard. None of them still exports a base-class
+// `description`) rules out for a row.
+//
+// `ranger.ts` and `bard.ts` survive for a DIFFERENT reason still — never a
+// grantLevel issue at all, unlike Cleric/Warlock/Wizard's retired one or
+// Sorcerer's/Druid's real one: each own header names it — Ranger's Hunter
+// `choices` catalog (#899/#1353 — its EDITION_2024 Wisdom-modifier resourceFn
+// was retired to a row by #1685); Bard's Cha-modifier/level-tiered-recharge
+// resourceFn (#1224) — both subclasses' `grantLevel: 3` already equal the
+// fallback, so that isn't why either module stays.
+//
+// `monk.ts` survives for yet another reason (#1675): its own resourceFn (the
+// base Focus/Ki pool) plus three subclasses' resourceFn's (Wholeness of Body,
+// Flurry of Healing and Harm, Hand of Ultimate Mercy) — all four subclasses'
+// `grantLevel: 3` already equal the fallback too, same as Ranger/Bard.
+//
+// `paladin.ts` is the fifth end state, and the odd one out: it genuinely
+// survives (a real resourceFn — Divine Sense/Lay on Hands, see its own
+// header), but its continued presence in TEST_CLASSES below is INERT, not
+// necessary — its base classRows already come from LITERAL_CLASS_ROWS
+// unconditionally, and its three oaths carry no `.features`/resourceFn of
+// their own to lose (`grantLevel: 3`, identity-only, same shape as
+// Barbarian's two or Ranger's two below), so testFeatureRowsFor's output is
+// identical whether `paladin` sits in TEST_CLASSES or not — the same
+// harmless dead weight `wizard` used to be here before this fixture stopped
+// needing it.
+//
+// None of the five still-surviving modules still exports a base-class
 // `features` array, which is what matters here.
 //
 // Barbarian's two subclasses (Totem Warrior, Berserker) need no subclassRows

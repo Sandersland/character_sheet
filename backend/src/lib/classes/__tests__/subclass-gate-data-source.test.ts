@@ -96,10 +96,15 @@ describe("2014 subclass gate reads the seeded subclassLevel (#1576)", () => {
     },
   );
 
-  // THE point of the issue. The carrier's value must beat the TS module's,
-  // because the module is the half that goes away — if the module still won,
-  // deleting it would still move the gate. Feeding a gate of 3 to a class whose
-  // module says 1 must suppress the level-1 features the module would grant.
+  // THE point of the issue — for Sorcerer/Druid (module still present) the
+  // carrier's seeded value must beat whatever the module's own `grantLevel`
+  // would otherwise supply, so deleting the module later (as already
+  // happened to Cleric/Warlock/Wizard, #1576) can never move the gate for a
+  // caller that carries the seeded relation. For Cleric/Warlock/Wizard
+  // themselves there is no module left to beat at all — `def.grantLevel` is
+  // always undefined now — so this same assertion just confirms the seeded
+  // value alone decides. Feeding a gate of 3 must suppress the level-1/2
+  // features either way.
   it.each(PHB14_GATE)(
     "%s / %s: the seeded value WINS over the module's own grantLevel",
     (className, subclass, gate) => {

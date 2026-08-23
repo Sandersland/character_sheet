@@ -93,8 +93,9 @@ describe("deriveEntryScopedActions", () => {
     expect(actions.filter((a) => a.key === "shadowStep")).toHaveLength(1);
   });
 
-  // #1340: cleric.ts (grantLevel 2) and paladin.ts (grantLevel 3) both grant
-  // "Channel Divinity" — one merged DERIVED_ACTIONS row (key "channelDivinity",
+  // #1340: Cleric grants "Channel Divinity" at class level 2, Paladin at
+  // class level 3 (each class's own base-class feature gate, not a subclass
+  // grantLevel) — one merged DERIVED_ACTIONS row (key "channelDivinity",
   // grantClasses) must surface as exactly ONE card for a Cleric/Paladin
   // multiclass, keyed off each entry's own effective level (mirrors
   // deriveEntryScopedActions' existing dedupe-by-key policy).

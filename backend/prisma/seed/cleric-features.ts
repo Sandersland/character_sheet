@@ -13,12 +13,12 @@
 // source confirmed and that is therefore omitted rather than carried over
 // from the 2014 text. Commit 3 (this one) moves the Channel Divinity resource
 // pool onto its two carrier rows (see the RESOURCE POOL block below) and
-// shrank lib/classes/cleric.ts to its irreducible residue — its `grantLevel: 1`
+// shrinks lib/classes/cleric.ts to its irreducible residue — its `grantLevel: 1`
 // on every subclass was PHB'14's actual Divine Domain gate, unlike
 // fighter.ts/barbarian.ts's residue (both deleted outright by their own
-// retabs) — until #1576's seeded CharacterClass.subclassLevel gave
-// isSubclassActive a data source that survives the module's deletion, which
-// is what let lib/classes/cleric.ts be deleted outright too.
+// retabs). #1576's seeded CharacterClass.subclassLevel later gave
+// isSubclassActive a data source that survives a module's deletion — that
+// tracked follow-up is what let lib/classes/cleric.ts be deleted outright too.
 // class-features.ts concatenates CLERIC_FEATURES onto the still-derived
 // classes' rows to build CLASS_FEATURES; see its LITERAL_ROW_CLASSES export
 // for the set of classes whose rows tests must not compare against a

@@ -190,9 +190,13 @@ describe("deriveEntryScopedResources", () => {
   // entry-scoped-actions.test.ts for the equivalent entry-scoped-gate coverage
   // (deriveEntryScopedActions, keyed off the monk entry's own level).
 
-  // #1340: cleric.ts and paladin.ts both emit a pool keyed "channelDivinity" —
-  // before the fix, collectEntryScopedPools treated any repeated pool key as an
-  // invariant violation and threw. PHB'14 p.164 (multiclassing): getting the
+  // #1340: Cleric and Paladin both emit a pool keyed "channelDivinity" — row-
+  // driven for both today (cleric-features.ts's/paladin-features.ts's own
+  // RESOURCE POOL blocks; lib/classes/cleric.ts is deleted outright, #1576,
+  // and paladin.ts's own resourceFn explicitly does NOT declare this pool —
+  // see that file's own comment) — before the fix, collectEntryScopedPools
+  // treated any repeated pool key as an invariant violation and threw.
+  // PHB'14 p.164 (multiclassing): getting the
   // feature again from a second class grants that class's effects but no
   // additional use — so the two entries must MERGE into one pool at the MAX
   // total either class alone would grant, never the sum. These tests call

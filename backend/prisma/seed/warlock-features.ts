@@ -11,12 +11,12 @@
 // (prisma/seed/subclasses.ts tags both Subclass rows the same way, same
 // commit — see #1559's hard-fail this is also forced by). Commit 3 (this one)
 // moves every movable resource pool onto its row (see the RESOURCE POOL block
-// below) and shrank lib/classes/warlock.ts to its irreducible residue — its
+// below) and shrinks lib/classes/warlock.ts to its irreducible residue — its
 // `grantLevel: 1` on every subclass was PHB'14's actual Otherworldly Patron
 // gate, unlike fighter.ts/barbarian.ts's residue (both deleted outright by
-// their own retabs) — until #1576's seeded CharacterClass.subclassLevel gave
-// isSubclassActive a data source that survives the module's deletion, which
-// is what let lib/classes/warlock.ts be deleted outright too.
+// their own retabs). #1576's seeded CharacterClass.subclassLevel later gave
+// isSubclassActive a data source that survives a module's deletion — that
+// tracked follow-up is what let lib/classes/warlock.ts be deleted outright too.
 // class-features.ts concatenates WARLOCK_FEATURES onto the still-derived
 // classes' rows to build CLASS_FEATURES; see its LITERAL_ROW_CLASSES export
 // for the set of classes whose rows tests must not compare against a

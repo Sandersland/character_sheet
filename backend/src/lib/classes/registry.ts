@@ -469,7 +469,15 @@ export function deriveResourcesForCharacterRow(row: {
   const abilityScores = row.abilityScores as Record<string, number>;
   // No relation on this row's narrow select — no production caller of this
   // wrapper exists today (barrel export + tests only, #1524); featureRows
-  // stays absent rather than widening a shape nothing loads.
+  // stays absent rather than widening a shape nothing loads. A caller added
+  // here would now do more than lose row-driven pools/features generically:
+  // for Cleric/Warlock/Wizard specifically (#1576, their lib/classes/<class>.ts
+  // modules deleted) it would silently gate 2014 Life/Trickery Domain, The
+  // Archfey/Fiend/Great Old One, or the three Schools at subclassGateLevel's
+  // plain `?? 3` fallback instead of their real PHB'14 gate (1/1/2) — there
+  // is no module left to fall back to correctly any more. A real caller
+  // should spread FEATURE_ROWS_ENTRY_SELECT into its select and pass
+  // featureRowsOf (feature-rows-select.ts) rather than reuse this wrapper.
   const derived = deriveResources(
     primaryEntry?.name ?? "",
     primaryEntry?.subclass ?? undefined,
