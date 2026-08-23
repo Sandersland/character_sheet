@@ -2,17 +2,17 @@
 // featureRows parameter expects, directly from the TS class/subclass
 // definitions, so a unit test can call deriveResources with a bare
 // class/subclass name (no DB round-trip) while still exercising the real
-// read path (featuresFromRows). literal-fixture-parity.test.ts (prisma-side)
-// is what proves LITERAL_CLASS_ROWS/LITERAL_SUBCLASS_ROWS below agree with the real seed.
+// read path (featuresFromRows). A prisma-side parity suite proves
+// LITERAL_CLASS_ROWS/LITERAL_SUBCLASS_ROWS below agree with the real seed.
 //
 // Every class but Ranger and Sorcerer authors its ClassFeature rows as
-// literal seed data (prisma/seed/<class>-features.ts), which this src-side
-// fixture can't import (backend/tsconfig.json's rootDir: "src" makes a src
-// file importing anything under prisma/ a TS6059 compile error) — so those
-// classes' rows come from the hardcoded LITERAL_CLASS_ROWS/
-// LITERAL_SUBCLASS_ROWS maps below instead, mirroring each seed file's
-// resource columns. Ranger/Sorcerer keep a real lib/classes/<class>.ts
-// module (a resourceFn or catalog a row can't express — see each module's own header).
+// literal seed data under prisma/seed/, which this src-side fixture can't
+// import (backend/tsconfig.json's rootDir: "src" makes a src file importing
+// anything under prisma/ a TS6059 compile error) — so those classes' rows
+// come from the hardcoded LITERAL_CLASS_ROWS/LITERAL_SUBCLASS_ROWS maps
+// below instead, mirroring each seed file's resource columns. Ranger/
+// Sorcerer keep a real class module (a resourceFn or catalog a row can't
+// express — see each module's own header).
 //
 // A class/subclass whose rows carry no resourceKey/derivedStat AND that no
 // surviving test probes for a null-vs-object distinction can skip the mirror
@@ -28,13 +28,13 @@ const TEST_CLASSES: Record<string, ClassDefinition> = {
   ranger, sorcerer,
 };
 
-// PHB'14 p.164: one feature, one pool, shared across both granting classes — mirrors cleric-features.ts's/paladin-features.ts's own text.
+// PHB'14 p.164: one feature, one pool, shared across both granting classes.
 const CHANNEL_DIVINITY_REMINDER =
   "Spend 1 use for any Channel Divinity effect you have — a Cleric's Turn Undead and Divine Domain options and a Paladin's Oath options all draw on this one pool.";
 
-// Flat map keyed by subclass name ACROSS all twelve classes, mirroring
-// registry.ts's SUBCLASSES table — subclass names are unique across the
-// seeded catalog, and production itself resolves a subclass through the FK
+// Flat map keyed by subclass name ACROSS all twelve classes, mirroring the
+// production SUBCLASSES table — subclass names are unique across the seeded
+// catalog, and production itself resolves a subclass through the FK
 // relation (Character.subclassId), never a name lookup.
 const TEST_SUBCLASSES: Record<string, SubclassDefinition> = {};
 for (const classDef of Object.values(TEST_CLASSES)) {
@@ -45,8 +45,7 @@ for (const classDef of Object.values(TEST_CLASSES)) {
 
 // Untagged (edition undefined) -> one row per edition, identical text;
 // already-tagged -> exactly the one row its tag names. Mirrors
-// prisma/seed/class-features.ts's expandFeatureRow — the write-time half of
-// the same rule.
+// expandFeatureRow — the write-time half of the same rule.
 function toRows(features: AuthoredFeature[]): ClassFeatureRow[] {
   return features.flatMap((f) => {
     const editions = f.edition ? [f.edition] : (["EDITION_2014", "EDITION_2024"] as const);
@@ -54,9 +53,7 @@ function toRows(features: AuthoredFeature[]): ClassFeatureRow[] {
   });
 }
 
-// Mirrors prisma/seed/fighter-features.ts's descriptor values and
-// description text exactly. Exported so entry-scoped-actions.test.ts/
-// entry-scoped-resources.test.ts can build their own per-entry getFeatureRows callback around it.
+// Exported so other entry-scoped test suites can build their own per-entry getFeatureRows callback around it.
 export const FIGHTER_BASE_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2024"] as const).flatMap((edition) => [
   {
     name: "Second Wind",
@@ -121,9 +118,7 @@ export const FIGHTER_BASE_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2
   },
 ]);
 
-// Mirrors prisma/seed/fighter-features.ts's BATTLE_MASTER_RAW verbatim.
-// Exported so test-support/fighter-resource-rows.ts's
-// battleMasterResourceRowsData can scope it to a bespoke fixture's classId/subclassId.
+// Exported so battleMasterResourceRowsData can scope it to a bespoke fixture's classId/subclassId.
 export const BATTLE_MASTER_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2024"] as const).flatMap((edition) => [
   {
     name: "Combat Superiority",
@@ -195,7 +190,6 @@ export const BATTLE_MASTER_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_
     : { name: "Ultimate Combat Superiority", level: 18, edition, description: "Your Superiority Dice turn into d12s." },
 ]);
 
-// Mirrors barbarian-features.ts's resourceKey/resourceTotals values exactly.
 // SRD 5.2 p.20: 2014 keeps the 99-at-L20 "unlimited" encoding with no
 // shortRestRegain; 2024 caps at 6 from L17 with shortRestRegain: 1 on every tier.
 function rageBuffFixture(): ClassFeatureRow["effectBuffs"] {
@@ -266,7 +260,7 @@ export const BARBARIAN_BASE_ROWS: ClassFeatureRow[] = [
     costBase: 1,
     effectBuffs: rageBuffFixture(),
   },
-  // Identity-only resourceKey, no cost columns — mirrors barbarian-features.ts's own two rows exactly.
+  // Identity-only resourceKey, no cost columns.
   {
     name: "Reckless Attack",
     level: 2,
@@ -287,7 +281,7 @@ export const BARBARIAN_BASE_ROWS: ClassFeatureRow[] = [
   },
 ];
 
-// A narrow mirror: just the two rows actions.test.ts's atRows() helper needs, not a full base-class transcription.
+// A narrow mirror: just the two rows the actions test suite's atRows() helper needs, not a full base-class transcription.
 export const ROGUE_CUNNING_ACTION_ROWS: ClassFeatureRow[] = [
   {
     name: "Cunning Action",
@@ -346,7 +340,6 @@ function withPool(rows: ClassFeatureRow[], name: string, recharge: string, minLe
   );
 }
 
-// Mirrors wizard-features.ts's EDITION_2014/EDITION_2024 text exactly.
 // Arcane Recovery's resource columns are applied by withPool below, once,
 // rather than repeated per edition.
 export const WIZARD_BASE_ROWS: ClassFeatureRow[] = withPool(
@@ -647,8 +640,6 @@ export const WIZARD_ILLUSION_ROWS: ClassFeatureRow[] = withPool(
 // through, keyed lowercase to match testFeatureRowsFor's own toLowerCase()
 // calls. LITERAL_CLASS_ROWS scopes a class's BASE rows; LITERAL_SUBCLASS_ROWS
 // scopes one subclass's own rows.
-//
-// Mirrors warlock-features.ts's real SRD 5.2 (2024) content and Magical Cunning's resourceKey/resourceTotals exactly.
 export const WARLOCK_BASE_ROWS: ClassFeatureRow[] = [
   {
     name: "Pact Magic",
@@ -741,9 +732,8 @@ export const WARLOCK_BASE_ROWS: ClassFeatureRow[] = [
 // REQUIRED, unlike Rogue (which needs no mirror at all): Ranger's base class
 // always grants at least one feature from level 1 (Favored Enemy), so an
 // empty carrier would flip "ranger / (no subclass)"'s snapshot from a real
-// object to null at every level. Mirrors ranger-features.ts's real content
-// and resource-pool columns exactly, including Extra Attack's
-// derivedStat/derivedStatTiers (which toRows drops).
+// object to null at every level. Extra Attack's derivedStat/derivedStatTiers
+// ride this array (toRows drops those two fields).
 export const RANGER_BASE_ROWS: ClassFeatureRow[] = [
   {
     name: "Favored Enemy",
@@ -943,9 +933,7 @@ export const RANGER_BASE_ROWS: ClassFeatureRow[] = [
   },
 ];
 
-// Mirrors warlock-features.ts's real SRD 5.2 content and resource-pool
-// columns exactly — Dark One's Own Luck's 2024 row carries a
-// { abilityMod: "charisma", min: 1 } formula tier.
+// Dark One's Own Luck's 2024 row carries a { abilityMod: "charisma", min: 1 } formula tier.
 export const THE_FIEND_ROWS: ClassFeatureRow[] = [
   {
     name: "Expanded Spell List",
@@ -1131,7 +1119,6 @@ export const THE_GREAT_OLD_ONE_ROWS: ClassFeatureRow[] = [
   },
 ];
 
-// Mirrors sorcerer-features.ts's real SRD 5.2/PHB'24 (2024) content exactly, including its resource-pool columns.
 export const SORCERER_BASE_ROWS: ClassFeatureRow[] = [
   {
     name: "Spellcasting",
@@ -1439,8 +1426,7 @@ export const BARD_BARDIC_INSPIRATION_ROWS: ClassFeatureRow[] = [
   },
 ];
 
-// Mirrors cleric-features.ts's real SRD 5.2/mirror-sourced content exactly —
-// a flat per-row array (not toRows) since 2014 and 2024 diverge in row count.
+// A flat per-row array (not toRows), since 2014 and 2024 diverge in row count.
 export const CLERIC_BASE_ROWS: ClassFeatureRow[] = [
   {
     name: "Spellcasting",
@@ -1739,8 +1725,7 @@ export const CLERIC_TRICKERY_DOMAIN_ROWS: ClassFeatureRow[] = [
 // REQUIRED for all three (base + both circles), unlike Barbarian's/Ranger's
 // subclasses which need no mirror at all: tests assert directly on
 // null-ness/.length against a Druid circle — the same Cleric-domains
-// counterexample this file's own header names. Mirrors druid-features.ts's
-// real content and resource-pool columns exactly.
+// counterexample this file's own header names.
 export const DRUID_BASE_ROWS: ClassFeatureRow[] = [
   {
     name: "Druidic",
@@ -2264,10 +2249,9 @@ export const PALADIN_BASE_ROWS: ClassFeatureRow[] = [
   },
 ];
 
-// Mirrors monk-features.ts's own MONK_BASE_RAW row-for-row — five 2024-only
-// rows and six 2014-only rows exist for one edition only, so this isn't a
-// uniform flatMap over both editions everywhere below. Extra Attack's
-// derivedStat/derivedStatTiers ride this array (toRows drops those two fields).
+// Five 2024-only rows and six 2014-only rows exist for one edition only, so
+// this isn't a uniform flatMap over both editions everywhere below. Extra
+// Attack's derivedStat/derivedStatTiers ride this array (toRows drops those two fields).
 const MONK_BASE_ROWS_SHARED: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2024"] as const).flatMap((edition) => [
   {
     name: "Unarmored Defense",
@@ -2491,9 +2475,7 @@ const MONK_BASE_ROWS_2024: ClassFeatureRow[] = [
   },
 ];
 
-// Mirrors monk-features.ts's own new MONK_BASE_RAW entries exactly. Kept as
-// its own array so the "real feature text vs. action-only" split stays
-// visually obvious here too.
+// Kept as its own array so the "real feature text vs. action-only" split stays visually obvious here too.
 const MONK_BASE_ROWS_ACTION_ONLY: ClassFeatureRow[] = [
   {
     name: "Bonus Unarmed Strike", level: 1, edition: "EDITION_2014",
@@ -2582,16 +2564,14 @@ export const MONK_BASE_ROWS: ClassFeatureRow[] = [
   ...MONK_BASE_ROWS_ACTION_ONLY,
 ];
 
-// Each of Monk's four 2024 subclasses mirrors its own monk-features.ts
-// partition. "Way of the Open Hand" below is a SEPARATE 2014 counterpart, not a fork of this row set.
+// "Way of the Open Hand" below is a SEPARATE 2014 counterpart, not a fork of this row set.
 export const WARRIOR_OF_THE_OPEN_HAND_ROWS: ClassFeatureRow[] = [
   {
     name: "Open Hand Technique",
     level: 3,
     edition: "EDITION_2024",
     // SRD 5.2's actual Addle text is "can't make Opportunity Attacks until
-    // the start of its next turn", not "take reactions" — see
-    // open-hand-technique.ts's addleClause for the verified source text.
+    // the start of its next turn", not "take reactions" — see addleClause for the verified source text.
     description:
       "When you hit a creature with an attack granted by your Flurry of Blows, you can impose one effect: Addle — the creature can't make Opportunity Attacks until the start of its next turn (no save); Push — the creature makes a Strength save or is pushed up to 15 ft away; or Topple — the creature makes a Dexterity save or is knocked prone.",
   },
@@ -2622,8 +2602,7 @@ export const WARRIOR_OF_THE_OPEN_HAND_ROWS: ClassFeatureRow[] = [
 ];
 
 // EDITION_2014-only: SRD 5.1's only monastic tradition, a SEPARATE subclass
-// from Warrior of the Open Hand above, not its 2014 fork. Mirrors
-// monk-features.ts's WAY_OF_THE_OPEN_HAND_RAW exactly.
+// from Warrior of the Open Hand above, not its 2014 fork.
 export const WAY_OF_THE_OPEN_HAND_ROWS: ClassFeatureRow[] = [
   {
     name: "Open Hand Technique",
@@ -2701,8 +2680,7 @@ export const WARRIOR_OF_SHADOW_ROWS: ClassFeatureRow[] = (["EDITION_2024"] as co
     resourceKey: "cloakOfShadows", activationCost: "action", costKind: "pool", costPoolKey: "focus", costBase: 3,
     reminder: "Magic action, entirely within dim light or darkness: spend 3 focus to become invisible and move through creatures/objects as difficult terrain for 1 minute (or until incapacitated, or you end your turn in bright light). Flurry of Blows costs no focus while it lasts.",
   },
-  // "Shadow Arts" above stays pure feature text — its served action identity
-  // needs a DIFFERENT name (#1912, see monk-features.ts's own row).
+  // "Shadow Arts" above stays pure feature text — its served action identity needs a DIFFERENT name.
   {
     name: "Shadow Arts (Darkness)", level: 3, edition,
     description: "Spend 1 focus to cast Darkness without material components; you can see through it and move it up to 30 ft as a bonus action while it persists.",
@@ -2711,8 +2689,7 @@ export const WARRIOR_OF_SHADOW_ROWS: ClassFeatureRow[] = (["EDITION_2024"] as co
   },
 ]);
 
-// PHB'14 pp.79-80 (not in SRD 5.1, #1502) — a materially different fork, not a
-// retab: see monk-features.ts's WAY_OF_SHADOW_RAW header for what diverges.
+// PHB'14 pp.79-80 (not in SRD 5.1, #1502) — a materially different fork, not a retab.
 export const WAY_OF_SHADOW_ROWS: ClassFeatureRow[] = (["EDITION_2014"] as const).flatMap((edition) => [
   {
     name: "Shadow Arts",
@@ -2859,7 +2836,7 @@ export const WARRIOR_OF_THE_ELEMENTS_ROWS: ClassFeatureRow[] = (["EDITION_2024"]
   },
 ]);
 
-// EDITION_2014-only. Mirrors monk-features.ts's WAY_OF_THE_FOUR_ELEMENTS_RAW.
+// EDITION_2014-only.
 export const WAY_OF_THE_FOUR_ELEMENTS_ROWS: ClassFeatureRow[] = [
   {
     name: "Disciple of the Elements", level: 3, edition: "EDITION_2014",
@@ -2918,7 +2895,7 @@ export const LITERAL_SUBCLASS_ROWS: Record<string, ClassFeatureRow[]> = {
   "trickery domain": CLERIC_TRICKERY_DOMAIN_ROWS,
 };
 
-// This fixture's mirror of catalog-data.ts's seeded CharacterClass.subclassLevel.
+// This fixture's mirror of the seeded CharacterClass.subclassLevel.
 export const SUBCLASS_LEVEL_BY_CLASS: Record<string, number> = {
   cleric: 1, // PHB'14 p.57
   sorcerer: 1, // PHB'14 p.99
@@ -2934,7 +2911,7 @@ export const SUBCLASS_LEVEL_BY_CLASS: Record<string, number> = {
  * SUBCLASS_LEVEL_BY_CLASS above.
  */
 export function testFeatureRowsFor(className: string, subclass: string | undefined): ClassFeatureRowsCarrier {
-  // .trim() mirrors resolveSubclassSlug's own normalization (subclass-slug.ts).
+  // .trim() mirrors resolveSubclassSlug's own normalization.
   const classKey = (className ?? "").trim().toLowerCase();
   const subclassKey = (subclass ?? "").trim().toLowerCase();
   const classDef = TEST_CLASSES[classKey];

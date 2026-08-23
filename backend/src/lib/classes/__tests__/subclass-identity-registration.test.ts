@@ -133,12 +133,11 @@ describe("real registry: the overlay still wins for every class still on the TS 
   });
 });
 
-// registry.ts builds SUBCLASSES in two passes: SUBCLASS_IDENTITY keyed by
-// nameKey first, then each TS ClassDefinition's subclasses keyed by its own
-// map key — the second pass replaces the first only while the two spellings
-// agree. Diverge them and both survive under different keys, so a character
-// whose persisted subclass matches the nameKey silently resolves to the
-// poorer identity-only stub.
+// SUBCLASSES is built in two passes: SUBCLASS_IDENTITY keyed by nameKey
+// first, then each TS ClassDefinition's subclasses keyed by its own map key
+// — the second pass replaces the first only while the two spellings agree.
+// Diverge them and both survive under different keys, so a character whose
+// persisted subclass matches the nameKey silently resolves to the poorer identity-only stub.
 const TS_REGISTERED_CLASSES: Record<string, ClassDefinition> = {
   bard,
   druid,
@@ -164,8 +163,8 @@ describe("#1557 review — the SUBCLASSES overlay's key-equality invariant", () 
     expect(mismatches).toEqual([]);
   });
 
-  // Ties to CLASS_SUBCLASSES so a class added to registry.ts's CLASSES but
-  // omitted here fails visibly instead of silently losing coverage.
+  // Ties to CLASS_SUBCLASSES so a class added to CLASSES but omitted here
+  // fails visibly instead of silently losing coverage.
   it("covers every class in CLASS_SUBCLASSES except Fighter, Barbarian, Rogue, Cleric, Warlock and Wizard, which have no TS module", () => {
     expect(new Set([...Object.keys(TS_REGISTERED_CLASSES), "fighter", "barbarian", "rogue", "cleric", "warlock", "wizard"])).toEqual(
       new Set(Object.keys(CLASS_SUBCLASSES)),

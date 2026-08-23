@@ -2,11 +2,10 @@
 // The Fiend are transcribed from the official SRD 5.2 CC-BY PDF. The Archfey
 // and The Great Old One's PHB'24 reworks are non-SRD and unverifiable, so
 // every row for both is tagged EDITION_2014-only and no 2024 row exists —
-// assertEverySubclassEditionPopulated hard-fails otherwise, and
-// prisma/seed/subclasses.ts tags both Subclass rows the same way.
+// assertEverySubclassEditionPopulated hard-fails otherwise, and both
+// Subclass rows are tagged the same way.
 //
-// DATA MODULE ONLY (scripts/check-seed-data-modules.sh): no direct database
-// calls or async write logic may live in this file.
+// DATA MODULE ONLY: no direct database calls or async write logic may live in this file.
 //
 // `edition` omitted on a row -> expand() seeds one row per edition with
 // identical text; `edition` set -> exactly the one row named. A "no 2024

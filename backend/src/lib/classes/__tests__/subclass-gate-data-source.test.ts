@@ -19,8 +19,8 @@ import { SUBCLASS_LEVEL_BY_CLASS, testFeatureRowsFor } from "./test-feature-rows
 const ABILITIES = { strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 };
 
 // Literal page-cited values, NOT read from the same constant the
-// implementation reads (catalog-data.ts is under prisma/, and a src file
-// importing it is a TS6059 error) — the DB assertion below ties these literals to the real seed.
+// implementation reads (a src file can't import anything under prisma/,
+// TS6059) — the DB assertion below ties these literals to the real seed.
 const PHB14_GATE: Array<[string, string, number]> = [
   ["cleric", "life domain", 1], // PHB'14 p.57
   ["sorcerer", "draconic bloodline", 1], // PHB'14 p.99

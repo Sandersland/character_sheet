@@ -76,7 +76,7 @@ describe("subclass grant level is 3 for all classes (#1128)", () => {
 // of the 2024 table above. Pins deriveResources agreeing with
 // buildClassesView's per-class gate. This describe block pins the GATE VALUE,
 // not which mechanism produces it (a TS module's grantLevel vs. the seeded
-// subclassLevel) — that distinction is subclass-gate-data-source.test.ts's job.
+// subclassLevel) — that distinction is covered by the seeded-vs-module gate-source suite.
 describe("subclass grant level is edition-aware for 2014 (#1291) — full twelve", () => {
   const GATE_1: Array<[string, string]> = [
     ["cleric", "life domain"],

@@ -290,7 +290,7 @@ describe("ACTION_EFFECT_FN — single spendResource keys", () => {
     ["channelDivinity", "channelDivinity"],
     ["wildShape", "wildShape"],
     // actionSurge is row-driven now (#1528) — no ACTION_EFFECT_FN entry; its
-    // pure-counter spend is covered by actions-cast.test.ts (routes).
+    // pure-counter spend is covered by the route-level cast tests.
     ["divineSense", "divineSense"],
   ];
 
@@ -302,8 +302,8 @@ describe("ACTION_EFFECT_FN — single spendResource keys", () => {
   }
 });
 
-// Rage/endRage are a row-driven "toggle" (barbarian-features.ts), reached
-// through deriveEntryScopedActions (toggleActionsFromRow) + toggleRowOps.
+// Rage/endRage are a row-driven "toggle", reached through
+// deriveEntryScopedActions (toggleActionsFromRow) + toggleRowOps.
 describe("Rage — row-driven toggle (#1686, retired from ACTION_EFFECT_FN)", () => {
   const rageRow = (edition: "EDITION_2014" | "EDITION_2024") =>
     testFeatureRowsFor("barbarian", undefined).classRows.find((r) => r.name === "Rage" && r.edition === edition)!;
@@ -870,8 +870,8 @@ describe("DERIVED_ACTIONS edition axis — 2014 Monk gets none of the six 2024-o
   });
 });
 
-// A synthetic Second Wind row (EDITION_2014 shape) matching
-// prisma/seed/fighter-features.ts's authored descriptor columns.
+// A synthetic Second Wind row (EDITION_2014 shape) matching the seeded
+// Fighter row's authored descriptor columns.
 function secondWindRow(): ClassFeatureRow {
   return {
     name: "Second Wind",
@@ -1174,7 +1174,7 @@ describe("ACTION_EFFECT_FN — useObject", () => {
   });
 });
 
-// The dedicated endpoint (shadow-arts.ts) owns the actual cast/activate — these rows only express the level gate as data.
+// The dedicated shadow-arts endpoint owns the actual cast/activate — these rows only express the level gate as data.
 describe("Warrior of Shadow — Shadow Arts / Cloak of Shadows catalog rows (#1315)", () => {
   it("Shadow monk gets shadowArts at L3, not L2", () => {
     expect(keys(atRows("monk", "Warrior of Shadow", 2, [], true, "EDITION_2024"))).not.toContain("shadowArts");

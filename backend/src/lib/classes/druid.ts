@@ -3,8 +3,8 @@ import type { ClassDefinition } from "./types.js";
 // EDITION_2014 Wild Shape's CR cap is a function of level AND subclassKey,
 // and its duration interpolates level/2 inside the description — neither fits
 // a ClassFeature row (poolFromRow reads only the row's own literal
-// description), so this stays a resourceFn rather than moving to
-// druid-features.ts like the 2024 version did.
+// description), so this stays a resourceFn rather than moving onto a row
+// like the 2024 version did.
 export const druid: ClassDefinition = {
   resourceFn: (level, _abilityScores, _profBonus, subclassKey, edition) => {
     if (edition === "EDITION_2024") return [];

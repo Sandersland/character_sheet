@@ -3,8 +3,7 @@
 // against two independent mirrors. Abjurer and Illusionist aren't in SRD 5.2
 // at all, so their 2024 text is mirror-sourced from those same two sources.
 //
-// DATA MODULE ONLY (scripts/check-seed-data-modules.sh): no direct database
-// calls or async write logic may live in this file.
+// DATA MODULE ONLY: no direct database calls or async write logic may live in this file.
 //
 // `edition` omitted on a row -> expand() seeds one row per edition with
 // identical text; `edition` set -> exactly the one row named. A "removed in
@@ -124,7 +123,7 @@ const WIZARD_BASE_RAW: RawWizardFeature[] = [
     edition: "EDITION_2014",
     description:
       "Once per day when finishing a short rest, choose expended spell slots to recover. Total levels of slots recovered can be up to half your wizard level (rounded up, max 5th-level slots).",
-    // The slot-level cap itself is computed at op time (resolveArcaneRecoveryContext, lib/spellcasting/spellcasting.ts), not a tier.
+    // The slot-level cap itself is computed at op time (resolveArcaneRecoveryContext), not a tier.
     resourceKey: "arcaneRecovery",
     resourceLabel: "Arcane Recovery",
     resourceRecharge: "longRest",
@@ -497,9 +496,9 @@ const ILLUSION_RAW: RawWizardFeature[] = [
 ];
 
 // Bladesinging — TCoE p.76 (2014). EDITION_2014 only — no SRD 5.2/PHB'24
-// printing exists; crossEditionRejection + the tagged Subclass row
-// (subclasses.ts) are the whole 2024 story (a 2024 wizard picking this slug
-// 400s). Every mechanic below rides the F1-F5 engine (formula pool totals,
+// printing exists; crossEditionRejection + the tagged Subclass row are the
+// whole 2024 story (a 2024 wizard picking this slug 400s). Every mechanic
+// below rides the F1-F5 engine (formula pool totals,
 // row-declared effectBuffs + generic toggle resolver, slot-shaped ability
 // costs, declarative activationRequires + equip-driven clearing, passive
 // improvements) with zero new ACTION_EFFECT_FN/resourceFn/hand-written gate.

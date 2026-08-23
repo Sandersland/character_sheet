@@ -1,6 +1,6 @@
-// Flattens the per-class definitions in classes/<class>.ts into the dispatch
-// tables deriveResources() merges from, and exposes the class-features.ts
-// public surface (resolveClassDie / deriveResources / deriveResourcesForCharacterRow).
+// Flattens the per-class definitions into the dispatch tables
+// deriveResources() merges from, and exposes the public surface
+// (resolveClassDie / deriveResources / deriveResourcesForCharacterRow).
 import type { RulesEdition } from "@character-sheet/shared-types";
 
 import { levelForExperience, proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
@@ -105,8 +105,7 @@ interface SubclassLayer extends ClassLayer {
 // the TS module's own grantLevel — still correct for Sorcerer/Druid (whose
 // modules exist), but Cleric/Warlock/Wizard have none left, so a
 // narrow-select caller with no seeded value now gates them at the plain ?? 3
-// default instead of their real PHB'14 gate (subclass-gate-data-source.test.ts
-// pins both halves).
+// default instead of their real PHB'14 gate.
 function isSubclassActive(
   def: SubclassDefinition | undefined,
   level: number,
@@ -147,7 +146,7 @@ function deriveSubclassLayer(
 
 // Base wins on pool-key collision; features sort by level then name;
 // improvements simply concatenate (a repeated grant dedups downstream at
-// deriveImprovementProficiencies' Set, lib/srd/feats.ts).
+// deriveImprovementProficiencies' Set).
 function mergeLayers(
   base: ClassLayer,
   sub: ClassLayer,
@@ -302,7 +301,7 @@ export function deriveResourcesForCharacterRow(row: {
   const abilityScores = row.abilityScores as Record<string, number>;
   // No relation loaded here — a caller added would silently gate 2014
   // Cleric/Warlock/Wizard subclasses at the plain ?? 3 fallback instead of
-  // their real PHB'14 gate; use featureRowsOf (feature-rows-select.ts) instead.
+  // their real PHB'14 gate; use featureRowsOf instead.
   const derived = deriveResources(
     primaryEntry?.name ?? "",
     primaryEntry?.subclass ?? undefined,
@@ -321,7 +320,7 @@ export function deriveResourcesForCharacterRow(row: {
 // {name, subclass, level} for EVERY entry, not just the primary, so a
 // secondary Monk's or Battle Master's own level drives its gate/DC/cap.
 // getFeatureRows is optional — a caller whose select carries
-// FEATURE_ROWS_ENTRY_SELECT passes featureRowsOf (feature-rows-select.ts).
+// FEATURE_ROWS_ENTRY_SELECT passes featureRowsOf.
 export function deriveEntryScopedResourcesForCharacterRow<E extends EntryScopedClassEntry>(
   row: {
     experiencePoints: number;
@@ -471,7 +470,7 @@ function mergeSharedPool(existing: DerivedResource, incoming: DerivedResource, s
 // Rebuilds the resources pool layer from EVERY class entry at its own
 // effective level (PHB'24 p.163: each class's pool scales to its own level,
 // not the primary's or the summed total). Also read by applySpendResourceOp's
-// write-side cap and rest.ts's recharge, so merging here — and only here —
+// write-side cap and the rest-recharge logic, so merging here — and only here —
 // keeps the read and write sides structurally unable to diverge.
 function collectEntryScopedPools<E extends EntryScopedClassEntry>(
   classEntries: E[],
@@ -542,8 +541,7 @@ function collectEntryScopedFeatures<E extends EntryScopedClassEntry>(
 }
 
 // Mirrors collectEntryScopedFeatures's per-entry loop; no name-based dedup —
-// a repeated proficiency grant collapses at deriveImprovementProficiencies'
-// Set instead (lib/srd/feats.ts).
+// a repeated proficiency grant collapses at deriveImprovementProficiencies' Set instead.
 function collectEntryScopedImprovements<E extends EntryScopedClassEntry>(
   classEntries: E[],
   totalLevel: number,
@@ -565,8 +563,8 @@ function collectEntryScopedImprovements<E extends EntryScopedClassEntry>(
 // re-derived per class entry at that entry's OWN effective level and merged
 // (PHB'24 p.163: each class's pool scales to its own level). Level-gated
 // action-availability gates are entry-scoped the same way but through
-// deriveEntryScopedActions (actions.ts) instead. Collapses to a bare
-// deriveResources() call for single-class characters.
+// deriveEntryScopedActions instead. Collapses to a bare deriveResources()
+// call for single-class characters.
 export function deriveEntryScopedResources<E extends EntryScopedClassEntry>(
   classEntries: E[],
   totalLevel: number,

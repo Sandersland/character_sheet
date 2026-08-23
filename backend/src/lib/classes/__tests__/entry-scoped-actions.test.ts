@@ -195,9 +195,8 @@ describe("deriveEntryScopedActions", () => {
     });
   });
 
-  // deflectAugmentor (lib/srd/deflect.ts) attaches the resolved roll spec via
-  // the same fold point Arcane Charge uses above; omitting abilityMods must
-  // leave `effect` unset rather than throw.
+  // deflectAugmentor attaches the resolved roll spec via the same fold point
+  // Arcane Charge uses above; omitting abilityMods must leave `effect` unset rather than throw.
   describe("Deflect Attacks / Deflect Missiles — resolved effect via announce augmentor (#1910)", () => {
     const abilityMods = { dexterity: 3 };
 

@@ -59,8 +59,7 @@ export interface BuffModifierTier {
 
 export type BuffModifierFormula = ResourceTotalFormula | BuffModifierTier[];
 
-// Re-declared (not imported from lib/combat/active-effects.ts) to keep this
-// file Prisma-free; must stay assignable from ActiveBuff.duration.
+// Re-declared, not imported, to keep this file Prisma-free; must stay assignable from ActiveBuff.duration.
 export type EffectBuffDuration = "concentration" | "while-active" | "until-rest";
 
 // equipBodyArmor fires for any body-armor category; equip<Category>Armor
@@ -77,7 +76,7 @@ export interface EffectBuffRow {
   // Gates the WHOLE ENTRY at the character's level — distinct from a tiered modifier's own minLevel axis.
   minLevel?: number;
   clearOn?: ClearOnTrigger[];
-  // Display text only; DURABLE_BUFF_END_CONDITIONS (frontend/src/lib/turnHooks.ts) holds the actual end predicate, keyed by `key`.
+  // Display text only; DURABLE_BUFF_END_CONDITIONS holds the actual end predicate, keyed by `key`.
   endReminder?: string;
   resistDamageTypes?: string[];
   conditionImmunities?: string[];
@@ -108,7 +107,7 @@ export interface RequiresActiveBuffRequirement {
   requiresActiveBuff: string;
 }
 
-// Interpreted by unmetActivationRequirements (lib/classes/activation-requires.ts).
+// Interpreted by unmetActivationRequirements.
 export type ActivationRequirement = ArmorActivationRequirement | RequiresActiveBuffRequirement;
 
 // Replaces a DERIVED_ACTIONS row — no gate columns here: the row's own
@@ -305,9 +304,9 @@ export function derivedStatFromRows(
 }
 
 // The first qualifying row's saveDcAbilities list — the trigger for a
-// closed-form announced save DC (arithmetic lives in
-// lib/srd/announced-save-dc.ts). Read directly, not via a `derivedStat` name
-// match, since a row may spend its one derivedStat slot on something else.
+// closed-form announced save DC (arithmetic lives in deriveAnnouncedSaveDC).
+// Read directly, not via a `derivedStat` name match, since a row may spend
+// its one derivedStat slot on something else.
 export function saveDcAbilitiesFromRows(
   rows: readonly ClassFeatureRow[],
   level: number,
@@ -322,9 +321,8 @@ export function saveDcAbilitiesFromRows(
 
 // Every condition key a class/subclass's rows grant immunity to, at one
 // character level, further gated on conditionImmunitiesRequireActiveBuff
-// being present in activeBuffKeys. deriveImmuneConditions
-// (lib/combat/conditions.ts) unions this with buff-declared immunity into the
-// actual immune set.
+// being present in activeBuffKeys. deriveImmuneConditions unions this with
+// buff-declared immunity into the actual immune set.
 export function conditionImmunitiesFromRows(
   rows: readonly ClassFeatureRow[],
   level: number,

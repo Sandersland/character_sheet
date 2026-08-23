@@ -1,11 +1,9 @@
-// ZERO IMPORTS: prisma/seed/subclasses.ts value-imports this module under
-// tsx, which resolves plain relative paths only, not the `@/` alias — an
-// aliased import here throws ERR_MODULE_NOT_FOUND at seed time.
+// ZERO IMPORTS: tsx can't resolve @/ aliases at seed time.
 //
-// Kept out of registry.ts to avoid an import cycle: registry.ts imports
-// every per-class module, several of which import srd.ts, which re-exports
-// extra-attack.ts — a resolver living in registry.ts would make
-// extra-attack -> registry -> monk -> srd -> extra-attack a real cycle.
+// Kept out of the registry to avoid an import cycle: it imports every
+// per-class module, several of which import the SRD module, which
+// re-exports extra-attack's exports — a resolver living in the registry
+// would make extra-attack -> registry -> monk -> srd -> extra-attack a real cycle.
 
 export const SUBCLASS_SLUGS = [
   "barbarian-berserker",
@@ -47,7 +45,7 @@ export const SUBCLASS_SLUGS = [
 
 export type SubclassSlug = (typeof SUBCLASS_SLUGS)[number];
 
-// classKey matches CLASSES' keys in registry.ts; nameKey matches a ClassDefinition.subclasses key (both lowercase).
+// classKey matches CLASSES' keys; nameKey matches a ClassDefinition.subclasses key (both lowercase).
 export interface SubclassIdentity {
   classKey: string;
   nameKey: string;

@@ -3,8 +3,7 @@
 // a duplicate business key (upsert-by-name would collapse two rows into one), a
 // GrantedAbility name colliding across the four sources (they share one unique
 // name column), or a dangling reference (a subclass on a class that doesn't
-// exist, a pack listing an item the catalog lacks). Mirrors the fail-fast guard
-// in seed.ts main().
+// exist, a pack listing an item the catalog lacks). Mirrors the seed's own fail-fast guard.
 import { describe, it, expect } from "vitest";
 
 import { bard } from "@/lib/classes/bard.js";
@@ -106,8 +105,7 @@ describe("SUBCLASS_SPELL_LIST_EXPANSIONS — referential integrity (#1631)", () 
   });
 
   // The Fiend/Archfey/Great Old One's ten-spell PHB'14 "Expanded Spell List"
-  // each, exactly as transcribed in warlock-features.ts's FIEND_RAW/
-  // ARCHFEY_RAW/GREAT_OLD_ONE_RAW EDITION_2014 rows.
+  // each, exactly as transcribed in the FIEND_RAW/ARCHFEY_RAW/GREAT_OLD_ONE_RAW EDITION_2014 rows.
   it("each of the three 2014 patrons carries its exact ten-spell list", () => {
     const listFor = (subclassName: string) =>
       SUBCLASS_SPELL_LIST_EXPANSIONS.filter((e) => e.className === "Warlock" && e.subclassName === subclassName)
@@ -491,9 +489,9 @@ describe("FEATS — 2014 general/origin catalog (#1310)", () => {
   });
 
   // The four originFeatName values BACKGROUNDS references — buildOriginEntry
-  // resolves them by name against the creating character's edition and returns
-  // null on a miss (character-create.ts), so a gap here would silently drop a
-  // background's Origin feat grant for whichever edition the miss lands on.
+  // resolves them by name against the creating character's edition and
+  // returns null on a miss, so a gap here would silently drop a background's
+  // Origin feat grant for whichever edition the miss lands on.
   it("every BACKGROUNDS originFeatName has both an EDITION_2014 and EDITION_2024 row", () => {
     const originFeatNames = [...new Set(BACKGROUNDS.map((b) => b.originFeatName).filter((n): n is string => !!n))];
     expect(originFeatNames.length).toBeGreaterThan(0);
@@ -734,9 +732,8 @@ describe("global GrantedAbility name-uniqueness", () => {
   // All these sources upsert into GrantedAbility, whose business key is
   // (name, edition) — #1415 widened it from name alone precisely so a
   // same-name fork (Nature's Wrath, #1229) can exist without colliding. Keyed
-  // the same way here as assertUniqueGrantedAbilityNames (guards.ts) itself —
-  // a bare name-only key would misreport that legitimate fork as a
-  // cross-source collision.
+  // the same way here as assertUniqueGrantedAbilityNames itself — a bare
+  // name-only key would misreport that legitimate fork as a cross-source collision.
   it("no (name, edition) pair collides across maneuvers/shadow-arts/channel-divinity", () => {
     const keys = [
       ...MANEUVERS.map((m) => `${m.name}::${m.edition ?? "shared"}`),
@@ -838,9 +835,9 @@ describe("SUBCLASS_SLUGS — three-way bijection (#1277)", () => {
     bard, druid, monk, paladin, ranger, sorcerer,
   };
 
-  // The named twin of scripts/check-class-ts-migration.sh's NOT_YET_MIGRATED
-  // list, keyed by SUBCLASS_IDENTITY's classKey. Deliberate-coupling latch:
-  // if you change one, update the other.
+  // The named twin of the class-migration guard's NOT_YET_MIGRATED list,
+  // keyed by SUBCLASS_IDENTITY's classKey. Deliberate-coupling latch: if you
+  // change one, update the other.
   const ROW_MIGRATED_CLASSES = ["fighter", "barbarian", "rogue", "cleric", "warlock", "wizard"];
 
   // Left as an empty, still-declared allowlist so the next genuinely

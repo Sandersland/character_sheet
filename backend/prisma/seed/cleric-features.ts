@@ -3,8 +3,7 @@
 // is not in SRD 5.2; its 2024 text is mirror-sourced from two independent
 // secondary sources that agree on every mechanic below.
 //
-// DATA MODULE ONLY (scripts/check-seed-data-modules.sh): no direct database
-// calls or async write logic may live in this file.
+// DATA MODULE ONLY: no direct database calls or async write logic may live in this file.
 //
 // `edition` omitted on a row -> expand() seeds one row per edition with
 // identical text; `edition` set -> exactly the one row named. A "no 2024
@@ -13,15 +12,14 @@
 //
 // Exactly ONE row per edition may set resourceKey: "channelDivinity" — two
 // would both be pushed by poolsFromRows and silently "max"-merged by
-// registry.ts's SHARED_POOL_MERGE instead of erroring. 2014's pool rides the
+// SHARED_POOL_MERGE instead of erroring. 2014's pool rides the
 // existing "Channel Divinity: Turn Undead" row (no separate 2014 "Channel
 // Divinity" row exists); 2024's pool rides the new 2024 "Channel Divinity" row.
 //
 // saveDcAbilities is deliberately unset on every row below: Cleric already
-// serves its Channel Divinity DC through channelDivinitySaveDC
-// (lib/classes/channel-divinity.ts) / ChannelDivinitySection.tsx, and
-// announcedSaveDC is a single scalar that a Cleric/Battle-Master multiclass
-// would collide on.
+// serves its Channel Divinity DC through channelDivinitySaveDC /
+// ChannelDivinitySection, and announcedSaveDC is a single scalar that a
+// Cleric/Battle-Master multiclass would collide on.
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { FeatImprovement } from "../../src/lib/classes/resources-state.js";
 import type { SeedEdition } from "./edition.js";
@@ -76,13 +74,7 @@ function expand(raw: RawClericFeature): ClassFeatureSeedRow[] {
   ];
 }
 
-// ---- Base class — PHB'14 p.57ff (2014) / SRD 5.2 pp. 36-38 (2024) ---------
-// 2014: 5 rows (byte-identical to commit 1 / cleric-2014-snapshot.test.ts).
-// 2024: 11 rows — Destroy Undead and Divine Intervention Improvement each get
-// a NEW-NAMED 2024 successor (Sear Undead, Greater Divine Intervention) so
-// neither old name gets its own 2024 row; Divine Order/Channel Divinity/
-// Channel Divinity: Divine Spark/Blessed Strikes/Improved Blessed
-// Strikes/Epic Boon join as wholly new 2024 features.
+// Base class — PHB'14 p.57ff (2014) / SRD 5.2 pp.36-38 (2024).
 const CLERIC_BASE_RAW: RawClericFeature[] = [
   {
     subclassSlug: null,
@@ -126,7 +118,7 @@ const CLERIC_BASE_RAW: RawClericFeature[] = [
       { minLevel: 6, total: 3, shortRestRegain: 1 },
       { minLevel: 18, total: 4, shortRestRegain: 1 },
     ],
-    // PHB'14 p.164: one feature, one pool, shared across both granting classes — same reminder text as paladin-features.ts's own Channel Divinity rows.
+    // PHB'14 p.164: one feature, one pool, shared across both granting classes — same reminder text as Paladin's Channel Divinity rows.
     activationCost: "action",
     costKind: "pool",
     costPoolKey: "channelDivinity",
