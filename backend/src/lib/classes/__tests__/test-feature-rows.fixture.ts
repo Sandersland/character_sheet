@@ -1,135 +1,25 @@
-// Test-only helper (#1524): builds the `ClassFeatureRowsCarrier` deriveResources'
-// `featureRows` parameter expects, directly from the TS class/subclass
-// definitions — the remaining lib/classes/<class>.ts modules stay the
-// seed's AUTHORING input even though production now reads seeded rows instead
-// (#1524's Fact 1). Lets every unit test that asserts on `.features` keep
-// calling deriveResources with a bare class/subclass name (no DB round-trip)
-// while still exercising the real read path (featuresFromRows).
+// Test-only helper: builds the ClassFeatureRowsCarrier deriveResources'
+// featureRows parameter expects, directly from the TS class/subclass
+// definitions, so a unit test can call deriveResources with a bare
+// class/subclass name (no DB round-trip) while still exercising the real
+// read path (featuresFromRows). literal-fixture-parity.test.ts (prisma-side)
+// is what proves LITERAL_CLASS_ROWS/LITERAL_SUBCLASS_ROWS below agree with the real seed.
 //
-// literal-fixture-parity.test.ts (#1593, prisma-side because only that
-// direction can import both halves) is what proves LITERAL_CLASS_ROWS/
-// LITERAL_SUBCLASS_ROWS below agree with the real seed — for all twelve
-// classes now that #1675 retired class-feature-parity.test.ts (the DB-backed
-// TS-vs-rows proof this file used to also lean on for whichever classes were
-// still TS-authored; it went vacuous the moment Monk, its last un-skipped
-// class, joined LITERAL_ROW_CLASSES, so keeping it around would have meant a
-// permanently-empty describe block). Without literal-fixture-parity.test.ts,
-// nothing would have caught #1232's corrected Draconic descriptions shipping
-// stale here through an otherwise fully green suite — this header previously
-// claimed class-feature-parity was the proof for everything, which was the
-// false statement that drift hid behind.
+// Every class but Ranger and Sorcerer authors its ClassFeature rows as
+// literal seed data (prisma/seed/<class>-features.ts), which this src-side
+// fixture can't import (backend/tsconfig.json's rootDir: "src" makes a src
+// file importing anything under prisma/ a TS6059 compile error) — so those
+// classes' rows come from the hardcoded LITERAL_CLASS_ROWS/
+// LITERAL_SUBCLASS_ROWS maps below instead, mirroring each seed file's
+// resource columns. Ranger/Sorcerer keep a real lib/classes/<class>.ts
+// module (a resourceFn or catalog a row can't express — see each module's own header).
 //
-// FIGHTER (#1227, #1528, #1532), BARBARIAN (#1223), CLERIC (#1225), RANGER
-// (#1230), ROGUE (#1231), SORCERER (#1232), WARLOCK (#1233), WIZARD (#1234),
-// BARD (#1224), DRUID (#1226), PALADIN (#1229) and MONK (#1675) all author
-// their ClassFeature rows as literal seed data
-// (prisma/seed/<class>-features.ts), which this src-side fixture can't
-// import — backend/tsconfig.json's `rootDir: "src"` makes a src file importing
-// anything under prisma/ a compile error (TS6059). Every one but Bard's rows
-// therefore come from the hardcoded LITERAL_CLASS_ROWS/LITERAL_SUBCLASS_ROWS
-// maps below, mirroring each seed file's RESOURCE columns — Bard needs no
-// mirror at all (Rogue's own exemption, see below).
-//
-// class-features-snapshot.test.ts records
-// `withoutFeatures(deriveResources(...))`, stripping `.features` before
-// snapshotting, so the row TEXT matters only for readability for THAT suite —
-// but `.features` being non-empty still decides whether `deriveResources`
-// returns `null` or an object at all (registry.ts's `resources.length === 0 &&
-// features.length === 0` check), which several OTHER suites (srd.test.ts's
-// Channel Divinity tests, subclass-grant-level.test.ts) assert on directly. So
-// a class whose rows a real test exercises that way cannot skip the mirror
-// even where `.features` content itself is never asserted (#1225).
-//
-// Five different end states sit behind that one list.
-//
-// `lib/classes/fighter.ts`, `barbarian.ts`, `rogue.ts`, `cleric.ts`,
-// `warlock.ts` and `wizard.ts` are all deleted outright — the last three's
-// sole survival reason (a subclass `grantLevel` of 1 for Warlock's patrons/
-// Cleric's Divine Domain, 2 for Wizard's schools, that no seeded row could
-// express while subclassGateLevel's undefined fallback is 3) is now covered
-// by this fixture's own SUBCLASS_LEVEL_BY_CLASS map below, mirroring the
-// seeded CharacterClass.subclassLevel column every production carrier
-// already supplies (#1576).
-//
-// `sorcerer.ts` and `druid.ts` carried the SAME grantLevel reason (Sorcerous
-// Origin/Druid Circle, also 1/2) — RETIRED by the same #1576 mechanism, same
-// as Cleric/Warlock/Wizard's — but survive for OTHER, independent reasons
-// their own file headers now name as binding: Sorcerer's `sorceryPoints` is a
-// `level` formula no resourceTotals tier array can express, plus a real
-// lib/spellcasting/spellcasting.ts consumer; Druid's 2014 Wild Shape CR cap
-// and duration interpolate `level`/`subclassKey` INSIDE the description text,
-// which #1528's no-second-string rule (poolFromRow reads only the row's own
-// `description`) rules out for a row.
-//
-// `ranger.ts` and `bard.ts` survive for a DIFFERENT reason still — never a
-// grantLevel issue at all, unlike Cleric/Warlock/Wizard's retired one or
-// Sorcerer's/Druid's real one: each own header names it — Ranger's Hunter
-// `choices` catalog (#899/#1353 — its EDITION_2024 Wisdom-modifier resourceFn
-// was retired to a row by #1685); Bard's Cha-modifier/level-tiered-recharge
-// resourceFn (#1224) — both subclasses' `grantLevel: 3` already equal the
-// fallback, so that isn't why either module stays.
-//
-// `monk.ts` survives for yet another reason (#1675): its own resourceFn (the
-// base Focus/Ki pool) plus three subclasses' resourceFn's (Wholeness of Body,
-// Flurry of Healing and Harm, Hand of Ultimate Mercy) — all four subclasses'
-// `grantLevel: 3` already equal the fallback too, same as Ranger/Bard.
-//
-// `paladin.ts` is the fifth end state, and the odd one out: it genuinely
-// survives (a real resourceFn — Divine Sense/Lay on Hands, see its own
-// header), but its continued presence in TEST_CLASSES below is INERT, not
-// necessary — its base classRows already come from LITERAL_CLASS_ROWS
-// unconditionally, and its three oaths carry no `.features`/resourceFn of
-// their own to lose (`grantLevel: 3`, identity-only, same shape as
-// Barbarian's two or Ranger's two below), so testFeatureRowsFor's output is
-// identical whether `paladin` sits in TEST_CLASSES or not — the same
-// harmless dead weight `wizard` used to be here before this fixture stopped
-// needing it.
-//
-// None of the five still-surviving modules still exports a base-class
-// `features` array, which is what matters here.
-//
-// Barbarian's two subclasses (Totem Warrior, Berserker) need no subclassRows
-// stand-in: neither declares a resourceKey/derivedStat in barbarian-features.ts,
-// so falling through to `toRows(subDef?.features ?? [])` -> `[]`
-// (TEST_SUBCLASSES has no entry for either, same as Champion/Eldritch Knight)
-// loses nothing a `.resources`-observing test could see. Ranger's two
-// subclasses (Hunter, Beast Master) are the same shape — see RANGER_BASE_ROWS'
-// own comment below.
-//
-// CLERIC'S TWO DOMAINS ARE THE COUNTEREXAMPLE (#1225): neither Life Domain nor
-// Trickery Domain declares a resourceKey/derivedStat either, but srd.test.ts's
-// Channel Divinity suite and subclass-grant-level.test.ts's domain-gate checks
-// both call testFeatureRowsFor with a cleric domain and assert directly on
-// null-ness/`.length`, which the null-vs-object distinction above DOES change —
-// so both domains need a mirror despite carrying no resource descriptor,
-// unlike Barbarian's two.
-//
-// ROGUE NEEDS NO MIRROR AT ALL: its rows declare no
-// resourceKey/derivedStat/saveDcAbilities anywhere (Sneak Attack's Nd6 is a
-// computed rule function, never a persisted pool — see sneakAttackSpec), and no
-// surviving test asserts a null-vs-object distinction against it either
-// (rogue-thief.test.ts, which used to call `testFeatureRowsFor("rogue",
-// "thief")`, is rewritten onto `loadDbFeatureRows` instead, same shape as
-// fighter-unregistered.test.ts) — so falling out of both maps entirely loses
-// nothing any surviving test can see. Ranger does NOT get this exemption — see
-// RANGER_BASE_ROWS' own comment for why its base class needs a mirror where
-// Rogue's doesn't.
-//
-// BARD (#1224) TAKES ROGUE'S EXEMPTION FOR EVERYTHING BUT ONE ROW: neither the
-// base class nor either college (bard-features.ts) declares a resourceKey —
-// Bardic Inspiration's POOL stays wholly in bard.ts's resourceFn, called
-// directly by registry.ts independent of this fixture — and College of
-// Valor's Extra Attack is the only derivedStat row, which srd.test.ts/
-// subclass-grant-level tests never probe through a null-vs-object check the
-// way Cleric's domains are. So `bard` is dropped from TEST_CLASSES below
-// entirely (not merely left featureless): `testFeatureRowsFor("bard", …)`
-// falls through to `toRows(undefined?.features ?? [])` -> `[]` for
-// subclassRows, identical to Rogue's own shape. classRows is the ONE
-// exception (#1909): `bard` DOES have a LITERAL_CLASS_ROWS entry
-// (BARD_BARDIC_INSPIRATION_ROWS, below) carrying Bardic Inspiration's
-// row-driven ACTION columns alone — its identity-only resourceKey mints no
-// phantom pool (poolFromRow requires resourceTotals), so the "no pool from
-// this fixture" invariant above is unaffected.
+// A class/subclass whose rows carry no resourceKey/derivedStat AND that no
+// surviving test probes for a null-vs-object distinction can skip the mirror
+// entirely (Barbarian's/Ranger's subclasses, Rogue, most of Bard) — falling
+// through to an empty array loses nothing observable. Cleric's two domains
+// are the counterexample: despite carrying no resource descriptor, they're
+// still asserted on directly by name, so both need a mirror.
 import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "@/lib/classes/class-feature-rows.js";
 import { ranger } from "@/lib/classes/ranger.js";
 import { sorcerer } from "@/lib/classes/sorcerer.js";
@@ -138,21 +28,14 @@ const TEST_CLASSES: Record<string, ClassDefinition> = {
   ranger, sorcerer,
 };
 
-// Channel Divinity's row-driven action reminder (#1909) — the SAME text on
-// cleric's and paladin's own carrier rows below (PHB'14 p.164: one feature,
-// one pool, shared across both granting classes), mirroring
-// cleric-features.ts's/paladin-features.ts's own byte-identical duplication.
+// PHB'14 p.164: one feature, one pool, shared across both granting classes — mirrors cleric-features.ts's/paladin-features.ts's own text.
 const CHANNEL_DIVINITY_REMINDER =
   "Spend 1 use for any Channel Divinity effect you have — a Cleric's Turn Undead and Divine Domain options and a Paladin's Oath options all draw on this one pool.";
 
 // Flat map keyed by subclass name ACROSS all twelve classes, mirroring
-// registry.ts's SUBCLASSES table — so testFeatureRowsFor("fighter", "life
-// domain") would silently hand back Cleric rows, and any cross-class
-// subclass-name collision resolves last-write-wins by TEST_CLASSES iteration
-// order. Harmless here: this is a test-fixture convenience keyed the same way
-// production's lookup table is (subclass names are unique across the seeded
-// catalog today), and production itself never resolves a subclass this way —
-// it goes through the FK relation (Character.subclassId), not a name lookup.
+// registry.ts's SUBCLASSES table — subclass names are unique across the
+// seeded catalog, and production itself resolves a subclass through the FK
+// relation (Character.subclassId), never a name lookup.
 const TEST_SUBCLASSES: Record<string, SubclassDefinition> = {};
 for (const classDef of Object.values(TEST_CLASSES)) {
   for (const [key, subclassDef] of Object.entries(classDef.subclasses ?? {})) {
@@ -171,18 +54,9 @@ function toRows(features: AuthoredFeature[]): ClassFeatureRow[] {
   });
 }
 
-// FIGHTER's base pools + actions (#1528): Second Wind/Action Surge/
-// Indomitable moved off fighter.ts's resourceFn/DERIVED_ACTIONS onto
-// ClassFeature descriptor columns (prisma/seed/fighter-features.ts) — a
-// prisma/ file this src-side fixture can't import (the same rootDir boundary
-// the file header explains for `.features`). Hardcoded here, once, mirroring
-// fighter-features.ts's own descriptor values AND description text exactly —
-// literal-fixture-parity.test.ts's DB-backed proof covers the description/
-// level half (its own SeedRow type); the descriptor columns stay a by-hand
-// mirror, same as every other LITERAL_CLASS_ROWS/LITERAL_SUBCLASS_ROWS entry.
-// Exported so entry-scoped-actions.test.ts/
-// entry-scoped-resources.test.ts can build their own per-entry
-// getFeatureRows callback around it.
+// Mirrors prisma/seed/fighter-features.ts's descriptor values and
+// description text exactly. Exported so entry-scoped-actions.test.ts/
+// entry-scoped-resources.test.ts can build their own per-entry getFeatureRows callback around it.
 export const FIGHTER_BASE_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2024"] as const).flatMap((edition) => [
   {
     name: "Second Wind",
@@ -247,21 +121,9 @@ export const FIGHTER_BASE_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2
   },
 ]);
 
-// BATTLE MASTER's own subclass rows (#1546 Part B-i scaffolding, descriptor
-// columns filled in by Part B-ii): mirrors prisma/seed/fighter-features.ts's
-// BATTLE_MASTER_RAW verbatim, INCLUDING the resourceKey/resourceTotals/
-// resourceDieTiers/derivedStat/derivedStatTiers/saveDcAbilities columns Part
-// B-ii adds there — Combat Superiority's superiority-dice pool +
-// maneuverChoiceCount + announcedSaveDC (#1589, renamed from maneuverSaveDC), and Student of War's
-// toolProfChoiceCount, are now ALL row-driven (fighter.ts's old
-// resourceFn/deriveExtras are gone). Same rootDir boundary as
-// FIGHTER_BASE_ROWS above (a src file can't import prisma/), same reason for
-// hardcoding rather than re-deriving. Exported so test-support/
-// fighter-resource-rows.ts's battleMasterResourceRowsData can scope it to a
-// bespoke fixture's classId/subclassId, the same way fighterResourceRowsData
-// derives from FIGHTER_BASE_ROWS — one shared source for every suite that
-// builds its own Battle Master Subclass row, instead of each hand-copying the
-// descriptor text a second (or third) time.
+// Mirrors prisma/seed/fighter-features.ts's BATTLE_MASTER_RAW verbatim.
+// Exported so test-support/fighter-resource-rows.ts's
+// battleMasterResourceRowsData can scope it to a bespoke fixture's classId/subclassId.
 export const BATTLE_MASTER_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2024"] as const).flatMap((edition) => [
   {
     name: "Combat Superiority",
@@ -333,19 +195,9 @@ export const BATTLE_MASTER_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_
     : { name: "Ultimate Combat Superiority", level: 18, edition, description: "Your Superiority Dice turn into d12s." },
 ]);
 
-// BARBARIAN's Rage pool (#1223): moved off barbarian.ts's resourceFn
-// (rageCountForLevel) onto the Rage row's own descriptor columns
-// (prisma/seed/barbarian-features.ts) — the same rootDir boundary FIGHTER_
-// BASE_ROWS' comment explains. Hardcoded here, once, mirroring
-// barbarian-features.ts's own resourceKey/resourceTotals values exactly. 2014
-// keeps the pre-existing 99-at-L20 "unlimited" encoding with no
-// shortRestRegain; 2024 caps at 6 from L17 (no L20 tier) with
-// shortRestRegain: 1 on every tier (SRD 5.2 p.20).
-// Rage's activation + buff block (#1686) — mirrors barbarian-features.ts's
-// own rageBuff()/RAGE_DAMAGE_TIERS; this fixture has no direct import path to
-// that prisma/seed/ module (backend/tsconfig.json's `rootDir: "src"` TS6059
-// boundary, this file's own header), so the shape is duplicated here exactly
-// like every other descriptor column below already is.
+// Mirrors barbarian-features.ts's resourceKey/resourceTotals values exactly.
+// SRD 5.2 p.20: 2014 keeps the 99-at-L20 "unlimited" encoding with no
+// shortRestRegain; 2024 caps at 6 from L17 with shortRestRegain: 1 on every tier.
 function rageBuffFixture(): ClassFeatureRow["effectBuffs"] {
   return [
     {
@@ -414,9 +266,7 @@ export const BARBARIAN_BASE_ROWS: ClassFeatureRow[] = [
     costBase: 1,
     effectBuffs: rageBuffFixture(),
   },
-  // Reckless Attack's row-driven action columns (#1912) — P-shaped
-  // (identity-only resourceKey, no cost columns), mirroring
-  // barbarian-features.ts's own two rows exactly.
+  // Identity-only resourceKey, no cost columns — mirrors barbarian-features.ts's own two rows exactly.
   {
     name: "Reckless Attack",
     level: 2,
@@ -437,14 +287,7 @@ export const BARBARIAN_BASE_ROWS: ClassFeatureRow[] = [
   },
 ];
 
-// ROGUE's row-driven action columns (#1912) — Rogue itself is EXEMPT from
-// this fixture's general "mirror the class" convention (see this file's own
-// header, "ROGUE NEEDS NO MIRROR AT ALL"): rogue.ts is deleted, and no
-// surviving test needed a null-vs-object distinction against it — until
-// Cunning Action/Fast Hands moved off DERIVED_ACTIONS onto rows. This is a
-// NARROW mirror (mirrors BARD_BARDIC_INSPIRATION_ROWS' own shape below): just
-// the two rows actions.test.ts's atRows() helper needs, not a full base-class
-// transcription.
+// A narrow mirror: just the two rows actions.test.ts's atRows() helper needs, not a full base-class transcription.
 export const ROGUE_CUNNING_ACTION_ROWS: ClassFeatureRow[] = [
   {
     name: "Cunning Action",
@@ -492,14 +335,9 @@ export const ROGUE_THIEF_ROWS: ClassFeatureRow[] = [
   },
 ];
 
-// Applies Arcane Recovery's / Illusory Self's resource-pool descriptor
-// columns (#1234 commit 3) onto the matching row(s) of an already-built
-// ClassFeatureRow[] — `toRows` only carries name/level/description/edition
-// through (it takes AuthoredFeature[], which has no resource columns), so
-// this is a targeted post-map rather than a second row-builder, mirroring
-// wizard-features.ts's own resourceKey/resourceLabel/resourceRecharge/
-// resourceTotals values exactly (both editions: flat total 1; Arcane
-// Recovery longRest, Illusory Self short-or-long from level 10).
+// Applies a resource pool onto the matching row(s) of an already-built
+// ClassFeatureRow[] — toRows only carries name/level/description/edition
+// through, so this is a targeted post-map rather than a second row-builder.
 function withPool(rows: ClassFeatureRow[], name: string, recharge: string, minLevel: number): ClassFeatureRow[] {
   return rows.map((row) =>
     row.name === name
@@ -508,17 +346,9 @@ function withPool(rows: ClassFeatureRow[], name: string, recharge: string, minLe
   );
 }
 
-// WIZARD's base-class rows (#1234): `lib/classes/wizard.ts`'s feature TEXT
-// (base + all three schools) moved to literal seed data
-// (prisma/seed/wizard-features.ts) — the same rootDir boundary FIGHTER_BASE_
-// ROWS' comment explains. `lib/classes/wizard.ts` itself is now deleted
-// outright too (#1576), same as Fighter's/Barbarian's own modules — see
-// SUBCLASS_LEVEL_BY_CLASS above for what replaced its subclass grantLevel.
-// Hardcoded here, once, mirroring wizard-features.ts's
-// own EDITION_2014/EDITION_2024 text exactly (commit 2's real SRD 5.2 /
-// PHB'24 content — every row below now sets its own `edition`, per that
-// file's tagging rule) — Arcane Recovery's resource columns (commit 3) are
-// applied by withPool below, once, rather than repeated per edition.
+// Mirrors wizard-features.ts's EDITION_2014/EDITION_2024 text exactly.
+// Arcane Recovery's resource columns are applied by withPool below, once,
+// rather than repeated per edition.
 export const WIZARD_BASE_ROWS: ClassFeatureRow[] = withPool(
   toRows([
   {
@@ -814,21 +644,11 @@ export const WIZARD_ILLUSION_ROWS: ClassFeatureRow[] = withPool(
 );
 
 // The two lookup maps every LITERAL_ROW_CLASSES member's rows resolve
-// through (#1234): replaces the `isFighter ? … : isBarbarian ? … :
-// isBattleMaster ? …` ternary chain, which didn't survive a fourth class
-// cleanly. Keyed lowercase to match testFeatureRowsFor's own
-// `.toLowerCase()` calls. LITERAL_CLASS_ROWS scopes a class's BASE rows;
-// LITERAL_SUBCLASS_ROWS scopes one subclass's own rows (Battle Master's
-// SubclassDefinition, fighter.ts, carries no `.features` at all any more —
-// its rows are BATTLE_MASTER_ROWS above, the same rootDir-boundary reason
-// FIGHTER_BASE_ROWS exists — so falling through to `toRows(subDef?.features
-// ?? [])` would silently go empty for it, same failure mode this map exists
-// to avoid for every literal-row subclass).
-// WARLOCK's base class (#1233): moved off warlock.ts's WARLOCK_FEATURES
-// AuthoredFeature[] array onto literal seed data (prisma/seed/
-// warlock-features.ts) — the same rootDir boundary FIGHTER_BASE_ROWS'/
-// BARBARIAN_BASE_ROWS' comments explain. Mirrors that file's real SRD 5.2
-// (2024) content and Magical Cunning's resourceKey/resourceTotals exactly.
+// through, keyed lowercase to match testFeatureRowsFor's own toLowerCase()
+// calls. LITERAL_CLASS_ROWS scopes a class's BASE rows; LITERAL_SUBCLASS_ROWS
+// scopes one subclass's own rows.
+//
+// Mirrors warlock-features.ts's real SRD 5.2 (2024) content and Magical Cunning's resourceKey/resourceTotals exactly.
 export const WARLOCK_BASE_ROWS: ClassFeatureRow[] = [
   {
     name: "Pact Magic",
@@ -918,34 +738,12 @@ export const WARLOCK_BASE_ROWS: ClassFeatureRow[] = [
   },
 ];
 
-// RANGER's base-class rows (#1230): `lib/classes/ranger.ts`'s base-class
-// `.features` moved to literal seed data (prisma/seed/ranger-features.ts) —
-// the same rootDir boundary FIGHTER_BASE_ROWS'/BARBARIAN_BASE_ROWS' comments
-// explain (ranger.ts itself still exists — see its own header for why it
-// isn't deletable — but its base `.features` are gone). REQUIRED, unlike
-// Rogue (which needs no mirror at all): Ranger's base class always grants at
-// least one feature from level 1 (Favored Enemy), so an empty carrier would
-// flip "ranger / (no subclass)"'s snapshot from a real (if empty-resources)
-// object to `null` at every level — exactly the regression this mirror
-// exists to prevent. Extra Attack's derivedStat/derivedStatTiers ride this
-// array (unlike `toRows`, which drops those two fields) for the same reason
-// FIGHTER_BASE_ROWS hand-builds rather than calling `toRows`. Hand-built per
-// edition (not a shared flatMap over identical text, unlike this fixture's
-// original commit-1 shape) because the two editions now genuinely diverge —
-// mirrors ranger-features.ts's real content AND resource-pool columns
-// exactly: Favored Enemy's (2024) flat level-tiered resourceTotals, and
-// Tireless's/Nature's Veil's (2024) `{ abilityMod: "wisdom", min: 1 }`
-// formula tiers (#1685) — ranger.ts no longer has a resourceFn for either.
-// class-features-snapshot.test.ts calls deriveResources with EDITION_2024
-// only, so the 2014 partition below matters for readability/parity with the
-// other LITERAL_CLASS_ROWS fixtures more than for any assertion — but it is
-// kept byte-accurate anyway, same discipline as FIGHTER_BASE_ROWS. Hunter's/
-// Beast Master's own subclass rows need NO mirror (same reasoning as Rogue's
-// module-wide exemption): neither declares a resourceKey/derivedStat
-// anywhere in ranger-features.ts, so the `toRows(subDef?.features ?? [])` ->
-// `[]` fallthrough (TEST_SUBCLASSES has no entry for either) loses nothing a
-// `.resources`-observing test could see — their `choices` catalog (Hunter)
-// keeps contributing `subclassChoices` independent of any row carrier.
+// REQUIRED, unlike Rogue (which needs no mirror at all): Ranger's base class
+// always grants at least one feature from level 1 (Favored Enemy), so an
+// empty carrier would flip "ranger / (no subclass)"'s snapshot from a real
+// object to null at every level. Mirrors ranger-features.ts's real content
+// and resource-pool columns exactly, including Extra Attack's
+// derivedStat/derivedStatTiers (which toRows drops).
 export const RANGER_BASE_ROWS: ClassFeatureRow[] = [
   {
     name: "Favored Enemy",
@@ -1145,12 +943,9 @@ export const RANGER_BASE_ROWS: ClassFeatureRow[] = [
   },
 ];
 
-// THE FIEND (#1233): mirrors warlock-features.ts's real SRD 5.2 content and
-// resource-pool columns exactly — Dark One's Own Luck's 2024 row carries a
-// { abilityMod: "charisma", min: 1 } formula tier (#1685; warlock.ts no
-// longer has a resourceFn for it), and Hurl Through Hell's resourceTotals/
-// recharge are identical across both editions (only the description and gate
-// level differ).
+// Mirrors warlock-features.ts's real SRD 5.2 content and resource-pool
+// columns exactly — Dark One's Own Luck's 2024 row carries a
+// { abilityMod: "charisma", min: 1 } formula tier.
 export const THE_FIEND_ROWS: ClassFeatureRow[] = [
   {
     name: "Expanded Spell List",
@@ -1239,25 +1034,11 @@ export const THE_FIEND_ROWS: ClassFeatureRow[] = [
   },
 ];
 
-// THE ARCHFEY / THE GREAT OLD ONE are EDITION_2014 only, mirroring
-// WARLOCK_FEATURES: #1233 tagged every one of their rows 2014 and authored zero
-// 2024 rows, because no licensed source could verify their PHB'24 reworks
-// (owner decision), and assertEverySubclassEditionPopulated (#1559) turns that
-// into a hard product fact — a 2024 character cannot pick either patron.
-//
-// They were frozen at a fabricated both-editions shape until #1595, purely so
-// subclass-grant-level.test.ts's grant-level cases could derive them at
-// EDITION_2024 and find rows to gate. Those cases are gone (both patrons now
-// prove the 2014 gate through GATE_1, and Sorcerer/Wild Magic carries the pool
-// case), so nothing needs the fabricated rows and they would only teach the
-// suite a state production forbids. Do not re-add a 2024 partition here to make
-// a new test pass — narrow the test's edition instead.
-//
-// Still true and load-bearing for the pool columns below: the real seed's
-// EDITION_2024 partition of WARLOCK_FEATURES has none of these keys at all, so
-// Fey Presence/Misty Escape/Dark Delirium/Entropic Ward are 2014-only pools and
-// poolsFromRows is the only thing that produces them (these patrons' 2014
-// resourceFns in lib/classes/warlock.ts were deleted by #1233).
+// The Archfey / The Great Old One are EDITION_2014 only, mirroring
+// WARLOCK_FEATURES: no licensed source could verify their PHB'24 reworks, and
+// assertEverySubclassEditionPopulated turns that into a hard product fact — a
+// 2024 character cannot pick either patron. Do not add a 2024 partition here
+// to make a new test pass — narrow the test's edition instead.
 export const THE_ARCHFEY_ROWS: ClassFeatureRow[] = [
   {
     name: "Expanded Spell List",
@@ -1350,14 +1131,7 @@ export const THE_GREAT_OLD_ONE_ROWS: ClassFeatureRow[] = [
   },
 ];
 
-// SORCERER's base class + subclass rows (#1232): moved off sorcerer.ts's
-// SORCERER_FEATURES/DRACONIC_BLOODLINE_FEATURES/WILD_MAGIC_FEATURES
-// AuthoredFeature[] arrays onto literal seed data
-// (prisma/seed/sorcerer-features.ts) — the same rootDir boundary
-// FIGHTER_BASE_ROWS'/WARLOCK_BASE_ROWS' comments explain. Mirrors that file's
-// real SRD 5.2/PHB'24 (2024) content exactly, including its RESOURCE POOL
-// columns (commit 3 of 3) — every row below now sets its own `edition`, per
-// that file's tagging rule.
+// Mirrors sorcerer-features.ts's real SRD 5.2/PHB'24 (2024) content exactly, including its resource-pool columns.
 export const SORCERER_BASE_ROWS: ClassFeatureRow[] = [
   {
     name: "Spellcasting",
@@ -1634,19 +1408,10 @@ export const WILD_MAGIC_ROWS: ClassFeatureRow[] = [
   },
 ];
 
-// BARD's Bardic Inspiration row (#1909) — a NARROW mirror, not a full
-// base-class one: unlike every other LITERAL_ROW_CLASSES member, bard-
-// features.ts sets no resourceKey ANYWHERE else (Bardic Inspiration's own
-// POOL stays wholly in bard.ts's resourceFn — see that file's own RESOURCE
-// POOL header block), so this fixture used to drop bard from TEST_CLASSES
-// entirely (Rogue's own exemption, see this file's header). #1909 gives
-// Bardic Inspiration's two rows an IDENTITY-ONLY resourceKey (no
-// resourceTotals) so each can carry a row-driven ACTION — that is now real,
-// testable behavior (actions.test.ts/entry-scoped-actions.test.ts), so this
-// one feature needs a mirror even though nothing else in the class does.
-// Every other Bard feature still falls through the `toRows(classDef?.features
-// ?? [])` -> `[]` path (bard stays absent from TEST_CLASSES), so this array
-// carries ONLY Bardic Inspiration, not a full BARD_BASE_ROWS.
+// A narrow mirror, not a full base-class one: Bardic Inspiration's two rows
+// carry an identity-only resourceKey (no resourceTotals) so each can carry a
+// row-driven action — every other Bard feature falls through the empty-array
+// path (bard stays absent from TEST_CLASSES).
 export const BARD_BARDIC_INSPIRATION_ROWS: ClassFeatureRow[] = [
   {
     name: "Bardic Inspiration",
@@ -1674,26 +1439,8 @@ export const BARD_BARDIC_INSPIRATION_ROWS: ClassFeatureRow[] = [
   },
 ];
 
-// CLERIC's base class + both domains (#1225): mirrors cleric-features.ts's
-// real SRD 5.2/mirror-sourced content exactly — the SAME rootDir boundary
-// FIGHTER_BASE_ROWS'/WARLOCK_BASE_ROWS' comments explain. Added in commit 1
-// (not held back for the pool move in commit 3, unlike Warlock's own
-// WARLOCK_BASE_ROWS split): the plan for #1225 originally assumed
-// `withoutFeatures` stripping `.features` before snapshotting meant no
-// fixture change was needed here until the pool landed, but removing
-// cleric.ts's AuthoredFeature arrays with NO literal-row override made
-// deriveResources return `null` instead of `{resources: [], features: []}`
-// at levels where both layers are empty (e.g. cleric level 1) — a real
-// behavioural difference several unit tests observe directly (srd.test.ts's
-// Channel Divinity suite, subclass-grant-level.test.ts's domain-gate
-// checks), not something `withoutFeatures` erases. Commit 2 (real 2024
-// content) and commit 3 (the Channel Divinity pool's resourceKey/
-// resourceLabel/resourceRecharge/resourceTotals on the two carrier rows —
-// see cleric-features.ts's own RESOURCE POOL header block) each updated these
-// three exports in step with cleric-features.ts, exactly mirroring what
-// class-features.ts's production seed does — a flat per-row array (not
-// `toRows`, unlike this file's fully-both-editions-identical exports) since
-// 2014 and 2024 genuinely diverge in row count from commit 2 on.
+// Mirrors cleric-features.ts's real SRD 5.2/mirror-sourced content exactly —
+// a flat per-row array (not toRows) since 2014 and 2024 diverge in row count.
 export const CLERIC_BASE_ROWS: ClassFeatureRow[] = [
   {
     name: "Spellcasting",
@@ -1989,28 +1736,11 @@ export const CLERIC_TRICKERY_DOMAIN_ROWS: ClassFeatureRow[] = [
   },
 ];
 
-// DRUID's base-class + both circles' rows (#1226): lib/classes/druid.ts's
-// `.features`/subclass `.features` arrays moved to literal seed data
-// (prisma/seed/druid-features.ts) — the same rootDir boundary
-// FIGHTER_BASE_ROWS' comment explains (druid.ts itself still exists — see
-// its own header for why it isn't deletable — but none of its three
-// `.features` arrays survive). REQUIRED for all three (base + both circles),
-// unlike Barbarian's/Ranger's subclasses which need no mirror at all:
-// srd.test.ts's Circle of the Moon feature-presence checks and
-// subclass-grant-level.test.ts's domain-gate-shaped checks call
-// testFeatureRowsFor with a Druid circle and assert directly on
-// null-ness/`.length` — the same CLERIC'S TWO DOMAINS counterexample this
-// file's own header names. Hand-built per edition (not a shared flatMap over
-// identical text, same reason RANGER_BASE_ROWS gives) because every Druid
-// feature genuinely diverges by #1226's own tagging rule (druid-features.ts's
-// header) — mirrors that file's real content AND resource-pool columns
-// exactly: the EDITION_2024 Wild Shape row's resourceTotals (#1226 commit 3),
-// and Moonlight Step's { abilityMod: "wisdom", min: 1 } formula tier (#1685)
-// — druid.ts no longer has a resourceFn for either, and Druid is no longer in
-// TEST_CLASSES (dropped at #1226 commit 1, same as Fighter/Barbarian/Rogue),
-// so this fixture's own poolsFromRows call is now the whole story for both
-// pools — DB-backed suites (druid-wildshape-pool.test.ts) additionally prove
-// the end-to-end pool through the real seed.
+// REQUIRED for all three (base + both circles), unlike Barbarian's/Ranger's
+// subclasses which need no mirror at all: tests assert directly on
+// null-ness/.length against a Druid circle — the same Cleric-domains
+// counterexample this file's own header names. Mirrors druid-features.ts's
+// real content and resource-pool columns exactly.
 export const DRUID_BASE_ROWS: ClassFeatureRow[] = [
   {
     name: "Druidic",
@@ -2302,31 +2032,11 @@ export const CIRCLE_OF_THE_MOON_ROWS: ClassFeatureRow[] = [
   },
 ];
 
-// Per-class/per-subclass literal-row overrides (#1233): replaces the former
-// isFighter/isBarbarian/isBattleMaster boolean chain with two lookup maps, one
-// keyed by class name and one by subclass name — a fourth `isWarlock` boolean
-// (plus a fifth/sixth/seventh for each patron) would have made
-// testFeatureRowsFor's own branching harder to read with every future
-// LITERAL_ROW_CLASSES addition than a table lookup is. Both maps are keyed
-// lowercase, matching this file's own registry convention.
-//
-// Exported for literal-fixture-parity.test.ts (#1593), which asserts these two
-// maps agree with the seed files they mirror — until it existed, nothing did,
-// and #1232's corrected Draconic descriptions shipped here stale through a
-// fully green suite. That guard lives prisma-side because only that direction
-// can import both halves (`rootDir: "src"`, TS6059).
-// DELIBERATELY absent from LITERAL_SUBCLASS_ROWS below: none declares a
-// resourceKey/derivedStat, and unlike Cleric's two domains (the
-// counterexample this file's own header names), no surviving test observes a
-// null-vs-object distinction against a Paladin oath's subclassRows — Paladin's
-// base layer alone (divineSense/layOnHands/channelDivinity, always active from
-// L1/L1/L3) already guarantees deriveResources returns a non-null object
-// regardless of whether the active oath contributes any rows of its own, so
-// srd.test.ts's Channel-Divinity-pool-merge suite and the entry-scoped
-// resources/actions suites all pass with an empty subclassRows fallback
-// (`toRows(subDef?.features ?? [])` -> `[]`, since paladin.ts's three
-// SubclassDefinition entries carry no `features` array) — checked directly,
-// not assumed.
+// Paladin's three oaths are DELIBERATELY absent from LITERAL_SUBCLASS_ROWS
+// below: none declares a resourceKey/derivedStat, and Paladin's base layer
+// alone (divineSense/layOnHands/channelDivinity, always active from L1/L1/L3)
+// already guarantees deriveResources returns a non-null object regardless of
+// whether the active oath contributes any rows of its own.
 export const PALADIN_BASE_ROWS: ClassFeatureRow[] = [
   {
     name: "Divine Sense",
@@ -2554,22 +2264,10 @@ export const PALADIN_BASE_ROWS: ClassFeatureRow[] = [
   },
 ];
 
-// MONK's base-class rows (#1675 transport, #1500 base-class rewrite):
-// `lib/classes/monk.ts`'s base-class `.features` moved to literal seed data
-// (prisma/seed/monk-features.ts) — the same rootDir boundary
-// FIGHTER_BASE_ROWS'/RANGER_BASE_ROWS' comments explain (monk.ts itself
-// still exists — see its own header for why it isn't deletable — but its
-// base `.features` are gone). #1500 forked the base class from real SRD 5.1
-// text — mirrors monk-features.ts's own MONK_BASE_RAW row-for-row
-// (literal-fixture-parity.test.ts enforces byte parity), so this fixture is
-// no longer a uniform flatMap over both editions: five 2024-only rows
-// (Uncanny Metabolism/Heightened Focus/Self-Restoration/Perfect
-// Focus/Superior Defense) and six 2014-only rows (Stillness of
-// Mind/Purity of Body/Tongue of the Sun and Moon/Diamond Soul/Timeless
-// Body/Empty Body/Perfect Self) exist for one edition only. Extra Attack's
-// derivedStat/derivedStatTiers ride this array (unlike `toRows`, which
-// drops those two fields), mirroring FIGHTER_BASE_ROWS'/RANGER_BASE_ROWS'
-// own reasoning.
+// Mirrors monk-features.ts's own MONK_BASE_RAW row-for-row — five 2024-only
+// rows and six 2014-only rows exist for one edition only, so this isn't a
+// uniform flatMap over both editions everywhere below. Extra Attack's
+// derivedStat/derivedStatTiers ride this array (toRows drops those two fields).
 const MONK_BASE_ROWS_SHARED: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2024"] as const).flatMap((edition) => [
   {
     name: "Unarmored Defense",
@@ -2793,12 +2491,9 @@ const MONK_BASE_ROWS_2024: ClassFeatureRow[] = [
   },
 ];
 
-// The base-class actionOnly rows #1912's 34-row sweep added — mirrors
-// monk-features.ts's own new MONK_BASE_RAW entries exactly (name/level/
-// edition/description/resourceKey/activationCost/cost*/count/regrants/
-// requiresUnarmored/reminder/actionOnly). Kept as its own array (not folded
-// into MONK_BASE_ROWS_2014/2024 above) so the "which rows are real feature
-// text vs. action-only" split stays visually obvious in this file too.
+// Mirrors monk-features.ts's own new MONK_BASE_RAW entries exactly. Kept as
+// its own array so the "real feature text vs. action-only" split stays
+// visually obvious here too.
 const MONK_BASE_ROWS_ACTION_ONLY: ClassFeatureRow[] = [
   {
     name: "Bonus Unarmed Strike", level: 1, edition: "EDITION_2014",
@@ -2887,25 +2582,16 @@ export const MONK_BASE_ROWS: ClassFeatureRow[] = [
   ...MONK_BASE_ROWS_ACTION_ONLY,
 ];
 
-// MONK's four 2024 subclasses (#1675) — each mirrors its own
-// monk-features.ts partition, byte-identical across both editions same as
-// MONK_BASE_ROWS above. Warrior of the Elements' Elemental Attunement row
-// carries the toggle descriptor block (#1686) — the one Monk row any
-// resourceKey-observing test could care about, mirrored here for the same
-// reason FIGHTER_BASE_ROWS hand-builds its populated rows rather than
-// calling `toRows`.
-// EDITION_2024-only as of #1501 (tagged in monk-features.ts, bound to the
-// "Warrior of the Open Hand" Subclass row's own retag) — "Way of the Open
-// Hand" below is its SEPARATE 2014 counterpart, not a fork of this row set.
+// Each of Monk's four 2024 subclasses mirrors its own monk-features.ts
+// partition. "Way of the Open Hand" below is a SEPARATE 2014 counterpart, not a fork of this row set.
 export const WARRIOR_OF_THE_OPEN_HAND_ROWS: ClassFeatureRow[] = [
   {
     name: "Open Hand Technique",
     level: 3,
     edition: "EDITION_2024",
-    // Addle corrected 2026-08 (#1501): SRD 5.2's actual text is "can't make
-    // Opportunity Attacks until the start of its next turn", not "take
-    // reactions" — see open-hand-technique.ts's addleClause for the verified
-    // source text.
+    // SRD 5.2's actual Addle text is "can't make Opportunity Attacks until
+    // the start of its next turn", not "take reactions" — see
+    // open-hand-technique.ts's addleClause for the verified source text.
     description:
       "When you hit a creature with an attack granted by your Flurry of Blows, you can impose one effect: Addle — the creature can't make Opportunity Attacks until the start of its next turn (no save); Push — the creature makes a Strength save or is pushed up to 15 ft away; or Topple — the creature makes a Dexterity save or is knocked prone.",
   },
@@ -2935,12 +2621,9 @@ export const WARRIOR_OF_THE_OPEN_HAND_ROWS: ClassFeatureRow[] = [
   },
 ];
 
-// EDITION_2014-only (#1501): SRD 5.1's only monastic tradition, a SEPARATE
-// subclass from Warrior of the Open Hand above, not its 2014 fork — mirrors
-// monk-features.ts's WAY_OF_THE_OPEN_HAND_RAW exactly, including Wholeness of
-// Body's row-owned pool (resourceKey/resourceRecharge/resourceTotals — a
-// fixed total, so no ability-score-dependent resourceFn is needed, unlike
-// the 2024 sibling's Wis-mod formula).
+// EDITION_2014-only: SRD 5.1's only monastic tradition, a SEPARATE subclass
+// from Warrior of the Open Hand above, not its 2014 fork. Mirrors
+// monk-features.ts's WAY_OF_THE_OPEN_HAND_RAW exactly.
 export const WAY_OF_THE_OPEN_HAND_ROWS: ClassFeatureRow[] = [
   {
     name: "Open Hand Technique",
@@ -2976,10 +2659,8 @@ export const WAY_OF_THE_OPEN_HAND_ROWS: ClassFeatureRow[] = [
     description:
       "When you hit a creature with an unarmed strike, you can spend 3 ki points to start imperceptible vibrations in its body, lasting a number of days equal to your monk level. You can have only one creature under this effect at a time, and you can end the vibrations harmlessly without using an action. To end them harmfully, you and the target must be on the same plane of existence — use your action to force a Constitution save: on a failure the target drops to 0 hit points; on a success it takes 10d10 necrotic damage.",
   },
-  // Wholeness of Body's actionOnly served-identity sibling (#1912) — see
-  // monk-features.ts's own row for why it can't ride the "Wholeness of
-  // Body" row above (resourceKey there is already claimed by the row-owned
-  // pool).
+  // Wholeness of Body's actionOnly identity sibling — can't ride the
+  // "Wholeness of Body" row above, whose resourceKey is already claimed by the row-owned pool.
   {
     name: "Wholeness of Body — Action", level: 6, edition: "EDITION_2014",
     description: "As an action, spend 1 use of Wholeness of Body to regain hit points equal to three times your monk level.",
@@ -3124,9 +2805,8 @@ export const WARRIOR_OF_MERCY_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITI
   },
 ]);
 
-// EDITION_2024 only (#1503's retag — its real 2014 predecessor, Way of the
-// Four Elements, is a from-scratch discipline menu, not this subclass under
-// a different edition tag) — was `.flatMap` over both editions before.
+// EDITION_2024 only — its 2014 predecessor, Way of the Four Elements, is a
+// from-scratch discipline menu, not this subclass under a different edition tag.
 export const WARRIOR_OF_THE_ELEMENTS_ROWS: ClassFeatureRow[] = (["EDITION_2024"] as const).flatMap((edition) => [
   {
     name: "Manipulate Elements",
@@ -3179,11 +2859,7 @@ export const WARRIOR_OF_THE_ELEMENTS_ROWS: ClassFeatureRow[] = (["EDITION_2024"]
   },
 ]);
 
-// Way of the Four Elements — EDITION_2014-only (#1503), no fixture entry
-// before #1912 (neither of its two rows carried a descriptor column until
-// Elemental Attunement's own action identity + the new "Elemental
-// Discipline" actionOnly row landed). Mirrors monk-features.ts's
-// WAY_OF_THE_FOUR_ELEMENTS_RAW.
+// EDITION_2014-only. Mirrors monk-features.ts's WAY_OF_THE_FOUR_ELEMENTS_RAW.
 export const WAY_OF_THE_FOUR_ELEMENTS_ROWS: ClassFeatureRow[] = [
   {
     name: "Disciple of the Elements", level: 3, edition: "EDITION_2014",
@@ -3206,11 +2882,7 @@ export const WAY_OF_THE_FOUR_ELEMENTS_ROWS: ClassFeatureRow[] = [
 export const LITERAL_CLASS_ROWS: Record<string, ClassFeatureRow[]> = {
   fighter: FIGHTER_BASE_ROWS,
   barbarian: BARBARIAN_BASE_ROWS,
-  // Narrow mirror (#1909) — see BARD_BARDIC_INSPIRATION_ROWS' own comment for
-  // why this is one feature, not a full base-class array.
   bard: BARD_BARDIC_INSPIRATION_ROWS,
-  // Narrow mirror (#1912) — see ROGUE_CUNNING_ACTION_ROWS' own comment above
-  // for why Rogue rejoins this map after being deliberately absent.
   rogue: ROGUE_CUNNING_ACTION_ROWS,
   ranger: RANGER_BASE_ROWS,
   warlock: WARLOCK_BASE_ROWS,
@@ -3246,15 +2918,7 @@ export const LITERAL_SUBCLASS_ROWS: Record<string, ClassFeatureRow[]> = {
   "trickery domain": CLERIC_TRICKERY_DOMAIN_ROWS,
 };
 
-// This fixture's mirror of catalog-data.ts's seeded CharacterClass.subclassLevel
-// (#1576) — the PHB'14 subclass gate ClassFeatureRowsCarrier.subclassLevel
-// carries in production, read through subclassGateLevel's undefined-fallback
-// of 3 for every class not listed here. Supplied for EVERY class below, not
-// only Cleric/Warlock/Wizard (whose TS module is gone and so has no
-// `grantLevel` left to fall back to): a real production carrier always
-// includes the seeded column regardless of whether a class still has a TS
-// module, so this fixture matches that shape uniformly rather than only where
-// omitting it would visibly diverge.
+// This fixture's mirror of catalog-data.ts's seeded CharacterClass.subclassLevel.
 export const SUBCLASS_LEVEL_BY_CLASS: Record<string, number> = {
   cleric: 1, // PHB'14 p.57
   sorcerer: 1, // PHB'14 p.99
@@ -3270,11 +2934,7 @@ export const SUBCLASS_LEVEL_BY_CLASS: Record<string, number> = {
  * SUBCLASS_LEVEL_BY_CLASS above.
  */
 export function testFeatureRowsFor(className: string, subclass: string | undefined): ClassFeatureRowsCarrier {
-  // .trim() (#1912) mirrors resolveSubclassSlug's own normalization
-  // (subclass-slug.ts) — a caller exercising the case/whitespace-insensitive
-  // gate through a row-driven action needs this fixture's OWN lookup to
-  // tolerate the same input, since production's real lookup (featureRowsOf,
-  // a DB FK relation) never depends on the display-name string at all.
+  // .trim() mirrors resolveSubclassSlug's own normalization (subclass-slug.ts).
   const classKey = (className ?? "").trim().toLowerCase();
   const subclassKey = (subclass ?? "").trim().toLowerCase();
   const classDef = TEST_CLASSES[classKey];

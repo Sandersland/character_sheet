@@ -1,21 +1,11 @@
-// #1576: the 2014 subclass grant level now has a data source that survives its
-// class module's deletion — the seeded CharacterClass.subclassLevel, carried to
-// isSubclassActive on ClassFeatureRowsCarrier.
-//
-// Before this, `grantLevel` on a lib/classes/<class>.ts SubclassDefinition was
-// the ONLY runtime source, while buildClassesView, character creation and the
-// level-up ceremony all read the seeded column. Deleting a module therefore
-// produced a SPLIT BRAIN rather than a clean break: subclassGateLevel's `?? 3`
-// moved the gate to 3, so a 2014 Cleric at level 1 kept its subclass NAME
-// (seeded column) and lost every subclass FEATURE (module gone).
-//
-// subclass-grant-level.test.ts's GATE_1/GATE_2 cases now resolve through the
-// SEEDED path too (testFeatureRowsFor supplies `subclassLevel` for every
-// class, not only Cleric/Warlock/Wizard) — eight of its twelve subclasses
-// (Cleric's two, Warlock's three, Wizard's three) have no TS module left to
-// fall back to at all; only Sorcerer's two and Druid's two still have one.
-// This file's own STILL_ON_TS_PATH cases below are what actually still pin
-// the `?? def.grantLevel` fallback — the only place left that exercises it.
+// The 2014 subclass grant level has a data source that survives its class
+// module's deletion — the seeded CharacterClass.subclassLevel, carried to
+// isSubclassActive on ClassFeatureRowsCarrier. Before this, grantLevel on a
+// lib/classes/<class>.ts SubclassDefinition was the only runtime source,
+// while buildClassesView, character creation and the level-up ceremony all
+// read the seeded column, so deleting a module moved the gate to 3 and split
+// a character's subclass NAME (seeded column) from its FEATURES (module
+// gone). This file's own STILL_ON_TS_PATH cases are the only place left that exercises the `?? def.grantLevel` fallback.
 import { describe, expect, it } from "vitest";
 
 import type { RulesEdition } from "@character-sheet/shared-types";
@@ -28,11 +18,9 @@ import { SUBCLASS_LEVEL_BY_CLASS, testFeatureRowsFor } from "./test-feature-rows
 
 const ABILITIES = { strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 };
 
-// The PHB'14 gate for each of #1576's five originally-affected classes.
 // Literal page-cited values, NOT read from the same constant the
-// implementation reads: catalog-data.ts is under prisma/ and a src file
-// importing it is a TS6059 error anyway, so the DB assertion below is what ties
-// these literals to the real seed.
+// implementation reads (catalog-data.ts is under prisma/, and a src file
+// importing it is a TS6059 error) — the DB assertion below ties these literals to the real seed.
 const PHB14_GATE: Array<[string, string, number]> = [
   ["cleric", "life domain", 1], // PHB'14 p.57
   ["sorcerer", "draconic bloodline", 1], // PHB'14 p.99
@@ -41,12 +29,10 @@ const PHB14_GATE: Array<[string, string, number]> = [
   ["wizard", "school of evocation", 2], // PHB'14 p.114
 ];
 
-// Cleric/Warlock/Wizard's modules are deleted outright (#1576's tracked
-// follow-up); Sorcerer's and Druid's stay for OTHER, independent reasons
-// their own file headers name (see test-feature-rows.fixture.ts's header for
-// the summary). Split ONLY for the "no seeded value" fallback test below —
-// every other test in this file behaves identically whether the module
-// exists or not, since a defined `subclassLevel` always wins regardless.
+// Cleric/Warlock/Wizard's modules are deleted outright; Sorcerer's and
+// Druid's stay for other, independent reasons their own file headers name.
+// Split ONLY for the "no seeded value" fallback test below — every other
+// test in this file behaves identically whether the module exists or not.
 const STILL_ON_TS_PATH: Array<[string, string, number]> = [
   ["sorcerer", "draconic bloodline", 1],
   ["druid", "circle of the land", 2],
@@ -57,12 +43,10 @@ const MODULE_DELETED: Array<[string, string, number]> = [
   ["wizard", "school of evocation", 2],
 ];
 
-/**
- * Derive a subclass's features with the carrier's `subclassLevel` set
- * explicitly — the shape a real caller gets from featureRowsOf once its select
- * carries the class relation. Passing `undefined` reproduces a narrow-select
- * caller, which is the fallback path.
- */
+// Derives a subclass's features with the carrier's subclassLevel set
+// explicitly — the shape a real caller gets from featureRowsOf once its
+// select carries the class relation. Passing undefined reproduces a
+// narrow-select caller, which is the fallback path.
 function subclassFeaturesWithSeededGate(
   className: string,
   subclass: string,
@@ -96,11 +80,8 @@ describe("2014 subclass gate reads the seeded subclassLevel (#1576)", () => {
     },
   );
 
-  // THE point of the issue — for Sorcerer/Druid (module still present) the
-  // carrier's seeded value must beat whatever the module's own `grantLevel`
-  // would otherwise supply, so deleting the module later (as already
-  // happened to Cleric/Warlock/Wizard, #1576) can never move the gate for a
-  // caller that carries the seeded relation.
+  // For Sorcerer/Druid (module still present) the carrier's seeded value
+  // must beat whatever the module's own grantLevel would otherwise supply.
   it.each(STILL_ON_TS_PATH)(
     "%s / %s: the seeded value WINS over the module's own grantLevel",
     (className, subclass, gate) => {
@@ -112,9 +93,7 @@ describe("2014 subclass gate reads the seeded subclassLevel (#1576)", () => {
     },
   );
 
-  // Cleric/Warlock/Wizard have no module left at all — `def.grantLevel` is
-  // always undefined now, so there is nothing left to "win" against. This
-  // just confirms the seeded value alone decides the gate.
+  // Cleric/Warlock/Wizard have no module left at all, so there's nothing left to "win" against.
   it.each(MODULE_DELETED)(
     "%s / %s: the seeded value alone decides the gate (no module left to beat)",
     (className, subclass, gate) => {
@@ -123,11 +102,8 @@ describe("2014 subclass gate reads the seeded subclassLevel (#1576)", () => {
     },
   );
 
-  // The fallback #1576 deliberately keeps: a narrow-select caller carries no
-  // class relation, so a class whose module still exists decides exactly as
-  // before. This is what makes the change behaviour-neutral on landing, and
-  // it is the assertion that goes red if someone "simplifies" the
-  // `?? def.grantLevel` away while Sorcerer's/Druid's modules still exist.
+  // Goes red if someone "simplifies" the `?? def.grantLevel` fallback away
+  // while Sorcerer's/Druid's modules still exist.
   it.each(STILL_ON_TS_PATH)(
     "%s / %s: with no seeded value the module still decides (unchanged fallback)",
     (className, subclass, gate) => {
@@ -137,15 +113,11 @@ describe("2014 subclass gate reads the seeded subclassLevel (#1576)", () => {
     },
   );
 
-  // Cleric/Warlock/Wizard's modules are gone (#1576's tracked follow-up) — a
-  // narrow-select caller (no seeded value) has no more `def.grantLevel` for
-  // isSubclassActive's `?? def.grantLevel` fallback to reach, so it now gates
-  // at subclassGateLevel's plain `?? 3` default instead of the class's own
-  // PHB'14 gate. This is the exact split-brain #1576's own comment warns
-  // about (a real character keeps its subclass NAME via the seeded column but
-  // loses FEATURES below level 3) — task-1's report confirms every production
-  // caller already carries the seeded relation, so this is a narrow-select-
-  // only consequence, not a live regression.
+  // Cleric/Warlock/Wizard's modules are gone, so a narrow-select caller has
+  // no def.grantLevel left to fall back to and now gates at
+  // subclassGateLevel's plain ?? 3 default instead of the class's own PHB'14
+  // gate — a narrow-select-only consequence, since every production caller
+  // already carries the seeded relation.
   it.each(MODULE_DELETED)(
     "%s / %s: with no seeded value and no module left, the gate falls back to subclassGateLevel's plain 3",
     (className, subclass, gate) => {
