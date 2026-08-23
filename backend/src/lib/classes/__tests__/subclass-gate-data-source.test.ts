@@ -24,7 +24,7 @@ import { deriveResources } from "@/lib/classes/class-features.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 
-import { testFeatureRowsFor } from "./test-feature-rows.fixture.js";
+import { SUBCLASS_LEVEL_BY_CLASS, testFeatureRowsFor } from "./test-feature-rows.fixture.js";
 
 const ABILITIES = { strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 };
 
@@ -100,18 +100,25 @@ describe("2014 subclass gate reads the seeded subclassLevel (#1576)", () => {
   // carrier's seeded value must beat whatever the module's own `grantLevel`
   // would otherwise supply, so deleting the module later (as already
   // happened to Cleric/Warlock/Wizard, #1576) can never move the gate for a
-  // caller that carries the seeded relation. For Cleric/Warlock/Wizard
-  // themselves there is no module left to beat at all — `def.grantLevel` is
-  // always undefined now — so this same assertion just confirms the seeded
-  // value alone decides. Feeding a gate of 3 must suppress the level-1/2
-  // features either way.
-  it.each(PHB14_GATE)(
+  // caller that carries the seeded relation.
+  it.each(STILL_ON_TS_PATH)(
     "%s / %s: the seeded value WINS over the module's own grantLevel",
     (className, subclass, gate) => {
       // Seeded 3 beats a module that says 1 or 2 -> nothing at the module's gate.
       expect(subclassFeaturesWithSeededGate(className, subclass, gate, "EDITION_2014", 3)).toEqual([]);
       // ...and the features return at 3, proving it was the gate that moved and
       // not the rows disappearing.
+      expect(subclassFeaturesWithSeededGate(className, subclass, 3, "EDITION_2014", 3).length).toBeGreaterThan(0);
+    },
+  );
+
+  // Cleric/Warlock/Wizard have no module left at all — `def.grantLevel` is
+  // always undefined now, so there is nothing left to "win" against. This
+  // just confirms the seeded value alone decides the gate.
+  it.each(MODULE_DELETED)(
+    "%s / %s: the seeded value alone decides the gate (no module left to beat)",
+    (className, subclass, gate) => {
+      expect(subclassFeaturesWithSeededGate(className, subclass, gate, "EDITION_2014", 3)).toEqual([]);
       expect(subclassFeaturesWithSeededGate(className, subclass, 3, "EDITION_2014", 3).length).toBeGreaterThan(0);
     },
   );
@@ -142,9 +149,7 @@ describe("2014 subclass gate reads the seeded subclassLevel (#1576)", () => {
   it.each(MODULE_DELETED)(
     "%s / %s: with no seeded value and no module left, the gate falls back to subclassGateLevel's plain 3",
     (className, subclass, gate) => {
-      if (gate < 3) {
-        expect(subclassFeaturesWithSeededGate(className, subclass, gate, "EDITION_2014", undefined)).toEqual([]);
-      }
+      expect(subclassFeaturesWithSeededGate(className, subclass, gate, "EDITION_2014", undefined)).toEqual([]);
       expect(
         subclassFeaturesWithSeededGate(className, subclass, 3, "EDITION_2014", undefined).length,
       ).toBeGreaterThan(0);
@@ -179,5 +184,13 @@ describe("the seeded column actually holds the PHB'14 values (#1576)", () => {
     expect(rows.length).toBeGreaterThanOrEqual(12);
     const nonThree = rows.filter((r) => r.subclassLevel !== 3).map((r) => `${r.name}=${r.subclassLevel}`).sort();
     expect(nonThree).toEqual(["Cleric=1", "Druid=2", "Sorcerer=1", "Warlock=1", "Wizard=2"]);
+  });
+
+  it("SUBCLASS_LEVEL_BY_CLASS mirrors every seeded CharacterClass.subclassLevel", async () => {
+    const rows = await prisma.characterClass.findMany({ select: { name: true, subclassLevel: true } });
+    expect(rows.length).toBeGreaterThanOrEqual(12);
+    for (const row of rows) {
+      expect(SUBCLASS_LEVEL_BY_CLASS[row.name.toLowerCase()] ?? 3, row.name).toBe(row.subclassLevel);
+    }
   });
 });

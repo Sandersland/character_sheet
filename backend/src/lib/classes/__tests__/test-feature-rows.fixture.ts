@@ -131,12 +131,11 @@
 // phantom pool (poolFromRow requires resourceTotals), so the "no pool from
 // this fixture" invariant above is unaffected.
 import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "@/lib/classes/class-feature-rows.js";
-import { paladin } from "@/lib/classes/paladin.js";
 import { ranger } from "@/lib/classes/ranger.js";
 import { sorcerer } from "@/lib/classes/sorcerer.js";
 import type { AuthoredFeature, ClassDefinition, SubclassDefinition } from "@/lib/classes/types.js";
 const TEST_CLASSES: Record<string, ClassDefinition> = {
-  paladin, ranger, sorcerer,
+  ranger, sorcerer,
 };
 
 // Channel Divinity's row-driven action reminder (#1909) — the SAME text on
@@ -3256,7 +3255,7 @@ export const LITERAL_SUBCLASS_ROWS: Record<string, ClassFeatureRow[]> = {
 // includes the seeded column regardless of whether a class still has a TS
 // module, so this fixture matches that shape uniformly rather than only where
 // omitting it would visibly diverge.
-const SUBCLASS_LEVEL_BY_CLASS: Record<string, number> = {
+export const SUBCLASS_LEVEL_BY_CLASS: Record<string, number> = {
   cleric: 1, // PHB'14 p.57
   sorcerer: 1, // PHB'14 p.99
   warlock: 1, // PHB'14 p.105
