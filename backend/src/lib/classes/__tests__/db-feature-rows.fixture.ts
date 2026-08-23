@@ -19,15 +19,28 @@ function titleCase(className: string): string {
   return className.charAt(0).toUpperCase() + className.slice(1);
 }
 
-const classIdCache = new Map<string, string>();
+interface ResolvedClass {
+  id: string;
+  subclassLevel: number;
+}
+
+const classCache = new Map<string, ResolvedClass>();
 const subclassIdCache = new Map<string, string>();
 
-async function resolveClassId(className: string): Promise<string> {
-  const cached = classIdCache.get(className);
+// Resolves both the class's id AND its seeded subclassLevel in one query —
+// findUniqueOrThrow already loads the whole row, so caching subclassLevel
+// alongside id costs nothing extra. Real seed data (catalog-data.ts), not a
+// hand-maintained mirror: this is what lets loadDbFeatureRows's carrier gate
+// Cleric/Warlock/Wizard's subclasses at their real PHB'14 level (1/1/2) now
+// that their lib/classes/<class>.ts modules are deleted (#1576) — without it
+// isSubclassActive's fallback would move their 2014 gate to 3.
+async function resolveClass(className: string): Promise<ResolvedClass> {
+  const cached = classCache.get(className);
   if (cached) return cached;
   const row = await prisma.characterClass.findUniqueOrThrow({ where: { name: titleCase(className) } });
-  classIdCache.set(className, row.id);
-  return row.id;
+  const resolved: ResolvedClass = { id: row.id, subclassLevel: row.subclassLevel };
+  classCache.set(className, resolved);
+  return resolved;
 }
 
 // Resolved via resolveSubclassSlug (subclass-slug.ts, #1277's sanctioned
@@ -53,7 +66,7 @@ async function resolveSubclassId(className: string, subclass: string): Promise<s
  * (className, subclass) pair into the carrier `deriveResources` expects.
  */
 export async function loadDbFeatureRows(className: string, subclass: string | undefined): Promise<ClassFeatureRowsCarrier> {
-  const classId = await resolveClassId(className);
+  const { id: classId, subclassLevel } = await resolveClass(className);
   // Prisma types resourceTotals/resourceDieTiers/derivedStatTiers as opaque
   // Prisma.JsonValue — cast to ClassFeatureRow's tiered shape here, mirroring
   // feature-rows-select.ts's featureRowsOf (#1528).
@@ -63,5 +76,5 @@ export async function loadDbFeatureRows(className: string, subclass: string | un
     const subclassId = await resolveSubclassId(className, subclass);
     subclassRows = (await prisma.classFeature.findMany({ where: { classId, subclassId } })) as unknown as ClassFeatureRow[];
   }
-  return { classRows, subclassRows };
+  return { classRows, subclassRows, subclassLevel };
 }

@@ -40,15 +40,23 @@
 // a class whose rows a real test exercises that way cannot skip the mirror
 // even where `.features` content itself is never asserted (#1225).
 //
-// Four different end states sit behind that one list. `lib/classes/
-// fighter.ts`, `barbarian.ts` and `rogue.ts` are deleted outright.
-// `warlock.ts`, `wizard.ts`, `sorcerer.ts`, `cleric.ts` and `druid.ts` survive
-// because each carries a subclass `grantLevel` (1 for Warlock's patrons,
-// Sorcerer's origins and Cleric's Divine Domain; 2 for Wizard's schools and
-// Druid's Circles) that no seeded row can express while subclassGateLevel's
-// undefined fallback is 3, so deleting any would silently move that class's
-// 2014 subclass gate (#1576). `ranger.ts` and `bard.ts` survive for a DIFFERENT
-// reason still — each own header names it: Ranger's Hunter `choices` catalog
+// Six different end states sit behind that one list. `lib/classes/
+// fighter.ts`, `barbarian.ts`, `rogue.ts`, `cleric.ts`, `warlock.ts` and
+// `wizard.ts` are all deleted outright — the last three's sole survival
+// reason (a subclass `grantLevel` of 1 for Warlock's patrons/Cleric's Divine
+// Domain, 2 for Wizard's schools, that no seeded row could express while
+// subclassGateLevel's undefined fallback is 3) is now covered by this
+// fixture's own SUBCLASS_LEVEL_BY_CLASS map below, mirroring the seeded
+// CharacterClass.subclassLevel column every production carrier already
+// supplies (#1576). `sorcerer.ts` and `druid.ts` carry the SAME grantLevel
+// reason (Sorcerous Origin/Druid Circle, also 1/2) but survive for OTHER,
+// independent reasons their own file headers name: Sorcerer's `sorceryPoints`
+// is a `level` formula no resourceTotals tier array can express, plus a real
+// lib/spellcasting/spellcasting.ts consumer; Druid's 2014 Wild Shape CR cap
+// and duration interpolate `level`/`subclassKey` INSIDE the description text,
+// which #1528's no-second-string rule (poolFromRow reads only the row's own
+// `description`) rules out for a row. `ranger.ts` and `bard.ts` survive for a
+// DIFFERENT reason still — each own header names it: Ranger's Hunter `choices` catalog
 // (#899/#1353 — its EDITION_2024 Wisdom-modifier resourceFn was retired to a
 // row by #1685); Bard's Cha-modifier/level-tiered-recharge resourceFn (#1224) — both subclasses'
 // `grantLevel: 3` already equal the fallback, so unlike the first five that
@@ -106,9 +114,8 @@ import { paladin } from "@/lib/classes/paladin.js";
 import { ranger } from "@/lib/classes/ranger.js";
 import { sorcerer } from "@/lib/classes/sorcerer.js";
 import type { AuthoredFeature, ClassDefinition, SubclassDefinition } from "@/lib/classes/types.js";
-import { wizard } from "@/lib/classes/wizard.js";
 const TEST_CLASSES: Record<string, ClassDefinition> = {
-  paladin, ranger, sorcerer, wizard,
+  paladin, ranger, sorcerer,
 };
 
 // Channel Divinity's row-driven action reminder (#1909) — the SAME text on
@@ -484,9 +491,10 @@ function withPool(rows: ClassFeatureRow[], name: string, recharge: string, minLe
 // WIZARD's base-class rows (#1234): `lib/classes/wizard.ts`'s feature TEXT
 // (base + all three schools) moved to literal seed data
 // (prisma/seed/wizard-features.ts) — the same rootDir boundary FIGHTER_BASE_
-// ROWS' comment explains (unlike Fighter/Barbarian, wizard.ts itself still
-// exists — see that file's own header for why it isn't deletable — but its
-// `.features` are gone). Hardcoded here, once, mirroring wizard-features.ts's
+// ROWS' comment explains. `lib/classes/wizard.ts` itself is now deleted
+// outright too (#1576), same as Fighter's/Barbarian's own modules — see
+// SUBCLASS_LEVEL_BY_CLASS above for what replaced its subclass grantLevel.
+// Hardcoded here, once, mirroring wizard-features.ts's
 // own EDITION_2014/EDITION_2024 text exactly (commit 2's real SRD 5.2 /
 // PHB'24 content — every row below now sets its own `edition`, per that
 // file's tagging rule) — Arcane Recovery's resource columns (commit 3) are
@@ -3218,7 +3226,29 @@ export const LITERAL_SUBCLASS_ROWS: Record<string, ClassFeatureRow[]> = {
   "trickery domain": CLERIC_TRICKERY_DOMAIN_ROWS,
 };
 
-/** The featureRows carrier for a (className, subclass) pair, sourced from the TS modules. */
+// This fixture's mirror of catalog-data.ts's seeded CharacterClass.subclassLevel
+// (#1576) — the PHB'14 subclass gate ClassFeatureRowsCarrier.subclassLevel
+// carries in production, read through subclassGateLevel's undefined-fallback
+// of 3 for every class not listed here. Supplied for EVERY class below, not
+// only Cleric/Warlock/Wizard (whose TS module is gone and so has no
+// `grantLevel` left to fall back to): a real production carrier always
+// includes the seeded column regardless of whether a class still has a TS
+// module, so this fixture matches that shape uniformly rather than only where
+// omitting it would visibly diverge.
+const SUBCLASS_LEVEL_BY_CLASS: Record<string, number> = {
+  cleric: 1, // PHB'14 p.57
+  sorcerer: 1, // PHB'14 p.99
+  warlock: 1, // PHB'14 p.105
+  druid: 2, // PHB'14 p.66
+  wizard: 2, // PHB'14 p.114
+};
+
+/**
+ * The featureRows carrier for a (className, subclass) pair — classRows/
+ * subclassRows sourced from the TS modules (or their LITERAL_*_ROWS mirror,
+ * for a class already migrated onto seeded rows), subclassLevel from
+ * SUBCLASS_LEVEL_BY_CLASS above.
+ */
 export function testFeatureRowsFor(className: string, subclass: string | undefined): ClassFeatureRowsCarrier {
   // .trim() (#1912) mirrors resolveSubclassSlug's own normalization
   // (subclass-slug.ts) — a caller exercising the case/whitespace-insensitive
@@ -3232,5 +3262,6 @@ export function testFeatureRowsFor(className: string, subclass: string | undefin
   return {
     classRows: LITERAL_CLASS_ROWS[classKey] ?? toRows(classDef?.features ?? []),
     subclassRows: LITERAL_SUBCLASS_ROWS[subclassKey] ?? toRows(subDef?.features ?? []),
+    subclassLevel: SUBCLASS_LEVEL_BY_CLASS[classKey] ?? 3,
   };
 }

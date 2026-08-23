@@ -15,12 +15,14 @@
 // 3. Moved Arcane Recovery's and Illusory Self's resource pools onto their
 //    rows (see the RESOURCE POOL block below) and deleted
 //    lib/classes/wizard.ts's two resourceFns, nothing depending on them.
-// 4. Reduced lib/classes/wizard.ts to its irreducible residue. It is NOT
-//    deletable, unlike Fighter's and Barbarian's modules: its `grantLevel: 2`
-//    on every subclass is PHB'14's actual Arcane Tradition gate, and
-//    `subclassGateLevel`'s undefined-grantLevel fallback is 3, so deleting it
-//    would silently move every 2014 Wizard's subclass gate — see wizard.ts's
-//    own header and #1576 for the tracked follow-up.
+// 4. Reduced lib/classes/wizard.ts to its irreducible residue: its
+//    `grantLevel: 2` on every subclass was PHB'14's actual Arcane Tradition
+//    gate, and `subclassGateLevel`'s undefined-grantLevel fallback is 3, so
+//    deleting the module would have silently moved every 2014 Wizard's
+//    subclass gate — until #1576's seeded CharacterClass.subclassLevel gave
+//    isSubclassActive a data source that survives the module's deletion. That
+//    tracked follow-up is what let lib/classes/wizard.ts be deleted outright;
+//    ClassFeatureRowsCarrier.subclassLevel's own doc comment has the mechanism.
 // class-features.ts concatenates WIZARD_FEATURES onto the still-derived
 // classes' rows to build CLASS_FEATURES; see its LITERAL_ROW_CLASSES export
 // for the set of classes whose rows tests must not compare against a

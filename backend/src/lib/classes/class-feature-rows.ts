@@ -348,10 +348,14 @@ export interface ClassFeatureRowsCarrier {
   //
   // Undefined for the narrow-select callers that carry no class relation, in
   // which case isSubclassActive falls back to the TS module's own grantLevel —
-  // so a class whose module still exists behaves identically either way. That
-  // fallback is what makes deleting the module SAFE: without this field, doing
-  // so silently moved five classes' 2014 gate to 3 (subclassGateLevel's
-  // `?? 3`), leaving a character its subclass NAME and none of its FEATURES.
+  // so a class whose module still exists (Sorcerer, Druid) behaves identically
+  // either way. That fallback is what already let cleric.ts/warlock.ts/
+  // wizard.ts be deleted outright: without this field, deleting one of the
+  // five non-3-grantLevel classes' modules would silently move its 2014 gate
+  // to 3 (subclassGateLevel's `?? 3`), leaving a character its subclass NAME
+  // and none of its FEATURES. Sorcerer's and Druid's modules still stand on
+  // the exact same mechanism, deletable the same way whenever their own
+  // independent survival reasons (see each file's own header) are worked down.
   subclassLevel?: number;
 }
 

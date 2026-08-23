@@ -24,8 +24,8 @@ import { testFeatureRowsFor } from "./test-feature-rows.fixture.js";
 
 const ABILITIES = { strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 };
 
-// The PHB'14 gate for each class whose module currently pins it — the five
-// #1576 names. Literal page-cited values, NOT read from the same constant the
+// The PHB'14 gate for each of #1576's five originally-affected classes.
+// Literal page-cited values, NOT read from the same constant the
 // implementation reads: catalog-data.ts is under prisma/ and a src file
 // importing it is a TS6059 error anyway, so the DB assertion below is what ties
 // these literals to the real seed.
@@ -35,6 +35,22 @@ const PHB14_GATE: Array<[string, string, number]> = [
   ["warlock", "the fiend", 1], // PHB'14 p.105
   ["druid", "circle of the land", 2], // PHB'14 p.66
   ["wizard", "school of evocation", 2], // PHB'14 p.114
+];
+
+// Cleric/Warlock/Wizard's modules are deleted outright (#1576's tracked
+// follow-up); Sorcerer's and Druid's stay for OTHER, independent reasons
+// their own file headers name (see test-feature-rows.fixture.ts's header for
+// the summary). Split ONLY for the "no seeded value" fallback test below —
+// every other test in this file behaves identically whether the module
+// exists or not, since a defined `subclassLevel` always wins regardless.
+const STILL_ON_TS_PATH: Array<[string, string, number]> = [
+  ["sorcerer", "draconic bloodline", 1],
+  ["druid", "circle of the land", 2],
+];
+const MODULE_DELETED: Array<[string, string, number]> = [
+  ["cleric", "life domain", 1],
+  ["warlock", "the fiend", 1],
+  ["wizard", "school of evocation", 2],
 ];
 
 /**
@@ -92,15 +108,36 @@ describe("2014 subclass gate reads the seeded subclassLevel (#1576)", () => {
   );
 
   // The fallback #1576 deliberately keeps: a narrow-select caller carries no
-  // class relation, so the module decides exactly as before. This is what makes
-  // the change behaviour-neutral on landing, and it is the assertion that goes
-  // red if someone "simplifies" the `?? def.grantLevel` away while the five
-  // modules still exist.
-  it.each(PHB14_GATE)(
+  // class relation, so a class whose module still exists decides exactly as
+  // before. This is what makes the change behaviour-neutral on landing, and
+  // it is the assertion that goes red if someone "simplifies" the
+  // `?? def.grantLevel` away while Sorcerer's/Druid's modules still exist.
+  it.each(STILL_ON_TS_PATH)(
     "%s / %s: with no seeded value the module still decides (unchanged fallback)",
     (className, subclass, gate) => {
       expect(
         subclassFeaturesWithSeededGate(className, subclass, gate, "EDITION_2014", undefined).length,
+      ).toBeGreaterThan(0);
+    },
+  );
+
+  // Cleric/Warlock/Wizard's modules are gone (#1576's tracked follow-up) — a
+  // narrow-select caller (no seeded value) has no more `def.grantLevel` for
+  // isSubclassActive's `?? def.grantLevel` fallback to reach, so it now gates
+  // at subclassGateLevel's plain `?? 3` default instead of the class's own
+  // PHB'14 gate. This is the exact split-brain #1576's own comment warns
+  // about (a real character keeps its subclass NAME via the seeded column but
+  // loses FEATURES below level 3) — task-1's report confirms every production
+  // caller already carries the seeded relation, so this is a narrow-select-
+  // only consequence, not a live regression.
+  it.each(MODULE_DELETED)(
+    "%s / %s: with no seeded value and no module left, the gate falls back to subclassGateLevel's plain 3",
+    (className, subclass, gate) => {
+      if (gate < 3) {
+        expect(subclassFeaturesWithSeededGate(className, subclass, gate, "EDITION_2014", undefined)).toEqual([]);
+      }
+      expect(
+        subclassFeaturesWithSeededGate(className, subclass, 3, "EDITION_2014", undefined).length,
       ).toBeGreaterThan(0);
     },
   );

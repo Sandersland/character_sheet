@@ -8,15 +8,12 @@
 import { describe, it, expect } from "vitest";
 
 import { bard } from "@/lib/classes/bard.js";
-import { cleric } from "@/lib/classes/cleric.js";
 import { druid } from "@/lib/classes/druid.js";
 import { monk } from "@/lib/classes/monk.js";
 import { paladin } from "@/lib/classes/paladin.js";
 import { ranger } from "@/lib/classes/ranger.js";
 import { sorcerer } from "@/lib/classes/sorcerer.js";
 import type { ClassDefinition } from "@/lib/classes/types.js";
-import { warlock } from "@/lib/classes/warlock.js";
-import { wizard } from "@/lib/classes/wizard.js";
 
 import { BACKGROUNDS, CLASSES, ITEMS } from "../catalog-data.js";
 import { ACTIONS, TWENTY_FOUR_ONLY_ACTION_KEYS } from "../actions.js";
@@ -823,9 +820,8 @@ describe("referential integrity", () => {
   // comparison while only the catalog column carried 2014 values).
   it("every class-definition grantLevel matches its seed subclassLevel", () => {
     const defByName: Record<string, ClassDefinition> = {
-      Bard: bard, Cleric: cleric, Druid: druid,
+      Bard: bard, Druid: druid,
       Monk: monk, Paladin: paladin, Ranger: ranger, Sorcerer: sorcerer,
-      Warlock: warlock, Wizard: wizard,
     };
     const drift = CLASSES.flatMap((seedClass) =>
       Object.entries(defByName[seedClass.name]?.subclasses ?? {})
@@ -855,6 +851,23 @@ describe("referential integrity", () => {
     expect(fighterClass?.subclassLevel).toBe(3);
     expect(barbarianClass?.subclassLevel).toBe(3);
     expect(rogueClass?.subclassLevel).toBe(3);
+  });
+
+  // Cleric/Warlock/Wizard left `defByName` above the same way, when
+  // lib/classes/cleric.ts/warlock.ts/wizard.ts were deleted (#1576) — their
+  // subclasses (Life/Trickery Domain; The Archfey/The Fiend/The Great Old
+  // One; Bladesinging/School of Abjuration/Evocation/Illusion) are
+  // SUBCLASS_IDENTITY-only now too. Unlike Fighter/Barbarian/Rogue, these
+  // three's PHB'14 gate is NOT 3 — Divine Domain (p.57) and Otherworldly
+  // Patron (p.105) are 1st level, Arcane Tradition (p.114) is 2nd — so assert
+  // the real gate value, not the edition-invariant fallback.
+  it("Cleric's, Warlock's and Wizard's seeded subclassLevel is their PHB'14 gate (#1576)", () => {
+    const clericClass = CLASSES.find((c) => c.name === "Cleric");
+    const warlockClass = CLASSES.find((c) => c.name === "Warlock");
+    const wizardClass = CLASSES.find((c) => c.name === "Wizard");
+    expect(clericClass?.subclassLevel).toBe(1); // PHB'14 p.57
+    expect(warlockClass?.subclassLevel).toBe(1); // PHB'14 p.105
+    expect(wizardClass?.subclassLevel).toBe(2); // PHB'14 p.114
   });
 
   // Unlike the grantLevel drift test above (reverted to direct equality by
@@ -901,18 +914,19 @@ describe("referential integrity", () => {
 // #1277: SUBCLASS_SLUGS is the closed vocabulary joining a seeded Subclass row
 // to its lib/classes/*.ts SubclassDefinition, replacing the substring match
 // #1339 fixed on one of the seven gate sites. F2 measured the seed catalog and
-// the class definitions as ALREADY a perfect 1:1 bijection (31 rows, 31
-// definition keys) at the time of filing — each assertion below is a
-// toEqual([]) diff so a broken row names the offender instead of a boolean
-// pass/fail. #1532 deleted lib/classes/fighter.ts, #1223 deleted
-// lib/classes/barbarian.ts, and #1231 deleted lib/classes/rogue.ts, so that
-// bijection is now 31 rows / 23 definition keys: Fighter's three subclasses,
-// Barbarian's two, and Rogue's three are SUBCLASS_IDENTITY-only (no
+// the class definitions as a perfect 1:1 bijection at the time of filing —
+// each assertion below is a toEqual([]) diff so a broken row names the
+// offender instead of a boolean pass/fail. #1532 deleted lib/classes/
+// fighter.ts, #1223 deleted lib/classes/barbarian.ts, #1231 deleted
+// lib/classes/rogue.ts, and #1576 deleted lib/classes/cleric.ts/warlock.ts/
+// wizard.ts, so that bijection is now 35 rows / 18 definition keys: Fighter's
+// three subclasses, Barbarian's two, Rogue's three, Cleric's two, Warlock's
+// three and Wizard's four are all SUBCLASS_IDENTITY-only (no
 // SubclassDefinition), which is exactly the row-migrated case the fourth
 // test below carves out.
 describe("SUBCLASS_SLUGS — three-way bijection (#1277)", () => {
   const CLASS_DEFS: Record<string, ClassDefinition> = {
-    bard, cleric, druid, monk, paladin, ranger, sorcerer, warlock, wizard,
+    bard, druid, monk, paladin, ranger, sorcerer,
   };
 
   // The named twin of scripts/check-class-ts-migration.sh's NOT_YET_MIGRATED
@@ -921,20 +935,19 @@ describe("SUBCLASS_SLUGS — three-way bijection (#1277)", () => {
   // BOTH lists in the same PR, or this test and the guard script silently
   // drift apart. Deliberate-coupling latch: if you change one, update the
   // other.
-  const ROW_MIGRATED_CLASSES = ["fighter", "barbarian", "rogue"];
+  const ROW_MIGRATED_CLASSES = ["fighter", "barbarian", "rogue", "cleric", "warlock", "wizard"];
 
-  // #1676: wizard-bladesinging is the FIRST real INTENTIONAL_GAPS entry.
-  // Wizard is NOT a row-migrated class in ROW_MIGRATED_CLASSES' sense —
-  // lib/classes/wizard.ts survives (it carries the class's residual subclass
-  // grantLevel, class-features.ts's own header) and its three OTHER
-  // subclasses each still have a real SubclassDefinition. Bladesinging is
-  // identity-only by design (CLAUDE.md: a pure identity/join key carries no
-  // rules text) — its mechanics ride the F1-F5 engine's seed-row vocabulary
-  // entirely (wizard-features.ts's BLADESINGING_RAW), never a
-  // SubclassDefinition, mirroring Fighter's own subclasses' shape without
-  // Fighter's whole-module deletion. Declared here, with a reason, rather
-  // than silently dropped from the bijection check below.
-  const INTENTIONAL_GAPS: SubclassSlug[] = ["wizard-bladesinging"];
+  // #1676 introduced wizard-bladesinging as the first true engine-first
+  // subclass (identity-only by design, no SubclassDefinition ever intended —
+  // CLAUDE.md: a pure identity/join key carries no rules text). #1576's
+  // deletion of lib/classes/wizard.ts folded Wizard into ROW_MIGRATED_CLASSES
+  // above alongside its three OTHER (once TS-registered) subclasses, so
+  // Bladesinging no longer needs its own carve-out here — the bijection check
+  // below already excuses every wizard-* slug via ROW_MIGRATED_CLASSES. Left
+  // as an empty, still-declared allowlist (rather than deleted outright) so
+  // the NEXT genuinely engine-first subclass in a class that keeps its module
+  // has a place to land with its own reason recorded.
+  const INTENTIONAL_GAPS: SubclassSlug[] = [];
 
   it("every SUBCLASSES row's slug is a member of SUBCLASS_SLUGS and maps back to its own (className, name)", () => {
     const bad = SUBCLASSES.filter((s) => {
@@ -985,6 +998,6 @@ describe("SUBCLASS_SLUGS — three-way bijection (#1277)", () => {
   // SubclassDefinition, with its own reason recorded at the declaration site
   // (never silently dropped from SUBCLASS_SLUGS itself).
   it("the intentional-gap allowlist names exactly the disclosed engine-first subclasses", () => {
-    expect(INTENTIONAL_GAPS).toEqual(["wizard-bladesinging"]);
+    expect(INTENTIONAL_GAPS).toEqual([]);
   });
 });

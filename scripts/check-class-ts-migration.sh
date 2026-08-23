@@ -17,19 +17,21 @@
 # an allow-list of what's STILL TS, not of what's forbidden. It started at
 # ELEVEN (Fighter deliberately absent — #1532 is what put it under this
 # guard's scan in the first place), then TEN (Barbarian dropped off too,
-# #1223), now NINE (Rogue dropped off too, #1231) — and only ever shrinks. A
-# genuinely new thirteenth class's lib/classes/<name>.ts is forced to be
-# classified onto EITHER ALL_CLASSES/NOT_YET_MIGRATED or NON_CLASS_MODULES
-# below by the reverse completeness check (search "reverse check") — without
-# it, a new file there defaults to unscanned, not "migrated": #1532's own
-# arbiter review found this guard exiting 0 against a lib/classes/
-# artificer.ts probe file for exactly that reason. Cross-linked: #1134 tracks
-# the retab wave itself; #1522 is the ClassFeature foundation epic each retab
-# depends on.
+# #1223), then NINE (Rogue dropped off too, #1231), now SIX (Cleric, Warlock
+# and Wizard dropped off too, #1576, once the seeded CharacterClass.
+# subclassLevel gave their 2014 subclass gate a data source that survives the
+# module's deletion) — and only ever shrinks. A genuinely new thirteenth
+# class's lib/classes/<name>.ts is forced to be classified onto EITHER
+# ALL_CLASSES/NOT_YET_MIGRATED or NON_CLASS_MODULES below by the reverse
+# completeness check (search "reverse check") — without it, a new file there
+# defaults to unscanned, not "migrated": #1532's own arbiter review found this
+# guard exiting 0 against a lib/classes/artificer.ts probe file for exactly
+# that reason. Cross-linked: #1134 tracks the retab wave itself; #1522 is the
+# ClassFeature foundation epic each retab depends on.
 set -eu
 
 ALL_CLASSES="barbarian bard cleric druid fighter monk paladin ranger rogue sorcerer warlock wizard"
-NOT_YET_MIGRATED="bard cleric druid monk paladin ranger sorcerer warlock wizard"
+NOT_YET_MIGRATED="bard druid monk paladin ranger sorcerer"
 
 # Every OTHER backend/src/lib/classes/*.ts file (shared infrastructure, not a
 # per-class module) — forced to stay in sync with the tree by the reverse
@@ -209,6 +211,39 @@ fi
 #     advancement-slots.ts's own entry directly above: a computed rule
 #     function keyed off subclass identity + level + edition, never routed
 #     through fighter's retired AuthoredFeature/resourceFn machinery.
+#   - srd/spellcasting-tables.ts: PERMANENT (#1576, first triggered here —
+#     Cleric/Warlock/Wizard are this guard's first MIGRATED classes that are
+#     also full/Pact-Magic casters). SPELLCASTING_ABILITY/FULL_CASTER_CLASSES/
+#     the slot-progression tables are closed-form 5e RAW (PHB p.114 / Basic
+#     Rules), edition-invariant and shared across every caster — never part of
+#     any lib/classes/<class>.ts registration or the ClassFeature-row
+#     migration, same category as the XP/proficiency tables CLAUDE.md keeps in
+#     code where editions agree. Sorcerer's and Druid's own names already sit
+#     here unflagged only because those two classes are still NOT_YET_MIGRATED
+#     — nothing about this file changed when Cleric/Warlock/Wizard's modules
+#     were deleted.
+#   - classes/channel-divinity.ts: PERMANENT (#419, first triggered by #1576).
+#     CHANNEL_DIVINITY_OPTIONS is the shared Cleric+Paladin Channel Divinity
+#     dispatch gate table (class/subclass/level per option) — independent of
+#     any lib/classes/<class>.ts registration; Paladin's own "paladin"/"cleric"
+#     literals already lived here unflagged (Paladin stays NOT_YET_MIGRATED).
+#   - combat/rest.ts: PERMANENT (first triggered by #1576). restoreWarlockPactSlots'
+#     `name.toLowerCase() === "warlock"` check is Pact Magic's own short-rest
+#     recharge rule (its slots regain differently from every other caster's) —
+#     a computed rule function never routed through warlock.ts's
+#     AuthoredFeature/resourceFn machinery.
+#   - character/character-create.ts: PERMANENT (#1130, first triggered by
+#     #1576). MAGIC_INITIATE_CLASS_BY_BACKGROUND is a creation-time snapshot
+#     rule (which class's spell list a background's Magic Initiate feat
+#     draws from) — independent of any lib/classes/<class>.ts registration.
+#   - frontend/src/features/entities/CampaignItemFields.tsx: PERMANENT (first
+#     triggered by #1576). "e.g. Wizard" is UI placeholder copy on a free-text
+#     prerequisite-value input, not rule code.
+#   - frontend/src/lib/spellList.ts: PERMANENT (first triggered by #1576).
+#     deriveSpellList's `=== "warlock"` check picks a display LABEL ("Pact
+#     Magic" vs. a merged slot block) for a single-class Warlock off the wire's
+#     already-server-computed class name — a UI display branch, not a
+#     frontend-originated rule (CLAUDE.md).
 FILE_ALLOWLIST="backend/src/lib/classes/subclass-slug.ts
 backend/src/lib/classes/actions.ts
 backend/src/lib/character/serialize/combat.ts
@@ -217,7 +252,13 @@ backend/src/lib/classes/sneak-attack.ts
 backend/src/lib/classes/assassinate.ts
 backend/src/lib/classes/weapon-bond.ts
 backend/src/lib/classes/arcane-charge.ts
-backend/src/lib/srd/advancement-slots.ts"
+backend/src/lib/srd/advancement-slots.ts
+backend/src/lib/srd/spellcasting-tables.ts
+backend/src/lib/classes/channel-divinity.ts
+backend/src/lib/combat/rest.ts
+backend/src/lib/character/character-create.ts
+frontend/src/features/entities/CampaignItemFields.tsx
+frontend/src/lib/spellList.ts"
 
 is_allowlisted_file() {
   target="$1"

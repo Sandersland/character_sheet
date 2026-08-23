@@ -11,7 +11,6 @@ import { deriveAnnouncedSaveDC } from "@/lib/srd/srd.js";
 
 import { bard } from "./bard.js";
 import { derivedStatFromRows, featuresFromRows, improvementsFromRows, poolsFromRows, type ClassFeatureRow, type ClassFeatureRowsCarrier } from "./class-feature-rows.js";
-import { cleric } from "./cleric.js";
 import { druid } from "./druid.js";
 import { monk } from "./monk.js";
 import { paladin } from "./paladin.js";
@@ -20,26 +19,25 @@ import type { FeatImprovement } from "./resources-state.js";
 import { sorcerer } from "./sorcerer.js";
 import { SUBCLASS_IDENTITY, type SubclassIdentity, type SubclassSlug } from "./subclass-slug.js";
 import type { ClassDefinition, ClassExtras, DerivedClassInfo, DerivedFeature, DerivedResource, DerivedSubclassChoice, SubclassDefinition } from "./types.js";
-import { warlock } from "./warlock.js";
-import { wizard } from "./wizard.js";
 
-// Fighter, Barbarian and Rogue are deliberately absent (#1532 / #1223 /
-// #1231 — lib/classes/fighter.ts, lib/classes/barbarian.ts and
-// lib/classes/rogue.ts are all deleted). Their subclasses (Fighter:
-// Champion/Battle Master/Eldritch Knight; Barbarian: Totem Warrior/
-// Berserker; Rogue: Arcane Trickster/Assassin/Thief) resolve entirely
-// through the SUBCLASS_IDENTITY seeding pass below; deriveBaseLayer's
-// optional-chaining on `classDef` already tolerates a missing key.
+// Fighter, Barbarian, Rogue, Cleric, Warlock and Wizard are deliberately
+// absent (#1532 / #1223 / #1231 / #1576 — lib/classes/fighter.ts,
+// lib/classes/barbarian.ts, lib/classes/rogue.ts, lib/classes/cleric.ts,
+// lib/classes/warlock.ts and lib/classes/wizard.ts are all deleted). Their
+// subclasses (Fighter: Champion/Battle Master/Eldritch Knight; Barbarian:
+// Totem Warrior/Berserker; Rogue: Arcane Trickster/Assassin/Thief; Cleric:
+// Life/Trickery Domain; Warlock: The Archfey/The Fiend/The Great Old One;
+// Wizard: Bladesinging/School of Abjuration/Evocation/Illusion) resolve
+// entirely through the SUBCLASS_IDENTITY seeding pass below;
+// deriveBaseLayer's optional-chaining on `classDef` already tolerates a
+// missing key.
 const CLASSES: Record<string, ClassDefinition> = {
   bard,
-  cleric,
   druid,
   monk,
   paladin,
   ranger,
   sorcerer,
-  warlock,
-  wizard,
 };
 
 // Subclass keys are global (not scoped per class) — matching the original
@@ -52,40 +50,46 @@ const CLASSES: Record<string, ClassDefinition> = {
 // subclassActiveAt/subclassGateLevel's undefined-grantLevel fallback, which is
 // already 3 in BOTH editions (effective-levels.ts) — CORRECTLY the value for
 // most classes not yet migrated off `lib/classes/<class>.ts` (Bard/Monk/
-// Paladin/Ranger/Rogue, each `grantLevel: 3` in their own module), but NOT
-// for all: Cleric/Sorcerer/Warlock supply `grantLevel: 1` and Druid/Wizard
-// supply `grantLevel: 2` explicitly (PHB'14) — a false "same value" claim
-// here would have shipped in #1234.
+// Paladin/Ranger, each `grantLevel: 3` in their own module), but NOT
+// for all: Sorcerer supplies `grantLevel: 1` and Druid supplies `grantLevel: 2`
+// explicitly (PHB'14) — a false "same value" claim here would have shipped
+// in #1234.
 //
-// As of #1576 those five are corrected by the SEEDED CharacterClass
-// .subclassLevel, which reaches isSubclassActive on ClassFeatureRowsCarrier
-// whenever the caller's select carries the class relation. Their TS overlay
-// (the second pass below) is now only the FALLBACK for a narrow-select caller
-// that carries no such relation — which is what makes deleting those five
-// modules safe, and is the whole point of that issue.
+// As of #1576 those five (Cleric/Sorcerer/Warlock/Druid/Wizard) are corrected
+// by the SEEDED CharacterClass.subclassLevel, which reaches isSubclassActive
+// on ClassFeatureRowsCarrier whenever the caller's select carries the class
+// relation. Their TS overlay (the second pass below) is now only the FALLBACK
+// for a narrow-select caller that carries no such relation — which is what
+// already let three of those five modules (Cleric, Warlock, Wizard) be
+// deleted outright; Sorcerer's and Druid's stay for OTHER, independent
+// reasons their own file headers name, not because the gate fix doesn't
+// apply to them too.
 //
 // The identity-only seed is what lets deriveSubclassLayer resolve a subclass's
 // seeded ClassFeature rows (poolsFromRows/featuresFromRows) even when no
 // ClassDefinition registers it in TS at all (Fighter's three since fighter.ts
-// was deleted, #1532; Barbarian's two since barbarian.ts was, #1223) —
-// before this, a missing TS entry meant `deriveSubclassLayer` returned early
-// with EMPTY pools and features, silently deleting every seeded row for that
-// subclass (see #1532's probe).
+// was deleted, #1532; Barbarian's two since barbarian.ts was, #1223; Cleric's
+// two, Warlock's three and Wizard's four since cleric.ts/warlock.ts/wizard.ts
+// were, #1576) — before this, a missing TS entry meant `deriveSubclassLayer`
+// returned early with EMPTY pools and features, silently deleting every
+// seeded row for that subclass (see #1532's probe).
 //
 // THEN overlaid by the CLASSES-derived definitions, in a second pass — order
 // matters: a class still on the TS migration path (a non-3 grantLevel,
 // resourceFn, deriveExtras, or the `choices` catalog) must win over its own
-// identity-only stub, or those fields would silently vanish for the nine
-// classes not yet fully row-driven. `SUBCLASS_IDENTITY` is 31 entries against
-// 23 TS registrations now that Fighter's three (Champion/Battle
-// Master/Eldritch Knight), Barbarian's two (Totem Warrior/Berserker) and
-// Rogue's three (Arcane Trickster/Assassin/Thief) have none — so the overlay
-// is behaviour-preserving by construction only for those 23: every key the
-// first loop seeds for a still-TS-registered class is immediately replaced by
-// the second loop's richer definition; Fighter's three, Barbarian's two and
-// Rogue's three keep their identity-only seed as their final definition,
-// which is correct — there is no richer TS definition left to overlay it
-// with.
+// identity-only stub, or those fields would silently vanish for the six
+// classes not yet fully row-driven. `SUBCLASS_IDENTITY` is 35 entries against
+// 18 TS registrations now that Fighter's three (Champion/Battle
+// Master/Eldritch Knight), Barbarian's two (Totem Warrior/Berserker), Rogue's
+// three (Arcane Trickster/Assassin/Thief), Cleric's two (Life/Trickery
+// Domain), Warlock's three (The Archfey/The Fiend/The Great Old One) and
+// Wizard's four (Bladesinging/School of Abjuration/Evocation/Illusion) have
+// none — so the overlay is behaviour-preserving by construction only for
+// those 18: every key the first loop seeds for a still-TS-registered class is
+// immediately replaced by the second loop's richer definition; the six
+// module-less classes' subclasses keep their identity-only seed as their
+// final definition, which is correct — there is no richer TS definition left
+// to overlay it with.
 const SUBCLASSES: Record<string, SubclassDefinition> = {};
 for (const [slug, { nameKey }] of Object.entries(SUBCLASS_IDENTITY) as [SubclassSlug, SubclassIdentity][]) {
   SUBCLASSES[nameKey] = { slug };
@@ -116,11 +120,11 @@ interface ClassLayer {
 // mergeLayers' base-wins policy) — no production collision exists today
 // (Fighter's rows declare a resourceKey since #1528, Barbarian's since #1223,
 // Warlock's since #1233, Ranger's since #1230, and Druid's Circle of the Moon
-// since #1226; Fighter's/Barbarian's modules are deleted outright, and
-// Warlock's/Ranger's/Druid's Circle of the Moon's own formula pools (Dark
-// One's Own Luck, Tireless/Nature's Veil, Moonlight Step) moved off their
-// resourceFns onto `{ abilityMod, min }` row tiers by #1685, so none of the
-// three has a resourceFn left to collide with either). This keeps a class
+// since #1226; Fighter's/Barbarian's/Warlock's modules are deleted outright,
+// and Ranger's/Druid's Circle of the Moon's own formula pools (Tireless/
+// Nature's Veil, Moonlight Step) moved off their resourceFns onto
+// `{ abilityMod, min }` row tiers by #1685, so neither has a resourceFn left
+// to collide with either). This keeps a class
 // mid-migration (resourceFn for some pools, rows for others) from silently
 // doubling a pool up if a row and a resourceFn ever named the same key during
 // a future transition — defense-in-depth, not a live guard today. NOTE: a
@@ -196,9 +200,14 @@ interface SubclassLayer extends ClassLayer {
 // Druid/Wizard at 2).
 //
 // The `?? def.grantLevel` fallback keeps a narrow-select caller (no class
-// relation loaded, so no seededSubclassLevel) behaving exactly as before, which
-// is what lets this land with zero behaviour change while the five modules are
-// still present.
+// relation loaded, so no seededSubclassLevel) behaving exactly as before for a
+// class whose module still exists (Sorcerer, Druid). Cleric, Warlock and
+// Wizard no longer have a module to fall back to at all (#1576) — `def` is
+// SUBCLASS_IDENTITY's identity-only stub for their subclasses, `grantLevel`
+// is always undefined, and a narrow-select caller with no seededSubclassLevel
+// now gates at subclassGateLevel's plain `?? 3` default instead of those
+// three classes' own PHB'14 gate (subclass-gate-data-source.test.ts pins
+// both halves).
 function isSubclassActive(
   def: SubclassDefinition | undefined,
   level: number,
