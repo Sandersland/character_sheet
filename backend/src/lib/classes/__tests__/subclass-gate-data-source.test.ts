@@ -29,16 +29,16 @@ const PHB14_GATE: Array<[string, string, number]> = [
   ["wizard", "school of evocation", 2], // PHB'14 p.114
 ];
 
-// Cleric/Warlock/Wizard's modules are deleted outright; Sorcerer's and
-// Druid's stay for other, independent reasons their own file headers name.
+// Cleric/Warlock/Wizard/Sorcerer's modules are deleted outright; Druid's
+// stays for an independent reason its own file header names.
 // Split ONLY for the "no seeded value" fallback test below — every other
 // test in this file behaves identically whether the module exists or not.
 const STILL_ON_TS_PATH: Array<[string, string, number]> = [
-  ["sorcerer", "draconic bloodline", 1],
   ["druid", "circle of the land", 2],
 ];
 const MODULE_DELETED: Array<[string, string, number]> = [
   ["cleric", "life domain", 1],
+  ["sorcerer", "draconic bloodline", 1],
   ["warlock", "the fiend", 1],
   ["wizard", "school of evocation", 2],
 ];
@@ -80,8 +80,8 @@ describe("2014 subclass gate reads the seeded subclassLevel (#1576)", () => {
     },
   );
 
-  // For Sorcerer/Druid (module still present) the carrier's seeded value
-  // must beat whatever the module's own grantLevel would otherwise supply.
+  // For Druid (module still present) the carrier's seeded value must beat
+  // whatever the module's own grantLevel would otherwise supply.
   it.each(STILL_ON_TS_PATH)(
     "%s / %s: the seeded value WINS over the module's own grantLevel",
     (className, subclass, gate) => {
@@ -93,7 +93,7 @@ describe("2014 subclass gate reads the seeded subclassLevel (#1576)", () => {
     },
   );
 
-  // Cleric/Warlock/Wizard have no module left at all, so there's nothing left to "win" against.
+  // Cleric/Warlock/Wizard/Sorcerer have no module left at all, so there's nothing left to "win" against.
   it.each(MODULE_DELETED)(
     "%s / %s: the seeded value alone decides the gate (no module left to beat)",
     (className, subclass, gate) => {
@@ -103,7 +103,7 @@ describe("2014 subclass gate reads the seeded subclassLevel (#1576)", () => {
   );
 
   // Goes red if someone "simplifies" the `?? def.grantLevel` fallback away
-  // while Sorcerer's/Druid's modules still exist.
+  // while Druid's module still exists.
   it.each(STILL_ON_TS_PATH)(
     "%s / %s: with no seeded value the module still decides (unchanged fallback)",
     (className, subclass, gate) => {
@@ -113,7 +113,7 @@ describe("2014 subclass gate reads the seeded subclassLevel (#1576)", () => {
     },
   );
 
-  // Cleric/Warlock/Wizard's modules are gone, so a narrow-select caller has
+  // Cleric/Warlock/Wizard/Sorcerer's modules are gone, so a narrow-select caller has
   // no def.grantLevel left to fall back to and now gates at
   // subclassGateLevel's plain ?? 3 default instead of the class's own PHB'14
   // gate — a narrow-select-only consequence, since every production caller

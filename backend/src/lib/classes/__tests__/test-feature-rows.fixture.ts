@@ -22,10 +22,9 @@
 // still asserted on directly by name, so both need a mirror.
 import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "@/lib/classes/class-feature-rows.js";
 import { ranger } from "@/lib/classes/ranger.js";
-import { sorcerer } from "@/lib/classes/sorcerer.js";
 import type { AuthoredFeature, ClassDefinition, SubclassDefinition } from "@/lib/classes/types.js";
 const TEST_CLASSES: Record<string, ClassDefinition> = {
-  ranger, sorcerer,
+  ranger,
 };
 
 // PHB'14 p.164: one feature, one pool, shared across both granting classes.
@@ -1151,6 +1150,10 @@ export const SORCERER_BASE_ROWS: ClassFeatureRow[] = [
     edition: "EDITION_2014",
     description:
       "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
+    resourceKey: "sorceryPoints",
+    resourceLabel: "Sorcery Points",
+    resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 2, total: { levelTimes: 1 } }],
   },
   {
     name: "Font of Magic",
@@ -1158,6 +1161,10 @@ export const SORCERER_BASE_ROWS: ClassFeatureRow[] = [
     edition: "EDITION_2024",
     description:
       "You have a pool of Sorcery Points equal to your Sorcerer level. As a Bonus Action, expend a spell slot to gain Sorcery Points equal to the slot's level, or spend Sorcery Points to create a spell slot (no action required): 2 SP for a level 1 slot (minimum Sorcerer level 2), 3 SP for level 2 (minimum level 3), 5 SP for level 3 (minimum level 5), 6 SP for level 4 (minimum level 7), 7 SP for level 5 (minimum level 9) — never above level 5. A slot created this way vanishes when you finish a Long Rest. You regain all expended Sorcery Points when you finish a Long Rest.",
+    resourceKey: "sorceryPoints",
+    resourceLabel: "Sorcery Points",
+    resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 2, total: { levelTimes: 1 } }],
   },
   {
     name: "Metamagic",

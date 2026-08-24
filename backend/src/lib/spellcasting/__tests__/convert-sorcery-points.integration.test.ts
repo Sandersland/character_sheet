@@ -53,6 +53,17 @@ describe("convertSorceryPoints (#903 Font of Magic)", () => {
       update: {},
     });
     sorcererClassId = cls.id;
+    // The sorceryPoints pool is row-declared (no resourceFn left): mirror the
+    // seeded Font of Magic row so the op path's row-driven derivation sees it.
+    await prisma.classFeature.deleteMany({ where: { classId: sorcererClassId } });
+    await prisma.classFeature.create({
+      data: {
+        classId: sorcererClassId, subclassId: null, name: "Font of Magic", level: 2, edition: "EDITION_2024",
+        description: "You have a pool of Sorcery Points equal to your Sorcerer level.",
+        resourceKey: "sorceryPoints", resourceLabel: "Sorcery Points", resourceRecharge: "longRest",
+        resourceTotals: [{ minLevel: 2, total: { levelTimes: 1 } }],
+      },
+    });
   });
 
   beforeEach(async () => {
@@ -64,6 +75,7 @@ describe("convertSorceryPoints (#903 Font of Magic)", () => {
   });
 
   afterAll(async () => {
+    await prisma.classFeature.deleteMany({ where: { class: { name: SORCERER_CATALOG_NAME } } });
     await prisma.characterClass.deleteMany({ where: { name: SORCERER_CATALOG_NAME } });
   });
 
@@ -200,14 +212,16 @@ describe("convertSorceryPoints (#903 Font of Magic)", () => {
   });
 
   it("rejects conversion for a class without the sorcery-point pool", async () => {
-    // Reuse the sorcerer slots but mark the class entry a wizard — no SP pool.
+    // A wizard entry with NO catalog class: pools are row-driven, so carrying
+    // no ClassFeature rows is what "no SP pool" means now — pointing at the
+    // sorcerer fixture class would inherit its Font of Magic row.
     const character = await prisma.character.create({
       data: {
         ...BASE_CHAR,
         ownerId: OWNER_ID,
         spellcasting: Prisma.JsonNull,
         resources: Prisma.JsonNull,
-        classEntries: { create: { name: "wizard", classId: sorcererClassId, level: 5, position: 0 } },
+        classEntries: { create: { name: "wizard", level: 5, position: 0 } },
       },
     });
     created.push(character.id);

@@ -3,7 +3,6 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 import { effectiveEntryLevel } from "@/lib/leveling/effective-levels.js";
 import { draconicResilienceMaxHpBonus } from "@/lib/srd/hit-points.js";
 import { resolveSubclassSlug } from "./subclass-slug.js";
-import { sorcerer } from "./sorcerer.js";
 
 /**
  * The minimal structural class-entry shape the Draconic Bloodline resolvers
@@ -71,11 +70,10 @@ export function draconicResilienceMaxHpTerm(
 ): number {
   const resolved = draconicBloodlineLevel(classEntries, derivedTotalLevel);
   if (!resolved) return 0;
-  // Null-FK guard: `class` is null when classId is (SetNull on catalog
-  // deletion/retag, or a free-text class). subclassGateLevel's own fallback is
-  // 3 — wrong for Sorcerer, whose PHB'14 p.99 Sorcerous Origin gate is 1 — so
-  // fall back to the sorcerer module's grantLevel instead, mirroring
-  // isSubclassActive's `seededSubclassLevel ?? def.grantLevel` (registry.ts).
-  const subclassGate = resolved.entry.class?.subclassLevel ?? sorcerer.subclasses?.["draconic bloodline"]?.grantLevel;
-  return draconicResilienceMaxHpBonus(resolved.level, subclassGate, edition);
+  // The seeded CharacterClass.subclassLevel is the sole PHB'14 gate source
+  // (no TS module left). `class` is null only when classId is (SetNull on
+  // catalog deletion/retag, or a free-text class) — that degraded character
+  // then gates at subclassGateLevel's plain ?? 3 default, the same answer
+  // isSubclassActive resolves for it.
+  return draconicResilienceMaxHpBonus(resolved.level, resolved.entry.class?.subclassLevel, edition);
 }

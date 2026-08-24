@@ -6,11 +6,11 @@
 set -eu
 
 ALL_CLASSES="barbarian bard cleric druid fighter monk paladin ranger rogue sorcerer warlock wizard"
-NOT_YET_MIGRATED="bard druid monk paladin ranger sorcerer"
+NOT_YET_MIGRATED="bard druid monk paladin ranger"
 
 # Every OTHER backend/src/lib/classes/*.ts file (shared infrastructure, not a
 # per-class module) — kept in sync with the tree by the reverse check below.
-NON_CLASS_MODULES="ability-registry actions activation-requires announce-augmentors arcane-charge assassinate channel-divinity class class-feature-rows class-features disciplines draconic-bloodline feature-rows-select focus-cast hand-of-harm hand-of-ultimate-mercy heightened-focus improved-shadow-step maneuver-effect maneuvers open-hand-technique physicians-touch quivering-palm registry resources resources-state shadow-arts sneak-attack stunning-strike subclass-slug types warrior-of-elements weapon-bond"
+NON_CLASS_MODULES="ability-registry actions activation-requires announce-augmentors arcane-charge assassinate channel-divinity class class-feature-rows class-features disciplines draconic-bloodline feature-rows-select focus-cast font-of-magic hand-of-harm hand-of-ultimate-mercy heightened-focus improved-shadow-step maneuver-effect maneuvers open-hand-technique physicians-touch quivering-palm registry resources resources-state shadow-arts sneak-attack stunning-strike subclass-slug types warrior-of-elements weapon-bond"
 
 # Reverse check: every backend/src/lib/classes/*.ts file's basename must be
 # classified as EITHER a class (ALL_CLASSES) or shared infrastructure
@@ -90,6 +90,7 @@ fi
 #   backend/src/lib/srd/armor-class.ts                     # PERMANENT: Unarmored Defense AC rule fn (#1223)
 #   backend/src/lib/classes/sneak-attack.ts                # PERMANENT: Sneak Attack Nd6 rule fn (#1231)
 #   backend/src/lib/classes/assassinate.ts                 # PERMANENT: Assassinate eligibility rule fn (#1526)
+#   backend/src/lib/classes/draconic-bloodline.ts          # PERMANENT: Draconic Resilience/Wings live-play rule fns, scoped to their own class entry (#1122/#1123)
 #   backend/src/lib/classes/weapon-bond.ts                 # PERMANENT: Weapon Bond eligibility rule fn (#1854)
 #   backend/src/lib/classes/arcane-charge.ts                # PERMANENT: Arcane Charge augmentor rule fn (#1910)
 #   backend/src/lib/srd/advancement-slots.ts               # PERMANENT: Fighting Style slot-count rule fn (#1148)
@@ -105,6 +106,7 @@ backend/src/lib/character/serialize/combat.ts
 backend/src/lib/srd/armor-class.ts
 backend/src/lib/classes/sneak-attack.ts
 backend/src/lib/classes/assassinate.ts
+backend/src/lib/classes/draconic-bloodline.ts
 backend/src/lib/classes/weapon-bond.ts
 backend/src/lib/classes/arcane-charge.ts
 backend/src/lib/srd/advancement-slots.ts

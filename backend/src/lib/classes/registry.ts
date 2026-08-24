@@ -16,21 +16,19 @@ import { monk } from "./monk.js";
 import { paladin } from "./paladin.js";
 import { ranger } from "./ranger.js";
 import type { FeatImprovement } from "./resources-state.js";
-import { sorcerer } from "./sorcerer.js";
 import { SUBCLASS_IDENTITY, type SubclassIdentity, type SubclassSlug } from "./subclass-slug.js";
 import type { ClassDefinition, ClassExtras, DerivedClassInfo, DerivedFeature, DerivedResource, DerivedSubclassChoice, SubclassDefinition } from "./types.js";
 
-// Fighter, Barbarian, Rogue, Cleric, Warlock and Wizard have no module —
-// their subclasses resolve entirely through the SUBCLASS_IDENTITY seeding
-// pass below; deriveBaseLayer's optional chaining on `classDef` already
-// tolerates a missing key.
+// Fighter, Barbarian, Rogue, Cleric, Warlock, Wizard and Sorcerer have no
+// module — their subclasses resolve entirely through the SUBCLASS_IDENTITY
+// seeding pass below; deriveBaseLayer's optional chaining on `classDef`
+// already tolerates a missing key.
 const CLASSES: Record<string, ClassDefinition> = {
   bard,
   druid,
   monk,
   paladin,
   ranger,
-  sorcerer,
 };
 
 // Subclass keys are global, not scoped per class. Seeded identity-only first
@@ -102,8 +100,8 @@ interface SubclassLayer extends ClassLayer {
 // resolved through the same gate buildClassesView uses (subclassActiveAt).
 // EDITION_2024 always hardcodes 3; EDITION_2014 prefers the seeded
 // CharacterClass.subclassLevel when the caller carries it, else falls back to
-// the TS module's own grantLevel — still correct for Sorcerer/Druid (whose
-// modules exist), but Cleric/Warlock/Wizard have none left, so a
+// the TS module's own grantLevel — still correct for Druid (whose module
+// exists), but Cleric/Warlock/Wizard/Sorcerer have none left, so a
 // narrow-select caller with no seeded value now gates them at the plain ?? 3
 // default instead of their real PHB'14 gate.
 function isSubclassActive(

@@ -24,7 +24,7 @@ import { clearBuffByKeyInTx, clearBuffsForSourceInTx } from "@/lib/combat/buff-e
 import { InvalidSpellcastingOperationError, type AbilityCost, type PayCostContext } from "./ability-cost.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
 import { applyResourceOpInTx } from "@/lib/classes/resources.js";
-import { sorceryPointCostForSlot, FONT_OF_MAGIC_MAX_SLOT_LEVEL } from "@/lib/classes/sorcerer.js";
+import { sorceryPointCostForSlot, FONT_OF_MAGIC_MAX_SLOT_LEVEL } from "@/lib/classes/font-of-magic.js";
 import { readEffectSpec } from "@/lib/combat/effects.js";
 import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/experience.js";
 import { logEvent } from "@/lib/activity/events.js";

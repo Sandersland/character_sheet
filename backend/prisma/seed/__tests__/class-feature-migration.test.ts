@@ -289,14 +289,16 @@ function isPopulatedRangerRow(row: RowKey): boolean {
 // Sorcerous Restoration (base), Tides of Chaos (Wild Magic, BOTH editions —
 // keyed with `edition` since the 2014 and 2024 rows are two DIFFERENT rows
 // sharing one name), Dragon Wings (Draconic Bloodline)/Tamed Surge (Wild
-// Magic). `sorceryPoints` stays in lib/classes/sorcerer.ts's resourceFn (a
-// formula, not a tier table) so it is deliberately absent from this set.
-// #1909 adds Metamagic (both editions) — an IDENTITY-ONLY resourceKey
-// ("metamagic", no resourceTotals: it spends the sorceryPoints pool above,
-// never declares its own) plus the row-driven ACTION columns.
+// Magic). The sorcerer retab adds Font of Magic (both editions) — the
+// `sorceryPoints` pool as a `{ levelTimes: 1 }` tier, replacing the deleted
+// resourceFn. #1909 adds Metamagic (both editions) — an IDENTITY-ONLY
+// resourceKey ("metamagic", no resourceTotals: it spends the sorceryPoints
+// pool above, never declares its own) plus the row-driven ACTION columns.
 const POPULATED_SORCERER_ROW_KEYS = new Set([
   "Sorcerer::null::Innate Sorcery::EDITION_2024",
   "Sorcerer::null::Sorcerous Restoration::EDITION_2024",
+  "Sorcerer::null::Font of Magic::EDITION_2014",
+  "Sorcerer::null::Font of Magic::EDITION_2024",
   "Sorcerer::sorcerer-wild-magic::Tides of Chaos::EDITION_2014",
   "Sorcerer::sorcerer-wild-magic::Tides of Chaos::EDITION_2024",
   "Sorcerer::sorcerer-draconic-bloodline::Dragon Wings::EDITION_2024",
@@ -636,9 +638,10 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
   // 2024's now a `{ abilityMod, min }` formula tier — Hurl Through Hell x2, Fey
   // Presence x1, Misty Escape x1, Dark Delirium x1, Entropic Ward x1) PLUS
   // #1230/#1685's THREE Ranger rows (Favored Enemy's 2024 row, plus
-  // Tireless/Nature's Veil's own 2024 formula tiers), #1232's six Sorcerer
+  // Tireless/Nature's Veil's own 2024 formula tiers), #1232's eight Sorcerer
   // rows (Innate Sorcery x1, Sorcerous Restoration x1, Tides of Chaos x2 — one
-  // per edition — Dragon Wings x1, Tamed Surge x1) and #1225's two Cleric
+  // per edition — Dragon Wings x1, Tamed Surge x1, plus the sorcerer retab's
+  // Font of Magic x2 — one per edition) and #1225's two Cleric
   // Channel Divinity carrier rows (Turn Undead 2014-only x1, Channel Divinity
   // 2024-only x1);
   // derivedStatTiers excludes #1530's twelve populated Extra
@@ -662,13 +665,14 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
     // Bladesong's own resourceTotals (EDITION_2014 only, no 2024 twin): 38 + 1
     // = 39. #1501 (Way of the Open Hand) adds ONE more — Wholeness of Body's
     // own resourceTotals (EDITION_2014 only, no 2024 twin, same one-row shape
-    // as Bladesong): 39 + 1 = 40.
+    // as Bladesong): 39 + 1 = 40. The sorcerer retab adds Font of Magic's two
+    // sorceryPoints rows (one per edition): 40 + 2 = 42.
     // 6 Fighter + 2 Combat Superiority + 2 Rage + 4 Wizard + 9 Warlock
-    // + 3 Ranger + 6 Sorcerer + 2 Cleric + 2 Druid + 2 Paladin (#1229's own
+    // + 3 Ranger + 8 Sorcerer + 2 Cleric + 2 Druid + 2 Paladin (#1229's own
     // Channel Divinity carrier rows, one per edition — see
     // isPopulatedPaladinRow) + 1 Bladesong + 1 Way of the Open Hand's
     // Wholeness of Body.
-    const populatedResourceTotalsCount = 40;
+    const populatedResourceTotalsCount = 42;
     const populatedResourceDieTiersCount = 2;
     // DERIVED_STAT_ROW_KEYS x2 editions each, MINUS 1: Bladesinger's own
     // "Wizard::wizard-bladesinging::Extra Attack" key is EDITION_2014 only

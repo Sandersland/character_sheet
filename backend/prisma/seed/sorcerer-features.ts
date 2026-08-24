@@ -1,22 +1,8 @@
-// --- Sorcerer ClassFeature rows, authored as LITERAL data (#1232) ----------
-// Commit 1 of 3 (mirrors Barbarian's #1223, Warlock's #1233, Wizard's #1234)
-// moved these rows off lib/classes/sorcerer.ts's AuthoredFeature[] arrays
-// into literal seed data, byte-identical to the old TS-derived text (pinned
-// by sorcerer-2014-snapshot.test.ts). Commit 2 authored Sorcerer's REAL SRD
-// 5.2 (2024) content for the base class and both subclasses — SRD 5.2 itself
-// only ships Draconic Sorcery (its own L3 text: "The Draconic Sorcery
-// subclass is detailed after this class's description", singular), so Wild
-// Magic Sorcery's 2024 text is mirror-sourced (two independently-agreeing
-// mirrors, cited on its own rows below) rather than SRD-verified — see this
-// file's WILD MAGIC section header for the provenance discipline. Commit 3
-// (this one) moves every movable resource pool onto its row (see the
-// RESOURCE POOL block below) and shrinks lib/classes/sorcerer.ts to its
-// irreducible residue — see that file's own header for why it survives (it
-// is NOT deletable, unlike fighter.ts/barbarian.ts).
-// class-features.ts concatenates SORCERER_FEATURES onto the still-derived
-// classes' rows to build CLASS_FEATURES; see its LITERAL_ROW_CLASSES export
-// for the set of classes whose rows tests must not compare against a
-// TS-array "old" side.
+// Sorcerer ClassFeature rows, authored as literal data (#1232). 2014 text is
+// pinned byte-identical by sorcerer-2014-snapshot.test.ts. 2024 text is SRD
+// 5.2 except Wild Magic Sorcery, which SRD 5.2 does not ship — its 2024 text
+// is mirror-sourced (two independently-agreeing mirrors, cited on its own
+// rows below). SORCERER_FEATURES joins CLASS_FEATURES via LITERAL_ROW_CLASSES.
 //
 // SUBCLASS NAMES STAY "Draconic Bloodline"/"Wild Magic" (#1232, NOT renamed
 // to PHB'24's "Draconic Sorcery"/"Wild Magic Sorcery"): seedSubclasses keys
@@ -52,27 +38,12 @@
 // `edition: "EDITION_2024"` tag alongside new 2024 text; it never edits a
 // 2014 row's own name/level/description.
 //
-// RESOURCE POOL (commit 3 of 3, mirrors Warlock's/Wizard's own two-step):
-// six rows carry a pool — Innate Sorcery (2024, flat 2 from L1), Sorcerous
-// Restoration (2024, flat 1 from L5), Tides of Chaos (BOTH editions — flat 1
-// from L1 in 2014, flat 1 from L3 in 2024, each row's own level replacing
-// the old `if (level >= N)` gate), Dragon Wings (2024, flat 1 from L14), and
-// Tamed Surge (2024, flat 1 from L18) — owner decision (#1232): pool every
-// once-per-rest activated ability, matching Warlock's #1233 precedent, not
-// just the two the issue itself named. `sorceryPoints` STAYS in
-// lib/classes/sorcerer.ts's resourceFn (see that file's own header for why);
-// this commit only edition-branches its DESCRIPTION, never its total, so
-// Font of Magic's row text and the fn's pool description can agree on the
-// Min. Sorcerer Level clause without a second hand-written string drifting
-// from it (mirrors Warlock's Dark One's Own Luck residue). The wild-magic
-// subclass resourceFn (tidesOfChaos) is DELETED in this same commit —
-// mergePoolSources (registry.ts) has a resourceFn pool WIN over a row pool
-// of the same key, so leaving the fn in place would make the new row column
-// inert. #1528's "no-second-string" rule (poolFromRow reads the row's own
-// `description`, never a second hand-written pool string) means the retired
-// wild-magic resourceFn's own description text is simply gone from the
-// wire — an accepted, intended consequence of the move, not a regression.
+// RESOURCE POOLS: every Sorcerer pool is row-declared, sorceryPoints included
+// (its Font of Magic rows carry `{ levelTimes: 1 }` from level 2) — the class
+// has no TS module left, and mergePoolSources would let a lingering
+// resourceFn pool shadow a row pool of the same key.
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
+import type { ResourceTotalFormula } from "../../src/lib/classes/class-feature-rows.js";
 import type { SeedEdition } from "./edition.js";
 import type { ClassFeatureSeedRow } from "./class-features.js";
 
@@ -92,14 +63,10 @@ interface RawSorcererFeature {
   description: string;
   /** Omitted -> identical text seeded for both editions (see file header). */
   edition?: SeedEdition;
-  // Resource-pool descriptor columns (#1232 commit 3) — see that commit's
-  // own header for why only Innate Sorcery's, Sorcerous Restoration's, Tides
-  // of Chaos' (both editions), Dragon Wings' and Tamed Surge's rows ever set
-  // these.
   resourceKey?: string;
   resourceLabel?: string;
   resourceRecharge?: string;
-  resourceTotals?: { minLevel: number; total: number; shortRestRegain?: number }[];
+  resourceTotals?: { minLevel: number; total: ResourceTotalFormula; shortRestRegain?: number }[];
   // Activation block (#1909) — Metamagic's row-driven action moved off
   // actions.ts's DERIVED_ACTIONS onto its own rows (both editions).
   // `resourceKey` here is the action's IDENTITY ("metamagic"), distinct from
@@ -182,6 +149,11 @@ const SORCERER_BASE_RAW: RawSorcererFeature[] = [
     edition: "EDITION_2014",
     description:
       "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
+    resourceKey: "sorceryPoints",
+    resourceLabel: "Sorcery Points",
+    resourceRecharge: "longRest",
+    // PHB'14 p.101: Sorcery Points equal sorcerer level, from level 2.
+    resourceTotals: [{ minLevel: 2, total: { levelTimes: 1 } }],
   },
   {
     subclassSlug: null,
@@ -197,6 +169,11 @@ const SORCERER_BASE_RAW: RawSorcererFeature[] = [
     // precedent).
     description:
       "You have a pool of Sorcery Points equal to your Sorcerer level. As a Bonus Action, expend a spell slot to gain Sorcery Points equal to the slot's level, or spend Sorcery Points to create a spell slot (no action required): 2 SP for a level 1 slot (minimum Sorcerer level 2), 3 SP for level 2 (minimum level 3), 5 SP for level 3 (minimum level 5), 6 SP for level 4 (minimum level 7), 7 SP for level 5 (minimum level 9) — never above level 5. A slot created this way vanishes when you finish a Long Rest. You regain all expended Sorcery Points when you finish a Long Rest.",
+    resourceKey: "sorceryPoints",
+    resourceLabel: "Sorcery Points",
+    resourceRecharge: "longRest",
+    // SRD 5.2 p.140: Sorcery Points equal Sorcerer level, from level 2.
+    resourceTotals: [{ minLevel: 2, total: { levelTimes: 1 } }],
   },
   {
     subclassSlug: null,

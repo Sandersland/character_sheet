@@ -10,7 +10,6 @@ import { druid } from "@/lib/classes/druid.js";
 import { monk } from "@/lib/classes/monk.js";
 import { paladin } from "@/lib/classes/paladin.js";
 import { ranger } from "@/lib/classes/ranger.js";
-import { sorcerer } from "@/lib/classes/sorcerer.js";
 import { SUBCLASS_IDENTITY } from "@/lib/classes/subclass-slug.js";
 import type { ClassDefinition } from "@/lib/classes/types.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
@@ -144,7 +143,6 @@ const TS_REGISTERED_CLASSES: Record<string, ClassDefinition> = {
   monk,
   paladin,
   ranger,
-  sorcerer,
 };
 
 describe("#1557 review — the SUBCLASSES overlay's key-equality invariant", () => {
@@ -165,8 +163,8 @@ describe("#1557 review — the SUBCLASSES overlay's key-equality invariant", () 
 
   // Ties to CLASS_SUBCLASSES so a class added to CLASSES but omitted here
   // fails visibly instead of silently losing coverage.
-  it("covers every class in CLASS_SUBCLASSES except Fighter, Barbarian, Rogue, Cleric, Warlock and Wizard, which have no TS module", () => {
-    expect(new Set([...Object.keys(TS_REGISTERED_CLASSES), "fighter", "barbarian", "rogue", "cleric", "warlock", "wizard"])).toEqual(
+  it("covers every class in CLASS_SUBCLASSES except Fighter, Barbarian, Rogue, Cleric, Warlock, Wizard and Sorcerer, which have no TS module", () => {
+    expect(new Set([...Object.keys(TS_REGISTERED_CLASSES), "fighter", "barbarian", "rogue", "cleric", "warlock", "wizard", "sorcerer"])).toEqual(
       new Set(Object.keys(CLASS_SUBCLASSES)),
     );
   });
