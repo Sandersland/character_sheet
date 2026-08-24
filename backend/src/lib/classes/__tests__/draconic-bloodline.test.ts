@@ -34,11 +34,10 @@ describe("draconicResilienceMaxHpTerm (#1123)", () => {
     ).toBe(5);
   });
 
-  // Null-FK: `class` is null (classId SetNull / free-text class). With no TS
-  // module left, the seeded subclassLevel is the sole PHB'14 p.99 gate-1
-  // source, so this degraded character gates at subclassGateLevel's plain
-  // ?? 3 — the same answer isSubclassActive gives it, keeping the HP term and
-  // the feature gate consistent (the accepted Cleric/Warlock/Wizard shape).
+  // A null class FK (classId SetNull / free-text class) loses the seeded
+  // subclassLevel — the sole PHB'14 p.99 gate-1 source — so the character
+  // gates at subclassGateLevel's plain 3, the same answer isSubclassActive
+  // gives, keeping the HP term and the feature gate consistent.
   it("2014 with a null class FK degrades to the plain gate 3, matching the feature gate", () => {
     expect(draconicResilienceMaxHpTerm([entry({ level: 1, class: null })], 1, "EDITION_2014")).toBe(0);
     expect(draconicResilienceMaxHpTerm([entry({ level: 2, class: null })], 2, "EDITION_2014")).toBe(0);

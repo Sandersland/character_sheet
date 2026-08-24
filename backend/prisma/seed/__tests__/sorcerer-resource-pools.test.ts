@@ -1,9 +1,3 @@
-// #1232 commit 3 of 3: every Sorcerer pool that is a flat, level-gated total
-// moved off lib/classes/sorcerer.ts's resourceFns onto its ClassFeature row's
-// own resourceKey/resourceLabel/resourceRecharge/resourceTotals columns, read
-// here through the SAME poolsFromRows a real character's derivation calls
-// (registry.ts's deriveBaseLayer/deriveSubclassLayer) — never a hand-rolled
-// re-derivation of the tier table. Modelled on warlock-resource-pools.test.ts.
 import { describe, expect, it } from "vitest";
 
 import { poolsFromRows } from "@/lib/classes/class-feature-rows.js";
@@ -16,11 +10,12 @@ const BASE_ROWS = SORCERER_FEATURES.filter((r) => r.subclassSlug === null);
 const DRACONIC_ROWS = SORCERER_FEATURES.filter((r) => r.subclassSlug === "sorcerer-draconic-bloodline");
 const WILD_ROWS = SORCERER_FEATURES.filter((r) => r.subclassSlug === "sorcerer-wild-magic");
 
-// abilityScores/profBonus are unused here — every Sorcerer resourceTotals
-// tier is a flat number or `{ levelTimes: 1 }` (level-driven), never an
-// ability/proficiency formula — so `{}`/`0` are inert.
+// No Sorcerer resourceTotals tier is an ability/proficiency formula.
+const UNUSED_ABILITY_SCORES: Record<string, number> = {};
+const UNUSED_PROF_BONUS = 0;
+
 function poolAt(rows: typeof SORCERER_FEATURES, key: string, level: number, edition: "EDITION_2014" | "EDITION_2024") {
-  return poolsFromRows(rows, level, {}, 0, edition).find((p) => p.key === key);
+  return poolsFromRows(rows, level, UNUSED_ABILITY_SCORES, UNUSED_PROF_BONUS, edition).find((p) => p.key === key);
 }
 
 describe("Innate Sorcery (base class, #1232): 2024 only, L1, 2/long rest — the first pool a 2024 Sorcerer has", () => {
@@ -117,8 +112,7 @@ describe("cross-edition absence at level 20 (#1232 §1.3 proof): innateSorcery/s
 
 describe("sorceryPoints rides the Font of Magic rows — the pool the deleted resourceFn used to declare", () => {
   // PHB'14 p.101 / SRD 5.2 p.140: Sorcery Points equal sorcerer level, from
-  // level 2, regained on a Long Rest — asserted at every level so a tier-table
-  // typo can't hide between spot checks.
+  // level 2, regained on a Long Rest.
   it("absent at level 1, then total === level with longRest recharge for every level 2-20, both editions", () => {
     for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {
       expect(poolAt(BASE_ROWS, "sorceryPoints", 1, edition), edition).toBeUndefined();

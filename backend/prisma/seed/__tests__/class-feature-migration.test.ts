@@ -1,15 +1,7 @@
-// DB-backed migration-correctness suite for #1522/#1523: ClassFeature is a
-// mechanical move of DerivedFeature[] text out of twelve lib/classes/*.ts
-// modules into seeded rows — no rules content changes, no reader wired up yet
-// (#1524). Modelled on granted-ability-fork-reseed.test.ts: seed-class-
-// features.ts exports seedClassFeatures(prisma) precisely so this file can
-// call it in-process (seed.ts's OWN families can't be re-run this way —
-// main() self-invokes at module load and exports nothing).
-//
-// The template DB vitest.global-setup.ts clones from already ran `prisma db
-// seed` once, so every row asserted against below is the REAL seeded catalog,
-// not a fixture — this suite is a positive control on that real seed, the
-// same shape validate.test.ts uses for assertSeedContentValid.
+// Runs against the real seeded catalog: the template DB the test setup clones
+// from has already run `prisma db seed`. seedClassFeatures is exported
+// precisely so this suite can re-run it in-process (seed.ts's main()
+// self-invokes at module load and exports nothing).
 import { describe, expect, it } from "vitest";
 
 import { Prisma } from "@/generated/prisma/client.js";
@@ -23,19 +15,12 @@ import { RESEED_TIMEOUT_MS } from "./reseed-timeout.js";
 
 describe("ClassFeature migration — row count (#1523)", () => {
   it("the seeded table holds exactly the row count CLASS_FEATURES derives from the registry", async () => {
-    // CLASS_FEATURES itself is not a literal — it's built at import time by
-    // walking all twelve lib/classes/*.ts modules (class-features.ts), so
-    // asserting the DB count against CLASS_FEATURES.length compares two
-    // genuinely independent numbers (a live Postgres COUNT vs. a static-source
-    // derivation), never a hardcoded 522.
+    // CLASS_FEATURES is built at import time from source, so this compares a
+    // live Postgres COUNT against an independent derivation, never a literal.
     const actual = await prisma.classFeature.count();
     expect(actual).toBe(CLASS_FEATURES.length);
   });
 
-  // Mutation proof (manual, recorded in the PR): deleting one real DB row
-  // (e.g. Fighter's base-class "Indomitable" 2024 row) drops `actual` by 1
-  // while CLASS_FEATURES.length is unaffected (it's derived from TS source,
-  // not the DB) — this assertion is what goes red and by how much.
   it("every (class, subclass, name, edition) CLASS_FEATURES declares exists in the table — names the first missing tuple", async () => {
     const dbKeys = new Set(
       (
@@ -54,29 +39,7 @@ describe("ClassFeature migration — row count (#1523)", () => {
   });
 });
 
-// The "expandFeatureRow's untagged branch keeps both editions byte-identical"
-// suite that used to live here (#1523) retired by #1675: it read in-memory
-// CLASS_FEATURES filtered to `!LITERAL_ROW_CLASSES.has(row.className)` — the
-// derived half — and Monk was the last class on that path (Cleric's "Domain
-// Spells", #1225, was the last pre-forked NAME, following Warlock's
-// "Expanded Spell List", #1233, off it). Once Monk joined LITERAL_ROW_CLASSES
-// too, the filtered set was permanently empty, so its own anti-vacuity
-// assertion (`pairs.length > 0`) started failing by design — the exact "four
-// suites break by design" shape #1522's own roster-completion note predicted.
-// expandFeatureRow/collectRawFeatures themselves are deleted (class-
-// features.ts, #1675); every class's rows now arrive in CLASS_FEATURES
-// already split one-row-per-edition by hand, the same shape Fighter's rows
-// always had.
-
 describe("ClassFeature migration — the already-forked pairs were not duplicated (#1523)", () => {
-  // #1225: Cleric's "Domain Spells" is NO LONGER a forked pair either — both
-  // domains' 2024 rows renamed ("Life Domain Spells" / "Trickery Domain
-  // Spells", different names from the 2014-only "Domain Spells"), so
-  // pruneStalePartitions retired the old (FABRICATED — a PHB'14 list with its
-  // first tier relabelled, never real SRD 5.2/PHB'24 content) 2024 "Domain
-  // Spells" rows outright. Every "Domain Spells" row left is a single
-  // EDITION_2014 row per domain — asserted here as exactly that, not a fork,
-  // the same replacement Warlock's "Expanded Spell List" test below models.
   it("Cleric Domain Spells: exactly one EDITION_2014 row per domain, no EDITION_2024 row anywhere", async () => {
     const rows = await prisma.classFeature.findMany({
       where: { name: "Domain Spells", class: { name: "Cleric" } },
@@ -92,13 +55,8 @@ describe("ClassFeature migration — the already-forked pairs were not duplicate
     }
   });
 
-  // #1233: Warlock's "Expanded Spell List" is NO LONGER a forked pair — The
-  // Fiend's 2024 row renamed to "Fiend Spells" (a different name, so
-  // pruneStalePartitions retired the old 2024 "Expanded Spell List" DB row
-  // outright) and The Archfey/The Great Old One are now EDITION_2014-only
-  // (owner decision: their PHB'24 reworks are non-SRD, so zero 2024 rows are
-  // authored). Every "Expanded Spell List" row left is a single EDITION_2014
-  // row per patron — asserted here as exactly that, not a fork.
+  // Owner decision (#1233): The Archfey's/The Great Old One's PHB'24 reworks
+  // are non-SRD — no 2024 rows authored.
   it("Warlock Expanded Spell List: exactly one EDITION_2014 row per patron, no EDITION_2024 row anywhere", async () => {
     const rows = await prisma.classFeature.findMany({
       where: { name: "Expanded Spell List", class: { name: "Warlock" } },
@@ -115,32 +73,18 @@ describe("ClassFeature migration — the already-forked pairs were not duplicate
   });
 });
 
-// Second Wind/Action Surge/Indomitable (base Fighter, both editions — 6 rows)
-// are the FIRST descriptor columns populated (#1528, the ClassFeature pilot):
-// resourceKey/resourceTotals/resourceRecharge for all three, plus
-// activation/cost/effect columns for the two that are selectable actions
-// (Indomitable never was — see fighter-features.ts's own comment). Every
-// OTHER row — including every OTHER Fighter row — stays NULL/default until
-// its own wave-2 retab (#1134).
 const POPULATED_ROW_NAMES = new Set(["Second Wind", "Action Surge", "Indomitable"]);
 
 function isPopulatedFighterRow(row: { className: string; subclassSlug: string | null; name: string }): boolean {
   return row.className === "Fighter" && row.subclassSlug === null && POPULATED_ROW_NAMES.has(row.name);
 }
 
-// #1223: Rage's resource pool (base Barbarian, both editions — 2 rows) is the
-// second class to populate a resource descriptor column after Fighter's #1528
-// pilot. #1912 adds Reckless Attack's row-driven ACTION columns (both
-// editions) — P-shaped (identity-only resourceKey, no cost columns).
 const POPULATED_BARBARIAN_ROW_NAMES = new Set(["Rage", "Reckless Attack"]);
 
 function isPopulatedBarbarianRow(row: { className: string; subclassSlug: string | null; name: string }): boolean {
   return row.className === "Barbarian" && row.subclassSlug === null && POPULATED_BARBARIAN_ROW_NAMES.has(row.name);
 }
 
-// #1912: Cunning Action (base, both editions) and Fast Hands (Thief, both
-// editions) moved off actions.ts's DERIVED_ACTIONS onto these rows — both
-// P-shaped (identity-only resourceKey, no cost columns).
 function isPopulatedRogueRow(row: { className: string; subclassSlug: string | null; name: string }): boolean {
   if (row.className !== "Rogue") return false;
   if (row.subclassSlug === null && row.name === "Cunning Action") return true;
@@ -148,16 +92,9 @@ function isPopulatedRogueRow(row: { className: string; subclassSlug: string | nu
   return false;
 }
 
-// Every Monk row #1912 (epic #1903, 4/4) populated moving the 31-row
-// DERIVED_ACTIONS block onto ClassFeature rows — keyed on
-// `${subclassSlug}::${name}::${edition}` since several names repeat across
-// subclasses/editions (Shadow Step, Cloak of Shadows, Patient Defense, Step
-// of the Wind, Wholeness of Body, Hand of Healing) with genuinely different
-// descriptor columns per row. Includes the two rows #1686/#1501 already
-// populated (Elemental Attunement's toggle block, Way of the Open Hand's
-// Wholeness of Body pool) — folded into this one set rather than kept split.
+// Keyed with edition: several Monk names repeat across subclasses/editions
+// with genuinely different descriptor columns per row.
 const POPULATED_MONK_ROW_KEYS = new Set([
-  // Base class (subclassSlug null).
   "null::Deflect Attacks::EDITION_2024",
   "null::Deflect Missiles::EDITION_2014",
   "null::Bonus Unarmed Strike::EDITION_2014",
@@ -174,31 +111,22 @@ const POPULATED_MONK_ROW_KEYS = new Set([
   "null::Deflect Missiles — Throw Back::EDITION_2014",
   "null::Empty Body — Invisibility::EDITION_2014",
   "null::Empty Body — Astral Projection::EDITION_2014",
-  // Warrior of the Open Hand (2024).
   "monk-warrior-of-the-open-hand::Wholeness of Body::EDITION_2024",
   "monk-warrior-of-the-open-hand::Fleet Step::EDITION_2024",
-  // Way of the Open Hand (2014) — Wholeness of Body's FIXED resource pool
-  // (#1501) plus its actionOnly served-identity sibling (#1912).
   "monk-way-of-the-open-hand::Wholeness of Body::EDITION_2014",
   "monk-way-of-the-open-hand::Tranquility::EDITION_2014",
   "monk-way-of-the-open-hand::Wholeness of Body — Action::EDITION_2014",
-  // Warrior of Shadow (2024).
   "monk-warrior-of-shadow::Shadow Step::EDITION_2024",
   "monk-warrior-of-shadow::Cloak of Shadows::EDITION_2024",
   "monk-warrior-of-shadow::Shadow Arts (Darkness)::EDITION_2024",
-  // Way of Shadow (2014).
   "monk-way-of-shadow::Shadow Arts::EDITION_2014",
   "monk-way-of-shadow::Shadow Step::EDITION_2014",
   "monk-way-of-shadow::Cloak of Shadows::EDITION_2014",
   "monk-way-of-shadow::Opportunist::EDITION_2014",
-  // Warrior of the Elements (2024) — Elemental Attunement's toggle block
-  // (#1686) plus Elemental Burst (#1912).
   "monk-warrior-of-the-elements::Elemental Attunement::EDITION_2024",
   "monk-warrior-of-the-elements::Elemental Burst::EDITION_2024",
-  // Way of the Four Elements (2014).
   "monk-way-of-the-four-elements::Elemental Attunement::EDITION_2014",
   "monk-way-of-the-four-elements::Elemental Discipline::EDITION_2014",
-  // Warrior of Mercy (untagged — shared both editions).
   "monk-warrior-of-mercy::Hand of Healing::EDITION_2014",
   "monk-warrior-of-mercy::Hand of Healing::EDITION_2024",
   "monk-warrior-of-mercy::Hand of Healing (Flurry replacement)::EDITION_2014",
@@ -210,36 +138,20 @@ function isPopulatedMonkRow(row: RowKey): boolean {
   return POPULATED_MONK_ROW_KEYS.has(`${row.subclassSlug ?? "null"}::${row.name}::${row.edition}`);
 }
 
-// #1234: Arcane Recovery's resource pool (base Wizard, both editions — 2
-// rows) — the third class to populate a resource descriptor column. No
-// activation/cost/effect columns (Arcane Recovery has no DERIVED_ACTIONS
-// entry — it's spent through the spellcasting op, not the actions endpoint).
+// Arcane Recovery is spent through the spellcasting op, not the actions
+// endpoint — no activation/cost columns.
 function isPopulatedWizardRow(row: { className: string; subclassSlug: string | null; name: string }): boolean {
   return row.className === "Wizard" && row.subclassSlug === null && row.name === "Arcane Recovery";
 }
 
-// #1234: Illusory Self's resource pool (School of Illusion subclass, both
-// editions — 2 rows) — the one SUBCLASS-scoped Wizard resource row, mirroring
-// Battle Master's Combat Superiority above. Same no-activation reasoning as
-// isPopulatedWizardRow.
 function isPopulatedIllusorySelfRow(row: { className: string; subclassSlug: string | null; name: string }): boolean {
   return row.className === "Wizard" && row.subclassSlug === "wizard-school-of-illusion" && row.name === "Illusory Self";
 }
 
-// #1546 Part B: Battle Master's Combat Superiority is the one SUBCLASS-scoped
-// resource row (its superiority-dice pool) alongside the three base-class
-// ones above.
 function isPopulatedBattleMasterPoolRow(row: { className: string; subclassSlug: string | null; name: string }): boolean {
   return row.className === "Fighter" && row.subclassSlug === "fighter-battle-master" && row.name === "Combat Superiority";
 }
 
-// #1233: every Warlock pool that moved onto its row — Magical Cunning (base),
-// Dark One's Own Luck/Hurl Through Hell (The Fiend), Fey Presence/Misty
-// Escape/Dark Delirium (The Archfey), Entropic Ward (The Great Old One).
-// Dark One's Own Luck's 2024 row used to set resourceKey while deliberately
-// OMITTING resourceTotals (a Charisma-modifier formula, then still
-// resourceFn-derived); #1685's `{ abilityMod, min }` tier now populates it
-// on both editions' rows.
 const POPULATED_WARLOCK_ROW_KEYS = new Set([
   "Warlock::null::Magical Cunning",
   "Warlock::warlock-the-fiend::Dark One's Own Luck",
@@ -254,27 +166,14 @@ function isPopulatedWarlockRow(row: { className: string; subclassSlug: string | 
   return POPULATED_WARLOCK_ROW_KEYS.has(`${row.className}::${row.subclassSlug ?? "null"}::${row.name}`);
 }
 
-// #1909: Bardic Inspiration's two rows — IDENTITY-ONLY resourceKey (no
-// resourceTotals; the pool itself stays wholly in bard.ts's resourceFn, see
-// bard-features.ts's own RESOURCE POOL header block) plus the row-driven
-// ACTION columns (activationCost/costKind/costPoolKey/costBase).
+// Identity-only resourceKey — Bardic Inspiration's pool itself stays in
+// bard's resourceFn.
 const POPULATED_BARD_ROW_KEYS = new Set(["Bard::null::Bardic Inspiration::EDITION_2014", "Bard::null::Bardic Inspiration::EDITION_2024"]);
 
 function isPopulatedBardRow(row: RowKey): boolean {
   return POPULATED_BARD_ROW_KEYS.has(`${row.className}::${row.subclassSlug ?? "null"}::${row.name}::${row.edition}`);
 }
 
-// #1230: Ranger's three Wisdom-tier-or-formula pools. Keyed on the 4-tuple
-// INCLUDING edition (unlike POPULATED_WARLOCK_ROW_KEYS' 3-tuple) because
-// Favored Enemy is the asymmetric case the RowKey comment below names: its
-// 2014 row carries NO resourceKey at all, only its 2024 row does — a 3-tuple
-// key would incorrectly mark the 2014 row "populated" too and fail its
-// expectNullResourceColumns check. Tireless/Nature's Veil have no 2014
-// counterpart at all, so their 2024-only keys need no such asymmetry
-// handling, but stay 4-tuples for consistency. Tireless/Nature's Veil used to
-// set resourceKey while deliberately OMITTING resourceTotals (a
-// Wisdom-modifier formula, then still resourceFn-derived); #1685's
-// `{ abilityMod, min }` tier now populates it on both rows.
 const POPULATED_RANGER_ROW_KEYS = new Set([
   "Ranger::null::Favored Enemy::EDITION_2024",
   "Ranger::null::Tireless::EDITION_2024",
@@ -285,15 +184,6 @@ function isPopulatedRangerRow(row: RowKey): boolean {
   return POPULATED_RANGER_ROW_KEYS.has(`${row.className}::${row.subclassSlug ?? "null"}::${row.name}::${row.edition}`);
 }
 
-// #1232: every Sorcerer pool that moved onto its row — Innate Sorcery/
-// Sorcerous Restoration (base), Tides of Chaos (Wild Magic, BOTH editions —
-// keyed with `edition` since the 2014 and 2024 rows are two DIFFERENT rows
-// sharing one name), Dragon Wings (Draconic Bloodline)/Tamed Surge (Wild
-// Magic). The sorcerer retab adds Font of Magic (both editions) — the
-// `sorceryPoints` pool as a `{ levelTimes: 1 }` tier, replacing the deleted
-// resourceFn. #1909 adds Metamagic (both editions) — an IDENTITY-ONLY
-// resourceKey ("metamagic", no resourceTotals: it spends the sorceryPoints
-// pool above, never declares its own) plus the row-driven ACTION columns.
 const POPULATED_SORCERER_ROW_KEYS = new Set([
   "Sorcerer::null::Innate Sorcery::EDITION_2024",
   "Sorcerer::null::Sorcerous Restoration::EDITION_2024",
@@ -311,13 +201,6 @@ function isPopulatedSorcererRow(row: RowKey): boolean {
   return POPULATED_SORCERER_ROW_KEYS.has(`${row.className}::${row.subclassSlug ?? "null"}::${row.name}::${row.edition}`);
 }
 
-// #1225: Cleric's Channel Divinity pool carrier rows — base class,
-// subclassSlug null, ONE per edition (the 2014 pool rides the existing
-// "Channel Divinity: Turn Undead" row; the 2024 pool rides the new "Channel
-// Divinity" row) — see cleric-features.ts's own RESOURCE POOL header block.
-// `edition` is part of the key: the 2024 "Channel Divinity: Turn Undead" row
-// carries no pool at all (only its 2014 twin does, same name, different
-// edition), so a name-only match would wrongly flag it populated too.
 function isPopulatedClericRow(row: RowKey): boolean {
   return (
     row.className === "Cleric" &&
@@ -327,17 +210,8 @@ function isPopulatedClericRow(row: RowKey): boolean {
   );
 }
 
-// #1226: Druid's Wild Shape pool moved onto its EDITION_2024 row only (the
-// EDITION_2014 row's pool stays in lib/classes/druid.ts's resourceFn — see
-// druid-features.ts's own RESOURCE POOL header for the split verdict); Circle
-// of the Moon's Moonlight Step (2024) row also declares resourceKey — it used
-// to deliberately OMIT resourceTotals (a Wisdom-modifier formula, then
-// supplied by druid.ts's subclass resourceFn), but #1685's
-// `{ abilityMod, min }` tier now populates it directly on the row. #1909 adds
-// the EDITION_2014 Wild Shape row too — IDENTITY-ONLY resourceKey (still no
-// resourceTotals, the pool itself is still resourceFn-derived) plus the
-// row-driven ACTION columns; the 2024 row's own action columns ride the same
-// pool-carrying row already in this set.
+// Wild Shape's 2014 pool stays in druid's resourceFn — that row carries an
+// identity-only resourceKey.
 const POPULATED_DRUID_ROW_KEYS = new Set([
   "Druid::null::Wild Shape::EDITION_2014",
   "Druid::null::Wild Shape::EDITION_2024",
@@ -348,16 +222,6 @@ function isPopulatedDruidRow(row: RowKey): boolean {
   return POPULATED_DRUID_ROW_KEYS.has(`${row.className}::${row.subclassSlug ?? "null"}::${row.name}::${row.edition}`);
 }
 
-// #1229: Paladin's Channel Divinity pool carrier rows — base class,
-// subclassSlug null, BOTH editions ride the SAME name ("Channel Divinity"),
-// unlike Cleric (forced onto "Turn Undead" for 2014 since Cleric's 2014
-// Channel Divinity has no feature of its own by that name) — Paladin already
-// had a base-class row literally named "Channel Divinity" in both editions
-// pre-migration, so each edition's pool rides its own same-named row. See
-// paladin-features.ts's own RESOURCE POOL header block. #1909 adds Divine
-// Sense (EDITION_2014 only — 2024 has no such pool, #1229) and Lay on Hands
-// (both editions) — both IDENTITY-ONLY resourceKey (no resourceTotals, both
-// pools stay resourceFn-derived) plus the row-driven ACTION columns.
 const POPULATED_PALADIN_ROW_NAMES = new Set(["Channel Divinity", "Lay on Hands"]);
 
 function isPopulatedPaladinRow(row: RowKey): boolean {
@@ -366,63 +230,25 @@ function isPopulatedPaladinRow(row: RowKey): boolean {
   return row.name === "Divine Sense" && row.edition === "EDITION_2014";
 }
 
-// #1676: Bladesinger's two resourceKey-carrying rows — Bladesong (the
-// bladesong pool + toggle/armor-gate block) and Song of Defense (a pure
-// action-key identity, no pool of its own — costKind "slot" spends real
-// spell slots instead, #1687). Training in War and Song sets only
-// `improvements` (#1691, not selected/asserted by this test at all) and
-// stays correctly unpopulated here; Extra Attack's derivedStat is handled by
-// DERIVED_STAT_ROW_KEYS below, not this predicate.
+// Training in War and Song sets only `improvements`, which this suite never
+// selects — it stays correctly unpopulated here.
 function isPopulatedBladesingerRow(row: RowKey): boolean {
   return row.className === "Wizard" && row.subclassSlug === "wizard-bladesinging" && (row.name === "Bladesong" || row.name === "Song of Defense");
 }
 
-// What the descriptor predicates below key on. `edition` is part of the key
-// because a class can populate a descriptor column on ONE edition's row and
-// not the other's, under the same (class, subclass, name): Ranger's Favored
-// Enemy exists in both editions and carries a pool only in 2024 (#1230). A
-// 3-tuple key cannot express that, and would assert the wrong thing on the
-// row it can't distinguish. Predicates that are edition-invariant simply
-// ignore the field.
+// `edition` is part of the key: a class can populate a descriptor column on
+// one edition's row only — Ranger's Favored Enemy carries a pool only in its
+// 2024 row (#1230). Edition-invariant predicates simply ignore the field.
 type RowKey = { className: string; subclassSlug: string | null; name: string; edition: string };
 
-// #1546 Part B: the ability list Combat Superiority's announcedSaveDC (#1589,
-// renamed from maneuverSaveDC) is computed from — the one row that sets it,
-// both editions.
 function isSaveDcRow(row: RowKey): boolean {
   return isPopulatedBattleMasterPoolRow(row);
 }
 
-// The single "this row has a populated resource pool" predicate, called once by
-// each check below rather than inlined as an OR chain — that chain is what
-// pushed those checks' own cyclomatic/CRAP scores over the ratchet as wave 2
-// added classes (prisma/seed/** carries no coverage instrumentation, so CRAP
-// floors at CC^2+CC regardless of real coverage — see baseFeatureRows'
-// comment, class-features.ts, for the same reasoning). #1229's own
-// isPopulatedPaladinRow pushed a plain `||` chain's cyclomatic score past the
-// fallow ratchet (10 branches, one function) — restructured as a predicate
-// LIST + `.some()` so this aggregator's own complexity stays flat (1) as more
-// classes join, rather than growing with every addition; the per-class
-// predicates below are unchanged, still one function each.
-//
-// #1233 and #1234 each introduced their own copy of this aggregator while
-// developing in parallel (isPopulatedRow / isAnyPopulatedResourceRow); they
-// were merged into this one at integration, because two aggregators each
-// naming a DIFFERENT subset is precisely how a row silently escapes the
-// descriptor sweep. Every new populated-row predicate goes here, once —
-// wave b's isPopulatedRangerRow (#1230) and isPopulatedSorcererRow (#1232)
-// included, both added to this SAME aggregator rather than sibling ones.
-// Wave C's isPopulatedDruidRow (#1226) and isPopulatedPaladinRow (#1229)
-// follow the same rule — both were authored in parallel and both landed here,
-// not in sibling aggregators.
-//
-// An array + `.some()` rather than an `||` chain (#1226): each `||` is its
-// own branch under the cyclomatic-complexity count, and prisma/seed/** carries
-// no coverage instrumentation so CRAP floors at CC^2+CC regardless of real
-// coverage (see baseFeatureRows' comment, class-features.ts) — a tenth
-// disjunct pushed the old chain over the ratchet. `.some()` iterating a fixed
-// array keeps this function's own CC at 1; every predicate's OWN complexity
-// is unchanged and still counted where it's defined.
+// Every populated-row predicate registers here, once — a second aggregator is
+// how a row silently escapes the descriptor sweep. An array + `.some()`
+// rather than an `||` chain keeps this function's cyclomatic count at 1
+// (prisma/seed/** has no coverage instrumentation, so CRAP floors at CC^2+CC).
 const POPULATED_ROW_PREDICATES: ((row: RowKey) => boolean)[] = [
   isPopulatedFighterRow,
   isPopulatedBattleMasterPoolRow,
@@ -445,25 +271,9 @@ function isPopulatedRow(row: RowKey): boolean {
   return POPULATED_ROW_PREDICATES.some((predicate) => predicate(row));
 }
 
-// #1530: Extra Attack's derivedStat/derivedStatTiers columns are populated on
-// six (class, subclass) pairs — the base-class row for Fighter/Barbarian/
-// Monk/Paladin/Ranger, plus Bard's College of Valor subclass row (the only
-// subclass-gated Extra Attack, #1277's slug join). Keyed by (className,
-// subclassSlug, name) tuple, not by (className, name): Bard is the row that
-// needs it — base Bard has no "Extra Attack" row at all, only College of
-// Valor's subclass-tagged one, so subclassSlug is what lets this set name
-// THAT row precisely instead of a bare className+name pair that would stop
-// being unambiguous the moment any class gains a same-named row under both
-// its base and a subclass. Two/Three Extra Attacks are a different name
-// entirely and never need the tuple for that reason.
-// #1546 Part B adds Fighter's Battle Master rows: Combat Superiority
-// (maneuverChoiceCount) and Student of War (toolProfChoiceCount) — both
-// subclass-scoped, keyed the same tuple way as Bard's College of Valor row.
-// #1120 adds Fighter's Champion row: Improved Critical (critRange) — both
-// tiers (19 at L3, 18 at L15) ride this ONE row, "Superior Critical" stays
-// text-only (see fighter-features.ts's own comment on why a second row on
-// this axis would need a cross-row MIN deriveAttacksPerAction's shape
-// doesn't have).
+// Keyed by (className, subclassSlug, name): base Bard has no "Extra Attack"
+// row at all — only College of Valor's subclass-tagged one, so the tuple is
+// what names that row precisely.
 const DERIVED_STAT_ROW_KEYS = new Set([
   "Fighter::null::Extra Attack",
   "Barbarian::null::Extra Attack",
@@ -473,16 +283,13 @@ const DERIVED_STAT_ROW_KEYS = new Set([
   "Bard::bard-college-of-valor::Extra Attack",
   "Fighter::fighter-battle-master::Combat Superiority",
   "Fighter::fighter-battle-master::Student of War",
-  // #1676: Bladesinger's L6 Extra Attack, EDITION_2014 only.
+  // EDITION_2014 only (#1676).
   "Wizard::wizard-bladesinging::Extra Attack",
-  // #1120: Champion's crit-range axis (critRange), both editions.
   "Fighter::fighter-champion::Improved Critical",
-  // #1588: Expertise pick-count ladder (expertiseChoiceCount) — Rogue/Bard
-  // base-class Expertise rows (both editions), Ranger's Deft Explorer
-  // (2024 only — the whole ladder rides this ONE row, not the L9 Expertise
-  // row too), Wizard's Scholar (2024 only).
   "Rogue::null::Expertise",
   "Bard::null::Expertise",
+  // Deft Explorer and Scholar are EDITION_2024 only (#1588); the whole
+  // expertiseChoiceCount ladder rides Deft Explorer, not the L9 Expertise row.
   "Ranger::null::Deft Explorer",
   "Wizard::null::Scholar",
 ]);
@@ -523,9 +330,6 @@ type DescriptorRow = {
   saveDcAbilities: string[];
 };
 
-// Every resource/activation/cost/effect column at its NULL/default reset —
-// split out so the test body's own branching stays low (see
-// isPopulatedRow's comment above for why).
 function expectNullResourceColumns(row: DescriptorRow): void {
   expect(row.resourceKey, row.name).toBeNull();
   expect(row.resourceLabel, row.name).toBeNull();
@@ -554,9 +358,6 @@ function expectNullResourceColumns(row: DescriptorRow): void {
   expect(row.buffModifier, row.name).toBeNull();
 }
 
-// One row's full set of descriptor-column assertions — extracted so the it()
-// body itself is a plain fetch + count + loop, not the branching (same
-// complexity-budget reasoning as the two functions above).
 function expectRowDescriptors(row: DescriptorRow & RowKey): void {
   const key = {
     className: row.className,
@@ -565,19 +366,13 @@ function expectRowDescriptors(row: DescriptorRow & RowKey): void {
     edition: row.edition,
   };
   if (isPopulatedRow(key)) {
-    // Populated by #1528/#1546/#1234 — asserted precisely in the describe
-    // blocks below. Falls through to the derivedStat/saveDcAbilities checks
-    // rather than an early return: Combat Superiority (#1546) sets a resource
-    // pool AND a derivedStat AND saveDcAbilities all on the SAME row, so
-    // returning here would skip asserting the latter two entirely.
+    // Falls through rather than returning early: Combat Superiority sets a
+    // resource pool AND a derivedStat AND saveDcAbilities on the SAME row.
     expect(row.resourceKey, row.name).not.toBeNull();
   } else {
     expectNullResourceColumns(row);
   }
 
-  // #1530/#1546: Extra Attack's six pairs plus Combat Superiority/Student
-  // of War are the derivedStat exceptions, checked separately since they
-  // don't all touch the resource columns asserted null above.
   if (isDerivedStatRow(key)) {
     expect(row.derivedStat, row.name).not.toBeNull();
     expect(row.derivedStatTiers, row.name).not.toBeNull();
@@ -586,9 +381,7 @@ function expectRowDescriptors(row: DescriptorRow & RowKey): void {
     expect(row.derivedStatTiers, row.name).toBeNull();
   }
 
-  // #1546: saveDcAbilities defaults to `[]` (a NOT NULL String[] column,
-  // same "no SQL NULL to distinguish" shape as `regrants`) — non-empty
-  // only on Combat Superiority, both editions.
+  // saveDcAbilities is a NOT NULL String[] column — its reset is [], not NULL.
   if (isSaveDcRow(key)) {
     expect(row.saveDcAbilities, row.name).toEqual(["strength", "dexterity"]);
   } else {
@@ -609,9 +402,8 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
         derivedStat: true, derivedStatTiers: true, saveDcAbilities: true,
       },
     });
-    // Pinned to the registry-derived count, not `> 0`: a row silently dropped
-    // by the seeder (or left over from a previous test's partial write) would
-    // still pass every per-row expectation below and read as "all clear".
+    // Pinned to the registry-derived count, not `> 0`: a silently dropped or
+    // leftover row would still pass every per-row expectation below.
     expect(rows.length).toBe(CLASS_FEATURES.length);
 
     for (const row of rows) {
@@ -619,72 +411,39 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
     }
   });
 
-  // Prisma deserializes BOTH SQL NULL (Prisma.DbNull) and a stored JSON `null`
-  // (Prisma.JsonNull) to the JS value `null` — so the per-row `toBeNull()`
-  // checks above pass identically whichever one is actually on disk and
-  // cannot tell them apart. That gap is exactly what let seed-class-
-  // features.ts write Prisma.JsonNull (a real, non-NULL JSON scalar) into
-  // all three Json? descriptor columns while this suite stayed green. Assert
-  // the SQL-level state directly for the three Json? columns so a future
-  // regression to JsonNull goes red here instead of only showing up as a
-  // `WHERE col IS NULL` filter silently matching zero rows four stages from
-  // now (#1525's population guards). resourceTotals excludes #1528's six
-  // populated Fighter rows (Second Wind ×2/Action Surge ×2/Indomitable ×2)
-  // PLUS #1546's Combat Superiority ×2 (its superiority-dice pool) PLUS
-  // #1223's Rage x2 (Barbarian's base-class pool, both editions) PLUS #1234's
-  // Arcane Recovery x2 (Wizard's base-class pool) and Illusory Self x2 (School
-  // of Illusion's subclass pool) PLUS #1233/#1685's nine Warlock rows that set
-  // resourceTotals (Magical Cunning x1, Dark One's Own Luck x2 — both editions,
-  // 2024's now a `{ abilityMod, min }` formula tier — Hurl Through Hell x2, Fey
-  // Presence x1, Misty Escape x1, Dark Delirium x1, Entropic Ward x1) PLUS
-  // #1230/#1685's THREE Ranger rows (Favored Enemy's 2024 row, plus
-  // Tireless/Nature's Veil's own 2024 formula tiers), #1232's eight Sorcerer
-  // rows (Innate Sorcery x1, Sorcerous Restoration x1, Tides of Chaos x2 — one
-  // per edition — Dragon Wings x1, Tamed Surge x1, plus the sorcerer retab's
-  // Font of Magic x2 — one per edition) and #1225's two Cleric
-  // Channel Divinity carrier rows (Turn Undead 2014-only x1, Channel Divinity
-  // 2024-only x1);
-  // derivedStatTiers excludes #1530's twelve populated Extra
-  // Attack rows PLUS #1546's Combat Superiority/Student of War x2 editions each
-  // (DERIVED_STAT_ROW_KEYS x2 editions each, computed below) PLUS #1676's
-  // Bladesinger Extra Attack row, EDITION_2014 only (x1, not x2 — see the
-  // subtraction below); resourceDieTiers excludes only Combat Superiority x2
-  // (the only row with a die-size tier).
+  // Prisma deserializes both SQL NULL (Prisma.DbNull) and a stored JSON
+  // `null` (Prisma.JsonNull) to the JS value `null`, so the per-row
+  // `toBeNull()` checks above cannot tell them apart — that gap once let
+  // seedClassFeatures write JsonNull into all three Json? columns while this
+  // suite stayed green, which a later `WHERE col IS NULL` filter would
+  // silently miss. Assert the SQL-level state directly.
   it("resourceTotals/resourceDieTiers/derivedStatTiers are SQL NULL (Prisma.DbNull), not a stored JSON null, everywhere they aren't authored", async () => {
-    // This total is SUMMED across wave-b branches, never taken from one of
-    // them: #1230 raised 22 -> 23, #1232 -> 28, #1225 -> 24, then wave C's
-    // #1226 -> 32 and #1229 -> 33, each independently and each correct for its
-    // own branch ALONE. The merged value is none of those: it is the SUM of
-    // the components, 22 + 1 + 6 + 2 + 1 + 2 = 34. Picking any one branch's
-    // number would silently exempt the other classes' rows from the sweep —
-    // the wave-A near-miss this file's aggregator comment already records, in
-    // its other half. #1685 then migrated the four remaining formula pools
-    // onto their rows (Dark One's Own Luck's 2024 row, Tireless, Nature's
-    // Veil, Moonlight Step), raising Warlock 8 -> 9, Ranger 1 -> 3, Druid
-    // 1 -> 2: 34 + 1 + 2 + 1 = 38. #1676 (Bladesinger) adds ONE more —
-    // Bladesong's own resourceTotals (EDITION_2014 only, no 2024 twin): 38 + 1
-    // = 39. #1501 (Way of the Open Hand) adds ONE more — Wholeness of Body's
-    // own resourceTotals (EDITION_2014 only, no 2024 twin, same one-row shape
-    // as Bladesong): 39 + 1 = 40. The sorcerer retab adds Font of Magic's two
-    // sorceryPoints rows (one per edition): 40 + 2 = 42.
-    // 6 Fighter + 2 Combat Superiority + 2 Rage + 4 Wizard + 9 Warlock
-    // + 3 Ranger + 8 Sorcerer + 2 Cleric + 2 Druid + 2 Paladin (#1229's own
-    // Channel Divinity carrier rows, one per edition — see
-    // isPopulatedPaladinRow) + 1 Bladesong + 1 Way of the Open Hand's
-    // Wholeness of Body.
-    const populatedResourceTotalsCount = 42;
-    const populatedResourceDieTiersCount = 2;
-    // DERIVED_STAT_ROW_KEYS x2 editions each, MINUS 1: Bladesinger's own
-    // "Wizard::wizard-bladesinging::Extra Attack" key is EDITION_2014 only
-    // (no 2024 successor, #1676), unlike every other keyed row here — see
-    // isPopulatedBladesingerRow's own comment. A future asymmetric addition
-    // needs this same correction, not a silent re-multiply.
-    // #1588 adds TWO more asymmetric keys: "Ranger::null::Deft Explorer" and
-    // "Wizard::null::Scholar" are EDITION_2024 only (no 2014 counterpart) —
-    // same one-row-not-two shape as Bladesinger's key above, hence -2 more
-    // (Rogue's and Bard's new "Expertise" keys ARE two-edition, no correction
-    // needed for those).
-    const populatedDerivedStatTiersCount = DERIVED_STAT_ROW_KEYS.size * 2 - 1 - 2;
+    // Per-class counts of rows with authored resourceTotals. After parallel
+    // branches merge, re-measure on the merged tree — each branch's own total
+    // was correct alone (#1230/#1232/#1225/#1226/#1229).
+    const FIGHTER_POOL_ROWS = 6;
+    const BATTLE_MASTER_POOL_ROWS = 2;
+    const BARBARIAN_POOL_ROWS = 2;
+    const WIZARD_POOL_ROWS = 4;
+    const WARLOCK_POOL_ROWS = 9;
+    const RANGER_POOL_ROWS = 3;
+    const SORCERER_POOL_ROWS = 8;
+    const CLERIC_POOL_ROWS = 2;
+    const DRUID_POOL_ROWS = 2;
+    const PALADIN_POOL_ROWS = 2;
+    const BLADESINGER_POOL_ROWS = 1;
+    const OPEN_HAND_POOL_ROWS = 1;
+    const populatedResourceTotalsCount =
+      FIGHTER_POOL_ROWS + BATTLE_MASTER_POOL_ROWS + BARBARIAN_POOL_ROWS + WIZARD_POOL_ROWS +
+      WARLOCK_POOL_ROWS + RANGER_POOL_ROWS + SORCERER_POOL_ROWS + CLERIC_POOL_ROWS +
+      DRUID_POOL_ROWS + PALADIN_POOL_ROWS + BLADESINGER_POOL_ROWS + OPEN_HAND_POOL_ROWS;
+    // Combat Superiority (both editions) is the only row with a die-size tier.
+    const populatedResourceDieTiersCount = BATTLE_MASTER_POOL_ROWS;
+    // Bladesinger's Extra Attack is EDITION_2014-only; Deft Explorer and
+    // Scholar are EDITION_2024-only — one row each, not two. A future
+    // asymmetric key needs the same correction, not a silent re-multiply.
+    const SINGLE_EDITION_DERIVED_STAT_KEYS = 3;
+    const populatedDerivedStatTiersCount = DERIVED_STAT_ROW_KEYS.size * 2 - SINGLE_EDITION_DERIVED_STAT_KEYS;
     for (const column of ["resourceTotals", "resourceDieTiers", "derivedStatTiers"] as const) {
       const expectedDbNull =
         column === "resourceTotals"
@@ -701,9 +460,6 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
   });
 });
 
-// #1528: precise pin for the six populated rows — proves the pilot's write
-// landed exactly as authored, not just "something is non-null" (the loose
-// check above).
 describe("ClassFeature migration — Fighter's #1528 pilot rows are populated exactly as authored", () => {
   it("Second Wind: resourceKey/recharge/totals + activation/cost/effect columns, per edition", async () => {
     const rows = await prisma.classFeature.findMany({
@@ -778,11 +534,6 @@ describe("ClassFeature migration — Fighter's #1528 pilot rows are populated ex
   });
 });
 
-// #1223: precise pin for Rage's two populated rows, mirroring the Fighter
-// pilot-row proofs above — proves the write landed exactly as authored, not
-// just "something is non-null". #1686 extends this pin to Rage's own
-// activation/cost/effectBuffs columns, now that its DERIVED_ACTIONS pair and
-// ACTION_EFFECT_FN closure are retired in favor of a row-driven "toggle".
 describe("ClassFeature migration — Barbarian's #1223/#1686 Rage rows are populated exactly as authored", () => {
   it("resourceKey/recharge/totals AND activation/cost/effectBuffs — Rage is fully row-driven now", async () => {
     const rows = await prisma.classFeature.findMany({
@@ -841,8 +592,6 @@ describe("ClassFeature migration — Barbarian's #1223/#1686 Rage rows are popul
   });
 });
 
-// #1234: precise pin for Wizard's two populated rows (Arcane Recovery,
-// Illusory Self) — same reasoning as the Fighter/Barbarian pins above.
 describe("ClassFeature migration — Wizard's #1234 Arcane Recovery / Illusory Self rows are populated exactly as authored", () => {
   it("Arcane Recovery: flat total 1, longRest, both editions — no activation/cost columns", async () => {
     const rows = await prisma.classFeature.findMany({
@@ -875,8 +624,8 @@ describe("ClassFeature migration — Wizard's #1234 Arcane Recovery / Illusory S
 
 describe("ClassFeature migration — every description is byte-identical to its TS source row (#1523)", () => {
   it("a sample of untagged and tagged rows match their CLASS_FEATURES source exactly", async () => {
-    // Full-table exhaustive check (cheap at 522 rows) rather than a sample —
-    // "byte-identical, no reflowing, no copy-editing" is the whole point.
+    // Exhaustive over the full table despite the title — byte-identical text
+    // is the whole point.
     const dbRows = await prisma.classFeature.findMany({
       select: { name: true, level: true, description: true, edition: true, class: { select: { name: true } }, subclass: { select: { slug: true } } },
     });
@@ -924,50 +673,33 @@ describe("ClassFeature migration — seedClassFeatures is idempotent (#1523)", (
   }, RESEED_TIMEOUT_MS);
 });
 
-// #1528 EffectRow landmine pin: EffectRow's `level` decides the SCALING axis
-// (cantrip/upcast), but a ClassFeature row's `level` is the CHARACTER level
-// the feature is GRANTED at — a different number entirely. The
-// `{ ...row, level: 0 }` adapter (castSpecFromRow, actions.ts) is what keeps
-// `resolveEffectScaling` from reinterpreting a grant level as a spell level.
-// Both tests below go THROUGH castSpecFromRow itself (the production call
-// site), not a re-implementation of its `{ ...row, level: 0 }` adapter inline
-// — a prior version of this test called readEffectSpec directly with the same
-// adapter hand-copied in, which stayed green even with the adapter deleted
-// from castSpecFromRow, because it was testing its own copy of the fix, not
-// the fix.
+// EffectRow's `level` is the spell-scaling axis; a ClassFeature row's `level`
+// is the character level the feature is granted at. castSpecFromRow's
+// `{ ...row, level: 0 }` override keeps resolveEffectScaling from reading a
+// grant level as a spell level. Both tests go through castSpecFromRow itself,
+// never a hand-copied adapter — a copy stays green when the real one is
+// deleted.
 describe("ClassFeature EffectRow landmine — no Fighter row ever resolves a non-'none' scaling mode (#1528)", () => {
   it("every REAL Fighter row with effectKind set resolves { mode: 'none' } through castSpecFromRow", async () => {
     const rows = await prisma.classFeature.findMany({
       where: { class: { name: "Fighter" }, effectKind: { not: null } },
     });
-    // Second Wind (both editions) is the only Fighter row with effectKind set
-    // today — asserting length keeps this pin honest as a real DB count, not
-    // an early-return over an accidentally-empty result set. NOTE: this loop
-    // alone is NOT mutation-proof against deleting the `level: 0` adapter —
-    // ClassFeature has no cantripScaling/upcastDicePerLevel columns (schema.prisma's
-    // own comment: must never gain them), so no REAL row can ever arm the
-    // landmine and this loop stays green either way. The adversarial test
-    // below is the one that actually exercises the adapter.
+    // This loop alone cannot catch a deleted `level: 0` override: ClassFeature
+    // has no cantripScaling/upcastDicePerLevel columns (and must never gain
+    // them), so no real row can arm the landmine — the adversarial test below
+    // is what exercises the override.
     expect(rows.length).toBeGreaterThan(0);
     for (const row of rows) {
-      // Prisma types resourceTotals/resourceDieTiers as opaque JsonValue —
-      // cast to ClassFeatureRow's concrete shape once, same as featureRowsOf's
-      // own comment (feature-rows-select.ts) explains for the identical cast.
+      // Prisma types the Json columns as opaque JsonValue — cast to
+      // ClassFeatureRow's concrete shape, the same cast featureRowsOf makes.
       const { spec } = castSpecFromRow(row as unknown as ClassFeatureRow, 14, () => 0);
       expect(spec.effect.scaling, `${row.name} (${row.edition})`).toEqual({ mode: "none" });
     }
   });
 
-  // The mutation-provable half: simulates a future migration mistake (an
-  // upcastDicePerLevel value landing on a ClassFeature row despite the "must
-  // never" comment) on top of a REAL Second Wind row, whose grant `level` (1,
-  // both editions) already satisfies resolveEffectScaling's `row.level > 0`
-  // guard on its own. With castSpecFromRow's `level: 0` override in place,
-  // that guard can't fire no matter what upcastDicePerLevel says, so scaling
-  // stays `{ mode: "none" }`. Deleting the override arms it: `row.level`
-  // reverts to the real grant level (1 > 0) and a truthy upcastDicePerLevel
-  // flips scaling to `{ mode: "slotUpcast", dicePerStep: 2 }` — confirmed by
-  // temporarily removing the override and re-running this test (went red).
+  // Simulates upcastDicePerLevel leaking onto a real row: Second Wind's grant
+  // level (1) satisfies resolveEffectScaling's `row.level > 0` guard on its
+  // own, so only castSpecFromRow's level:0 override keeps scaling at "none".
   it("castSpecFromRow's level:0 override neutralizes an upcastDicePerLevel leaked onto a real row", async () => {
     const [row] = await prisma.classFeature.findMany({
       where: { class: { name: "Fighter" }, name: "Second Wind", edition: "EDITION_2014" },

@@ -53,8 +53,7 @@ describe("convertSorceryPoints (#903 Font of Magic)", () => {
       update: {},
     });
     sorcererClassId = cls.id;
-    // The sorceryPoints pool is row-declared (no resourceFn left): mirror the
-    // seeded Font of Magic row so the op path's row-driven derivation sees it.
+    // Pools are row-driven (no resourceFn left), so the fixture class must carry the seeded Font of Magic row.
     await prisma.classFeature.deleteMany({ where: { classId: sorcererClassId } });
     await prisma.classFeature.create({
       data: {
@@ -125,7 +124,6 @@ describe("convertSorceryPoints (#903 Font of Magic)", () => {
     );
 
     const row = await prisma.character.findUniqueOrThrow({ where: { id } });
-    // Expend one L3 slot (used 0→1), gain 3 SP (5 spent → 2 spent → 3 remaining).
     expect(slotsUsed(row)["3"]).toBe(1);
     expect(spRemaining(row)).toBe(3);
 
@@ -149,7 +147,6 @@ describe("convertSorceryPoints (#903 Font of Magic)", () => {
     expect(result.ok).toBe(true);
 
     const row = await prisma.character.findUniqueOrThrow({ where: { id } });
-    // Created slot is gone (no negative used) and the 2 SP are refunded.
     expect(slotsUsed(row)["1"] ?? 0).toBe(0);
     expect(spRemaining(row)).toBe(5);
   });
@@ -165,7 +162,6 @@ describe("convertSorceryPoints (#903 Font of Magic)", () => {
     expect(result.ok).toBe(true);
 
     const row = await prisma.character.findUniqueOrThrow({ where: { id } });
-    // Expended slot is restored and the gained SP are given back (5 spent again → 0 remaining).
     expect(slotsUsed(row)["2"] ?? 0).toBe(0);
     expect(spRemaining(row)).toBe(0);
   });
@@ -212,9 +208,9 @@ describe("convertSorceryPoints (#903 Font of Magic)", () => {
   });
 
   it("rejects conversion for a class without the sorcery-point pool", async () => {
-    // A wizard entry with NO catalog class: pools are row-driven, so carrying
-    // no ClassFeature rows is what "no SP pool" means now — pointing at the
-    // sorcerer fixture class would inherit its Font of Magic row.
+    // A wizard entry with no catalog class: carrying no ClassFeature rows is
+    // what "no SP pool" means — pointing at the sorcerer fixture class would
+    // inherit its Font of Magic row.
     const character = await prisma.character.create({
       data: {
         ...BASE_CHAR,

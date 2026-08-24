@@ -1,5 +1,3 @@
-// Subclass registration resolves from SUBCLASS_IDENTITY, not the CLASSES map,
-// so a class with no TS module still resolves its seeded subclass rows.
 import { describe, expect, it } from "vitest";
 
 import type { RulesEdition } from "@character-sheet/shared-types";
@@ -18,9 +16,7 @@ import { CLASS_SUBCLASSES } from "./class-subclasses.fixture.js";
 
 const ABILITIES = { strength: 10, dexterity: 10, constitution: 12, intelligence: 14, wisdom: 16, charisma: 16 };
 
-// Fabricated rows standing in for seeded ClassFeature rows, proving the
-// derivation reads ROWS, not a TS SubclassDefinition. level: 1 clears every
-// gate this file tests against.
+// level: 1 clears every gate this file tests against.
 const FAKE_SUBCLASS_ROWS = (["EDITION_2014", "EDITION_2024"] as const).map((edition) => ({
   name: "Fake Subclass Feature",
   level: 1,
@@ -81,9 +77,6 @@ describe("#1546 Part A — SUBCLASSES resolves from SUBCLASS_IDENTITY when a cla
   });
 });
 
-// Cleric/Warlock/Wizard have no TS module either — same identity-only shape
-// as Fighter's subclasses, but the PHB'14 gate comes from the carrier's own
-// subclassLevel rather than a module's grantLevel, since there's no module left.
 const MODULE_LESS_SUBCLASSES: Array<[className: string, subclass: string, gate: number]> = [
   ["cleric", "life domain", 1], // PHB'14 p.57
   ["warlock", "the fiend", 1], // PHB'14 p.105
@@ -132,11 +125,10 @@ describe("real registry: the overlay still wins for every class still on the TS 
   });
 });
 
-// SUBCLASSES is built in two passes: SUBCLASS_IDENTITY keyed by nameKey
-// first, then each TS ClassDefinition's subclasses keyed by its own map key
-// — the second pass replaces the first only while the two spellings agree.
-// Diverge them and both survive under different keys, so a character whose
-// persisted subclass matches the nameKey silently resolves to the poorer identity-only stub.
+// SUBCLASS_IDENTITY seeds SUBCLASSES by nameKey; each TS ClassDefinition's
+// map then overlays it only while the two spellings agree. Diverge them and
+// both survive under different keys, so a persisted subclass silently
+// resolves to the poorer identity-only stub.
 const TS_REGISTERED_CLASSES: Record<string, ClassDefinition> = {
   bard,
   druid,

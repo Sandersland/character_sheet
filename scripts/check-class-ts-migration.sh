@@ -122,9 +122,7 @@ is_allowlisted_file() {
   printf '%s\n' "$FILE_ALLOWLIST" | grep -qxF "$target"
 }
 
-# Strips a `lineno:content` grep hit down to its content, then reports
-# whether it starts a comment line (`//`, `*`, or `/*`) — a why-comment
-# legitimately naming a class is not a violation.
+# A why-comment legitimately naming a class is not a violation.
 is_comment_line() {
   content="${1#*:}"
   trimmed=$(printf '%s' "$content" | sed -e 's/^[[:space:]]*//')
@@ -134,9 +132,6 @@ is_comment_line() {
   esac
 }
 
-# Scans $FILES once for a case-insensitive, word-bounded match of any
-# $1-listed name, returning `file:line:content` triples with comment lines
-# already stripped. `set --` re-splits on whitespace before joining with `|`.
 scan_names() {
   # shellcheck disable=SC2086 -- word-splitting is the point, not a bug
   set -- $1
@@ -170,7 +165,6 @@ for cls in $NOT_YET_MIGRATED; do
   fi
 done
 
-# The real check: every MIGRATED class name's non-comment hits, outside the allow-listed files.
 occurrences=$(scan_names "$MIGRATED" | cut -d: -f1,2)
 
 # Anti-vacuity check 3: each FILE_ALLOWLIST entry must still produce >=1 hit,
