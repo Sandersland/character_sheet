@@ -29,6 +29,7 @@ import {
   type EffectBuffRow,
   type ResourceTotalFormula,
 } from "../../src/lib/classes/class-feature-rows.js";
+import type { RechargeOn } from "../../src/lib/classes/types.js";
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { FeatImprovement } from "../../src/lib/classes/resources-state.js";
 import { featImprovementSchema } from "../../src/lib/srd/feats.js";
@@ -133,7 +134,7 @@ export interface ClassFeatureSeedRow {
   // short-or-long from it) for a pool whose `resourceRecharge` scalar can't
   // express the change — see ClassFeature.resourceRechargeTiers' own
   // schema.prisma comment for the ASCENDING/last-match-wins invariant.
-  resourceRechargeTiers?: { minLevel: number; recharge: string }[];
+  resourceRechargeTiers?: { minLevel: number; recharge: RechargeOn }[];
   activationCost?: string;
   resolverKind?: string;
   requiresUnarmored?: boolean;
@@ -222,8 +223,8 @@ export const CLASS_FEATURES: ClassFeatureSeedRow[] = [
 // below stays a plain (non-generic) zod object — a generic factory spreading
 // a type parameter into z.object's shape defeats TS's inference of the merged
 // shape (verified: `minLevel` becomes unreachable through the resulting
-// conditional type) — but all three `.refine` the SAME predicate, so the
-// invariant itself has exactly one definition.
+// conditional type) — but every one of them `.refine`s the SAME predicate, so
+// the invariant itself has exactly one definition.
 function isAscendingByMinLevel(tiers: { minLevel: number }[]): boolean {
   return tiers.every((tier, i) => i === 0 || tier.minLevel > tiers[i - 1].minLevel);
 }
@@ -376,6 +377,9 @@ export const classFeatureSeedSchema = z
     level: z.number().int().positive(),
     description: z.string().min(1),
     edition: z.enum(["EDITION_2014", "EDITION_2024"]),
+    // Declared here (not just on ClassFeatureSeedRow) so the resourceRechargeTiers
+    // cross-field `.refine` below can see it.
+    resourceRecharge: z.enum(["shortRest", "longRest", "short-or-long", "none"]).optional(),
     resourceTotals: resourceTotalsTierSchema.nullable().optional(),
     resourceDieTiers: resourceDieTiersSchema.nullable().optional(),
     resourceRechargeTiers: resourceRechargeTiersSchema.nullable().optional(),
@@ -406,4 +410,19 @@ export const classFeatureSeedSchema = z
   })
   .refine((row) => !row.actionOnly || (Boolean(row.activationCost) && Boolean(row.resourceKey)), {
     message: "an actionOnly row must declare both activationCost and resourceKey",
-  });
+  })
+  // resourceRecharge is the ONLY fallback poolFromRow reads below a row's
+  // first resourceRechargeTiers tier — a row with no scalar and a pool that
+  // opens (resourceTotals) before that first tier is reached would silently
+  // resolve to "none" at those levels, never a rules bug the seed itself catches.
+  .refine(
+    (row) =>
+      !row.resourceRechargeTiers ||
+      row.resourceRecharge !== undefined ||
+      !row.resourceTotals ||
+      row.resourceRechargeTiers[0].minLevel <= row.resourceTotals[0].minLevel,
+    {
+      message:
+        'resourceRechargeTiers with no resourceRecharge fallback must reach its first tier at or before resourceTotals\' first tier, or the pool would silently recharge "none" below it',
+    },
+  );

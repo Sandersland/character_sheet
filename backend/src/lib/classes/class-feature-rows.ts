@@ -53,10 +53,10 @@ export interface ResourceDieTier {
 }
 
 // Tiers are ASCENDING by minLevel, last-match-wins — same invariant as
-// ResourceTotalTier/ResourceDieTier. `recharge` is a RechargeOn value.
+// ResourceTotalTier/ResourceDieTier.
 export interface ResourceRechargeTier {
   minLevel: number;
-  recharge: string;
+  recharge: RechargeOn;
 }
 
 export interface BuffModifierTier {
@@ -267,7 +267,7 @@ function poolFromRow(row: ClassFeatureRow, ctx: ResourceTotalContext): DerivedRe
     label: row.resourceLabel ?? row.name,
     total: evaluateResourceTotal(totalTier.total, ctx),
     ...(dieTier ? { die: dieTier.die } : {}),
-    recharge: (tierAt(row.resourceRechargeTiers, ctx.level)?.recharge as RechargeOn | undefined) ?? (row.resourceRecharge as RechargeOn | null) ?? "none",
+    recharge: tierAt(row.resourceRechargeTiers, ctx.level)?.recharge ?? (row.resourceRecharge as RechargeOn | null) ?? "none",
     ...(totalTier.shortRestRegain !== undefined ? { shortRestRegain: totalTier.shortRestRegain } : {}),
     description: row.description,
   };

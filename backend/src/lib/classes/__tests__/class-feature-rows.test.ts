@@ -16,6 +16,7 @@ import {
   improvementsFromRows,
   poolsFromRows,
   type ClassFeatureRow,
+  type ResourceRechargeTier,
 } from "@/lib/classes/class-feature-rows.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 
@@ -160,7 +161,7 @@ describe("poolsFromRows resolves a tier's formula total end to end (#1685)", () 
 });
 
 describe("poolsFromRows resolves resourceRechargeTiers (level-tiered recharge cadence)", () => {
-  const rechargeTiers = [
+  const rechargeTiers: ResourceRechargeTier[] = [
     { minLevel: 1, recharge: "longRest" },
     { minLevel: 5, recharge: "short-or-long" },
   ];
