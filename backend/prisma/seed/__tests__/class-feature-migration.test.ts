@@ -439,11 +439,13 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
       DRUID_POOL_ROWS + PALADIN_POOL_ROWS + BLADESINGER_POOL_ROWS + OPEN_HAND_POOL_ROWS;
     // Combat Superiority (both editions) is the only row with a die-size tier.
     const populatedResourceDieTiersCount = BATTLE_MASTER_POOL_ROWS;
-    // Bladesinger's Extra Attack is EDITION_2014-only; Deft Explorer and
-    // Scholar are EDITION_2024-only — one row each, not two. A future
-    // asymmetric key needs the same correction, not a silent re-multiply.
-    const SINGLE_EDITION_DERIVED_STAT_KEYS = 3;
-    const populatedDerivedStatTiersCount = DERIVED_STAT_ROW_KEYS.size * 2 - SINGLE_EDITION_DERIVED_STAT_KEYS;
+    // One row each, not two — a future asymmetric key joins this list.
+    const SINGLE_EDITION_DERIVED_STAT_KEYS = [
+      "Bladesinger Extra Attack (EDITION_2014 only)",
+      "Deft Explorer (EDITION_2024 only)",
+      "Scholar (EDITION_2024 only)",
+    ];
+    const populatedDerivedStatTiersCount = DERIVED_STAT_ROW_KEYS.size * 2 - SINGLE_EDITION_DERIVED_STAT_KEYS.length;
     for (const column of ["resourceTotals", "resourceDieTiers", "derivedStatTiers"] as const) {
       const expectedDbNull =
         column === "resourceTotals"

@@ -10,12 +10,16 @@ const BASE_ROWS = SORCERER_FEATURES.filter((r) => r.subclassSlug === null);
 const DRACONIC_ROWS = SORCERER_FEATURES.filter((r) => r.subclassSlug === "sorcerer-draconic-bloodline");
 const WILD_ROWS = SORCERER_FEATURES.filter((r) => r.subclassSlug === "sorcerer-wild-magic");
 
-// No Sorcerer resourceTotals tier is an ability/proficiency formula.
-const UNUSED_ABILITY_SCORES: Record<string, number> = {};
-const UNUSED_PROF_BONUS = 0;
-
-function poolAt(rows: typeof SORCERER_FEATURES, key: string, level: number, edition: "EDITION_2014" | "EDITION_2024") {
-  return poolsFromRows(rows, level, UNUSED_ABILITY_SCORES, UNUSED_PROF_BONUS, edition).find((p) => p.key === key);
+// abilityScores/profBonus default to `{}`/`0` — no Sorcerer resourceTotals
+// tier is an ability/proficiency formula. Signature matches warlock-resource-pools' poolAt.
+function poolAt(
+  rows: typeof SORCERER_FEATURES,
+  key: string,
+  level: number,
+  edition: "EDITION_2014" | "EDITION_2024",
+  abilityScores: Record<string, number> = {},
+) {
+  return poolsFromRows(rows, level, abilityScores, 0, edition).find((p) => p.key === key);
 }
 
 describe("Innate Sorcery (base class, #1232): 2024 only, L1, 2/long rest — the first pool a 2024 Sorcerer has", () => {
