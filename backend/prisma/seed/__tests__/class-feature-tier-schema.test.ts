@@ -96,6 +96,36 @@ describe("ClassFeature tier-array schemas reject a descending minLevel order (#1
     });
     expect(result.success).toBe(true);
   });
+
+  it("resourceRechargeTiers accepts strictly ascending minLevel", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceRechargeTiers: [
+        { minLevel: 1, recharge: "longRest" },
+        { minLevel: 5, recharge: "short-or-long" },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("resourceRechargeTiers rejects descending order", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceRechargeTiers: [
+        { minLevel: 5, recharge: "short-or-long" },
+        { minLevel: 1, recharge: "longRest" },
+      ],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("resourceRechargeTiers rejects an unrecognized recharge value", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceRechargeTiers: [{ minLevel: 1, recharge: "everyTurn" }],
+    });
+    expect(result.success).toBe(false);
+  });
 });
 
 // #1685/#416 C3: total may be a formula instead of a flat number. Driven

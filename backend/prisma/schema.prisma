@@ -845,6 +845,7 @@ model ClassFeature {
   resourceRecharge String? // RechargeOn
   resourceTotals   Json? // [{ minLevel, total }] — total: number | "proficiencyBonus" | { abilityMod, min? } | { levelTimes } (#1685) — ASCENDING by minLevel, last-match-wins
   resourceDieTiers Json? // [{ minLevel, die }]   — ASCENDING by minLevel, last-match-wins
+  resourceRechargeTiers Json? // [{ minLevel, recharge }] — recharge: RechargeOn — ASCENDING by minLevel, last-match-wins
 
   // Activation block — replaces this feature's DERIVED_ACTIONS row. No gate
   // columns: grantClass IS classId, grantSubclassSlugs IS subclassId,

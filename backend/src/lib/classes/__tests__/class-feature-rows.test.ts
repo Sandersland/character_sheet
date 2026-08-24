@@ -159,6 +159,45 @@ describe("poolsFromRows resolves a tier's formula total end to end (#1685)", () 
   });
 });
 
+describe("poolsFromRows resolves resourceRechargeTiers (level-tiered recharge cadence)", () => {
+  const rechargeTiers = [
+    { minLevel: 1, recharge: "longRest" },
+    { minLevel: 5, recharge: "short-or-long" },
+  ];
+
+  it("below the first tier's minLevel, falls back to the scalar resourceRecharge", () => {
+    const rows = [
+      row({
+        resourceKey: "bardic",
+        resourceTotals: [{ minLevel: 1, total: 2 }],
+        resourceRecharge: "longRest",
+        resourceRechargeTiers: [{ minLevel: 5, recharge: "short-or-long" }],
+      }),
+    ];
+    expect(poolsFromRows(rows, 4, {}, 2, "EDITION_2014")[0].recharge).toBe("longRest");
+  });
+
+  it("at/above a tier's minLevel, the tier's recharge wins over the scalar — last-match-wins across two tiers", () => {
+    const rows = [
+      row({ resourceKey: "bardic", resourceTotals: [{ minLevel: 1, total: 2 }], resourceRecharge: "none", resourceRechargeTiers: rechargeTiers }),
+    ];
+    expect(poolsFromRows(rows, 1, {}, 2, "EDITION_2014")[0].recharge).toBe("longRest");
+    expect(poolsFromRows(rows, 4, {}, 2, "EDITION_2014")[0].recharge).toBe("longRest");
+    expect(poolsFromRows(rows, 5, {}, 2, "EDITION_2014")[0].recharge).toBe("short-or-long");
+    expect(poolsFromRows(rows, 20, {}, 2, "EDITION_2014")[0].recharge).toBe("short-or-long");
+  });
+
+  it("with no resourceRechargeTiers, resolves from the scalar resourceRecharge unchanged", () => {
+    const rows = [row({ resourceKey: "flat", resourceTotals: [{ minLevel: 1, total: 1 }], resourceRecharge: "shortRest" })];
+    expect(poolsFromRows(rows, 1, {}, 2, "EDITION_2014")[0].recharge).toBe("shortRest");
+  });
+
+  it("with neither resourceRechargeTiers nor resourceRecharge, resolves to \"none\"", () => {
+    const rows = [row({ resourceKey: "flat", resourceTotals: [{ minLevel: 1, total: 1 }] })];
+    expect(poolsFromRows(rows, 1, {}, 2, "EDITION_2014")[0].recharge).toBe("none");
+  });
+});
+
 describe("improvementsFromRows (#1691) — same edition/level truth table as featuresFromRows, flattened across rows", () => {
   it("a row tagged for the matching edition, at or below the character's level, contributes its improvements", () => {
     const rows = [row({ level: 3, improvements: [{ target: "armorProficiency", amount: 1, key: "heavy" }] })];

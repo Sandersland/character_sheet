@@ -129,6 +129,11 @@ export interface ClassFeatureSeedRow {
   // of catching a typo'd ability name at compile time.
   resourceTotals?: { minLevel: number; total: ResourceTotalFormula; shortRestRegain?: number }[];
   resourceDieTiers?: { minLevel: number; die: string }[];
+  // A level-tiered recharge cadence (e.g. longRest below a threshold,
+  // short-or-long from it) for a pool whose `resourceRecharge` scalar can't
+  // express the change — see ClassFeature.resourceRechargeTiers' own
+  // schema.prisma comment for the ASCENDING/last-match-wins invariant.
+  resourceRechargeTiers?: { minLevel: number; recharge: string }[];
   activationCost?: string;
   resolverKind?: string;
   requiresUnarmored?: boolean;
@@ -272,6 +277,11 @@ const resourceTotalsTierSchema = z
 const resourceDieTiersSchema = z
   .array(z.object({ minLevel: z.number().int().positive(), die: z.string().min(1) }))
   .refine(isAscendingByMinLevel, ASCENDING_TIER_MESSAGE);
+// `recharge` mirrors RechargeOn (lib/classes/types.ts) — the same vocabulary
+// poolFromRow's flat `resourceRecharge` scalar reads, now expressible per tier.
+const resourceRechargeTiersSchema = z
+  .array(z.object({ minLevel: z.number().int().positive(), recharge: z.enum(["shortRest", "longRest", "short-or-long", "none"]) }))
+  .refine(isAscendingByMinLevel, ASCENDING_TIER_MESSAGE);
 const derivedStatTiersSchema = z
   .array(z.object({ minLevel: z.number().int().positive(), value: z.union([z.number(), z.string()]) }))
   .refine(isAscendingByMinLevel, ASCENDING_TIER_MESSAGE);
@@ -368,6 +378,7 @@ export const classFeatureSeedSchema = z
     edition: z.enum(["EDITION_2014", "EDITION_2024"]),
     resourceTotals: resourceTotalsTierSchema.nullable().optional(),
     resourceDieTiers: resourceDieTiersSchema.nullable().optional(),
+    resourceRechargeTiers: resourceRechargeTiersSchema.nullable().optional(),
     derivedStatTiers: derivedStatTiersSchema.nullable().optional(),
     saveDcAbilities: z.array(z.string().min(1)).optional(),
     // Reuses featImprovementSchema (lib/srd/feats.ts) — the SAME zod a taken
