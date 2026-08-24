@@ -58,11 +58,11 @@ export function selectEquippedBodyArmor(
 
 // Draconic Resilience (Draconic Bloodline L1, #1122): the character's Sorcerer
 // class entry resolved onto the subclass slug vocabulary (#1277) via
-// draconicBloodlineEntry (draconic-bloodline.ts) — the one slug-gated
-// resolution this, draconicWingsFlySpeed below, and
-// draconicResilienceMaxHpTerm all share. No level gate here: sorcerer.ts's
-// `grantLevel: 1` already gates when the subclass itself becomes choosable,
-// and the AC clause carries no separate one.
+// draconicBloodlineEntry — the one slug-gated resolution this,
+// draconicWingsFlySpeed below, and draconicResilienceMaxHpTerm all share. No
+// level gate here: the seeded subclassLevel gate (isSubclassActive, #1576)
+// already gates when the subclass itself becomes choosable, and the AC clause
+// carries no separate one.
 function draconicResilienceOverride(
   classEntries: CharacterWithRelations["classEntries"],
   edition: RulesEdition,

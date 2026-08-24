@@ -3,15 +3,11 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 import { effectiveEntryLevel } from "@/lib/leveling/effective-levels.js";
 import { draconicResilienceMaxHpBonus } from "@/lib/srd/hit-points.js";
 import { resolveSubclassSlug } from "./subclass-slug.js";
-import { sorcerer } from "./sorcerer.js";
 
 /**
- * The minimal structural class-entry shape the Draconic Bloodline resolvers
- * need. Every field is REQUIRED on purpose: `subclass`/`subclassRef` feed
- * resolveSubclassSlug and `class.subclassLevel` feeds the 2014 gate, so an
- * optional field would let a narrow Prisma select compile and then silently
- * resolve "not Draconic" / the wrong gate — the select and this computation
- * must travel together. A new call site widens its select or fails typecheck.
+ * Every field is REQUIRED on purpose: an optional field would let a narrow
+ * Prisma select compile and then silently resolve "not Draconic" or the wrong
+ * gate — a new call site widens its select or fails typecheck.
  */
 export interface DraconicSorcererEntry {
   name: string;
@@ -22,12 +18,9 @@ export interface DraconicSorcererEntry {
 }
 
 /**
- * The character's Draconic Bloodline sorcerer class entry, or `undefined` if
- * it doesn't have one — the ONE slug-gated resolution shared by
- * draconicResilienceOverride (the #1122 AC override),
- * draconicResilienceMaxHpTerm below, and draconicWingsFlySpeed (#1123).
- * Extracted so a slug typo or a diverging name-lookup in one caller can't
- * silently disagree with the others — previously copy-pasted three times.
+ * The character's Draconic Bloodline sorcerer entry, or undefined — the one
+ * slug-gated resolution shared by draconicResilienceOverride,
+ * draconicResilienceMaxHpTerm, and draconicWingsFlySpeed.
  */
 export function draconicBloodlineEntry<T extends DraconicSorcererEntry>(
   classEntries: readonly T[],
@@ -38,12 +31,8 @@ export function draconicBloodlineEntry<T extends DraconicSorcererEntry>(
 }
 
 /**
- * The Draconic entry plus its effective sorcerer level (#1070 convention:
- * entry-scoped for multiclass, XP-derived for single-class via
- * effectiveEntryLevel — the raw `level` column lags a pending level-up
- * ceremony). The ONE level resolution shared by the max-HP term below and
- * draconicWingsFlySpeed, so the two halves of the subclass can never
- * disagree about what level the sorcerer is.
+ * The Draconic entry plus its effective sorcerer level via effectiveEntryLevel
+ * (the raw `level` column lags a pending level-up ceremony).
  */
 export function draconicBloodlineLevel<T extends DraconicSorcererEntry>(
   classEntries: readonly T[],
@@ -55,14 +44,10 @@ export function draconicBloodlineLevel<T extends DraconicSorcererEntry>(
 }
 
 /**
- * Draconic Resilience's max-HP term (#1123), 0 for any non-Draconic character.
- * The ONE function every HP-max composition resolves the subclass term
- * through — applyFeatLayer (serializeCharacter's clamp-on-read),
- * effectiveMaxHitPointsForRow (the write seam: heal cap, long rest,
- * level-up), and every inline write-side clamp (reconcileAdvancements,
- * resolveSetExhaustion, computeLevelDownState, applyAdvancementOpInTx,
- * applyAddClass). CLAUDE.md's reconciler/clamp-on-read rule: all of them
- * MUST call this, never an inline copy of the formula.
+ * Draconic Resilience's max-HP term, 0 for any non-Draconic character. Every
+ * HP-max composition — serializeCharacter's clamp-on-read, the write seam
+ * (effectiveMaxHitPointsForRow), and every write-side clamp — must resolve the
+ * term through this function, never an inline copy of the formula.
  */
 export function draconicResilienceMaxHpTerm(
   classEntries: readonly DraconicSorcererEntry[],
@@ -71,11 +56,9 @@ export function draconicResilienceMaxHpTerm(
 ): number {
   const resolved = draconicBloodlineLevel(classEntries, derivedTotalLevel);
   if (!resolved) return 0;
-  // Null-FK guard: `class` is null when classId is (SetNull on catalog
-  // deletion/retag, or a free-text class). subclassGateLevel's own fallback is
-  // 3 — wrong for Sorcerer, whose PHB'14 p.99 Sorcerous Origin gate is 1 — so
-  // fall back to the sorcerer module's grantLevel instead, mirroring
-  // isSubclassActive's `seededSubclassLevel ?? def.grantLevel` (registry.ts).
-  const subclassGate = resolved.entry.class?.subclassLevel ?? sorcerer.subclasses?.["draconic bloodline"]?.grantLevel;
-  return draconicResilienceMaxHpBonus(resolved.level, subclassGate, edition);
+  // The seeded CharacterClass.subclassLevel is the sole PHB'14 gate source.
+  // `class` is null only when classId is (SetNull on catalog deletion/retag,
+  // or a free-text class) — that degraded character gates at subclassGateLevel's
+  // plain ?? 3 default, the same answer isSubclassActive resolves for it.
+  return draconicResilienceMaxHpBonus(resolved.level, resolved.entry.class?.subclassLevel, edition);
 }

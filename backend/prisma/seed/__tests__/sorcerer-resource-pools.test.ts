@@ -1,14 +1,7 @@
-// #1232 commit 3 of 3: every Sorcerer pool that is a flat, level-gated total
-// moved off lib/classes/sorcerer.ts's resourceFns onto its ClassFeature row's
-// own resourceKey/resourceLabel/resourceRecharge/resourceTotals columns, read
-// here through the SAME poolsFromRows a real character's derivation calls
-// (registry.ts's deriveBaseLayer/deriveSubclassLayer) — never a hand-rolled
-// re-derivation of the tier table. Modelled on warlock-resource-pools.test.ts.
 import { describe, expect, it } from "vitest";
 
 import { poolsFromRows } from "@/lib/classes/class-feature-rows.js";
 import { deriveResources } from "@/lib/classes/class-features.js";
-import { sorcerer } from "@/lib/classes/sorcerer.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 
 import { SORCERER_FEATURES } from "../sorcerer-features.js";
@@ -17,10 +10,16 @@ const BASE_ROWS = SORCERER_FEATURES.filter((r) => r.subclassSlug === null);
 const DRACONIC_ROWS = SORCERER_FEATURES.filter((r) => r.subclassSlug === "sorcerer-draconic-bloodline");
 const WILD_ROWS = SORCERER_FEATURES.filter((r) => r.subclassSlug === "sorcerer-wild-magic");
 
-// abilityScores/profBonus are unused here — every Sorcerer resourceTotals
-// tier is a flat number, never a #1685 formula — so `{}`/`0` are inert.
-function poolAt(rows: typeof SORCERER_FEATURES, key: string, level: number, edition: "EDITION_2014" | "EDITION_2024") {
-  return poolsFromRows(rows, level, {}, 0, edition).find((p) => p.key === key);
+// abilityScores/profBonus default to `{}`/`0` — no Sorcerer resourceTotals
+// tier is an ability/proficiency formula. Signature matches warlock-resource-pools' poolAt.
+function poolAt(
+  rows: typeof SORCERER_FEATURES,
+  key: string,
+  level: number,
+  edition: "EDITION_2014" | "EDITION_2024",
+  abilityScores: Record<string, number> = {},
+) {
+  return poolsFromRows(rows, level, abilityScores, 0, edition).find((p) => p.key === key);
 }
 
 describe("Innate Sorcery (base class, #1232): 2024 only, L1, 2/long rest — the first pool a 2024 Sorcerer has", () => {
@@ -115,14 +114,22 @@ describe("cross-edition absence at level 20 (#1232 §1.3 proof): innateSorcery/s
   });
 });
 
-describe("sorceryPoints stays in resourceFn, never on a row (#1232 §1.1)", () => {
-  it("poolsFromRows over the base rows never contains a sorceryPoints key, in either edition", () => {
+describe("sorceryPoints rides the Font of Magic rows — the pool the deleted resourceFn used to declare", () => {
+  // PHB'14 p.101 / SRD 5.2 p.140: Sorcery Points equal sorcerer level, from
+  // level 2, regained on a Long Rest.
+  it("absent at level 1, then total === level with longRest recharge for every level 2-20, both editions", () => {
     for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {
-      expect(poolsFromRows(BASE_ROWS, 20, {}, 0, edition).some((p) => p.key === "sorceryPoints")).toBe(false);
+      expect(poolAt(BASE_ROWS, "sorceryPoints", 1, edition), edition).toBeUndefined();
+      for (let level = 2; level <= 20; level++) {
+        const pool = poolAt(BASE_ROWS, "sorceryPoints", level, edition);
+        expect(pool?.label, `${edition} L${level}`).toBe("Sorcery Points");
+        expect(pool?.total, `${edition} L${level}`).toBe(level);
+        expect(pool?.recharge, `${edition} L${level}`).toBe("longRest");
+      }
     }
   });
 
-  it("deriveResources still yields total === level for sorceryPoints, both editions", () => {
+  it("deriveResources yields total === level for sorceryPoints, both editions", () => {
     const abilityScores = { strength: 10, dexterity: 14, constitution: 12, intelligence: 8, wisdom: 13, charisma: 18 };
     for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {
       const profBonus = proficiencyBonusForLevel(10);
@@ -132,17 +139,12 @@ describe("sorceryPoints stays in resourceFn, never on a row (#1232 §1.1)", () =
     }
   });
 
-  it("the 2024 resourceFn description agrees with the 2024 Font of Magic row's text (the Dark One's Own Luck no-second-string pattern)", () => {
-    const fnPools = sorcerer.resourceFn!(10, { charisma: 18 }, 2, undefined, "EDITION_2024");
-    const fnDescription = fnPools.find((p) => p.key === "sorceryPoints")?.description ?? "";
-    const rowDescription = BASE_ROWS.find((r) => r.name === "Font of Magic" && r.edition === "EDITION_2024")!.description;
-    expect(fnDescription).toContain("minimum Sorcerer level 2");
-    expect(rowDescription).toContain("minimum Sorcerer level 2");
-  });
-
-  it("the 2014 resourceFn description is unchanged from before this retab", () => {
-    const fnPools = sorcerer.resourceFn!(10, { charisma: 18 }, 2, undefined, "EDITION_2014");
-    const fnDescription = fnPools.find((p) => p.key === "sorceryPoints")?.description ?? "";
-    expect(fnDescription).toBe("Convert to spell slots or fuel Metamagic options (Font of Magic). Regain all points on a long rest.");
+  it("each edition's pool description IS its own Font of Magic row text (#1528 no-second-string rule), and 2024's keeps the Min. Sorcerer Level clause", () => {
+    for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {
+      const row = BASE_ROWS.find((r) => r.name === "Font of Magic" && r.edition === edition)!;
+      expect(poolAt(BASE_ROWS, "sorceryPoints", 2, edition)?.description, edition).toBe(row.description);
+    }
+    const row2024 = BASE_ROWS.find((r) => r.name === "Font of Magic" && r.edition === "EDITION_2024")!;
+    expect(row2024.description).toContain("minimum Sorcerer level 2");
   });
 });

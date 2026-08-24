@@ -1,9 +1,3 @@
-// Structural invariants on the per-domain seed modules. NO database — pure
-// data checks that guard the bugs a data-move refactor can silently introduce:
-// a duplicate business key (upsert-by-name would collapse two rows into one), a
-// GrantedAbility name colliding across the four sources (they share one unique
-// name column), or a dangling reference (a subclass on a class that doesn't
-// exist, a pack listing an item the catalog lacks). Mirrors the seed's own fail-fast guard.
 import { describe, it, expect } from "vitest";
 
 import { bard } from "@/lib/classes/bard.js";
@@ -11,7 +5,6 @@ import { druid } from "@/lib/classes/druid.js";
 import { monk } from "@/lib/classes/monk.js";
 import { paladin } from "@/lib/classes/paladin.js";
 import { ranger } from "@/lib/classes/ranger.js";
-import { sorcerer } from "@/lib/classes/sorcerer.js";
 import type { ClassDefinition } from "@/lib/classes/types.js";
 
 import { BACKGROUNDS, CLASSES, ITEMS } from "../catalog-data.js";
@@ -32,14 +25,11 @@ import { SUBCLASS_SLUGS, SUBCLASS_IDENTITY, type SubclassSlug } from "@/lib/clas
 import { REGRANTED_UNIVERSAL_KEYS } from "@/lib/classes/actions.js";
 import { CLASS_FEATURES } from "../class-features.js";
 
-// The values that repeat when a list has a duplicate on `key`.
 const duplicates = <T>(values: T[]): T[] =>
   [...new Set(values.filter((v, i) => values.indexOf(v) !== i))];
 
 describe("SUBCLASS_GRANTED_SPELLS — referential integrity", () => {
-  // A feature that says "you know the X cantrip" must have a matching grant row,
-  // or the cantrip never reaches the sheet (the #1247 Elementalism bug: seeded
-  // spell, no link). Guard that every grant points at seeded content.
+  // #1247: a seeded spell with no grant row never reaches the sheet.
   it("every grant references a seeded spell and a seeded subclass", () => {
     const spellNames = new Set(SPELLS.map((s) => s.name));
     const subclassKeys = new Set(SUBCLASSES.map((s) => `${s.className}::${s.name}`));
@@ -104,8 +94,7 @@ describe("SUBCLASS_SPELL_LIST_EXPANSIONS — referential integrity (#1631)", () 
     }
   });
 
-  // The Fiend/Archfey/Great Old One's ten-spell PHB'14 "Expanded Spell List"
-  // each, exactly as transcribed in the FIEND_RAW/ARCHFEY_RAW/GREAT_OLD_ONE_RAW EDITION_2014 rows.
+  // PHB'14: each 2014 patron's ten-spell "Expanded Spell List".
   it("each of the three 2014 patrons carries its exact ten-spell list", () => {
     const listFor = (subclassName: string) =>
       SUBCLASS_SPELL_LIST_EXPANSIONS.filter((e) => e.className === "Warlock" && e.subclassName === subclassName)
@@ -221,27 +210,16 @@ describe("per-domain business-key uniqueness", () => {
     expect(duplicates(MANEUVERS.map((m) => m.name))).toEqual([]);
   });
 
-  // Keyed on (name, edition) rather than name alone (#1415/#1502): "Shadow
-  // Arts: Darkness" legitimately repeats its name once per edition (a
-  // genuine mechanical fork — 1 focus vs 2 ki) — only a same-name/
-  // same-edition collision would collapse in the DB's (name, edition) upsert.
+  // A name may legitimately repeat once per edition (#1415/#1502) — only a
+  // same-name/same-edition pair collapses in the DB's (name, edition) upsert.
   it("SHADOW_ARTS have unique (name, edition) pairs", () => {
     expect(duplicates(SHADOW_ARTS.map((s) => `${s.name}::${s.edition}`))).toEqual([]);
   });
 
-  // Keyed on (name, edition) rather than name alone (#1229): Nature's Wrath
-  // legitimately repeats its name once per edition (a genuine mechanical
-  // fork — saveAbility dexterity vs strength) — only a same-name/same-edition
-  // collision would collapse in the DB's upsert. Mirrors FEATS' own
-  // (name, edition) key below.
   it("CHANNEL_DIVINITIES have unique (name, edition) pairs", () => {
     expect(duplicates(CHANNEL_DIVINITIES.map((c) => `${c.name}::${c.edition ?? "shared"}`))).toEqual([]);
   });
 
-  // Keyed on (name, edition) rather than name alone: a feat that genuinely
-  // diverges by edition (Alert, #1306) legitimately repeats its name once per
-  // edition — only a same-name/same-edition collision (including two `undefined`
-  // = shared rows) would collapse in the DB's upsert.
   it("FEATS have unique (name, edition) pairs", () => {
     expect(duplicates(FEATS.map((f) => `${f.name}::${f.edition ?? "shared"}`))).toEqual([]);
   });
@@ -268,9 +246,7 @@ describe("FEATS — PHB'24 category invariants", () => {
     expect(missing, "feats without a category").toEqual([]);
   });
 
-  // #1310: scoped to EDITION_2024 — PHB'14's "general" rows (below) carry no
-  // levelPrerequisite (PHB'14 p.165 has no per-feat level gate) and 13 of the
-  // 18 shared General names grant no PHB'14 ability bump.
+  // Scoped to EDITION_2024: PHB'14 p.165 has no per-feat level gate (#1310).
   it("2024 General feats have levelPrerequisite 4, a nonempty abilityOptions, and abilityIncrease 1", () => {
     for (const f of FEATS.filter((f) => f.category === "general" && f.edition === "EDITION_2024")) {
       expect(f.levelPrerequisite, `${f.name} levelPrerequisite`).toBe(4);
@@ -297,10 +273,7 @@ describe("FEATS — PHB'24 category invariants", () => {
     }
   });
 
-  // #1137: the mechanical Fighting Style feats carry the same derived effects the
-  // former scalar styles applied — Archery +2 ranged attack, Defense +1 AC while
-  // armored, Two-Weapon Fighting the off-hand ability-mod marker. Great Weapon
-  // Fighting stays descriptive (its reroll is not automated).
+  // Great Weapon Fighting stays descriptive — its reroll is not automated.
   it("Fighting Style feats carry their derived improvements", () => {
     const byName = new Map(FEATS.map((f) => [f.name, f]));
     expect(byName.get("Archery")?.improvements).toEqual([{ target: "rangedAttackRoll", amount: 2 }]);
@@ -319,9 +292,8 @@ describe("FEATS — PHB'24 category invariants", () => {
     const alert2024 = alerts.find((f) => f.edition === "EDITION_2024")!;
     expect(alert2014.improvements).toEqual([{ target: "initiative", amount: 5 }]);
     expect(alert2024.improvements).toEqual([{ target: "initiative", amount: 1, scaling: "proficiencyBonus" }]);
-    // #1310: PHB'14 has no Origin taxonomy — the 2014 row's category moves to
-    // "general" (the corollary is it takes an ASI slot; the 2024 row stays
-    // "origin", background-granted only).
+    // PHB'14 has no Origin taxonomy — the 2014 row is "general" and takes an
+    // ASI slot (#1310).
     expect(alert2014.category).toBe("general");
     expect(alert2024.category).toBe("origin");
 
@@ -330,10 +302,8 @@ describe("FEATS — PHB'24 category invariants", () => {
     expect(grapplers.map((f) => f.edition).sort()).toEqual(["EDITION_2014", "EDITION_2024"]);
     const grappler2014 = grapplers.find((f) => f.edition === "EDITION_2014")!;
     const grappler2024 = grapplers.find((f) => f.edition === "EDITION_2024")!;
-    // 2014 (SRD 5.1): no ability bump, flat Strength 13+ prerequisite.
     expect(grappler2014.abilityIncrease).toBeUndefined();
     expect(grappler2014.prerequisite).toBe("Strength 13+");
-    // 2024: adds the half-feat bump and a Strength-or-Dexterity choice.
     expect(grappler2024.abilityIncrease).toBe(1);
   });
 
@@ -362,10 +332,9 @@ describe("FEATS — PHB'24 category invariants", () => {
   });
 });
 
-// PHB'14 p. 72 (Fighter) / p. 82 (Paladin) / p. 91 (Ranger), = SRD 5.1 (#1311).
-// A 2014 Fighting Style has six options; SRD 5.2 has four (Dueling and
-// Protection have no 2024 counterpart). Per-class option gating (Fighter gets
-// all six, Paladin/Ranger a four-style subset each) is #1495, not this issue.
+// PHB'14 p. 72 (Fighter) / p. 82 (Paladin) / p. 91 (Ranger), = SRD 5.1: six
+// 2014 styles; SRD 5.2 has four (Dueling and Protection have no 2024
+// counterpart). Per-class option gating is #1495, not seeded here.
 describe("FEATS — 2014 Fighting Style feats (#1311)", () => {
   const STYLES_2014 = ["Archery", "Defense", "Dueling", "Great Weapon Fighting", "Protection", "Two-Weapon Fighting"];
   const STYLES_2024 = ["Archery", "Defense", "Great Weapon Fighting", "Two-Weapon Fighting"];
@@ -422,9 +391,8 @@ describe("FEATS — 2014 Fighting Style feats (#1311)", () => {
   });
 });
 
-// PHB'14 pp. 165-170 (#1310): restores the 2014 half of the catalog `6491c528`
-// (#1154) replaced. PHB'14 has no Origin/Fighting Style/Epic Boon taxonomy, so
-// every 2014 row is "general" with no levelPrerequisite — featOfferedForAsiSlot's
+// PHB'14 pp. 165-170: no Origin/Fighting Style/Epic Boon taxonomy, so every
+// 2014 row is "general" with no levelPrerequisite — featOfferedForAsiSlot's
 // `?? 4` default IS the 2014 "earliest ASI is level 4" rule, not a fudge.
 describe("FEATS — 2014 general/origin catalog (#1310)", () => {
   const feats2014 = () => FEATS.filter((f) => f.edition === "EDITION_2014" && f.category !== "fighting_style");
@@ -488,10 +456,8 @@ describe("FEATS — 2014 general/origin catalog (#1310)", () => {
     expect(shared).toEqual([]);
   });
 
-  // The four originFeatName values BACKGROUNDS references — buildOriginEntry
-  // resolves them by name against the creating character's edition and
-  // returns null on a miss, so a gap here would silently drop a background's
-  // Origin feat grant for whichever edition the miss lands on.
+  // buildOriginEntry resolves originFeatName per edition and returns null on
+  // a miss — a gap here silently drops a background's Origin feat grant.
   it("every BACKGROUNDS originFeatName has both an EDITION_2014 and EDITION_2024 row", () => {
     const originFeatNames = [...new Set(BACKGROUNDS.map((b) => b.originFeatName).filter((n): n is string => !!n))];
     expect(originFeatNames.length).toBeGreaterThan(0);
@@ -502,8 +468,6 @@ describe("FEATS — 2014 general/origin catalog (#1310)", () => {
   });
 });
 
-// #1131: the creation spell picker needs real choice — strictly MORE spells on a
-// class's list than it takes at level 1, so a fresh caster is never forced.
 describe("SPELLS — creation picker coverage (#1131)", () => {
   const onList = (cls: string, level: number) =>
     SPELLS.filter((s) => s.level === level && s.classes.includes(cls)).length;
@@ -521,9 +485,6 @@ describe("SPELLS — creation picker coverage (#1131)", () => {
   });
 });
 
-// SRD 5.2 spell resweep (#1132): shape invariants the value-by-value catalog
-// edits must never break. The class list is the authority — a spell offering
-// itself outside its SRD list is the leak bug the resweep fixes.
 describe("SPELLS — structured-field invariants (#1132)", () => {
   const CLASS_NAMES = new Set([
     "barbarian", "bard", "cleric", "druid", "fighter", "monk",
@@ -575,10 +536,6 @@ describe("SPELLS — structured-field invariants (#1132)", () => {
   });
 });
 
-// SRD 5.2 value spot-checks (#1132) — the load-bearing deltas per level band.
-// Not exhaustive: guards the mechanics that changed and the class-list leak fix.
-// `get` throws (definite CatalogSpell, no optional chains → low complexity);
-// `has` covers the removed/renamed presence checks.
 const get = (name: string): CatalogSpell => {
   const s = SPELLS.find((sp) => sp.name === name);
   if (!s) throw new Error(`SPELLS has no "${name}"`);
@@ -729,11 +686,8 @@ describe("SRD 5.2 catalog values — CHUNK 4 additions (#1132)", () => {
 });
 
 describe("global GrantedAbility name-uniqueness", () => {
-  // All these sources upsert into GrantedAbility, whose business key is
-  // (name, edition) — #1415 widened it from name alone precisely so a
-  // same-name fork (Nature's Wrath, #1229) can exist without colliding. Keyed
-  // the same way here as assertUniqueGrantedAbilityNames itself — a bare
-  // name-only key would misreport that legitimate fork as a cross-source collision.
+  // GrantedAbility's business key is (name, edition) (#1415) — a name-only
+  // key would misreport a legitimate same-name edition fork as a collision.
   it("no (name, edition) pair collides across maneuvers/shadow-arts/channel-divinity", () => {
     const keys = [
       ...MANEUVERS.map((m) => `${m.name}::${m.edition ?? "shared"}`),
@@ -767,7 +721,7 @@ describe("referential integrity", () => {
   it("every class-definition grantLevel matches its seed subclassLevel", () => {
     const defByName: Record<string, ClassDefinition> = {
       Bard: bard, Druid: druid,
-      Monk: monk, Paladin: paladin, Ranger: ranger, Sorcerer: sorcerer,
+      Monk: monk, Paladin: paladin, Ranger: ranger,
     };
     const drift = CLASSES.flatMap((seedClass) =>
       Object.entries(defByName[seedClass.name]?.subclasses ?? {})
@@ -777,10 +731,8 @@ describe("referential integrity", () => {
     expect(drift, "class-definition grantLevel differs from seed subclassLevel").toEqual([]);
   });
 
-  // Fighter/Barbarian/Rogue have no TS module left, so there's no
-  // sub.grantLevel to compare against — assert the seeded subclassLevel
-  // directly. PHB'14 grants Martial Archetype (p.72) and Primal Path (p.48)
-  // at 3rd level, same as SRD 5.2's uniform L3, so these rows are edition-invariant.
+  // Fighter/Barbarian/Rogue have no TS module left — no sub.grantLevel to
+  // compare against, so assert the seeded subclassLevel directly.
   it("Fighter's, Barbarian's and Rogue's seeded subclassLevel is 3 in both editions (SRD 5.2; PHB'14 pp. 72/48 verified, Rogue's own page not re-verified)", () => {
     const fighterClass = CLASSES.find((c) => c.name === "Fighter");
     const barbarianClass = CLASSES.find((c) => c.name === "Barbarian");
@@ -790,9 +742,6 @@ describe("referential integrity", () => {
     expect(rogueClass?.subclassLevel).toBe(3);
   });
 
-  // Unlike Fighter/Barbarian/Rogue, these three's PHB'14 gate is NOT 3 —
-  // Divine Domain (p.57) and Otherworldly Patron (p.105) are 1st level,
-  // Arcane Tradition (p.114) is 2nd.
   it("Cleric's, Warlock's and Wizard's seeded subclassLevel is their PHB'14 gate (#1576)", () => {
     const clericClass = CLASSES.find((c) => c.name === "Cleric");
     const warlockClass = CLASSES.find((c) => c.name === "Warlock");
@@ -802,13 +751,8 @@ describe("referential integrity", () => {
     expect(wizardClass?.subclassLevel).toBe(2); // PHB'14 p.114
   });
 
-  // Checked against subclassGateLevel, not the raw subclassLevel column: a
-  // row TAGGED EDITION_2014 is checked against the 2014-resolved gate (some
-  // PHB'14 content gates earlier than 2024's uniform L3); a shared
-  // (untagged) row is checked against the stricter 2024-resolved gate, which
-  // also proves it clears the 2014 gate. A row whose className has no
-  // CLASSES entry (a typo) is flagged separately, since Map.get's undefined
-  // would otherwise reach subclassGateLevel's own `?? 3` default and pass unchecked.
+  // A typo'd className is flagged separately: Map.get's undefined would
+  // otherwise reach subclassGateLevel's `?? 3` default and pass unchecked.
   it("every SUBCLASS_GRANTED_SPELLS gateLevel is at least its own admitted edition's resolved subclass gate", () => {
     const subclassLevelByClassName = new Map(CLASSES.map((c) => [c.name, c.subclassLevel]));
     const unknownClass: string[] = [];
@@ -827,22 +771,18 @@ describe("referential integrity", () => {
   });
 });
 
-// SUBCLASS_SLUGS is the closed vocabulary joining a seeded Subclass row to
-// its lib/classes/*.ts SubclassDefinition. Each assertion below is a
-// toEqual([]) diff so a broken row names the offender instead of a boolean pass/fail.
 describe("SUBCLASS_SLUGS — three-way bijection (#1277)", () => {
   const CLASS_DEFS: Record<string, ClassDefinition> = {
-    bard, druid, monk, paladin, ranger, sorcerer,
+    bard, druid, monk, paladin, ranger,
   };
 
   // The named twin of the class-migration guard's NOT_YET_MIGRATED list,
   // keyed by SUBCLASS_IDENTITY's classKey. Deliberate-coupling latch: if you
   // change one, update the other.
-  const ROW_MIGRATED_CLASSES = ["fighter", "barbarian", "rogue", "cleric", "warlock", "wizard"];
+  const ROW_MIGRATED_CLASSES = ["fighter", "barbarian", "rogue", "cleric", "warlock", "wizard", "sorcerer"];
 
-  // Left as an empty, still-declared allowlist so the next genuinely
-  // engine-first subclass in a class that keeps its module has a place to
-  // land with its own reason recorded.
+  // Empty on purpose — the allowlist for an engine-first subclass in a class
+  // that keeps its module, with its reason recorded.
   const INTENTIONAL_GAPS: SubclassSlug[] = [];
 
   it("every SUBCLASSES row's slug is a member of SUBCLASS_SLUGS and maps back to its own (className, name)", () => {
