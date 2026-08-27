@@ -16,6 +16,7 @@ import {
   improvementsFromRows,
   poolsFromRows,
   type ClassFeatureRow,
+  type ResourceDetailTier,
   type ResourceRechargeTier,
 } from "@/lib/classes/class-feature-rows.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
@@ -196,6 +197,73 @@ describe("poolsFromRows resolves resourceRechargeTiers (level-tiered recharge ca
   it("with neither resourceRechargeTiers nor resourceRecharge, resolves to \"none\"", () => {
     const rows = [row({ resourceKey: "flat", resourceTotals: [{ minLevel: 1, total: 1 }] })];
     expect(poolsFromRows(rows, 1, {}, 2, "EDITION_2014")[0].recharge).toBe("none");
+  });
+});
+
+describe("poolsFromRows resolves resourceDetailTiers (labeled display parts, #1685's DerivedResource.details)", () => {
+  it("no resourceDetailTiers on the row means `details` is absent entirely", () => {
+    const rows = [row({ resourceKey: "flat", resourceTotals: [{ minLevel: 1, total: 1 }] })];
+    expect(poolsFromRows(rows, 1, {}, 2, "EDITION_2014")[0].details).toBeUndefined();
+  });
+
+  it("resolves each label's own last-match-wins tier independently — interleaved labels in one flat array", () => {
+    const detailTiers: ResourceDetailTier[] = [
+      { minLevel: 2, label: "Max CR", value: "1/4" },
+      { minLevel: 2, label: "Duration", value: "1 hour(s)" },
+      { minLevel: 4, label: "Max CR", value: "1/2 (no flying speed)" },
+      { minLevel: 6, label: "Duration", value: "3 hour(s)" },
+    ];
+    const rows = [row({ resourceKey: "wildShape", resourceTotals: [{ minLevel: 2, total: 2 }], resourceDetailTiers: detailTiers })];
+
+    expect(poolsFromRows(rows, 3, {}, 2, "EDITION_2014")[0].details).toEqual([
+      { label: "Max CR", value: "1/4" },
+      { label: "Duration", value: "1 hour(s)" },
+    ]);
+    expect(poolsFromRows(rows, 5, {}, 2, "EDITION_2014")[0].details).toEqual([
+      { label: "Max CR", value: "1/2 (no flying speed)" },
+      { label: "Duration", value: "1 hour(s)" },
+    ]);
+    expect(poolsFromRows(rows, 6, {}, 2, "EDITION_2014")[0].details).toEqual([
+      { label: "Max CR", value: "1/2 (no flying speed)" },
+      { label: "Duration", value: "3 hour(s)" },
+    ]);
+  });
+
+  it("preserves first-appearance order of labels, not alphabetical or minLevel order", () => {
+    const detailTiers: ResourceDetailTier[] = [
+      { minLevel: 20, label: "Uses", value: "Unlimited (Archdruid)" },
+      { minLevel: 1, label: "Duration", value: "1 hour(s)" },
+      { minLevel: 1, label: "Max CR", value: "1/4" },
+    ];
+    const rows = [row({ resourceKey: "wildShape", resourceTotals: [{ minLevel: 1, total: 2 }], resourceDetailTiers: detailTiers })];
+
+    expect(poolsFromRows(rows, 20, {}, 2, "EDITION_2014")[0].details).toEqual([
+      { label: "Uses", value: "Unlimited (Archdruid)" },
+      { label: "Duration", value: "1 hour(s)" },
+      { label: "Max CR", value: "1/4" },
+    ]);
+  });
+
+  it("a label whose first tier isn't reached yet is omitted, while other labels still resolve", () => {
+    const detailTiers: ResourceDetailTier[] = [
+      { minLevel: 2, label: "Max CR", value: "1/4" },
+      { minLevel: 20, label: "Uses", value: "Unlimited (Archdruid)" },
+    ];
+    const rows = [row({ resourceKey: "wildShape", resourceTotals: [{ minLevel: 2, total: 2 }], resourceDetailTiers: detailTiers })];
+
+    expect(poolsFromRows(rows, 10, {}, 2, "EDITION_2014")[0].details).toEqual([{ label: "Max CR", value: "1/4" }]);
+  });
+
+  it("an empty resourceDetailTiers array resolves `details` to absent, not an empty array", () => {
+    const rows = [row({ resourceKey: "flat", resourceTotals: [{ minLevel: 1, total: 1 }], resourceDetailTiers: [] })];
+    expect(poolsFromRows(rows, 1, {}, 2, "EDITION_2014")[0].details).toBeUndefined();
+  });
+
+  it("every label below its own first tier at the character's level means `details` is absent entirely", () => {
+    const detailTiers: ResourceDetailTier[] = [{ minLevel: 20, label: "Uses", value: "Unlimited (Archdruid)" }];
+    const rows = [row({ resourceKey: "wildShape", resourceTotals: [{ minLevel: 1, total: 2 }], resourceDetailTiers: detailTiers })];
+
+    expect(poolsFromRows(rows, 5, {}, 2, "EDITION_2014")[0].details).toBeUndefined();
   });
 });
 

@@ -140,6 +140,7 @@ function buildResourcesPayload(
       die: pool.die,
       recharge: pool.recharge,
       description: pool.description,
+      details: pool.details,
       used: Math.min(pool.total, stored.used[pool.key] ?? 0),
       remaining: pool.total - Math.min(pool.total, stored.used[pool.key] ?? 0),
     })),

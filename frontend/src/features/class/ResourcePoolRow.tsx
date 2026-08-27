@@ -68,6 +68,18 @@ export default function ResourcePoolRow({ pool, busy, onOperations }: Props) {
         </span>
       </div>
 
+      {/* Details row */}
+      {pool.details && pool.details.length > 0 && (
+        <div className="text-xs text-parchment-600">
+          {pool.details.map((detail, i) => (
+            <span key={detail.label}>
+              {i > 0 && " · "}
+              {detail.label} {detail.value}
+            </span>
+          ))}
+        </div>
+      )}
+
       {/* Meter */}
       <MeterBar
         current={pool.remaining}

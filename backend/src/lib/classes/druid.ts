@@ -1,22 +1,30 @@
 import type { ClassDefinition } from "./types.js";
 
-// EDITION_2014 Wild Shape's CR cap is a function of level AND subclassKey,
-// and its duration interpolates level/2 inside the description — neither fits
-// a ClassFeature row (poolFromRow reads only the row's own literal
-// description), so this stays a resourceFn rather than moving onto a row
-// like the 2024 version did.
+// EDITION_2014 Wild Shape's CR cap is a function of level AND subclassKey
+// (Circle of the Moon's Circle Forms raise it on a different curve, see
+// wildShapeCrCap below) — no ClassFeature descriptor column takes a subclass
+// axis, so this pool still can't move onto a row, even after the
+// pool-detail-fields task turned its CR cap and duration into structured
+// `details` (armorClassBreakdown pattern) instead of interpolating them into
+// the description.
 export const druid: ClassDefinition = {
   resourceFn: (level, _abilityScores, _profBonus, subclassKey, edition) => {
     if (edition === "EDITION_2024") return [];
     if (level < 2) return [];
     const crCap = `${wildShapeCrCap(level, subclassKey)}${wildShapeSpeedNote(level)}`;
+    const hours = Math.max(1, Math.floor(level / 2));
     return [
       {
         key: "wildShape",
         label: "Wild Shape",
         total: level >= 20 ? 99 : 2,
         recharge: "short-or-long",
-        description: `Transform into a beast (max CR ${crCap}). Lasts up to ${Math.max(1, Math.floor(level / 2))} hour(s). Regain all uses on a short or long rest.${level >= 20 ? " Unlimited uses (Archdruid)." : ""}`,
+        description: "Transform into a beast. Regain all uses on a short or long rest.",
+        details: [
+          { label: "Max CR", value: crCap },
+          { label: "Duration", value: `${hours} hour(s)` },
+          ...(level >= 20 ? [{ label: "Uses", value: "Unlimited (Archdruid)" }] : []),
+        ],
       },
     ];
   },

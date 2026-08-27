@@ -133,6 +133,9 @@ export interface ResourcePool {
   die?: string;        // e.g. "d8"
   recharge: RechargeOn;
   description?: string;
+  // Labeled display parts rendered verbatim next to the description (the
+  // armorClassBreakdown pattern) — never parsed.
+  details?: { label: string; value: string }[];
   used: number;
   remaining: number;
 }

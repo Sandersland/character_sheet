@@ -2306,7 +2306,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d6. They add it to one roll. Regain all uses on a long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d6",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2321,7 +2321,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d6. They add it to one roll. Regain all uses on a long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d6",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2336,7 +2336,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d6. They add it to one roll. Regain all uses on a long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d6",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2351,7 +2351,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d6. They add it to one roll. Regain all uses on a long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d6",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2366,7 +2366,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d8. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d8",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2381,7 +2381,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d8. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d8",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2396,7 +2396,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d8. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d8",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2411,7 +2411,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d8. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d8",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2426,7 +2426,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d8. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d8",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2441,7 +2441,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d10. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d10",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2456,7 +2456,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d10. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d10",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2471,7 +2471,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d10. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d10",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2486,7 +2486,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d10. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d10",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2501,7 +2501,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d10. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d10",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2516,7 +2516,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d12. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d12",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2531,7 +2531,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d12. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d12",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2546,7 +2546,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d12. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d12",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2561,7 +2561,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d12. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d12",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2576,7 +2576,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d12. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d12",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2591,7 +2591,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d12. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d12",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2611,7 +2611,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d6. They add it to one roll. Regain all uses on a long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d6",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2626,7 +2626,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d6. They add it to one roll. Regain all uses on a long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d6",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2641,7 +2641,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d6. They add it to one roll. Regain all uses on a long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d6",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2656,7 +2656,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d6. They add it to one roll. Regain all uses on a long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d6",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2671,7 +2671,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d8. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d8",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2686,7 +2686,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d8. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d8",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2701,7 +2701,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d8. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d8",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2716,7 +2716,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d8. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d8",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2731,7 +2731,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d8. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d8",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2746,7 +2746,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d10. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d10",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2761,7 +2761,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d10. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d10",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2776,7 +2776,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d10. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d10",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2791,7 +2791,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d10. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d10",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2806,7 +2806,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d10. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d10",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2821,7 +2821,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d12. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d12",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2836,7 +2836,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d12. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d12",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2851,7 +2851,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d12. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d12",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2866,7 +2866,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d12. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d12",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2881,7 +2881,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d12. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d12",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2896,7 +2896,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d12. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d12",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2916,7 +2916,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d6. They add it to one roll. Regain all uses on a long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d6",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2931,7 +2931,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d6. They add it to one roll. Regain all uses on a long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d6",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2946,7 +2946,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d6. They add it to one roll. Regain all uses on a long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d6",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2961,7 +2961,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d6. They add it to one roll. Regain all uses on a long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d6",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2976,7 +2976,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d8. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d8",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -2991,7 +2991,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d8. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d8",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -3006,7 +3006,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d8. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d8",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -3021,7 +3021,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d8. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d8",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -3036,7 +3036,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d8. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d8",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -3051,7 +3051,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d10. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d10",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -3066,7 +3066,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d10. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d10",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -3081,7 +3081,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d10. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d10",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -3096,7 +3096,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d10. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d10",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -3111,7 +3111,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d10. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d10",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -3126,7 +3126,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d12. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d12",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -3141,7 +3141,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d12. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d12",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -3156,7 +3156,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d12. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d12",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -3171,7 +3171,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d12. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d12",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -3186,7 +3186,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d12. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d12",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",
@@ -3201,7 +3201,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration d12. They add it to one roll. Regain all uses on a short or long rest.",
+          "description": "Bonus action: grant one creature within 60 ft a Bardic Inspiration die. They add it to one roll.",
           "die": "d12",
           "key": "bardicInspiration",
           "label": "Bardic Inspiration",

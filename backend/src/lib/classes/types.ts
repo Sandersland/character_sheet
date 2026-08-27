@@ -98,6 +98,12 @@ export interface DerivedResource {
    */
   shortRestRegain?: number;
   description?: string;
+  /**
+   * Labeled display parts rendered verbatim by the client next to the
+   * description (the armorClassBreakdown pattern) — never parsed, e.g. a
+   * 2014 Wild Shape pool's `{ label: "Max CR", value: "1/2 (no flying speed)" }`.
+   */
+  details?: { label: string; value: string }[];
 }
 
 /**

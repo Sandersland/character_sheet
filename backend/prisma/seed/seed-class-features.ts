@@ -32,6 +32,7 @@ const DESCRIPTOR_RESET = {
   resourceTotals: Prisma.DbNull,
   resourceDieTiers: Prisma.DbNull,
   resourceRechargeTiers: Prisma.DbNull,
+  resourceDetailTiers: Prisma.DbNull,
   activationCost: null,
   resolverKind: null,
   requiresUnarmored: false,

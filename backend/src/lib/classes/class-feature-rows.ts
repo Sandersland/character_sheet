@@ -59,6 +59,16 @@ export interface ResourceRechargeTier {
   recharge: RechargeOn;
 }
 
+// Tiers are ASCENDING by minLevel PER LABEL, last-match-wins per label — a
+// label's own tiers form their own progression; different labels interleave
+// freely in the flat array (schema.prisma's ClassFeature.resourceDetailTiers
+// comment carries the same invariant).
+export interface ResourceDetailTier {
+  minLevel: number;
+  label: string;
+  value: string;
+}
+
 export interface BuffModifierTier {
   minLevel: number;
   value: number;
@@ -104,6 +114,7 @@ export interface ResourceColumns {
   resourceTotals?: ResourceTotalTier[] | null;
   resourceDieTiers?: ResourceDieTier[] | null;
   resourceRechargeTiers?: ResourceRechargeTier[] | null;
+  resourceDetailTiers?: ResourceDetailTier[] | null;
 }
 
 // Evaluated against the character's CURRENTLY EQUIPPED state at activation
@@ -255,20 +266,67 @@ function tierAt<T extends { minLevel: number }>(tiers: readonly T[] | null | und
   return match;
 }
 
+// Groups a flat resourceDetailTiers array by label, preserving each label's
+// first-appearance order — the labels interleave freely in the source array
+// (schema.prisma's own comment), but each label's OWN tiers stay in their
+// original relative order, which is what the ASCENDING-per-label authoring
+// invariant (classFeatureSeedSchema's isAscendingByMinLevelPerLabel) requires
+// for tierAt to resolve correctly per group.
+function groupDetailTiersByLabel(tiers: readonly ResourceDetailTier[]): Map<string, ResourceDetailTier[]> {
+  const byLabel = new Map<string, ResourceDetailTier[]>();
+  for (const tier of tiers) {
+    const group = byLabel.get(tier.label);
+    if (group) group.push(tier);
+    else byLabel.set(tier.label, [tier]);
+  }
+  return byLabel;
+}
+
+// Resolves a row's resourceDetailTiers to the labeled parts reached at
+// `level` — reuses tierAt per label (never a second tier-walking loop).
+// Undefined when the row declares no tiers, or every label's first tier is
+// still ahead of `level`, so poolFromRow can omit `details` entirely rather
+// than emit an empty array.
+function detailsFromRow(tiers: readonly ResourceDetailTier[] | null | undefined, level: number): { label: string; value: string }[] | undefined {
+  if (!tiers?.length) return undefined;
+  const details: { label: string; value: string }[] = [];
+  for (const [label, labelTiers] of groupDetailTiersByLabel(tiers)) {
+    const tier = tierAt(labelTiers, level);
+    if (tier) details.push({ label, value: tier.value });
+  }
+  return details.length > 0 ? details : undefined;
+}
+
+// The optional pool fields (die/shortRestRegain/details) that only appear on
+// the result when their own tier is reached — split out of poolFromRow to
+// keep that function's own cyclomatic complexity/CRAP low (the fallow
+// guardrail ratchet, CLAUDE.md).
+function optionalPoolFields(
+  row: ClassFeatureRow,
+  ctx: ResourceTotalContext,
+  totalTier: ResourceTotalTier,
+): Pick<DerivedResource, "die" | "shortRestRegain" | "details"> {
+  const dieTier = tierAt(row.resourceDieTiers, ctx.level);
+  const details = detailsFromRow(row.resourceDetailTiers, ctx.level);
+  return {
+    ...(dieTier ? { die: dieTier.die } : {}),
+    ...(totalTier.shortRestRegain !== undefined ? { shortRestRegain: totalTier.shortRestRegain } : {}),
+    ...(details ? { details } : {}),
+  };
+}
+
 // null when the row declares no pool or the character hasn't reached its
 // first tier; description IS the feature's own description, never a second string.
 function poolFromRow(row: ClassFeatureRow, ctx: ResourceTotalContext): DerivedResource | null {
   if (!row.resourceKey) return null;
   const totalTier = tierAt(row.resourceTotals, ctx.level);
   if (!totalTier) return null;
-  const dieTier = tierAt(row.resourceDieTiers, ctx.level);
   return {
     key: row.resourceKey,
     label: row.resourceLabel ?? row.name,
     total: evaluateResourceTotal(totalTier.total, ctx),
-    ...(dieTier ? { die: dieTier.die } : {}),
     recharge: tierAt(row.resourceRechargeTiers, ctx.level)?.recharge ?? (row.resourceRecharge as RechargeOn | null) ?? "none",
-    ...(totalTier.shortRestRegain !== undefined ? { shortRestRegain: totalTier.shortRestRegain } : {}),
+    ...optionalPoolFields(row, ctx, totalTier),
     description: row.description,
   };
 }

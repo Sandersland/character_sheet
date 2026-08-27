@@ -135,6 +135,11 @@ export interface ClassFeatureSeedRow {
   // express the change — see ClassFeature.resourceRechargeTiers' own
   // schema.prisma comment for the ASCENDING/last-match-wins invariant.
   resourceRechargeTiers?: { minLevel: number; recharge: RechargeOn }[];
+  // Labeled display parts (#1685's DerivedResource.details, e.g. 2014 Wild
+  // Shape's "Max CR"/"Duration") — see ClassFeature.resourceDetailTiers' own
+  // schema.prisma comment for the ASCENDING-PER-LABEL/last-match-wins-per-label
+  // invariant, distinct from the other tier columns' plain ascending rule.
+  resourceDetailTiers?: { minLevel: number; label: string; value: string }[];
   activationCost?: string;
   resolverKind?: string;
   requiresUnarmored?: boolean;
@@ -289,6 +294,31 @@ const derivedStatTiersSchema = z
   .array(z.object({ minLevel: z.number().int().positive(), value: z.union([z.number(), z.string()]) }))
   .refine(isAscendingByMinLevel, ASCENDING_TIER_MESSAGE);
 
+// resourceDetailTiers' own invariant (#1685): ASCENDING by minLevel PER
+// LABEL, not globally — a label's own tiers form their own progression while
+// different labels interleave freely in the flat array (2014 Wild Shape's
+// "Max CR" and "Duration" tiers land at different levels). Groups by label,
+// then reuses isAscendingByMinLevel (never a second ordering predicate) on
+// each label's own minLevel sequence.
+function groupMinLevelsByLabel(tiers: { minLevel: number; label: string }[]): number[][] {
+  const byLabel = new Map<string, number[]>();
+  for (const tier of tiers) {
+    const levels = byLabel.get(tier.label);
+    if (levels) levels.push(tier.minLevel);
+    else byLabel.set(tier.label, [tier.minLevel]);
+  }
+  return [...byLabel.values()];
+}
+
+function isAscendingByMinLevelPerLabel(tiers: { minLevel: number; label: string }[]): boolean {
+  return groupMinLevelsByLabel(tiers).every((levels) => isAscendingByMinLevel(levels.map((minLevel) => ({ minLevel }))));
+}
+
+const resourceDetailTiersSchema = z
+  .array(z.object({ minLevel: z.number().int().positive(), label: z.string().min(1), value: z.string().min(1) }))
+  .min(1) // an empty tier array is authoring garbage, same as resourceRechargeTiers
+  .refine(isAscendingByMinLevelPerLabel, ASCENDING_TIER_MESSAGE);
+
 // #1686: effectBuffs' `modifier` — evaluateBuffModifier's own vocabulary
 // (class-feature-rows.ts): resourceTotalFormulaSchema's formula shapes, OR a
 // tier array (ASCENDING minLevel, last-match-wins, same invariant as
@@ -409,6 +439,7 @@ export const classFeatureSeedSchema = z
     resourceTotals: resourceTotalsTierSchema.nullable().optional(),
     resourceDieTiers: resourceDieTiersSchema.nullable().optional(),
     resourceRechargeTiers: resourceRechargeTiersSchema.nullable().optional(),
+    resourceDetailTiers: resourceDetailTiersSchema.nullable().optional(),
     derivedStatTiers: derivedStatTiersSchema.nullable().optional(),
     saveDcAbilities: z.array(z.string().min(1)).optional(),
     // Reuses featImprovementSchema (lib/srd/feats.ts) — the SAME zod a taken

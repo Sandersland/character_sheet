@@ -129,6 +129,70 @@ describe("ClassFeature tier-array schemas reject a descending minLevel order (#1
   });
 });
 
+// resourceDetailTiers (#1685): ASCENDING PER LABEL, not globally — two
+// different labels may interleave their minLevels freely, since each forms
+// its own independent progression (2014 Wild Shape's "Max CR"/"Duration").
+describe("resourceDetailTiers accepts interleaved-but-per-label-ascending order and rejects a per-label descending pair (#1685)", () => {
+  it("accepts two labels interleaved in the array, each strictly ascending on its own", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceDetailTiers: [
+        { minLevel: 2, label: "Max CR", value: "1/4" },
+        { minLevel: 2, label: "Duration", value: "1 hour(s)" },
+        { minLevel: 4, label: "Max CR", value: "1/2 (no flying speed)" },
+        { minLevel: 6, label: "Duration", value: "3 hour(s)" },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a descending pair WITHIN the same label, even though the array's raw order looks fine for a different label", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceDetailTiers: [
+        { minLevel: 4, label: "Max CR", value: "1/2" },
+        { minLevel: 2, label: "Max CR", value: "1/4" },
+      ],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a repeated minLevel within the same label (not strictly increasing)", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceDetailTiers: [
+        { minLevel: 2, label: "Max CR", value: "1/4" },
+        { minLevel: 2, label: "Max CR", value: "1/2" },
+      ],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an empty array — authoring garbage, same as resourceRechargeTiers", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceDetailTiers: [],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an empty label", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceDetailTiers: [{ minLevel: 1, label: "", value: "1/4" }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an empty value", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceDetailTiers: [{ minLevel: 1, label: "Max CR", value: "" }],
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
 // A row with resourceRechargeTiers and no resourceRecharge scalar has no
 // fallback below the tiers' first minLevel — poolFromRow would silently
 // resolve "none" at any level the pool exists but no tier is reached yet.

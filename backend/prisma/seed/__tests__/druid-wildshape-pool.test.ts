@@ -150,11 +150,19 @@ describe("Moonlight Step pool (Circle of the Moon, EDITION_2024, #1226): Wisdom-
 });
 
 describe("EDITION_2014 regression check (#1226): resourceFn was FORKED, not deleted", () => {
-  it("level 20 still has total 99 and a description containing 'Unlimited uses (Archdruid)' and 'max CR'", async () => {
+  // The pool-detail-fields task made the description static and moved the
+  // Archdruid uses note and the CR cap onto `details` — see
+  // druid-wildshape-cr.test.ts for the CR cap's own coverage.
+  it("level 20 still has total 99, a static description, and an 'Uses: Unlimited (Archdruid)' detail", async () => {
     const pool = await wildShapePool(20, "EDITION_2014");
     expect(pool?.total).toBe(99);
-    expect(pool?.description).toContain("Unlimited uses (Archdruid)");
-    expect(pool?.description).toContain("max CR");
+    expect(pool?.description).toBe("Transform into a beast. Regain all uses on a short or long rest.");
+    expect(pool?.details).toContainEqual({ label: "Uses", value: "Unlimited (Archdruid)" });
+  });
+
+  it("the 'Uses' detail is absent below level 20", async () => {
+    const pool = await wildShapePool(19, "EDITION_2014");
+    expect(pool?.details?.some((d) => d.label === "Uses")).toBe(false);
   });
 
   it("recharge stays short-or-long, with no shortRestRegain field at all (SRD 5.1 long-or-short-rest full regain)", async () => {
