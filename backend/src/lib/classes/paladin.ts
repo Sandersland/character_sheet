@@ -26,10 +26,9 @@ import type { ClassDefinition, DerivedResource } from "./types.js";
 // actually reads (a formula) for what they read today (a live number),
 // failing #1685's byte-identical AC outright, so Lay on Hands stays
 // EXCLUDED rather than migrated as the issue's named stretch goal.
-// `channelDivinity`'s pool, a flat/tiered total
-// with no computed value, is the one that moved onto its rows — see
-// paladin-features.ts's own RESOURCE POOL header block for why exactly one
-// row per edition carries it.
+// `channelDivinity`'s pool, a flat/tiered total with no computed value, is
+// the one that moved onto its rows — see paladin-features.ts's own RESOURCE
+// POOL header block for why exactly one row per edition carries it.
 export const paladin: ClassDefinition = {
   // subclassKey is unused here — the base pool never needs to resolve a
   // subclass-specific variant — but the full parameter list is declared so

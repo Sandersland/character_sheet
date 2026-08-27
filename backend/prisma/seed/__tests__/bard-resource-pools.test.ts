@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { poolsFromRows } from "@/lib/classes/class-feature-rows.js";
+import { deriveResources } from "@/lib/classes/class-features.js";
+import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 
 import { BARD_FEATURES } from "../bard-features.js";
 
@@ -12,9 +14,7 @@ function poolAt(key: string, level: number, edition: "EDITION_2014" | "EDITION_2
 
 // SRD 5.1 p.53 / SRD 5.2 p.31: a minimum of once, equal to your Charisma
 // modifier — die d6/d8/d10/d12 at L1/5/10/15, longRest recharge upgrading to
-// short-or-long at Font of Inspiration (L5). Both editions agree on every
-// axis, matching the deleted bard.ts resourceFn's arithmetic exactly (proven
-// row-vs-fn parity across levels 1-20, both editions, before the fn's deletion).
+// short-or-long at Font of Inspiration (L5). Both editions agree on every axis.
 describe("bardicInspiration rides Bard's own row — the pool bard.ts's resourceFn used to declare", () => {
   it.each(["EDITION_2014", "EDITION_2024"] as const)("%s: total is max(1, Cha modifier)", (edition) => {
     expect(poolAt("bardicInspiration", 1, edition, 8)?.total).toBe(1); // Cha 8, -1 mod, floors at 1
@@ -47,6 +47,18 @@ describe("bardicInspiration rides Bard's own row — the pool bard.ts's resource
     for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {
       const row = BASE_ROWS.find((r) => r.name === "Bardic Inspiration" && r.edition === edition)!;
       expect(poolAt("bardicInspiration", 1, edition, 10)?.description).toBe(row.description);
+    }
+  });
+
+  // The only other coverage of this pool (srd.test.ts) drives it through
+  // EDITION_2024 alone — this closes the gap for a 2014 Bard.
+  it("deriveResources yields total 3 (Cha 16, +3 mod) for bardicInspiration, both editions", () => {
+    const abilityScores = { strength: 10, dexterity: 14, constitution: 12, intelligence: 8, wisdom: 13, charisma: 16 };
+    for (const edition of ["EDITION_2014", "EDITION_2024"] as const) {
+      const profBonus = proficiencyBonusForLevel(3);
+      const info = deriveResources("bard", undefined, 3, abilityScores, profBonus, { classRows: BASE_ROWS, subclassRows: [] }, edition);
+      const pool = info?.resources.find((r) => r.key === "bardicInspiration");
+      expect(pool?.total, edition).toBe(3);
     }
   });
 });

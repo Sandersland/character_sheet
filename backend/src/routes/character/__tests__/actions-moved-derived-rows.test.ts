@@ -88,7 +88,7 @@ describe("POST /:id/actions/transactions — Bardic Inspiration (#1909, row-driv
     await prisma.character.deleteMany({ where: { id: CHAR_ID } });
   });
 
-  it("spends 1 bardicInspiration use (pool total 3 — max(1, +3 Cha mod) — still resourceFn-derived, #1909 only added the row-driven ACTION)", async () => {
+  it("spends 1 bardicInspiration use (pool total 3 — max(1, +3 Cha mod) — row-driven pool AND action)", async () => {
     const res = await executeAction(CHAR_ID, "bardicInspiration");
     expect(res.status).toBe(200);
     expect(pool(res.body, "bardicInspiration")).toMatchObject({ total: 3, used: 1, remaining: 2 });
