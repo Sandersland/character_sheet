@@ -283,7 +283,7 @@ const resourceDieTiersSchema = z
 const RECHARGE_ON_VALUES = ["shortRest", "longRest", "short-or-long", "none"] as const;
 const resourceRechargeTiersSchema = z
   .array(z.object({ minLevel: z.number().int().positive(), recharge: z.enum(RECHARGE_ON_VALUES) }))
-  .min(1) // an empty tier array is authoring garbage — also keeps it truthy-iff-nonempty for the gap `.refine` below
+  .min(1) // an empty tier array is authoring garbage
   .refine(isAscendingByMinLevel, ASCENDING_TIER_MESSAGE);
 const derivedStatTiersSchema = z
   .array(z.object({ minLevel: z.number().int().positive(), value: z.union([z.number(), z.string()]) }))
