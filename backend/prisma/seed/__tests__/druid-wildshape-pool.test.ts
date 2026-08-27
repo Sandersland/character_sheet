@@ -150,7 +150,7 @@ describe("EDITION_2014 regression check (#1226): resourceFn was FORKED, not dele
 
   it("the 'Uses' detail is absent below level 20", async () => {
     const pool = await wildShapePool(19, "EDITION_2014");
-    expect(pool?.details?.some((d) => d.label === "Uses")).toBe(false);
+    expect(pool?.details?.find((d) => d.label === "Uses")).toBeUndefined();
   });
 
   it("the 'Duration' detail scales with half druid level, rounded down (minimum 1)", async () => {

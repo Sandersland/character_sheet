@@ -181,6 +181,8 @@ const derivedStatTiersSchema = z
 // resourceDetailTiers' own invariant (#1685): ASCENDING by minLevel PER
 // LABEL, not globally — labels interleave freely in the flat array. Reuses
 // isAscendingByMinLevel per label, never a second ordering predicate.
+// If you change this grouping, also update its resolution twin
+// groupDetailTiersByLabel — both must group identically.
 function groupMinLevelsByLabel(tiers: { minLevel: number; label: string }[]): number[][] {
   const byLabel = new Map<string, number[]>();
   for (const tier of tiers) {

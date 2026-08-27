@@ -258,6 +258,8 @@ function tierAt<T extends { minLevel: number }>(tiers: readonly T[] | null | und
 // Preserves each label's own relative tier order, which the
 // ASCENDING-per-label authoring invariant (classFeatureSeedSchema's
 // isAscendingByMinLevelPerLabel) requires for tierAt to resolve per group.
+// If you change this grouping, also update its seed-validation twin
+// groupMinLevelsByLabel — both must group identically.
 function groupDetailTiersByLabel(tiers: readonly ResourceDetailTier[]): Map<string, ResourceDetailTier[]> {
   const byLabel = new Map<string, ResourceDetailTier[]>();
   for (const tier of tiers) {

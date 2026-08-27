@@ -63,7 +63,7 @@ export default function ResourcePoolRow({ pool, busy, onOperations }: Props) {
       {pool.details && pool.details.length > 0 && (
         <div className="text-xs text-parchment-600">
           {pool.details.map((detail, i) => (
-            <span key={`${detail.label}-${i}`}>
+            <span key={detail.label}>
               {i > 0 && " · "}
               {detail.label} <span className="font-semibold text-parchment-700">{detail.value}</span>
             </span>
