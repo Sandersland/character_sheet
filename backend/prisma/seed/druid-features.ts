@@ -174,6 +174,11 @@ const DRUID_BASE_RAW: RawDruidFeature[] = [
     // Row-driven action (#1909, moved off actions.ts's DERIVED_ACTIONS) —
     // identity-only resourceKey, see RawDruidFeature's own comment. SRD 5.1 /
     // PHB'14 p.66: "As an action, you can magically transform..." — an Action.
+    // No resourceTotals here on purpose: the pool itself stays wholly in
+    // druid.ts's resourceFn (see its own header). If a later slice adds
+    // resourceTotals to THIS row without deleting that resourceFn,
+    // mergePoolSources (registry.ts, fn-wins) keeps the fn's pool and this
+    // row's totals go silently inert — a green suite that proves nothing.
     resourceKey: "wildShape",
     activationCost: "action",
     costKind: "pool",

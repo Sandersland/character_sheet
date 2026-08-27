@@ -81,6 +81,10 @@ describe("druid Wild Shape CR cap derivation, EDITION_2014 (#906) — 2014-only,
   });
 
   it("no Wild Shape pool below level 2, even for the Moon", () => {
+    expect(wildShapePool("circle of the moon", 1)).toBeUndefined();
+    expect(wildShapePool(undefined, 1)).toBeUndefined();
+    // Same fact restated through the "Max CR" detail specifically — kept
+    // alongside the pool-level assertion above since it costs nothing.
     expect(wildShapeMaxCr("circle of the moon", 1)).toBeUndefined();
     expect(wildShapeMaxCr(undefined, 1)).toBeUndefined();
   });

@@ -314,10 +314,15 @@ function isAscendingByMinLevelPerLabel(tiers: { minLevel: number; label: string 
   return groupMinLevelsByLabel(tiers).every((levels) => isAscendingByMinLevel(levels.map((minLevel) => ({ minLevel }))));
 }
 
+// A dedicated message, not ASCENDING_TIER_MESSAGE: that message describes a
+// GLOBAL ascending order, which is not this schema's actual rule (labels
+// interleave freely; only each label's OWN tiers must ascend).
+const PER_LABEL_ASCENDING_TIER_MESSAGE = { message: "each label's tiers must be ascending by minLevel" };
+
 const resourceDetailTiersSchema = z
   .array(z.object({ minLevel: z.number().int().positive(), label: z.string().min(1), value: z.string().min(1) }))
   .min(1) // an empty tier array is authoring garbage, same as resourceRechargeTiers
-  .refine(isAscendingByMinLevelPerLabel, ASCENDING_TIER_MESSAGE);
+  .refine(isAscendingByMinLevelPerLabel, PER_LABEL_ASCENDING_TIER_MESSAGE);
 
 // #1686: effectBuffs' `modifier` — evaluateBuffModifier's own vocabulary
 // (class-feature-rows.ts): resourceTotalFormulaSchema's formula shapes, OR a

@@ -165,6 +165,11 @@ describe("EDITION_2014 regression check (#1226): resourceFn was FORKED, not dele
     expect(pool?.details?.some((d) => d.label === "Uses")).toBe(false);
   });
 
+  it("the 'Duration' detail scales with half druid level, rounded down (minimum 1)", async () => {
+    expect((await wildShapePool(2, "EDITION_2014"))?.details).toContainEqual({ label: "Duration", value: "1 hour(s)" });
+    expect((await wildShapePool(8, "EDITION_2014"))?.details).toContainEqual({ label: "Duration", value: "4 hour(s)" });
+  });
+
   it("recharge stays short-or-long, with no shortRestRegain field at all (SRD 5.1 long-or-short-rest full regain)", async () => {
     const pool = await wildShapePool(10, "EDITION_2014");
     expect(pool?.recharge).toBe("short-or-long");

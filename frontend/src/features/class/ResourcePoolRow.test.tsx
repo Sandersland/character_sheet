@@ -36,6 +36,19 @@ describe("ResourcePoolRow — details (#1685)", () => {
     expect(durationIndex).toBeGreaterThan(maxCrIndex);
   });
 
+  it("renders the value heavier than the label (armorClassBreakdown's dt/dd contrast)", () => {
+    render(
+      <ResourcePoolRow
+        characterId="c1"
+        pool={pool({ details: [{ label: "Max CR", value: "1/2 (no flying speed)" }] })}
+        busy={false}
+        onOperations={vi.fn()}
+      />,
+    );
+    const value = screen.getByText("1/2 (no flying speed)");
+    expect(value).toHaveClass("font-semibold");
+  });
+
   it("renders nothing detail-related when `details` is absent", () => {
     render(<ResourcePoolRow characterId="c1" pool={pool()} busy={false} onOperations={vi.fn()} />);
     expect(screen.queryByText(/Max CR/)).not.toBeInTheDocument();
