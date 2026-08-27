@@ -52,6 +52,13 @@ export interface ResourceDieTier {
   die: string;
 }
 
+// Tiers are ASCENDING by minLevel, last-match-wins — same invariant as
+// ResourceTotalTier/ResourceDieTier.
+export interface ResourceRechargeTier {
+  minLevel: number;
+  recharge: RechargeOn;
+}
+
 export interface BuffModifierTier {
   minLevel: number;
   value: number;
@@ -96,6 +103,7 @@ export interface ResourceColumns {
   resourceRecharge?: string | null; // RechargeOn
   resourceTotals?: ResourceTotalTier[] | null;
   resourceDieTiers?: ResourceDieTier[] | null;
+  resourceRechargeTiers?: ResourceRechargeTier[] | null;
 }
 
 // Evaluated against the character's CURRENTLY EQUIPPED state at activation
@@ -259,7 +267,7 @@ function poolFromRow(row: ClassFeatureRow, ctx: ResourceTotalContext): DerivedRe
     label: row.resourceLabel ?? row.name,
     total: evaluateResourceTotal(totalTier.total, ctx),
     ...(dieTier ? { die: dieTier.die } : {}),
-    recharge: (row.resourceRecharge as RechargeOn | null) ?? "none",
+    recharge: tierAt(row.resourceRechargeTiers, ctx.level)?.recharge ?? (row.resourceRecharge as RechargeOn | null) ?? "none",
     ...(totalTier.shortRestRegain !== undefined ? { shortRestRegain: totalTier.shortRestRegain } : {}),
     description: row.description,
   };

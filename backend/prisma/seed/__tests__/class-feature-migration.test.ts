@@ -305,6 +305,7 @@ type DescriptorRow = {
   resourceRecharge: string | null;
   resourceTotals: unknown;
   resourceDieTiers: unknown;
+  resourceRechargeTiers: unknown;
   activationCost: string | null;
   resolverKind: string | null;
   requiresUnarmored: boolean;
@@ -336,6 +337,7 @@ function expectNullResourceColumns(row: DescriptorRow): void {
   expect(row.resourceRecharge, row.name).toBeNull();
   expect(row.resourceTotals, row.name).toBeNull();
   expect(row.resourceDieTiers, row.name).toBeNull();
+  expect(row.resourceRechargeTiers, row.name).toBeNull();
   expect(row.activationCost, row.name).toBeNull();
   expect(row.resolverKind, row.name).toBeNull();
   expect(row.requiresUnarmored, row.name).toBe(false);
@@ -393,7 +395,7 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
   it("no row has a populated descriptor column, except Fighter's (#1528/#1546), Barbarian's Rage (#1223), Wizard's (#1234), Warlock's (#1233), Ranger's (#1230), Sorcerer's (#1232), Cleric's (#1225), Paladin's (#1229), Wizard's Bladesinger (#1676) and Bard's/Druid's/Sorcerer's Metamagic/Paladin's/Cleric's row-driven actions (#1909)", async () => {
     const rows = await prisma.classFeature.findMany({
       select: { name: true, edition: true, class: { select: { name: true } }, subclass: { select: { slug: true } },
-        resourceKey: true, resourceLabel: true, resourceRecharge: true, resourceTotals: true, resourceDieTiers: true,
+        resourceKey: true, resourceLabel: true, resourceRecharge: true, resourceTotals: true, resourceDieTiers: true, resourceRechargeTiers: true,
         activationCost: true, resolverKind: true, requiresUnarmored: true, regrants: true,
         costKind: true, costPoolKey: true, costBase: true, costPerStep: true,
         effectKind: true, effectDiceCount: true, effectDiceFaces: true, effectDieSource: true,
@@ -414,10 +416,10 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
   // Prisma deserializes both SQL NULL (Prisma.DbNull) and a stored JSON
   // `null` (Prisma.JsonNull) to the JS value `null`, so the per-row
   // `toBeNull()` checks above cannot tell them apart — that gap once let
-  // seedClassFeatures write JsonNull into all three Json? columns while this
-  // suite stayed green, which a later `WHERE col IS NULL` filter would
+  // seedClassFeatures write JsonNull into every Json? descriptor column while
+  // this suite stayed green, which a later `WHERE col IS NULL` filter would
   // silently miss. Assert the SQL-level state directly.
-  it("resourceTotals/resourceDieTiers/derivedStatTiers are SQL NULL (Prisma.DbNull), not a stored JSON null, everywhere they aren't authored", async () => {
+  it("every Json? tier column is SQL NULL (Prisma.DbNull), not a stored JSON null, everywhere it isn't authored", async () => {
     // Per-class counts of rows with authored resourceTotals. After parallel
     // branches merge, re-measure on the merged tree — each branch's own total
     // was correct alone (#1230/#1232/#1225/#1226/#1229).
@@ -446,15 +448,16 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
       "Scholar (EDITION_2024 only)",
     ];
     const populatedDerivedStatTiersCount = DERIVED_STAT_ROW_KEYS.size * 2 - SINGLE_EDITION_DERIVED_STAT_KEYS.length;
-    for (const column of ["resourceTotals", "resourceDieTiers", "derivedStatTiers"] as const) {
-      const expectedDbNull =
-        column === "resourceTotals"
-          ? CLASS_FEATURES.length - populatedResourceTotalsCount
-          : column === "derivedStatTiers"
-            ? CLASS_FEATURES.length - populatedDerivedStatTiersCount
-            : CLASS_FEATURES.length - populatedResourceDieTiersCount;
+    // resourceRechargeTiers has no populated rows yet — its whole table is DbNull.
+    const EXPECTED_DB_NULL: Record<"resourceTotals" | "resourceDieTiers" | "derivedStatTiers" | "resourceRechargeTiers", number> = {
+      resourceTotals: CLASS_FEATURES.length - populatedResourceTotalsCount,
+      resourceDieTiers: CLASS_FEATURES.length - populatedResourceDieTiersCount,
+      derivedStatTiers: CLASS_FEATURES.length - populatedDerivedStatTiersCount,
+      resourceRechargeTiers: CLASS_FEATURES.length,
+    };
+    for (const column of ["resourceTotals", "resourceDieTiers", "derivedStatTiers", "resourceRechargeTiers"] as const) {
       const dbNullCount = await prisma.classFeature.count({ where: { [column]: { equals: Prisma.DbNull } } });
-      expect(dbNullCount, column).toBe(expectedDbNull);
+      expect(dbNullCount, column).toBe(EXPECTED_DB_NULL[column]);
 
       const jsonNullCount = await prisma.classFeature.count({ where: { [column]: { equals: Prisma.JsonNull } } });
       expect(jsonNullCount, column).toBe(0);

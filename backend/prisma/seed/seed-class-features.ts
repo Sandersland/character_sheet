@@ -13,7 +13,7 @@ import { SUBCLASSES } from "./subclasses.js";
 // Every descriptor column reset to NULL/default — the literal "populated
 // nowhere" state #1523's acceptance criteria pin. Spread onto every row this
 // seeder writes; #1528 is what first overrides any of these per-row. The
-// three Json? columns use Prisma.DbNull (never a bare `null`): Prisma's
+// Json? columns use Prisma.DbNull (never a bare `null`): Prisma's
 // generated CreateInput type for a nullable Json field only accepts
 // InputJsonValue | NullableJsonNullValueInput, rejecting a literal `null` at
 // compile time, but that type also accepts Prisma.JsonNull — which stores the
@@ -31,6 +31,7 @@ const DESCRIPTOR_RESET = {
   resourceRecharge: null,
   resourceTotals: Prisma.DbNull,
   resourceDieTiers: Prisma.DbNull,
+  resourceRechargeTiers: Prisma.DbNull,
   activationCost: null,
   resolverKind: null,
   requiresUnarmored: false,

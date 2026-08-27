@@ -1,14 +1,15 @@
 // Pure unit test (NO database) for #1522's settled tier-array ordering rule:
-// resourceTotals/resourceDieTiers/derivedStatTiers are authored ASCENDING by
-// minLevel, last-match-wins. Settled because the two shapes being merged
-// disagreed — EXTRA_ATTACK_TIERS is descending/first-match while #1522's own
-// resourceTotals example is ascending — so all three ClassFeature tier
-// columns share ONE zod-enforced invariant rather than inheriting the
-// ambiguity. Nothing in this migration populates these columns yet (#1528+
-// is the first consumer); this only proves the validator itself rejects a
-// descending array.
+// every ClassFeature tier column (resourceTotals/resourceDieTiers/
+// derivedStatTiers/resourceRechargeTiers) is authored ASCENDING by minLevel,
+// last-match-wins. Settled because the two shapes being merged disagreed —
+// EXTRA_ATTACK_TIERS is descending/first-match while #1522's own
+// resourceTotals example is ascending — so every one of these columns shares
+// ONE zod-enforced invariant rather than inheriting the ambiguity. Nothing in
+// this migration populates resourceTotals/resourceDieTiers/derivedStatTiers
+// yet (#1528+ is the first consumer); this only proves the validator itself
+// rejects a descending array.
 //
-// Driven through classFeatureSeedSchema.safeParse, not the three tier
+// Driven through classFeatureSeedSchema.safeParse, not the per-column tier
 // schemas directly: those are intentionally un-exported (class-features.ts)
 // since classFeatureSeedSchema is the surface that actually ships, and
 // testing through it exercises the SAME `.refine` predicate as the
@@ -93,6 +94,100 @@ describe("ClassFeature tier-array schemas reject a descending minLevel order (#1
         { minLevel: 5, value: "19-20" },
         { minLevel: 15, value: "18-20" },
       ],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("resourceRechargeTiers accepts strictly ascending minLevel", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceRechargeTiers: [
+        { minLevel: 1, recharge: "longRest" },
+        { minLevel: 5, recharge: "short-or-long" },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("resourceRechargeTiers rejects descending order", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceRechargeTiers: [
+        { minLevel: 5, recharge: "short-or-long" },
+        { minLevel: 1, recharge: "longRest" },
+      ],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("resourceRechargeTiers rejects an unrecognized recharge value", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceRechargeTiers: [{ minLevel: 1, recharge: "everyTurn" }],
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+// A row with resourceRechargeTiers and no resourceRecharge scalar has no
+// fallback below the tiers' first minLevel — poolFromRow would silently
+// resolve "none" at any level the pool exists but no tier is reached yet.
+describe("resourceRechargeTiers' first tier must be reached by resourceTotals' first tier when there is no resourceRecharge fallback", () => {
+  it("rejects a gap: the pool opens at level 1 but the first recharge tier isn't reached until level 5", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceTotals: [{ minLevel: 1, total: 2 }],
+      resourceRechargeTiers: [{ minLevel: 5, recharge: "short-or-long" }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts the same gap when a resourceRecharge scalar covers the levels below the first tier", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceRecharge: "longRest",
+      resourceTotals: [{ minLevel: 1, total: 2 }],
+      resourceRechargeTiers: [{ minLevel: 5, recharge: "short-or-long" }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  // An empty array is truthy in JS, so `!row.resourceRechargeTiers` alone
+  // doesn't short-circuit the refine for it — reading `[0].minLevel` off an
+  // empty array would throw inside the refine instead of failing validation.
+  it("resourceRechargeTiers: [] is a clean validation FAILURE, not a thrown error", () => {
+    expect(() =>
+      classFeatureSeedSchema.safeParse({
+        ...baseRow,
+        resourceRechargeTiers: [],
+      }),
+    ).not.toThrow();
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceRechargeTiers: [],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  // Same empty-array hazard on the OTHER side of the refine's condition:
+  // `!row.resourceTotals` doesn't short-circuit for `resourceTotals: []`
+  // either. This row has valid recharge tiers and no scalar fallback, so the
+  // refine reaches the `resourceTotals[0]` read — it must not throw. Whether
+  // safeParse then accepts or rejects the row is secondary to that; it
+  // ACCEPTS here, since an empty resourceTotals means no pool ever opens, so
+  // there is no level at which the missing recharge coverage matters.
+  it("resourceTotals: [] alongside recharge tiers and no scalar does not throw, and is accepted (no pool ever opens to need recharge coverage)", () => {
+    expect(() =>
+      classFeatureSeedSchema.safeParse({
+        ...baseRow,
+        resourceRechargeTiers: [{ minLevel: 5, recharge: "short-or-long" }],
+        resourceTotals: [],
+      }),
+    ).not.toThrow();
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceRechargeTiers: [{ minLevel: 5, recharge: "short-or-long" }],
+      resourceTotals: [],
     });
     expect(result.success).toBe(true);
   });

@@ -145,7 +145,7 @@ model User {
   // USER-scope catalog entries this user owns (#1796, epic #1795 1/6) —
   // homebrew content across every kind, not just Spell. Mirrors `characters`
   // — cascade-deleted with the user (CatalogEntry.ownerUser onDelete: Cascade).
-  catalogEntries CatalogEntry[]
+  catalogEntries  CatalogEntry[]
   // Per-user dismissals of derived inbox flags (#1945).
   inboxDismissals InboxDismissal[]
 
@@ -678,11 +678,11 @@ model CharacterClass {
 // subclasses are represented by a null subclassId with a drifting name string,
 // same as homebrew races/classes/backgrounds.
 model Subclass {
-  id          String         @id @default(uuid())
-  classId     String
-  class       CharacterClass @relation(fields: [classId], references: [id], onDelete: Cascade)
-  name        String
-  description String
+  id                  String                  @id @default(uuid())
+  classId             String
+  class               CharacterClass          @relation(fields: [classId], references: [id], onDelete: Cascade)
+  name                String
+  description         String
   // Stable mechanics identity: the join key between this catalog row and the
   // lib/classes/*.ts definition that implements it (#1277). Immutable — a
   // display-name rename must NOT change it, which is the whole point: a player
@@ -691,14 +691,14 @@ model Subclass {
   // Vocabulary is SUBCLASS_SLUGS; resolveSubclassSlug is the ONE place a
   // character resolves onto it. Generated once from (class, name) by this
   // column's migration as an authoring CONVENTION for new rows, never at read time.
-  slug        String
+  slug                String
   // NULL = valid in both editions; a diverging subclass (gate level, grants)
   // forks into one row per edition sharing this name (#1306). Kept named
   // "classId_name" (not classId_name_edition) so the compound-key literal at
   // every existing call site only grows an `edition` field, not a rename.
   // NULLS NOT DISTINCT on the migration's unique index — see resolveEditionRow,
   // the single place the exact/NULL fallback ordering is expressed.
-  edition     RulesEdition?
+  edition             RulesEdition?
   // Third-caster identity (#1531): NULL for every subclass that grants no
   // spellcasting of its own (the vast majority — Champion, Battle Master, …).
   // "third" for Eldritch Knight / Arcane Trickster today. A Prisma enum
@@ -712,7 +712,7 @@ model Subclass {
   // Replaces the retired THIRD_CASTER_SUBCLASSES name-keyed lookup
   // (spellcasting-tables.ts) — a renamed or homebrew subclass now carries its
   // own mechanics on this row instead of matching a display name.
-  casterFraction       SubclassCasterFraction?
+  casterFraction      SubclassCasterFraction?
   // Governing ability for this subclass's granted spellcasting ("intelligence"
   // for EK/AT) — NULL alongside casterFraction for a non-caster subclass.
   // Plain string (unlike casterFraction): the value space is 5e's six ability
@@ -720,7 +720,7 @@ model Subclass {
   // (SPELLCASTING_ABILITY, SubclassGrantedSpell.castingAbility above) — no
   // single call site branches on it the way thirdCasterAbilityOf branches on
   // casterFraction, so there's no compile-time gate to buy with an enum here.
-  spellcastingAbility  String?
+  spellcastingAbility String?
 
   selections          CharacterClassEntry[]
   grantedSpells       SubclassGrantedSpell[]
@@ -835,16 +835,19 @@ model ClassFeature {
   // ---- than re-migrating all 522 text rows a second time when #1528 lands.
 
   // Resource block — replaces the pool this feature declares in resourceFn.
-  // `resourceRecharge` is a single scalar, not a tier array — Bardic
-  // Inspiration's recharge changes mid-progression (longRest below level 5,
-  // short-or-long from level 5), which is why it stays resourceFn-derived
-  // even though #1685's evaluator can now express its Cha-mod total
-  // (`{ abilityMod, min }`) directly on a row (#1224).
-  resourceKey      String?
-  resourceLabel    String?
-  resourceRecharge String? // RechargeOn
-  resourceTotals   Json? // [{ minLevel, total }] — total: number | "proficiencyBonus" | { abilityMod, min? } | { levelTimes } (#1685) — ASCENDING by minLevel, last-match-wins
-  resourceDieTiers Json? // [{ minLevel, die }]   — ASCENDING by minLevel, last-match-wins
+  // `resourceRecharge` is a flat scalar; `resourceRechargeTiers` below covers
+  // a recharge cadence that changes mid-progression instead (e.g. Bardic
+  // Inspiration's longRest-then-short-or-long shift at level 5). Bardic
+  // Inspiration itself still stays resourceFn-derived (#1224, bard.ts) — not
+  // for its recharge or its Cha-mod total, both now expressible on a row, but
+  // for its level-conditional description text (die size and rest type
+  // interpolated inline, #1528's no-second-string rule).
+  resourceKey           String?
+  resourceLabel         String?
+  resourceRecharge      String? // RechargeOn
+  resourceTotals        Json? // [{ minLevel, total }] — total: number | "proficiencyBonus" | { abilityMod, min? } | { levelTimes } (#1685) — ASCENDING by minLevel, last-match-wins
+  resourceDieTiers      Json? // [{ minLevel, die }]   — ASCENDING by minLevel, last-match-wins
+  resourceRechargeTiers Json? // [{ minLevel, recharge }] — recharge: RechargeOn — ASCENDING by minLevel, last-match-wins
 
   // Activation block — replaces this feature's DERIVED_ACTIONS row. No gate
   // columns: grantClass IS classId, grantSubclassSlugs IS subclassId,
@@ -870,14 +873,14 @@ model ClassFeature {
   // `describeRowReminder`'s derived heal text yields nothing, so a row with
   // an effectKind (Second Wind) keeps its computed "Regain NdM HP" subtitle
   // over this column. Validated seed-time (classFeatureSeedSchema).
-  reminder String?
+  reminder           String?
   // A resolved numeric fact about this action the client renders verbatim
   // (#1912) — the row-authored counterpart to DERIVED_ACTIONS' retired
   // `count` field (actions.ts), e.g. Flurry of Blows' strike count (2
   // normally, 3 at Heightened Focus, monk L10). `buildRowAction` serves it
   // verbatim; a level-gated bump is an announce-augmentor payload (#1910),
   // never a second row.
-  count Int?
+  count              Int?
   // Marks a row that exists ONLY to carry one action VARIANT of a feature
   // that grants several (Patient Defense free vs. 1-Focus, Step of the
   // Wind's pair, Empty Body's two ki options, the Deflect riders, Hand of
@@ -889,7 +892,7 @@ model ClassFeature {
   // projected — ONLY in `availableActions[]`. Requires `activationCost` +
   // `resourceKey` (enforced at seed time, classFeatureSeedSchema): a row
   // with neither is dead data, invisible everywhere.
-  actionOnly Boolean @default(false)
+  actionOnly         Boolean  @default(false)
 
   // Cost block — GrantedAbility's columns verbatim (AbilityCostColumns is
   // exactly these four, all optional) so readAbilityCost reads them unchanged.
@@ -1001,7 +1004,7 @@ model ClassFeature {
   // Beguiling Defenses/Nature's Ward are UNCONDITIONAL (no gating buff), so
   // forcing them through the buff-only effectBuffs list would need a fake
   // always-active buff for a feature the player never toggles.
-  conditionImmunities String[] @default([])
+  conditionImmunities                  String[] @default([])
   // Gates `conditionImmunities` on a buff of this key currently being active
   // (#1121) — e.g. Mindless Rage names "rage" (the Barbarian base-class Rage
   // row's own effectBuffs key), so the immunity applies only while raging.
@@ -1017,7 +1020,7 @@ model ClassFeature {
   // the one place this vocabulary is interpreted, alongside
   // conditionImmunitiesFromRows (lib/classes/class-feature-rows.ts) for the
   // read-time immune SET itself.
-  conditionImmunitiesOnBuffStart String?
+  conditionImmunitiesOnBuffStart       String?
 
   // NULLS NOT DISTINCT is hand-written in the migration (Prisma's DSL cannot
   // express it) — subclassId is nullable and base-class features are the
@@ -2464,14 +2467,14 @@ model Session {
 // One character's membership in a shared session, with their present-interval
 // (joinedAt..leftAt) and per-participant summary computed at session-end (#245).
 model SessionParticipant {
-  id          String    @id @default(uuid())
-  sessionId   String
-  session     Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  characterId String
-  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
-  joinedAt    DateTime  @default(now())
-  leftAt      DateTime?
-  summary     Json?
+  id                String         @id @default(uuid())
+  sessionId         String
+  session           Session        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  characterId       String
+  character         Character      @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  joinedAt          DateTime       @default(now())
+  leftAt            DateTime?
+  summary           Json?
   // Per-turn spell-cast kind (#1439) — the SECOND deliberate DERIVE-DON'T-PERSIST
   // EXCEPTION, alongside Session.combatActive/round (#1030). The 5e bonus-action
   // spellcasting interlock (a leveled spell cast with your Action blocks a
@@ -2491,7 +2494,7 @@ model SessionParticipant {
   // `updatedAt` (max of this and Session.updatedAt) advances on a
   // participant-only change, keeping the client's monotonic sync guard correct
   // for the interlock flags, not just for round (#1439).
-  updatedAt   DateTime  @updatedAt @default(now())
+  updatedAt         DateTime       @default(now()) @updatedAt
 
   @@unique([sessionId, characterId])
   @@index([sessionId])

@@ -16,6 +16,7 @@ import {
   improvementsFromRows,
   poolsFromRows,
   type ClassFeatureRow,
+  type ResourceRechargeTier,
 } from "@/lib/classes/class-feature-rows.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 
@@ -156,6 +157,45 @@ describe("poolsFromRows resolves a tier's formula total end to end (#1685)", () 
     const rows = [row({ resourceKey: "loh", resourceTotals: [{ minLevel: 1, total: { levelTimes: 5 } }] })];
     expect(poolsFromRows(rows, 3, {}, 2, "EDITION_2014")[0].total).toBe(15);
     expect(poolsFromRows(rows, 7, {}, 2, "EDITION_2014")[0].total).toBe(35);
+  });
+});
+
+describe("poolsFromRows resolves resourceRechargeTiers (level-tiered recharge cadence)", () => {
+  const rechargeTiers: ResourceRechargeTier[] = [
+    { minLevel: 1, recharge: "longRest" },
+    { minLevel: 5, recharge: "short-or-long" },
+  ];
+
+  it("below the first tier's minLevel, falls back to the scalar resourceRecharge", () => {
+    const rows = [
+      row({
+        resourceKey: "bardic",
+        resourceTotals: [{ minLevel: 1, total: 2 }],
+        resourceRecharge: "longRest",
+        resourceRechargeTiers: [{ minLevel: 5, recharge: "short-or-long" }],
+      }),
+    ];
+    expect(poolsFromRows(rows, 4, {}, 2, "EDITION_2014")[0].recharge).toBe("longRest");
+  });
+
+  it("at/above a tier's minLevel, the tier's recharge wins over the scalar — last-match-wins across two tiers", () => {
+    const rows = [
+      row({ resourceKey: "bardic", resourceTotals: [{ minLevel: 1, total: 2 }], resourceRecharge: "none", resourceRechargeTiers: rechargeTiers }),
+    ];
+    expect(poolsFromRows(rows, 1, {}, 2, "EDITION_2014")[0].recharge).toBe("longRest");
+    expect(poolsFromRows(rows, 4, {}, 2, "EDITION_2014")[0].recharge).toBe("longRest");
+    expect(poolsFromRows(rows, 5, {}, 2, "EDITION_2014")[0].recharge).toBe("short-or-long");
+    expect(poolsFromRows(rows, 20, {}, 2, "EDITION_2014")[0].recharge).toBe("short-or-long");
+  });
+
+  it("with no resourceRechargeTiers, resolves from the scalar resourceRecharge unchanged", () => {
+    const rows = [row({ resourceKey: "flat", resourceTotals: [{ minLevel: 1, total: 1 }], resourceRecharge: "shortRest" })];
+    expect(poolsFromRows(rows, 1, {}, 2, "EDITION_2014")[0].recharge).toBe("shortRest");
+  });
+
+  it("with neither resourceRechargeTiers nor resourceRecharge, resolves to \"none\"", () => {
+    const rows = [row({ resourceKey: "flat", resourceTotals: [{ minLevel: 1, total: 1 }] })];
+    expect(poolsFromRows(rows, 1, {}, 2, "EDITION_2014")[0].recharge).toBe("none");
   });
 });
 
