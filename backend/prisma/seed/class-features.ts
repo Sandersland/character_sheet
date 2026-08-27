@@ -367,6 +367,30 @@ const activationRequirementSchema = z.union([
 ]);
 const activationRequiresSchema = z.array(activationRequirementSchema);
 
+function firstMinLevel(tiers: { minLevel: number }[] | null | undefined): number | undefined {
+  return tiers?.length ? tiers[0].minLevel : undefined;
+}
+
+interface RechargeGapRow {
+  resourceRecharge?: string;
+  resourceRechargeTiers?: { minLevel: number }[] | null;
+  resourceTotals?: { minLevel: number }[] | null;
+}
+
+// The classFeatureSeedSchema.refine predicate below, split out to stay under
+// the seed module's CC ceiling (prisma/seed/** carries no coverage
+// instrumentation, so CRAP floors at CC^2+CC — see isAscendingByMinLevel's own
+// comment on the same constraint). True unless a row declares
+// resourceRechargeTiers with no resourceRecharge scalar fallback AND a
+// resourceTotals pool that opens before the first recharge tier is reached —
+// see the `.refine` call site's message for why that combination is rejected.
+function rechargeTiersCoverPoolStart(row: RechargeGapRow): boolean {
+  const rechargeStart = firstMinLevel(row.resourceRechargeTiers);
+  if (rechargeStart === undefined || row.resourceRecharge !== undefined) return true;
+  const poolStart = firstMinLevel(row.resourceTotals);
+  return poolStart === undefined || rechargeStart <= poolStart;
+}
+
 // Validated at seed time (prisma/seed/validate.ts). Only the identity fields
 // this migration actually populates are required; the descriptor fields are
 // declared (using the tier schemas above) so a future population pass is
@@ -417,14 +441,7 @@ export const classFeatureSeedSchema = z
   // first resourceRechargeTiers tier — a row with no scalar and a pool that
   // opens (resourceTotals) before that first tier is reached would silently
   // resolve to "none" at those levels, never a rules bug the seed itself catches.
-  .refine(
-    (row) =>
-      !row.resourceRechargeTiers ||
-      row.resourceRecharge !== undefined ||
-      !row.resourceTotals?.length ||
-      row.resourceRechargeTiers[0].minLevel <= row.resourceTotals[0].minLevel,
-    {
-      message:
-        'resourceRechargeTiers with no resourceRecharge fallback must reach its first tier at or before resourceTotals\' first tier, or the pool would silently recharge "none" below it',
-    },
-  );
+  .refine(rechargeTiersCoverPoolStart, {
+    message:
+      'resourceRechargeTiers with no resourceRecharge fallback must reach its first tier at or before resourceTotals\' first tier, or the pool would silently recharge "none" below it',
+  });
