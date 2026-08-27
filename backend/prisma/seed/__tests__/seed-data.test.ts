@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 
-import { bard } from "@/lib/classes/bard.js";
 import { druid } from "@/lib/classes/druid.js";
 import { monk } from "@/lib/classes/monk.js";
 import { paladin } from "@/lib/classes/paladin.js";
@@ -720,7 +719,7 @@ describe("referential integrity", () => {
   // 2014-scoped, so the two values must mean the same PHB'14 level.
   it("every class-definition grantLevel matches its seed subclassLevel", () => {
     const defByName: Record<string, ClassDefinition> = {
-      Bard: bard, Druid: druid,
+      Druid: druid,
       Monk: monk, Paladin: paladin, Ranger: ranger,
     };
     const drift = CLASSES.flatMap((seedClass) =>
@@ -773,13 +772,13 @@ describe("referential integrity", () => {
 
 describe("SUBCLASS_SLUGS — three-way bijection (#1277)", () => {
   const CLASS_DEFS: Record<string, ClassDefinition> = {
-    bard, druid, monk, paladin, ranger,
+    druid, monk, paladin, ranger,
   };
 
   // The named twin of the class-migration guard's NOT_YET_MIGRATED list,
   // keyed by SUBCLASS_IDENTITY's classKey. Deliberate-coupling latch: if you
   // change one, update the other.
-  const ROW_MIGRATED_CLASSES = ["fighter", "barbarian", "rogue", "cleric", "warlock", "wizard", "sorcerer"];
+  const ROW_MIGRATED_CLASSES = ["fighter", "barbarian", "rogue", "cleric", "warlock", "wizard", "sorcerer", "bard"];
 
   // Empty on purpose — the allowlist for an engine-first subclass in a class
   // that keeps its module, with its reason recorded.

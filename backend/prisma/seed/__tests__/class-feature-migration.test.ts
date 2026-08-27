@@ -165,8 +165,6 @@ function isPopulatedWarlockRow(row: { className: string; subclassSlug: string | 
   return POPULATED_WARLOCK_ROW_KEYS.has(`${row.className}::${row.subclassSlug ?? "null"}::${row.name}`);
 }
 
-// Identity-only resourceKey — Bardic Inspiration's pool itself stays in
-// bard's resourceFn.
 const POPULATED_BARD_ROW_KEYS = new Set(["Bard::null::Bardic Inspiration::EDITION_2014", "Bard::null::Bardic Inspiration::EDITION_2024"]);
 
 function isPopulatedBardRow(row: RowKey): boolean {
@@ -434,12 +432,16 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
     const PALADIN_POOL_ROWS = 2;
     const BLADESINGER_POOL_ROWS = 1;
     const OPEN_HAND_POOL_ROWS = 1;
+    const BARD_POOL_ROWS = 2;
     const populatedResourceTotalsCount =
       FIGHTER_POOL_ROWS + BATTLE_MASTER_POOL_ROWS + BARBARIAN_POOL_ROWS + WIZARD_POOL_ROWS +
       WARLOCK_POOL_ROWS + RANGER_POOL_ROWS + SORCERER_POOL_ROWS + CLERIC_POOL_ROWS +
-      DRUID_POOL_ROWS + PALADIN_POOL_ROWS + BLADESINGER_POOL_ROWS + OPEN_HAND_POOL_ROWS;
-    // Combat Superiority (both editions) is the only row with a die-size tier.
-    const populatedResourceDieTiersCount = BATTLE_MASTER_POOL_ROWS;
+      DRUID_POOL_ROWS + PALADIN_POOL_ROWS + BLADESINGER_POOL_ROWS + OPEN_HAND_POOL_ROWS + BARD_POOL_ROWS;
+    // Combat Superiority (both editions) and Bardic Inspiration (both
+    // editions) are the only rows with a die-size tier.
+    const populatedResourceDieTiersCount = BATTLE_MASTER_POOL_ROWS + BARD_POOL_ROWS;
+    // Bardic Inspiration (both editions) is the only row with a recharge tier.
+    const populatedResourceRechargeTiersCount = BARD_POOL_ROWS;
     // One row each, not two — a future asymmetric key joins this list.
     const SINGLE_EDITION_DERIVED_STAT_KEYS = [
       "Bladesinger Extra Attack (EDITION_2014 only)",
@@ -447,12 +449,12 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
       "Scholar (EDITION_2024 only)",
     ];
     const populatedDerivedStatTiersCount = DERIVED_STAT_ROW_KEYS.size * 2 - SINGLE_EDITION_DERIVED_STAT_KEYS.length;
-    // resourceRechargeTiers/resourceDetailTiers have no populated rows yet — their whole tables are DbNull.
+    // resourceDetailTiers has no populated rows yet — its whole table is DbNull.
     const EXPECTED_DB_NULL: Record<"resourceTotals" | "resourceDieTiers" | "derivedStatTiers" | "resourceRechargeTiers" | "resourceDetailTiers", number> = {
       resourceTotals: CLASS_FEATURES.length - populatedResourceTotalsCount,
       resourceDieTiers: CLASS_FEATURES.length - populatedResourceDieTiersCount,
       derivedStatTiers: CLASS_FEATURES.length - populatedDerivedStatTiersCount,
-      resourceRechargeTiers: CLASS_FEATURES.length,
+      resourceRechargeTiers: CLASS_FEATURES.length - populatedResourceRechargeTiersCount,
       resourceDetailTiers: CLASS_FEATURES.length,
     };
     for (const column of ["resourceTotals", "resourceDieTiers", "derivedStatTiers", "resourceRechargeTiers", "resourceDetailTiers"] as const) {

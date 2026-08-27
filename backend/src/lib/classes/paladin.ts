@@ -24,9 +24,9 @@ import type { ClassDefinition, DerivedResource } from "./types.js";
 // while this resourceFn's description below states the COMPUTED NUMBER
 // (`Pool of ${level * 5} healing HP`) — migrating would swap what a player
 // actually reads (a formula) for what they read today (a live number),
-// failing #1685's byte-identical AC outright, so Lay on Hands is EXCLUDED
-// here alongside Bardic Inspiration (bard.ts) rather than migrated as the
-// issue's named stretch goal. `channelDivinity`'s pool, a flat/tiered total
+// failing #1685's byte-identical AC outright, so Lay on Hands stays
+// EXCLUDED rather than migrated as the issue's named stretch goal.
+// `channelDivinity`'s pool, a flat/tiered total
 // with no computed value, is the one that moved onto its rows — see
 // paladin-features.ts's own RESOURCE POOL header block for why exactly one
 // row per edition carries it.
