@@ -1,7 +1,6 @@
-// Runs against the real seeded catalog: the template DB the test setup clones
-// from has already run `prisma db seed`. seedClassFeatures is exported
-// precisely so this suite can re-run it in-process (seed.ts's main()
-// self-invokes at module load and exports nothing).
+// Runs against the real seeded catalog (the template DB has already run
+// `prisma db seed`); seedClassFeatures is exported precisely so this suite
+// can re-run it in-process.
 import { describe, expect, it } from "vitest";
 
 import { Prisma } from "@/generated/prisma/client.js";
@@ -246,9 +245,7 @@ function isSaveDcRow(row: RowKey): boolean {
 }
 
 // Every populated-row predicate registers here, once — a second aggregator is
-// how a row silently escapes the descriptor sweep. An array + `.some()`
-// rather than an `||` chain keeps this function's cyclomatic count at 1
-// (prisma/seed/** has no coverage instrumentation, so CRAP floors at CC^2+CC).
+// how a row silently escapes the descriptor sweep.
 const POPULATED_ROW_PREDICATES: ((row: RowKey) => boolean)[] = [
   isPopulatedFighterRow,
   isPopulatedBattleMasterPoolRow,
@@ -306,6 +303,7 @@ type DescriptorRow = {
   resourceTotals: unknown;
   resourceDieTiers: unknown;
   resourceRechargeTiers: unknown;
+  resourceDetailTiers: unknown;
   activationCost: string | null;
   resolverKind: string | null;
   requiresUnarmored: boolean;
@@ -338,6 +336,7 @@ function expectNullResourceColumns(row: DescriptorRow): void {
   expect(row.resourceTotals, row.name).toBeNull();
   expect(row.resourceDieTiers, row.name).toBeNull();
   expect(row.resourceRechargeTiers, row.name).toBeNull();
+  expect(row.resourceDetailTiers, row.name).toBeNull();
   expect(row.activationCost, row.name).toBeNull();
   expect(row.resolverKind, row.name).toBeNull();
   expect(row.requiresUnarmored, row.name).toBe(false);
@@ -395,7 +394,7 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
   it("no row has a populated descriptor column, except Fighter's (#1528/#1546), Barbarian's Rage (#1223), Wizard's (#1234), Warlock's (#1233), Ranger's (#1230), Sorcerer's (#1232), Cleric's (#1225), Paladin's (#1229), Wizard's Bladesinger (#1676) and Bard's/Druid's/Sorcerer's Metamagic/Paladin's/Cleric's row-driven actions (#1909)", async () => {
     const rows = await prisma.classFeature.findMany({
       select: { name: true, edition: true, class: { select: { name: true } }, subclass: { select: { slug: true } },
-        resourceKey: true, resourceLabel: true, resourceRecharge: true, resourceTotals: true, resourceDieTiers: true, resourceRechargeTiers: true,
+        resourceKey: true, resourceLabel: true, resourceRecharge: true, resourceTotals: true, resourceDieTiers: true, resourceRechargeTiers: true, resourceDetailTiers: true,
         activationCost: true, resolverKind: true, requiresUnarmored: true, regrants: true,
         costKind: true, costPoolKey: true, costBase: true, costPerStep: true,
         effectKind: true, effectDiceCount: true, effectDiceFaces: true, effectDieSource: true,
@@ -448,14 +447,15 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
       "Scholar (EDITION_2024 only)",
     ];
     const populatedDerivedStatTiersCount = DERIVED_STAT_ROW_KEYS.size * 2 - SINGLE_EDITION_DERIVED_STAT_KEYS.length;
-    // resourceRechargeTiers has no populated rows yet — its whole table is DbNull.
-    const EXPECTED_DB_NULL: Record<"resourceTotals" | "resourceDieTiers" | "derivedStatTiers" | "resourceRechargeTiers", number> = {
+    // resourceRechargeTiers/resourceDetailTiers have no populated rows yet — their whole tables are DbNull.
+    const EXPECTED_DB_NULL: Record<"resourceTotals" | "resourceDieTiers" | "derivedStatTiers" | "resourceRechargeTiers" | "resourceDetailTiers", number> = {
       resourceTotals: CLASS_FEATURES.length - populatedResourceTotalsCount,
       resourceDieTiers: CLASS_FEATURES.length - populatedResourceDieTiersCount,
       derivedStatTiers: CLASS_FEATURES.length - populatedDerivedStatTiersCount,
       resourceRechargeTiers: CLASS_FEATURES.length,
+      resourceDetailTiers: CLASS_FEATURES.length,
     };
-    for (const column of ["resourceTotals", "resourceDieTiers", "derivedStatTiers", "resourceRechargeTiers"] as const) {
+    for (const column of ["resourceTotals", "resourceDieTiers", "derivedStatTiers", "resourceRechargeTiers", "resourceDetailTiers"] as const) {
       const dbNullCount = await prisma.classFeature.count({ where: { [column]: { equals: Prisma.DbNull } } });
       expect(dbNullCount, column).toBe(EXPECTED_DB_NULL[column]);
 
@@ -516,7 +516,7 @@ describe("ClassFeature migration — Fighter's #1528 pilot rows are populated ex
       expect(row.costKind, row.edition).toBe("pool");
       expect(row.costPoolKey, row.edition).toBe("actionSurge");
       expect(row.costBase, row.edition).toBe(1);
-      expect(row.effectKind, row.edition).toBeNull(); // no such axis — a pure counter
+      expect(row.effectKind, row.edition).toBeNull();
     }
   });
 
@@ -670,8 +670,6 @@ describe("ClassFeature migration — seedClassFeatures is idempotent (#1523)", (
     const rows = await prisma.classFeature.findMany({
       where: { name: "Second Wind", class: { name: "Fighter" }, subclassId: null, edition: "EDITION_2024" },
     });
-    // Same row updated in place — not a second row created alongside the
-    // (never-deleted) mutated one.
     expect(rows).toHaveLength(1);
     expect(rows[0].id).toBe(target.id);
     expect(rows[0].description).toBe(canonical.description);

@@ -569,6 +569,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
     "pools": [
       {
         "description": "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
+        "details": undefined,
         "die": undefined,
         "key": "arcaneRecovery",
         "label": "Arcane Recovery",
@@ -579,6 +580,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
       },
       {
         "description": "As a bonus action, regain 1d10 + your fighter level HP. Regain use on a short or long rest.",
+        "details": undefined,
         "die": undefined,
         "key": "secondWind",
         "label": "Second Wind",
@@ -1123,6 +1125,7 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
     "pools": [
       {
         "description": "As a bonus action, regain 1d10 + your fighter level HP. Regain use on a short or long rest.",
+        "details": undefined,
         "die": undefined,
         "key": "secondWind",
         "label": "Second Wind",
@@ -1133,6 +1136,7 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
       },
       {
         "description": "Take one additional action on your turn. Regain use(s) on a short or long rest. You have 2 uses starting at level 17.",
+        "details": undefined,
         "die": undefined,
         "key": "actionSurge",
         "label": "Action Surge",
@@ -1143,6 +1147,7 @@ exports[`serializeCharacter snapshot lock (#1003) > single-class non-caster cont
       },
       {
         "description": "You learn maneuvers fueled by Superiority Dice. You have 4 d8s (5 at level 7, 6 at level 15), and you know 3 maneuvers (5 at level 7, 7 at level 10, 9 at level 15). The save DC for a maneuver that requires one equals 8 + your Proficiency Bonus + your Strength or Dexterity modifier. You regain all expended dice on a short or long rest.",
+        "details": undefined,
         "die": "d8",
         "key": "superiorityDice",
         "label": "Superiority Dice",

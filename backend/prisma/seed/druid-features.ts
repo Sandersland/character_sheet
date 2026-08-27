@@ -1,65 +1,17 @@
-// --- Druid ClassFeature rows, authored as LITERAL data (#1226) -------------
-// Commit 1 of 3 (mirrors Barbarian's #1223 / Ranger's #1230 pilots) moves
-// these rows off lib/classes/druid.ts's AuthoredFeature[] arrays into literal
-// seed data, byte-identical to the old TS-derived text (pinned by
-// druid-2014-snapshot.test.ts) — all 17 rows below are still UNTAGGED at this
-// commit (`edition` omitted, expand() seeds an identical copy per edition),
-// exactly reproducing today's behaviour where a 2024 Druid sees 2014 text.
-// Commit 2 authors Druid's REAL SRD 5.2 (2024) content, transcribed from SRD
-// 5.2's own raw text for the base class and Circle of the Land; Circle of
-// the Moon is NOT in SRD 5.2 (owner decision: mirror-source it from two
-// independent sources, dnd2024.wikidot.com and wastedwizardgames.com —
-// validated against each other and against the Land subclass's byte-identical
-// SRD text, see CIRCLE_OF_THE_MOON_RAW's own comment) — by tagging every row
-// below EDITION_2014 and adding new EDITION_2024 rows alongside them. Commit 3
-// SPLITS Wild Shape's pool: the EDITION_2024 row gets resourceTotals/
-// shortRestRegain (SRD 5.2 restructures Wild Shape enough that the CR cap and
-// duration are no longer computed values embedded in the description — see
-// DRUID_BASE_RAW's own EDITION_2024 Wild Shape row for the three-axis
-// re-evaluation), while the
-// EDITION_2014 row stays exactly as it always has — its pool computed by
-// lib/classes/druid.ts's resourceFn, which commit 3 leaves untouched.
-// Moonlight Step's pool (Circle of the Moon, 2024) is a Wisdom-modifier
-// formula, same shape as ranger-features.ts's Tireless/Nature's Veil — #1685
-// widened resourceTotals to express it directly as a
-// `{ abilityMod: "wisdom", min: 1 }` tier, retiring the small EDITION_2024
-// resourceFn that used to live on the subclass definition (lib/classes/druid.ts).
-//
-// class-features.ts concatenates DRUID_FEATURES onto the still-derived
-// classes' rows to build CLASS_FEATURES; see its LITERAL_ROW_CLASSES export
-// for the set of classes whose rows tests must not compare against a
-// TS-array "old" side.
-//
+// Druid ClassFeature rows, authored as LITERAL seed data (#1226).
 // DATA MODULE ONLY (#1277 AC 4, scripts/check-seed-data-modules.sh): no
-// direct database calls or async write logic may live in this file. expand()
-// below is pure content assembly, not seeding logic.
-//
-// EDITION RULE (mirrors barbarian-features.ts/ranger-features.ts): `edition`
-// omitted -> expand() seeds ONE row per edition with IDENTICAL text. As of
-// commit 2, EVERY row below sets an explicit `edition` — unlike Barbarian's
-// Extra Attack/Fast Movement or Ranger's Extra Attack, no Druid feature is
-// genuinely edition-invariant in both mechanics AND wording once transcribed
-// (even Beast Spells, which keeps its core clause, tightens its Material-
-// component exclusion in 2024). A "removed in 2024" feature (Bonus Cantrip,
-// Land's Stride, Combat Wild Shape, Primal Strike, Elemental Wild Shape,
-// Thousand Forms; Timeless Body folds into Archdruid rather than surviving as
-// its own row) means NOT authoring a 2024 row for that name, never deleting
-// the 2014 row; a rename (Circle Spells -> Circle of the Land Spells) is a
-// wholly different row, never one edited in place; a level-shift (Natural
-// Recovery 2->6, Circle Forms 2->3) is two rows with two `level` values.
-// Every EDITION_2014 row below stays byte-identical to what commit 1 pinned
-// (druid-2014-snapshot.test.ts) — commit 2 only ever ADDS an
-// `edition: "EDITION_2014"` tag alongside new 2024 text; it never edits a
-// 2014 row's own name/level/description.
+// database calls or async write logic; expand() is pure content assembly.
+// EDITION_2014 text is pinned byte-identical by druid-2014-snapshot.test.ts.
+// EDITION_2024 base-class and Circle of the Land text is transcribed from SRD
+// 5.2's own raw text; Circle of the Moon is NOT in SRD 5.2 and is
+// mirror-sourced (owner decision) — see CIRCLE_OF_THE_MOON_RAW's own comment.
+// A feature removed in 2024 keeps its 2014 row and gets no 2024 row; a rename
+// or a level shift is a wholly new row, never one edited in place.
 import type { ResourceTotalFormula } from "../../src/lib/classes/class-feature-rows.js";
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { SeedEdition } from "./edition.js";
 import type { ClassFeatureSeedRow } from "./class-features.js";
 
-// Guards a stray subclass-slug typo below at import time, same intent as
-// classFeatureSeedSchema's z.enum(SUBCLASS_SLUGS) — cheaper than a zod parse
-// for a fixed, tiny, module-local list (mirrors barbarian-features.ts's
-// slug()).
 function slug(s: SubclassSlug): SubclassSlug {
   if (!SUBCLASS_SLUGS.includes(s)) throw new Error(`druid-features: unknown subclass slug "${s}"`);
   return s;
@@ -70,24 +22,13 @@ interface RawDruidFeature {
   name: string;
   level: number;
   description: string;
-  /** Omitted -> identical text seeded for both editions (see file header). */
+  /** Omitted -> identical text seeded for both editions. */
   edition?: SeedEdition;
-  // Resource-pool descriptor columns (#1226 commit 3, widened #1685) — see
-  // this file's own header for the two rows that set these (EDITION_2024
-  // Wild Shape and EDITION_2024 Moonlight Step).
   resourceKey?: string;
   resourceLabel?: string;
   resourceRecharge?: string;
   resourceTotals?: { minLevel: number; total: ResourceTotalFormula; shortRestRegain?: number }[];
-  // Nature's Ward's unconditional Poisoned immunity (#1121) — see this file's
-  // own header for the two rows that set this.
   conditionImmunities?: string[];
-  // Activation block (#1909) — Wild Shape's row-driven action moved off
-  // actions.ts's DERIVED_ACTIONS onto its own rows (both editions). The 2014
-  // row's resourceKey is IDENTITY-ONLY (no resourceTotals — its pool stays
-  // wholly in druid.ts's resourceFn); the 2024 row's resourceKey already
-  // carries the real pool (resourceTotals above), so the action rides the
-  // SAME row rather than a second one.
   activationCost?: string;
   costKind?: string;
   costPoolKey?: string;
@@ -115,14 +56,6 @@ function expand(raw: RawDruidFeature): ClassFeatureSeedRow[] {
   return editions.map((edition) => ({ ...base, edition }));
 }
 
-// ---- Base class — SRD 5.1 Druid (2014) / SRD 5.2 Druid (2024) -------------
-// 2014: 6 rows (byte-identical to commit 1 / druid-2014-snapshot.test.ts).
-// 2024: 11 rows — Timeless Body has no 2024 successor (folded into
-// Archdruid's Longevity, not deleted — its 2014 row stays), and six wholly
-// new 2024 features join (Primal Order, Wild Companion, Wild Resurgence,
-// Elemental Fury, Improved Elemental Fury, Epic Boon) alongside the five
-// genuine reworks (Druidic, Spellcasting, Wild Shape, Beast Spells,
-// Archdruid).
 const DRUID_BASE_RAW: RawDruidFeature[] = [
   {
     subclassSlug: null,
@@ -137,10 +70,8 @@ const DRUID_BASE_RAW: RawDruidFeature[] = [
     name: "Druidic",
     level: 1,
     edition: "EDITION_2024",
-    // SRD 5.2: adds an always-prepared Speak with Animals, castable free; the
-    // hidden-message detection check changes from Wisdom (Perception) (2014
-    // has no check at all — it's automatic) to a stated Intelligence
-    // (Investigation) DC.
+    // SRD 5.2: adds a free always-prepared Speak with Animals; hidden-message
+    // detection becomes a stated Intelligence (Investigation) DC.
     description:
       "You know Druidic, the secret language of druids, and you can leave hidden messages that others can discover only with a successful DC 15 Intelligence (Investigation) check. You always have the Speak with Animals spell prepared, and you can cast it without expending a spell slot.",
   },
@@ -157,10 +88,8 @@ const DRUID_BASE_RAW: RawDruidFeature[] = [
     name: "Spellcasting",
     level: 1,
     edition: "EDITION_2024",
-    // SRD 5.2: prepared count becomes a fixed per-level table (4 at level 1,
-    // growing to 22 by level 20) rather than Wisdom modifier + druid level;
-    // cantrips known are 2/3/4 at levels 1/4/10 with a free swap on a Long
-    // Rest; adds a Druidic Focus as an allowed spellcasting focus.
+    // SRD 5.2: prepared count becomes a fixed per-level table rather than
+    // Wisdom modifier + druid level.
     description:
       "You cast spells using Wisdom (spell save DC = 8 + your Proficiency Bonus + your Wisdom modifier). You know 2 Druid cantrips of your choice from the Druid spell list (3 at level 4, 4 at level 10), and you can replace one of them with another Druid cantrip whenever you finish a Long Rest. You prepare a number of Druid spells equal to the number shown on the Druid Features table for your level (4 at level 1, growing to 22 by level 20) after finishing a Long Rest, and you regain all expended spell slots when you finish a Long Rest. You can use a Druidic Focus as a spellcasting focus for your Druid spells.",
   },
@@ -171,9 +100,11 @@ const DRUID_BASE_RAW: RawDruidFeature[] = [
     edition: "EDITION_2014",
     description:
       "As an action, transform into a beast you have seen. Max CR: 1/4 at L2 (no flying or swimming speed); 1/2 at L4 (no flying speed); 1 at L8. You retain your mental stats and class features but use the beast's physical stats. Lasts up to half your druid level in hours (minimum 1). Reverts when reduced to 0 HP.",
-    // Row-driven action (#1909, moved off actions.ts's DERIVED_ACTIONS) —
-    // identity-only resourceKey, see RawDruidFeature's own comment. SRD 5.1 /
-    // PHB'14 p.66: "As an action, you can magically transform..." — an Action.
+    // SRD 5.1 / PHB'14 p.66: "As an action, you can magically transform..." —
+    // an Action. resourceKey is identity-only, NO resourceTotals on purpose:
+    // the pool stays wholly in druid.ts's resourceFn. Adding resourceTotals to
+    // THIS row without deleting that resourceFn leaves them silently inert —
+    // mergePoolSources (fn-wins) keeps the fn's pool, and the suite stays green.
     resourceKey: "wildShape",
     activationCost: "action",
     costKind: "pool",
@@ -185,15 +116,11 @@ const DRUID_BASE_RAW: RawDruidFeature[] = [
     name: "Wild Shape",
     level: 2,
     edition: "EDITION_2024",
-    // SRD 5.2: a Bonus Action (was an Action) that grants Temporary Hit
-    // Points equal to your Druid level, allows a Fly Speed from level 8 on
-    // (a Swim Speed was never restricted — the 2014 "no flying or swimming"
-    // note conflated the two), and can be left early as a Bonus Action.
-    // Total uses (2/3/4 at levels 2/6/17) and the Short Rest partial regain
-    // are #1226 commit 3's resourceTotals on THIS row — this description is
-    // the one #1528's no-second-string rule reads verbatim for the pool card,
-    // so it states the static CR table and duration formula in prose rather
-    // than a computed value.
+    // SRD 5.2: a Bonus Action (2014's was an Action) granting Temp HP equal
+    // to Druid level; a Fly Speed is allowed from level 8 (a Swim Speed was
+    // never restricted — 2014's "no flying or swimming" note conflated the
+    // two). The pool card reads this description verbatim (#1528
+    // no-second-string), so it states the CR table and duration in prose.
     description:
       "As a Bonus Action, you transform into a Beast you have seen before, with a challenge rating of 1/4 or lower at level 2, 1/2 or lower at level 4, and 1 or lower starting at level 8 (a Fly Speed is allowed only from level 8 on; a Swim Speed is never restricted). You retain your own mental ability scores, personality, and Druid features while using the Beast's physical statistics, and you gain Temporary Hit Points equal to your Druid level when you transform. Your Wild Shape lasts for a number of hours equal to half your Druid level (round down), until you have 0 Hit Points, or until you use a Bonus Action to leave it early; using Wild Shape again also ends it. You can use this feature 2 times (3 at level 6, 4 at level 17), and you regain one expended use when you finish a Short Rest and all expended uses when you finish a Long Rest.",
     resourceKey: "wildShape",
@@ -204,12 +131,8 @@ const DRUID_BASE_RAW: RawDruidFeature[] = [
       { minLevel: 6, total: 3, shortRestRegain: 1 },
       { minLevel: 17, total: 4, shortRestRegain: 1 },
     ],
-    // Row-driven action (#1909, moved off actions.ts's DERIVED_ACTIONS). SRD
-    // 5.2 / PHB'24 p.70: "As a Bonus Action, you shape-shift..." — a Bonus
-    // Action, DIFFERENT from 2014's Action above (this row's own description,
-    // transcribed from SRD 5.2, already states "As a Bonus Action" — the
-    // DERIVED_ACTIONS row this replaces served `cost: "action"` to BOTH
-    // editions, an undisclosed drift #1909 corrects).
+    // SRD 5.2 / PHB'24 p.70: "As a Bonus Action, you shape-shift..." — a
+    // Bonus Action, unlike 2014's Action above.
     activationCost: "bonusAction",
     costKind: "pool",
     costPoolKey: "wildShape",
@@ -221,9 +144,8 @@ const DRUID_BASE_RAW: RawDruidFeature[] = [
     level: 1,
     edition: "EDITION_2024",
     // SRD 5.2. NEW in 2024 — no 2014 counterpart. Magician's bonus is TO an
-    // Intelligence check, EQUAL TO your Wisdom modifier — never an
-    // "Intelligence modifier", which is what the issue's own checklist got
-    // wrong (#1226 correction 3).
+    // Intelligence check but EQUAL TO your Wisdom modifier — never an
+    // "Intelligence modifier".
     description:
       "You have dedicated yourself to one of the following two ways of being a Druid, granting you a benefit; choose Magician or Warden. Magician: you learn one extra cantrip from the Druid spell list, and you gain a bonus to your Intelligence (Arcana or Nature) checks equal to your Wisdom modifier (minimum bonus of +1). Warden: you gain proficiency with Martial weapons and training with Medium armor.",
   },
@@ -297,10 +219,8 @@ const DRUID_BASE_RAW: RawDruidFeature[] = [
     name: "Epic Boon",
     level: 19,
     edition: "EDITION_2024",
-    // SRD 5.2. NEW in 2024 — no 2014 counterpart (2014 keeps a plain ASI at
-    // 19 instead, already covered by the edition-invariant ASI-level table,
-    // not a ClassFeature row). Mirrors Fighter's/Barbarian's own Epic Boon
-    // row (#1227/#1223); the feat system itself is deferred — text only.
+    // SRD 5.2. NEW in 2024 — 2014 keeps a plain ASI at 19 (the edition-
+    // invariant ASI table, not a row). Text only; the feat grant is deferred.
     description: "You gain an Epic Boon feat of your choice (Boon of Fortitude recommended). You can take this feat only once.",
   },
   {
@@ -316,27 +236,13 @@ const DRUID_BASE_RAW: RawDruidFeature[] = [
     name: "Archdruid",
     level: 20,
     edition: "EDITION_2024",
-    // SRD 5.2: a full rewrite — no unlimited-uses sentinel and no
-    // ignore-components clause at all; replaced by three named benefits
-    // (Evergreen Wild Shape / Nature Magician / Longevity), the last of
-    // which folds in what used to be Timeless Body's own row.
+    // SRD 5.2: a full rewrite — three named benefits, the last folding in
+    // what was Timeless Body's own 2014 row.
     description:
       "You gain the following three benefits. Evergreen Wild Shape: when you roll Initiative and have no uses of Wild Shape remaining, you regain one expended use. Nature Magician: as a Bonus Action, you can convert any number of your unexpended Wild Shape uses into one spell slot; the slot's level equals half the number of uses you convert, rounded down (minimum 1st level). You can do this once, and you regain the ability to do so when you finish a Long Rest. Longevity: the primal magic you wield causes you to age more slowly — for every 10 years that pass, your body ages only 1 year.",
   },
 ];
 
-// ---- Circle of the Land (SRD 5.2 — first-party) ----------------------------
-// 2014: 6 rows (byte-identical to commit 1 / druid-2014-snapshot.test.ts).
-// 2024: 5 rows — Bonus Cantrip and Land's Stride have no 2024 successor
-// (removed, not deleted — their 2014 rows stay). "Circle Spells" renames to
-// "Circle of the Land Spells" (a NEW row, never an edit in place — mirrors
-// Cleric's Domain Spells -> Life/Trickery Domain Spells precedent, #1225):
-// the terrain list collapses from eight (arctic/coast/desert/forest/
-// grassland/mountain/swamp/Underdark) to four (arid/polar/temperate/
-// tropical), each re-chosen on a Long Rest rather than fixed at character
-// creation. Natural Recovery level-shifts 2 -> 6 and gains a free-cast
-// clause; Nature's Ward and Nature's Sanctuary are full rewrites; Land's Aid
-// is wholly new.
 const CIRCLE_OF_THE_LAND_SLUG = slug("druid-circle-of-the-land");
 const CIRCLE_OF_THE_LAND_RAW: RawDruidFeature[] = [
   {
@@ -392,8 +298,7 @@ const CIRCLE_OF_THE_LAND_RAW: RawDruidFeature[] = [
     name: "Natural Recovery",
     level: 6,
     edition: "EDITION_2024",
-    // SRD 5.2: level-shifts 2 -> 6; the Short Rest slot-recovery clause
-    // survives, and a new free-cast clause is added.
+    // SRD 5.2: level-shifts 2 -> 6 and adds a free-cast clause.
     description:
       "When you finish a Short Rest, you can choose expended spell slots to recover; the combined level of the slots can't exceed half your Druid level (round up), and none of them can be level 6 or higher. You can use this feature only once, and you regain the ability to do so when you finish a Long Rest. In addition, when you finish a Long Rest, you can cast one of your prepared Circle of the Land spells of level 1 or higher without expending a spell slot, provided the spell doesn't require a Material component with a cost.",
   },
@@ -403,15 +308,12 @@ const CIRCLE_OF_THE_LAND_RAW: RawDruidFeature[] = [
     level: 10,
     edition: "EDITION_2014",
     description: "Immune to poison and disease. Elementals and fey can't charm or frighten you.",
-    // #1121, PHB'14 p.68: poison immunity is unconditional — modeled here.
-    // Disease immunity has no ConditionKey to target (disease isn't a 5e
-    // status condition), so it stays reminder text only. The "by elementals
-    // or fey" charm/fright qualifier is source-conditional — this app has no
-    // attacker/source model (self-or-announce, an explicit non-goal to build
-    // one), so it is deliberately NOT added to conditionImmunities: doing so
-    // would grant unconditional charm/fright immunity, which is MORE
-    // permissive than PHB'14 actually says (the #1516/#1496 failure class).
-    // It stays reminder text in `description` only.
+    // PHB'14 p.68 (#1121): poison immunity is unconditional — modeled here.
+    // Disease has no ConditionKey, so it stays reminder text. The "by
+    // elementals or fey" charm/fright qualifier is source-conditional and
+    // deliberately NOT modeled: with no attacker model it would grant
+    // unconditional immunity, more permissive than PHB'14 actually says (the
+    // #1516/#1496 failure class).
     conditionImmunities: ["poisoned"],
   },
   {
@@ -419,12 +321,8 @@ const CIRCLE_OF_THE_LAND_RAW: RawDruidFeature[] = [
     name: "Nature's Ward",
     level: 10,
     edition: "EDITION_2024",
-    // SRD 5.2: a full rewrite — immunity narrows to the Poisoned condition
-    // (drops disease immunity and the elemental/fey charm-fright clause) and
-    // adds a Resistance keyed to your chosen land type.
-    // #1121 — unconditional Poisoned immunity, modeled directly; the
-    // land-typed damage Resistance clause is a separate, unwired axis (out of
-    // scope here — see #1121's own scope notes).
+    // SRD 5.2: immunity narrows to the Poisoned condition (modeled, #1121);
+    // the land-typed damage Resistance is a separate, unwired axis — text only.
     description:
       "You are immune to the Poisoned condition, and you have Resistance to a damage type based on your Druid Circle land: Fire if your land is arid, Cold if it's polar, Lightning if it's temperate, or Poison if it's tropical.",
     conditionImmunities: ["poisoned"],
@@ -442,30 +340,17 @@ const CIRCLE_OF_THE_LAND_RAW: RawDruidFeature[] = [
     name: "Nature's Sanctuary",
     level: 14,
     edition: "EDITION_2024",
-    // SRD 5.2: a full rewrite — no saving throw at all. A conjured Cube grants
-    // Half Cover and your current Nature's Ward Resistance to you and your
-    // allies within it.
+    // SRD 5.2: a full rewrite — no saving throw at all.
     description:
       "As a Magic action, you conjure a protective terrain in a 15-foot Cube on ground you can see within 120 feet, lasting for 1 minute or until you die or have the Incapacitated condition. While within the Cube, you and your allies have Half Cover and the Resistance granted by your Nature's Ward feature, even if you don't currently have one active. As a Bonus Action, you can move the Cube up to 60 feet to a new spot on the ground you can see.",
   },
 ];
 
-// ---- Circle of the Moon (mirror-sourced — NOT in SRD 5.2) ------------------
-// 2014: 5 rows (byte-identical to commit 1 / druid-2014-snapshot.test.ts).
-// 2024: 5 rows. Circle of the Moon is NOT one of SRD 5.2's licensed subclasses
-// (SRD 5.2's single Druid subclass is Circle of the Land) — owner decision
-// (#1226): mirror-source it rather than tag it EDITION_2014-only, like
-// Ranger's Beast Master (#1230) and Sorcerer's Wild Magic (#1232). Two
-// independent mirrors: dnd2024.wikidot.com's Circle of the Moon page
-// (validated by its sibling Circle of the Land page being byte-equivalent to
-// the real SRD 5.2 text — the strongest available evidence the Moon page is
-// an equally faithful transcription) and wastedwizardgames.com's independent
-// 2024 Druid subclass breakdown, which agrees on every number. Combat Wild
-// Shape, Primal Strike and Elemental Wild Shape have no 2024 successor
-// (Combat Wild Shape is baseline now; Primal Strike becomes a base Elemental
-// Fury option; Elemental Wild Shape is replaced outright by Moonlight Step) —
-// removed, not deleted, their 2014 rows stay. Circle Forms level-shifts 2 ->
-// 3; Thousand Forms is replaced outright by Lunar Form.
+// Circle of the Moon is NOT in SRD 5.2 — its 2024 rows are mirror-sourced
+// (owner decision, #1226) from two independent mirrors: dnd2024.wikidot.com's
+// Circle of the Moon page (whose sibling Circle of the Land page is
+// byte-equivalent to the real SRD 5.2 text) and wastedwizardgames.com's
+// independent 2024 Druid subclass breakdown, which agrees on every number.
 const CIRCLE_OF_THE_MOON_SLUG = slug("druid-circle-of-the-moon");
 const CIRCLE_OF_THE_MOON_RAW: RawDruidFeature[] = [
   {
@@ -489,10 +374,8 @@ const CIRCLE_OF_THE_MOON_RAW: RawDruidFeature[] = [
     name: "Circle Forms",
     level: 3,
     edition: "EDITION_2024",
-    // Mirror-sourced (M1/M2, see file header). Level-shifts 2 -> 3, drops the
-    // "starting at level 6" step-up for a flat level ÷ 3 formula, and adds an
-    // AC floor and a temp-HP override that supersede the base Wild Shape
-    // feature's own values while transformed.
+    // Mirror-sourced. Level-shifts 2 -> 3; the AC floor and temp-HP override
+    // supersede the base Wild Shape feature's own values while transformed.
     description:
       "Beginning at level 3, you can transform into a Beast with a challenge rating as high as your Druid level divided by 3, rounded down (minimum challenge rating 1). While transformed, if your Armor Class would be lower than 13 plus your Wisdom modifier, you use 13 plus your Wisdom modifier instead. When you transform, you gain Temporary Hit Points equal to three times your Druid level, in place of the Temporary Hit Points your Wild Shape feature would otherwise grant.",
   },
@@ -501,7 +384,7 @@ const CIRCLE_OF_THE_MOON_RAW: RawDruidFeature[] = [
     name: "Circle of the Moon Spells",
     level: 3,
     edition: "EDITION_2024",
-    // Mirror-sourced (M1/M2). NEW in 2024 — no 2014 counterpart.
+    // Mirror-sourced. NEW in 2024 — no 2014 counterpart.
     description:
       "You always have certain spells prepared, and you can cast them while transformed by Wild Shape: Cure Wounds, Moonbeam, and Starry Wisp starting at level 3; Conjure Animals at level 5; Fount of Moonlight at level 7; and Mass Cure Wounds at level 9. These spells don't count against the number of Druid spells you can prepare.",
   },
@@ -518,8 +401,8 @@ const CIRCLE_OF_THE_MOON_RAW: RawDruidFeature[] = [
     name: "Improved Circle Forms",
     level: 6,
     edition: "EDITION_2024",
-    // Mirror-sourced (M1/M2). NEW in 2024, replacing Primal Strike (now a
-    // base-class Elemental Fury option available to every Circle).
+    // Mirror-sourced. NEW in 2024, replacing Primal Strike (now a base-class
+    // Elemental Fury option).
     description:
       "Your Circle Forms improve, granting you two benefits. Lunar Radiance: immediately after you hit a target with an attack while transformed by Wild Shape, you can change the attack's damage type to Radiant. Increased Toughness: you add your Wisdom modifier to any Constitution saving throws you make to maintain Concentration.",
   },
@@ -535,11 +418,7 @@ const CIRCLE_OF_THE_MOON_RAW: RawDruidFeature[] = [
     name: "Moonlight Step",
     level: 10,
     edition: "EDITION_2024",
-    // Mirror-sourced (M1/M2). NEW in 2024, replacing Elemental Wild Shape.
-    // #1226 commit 3 declared resourceKey WITHOUT resourceTotals on this row
-    // (a Wisdom-modifier formula, then still resourceFn-derived); #1685 now
-    // expresses the total directly as a `{ abilityMod: "wisdom", min: 1 }`
-    // tier, retiring lib/classes/druid.ts's Circle of the Moon resourceFn.
+    // Mirror-sourced. NEW in 2024, replacing Elemental Wild Shape.
     resourceKey: "moonlightStep",
     resourceLabel: "Moonlight Step",
     resourceRecharge: "longRest",
@@ -559,7 +438,7 @@ const CIRCLE_OF_THE_MOON_RAW: RawDruidFeature[] = [
     name: "Lunar Form",
     level: 14,
     edition: "EDITION_2024",
-    // Mirror-sourced (M1/M2). NEW in 2024, replacing Thousand Forms.
+    // Mirror-sourced. NEW in 2024, replacing Thousand Forms.
     description:
       "Your connection to the moon grants you two benefits. Improved Lunar Radiance: once on each of your turns when you deal damage with an attack while transformed by Wild Shape, you can also deal an extra 2d10 Radiant damage. Shared Moonlight: when you use your Moonlight Step feature, you can bring along one willing creature within 10 feet of you, teleporting it to a space within 5 feet of your destination.",
   },

@@ -10,7 +10,6 @@ import type { DerivedFeature, DerivedResource, RechargeOn } from "./types.js";
 
 export type ResourceTotalAbility = "strength" | "dexterity" | "constitution" | "intelligence" | "wisdom" | "charisma";
 
-// A tier's total: a flat number, "proficiencyBonus", an ability-modifier formula (`min` floors it), or level times N.
 export type ResourceTotalFormula = number | "proficiencyBonus" | { abilityMod: ResourceTotalAbility; min?: number } | { levelTimes: number };
 
 // Tiers are ASCENDING by minLevel, last-match-wins.
@@ -39,9 +38,8 @@ export function evaluateResourceTotal(total: ResourceTotalFormula, ctx: Resource
   return total.levelTimes * ctx.level;
 }
 
-// Reuses evaluateResourceTotal for a flat formula; a tier array resolves
-// last-match-wins, defaulting to 0 below every tier — gate the whole entry
-// with EffectBuffRow.minLevel if that isn't the intent.
+// A tier array reads as 0 below its first tier — gate the whole entry with
+// EffectBuffRow.minLevel if that isn't the intent.
 export function evaluateBuffModifier(modifier: BuffModifierFormula, ctx: ResourceTotalContext): number {
   if (!Array.isArray(modifier)) return evaluateResourceTotal(modifier, ctx);
   return tierAt(modifier, ctx.level)?.value ?? 0;
@@ -57,6 +55,15 @@ export interface ResourceDieTier {
 export interface ResourceRechargeTier {
   minLevel: number;
   recharge: RechargeOn;
+}
+
+// Tiers are ASCENDING by minLevel PER LABEL, last-match-wins per label —
+// different labels interleave freely in the flat array. If you change this
+// invariant, also update the ClassFeature.resourceDetailTiers schema comment.
+export interface ResourceDetailTier {
+  minLevel: number;
+  label: string;
+  value: string;
 }
 
 export interface BuffModifierTier {
@@ -96,7 +103,6 @@ export interface DerivedStatTier {
   value: number | string;
 }
 
-// The row-authored counterpart to a resourceFn's returned pool.
 export interface ResourceColumns {
   resourceKey?: string | null;
   resourceLabel?: string | null;
@@ -104,6 +110,7 @@ export interface ResourceColumns {
   resourceTotals?: ResourceTotalTier[] | null;
   resourceDieTiers?: ResourceDieTier[] | null;
   resourceRechargeTiers?: ResourceRechargeTier[] | null;
+  resourceDetailTiers?: ResourceDetailTier[] | null;
 }
 
 // Evaluated against the character's CURRENTLY EQUIPPED state at activation
@@ -118,8 +125,7 @@ export interface RequiresActiveBuffRequirement {
 // Interpreted by unmetActivationRequirements.
 export type ActivationRequirement = ArmorActivationRequirement | RequiresActiveBuffRequirement;
 
-// Replaces a DERIVED_ACTIONS row — no gate columns here: the row's own
-// classId/subclassId/level IS the gate.
+// No gate columns here: the row's own classId/subclassId/level IS the gate.
 export interface ActivationColumns {
   activationCost?: string | null; // ActionCost
   resolverKind?: string | null;
@@ -133,12 +139,12 @@ export interface ActivationColumns {
   actionOnly?: boolean | null;
 }
 
-// Cost/effect fields below are duplicated from AbilityCostColumns/EffectColumns
-// rather than imported, to keep this a Prisma-free structural type that
-// readAbilityCost/readEffectSpec can accept without either file importing the
-// other. Effect fields are EffectColumns MINUS upcastDicePerLevel/
-// cantripScaling/concentration — see the EffectRow comment at readEffectSpec's
-// Fighter call site for why those three must never be added here.
+// Cost/effect fields are duplicated from AbilityCostColumns/EffectColumns
+// rather than imported, keeping this a Prisma-free structural type that
+// readAbilityCost/readEffectSpec accept without a cross-import. Effect fields
+// are EffectColumns MINUS upcastDicePerLevel/cantripScaling/concentration —
+// see the EffectRow comment at readEffectSpec's Fighter call site for why
+// those three must never be added here.
 export interface ClassFeatureRow extends ResourceColumns, ActivationColumns {
   name: string;
   level: number;
@@ -165,11 +171,10 @@ export interface ClassFeatureRow extends ResourceColumns, ActivationColumns {
   derivedStatTiers?: DerivedStatTier[] | null;
   // Read directly by saveDcAbilitiesFromRows, never matched against `derivedStat` by name — a row may need both axes at once.
   saveDcAbilities?: string[] | null;
-  // The same FeatImprovement vocabulary a taken feat's own `improvements` snapshot uses. Read by improvementsFromRows.
+  // The same FeatImprovement vocabulary a taken feat's own `improvements` snapshot uses.
   improvements?: FeatImprovement[] | null;
-  // The buff list a "toggle" resolverKind activates — see EffectBuffRow.
+  // The buff list a "toggle" resolverKind activates.
   effectBuffs?: EffectBuffRow[] | null;
-  // Read by conditionImmunitiesFromRows.
   conditionImmunities?: string[] | null;
   // Gates conditionImmunities on a buff of this key being active. Absent = unconditional.
   conditionImmunitiesRequireActiveBuff?: string | null;
@@ -177,10 +182,8 @@ export interface ClassFeatureRow extends ResourceColumns, ActivationColumns {
   conditionImmunitiesOnBuffStart?: "clear" | "suspend" | null;
 }
 
-// Both halves of one class/subclass pairing's loaded feature rows — the
-// deriveResources carrier. classRows is already subclassId: null filtered by
-// the caller's include; subclassRows is whatever the active subclass's own
-// features relation loaded.
+// classRows must arrive already subclassId: null filtered by the caller's
+// include; subclassRows is whatever the active subclass's features relation loaded.
 export interface ClassFeatureRowsCarrier {
   classRows: ClassFeatureRow[];
   subclassRows: ClassFeatureRow[];
@@ -206,7 +209,6 @@ export function featuresFromRows(
     .map((row) => ({ name: row.name, level: row.level, description: row.description, source, edition: row.edition }));
 }
 
-// The ClassFeature twin of a taken feat's own `improvements` snapshot.
 export function improvementsFromRows(
   rows: readonly ClassFeatureRow[],
   level: number,
@@ -228,8 +230,6 @@ export interface ResolvedEffectBuff {
   rollEffects?: RollEffect[];
 }
 
-// One row's own effectBuffs, filtered to entries whose per-entry minLevel is
-// reached, with each entry's formula/tier modifier evaluated to a number.
 export function effectBuffsFromRow(row: ClassFeatureRow, ctx: ResourceTotalContext): ResolvedEffectBuff[] {
   return (row.effectBuffs ?? [])
     .filter((buff) => buff.minLevel === undefined || ctx.level >= buff.minLevel)
@@ -255,26 +255,61 @@ function tierAt<T extends { minLevel: number }>(tiers: readonly T[] | null | und
   return match;
 }
 
-// null when the row declares no pool or the character hasn't reached its
-// first tier; description IS the feature's own description, never a second string.
+// Preserves each label's own relative tier order, which the
+// ASCENDING-per-label authoring invariant (classFeatureSeedSchema's
+// isAscendingByMinLevelPerLabel) requires for tierAt to resolve per group.
+// If you change this grouping, also update its seed-validation twin
+// groupMinLevelsByLabel — both must group identically.
+function groupDetailTiersByLabel(tiers: readonly ResourceDetailTier[]): Map<string, ResourceDetailTier[]> {
+  const byLabel = new Map<string, ResourceDetailTier[]>();
+  for (const tier of tiers) {
+    const group = byLabel.get(tier.label);
+    if (group) group.push(tier);
+    else byLabel.set(tier.label, [tier]);
+  }
+  return byLabel;
+}
+
+// Undefined rather than [] so poolFromRow omits `details` entirely.
+function detailsFromRow(tiers: readonly ResourceDetailTier[] | null | undefined, level: number): { label: string; value: string }[] | undefined {
+  if (!tiers?.length) return undefined;
+  const details: { label: string; value: string }[] = [];
+  for (const [label, labelTiers] of groupDetailTiersByLabel(tiers)) {
+    const tier = tierAt(labelTiers, level);
+    if (tier) details.push({ label, value: tier.value });
+  }
+  return details.length > 0 ? details : undefined;
+}
+
+function optionalPoolFields(
+  row: ClassFeatureRow,
+  ctx: ResourceTotalContext,
+  totalTier: ResourceTotalTier,
+): Pick<DerivedResource, "die" | "shortRestRegain" | "details"> {
+  const dieTier = tierAt(row.resourceDieTiers, ctx.level);
+  const details = detailsFromRow(row.resourceDetailTiers, ctx.level);
+  return {
+    ...(dieTier ? { die: dieTier.die } : {}),
+    ...(totalTier.shortRestRegain !== undefined ? { shortRestRegain: totalTier.shortRestRegain } : {}),
+    ...(details ? { details } : {}),
+  };
+}
+
+// The pool's description IS the row's own description, never a second string (#1528).
 function poolFromRow(row: ClassFeatureRow, ctx: ResourceTotalContext): DerivedResource | null {
   if (!row.resourceKey) return null;
   const totalTier = tierAt(row.resourceTotals, ctx.level);
   if (!totalTier) return null;
-  const dieTier = tierAt(row.resourceDieTiers, ctx.level);
   return {
     key: row.resourceKey,
     label: row.resourceLabel ?? row.name,
     total: evaluateResourceTotal(totalTier.total, ctx),
-    ...(dieTier ? { die: dieTier.die } : {}),
     recharge: tierAt(row.resourceRechargeTiers, ctx.level)?.recharge ?? (row.resourceRecharge as RechargeOn | null) ?? "none",
-    ...(totalTier.shortRestRegain !== undefined ? { shortRestRegain: totalTier.shortRestRegain } : {}),
+    ...optionalPoolFields(row, ctx, totalTier),
     description: row.description,
   };
 }
 
-// Every resource pool declared across a class/subclass's rows, at one
-// character level — the row-driven counterpart to a resourceFn call.
 export function poolsFromRows(
   rows: readonly ClassFeatureRow[],
   level: number,
@@ -291,10 +326,9 @@ export function poolsFromRows(
   return pools;
 }
 
-// The MAX numeric derivedStatTiers value across every row named `stat`, at
-// one character level — takes the max over every qualifying row (not the
-// first match) so a base-class row and a subclass row can compose. undefined
-// means no qualifying row; the caller supplies the floor.
+// Max over every qualifying row (not the first match) so a base-class row and
+// a subclass row can compose. undefined means no qualifying row; the caller
+// supplies the floor.
 export function derivedStatFromRows(
   rows: readonly ClassFeatureRow[],
   level: number,
@@ -311,10 +345,9 @@ export function derivedStatFromRows(
   return best;
 }
 
-// The first qualifying row's saveDcAbilities list — the trigger for a
-// closed-form announced save DC (arithmetic lives in deriveAnnouncedSaveDC).
-// Read directly, not via a `derivedStat` name match, since a row may spend
-// its one derivedStat slot on something else.
+// The trigger for a closed-form announced save DC; the arithmetic lives in
+// deriveAnnouncedSaveDC. Read directly, not via a `derivedStat` name match,
+// since a row may spend its one derivedStat slot on something else.
 export function saveDcAbilitiesFromRows(
   rows: readonly ClassFeatureRow[],
   level: number,
@@ -327,10 +360,8 @@ export function saveDcAbilitiesFromRows(
   return undefined;
 }
 
-// Every condition key a class/subclass's rows grant immunity to, at one
-// character level, further gated on conditionImmunitiesRequireActiveBuff
-// being present in activeBuffKeys. deriveImmuneConditions unions this with
-// buff-declared immunity into the actual immune set.
+// deriveImmuneConditions unions this with buff-declared immunity into the
+// actual immune set.
 export function conditionImmunitiesFromRows(
   rows: readonly ClassFeatureRow[],
   level: number,

@@ -27,17 +27,12 @@ import type { CharacterWithRelations } from "@/lib/character/character-include.j
 
 export type PrimaryClass = CharacterWithRelations["classEntries"][number] | undefined;
 
-// Resources clamp-on-read: derive class/subclass pools + level-gated caps, then
-// layer stored `used` counts and known lists (clamped to caps). Returns the
-// resources view (undefined for classes with no pools) plus the raw
-// announcedSaveDC number (#1589, renamed from the Fighter-specific
-// maneuverSaveDC) — serializeCharacter folds it into the top-level `maneuvers`
-// rider (#1316), so it isn't part of the resources payload. Fighting Style is
-// a feat now (#1137) — surfaced via top-level fightingStyleSlots +
-// advancements, not here. The choice-cap fields are entry-scoped (#1177) via
-// deriveEntryScopedResources — mirrors loadResourcesReconcileState
-// (level-reconciliation.ts) so both sides compute the legal limit through the
-// one shared rule function.
+// Resources clamp-on-read: derive class/subclass pools + level-gated caps,
+// then layer stored `used` counts and known lists clamped to those caps.
+// announcedSaveDC is returned separately — serializeCharacter folds it into
+// the top-level `maneuvers` rider (#1316), not the resources payload.
+// Mirrors loadResourcesReconcileState so both sides compute the legal limit
+// through the one shared rule function.
 export function buildResourcesView(
   row: CharacterWithRelations,
   level: number,
@@ -48,13 +43,8 @@ export function buildResourcesView(
   announcedSaveDC: number | undefined;
   classFeatureImprovements: FeatImprovement[];
 } {
-  // The ONE production caller that supplies real ClassFeature rows (#1524):
-  // characterInclude loaded entry.class.features (already subclassId:null
-  // filtered) and entry.subclassRef.features — featuresFromRows/poolsFromRows
-  // do the per-edition filter inside deriveResources itself. featureRowsOf
-  // (feature-rows-select.ts, #1528 chunk 0) is the SAME extractor every
-  // narrow-select caller now uses too, so this stays the one place the
-  // "class"/"subclassRef" → carrier mapping is written.
+  // featureRowsOf is the same extractor every narrow-select caller uses, so
+  // it stays the one place the "class"/"subclassRef" → carrier mapping is written.
   const { derived: derivedRes } = deriveEntryScopedResources(
     row.classEntries,
     level,
@@ -68,33 +58,23 @@ export function buildResourcesView(
     ? buildResourcesPayload(derivedRes, normalizeResourcesMutable(row.resources))
     : undefined;
 
-  // Row-driven passive grants (#1691) — level/edition/subclass-active gated
-  // the SAME way `resources.features` already is (deriveEntryScopedResources'
-  // own per-entry loop); applyFeatLayer merges this with advancement-sourced
-  // improvements through the shared deriveImprovementBonuses/
-  // deriveImprovementProficiencies evaluator.
   return { resources, announcedSaveDC: derivedRes?.announcedSaveDC, classFeatureImprovements: derivedRes?.improvements ?? [] };
 }
 
-// #1272/#1374: DerivedFeature.edition is a server-side selector (which of a
-// fork's two rows survived featuresFromRows' edition filter,
-// lib/classes/class-feature-rows.ts, #1524) — never a client-trusted rule
-// input, so it must not cross the wire. Every other buildResourcesPayload
-// field is already explicitly projected; `features` was the one passthrough.
+// DerivedFeature.edition is a server-side selector (which of a fork's two
+// rows survived featuresFromRows' edition filter) — never a client-trusted
+// rule input, so it must not cross the wire (#1272/#1374).
 export function toWireFeatures(
   features: DerivedFeature[],
 ): { name: string; level: number; description: string; source: "class" | "subclass" }[] {
   return features.map(({ name, level, description, source }) => ({ name, level, description, source }));
 }
 
-// Assemble the wire `resources` payload from the derived caps + stored mutable
-// state, clamping each level-gated list to its derived count (defense-in-depth
-// for characters who haven't had a reconciling XP op since their level dropped).
-// No explicit return type (#1588 review): was a widened `object`, which forced
-// every downstream reader (buildSkillsView) into an `"x" in resources` guard +
-// an `as {...}` cast to reach a single field — inferring the literal return
-// shape here instead lets ReturnType<typeof buildResourcesPayload> (used by
-// buildResourcesView below) carry every field, incl. expertiseKnown, precisely.
+// Clamps each level-gated list to its derived count — defense-in-depth for
+// characters without a reconciling XP op since their level dropped. No
+// explicit return type (#1588): inferring the literal shape lets
+// ReturnType<typeof buildResourcesPayload> carry every field precisely,
+// instead of a widened `object` forcing guards + casts on readers.
 function buildResourcesPayload(
   derivedRes: DerivedClassInfo,
   stored: ReturnType<typeof normalizeResourcesMutable>,
@@ -107,26 +87,19 @@ function buildResourcesPayload(
     derivedRes.toolProfChoiceCount !== undefined
       ? stored.toolProficienciesKnown.slice(0, derivedRes.toolProfChoiceCount)
       : stored.toolProficienciesKnown;
-  // #1588 (Opus review): deliberately NOT clampedToolProfsKnown's `!==
-  // undefined ? slice : full` shape — an undefined expertiseChoiceCount (no
-  // grantor class at all) clamps to ZERO here, matching applyLearnExpertiseOp's
-  // own undefined -> 0 treatment (resources.ts) so learn/clamp/reconcile all
-  // agree. toolProficienciesKnown/maneuversKnown stay on the permissive
-  // pattern (out of scope, pre-existing) — Expertise is the more exploitable
-  // case (four grantor classes) and reconcileExpertise (level-reconciliation.ts)
-  // already treats `derived?.expertiseChoiceCount ?? 0` as the allowed count,
-  // so this was already the reconciler's behavior; the clamp-on-read was the
-  // one site out of step with it.
+  // Deliberately NOT the permissive `!== undefined ? slice : full` shape
+  // above: an undefined expertiseChoiceCount (no grantor class) clamps to
+  // ZERO, matching applyLearnExpertiseOp's and reconcileExpertise's own
+  // undefined -> 0 treatment so learn/clamp/reconcile all agree (#1588).
   const clampedExpertiseKnown = stored.expertiseKnown.slice(0, derivedRes.expertiseChoiceCount ?? 0);
-  // Generic subclass "choose N" clamp-on-read (#899): keep only keys the derived
-  // subclassChoices still grant, each capped to its count — defense-in-depth
-  // mirroring reconcileSubclassChoices for characters not yet reconciled.
+  // Keep only keys the derived subclassChoices still grant, each capped to
+  // its count — mirrors reconcileSubclassChoices (#899).
   const subclassChoices = derivedRes.subclassChoices ?? [];
   const choiceCaps = new Map(subclassChoices.map((c) => [c.key, c.count]));
   const { clamped: clampedChoicesKnown } = clampChoicesToCaps(stored.choicesKnown, choiceCaps);
-  // #1381: resolved once per response (not per maneuver) — the die is uniform
-  // across every known maneuver, keyed off the character's OWN superiority
-  // die (deriveManeuverEffect), not a per-maneuver catalog column.
+  // Resolved once per response (#1381) — the die is uniform across every
+  // known maneuver, keyed off the character's own superiority die, not a
+  // per-maneuver catalog column.
   const maneuverEffect = derivedRes.maneuverChoiceCount !== undefined ? deriveManeuverEffect(derivedRes) : undefined;
   return {
     features: toWireFeatures(derivedRes.features),
@@ -140,6 +113,7 @@ function buildResourcesPayload(
       die: pool.die,
       recharge: pool.recharge,
       description: pool.description,
+      details: pool.details,
       used: Math.min(pool.total, stored.used[pool.key] ?? 0),
       remaining: pool.total - Math.min(pool.total, stored.used[pool.key] ?? 0),
     })),
@@ -148,19 +122,15 @@ function buildResourcesPayload(
       : clampedManeuversKnown,
     toolProficienciesKnown: clampedToolProfsKnown,
     expertiseKnown: clampedExpertiseKnown,
-    // Generic subclass "choose N" surface (#899): the derived choices (key/label/
-    // count/catalogSource) tell the level-up Choose-N step which pickers to render;
-    // choicesKnown holds the (clamped) selections.
     subclassChoices,
     choicesKnown: clampedChoicesKnown,
   };
 }
 
-// Advancement clamp-on-read: mirrors reconcile-on-write in
-// level-reconciliation.ts. When stored advancements exceed the level-derived
-// slot count, cap them and reverse the excess to compute effective ability
-// scores / HP / initiative for display (without writing). Returns the clamped
-// list + slot total + the effective values.
+// Advancement clamp-on-read: mirrors reconcileAdvancements. When stored
+// advancements exceed the level-derived slot count, cap them and reverse the
+// excess to compute effective ability scores / HP / initiative for display,
+// without writing.
 export function applyAdvancementClamp(
   row: CharacterWithRelations,
   level: number,
@@ -179,22 +149,19 @@ export function applyAdvancementClamp(
   const storedForAdv = normalizeResourcesMutable(row.resources);
   const advSlotTotal = characterAdvancementSlots(row.classEntries, level);
   const edition = editionOf(row);
-  // Fighting Style feat cap across all class entries (#1137) — its own partition.
-  // edition (#1148): Champion's Additional Fighting Style second slot forks 7
-  // (2024) vs 10 (2014).
+  // Fighting Style feat cap is its own partition (#1137); edition matters
+  // because Champion's Additional Fighting Style second slot forks 7 (2024)
+  // vs 10 (2014) (#1148).
   const fightingStyleSlotTotal = characterFightingStyleFeatSlots(row.classEntries, level, edition);
-  // #1495: the class names that have actually EARNED the Fighting Style
-  // feature at this level — served so the picker/level-up ceremony ask the
-  // server which classes to pass to GET /api/feats?classes=/the takeFeat
-  // write path, rather than re-deriving the level threshold client-side
-  // (CLAUDE.md: rules logic is backend-owned). Same shared rule
-  // resolveCatalogFeat's own gate reads (advancement.ts).
+  // Served so the picker/level-up ceremony ask the server which classes have
+  // earned Fighting Style rather than re-deriving the level threshold
+  // client-side (#1495); resolveCatalogFeat's gate reads the same shared rule.
   const fightingStyleGrantingClasses = fightingStyleGrantingClassNames(row.classEntries, level, edition);
   let effectiveScores = row.abilityScores as Record<string, number>;
   let effectiveInitBonus = row.initiativeBonus;
   let effectiveHitPoints = hitPoints;
-  // Origin feats are kept regardless of the slot cap (#1130); fs feats trim against
-  // their own cap (#1137) — both handled by the shared split.
+  // Origin feats are kept regardless of the slot cap (#1130); fighting-style
+  // feats trim against their own cap (#1137).
   const { kept: clampedAdvancements, excess, usedSlots, usedFightingStyleSlots } = splitAdvancementsBySlotCap(
     storedForAdv.advancements,
     advSlotTotal,
@@ -202,8 +169,6 @@ export function applyAdvancementClamp(
   );
 
   if (excess.length > 0) {
-    // Some advancements are beyond the cap — reverse the excess ones to compute
-    // effective display values (without writing; reconcile-on-write handles that).
     const reversed = reverseAdvancementEffects(
       effectiveScores,
       effectiveHitPoints,
@@ -228,25 +193,15 @@ export function applyAdvancementClamp(
   };
 }
 
-// Improvement modifier layer: sum structured improvements from the kept
-// advancements (origin feats + slot-bounded entries) TOGETHER WITH active
-// ClassFeature row grants (#1691) AND active SpeciesTrait row grants (#1682,
-// serialize/species.ts's buildSpeciesTraitsView) through the ONE
-// deriveImprovementBonuses/deriveImprovementProficiencies evaluator — the
-// merge point that makes a proficiency granted by any of the three sources
-// collapse to one Set entry (no separate dedup: see
-// deriveImprovementProficiencies' own header). RACE_PROFICIENCY_GRANTS
-// (retired #1682) used to be a fourth, name-keyed source outside this merge;
-// a species trait's weapon/armor grant now surfaces with source: "feat" in
-// the wire proficiency arrays, the SAME bucket a ClassFeature row grant
-// already uses (#1691 precedent) — not a new "species" bucket.
-// Because clampedAdvancements already excludes over-cap feats and
-// classFeatureImprovements/speciesTraitImprovements are already gated at
-// collection time (buildResourcesView via deriveEntryScopedResources;
-// buildSpeciesTraitsView via the character's own species/variant selection),
-// level-down behavior for every source is automatic — no separate reversal
-// code needed. perLevel bonuses (e.g. Tough, Dwarven Toughness) scale with
-// hitDiceTotal (applied level) for EVERY source.
+// Sums improvements from advancements, ClassFeature row grants (#1691), and
+// SpeciesTrait row grants (#1682) through the ONE deriveImprovementBonuses/
+// deriveImprovementProficiencies evaluator, so a proficiency granted by any
+// source collapses to one Set entry. A species trait's weapon/armor grant
+// surfaces with source: "feat" on the wire — the same bucket as a ClassFeature
+// row grant, not a new "species" bucket. All three inputs are already
+// level-gated at collection time, so level-down behavior is automatic — no
+// separate reversal code. perLevel bonuses (e.g. Tough, Dwarven Toughness)
+// scale with hitDiceTotal for every source.
 export function applyFeatLayer(
   clampedAdvancements: AdvancementEntry[],
   classFeatureImprovements: FeatImprovement[],
@@ -271,46 +226,41 @@ export function applyFeatLayer(
     ...speciesTraitImprovements,
   ];
   const featBonuses = deriveImprovementBonuses(improvements, hitDiceTotal);
-  // #1123: the subclass term composes into the SAME effectiveMaxHitPoints call
-  // as the feat bonus — added to the base BEFORE exhaustion's tier-4 halving,
-  // never a second inline `+ subclassBonus` after the fact (see #1123's own
-  // composition-order acceptance case, mirroring #1321's decision 2).
-  // draconicResilienceMaxHpTerm is the ONE shared function this clamp-on-read,
-  // the write seam (effectiveMaxHitPointsForRow), and the reconciler
-  // (reconcileAdvancements) all resolve the subclass term through.
+  // The subclass term composes into the SAME effectiveMaxHitPoints call as
+  // the feat bonus — added BEFORE exhaustion's tier-4 halving, never a second
+  // inline `+ subclassBonus` after the fact (#1123). draconicResilienceMaxHpTerm
+  // is the one shared function this clamp-on-read, effectiveMaxHitPointsForRow,
+  // and reconcileAdvancements all resolve the subclass term through.
   const subclassMaxHpBonus = draconicResilienceMaxHpTerm(classEntries, totalLevel, edition);
   const effectiveMaxHp = effectiveMaxHitPoints(maxHp, featBonuses.maxHp + subclassMaxHpBonus, exhaustionLevel, edition);
-  // Proficiency grants from feats + class feature rows (skills + saving
-  // throws + armor + weapons). Merged with stored proficiencies by the
-  // caller using OR — existing proficiency is never removed.
+  // Merged with stored proficiencies by the caller using OR — existing
+  // proficiency is never removed.
   const featProficiencies = deriveImprovementProficiencies(improvements);
   return { featBonuses, effectiveMaxHp, featProficiencies };
 }
 
-// Class-specific available actions for the turn tracker — derived from EVERY
-// class entry at its own effective level (#1206/#1315), not just the primary
-// entry at total level, so a secondary class's gated actions (e.g. a Warrior
-// of Shadow monk's shadowArts/cloakOfShadows) surface even when it isn't
-// primary. Universal actions are served per edition by referenceRouter (#1430);
-// only class-specific ones live here to avoid double-rendering.
+// Derived from EVERY class entry at its own effective level (#1206/#1315),
+// not just the primary entry at total level, so a secondary class's gated
+// actions still surface. Universal actions are served per edition by
+// referenceRouter (#1430); only class-specific ones live here to avoid
+// double-rendering.
 export function buildAvailableActionsView(
   classEntries: CharacterWithRelations["classEntries"],
   level: number,
   resources: object | undefined,
   // Martial Arts blanket condition (bestArmor == null && !hasShield, #1218) —
-  // gates the Monk's Bonus Unarmed Strike (requiresUnarmored in DERIVED_ACTIONS).
+  // gates requiresUnarmored actions.
   unarmoredUnshielded: boolean,
   edition: RulesEdition,
   effectiveScores: Record<string, number>,
-  // Light flags of the currently-equipped weapons — the off-hand eligibility
-  // input (#1435), computed by the caller from the already-serialized inventory.
+  // Light flags of the currently-equipped weapons (#1435), computed by the
+  // caller from the already-serialized inventory.
   equippedWeaponLight: ReadonlyArray<{ light: boolean }>,
   // Eldritch Knight Weapon Bond (#1854): count of `weaponBonded` inventory
-  // rows, ALREADY clamped by the caller through weaponBondEligible (the
-  // clamp-on-read half — a stale bonded flag on a disqualified character
-  // reads as 0 here until reconcileWeaponBond physically clears it). Folded
-  // into a synthetic "weaponBond" pool rather than a bespoke enablement path,
-  // reusing DERIVED_ACTIONS' existing resourceKey/resourceAmount gate.
+  // rows, ALREADY clamped by the caller through weaponBondEligible — a stale
+  // bonded flag on a disqualified character reads as 0 here until
+  // reconcileWeaponBond physically clears it. Folded into a synthetic
+  // "weaponBond" pool, reusing the existing resourceKey/resourceAmount gate.
   bondedWeaponCount: number,
 ): AvailableAction[] {
   const pools = [
@@ -319,32 +269,24 @@ export function buildAvailableActionsView(
       : []),
     { key: "weaponBond", remaining: bondedWeaponCount },
   ];
-  // Ability modifiers (#1910) — the announce-augmentor registry's abilityMods
-  // input (announce-augmentors.ts's AugmentorContext), e.g. the Deflect
-  // Attacks/Missiles descriptor's Dex modifier. Computed once here, keyed the
-  // same as effectiveScores, rather than each augmentor re-deriving its own.
+  // AugmentorContext's abilityMods input (#1910), computed once here rather
+  // than each announce augmentor re-deriving its own.
   const abilityMods = Object.fromEntries(
     Object.entries(effectiveScores).map(([key, score]) => [key, abilityModifier(score)]),
   );
-  // featureRowsOf (#1528 chunk 0): a Fighter entry's row-driven actions
-  // (Second Wind/Action Surge) surface here through the SAME carrier
-  // buildResourcesView passes for its pools/features.
   const actions = deriveEntryScopedActions(classEntries, level, pools, unarmoredUnshielded, edition, featureRowsOf, abilityMods);
   return [
     ...actions,
-    // Off-hand / Two-Weapon Fighting eligibility (#1435) — served for EVERY
-    // character (TWF is not class-gated), enabled only when both equipped
-    // weapons are Light (`bothWeaponsLight`; the Two-Weapon Fighting style
-    // grants off-hand DAMAGE only and never waives this, #1496/#1640, so no
-    // `hasOffHandAbilityDamage` clause here). Distinct from `offHandBusy` (a
-    // shield OR two weapons) — the distinction this row exists to make.
     offHandActionRow(equippedWeaponLight),
   ];
 }
 
-// The off-hand bonus-action eligibility row (#1435): `enabled` is the pure
-// two-Light-weapons rule; when disabled, the reason names that requirement
-// (the frontend's twfHint adds the concrete item-name suggestion on top).
+// Off-hand / Two-Weapon Fighting eligibility (#1435), served for EVERY
+// character — TWF is not class-gated. Enabled only with two Light weapons:
+// the Two-Weapon Fighting style grants off-hand DAMAGE only and never waives
+// this (#1496/#1640), so no style clause here. Distinct from `offHandBusy`
+// (a shield OR two weapons). The frontend's twfHint adds the concrete
+// item-name suggestion on top of disabledReason.
 function offHandActionRow(equippedWeaponLight: ReadonlyArray<{ light: boolean }>): AvailableAction {
   const enabled = bothWeaponsLight(equippedWeaponLight);
   return {
@@ -356,11 +298,10 @@ function offHandActionRow(equippedWeaponLight: ReadonlyArray<{ light: boolean }>
   };
 }
 
-// Structured, multiclass-aware view alongside the flattened class/subclass.
-// Clamp-on-read (issue #124): cap the cumulative per-class levels at the
-// XP-derived total so a not-yet-reconciled over-cap character still renders
-// correctly. Position order = allocation order, so position-0 keeps its levels
-// first and trailing (newest) classes absorb the shortfall.
+// Clamp-on-read (#124): cap the cumulative per-class levels at the XP-derived
+// total so a not-yet-reconciled over-cap character still renders correctly.
+// Position order = allocation order, so position-0 keeps its levels first and
+// trailing (newest) classes absorb the shortfall.
 export function buildClassesView(row: CharacterWithRelations, totalLevel: number) {
   let remaining = totalLevel;
   const out: {
@@ -378,28 +319,19 @@ export function buildClassesView(row: CharacterWithRelations, totalLevel: number
     if (remaining <= 0) break;
     const level = Math.min(entry.level, remaining);
     remaining -= level;
-    // Per-entry subclass clamp-on-read (issue #125): hide a subclass whose
-    // grant level exceeds this entry's effective level. Mirrors reconcileSubclass.
+    // Per-entry subclass clamp-on-read (#125): hide a subclass whose grant
+    // level exceeds this entry's effective level. Mirrors reconcileSubclass.
     const effectiveLevel = effectiveEntryLevel(level, row.classEntries.length, totalLevel);
     const subclassVisible = subclassActiveAt(effectiveLevel, entry.class?.subclassLevel, edition);
-    // Stranded-subclass determination (#1598): a held row edition-tagged for a
-    // DIFFERENT edition than the character's own. This can only arise from a
-    // catalog retag landing AFTER the pick — crossEditionRejection
-    // (applySetSubclass) already blocks the pick itself at creation/level-up/
-    // setSubclass — so it is a legacy-state check, not a rule the write path
-    // also needs. featuresFromRows filters subclass features by the
-    // CHARACTER's edition (class-feature-rows.ts), so a stranded entry derives
-    // zero subclass features while `subclass` above still renders the name;
-    // the frontend uses this flag to explain that split rather than hide it.
-    //
-    // Gated on `subclassVisible` for the same reason `subclass`/`subclassId`
-    // below are: a level-down leaves the subclassId in place and relies on the
-    // clamp-on-read to hide it, so an ungated flag would report a stranded pick
-    // the sheet is deliberately not showing. That is not merely inconsistent —
-    // `character.subclass` (character-serialize.ts) reads the RAW entry column
-    // and is NOT level-gated, so SubclassSection's early return would not fire
-    // and a below-gate character would be shown the explanation and invited to
-    // re-pick a subclass it has not yet earned.
+    // Stranded subclass (#1598): a held row edition-tagged for a DIFFERENT
+    // edition than the character's — only possible from a catalog retag
+    // landing AFTER the pick (crossEditionRejection blocks the pick itself),
+    // so a legacy-state check, not a write-path rule. A stranded entry
+    // derives zero subclass features while the name still renders; the
+    // frontend uses this flag to explain that split rather than hide it.
+    // Gated on `subclassVisible` because a level-down leaves subclassId in
+    // place: ungated, a below-gate character would be shown the explanation
+    // and invited to re-pick a subclass it has not yet earned.
     const subclassRowEdition = entry.subclassRef?.edition ?? null;
     const subclassUnavailable =
       subclassVisible && Boolean(entry.subclassId) && subclassRowEdition !== null && subclassRowEdition !== edition;
@@ -410,11 +342,9 @@ export function buildClassesView(row: CharacterWithRelations, totalLevel: number
       subclass: subclassVisible ? (entry.subclass ?? undefined) : undefined,
       subclassId: subclassVisible ? (entry.subclassId ?? undefined) : undefined,
       classId: entry.classId ?? undefined,
-      // Gate passed AND (nothing picked yet OR the pick is stranded) — the
-      // frontend reads this instead of re-deriving level >= subclassGateLevel
-      // (CLAUDE.md: rules logic is backend-owned). Per-entry, unlike the old
-      // frontend mirror that compared TOTAL character level against the
-      // PRIMARY entry's subclass (wrong for multiclass).
+      // Served so the frontend never re-derives level >= subclassGateLevel;
+      // per-entry, unlike the old mirror that compared TOTAL character level
+      // against the PRIMARY entry's subclass (wrong for multiclass).
       needsSubclass: subclassVisible && (!entry.subclassId || subclassUnavailable),
       subclassUnavailable,
     });

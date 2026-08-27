@@ -1,8 +1,3 @@
-// #1524: featuresFromRows — the ONE place the edition rule for feature TEXT
-// lives, retired here from featureAppliesToEdition (registry.ts). Truth-table
-// coverage for the predicate (edition match + level gate), plus the
-// no-Prisma-import assertion that keeps lib/classes/ a pure leaf (mirrors
-// lib/spellcasting/granted-spells.ts's GrantedSpellSource pattern).
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -16,6 +11,7 @@ import {
   improvementsFromRows,
   poolsFromRows,
   type ClassFeatureRow,
+  type ResourceDetailTier,
   type ResourceRechargeTier,
 } from "@/lib/classes/class-feature-rows.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
@@ -127,7 +123,7 @@ describe("evaluateResourceTotal (#1685) — the formula vocabulary poolFromRow r
 
   it("{ abilityMod, min } floors a low/negative modifier at min — the Math.max(1, mod) shape every migrated pool uses", () => {
     expect(evaluateResourceTotal({ abilityMod: "charisma", min: 1 }, ctx)).toBe(1); // Cha 8 -> -1, floored to 1
-    expect(evaluateResourceTotal({ abilityMod: "wisdom", min: 1 }, ctx)).toBe(3); // above min, min is a no-op
+    expect(evaluateResourceTotal({ abilityMod: "wisdom", min: 1 }, ctx)).toBe(3); // Wis 16 -> +3, above min
   });
 
   it("{ levelTimes } multiplies ctx.level — the Lay on Hands (5 x level) shape", () => {
@@ -199,6 +195,73 @@ describe("poolsFromRows resolves resourceRechargeTiers (level-tiered recharge ca
   });
 });
 
+describe("poolsFromRows resolves resourceDetailTiers (labeled display parts, #1685's DerivedResource.details)", () => {
+  it("no resourceDetailTiers on the row means `details` is absent entirely", () => {
+    const rows = [row({ resourceKey: "flat", resourceTotals: [{ minLevel: 1, total: 1 }] })];
+    expect(poolsFromRows(rows, 1, {}, 2, "EDITION_2014")[0].details).toBeUndefined();
+  });
+
+  it("resolves each label's own last-match-wins tier independently — interleaved labels in one flat array", () => {
+    const detailTiers: ResourceDetailTier[] = [
+      { minLevel: 2, label: "Max CR", value: "1/4" },
+      { minLevel: 2, label: "Duration", value: "1 hour(s)" },
+      { minLevel: 4, label: "Max CR", value: "1/2 (no flying speed)" },
+      { minLevel: 6, label: "Duration", value: "3 hour(s)" },
+    ];
+    const rows = [row({ resourceKey: "wildShape", resourceTotals: [{ minLevel: 2, total: 2 }], resourceDetailTiers: detailTiers })];
+
+    expect(poolsFromRows(rows, 3, {}, 2, "EDITION_2014")[0].details).toEqual([
+      { label: "Max CR", value: "1/4" },
+      { label: "Duration", value: "1 hour(s)" },
+    ]);
+    expect(poolsFromRows(rows, 5, {}, 2, "EDITION_2014")[0].details).toEqual([
+      { label: "Max CR", value: "1/2 (no flying speed)" },
+      { label: "Duration", value: "1 hour(s)" },
+    ]);
+    expect(poolsFromRows(rows, 6, {}, 2, "EDITION_2014")[0].details).toEqual([
+      { label: "Max CR", value: "1/2 (no flying speed)" },
+      { label: "Duration", value: "3 hour(s)" },
+    ]);
+  });
+
+  it("preserves first-appearance order of labels, not alphabetical or minLevel order", () => {
+    const detailTiers: ResourceDetailTier[] = [
+      { minLevel: 20, label: "Uses", value: "Unlimited (Archdruid)" },
+      { minLevel: 1, label: "Duration", value: "1 hour(s)" },
+      { minLevel: 1, label: "Max CR", value: "1/4" },
+    ];
+    const rows = [row({ resourceKey: "wildShape", resourceTotals: [{ minLevel: 1, total: 2 }], resourceDetailTiers: detailTiers })];
+
+    expect(poolsFromRows(rows, 20, {}, 2, "EDITION_2014")[0].details).toEqual([
+      { label: "Uses", value: "Unlimited (Archdruid)" },
+      { label: "Duration", value: "1 hour(s)" },
+      { label: "Max CR", value: "1/4" },
+    ]);
+  });
+
+  it("a label whose first tier isn't reached yet is omitted, while other labels still resolve", () => {
+    const detailTiers: ResourceDetailTier[] = [
+      { minLevel: 2, label: "Max CR", value: "1/4" },
+      { minLevel: 20, label: "Uses", value: "Unlimited (Archdruid)" },
+    ];
+    const rows = [row({ resourceKey: "wildShape", resourceTotals: [{ minLevel: 2, total: 2 }], resourceDetailTiers: detailTiers })];
+
+    expect(poolsFromRows(rows, 10, {}, 2, "EDITION_2014")[0].details).toEqual([{ label: "Max CR", value: "1/4" }]);
+  });
+
+  it("an empty resourceDetailTiers array resolves `details` to absent, not an empty array", () => {
+    const rows = [row({ resourceKey: "flat", resourceTotals: [{ minLevel: 1, total: 1 }], resourceDetailTiers: [] })];
+    expect(poolsFromRows(rows, 1, {}, 2, "EDITION_2014")[0].details).toBeUndefined();
+  });
+
+  it("every label below its own first tier at the character's level means `details` is absent entirely", () => {
+    const detailTiers: ResourceDetailTier[] = [{ minLevel: 20, label: "Uses", value: "Unlimited (Archdruid)" }];
+    const rows = [row({ resourceKey: "wildShape", resourceTotals: [{ minLevel: 1, total: 2 }], resourceDetailTiers: detailTiers })];
+
+    expect(poolsFromRows(rows, 5, {}, 2, "EDITION_2014")[0].details).toBeUndefined();
+  });
+});
+
 describe("improvementsFromRows (#1691) — same edition/level truth table as featuresFromRows, flattened across rows", () => {
   it("a row tagged for the matching edition, at or below the character's level, contributes its improvements", () => {
     const rows = [row({ level: 3, improvements: [{ target: "armorProficiency", amount: 1, key: "heavy" }] })];
@@ -225,7 +288,6 @@ describe("improvementsFromRows (#1691) — same edition/level truth table as fea
       { target: "skillProficiency", amount: 1, key: "athletics" },
       { target: "armorClass", amount: 1 },
     ]);
-    // Below B's level, only A's grant is active.
     expect(improvementsFromRows(rows, 2, "EDITION_2014")).toEqual([
       { target: "skillProficiency", amount: 1, key: "athletics" },
     ]);
@@ -259,7 +321,6 @@ describe("conditionImmunitiesFromRows (#1121) — same edition/level truth table
     ];
     expect(conditionImmunitiesFromRows(rows, 6, "EDITION_2014", new Set())).toEqual([]);
     expect(conditionImmunitiesFromRows(rows, 6, "EDITION_2014", new Set(["rage"]))).toEqual(["charmed", "frightened"]);
-    // A different active buff key doesn't satisfy the gate.
     expect(conditionImmunitiesFromRows(rows, 6, "EDITION_2014", new Set(["bardicInspiration"]))).toEqual([]);
   });
 
