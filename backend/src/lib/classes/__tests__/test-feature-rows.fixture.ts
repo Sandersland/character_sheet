@@ -1371,8 +1371,8 @@ export const WILD_MAGIC_ROWS: ClassFeatureRow[] = [
   },
 ];
 
-// Narrow mirror: only Bardic Inspiration needs a row-driven action — every
-// other Bard feature falls through the empty-array path.
+// Narrow mirror: only Bardic Inspiration needs a row-driven pool/action —
+// every other Bard feature falls through the empty-array path.
 export const BARD_BARDIC_INSPIRATION_ROWS: ClassFeatureRow[] = [
   {
     name: "Bardic Inspiration",
@@ -1381,6 +1381,18 @@ export const BARD_BARDIC_INSPIRATION_ROWS: ClassFeatureRow[] = [
     description:
       "As a bonus action, give one creature within 60 ft a Bardic Inspiration die (d6, becoming d8 at L5, d10 at L10, d12 at L15). They add it to one ability check, attack roll, or saving throw within 10 minutes.",
     resourceKey: "bardicInspiration",
+    resourceLabel: "Bardic Inspiration",
+    resourceTotals: [{ minLevel: 1, total: { abilityMod: "charisma", min: 1 } }],
+    resourceDieTiers: [
+      { minLevel: 1, die: "d6" },
+      { minLevel: 5, die: "d8" },
+      { minLevel: 10, die: "d10" },
+      { minLevel: 15, die: "d12" },
+    ],
+    resourceRechargeTiers: [
+      { minLevel: 1, recharge: "longRest" },
+      { minLevel: 5, recharge: "short-or-long" },
+    ],
     activationCost: "bonusAction",
     costKind: "pool",
     costPoolKey: "bardicInspiration",
@@ -1393,6 +1405,18 @@ export const BARD_BARDIC_INSPIRATION_ROWS: ClassFeatureRow[] = [
     description:
       "As a Bonus Action, give one creature within 60 feet that can see or hear you a Bardic Inspiration die (d6, becoming d8 at level 5, d10 at level 10, d12 at level 15). Within the next hour, that creature can roll the die and add the number rolled to one D20 Test it makes, potentially turning the failure into a success.",
     resourceKey: "bardicInspiration",
+    resourceLabel: "Bardic Inspiration",
+    resourceTotals: [{ minLevel: 1, total: { abilityMod: "charisma", min: 1 } }],
+    resourceDieTiers: [
+      { minLevel: 1, die: "d6" },
+      { minLevel: 5, die: "d8" },
+      { minLevel: 10, die: "d10" },
+      { minLevel: 15, die: "d12" },
+    ],
+    resourceRechargeTiers: [
+      { minLevel: 1, recharge: "longRest" },
+      { minLevel: 5, recharge: "short-or-long" },
+    ],
     activationCost: "bonusAction",
     costKind: "pool",
     costPoolKey: "bardicInspiration",

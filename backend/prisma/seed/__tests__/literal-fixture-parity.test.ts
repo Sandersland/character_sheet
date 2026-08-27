@@ -96,12 +96,12 @@ function collectFixtureRows(): FixtureRow[] {
 
 describe("literal-row fixture parity (#1593)", () => {
   // Anti-vacuity: if the fixture maps were empty (or the join produced nothing)
-  // every assertion below would pass by iterating nothing. Eleven classes are
-  // literal as of wave C (#1224/#1226/#1229), and the fixture mirrors nine of
-  // them — Rogue and Bard are deliberately absent entirely, since neither
-  // declares a resourceKey/derivedStat the fixture must carry and no surviving
-  // test asserts a null-vs-object distinction against either (see the
-  // fixture's own header).
+  // every assertion below would pass by iterating nothing. All twelve classes
+  // now have a LITERAL_CLASS_ROWS entry; Rogue's and Bard's are narrow
+  // single-feature mirrors (Cunning Action, Bardic Inspiration) rather than
+  // full base-class coverage — the fixture needs a mirror only where a row
+  // carries a resourceKey/derivedStat or a surviving test probes it directly
+  // (see the fixture's own header).
   //
   // RE-MEASURED on the merged wave-C tree, never carried over from a branch.
   // #1226 measured 241 rows / 8 classes / 13 subclasses and #1229 measured

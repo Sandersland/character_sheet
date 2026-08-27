@@ -216,9 +216,8 @@ const BASE_RAW: RawPaladinFeature[] = [
   // "five times your Paladin level") while lib/classes/paladin.ts's
   // resourceFn description states the COMPUTED NUMBER — moving the POOL onto
   // the row would change what a player actually reads, failing #1685's
-  // byte-identical AC; excluded alongside Bardic Inspiration (bard-features.ts)
-  // rather than migrated — see paladin.ts's own header for the full
-  // reasoning. Both rows DO set an identity-only `resourceKey` (#1909, no
+  // byte-identical AC; excluded rather than migrated — see paladin.ts's own
+  // header for the full reasoning. Both rows DO set an identity-only `resourceKey` (#1909, no
   // resourceTotals) so each can carry its own row-driven ACTION — see
   // RawPaladinFeature's own comment.
   {

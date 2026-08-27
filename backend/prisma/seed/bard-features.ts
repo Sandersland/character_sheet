@@ -1,78 +1,38 @@
-// --- Bard ClassFeature rows, authored as LITERAL data (#1224) ---------------
-// Commit 1 of 3 (mirrors Cleric's #1225 / Ranger's #1230 shape) moved these
-// rows off lib/classes/bard.ts's AuthoredFeature[] arrays into literal seed
-// data, byte-identical to the old TS-derived text (pinned by
-// bard-2014-snapshot.test.ts). Commit 2 authored Bard's real SRD 5.2 (2024)
-// content: the base class and College of Lore are transcribed directly from
-// the SRD 5.2.1 raw markdown (downfallx/dnd-5e-srd-markdown, classes.md).
-// College of Valor is NOT in SRD 5.2 (owner decision, #1224): its 2024 text is
-// mirror-sourced from three independent, non-scraper secondary sources
-// (aidedd.org's Bard 2024 reference, Roll20's licensed 2024 compendium, and
-// D&D Beyond's first-party "2024 Bard vs. 2014 Bard" article) that agree word-
-// for-mechanic — see the COLLEGE OF VALOR section below.
-//
-// Commit 3 is a no-op for resource-pool columns: unlike Cleric's Channel
-// Divinity, Bardic Inspiration's pool does NOT move onto a row — see the
-// RESOURCE POOL header block further down for why (a level-conditional
-// description, not a formula or recharge limitation). Bard is
-// Ranger-shaped (lib/classes/ranger.ts), NOT Cleric-shaped: both Bard
-// subclasses declare `grantLevel: 3`, which already equals
-// subclassGateLevel's undefined fallback, so `lib/classes/bard.ts` survives
-// this migration for its `resourceFn` ALONE, never for the gate level — see
-// that file's own header.
+// Bard ClassFeature seed rows. 2014 text: PHB'14. 2024 text: the base class
+// and College of Lore are transcribed from SRD 5.2.1 raw markdown
+// (downfallx/dnd-5e-srd-markdown, classes.md). College of Valor is NOT in
+// SRD 5.2 (owner decision, #1224): its 2024 text is mirror-sourced from three
+// independent, non-scraper secondary sources (aidedd.org's Bard 2024
+// reference, Roll20's licensed 2024 compendium, and D&D Beyond's first-party
+// "2024 Bard vs. 2014 Bard" article) that agree word-for-mechanic — see the
+// COLLEGE OF VALOR section below.
 //
 // DATA MODULE ONLY (#1277 AC 4, scripts/check-seed-data-modules.sh): no
 // direct database calls or async write logic may live in this file. expand()
 // below is pure content assembly, not seeding logic.
 //
-// EDITION RULE (mirrors cleric-features.ts/ranger-features.ts): `edition`
-// omitted -> expand() seeds ONE row per edition with IDENTICAL text — reserved
-// for a feature genuinely edition-invariant in both mechanics AND wording
-// (none of Bard's rows qualify, CLAUDE.md's ACTIONS precedent: even where a
-// 2024 row's mechanics match 2014's, the text is transcribed from a different
-// document, so every row below is explicitly tagged once commit 2 lands).
-// `edition` set -> exactly the one row named. A "no 2024 successor" feature
-// (Song of Rest) means NOT authoring a 2024 row for that name, never deleting
-// the 2014 row. A rename (Additional Magical Secrets -> Magical Discoveries,
-// College of Valor's Bonus Proficiencies -> Martial Training) is a DIFFERENT
-// name at the same or a shifted level, so the old 2024 row (where one existed)
-// simply never gets authored, rather than being edited in place. Every
-// EDITION_2014 row below stays byte-identical to what commit 1 pinned
-// (bard-2014-snapshot.test.ts) — commit 2 only ever ADDS an
-// `edition: "EDITION_2024"` tag alongside new 2024 text; it never edits a 2014
-// row's own name/level/description.
+// Edition authoring rule (mirrors cleric-features.ts/ranger-features.ts):
+// `edition` omitted -> expand() seeds one identical row per edition (none of
+// Bard's rows qualify — CLAUDE.md's ACTIONS precedent: transcribed text
+// forks even where mechanics agree). `edition` set -> exactly the one row
+// named. A "no 2024 successor" feature (Song of Rest) means NOT authoring a
+// 2024 row for that name, never deleting the 2014 row. A rename (Additional
+// Magical Secrets -> Magical Discoveries, College of Valor's Bonus
+// Proficiencies -> Martial Training) is a DIFFERENT name at the same or a
+// shifted level, so the old 2024 row (where one existed) simply never gets
+// authored, rather than being edited in place.
 //
-// RESOURCE POOL — Bardic Inspiration stays WHOLLY in lib/classes/bard.ts's
-// resourceFn. Its total (`Math.max(1, chaMod)`) is now expressible as a
-// `{ abilityMod: "charisma", min: 1 }` formula tier (#1685's evaluator), and
-// its longRest-below-level-5/short-or-long-from-level-5 (Font of Inspiration)
-// recharge shift is now expressible via `resourceRechargeTiers` too — see the
-// four pools that DID migrate onto a row (Dark One's Own Luck, Tireless,
-// Nature's Veil, Moonlight Step). The one remaining blocker: the pool's
-// description is itself level-conditional — it names the current die size
-// and which rest currently recharges it inline (see bard.ts's resourceFn
-// literal). #1528's no-second-string rule means a row's `description` is
-// read verbatim; a per-level interpolated string can't be authored as one
-// static row.
-// No row below sets resourceLabel/resourceRecharge/resourceTotals/
-// resourceRechargeTiers — the whole pool's shape is documented here in prose
-// instead, since none of it can be authored without the description also
-// moving onto the row. Bardic Inspiration's two rows DO set `resourceKey`
-// alone (#1909, identity-only, no resourceTotals) so the row can carry the
-// row-driven ACTION (activationCost/costKind/costPoolKey/costBase) —
-// poolFromRow (class-feature-rows.ts) requires resourceTotals to mint a pool,
-// so this mints no phantom one; the real pool total still comes wholly from
-// bard.ts's resourceFn, described above.
-//
-// The rule itself is edition-invariant, verified against BOTH SRDs: SRD 5.1
-// ("Charisma modifier, a minimum of once"; die d6/d8/d10/d12 at L1/5/10/15;
-// Long Rest recharge; Font of Inspiration upgrades to short-or-long) and SRD
-// 5.2 (identical on every axis — "minimum of once", same die tiers, same
-// recharge upgrade). bard.ts's resourceFn therefore takes NO `edition`
-// parameter (CLAUDE.md's no-fork-when-they-agree rule) — its signature stays
-// `(level, abilityScores)`.
+// Every Bard pool is row-declared (no resourceFn left); a reintroduced
+// resourceFn pool would shadow a same-keyed row pool in mergePoolSources.
+// Bardic Inspiration's total (SRD 5.1 p.53 / SRD 5.2 p.31: Charisma modifier,
+// minimum of once), die ladder (d6/d8/d10/d12 at L1/5/10/15), and its
+// longRest-below-L5/short-or-long-from-L5 (Font of Inspiration) recharge
+// shift are edition-invariant and identical to the deleted bard.ts
+// resourceFn's arithmetic — verified against both SRDs directly on each row.
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
+import type { ResourceTotalFormula } from "../../src/lib/classes/class-feature-rows.js";
 import type { FeatImprovement } from "../../src/lib/classes/resources-state.js";
+import type { RechargeOn } from "../../src/lib/classes/types.js";
 import type { SeedEdition } from "./edition.js";
 import type { ClassFeatureSeedRow } from "./class-features.js";
 
@@ -99,13 +59,14 @@ interface RawBardFeature {
   // schema.prisma comment. Only College of Valor's 2014 "Bonus Proficiencies"
   // row sets this today.
   improvements?: FeatImprovement[];
-  // Activation block (#1909) — Bardic Inspiration's row-driven action moved
-  // off actions.ts's DERIVED_ACTIONS onto its own row. `resourceKey` here is
-  // IDENTITY-ONLY (no resourceTotals) — the pool itself stays wholly in
-  // bard.ts's resourceFn (see this file's own RESOURCE POOL header block for
-  // why); poolFromRow (class-feature-rows.ts) requires resourceTotals to mint
-  // a pool, so this mints no phantom one.
+  // Pool descriptor + activation columns: the action moved off DERIVED_ACTIONS
+  // (#1909); the pool's totals/die/recharge tiers replaced the deleted
+  // resourceFn (bard retab).
   resourceKey?: string;
+  resourceLabel?: string;
+  resourceTotals?: { minLevel: number; total: ResourceTotalFormula }[];
+  resourceDieTiers?: { minLevel: number; die: string }[];
+  resourceRechargeTiers?: { minLevel: number; recharge: RechargeOn }[];
   activationCost?: string;
   costKind?: string;
   costPoolKey?: string;
@@ -125,6 +86,10 @@ function expand(raw: RawBardFeature): ClassFeatureSeedRow[] {
     derivedStatTiers: raw.derivedStatTiers,
     improvements: raw.improvements,
     resourceKey: raw.resourceKey,
+    resourceLabel: raw.resourceLabel,
+    resourceTotals: raw.resourceTotals,
+    resourceDieTiers: raw.resourceDieTiers,
+    resourceRechargeTiers: raw.resourceRechargeTiers,
     activationCost: raw.activationCost,
     costKind: raw.costKind,
     costPoolKey: raw.costPoolKey,
@@ -168,9 +133,23 @@ const BARD_BASE_RAW: RawBardFeature[] = [
     edition: "EDITION_2014",
     description:
       "As a bonus action, give one creature within 60 ft a Bardic Inspiration die (d6, becoming d8 at L5, d10 at L10, d12 at L15). They add it to one ability check, attack roll, or saving throw within 10 minutes.",
-    // Row-driven action (#1909, moved off actions.ts's DERIVED_ACTIONS) —
-    // identity-only resourceKey, see RawBardFeature's own comment.
+    // Row-driven action (#1909, moved off actions.ts's DERIVED_ACTIONS).
     resourceKey: "bardicInspiration",
+    resourceLabel: "Bardic Inspiration",
+    // SRD 5.1 p.53: a minimum of once, equal to your Charisma modifier.
+    resourceTotals: [{ minLevel: 1, total: { abilityMod: "charisma", min: 1 } }],
+    // SRD 5.1 p.54: d6 at L1, d8 at L5, d10 at L10, d12 at L15.
+    resourceDieTiers: [
+      { minLevel: 1, die: "d6" },
+      { minLevel: 5, die: "d8" },
+      { minLevel: 10, die: "d10" },
+      { minLevel: 15, die: "d12" },
+    ],
+    // SRD 5.1 p.54: Long Rest below Font of Inspiration (L5), then short-or-long.
+    resourceRechargeTiers: [
+      { minLevel: 1, recharge: "longRest" },
+      { minLevel: 5, recharge: "short-or-long" },
+    ],
     activationCost: "bonusAction",
     costKind: "pool",
     costPoolKey: "bardicInspiration",
@@ -188,6 +167,22 @@ const BARD_BASE_RAW: RawBardFeature[] = [
     description:
       "As a Bonus Action, give one creature within 60 feet that can see or hear you a Bardic Inspiration die (d6, becoming d8 at level 5, d10 at level 10, d12 at level 15). Within the next hour, that creature can roll the die and add the number rolled to one D20 Test it makes, potentially turning the failure into a success.",
     resourceKey: "bardicInspiration",
+    resourceLabel: "Bardic Inspiration",
+    // SRD 5.2 p.31: a minimum of once, equal to your Charisma modifier — same
+    // formula as 2014 (CLAUDE.md no-fork-when-they-agree rule).
+    resourceTotals: [{ minLevel: 1, total: { abilityMod: "charisma", min: 1 } }],
+    // SRD 5.2 p.31: d6 at level 1, d8 at level 5, d10 at level 10, d12 at level 15.
+    resourceDieTiers: [
+      { minLevel: 1, die: "d6" },
+      { minLevel: 5, die: "d8" },
+      { minLevel: 10, die: "d10" },
+      { minLevel: 15, die: "d12" },
+    ],
+    // SRD 5.2 p.32: Long Rest below Font of Inspiration (L5), then short-or-long.
+    resourceRechargeTiers: [
+      { minLevel: 1, recharge: "longRest" },
+      { minLevel: 5, recharge: "short-or-long" },
+    ],
     activationCost: "bonusAction",
     costKind: "pool",
     costPoolKey: "bardicInspiration",
@@ -271,9 +266,9 @@ const BARD_BASE_RAW: RawBardFeature[] = [
     level: 5,
     edition: "EDITION_2024",
     // SRD 5.2.1 classes.md:908-912: adds the no-action spell-slot top-up —
-    // #1528's no-second-string rule means this text must agree with
-    // bard.ts's own resourceFn description, which stays edition-neutral (no
-    // duration claim) rather than repeating this clause.
+    // #1528's no-second-string rule means this text must agree with the
+    // Bardic Inspiration row's own pool description, which stays silent on
+    // this clause rather than repeating it.
     description:
       "You regain all of your expended Bardic Inspiration uses when you finish a Short or Long Rest. In addition, you can expend a spell slot (no action required) to regain one expended use of Bardic Inspiration.",
   },

@@ -823,9 +823,8 @@ model ClassFeature {
   edition RulesEdition
 
   // Resource block — the pool this feature would otherwise declare in a class
-  // module's resourceFn. A pool whose description interpolates
-  // level-conditional text (Bardic Inspiration) stays resourceFn-derived: the
-  // pool card reads the row description verbatim (#1528 no-second-string).
+  // module's resourceFn. #1528 no-second-string: the pool card reads this
+  // row's own description verbatim, never a second, separately maintained string.
   resourceKey           String?
   resourceLabel         String?
   resourceRecharge      String? // RechargeOn
