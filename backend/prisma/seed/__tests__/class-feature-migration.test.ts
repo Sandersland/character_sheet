@@ -429,7 +429,7 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
     const SORCERER_POOL_ROWS = 8;
     const CLERIC_POOL_ROWS = 2;
     const DRUID_POOL_ROWS = 2;
-    const PALADIN_POOL_ROWS = 2;
+    const PALADIN_POOL_ROWS = 5;
     const BLADESINGER_POOL_ROWS = 1;
     const OPEN_HAND_POOL_ROWS = 1;
     const BARD_POOL_ROWS = 2;

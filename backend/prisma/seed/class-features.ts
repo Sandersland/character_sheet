@@ -149,7 +149,10 @@ const resourceTotalFormulaSchema = z.union([
   z.literal("proficiencyBonus"),
   z.object({
     abilityMod: z.enum(["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"]),
-    // A floor for the modifier, never a source of negative totals (#1685).
+    // An additive offset applied before `min` floors the sum — Divine Sense's
+    // "1 + Charisma modifier" (PHB'14 p.84).
+    plus: z.number().int().optional(),
+    // A floor for the modifier (+ plus, if set), never a source of negative totals (#1685).
     min: z.number().int().nonnegative().optional(),
   }),
   z.object({ levelTimes: z.number().int().positive() }),

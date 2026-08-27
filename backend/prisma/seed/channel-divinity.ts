@@ -123,8 +123,8 @@ export const CHANNEL_DIVINITIES: ChannelDivinitySeed[] = [
       "As a bonus action, utter a vow of enmity against a creature within 10 ft. Gain advantage on attack rolls against it for 1 minute or until it drops to 0 HP or falls unconscious.",
   },
   // #1229: NEW in 2024 — Divine Sense moves from its own L1 resource pool
-  // (paladin.ts's resourceFn, 2014-only) to a base Channel Divinity option
-  // every Paladin has regardless of oath (no `subclass` on its gate,
+  // (paladin-features.ts's own row, 2014-only) to a base Channel Divinity
+  // option every Paladin has regardless of oath (no `subclass` on its gate,
   // lib/classes/channel-divinity.ts).
   {
     name: "Channel Divinity: Divine Sense",

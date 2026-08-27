@@ -11939,7 +11939,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 5 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -11953,7 +11953,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 10 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -11967,7 +11967,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 15 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -11989,7 +11989,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 20 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12011,7 +12011,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 25 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12033,7 +12033,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 30 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12055,7 +12055,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 35 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12077,7 +12077,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 40 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12099,7 +12099,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 45 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12121,7 +12121,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 50 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12143,7 +12143,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 55 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12165,7 +12165,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 60 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12187,7 +12187,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 65 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12209,7 +12209,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 70 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12231,7 +12231,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 75 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12253,7 +12253,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 80 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12275,7 +12275,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 85 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12297,7 +12297,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 90 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12319,7 +12319,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 95 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12341,7 +12341,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 100 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12368,7 +12368,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 5 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12382,7 +12382,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 10 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12396,7 +12396,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 15 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12418,7 +12418,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 20 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12440,7 +12440,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 25 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12462,7 +12462,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 30 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12484,7 +12484,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 35 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12506,7 +12506,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 40 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12528,7 +12528,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 45 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12550,7 +12550,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 50 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12572,7 +12572,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 55 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12594,7 +12594,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 60 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12616,7 +12616,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 65 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12638,7 +12638,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 70 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12660,7 +12660,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 75 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12682,7 +12682,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 80 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12704,7 +12704,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 85 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12726,7 +12726,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 90 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12748,7 +12748,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 95 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12770,7 +12770,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 100 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12797,7 +12797,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 5 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12811,7 +12811,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 10 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12825,7 +12825,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 15 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12847,7 +12847,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 20 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12869,7 +12869,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 25 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12891,7 +12891,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 30 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12913,7 +12913,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 35 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12935,7 +12935,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 40 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12957,7 +12957,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 45 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -12979,7 +12979,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 50 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -13001,7 +13001,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 55 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -13023,7 +13023,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 60 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -13045,7 +13045,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 65 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -13067,7 +13067,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 70 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -13089,7 +13089,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 75 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -13111,7 +13111,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 80 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -13133,7 +13133,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 85 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -13155,7 +13155,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 90 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -13177,7 +13177,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 95 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -13199,7 +13199,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 100 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -13226,7 +13226,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 5 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -13240,7 +13240,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 10 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -13254,7 +13254,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 15 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -13276,7 +13276,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 20 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -13298,7 +13298,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 25 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -13320,7 +13320,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 30 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -13342,7 +13342,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 35 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -13364,7 +13364,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 40 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -13386,7 +13386,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 45 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -13408,7 +13408,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 50 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -13430,7 +13430,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 55 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -13452,7 +13452,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 60 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -13474,7 +13474,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 65 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -13496,7 +13496,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 70 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -13518,7 +13518,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 75 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -13540,7 +13540,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 80 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -13562,7 +13562,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 85 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -13584,7 +13584,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 90 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -13606,7 +13606,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 95 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",
@@ -13628,7 +13628,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
     "info": {
       "resources": [
         {
-          "description": "Pool of 100 healing HP. Touch to restore HP; spend 5 HP to remove the Poisoned condition instead of healing. Replenishes on a long rest.",
+          "description": "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
           "key": "layOnHands",
           "label": "Lay on Hands",
           "recharge": "longRest",

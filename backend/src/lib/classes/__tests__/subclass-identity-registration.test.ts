@@ -5,7 +5,6 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 import { deriveResources } from "@/lib/classes/class-features.js";
 import { druid } from "@/lib/classes/druid.js";
 import { monk } from "@/lib/classes/monk.js";
-import { paladin } from "@/lib/classes/paladin.js";
 import { ranger } from "@/lib/classes/ranger.js";
 import { SUBCLASS_IDENTITY } from "@/lib/classes/subclass-slug.js";
 import type { ClassDefinition } from "@/lib/classes/types.js";
@@ -131,7 +130,6 @@ describe("real registry: the overlay still wins for every class still on the TS 
 const TS_REGISTERED_CLASSES: Record<string, ClassDefinition> = {
   druid,
   monk,
-  paladin,
   ranger,
 };
 
@@ -153,9 +151,9 @@ describe("#1557 review — the SUBCLASSES overlay's key-equality invariant", () 
 
   // Ties to CLASS_SUBCLASSES so a class added to CLASSES but omitted here
   // fails visibly instead of silently losing coverage.
-  it("covers every class in CLASS_SUBCLASSES except Fighter, Barbarian, Rogue, Cleric, Warlock, Wizard, Sorcerer and Bard, which have no TS module", () => {
-    expect(new Set([...Object.keys(TS_REGISTERED_CLASSES), "fighter", "barbarian", "rogue", "cleric", "warlock", "wizard", "sorcerer", "bard"])).toEqual(
-      new Set(Object.keys(CLASS_SUBCLASSES)),
-    );
+  it("covers every class in CLASS_SUBCLASSES except Fighter, Barbarian, Rogue, Cleric, Warlock, Wizard, Sorcerer, Bard and Paladin, which have no TS module", () => {
+    expect(
+      new Set([...Object.keys(TS_REGISTERED_CLASSES), "fighter", "barbarian", "rogue", "cleric", "warlock", "wizard", "sorcerer", "bard", "paladin"]),
+    ).toEqual(new Set(Object.keys(CLASS_SUBCLASSES)));
   });
 });

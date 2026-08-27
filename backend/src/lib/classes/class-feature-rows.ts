@@ -10,7 +10,11 @@ import type { DerivedFeature, DerivedResource, RechargeOn } from "./types.js";
 
 export type ResourceTotalAbility = "strength" | "dexterity" | "constitution" | "intelligence" | "wisdom" | "charisma";
 
-export type ResourceTotalFormula = number | "proficiencyBonus" | { abilityMod: ResourceTotalAbility; min?: number } | { levelTimes: number };
+export type ResourceTotalFormula =
+  | number
+  | "proficiencyBonus"
+  | { abilityMod: ResourceTotalAbility; plus?: number; min?: number }
+  | { levelTimes: number };
 
 // Tiers are ASCENDING by minLevel, last-match-wins.
 export interface ResourceTotalTier {
@@ -32,7 +36,7 @@ export function evaluateResourceTotal(total: ResourceTotalFormula, ctx: Resource
   if (total === "proficiencyBonus") return ctx.profBonus;
   if ("abilityMod" in total) {
     // A missing score reads as 10 (modifier 0), matching resourceFn's own default.
-    const mod = abilityModifier(ctx.abilityScores[total.abilityMod] ?? 10);
+    const mod = abilityModifier(ctx.abilityScores[total.abilityMod] ?? 10) + (total.plus ?? 0);
     return total.min !== undefined ? Math.max(total.min, mod) : mod;
   }
   return total.levelTimes * ctx.level;

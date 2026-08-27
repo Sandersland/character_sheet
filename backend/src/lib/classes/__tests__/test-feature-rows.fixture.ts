@@ -2023,6 +2023,9 @@ export const PALADIN_BASE_ROWS: ClassFeatureRow[] = [
     description:
       "As an action, sense the presence of celestials, fiends, and undead within 60 ft until the end of your next turn (they aren't hidden from this sense). You can also detect consecrated or desecrated places/objects. Uses = 1 + Charisma modifier per long rest.",
     resourceKey: "divineSense",
+    resourceLabel: "Divine Sense",
+    resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 1, total: { abilityMod: "charisma", plus: 1, min: 1 } }],
     activationCost: "action",
     costKind: "pool",
     costPoolKey: "divineSense",
@@ -2035,6 +2038,9 @@ export const PALADIN_BASE_ROWS: ClassFeatureRow[] = [
     description:
       "Touch to restore HP from a pool of 5 × your paladin level. Alternatively, spend 5 HP from the pool to cure one disease or neutralize one poison. The pool replenishes on a long rest.",
     resourceKey: "layOnHands",
+    resourceLabel: "Lay on Hands",
+    resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 1, total: { levelTimes: 5 } }],
     activationCost: "action",
     costKind: "pool",
     costPoolKey: "layOnHands",
@@ -2048,6 +2054,9 @@ export const PALADIN_BASE_ROWS: ClassFeatureRow[] = [
     description:
       "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
     resourceKey: "layOnHands",
+    resourceLabel: "Lay on Hands",
+    resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 1, total: { levelTimes: 5 } }],
     activationCost: "bonusAction",
     costKind: "pool",
     costPoolKey: "layOnHands",
