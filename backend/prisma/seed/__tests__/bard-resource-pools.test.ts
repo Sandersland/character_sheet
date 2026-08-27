@@ -15,7 +15,7 @@ function poolAt(key: string, level: number, edition: "EDITION_2014" | "EDITION_2
 // SRD 5.1 p.53 / SRD 5.2 p.31: a minimum of once, equal to your Charisma
 // modifier — die d6/d8/d10/d12 at L1/5/10/15, longRest recharge upgrading to
 // short-or-long at Font of Inspiration (L5). Both editions agree on every axis.
-describe("bardicInspiration rides Bard's own row — the pool bard.ts's resourceFn used to declare", () => {
+describe("bardicInspiration rides Bard's own row — the pool the deleted bard resourceFn used to declare", () => {
   it.each(["EDITION_2014", "EDITION_2024"] as const)("%s: total is max(1, Cha modifier)", (edition) => {
     expect(poolAt("bardicInspiration", 1, edition, 8)?.total).toBe(1); // Cha 8, -1 mod, floors at 1
     expect(poolAt("bardicInspiration", 1, edition, 18)?.total).toBe(4); // Cha 18, +4 mod

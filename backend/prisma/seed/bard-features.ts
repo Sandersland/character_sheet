@@ -59,8 +59,9 @@ interface RawBardFeature {
   // schema.prisma comment. Only College of Valor's 2014 "Bonus Proficiencies"
   // row sets this today.
   improvements?: FeatImprovement[];
-  // Activation block (#1909) — Bardic Inspiration's row-driven action moved
-  // off actions.ts's DERIVED_ACTIONS onto its own row.
+  // Pool descriptor + activation columns: the action moved off DERIVED_ACTIONS
+  // (#1909); the pool's totals/die/recharge tiers replaced the deleted
+  // resourceFn (bard retab).
   resourceKey?: string;
   resourceLabel?: string;
   resourceTotals?: { minLevel: number; total: ResourceTotalFormula }[];
