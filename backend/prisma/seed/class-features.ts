@@ -278,10 +278,12 @@ const resourceTotalsTierSchema = z
 const resourceDieTiersSchema = z
   .array(z.object({ minLevel: z.number().int().positive(), die: z.string().min(1) }))
   .refine(isAscendingByMinLevel, ASCENDING_TIER_MESSAGE);
-// `recharge` mirrors RechargeOn (lib/classes/types.ts) — the same vocabulary
-// poolFromRow's flat `resourceRecharge` scalar reads, now expressible per tier.
+// Mirrors RechargeOn (lib/classes/types.ts) — the same vocabulary
+// poolFromRow's flat `resourceRecharge` scalar reads, now also usable per tier.
+const RECHARGE_ON_VALUES = ["shortRest", "longRest", "short-or-long", "none"] as const;
 const resourceRechargeTiersSchema = z
-  .array(z.object({ minLevel: z.number().int().positive(), recharge: z.enum(["shortRest", "longRest", "short-or-long", "none"]) }))
+  .array(z.object({ minLevel: z.number().int().positive(), recharge: z.enum(RECHARGE_ON_VALUES) }))
+  .min(1) // an empty tier array is authoring garbage — also keeps it truthy-iff-nonempty for the gap `.refine` below
   .refine(isAscendingByMinLevel, ASCENDING_TIER_MESSAGE);
 const derivedStatTiersSchema = z
   .array(z.object({ minLevel: z.number().int().positive(), value: z.union([z.number(), z.string()]) }))
@@ -379,7 +381,7 @@ export const classFeatureSeedSchema = z
     edition: z.enum(["EDITION_2014", "EDITION_2024"]),
     // Declared here (not just on ClassFeatureSeedRow) so the resourceRechargeTiers
     // cross-field `.refine` below can see it.
-    resourceRecharge: z.enum(["shortRest", "longRest", "short-or-long", "none"]).optional(),
+    resourceRecharge: z.enum(RECHARGE_ON_VALUES).optional(),
     resourceTotals: resourceTotalsTierSchema.nullable().optional(),
     resourceDieTiers: resourceDieTiersSchema.nullable().optional(),
     resourceRechargeTiers: resourceRechargeTiersSchema.nullable().optional(),
@@ -419,7 +421,7 @@ export const classFeatureSeedSchema = z
     (row) =>
       !row.resourceRechargeTiers ||
       row.resourceRecharge !== undefined ||
-      !row.resourceTotals ||
+      !row.resourceTotals?.length ||
       row.resourceRechargeTiers[0].minLevel <= row.resourceTotals[0].minLevel,
     {
       message:

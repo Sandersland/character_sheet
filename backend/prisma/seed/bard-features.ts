@@ -13,9 +13,8 @@
 //
 // Commit 3 is a no-op for resource-pool columns: unlike Cleric's Channel
 // Divinity, Bardic Inspiration's pool does NOT move onto a row — see the
-// RESOURCE POOL header block further down for the two independent blockers
-// (a Cha-modifier formula AND a level-tiered recharge, neither of which
-// `resourceTotals`/`resourceRecharge` can express as a single scalar). Bard is
+// RESOURCE POOL header block further down for why (a level-conditional
+// description, not a formula or recharge limitation). Bard is
 // Ranger-shaped (lib/classes/ranger.ts), NOT Cleric-shaped: both Bard
 // subclasses declare `grantLevel: 3`, which already equals
 // subclassGateLevel's undefined fallback, so `lib/classes/bard.ts` survives
@@ -45,30 +44,25 @@
 //
 // RESOURCE POOL — Bardic Inspiration stays WHOLLY in lib/classes/bard.ts's
 // resourceFn. Its total (`Math.max(1, chaMod)`) is now expressible as a
-// `{ abilityMod: "charisma", min: 1 }` formula tier (#1685's evaluator) —
-// see the four pools that DID migrate that way (Dark One's Own Luck,
-// Tireless, Nature's Veil, Moonlight Step) — but TWO other, independent
-// blockers remain, either one alone sufficient to keep this pool in TS:
-// (1) Recharge is level-tiered: `longRest` below level 5, `short-or-long`
-// from level 5 (Font of Inspiration). `resourceRecharge` is a single scalar
-// column with no `resourceRechargeTiers` sibling — a row physically cannot
-// carry a recharge that changes mid-progression.
-// (2) The pool's description is itself level-conditional — it names the
-// current die size and which rest currently recharges it inline (see
-// bard.ts's resourceFn literal). #1528's no-second-string rule means a row's
-// `description` is read verbatim; a per-level interpolated string can't be
-// authored as one static row.
-// No row below sets resourceLabel/resourceRecharge/resourceTotals — not even
-// the resourceKey-without-resourceTotals documentation form Ranger/Warlock
-// use for their own Wisdom/Charisma-modifier pools, since Ranger's/Warlock's
-// pools have a SINGLE recharge value and Bard's doesn't; a half-declared row
-// would misstate Bard's recharge for levels 1-4. The whole pool's shape is
-// documented here in prose instead. Bardic Inspiration's two rows DO set
-// `resourceKey` alone (#1909, identity-only, no resourceTotals) so the row
-// can carry the row-driven ACTION (activationCost/costKind/costPoolKey/
-// costBase) — poolFromRow (class-feature-rows.ts) requires resourceTotals to
-// mint a pool, so this mints no phantom one; the real pool total still comes
-// wholly from bard.ts's resourceFn, described above.
+// `{ abilityMod: "charisma", min: 1 }` formula tier (#1685's evaluator), and
+// its longRest-below-level-5/short-or-long-from-level-5 (Font of Inspiration)
+// recharge shift is now expressible via `resourceRechargeTiers` too — see the
+// four pools that DID migrate onto a row (Dark One's Own Luck, Tireless,
+// Nature's Veil, Moonlight Step). The one remaining blocker: the pool's
+// description is itself level-conditional — it names the current die size
+// and which rest currently recharges it inline (see bard.ts's resourceFn
+// literal). #1528's no-second-string rule means a row's `description` is
+// read verbatim; a per-level interpolated string can't be authored as one
+// static row.
+// No row below sets resourceLabel/resourceRecharge/resourceTotals/
+// resourceRechargeTiers — the whole pool's shape is documented here in prose
+// instead, since none of it can be authored without the description also
+// moving onto the row. Bardic Inspiration's two rows DO set `resourceKey`
+// alone (#1909, identity-only, no resourceTotals) so the row can carry the
+// row-driven ACTION (activationCost/costKind/costPoolKey/costBase) —
+// poolFromRow (class-feature-rows.ts) requires resourceTotals to mint a pool,
+// so this mints no phantom one; the real pool total still comes wholly from
+// bard.ts's resourceFn, described above.
 //
 // The rule itself is edition-invariant, verified against BOTH SRDs: SRD 5.1
 // ("Charisma modifier, a minimum of once"; die d6/d8/d10/d12 at L1/5/10/15;

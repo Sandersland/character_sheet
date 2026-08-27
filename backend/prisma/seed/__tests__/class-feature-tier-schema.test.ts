@@ -151,6 +151,46 @@ describe("resourceRechargeTiers' first tier must be reached by resourceTotals' f
     });
     expect(result.success).toBe(true);
   });
+
+  // An empty array is truthy in JS, so `!row.resourceRechargeTiers` alone
+  // doesn't short-circuit the refine for it — reading `[0].minLevel` off an
+  // empty array would throw inside the refine instead of failing validation.
+  it("resourceRechargeTiers: [] is a clean validation FAILURE, not a thrown error", () => {
+    expect(() =>
+      classFeatureSeedSchema.safeParse({
+        ...baseRow,
+        resourceRechargeTiers: [],
+      }),
+    ).not.toThrow();
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceRechargeTiers: [],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  // Same empty-array hazard on the OTHER side of the refine's condition:
+  // `!row.resourceTotals` doesn't short-circuit for `resourceTotals: []`
+  // either. This row has valid recharge tiers and no scalar fallback, so the
+  // refine reaches the `resourceTotals[0]` read — it must not throw. Whether
+  // safeParse then accepts or rejects the row is secondary to that; it
+  // ACCEPTS here, since an empty resourceTotals means no pool ever opens, so
+  // there is no level at which the missing recharge coverage matters.
+  it("resourceTotals: [] alongside recharge tiers and no scalar does not throw, and is accepted (no pool ever opens to need recharge coverage)", () => {
+    expect(() =>
+      classFeatureSeedSchema.safeParse({
+        ...baseRow,
+        resourceRechargeTiers: [{ minLevel: 5, recharge: "short-or-long" }],
+        resourceTotals: [],
+      }),
+    ).not.toThrow();
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceRechargeTiers: [{ minLevel: 5, recharge: "short-or-long" }],
+      resourceTotals: [],
+    });
+    expect(result.success).toBe(true);
+  });
 });
 
 // #1685/#416 C3: total may be a formula instead of a flat number. Driven
