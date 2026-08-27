@@ -802,14 +802,10 @@ model SubclassSpellListExpansion {
   @@index([subclassId])
 }
 
-// Seeded home for the per-class feature text that lived in twelve lib/classes/
-// *.ts modules as DerivedFeature[] (#1522/#1523). Real relations (not bare
-// scalar FKs) to CharacterClass/Subclass, both onDelete: Cascade — #1524's
-// read path is "arrives through the include that already loads class/
-// subclass", which needs a `features` field on both parents to include, and
-// #1522 forbids making the derivation path async (the only alternative to a
-// relation here). classId is required (every feature belongs to a class);
-// subclassId is NULL for a base-class feature (the majority of rows).
+// Seeded per-class/subclass feature content (#1522/#1523). Real relations
+// (not bare scalar FKs): the read path arrives through the include that
+// already loads class/subclass, and the derivation path must stay
+// synchronous. subclassId is NULL for a base-class feature (the majority).
 model ClassFeature {
   id          String         @id @default(uuid())
   classId     String
@@ -817,31 +813,19 @@ model ClassFeature {
   subclassId  String?
   subclass    Subclass?      @relation(fields: [subclassId], references: [id], onDelete: Cascade)
   name        String
-  level       Int // absolute character level (#1522's settled Q1 — copy 2014 subclass-grant levels verbatim)
+  level       Int // absolute character level, not a subclass-relative grant level (#1522)
   description String
 
-  // Non-nullable, unlike Subclass/Feat/GrantedAbility/Background/Action's
-  // `edition RulesEdition?` (NULL there means "shared"). Here every row
-  // forks: this is the enforcement mechanism for "every class-authoring unit
-  // is a row per edition" (#1522 decision), which makes resolveEditionRow's
-  // shared-row (edition: null) fallback unreachable BY TYPE for this family —
-  // the #1430/#1519 "silently ambiguous which document a row cites" failure
-  // class cannot be expressed here at all.
+  // Non-nullable, unlike every other catalog `edition RulesEdition?` (NULL =
+  // shared): every ClassFeature row forks (#1522), so resolveEditionRow's
+  // shared-row fallback is unreachable by type and a row can never be
+  // ambiguous about which document it cites (#1430/#1519).
   edition RulesEdition
 
-  // ---- Descriptor columns (#1522 decision 3). Every one is NULL/default
-  // ---- after this migration — #1528 populates Fighter's, then each wave-2
-  // ---- per-class retab its own. Authored once here (one migration) rather
-  // ---- than re-migrating all 522 text rows a second time when #1528 lands.
-
-  // Resource block — replaces the pool this feature declares in resourceFn.
-  // `resourceRecharge` is a flat scalar; `resourceRechargeTiers` below covers
-  // a recharge cadence that changes mid-progression instead (e.g. Bardic
-  // Inspiration's longRest-then-short-or-long shift at level 5). Bardic
-  // Inspiration itself still stays resourceFn-derived (#1224, bard.ts) — not
-  // for its recharge or its Cha-mod total, both now expressible on a row, but
-  // for its level-conditional description text (die size and rest type
-  // interpolated inline, #1528's no-second-string rule).
+  // Resource block — the pool this feature would otherwise declare in a class
+  // module's resourceFn. A pool whose description interpolates
+  // level-conditional text (Bardic Inspiration) stays resourceFn-derived: the
+  // pool card reads the row description verbatim (#1528 no-second-string).
   resourceKey           String?
   resourceLabel         String?
   resourceRecharge      String? // RechargeOn
@@ -850,77 +834,53 @@ model ClassFeature {
   resourceRechargeTiers Json? // [{ minLevel, recharge }] — recharge: RechargeOn — ASCENDING by minLevel, last-match-wins
   resourceDetailTiers   Json? // [{ minLevel, label, value }] — labeled display parts (#1685's DerivedResource.details) — ASCENDING by minLevel PER LABEL, last-match-wins per label; different labels interleave freely
 
-  // Activation block — replaces this feature's DERIVED_ACTIONS row. No gate
-  // columns: grantClass IS classId, grantSubclassSlugs IS subclassId,
-  // grantLevel IS level — one row, one gate.
+  // Activation block — this feature's action, gated by the row itself
+  // (classId/subclassId/level), never separate grant columns.
   activationCost     String? // ActionCost: action | bonusAction | reaction | free | special
   resolverKind       String? // ResolutionKind — served on the wire, retiring the frontend mirror
   requiresUnarmored  Boolean  @default(false)
   regrants           String[] @default([])
-  // Declarative activation-time gates (#1688): a closed vocabulary — armor/
-  // shield literals ("noMediumArmor" | "noHeavyArmor" | "noShield" |
-  // "noBodyArmor") plus `{ requiresActiveBuff: <buffKey> }`, evaluated by
-  // unmetActivationRequirements at activation, server-side, inside
-  // applyRowDrivenActionInTx — never
-  // re-derived client-side. Bladesong (#1676) is the first `noMediumArmor`/
-  // `noHeavyArmor`/`noShield` consumer; Song of Defense's `requiresActiveBuff`
-  // and Elemental Attunement's burst/strike ops are the follow-ons. Validated
+  // Declarative activation-time gates (#1688): armor/shield literals
+  // ("noMediumArmor" | "noHeavyArmor" | "noShield" | "noBodyArmor") plus
+  // `{ requiresActiveBuff: <buffKey> }`, evaluated server-side by
+  // unmetActivationRequirements — never re-derived client-side. Validated
   // seed-time (classFeatureSeedSchema).
   activationRequires Json?
-  // Static in-play announce text (#1909) — distinct from `description` (the
-  // feature prose): this is what a player reads when they actually USE the
-  // action, e.g. Lay on Hands' "touch a creature to restore HP" line.
-  // `buildRowAction` (lib/classes/actions.ts) serves it only when
-  // `describeRowReminder`'s derived heal text yields nothing, so a row with
-  // an effectKind (Second Wind) keeps its computed "Regain NdM HP" subtitle
-  // over this column. Validated seed-time (classFeatureSeedSchema).
+  // Static in-play announce text (#1909) — what a player reads when they USE
+  // the action, distinct from `description` (the feature prose). buildRowAction
+  // serves it only when describeRowReminder's derived heal text yields nothing.
   reminder           String?
-  // A resolved numeric fact about this action the client renders verbatim
-  // (#1912) — the row-authored counterpart to DERIVED_ACTIONS' retired
-  // `count` field (actions.ts), e.g. Flurry of Blows' strike count (2
-  // normally, 3 at Heightened Focus, monk L10). `buildRowAction` serves it
-  // verbatim; a level-gated bump is an announce-augmentor payload (#1910),
-  // never a second row.
+  // A resolved numeric fact the client renders verbatim (#1912), e.g. Flurry
+  // of Blows' strike count. A level-gated bump is an announce-augmentor
+  // payload (#1910), never a second row.
   count              Int?
-  // Marks a row that exists ONLY to carry one action VARIANT of a feature
-  // that grants several (Patient Defense free vs. 1-Focus, Step of the
-  // Wind's pair, Empty Body's two ki options, the Deflect riders, Hand of
-  // Healing's Flurry variant, #1912/epic #1903 decision 4) — or, more
-  // generally, any action identity with no feature-card text of its own.
-  // `featuresFromRows` (lib/classes/class-feature-rows.ts) filters an
-  // `actionOnly` row out, so it never surfaces as a feature card, in the
-  // level-up ceremony's feature list, or anywhere else `DerivedFeature` is
-  // projected — ONLY in `availableActions[]`. Requires `activationCost` +
-  // `resourceKey` (enforced at seed time, classFeatureSeedSchema): a row
-  // with neither is dead data, invisible everywhere.
+  // A row that exists ONLY to carry one action variant of a feature, or any
+  // action identity with no feature-card text (#1912). featuresFromRows
+  // filters it out of every DerivedFeature projection — it surfaces ONLY in
+  // `availableActions[]`. Requires `activationCost` + `resourceKey`
+  // (seed-enforced): a row with neither is dead data, invisible everywhere.
   actionOnly         Boolean  @default(false)
 
-  // Cost block — GrantedAbility's columns verbatim (AbilityCostColumns is
-  // exactly these four, all optional) so readAbilityCost reads them unchanged.
+  // Cost block — GrantedAbility's columns verbatim (AbilityCostColumns), so
+  // readAbilityCost reads them unchanged.
   costKind    String?
   costPoolKey String?
   costBase    Int?
   costPerStep Int?
 
-  // Effect block — GrantedAbility's columns MINUS upcastDicePerLevel,
-  // cantripScaling and concentration. Those three are deliberately NOT
-  // copied: EffectRow is `EffectColumns & { level: number }` and
-  // resolveEffectScaling reads `row.level` as the SPELL level, while this
-  // model's `level` is the CHARACTER level the feature is gained at. A
-  // ClassFeature row handed straight to readEffectSpec would typecheck and
-  // silently reinterpret the grant level — turning Second Wind (grant level
-  // 1) into an upcastable spell. Inert only because these three columns are
-  // absent; #1528 must adapt the row (e.g. `{ ...row, level: 0 }`) or use a
-  // dedicated reader, never add these three columns back to "complete" the copy.
+  // Effect block — GrantedAbility's columns MINUS upcastDicePerLevel/
+  // cantripScaling/concentration, deliberately: resolveEffectScaling reads
+  // EffectRow.level as the SPELL level, while this model's `level` is the
+  // character level — a row handed straight to readEffectSpec would silently
+  // turn Second Wind into an upcastable spell. Readers must adapt the row
+  // (castSpecFromRow's `{ ...row, level: 0 }`); never add those three columns
+  // back to "complete" the copy.
   effectKind           String?
   effectDiceCount      Int?
   effectDiceFaces      Int?
   effectDieSource      String?
   effectModifier       Int?
-  // "classLevel" | "abilityMod:<ability>" — the ONE column decision 3 adds
-  // beyond GrantedAbility's shipped vocabulary (#1528 earns it with content).
-  // NOT in EffectColumns, so readEffectSpec ignores it until #1528 wires it.
-  effectModifierSource String?
+  effectModifierSource String? // "classLevel" | "abilityMod:<ability>"
   damageType           String?
   attackType           String?
   saveAbility          String?
@@ -928,108 +888,58 @@ model ClassFeature {
   buffTarget           String?
   buffModifier         Int?
 
-  // A passive derived-stat modifier is NOT a #900 C2b buff (duration-bound:
-  // while-active/until-rest) — Extra Attack (#1530), crit range (#1120) and
-  // half-proficiency (#1124) are permanent and level-gated, read synchronously
-  // in serializeCharacter off these two columns. Populated by nobody yet; the
-  // VALUE vocabulary is defined by whichever of #1530/#1120 populates it
-  // first — this issue invents none. Recorded as a comment on #900.
+  // A permanent, level-gated derived-stat modifier (Extra Attack, crit range),
+  // read synchronously in serializeCharacter — not a duration-bound buff.
   derivedStat      String?
   derivedStatTiers Json? // [{ minLevel, value }] — ASCENDING by minLevel, last-match-wins
 
-  // A closed-form save DC a class/subclass row announces from the abilities
-  // named here (#1546): 8 + proficiency bonus + the higher of these
-  // abilities' modifiers (Battle Master maneuvers, PHB'14 p.73 / PHB'24
-  // p.83). Genuinely generic in FORMULA — Monk's focus DC, Cleric's turn DC,
-  // Barbarian's frighten DC and Rogue's assassin DC are the same closed form
-  // hardcoded into class TS strings today — not a Fighter special case, and
-  // (#1589) now a genuinely live path for a BASE-CLASS row too: registry.ts's
-  // deriveRowExtras runs over both classRows (unconditional) and an active
-  // subclass's subclassRows, feeding ClassExtras.announcedSaveDC (renamed
-  // from the Fighter-specific `maneuverSaveDC`). Still only Combat Superiority
-  // (a SUBCLASS row) actually sets this column in production — Cleric's Turn
-  // Undead/Channel Divinity deliberately still don't (cleric-features.ts's own
-  // header): `announcedSaveDC` stays a SINGLE scalar overlaid across every
-  // class entry (deriveEntryScopedResources), so two entries each declaring
-  // one is a real collision — registry.ts's overlay throws on it rather than
-  // silently letting one clobber the other, and Cleric already serves its own
-  // DC through a fully independent, already-correct path
-  // (channelDivinitySaveDC, lib/classes/channel-divinity.ts) with no need to
-  // risk that collision for zero consumer benefit. Deliberately NOT layered
-  // onto derivedStat/derivedStatTiers: the DC is per-character ability math,
-  // not a level tier, and Combat Superiority's own derivedStat slot is
-  // already claimed by maneuverChoiceCount's tiers on the SAME row — one
-  // nullable String column cannot name both, so this is read directly (a
-  // non-empty list IS the trigger), never matched by a derivedStat name.
-  // Empty (the default) means "no such axis" for every row but Combat
-  // Superiority.
+  // A closed-form save DC announced from the abilities named here (#1546):
+  // 8 + proficiency bonus + the higher named modifier (PHB'14 p.73 / PHB'24
+  // p.83). Read directly — a non-empty list IS the trigger — never matched by
+  // derivedStat name, whose slot the same row may already claim. Feeds
+  // ClassExtras.announcedSaveDC, a single scalar whose overlay throws on a
+  // collision — why Cleric keeps its independent channelDivinitySaveDC path.
   saveDcAbilities String[] @default([])
 
-  // A passive, always-on grant — proficiency or a flat numeric bonus — the
-  // row's prose promises but no other descriptor column can express (#1691;
-  // the proving case is Life Domain's 2014 "Bonus Proficiency" row, which
-  // said "you gain heavy armor proficiency" and granted nothing). Validated
-  // seed-time against the SAME FeatImprovement vocabulary/zod schema a taken
-  // feat's `improvements` snapshot uses (lib/srd/feats.ts's
-  // featImprovementSchema/FEAT_IMPROVEMENT_TARGETS) — reused, not forked, so
-  // a target added for feats is usable here with no second declaration.
-  // #1682's SpeciesTrait.improvements is the sibling of this column, reusing
-  // the same read-time evaluator (deriveImprovementBonuses/
-  // deriveImprovementProficiencies).
+  // A passive, always-on grant the row's prose promises but no other column
+  // can express (#1691; Life Domain's 2014 "Bonus Proficiency" is the proving
+  // case). Validated against featImprovementSchema — the SAME vocabulary a
+  // taken feat's `improvements` snapshot uses, reused, not forked.
   improvements Json?
 
-  // A row-declared list of while-active buffs a "toggle" resolverKind
-  // activates (#1686): [{ key, target, modifier, duration, minLevel?,
-  // clearOn?, endReminder?, resistDamageTypes?, rollEffects? }]. Distinct from
-  // buffTarget/buffModifier above (#900 C2b's single flat modifier, applied by
-  // a cast) — this column carries a LIST, each entry independently
-  // level-gated (minLevel) and able to carry resistance/roll-effect grants a
-  // single flat modifier can't express (Rage needs both). `modifier` is
-  // #1685's ResourceTotalFormula OR a tier array (ASCENDING minLevel,
-  // last-match-wins, same invariant as resourceTotals/derivedStatTiers) —
-  // evaluateBuffModifier (lib/classes/class-feature-rows.ts) is the one place
-  // this vocabulary is interpreted. Validated seed-time
-  // (classFeatureSeedSchema); `target` may equal the buff's own `key` for a
-  // marker buff with no numeric effect (Elemental Attunement's shape).
-  // `clearOn` (#1688) is a list of equip-time trigger keys (CLEAR_ON_TRIGGERS)
-  // copied onto the instantiated ActiveBuff and matched against the equip
-  // hook's own raised triggers (equipClearTriggers) — the metadata path Mage
-  // Armor's equip-driven true-end (#363) now rides too (buffTarget
-  // "acUnarmoredBase" -> clearOn ["equipBodyArmor"], set at cast time via
-  // BUFF_TARGET_CLEAR_ON).
+  // While-active buffs a "toggle" resolverKind activates (#1686): [{ key,
+  // target, modifier, duration, minLevel?, clearOn?, endReminder?,
+  // resistDamageTypes?, rollEffects? }] — a LIST, each entry level-gated and
+  // able to carry resistance/roll-effect grants, unlike buffTarget/
+  // buffModifier's single flat cast-applied modifier. `modifier` is a
+  // ResourceTotalFormula OR a tier array (ASCENDING minLevel,
+  // last-match-wins); evaluateBuffModifier is the one interpreter. `target`
+  // may equal the buff's own `key` (a marker buff). `clearOn` (#1688) lists
+  // equip-time trigger keys (CLEAR_ON_TRIGGERS) matched against
+  // equipClearTriggers. Validated seed-time (classFeatureSeedSchema).
   effectBuffs Json?
 
-  // Condition keys this feature grants immunity to, once its own level/
-  // edition gate is met (#1121) — read together with the two columns below.
-  // A plain String[] (mirrors saveDcAbilities), not nested in effectBuffs:
-  // Beguiling Defenses/Nature's Ward are UNCONDITIONAL (no gating buff), so
-  // forcing them through the buff-only effectBuffs list would need a fake
-  // always-active buff for a feature the player never toggles.
+  // Condition keys this feature grants immunity to once its level/edition
+  // gate is met (#1121). A plain String[], not nested in effectBuffs:
+  // unconditional immunities (Beguiling Defenses, Nature's Ward) would
+  // otherwise need a fake always-active buff.
   conditionImmunities                  String[] @default([])
-  // Gates `conditionImmunities` on a buff of this key currently being active
-  // (#1121) — e.g. Mindless Rage names "rage" (the Barbarian base-class Rage
-  // row's own effectBuffs key), so the immunity applies only while raging.
-  // Absent/null = unconditional (Beguiling Defenses, Nature's Ward).
+  // Gates the immunities on a buff of this key being active (Mindless Rage
+  // names "rage"). Absent/null = unconditional.
   conditionImmunitiesRequireActiveBuff String?
-  // What happens to an EXISTING matching condition when the gating buff above
-  // STARTS (#1121, PHB'14 p.49 / SRD 5.2): "clear" permanently removes it
-  // (2024 Mindless Rage — entering Rage ends Charmed/Frightened outright);
-  // "suspend" removes it but restores it when the gating buff ENDS (2014
-  // Mindless Rage — the condition is suspended, not cured, for the rage's
-  // duration). Meaningless without conditionImmunitiesRequireActiveBuff;
-  // applyRowDrivenActionInTx's toggle branch (routes/character/actions.ts) is
-  // the one place this vocabulary is interpreted, alongside
-  // conditionImmunitiesFromRows (lib/classes/class-feature-rows.ts) for the
-  // read-time immune SET itself.
+  // For an EXISTING matching condition when the gating buff STARTS (#1121,
+  // PHB'14 p.49 / SRD 5.2): "clear" removes it permanently (2024 Mindless
+  // Rage); "suspend" removes it but restores it when the buff ends (2014
+  // Mindless Rage). Interpreted only by applyRowDrivenActionInTx's toggle
+  // branch and conditionImmunitiesFromRows.
   conditionImmunitiesOnBuffStart       String?
 
   // NULLS NOT DISTINCT is hand-written in the migration (Prisma's DSL cannot
-  // express it) — subclassId is nullable and base-class features are the
-  // majority of rows, so without it two identical (fighter, NULL, "Second
-  // Wind", EDITION_2024) rows would both insert.
+  // express it): subclassId is nullable, so without it two identical
+  // base-class rows would both insert.
   @@unique([classId, subclassId, name, edition])
-  // The read path (#1524) joins on subclassId alone; the compound unique
-  // above is classId-prefixed and cannot serve it.
+  // The read path joins on subclassId alone; the classId-prefixed compound
+  // unique above cannot serve it.
   @@index([subclassId])
 }
 

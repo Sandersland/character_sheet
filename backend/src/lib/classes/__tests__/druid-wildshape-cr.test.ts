@@ -1,19 +1,7 @@
-// Circle of the Moon derives Circle Forms CR caps; base/Land keep the base
-// table (#906) — EDITION_2014 only. #1226 commit 3: the EDITION_2024 pool
-// moved wholesale onto druid-features.ts's Wild Shape row (wildShapeCrCap and
-// wildShapeSpeedNote are now 2014-only, gated by `edition === "EDITION_2024"
-// -> []` at the top of lib/classes/druid.ts's resourceFn) — SRD 5.2 states a
-// flat, subclass-invariant CR table in prose instead of a computed value, so
-// under 2024 every subclass context reads the SAME Wild Shape description;
-// Circle of the Moon's own level/3 CR bump is a FEATURE-list fact (its Circle
-// Forms row) now, never baked into the pool description. This file used to
-// assert 2014's computed values under a hardcoded "EDITION_2024" call — that
-// was the stale-copy bug #1226 exists to fix.
-//
-// The pool-detail-fields task moved the computed CR cap off the description
-// string onto the pool's own `details` (armorClassBreakdown pattern) — this
-// file now reads the "Max CR" detail part instead of matching description
-// substrings.
+// The computed CR cap is EDITION_2014-only: SRD 5.2 states a flat,
+// subclass-invariant CR table in prose, so under 2024 every subclass reads the
+// same Wild Shape description and Circle of the Moon's level/3 bump lives on
+// its Circle Forms feature row instead (#1226).
 import { describe, expect, it } from "vitest";
 
 import { deriveResources } from "@/lib/classes/class-features.js";
@@ -44,16 +32,11 @@ function wildShapeMaxCr(subclass: string | undefined, level: number, edition: "E
 }
 
 describe("druid Wild Shape CR cap derivation, EDITION_2014 (#906) — 2014-only, unaffected by #1226", () => {
-  // PHB'14 p.66: Circle of the Moon grants at level 2 (druid.ts's own
-  // `grantLevel: 2`) — subclassGateLevel resolves the 2014 gate straight off
-  // that value when no CharacterClass.subclassLevel relation is supplied
-  // (testFeatureRowsFor carries none), unlike EDITION_2024's hardcoded gate
-  // of 3 regardless of `grantLevel` (effective-levels.ts). Circle Forms
-  // itself caps CR at 1 from L2-L5 (its "starting at level 6" step hasn't
-  // hit yet), so this is a flat "1", not the base table's "1/4" — the prior
-  // version of this test called deriveResources with a hardcoded
-  // "EDITION_2024" (which always gates at 3, masking this) while asserting
-  // this exact SRD 5.1 text; that's the bug #1226 was retargeting to fix.
+  // PHB'14 p.66: Circle of the Moon grants at level 2 — subclassGateLevel
+  // resolves the 2014 gate off `grantLevel` (testFeatureRowsFor supplies no
+  // subclassLevel relation), unlike EDITION_2024's hardcoded gate of 3.
+  // Circle Forms caps CR at a flat 1 from L2-L5 (its "starting at level 6"
+  // step hasn't hit yet), not the base table's "1/4".
   it("Circle of the Moon caps CR at 1 starting at its own level-2 grant", () => {
     expect(wildShapeMaxCr("circle of the moon", 2)).toBe("1 (no flying or swimming speed)");
     expect(wildShapeMaxCr("circle of the moon", 3)).toBe("1 (no flying or swimming speed)");
@@ -83,8 +66,6 @@ describe("druid Wild Shape CR cap derivation, EDITION_2014 (#906) — 2014-only,
   it("no Wild Shape pool below level 2, even for the Moon", () => {
     expect(wildShapePool("circle of the moon", 1)).toBeUndefined();
     expect(wildShapePool(undefined, 1)).toBeUndefined();
-    // Same fact restated through the "Max CR" detail specifically — kept
-    // alongside the pool-level assertion above since it costs nothing.
     expect(wildShapeMaxCr("circle of the moon", 1)).toBeUndefined();
     expect(wildShapeMaxCr(undefined, 1)).toBeUndefined();
   });

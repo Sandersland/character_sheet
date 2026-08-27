@@ -16,8 +16,6 @@ function pool(overrides: Partial<ResourcePool> = {}): ResourcePool {
   };
 }
 
-// #1685: labeled display parts (the armorClassBreakdown pattern) rendered
-// verbatim next to the pool's description — never parsed by the client.
 describe("ResourcePoolRow — details (#1685)", () => {
   it("renders each detail's label and value, in order", () => {
     const { container } = render(

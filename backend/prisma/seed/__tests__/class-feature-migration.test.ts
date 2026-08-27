@@ -1,7 +1,6 @@
-// Runs against the real seeded catalog: the template DB the test setup clones
-// from has already run `prisma db seed`. seedClassFeatures is exported
-// precisely so this suite can re-run it in-process (seed.ts's main()
-// self-invokes at module load and exports nothing).
+// Runs against the real seeded catalog (the template DB has already run
+// `prisma db seed`); seedClassFeatures is exported precisely so this suite
+// can re-run it in-process.
 import { describe, expect, it } from "vitest";
 
 import { Prisma } from "@/generated/prisma/client.js";
@@ -246,9 +245,7 @@ function isSaveDcRow(row: RowKey): boolean {
 }
 
 // Every populated-row predicate registers here, once — a second aggregator is
-// how a row silently escapes the descriptor sweep. An array + `.some()`
-// rather than an `||` chain keeps this function's cyclomatic count at 1
-// (prisma/seed/** has no coverage instrumentation, so CRAP floors at CC^2+CC).
+// how a row silently escapes the descriptor sweep.
 const POPULATED_ROW_PREDICATES: ((row: RowKey) => boolean)[] = [
   isPopulatedFighterRow,
   isPopulatedBattleMasterPoolRow,
@@ -519,7 +516,7 @@ describe("ClassFeature migration — Fighter's #1528 pilot rows are populated ex
       expect(row.costKind, row.edition).toBe("pool");
       expect(row.costPoolKey, row.edition).toBe("actionSurge");
       expect(row.costBase, row.edition).toBe(1);
-      expect(row.effectKind, row.edition).toBeNull(); // no such axis — a pure counter
+      expect(row.effectKind, row.edition).toBeNull();
     }
   });
 
@@ -673,8 +670,6 @@ describe("ClassFeature migration — seedClassFeatures is idempotent (#1523)", (
     const rows = await prisma.classFeature.findMany({
       where: { name: "Second Wind", class: { name: "Fighter" }, subclassId: null, edition: "EDITION_2024" },
     });
-    // Same row updated in place — not a second row created alongside the
-    // (never-deleted) mutated one.
     expect(rows).toHaveLength(1);
     expect(rows[0].id).toBe(target.id);
     expect(rows[0].description).toBe(canonical.description);

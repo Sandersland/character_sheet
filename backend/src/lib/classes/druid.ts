@@ -5,8 +5,8 @@ import type { ClassDefinition } from "./types.js";
 // `details` instead of interpolating them into the description. The blocker
 // isn't that a row can't be subclass-scoped (Circle Forms below already is a
 // subclass row) — it's two mechanics specific to how a BASE pool picks up a
-// subclass's variant: (a) mergeLayers (registry.ts) is base-wins on pool
-// keys, so a Circle of the Moon row declaring its own "wildShape" pool would
+// subclass's variant: (a) mergeLayers is base-wins on pool keys, so a
+// Circle of the Moon row declaring its own "wildShape" pool would
 // be silently DROPPED, not overlaid, once a base row also claims that key;
 // (b) the Moon curve (wildShapeCrCap below) works today only because
 // deriveBaseLayer feeds the ACTIVE subclassKey into the base class's own

@@ -1,20 +1,7 @@
-// Pure unit test (NO database) for #1522's settled tier-array ordering rule:
-// every ClassFeature tier column (resourceTotals/resourceDieTiers/
-// derivedStatTiers/resourceRechargeTiers) is authored ASCENDING by minLevel,
-// last-match-wins. Settled because the two shapes being merged disagreed —
-// EXTRA_ATTACK_TIERS is descending/first-match while #1522's own
-// resourceTotals example is ascending — so every one of these columns shares
-// ONE zod-enforced invariant rather than inheriting the ambiguity. Nothing in
-// this migration populates resourceTotals/resourceDieTiers/derivedStatTiers
-// yet (#1528+ is the first consumer); this only proves the validator itself
-// rejects a descending array.
-//
-// Driven through classFeatureSeedSchema.safeParse, not the per-column tier
-// schemas directly: those are intentionally un-exported (class-features.ts)
-// since classFeatureSeedSchema is the surface that actually ships, and
-// testing through it exercises the SAME `.refine` predicate as the
-// production validation path (prisma/seed/validate.ts) rather than a second,
-// bypassable entry point.
+// Pure unit test (no database) for classFeatureSeedSchema's tier-array
+// invariants. Driven through classFeatureSeedSchema.safeParse — the surface
+// the production validation path (prisma/seed/validate.ts) actually runs —
+// never the intentionally un-exported per-column tier schemas.
 import { describe, expect, it } from "vitest";
 
 import { classFeatureSeedSchema } from "../class-features.js";
@@ -129,9 +116,6 @@ describe("ClassFeature tier-array schemas reject a descending minLevel order (#1
   });
 });
 
-// resourceDetailTiers (#1685): ASCENDING PER LABEL, not globally — two
-// different labels may interleave their minLevels freely, since each forms
-// its own independent progression (2014 Wild Shape's "Max CR"/"Duration").
 describe("resourceDetailTiers accepts interleaved-but-per-label-ascending order and rejects a per-label descending pair (#1685)", () => {
   it("accepts two labels interleaved in the array, each strictly ascending on its own", () => {
     const result = classFeatureSeedSchema.safeParse({
@@ -193,9 +177,8 @@ describe("resourceDetailTiers accepts interleaved-but-per-label-ascending order 
   });
 });
 
-// A row with resourceRechargeTiers and no resourceRecharge scalar has no
-// fallback below the tiers' first minLevel — poolFromRow would silently
-// resolve "none" at any level the pool exists but no tier is reached yet.
+// Without the scalar fallback, poolFromRow silently resolves "none" at any
+// level where the pool exists but no recharge tier is reached yet.
 describe("resourceRechargeTiers' first tier must be reached by resourceTotals' first tier when there is no resourceRecharge fallback", () => {
   it("rejects a gap: the pool opens at level 1 but the first recharge tier isn't reached until level 5", () => {
     const result = classFeatureSeedSchema.safeParse({
@@ -216,9 +199,8 @@ describe("resourceRechargeTiers' first tier must be reached by resourceTotals' f
     expect(result.success).toBe(true);
   });
 
-  // An empty array is truthy in JS, so `!row.resourceRechargeTiers` alone
-  // doesn't short-circuit the refine for it — reading `[0].minLevel` off an
-  // empty array would throw inside the refine instead of failing validation.
+  // An empty array is truthy, so `!row.resourceRechargeTiers` doesn't
+  // short-circuit the refine — reading `[0].minLevel` could throw instead.
   it("resourceRechargeTiers: [] is a clean validation FAILURE, not a thrown error", () => {
     expect(() =>
       classFeatureSeedSchema.safeParse({
@@ -233,13 +215,9 @@ describe("resourceRechargeTiers' first tier must be reached by resourceTotals' f
     expect(result.success).toBe(false);
   });
 
-  // Same empty-array hazard on the OTHER side of the refine's condition:
-  // `!row.resourceTotals` doesn't short-circuit for `resourceTotals: []`
-  // either. This row has valid recharge tiers and no scalar fallback, so the
-  // refine reaches the `resourceTotals[0]` read — it must not throw. Whether
-  // safeParse then accepts or rejects the row is secondary to that; it
-  // ACCEPTS here, since an empty resourceTotals means no pool ever opens, so
-  // there is no level at which the missing recharge coverage matters.
+  // Same empty-array hazard on the refine's other side: the `resourceTotals[0]`
+  // read must not throw. Acceptance is correct — an empty resourceTotals opens
+  // no pool, so missing recharge coverage never matters.
   it("resourceTotals: [] alongside recharge tiers and no scalar does not throw, and is accepted (no pool ever opens to need recharge coverage)", () => {
     expect(() =>
       classFeatureSeedSchema.safeParse({
@@ -257,11 +235,6 @@ describe("resourceRechargeTiers' first tier must be reached by resourceTotals' f
   });
 });
 
-// #1685/#416 C3: total may be a formula instead of a flat number. Driven
-// through classFeatureSeedSchema.safeParse for the same reason as the suite
-// above — the one surface that actually ships (prisma/seed/validate.ts's
-// assertSeedContentValid runs it at seed time, so a malformed formula fails
-// the seed, never a character's read path).
 describe("resourceTotals' `total` accepts the #1685 formula vocabulary and rejects malformed formulas", () => {
   it('accepts "proficiencyBonus"', () => {
     const result = classFeatureSeedSchema.safeParse({
@@ -320,11 +293,6 @@ describe("resourceTotals' `total` accepts the #1685 formula vocabulary and rejec
   });
 });
 
-// #1686: effectBuffs is a NEW nullable/optional list on ClassFeature — a
-// "toggle" resolverKind row's while-active buff descriptors. Driven through
-// classFeatureSeedSchema.safeParse for the same reason as every suite above:
-// prisma/seed/validate.ts's assertSeedContentValid is the one surface that
-// actually ships.
 describe("effectBuffs (#1686) — the toggle-resolver buff-list vocabulary", () => {
   it("accepts a minimal buff (flat number modifier, a known target)", () => {
     const result = classFeatureSeedSchema.safeParse({
@@ -476,10 +444,6 @@ describe("effectBuffs (#1686) — the toggle-resolver buff-list vocabulary", () 
   });
 });
 
-// #1688: activationRequires' closed vocabulary — an armor/shield literal or a
-// `requiresActiveBuff` object. Driven through classFeatureSeedSchema.safeParse
-// for the same reason as effectBuffs above: the production validation path
-// (prisma/seed/validate.ts) is what this pins, not an un-exported schema.
 describe("activationRequires (#1688) — the declarative activation-constraint vocabulary", () => {
   it("accepts every armor/shield literal", () => {
     const result = classFeatureSeedSchema.safeParse({

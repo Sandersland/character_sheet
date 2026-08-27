@@ -1,22 +1,12 @@
-// #1226 commit 3: Wild Shape's pool SPLITS by edition — the EDITION_2024 row
-// (druid-features.ts) carries resourceTotals/shortRestRegain; EDITION_2014
-// stays computed by lib/classes/druid.ts's resourceFn, UNTOUCHED (including
-// its `level >= 20 ? 99` Archdruid branch — SRD 5.1 is correct, not legacy).
-// DB-backed via loadDbFeatureRows, mirroring barbarian-rage-pool.test.ts's/
-// cleric-channel-divinity-pool.test.ts's own shape — this is the real
-// end-to-end path a character's sheet resolves through (deriveResources),
-// not a bare poolsFromRows/resourceFn call, which is what lets it also prove
-// Moonlight Step (druid.ts's Circle of the Moon subclass resourceFn) never
-// double-emits alongside the row's own resourceKey-without-resourceTotals
-// declaration.
+// Wild Shape's pool splits by edition (#1226): the EDITION_2024 row carries
+// resourceTotals/shortRestRegain; EDITION_2014 stays computed by druid.ts's
+// resourceFn, including its `level >= 20 ? 99` Archdruid branch (SRD 5.1 is
+// correct, not legacy). DB-backed via loadDbFeatureRows — the real
+// deriveResources path a sheet resolves through, which is what lets this also
+// prove Moonlight Step never double-emits.
 //
-// Lives prisma-side (not src/lib/classes/__tests__/) because it imports
-// DRUID_FEATURES directly to prove the #1528 no-second-string property — a
-// src file importing anything under prisma/ is a TS6059 compile error
-// (backend/tsconfig.json's `rootDir: "src"`), the same boundary
-// test-feature-rows.fixture.ts's own header explains. `@/...` imports below
-// are fine in this direction (prisma -> src), mirroring
-// druid-2014-snapshot.test.ts/druid-2024-content.test.ts.
+// Lives prisma-side because it imports DRUID_FEATURES — a src file importing
+// anything under prisma/ is a TS6059 compile error (rootDir "src").
 import { describe, expect, it } from "vitest";
 
 import { deriveResources } from "@/lib/classes/class-features.js";
@@ -150,9 +140,7 @@ describe("Moonlight Step pool (Circle of the Moon, EDITION_2024, #1226): Wisdom-
 });
 
 describe("EDITION_2014 regression check (#1226): resourceFn was FORKED, not deleted", () => {
-  // The pool-detail-fields task made the description static and moved the
-  // Archdruid uses note and the CR cap onto `details` — see
-  // druid-wildshape-cr.test.ts for the CR cap's own coverage.
+  // The CR cap's own coverage lives in druid-wildshape-cr.test.ts.
   it("level 20 still has total 99, a static description, and an 'Uses: Unlimited (Archdruid)' detail", async () => {
     const pool = await wildShapePool(20, "EDITION_2014");
     expect(pool?.total).toBe(99);

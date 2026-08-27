@@ -1,8 +1,3 @@
-// #1524: featuresFromRows — the ONE place the edition rule for feature TEXT
-// lives, retired here from featureAppliesToEdition (registry.ts). Truth-table
-// coverage for the predicate (edition match + level gate), plus the
-// no-Prisma-import assertion that keeps lib/classes/ a pure leaf (mirrors
-// lib/spellcasting/granted-spells.ts's GrantedSpellSource pattern).
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -128,7 +123,7 @@ describe("evaluateResourceTotal (#1685) — the formula vocabulary poolFromRow r
 
   it("{ abilityMod, min } floors a low/negative modifier at min — the Math.max(1, mod) shape every migrated pool uses", () => {
     expect(evaluateResourceTotal({ abilityMod: "charisma", min: 1 }, ctx)).toBe(1); // Cha 8 -> -1, floored to 1
-    expect(evaluateResourceTotal({ abilityMod: "wisdom", min: 1 }, ctx)).toBe(3); // above min, min is a no-op
+    expect(evaluateResourceTotal({ abilityMod: "wisdom", min: 1 }, ctx)).toBe(3); // Wis 16 -> +3, above min
   });
 
   it("{ levelTimes } multiplies ctx.level — the Lay on Hands (5 x level) shape", () => {
@@ -293,7 +288,6 @@ describe("improvementsFromRows (#1691) — same edition/level truth table as fea
       { target: "skillProficiency", amount: 1, key: "athletics" },
       { target: "armorClass", amount: 1 },
     ]);
-    // Below B's level, only A's grant is active.
     expect(improvementsFromRows(rows, 2, "EDITION_2014")).toEqual([
       { target: "skillProficiency", amount: 1, key: "athletics" },
     ]);
@@ -327,7 +321,6 @@ describe("conditionImmunitiesFromRows (#1121) — same edition/level truth table
     ];
     expect(conditionImmunitiesFromRows(rows, 6, "EDITION_2014", new Set())).toEqual([]);
     expect(conditionImmunitiesFromRows(rows, 6, "EDITION_2014", new Set(["rage"]))).toEqual(["charmed", "frightened"]);
-    // A different active buff key doesn't satisfy the gate.
     expect(conditionImmunitiesFromRows(rows, 6, "EDITION_2014", new Set(["bardicInspiration"]))).toEqual([]);
   });
 
