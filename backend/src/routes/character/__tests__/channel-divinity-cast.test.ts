@@ -452,10 +452,10 @@ describe("Channel Divinity cast endpoint", () => {
     const initialPool = (initial.body.resources.pools as { key: string; total: number }[]).find(
       (p) => p.key === "channelDivinity",
     );
-    // #1225: Cleric's 2024 pool is the real SRD 5.2 progression (3 at L6,
-    // not the pre-retab edition-blind 2) — Paladin's own pool stays a flat 1
-    // from L3 on (paladin.ts, not yet retabbed).
-    expect(initialPool?.total).toBe(3); // max(cleric@6→3, paladin@4→1)
+    // #1225: Cleric's 2024 pool (this fixture's default edition) is the real
+    // SRD 5.2 progression, 3 at L6 — Paladin's own 2024 pool is 2 from L3 on,
+    // so the merged (max-wins) total is Cleric's 3.
+    expect(initialPool?.total).toBe(3); // max(cleric@6→3, paladin@4→2)
 
     const turnUndead = await cast([{ type: "castChannelDivinity", abilityId: optionId["Channel Divinity: Turn Undead"] }]);
     expect(turnUndead.status).toBe(200);

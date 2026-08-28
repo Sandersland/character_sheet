@@ -15,12 +15,11 @@
 // dungeonmister.com's own Oath guides) that agree on every mechanic below
 // except two contested values, each disclosed and OMITTED rather than guessed
 // on its own row (Vow of Enmity's action cost, Avenging Angel's duration —
-// see those rows' own comments). Commit 3 (this one, done alongside) moves
-// the Channel Divinity resource pool onto its base-class rows (see the
-// RESOURCE POOL block below) — `lib/classes/paladin.ts` is NOT deleted,
-// unlike fighter.ts/barbarian.ts/rogue.ts: it keeps divineSense/layOnHands in
-// its resourceFn (formula-shaped pools, not tier tables) — see that file's
-// own header for why this is a FOURTH end state.
+// see those rows' own comments). Commit 3 moved the Channel Divinity resource
+// pool onto its base-class rows (see the RESOURCE POOL block below); a later
+// retab moved Divine Sense and Lay on Hands onto their own rows too, using
+// the `plus` additive term #1685's evaluator gained for Divine Sense's 1 +
+// Charisma modifier shape, and `lib/classes/paladin.ts` is deleted.
 // class-features.ts concatenates PALADIN_FEATURES onto the still-derived
 // classes' rows to build CLASS_FEATURES; see its LITERAL_ROW_CLASSES export
 // for the set of classes whose rows tests must not compare against a
@@ -72,11 +71,11 @@
 // instead of erroring. Unlike Cleric — forced to hang its 2014 pool on the
 // "Turn Undead" row, since Cleric's 2014 Channel Divinity has no feature of
 // its own named "Channel Divinity" — Paladin already has a base-class row
-// literally named "Channel Divinity" at L3 in BOTH editions
-// (paladin.ts:48-54's pre-migration text), so each edition's pool rides its
-// own same-named row: 2014's total 1 (short-or-long rest, no
-// shortRestRegain); 2024's total 2/3 at L3/L11 (longRest, shortRestRegain 1
-// on every tier, #1221) — SRD 5.2's own progression, verified verbatim: "You
+// literally named "Channel Divinity" at L3 in BOTH editions (this file's own
+// BASE_RAW below), so each edition's pool rides its own same-named row:
+// 2014's total 1 (short-or-long rest, no shortRestRegain); 2024's total 2/3
+// at L3/L11 (longRest, shortRestRegain 1 on every tier, #1221) — SRD 5.2's
+// own progression, verified verbatim: "You
 // regain one of its expended uses when you finish a Short Rest, and you
 // regain all expended uses when you finish a Long Rest."
 // `lib/classes/channel-divinity.ts` and `prisma/seed/channel-divinity.ts` do
@@ -109,6 +108,7 @@
 // column; #1626 retagged the 2014/2024 divergences) — this file's oath-spell
 // feature text is the authority those rows are cross-checked against, not
 // their mechanism.
+import type { ResourceTotalFormula } from "../../src/lib/classes/class-feature-rows.js";
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { SeedEdition } from "./edition.js";
 import type { ClassFeatureSeedRow } from "./class-features.js";
@@ -135,19 +135,17 @@ interface RawPaladinFeature {
   // explicitly regardless).
   derivedStat?: string;
   derivedStatTiers?: { minLevel: number; value: number | string }[];
-  // Resource-pool descriptor columns (#1229 commit 3) — see the RESOURCE POOL
-  // header block above. Only the two "Channel Divinity" rows (one per
-  // edition) set these; every other row leaves them unset.
+  // Resource-pool descriptor columns (#1229 commit 3, widened by the retab
+  // that moved Divine Sense/Lay on Hands onto rows too) — see the RESOURCE
+  // POOL header block above.
   resourceKey?: string;
   resourceLabel?: string;
   resourceRecharge?: string;
-  resourceTotals?: { minLevel: number; total: number; shortRestRegain?: number }[];
+  resourceTotals?: { minLevel: number; total: ResourceTotalFormula; shortRestRegain?: number }[];
   // Activation block (#1909) — Divine Sense/Lay on Hands/Channel Divinity's
   // row-driven actions moved off actions.ts's DERIVED_ACTIONS onto their own
-  // rows. Divine Sense's and Lay on Hands' resourceKey is IDENTITY-ONLY (no
-  // resourceTotals — both pools stay wholly in paladin.ts's resourceFn, see
-  // this file's own header); Channel Divinity's two rows already carry the
-  // real pool (resourceTotals above), so the action rides the SAME rows.
+  // rows; all three now carry both the real pool (resourceTotals above) and
+  // the action off the same rows.
   activationCost?: string;
   costKind?: string;
   costPoolKey?: string;
@@ -198,9 +196,18 @@ const BASE_RAW: RawPaladinFeature[] = [
     description:
       "As an action, sense the presence of celestials, fiends, and undead within 60 ft until the end of your next turn (they aren't hidden from this sense). You can also detect consecrated or desecrated places/objects. Uses = 1 + Charisma modifier per long rest.",
     // Row-driven action (#1909, moved off actions.ts's DERIVED_ACTIONS,
-    // EDITION_2014-only — 2024 has no such pool, see the comment below).
-    // Identity-only resourceKey — see RawPaladinFeature's own comment.
+    // EDITION_2014-only — 2024 has no such pool, see the comment below). The
+    // pool itself (PHB'14 p.84: 1 + Charisma modifier, no stated minimum —
+    // contrast Cleansing Touch's own "minimum 1" below, where PHB'14 states a
+    // floor explicitly) rides the `plus` term #1685's evaluator gains for
+    // this retab — an ADDITIVE offset, not a floor, distinct from `min`. The
+    // `min: 1` here is NOT RAW: it's byte-parity with the deleted
+    // resourceFn's `Math.max(1, 1 + chaMod)`, kept so a negative-Charisma
+    // Paladin's pool reads the same as it always has.
     resourceKey: "divineSense",
+    resourceLabel: "Divine Sense",
+    resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 1, total: { abilityMod: "charisma", plus: 1, min: 1 } }],
     activationCost: "action",
     costKind: "pool",
     costPoolKey: "divineSense",
@@ -210,16 +217,6 @@ const BASE_RAW: RawPaladinFeature[] = [
   // resource pool and becomes the base Channel Divinity option "Channel
   // Divinity: Divine Sense" below (a DIFFERENT name), gated at L3 rather than
   // L1.
-  // Neither Lay on Hands row below sets resourceTotals (#1685 stretch goal,
-  // declined): its total fits the `{ levelTimes: 5 }` shape, but each row's
-  // own description states the formula IN WORDS ("5 × your paladin level" /
-  // "five times your Paladin level") while lib/classes/paladin.ts's
-  // resourceFn description states the COMPUTED NUMBER — moving the POOL onto
-  // the row would change what a player actually reads, failing #1685's
-  // byte-identical AC; excluded rather than migrated — see paladin.ts's own
-  // header for the full reasoning. Both rows DO set an identity-only `resourceKey` (#1909, no
-  // resourceTotals) so each can carry its own row-driven ACTION — see
-  // RawPaladinFeature's own comment.
   {
     subclassSlug: null,
     name: "Lay on Hands",
@@ -227,9 +224,15 @@ const BASE_RAW: RawPaladinFeature[] = [
     edition: "EDITION_2014",
     description:
       "Touch to restore HP from a pool of 5 × your paladin level. Alternatively, spend 5 HP from the pool to cure one disease or neutralize one poison. The pool replenishes on a long rest.",
-    // Row-driven action (#1909, moved off actions.ts's DERIVED_ACTIONS).
-    // Identity-only resourceKey — see RawPaladinFeature's own comment.
+    // Row-driven action (#1909, moved off actions.ts's DERIVED_ACTIONS). The
+    // pool (PHB'14 p.84: 5 × Paladin level) rides the `{ levelTimes: 5 }`
+    // shape #1685 already evaluates; the row's own description above already
+    // states the formula in words, so serving it as the pool's description
+    // (#1528 no-second-string) changes nothing a player reads.
     resourceKey: "layOnHands",
+    resourceLabel: "Lay on Hands",
+    resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 1, total: { levelTimes: 5 } }],
     activationCost: "action",
     costKind: "pool",
     costPoolKey: "layOnHands",
@@ -249,6 +252,9 @@ const BASE_RAW: RawPaladinFeature[] = [
     description:
       "As a Bonus Action, touch a creature and restore a number of Hit Points from a pool equal to five times your Paladin level. Alternatively, expend 5 Hit Points from the pool to remove the Poisoned condition from the creature instead of healing it. The pool refills when you finish a Long Rest.",
     resourceKey: "layOnHands",
+    resourceLabel: "Lay on Hands",
+    resourceRecharge: "longRest",
+    resourceTotals: [{ minLevel: 1, total: { levelTimes: 5 } }],
     activationCost: "bonusAction",
     costKind: "pool",
     costPoolKey: "layOnHands",

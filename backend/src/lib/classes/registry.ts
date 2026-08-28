@@ -9,19 +9,17 @@ import { deriveAnnouncedSaveDC } from "@/lib/srd/srd.js";
 import { derivedStatFromRows, featuresFromRows, improvementsFromRows, poolsFromRows, type ClassFeatureRow, type ClassFeatureRowsCarrier } from "./class-feature-rows.js";
 import { druid } from "./druid.js";
 import { monk } from "./monk.js";
-import { paladin } from "./paladin.js";
 import { ranger } from "./ranger.js";
 import type { FeatImprovement } from "./resources-state.js";
 import { SUBCLASS_IDENTITY, type SubclassIdentity, type SubclassSlug } from "./subclass-slug.js";
 import type { ClassDefinition, ClassExtras, DerivedClassInfo, DerivedFeature, DerivedResource, DerivedSubclassChoice, SubclassDefinition } from "./types.js";
 
 // Classes absent here (Fighter, Barbarian, Rogue, Cleric, Warlock, Wizard,
-// Sorcerer, Bard) resolve entirely through SUBCLASS_IDENTITY and seeded
-// ClassFeature rows; deriveBaseLayer tolerates the missing key.
+// Sorcerer, Bard, Paladin) resolve entirely through SUBCLASS_IDENTITY and
+// seeded ClassFeature rows; deriveBaseLayer tolerates the missing key.
 const CLASSES: Record<string, ClassDefinition> = {
   druid,
   monk,
-  paladin,
   ranger,
 };
 

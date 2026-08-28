@@ -828,7 +828,7 @@ model ClassFeature {
   resourceKey           String?
   resourceLabel         String?
   resourceRecharge      String? // RechargeOn
-  resourceTotals        Json? // [{ minLevel, total }] — total: number | "proficiencyBonus" | { abilityMod, min? } | { levelTimes } (#1685) — ASCENDING by minLevel, last-match-wins
+  resourceTotals        Json? // [{ minLevel, total }] — total: number | "proficiencyBonus" | { abilityMod, plus?, min? } | { levelTimes } (#1685) — ASCENDING by minLevel, last-match-wins
   resourceDieTiers      Json? // [{ minLevel, die }]   — ASCENDING by minLevel, last-match-wins
   resourceRechargeTiers Json? // [{ minLevel, recharge }] — recharge: RechargeOn — ASCENDING by minLevel, last-match-wins
   resourceDetailTiers   Json? // [{ minLevel, label, value }] — labeled display parts (#1685's DerivedResource.details) — ASCENDING by minLevel PER LABEL, last-match-wins per label; different labels interleave freely

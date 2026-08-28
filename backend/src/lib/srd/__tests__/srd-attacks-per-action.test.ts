@@ -5,8 +5,8 @@ import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "@/lib/classes/cla
 
 // Pure unit test — no database — for #1530's row-driven deriveAttacksPerAction.
 // EXTRA_ATTACK_TIERS (a TS Record keyed by class name) is retired; these rows
-// mirror what the seed actually authors (fighter-features.ts, barbarian.ts,
-// monk.ts, paladin.ts, ranger.ts, bard-features.ts's College of Valor rows) closely
+// mirror what the seed actually authors (fighter-features.ts, barbarian-features.ts,
+// monk.ts, paladin-features.ts, ranger.ts, bard-features.ts's College of Valor rows) closely
 // enough to pin the SHAPE (ascending tiers, one row carrying all of Fighter's
 // three), but are synthetic fixtures, not a read of the real seed — see
 // extra-attack-seeded.test.ts (lib/classes/__tests__/) for the DB-backed

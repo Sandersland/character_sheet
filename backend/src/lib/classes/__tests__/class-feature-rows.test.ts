@@ -129,6 +129,18 @@ describe("evaluateResourceTotal (#1685) — the formula vocabulary poolFromRow r
   it("{ levelTimes } multiplies ctx.level — the Lay on Hands (5 x level) shape", () => {
     expect(evaluateResourceTotal({ levelTimes: 5 }, { ...ctx, level: 7 })).toBe(35);
   });
+
+  it("{ abilityMod, plus } adds plus to the modifier — Divine Sense's 1 + Charisma modifier shape (PHB'14 p.84)", () => {
+    expect(evaluateResourceTotal({ abilityMod: "wisdom", plus: 1 }, ctx)).toBe(4); // Wis 16 -> +3, +1 = 4
+  });
+
+  it("{ abilityMod, plus, min } floors the SUM of modifier and plus, not the bare modifier — Cha 8 (-1) + 1 = 0, floored to 1", () => {
+    expect(evaluateResourceTotal({ abilityMod: "charisma", plus: 1, min: 1 }, ctx)).toBe(1);
+  });
+
+  it("{ abilityMod } with plus omitted is unaffected by the widening", () => {
+    expect(evaluateResourceTotal({ abilityMod: "wisdom", min: 1 }, ctx)).toBe(3);
+  });
 });
 
 describe("poolsFromRows resolves a tier's formula total end to end (#1685)", () => {

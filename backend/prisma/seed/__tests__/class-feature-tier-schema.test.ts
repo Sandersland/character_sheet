@@ -260,6 +260,22 @@ describe("resourceTotals' `total` accepts the #1685 formula vocabulary and rejec
     expect(result.success).toBe(true);
   });
 
+  it("accepts { abilityMod, plus }", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceTotals: [{ minLevel: 1, total: { abilityMod: "charisma", plus: 1 } }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a negative plus — nothing downstream guards a negative pool total", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceTotals: [{ minLevel: 1, total: { abilityMod: "charisma", plus: -1 } }],
+    });
+    expect(result.success).toBe(false);
+  });
+
   it("accepts { levelTimes }", () => {
     const result = classFeatureSeedSchema.safeParse({
       ...baseRow,
