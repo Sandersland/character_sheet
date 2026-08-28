@@ -1,10 +1,9 @@
 // The seeded CharacterClass.subclassLevel is the 2014 subclass-gate source
 // that survives a class module's deletion. Every class this file tests is
-// now module-deleted — Ranger and Monk, the only classes still on the TS
-// path, already grant at level 3 (subclassGateLevel's own default) — so
-// nothing here exercises the `?? def.grantLevel` fallback any more; that
-// fallback has no live test seat until a future TS class's grantLevel
-// differs from 3.
+// now module-deleted — Monk, the only class still on the TS path, already
+// grants at level 3 (subclassGateLevel's own default) — so nothing here
+// exercises the `?? def.grantLevel` fallback any more; that fallback has no
+// live test seat until a future TS class's grantLevel differs from 3.
 import { describe, expect, it } from "vitest";
 
 import type { RulesEdition } from "@character-sheet/shared-types";

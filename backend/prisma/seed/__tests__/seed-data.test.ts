@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 
 import { monk } from "@/lib/classes/monk.js";
-import { ranger } from "@/lib/classes/ranger.js";
 import type { ClassDefinition } from "@/lib/classes/types.js";
 
 import { BACKGROUNDS, CLASSES, ITEMS } from "../catalog-data.js";
@@ -717,7 +716,7 @@ describe("referential integrity", () => {
   // 2014-scoped, so the two values must mean the same PHB'14 level.
   it("every class-definition grantLevel matches its seed subclassLevel", () => {
     const defByName: Record<string, ClassDefinition> = {
-      Monk: monk, Ranger: ranger,
+      Monk: monk,
     };
     const drift = CLASSES.flatMap((seedClass) =>
       Object.entries(defByName[seedClass.name]?.subclasses ?? {})
@@ -727,15 +726,17 @@ describe("referential integrity", () => {
     expect(drift, "class-definition grantLevel differs from seed subclassLevel").toEqual([]);
   });
 
-  // Fighter/Barbarian/Rogue have no TS module left — no sub.grantLevel to
-  // compare against, so assert the seeded subclassLevel directly.
-  it("Fighter's, Barbarian's and Rogue's seeded subclassLevel is 3 in both editions (SRD 5.2; PHB'14 pp. 72/48 verified, Rogue's own page not re-verified)", () => {
+  // Fighter/Barbarian/Rogue/Ranger have no TS module left — no sub.grantLevel
+  // to compare against, so assert the seeded subclassLevel directly.
+  it("Fighter's, Barbarian's, Rogue's and Ranger's seeded subclassLevel is 3 in both editions (SRD 5.2; PHB'14 pp. 72/48/91 verified, Rogue's own page not re-verified)", () => {
     const fighterClass = CLASSES.find((c) => c.name === "Fighter");
     const barbarianClass = CLASSES.find((c) => c.name === "Barbarian");
     const rogueClass = CLASSES.find((c) => c.name === "Rogue");
+    const rangerClass = CLASSES.find((c) => c.name === "Ranger");
     expect(fighterClass?.subclassLevel).toBe(3);
     expect(barbarianClass?.subclassLevel).toBe(3);
     expect(rogueClass?.subclassLevel).toBe(3);
+    expect(rangerClass?.subclassLevel).toBe(3);
   });
 
   it("Cleric's, Warlock's and Wizard's seeded subclassLevel is their PHB'14 gate (#1576)", () => {
@@ -769,13 +770,13 @@ describe("referential integrity", () => {
 
 describe("SUBCLASS_SLUGS — three-way bijection (#1277)", () => {
   const CLASS_DEFS: Record<string, ClassDefinition> = {
-    monk, ranger,
+    monk,
   };
 
   // The named twin of the class-migration guard's NOT_YET_MIGRATED list,
   // keyed by SUBCLASS_IDENTITY's classKey. Deliberate-coupling latch: if you
   // change one, update the other.
-  const ROW_MIGRATED_CLASSES = ["fighter", "barbarian", "rogue", "cleric", "warlock", "wizard", "sorcerer", "bard", "paladin", "druid"];
+  const ROW_MIGRATED_CLASSES = ["fighter", "barbarian", "rogue", "cleric", "warlock", "wizard", "sorcerer", "bard", "paladin", "druid", "ranger"];
 
   // Empty on purpose — the allowlist for an engine-first subclass in a class
   // that keeps its module, with its reason recorded.

@@ -276,6 +276,18 @@ async function seedSubclassChoiceOptions(prisma: PrismaClient) {
     };
     await upsertEditionRow(prisma.grantedAbility, { name: option.name, edition }, data, data);
   }
+  // Scoped by `source` to the set THIS array actually seeds, so it never
+  // touches maneuver/shadowArts/discipline/channelDivinity rows sharing this table.
+  const staleWhere = staleCatalogRowsWhere(
+    "name",
+    SUBCLASS_CHOICE_OPTIONS.map((o) => ({ identity: o.name, edition: o.edition ?? null })),
+    { source: { in: [...new Set(SUBCLASS_CHOICE_OPTIONS.map((o) => o.source))] } },
+  );
+  const stale = await prisma.grantedAbility.findMany({ where: staleWhere, select: { name: true, edition: true } });
+  if (stale.length) {
+    console.log(`seedSubclassChoiceOptions: dropping stale catalog rows: ${stale.map((o) => `${o.name} (${o.edition ?? "shared"})`).join(", ")}`);
+  }
+  await prisma.grantedAbility.deleteMany({ where: staleWhere });
 }
 
 // Seed Channel Divinity catalog — upsert by (name, edition). Each spends 1 CD charge.

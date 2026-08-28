@@ -460,8 +460,11 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
     const populatedResourceDetailTiersCount = 2;
     // 0 until monk's rows author resourceOnInitiative (#1522).
     const populatedResourceOnInitiativeCount = 0;
-    // 0 until Hunter/Four Elements author choiceCountTiers (#899).
-    const populatedChoiceCountTiersCount = 0;
+    // Hunter's Prey/Defensive Tactics (both editions) and Multiattack/Superior
+    // Hunter's Defense (SRD 5.1 pp. 37-38 only; absent from SRD 5.2 p. 61) — 6 rows (#899/#1353).
+    // Four Elements' fourElementsDisciplines stays a TS SubclassChoice
+    // (monk.ts), not yet a row.
+    const populatedChoiceCountTiersCount = 6;
     const EXPECTED_DB_NULL: Record<
       | "resourceTotals"
       | "resourceDieTiers"

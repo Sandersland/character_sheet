@@ -11,23 +11,11 @@
 // Cleric's two domains carry no resource descriptor but are asserted on
 // directly by name, so both need one.
 import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "@/lib/classes/class-feature-rows.js";
-import { ranger } from "@/lib/classes/ranger.js";
-import type { AuthoredFeature, ClassDefinition, SubclassDefinition } from "@/lib/classes/types.js";
-const TEST_CLASSES: Record<string, ClassDefinition> = {
-  ranger,
-};
+import type { AuthoredFeature } from "@/lib/classes/types.js";
 
 // PHB'14 p.164: one feature, one pool, shared across both granting classes.
 const CHANNEL_DIVINITY_REMINDER =
   "Spend 1 use for any Channel Divinity effect you have — a Cleric's Turn Undead and Divine Domain options and a Paladin's Oath options all draw on this one pool.";
-
-// Keyed by subclass name alone — subclass names are unique across the seeded catalog.
-const TEST_SUBCLASSES: Record<string, SubclassDefinition> = {};
-for (const classDef of Object.values(TEST_CLASSES)) {
-  for (const [key, subclassDef] of Object.entries(classDef.subclasses ?? {})) {
-    TEST_SUBCLASSES[key] = subclassDef;
-  }
-}
 
 // Mirrors expandFeatureRow, the write-time half of the same rule: untagged
 // fans out to both editions, tagged keeps its one row.
@@ -2901,6 +2889,90 @@ export const WAY_OF_THE_FOUR_ELEMENTS_ROWS: ClassFeatureRow[] = [
   },
 ];
 
+export const HUNTER_ROWS: ClassFeatureRow[] = [
+  {
+    name: "Hunter's Prey",
+    level: 3,
+    edition: "EDITION_2014",
+    description:
+      "Choose one: Colossus Slayer (once per turn, +1d8 damage to a wounded creature); Giant Killer (reaction attack when a Large+ creature misses you); or Horde Breaker (once per turn, attack a second creature adjacent to the first).",
+    choiceKey: "huntersPrey",
+    choiceCatalogSource: "huntersPrey",
+    choiceCountTiers: [{ minLevel: 3, count: 1 }],
+  },
+  {
+    name: "Hunter's Prey",
+    level: 3,
+    edition: "EDITION_2024",
+    description:
+      "Choose one: Colossus Slayer (once per turn, +1d8 damage to a creature missing any of its Hit Points) or Horde Breaker (once per turn, make another attack with the same weapon against a different creature within 5 ft of the original target). Swappable for the other option whenever you finish a Short or Long Rest.",
+    choiceKey: "huntersPrey",
+    choiceCatalogSource: "huntersPrey",
+    choiceCountTiers: [{ minLevel: 3, count: 1 }],
+  },
+  {
+    name: "Defensive Tactics",
+    level: 7,
+    edition: "EDITION_2014",
+    description:
+      "Choose one: Escape the Horde (opportunity attacks against you have disadvantage); Multiattack Defense (+4 AC against other attacks after being hit by one); or Steel Will (advantage on saves against being frightened).",
+    choiceKey: "defensiveTactics",
+    choiceCatalogSource: "defensiveTactics",
+    choiceCountTiers: [{ minLevel: 7, count: 1 }],
+  },
+  {
+    name: "Defensive Tactics",
+    level: 7,
+    edition: "EDITION_2024",
+    description:
+      "Choose one: Escape the Horde (Opportunity Attacks have disadvantage against you) or Multiattack Defense (when a creature hits you with an attack roll, that creature has disadvantage on all other attack rolls against you this turn). Swappable for the other option whenever you finish a Short or Long Rest.",
+    choiceKey: "defensiveTactics",
+    choiceCatalogSource: "defensiveTactics",
+    choiceCountTiers: [{ minLevel: 7, count: 1 }],
+  },
+  {
+    name: "Multiattack",
+    level: 11,
+    edition: "EDITION_2014",
+    description:
+      "Choose one: Volley (action: ranged attack against every creature in a 10-ft radius within range); or Whirlwind Attack (action: melee attack against every creature within reach).",
+    choiceKey: "hunterMultiattack",
+    choiceCatalogSource: "hunterMultiattack",
+    choiceCountTiers: [{ minLevel: 11, count: 1 }],
+  },
+  {
+    name: "Superior Hunter's Prey",
+    level: 11,
+    edition: "EDITION_2024",
+    description:
+      "Once per turn when you deal damage to the creature marked by your Hunter's Mark, you can deal that spell's extra damage to a different creature you can see within 30 feet of the marked creature.",
+  },
+  {
+    name: "Hunter's Lore",
+    level: 3,
+    edition: "EDITION_2024",
+    description:
+      "While a creature is marked by your Hunter's Mark, you know whether that creature has any damage Immunities, Resistances, or Vulnerabilities, and if it does, you know what they are.",
+  },
+  {
+    name: "Superior Hunter's Defense",
+    level: 15,
+    edition: "EDITION_2014",
+    description:
+      "Choose one: Evasion (no damage on successful Dex save, half on failure); Stand Against the Tide (redirect a missed melee attack to another creature within range); or Uncanny Dodge (halve damage from one attack per reaction).",
+    choiceKey: "superiorHuntersDefense",
+    choiceCatalogSource: "superiorHuntersDefense",
+    choiceCountTiers: [{ minLevel: 15, count: 1 }],
+  },
+  {
+    name: "Superior Hunter's Defense",
+    level: 15,
+    edition: "EDITION_2024",
+    description:
+      "When you take damage, you can take a Reaction to give yourself Resistance to that damage type and any other damage of the same type, until the end of the current turn.",
+  },
+];
+
 export const LITERAL_CLASS_ROWS: Record<string, ClassFeatureRow[]> = {
   fighter: FIGHTER_BASE_ROWS,
   barbarian: BARBARIAN_BASE_ROWS,
@@ -2918,6 +2990,7 @@ export const LITERAL_CLASS_ROWS: Record<string, ClassFeatureRow[]> = {
 
 export const LITERAL_SUBCLASS_ROWS: Record<string, ClassFeatureRow[]> = {
   "battle master": BATTLE_MASTER_ROWS,
+  hunter: HUNTER_ROWS,
   thief: ROGUE_THIEF_ROWS,
   "circle of the land": CIRCLE_OF_THE_LAND_ROWS,
   "circle of the moon": CIRCLE_OF_THE_MOON_ROWS,
@@ -2952,11 +3025,9 @@ export function testFeatureRowsFor(className: string, subclass: string | undefin
   // .trim() mirrors resolveSubclassSlug's own normalization.
   const classKey = (className ?? "").trim().toLowerCase();
   const subclassKey = (subclass ?? "").trim().toLowerCase();
-  const classDef = TEST_CLASSES[classKey];
-  const subDef = subclass ? TEST_SUBCLASSES[subclassKey] : undefined;
   return {
-    classRows: LITERAL_CLASS_ROWS[classKey] ?? toRows(classDef?.features ?? []),
-    subclassRows: LITERAL_SUBCLASS_ROWS[subclassKey] ?? toRows(subDef?.features ?? []),
+    classRows: LITERAL_CLASS_ROWS[classKey] ?? [],
+    subclassRows: LITERAL_SUBCLASS_ROWS[subclassKey] ?? [],
     subclassLevel: SUBCLASS_LEVEL_BY_CLASS[classKey] ?? 3,
   };
 }
