@@ -32,11 +32,11 @@ function wildShapeMaxCr(subclass: string | undefined, level: number, edition: "E
 }
 
 describe("druid Wild Shape CR cap derivation, EDITION_2014 (#906) — 2014-only, unaffected by #1226", () => {
-  // PHB'14 p.66: Circle of the Moon grants at level 2 — subclassGateLevel
-  // resolves the 2014 gate off `grantLevel` (testFeatureRowsFor supplies no
-  // subclassLevel relation), unlike EDITION_2024's hardcoded gate of 3.
-  // Circle Forms caps CR at a flat 1 from L2-L5 (its "starting at level 6"
-  // step hasn't hit yet), not the base table's "1/4".
+  // PHB'14 p.66: Circle of the Moon grants at level 2 — testFeatureRowsFor
+  // supplies the seeded subclassLevel (2, SUBCLASS_LEVEL_BY_CLASS), unlike
+  // EDITION_2024's hardcoded gate of 3. Circle Forms caps CR at a flat 1 from
+  // L2-L5 (its "starting at level 6" step hasn't hit yet), not the base
+  // table's "1/4".
   it("Circle of the Moon caps CR at 1 starting at its own level-2 grant", () => {
     expect(wildShapeMaxCr("circle of the moon", 2)).toBe("1 (no flying or swimming speed)");
     expect(wildShapeMaxCr("circle of the moon", 3)).toBe("1 (no flying or swimming speed)");

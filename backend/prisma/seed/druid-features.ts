@@ -12,7 +12,10 @@
 // first rows to use poolsFromRows' overrideRows mechanism (class-feature-
 // rows.ts, #906/#1226): the Moon row declares the SAME resourceKey with its
 // own totals/details, and deriveBaseLayer resolves the base pool from it
-// instead whenever Circle of the Moon is the active subclass.
+// instead whenever Circle of the Moon is the active subclass — except the
+// pool's `description`, which always stays the BASE Wild Shape row's own
+// text (poolsFromRows' own carve-out; Circle Forms' text names only Moon's
+// curve, wrong at every other circle/level).
 import type { ResourceTotalFormula } from "../../src/lib/classes/class-feature-rows.js";
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { SeedEdition } from "./edition.js";
@@ -411,6 +414,10 @@ const CIRCLE_OF_THE_MOON_RAW: RawDruidFeature[] = [
     // totals/recharge, a different Max CR curve. Max CR is 1 from L2, then
     // level/3 (rounded down, minimum 1) from L6; the "(no flying...)" speed
     // notes are the same base-table notes every Circle carries below L8.
+    // The pool's description still comes from the BASE row above, never
+    // this row's own text (poolsFromRows' description carve-out) — this
+    // row's own feature text above is served only as a plain subclass
+    // FEATURE, unaffected by the override.
     resourceKey: "wildShape",
     resourceLabel: "Wild Shape",
     resourceRecharge: "short-or-long",

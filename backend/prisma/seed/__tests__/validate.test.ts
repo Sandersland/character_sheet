@@ -11,7 +11,7 @@
 //      what's currently seeded.
 import { describe, it, expect } from "vitest";
 
-import { assertSeedContentValid, assertCatalogNamesResolve } from "../validate.js";
+import { assertSeedContentValid, assertCatalogNamesResolve, assertNoDuplicatePoolDeclaringRows } from "../validate.js";
 import { subclassSeedSchema } from "../subclasses.js";
 
 describe("assertSeedContentValid — positive control (#1277, #1370)", () => {
@@ -116,6 +116,34 @@ describe("assertSeedContentValid — positive control (#1277, #1370)", () => {
   // them, never the real BACKGROUND_STARTING_EQUIPMENT_PACKAGES (which cites
   // them via `backgroundName`, not `className`, but assertCatalogNamesResolve
   // only reads `.package`, so a class-shaped fixture proves the same thing).
+  // L1 (#906): the inbound-subclass override's findOverrideRow picks the
+  // FIRST matching row — two pool-declaring rows sharing (class, subclass,
+  // resourceKey, edition) is content ambiguity, never a legal seed shape.
+  it("assertNoDuplicatePoolDeclaringRows rejects two rows sharing (class, subclass, resourceKey, edition)", () => {
+    const brokenFixture = [
+      { className: "Druid", subclassSlug: "druid-circle-of-the-moon", edition: "EDITION_2014", resourceKey: "wildShape", resourceTotals: [{ minLevel: 2, total: 2 }] },
+      { className: "Druid", subclassSlug: "druid-circle-of-the-moon", edition: "EDITION_2014", resourceKey: "wildShape", resourceTotals: [{ minLevel: 2, total: 3 }] },
+    ];
+    expect(() => assertNoDuplicatePoolDeclaringRows(brokenFixture)).toThrow(/duplicate pool-declaring ClassFeature row/);
+  });
+
+  it("assertNoDuplicatePoolDeclaringRows accepts the same resourceKey across DIFFERENT subclasses/editions", () => {
+    const okFixture = [
+      { className: "Druid", subclassSlug: null, edition: "EDITION_2014", resourceKey: "wildShape", resourceTotals: [{ minLevel: 2, total: 2 }] },
+      { className: "Druid", subclassSlug: "druid-circle-of-the-moon", edition: "EDITION_2014", resourceKey: "wildShape", resourceTotals: [{ minLevel: 2, total: 2 }] },
+      { className: "Druid", subclassSlug: null, edition: "EDITION_2024", resourceKey: "wildShape", resourceTotals: [{ minLevel: 2, total: 2 }] },
+    ];
+    expect(() => assertNoDuplicatePoolDeclaringRows(okFixture)).not.toThrow();
+  });
+
+  it("assertNoDuplicatePoolDeclaringRows ignores identity-only rows (resourceKey with no resourceTotals, the Metamagic pattern)", () => {
+    const okFixture = [
+      { className: "Sorcerer", subclassSlug: null, edition: "EDITION_2014", resourceKey: "metamagic" },
+      { className: "Sorcerer", subclassSlug: null, edition: "EDITION_2024", resourceKey: "metamagic" },
+    ];
+    expect(() => assertNoDuplicatePoolDeclaringRows(okFixture)).not.toThrow();
+  });
+
   it("assertCatalogNamesResolve accepts every #1565 catalog addition", () => {
     const newNames = [
       "Traveler's Clothes", "Common Clothes", "Pouch", "Calligrapher's Supplies", "Prayer Book",

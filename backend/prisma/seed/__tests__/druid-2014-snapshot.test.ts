@@ -7,11 +7,10 @@
 // touches — a hardcoded oracle is the whole point, mirroring
 // barbarian-2014-snapshot.test.ts's/ranger-2014-snapshot.test.ts's shape.
 //
-// This is a GUARD, not a red/green cycle: it is green on first run by
-// construction (DRUID_FEATURES is authored as a byte-identical copy in the
-// same commit that adds this file). Its job is to catch commit 2/3 silently
-// editing a 2014 row while authoring 2024 content or moving a pool onto a
-// row — this file must stay green, unedited, from commit 1 through commit 3.
+// This is a GUARD, not a red/green cycle: it was green on first run by
+// construction. It pins name/level/description only — never resource/pool
+// columns, which a LATER retab (#906) was free to populate onto these same
+// 2014 rows without this file needing an edit.
 import { describe, expect, it } from "vitest";
 
 import { DRUID_FEATURES } from "../druid-features.js";

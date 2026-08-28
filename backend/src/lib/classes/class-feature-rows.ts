@@ -316,17 +316,27 @@ function poolFromRow(row: ClassFeatureRow, ctx: ResourceTotalContext): DerivedRe
 
 // A base row's resourceKey that an active subclass's own row ALSO declares
 // resolves from that subclass row instead — the row-driven counterpart to a
-// resourceFn receiving the active subclassKey (#906). Swaps the WHOLE row
-// (every descriptor column moves together), never a per-column merge, so a
-// subclass's variant pool (e.g. druid Circle of the Moon's wildShape) reads
-// as one coherent row, not a base/subclass hybrid.
+// resourceFn receiving the active subclassKey (#906). Swaps the WHOLE
+// descriptor block (key/label/totals/die/recharge/details/shortRestRegain)
+// together, never a per-column merge, so a subclass's variant pool (e.g.
+// druid Circle of the Moon's wildShape) reads as one coherent set of
+// numbers — EXCEPT `description`, which poolsFromRows below always takes
+// from the BASE row: description is the carrier FEATURE's text, not a
+// descriptor column, and the base row's text is the one that stays true at
+// every level/circle (Moon's own Circle Forms text names only ITS curve).
+// `resourceTotals?.length` excludes an identity-only row (e.g. Metamagic's
+// resourceKey with no pool, #1909) from ever being picked as an override —
+// without it, an identity-only row would silently null out the base pool
+// (poolFromRow requires a totalTier to mint one at all).
 function findOverrideRow(
   overrideRows: readonly ClassFeatureRow[] | undefined,
   resourceKey: string,
   level: number,
   edition: RulesEdition,
 ): ClassFeatureRow | undefined {
-  return overrideRows?.find((row) => row.resourceKey === resourceKey && row.edition === edition && row.level <= level);
+  return overrideRows?.find(
+    (row) => row.resourceKey === resourceKey && row.edition === edition && row.level <= level && Boolean(row.resourceTotals?.length),
+  );
 }
 
 export function poolsFromRows(
@@ -343,9 +353,10 @@ export function poolsFromRows(
   const pools: DerivedResource[] = [];
   for (const row of rows) {
     if (row.edition !== edition || row.level > level) continue;
-    const sourceRow = row.resourceKey ? (findOverrideRow(overrideRows, row.resourceKey, level, edition) ?? row) : row;
-    const pool = poolFromRow(sourceRow, { level, abilityScores, profBonus });
-    if (pool) pools.push(pool);
+    const override = row.resourceKey ? findOverrideRow(overrideRows, row.resourceKey, level, edition) : undefined;
+    const pool = poolFromRow(override ?? row, { level, abilityScores, profBonus });
+    if (!pool) continue;
+    pools.push(override ? { ...pool, description: row.description } : pool);
   }
   return pools;
 }

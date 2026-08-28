@@ -86,13 +86,10 @@ describe("deriveResources — Battle Master subclass gating", () => {
   });
 });
 
-// ── Druid — Wild Shape base pool ──────────────────────────────────────────────
-// #1226 retarget: these cases used to pass "EDITION_2024" while asserting SRD
-// 5.1 values (flat 2, then a >10 "unlimited" sentinel at level 20) — the
-// stale-copy state #1226 exists to fix. Retargeted to EDITION_2014 verbatim
-// (now the 2014 regression guard, druid.ts's resourceFn untouched); the
-// EDITION_2024 sibling below asserts the real 2/3/4 SRD 5.2 tier table,
-// authored onto the Wild Shape row itself (#1226 commit 3).
+// EDITION_2014's wildShape pool is row-driven (#906/#1226, druid.ts deleted):
+// flat 2, then a >10 "unlimited" sentinel at level 20. The EDITION_2024
+// sibling below asserts the real 2/3/4 SRD 5.2 tier table, authored onto its
+// own Wild Shape row.
 
 describe("deriveResources — Druid Wild Shape, EDITION_2014", () => {
   it("returns no wildShape pool below level 2", () => {
@@ -128,8 +125,8 @@ describe("deriveResources — Druid Wild Shape, EDITION_2014", () => {
   });
 
   // Level 3 is above the gate, not at it: EDITION_2014's Circle of the Moon
-  // grants at 2 (druid.ts's grantLevel, PHB'14 p.66). druid-wildshape-cr.test.ts
-  // owns the level-2 boundary itself.
+  // grants at 2 (the seeded CharacterClass.subclassLevel, PHB'14 p.66).
+  // druid-wildshape-cr.test.ts owns the level-2 boundary itself.
   it("Circle of the Moon contributes features (Combat Wild Shape, Circle Forms) above its level-2 grant (#1128)", () => {
     const result = deriveResources("druid", "circle of the moon", 3, ABILITY_SCORES, PROF_2, testFeatureRowsFor("druid", "circle of the moon"), "EDITION_2014");
     const featureNames = result!.features.map((f) => f.name);

@@ -280,15 +280,39 @@ describe("poolsFromRows resolves overrideRows (#906/#1226 druid retab) — a bas
     expect(poolsFromRows(rows, 1, {}, 0, "EDITION_2014", [])[0].total).toBe(2);
   });
 
-  it("an override row with the SAME resourceKey wins — every descriptor column moves together, not per-field", () => {
-    const rows = [row({ name: "Base Feature", resourceKey: "wildShape", resourceLabel: "Base Label", resourceRecharge: "longRest", resourceTotals: [{ minLevel: 1, total: 2 }] })];
+  it("an override row with the SAME resourceKey wins on every descriptor column (die/recharge/total/shortRestRegain/details), never per-field — EXCEPT description, which stays the base row's own text (S2)", () => {
+    const rows = [
+      row({
+        name: "Base Feature",
+        description: "base feature text",
+        resourceKey: "wildShape",
+        resourceLabel: "Base Label",
+        resourceRecharge: "longRest",
+        resourceTotals: [{ minLevel: 1, total: 2, shortRestRegain: 1 }],
+        resourceDieTiers: [{ minLevel: 1, die: "d6" }],
+        resourceDetailTiers: [{ minLevel: 1, label: "Max CR", value: "base value" }],
+      }),
+    ];
     const overrideRows = [
-      row({ name: "Override Feature", resourceKey: "wildShape", resourceLabel: "Override Label", resourceRecharge: "short-or-long", resourceTotals: [{ minLevel: 1, total: 5 }] }),
+      row({
+        name: "Override Feature",
+        description: "override feature text",
+        resourceKey: "wildShape",
+        resourceLabel: "Override Label",
+        resourceRecharge: "short-or-long",
+        resourceTotals: [{ minLevel: 1, total: 5 }],
+        resourceDieTiers: [{ minLevel: 1, die: "d8" }],
+        resourceDetailTiers: [{ minLevel: 1, label: "Max CR", value: "override value" }],
+      }),
     ];
     const pool = poolsFromRows(rows, 1, {}, 0, "EDITION_2014", overrideRows)[0];
     expect(pool.label).toBe("Override Label");
     expect(pool.recharge).toBe("short-or-long");
     expect(pool.total).toBe(5);
+    expect(pool.die).toBe("d8");
+    expect(pool.shortRestRegain).toBeUndefined();
+    expect(pool.details).toEqual([{ label: "Max CR", value: "override value" }]);
+    expect(pool.description).toBe("base feature text");
   });
 
   it("an override row for a DIFFERENT resourceKey never applies", () => {
@@ -308,6 +332,19 @@ describe("poolsFromRows resolves overrideRows (#906/#1226 druid retab) — a bas
     const rows = [row({ edition: "EDITION_2014", resourceKey: "wildShape", resourceTotals: [{ minLevel: 1, total: 2 }] })];
     const overrideRows = [row({ edition: "EDITION_2024", resourceKey: "wildShape", resourceTotals: [{ minLevel: 1, total: 99 }] })];
     expect(poolsFromRows(rows, 1, {}, 0, "EDITION_2014", overrideRows)[0].total).toBe(2);
+  });
+
+  // S1: an identity-only row (resourceKey with no resourceTotals — the
+  // established Metamagic pattern, #1909) must never be picked as an
+  // override; without the resourceTotals?.length guard, findOverrideRow
+  // would match it and poolFromRow would then return null (no totalTier),
+  // silently DELETING the base pool instead of leaving it alone.
+  it("an identity-only override row (resourceKey with no resourceTotals) never applies — the base pool survives unchanged", () => {
+    const rows = [row({ resourceKey: "wildShape", resourceTotals: [{ minLevel: 1, total: 2 }] })];
+    const overrideRows = [row({ resourceKey: "wildShape" })];
+    const pool = poolsFromRows(rows, 1, {}, 0, "EDITION_2014", overrideRows)[0];
+    expect(pool).toBeDefined();
+    expect(pool.total).toBe(2);
   });
 });
 
