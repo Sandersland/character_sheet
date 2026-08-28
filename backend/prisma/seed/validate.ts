@@ -214,15 +214,55 @@ function assertSpeciesGrantedSpellsResolve(
   grantRows.forEach((grant, index) => assertSpeciesGrantedSpellRowResolves(grant, index, speciesByKey, spellNames));
 }
 
+interface PoolDeclaringRowCandidate {
+  className: string;
+  subclassSlug: string | null;
+  edition: string;
+  resourceKey?: string | null;
+  resourceTotals?: unknown[] | null;
+}
+
+// "Pool-declaring" means resourceKey AND a populated resourceTotals — an
+// identity-only resourceKey (Metamagic's own pattern, #1909) never contends
+// here, matching findOverrideRow's own tierAt-reachability guard
+// (class-feature-rows.ts).
+function isPoolDeclaringRow(row: PoolDeclaringRowCandidate): boolean {
+  return Boolean(row.resourceKey) && Boolean(row.resourceTotals?.length);
+}
+
+function poolDeclaringRowKey(row: PoolDeclaringRowCandidate): string {
+  return `${row.className}::${row.subclassSlug ?? "null"}::${row.resourceKey}::${row.edition}`;
+}
+
+// #906: poolsFromRows' inbound-subclass override (class-feature-rows.ts's
+// findOverrideRow) picks its target via the FIRST matching row — two
+// pool-declaring rows sharing (class, subclass, resourceKey, edition) would
+// let seed content ORDER silently decide which one wins, an ambiguity no
+// per-row schema can catch. Split into isPoolDeclaringRow/poolDeclaringRowKey
+// above to keep this loop's own cyclomatic count low (seed/** has no
+// coverage instrumentation, so CRAP floors at CC^2+CC).
+export function assertNoDuplicatePoolDeclaringRows(rows: readonly PoolDeclaringRowCandidate[]): void {
+  const rowsByKey = new Map<string, number>();
+  rows.forEach((row, index) => {
+    if (!isPoolDeclaringRow(row)) return;
+    const key = poolDeclaringRowKey(row);
+    const seenAt = rowsByKey.get(key);
+    if (seenAt !== undefined) {
+      throw new Error(`Seed error: duplicate pool-declaring ClassFeature row for "${key}" (rows ${seenAt} and ${index})`);
+    }
+    rowsByKey.set(key, index);
+  });
+}
+
 /**
  * Validates every registered family's rows against its schema, throwing on the
  * FIRST invalid row with its family/index/path so the failure names the
- * offender. Also enforces two cross-row invariants no per-row schema can
- * express: two SUBCLASSES rows must never share a slug (M2, #1277) — a
- * duplicate would silently collapse two subclasses' seeded content onto one
- * DB row under the new slug_edition unique index — and every
- * STARTING_EQUIPMENT_PACKAGES catalogName must resolve against ITEMS ∪ PACKS
- * (#1533 [R3]/[R4]).
+ * offender. Also enforces cross-row invariants no per-row schema can express:
+ * two SUBCLASSES rows must never share a slug (M2, #1277) — a duplicate would
+ * silently collapse two subclasses' seeded content onto one DB row under the
+ * new slug_edition unique index — every STARTING_EQUIPMENT_PACKAGES
+ * catalogName must resolve against ITEMS ∪ PACKS (#1533 [R3]/[R4]), and no two
+ * CLASS_FEATURES rows may both declare the same pool (assertNoDuplicatePoolDeclaringRows above).
  *
  * Returns a summary so a permanent test can assert this function actually
  * visited real content (families/rows counts) rather than reporting "valid"
@@ -256,6 +296,7 @@ export function assertSeedContentValid(): SeedValidationSummary {
 
   assertCatalogNamesResolve(STARTING_EQUIPMENT_PACKAGES);
   assertCatalogNamesResolve(BACKGROUND_STARTING_EQUIPMENT_PACKAGES, "BACKGROUND_STARTING_EQUIPMENT_PACKAGES");
+  assertNoDuplicatePoolDeclaringRows(CLASS_FEATURES);
 
   // #1679: no two SPECIES rows may share (slug, edition) — the same M2 role
   // as the SUBCLASSES slug check above, catching what @@unique([slug,

@@ -7,14 +7,12 @@
 // touches — a hardcoded oracle is the whole point, mirroring
 // barbarian-2014-snapshot.test.ts's/ranger-2014-snapshot.test.ts's shape.
 //
-// This is a GUARD, not a red/green cycle: it is green on first run by
-// construction (DRUID_FEATURES is authored as a byte-identical copy in the
-// same commit that adds this file). Its job is to catch commit 2/3 silently
-// editing a 2014 row while authoring 2024 content or moving a pool onto a
-// row — this file must stay green, unedited, from commit 1 through commit 3.
+// This is a GUARD, not a red/green cycle: it was green on first run by
+// construction. It pins name/level/description only — never resource/pool
+// columns, which a LATER retab (#906) was free to populate onto these same
+// 2014 rows without this file needing an edit.
 import { describe, expect, it } from "vitest";
 
-import { druid } from "@/lib/classes/druid.js";
 import { DRUID_FEATURES } from "../druid-features.js";
 
 interface Pinned {
@@ -170,36 +168,5 @@ describe("Druid EDITION_2014 rows are byte-identical to the pre-#1226 tree (2014
     const actualKeys = new Set(DRUID_FEATURES.filter((r) => r.edition === "EDITION_2014").map((r) => key(r)));
     const pinnedKeys = new Set(PRE_CHANGE_2014.map((p) => key(p)));
     expect(actualKeys).toEqual(pinnedKeys);
-  });
-});
-
-describe("druid.ts no longer authors feature TEXT — moved to literal seed data (commit 1), unaffected by commits 2-3", () => {
-  it("lib/classes/druid.ts's ClassDefinition carries no `features` array", () => {
-    expect(druid.features).toBeUndefined();
-  });
-
-  it("neither subclass's SubclassDefinition carries a `features` array either", () => {
-    for (const subclassDef of Object.values(druid.subclasses ?? {})) {
-      expect(subclassDef.features).toBeUndefined();
-    }
-  });
-
-  // Commit 3 moves Wild Shape's (and Moonlight Step's) pool onto the row —
-  // see druid-wildshape-pool.test.ts for that split's own coverage. The
-  // invariant this suite protects is narrower: no EDITION_2014 row EVER
-  // carries a resourceTotals TIER TABLE (the 2014 pool's actual TOTAL stays
-  // in druid.ts's resourceFn, untouched by #1226). #1909 gives the 2014 Wild
-  // Shape row an IDENTITY-ONLY resourceKey (no resourceTotals) so it can
-  // carry a row-driven ACTION — poolFromRow (class-feature-rows.ts) requires
-  // resourceTotals to mint a pool, so this mints no phantom one; checking
-  // resourceTotals rather than resourceKey is what keeps that distinction
-  // visible here instead of flagging Wild Shape's identity key as a
-  // regression.
-  it("no EDITION_2014 row carries resourceTotals — the 2014 pool total stays in druid.ts's resourceFn", () => {
-    for (const row of DRUID_FEATURES) {
-      if (row.edition === "EDITION_2014") {
-        expect(row.resourceTotals, `${row.name} (${row.edition})`).toBeUndefined();
-      }
-    }
   });
 });

@@ -207,11 +207,14 @@ function isPopulatedClericRow(row: RowKey): boolean {
   );
 }
 
-// Wild Shape's 2014 pool stays in druid's resourceFn — that row carries an
-// identity-only resourceKey.
+// Wild Shape's 2014 pool now lives on its own base row AND Circle of the
+// Moon's Circle Forms row — the latter overrides the former's resourceKey
+// (class-feature-rows.ts's overrideRows mechanism, #906/#1226) with Moon's
+// own Max CR curve.
 const POPULATED_DRUID_ROW_KEYS = new Set([
   "Druid::null::Wild Shape::EDITION_2014",
   "Druid::null::Wild Shape::EDITION_2024",
+  "Druid::druid-circle-of-the-moon::Circle Forms::EDITION_2014",
   "Druid::druid-circle-of-the-moon::Moonlight Step::EDITION_2024",
 ]);
 
@@ -428,7 +431,10 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
     const RANGER_POOL_ROWS = 3;
     const SORCERER_POOL_ROWS = 8;
     const CLERIC_POOL_ROWS = 2;
-    const DRUID_POOL_ROWS = 2;
+    // The 2014 base Wild Shape row + Circle of the Moon's Circle Forms
+    // override row (both now resourceTotals-populated, #906/#1226) join the
+    // pre-existing 2024 Wild Shape + Moonlight Step rows.
+    const DRUID_POOL_ROWS = 4;
     const PALADIN_POOL_ROWS = 5;
     const BLADESINGER_POOL_ROWS = 1;
     const OPEN_HAND_POOL_ROWS = 1;
@@ -449,13 +455,15 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
       "Scholar (EDITION_2024 only)",
     ];
     const populatedDerivedStatTiersCount = DERIVED_STAT_ROW_KEYS.size * 2 - SINGLE_EDITION_DERIVED_STAT_KEYS.length;
-    // resourceDetailTiers has no populated rows yet — its whole table is DbNull.
+    // resourceDetailTiers' first populated rows (#906/#1226): the 2014 base
+    // Wild Shape row and Circle of the Moon's own Circle Forms override row.
+    const populatedResourceDetailTiersCount = 2;
     const EXPECTED_DB_NULL: Record<"resourceTotals" | "resourceDieTiers" | "derivedStatTiers" | "resourceRechargeTiers" | "resourceDetailTiers", number> = {
       resourceTotals: CLASS_FEATURES.length - populatedResourceTotalsCount,
       resourceDieTiers: CLASS_FEATURES.length - populatedResourceDieTiersCount,
       derivedStatTiers: CLASS_FEATURES.length - populatedDerivedStatTiersCount,
       resourceRechargeTiers: CLASS_FEATURES.length - populatedResourceRechargeTiersCount,
-      resourceDetailTiers: CLASS_FEATURES.length,
+      resourceDetailTiers: CLASS_FEATURES.length - populatedResourceDetailTiersCount,
     };
     for (const column of ["resourceTotals", "resourceDieTiers", "derivedStatTiers", "resourceRechargeTiers", "resourceDetailTiers"] as const) {
       const dbNullCount = await prisma.classFeature.count({ where: { [column]: { equals: Prisma.DbNull } } });

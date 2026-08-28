@@ -6,7 +6,7 @@
 set -eu
 
 ALL_CLASSES="barbarian bard cleric druid fighter monk paladin ranger rogue sorcerer warlock wizard"
-NOT_YET_MIGRATED="druid monk ranger"
+NOT_YET_MIGRATED="monk ranger"
 
 # Every OTHER backend/src/lib/classes/*.ts file (shared infrastructure, not a
 # per-class module) — kept in sync with the tree by the reverse check below.

@@ -1,6 +1,10 @@
 // The seeded CharacterClass.subclassLevel is the 2014 subclass-gate source
-// that survives a class module's deletion. This file's STILL_ON_TS_PATH cases
-// are the only place left that exercises the `?? def.grantLevel` fallback.
+// that survives a class module's deletion. Every class this file tests is
+// now module-deleted — Ranger and Monk, the only classes still on the TS
+// path, already grant at level 3 (subclassGateLevel's own default) — so
+// nothing here exercises the `?? def.grantLevel` fallback any more; that
+// fallback has no live test seat until a future TS class's grantLevel
+// differs from 3.
 import { describe, expect, it } from "vitest";
 
 import type { RulesEdition } from "@character-sheet/shared-types";
@@ -24,15 +28,11 @@ const PHB14_GATE: Array<[string, string, number]> = [
   ["wizard", "school of evocation", 2], // PHB'14 p.114
 ];
 
-// Split only for the "no seeded value" fallback tests — every other test in
-// this file behaves identically whether the module exists or not.
-const STILL_ON_TS_PATH: Array<[string, string, number]> = [
-  ["druid", "circle of the land", 2],
-];
 const MODULE_DELETED: Array<[string, string, number]> = [
   ["cleric", "life domain", 1],
   ["sorcerer", "draconic bloodline", 1],
   ["warlock", "the fiend", 1],
+  ["druid", "circle of the land", 2],
   ["wizard", "school of evocation", 2],
 ];
 
@@ -70,29 +70,11 @@ describe("2014 subclass gate reads the seeded subclassLevel (#1576)", () => {
     },
   );
 
-  it.each(STILL_ON_TS_PATH)(
-    "%s / %s: the seeded value WINS over the module's own grantLevel",
-    (className, subclass, gate) => {
-      expect(subclassFeaturesWithSeededGate(className, subclass, gate, "EDITION_2014", 3)).toEqual([]);
-      // Features return at 3 — the gate moved, the rows didn't disappear.
-      expect(subclassFeaturesWithSeededGate(className, subclass, 3, "EDITION_2014", 3).length).toBeGreaterThan(0);
-    },
-  );
-
   it.each(MODULE_DELETED)(
     "%s / %s: the seeded value alone decides the gate (no module left to beat)",
     (className, subclass, gate) => {
       expect(subclassFeaturesWithSeededGate(className, subclass, gate, "EDITION_2014", 3)).toEqual([]);
       expect(subclassFeaturesWithSeededGate(className, subclass, 3, "EDITION_2014", 3).length).toBeGreaterThan(0);
-    },
-  );
-
-  it.each(STILL_ON_TS_PATH)(
-    "%s / %s: with no seeded value the module still decides (unchanged fallback)",
-    (className, subclass, gate) => {
-      expect(
-        subclassFeaturesWithSeededGate(className, subclass, gate, "EDITION_2014", undefined).length,
-      ).toBeGreaterThan(0);
     },
   );
 

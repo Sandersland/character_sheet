@@ -274,6 +274,95 @@ describe("poolsFromRows resolves resourceDetailTiers (labeled display parts, #16
   });
 });
 
+describe("poolsFromRows resolves overrideRows (#906/#1226 druid retab) — a base row's resourceKey resolves from a matching active-subclass row instead", () => {
+  it("a base row with no matching override row resolves from itself unchanged", () => {
+    const rows = [row({ resourceKey: "wildShape", resourceTotals: [{ minLevel: 1, total: 2 }] })];
+    expect(poolsFromRows(rows, 1, {}, 0, "EDITION_2014", [])[0].total).toBe(2);
+  });
+
+  it("an override row with the SAME resourceKey wins on every descriptor column (die/recharge/total/shortRestRegain/details), never per-field — EXCEPT description, which stays the base row's own text (S2)", () => {
+    const rows = [
+      row({
+        name: "Base Feature",
+        description: "base feature text",
+        resourceKey: "wildShape",
+        resourceLabel: "Base Label",
+        resourceRecharge: "longRest",
+        resourceTotals: [{ minLevel: 1, total: 2, shortRestRegain: 1 }],
+        resourceDieTiers: [{ minLevel: 1, die: "d6" }],
+        resourceDetailTiers: [{ minLevel: 1, label: "Max CR", value: "base value" }],
+      }),
+    ];
+    const overrideRows = [
+      row({
+        name: "Override Feature",
+        description: "override feature text",
+        resourceKey: "wildShape",
+        resourceLabel: "Override Label",
+        resourceRecharge: "short-or-long",
+        resourceTotals: [{ minLevel: 1, total: 5 }],
+        resourceDieTiers: [{ minLevel: 1, die: "d8" }],
+        resourceDetailTiers: [{ minLevel: 1, label: "Max CR", value: "override value" }],
+      }),
+    ];
+    const pool = poolsFromRows(rows, 1, {}, 0, "EDITION_2014", overrideRows)[0];
+    expect(pool.label).toBe("Override Label");
+    expect(pool.recharge).toBe("short-or-long");
+    expect(pool.total).toBe(5);
+    expect(pool.die).toBe("d8");
+    expect(pool.shortRestRegain).toBeUndefined();
+    expect(pool.details).toEqual([{ label: "Max CR", value: "override value" }]);
+    expect(pool.description).toBe("base feature text");
+  });
+
+  it("an override row for a DIFFERENT resourceKey never applies", () => {
+    const rows = [row({ resourceKey: "wildShape", resourceTotals: [{ minLevel: 1, total: 2 }] })];
+    const overrideRows = [row({ resourceKey: "somethingElse", resourceTotals: [{ minLevel: 1, total: 99 }] })];
+    expect(poolsFromRows(rows, 1, {}, 0, "EDITION_2014", overrideRows)[0].total).toBe(2);
+  });
+
+  it("an override row not yet reached at the character's level is ignored — the base row resolves instead", () => {
+    const rows = [row({ resourceKey: "wildShape", resourceTotals: [{ minLevel: 1, total: 2 }] })];
+    const overrideRows = [row({ level: 6, resourceKey: "wildShape", resourceTotals: [{ minLevel: 6, total: 5 }] })];
+    expect(poolsFromRows(rows, 3, {}, 0, "EDITION_2014", overrideRows)[0].total).toBe(2);
+    expect(poolsFromRows(rows, 6, {}, 0, "EDITION_2014", overrideRows)[0].total).toBe(5);
+  });
+
+  it("an override row for the wrong edition never applies", () => {
+    const rows = [row({ edition: "EDITION_2014", resourceKey: "wildShape", resourceTotals: [{ minLevel: 1, total: 2 }] })];
+    const overrideRows = [row({ edition: "EDITION_2024", resourceKey: "wildShape", resourceTotals: [{ minLevel: 1, total: 99 }] })];
+    expect(poolsFromRows(rows, 1, {}, 0, "EDITION_2014", overrideRows)[0].total).toBe(2);
+  });
+
+  // S1: an identity-only row (resourceKey with no resourceTotals — the
+  // established Metamagic pattern, #1909) must never be picked as an
+  // override; without findOverrideRow's tierAt guard, it would match and
+  // poolFromRow would then return null (no totalTier), silently DELETING
+  // the base pool instead of leaving it alone.
+  it("an identity-only override row (resourceKey with no resourceTotals) never applies — the base pool survives unchanged", () => {
+    const rows = [row({ resourceKey: "wildShape", resourceTotals: [{ minLevel: 1, total: 2 }] })];
+    const overrideRows = [row({ resourceKey: "wildShape" })];
+    const pool = poolsFromRows(rows, 1, {}, 0, "EDITION_2014", overrideRows)[0];
+    expect(pool).toBeDefined();
+    expect(pool.total).toBe(2);
+  });
+
+  // Review Finding 1: a non-empty resourceTotals is NOT enough — the row's
+  // OWN first tier must also be reached at the character's level. Here the
+  // override row's grant level (2) is reached at character level 3, but its
+  // resourceTotals only starts at minLevel 5, so tierAt(resourceTotals, 3)
+  // is undefined. Without the tierAt guard, findOverrideRow would still
+  // match on resourceTotals?.length alone and poolFromRow would return null,
+  // silently deleting the base pool the same way an identity-only row would.
+  it("an override row whose grant level is reached but whose FIRST totals tier isn't yet degrades to base-wins, not pool deletion", () => {
+    const rows = [row({ resourceKey: "wildShape", resourceTotals: [{ minLevel: 1, total: 2 }] })];
+    const overrideRows = [row({ level: 2, resourceKey: "wildShape", resourceTotals: [{ minLevel: 5, total: 99 }] })];
+    const pool = poolsFromRows(rows, 3, {}, 0, "EDITION_2014", overrideRows)[0];
+    expect(pool).toBeDefined();
+    expect(pool.total).toBe(2);
+  });
+});
+
 describe("improvementsFromRows (#1691) — same edition/level truth table as featuresFromRows, flattened across rows", () => {
   it("a row tagged for the matching edition, at or below the character's level, contributes its improvements", () => {
     const rows = [row({ level: 3, improvements: [{ target: "armorProficiency", amount: 1, key: "heavy" }] })];

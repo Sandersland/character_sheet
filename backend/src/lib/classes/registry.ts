@@ -7,7 +7,6 @@ import { editionOf } from "@/lib/rules/edition.js";
 import { deriveAnnouncedSaveDC } from "@/lib/srd/srd.js";
 
 import { derivedStatFromRows, featuresFromRows, improvementsFromRows, poolsFromRows, type ClassFeatureRow, type ClassFeatureRowsCarrier } from "./class-feature-rows.js";
-import { druid } from "./druid.js";
 import { monk } from "./monk.js";
 import { ranger } from "./ranger.js";
 import type { FeatImprovement } from "./resources-state.js";
@@ -15,10 +14,9 @@ import { SUBCLASS_IDENTITY, type SubclassIdentity, type SubclassSlug } from "./s
 import type { ClassDefinition, ClassExtras, DerivedClassInfo, DerivedFeature, DerivedResource, DerivedSubclassChoice, SubclassDefinition } from "./types.js";
 
 // Classes absent here (Fighter, Barbarian, Rogue, Cleric, Warlock, Wizard,
-// Sorcerer, Bard, Paladin) resolve entirely through SUBCLASS_IDENTITY and
-// seeded ClassFeature rows; deriveBaseLayer tolerates the missing key.
+// Sorcerer, Bard, Paladin, Druid) resolve entirely through SUBCLASS_IDENTITY
+// and seeded ClassFeature rows; deriveBaseLayer tolerates the missing key.
 const CLASSES: Record<string, ClassDefinition> = {
-  druid,
   monk,
   ranger,
 };
@@ -58,8 +56,19 @@ function mergePoolSources(fromFn: DerivedResource[], fromRows: DerivedResource[]
   return [...fromFn, ...fromRows.filter((p) => !seenKeys.has(p.key))];
 }
 
+// `subclassKey` is already gated on the subclass being ACTIVE (see the call
+// site below) — undefined otherwise, which is also the "no override" input
+// poolsFromRows expects.
+function activeSubclassRows(subclassKey: string | undefined, featureRows: ClassFeatureRowsCarrier | undefined): readonly ClassFeatureRow[] | undefined {
+  return subclassKey ? featureRows?.subclassRows : undefined;
+}
+
 // Row-driven pools are data-gated: poolsFromRows reads whatever resourceKey
-// the rows populate — never a per-class-name check.
+// the rows populate — never a per-class-name check. The active subclass's
+// rows (activeSubclassRows) are passed through as poolsFromRows' overrideRows:
+// a base row's resourceKey that the active subclass also declares resolves
+// from the subclass's own row instead (druid wildShape's Circle of the Moon
+// variant, #906/#1226).
 function deriveBaseLayer(
   classDef: ClassDefinition | undefined,
   level: number,
@@ -70,7 +79,7 @@ function deriveBaseLayer(
   edition: RulesEdition,
 ): ClassLayer {
   const fnPools = classDef?.resourceFn ? classDef.resourceFn(level, abilityScores, profBonus, subclassKey, edition) : [];
-  const rowPools = poolsFromRows(featureRows?.classRows ?? [], level, abilityScores, profBonus, edition);
+  const rowPools = poolsFromRows(featureRows?.classRows ?? [], level, abilityScores, profBonus, edition, activeSubclassRows(subclassKey, featureRows));
   return {
     pools: mergePoolSources(fnPools, rowPools),
     features: featuresFromRows(featureRows?.classRows ?? [], level, "class", edition),

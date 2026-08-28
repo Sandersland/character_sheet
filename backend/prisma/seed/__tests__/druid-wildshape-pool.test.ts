@@ -1,7 +1,8 @@
-// Wild Shape's pool splits by edition (#1226): the EDITION_2024 row carries
-// resourceTotals/shortRestRegain; EDITION_2014 stays computed by druid.ts's
-// resourceFn, including its `level >= 20 ? 99` Archdruid branch (SRD 5.1 is
-// correct, not legacy). DB-backed via loadDbFeatureRows — the real
+// Wild Shape's pool is row-driven in both editions (#906/#1226): the
+// EDITION_2024 row carries resourceTotals/shortRestRegain; EDITION_2014's own
+// base row carries the `total: 99` Archdruid tier at level 20 (SRD 5.1 is
+// correct, not legacy), with Circle of the Moon overriding it via its own
+// Circle Forms row. DB-backed via loadDbFeatureRows — the real
 // deriveResources path a sheet resolves through, which is what lets this also
 // prove Moonlight Step never double-emits.
 //
@@ -139,12 +140,13 @@ describe("Moonlight Step pool (Circle of the Moon, EDITION_2024, #1226): Wisdom-
   });
 });
 
-describe("EDITION_2014 regression check (#1226): resourceFn was FORKED, not deleted", () => {
+describe("EDITION_2014 regression check (#906/#1226): row-driven now, no resourceFn left in druid.ts (deleted)", () => {
   // The CR cap's own coverage lives in druid-wildshape-cr.test.ts.
-  it("level 20 still has total 99, a static description, and an 'Uses: Unlimited (Archdruid)' detail", async () => {
+  it("level 20 still has total 99, the row's own description, and an 'Uses: Unlimited (Archdruid)' detail", async () => {
     const pool = await wildShapePool(20, "EDITION_2014");
+    const row = DRUID_FEATURES.find((r) => r.subclassSlug === null && r.name === "Wild Shape" && r.edition === "EDITION_2014");
     expect(pool?.total).toBe(99);
-    expect(pool?.description).toBe("Transform into a beast. Regain all uses on a short or long rest.");
+    expect(pool?.description).toBe(row?.description);
     expect(pool?.details).toContainEqual({ label: "Uses", value: "Unlimited (Archdruid)" });
   });
 
