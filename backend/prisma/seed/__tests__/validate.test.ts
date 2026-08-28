@@ -11,7 +11,7 @@
 //      what's currently seeded.
 import { describe, it, expect } from "vitest";
 
-import { assertSeedContentValid, assertCatalogNamesResolve, assertNoDuplicatePoolDeclaringRows } from "../validate.js";
+import { assertSeedContentValid, assertCatalogNamesResolve, assertNoDuplicatePoolDeclaringRows, assertNoDuplicateChoiceDeclaringRows } from "../validate.js";
 import { subclassSeedSchema } from "../subclasses.js";
 
 describe("assertSeedContentValid — positive control (#1277, #1370)", () => {
@@ -142,6 +142,22 @@ describe("assertSeedContentValid — positive control (#1277, #1370)", () => {
       { className: "Sorcerer", subclassSlug: null, edition: "EDITION_2024", resourceKey: "metamagic" },
     ];
     expect(() => assertNoDuplicatePoolDeclaringRows(okFixture)).not.toThrow();
+  });
+
+  it("assertNoDuplicateChoiceDeclaringRows rejects two rows sharing (class, subclass, choiceKey, edition)", () => {
+    const brokenFixture = [
+      { className: "Monk", subclassSlug: "monk-way-of-the-four-elements", edition: "EDITION_2014", choiceKey: "fourElementsDisciplines" },
+      { className: "Monk", subclassSlug: "monk-way-of-the-four-elements", edition: "EDITION_2014", choiceKey: "fourElementsDisciplines" },
+    ];
+    expect(() => assertNoDuplicateChoiceDeclaringRows(brokenFixture)).toThrow(/duplicate choice-declaring ClassFeature row/);
+  });
+
+  it("assertNoDuplicateChoiceDeclaringRows accepts the same choiceKey across DIFFERENT editions", () => {
+    const okFixture = [
+      { className: "Monk", subclassSlug: "monk-way-of-the-four-elements", edition: "EDITION_2014", choiceKey: "fourElementsDisciplines" },
+      { className: "Monk", subclassSlug: "monk-way-of-the-four-elements", edition: "EDITION_2024", choiceKey: "fourElementsDisciplines" },
+    ];
+    expect(() => assertNoDuplicateChoiceDeclaringRows(okFixture)).not.toThrow();
   });
 
   it("assertCatalogNamesResolve accepts every #1565 catalog addition", () => {

@@ -6,7 +6,7 @@ import { logger } from "@/lib/core/logger.js";
 import { editionOf } from "@/lib/rules/edition.js";
 import { deriveAnnouncedSaveDC } from "@/lib/srd/srd.js";
 
-import { derivedStatFromRows, featuresFromRows, improvementsFromRows, poolsFromRows, type ClassFeatureRow, type ClassFeatureRowsCarrier } from "./class-feature-rows.js";
+import { choicesFromRows, derivedStatFromRows, featuresFromRows, improvementsFromRows, poolsFromRows, type ClassFeatureRow, type ClassFeatureRowsCarrier } from "./class-feature-rows.js";
 import { monk } from "./monk.js";
 import { ranger } from "./ranger.js";
 import type { FeatImprovement } from "./resources-state.js";
@@ -90,6 +90,7 @@ function deriveBaseLayer(
 interface SubclassLayer extends ClassLayer {
   active: boolean;
   def: SubclassDefinition | undefined;
+  rowChoices: DerivedSubclassChoice[];
 }
 
 // EDITION_2024 always gates at 3; EDITION_2014 prefers the seeded
@@ -116,7 +117,7 @@ function deriveSubclassLayer(
 ): SubclassLayer {
   const def = SUBCLASSES[subclassKey];
   if (!isSubclassActive(def, level, edition, featureRows?.subclassLevel)) {
-    return { active: false, def, pools: [], features: [], improvements: [] };
+    return { active: false, def, pools: [], features: [], improvements: [], rowChoices: [] };
   }
   // undefined, not subclassKey: a subclass's own resourceFn is already scoped
   // to itself; the param exists so the BASE layer can resolve a pool-key
@@ -130,6 +131,7 @@ function deriveSubclassLayer(
     pools: mergePoolSources(fnPools, rowPools),
     features: featuresFromRows(subclassRows, level, "subclass", edition),
     improvements: improvementsFromRows(subclassRows, level, edition),
+    rowChoices: choicesFromRows(subclassRows, level, edition),
   };
 }
 
@@ -198,12 +200,16 @@ function combineExtras(fromFn: ClassExtras | undefined, fromRows: ClassExtras | 
   return Object.keys(merged).length > 0 ? merged : undefined;
 }
 
+// Def wins on a same-key collision (mergePoolSources' mid-migration rule);
+// the def side deletes once the last module retabs (#1353/#1503).
 function deriveSubclassChoiceList(sub: SubclassLayer, level: number): DerivedSubclassChoice[] | undefined {
-  if (!sub.active || !sub.def?.choices) return undefined;
-  const computed = sub.def.choices
+  if (!sub.active) return undefined;
+  const fromDef = (sub.def?.choices ?? [])
     .map((c) => ({ key: c.key, label: c.label, catalogSource: c.catalogSource, count: c.count(level) }))
     .filter((c) => c.count > 0);
-  return computed.length > 0 ? computed : undefined;
+  const seenKeys = new Set(fromDef.map((c) => c.key));
+  const merged = [...fromDef, ...sub.rowChoices.filter((c) => !seenKeys.has(c.key))];
+  return merged.length > 0 ? merged : undefined;
 }
 
 // Trackable resources + feature descriptions for a class/subclass; null for an

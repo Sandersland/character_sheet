@@ -10,6 +10,7 @@ import {
   CLEAR_ON_TRIGGERS,
   type ActivationRequirement,
   type BuffModifierFormula,
+  type ChoiceCountTier,
   type EffectBuffRow,
   type InitiativeRegenRow,
   type ResourceTotalFormula,
@@ -81,6 +82,10 @@ export interface ClassFeatureSeedRow {
   resourceRechargeTiers?: { minLevel: number; recharge: RechargeOn }[];
   resourceDetailTiers?: { minLevel: number; label: string; value: string }[];
   resourceOnInitiative?: InitiativeRegenRow[];
+  choiceKey?: string;
+  choiceLabel?: string;
+  choiceCatalogSource?: string;
+  choiceCountTiers?: ChoiceCountTier[];
   activationCost?: string;
   resolverKind?: string;
   requiresUnarmored?: boolean;
@@ -183,6 +188,10 @@ const resourceRechargeTiersSchema = z
 const derivedStatTiersSchema = z
   .array(z.object({ minLevel: z.number().int().positive(), value: z.union([z.number(), z.string()]) }))
   .refine(isAscendingByMinLevel, ASCENDING_TIER_MESSAGE);
+const choiceCountTiersSchema = z
+  .array(z.object({ minLevel: z.number().int().positive(), count: z.number().int().positive() }))
+  .min(1) // an empty tier array is authoring garbage, same as resourceRechargeTiers
+  .refine(isAscendingByMinLevel, ASCENDING_TIER_MESSAGE);
 
 // resourceDetailTiers' own invariant (#1685): ASCENDING by minLevel PER
 // LABEL, not globally — labels interleave freely in the flat array. Reuses
@@ -212,9 +221,7 @@ const resourceDetailTiersSchema = z
   .min(1) // an empty tier array is authoring garbage, same as resourceRechargeTiers
   .refine(isAscendingByMinLevelPerLabel, PER_LABEL_ASCENDING_TIER_MESSAGE);
 
-// InitiativeRegenRow's seed-time mirror (#1522). `minLevel` gates each entry
-// ADDITIVELY (see InitiativeRegenRow's own comment) — no ascending-tiers
-// refine here, unlike every tier schema above.
+// Additive minLevel entries (InitiativeRegenRow) — deliberately no ascending refine, unlike the tier schemas above.
 const initiativeRegenBonusHealSchema = z.object({
   sourceName: z.string().min(1),
   dieFaces: z.union([z.number().int().positive(), z.literal("martialArtsDie")]),
@@ -325,13 +332,44 @@ interface OnInitiativeGuardRow {
   resourceTotals?: unknown[] | null;
 }
 
-// A descriptor with no pool to attach to is dead data — the same discipline
-// rechargeTiersCoverPoolStart enforces for resourceRechargeTiers.
-// resourceOnInitiativeSchema's own .min(1) already rules out an empty array
-// reaching this refine, so presence alone is the right test here.
 function onInitiativeDeclaresItsPool(row: OnInitiativeGuardRow): boolean {
   if (!row.resourceOnInitiative) return true;
   return Boolean(row.resourceKey) && Boolean(row.resourceTotals?.length);
+}
+
+interface ChoiceColumnsRow {
+  choiceKey?: string;
+  choiceLabel?: string;
+  choiceCatalogSource?: string;
+  choiceCountTiers?: unknown[] | null;
+}
+
+function choiceColumnsDeclareTogether(row: ChoiceColumnsRow): boolean {
+  const trio = [row.choiceKey, row.choiceCatalogSource, row.choiceCountTiers];
+  const trioComplete = trio.every(Boolean);
+  if (!trioComplete && trio.some(Boolean)) return false;
+  return trioComplete || !row.choiceLabel;
+}
+
+interface ChoiceScopeRow {
+  choiceKey?: string;
+  subclassSlug: string | null;
+}
+
+// Base-class rows never reach deriveSubclassChoiceList, so a class-scoped declaration would be silently dead (#899).
+function choiceRowIsSubclassScoped(row: ChoiceScopeRow): boolean {
+  return !row.choiceKey || row.subclassSlug !== null;
+}
+
+interface ChoiceTierGapRow {
+  level: number;
+  choiceCountTiers?: { minLevel: number }[] | null;
+}
+
+// A first tier below the row's own level is unreachable: choicesFromRows' row-level gate fires first.
+function choiceTiersStartAtOrAfterRowLevel(row: ChoiceTierGapRow): boolean {
+  const tiersStart = firstMinLevel(row.choiceCountTiers);
+  return tiersStart === undefined || tiersStart >= row.level;
 }
 
 // Run at seed time (prisma/seed/validate.ts). Only the identity fields are
@@ -353,6 +391,10 @@ export const classFeatureSeedSchema = z
     resourceRechargeTiers: resourceRechargeTiersSchema.nullable().optional(),
     resourceDetailTiers: resourceDetailTiersSchema.nullable().optional(),
     resourceOnInitiative: resourceOnInitiativeSchema.nullable().optional(),
+    choiceKey: z.string().min(1).optional(),
+    choiceLabel: z.string().min(1).optional(),
+    choiceCatalogSource: z.string().min(1).optional(),
+    choiceCountTiers: choiceCountTiersSchema.nullable().optional(),
     derivedStatTiers: derivedStatTiersSchema.nullable().optional(),
     saveDcAbilities: z.array(z.string().min(1)).optional(),
     // The SAME zod a taken feat's improvements snapshot validates against
@@ -380,4 +422,13 @@ export const classFeatureSeedSchema = z
   })
   .refine(onInitiativeDeclaresItsPool, {
     message: "a row with resourceOnInitiative must also declare resourceKey and a non-empty resourceTotals",
+  })
+  .refine(choiceColumnsDeclareTogether, {
+    message: "choiceKey, choiceCatalogSource, and choiceCountTiers must all be present or all be absent, and choiceLabel must not appear without them",
+  })
+  .refine(choiceRowIsSubclassScoped, {
+    message: "choice columns are only valid on a subclass-scoped row (subclassSlug must not be null)",
+  })
+  .refine(choiceTiersStartAtOrAfterRowLevel, {
+    message: "choiceCountTiers' first tier minLevel must be >= the row's own level, or it would silently never fire at its authored level",
   });
