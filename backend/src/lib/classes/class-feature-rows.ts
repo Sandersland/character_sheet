@@ -36,8 +36,8 @@ export function evaluateResourceTotal(total: ResourceTotalFormula, ctx: Resource
   if (total === "proficiencyBonus") return ctx.profBonus;
   if ("abilityMod" in total) {
     // A missing score reads as 10 (modifier 0), matching resourceFn's own default.
-    const mod = abilityModifier(ctx.abilityScores[total.abilityMod] ?? 10) + (total.plus ?? 0);
-    return total.min !== undefined ? Math.max(total.min, mod) : mod;
+    const base = abilityModifier(ctx.abilityScores[total.abilityMod] ?? 10) + (total.plus ?? 0);
+    return total.min !== undefined ? Math.max(total.min, base) : base;
   }
   return total.levelTimes * ctx.level;
 }

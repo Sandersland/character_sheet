@@ -16,9 +16,12 @@ function poolAt(key: string, level: number, edition: "EDITION_2014" | "EDITION_2
 // Divine Sense as its own pool (its job moves to the Channel Divinity option
 // "Channel Divinity: Divine Sense" instead, spending the channelDivinity
 // pool). The `plus` additive term (#1685's evaluator, widened for this retab)
-// is what expresses the offset.
+// is what expresses the offset. The floor at 1 is NOT in PHB'14 (it names no
+// minimum) — it's byte-parity with the deleted resourceFn's own
+// `Math.max(1, 1 + chaMod)`, carried forward so a negative-Charisma Paladin's
+// pool reads the same as it always has.
 describe("divineSense rides Paladin's own row — the pool the deleted paladin resourceFn used to declare", () => {
-  it("total is 1 + Cha modifier, floored at 1 — Cha 8 (-1 mod) floors to 1, Cha 18 (+4 mod) is 5", () => {
+  it("total is 1 + Cha modifier (PHB'14 p.84) — Cha 18 (+4 mod) is 5; Cha 8 (-1 mod) floors to 1 (fn-parity, not RAW)", () => {
     expect(poolAt("divineSense", 1, "EDITION_2014", 8)?.total).toBe(1);
     expect(poolAt("divineSense", 1, "EDITION_2014", 18)?.total).toBe(5);
   });

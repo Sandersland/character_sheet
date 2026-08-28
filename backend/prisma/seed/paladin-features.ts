@@ -73,9 +73,9 @@
 // its own named "Channel Divinity" — Paladin already has a base-class row
 // literally named "Channel Divinity" at L3 in BOTH editions (this file's own
 // BASE_RAW below), so each edition's pool rides its own same-named row:
-// 2014's total 1 (short-or-long rest, no
-// shortRestRegain); 2024's total 2/3 at L3/L11 (longRest, shortRestRegain 1
-// on every tier, #1221) — SRD 5.2's own progression, verified verbatim: "You
+// 2014's total 1 (short-or-long rest, no shortRestRegain); 2024's total 2/3
+// at L3/L11 (longRest, shortRestRegain 1 on every tier, #1221) — SRD 5.2's
+// own progression, verified verbatim: "You
 // regain one of its expended uses when you finish a Short Rest, and you
 // regain all expended uses when you finish a Long Rest."
 // `lib/classes/channel-divinity.ts` and `prisma/seed/channel-divinity.ts` do
@@ -197,9 +197,13 @@ const BASE_RAW: RawPaladinFeature[] = [
       "As an action, sense the presence of celestials, fiends, and undead within 60 ft until the end of your next turn (they aren't hidden from this sense). You can also detect consecrated or desecrated places/objects. Uses = 1 + Charisma modifier per long rest.",
     // Row-driven action (#1909, moved off actions.ts's DERIVED_ACTIONS,
     // EDITION_2014-only — 2024 has no such pool, see the comment below). The
-    // pool itself (PHB'14 p.84: 1 + Charisma modifier) rides the `plus` term
-    // #1685's evaluator gains for this retab — an ADDITIVE offset, not a
-    // floor, distinct from `min`.
+    // pool itself (PHB'14 p.84: 1 + Charisma modifier, no stated minimum —
+    // contrast Cleansing Touch's own "minimum 1" below, where PHB'14 states a
+    // floor explicitly) rides the `plus` term #1685's evaluator gains for
+    // this retab — an ADDITIVE offset, not a floor, distinct from `min`. The
+    // `min: 1` here is NOT RAW: it's byte-parity with the deleted
+    // resourceFn's `Math.max(1, 1 + chaMod)`, kept so a negative-Charisma
+    // Paladin's pool reads the same as it always has.
     resourceKey: "divineSense",
     resourceLabel: "Divine Sense",
     resourceRecharge: "longRest",
