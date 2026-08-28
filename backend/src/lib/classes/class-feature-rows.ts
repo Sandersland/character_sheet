@@ -4,9 +4,10 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 
 import { abilityModifier } from "@/lib/srd/math.js";
 import type { RollEffect } from "@/lib/srd/roll-effects.js";
+import { deriveMartialArtsDie } from "@/lib/srd/weapon-damage.js";
 
 import type { FeatImprovement } from "./resources-state.js";
-import type { DerivedFeature, DerivedResource, RechargeOn } from "./types.js";
+import type { DerivedFeature, DerivedResource, InitiativeBonusHeal, InitiativeRegen, RechargeOn } from "./types.js";
 
 export type ResourceTotalAbility = "strength" | "dexterity" | "constitution" | "intelligence" | "wisdom" | "charisma";
 
@@ -107,6 +108,31 @@ export interface DerivedStatTier {
   value: number | string;
 }
 
+export interface InitiativeRegenBonusHealRow {
+  sourceName: string;
+  dieFaces: number | "martialArtsDie";
+  flatBonus?: ResourceTotalFormula;
+}
+
+/**
+ * A row-authored counterpart to `InitiativeRegen` (#1522) — the vocabulary a
+ * ClassFeature row uses to declare the same regain-on-rolling-Initiative
+ * behavior a class module's resourceFn declares in TS. `minLevel` gates ONE
+ * ENTRY ADDITIVELY: every entry whose minLevel is absent or <= the
+ * character's level survives, same as EffectBuffRow.minLevel in
+ * effectBuffsFromRow. This is NOT the tier last-match-wins rule the other
+ * tier arrays in this file use — Perfect Focus (L15) JOINS Uncanny
+ * Metabolism, it doesn't replace it.
+ */
+export interface InitiativeRegenRow {
+  id: string;
+  amount: "all" | number;
+  minLevel?: number;
+  oncePerLongRest?: boolean;
+  threshold?: number;
+  bonusHeal?: InitiativeRegenBonusHealRow;
+}
+
 export interface ResourceColumns {
   resourceKey?: string | null;
   resourceLabel?: string | null;
@@ -115,6 +141,7 @@ export interface ResourceColumns {
   resourceDieTiers?: ResourceDieTier[] | null;
   resourceRechargeTiers?: ResourceRechargeTier[] | null;
   resourceDetailTiers?: ResourceDetailTier[] | null;
+  resourceOnInitiative?: InitiativeRegenRow[] | null;
 }
 
 // Evaluated against the character's CURRENTLY EQUIPPED state at activation
@@ -299,17 +326,53 @@ function optionalPoolFields(
   };
 }
 
-// The pool's description IS the row's own description, never a second string (#1528).
-function poolFromRow(row: ClassFeatureRow, ctx: ResourceTotalContext): DerivedResource | null {
+function resolveBonusHeal(bonusHeal: InitiativeRegenBonusHealRow, ctx: ResourceTotalContext, edition: RulesEdition): InitiativeBonusHeal {
+  return {
+    sourceName: bonusHeal.sourceName,
+    dieFaces: bonusHeal.dieFaces === "martialArtsDie" ? deriveMartialArtsDie(ctx.level, edition) : bonusHeal.dieFaces,
+    flatBonus: bonusHeal.flatBonus !== undefined ? evaluateResourceTotal(bonusHeal.flatBonus, ctx) : 0,
+  };
+}
+
+function resolveInitiativeRegenEntry(entry: InitiativeRegenRow, ctx: ResourceTotalContext, edition: RulesEdition): InitiativeRegen {
+  return {
+    id: entry.id,
+    amount: entry.amount,
+    ...(entry.oncePerLongRest !== undefined ? { oncePerLongRest: entry.oncePerLongRest } : {}),
+    ...(entry.threshold !== undefined ? { threshold: entry.threshold } : {}),
+    ...(entry.bonusHeal ? { bonusHeal: resolveBonusHeal(entry.bonusHeal, ctx, edition) } : {}),
+  };
+}
+
+// Undefined (never []) so poolFromRow omits `onInitiative` entirely once no
+// entry survives the level filter — same convention as detailsFromRow.
+function resourceOnInitiativeFromRow(
+  entries: readonly InitiativeRegenRow[] | null | undefined,
+  ctx: ResourceTotalContext,
+  edition: RulesEdition,
+): InitiativeRegen[] | undefined {
+  const surviving = (entries ?? []).filter((entry) => entry.minLevel === undefined || ctx.level >= entry.minLevel);
+  if (surviving.length === 0) return undefined;
+  return surviving.map((entry) => resolveInitiativeRegenEntry(entry, ctx, edition));
+}
+
+// The pool's description IS the row's own description, never a second string
+// (#1528). `edition` is a separate parameter rather than a ResourceTotalContext
+// field: poolFromRow is the only caller that needs it (for
+// resourceOnInitiative's martialArtsDie faces), and ResourceTotalContext is
+// shared with evaluateResourceTotal/evaluateBuffModifier call sites that don't.
+function poolFromRow(row: ClassFeatureRow, ctx: ResourceTotalContext, edition: RulesEdition): DerivedResource | null {
   if (!row.resourceKey) return null;
   const totalTier = tierAt(row.resourceTotals, ctx.level);
   if (!totalTier) return null;
+  const onInitiative = resourceOnInitiativeFromRow(row.resourceOnInitiative, ctx, edition);
   return {
     key: row.resourceKey,
     label: row.resourceLabel ?? row.name,
     total: evaluateResourceTotal(totalTier.total, ctx),
     recharge: tierAt(row.resourceRechargeTiers, ctx.level)?.recharge ?? (row.resourceRecharge as RechargeOn | null) ?? "none",
     ...optionalPoolFields(row, ctx, totalTier),
+    ...(onInitiative ? { onInitiative } : {}),
     description: row.description,
   };
 }
@@ -317,7 +380,7 @@ function poolFromRow(row: ClassFeatureRow, ctx: ResourceTotalContext): DerivedRe
 // A base row's resourceKey that an active subclass's own row ALSO declares
 // resolves from that subclass row instead — the row-driven counterpart to a
 // resourceFn receiving the active subclassKey (#906). Swaps the WHOLE
-// descriptor block (key/label/totals/die/recharge/details/shortRestRegain)
+// descriptor block (key/label/totals/die/recharge/details/shortRestRegain/onInitiative)
 // together, never a per-column merge, so a subclass's variant pool (e.g.
 // druid Circle of the Moon's wildShape) reads as one coherent set of
 // numbers — EXCEPT `description`, which poolsFromRows below always takes
@@ -363,7 +426,7 @@ export function poolsFromRows(
   for (const row of rows) {
     if (row.edition !== edition || row.level > level) continue;
     const override = row.resourceKey ? findOverrideRow(overrideRows, row.resourceKey, level, edition) : undefined;
-    const pool = poolFromRow(override ?? row, { level, abilityScores, profBonus });
+    const pool = poolFromRow(override ?? row, { level, abilityScores, profBonus }, edition);
     if (!pool) continue;
     pools.push(override ? { ...pool, description: row.description } : pool);
   }

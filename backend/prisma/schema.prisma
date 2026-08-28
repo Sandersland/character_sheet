@@ -832,6 +832,7 @@ model ClassFeature {
   resourceDieTiers      Json? // [{ minLevel, die }]   — ASCENDING by minLevel, last-match-wins
   resourceRechargeTiers Json? // [{ minLevel, recharge }] — recharge: RechargeOn — ASCENDING by minLevel, last-match-wins
   resourceDetailTiers   Json? // [{ minLevel, label, value }] — labeled display parts (#1685's DerivedResource.details) — ASCENDING by minLevel PER LABEL, last-match-wins per label; different labels interleave freely
+  resourceOnInitiative  Json? // InitiativeRegenRow[] — regain-on-rolling-Initiative descriptors (#1522) — minLevel gates each entry ADDITIVELY (every entry at or below the character's level survives, unlike the tier columns above's last-match-wins)
 
   // Activation block — this feature's action, gated by the row itself
   // (classId/subclassId/level), never separate grant columns.
