@@ -74,6 +74,9 @@ interface RawRangerFeature {
   resourceLabel?: string;
   resourceRecharge?: string;
   resourceTotals?: { minLevel: number; total: ResourceTotalFormula; shortRestRegain?: number }[];
+  choiceKey?: string;
+  choiceCatalogSource?: string;
+  choiceCountTiers?: { minLevel: number; count: number }[];
 }
 
 function expand(raw: RawRangerFeature): ClassFeatureSeedRow[] {
@@ -89,6 +92,9 @@ function expand(raw: RawRangerFeature): ClassFeatureSeedRow[] {
     resourceLabel: raw.resourceLabel,
     resourceRecharge: raw.resourceRecharge,
     resourceTotals: raw.resourceTotals,
+    choiceKey: raw.choiceKey,
+    choiceCatalogSource: raw.choiceCatalogSource,
+    choiceCountTiers: raw.choiceCountTiers,
   };
   const editions: SeedEdition[] = raw.edition ? [raw.edition] : ["EDITION_2014", "EDITION_2024"];
   return editions.map((edition) => ({ ...base, edition }));
@@ -427,6 +433,9 @@ const HUNTER_RAW: RawRangerFeature[] = [
     edition: "EDITION_2014",
     description:
       "Choose one: Colossus Slayer (once per turn, +1d8 damage to a wounded creature); Giant Killer (reaction attack when a Large+ creature misses you); or Horde Breaker (once per turn, attack a second creature adjacent to the first).",
+    choiceKey: "huntersPrey",
+    choiceCatalogSource: "huntersPrey",
+    choiceCountTiers: [{ minLevel: 3, count: 1 }],
   },
   {
     subclassSlug: HUNTER_SLUG,
@@ -439,6 +448,9 @@ const HUNTER_RAW: RawRangerFeature[] = [
     // mechanism) — deferred to #1353, noted there.
     description:
       "Choose one: Colossus Slayer (once per turn, +1d8 damage to a creature missing any of its Hit Points) or Horde Breaker (once per turn, make another attack with the same weapon against a different creature within 5 ft of the original target). Swappable for the other option whenever you finish a Short or Long Rest.",
+    choiceKey: "huntersPrey",
+    choiceCatalogSource: "huntersPrey",
+    choiceCountTiers: [{ minLevel: 3, count: 1 }],
   },
   {
     subclassSlug: HUNTER_SLUG,
@@ -447,6 +459,9 @@ const HUNTER_RAW: RawRangerFeature[] = [
     edition: "EDITION_2014",
     description:
       "Choose one: Escape the Horde (opportunity attacks against you have disadvantage); Multiattack Defense (+4 AC against other attacks after being hit by one); or Steel Will (advantage on saves against being frightened).",
+    choiceKey: "defensiveTactics",
+    choiceCatalogSource: "defensiveTactics",
+    choiceCountTiers: [{ minLevel: 7, count: 1 }],
   },
   {
     subclassSlug: HUNTER_SLUG,
@@ -459,6 +474,9 @@ const HUNTER_RAW: RawRangerFeature[] = [
     // attacks this turn" — a different mechanic, not merely a number change.
     description:
       "Choose one: Escape the Horde (Opportunity Attacks have disadvantage against you) or Multiattack Defense (when a creature hits you with an attack roll, that creature has disadvantage on all other attack rolls against you this turn). Swappable for the other option whenever you finish a Short or Long Rest.",
+    choiceKey: "defensiveTactics",
+    choiceCatalogSource: "defensiveTactics",
+    choiceCountTiers: [{ minLevel: 7, count: 1 }],
   },
   {
     subclassSlug: HUNTER_SLUG,
@@ -467,6 +485,9 @@ const HUNTER_RAW: RawRangerFeature[] = [
     edition: "EDITION_2014",
     description:
       "Choose one: Volley (action: ranged attack against every creature in a 10-ft radius within range); or Whirlwind Attack (action: melee attack against every creature within reach).",
+    choiceKey: "hunterMultiattack",
+    choiceCatalogSource: "hunterMultiattack",
+    choiceCountTiers: [{ minLevel: 11, count: 1 }],
   },
   // Multiattack has NO EDITION_2024 row — removed in 2024 (Superior Hunter's
   // Prey, below, fills its L11 slot instead with a wholly different, no-
@@ -498,6 +519,9 @@ const HUNTER_RAW: RawRangerFeature[] = [
     edition: "EDITION_2014",
     description:
       "Choose one: Evasion (no damage on successful Dex save, half on failure); Stand Against the Tide (redirect a missed melee attack to another creature within range); or Uncanny Dodge (halve damage from one attack per reaction).",
+    choiceKey: "superiorHuntersDefense",
+    choiceCatalogSource: "superiorHuntersDefense",
+    choiceCountTiers: [{ minLevel: 15, count: 1 }],
   },
   {
     subclassSlug: HUNTER_SLUG,

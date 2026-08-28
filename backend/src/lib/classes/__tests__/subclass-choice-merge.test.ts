@@ -27,17 +27,18 @@ function fixtureChoiceRow(level: number): ClassFeatureRow {
   };
 }
 
+// fourElementsDisciplines' count(6) === 2 per monk.ts's own tier table.
 describe("deriveSubclassChoiceList registry merge (#899/#1522) — DEF-WINS BY KEY", () => {
-  it("def wins on a same-key collision with a row-driven choice, non-colliding def entries still appear", () => {
+  it("def wins on a same-key collision with a row-driven choice", () => {
     const featureRows: ClassFeatureRowsCarrier = {
       classRows: [],
       subclassRows: [
         {
-          name: "Row Hunter's Prey",
+          name: "Row Disciple of the Elements",
           level: 3,
           description: "",
           edition: "EDITION_2024",
-          choiceKey: "huntersPrey",
+          choiceKey: "fourElementsDisciplines",
           choiceLabel: "Row Label Should Not Win",
           choiceCatalogSource: "rowCatalogShouldNotWin",
           choiceCountTiers: [{ minLevel: 3, count: 99 }],
@@ -45,10 +46,9 @@ describe("deriveSubclassChoiceList registry merge (#899/#1522) — DEF-WINS BY K
       ],
       subclassLevel: 3,
     };
-    const info = deriveResources("ranger", "hunter", 7, ABILITY_SCORES, 3, featureRows, "EDITION_2024");
+    const info = deriveResources("monk", "way of the four elements", 6, ABILITY_SCORES, 3, featureRows, "EDITION_2024");
     expect(info?.subclassChoices).toEqual([
-      { key: "huntersPrey", label: "Hunter's Prey", catalogSource: "huntersPrey", count: 1 },
-      { key: "defensiveTactics", label: "Defensive Tactics", catalogSource: "defensiveTactics", count: 1 },
+      { key: "fourElementsDisciplines", label: "Elemental Disciplines", catalogSource: "discipline", count: 2 },
     ]);
   });
 
@@ -58,19 +58,17 @@ describe("deriveSubclassChoiceList registry merge (#899/#1522) — DEF-WINS BY K
       subclassRows: [fixtureChoiceRow(3)],
       subclassLevel: 3,
     };
-    const info = deriveResources("ranger", "hunter", 7, ABILITY_SCORES, 3, featureRows, "EDITION_2024");
+    const info = deriveResources("monk", "way of the four elements", 6, ABILITY_SCORES, 3, featureRows, "EDITION_2024");
     expect(info?.subclassChoices).toEqual([
-      { key: "huntersPrey", label: "Hunter's Prey", catalogSource: "huntersPrey", count: 1 },
-      { key: "defensiveTactics", label: "Defensive Tactics", catalogSource: "defensiveTactics", count: 1 },
+      { key: "fourElementsDisciplines", label: "Elemental Disciplines", catalogSource: "discipline", count: 2 },
       { key: "fixtureChoice", label: "Fixture Choice Feature", catalogSource: "fixtureCatalog", count: 2 },
     ]);
   });
 
   it("def-only subclass (no rows carrier) resolves exactly as today", () => {
-    const info = deriveResources("ranger", "hunter", 7, ABILITY_SCORES, 3, undefined, "EDITION_2024");
+    const info = deriveResources("monk", "way of the four elements", 6, ABILITY_SCORES, 3, undefined, "EDITION_2024");
     expect(info?.subclassChoices).toEqual([
-      { key: "huntersPrey", label: "Hunter's Prey", catalogSource: "huntersPrey", count: 1 },
-      { key: "defensiveTactics", label: "Defensive Tactics", catalogSource: "defensiveTactics", count: 1 },
+      { key: "fourElementsDisciplines", label: "Elemental Disciplines", catalogSource: "discipline", count: 2 },
     ]);
   });
 
@@ -80,13 +78,13 @@ describe("deriveSubclassChoiceList registry merge (#899/#1522) — DEF-WINS BY K
       subclassRows: [fixtureChoiceRow(3)],
       subclassLevel: 3,
     };
-    const info = deriveResources("ranger", "beast master", 3, ABILITY_SCORES, 3, featureRows, "EDITION_2024");
+    const info = deriveResources("monk", "warrior of the open hand", 3, ABILITY_SCORES, 3, featureRows, "EDITION_2024");
     expect(info?.subclassChoices).toEqual([{ key: "fixtureChoice", label: "Fixture Choice Feature", catalogSource: "fixtureCatalog", count: 2 }]);
   });
 
   it("undefined (not present) when the merged list is empty, even though the character has other resources", () => {
     const featureRows: ClassFeatureRowsCarrier = { classRows: [DUMMY_CLASS_ROW], subclassRows: [], subclassLevel: 3 };
-    const info = deriveResources("ranger", "beast master", 3, ABILITY_SCORES, 3, featureRows, "EDITION_2024");
+    const info = deriveResources("monk", "warrior of the open hand", 3, ABILITY_SCORES, 3, featureRows, "EDITION_2024");
     expect(info).not.toBeNull();
     expect(info?.subclassChoices).toBeUndefined();
   });
@@ -97,7 +95,7 @@ describe("deriveSubclassChoiceList registry merge (#899/#1522) — DEF-WINS BY K
       subclassRows: [fixtureChoiceRow(1)],
       subclassLevel: 3,
     };
-    const info = deriveResources("ranger", "beast master", 1, ABILITY_SCORES, 3, featureRows, "EDITION_2024");
+    const info = deriveResources("monk", "warrior of the open hand", 1, ABILITY_SCORES, 3, featureRows, "EDITION_2024");
     expect(info).not.toBeNull();
     expect(info?.subclassChoices).toBeUndefined();
   });

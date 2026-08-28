@@ -344,6 +344,8 @@ describe("Chunk 4 — GrantedAbility snapshots (lib/classes/resources.ts, the tw
   let maneuverIdShared: string;
   let choiceId2014: string;
   let choiceIdShared: string;
+  let rangerClassId: string;
+  let hunterSubclassId: string;
 
   beforeAll(async () => {
     const cls = await prisma.characterClass.upsert({
@@ -387,6 +389,15 @@ describe("Chunk 4 — GrantedAbility snapshots (lib/classes/resources.ts, the tw
     maneuverIdShared = (await mkGranted(MANEUVER_SHARED, "maneuver", null)).id;
     choiceId2014 = (await mkGranted(CHOICE_2014, "huntersPrey", "EDITION_2014")).id;
     choiceIdShared = (await mkGranted(CHOICE_SHARED, "huntersPrey", null)).id;
+
+    // #899/#1353 resolution: Hunter's huntersPrey choice is now row-driven
+    // (ranger-features.ts) — it resolves through the classEntry's real
+    // classId/subclassId (subclassRef.features), not a TS SubclassChoice, so
+    // createHunter below needs the real seeded Ranger/Hunter ids.
+    const rangerClass = await prisma.characterClass.findUniqueOrThrow({ where: { name: "Ranger" } });
+    const hunterSubclass = await prisma.subclass.findFirstOrThrow({ where: { classId: rangerClass.id, name: "Hunter" }, orderBy: { id: "asc" } });
+    rangerClassId = rangerClass.id;
+    hunterSubclassId = hunterSubclass.id;
   });
 
   afterEach(async () => {
@@ -473,7 +484,7 @@ describe("Chunk 4 — GrantedAbility snapshots (lib/classes/resources.ts, the tw
         currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
         spellcasting: Prisma.JsonNull,
         resources: Prisma.JsonNull,
-        classEntries: { create: [{ name: "ranger", subclass: "hunter", position: 0, level: 7 }] },
+        classEntries: { create: [{ name: "ranger", subclass: "hunter", classId: rangerClassId, subclassId: hunterSubclassId, position: 0, level: 7 }] },
       },
     });
   }

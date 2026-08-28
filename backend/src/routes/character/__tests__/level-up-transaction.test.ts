@@ -1987,7 +1987,7 @@ describe("POST …/level-up/transactions — subclassChoice validator messages",
 
   it("enforces the count of a KNOWN generic subclass choice (Ranger→Hunter, Hunter's Prey at L3)", async () => {
     const ranger = await prisma.characterClass.findFirstOrThrow({ where: { name: "Ranger" } });
-    const hunter = await prisma.subclass.findFirstOrThrow({ where: { name: "Hunter", classId: ranger.id } });
+    const hunter = await prisma.subclass.findFirstOrThrow({ where: { name: "Hunter", classId: ranger.id }, orderBy: { id: "asc" } });
     await prisma.character.create({
       data: {
         ...BASE,

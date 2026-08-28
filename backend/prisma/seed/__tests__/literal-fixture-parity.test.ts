@@ -41,6 +41,15 @@ const SLUG_BY_NAME_KEY = new Map(
 interface SeedRow {
   level: number;
   description: string;
+  choiceColumns: string;
+}
+
+function choiceColumnsOf(row: { choiceKey?: string | null; choiceCatalogSource?: string | null; choiceCountTiers?: unknown }): string {
+  return JSON.stringify({
+    choiceKey: row.choiceKey ?? null,
+    choiceCatalogSource: row.choiceCatalogSource ?? null,
+    choiceCountTiers: row.choiceCountTiers ?? null,
+  });
 }
 
 // (lowercased className, subclassSlug or "null", name, edition) -> row. Keyed
@@ -50,7 +59,7 @@ interface SeedRow {
 const SEED_BY_KEY = new Map<string, SeedRow>(
   CLASS_FEATURES.map((row) => [
     `${row.className.toLowerCase()}::${row.subclassSlug ?? "null"}::${row.name}::${row.edition}`,
-    { level: row.level, description: row.description },
+    { level: row.level, description: row.description, choiceColumns: choiceColumnsOf(row) },
   ]),
 );
 
@@ -59,6 +68,7 @@ interface FixtureRow {
   label: string;
   level: number;
   description: string;
+  choiceColumns: string;
 }
 
 function collectFixtureRows(): FixtureRow[] {
@@ -71,6 +81,7 @@ function collectFixtureRows(): FixtureRow[] {
         label: `LITERAL_CLASS_ROWS[${classKey}] "${row.name}" (${row.edition})`,
         level: row.level,
         description: row.description,
+        choiceColumns: choiceColumnsOf(row),
       });
     }
   }
@@ -87,6 +98,7 @@ function collectFixtureRows(): FixtureRow[] {
         label: `LITERAL_SUBCLASS_ROWS["${nameKey}"] "${row.name}" (${row.edition})`,
         level: row.level,
         description: row.description,
+        choiceColumns: choiceColumnsOf(row),
       });
     }
   }
@@ -148,6 +160,9 @@ describe("literal-row fixture parity (#1593)", () => {
       }
       if (seed.level !== row.level) {
         mismatches.push(`${row.label}: level ${row.level} in fixture, ${seed.level} in seed`);
+      }
+      if (seed.choiceColumns !== row.choiceColumns) {
+        mismatches.push(`${row.label}: choice columns drifted\n    fixture: ${row.choiceColumns}\n    seed:    ${seed.choiceColumns}`);
       }
     }
 

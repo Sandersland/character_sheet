@@ -4,7 +4,6 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 
 import { deriveResources } from "@/lib/classes/class-features.js";
 import { monk } from "@/lib/classes/monk.js";
-import { ranger } from "@/lib/classes/ranger.js";
 import { SUBCLASS_IDENTITY } from "@/lib/classes/subclass-slug.js";
 import type { ClassDefinition } from "@/lib/classes/types.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
@@ -107,7 +106,7 @@ describe("real registry: the overlay still wins for every class still on the TS 
     expect(info).toBeNull();
   });
 
-  it("Ranger (a class still fully on the TS path) is untouched by the identity-only seeding pass — Hunter's own choices catalog still resolves", async () => {
+  it("Ranger (fully retabled to rows, #899/#1353 resolution) resolves to 'active but empty' with no rows supplied — same shape as Champion", async () => {
     const info2 = deriveResources(
       "ranger",
       "hunter",
@@ -117,8 +116,29 @@ describe("real registry: the overlay still wins for every class still on the TS 
       { classRows: [], subclassRows: [] },
       "EDITION_2024",
     );
-    expect(info2).not.toBeNull();
-    expect(info2?.subclassChoices).toBeDefined();
+    expect(info2).toBeNull();
+  });
+
+  it("Ranger's Hunter resolves its choices catalog from SEEDED rows now, not a TS SubclassChoice declaration", async () => {
+    const huntersPreyRow = {
+      name: "Hunter's Prey",
+      level: 3,
+      description: "test",
+      edition: "EDITION_2024" as const,
+      choiceKey: "huntersPrey",
+      choiceCatalogSource: "huntersPrey",
+      choiceCountTiers: [{ minLevel: 3, count: 1 }],
+    };
+    const info2 = deriveResources(
+      "ranger",
+      "hunter",
+      3,
+      ABILITIES,
+      proficiencyBonusForLevel(3),
+      { classRows: [], subclassRows: [huntersPreyRow] },
+      "EDITION_2024",
+    );
+    expect(info2?.subclassChoices).toEqual([{ key: "huntersPrey", label: "Hunter's Prey", catalogSource: "huntersPrey", count: 1 }]);
   });
 });
 
@@ -128,7 +148,6 @@ describe("real registry: the overlay still wins for every class still on the TS 
 // resolves to the poorer identity-only stub.
 const TS_REGISTERED_CLASSES: Record<string, ClassDefinition> = {
   monk,
-  ranger,
 };
 
 describe("#1557 review — the SUBCLASSES overlay's key-equality invariant", () => {
@@ -149,9 +168,9 @@ describe("#1557 review — the SUBCLASSES overlay's key-equality invariant", () 
 
   // Ties to CLASS_SUBCLASSES so a class added to CLASSES but omitted here
   // fails visibly instead of silently losing coverage.
-  it("covers every class in CLASS_SUBCLASSES except Fighter, Barbarian, Rogue, Cleric, Warlock, Wizard, Sorcerer, Bard, Paladin and Druid, which have no TS module", () => {
+  it("covers every class in CLASS_SUBCLASSES except Fighter, Barbarian, Rogue, Cleric, Warlock, Wizard, Sorcerer, Bard, Paladin, Druid and Ranger, which have no TS module", () => {
     expect(
-      new Set([...Object.keys(TS_REGISTERED_CLASSES), "fighter", "barbarian", "rogue", "cleric", "warlock", "wizard", "sorcerer", "bard", "paladin", "druid"]),
+      new Set([...Object.keys(TS_REGISTERED_CLASSES), "fighter", "barbarian", "rogue", "cleric", "warlock", "wizard", "sorcerer", "bard", "paladin", "druid", "ranger"]),
     ).toEqual(new Set(Object.keys(CLASS_SUBCLASSES)));
   });
 });

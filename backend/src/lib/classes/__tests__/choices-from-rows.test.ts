@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import { choicesFromRows, type ChoiceCountTier, type ClassFeatureRow } from "@/lib/classes/class-feature-rows.js";
 import { monk } from "@/lib/classes/monk.js";
-import { ranger } from "@/lib/classes/ranger.js";
 
 function row(overrides: Partial<ClassFeatureRow> = {}): ClassFeatureRow {
   return { name: "Test Feature", level: 1, description: "test description", edition: "EDITION_2024", ...overrides };
@@ -28,8 +27,14 @@ function fourElementsRow(edition: ClassFeatureRow["edition"] = "EDITION_2014"): 
 }
 
 const fourElementsDef = monk.subclasses!["way of the four elements"].choices![0];
-const hunterChoices = ranger.subclasses!.hunter.choices!;
-const HUNTER_TIER_LEVELS = [3, 7, 11, 15];
+
+const FOUR_TIER_CHOICE_SHAPE: { key: string; label: string; catalogSource: string; count: (level: number) => number }[] = [
+  { key: "tierOne", label: "Tier One", catalogSource: "tierOne", count: (l) => (l >= 3 ? 1 : 0) },
+  { key: "tierTwo", label: "Tier Two", catalogSource: "tierTwo", count: (l) => (l >= 7 ? 1 : 0) },
+  { key: "tierThree", label: "Tier Three", catalogSource: "tierThree", count: (l) => (l >= 11 ? 1 : 0) },
+  { key: "tierFour", label: "Tier Four", catalogSource: "tierFour", count: (l) => (l >= 15 ? 1 : 0) },
+];
+const FOUR_TIER_LEVELS = [3, 7, 11, 15];
 
 describe("choicesFromRows (#899/#1522) — the row-driven SubclassChoice vocabulary", () => {
   describe("Four Elements shape: deep-equal against monk.ts's declaration through deriveSubclassChoiceList's own math", () => {
@@ -46,22 +51,22 @@ describe("choicesFromRows (#899/#1522) — the row-driven SubclassChoice vocabul
     }
   });
 
-  describe("Hunter shape: four one-tier rows, deep-equal against ranger.ts's declaration, order preserved", () => {
-    const hunterRows: ClassFeatureRow[] = hunterChoices.map((c, i) =>
+  describe("Four-tier shape: four one-tier rows at different grant levels, order preserved", () => {
+    const fourTierRows: ClassFeatureRow[] = FOUR_TIER_CHOICE_SHAPE.map((c, i) =>
       row({
         name: c.label,
-        level: HUNTER_TIER_LEVELS[i],
+        level: FOUR_TIER_LEVELS[i],
         edition: "EDITION_2024",
         choiceKey: c.key,
         choiceCatalogSource: c.catalogSource,
-        choiceCountTiers: [{ minLevel: HUNTER_TIER_LEVELS[i], count: 1 }],
+        choiceCountTiers: [{ minLevel: FOUR_TIER_LEVELS[i], count: 1 }],
       }),
     );
 
     for (const level of [2, 3, 7, 11, 15, 20]) {
       it(`level ${level}`, () => {
-        const resolved = choicesFromRows(hunterRows, level, "EDITION_2024");
-        const expected = hunterChoices
+        const resolved = choicesFromRows(fourTierRows, level, "EDITION_2024");
+        const expected = FOUR_TIER_CHOICE_SHAPE
           .map((c) => ({ key: c.key, label: c.label, catalogSource: c.catalogSource, count: c.count(level) }))
           .filter((c) => c.count > 0);
         expect(resolved).toEqual(expected);

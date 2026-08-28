@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { BATTLE_MASTER_ROWS } from "@/lib/classes/__tests__/test-feature-rows.fixture.js";
+import { BATTLE_MASTER_ROWS, HUNTER_ROWS } from "@/lib/classes/__tests__/test-feature-rows.fixture.js";
 import {
   buildLevelUpPlan,
   type LevelUpPlanCharacter,
@@ -322,14 +322,14 @@ describe("buildLevelUpPlan — bespoke choose-N (maneuvers/fightingStyleFeat/too
 
 describe("buildLevelUpPlan — generic subclassChoice (#899)", () => {
   it("Hunter Ranger 2→3 grants Hunter's Prey after the subclass step position", () => {
-    const plan = buildLevelUpPlan(char("ranger", 2), target("ranger", 3, "hunter"));
+    const plan = buildLevelUpPlan(char("ranger", 2), { ...target("ranger", 3, "hunter"), subclassFeatureRows: HUNTER_ROWS });
     const choice = plan.find((s) => s.kind === "subclassChoice");
     expect(choice?.count).toBe(1);
     expect(choice?.meta).toMatchObject({ key: "huntersPrey", catalogSource: "huntersPrey" });
   });
 
   it("Hunter Ranger 6→7 grants Defensive Tactics only", () => {
-    const plan = buildLevelUpPlan(char("ranger", 6, "hunter"), target("ranger", 7, "hunter"));
+    const plan = buildLevelUpPlan(char("ranger", 6, "hunter"), { ...target("ranger", 7, "hunter"), subclassFeatureRows: HUNTER_ROWS });
     const choices = plan.filter((s) => s.kind === "subclassChoice");
     expect(choices).toHaveLength(1);
     expect(choices[0].meta).toMatchObject({ key: "defensiveTactics" });

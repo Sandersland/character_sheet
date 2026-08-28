@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { BATTLE_MASTER_ROWS } from "@/lib/classes/__tests__/test-feature-rows.fixture.js";
+import { BATTLE_MASTER_ROWS, HUNTER_ROWS } from "@/lib/classes/__tests__/test-feature-rows.fixture.js";
 import {
   buildLevelUpPlan,
   type LevelUpPlanCharacter,
@@ -356,7 +356,7 @@ describe("validateLevelUpSubmission — choose-N swap (#1503, Way of the Four El
     expect(() =>
       validateLevelUpSubmission(
         { abilityScores: ABILITIES, classEntries: [{ name: "ranger", level: 6, subclass: "hunter" }], edition: "EDITION_2024" },
-        target("ranger", 7, "hunter"),
+        { ...target("ranger", 7, "hunter"), subclassFeatureRows: HUNTER_ROWS },
         null,
         {
           ...base,

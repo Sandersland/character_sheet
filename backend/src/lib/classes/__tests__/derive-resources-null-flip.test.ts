@@ -1,22 +1,7 @@
-// #1524's "Watch for: the deriveResources null-flip" — with an absent
-// featureRows carrier (every narrow-select caller reaching deriveResources
-// through deriveEntryScopedResources: MANEUVER_SELECT, FOCUS_CAST_CHARACTER_SELECT,
-// SPELLCASTING_SELECT, rest.ts's HpOpContext, level-reconciliation.ts's three
-// selects, channel-divinity.ts), `features` is always empty. A class/subclass
-// whose only content used to come from TS-array features (no resourceFn pools)
-// now trips deriveResources' `resources.length === 0 && features.length === 0`
-// guard and returns null where it used to return a valid info object — DROPPING
-// any subclass deriveExtras/choices contribution, since those were computed
-// AFTER that guard in the original #1524 scope. Ranger/Hunter is the real,
-// live example: Ranger has no resourceFn below level 10 under EDITION_2024
-// (Tireless's own grant level, #1230 commit 3), and none at all under
-// EDITION_2014, so at level 7 (Hunter's Prey + Defensive Tactics both
-// granted, under either edition) the ENTIRE contribution used to be features +
-// subclassChoices — with no carrier, features is empty, and pre-fix this
-// function returned null, silently losing subclassChoices too.
 import { describe, expect, it } from "vitest";
 
 import { deriveResources } from "@/lib/classes/class-features.js";
+import type { ClassFeatureRow } from "@/lib/classes/class-feature-rows.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 
 import { BATTLE_MASTER_ROWS } from "./test-feature-rows.fixture.js";
@@ -25,15 +10,35 @@ const ABILITY_SCORES = {
   strength: 10, dexterity: 14, constitution: 12, intelligence: 10, wisdom: 14, charisma: 10,
 };
 
+// actionOnly rows are excluded from features but not from choices.
+const ACTION_ONLY_CHOICE_ROW: ClassFeatureRow = {
+  name: "Hunter's Prey",
+  level: 3,
+  description: "test",
+  edition: "EDITION_2024",
+  actionOnly: true,
+  choiceKey: "huntersPrey",
+  choiceCatalogSource: "huntersPrey",
+  choiceCountTiers: [{ minLevel: 3, count: 1 }],
+};
+
 describe("deriveResources computes subclass extras/choices BEFORE the null check (#1524 null-flip fix)", () => {
-  it("Ranger/Hunter L7 with NO featureRows carrier still derives subclassChoices — the real regression this fix closes", () => {
-    const info = deriveResources("ranger", "hunter", 7, ABILITY_SCORES, proficiencyBonusForLevel(7), undefined, "EDITION_2024");
+  it("Ranger/Hunter L3 with ONLY a row-driven subclassChoice (no resourceFn pools, no non-actionOnly features) still derives subclassChoices — the real regression this fix closes", () => {
+    const info = deriveResources(
+      "ranger",
+      "hunter",
+      3,
+      ABILITY_SCORES,
+      proficiencyBonusForLevel(3),
+      { classRows: [], subclassRows: [ACTION_ONLY_CHOICE_ROW] },
+      "EDITION_2024",
+    );
     expect(info).not.toBeNull();
-    const keys = (info?.subclassChoices ?? []).map((c) => c.key).sort();
-    expect(keys).toEqual(["defensiveTactics", "huntersPrey"]);
-    // features is legitimately empty here — no carrier was supplied — proving
-    // this isn't a false pass from features smuggling content back in.
+    expect(info?.subclassChoices).toEqual([{ key: "huntersPrey", label: "Hunter's Prey", catalogSource: "huntersPrey", count: 1 }]);
+    // features/resources are legitimately empty here — proving this isn't a
+    // false pass from features/resources smuggling content back in.
     expect(info?.features).toEqual([]);
+    expect(info?.resources).toEqual([]);
   });
 
   it("a genuinely empty class (unknown name, no subclass, no carrier) still returns null — the guard isn't disabled, just reordered", () => {
