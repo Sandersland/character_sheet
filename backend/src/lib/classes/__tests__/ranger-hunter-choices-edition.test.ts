@@ -7,9 +7,7 @@ import { loadDbFeatureRows } from "./db-feature-rows.fixture.js";
 
 const ABILITY_SCORES = { strength: 10, dexterity: 16, constitution: 12, intelligence: 10, wisdom: 14, charisma: 10 };
 
-// Sorted by key: loadDbFeatureRows' findMany carries no orderBy (db-feature-
-// rows.fixture.ts), so row order — and therefore choicesFromRows' output
-// order — isn't a guarantee this test should pin.
+// Sorted by key: loadDbFeatureRows' findMany carries no orderBy, so row order isn't a guarantee to pin.
 function choicesAt(
   featureRows: Awaited<ReturnType<typeof loadDbFeatureRows>>,
   level: number,

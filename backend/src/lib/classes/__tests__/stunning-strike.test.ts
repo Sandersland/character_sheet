@@ -7,12 +7,9 @@ import {
   resolveStunningStrikeOutcome,
   stunningStrikeSummary,
 } from "@/lib/classes/stunning-strike.js";
-import { monkSaveDC, monkPoolKey } from "@/lib/classes/monk.js";
+import { monkSaveDC, monkPoolKey } from "@/lib/classes/ki-focus.js";
 
-// Renamed for #1499 (the old name cited only the 2024 "Focus" pool). SRD 5.1
-// "Ki save DC = 8 + your proficiency bonus + your Wisdom modifier" (PHB'14
-// p.78) and SRD 5.2 "Focus save DC = 8 + Wisdom modifier + Proficiency Bonus"
-// (PHB'24 p.88) are the identical formula, so this takes no `edition`.
+// SRD 5.1 PHB'14 p.78 / SRD 5.2 PHB'24 p.88 — identical formula, no edition fork needed.
 describe("monkSaveDC (SRD 5.1 Ki save DC / SRD 5.2 Focus save DC: 8 + prof + Wis)", () => {
   it("computes 8 + proficiency + Wisdom modifier", () => {
     // Wis 16 → +3 mod, prof +3 (level 5-8) → 8 + 3 + 3 = 14.
@@ -29,9 +26,7 @@ describe("monkSaveDC (SRD 5.1 Ki save DC / SRD 5.2 Focus save DC: 8 + prof + Wis
   });
 });
 
-// #1313 D3: the Monk pool's vocabulary by edition — Ki Points (SRD 5.1 /
-// PHB'14 p.78) vs Focus Points (SRD 5.2 / PHB'24 p.88). Nothing consumes the
-// "ki" branch yet (#1500 wires up the 2014 monk's own pool under this key).
+// Ki Points (SRD 5.1 / PHB'14 p.78) vs Focus Points (SRD 5.2 / PHB'24 p.88).
 describe("monkPoolKey (#1313 D3)", () => {
   it('is "ki" for EDITION_2014', () => {
     expect(monkPoolKey("EDITION_2014")).toBe("ki");
@@ -42,11 +37,8 @@ describe("monkPoolKey (#1313 D3)", () => {
   });
 });
 
-// #1337: hasStunningStrike is the single source of the L5 gate — both
-// stunningStrikeRider and this module's own cast guard import it. No
-// numeric literal for the gate appears here; the boundary is derived from
-// STUNNING_STRIKE_LEVEL itself, so mutating that one constant would flip
-// both this assertion and the rider/guard together.
+// #1337: hasStunningStrike is the single source of the L5 gate, shared with
+// stunningStrikeRider — the boundary below is STUNNING_STRIKE_LEVEL itself, not a literal.
 describe("hasStunningStrike (#1337 shared gate)", () => {
   it("is false one level below the gate", () => {
     expect(hasStunningStrike(STUNNING_STRIKE_LEVEL - 1)).toBe(false);

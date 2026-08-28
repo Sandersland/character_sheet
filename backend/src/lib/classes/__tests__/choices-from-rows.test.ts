@@ -1,32 +1,24 @@
 import { describe, expect, it } from "vitest";
 
-import { choicesFromRows, type ChoiceCountTier, type ClassFeatureRow } from "@/lib/classes/class-feature-rows.js";
-import { monk } from "@/lib/classes/monk.js";
+import { choicesFromRows, type ClassFeatureRow } from "@/lib/classes/class-feature-rows.js";
+
+import { WAY_OF_THE_FOUR_ELEMENTS_ROWS } from "./test-feature-rows.fixture.js";
 
 function row(overrides: Partial<ClassFeatureRow> = {}): ClassFeatureRow {
   return { name: "Test Feature", level: 1, description: "test description", edition: "EDITION_2024", ...overrides };
 }
 
-const FOUR_ELEMENTS_TIERS: ChoiceCountTier[] = [
-  { minLevel: 3, count: 1 },
-  { minLevel: 6, count: 2 },
-  { minLevel: 11, count: 3 },
-  { minLevel: 17, count: 4 },
-];
+const disciple = WAY_OF_THE_FOUR_ELEMENTS_ROWS.find((r) => r.name === "Disciple of the Elements");
+if (!disciple) throw new Error("fixture missing Disciple of the Elements row");
+const fourElementsRow = (): ClassFeatureRow => disciple;
 
-function fourElementsRow(edition: ClassFeatureRow["edition"] = "EDITION_2014"): ClassFeatureRow {
-  return row({
-    name: "Disciple of the Elements",
-    level: 3,
-    edition,
-    choiceKey: "fourElementsDisciplines",
-    choiceLabel: "Elemental Disciplines",
-    choiceCatalogSource: "discipline",
-    choiceCountTiers: FOUR_ELEMENTS_TIERS,
-  });
-}
-
-const fourElementsDef = monk.subclasses!["way of the four elements"].choices![0];
+// Independent oracle (not copied from the row) — PHB'14 pp. 78, 80: 1/2/3/4 discipline slots at L3/6/11/17.
+const fourElementsDef = {
+  key: "fourElementsDisciplines",
+  label: "Elemental Disciplines",
+  catalogSource: "discipline",
+  count: (level: number) => (level >= 17 ? 4 : level >= 11 ? 3 : level >= 6 ? 2 : level >= 3 ? 1 : 0),
+};
 
 const FOUR_TIER_CHOICE_SHAPE: { key: string; label: string; catalogSource: string; count: (level: number) => number }[] = [
   { key: "tierOne", label: "Tier One", catalogSource: "tierOne", count: (l) => (l >= 3 ? 1 : 0) },
@@ -37,7 +29,7 @@ const FOUR_TIER_CHOICE_SHAPE: { key: string; label: string; catalogSource: strin
 const FOUR_TIER_LEVELS = [3, 7, 11, 15];
 
 describe("choicesFromRows (#899/#1522) — the row-driven SubclassChoice vocabulary", () => {
-  describe("Four Elements shape: deep-equal against monk.ts's declaration through deriveSubclassChoiceList's own math", () => {
+  describe("Four Elements shape: deep-equal against the seeded row's own tier table", () => {
     for (const level of [2, 3, 5, 6, 10, 11, 16, 17, 20]) {
       it(`level ${level}`, () => {
         const resolved = choicesFromRows([fourElementsRow()], level, "EDITION_2014");
@@ -75,7 +67,7 @@ describe("choicesFromRows (#899/#1522) — the row-driven SubclassChoice vocabul
   });
 
   it("edition filtering: a 2014-tagged choice row is invisible to a 2024 derive", () => {
-    expect(choicesFromRows([fourElementsRow("EDITION_2014")], 10, "EDITION_2024")).toEqual([]);
+    expect(choicesFromRows([fourElementsRow()], 10, "EDITION_2024")).toEqual([]);
   });
 
   it("below-first-tier yields no entry", () => {

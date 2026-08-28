@@ -6,11 +6,11 @@
 set -eu
 
 ALL_CLASSES="barbarian bard cleric druid fighter monk paladin ranger rogue sorcerer warlock wizard"
-NOT_YET_MIGRATED="monk"
+NOT_YET_MIGRATED=""
 
 # Every OTHER backend/src/lib/classes/*.ts file (shared infrastructure, not a
 # per-class module) — kept in sync with the tree by the reverse check below.
-NON_CLASS_MODULES="ability-registry actions activation-requires announce-augmentors arcane-charge assassinate channel-divinity class class-feature-rows class-features disciplines draconic-bloodline feature-rows-select focus-cast font-of-magic hand-of-harm hand-of-ultimate-mercy heightened-focus improved-shadow-step maneuver-effect maneuvers open-hand-technique physicians-touch quivering-palm registry resources resources-state shadow-arts sneak-attack stunning-strike subclass-slug types warrior-of-elements weapon-bond"
+NON_CLASS_MODULES="ability-registry actions activation-requires announce-augmentors arcane-charge assassinate channel-divinity class class-feature-rows class-features disciplines draconic-bloodline feature-rows-select focus-cast font-of-magic hand-of-harm hand-of-ultimate-mercy heightened-focus improved-shadow-step ki-focus maneuver-effect maneuvers open-hand-technique physicians-touch quivering-palm registry resources resources-state shadow-arts sneak-attack stunning-strike subclass-slug types warrior-of-elements weapon-bond"
 
 # Reverse check: every backend/src/lib/classes/*.ts file's basename must be
 # classified as EITHER a class (ALL_CLASSES) or shared infrastructure
@@ -100,6 +100,23 @@ fi
 #   backend/src/lib/character/character-create.ts          # No destination column yet: Magic Initiate class-by-background map
 #   frontend/src/features/entities/CampaignItemFields.tsx  # PERMANENT: UI placeholder copy, not rule code
 #   frontend/src/lib/spellList.ts                          # Debt: tracked frontend rule mirror (#1383)
+#   backend/src/lib/character/character-serialize.ts       # PERMANENT: Stunning Strike/Open Hand Technique/Quivering Palm rider assembly, scoped to their own class entry (#1337)
+#   backend/src/lib/classes/disciplines.ts                 # PERMANENT: Way of the Four Elements discipline-cast rule fn, scoped to its own class entry (#1503)
+#   backend/src/lib/classes/hand-of-harm.ts                # PERMANENT: Hand of Harm live-play rule fn, scoped to its own class entry (#1248)
+#   backend/src/lib/classes/hand-of-ultimate-mercy.ts      # PERMANENT: Hand of Ultimate Mercy live-play rule fn, scoped to its own class entry (#1248)
+#   backend/src/lib/classes/improved-shadow-step.ts        # PERMANENT: Improved Shadow Step announce-augmentor rule fn (#1246)
+#   backend/src/lib/classes/open-hand-technique.ts         # PERMANENT: Open Hand Technique live-play rule fn, scoped to its own class entry (#1245)
+#   backend/src/lib/classes/physicians-touch.ts            # PERMANENT: Physician's Touch announce-augmentor rule fn (#1248)
+#   backend/src/lib/classes/quivering-palm.ts              # PERMANENT: Quivering Palm live-play rule fn, scoped to its own class entry (#1245)
+#   backend/src/lib/classes/shadow-arts.ts                 # PERMANENT: Shadow Arts/Cloak of Shadows cast rule fn, scoped to its own class entry (#1246/#1502)
+#   backend/src/lib/classes/stunning-strike.ts             # PERMANENT: Stunning Strike live-play rule fn, scoped to its own class entry (#1242)
+#   backend/src/lib/classes/warrior-of-elements.ts         # PERMANENT: Elemental Burst/Elemental Strike live-play rule fn, scoped to its own class entry (#1247)
+#   backend/src/lib/srd/weapon-damage.ts                   # PERMANENT: Martial Arts die / Empowered Strikes rule fn (#1500)
+#   backend/src/routes/character/actions.ts                # PERMANENT: Heightened Focus temp-HP roll, scoped to its own class entry (#1244)
+#   frontend/src/features/class/FourElementsSection.tsx    # Debt: tracked frontend rule mirror (#1383) — the 3rd/6th/11th/17th cadence string mirrors choiceCountTiers; deriving it needs the tier levels on the wire
+#   frontend/src/features/session/StunningStrikeSection.tsx # Debt: tracked frontend rule mirror (#1383, live bug #1970) — the copy is edition-blind ("focus" for a 2014 ki monk)
+#   frontend/src/features/session/actionResolvers.ts       # Debt: tracked frontend rule mirror (#1383) — Wholeness of Body's flat heal formula
+#   frontend/src/lib/deflectAttacks.ts                     # PERMANENT: client-rolled Deflect Missiles/Attacks narration (#1241/#1500/#1505)
 FILE_ALLOWLIST="backend/src/lib/classes/subclass-slug.ts
 backend/src/lib/classes/actions.ts
 backend/src/lib/character/serialize/combat.ts
@@ -115,7 +132,24 @@ backend/src/lib/classes/channel-divinity.ts
 backend/src/lib/combat/rest.ts
 backend/src/lib/character/character-create.ts
 frontend/src/features/entities/CampaignItemFields.tsx
-frontend/src/lib/spellList.ts"
+frontend/src/lib/spellList.ts
+backend/src/lib/character/character-serialize.ts
+backend/src/lib/classes/disciplines.ts
+backend/src/lib/classes/hand-of-harm.ts
+backend/src/lib/classes/hand-of-ultimate-mercy.ts
+backend/src/lib/classes/improved-shadow-step.ts
+backend/src/lib/classes/open-hand-technique.ts
+backend/src/lib/classes/physicians-touch.ts
+backend/src/lib/classes/quivering-palm.ts
+backend/src/lib/classes/shadow-arts.ts
+backend/src/lib/classes/stunning-strike.ts
+backend/src/lib/classes/warrior-of-elements.ts
+backend/src/lib/srd/weapon-damage.ts
+backend/src/routes/character/actions.ts
+frontend/src/features/class/FourElementsSection.tsx
+frontend/src/features/session/StunningStrikeSection.tsx
+frontend/src/features/session/actionResolvers.ts
+frontend/src/lib/deflectAttacks.ts"
 
 is_allowlisted_file() {
   target="$1"

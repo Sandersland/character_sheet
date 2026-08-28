@@ -1,19 +1,10 @@
 // Seed-time content validation (#1277). Malformed catalog content fails the
 // seed with a row-indexed message instead of writing a broken row that only
-// 500s later at read time (the #1247/#1370 failure class this closes for the
-// families registered here). Composes zod schemas that live co-located with
-// their content (subclasses.ts's subclassSeedSchema, subclass-granted-
-// spells.ts's twin) rather than one central schema file, so a family's schema
-// changes in the same diff as its content shape.
-//
-// SEED_FAMILIES is a registry, not a hardcoded list of calls — adding a
-// family is one entry here, demonstrated by the second member (SUBCLASS_
-// GRANTED_SPELLS) landing alongside the first, not merely asserted, the third
-// (CLASS_FEATURES, #1523) landing the same way, the fourth
-// (STARTING_EQUIPMENT_PACKAGES, #1533), and SUBCLASS_SPELL_LIST_EXPANSIONS
-// (#1631, SUBCLASS_GRANTED_SPELLS' sibling family) too. The other seed
-// families already carry structural coverage via seed-data.test.ts and are a
-// named follow-up.
+// 500s later at read time. Composes zod schemas that live co-located with
+// their content (e.g. subclasses.ts's subclassSeedSchema) rather than one
+// central schema file, so a family's schema changes in the same diff as its
+// content shape. SEED_FAMILIES is a registry, not a hardcoded list of calls —
+// adding a family is one entry here.
 import { z } from "zod";
 
 import { SUBCLASSES, subclassSeedSchema } from "./subclasses.js";
@@ -45,24 +36,20 @@ const SEED_FAMILIES: Record<string, SeedFamily> = {
   SUBCLASS_SPELL_LIST_EXPANSIONS: { schema: subclassSpellListExpansionSeedSchema, rows: SUBCLASS_SPELL_LIST_EXPANSIONS },
   CLASS_FEATURES: { schema: classFeatureSeedSchema, rows: CLASS_FEATURES },
   STARTING_EQUIPMENT_PACKAGES: { schema: startingEquipmentSeedSchema, rows: STARTING_EQUIPMENT_PACKAGES },
-  // #1565 — the background twin, validated by the same tree shape
-  // (backgroundStartingEquipmentSeedSchema) keyed by backgroundName instead
-  // of className.
+  // The background twin, validated by the same tree shape keyed by
+  // backgroundName instead of className (#1565).
   BACKGROUND_STARTING_EQUIPMENT_PACKAGES: {
     schema: backgroundStartingEquipmentSeedSchema,
     rows: BACKGROUND_STARTING_EQUIPMENT_PACKAGES,
   },
-  // #1679 — speciesSeedSchema validates the nested variants array too (each
-  // SPECIES row embeds its own variants), so no separate SPECIES_VARIANTS
-  // family is needed.
+  // speciesSeedSchema validates the nested variants array too, so no separate
+  // SPECIES_VARIANTS family is needed.
   SPECIES: { schema: speciesSeedSchema, rows: SPECIES },
-  // #1682 — trait content; cross-referenced against SPECIES below (a
-  // speciesSlug/variantSlug typo is a broken FK resolution at seed time
-  // otherwise, not a zod-catchable shape error).
+  // Cross-referenced against SPECIES below: a speciesSlug/variantSlug typo is
+  // a broken FK resolution at seed time otherwise, not a zod-catchable shape error.
   SPECIES_TRAITS: { schema: speciesTraitSeedSchema, rows: SPECIES_TRAITS },
-  // #1683 — 2024 lineage/legacy spell tracks; cross-referenced against SPECIES
-  // (variant must exist) and SPELLS (spellName must resolve) below, the same
-  // "zod catches shape, assertX catches FK typos" split as SPECIES_TRAITS.
+  // Cross-referenced against SPECIES (variant must exist) and SPELLS
+  // (spellName must resolve) below, same split as SPECIES_TRAITS.
   SPECIES_GRANTED_SPELLS: { schema: speciesGrantedSpellSeedSchema, rows: SPECIES_GRANTED_SPELLS },
 };
 
@@ -71,12 +58,10 @@ export interface SeedValidationSummary {
   rowsChecked: number;
 }
 
-// Split into one function per tree level — purely to keep each function's
-// cyclomatic/cognitive complexity low: prisma/seed/** carries no coverage
-// instrumentation (vitest.config.ts's coverage `include` is `src/**/*.ts`
-// only), so a single triple-nested-loop version of this floors at the
-// uncovered-CRAP formula regardless of real test coverage — the same reason
-// collectClassPairCounts/pairCount (seed-class-features.ts) are split out.
+// Split into one function per tree level to keep cyclomatic/cognitive
+// complexity low: prisma/seed/** carries no coverage instrumentation, so a
+// single triple-nested-loop version floors at the uncovered-CRAP formula
+// regardless of real test coverage.
 //
 // Typed against `package` alone (StartingEquipmentSeed and
 // BackgroundStartingEquipmentSeed's shared ClassStartingEquipment tree, #1565)
@@ -91,11 +76,9 @@ function catalogNamesInGroup(group: PackageTree["groups"][number]): string[] {
   return group.options.flatMap(catalogNamesInOption);
 }
 
-// Every catalogName a STARTING_EQUIPMENT_PACKAGES/BACKGROUND_STARTING_
-// EQUIPMENT_PACKAGES row references, walking the nested group -> option ->
-// items tree. Pure and literal-vs-literal (#1533 [R3]): assertSeedContentValid
-// runs at seed.ts:459, BEFORE seedClasses/seedItems/seedPacks, so it cannot
-// query the database — it fails the seed before anything is written instead.
+// Pure (#1533 [R3]): assertSeedContentValid runs BEFORE seedClasses/
+// seedItems/seedPacks, so this can't query the database — it fails the seed
+// before anything is written instead.
 function collectCatalogNames(rows: readonly { package: PackageTree }[]): string[] {
   return rows.flatMap((row) => row.package.groups.flatMap(catalogNamesInGroup));
 }
@@ -104,12 +87,8 @@ function collectCatalogNames(rows: readonly { package: PackageTree }[]): string[
 // FIRST, then Item — so a catalogName is valid if it resolves against EITHER
 // catalog. All seven packs also exist as ITEMS rows today (#1533 [R4]), so an
 // Item-only check would pass by luck and only diverge the first time they do.
-// Exported so a test can call it against a FIXTURE row with a nonexistent
-// catalogName (never the real seed content) — same "broken fixture, never
-// real content" pattern subclassSeedSchema's test uses below. `familyName`
-// (#1565) names the offending family in the thrown message — STARTING_
-// EQUIPMENT_PACKAGES for the class family, BACKGROUND_STARTING_EQUIPMENT_
-// PACKAGES for the background one — since one function now serves both.
+// `familyName` (#1565) names the offending family in the thrown message,
+// since one function now serves both the class and background packages.
 export function assertCatalogNamesResolve(
   rows: readonly { package: PackageTree }[],
   familyName = "STARTING_EQUIPMENT_PACKAGES",
@@ -122,14 +101,10 @@ export function assertCatalogNamesResolve(
   }
 }
 
-// A variantSlug (when given) must name a real variant of its species. Split
-// out of assertSpeciesTraitsResolve to keep every seed validator under the
-// seed-file cyclomatic budget (CC <= 4): they run uncovered in globalSetup, so
-// CRAP is complexity-driven and CC 5+ crosses the ceiling (#1682/#1679).
 // Shared variant-slug resolution check for the SpeciesTrait and
-// SpeciesGrantedSpell seed validators (#1682/#1683): variantSlug must name a
-// real variant of its species. `context` identifies the calling row for the
-// error message (e.g. "SPECIES_TRAITS[3]").
+// SpeciesGrantedSpell seed validators (#1682/#1683) — split out to keep every
+// seed validator under the seed-file cyclomatic budget (CC <= 4). `context`
+// identifies the calling row for the error message (e.g. "SPECIES_TRAITS[3]").
 function assertVariantSlugKnown(species: (typeof SPECIES)[number], variantSlug: string, context: string): void {
   if (!(species.variants ?? []).some((v) => v.slug === variantSlug)) {
     throw new Error(
@@ -169,23 +144,18 @@ function assertSpeciesTraitRowResolves(
   seen.add(key);
 }
 
-// Every (speciesSlug, speciesEdition) a SPECIES_TRAITS row names must resolve
-// against SPECIES, and a variantSlug (when given) against that species' own
-// variants — the #1682 twin of assertCatalogNamesResolve above, catching a
-// typo'd slug before seedSpeciesTraits' DB-backed resolveTarget throws a much
-// less specific runtime error mid-seed. Also rejects two rows sharing the
-// same (speciesSlug, speciesEdition, variantSlug, name).
+// The #1682 twin of assertCatalogNamesResolve above — catches a typo'd slug
+// before seedSpeciesTraits' DB-backed resolveTarget throws a less specific
+// runtime error mid-seed.
 function assertSpeciesTraitsResolve(speciesRows: typeof SPECIES, traitRows: typeof SPECIES_TRAITS): void {
   const speciesByKey = new Map(speciesRows.map((s) => [`${s.slug}::${s.edition}`, s]));
   const seen = new Set<string>();
   traitRows.forEach((trait, index) => assertSpeciesTraitRowResolves(trait, index, speciesByKey, seen));
 }
 
-// One SPECIES_GRANTED_SPELLS row: its species must resolve, its variant must
-// resolve (every row this slice is variant-level, #1683), and its spellName
-// must name a real SPELLS catalog entry — the #1683 twin of
-// assertSpeciesTraitRowResolves above, catching a typo'd slug/name before
-// seedSpeciesGrantedSpells' DB-backed resolution throws a less specific error.
+// The #1683 twin of assertSpeciesTraitRowResolves above — catches a typo'd
+// slug/name before seedSpeciesGrantedSpells' DB-backed resolution throws a
+// less specific error. Every row this slice grants is variant-level.
 function assertSpeciesGrantedSpellRowResolves(
   grant: (typeof SPECIES_GRANTED_SPELLS)[number],
   index: number,
@@ -224,8 +194,7 @@ interface PoolDeclaringRowCandidate {
 
 // "Pool-declaring" means resourceKey AND a populated resourceTotals — an
 // identity-only resourceKey (Metamagic's own pattern, #1909) never contends
-// here, matching findOverrideRow's own tierAt-reachability guard
-// (class-feature-rows.ts).
+// here, matching findOverrideRow's own tierAt-reachability guard.
 function isPoolDeclaringRow(row: PoolDeclaringRowCandidate): boolean {
   return Boolean(row.resourceKey) && Boolean(row.resourceTotals?.length);
 }
@@ -234,13 +203,10 @@ function poolDeclaringRowKey(row: PoolDeclaringRowCandidate): string {
   return `${row.className}::${row.subclassSlug ?? "null"}::${row.resourceKey}::${row.edition}`;
 }
 
-// #906: poolsFromRows' inbound-subclass override (class-feature-rows.ts's
-// findOverrideRow) picks its target via the FIRST matching row — two
+// #906: findOverrideRow picks its target via the FIRST matching row — two
 // pool-declaring rows sharing (class, subclass, resourceKey, edition) would
 // let seed content ORDER silently decide which one wins, an ambiguity no
-// per-row schema can catch. Split into isPoolDeclaringRow/poolDeclaringRowKey
-// above to keep this loop's own cyclomatic count low (seed/** has no
-// coverage instrumentation, so CRAP floors at CC^2+CC).
+// per-row schema can catch.
 export function assertNoDuplicatePoolDeclaringRows(rows: readonly PoolDeclaringRowCandidate[]): void {
   const rowsByKey = new Map<string, number>();
   rows.forEach((row, index) => {
@@ -286,21 +252,16 @@ export function assertNoDuplicateChoiceDeclaringRows(rows: readonly ChoiceDeclar
 }
 
 /**
- * Validates every registered family's rows against its schema, throwing on the
- * FIRST invalid row with its family/index/path so the failure names the
- * offender. Also enforces cross-row invariants no per-row schema can express:
- * two SUBCLASSES rows must never share a slug (M2, #1277) — a duplicate would
- * silently collapse two subclasses' seeded content onto one DB row under the
- * new slug_edition unique index — every STARTING_EQUIPMENT_PACKAGES
- * catalogName must resolve against ITEMS ∪ PACKS (#1533 [R3]/[R4]), no two
- * CLASS_FEATURES rows may both declare the same pool
- * (assertNoDuplicatePoolDeclaringRows above), and no two may both declare the
- * same choice key (assertNoDuplicateChoiceDeclaringRows above, #899/#1522).
+ * Validates every registered family's rows against its schema, throwing on
+ * the FIRST invalid row with its family/index/path. Also enforces cross-row
+ * invariants no per-row schema can express: two SUBCLASSES rows must never
+ * share a slug (a duplicate would silently collapse two subclasses' seeded
+ * content onto one DB row), every STARTING_EQUIPMENT_PACKAGES catalogName
+ * must resolve against ITEMS ∪ PACKS, and no two CLASS_FEATURES rows may
+ * declare the same pool or the same choice key.
  *
  * Returns a summary so a permanent test can assert this function actually
- * visited real content (families/rows counts) rather than reporting "valid"
- * vacuously — the #1370 lesson: a validator that short-circuits, has an empty
- * registry, or is `.optional()` all the way down must fail that test.
+ * visited real content, rather than reporting "valid" vacuously (#1370).
  */
 export function assertSeedContentValid(): SeedValidationSummary {
   let rowsChecked = 0;
@@ -332,11 +293,10 @@ export function assertSeedContentValid(): SeedValidationSummary {
   assertNoDuplicatePoolDeclaringRows(CLASS_FEATURES);
   assertNoDuplicateChoiceDeclaringRows(CLASS_FEATURES);
 
-  // #1679: no two SPECIES rows may share (slug, edition) — the same M2 role
-  // as the SUBCLASSES slug check above, catching what @@unique([slug,
-  // edition]) would otherwise surface as an opaque P2002 mid-seed. Nested
-  // variant slugs are checked per-species, since @@unique([speciesId, slug])
-  // scopes uniqueness to the parent, not the whole table.
+  // No two SPECIES rows may share (slug, edition), catching what
+  // @@unique([slug, edition]) would otherwise surface as an opaque P2002
+  // mid-seed. Nested variant slugs are checked per-species, since
+  // @@unique([speciesId, slug]) scopes uniqueness to the parent, not the whole table.
   const rowsBySpeciesKey = new Map<string, number>();
   SPECIES.forEach((species, index) => {
     const key = `${species.slug}::${species.edition}`;

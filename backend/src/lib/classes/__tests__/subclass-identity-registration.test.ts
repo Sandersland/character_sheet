@@ -3,8 +3,6 @@ import { describe, expect, it } from "vitest";
 import type { RulesEdition } from "@character-sheet/shared-types";
 
 import { deriveResources } from "@/lib/classes/class-features.js";
-import { monk } from "@/lib/classes/monk.js";
-import { SUBCLASS_IDENTITY } from "@/lib/classes/subclass-slug.js";
 import type { ClassDefinition } from "@/lib/classes/types.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 
@@ -142,35 +140,14 @@ describe("real registry: the overlay still wins for every class still on the TS 
   });
 });
 
-// SUBCLASS_IDENTITY seeds SUBCLASSES by nameKey; each TS ClassDefinition's
-// map then overlays it only while the two spellings agree. Diverge them and
-// both survive under different keys, so a persisted subclass silently
-// resolves to the poorer identity-only stub.
-const TS_REGISTERED_CLASSES: Record<string, ClassDefinition> = {
-  monk,
-};
+// No class has a TS subclasses map left to check against SUBCLASS_IDENTITY's nameKey, so this stays empty.
+const TS_REGISTERED_CLASSES: Record<string, ClassDefinition> = {};
 
 describe("#1557 review — the SUBCLASSES overlay's key-equality invariant", () => {
-  it("every TS subclass map key is exactly the nameKey its own declared slug resolves to", () => {
-    const mismatches: string[] = [];
-    for (const [classKey, def] of Object.entries(TS_REGISTERED_CLASSES)) {
-      for (const [mapKey, subclassDef] of Object.entries(def.subclasses ?? {})) {
-        const identity = SUBCLASS_IDENTITY[subclassDef.slug];
-        if (identity.nameKey !== mapKey || identity.classKey !== classKey) {
-          mismatches.push(
-            `${classKey}.subclasses["${mapKey}"] declares slug "${subclassDef.slug}", whose identity is ${identity.classKey}/"${identity.nameKey}"`,
-          );
-        }
-      }
-    }
-    expect(mismatches).toEqual([]);
-  });
-
-  // Ties to CLASS_SUBCLASSES so a class added to CLASSES but omitted here
-  // fails visibly instead of silently losing coverage.
-  it("covers every class in CLASS_SUBCLASSES except Fighter, Barbarian, Rogue, Cleric, Warlock, Wizard, Sorcerer, Bard, Paladin, Druid and Ranger, which have no TS module", () => {
+  // Ties to CLASS_SUBCLASSES so a class added to CLASSES but omitted here fails visibly.
+  it("covers every class in CLASS_SUBCLASSES except Fighter, Barbarian, Rogue, Cleric, Warlock, Wizard, Sorcerer, Bard, Paladin, Druid, Ranger and Monk, which have no TS module", () => {
     expect(
-      new Set([...Object.keys(TS_REGISTERED_CLASSES), "fighter", "barbarian", "rogue", "cleric", "warlock", "wizard", "sorcerer", "bard", "paladin", "druid", "ranger"]),
+      new Set([...Object.keys(TS_REGISTERED_CLASSES), "fighter", "barbarian", "rogue", "cleric", "warlock", "wizard", "sorcerer", "bard", "paladin", "druid", "ranger", "monk"]),
     ).toEqual(new Set(Object.keys(CLASS_SUBCLASSES)));
   });
 });

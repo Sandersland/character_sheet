@@ -1,13 +1,10 @@
-// --- Generic subclass "choose N" option catalog (#899) ----------------------
 // Options for the data-driven subclass choice mechanism (SubclassChoice in
 // classes/types.ts), seeded as GrantedAbility rows keyed by `source` = the
-// choice's catalogSource. These are plain descriptive features — no cost/effect
+// choice's catalogSource. Plain descriptive features — no cost/effect
 // columns; the only per-character state is which option was picked
-// (Character.resources.choicesKnown[choiceKey]).
-//
-// A new "choose N" feature (Barbarian totems, Sorcerer Metamagic, Warlock
-// Invocations) is added by declaring a SubclassChoice on its subclass and adding
-// its options here — no new reconciler or state key.
+// (Character.resources.choicesKnown[choiceKey]). A new "choose N" feature is
+// added by declaring a SubclassChoice on its subclass and adding its options
+// here — no new reconciler or state key.
 
 import type { SeedEdition } from "./edition.js";
 
@@ -25,7 +22,6 @@ export interface SubclassChoiceOptionSeed {
 
 // SRD 5.1 pp. 37-38 (EDITION_2014/shared rows below); SRD 5.2 p. 61 (EDITION_2024 forks).
 export const SUBCLASS_CHOICE_OPTIONS: SubclassChoiceOptionSeed[] = [
-  // Ranger — Hunter: Hunter's Prey (L3, choose one).
   {
     name: "Colossus Slayer",
     source: "huntersPrey",
@@ -67,7 +63,6 @@ export const SUBCLASS_CHOICE_OPTIONS: SubclassChoiceOptionSeed[] = [
       "Once on each of your turns when you make an attack with a weapon, you can make another attack with the same weapon against a different creature that is within 5 feet of the original target, that is within the weapon's range, and that you haven't attacked this turn.",
   },
 
-  // Ranger — Hunter: Defensive Tactics (L7, choose one).
   {
     name: "Escape the Horde",
     source: "defensiveTactics",
@@ -105,8 +100,7 @@ export const SUBCLASS_CHOICE_OPTIONS: SubclassChoiceOptionSeed[] = [
     description: "You have advantage on saving throws against being frightened.",
   },
 
-  // Ranger — Hunter: Multiattack (L11, choose one; 2014-only — 2024's
-  // Superior Hunter's Prey replaces this slot with a fixed feature).
+  // 2014-only: 2024's Superior Hunter's Prey replaces this slot with a fixed feature.
   {
     name: "Volley",
     source: "hunterMultiattack",
@@ -124,8 +118,7 @@ export const SUBCLASS_CHOICE_OPTIONS: SubclassChoiceOptionSeed[] = [
       "You can use your action to make a melee attack against any number of creatures within 5 feet of you, with a separate attack roll for each target.",
   },
 
-  // Ranger — Hunter: Superior Hunter's Defense (L15, choose one; 2014-only —
-  // 2024's Superior Hunter's Defense is a single fixed Reaction, not a choice).
+  // 2014-only: 2024's Superior Hunter's Defense is a single fixed Reaction, not a choice.
   {
     name: "Evasion",
     source: "superiorHuntersDefense",

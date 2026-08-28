@@ -1,12 +1,6 @@
 /**
- * Wholeness of Body route tests (#1245) — the Warrior of the Open Hand's
- * Bonus-Action heal exercised through the real HTTP stack (POST
- * /api/characters/:id/actions/transactions), mirroring
- * actions-monk-focus.test.ts's pattern for the Monk's own resource pools.
- *
  * SRD 5.2: Bonus Action, regain Martial Arts die + Wisdom modifier HP; usable
- * max(1, Wis mod) times per long rest (the #1228 wholenessOfBody pool this
- * spends already encodes that count — see monk.ts's subclass resourceFn).
+ * max(1, Wis mod) times per long rest.
  */
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -24,8 +18,7 @@ const MONK_ID = "test-actions-wholeness-of-body";
 const MONK_CATALOG_NAME = "Actions Wholeness Of Body Test Monk";
 let monkClassId: string;
 
-// XP threshold for level 6 (single-class).
-const L6_XP = 14000;
+const L6_XP = 14000; // single-class monk level 6
 
 const MONK_BASE = {
   id: MONK_ID,
@@ -54,14 +47,35 @@ interface ActivityEvent {
   data?: Record<string, unknown>;
 }
 
+async function seedWholenessOfBodyRow(classId: string): Promise<string> {
+  const existing = await prisma.subclass.findFirst({ where: { classId, slug: "actions-wholeness-of-body-route-test" } });
+  const sub =
+    existing ??
+    (await prisma.subclass.create({
+      data: { classId, name: "Warrior of the Open Hand Route Test", description: "Test fixture subclass.", slug: "actions-wholeness-of-body-route-test" },
+    }));
+  await prisma.classFeature.deleteMany({ where: { subclassId: sub.id } });
+  await prisma.classFeature.create({
+    data: {
+      classId, subclassId: sub.id, name: "Wholeness of Body", level: 6, edition: "EDITION_2024",
+      description: "row text",
+      resourceKey: "wholenessOfBody", resourceRecharge: "longRest",
+      resourceTotals: [{ minLevel: 6, total: { abilityMod: "wisdom", min: 1 } }],
+      activationCost: "bonusAction", costKind: "pool", costPoolKey: "wholenessOfBody", costBase: 1,
+    },
+  });
+  return sub.id;
+}
+
 async function createMonk() {
+  const subclassId = await seedWholenessOfBodyRow(monkClassId);
   await prisma.character.create({
     data: {
       ...MONK_BASE,
       experiencePoints: L6_XP,
       ownerId: OWNER_ID,
       classEntries: {
-        create: [{ name: "monk", classId: monkClassId, position: 0, level: 6, subclass: "Warrior of the Open Hand" }],
+        create: [{ name: "monk", classId: monkClassId, subclassId, position: 0, level: 6, subclass: "Warrior of the Open Hand" }],
       },
     },
   });

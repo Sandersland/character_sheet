@@ -1,20 +1,3 @@
-/**
- * Generic subclass "choose N" mechanism (#899).
- *
- * Exercises the data-driven choice pipeline end-to-end against real Postgres:
- *   - GET /api/subclass-choices/:source lists the seeded option catalog
- *   - resources.subclassChoices surfaces only the choices reached at this level
- *   - learn/forgetSubclassChoice ops (cap, wrong-catalog, dedup, custom)
- *   - reconcileSubclassChoices trims on level-down (tier lost, then subclass lost)
- *
- * Fixture: a Ranger whose "hunter" subclass declares choose-ones (Hunter's
- * Prey L3, Defensive Tactics L7 — both editions; Multiattack L11 and Superior
- * Hunter's Defense L15 are 2014-only, #1230/#899's edition-honest 2024
- * narrowing). This suite creates 2024 characters (no rulesEdition set, the
- * DB default), so only huntersPrey/defensiveTactics are ever reachable here.
- * The option rows come from the standard seed.
- */
-
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -28,7 +11,6 @@ import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 const OWNER_ID = "owner-subclass-choices";
 let COOKIE: string;
 
-// XP thresholds (levelForExperience): L1=0, L3=900, L7=23000, L11=85000, L15=165000.
 const XP_LVL_1 = 0;
 const XP_LVL_3 = 900;
 const XP_LVL_7 = 23000;
@@ -74,7 +56,6 @@ async function getCharacter() {
   return agent().get(`/api/characters/${FIXTURE_ID}`);
 }
 
-// Option ids resolved from the seeded catalog (source = catalogSource).
 let colossusSlayerId: string; // huntersPrey
 let hordeBreakerId: string; // huntersPrey
 let steelWillId: string; // defensiveTactics
@@ -87,12 +68,9 @@ async function createHunter(
   resourcesJson: Prisma.InputJsonValue | typeof Prisma.JsonNull,
   rulesEdition?: "EDITION_2014" | "EDITION_2024",
 ) {
-  // #1524: classId/subclassId resolved from the real seeded catalog rows —
-  // production always sets both (routes/character/class.ts, level-up.ts), and
-  // characterInclude's ClassFeature relations key off them, so a fixture that
-  // sets neither loses every feature (base AND subclass) under the new
-  // rows-fed derivation. The string "ranger"/"hunter" pair still separately
-  // drives deriveResources' pools/extras/gate — unaffected by these ids.
+  // classId/subclassId must come from the real seeded rows: characterInclude's
+  // ClassFeature relations key off them, so a fixture that omits them loses
+  // every feature (base and subclass).
   const rangerClass = await prisma.characterClass.findUniqueOrThrow({ where: { name: "Ranger" } });
   const hunterSubclass = await prisma.subclass.findFirstOrThrow({ where: { classId: rangerClass.id, name: "Hunter" }, orderBy: { id: "asc" } });
   return prisma.character.create({
@@ -117,10 +95,8 @@ async function createHunter(
 beforeAll(async () => {
   await ensureTestOwner(OWNER_ID);
   COOKIE = await authCookie(OWNER_ID);
-  // Colossus Slayer/Horde Breaker fork by edition (#1230) — this file's
-  // fixtures are all 2024 characters (no rulesEdition set), so resolve their
-  // EDITION_2024 row explicitly; an unqualified name lookup is now ambiguous
-  // between the two rows. Steel Will has no 2024 row, so its name is still unique.
+  // Colossus Slayer/Horde Breaker fork by edition (#1230), so their EDITION_2024
+  // row must be resolved explicitly; Steel Will has no 2024 row so its name stays unique.
   const byName = async (name: string, edition?: "EDITION_2014" | "EDITION_2024") => {
     const row = await prisma.grantedAbility.findFirst({ where: { name, ...(edition ? { edition } : {}) } });
     if (!row) throw new Error(`Seed missing GrantedAbility "${name}" — run prisma db seed`);
@@ -168,8 +144,8 @@ describe("GET /api/subclass-choices/:source", () => {
     expect(unknown.body.error).toMatch(/^Unknown edition: /);
   });
 
-  // #1412: fixture deleted by NAME in the finally, never by an id var that would
-  // read to Prisma as "no filter" if the create threw partway.
+  // Fixture cleanup deletes by NAME, never by an id var that would read to
+  // Prisma as "no filter" if the create threw partway.
   it("(#1412) silently omits a 2014-tagged option from a 2024 request and serves it to a 2014 one", async () => {
     const FIXTURE_NAME = "XEd Hunters Prey 2014";
     const row = await upsertEditionRow(
@@ -188,7 +164,6 @@ describe("GET /api/subclass-choices/:source", () => {
       const as2024 = await agent().get("/api/subclass-choices/huntersPrey?edition=EDITION_2024");
       expect(as2024.status).toBe(200);
       expect((as2024.body as { id: string }[]).some((o) => o.id === row.id)).toBe(false);
-      // Colossus Slayer's own EDITION_2024 row (a genuine text fork, #1230) still reaches this request.
       expect((as2024.body as { name: string }[]).map((o) => o.name)).toContain("Colossus Slayer");
 
       const as2014 = await agent().get("/api/subclass-choices/huntersPrey?edition=EDITION_2014");
@@ -240,9 +215,7 @@ describe("subclass choices — derivation + ops", () => {
   });
 
   it("rejects a malformed (non-UUID) optionId as a clean 400, not a 500", async () => {
-    // GrantedAbility.id is a `text` PK, so findUnique returns null for a garbage
-    // id (no Prisma P2023) and the catalog-membership guard yields a 400. Locks
-    // this against a future switch to a uuid-typed column silently 500ing.
+    // GrantedAbility.id is a text PK, so a garbage id resolves to null (no Prisma P2023) and 400s cleanly.
     const res = await post([{ type: "learnSubclassChoice", choiceKey: "huntersPrey", optionId: "not-a-real-uuid" }]);
     expect(res.status).toBe(400);
   });
@@ -252,12 +225,8 @@ describe("subclass choices — derivation + ops", () => {
     expect(res.status).toBe(400);
   });
 
-  // #1516: PHB'14 Way of the Four Elements p.81 / Battle Master p.73 bound a
-  // choose-N replacement to learn-time — this generic route is never a
-  // validated level-up step, so forgetSubclassChoice 400s here regardless of
-  // whether the entry actually exists. Only POST …/level-up/transactions (a
-  // canSwap-carrying "subclassChoice" step) can forget a choice — see
-  // level-up-transaction.test.ts's Way of the Four Elements swap suite.
+  // PHB'14 Way of the Four Elements p.81 / Battle Master p.73 bind a choose-N
+  // replacement to learn-time; only a level-up ceremony's "subclassChoice" step can forget a choice.
   it("400s forgetSubclassChoice — only reachable through a level-up ceremony step", async () => {
     const learn = await post([
       { type: "learnSubclassChoice", choiceKey: "defensiveTactics", custom: { name: "Homebrew Tactic", description: "Custom." } },
@@ -269,7 +238,6 @@ describe("subclass choices — derivation + ops", () => {
     const forget = await post([{ type: "forgetSubclassChoice", choiceKey: "defensiveTactics", entryId: entry.id }]);
     expect(forget.status).toBe(400);
     expect(forget.body.error).toMatch(/level-up ceremony/i);
-    // The learn is untouched — the op never reached applyForgetSubclassChoiceOp's mutation.
     const char = await agent().get(`/api/characters/${FIXTURE_ID}`);
     expect(resources(char).choicesKnown.defensiveTactics).toHaveLength(1);
   });
@@ -300,8 +268,7 @@ describe("subclass choices — level-down reconciliation", () => {
       where: { characterId: FIXTURE_ID, type: "subclassChoicesReconciled" },
     });
     expect(event?.summary).toBe("1 subclass choice removed — no longer available at this level");
-    // before must snapshot BOTH picks (guards the snapshot-ordering bug where the
-    // trim corrupts the before payload via a shared reference), after only huntersPrey.
+    // before must snapshot BOTH picks (guards against the trim corrupting it via a shared reference); after only huntersPrey.
     const before = (event?.before as { resources: { choicesKnown: Record<string, unknown[]> } }).resources;
     const after = (event?.after as { resources: { choicesKnown: Record<string, unknown[]> } }).resources;
     expect(Object.keys(before.choicesKnown).sort()).toEqual(["defensiveTactics", "huntersPrey"]);
@@ -319,14 +286,13 @@ describe("subclass choices — level-down reconciliation", () => {
       },
     });
 
-    // Same-level "set" still runs reconcileLevelGatedState (class-table-columns-reconcile.test.ts's pattern).
+    // A same-level XP "set" still runs reconcileLevelGatedState.
     const res = await setXp(XP_LVL_15);
     expect(res.status).toBe(200);
     const known = resources(res).choicesKnown;
     expect(known.huntersPrey).toHaveLength(1);
-    // #1968: reconcileSubclassChoices trims by CHOICE KEY only — defensiveTactics
-    // is still granted at L15, so this Steel Will pick (a 2014-only option) survives
-    // even though it's no longer offered to this 2024 character.
+    // #1968: reconcileSubclassChoices trims by CHOICE KEY only, so this Steel
+    // Will pick (2014-only) survives even though it's no longer offered to this 2024 character.
     expect(known.defensiveTactics).toHaveLength(1);
     expect(known.hunterMultiattack).toBeUndefined();
     expect(known.superiorHuntersDefense).toBeUndefined();
@@ -370,7 +336,7 @@ describe("2014 Hunter — hunterMultiattack/superiorHuntersDefense are reachable
       "EDITION_2014",
     );
 
-    const res = await setXp(XP_LVL_15); // same-level "set" still runs reconcileLevelGatedState
+    const res = await setXp(XP_LVL_15); // a same-level XP "set" still runs reconcileLevelGatedState
     expect(res.status).toBe(200);
     const known = resources(res).choicesKnown;
     expect(known.hunterMultiattack).toHaveLength(1);
