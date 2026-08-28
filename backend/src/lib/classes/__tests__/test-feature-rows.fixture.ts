@@ -1719,6 +1719,27 @@ export const CLERIC_TRICKERY_DOMAIN_ROWS: ClassFeatureRow[] = [
   },
 ];
 
+// Mirrors druid-features.ts's own WILD_SHAPE_* constants (#906/#1226) —
+// PHB'14 p.66: 2/short-or-long rest, unlimited (Archdruid) from level 20;
+// Duration is floor(level / 2) hours (minimum 1), shared by every Circle.
+const WILD_SHAPE_TOTALS: ClassFeatureRow["resourceTotals"] = [
+  { minLevel: 2, total: 2 },
+  { minLevel: 20, total: 99 },
+];
+const WILD_SHAPE_DURATION_TIERS = [
+  { minLevel: 2, label: "Duration", value: "1 hour(s)" },
+  { minLevel: 4, label: "Duration", value: "2 hour(s)" },
+  { minLevel: 6, label: "Duration", value: "3 hour(s)" },
+  { minLevel: 8, label: "Duration", value: "4 hour(s)" },
+  { minLevel: 10, label: "Duration", value: "5 hour(s)" },
+  { minLevel: 12, label: "Duration", value: "6 hour(s)" },
+  { minLevel: 14, label: "Duration", value: "7 hour(s)" },
+  { minLevel: 16, label: "Duration", value: "8 hour(s)" },
+  { minLevel: 18, label: "Duration", value: "9 hour(s)" },
+  { minLevel: 20, label: "Duration", value: "10 hour(s)" },
+];
+const WILD_SHAPE_UNLIMITED_USES_TIER = { minLevel: 20, label: "Uses", value: "Unlimited (Archdruid)" };
+
 // Tests assert null-ness/.length against a Druid circle directly, so the base
 // and both circles all need mirrors.
 export const DRUID_BASE_ROWS: ClassFeatureRow[] = [
@@ -1757,6 +1778,16 @@ export const DRUID_BASE_ROWS: ClassFeatureRow[] = [
     description:
       "As an action, transform into a beast you have seen. Max CR: 1/4 at L2 (no flying or swimming speed); 1/2 at L4 (no flying speed); 1 at L8. You retain your mental stats and class features but use the beast's physical stats. Lasts up to half your druid level in hours (minimum 1). Reverts when reduced to 0 HP.",
     resourceKey: "wildShape",
+    resourceLabel: "Wild Shape",
+    resourceRecharge: "short-or-long",
+    resourceTotals: WILD_SHAPE_TOTALS,
+    resourceDetailTiers: [
+      { minLevel: 2, label: "Max CR", value: "1/4 (no flying or swimming speed)" },
+      { minLevel: 4, label: "Max CR", value: "1/2 (no flying speed)" },
+      { minLevel: 8, label: "Max CR", value: "1" },
+      ...WILD_SHAPE_DURATION_TIERS,
+      WILD_SHAPE_UNLIMITED_USES_TIER,
+    ],
     activationCost: "action",
     costKind: "pool",
     costPoolKey: "wildShape",
@@ -1951,6 +1982,22 @@ export const CIRCLE_OF_THE_MOON_ROWS: ClassFeatureRow[] = [
     edition: "EDITION_2014",
     description:
       "You can use Wild Shape to transform into beasts with a challenge rating as high as 1 (instead of the base druid table). Starting at level 6, the max CR equals your druid level divided by 3 (rounded down, minimum 1).",
+    resourceKey: "wildShape",
+    resourceLabel: "Wild Shape",
+    resourceRecharge: "short-or-long",
+    resourceTotals: WILD_SHAPE_TOTALS,
+    resourceDetailTiers: [
+      { minLevel: 2, label: "Max CR", value: "1 (no flying or swimming speed)" },
+      { minLevel: 4, label: "Max CR", value: "1 (no flying speed)" },
+      { minLevel: 6, label: "Max CR", value: "2 (no flying speed)" },
+      { minLevel: 8, label: "Max CR", value: "2" },
+      { minLevel: 9, label: "Max CR", value: "3" },
+      { minLevel: 12, label: "Max CR", value: "4" },
+      { minLevel: 15, label: "Max CR", value: "5" },
+      { minLevel: 18, label: "Max CR", value: "6" },
+      ...WILD_SHAPE_DURATION_TIERS,
+      WILD_SHAPE_UNLIMITED_USES_TIER,
+    ],
   },
   {
     name: "Circle Forms",

@@ -1,6 +1,9 @@
 // The seeded CharacterClass.subclassLevel is the 2014 subclass-gate source
-// that survives a class module's deletion. This file's STILL_ON_TS_PATH cases
-// are the only place left that exercises the `?? def.grantLevel` fallback.
+// that survives a class module's deletion. STILL_ON_TS_PATH is empty now
+// that Druid's module is gone too — Ranger and Monk, the only classes still
+// on the TS path, already grant at level 3 (subclassGateLevel's own
+// default), so nothing left exercises the `?? def.grantLevel` fallback; the
+// array stays as the seat for a future TS class whose grantLevel differs.
 import { describe, expect, it } from "vitest";
 
 import type { RulesEdition } from "@character-sheet/shared-types";
@@ -26,13 +29,12 @@ const PHB14_GATE: Array<[string, string, number]> = [
 
 // Split only for the "no seeded value" fallback tests — every other test in
 // this file behaves identically whether the module exists or not.
-const STILL_ON_TS_PATH: Array<[string, string, number]> = [
-  ["druid", "circle of the land", 2],
-];
+const STILL_ON_TS_PATH: Array<[string, string, number]> = [];
 const MODULE_DELETED: Array<[string, string, number]> = [
   ["cleric", "life domain", 1],
   ["sorcerer", "draconic bloodline", 1],
   ["warlock", "the fiend", 1],
+  ["druid", "circle of the land", 2],
   ["wizard", "school of evocation", 2],
 ];
 

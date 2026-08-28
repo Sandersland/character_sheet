@@ -7,6 +7,12 @@
 // mirror-sourced (owner decision) — see CIRCLE_OF_THE_MOON_RAW's own comment.
 // A feature removed in 2024 keeps its 2014 row and gets no 2024 row; a rename
 // or a level shift is a wholly new row, never one edited in place.
+// Wild Shape's EDITION_2014 pool (base row below) and Circle of the Moon's
+// own override of it (CIRCLE_OF_THE_MOON_RAW's Circle Forms row) are the
+// first rows to use poolsFromRows' overrideRows mechanism (class-feature-
+// rows.ts, #906/#1226): the Moon row declares the SAME resourceKey with its
+// own totals/details, and deriveBaseLayer resolves the base pool from it
+// instead whenever Circle of the Moon is the active subclass.
 import type { ResourceTotalFormula } from "../../src/lib/classes/class-feature-rows.js";
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { SeedEdition } from "./edition.js";
@@ -28,12 +34,34 @@ interface RawDruidFeature {
   resourceLabel?: string;
   resourceRecharge?: string;
   resourceTotals?: { minLevel: number; total: ResourceTotalFormula; shortRestRegain?: number }[];
+  resourceDetailTiers?: { minLevel: number; label: string; value: string }[];
   conditionImmunities?: string[];
   activationCost?: string;
   costKind?: string;
   costPoolKey?: string;
   costBase?: number;
 }
+
+// Wild Shape's Duration text (PHB'14 p.66): floor(level / 2) hours (minimum
+// 1), shared by every Circle — the first seeded use of resourceDetailTiers.
+const WILD_SHAPE_DURATION_TIERS = [
+  { minLevel: 2, label: "Duration", value: "1 hour(s)" },
+  { minLevel: 4, label: "Duration", value: "2 hour(s)" },
+  { minLevel: 6, label: "Duration", value: "3 hour(s)" },
+  { minLevel: 8, label: "Duration", value: "4 hour(s)" },
+  { minLevel: 10, label: "Duration", value: "5 hour(s)" },
+  { minLevel: 12, label: "Duration", value: "6 hour(s)" },
+  { minLevel: 14, label: "Duration", value: "7 hour(s)" },
+  { minLevel: 16, label: "Duration", value: "8 hour(s)" },
+  { minLevel: 18, label: "Duration", value: "9 hour(s)" },
+  { minLevel: 20, label: "Duration", value: "10 hour(s)" },
+];
+const WILD_SHAPE_UNLIMITED_USES_TIER = { minLevel: 20, label: "Uses", value: "Unlimited (Archdruid)" };
+// PHB'14 p.66: 2/level, unlimited (Archdruid) from level 20.
+const WILD_SHAPE_TOTALS: { minLevel: number; total: ResourceTotalFormula }[] = [
+  { minLevel: 2, total: 2 },
+  { minLevel: 20, total: 99 },
+];
 
 function expand(raw: RawDruidFeature): ClassFeatureSeedRow[] {
   const base: Omit<ClassFeatureSeedRow, "edition"> = {
@@ -46,6 +74,7 @@ function expand(raw: RawDruidFeature): ClassFeatureSeedRow[] {
     resourceLabel: raw.resourceLabel,
     resourceRecharge: raw.resourceRecharge,
     resourceTotals: raw.resourceTotals,
+    resourceDetailTiers: raw.resourceDetailTiers,
     conditionImmunities: raw.conditionImmunities,
     activationCost: raw.activationCost,
     costKind: raw.costKind,
@@ -101,11 +130,20 @@ const DRUID_BASE_RAW: RawDruidFeature[] = [
     description:
       "As an action, transform into a beast you have seen. Max CR: 1/4 at L2 (no flying or swimming speed); 1/2 at L4 (no flying speed); 1 at L8. You retain your mental stats and class features but use the beast's physical stats. Lasts up to half your druid level in hours (minimum 1). Reverts when reduced to 0 HP.",
     // SRD 5.1 / PHB'14 p.66: "As an action, you can magically transform..." —
-    // an Action. resourceKey is identity-only, NO resourceTotals on purpose:
-    // the pool stays wholly in druid.ts's resourceFn. Adding resourceTotals to
-    // THIS row without deleting that resourceFn leaves them silently inert —
-    // mergePoolSources (fn-wins) keeps the fn's pool, and the suite stays green.
+    // an Action, 2/short-or-long-rest, unlimited (Archdruid) from level 20.
+    // Circle of the Moon overrides this same resourceKey with its own totals
+    // and Max CR curve — see CIRCLE_OF_THE_MOON_RAW's Circle Forms row.
     resourceKey: "wildShape",
+    resourceLabel: "Wild Shape",
+    resourceRecharge: "short-or-long",
+    resourceTotals: WILD_SHAPE_TOTALS,
+    resourceDetailTiers: [
+      { minLevel: 2, label: "Max CR", value: "1/4 (no flying or swimming speed)" },
+      { minLevel: 4, label: "Max CR", value: "1/2 (no flying speed)" },
+      { minLevel: 8, label: "Max CR", value: "1" },
+      ...WILD_SHAPE_DURATION_TIERS,
+      WILD_SHAPE_UNLIMITED_USES_TIER,
+    ],
     activationCost: "action",
     costKind: "pool",
     costPoolKey: "wildShape",
@@ -368,6 +406,27 @@ const CIRCLE_OF_THE_MOON_RAW: RawDruidFeature[] = [
     edition: "EDITION_2014",
     description:
       "You can use Wild Shape to transform into beasts with a challenge rating as high as 1 (instead of the base druid table). Starting at level 6, the max CR equals your druid level divided by 3 (rounded down, minimum 1).",
+    // PHB'14 p.69: overrides the base Wild Shape row's OWN "wildShape"
+    // resourceKey (class-feature-rows.ts's overrideRows mechanism) — same
+    // totals/recharge, a different Max CR curve. Max CR is 1 from L2, then
+    // level/3 (rounded down, minimum 1) from L6; the "(no flying...)" speed
+    // notes are the same base-table notes every Circle carries below L8.
+    resourceKey: "wildShape",
+    resourceLabel: "Wild Shape",
+    resourceRecharge: "short-or-long",
+    resourceTotals: WILD_SHAPE_TOTALS,
+    resourceDetailTiers: [
+      { minLevel: 2, label: "Max CR", value: "1 (no flying or swimming speed)" },
+      { minLevel: 4, label: "Max CR", value: "1 (no flying speed)" },
+      { minLevel: 6, label: "Max CR", value: "2 (no flying speed)" },
+      { minLevel: 8, label: "Max CR", value: "2" },
+      { minLevel: 9, label: "Max CR", value: "3" },
+      { minLevel: 12, label: "Max CR", value: "4" },
+      { minLevel: 15, label: "Max CR", value: "5" },
+      { minLevel: 18, label: "Max CR", value: "6" },
+      ...WILD_SHAPE_DURATION_TIERS,
+      WILD_SHAPE_UNLIMITED_USES_TIER,
+    ],
   },
   {
     subclassSlug: CIRCLE_OF_THE_MOON_SLUG,

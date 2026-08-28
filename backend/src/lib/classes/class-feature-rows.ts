@@ -314,17 +314,37 @@ function poolFromRow(row: ClassFeatureRow, ctx: ResourceTotalContext): DerivedRe
   };
 }
 
+// A base row's resourceKey that an active subclass's own row ALSO declares
+// resolves from that subclass row instead — the row-driven counterpart to a
+// resourceFn receiving the active subclassKey (#906). Swaps the WHOLE row
+// (every descriptor column moves together), never a per-column merge, so a
+// subclass's variant pool (e.g. druid Circle of the Moon's wildShape) reads
+// as one coherent row, not a base/subclass hybrid.
+function findOverrideRow(
+  overrideRows: readonly ClassFeatureRow[] | undefined,
+  resourceKey: string,
+  level: number,
+  edition: RulesEdition,
+): ClassFeatureRow | undefined {
+  return overrideRows?.find((row) => row.resourceKey === resourceKey && row.edition === edition && row.level <= level);
+}
+
 export function poolsFromRows(
   rows: readonly ClassFeatureRow[],
   level: number,
   abilityScores: Record<string, number>,
   profBonus: number,
   edition: RulesEdition,
+  // The active subclass's own rows (undefined when no subclass is active) —
+  // see findOverrideRow above. Only deriveBaseLayer passes this; a subclass
+  // layer's own poolsFromRows call never needs to override itself.
+  overrideRows?: readonly ClassFeatureRow[],
 ): DerivedResource[] {
   const pools: DerivedResource[] = [];
   for (const row of rows) {
     if (row.edition !== edition || row.level > level) continue;
-    const pool = poolFromRow(row, { level, abilityScores, profBonus });
+    const sourceRow = row.resourceKey ? (findOverrideRow(overrideRows, row.resourceKey, level, edition) ?? row) : row;
+    const pool = poolFromRow(sourceRow, { level, abilityScores, profBonus });
     if (pool) pools.push(pool);
   }
   return pools;

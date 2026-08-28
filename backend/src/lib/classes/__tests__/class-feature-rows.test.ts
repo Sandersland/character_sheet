@@ -274,6 +274,43 @@ describe("poolsFromRows resolves resourceDetailTiers (labeled display parts, #16
   });
 });
 
+describe("poolsFromRows resolves overrideRows (#906/#1226 druid retab) — a base row's resourceKey resolves from a matching active-subclass row instead", () => {
+  it("a base row with no matching override row resolves from itself unchanged", () => {
+    const rows = [row({ resourceKey: "wildShape", resourceTotals: [{ minLevel: 1, total: 2 }] })];
+    expect(poolsFromRows(rows, 1, {}, 0, "EDITION_2014", [])[0].total).toBe(2);
+  });
+
+  it("an override row with the SAME resourceKey wins — every descriptor column moves together, not per-field", () => {
+    const rows = [row({ name: "Base Feature", resourceKey: "wildShape", resourceLabel: "Base Label", resourceRecharge: "longRest", resourceTotals: [{ minLevel: 1, total: 2 }] })];
+    const overrideRows = [
+      row({ name: "Override Feature", resourceKey: "wildShape", resourceLabel: "Override Label", resourceRecharge: "short-or-long", resourceTotals: [{ minLevel: 1, total: 5 }] }),
+    ];
+    const pool = poolsFromRows(rows, 1, {}, 0, "EDITION_2014", overrideRows)[0];
+    expect(pool.label).toBe("Override Label");
+    expect(pool.recharge).toBe("short-or-long");
+    expect(pool.total).toBe(5);
+  });
+
+  it("an override row for a DIFFERENT resourceKey never applies", () => {
+    const rows = [row({ resourceKey: "wildShape", resourceTotals: [{ minLevel: 1, total: 2 }] })];
+    const overrideRows = [row({ resourceKey: "somethingElse", resourceTotals: [{ minLevel: 1, total: 99 }] })];
+    expect(poolsFromRows(rows, 1, {}, 0, "EDITION_2014", overrideRows)[0].total).toBe(2);
+  });
+
+  it("an override row not yet reached at the character's level is ignored — the base row resolves instead", () => {
+    const rows = [row({ resourceKey: "wildShape", resourceTotals: [{ minLevel: 1, total: 2 }] })];
+    const overrideRows = [row({ level: 6, resourceKey: "wildShape", resourceTotals: [{ minLevel: 6, total: 5 }] })];
+    expect(poolsFromRows(rows, 3, {}, 0, "EDITION_2014", overrideRows)[0].total).toBe(2);
+    expect(poolsFromRows(rows, 6, {}, 0, "EDITION_2014", overrideRows)[0].total).toBe(5);
+  });
+
+  it("an override row for the wrong edition never applies", () => {
+    const rows = [row({ edition: "EDITION_2014", resourceKey: "wildShape", resourceTotals: [{ minLevel: 1, total: 2 }] })];
+    const overrideRows = [row({ edition: "EDITION_2024", resourceKey: "wildShape", resourceTotals: [{ minLevel: 1, total: 99 }] })];
+    expect(poolsFromRows(rows, 1, {}, 0, "EDITION_2014", overrideRows)[0].total).toBe(2);
+  });
+});
+
 describe("improvementsFromRows (#1691) — same edition/level truth table as featuresFromRows, flattened across rows", () => {
   it("a row tagged for the matching edition, at or below the character's level, contributes its improvements", () => {
     const rows = [row({ level: 3, improvements: [{ target: "armorProficiency", amount: 1, key: "heavy" }] })];
