@@ -446,10 +446,11 @@ async function loadResourcesReconcileState(
   // Master's two counts are ROW-driven now (#1546 Part B-ii: registry.ts's
   // deriveRowExtras reads Combat Superiority/Student of War's derivedStat
   // columns), so this carrier is load-bearing for reconcileManeuvers/
-  // reconcileToolProficiencies, not merely future-proofing; every other
-  // class's subclassChoices is still SubclassDefinition.choices (code). This
-  // select matches every other deriveEntryScopedResources call site and stays
-  // correct if a future reconciler ever needs a row-driven pool's `used` cap.
+  // reconcileToolProficiencies, not merely future-proofing; subclassChoices
+  // resolve through deriveSubclassChoiceList (SubclassDefinition.choices
+  // merged with row-driven choicesFromRows, #899). This select matches every
+  // other deriveEntryScopedResources call site and stays correct if a future
+  // reconciler ever needs a row-driven pool's `used` cap.
   const { derived } = deriveEntryScopedResources(row.classEntries, newDerivedLevel, abilityScores, profBonus, edition, featureRowsOf);
   return { state, derived };
 }

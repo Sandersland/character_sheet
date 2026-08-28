@@ -10,11 +10,8 @@ function row(overrides: Partial<ClassFeatureRow> = {}): ClassFeatureRow {
   return { name: "Test Feature", level: 1, description: "test description", edition: "EDITION_2014", ...overrides };
 }
 
-// Hand-authored to reproduce monk.ts's real 2024 Focus descriptor authoring
-// (uncannyMetabolism always-on, perfectFocus gated to L15+) as a row — no
-// seed row uses this vocabulary yet. monk.resourceFn (imported below) is used
-// only as the expectation these fixture rows must resolve to, never as the
-// fixture's own source.
+// Hand-authored rows; monk.resourceFn is imported only as the expectation
+// they must resolve to, never as the fixture's source.
 const FOCUS_ON_INITIATIVE: InitiativeRegenRow[] = [
   {
     id: "uncannyMetabolism",

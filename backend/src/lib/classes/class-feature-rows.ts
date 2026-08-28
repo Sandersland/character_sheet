@@ -7,7 +7,7 @@ import type { RollEffect } from "@/lib/srd/roll-effects.js";
 import { deriveMartialArtsDie } from "@/lib/srd/weapon-damage.js";
 
 import type { FeatImprovement } from "./resources-state.js";
-import type { DerivedFeature, DerivedResource, InitiativeBonusHeal, InitiativeRegen, RechargeOn } from "./types.js";
+import type { DerivedFeature, DerivedResource, DerivedSubclassChoice, InitiativeBonusHeal, InitiativeRegen, RechargeOn } from "./types.js";
 
 export type ResourceTotalAbility = "strength" | "dexterity" | "constitution" | "intelligence" | "wisdom" | "charisma";
 
@@ -114,16 +114,9 @@ export interface InitiativeRegenBonusHealRow {
   flatBonus?: ResourceTotalFormula;
 }
 
-/**
- * A row-authored counterpart to `InitiativeRegen` (#1522) — the vocabulary a
- * ClassFeature row uses to declare the same regain-on-rolling-Initiative
- * behavior a class module's resourceFn declares in TS. `minLevel` gates ONE
- * ENTRY ADDITIVELY: every entry whose minLevel is absent or <= the
- * character's level survives, same as EffectBuffRow.minLevel in
- * effectBuffsFromRow. This is NOT the tier last-match-wins rule the other
- * tier arrays in this file use — Perfect Focus (L15) JOINS Uncanny
- * Metabolism, it doesn't replace it.
- */
+// Row-authored counterpart to InitiativeRegen (#1522). `minLevel` gates each
+// entry ADDITIVELY (like EffectBuffRow.minLevel), NOT last-match-wins like
+// this file's tier arrays — a later entry joins the earlier ones.
 export interface InitiativeRegenRow {
   id: string;
   amount: "all" | number;
@@ -142,6 +135,21 @@ export interface ResourceColumns {
   resourceRechargeTiers?: ResourceRechargeTier[] | null;
   resourceDetailTiers?: ResourceDetailTier[] | null;
   resourceOnInitiative?: InitiativeRegenRow[] | null;
+}
+
+// Tiers are ASCENDING by minLevel, last-match-wins — same invariant as ResourceTotalTier.
+export interface ChoiceCountTier {
+  minLevel: number;
+  count: number;
+}
+
+// Row-driven counterpart to SubclassChoice (#899): choiceKey keys
+// choicesKnown, choiceCatalogSource names the GrantedAbility.source catalog.
+export interface ChoiceColumns {
+  choiceKey?: string | null;
+  choiceLabel?: string | null;
+  choiceCatalogSource?: string | null;
+  choiceCountTiers?: ChoiceCountTier[] | null;
 }
 
 // Evaluated against the character's CURRENTLY EQUIPPED state at activation
@@ -176,7 +184,7 @@ export interface ActivationColumns {
 // are EffectColumns MINUS upcastDicePerLevel/cantripScaling/concentration —
 // see the EffectRow comment at readEffectSpec's Fighter call site for why
 // those three must never be added here.
-export interface ClassFeatureRow extends ResourceColumns, ActivationColumns {
+export interface ClassFeatureRow extends ResourceColumns, ActivationColumns, ChoiceColumns {
   name: string;
   level: number;
   description: string;
@@ -344,8 +352,7 @@ function resolveInitiativeRegenEntry(entry: InitiativeRegenRow, ctx: ResourceTot
   };
 }
 
-// Undefined (never []) so poolFromRow omits `onInitiative` entirely once no
-// entry survives the level filter — same convention as detailsFromRow.
+// Undefined rather than [] so poolFromRow omits `onInitiative` entirely.
 function resourceOnInitiativeFromRow(
   entries: readonly InitiativeRegenRow[] | null | undefined,
   ctx: ResourceTotalContext,
@@ -356,11 +363,7 @@ function resourceOnInitiativeFromRow(
   return surviving.map((entry) => resolveInitiativeRegenEntry(entry, ctx, edition));
 }
 
-// The pool's description IS the row's own description, never a second string
-// (#1528). `edition` is a separate parameter rather than a ResourceTotalContext
-// field: poolFromRow is the only caller that needs it (for
-// resourceOnInitiative's martialArtsDie faces), and ResourceTotalContext is
-// shared with evaluateResourceTotal/evaluateBuffModifier call sites that don't.
+// The pool's description IS the row's own description, never a second string (#1528).
 function poolFromRow(row: ClassFeatureRow, ctx: ResourceTotalContext, edition: RulesEdition): DerivedResource | null {
   if (!row.resourceKey) return null;
   const totalTier = tierAt(row.resourceTotals, ctx.level);
@@ -465,6 +468,17 @@ export function saveDcAbilitiesFromRows(
     if (row.saveDcAbilities && row.saveDcAbilities.length > 0) return row.saveDcAbilities;
   }
   return undefined;
+}
+
+export function choicesFromRows(rows: readonly ClassFeatureRow[], level: number, edition: RulesEdition): DerivedSubclassChoice[] {
+  const choices: DerivedSubclassChoice[] = [];
+  for (const row of rows) {
+    if (row.edition !== edition || row.level > level || !row.choiceKey || !row.choiceCatalogSource) continue;
+    const tier = tierAt(row.choiceCountTiers, level);
+    if (!tier || tier.count <= 0) continue;
+    choices.push({ key: row.choiceKey, label: row.choiceLabel ?? row.name, catalogSource: row.choiceCatalogSource, count: tier.count });
+  }
+  return choices;
 }
 
 // deriveImmuneConditions unions this with buff-declared immunity into the

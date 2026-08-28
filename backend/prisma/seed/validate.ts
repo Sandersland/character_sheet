@@ -254,6 +254,37 @@ export function assertNoDuplicatePoolDeclaringRows(rows: readonly PoolDeclaringR
   });
 }
 
+interface ChoiceDeclaringRowCandidate {
+  className: string;
+  subclassSlug: string | null;
+  edition: string;
+  choiceKey?: string | null;
+}
+
+// choiceColumnsDeclareTogether guarantees choiceKey implies the full column trio.
+function isChoiceDeclaringRow(row: ChoiceDeclaringRowCandidate): boolean {
+  return Boolean(row.choiceKey);
+}
+
+function choiceDeclaringRowKey(row: ChoiceDeclaringRowCandidate): string {
+  return `${row.className}::${row.subclassSlug ?? "null"}::${row.choiceKey}::${row.edition}`;
+}
+
+// Downstream consumers key by choiceKey alone, so a same-edition duplicate
+// would let seed content order silently decide which entry wins (#899).
+export function assertNoDuplicateChoiceDeclaringRows(rows: readonly ChoiceDeclaringRowCandidate[]): void {
+  const rowsByKey = new Map<string, number>();
+  rows.forEach((row, index) => {
+    if (!isChoiceDeclaringRow(row)) return;
+    const key = choiceDeclaringRowKey(row);
+    const seenAt = rowsByKey.get(key);
+    if (seenAt !== undefined) {
+      throw new Error(`Seed error: duplicate choice-declaring ClassFeature row for "${key}" (rows ${seenAt} and ${index})`);
+    }
+    rowsByKey.set(key, index);
+  });
+}
+
 /**
  * Validates every registered family's rows against its schema, throwing on the
  * FIRST invalid row with its family/index/path so the failure names the
@@ -261,8 +292,10 @@ export function assertNoDuplicatePoolDeclaringRows(rows: readonly PoolDeclaringR
  * two SUBCLASSES rows must never share a slug (M2, #1277) — a duplicate would
  * silently collapse two subclasses' seeded content onto one DB row under the
  * new slug_edition unique index — every STARTING_EQUIPMENT_PACKAGES
- * catalogName must resolve against ITEMS ∪ PACKS (#1533 [R3]/[R4]), and no two
- * CLASS_FEATURES rows may both declare the same pool (assertNoDuplicatePoolDeclaringRows above).
+ * catalogName must resolve against ITEMS ∪ PACKS (#1533 [R3]/[R4]), no two
+ * CLASS_FEATURES rows may both declare the same pool
+ * (assertNoDuplicatePoolDeclaringRows above), and no two may both declare the
+ * same choice key (assertNoDuplicateChoiceDeclaringRows above, #899/#1522).
  *
  * Returns a summary so a permanent test can assert this function actually
  * visited real content (families/rows counts) rather than reporting "valid"
@@ -297,6 +330,7 @@ export function assertSeedContentValid(): SeedValidationSummary {
   assertCatalogNamesResolve(STARTING_EQUIPMENT_PACKAGES);
   assertCatalogNamesResolve(BACKGROUND_STARTING_EQUIPMENT_PACKAGES, "BACKGROUND_STARTING_EQUIPMENT_PACKAGES");
   assertNoDuplicatePoolDeclaringRows(CLASS_FEATURES);
+  assertNoDuplicateChoiceDeclaringRows(CLASS_FEATURES);
 
   // #1679: no two SPECIES rows may share (slug, edition) — the same M2 role
   // as the SUBCLASSES slug check above, catching what @@unique([slug,

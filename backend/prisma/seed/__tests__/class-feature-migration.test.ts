@@ -458,11 +458,18 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
     // resourceDetailTiers' first populated rows (#906/#1226): the 2014 base
     // Wild Shape row and Circle of the Moon's own Circle Forms override row.
     const populatedResourceDetailTiersCount = 2;
-    // Vocabulary-only slice (#1522): no seed row authors resourceOnInitiative
-    // yet — monk's rows migrate onto it in a later slice.
+    // 0 until monk's rows author resourceOnInitiative (#1522).
     const populatedResourceOnInitiativeCount = 0;
+    // 0 until Hunter/Four Elements author choiceCountTiers (#899).
+    const populatedChoiceCountTiersCount = 0;
     const EXPECTED_DB_NULL: Record<
-      "resourceTotals" | "resourceDieTiers" | "derivedStatTiers" | "resourceRechargeTiers" | "resourceDetailTiers" | "resourceOnInitiative",
+      | "resourceTotals"
+      | "resourceDieTiers"
+      | "derivedStatTiers"
+      | "resourceRechargeTiers"
+      | "resourceDetailTiers"
+      | "resourceOnInitiative"
+      | "choiceCountTiers",
       number
     > = {
       resourceTotals: CLASS_FEATURES.length - populatedResourceTotalsCount,
@@ -471,6 +478,7 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
       resourceRechargeTiers: CLASS_FEATURES.length - populatedResourceRechargeTiersCount,
       resourceDetailTiers: CLASS_FEATURES.length - populatedResourceDetailTiersCount,
       resourceOnInitiative: CLASS_FEATURES.length - populatedResourceOnInitiativeCount,
+      choiceCountTiers: CLASS_FEATURES.length - populatedChoiceCountTiersCount,
     };
     for (const column of [
       "resourceTotals",
@@ -479,6 +487,7 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
       "resourceRechargeTiers",
       "resourceDetailTiers",
       "resourceOnInitiative",
+      "choiceCountTiers",
     ] as const) {
       const dbNullCount = await prisma.classFeature.count({ where: { [column]: { equals: Prisma.DbNull } } });
       expect(dbNullCount, column).toBe(EXPECTED_DB_NULL[column]);
