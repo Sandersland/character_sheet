@@ -336,13 +336,28 @@ describe("poolsFromRows resolves overrideRows (#906/#1226 druid retab) — a bas
 
   // S1: an identity-only row (resourceKey with no resourceTotals — the
   // established Metamagic pattern, #1909) must never be picked as an
-  // override; without the resourceTotals?.length guard, findOverrideRow
-  // would match it and poolFromRow would then return null (no totalTier),
-  // silently DELETING the base pool instead of leaving it alone.
+  // override; without findOverrideRow's tierAt guard, it would match and
+  // poolFromRow would then return null (no totalTier), silently DELETING
+  // the base pool instead of leaving it alone.
   it("an identity-only override row (resourceKey with no resourceTotals) never applies — the base pool survives unchanged", () => {
     const rows = [row({ resourceKey: "wildShape", resourceTotals: [{ minLevel: 1, total: 2 }] })];
     const overrideRows = [row({ resourceKey: "wildShape" })];
     const pool = poolsFromRows(rows, 1, {}, 0, "EDITION_2014", overrideRows)[0];
+    expect(pool).toBeDefined();
+    expect(pool.total).toBe(2);
+  });
+
+  // Review Finding 1: a non-empty resourceTotals is NOT enough — the row's
+  // OWN first tier must also be reached at the character's level. Here the
+  // override row's grant level (2) is reached at character level 3, but its
+  // resourceTotals only starts at minLevel 5, so tierAt(resourceTotals, 3)
+  // is undefined. Without the tierAt guard, findOverrideRow would still
+  // match on resourceTotals?.length alone and poolFromRow would return null,
+  // silently deleting the base pool the same way an identity-only row would.
+  it("an override row whose grant level is reached but whose FIRST totals tier isn't yet degrades to base-wins, not pool deletion", () => {
+    const rows = [row({ resourceKey: "wildShape", resourceTotals: [{ minLevel: 1, total: 2 }] })];
+    const overrideRows = [row({ level: 2, resourceKey: "wildShape", resourceTotals: [{ minLevel: 5, total: 99 }] })];
+    const pool = poolsFromRows(rows, 3, {}, 0, "EDITION_2014", overrideRows)[0];
     expect(pool).toBeDefined();
     expect(pool.total).toBe(2);
   });

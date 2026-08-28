@@ -214,21 +214,38 @@ function assertSpeciesGrantedSpellsResolve(
   grantRows.forEach((grant, index) => assertSpeciesGrantedSpellRowResolves(grant, index, speciesByKey, spellNames));
 }
 
+interface PoolDeclaringRowCandidate {
+  className: string;
+  subclassSlug: string | null;
+  edition: string;
+  resourceKey?: string | null;
+  resourceTotals?: unknown[] | null;
+}
+
+// "Pool-declaring" means resourceKey AND a populated resourceTotals — an
+// identity-only resourceKey (Metamagic's own pattern, #1909) never contends
+// here, matching findOverrideRow's own tierAt-reachability guard
+// (class-feature-rows.ts).
+function isPoolDeclaringRow(row: PoolDeclaringRowCandidate): boolean {
+  return Boolean(row.resourceKey) && Boolean(row.resourceTotals?.length);
+}
+
+function poolDeclaringRowKey(row: PoolDeclaringRowCandidate): string {
+  return `${row.className}::${row.subclassSlug ?? "null"}::${row.resourceKey}::${row.edition}`;
+}
+
 // #906: poolsFromRows' inbound-subclass override (class-feature-rows.ts's
 // findOverrideRow) picks its target via the FIRST matching row — two
 // pool-declaring rows sharing (class, subclass, resourceKey, edition) would
 // let seed content ORDER silently decide which one wins, an ambiguity no
-// per-row schema can catch. "Pool-declaring" means resourceTotals is
-// populated — an identity-only resourceKey (Metamagic's own pattern, #1909)
-// never contends here, matching findOverrideRow's own resourceTotals?.length
-// guard.
-export function assertNoDuplicatePoolDeclaringRows(
-  rows: readonly { className: string; subclassSlug: string | null; edition: string; resourceKey?: string | null; resourceTotals?: unknown[] | null }[],
-): void {
+// per-row schema can catch. Split into isPoolDeclaringRow/poolDeclaringRowKey
+// above to keep this loop's own cyclomatic count low (seed/** has no
+// coverage instrumentation, so CRAP floors at CC^2+CC).
+export function assertNoDuplicatePoolDeclaringRows(rows: readonly PoolDeclaringRowCandidate[]): void {
   const rowsByKey = new Map<string, number>();
   rows.forEach((row, index) => {
-    if (!row.resourceKey || !row.resourceTotals?.length) return;
-    const key = `${row.className}::${row.subclassSlug ?? "null"}::${row.resourceKey}::${row.edition}`;
+    if (!isPoolDeclaringRow(row)) return;
+    const key = poolDeclaringRowKey(row);
     const seenAt = rowsByKey.get(key);
     if (seenAt !== undefined) {
       throw new Error(`Seed error: duplicate pool-declaring ClassFeature row for "${key}" (rows ${seenAt} and ${index})`);
