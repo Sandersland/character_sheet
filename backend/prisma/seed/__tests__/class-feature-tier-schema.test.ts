@@ -514,3 +514,128 @@ describe("activationRequires (#1688) — the declarative activation-constraint v
     expect(classFeatureSeedSchema.safeParse({ ...baseRow }).success).toBe(true);
   });
 });
+
+describe("resourceOnInitiative (#1522) — the row-driven InitiativeRegen vocabulary", () => {
+  const withPool = {
+    resourceKey: "focus",
+    resourceTotals: [{ minLevel: 2, total: { levelTimes: 1 } }],
+  };
+
+  it("accepts a minimal entry (id + amount only) on a row that declares its own pool", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      ...withPool,
+      resourceOnInitiative: [{ id: "uncannyMetabolism", amount: "all" }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts the full monk shape: minLevel, oncePerLongRest, threshold, and bonusHeal with a martialArtsDie/flatBonus formula", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      ...withPool,
+      resourceOnInitiative: [
+        {
+          id: "uncannyMetabolism",
+          amount: "all",
+          oncePerLongRest: true,
+          bonusHeal: { sourceName: "Uncanny Metabolism", dieFaces: "martialArtsDie", flatBonus: { levelTimes: 1 } },
+        },
+        { id: "perfectFocus", minLevel: 15, amount: 4, threshold: 3 },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects duplicate ids within one row's array — the id disambiguates once-per-long-rest markers", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      ...withPool,
+      resourceOnInitiative: [
+        { id: "dup", amount: "all" },
+        { id: "dup", amount: 2 },
+      ],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a zero amount", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      ...withPool,
+      resourceOnInitiative: [{ id: "bad", amount: 0 }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a negative amount", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      ...withPool,
+      resourceOnInitiative: [{ id: "bad", amount: -1 }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a missing id", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      ...withPool,
+      resourceOnInitiative: [{ amount: "all" }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects dieFaces: 0 on bonusHeal", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      ...withPool,
+      resourceOnInitiative: [{ id: "heal", amount: "all", bonusHeal: { sourceName: "Test", dieFaces: 0 } }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a malformed flatBonus formula on bonusHeal", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      ...withPool,
+      resourceOnInitiative: [
+        { id: "heal", amount: "all", bonusHeal: { sourceName: "Test", dieFaces: 6, flatBonus: { levelTimes: 0 } } },
+      ],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a descriptor with no pool: resourceOnInitiative present but resourceKey/resourceTotals absent", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceOnInitiative: [{ id: "orphan", amount: "all" }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a descriptor whose row declares resourceKey but an empty resourceTotals", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceKey: "focus",
+      resourceTotals: [],
+      resourceOnInitiative: [{ id: "orphan", amount: "all" }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an empty array — authoring garbage, same as resourceRechargeTiers/resourceDetailTiers", () => {
+    const result = classFeatureSeedSchema.safeParse({
+      ...baseRow,
+      resourceKey: "focus",
+      resourceTotals: [{ minLevel: 2, total: { levelTimes: 1 } }],
+      resourceOnInitiative: [],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("null/absent resourceOnInitiative is valid (the common case — no seed row uses it yet)", () => {
+    expect(classFeatureSeedSchema.safeParse({ ...baseRow, resourceOnInitiative: null }).success).toBe(true);
+    expect(classFeatureSeedSchema.safeParse({ ...baseRow }).success).toBe(true);
+  });
+});

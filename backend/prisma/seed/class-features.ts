@@ -11,6 +11,7 @@ import {
   type ActivationRequirement,
   type BuffModifierFormula,
   type EffectBuffRow,
+  type InitiativeRegenRow,
   type ResourceTotalFormula,
 } from "../../src/lib/classes/class-feature-rows.js";
 import type { RechargeOn } from "../../src/lib/classes/types.js";
@@ -79,6 +80,7 @@ export interface ClassFeatureSeedRow {
   resourceDieTiers?: { minLevel: number; die: string }[];
   resourceRechargeTiers?: { minLevel: number; recharge: RechargeOn }[];
   resourceDetailTiers?: { minLevel: number; label: string; value: string }[];
+  resourceOnInitiative?: InitiativeRegenRow[];
   activationCost?: string;
   resolverKind?: string;
   requiresUnarmored?: boolean;
@@ -210,6 +212,35 @@ const resourceDetailTiersSchema = z
   .min(1) // an empty tier array is authoring garbage, same as resourceRechargeTiers
   .refine(isAscendingByMinLevelPerLabel, PER_LABEL_ASCENDING_TIER_MESSAGE);
 
+// InitiativeRegenRow's seed-time mirror (#1522). `minLevel` gates each entry
+// ADDITIVELY (see InitiativeRegenRow's own comment) — no ascending-tiers
+// refine here, unlike every tier schema above.
+const initiativeRegenBonusHealSchema = z.object({
+  sourceName: z.string().min(1),
+  dieFaces: z.union([z.number().int().positive(), z.literal("martialArtsDie")]),
+  flatBonus: resourceTotalFormulaSchema.optional(),
+});
+
+function hasUniqueInitiativeRegenIds(entries: { id: string }[]): boolean {
+  return new Set(entries.map((entry) => entry.id)).size === entries.length;
+}
+
+const resourceOnInitiativeSchema = z
+  .array(
+    z.object({
+      id: z.string().min(1),
+      amount: z.union([z.literal("all"), z.number().int().positive()]),
+      minLevel: z.number().int().positive().optional(),
+      oncePerLongRest: z.boolean().optional(),
+      threshold: z.number().int().nonnegative().optional(),
+      bonusHeal: initiativeRegenBonusHealSchema.optional(),
+    }),
+  )
+  .min(1) // an empty tier array is authoring garbage, same as resourceRechargeTiers/resourceDetailTiers
+  .refine(hasUniqueInitiativeRegenIds, {
+    message: "resourceOnInitiative ids must be unique within one row's array (the id disambiguates once-per-long-rest markers)",
+  });
+
 // effectBuffs' `modifier` (#1686): evaluateBuffModifier's vocabulary — a
 // formula OR a tier array (same ascending invariant); `value` mirrors
 // derivedStatTiersSchema's naming since this scales a modifier, not a pool.
@@ -288,6 +319,21 @@ function rechargeTiersCoverPoolStart(row: RechargeGapRow): boolean {
   return poolStart === undefined || rechargeStart <= poolStart;
 }
 
+interface OnInitiativeGuardRow {
+  resourceOnInitiative?: unknown[] | null;
+  resourceKey?: string;
+  resourceTotals?: unknown[] | null;
+}
+
+// A descriptor with no pool to attach to is dead data — the same discipline
+// rechargeTiersCoverPoolStart enforces for resourceRechargeTiers.
+// resourceOnInitiativeSchema's own .min(1) already rules out an empty array
+// reaching this refine, so presence alone is the right test here.
+function onInitiativeDeclaresItsPool(row: OnInitiativeGuardRow): boolean {
+  if (!row.resourceOnInitiative) return true;
+  return Boolean(row.resourceKey) && Boolean(row.resourceTotals?.length);
+}
+
 // Run at seed time (prisma/seed/validate.ts). Only the identity fields are
 // required; descriptor fields are declared so a population pass is validated
 // by this SAME schema, never a second one.
@@ -306,6 +352,7 @@ export const classFeatureSeedSchema = z
     resourceDieTiers: resourceDieTiersSchema.nullable().optional(),
     resourceRechargeTiers: resourceRechargeTiersSchema.nullable().optional(),
     resourceDetailTiers: resourceDetailTiersSchema.nullable().optional(),
+    resourceOnInitiative: resourceOnInitiativeSchema.nullable().optional(),
     derivedStatTiers: derivedStatTiersSchema.nullable().optional(),
     saveDcAbilities: z.array(z.string().min(1)).optional(),
     // The SAME zod a taken feat's improvements snapshot validates against
@@ -330,4 +377,7 @@ export const classFeatureSeedSchema = z
   .refine(rechargeTiersCoverPoolStart, {
     message:
       'resourceRechargeTiers with no resourceRecharge fallback must reach its first tier at or before resourceTotals\' first tier, or the pool would silently recharge "none" below it',
+  })
+  .refine(onInitiativeDeclaresItsPool, {
+    message: "a row with resourceOnInitiative must also declare resourceKey and a non-empty resourceTotals",
   });
