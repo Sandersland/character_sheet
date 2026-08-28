@@ -1,10 +1,3 @@
-/**
- * Quivering Palm route tests (#1245). A level-17 Warrior of the Open Hand
- * (Wis 16, prof +6) has focus DC 17. Set spends 4 focus and marks vibrations
- * active; Trigger requires an active set, rolls a flat d20 Con save vs the DC,
- * halves the client-rolled 10d12 on a success, and clears the active flag.
- */
-
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -41,12 +34,26 @@ function agent() {
 }
 const url = `/api/characters/${FIXTURE_ID}/abilities/quivering-palm/transactions`;
 
+async function seedBasePoolRow(classId: string, rulesEdition: "EDITION_2014" | "EDITION_2024") {
+  await prisma.classFeature.deleteMany({ where: { classId, subclassId: null } });
+  const [poolName, poolKey, poolLabel] = rulesEdition === "EDITION_2014" ? (["Ki", "ki", "Ki Points"] as const) : (["Focus", "focus", "Focus Points"] as const);
+  await prisma.classFeature.create({
+    data: {
+      classId, subclassId: null, name: poolName, level: 2, edition: rulesEdition,
+      description: `You have a pool of ${poolLabel} equal to your monk level.`,
+      resourceKey: poolKey, resourceLabel: poolLabel, resourceRecharge: "short-or-long",
+      resourceTotals: [{ minLevel: 2, total: { levelTimes: 1 } }],
+    },
+  });
+}
+
 async function createMonk(level: number, subclass?: string, rulesEdition: "EDITION_2014" | "EDITION_2024" = "EDITION_2024") {
   const cls = await prisma.characterClass.upsert({
     where: { name: CLASS_NAME },
     create: { name: CLASS_NAME, hitDie: "d8", savingThrows: ["strength", "dexterity"], skillChoiceCount: 2, skillChoices: ["acrobatics"], isSpellcaster: false },
     update: {},
   });
+  await seedBasePoolRow(cls.id, rulesEdition);
   await prisma.character.create({
     data: {
       ...FIXTURE_BASE,
@@ -79,13 +86,10 @@ describe("POST /api/characters/:id/abilities/quivering-palm/transactions", () =>
     expect(result.daysRemaining).toBe(17);
 
     const focusPool = res.body.character.resources.pools.find((p: { key: string }) => p.key === "focus");
-    expect(focusPool.remaining).toBe(13); // 17 total − 4 spent
+    expect(focusPool.remaining).toBe(13);
     expect(res.body.character.quiveringPalm).toEqual({ saveDC: 17, active: true });
   });
 
-  // #1275 byte-identity oracle: captured on the per-feature URL before the move to
-  // the shared ability endpoint, so a green run afterwards is evidence the audit
-  // trail is unchanged.
   it("pins the audit trail of one setQuiveringPalm", async () => {
     const res = await agent().post(url).send({ operations: [{ type: "setQuiveringPalm" }] });
     expect(res.status).toBe(200);
@@ -166,7 +170,7 @@ describe("POST /api/characters/:id/abilities/quivering-palm/transactions", () =>
       .post(url)
       .send({ operations: [{ type: "triggerQuiveringPalm", roll: 60 }] });
     const focusPool = res.body.character.resources.pools.find((p: { key: string }) => p.key === "focus");
-    expect(focusPool.remaining).toBe(13); // unchanged from the Set spend
+    expect(focusPool.remaining).toBe(13);
   });
 });
 
@@ -196,9 +200,6 @@ describe("Quivering Palm for an under-level or off-subclass monk", () => {
     expect(res.body.error).toMatch(/open hand/i);
   });
 
-  // #1277: isWarriorOfTheOpenHand used to substring-match ("open hand"), so a
-  // homebrew name merely CONTAINING "Open Hand" inherited real Warrior of the
-  // Open Hand mechanics.
   it("rejects a homebrew name containing \"Open Hand\" that isn't the real subclass", async () => {
     await createMonk(20, "Warrior of the Open Handbook");
     const res = await agent().post(url).send({ operations: [{ type: "setQuiveringPalm" }] });
@@ -207,9 +208,6 @@ describe("Quivering Palm for an under-level or off-subclass monk", () => {
   });
 });
 
-// #1501: the 2014 counterpart — Way of the Open Hand, a SEPARATE subclass.
-// Set spends 3 KI (not 4 focus); Trigger's outcome mapping is INVERTED from
-// 2024's (fail drops to 0 HP, success takes the full rolled damage).
 describe("Quivering Palm for a 2014 Way of the Open Hand monk (#1501)", () => {
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
@@ -231,7 +229,7 @@ describe("Quivering Palm for a 2014 Way of the Open Hand monk (#1501)", () => {
     expect(result.daysRemaining).toBe(17);
 
     const kiPool = res.body.character.resources.pools.find((p: { key: string }) => p.key === "ki");
-    expect(kiPool.remaining).toBe(14); // 17 total − 3 spent
+    expect(kiPool.remaining).toBe(14);
   });
 
   it("triggerQuiveringPalm: a failed save reports dropping to 0 HP, ignoring rawDamage", async () => {
@@ -246,33 +244,41 @@ describe("Quivering Palm for a 2014 Way of the Open Hand monk (#1501)", () => {
       expect(result.appliedDamage).toBe(0);
       expect(result.summary).toMatch(/dropped to 0 hit points/i);
     } else {
-      // success: FULL damage, never halved (inverted from 2024's shape)
+      // 2014: a successful save still takes the full rolled damage, never halved.
       expect(result.appliedDamage).toBe(60);
       expect(result.summary).toMatch(/necrotic/i);
     }
   });
 });
 
-// #1337: hasQuiveringPalm is the single source of the L17 gate — both the
-// serialized rider and this route's cast guard read it. Proven with a
-// Fighter/Warrior-of-the-Open-Hand multiclass whose TOTAL character level is
-// held CONSTANT across the two fixtures — only the monk entry's own level
-// moves across the gate, so the assertion cannot pass on `character.level`.
+// hasQuiveringPalm is the single source of the L17 gate — both the
+// serialized rider and this route's cast guard read it. The fixtures below
+// hold TOTAL character level constant and move only the monk entry's own
+// level, so the assertion cannot pass on `character.level`.
 describe("Quivering Palm multiclass entry-scoping (#1337)", () => {
   const MULTICLASS_ID = "test-quivering-palm-multiclass-1";
   const multiclassUrl = `/api/characters/${MULTICLASS_ID}/abilities/quivering-palm/transactions`;
-  // Arbitrary total held constant across both fixtures below (must exceed
-  // QUIVERING_PALM_LEVEL so the "below the gate" fixture's fighter level
-  // stays positive).
+  // Must exceed QUIVERING_PALM_LEVEL so the "below the gate" fixture's fighter level stays positive.
   const TOTAL_LEVEL = 18;
 
   afterEach(async () => {
     await prisma.character.deleteMany({ where: { id: MULTICLASS_ID } });
   });
+  // Last describe in this file to (re-)upsert CLASS_NAME — its own cleanup keeps
+  // the class from leaking into other suites' full CharacterClass sweeps.
+  afterAll(async () => {
+    await prisma.characterClass.deleteMany({ where: { name: CLASS_NAME } });
+  });
 
   async function createFighterMonk(fighterLevel: number, monkLevel: number) {
     await ensureTestOwner(OWNER_ID);
     COOKIE = await authCookie(OWNER_ID);
+    const monkClass = await prisma.characterClass.upsert({
+      where: { name: CLASS_NAME },
+      create: { name: CLASS_NAME, hitDie: "d8", savingThrows: ["strength", "dexterity"], skillChoiceCount: 2, skillChoices: ["acrobatics"], isSpellcaster: false },
+      update: {},
+    });
+    await seedBasePoolRow(monkClass.id, "EDITION_2024");
     await prisma.character.create({
       data: {
         ...FIXTURE_BASE,
@@ -282,7 +288,7 @@ describe("Quivering Palm multiclass entry-scoping (#1337)", () => {
         classEntries: {
           create: [
             { name: "fighter", position: 0, level: fighterLevel },
-            { name: "monk", position: 1, level: monkLevel, subclass: "Warrior of the Open Hand" },
+            { name: "monk", classId: monkClass.id, position: 1, level: monkLevel, subclass: "Warrior of the Open Hand" },
           ],
         },
       },

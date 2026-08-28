@@ -1,21 +1,13 @@
 // Warrior of the Elements (2024, PHB'24 p.90) — Elemental Burst plus the
-// Elemental Strikes rider, built as a dedicated vertical like quivering-palm.ts
-// (a bespoke monk-subclass flow that bypasses the generic action catalog).
-// Elemental Attunement's own toggle (activate/end) moved OFF this file (#1686)
-// onto a row-driven "toggle" (monk.ts's AuthoredFeature entry, dispatched
-// through routes/character/actions.ts's generic toggle handler) — it is no
-// longer a WarriorOfElementsOperation at all.
+// Elemental Strikes rider. Elemental Attunement's own activate/end toggle is
+// row-driven, dispatched through the generic toggle handler; attunementActive()
+// below still checks the shared "while-active" activeEffects buff registry
+// (same key Rage uses) since Elemental Strike gates on it and Stride of the
+// Elements/Elemental Epitome narrate off it.
 //
-// What stays here reads attunementActive() (below) — a plain presence check
-// against the SAME "while-active" activeEffects buff registry Rage uses,
-// still keyed ELEMENTAL_ATTUNEMENT_BUFF_KEY — since Elemental Strike gates on
-// it and Stride of the Elements (L11)/Elemental Epitome (L17) narrate off it.
-//
-// Roll ownership (mirrors Stunning Strike / Quivering Palm): the Dex/Str save is
-// a flat d20 with no modifier — the DC is exact, the save roll is a deliberate
-// simplification pending an NPC stat-block model. Elemental Burst's 3× Martial
-// Arts die damage is the monk's OWN effect, so the client rolls it and sends the
-// total; the server only decides full vs half from its own save roll.
+// This app has no NPC combatant model: the Dex/Str save is a flat d20 (DC
+// exact, roll is a simplification); Elemental Burst's damage is client-rolled
+// and the server only resolves full vs half from its own save roll.
 
 import { Prisma } from "@/generated/prisma/client.js";
 import { logEvent } from "@/lib/activity/events.js";
@@ -25,7 +17,7 @@ import { normalizeActiveEffectsMutable } from "@/lib/combat/active-effects.js";
 import { applySpendResourceInTx } from "./resources.js";
 import { actionGrantLevel, deriveEntryScopedActions } from "./actions.js";
 import { FEATURE_ROWS_CLASS_FEATURES, FEATURE_ROWS_SUBCLASS_FEATURES, featureRowsOf } from "./feature-rows-select.js";
-import { monkSaveDC } from "./monk.js";
+import { monkSaveDC } from "./ki-focus.js";
 import { editionOf } from "@/lib/rules/edition.js";
 import type {
   CastElementalBurstOperation,
@@ -42,9 +34,8 @@ export class InvalidWarriorOfElementsOperationError extends Error {}
 export const ELEMENTAL_ATTUNEMENT_BUFF_KEY = "elementalAttunement";
 const ELEMENTAL_BURST_FOCUS_COST = 2;
 
-// The five elemental damage types a Warrior of the Elements can deal (PHB'24 p.90).
-// The tuple stays here because the route's z.enum consumes it; the union it used
-// to define lives in shared-types (#1273), latched by resource-wire-contract.test.ts.
+// PHB'24 p.90. Kept here because the route's z.enum consumes it; shared-types'
+// union mirror is latched by resource-wire-contract.test.ts.
 export const ELEMENTAL_DAMAGE_TYPES = ["acid", "cold", "fire", "lightning", "thunder"] as const;
 
 /** Fail (roll < DC) takes full damage; success halves it, rounded down (SRD 5.2 "half as much"). */
@@ -62,16 +53,9 @@ const WARRIOR_OF_ELEMENTS_SELECT = {
   abilityScores: true,
   activeEffects: true,
   rulesEdition: true,
-  // subclassRef.slug (#1277) is what deriveEntryScopedActions' assertWarriorOfElements
-  // gate resolves the subclass identity through — see resolveSubclassSlug.
-  // NOT in #1339's handover (measured 2026-07-26): this select was missed
-  // entirely by that issue's site table. class.features/subclassRef.features
-  // (#1686, the FEATURE_ROWS_CLASS_FEATURES/FEATURE_ROWS_SUBCLASS_FEATURES
-  // fragments — not the folded FEATURE_ROWS_ENTRY_SELECT, which collides
-  // with this select's own subclassRef.slug field, see that file's own
-  // comment on why some callers can't spread it) are what let that same gate
-  // see Elemental Attunement's own row-driven "elementalAttunement" key now
-  // that it's off DERIVED_ACTIONS.
+  // subclassRef.slug drives assertWarriorOfElements' subclass-identity gate;
+  // class.features/subclassRef.features let that same gate see Elemental
+  // Attunement's own row-driven action key too.
   classEntries: {
     orderBy: { position: "asc" as const },
     select: {
@@ -91,21 +75,11 @@ function monkEntry(row: WarriorOfElementsRow) {
 }
 
 /**
- * Throws unless `actionKey`'s DERIVED_ACTIONS gate (actions.ts) is granted to
- * this row's monk entry; returns the monk entry's own level. Resolved through
- * the SAME deriveEntryScopedActions the wire's availableActions[] and
- * shadow-arts.ts's cast guards use (#1315) — not a hand-rolled level/subclass
- * comparison, and not the classEntries[].level COLUMN directly (that column
- * can lag the XP-derived level for a pending level-up; deriveEntryScopedActions
- * resolves the effective level instead, same as every other entry-scoped gate).
- * Passes pools:[] deliberately — this only reads `.key` presence (the gate
- * itself), never `.enabled`; the actual focus spend is validated by
- * applySpendResourceInTx below, so a future `.enabled` check here would
- * wrongly reject every call. `featureRowsOf` (#1686) is threaded through so
- * a row-driven key (Elemental Attunement's own "elementalAttunement", and
- * Elemental Burst too as of #1912) resolves through the SAME gate a
- * DERIVED_ACTIONS key used to — elementalStrike's own "elementalAttunement"
- * gate check is what makes this load-bearing, not just cosmetic.
+ * Throws unless `actionKey` is granted to this row's monk entry (via
+ * deriveEntryScopedActions, the same gate availableActions[] uses); returns
+ * the monk entry's own level. Passes pools:[] deliberately — only `.key`
+ * presence is read here, never `.enabled`; the actual focus spend is
+ * validated separately by applySpendResourceInTx.
  */
 function assertWarriorOfElements(row: WarriorOfElementsRow, actionKey: string, feature: string): number {
   const monk = monkEntry(row);
@@ -113,10 +87,7 @@ function assertWarriorOfElements(row: WarriorOfElementsRow, actionKey: string, f
   const edition = editionOf(row);
   const granted = deriveEntryScopedActions(row.classEntries, totalLevel, [], true, edition, featureRowsOf).some((a) => a.key === actionKey);
   if (!monk || !granted) {
-    // actionGrantLevel (#1912) is row-aware — Elemental Burst moved off
-    // DERIVED_ACTIONS onto its own row, so the error text's level now
-    // resolves from THIS row's own class+subclass feature rows, never a
-    // second hardcoded copy of the gate (CLAUDE.md's level-gated rule).
+    // actionGrantLevel resolves the level from these rows, never a hardcoded duplicate of the gate.
     const rows = row.classEntries.flatMap((e) => {
       const carrier = featureRowsOf(e);
       return [...carrier.classRows, ...carrier.subclassRows];
@@ -139,15 +110,6 @@ function attunementActive(row: WarriorOfElementsRow): boolean {
     (b) => b.key === ELEMENTAL_ATTUNEMENT_BUFF_KEY,
   );
 }
-
-// toggleElementalAttunement retired (#1686) — the activate/end toggle is
-// row-driven now (monk.ts's AuthoredFeature entry, resolverKind "toggle"),
-// dispatched through the GENERIC toggle handler
-// (routes/character/actions.ts's applyRowDrivenActionInTx +
-// lib/classes/actions.ts's toggleRowOps) instead of this bespoke function —
-// same reason Rage's own ACTION_EFFECT_FN closure retired. attunementActive()
-// above still reads the resulting buff's presence for Elemental Strike's own
-// gate and Stride of the Elements'/Elemental Epitome's narration.
 
 async function castElementalBurst(
   tx: Prisma.TransactionClient,
@@ -193,10 +155,6 @@ async function castElementalBurst(
   return { dc, saveRoll, outcome, damageType: op.damageType, rawDamage: op.roll, appliedDamage, summary };
 }
 
-// The elemental-strike rider (damage-type swap + Str-save 10-ft move while
-// attuned) is fully wired server-side and covered by tests, but has no
-// dedicated live-play button yet — the Attunement toggle + Elemental Burst are
-// the surfaced actions. Frontend surfacing is a follow-up (#1247 deferral).
 async function elementalStrike(
   tx: Prisma.TransactionClient,
   row: WarriorOfElementsRow,
@@ -212,9 +170,7 @@ async function elementalStrike(
     );
   }
 
-  // The Unarmed Strike deals the chosen type instead of its normal type; on a hit
-  // you may force a Strength save (focus DC) to move the target up to 10 ft. Free
-  // rider — no Focus cost. The move itself is narrated (no NPC combatant model).
+  // Free rider — no Focus cost. The move is narrated only (no NPC combatant model).
   const dc = focusDcFor(row);
   const saveRoll = 1 + Math.floor(Math.random() * 20);
   const outcome: ElementalSaveOutcome = saveRoll >= dc ? "success" : "fail";
@@ -238,14 +194,6 @@ async function elementalStrike(
   return { dc, saveRoll, outcome, damageType: op.damageType, moved, summary };
 }
 
-/**
- * Applies a batch of Warrior of the Elements operations atomically. Mirrors
- * applyQuiveringPalmOperations: one batchId, state re-read per op. Elemental
- * Burst's Focus spend logs its own undoable spendResource event. The
- * Attunement toggle no longer flows through here at all (#1686) — it's a
- * plain executeAction "elementalAttunement"/"endElementalAttunement" op on
- * the generic actions endpoint now.
- */
 export async function applyWarriorOfElementsOperations(
   characterId: string,
   operations: WarriorOfElementsOperation[],

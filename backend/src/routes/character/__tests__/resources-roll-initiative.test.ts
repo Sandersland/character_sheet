@@ -1,10 +1,3 @@
-/**
- * rollInitiative route tests (#1243): Monk Uncanny Metabolism (L2, full Focus
- * refill once per long rest + an HP heal) and Perfect Focus (L15, top Focus up
- * to 4 every combat). Real Postgres + supertest, fixture style mirrors
- * shadow-arts-cast.test.ts (a plain monk needs no subclass/spell-catalog setup).
- */
-
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -13,6 +6,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
+import { MONK_BASE_ROWS } from "@/lib/classes/__tests__/test-feature-rows.fixture.js";
 
 const OWNER_ID = "owner-roll-initiative";
 let COOKIE: string;
@@ -20,7 +14,6 @@ let COOKIE: string;
 const FIXTURE_ID = "test-roll-initiative-monk-1";
 const CLASS_NAME = "Roll Initiative Test Monk";
 
-// XP thresholds → monk level: L1=0, L2=300, L15=165000.
 const XP_L1 = 0;
 const XP_L2 = 300;
 const XP_L15 = 165000;
@@ -31,8 +24,7 @@ const FIXTURE_BASE = {
   alignment: "Neutral",
   initiativeBonus: 3,
   speed: 40,
-  // Plenty of headroom above current so an Uncanny Metabolism heal (up to
-  // monk level 15 + a d12 = 27) never clips against max.
+  // max: 100 leaves headroom above current so an Uncanny Metabolism heal (up to monk level 15 + a d12) never clips.
   hitPoints: { current: 50, max: 100, temp: 0 },
   abilityScores: {
     strength: 10, dexterity: 16, constitution: 12, intelligence: 10, wisdom: 15, charisma: 10,
@@ -93,18 +85,21 @@ describe("POST /api/characters/:id/resources/transactions — rollInitiative (Mo
     });
     classId = cls.id;
 
-    // #1524: this fixture uses a bespoke CharacterClass row (isolated by its
-    // own name, per this file's own convention), so it carries no seeded
-    // ClassFeature rows. At level 1 Monk's Focus pool doesn't exist yet
-    // (resourceFn returns []), so without at least one level-1 base feature
-    // row, deriveResources' `resources.length === 0 && features.length === 0`
-    // guard would return null for the (c)/(d) below-gate case — text copied
-    // verbatim from the real seeded Monk EDITION_2024 level-1 rows.
+    // A level-1 base feature row must exist or deriveResources returns null for the below-gate case.
+    const focusRow = MONK_BASE_ROWS.find((r) => r.name === "Focus" && r.edition === "EDITION_2024");
+    if (!focusRow) throw new Error("fixture missing monk Focus/EDITION_2024 row");
     await prisma.classFeature.deleteMany({ where: { classId } });
     await prisma.classFeature.createMany({
       data: [
         { classId, subclassId: null, name: "Martial Arts", level: 1, edition: "EDITION_2024", description: "With unarmed strikes or monk weapons: use Dexterity instead of Strength for attack and damage rolls; deal 1d6 (L1–4), 1d8 (L5–10), 1d10 (L11–16), or 1d12 (L17+) damage; make one bonus unarmed strike after the Attack action." },
         { classId, subclassId: null, name: "Unarmored Defense", level: 1, edition: "EDITION_2024", description: "While not wearing armor or wielding a shield, your AC equals 10 + your Dexterity modifier + your Wisdom modifier." },
+        {
+          classId, subclassId: null, name: focusRow.name, level: focusRow.level, edition: focusRow.edition,
+          description: focusRow.description,
+          resourceKey: focusRow.resourceKey, resourceLabel: focusRow.resourceLabel, resourceRecharge: focusRow.resourceRecharge,
+          resourceTotals: (focusRow.resourceTotals ?? []) as unknown as Prisma.InputJsonValue,
+          resourceOnInitiative: (focusRow.resourceOnInitiative ?? []) as unknown as Prisma.InputJsonValue,
+        },
       ],
     });
   });
@@ -123,14 +118,14 @@ describe("POST /api/characters/:id/resources/transactions — rollInitiative (Mo
   });
 
   it("(a) L2: fully refills Focus and heals monk level (2) + a Martial Arts d6 roll, once per long rest", async () => {
-    await createMonk(XP_L2, 2, 2); // Focus total 2, fully spent
+    await createMonk(XP_L2, 2, 2);
     const res = await rollInitiative();
     expect(res.status).toBe(200);
 
     const focus = focusPool(res.body);
     expect(focus).toMatchObject({ used: 0, remaining: 2 });
 
-    // Healed 2 (monk level) + 1d6 → [3, 8]. Started at 50 HP.
+    // Started at 50 HP; heals 2 (monk level) + 1d6 → range [53, 58].
     expect(res.body.hitPoints.current).toBeGreaterThanOrEqual(53);
     expect(res.body.hitPoints.current).toBeLessThanOrEqual(58);
 
@@ -148,30 +143,28 @@ describe("POST /api/characters/:id/resources/transactions — rollInitiative (Mo
     const first = await rollInitiative();
     const hpAfterFirst = first.body.hitPoints.current;
 
-    // Spend Focus again mid-rest, then roll initiative for a second combat.
     await spendFocus(2);
     const second = await rollInitiative();
-    expect(focusPool(second.body)).toMatchObject({ used: 2 }); // unchanged — no refill
-    expect(second.body.hitPoints.current).toBe(hpAfterFirst); // no second heal
+    expect(focusPool(second.body)).toMatchObject({ used: 2 });
+    expect(second.body.hitPoints.current).toBe(hpAfterFirst);
     expect(second.body.results[0].summary).toBe("Rolled Initiative — no resources to regain");
 
     await longRest();
     const third = await rollInitiative();
-    expect(focusPool(third.body)).toMatchObject({ used: 0 }); // fires again after a long rest
+    expect(focusPool(third.body)).toMatchObject({ used: 0 });
     expect(third.body.results[0].summary).toContain("Uncanny Metabolism");
   });
 
   it("(b) L15: once Uncanny Metabolism has fired this rest, Perfect Focus tops Focus up to 4 with no second heal", async () => {
-    await createMonk(XP_L15, 15, 15); // Focus total 15, fully spent
+    await createMonk(XP_L15, 15, 15);
     const first = await rollInitiative();
     expect(focusPool(first.body)).toMatchObject({ used: 0 });
     const hpAfterFirst = first.body.hitPoints.current;
 
-    // Spend down to 2 remaining (13 used) mid-rest, then roll initiative again.
     await spendFocus(13);
     const second = await rollInitiative();
-    expect(focusPool(second.body)).toMatchObject({ used: 11, remaining: 4 }); // topped up to 4
-    expect(second.body.hitPoints.current).toBe(hpAfterFirst); // no second heal this rest
+    expect(focusPool(second.body)).toMatchObject({ used: 11, remaining: 4 });
+    expect(second.body.hitPoints.current).toBe(hpAfterFirst);
     expect(second.body.results[0].summary).not.toContain("Uncanny Metabolism");
   });
 
@@ -181,6 +174,6 @@ describe("POST /api/characters/:id/resources/transactions — rollInitiative (Mo
     expect(res.status).toBe(200);
     expect(focusPool(res.body)).toBeUndefined();
     expect(res.body.results[0].summary).toBe("Rolled Initiative — no resources to regain");
-    expect(res.body.hitPoints.current).toBe(50); // unchanged
+    expect(res.body.hitPoints.current).toBe(50);
   });
 });

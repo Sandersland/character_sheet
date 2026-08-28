@@ -7,22 +7,17 @@ import { editionOf } from "@/lib/rules/edition.js";
 import { deriveAnnouncedSaveDC } from "@/lib/srd/srd.js";
 
 import { choicesFromRows, derivedStatFromRows, featuresFromRows, improvementsFromRows, poolsFromRows, type ClassFeatureRow, type ClassFeatureRowsCarrier } from "./class-feature-rows.js";
-import { monk } from "./monk.js";
 import type { FeatImprovement } from "./resources-state.js";
 import { SUBCLASS_IDENTITY, type SubclassIdentity, type SubclassSlug } from "./subclass-slug.js";
 import type { ClassDefinition, ClassExtras, DerivedClassInfo, DerivedFeature, DerivedResource, DerivedSubclassChoice, SubclassDefinition } from "./types.js";
 
-// Classes absent here (Fighter, Barbarian, Rogue, Cleric, Warlock, Wizard,
-// Sorcerer, Bard, Paladin, Druid, Ranger) resolve entirely through
-// SUBCLASS_IDENTITY and seeded ClassFeature rows; deriveBaseLayer tolerates
-// the missing key.
-const CLASSES: Record<string, ClassDefinition> = {
-  monk,
-};
+// CLASSES is empty — every class now resolves through SUBCLASS_IDENTITY +
+// seeded ClassFeature rows; deriveBaseLayer tolerates the missing key.
+const CLASSES: Record<string, ClassDefinition> = {};
 
-// Subclass keys are global, not scoped per class. Identity-only stubs seed
-// first so a subclass with no TS module still resolves its seeded rows; a
-// class definition still on the TS migration path then overlays its own stubs.
+// Subclass keys are global. Identity-only stubs seed first so a moduleless
+// subclass still resolves its seeded rows; a still-migrating class then
+// overlays its own stubs.
 const SUBCLASSES: Record<string, SubclassDefinition> = {};
 for (const [slug, { nameKey }] of Object.entries(SUBCLASS_IDENTITY) as [SubclassSlug, SubclassIdentity][]) {
   SUBCLASSES[nameKey] = { slug };
@@ -55,19 +50,16 @@ function mergePoolSources(fromFn: DerivedResource[], fromRows: DerivedResource[]
   return [...fromFn, ...fromRows.filter((p) => !seenKeys.has(p.key))];
 }
 
-// `subclassKey` is already gated on the subclass being ACTIVE (see the call
-// site below) — undefined otherwise, which is also the "no override" input
-// poolsFromRows expects.
+// `subclassKey` is already gated on the subclass being ACTIVE — undefined
+// otherwise, which is also the "no override" input poolsFromRows expects.
 function activeSubclassRows(subclassKey: string | undefined, featureRows: ClassFeatureRowsCarrier | undefined): readonly ClassFeatureRow[] | undefined {
   return subclassKey ? featureRows?.subclassRows : undefined;
 }
 
-// Row-driven pools are data-gated: poolsFromRows reads whatever resourceKey
-// the rows populate — never a per-class-name check. The active subclass's
-// rows (activeSubclassRows) are passed through as poolsFromRows' overrideRows:
-// a base row's resourceKey that the active subclass also declares resolves
-// from the subclass's own row instead (druid wildShape's Circle of the Moon
-// variant, #906/#1226).
+// Row-driven pools are data-gated (no per-class-name check); the active
+// subclass's rows are passed through as poolsFromRows' overrideRows so a base
+// row's resourceKey that the active subclass also declares resolves from the
+// subclass's own row instead (druid wildShape's Circle of the Moon variant).
 function deriveBaseLayer(
   classDef: ClassDefinition | undefined,
   level: number,
@@ -93,9 +85,8 @@ interface SubclassLayer extends ClassLayer {
 }
 
 // EDITION_2024 always gates at 3; EDITION_2014 prefers the seeded
-// CharacterClass.subclassLevel when the caller carries it. Without it, a
-// moduleless class (Cleric/Warlock/Wizard/Sorcerer) silently gates at the
-// plain ?? 3 default instead of its real PHB'14 gate.
+// CharacterClass.subclassLevel — without it a moduleless class silently falls
+// back to the plain ?? 3 default instead of its real PHB'14 gate.
 function isSubclassActive(
   def: SubclassDefinition | undefined,
   level: number,

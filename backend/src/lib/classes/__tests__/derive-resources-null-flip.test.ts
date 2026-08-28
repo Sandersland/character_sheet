@@ -35,8 +35,7 @@ describe("deriveResources computes subclass extras/choices BEFORE the null check
     );
     expect(info).not.toBeNull();
     expect(info?.subclassChoices).toEqual([{ key: "huntersPrey", label: "Hunter's Prey", catalogSource: "huntersPrey", count: 1 }]);
-    // features/resources are legitimately empty here — proving this isn't a
-    // false pass from features/resources smuggling content back in.
+    // Confirms this isn't a false pass from features/resources smuggling content back in.
     expect(info?.features).toEqual([]);
     expect(info?.resources).toEqual([]);
   });
@@ -47,20 +46,9 @@ describe("deriveResources computes subclass extras/choices BEFORE the null check
   });
 });
 
-// resolveArcaneRecoveryContext (lib/spellcasting/spellcasting.ts) and
-// loadResourcesReconcileState (lib/leveling/level-reconciliation.ts) are both
-// module-private, so their exact expressions are re-asserted here directly
-// rather than imported:
-//   resolveArcaneRecoveryContext: `Boolean(resourceInfo?.resources.some(...))`
-//   reconcileManeuvers/reconcileToolProficiencies (loadResourcesReconcileState's
-//     two callers): `derived?.maneuverChoiceCount ?? 0` / `derived?.toolProfChoiceCount ?? 0`
-// Both are optional-chained/defaulted, so a null `derived`/`resourceInfo` is
-// UNCONDITIONALLY safe by construction — verified here on the null value
-// itself, since the private functions can't be imported directly. The
-// end-to-end proof that loadResourcesReconcileState's real callers survive a
-// null-flip case lives in subclass-choices.test.ts's "level-down
-// reconciliation" describe block (Ranger/Hunter, the same live example above),
-// which exercises the actual private function through its real reconcilers.
+// resolveArcaneRecoveryContext and loadResourcesReconcileState's callers are
+// module-private, so their exact null-safe expressions are pinned here
+// literally rather than imported.
 describe("the exact null-safe expressions resolveArcaneRecoveryContext / loadResourcesReconcileState's callers use", () => {
   it("Boolean(nullDerived?.resources.some(...)) is false, never throws", () => {
     const nullDerived = deriveResources("not-a-class", undefined, 5, ABILITY_SCORES, 3, undefined, "EDITION_2024");
@@ -75,19 +63,11 @@ describe("the exact null-safe expressions resolveArcaneRecoveryContext / loadRes
   });
 });
 
-// #1546 Part B-ii opens a SECOND null-flip channel, distinct from #1524's
-// above: before this issue, Battle Master's maneuverChoiceCount/
-// toolProfChoiceCount/announcedSaveDC came from fighter.ts's `deriveExtras` —
-// CODE, unaffected by whether a featureRows carrier was supplied at all — so
-// an EMPTY carrier for a Battle Master fighter still produced a fully
-// populated DerivedClassInfo. After this issue, that same content is ONLY on
-// the Combat Superiority/Student of War rows (registry.ts's deriveRowExtras),
-// so an empty carrier now genuinely has nothing to contribute, and (with no
-// resourceFn pools either) deriveResources' null guard trips: the SAME call
-// that used to return a real object now returns null. This is exactly why
-// derivedAt (level-up-plan.ts) needed a comment update, not just a value
-// check — see its own comment for the plan-level consequence
-// (choiceCountStep's `?? 0` stops being a coincidental no-op).
+// #1546 Part B-ii: an empty featureRows carrier for a Battle Master fighter
+// now trips deriveResources' null guard, since maneuverChoiceCount/
+// toolProfChoiceCount/announcedSaveDC live only on the Combat
+// Superiority/Student of War rows now — see derivedAt's comment in
+// level-up-plan.ts for the level-up-plan consequence.
 describe("#1546 Part B-ii: the featureRows carrier can flip a Battle Master's result between null and non-null", () => {
   it("an EMPTY carrier for a Battle Master fighter now returns null — nothing left to contribute without rows", () => {
     const info = deriveResources("fighter", "battle master", 5, ABILITY_SCORES, proficiencyBonusForLevel(5), { classRows: [], subclassRows: [] }, "EDITION_2024");

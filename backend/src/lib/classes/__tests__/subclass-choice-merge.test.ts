@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import { deriveResources } from "@/lib/classes/registry.js";
 import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "@/lib/classes/class-feature-rows.js";
 
+import { WAY_OF_THE_FOUR_ELEMENTS_ROWS } from "./test-feature-rows.fixture.js";
+
 const ABILITY_SCORES = { strength: 10, dexterity: 14, constitution: 12, intelligence: 10, wisdom: 12, charisma: 10 };
 
 // Keeps deriveResources non-null so an undefined subclassChoices stays observable.
@@ -15,61 +17,55 @@ const DUMMY_CLASS_ROW: ClassFeatureRow = {
   resourceTotals: [{ minLevel: 1, total: 3 }],
 };
 
-function fixtureChoiceRow(level: number): ClassFeatureRow {
+function fixtureChoiceRow(level: number, edition: ClassFeatureRow["edition"] = "EDITION_2024"): ClassFeatureRow {
   return {
     name: "Fixture Choice Feature",
     level,
     description: "",
-    edition: "EDITION_2024",
+    edition,
     choiceKey: "fixtureChoice",
     choiceCatalogSource: "fixtureCatalog",
     choiceCountTiers: [{ minLevel: level, count: 2 }],
   };
 }
 
-// fourElementsDisciplines' count(6) === 2 per monk.ts's own tier table.
-describe("deriveSubclassChoiceList registry merge (#899/#1522) — DEF-WINS BY KEY", () => {
-  it("def wins on a same-key collision with a row-driven choice", () => {
+// deriveSubclassChoiceList's DEF-WINS collision rule (`fromDef` beating
+// `sub.rowChoices` on a same-key match) is dead code now: no SubclassDefinition
+// declares `.choices` any more, so `fromDef` is unconditionally `[]`. Kept
+// until the ResourceFn/SubclassDefinition overlay is deleted; the cases below
+// pin the rows-only path against the shared fixture's Disciple row (EDITION_2014).
+describe("deriveSubclassChoiceList registry merge (#899/#1522) — rows-only path (no TS def.choices left to collide with)", () => {
+  const fourElementsDisciplinesRow = WAY_OF_THE_FOUR_ELEMENTS_ROWS.find((r) => r.name === "Disciple of the Elements");
+  if (!fourElementsDisciplinesRow) throw new Error("fixture missing Disciple of the Elements row");
+
+  it("a subclass's own choice row resolves through deriveResources with no def to merge against", () => {
     const featureRows: ClassFeatureRowsCarrier = {
       classRows: [],
-      subclassRows: [
-        {
-          name: "Row Disciple of the Elements",
-          level: 3,
-          description: "",
-          edition: "EDITION_2024",
-          choiceKey: "fourElementsDisciplines",
-          choiceLabel: "Row Label Should Not Win",
-          choiceCatalogSource: "rowCatalogShouldNotWin",
-          choiceCountTiers: [{ minLevel: 3, count: 99 }],
-        },
-      ],
+      subclassRows: [fourElementsDisciplinesRow],
       subclassLevel: 3,
     };
-    const info = deriveResources("monk", "way of the four elements", 6, ABILITY_SCORES, 3, featureRows, "EDITION_2024");
+    const info = deriveResources("monk", "way of the four elements", 6, ABILITY_SCORES, 3, featureRows, "EDITION_2014");
     expect(info?.subclassChoices).toEqual([
       { key: "fourElementsDisciplines", label: "Elemental Disciplines", catalogSource: "discipline", count: 2 },
     ]);
   });
 
-  it("combined ordering: def entries first (declaration order), non-colliding row entries appended after", () => {
+  it("two non-colliding row entries both appear, in row declaration order", () => {
     const featureRows: ClassFeatureRowsCarrier = {
       classRows: [],
-      subclassRows: [fixtureChoiceRow(3)],
+      subclassRows: [fourElementsDisciplinesRow, fixtureChoiceRow(3, "EDITION_2014")],
       subclassLevel: 3,
     };
-    const info = deriveResources("monk", "way of the four elements", 6, ABILITY_SCORES, 3, featureRows, "EDITION_2024");
+    const info = deriveResources("monk", "way of the four elements", 6, ABILITY_SCORES, 3, featureRows, "EDITION_2014");
     expect(info?.subclassChoices).toEqual([
       { key: "fourElementsDisciplines", label: "Elemental Disciplines", catalogSource: "discipline", count: 2 },
       { key: "fixtureChoice", label: "Fixture Choice Feature", catalogSource: "fixtureCatalog", count: 2 },
     ]);
   });
 
-  it("def-only subclass (no rows carrier) resolves exactly as today", () => {
+  it("no rows carrier at all resolves to no choices (there is no def left to fall back to)", () => {
     const info = deriveResources("monk", "way of the four elements", 6, ABILITY_SCORES, 3, undefined, "EDITION_2024");
-    expect(info?.subclassChoices).toEqual([
-      { key: "fourElementsDisciplines", label: "Elemental Disciplines", catalogSource: "discipline", count: 2 },
-    ]);
+    expect(info?.subclassChoices).toBeUndefined();
   });
 
   it("rows-only subclass (no TS def.choices) resolves end to end through deriveResources", () => {

@@ -1,19 +1,11 @@
-// Builds the ClassFeatureRowsCarrier deriveResources expects from a bare
-// class/subclass name — no DB round-trip, same read path (featuresFromRows).
 // A src file can't import anything under prisma/ (rootDir "src", TS6059), so
-// migrated classes' rows come from the hardcoded LITERAL_CLASS_ROWS/
-// LITERAL_SUBCLASS_ROWS mirrors below; a prisma-side parity suite proves
-// they agree with the real seed.
-//
-// A class/subclass needs a mirror only if its rows carry a resourceKey/
-// derivedStat or a surviving test probes null-vs-object for it — anything
-// else falls through to an empty array with nothing observable lost.
-// Cleric's two domains carry no resource descriptor but are asserted on
-// directly by name, so both need one.
+// LITERAL_CLASS_ROWS/LITERAL_SUBCLASS_ROWS below hardcode a mirror of each
+// seeded row that a test reads a resourceKey/derivedStat from, or asserts
+// null-vs-object against — everything else falls through to an empty array.
 import type { ClassFeatureRow, ClassFeatureRowsCarrier } from "@/lib/classes/class-feature-rows.js";
 import type { AuthoredFeature } from "@/lib/classes/types.js";
 
-// PHB'14 p.164: one feature, one pool, shared across both granting classes.
+// PHB'14 p.164.
 const CHANNEL_DIVINITY_REMINDER =
   "Spend 1 use for any Channel Divinity effect you have — a Cleric's Turn Undead and Divine Domain options and a Paladin's Oath options all draw on this one pool.";
 
@@ -36,6 +28,7 @@ export const FIGHTER_BASE_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2
         : "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
     edition,
     resourceKey: "secondWind",
+    resourceLabel: "Second Wind",
     resourceRecharge: edition === "EDITION_2014" ? "short-or-long" : "longRest",
     resourceTotals: edition === "EDITION_2014" ? [{ minLevel: 1, total: 1 }] : [
       { minLevel: 1, total: 2, shortRestRegain: 1 },
@@ -61,6 +54,7 @@ export const FIGHTER_BASE_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2
         : "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
     edition,
     resourceKey: "actionSurge",
+    resourceLabel: "Action Surge",
     resourceRecharge: "short-or-long",
     resourceTotals: [
       { minLevel: 2, total: 1 },
@@ -81,6 +75,7 @@ export const FIGHTER_BASE_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_2
         : "Reroll a failed saving throw, adding a bonus equal to your Fighter level, and use the new roll. Two uses at level 13, three at level 17. Regain expended uses on a Long Rest.",
     edition,
     resourceKey: "indomitable",
+    resourceLabel: "Indomitable",
     resourceRecharge: "longRest",
     resourceTotals: [
       { minLevel: 9, total: 1 },
@@ -161,8 +156,7 @@ export const BATTLE_MASTER_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITION_
     : { name: "Ultimate Combat Superiority", level: 18, edition, description: "Your Superiority Dice turn into d12s." },
 ]);
 
-// SRD 5.2 p.20: 2014 keeps the 99-at-L20 "unlimited" encoding with no
-// shortRestRegain; 2024 caps at 6 from L17 with shortRestRegain: 1 on every tier.
+// SRD 5.2 p.20: 2014 encodes "unlimited" as a total of 99 at L20; 2024 caps at 6, with shortRestRegain from L17.
 function rageBuffFixture(): ClassFeatureRow["effectBuffs"] {
   return [
     {
@@ -251,7 +245,7 @@ export const BARBARIAN_BASE_ROWS: ClassFeatureRow[] = [
   },
 ];
 
-// A narrow mirror: just the two rows the actions test suite's atRows() helper needs, not a full base-class transcription.
+// Narrow mirror — only the rows atRows() needs, not the full base class.
 export const ROGUE_CUNNING_ACTION_ROWS: ClassFeatureRow[] = [
   {
     name: "Cunning Action",
@@ -690,8 +684,7 @@ export const WARLOCK_BASE_ROWS: ClassFeatureRow[] = [
   },
 ];
 
-// Tests probe "ranger / (no subclass)" null-ness (Favored Enemy from L1), and
-// Extra Attack's derivedStat tiers can't ride toRows (it drops those fields).
+// Hand-authored, not toRows: Extra Attack's derivedStat tiers don't survive toRows.
 export const RANGER_BASE_ROWS: ClassFeatureRow[] = [
   {
     name: "Favored Enemy",
@@ -979,10 +972,9 @@ export const THE_FIEND_ROWS: ClassFeatureRow[] = [
   },
 ];
 
-// The Archfey / The Great Old One are 2014-only: no licensed source verifies
-// their PHB'24 reworks, and assertEverySubclassEditionPopulated makes that a
-// hard product fact. Never add a 2024 partition here to make a test pass —
-// narrow the test's edition instead.
+// The Archfey / The Great Old One are 2014-only — no licensed 2024 rework
+// exists, and assertEverySubclassEditionPopulated enforces that. Don't add a
+// 2024 partition here to make a test pass; narrow the test's edition instead.
 export const THE_ARCHFEY_ROWS: ClassFeatureRow[] = [
   {
     name: "Expanded Spell List",
@@ -1359,8 +1351,7 @@ export const WILD_MAGIC_ROWS: ClassFeatureRow[] = [
   },
 ];
 
-// Narrow mirror: only Bardic Inspiration needs a row-driven pool/action —
-// every other Bard feature falls through the empty-array path.
+// Narrow mirror — only Bardic Inspiration needs a row-driven pool/action.
 export const BARD_BARDIC_INSPIRATION_ROWS: ClassFeatureRow[] = [
   {
     name: "Bardic Inspiration",
@@ -1707,9 +1698,8 @@ export const CLERIC_TRICKERY_DOMAIN_ROWS: ClassFeatureRow[] = [
   },
 ];
 
-// Mirrors druid-features.ts's own WILD_SHAPE_* constants (#906/#1226) —
-// PHB'14 p.66: 2/short-or-long rest, unlimited (Archdruid) from level 20;
-// Duration is floor(level / 2) hours (minimum 1), shared by every Circle.
+// Mirrors druid-features.ts's WILD_SHAPE_* constants.
+// PHB'14 p.66: duration is floor(level / 2) hours (minimum 1), shared by every Circle.
 const WILD_SHAPE_TOTALS: ClassFeatureRow["resourceTotals"] = [
   { minLevel: 2, total: 2 },
   { minLevel: 20, total: 99 },
@@ -1728,8 +1718,7 @@ const WILD_SHAPE_DURATION_TIERS = [
 ];
 const WILD_SHAPE_UNLIMITED_USES_TIER = { minLevel: 20, label: "Uses", value: "Unlimited (Archdruid)" };
 
-// Tests assert null-ness/.length against a Druid circle directly, so the base
-// and both circles all need mirrors.
+// Tests assert null-ness/.length against a Druid circle directly, so the base and both circles need mirrors.
 export const DRUID_BASE_ROWS: ClassFeatureRow[] = [
   {
     name: "Druidic",
@@ -2047,9 +2036,7 @@ export const CIRCLE_OF_THE_MOON_ROWS: ClassFeatureRow[] = [
   },
 ];
 
-// Paladin's oaths are deliberately absent from LITERAL_SUBCLASS_ROWS: none
-// declares a resourceKey/derivedStat, and the base rows alone keep
-// deriveResources non-null from L1.
+// Paladin's oaths are deliberately absent from LITERAL_SUBCLASS_ROWS — none declares a resourceKey/derivedStat.
 export const PALADIN_BASE_ROWS: ClassFeatureRow[] = [
   {
     name: "Divine Sense",
@@ -2339,6 +2326,11 @@ const MONK_BASE_ROWS_2014: ClassFeatureRow[] = [
     edition: "EDITION_2014",
     description:
       "You have a pool of Ki Points equal to your monk level. Spend them to fuel: Flurry of Blows (1 ki — immediately after taking the Attack action, make two unarmed strikes as a bonus action), Patient Defense (1 ki — take the Dodge action as a bonus action), Step of the Wind (1 ki — take the Disengage or Dash action as a bonus action, jump distance doubled for the turn). Ki save DC = 8 + proficiency + Wisdom modifier. Regain all ki on a short or long rest.",
+    resourceKey: "ki",
+    resourceLabel: "Ki Points",
+    resourceRecharge: "short-or-long",
+    resourceTotals: [{ minLevel: 2, total: { levelTimes: 1 } }],
+    resourceOnInitiative: [{ id: "perfectSelf", minLevel: 20, amount: 4, threshold: 0 }],
   },
   {
     name: "Deflect Missiles",
@@ -2427,6 +2419,19 @@ const MONK_BASE_ROWS_2024: ClassFeatureRow[] = [
     edition: "EDITION_2024",
     description:
       "You have a pool of Focus Points equal to your monk level. Spend them to fuel: Flurry of Blows (1 focus — two bonus unarmed strikes), Patient Defense (free for Disengage as a bonus action, or 1 focus for Disengage + Dodge), Step of the Wind (free for Dash as a bonus action, or 1 focus for Disengage + Dash with jump distance doubled). Focus save DC = 8 + proficiency + Wisdom modifier. Regain all focus on a short or long rest.",
+    resourceKey: "focus",
+    resourceLabel: "Focus Points",
+    resourceRecharge: "short-or-long",
+    resourceTotals: [{ minLevel: 2, total: { levelTimes: 1 } }],
+    resourceOnInitiative: [
+      {
+        id: "uncannyMetabolism",
+        amount: "all",
+        oncePerLongRest: true,
+        bonusHeal: { sourceName: "Uncanny Metabolism", dieFaces: "martialArtsDie", flatBonus: { levelTimes: 1 } },
+      },
+      { id: "perfectFocus", minLevel: 15, amount: 4 },
+    ],
   },
   {
     name: "Uncanny Metabolism",
@@ -2598,14 +2603,13 @@ export const MONK_BASE_ROWS: ClassFeatureRow[] = [
   ...MONK_BASE_ROWS_ACTION_ONLY,
 ];
 
-// "Way of the Open Hand" below is a SEPARATE 2014 counterpart, not a fork of this row set.
+// "Way of the Open Hand" below is a SEPARATE 2014 subclass, not this one's 2014 fork.
 export const WARRIOR_OF_THE_OPEN_HAND_ROWS: ClassFeatureRow[] = [
   {
     name: "Open Hand Technique",
     level: 3,
     edition: "EDITION_2024",
-    // SRD 5.2's actual Addle text is "can't make Opportunity Attacks until
-    // the start of its next turn", not "take reactions" — see addleClause for the verified source text.
+    // See open-hand-technique.ts's addleClause for the verified SRD 5.2 Addle text.
     description:
       "When you hit a creature with an attack granted by your Flurry of Blows, you can impose one effect: Addle — the creature can't make Opportunity Attacks until the start of its next turn (no save); Push — the creature makes a Strength save or is pushed up to 15 ft away; or Topple — the creature makes a Dexterity save or is knocked prone.",
   },
@@ -2615,7 +2619,10 @@ export const WARRIOR_OF_THE_OPEN_HAND_ROWS: ClassFeatureRow[] = [
     edition: "EDITION_2024",
     description:
       "As a bonus action, roll your Martial Arts die and regain that many hit points plus your Wisdom modifier (minimum 1). Usable a number of times equal to your Wisdom modifier (minimum once); regain all expended uses on a long rest.",
-    resourceKey: "wholenessOfBody", activationCost: "bonusAction", costKind: "pool", costPoolKey: "wholenessOfBody", costBase: 1,
+    resourceKey: "wholenessOfBody",
+    resourceTotals: [{ minLevel: 6, total: { abilityMod: "wisdom", min: 1 } }],
+    resourceRecharge: "longRest",
+    activationCost: "bonusAction", costKind: "pool", costPoolKey: "wholenessOfBody", costBase: 1,
   },
   {
     name: "Fleet Step",
@@ -2635,8 +2642,7 @@ export const WARRIOR_OF_THE_OPEN_HAND_ROWS: ClassFeatureRow[] = [
   },
 ];
 
-// EDITION_2014-only: SRD 5.1's only monastic tradition, a SEPARATE subclass
-// from Warrior of the Open Hand above, not its 2014 fork.
+// EDITION_2014-only: SRD 5.1's only monastic tradition, a SEPARATE subclass from Warrior of the Open Hand above.
 export const WAY_OF_THE_OPEN_HAND_ROWS: ClassFeatureRow[] = [
   {
     name: "Open Hand Technique",
@@ -2672,8 +2678,7 @@ export const WAY_OF_THE_OPEN_HAND_ROWS: ClassFeatureRow[] = [
     description:
       "When you hit a creature with an unarmed strike, you can spend 3 ki points to start imperceptible vibrations in its body, lasting a number of days equal to your monk level. You can have only one creature under this effect at a time, and you can end the vibrations harmlessly without using an action. To end them harmfully, you and the target must be on the same plane of existence — use your action to force a Constitution save: on a failure the target drops to 0 hit points; on a success it takes 10d10 necrotic damage.",
   },
-  // Wholeness of Body's actionOnly identity sibling — can't ride the
-  // "Wholeness of Body" row above, whose resourceKey is already claimed by the row-owned pool.
+  // actionOnly sibling of "Wholeness of Body" above, which already owns the resourceKey.
   {
     name: "Wholeness of Body — Action", level: 6, edition: "EDITION_2014",
     description: "As an action, spend 1 use of Wholeness of Body to regain hit points equal to three times your monk level.",
@@ -2714,7 +2719,7 @@ export const WARRIOR_OF_SHADOW_ROWS: ClassFeatureRow[] = (["EDITION_2024"] as co
     resourceKey: "cloakOfShadows", activationCost: "action", costKind: "pool", costPoolKey: "focus", costBase: 3,
     reminder: "Magic action, entirely within dim light or darkness: spend 3 focus to become invisible and move through creatures/objects as difficult terrain for 1 minute (or until incapacitated, or you end your turn in bright light). Flurry of Blows costs no focus while it lasts.",
   },
-  // "Shadow Arts" above stays pure feature text — its served action identity needs a DIFFERENT name.
+  // Served action identity for "Shadow Arts" above, which stays pure feature text.
   {
     name: "Shadow Arts (Darkness)", level: 3, edition,
     description: "Spend 1 focus to cast Darkness without material components; you can see through it and move it up to 30 ft as a bonus action while it persists.",
@@ -2799,6 +2804,9 @@ export const WARRIOR_OF_MERCY_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITI
     edition,
     description:
       "When you use Flurry of Blows, you can replace each of its unarmed strikes with Hand of Healing, and you can apply Hand of Harm to one of its strikes without spending focus (Hand of Harm's once-per-turn limit still applies). Usable a number of times equal to your Wisdom modifier (minimum once) per long rest.",
+    resourceKey: "flurryOfHealingAndHarm",
+    resourceTotals: [{ minLevel: 11, total: { abilityMod: "wisdom", min: 1 } }],
+    resourceRecharge: "longRest",
   },
   {
     name: "Hand of Ultimate Mercy",
@@ -2806,6 +2814,9 @@ export const WARRIOR_OF_MERCY_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITI
     edition,
     description:
       "As a Magic action, expend 5 focus to touch a creature that died no more than 24 hours ago and return it to life with 4d10 plus your Wisdom modifier hit points, ending the Blinded, Deafened, Paralyzed, Poisoned, and Stunned conditions on it. Usable once per long rest.",
+    resourceKey: "handOfUltimateMercy",
+    resourceTotals: [{ minLevel: 17, total: 1 }],
+    resourceRecharge: "longRest",
   },
   {
     name: "Hand of Healing (Flurry replacement)", level: 3, edition,
@@ -2816,8 +2827,7 @@ export const WARRIOR_OF_MERCY_ROWS: ClassFeatureRow[] = (["EDITION_2014", "EDITI
   },
 ]);
 
-// EDITION_2024 only — its 2014 predecessor, Way of the Four Elements, is a
-// from-scratch discipline menu, not this subclass under a different edition tag.
+// EDITION_2024 only — its 2014 predecessor, Way of the Four Elements, is a from-scratch discipline menu.
 export const WARRIOR_OF_THE_ELEMENTS_ROWS: ClassFeatureRow[] = (["EDITION_2024"] as const).flatMap((edition) => [
   {
     name: "Manipulate Elements",
@@ -2874,6 +2884,15 @@ export const WAY_OF_THE_FOUR_ELEMENTS_ROWS: ClassFeatureRow[] = [
   {
     name: "Disciple of the Elements", level: 3, edition: "EDITION_2014",
     description: "You learn magical disciplines that harness the power of the four elements. You know Elemental Attunement plus one other elemental discipline of your choice, learning one more at 6th, 11th, and 17th level (2/3/4/5 known total). A discipline requires you to spend ki points each time you use it, and some disciplines require you to reach a specified monk level before you can use them. Whenever you learn a new elemental discipline, you can also replace one you already know with a different discipline. PHB'14 pp. 78, 80.",
+    choiceKey: "fourElementsDisciplines",
+    choiceLabel: "Elemental Disciplines",
+    choiceCatalogSource: "discipline",
+    choiceCountTiers: [
+      { minLevel: 3, count: 1 },
+      { minLevel: 6, count: 2 },
+      { minLevel: 11, count: 3 },
+      { minLevel: 17, count: 4 },
+    ],
   },
   {
     name: "Elemental Attunement", level: 3, edition: "EDITION_2014",

@@ -94,6 +94,8 @@ function isPopulatedRogueRow(row: { className: string; subclassSlug: string | nu
 // Keyed with edition: several Monk names repeat across subclasses/editions
 // with genuinely different descriptor columns per row.
 const POPULATED_MONK_ROW_KEYS = new Set([
+  "null::Ki::EDITION_2014",
+  "null::Focus::EDITION_2024",
   "null::Deflect Attacks::EDITION_2024",
   "null::Deflect Missiles::EDITION_2014",
   "null::Bonus Unarmed Strike::EDITION_2014",
@@ -130,6 +132,10 @@ const POPULATED_MONK_ROW_KEYS = new Set([
   "monk-warrior-of-mercy::Hand of Healing::EDITION_2024",
   "monk-warrior-of-mercy::Hand of Healing (Flurry replacement)::EDITION_2014",
   "monk-warrior-of-mercy::Hand of Healing (Flurry replacement)::EDITION_2024",
+  "monk-warrior-of-mercy::Flurry of Healing and Harm::EDITION_2014",
+  "monk-warrior-of-mercy::Flurry of Healing and Harm::EDITION_2024",
+  "monk-warrior-of-mercy::Hand of Ultimate Mercy::EDITION_2014",
+  "monk-warrior-of-mercy::Hand of Ultimate Mercy::EDITION_2024",
 ]);
 
 function isPopulatedMonkRow(row: RowKey): boolean {
@@ -207,10 +213,9 @@ function isPopulatedClericRow(row: RowKey): boolean {
   );
 }
 
-// Wild Shape's 2014 pool now lives on its own base row AND Circle of the
-// Moon's Circle Forms row — the latter overrides the former's resourceKey
-// (class-feature-rows.ts's overrideRows mechanism, #906/#1226) with Moon's
-// own Max CR curve.
+// Wild Shape's 2014 pool lives on its own base row AND Circle of the Moon's
+// Circle Forms row — the latter overrides the former's resourceKey (the
+// overrideRows mechanism, #906/#1226) with Moon's own Max CR curve.
 const POPULATED_DRUID_ROW_KEYS = new Set([
   "Druid::null::Wild Shape::EDITION_2014",
   "Druid::null::Wild Shape::EDITION_2024",
@@ -415,10 +420,8 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
 
   // Prisma deserializes both SQL NULL (Prisma.DbNull) and a stored JSON
   // `null` (Prisma.JsonNull) to the JS value `null`, so the per-row
-  // `toBeNull()` checks above cannot tell them apart — that gap once let
-  // seedClassFeatures write JsonNull into every Json? descriptor column while
-  // this suite stayed green, which a later `WHERE col IS NULL` filter would
-  // silently miss. Assert the SQL-level state directly.
+  // `toBeNull()` checks above cannot tell them apart. Assert the SQL-level
+  // state directly, since a later `WHERE col IS NULL` filter would.
   it("every Json? tier column is SQL NULL (Prisma.DbNull), not a stored JSON null, everywhere it isn't authored", async () => {
     // Per-class counts of rows with authored resourceTotals. After parallel
     // branches merge, re-measure on the merged tree — each branch's own total
@@ -437,12 +440,19 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
     const DRUID_POOL_ROWS = 4;
     const PALADIN_POOL_ROWS = 5;
     const BLADESINGER_POOL_ROWS = 1;
+    // Way of the Open Hand's own 2014 Wholeness of Body row (row-authored
+    // fixed total, #1134's discriminator).
     const OPEN_HAND_POOL_ROWS = 1;
     const BARD_POOL_ROWS = 2;
+    // Monk retab (#1522): base Ki (2014) + Focus (2024) + Warrior of the Open
+    // Hand's own 2024 Wholeness of Body + Flurry of Healing and Harm (both
+    // editions, shared/untagged row) + Hand of Ultimate Mercy (both editions).
+    const MONK_NEW_POOL_ROWS = 7;
     const populatedResourceTotalsCount =
       FIGHTER_POOL_ROWS + BATTLE_MASTER_POOL_ROWS + BARBARIAN_POOL_ROWS + WIZARD_POOL_ROWS +
       WARLOCK_POOL_ROWS + RANGER_POOL_ROWS + SORCERER_POOL_ROWS + CLERIC_POOL_ROWS +
-      DRUID_POOL_ROWS + PALADIN_POOL_ROWS + BLADESINGER_POOL_ROWS + OPEN_HAND_POOL_ROWS + BARD_POOL_ROWS;
+      DRUID_POOL_ROWS + PALADIN_POOL_ROWS + BLADESINGER_POOL_ROWS + OPEN_HAND_POOL_ROWS + BARD_POOL_ROWS +
+      MONK_NEW_POOL_ROWS;
     // Combat Superiority (both editions) and Bardic Inspiration (both
     // editions) are the only rows with a die-size tier.
     const populatedResourceDieTiersCount = BATTLE_MASTER_POOL_ROWS + BARD_POOL_ROWS;
@@ -458,13 +468,13 @@ describe("ClassFeature migration — every descriptor column is NULL/default, ex
     // resourceDetailTiers' first populated rows (#906/#1226): the 2014 base
     // Wild Shape row and Circle of the Moon's own Circle Forms override row.
     const populatedResourceDetailTiersCount = 2;
-    // 0 until monk's rows author resourceOnInitiative (#1522).
-    const populatedResourceOnInitiativeCount = 0;
+    // Monk's base Ki (Perfect Self, L20) and Focus (Uncanny Metabolism +
+    // Perfect Focus, L2/L15) rows (#1522).
+    const populatedResourceOnInitiativeCount = 2;
     // Hunter's Prey/Defensive Tactics (both editions) and Multiattack/Superior
-    // Hunter's Defense (SRD 5.1 pp. 37-38 only; absent from SRD 5.2 p. 61) — 6 rows (#899/#1353).
-    // Four Elements' fourElementsDisciplines stays a TS SubclassChoice
-    // (monk.ts), not yet a row.
-    const populatedChoiceCountTiersCount = 6;
+    // Hunter's Defense (SRD 5.1 pp. 37-38 only; absent from SRD 5.2 p. 61) — 6 rows (#899/#1353),
+    // plus Way of the Four Elements' Disciple of the Elements row (#1522).
+    const populatedChoiceCountTiersCount = 7;
     const EXPECTED_DB_NULL: Record<
       | "resourceTotals"
       | "resourceDieTiers"
@@ -716,8 +726,7 @@ describe("ClassFeature migration — seedClassFeatures is idempotent (#1523)", (
 // is the character level the feature is granted at. castSpecFromRow's
 // `{ ...row, level: 0 }` override keeps resolveEffectScaling from reading a
 // grant level as a spell level. Both tests go through castSpecFromRow itself,
-// never a hand-copied adapter — a copy stays green when the real one is
-// deleted.
+// never a hand-copied adapter.
 describe("ClassFeature EffectRow landmine — no Fighter row ever resolves a non-'none' scaling mode (#1528)", () => {
   it("every REAL Fighter row with effectKind set resolves { mode: 'none' } through castSpecFromRow", async () => {
     const rows = await prisma.classFeature.findMany({

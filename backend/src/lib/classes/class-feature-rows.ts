@@ -114,9 +114,9 @@ export interface InitiativeRegenBonusHealRow {
   flatBonus?: ResourceTotalFormula;
 }
 
-// Row-authored counterpart to InitiativeRegen (#1522). `minLevel` gates each
-// entry ADDITIVELY (like EffectBuffRow.minLevel), NOT last-match-wins like
-// this file's tier arrays — a later entry joins the earlier ones.
+// Row-authored counterpart to InitiativeRegen. `minLevel` gates each entry
+// ADDITIVELY (like EffectBuffRow.minLevel), NOT last-match-wins like this
+// file's tier arrays — a later entry joins the earlier ones.
 export interface InitiativeRegenRow {
   id: string;
   amount: "all" | number;
@@ -143,8 +143,8 @@ export interface ChoiceCountTier {
   count: number;
 }
 
-// Row-driven counterpart to SubclassChoice (#899): choiceKey keys
-// choicesKnown, choiceCatalogSource names the GrantedAbility.source catalog.
+// Row-driven counterpart to SubclassChoice: choiceKey keys choicesKnown,
+// choiceCatalogSource names the GrantedAbility.source catalog.
 export interface ChoiceColumns {
   choiceKey?: string | null;
   choiceLabel?: string | null;
@@ -178,12 +178,10 @@ export interface ActivationColumns {
   actionOnly?: boolean | null;
 }
 
-// Cost/effect fields are duplicated from AbilityCostColumns/EffectColumns
-// rather than imported, keeping this a Prisma-free structural type that
-// readAbilityCost/readEffectSpec accept without a cross-import. Effect fields
-// are EffectColumns MINUS upcastDicePerLevel/cantripScaling/concentration —
-// see the EffectRow comment at readEffectSpec's Fighter call site for why
-// those three must never be added here.
+// Cost/effect fields are duplicated from AbilityCostColumns/EffectColumns,
+// not imported, to keep this a Prisma-free structural type. Effect fields
+// exclude upcastDicePerLevel/cantripScaling/concentration — never add those
+// three here; a ClassFeature row's scaling axis is always "none".
 export interface ClassFeatureRow extends ResourceColumns, ActivationColumns, ChoiceColumns {
   name: string;
   level: number;
@@ -363,7 +361,7 @@ function resourceOnInitiativeFromRow(
   return surviving.map((entry) => resolveInitiativeRegenEntry(entry, ctx, edition));
 }
 
-// The pool's description IS the row's own description, never a second string (#1528).
+// The pool's description IS the row's own description, never a second string.
 function poolFromRow(row: ClassFeatureRow, ctx: ResourceTotalContext, edition: RulesEdition): DerivedResource | null {
   if (!row.resourceKey) return null;
   const totalTier = tierAt(row.resourceTotals, ctx.level);
@@ -381,28 +379,14 @@ function poolFromRow(row: ClassFeatureRow, ctx: ResourceTotalContext, edition: R
 }
 
 // A base row's resourceKey that an active subclass's own row ALSO declares
-// resolves from that subclass row instead — the row-driven counterpart to a
-// resourceFn receiving the active subclassKey (#906). Swaps the WHOLE
-// descriptor block (key/label/totals/die/recharge/details/shortRestRegain/onInitiative)
-// together, never a per-column merge, so a subclass's variant pool (e.g.
-// druid Circle of the Moon's wildShape) reads as one coherent set of
-// numbers — EXCEPT `description`, which poolsFromRows below always takes
-// from the BASE row: description is the carrier FEATURE's text, not a
-// descriptor column, and the base row's text is the one that stays true at
-// every level/circle (Moon's own Circle Forms text names only ITS curve).
-// `tierAt(row.resourceTotals, level) !== undefined` is the FULL guard against
-// silently deleting the base pool (poolFromRow requires a totalTier to mint
-// one at all) — resourceTotals merely being non-empty is NOT enough on its
-// own: it also excludes an identity-only row (e.g. Metamagic's resourceKey
-// with no pool, #1909), AND a row whose grant level (row.level) is reached
-// but whose OWN first totals tier isn't yet (e.g. a level-2 row whose
-// resourceTotals only starts at minLevel 5). Either gap left unguarded would
-// pick a row poolFromRow then nulls out, deleting the base pool instead of
-// leaving it alone. A poolFromRow-side fallback (return the base row when the
-// override yields null) is NOT the fix: poolsFromRows re-stamps the
-// description from `row` (the base row) whenever `override` is truthy, so a
-// fallback would have to thread that same distinction back through
-// poolFromRow's own return, duplicating this function's job.
+// resolves from that subclass row instead (e.g. druid Circle of the Moon's
+// wildShape variant) — swapping the WHOLE descriptor block together, never a
+// per-column merge. `description` always comes from the BASE row regardless
+// (poolsFromRows re-stamps it) since it's the carrier feature's text, not a
+// descriptor column. The `tierAt(...) !== undefined` check guards against
+// picking an identity-only row (no pool at all, e.g. Metamagic's resourceKey)
+// or one whose own first tier isn't yet reached — either gap would null out
+// and delete the base pool instead of leaving it alone.
 function findOverrideRow(
   overrideRows: readonly ClassFeatureRow[] | undefined,
   resourceKey: string,

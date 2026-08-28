@@ -1,11 +1,3 @@
-/**
- * Stunning Strike route tests (#1242). A level-5 monk (Wis 16, prof +3) has
- * focus DC 14; the once-per-turn guard rejects a repeat attempt, insufficient
- * focus is rejected, and a non-monk (or a monk below L5) has no Stunning Strike.
- * #1500 adds a 2014 (Ki) counterpart proving the once-per-turn guard is
- * LIFTED and the resource spend targets "ki" instead of "focus".
- */
-
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -43,12 +35,37 @@ function agent() {
 }
 const url = `/api/characters/${FIXTURE_ID}/abilities/stunning-strike/transactions`;
 
+async function seedFocusRow(classId: string) {
+  await prisma.classFeature.deleteMany({ where: { classId, subclassId: null } });
+  await prisma.classFeature.create({
+    data: {
+      classId, subclassId: null, name: "Focus", level: 2, edition: "EDITION_2024",
+      description: "You have a pool of Focus Points equal to your monk level.",
+      resourceKey: "focus", resourceLabel: "Focus Points", resourceRecharge: "short-or-long",
+      resourceTotals: [{ minLevel: 2, total: { levelTimes: 1 } }],
+    },
+  });
+}
+
+async function seedKiRow(classId: string) {
+  await prisma.classFeature.deleteMany({ where: { classId, subclassId: null } });
+  await prisma.classFeature.create({
+    data: {
+      classId, subclassId: null, name: "Ki", level: 2, edition: "EDITION_2014",
+      description: "You have a pool of Ki Points equal to your monk level.",
+      resourceKey: "ki", resourceLabel: "Ki Points", resourceRecharge: "short-or-long",
+      resourceTotals: [{ minLevel: 2, total: { levelTimes: 1 } }],
+    },
+  });
+}
+
 async function createMonk(level: number, resources?: Prisma.InputJsonValue) {
   const cls = await prisma.characterClass.upsert({
     where: { name: CLASS_NAME },
     create: { name: CLASS_NAME, hitDie: "d8", savingThrows: ["strength", "dexterity"], skillChoiceCount: 2, skillChoices: ["acrobatics"], isSpellcaster: false },
     update: {},
   });
+  await seedFocusRow(cls.id);
   await prisma.character.create({
     data: {
       ...FIXTURE_BASE,
@@ -82,19 +99,15 @@ describe("POST /api/characters/:id/abilities/stunning-strike/transactions", () =
     expect(result.dc).toBe(14);
     expect(result.roll).toBeGreaterThanOrEqual(1);
     expect(result.roll).toBeLessThanOrEqual(20);
-    // Outcome is internally consistent with the roll vs DC (SRD 5.2 save rule).
+    // SRD 5.2: outcome follows the roll vs DC.
     expect(result.outcome).toBe(result.roll >= result.dc ? "success" : "fail");
     expect(result.summary).toContain(`DC ${result.dc}`);
     expect(result.summary).toContain(`target rolled ${result.roll}`);
 
-    // Focus was actually spent — the resource pool reflects it.
     const focusPool = res.body.character.resources.pools.find((p: { key: string }) => p.key === "focus");
-    expect(focusPool.remaining).toBe(4); // 5 total − 1 spent
+    expect(focusPool.remaining).toBe(4);
   });
 
-  // #1275 byte-identity oracle: captured on the per-feature URL before the move to
-  // the shared ability endpoint, so a green run afterwards is evidence the audit
-  // trail is unchanged.
   it("pins the audit trail of one Stunning Strike attempt", async () => {
     const res = await agent()
       .post(url)
@@ -154,6 +167,7 @@ async function createMonk2014(level: number, resources?: Prisma.InputJsonValue) 
     create: { name: CLASS_NAME_2014, hitDie: "d8", savingThrows: ["strength", "dexterity"], skillChoiceCount: 2, skillChoices: ["acrobatics"], isSpellcaster: false },
     update: {},
   });
+  await seedKiRow(cls.id);
   await prisma.character.create({
     data: {
       ...FIXTURE_BASE,
@@ -190,7 +204,7 @@ describe("POST /api/characters/:id/abilities/stunning-strike/transactions — ED
     expect(result.summary).toContain(`DC ${result.dc}`);
 
     const kiPool = res.body.character.resources.pools.find((p: { key: string }) => p.key === "ki");
-    expect(kiPool.remaining).toBe(4); // 5 total − 1 spent
+    expect(kiPool.remaining).toBe(4);
     expect(res.body.character.resources.pools.find((p: { key: string }) => p.key === "focus")).toBeUndefined();
   });
 
@@ -206,7 +220,7 @@ describe("POST /api/characters/:id/abilities/stunning-strike/transactions — ED
     expect(second.status).toBe(200);
 
     const kiPool = second.body.character.resources.pools.find((p: { key: string }) => p.key === "ki");
-    expect(kiPool.remaining).toBe(3); // 5 total − 2 spent across the two attempts
+    expect(kiPool.remaining).toBe(3);
   });
 
   it("rejects an attempt with no ki remaining", async () => {
@@ -279,10 +293,9 @@ describe("Stunning Strike for a non-monk", () => {
   });
 });
 
-// #1337: hasStunningStrike is the single source of the L5 gate — both the
-// serialized rider and this route's cast guard read it. Proven with a
-// Fighter/Monk multiclass, where the monk class ENTRY's own level (not the
-// derived total character level) decides the gate.
+// hasStunningStrike is the single source of the L5 gate — both the serialized
+// rider and this route's cast guard read it. The monk class ENTRY's own
+// level (not the derived total character level) decides the gate.
 describe("Stunning Strike multiclass entry-scoping (#1337)", () => {
   const MULTICLASS_ID = "test-stunning-strike-multiclass-1";
   const multiclassUrl = `/api/characters/${MULTICLASS_ID}/abilities/stunning-strike/transactions`;
@@ -290,10 +303,21 @@ describe("Stunning Strike multiclass entry-scoping (#1337)", () => {
   afterEach(async () => {
     await prisma.character.deleteMany({ where: { id: MULTICLASS_ID } });
   });
+  // Last describe in this file to (re-)upsert CLASS_NAME — its own cleanup keeps
+  // the class from leaking into other suites' full CharacterClass sweeps.
+  afterAll(async () => {
+    await prisma.characterClass.deleteMany({ where: { name: CLASS_NAME } });
+  });
 
   async function createFighterMonk(monkLevel: number) {
     await ensureTestOwner(OWNER_ID);
     COOKIE = await authCookie(OWNER_ID);
+    const monkClass = await prisma.characterClass.upsert({
+      where: { name: CLASS_NAME },
+      create: { name: CLASS_NAME, hitDie: "d8", savingThrows: ["strength", "dexterity"], skillChoiceCount: 2, skillChoices: ["acrobatics"], isSpellcaster: false },
+      update: {},
+    });
+    await seedFocusRow(monkClass.id);
     await prisma.character.create({
       data: {
         ...FIXTURE_BASE,
@@ -303,7 +327,7 @@ describe("Stunning Strike multiclass entry-scoping (#1337)", () => {
         classEntries: {
           create: [
             { name: "fighter", position: 0, level: 5 },
-            { name: "monk", position: 1, level: monkLevel },
+            { name: "monk", classId: monkClass.id, position: 1, level: monkLevel },
           ],
         },
       },

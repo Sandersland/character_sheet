@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { poolsFromRows, type ClassFeatureRow, type InitiativeRegenRow } from "@/lib/classes/class-feature-rows.js";
 import { deriveMartialArtsDie } from "@/lib/srd/weapon-damage.js";
-import { monk } from "@/lib/classes/monk.js";
+
+import { MONK_BASE_ROWS } from "./test-feature-rows.fixture.js";
 
 const ABILITY_SCORES = { strength: 10, dexterity: 16, constitution: 14, intelligence: 10, wisdom: 14, charisma: 10 };
 
@@ -10,46 +11,35 @@ function row(overrides: Partial<ClassFeatureRow> = {}): ClassFeatureRow {
   return { name: "Test Feature", level: 1, description: "test description", edition: "EDITION_2014", ...overrides };
 }
 
-// Hand-authored rows; monk.resourceFn is imported only as the expectation
-// they must resolve to, never as the fixture's source.
-const FOCUS_ON_INITIATIVE: InitiativeRegenRow[] = [
-  {
-    id: "uncannyMetabolism",
-    amount: "all",
-    oncePerLongRest: true,
-    bonusHeal: { sourceName: "Uncanny Metabolism", dieFaces: "martialArtsDie", flatBonus: { levelTimes: 1 } },
-  },
-  { id: "perfectFocus", minLevel: 15, amount: 4 },
-];
-
-const PERFECT_SELF_ON_INITIATIVE: InitiativeRegenRow[] = [{ id: "perfectSelf", minLevel: 20, amount: 4, threshold: 0 }];
+function findMonkRow(name: string, edition: "EDITION_2014" | "EDITION_2024"): ClassFeatureRow {
+  const found = MONK_BASE_ROWS.find((r) => r.name === name && r.edition === edition);
+  if (!found) throw new Error(`test-feature-rows.fixture.ts: no "${name}" (${edition}) row found`);
+  return found;
+}
 
 function focusRow(): ClassFeatureRow {
-  return row({
-    edition: "EDITION_2024",
-    resourceKey: "focus",
-    resourceTotals: [{ minLevel: 2, total: { levelTimes: 1 } }],
-    resourceOnInitiative: FOCUS_ON_INITIATIVE,
-  });
+  return findMonkRow("Focus", "EDITION_2024");
 }
 
 function kiRow(): ClassFeatureRow {
-  return row({
-    edition: "EDITION_2014",
-    resourceKey: "ki",
-    resourceTotals: [{ minLevel: 2, total: { levelTimes: 1 } }],
-    resourceOnInitiative: PERFECT_SELF_ON_INITIATIVE,
-  });
+  return findMonkRow("Ki", "EDITION_2014");
 }
 
 describe("poolsFromRows resolves resourceOnInitiative (#1522) — the row-driven InitiativeRegen vocabulary", () => {
-  describe("reproduces monk.ts's real descriptors byte-for-byte", () => {
+  describe("resolves the shared monk fixture's Ki/Focus onInitiative descriptors", () => {
     it("2024 Focus at L15+: uncannyMetabolism + perfectFocus both present, in authored order", () => {
       for (const level of [15, 16, 20]) {
         const rows = [focusRow()];
         const resolved = poolsFromRows(rows, level, ABILITY_SCORES, 3, "EDITION_2024")[0];
-        const expected = monk.resourceFn!(level, ABILITY_SCORES, 3, undefined, "EDITION_2024")[0];
-        expect(resolved.onInitiative).toEqual(expected.onInitiative);
+        expect(resolved.onInitiative).toEqual([
+          {
+            id: "uncannyMetabolism",
+            amount: "all",
+            oncePerLongRest: true,
+            bonusHeal: { sourceName: "Uncanny Metabolism", dieFaces: deriveMartialArtsDie(level, "EDITION_2024"), flatBonus: level },
+          },
+          { id: "perfectFocus", amount: 4 },
+        ]);
       }
     });
 
@@ -57,8 +47,6 @@ describe("poolsFromRows resolves resourceOnInitiative (#1522) — the row-driven
       for (const level of [2, 4, 5, 10, 14]) {
         const rows = [focusRow()];
         const resolved = poolsFromRows(rows, level, ABILITY_SCORES, 2, "EDITION_2024")[0];
-        const expected = monk.resourceFn!(level, ABILITY_SCORES, 2, undefined, "EDITION_2024")[0];
-        expect(resolved.onInitiative).toEqual(expected.onInitiative);
         expect(resolved.onInitiative).toEqual([
           {
             id: "uncannyMetabolism",
@@ -73,8 +61,6 @@ describe("poolsFromRows resolves resourceOnInitiative (#1522) — the row-driven
     it("2014 Ki at L20: Perfect Self ({amount:4, threshold:0}), and no onInitiative key at all below L20", () => {
       const rowsAt20 = [kiRow()];
       const resolvedAt20 = poolsFromRows(rowsAt20, 20, ABILITY_SCORES, 6, "EDITION_2014")[0];
-      const expectedAt20 = monk.resourceFn!(20, ABILITY_SCORES, 6, undefined, "EDITION_2014")[0];
-      expect(resolvedAt20.onInitiative).toEqual(expectedAt20.onInitiative);
       expect(resolvedAt20.onInitiative).toEqual([{ id: "perfectSelf", amount: 4, threshold: 0 }]);
 
       const rowsAt19 = [kiRow()];

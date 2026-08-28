@@ -1,12 +1,3 @@
-/**
- * Hand of Harm route tests (#1248). A level-3+ Warrior of Mercy monk can
- * spend 1 Focus once per turn to narrate a client-rolled necrotic bonus on an
- * Unarmed Strike hit; Physician's Touch (L6+) adds the Poisoned rider to the
- * summary. Flurry of Healing and Harm (L11+) can spend a free use of its own
- * pool instead of Focus. Off-subclass, under-level, and once-per-turn
- * violations are all rejected.
- */
-
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -45,18 +36,50 @@ function agent() {
 }
 const url = `/api/characters/${FIXTURE_ID}/abilities/hand-of-harm/transactions`;
 
+// dealHandOfHarm's gate (resolveSubclassSlug) reads only the display-name
+// string, so this bespoke class/subclass need their own seeded rows.
 async function createMonk(experiencePoints: number, level: number, subclass?: string, resources?: Prisma.InputJsonValue) {
   const cls = await prisma.characterClass.upsert({
     where: { name: CLASS_NAME },
     create: { name: CLASS_NAME, hitDie: "d8", savingThrows: ["strength", "dexterity"], skillChoiceCount: 2, skillChoices: ["acrobatics"], isSpellcaster: false },
     update: {},
   });
+  await prisma.classFeature.deleteMany({ where: { classId: cls.id, subclassId: null } });
+  await prisma.classFeature.create({
+    data: {
+      classId: cls.id, subclassId: null, name: "Focus", level: 2, edition: "EDITION_2024",
+      description: "You have a pool of Focus Points equal to your monk level.",
+      resourceKey: "focus", resourceLabel: "Focus Points", resourceRecharge: "short-or-long",
+      resourceTotals: [{ minLevel: 2, total: { levelTimes: 1 } }],
+    },
+  });
+  let subclassId: string | undefined;
+  if (subclass === "Warrior of Mercy") {
+    // find-then-create, not .upsert(): `edition` is nullable and Prisma's
+    // compound-unique input rejects an explicit null.
+    const existing = await prisma.subclass.findFirst({ where: { classId: cls.id, slug: "hand-of-harm-route-test-mercy" } });
+    const sub =
+      existing ??
+      (await prisma.subclass.create({
+        data: { classId: cls.id, name: "Warrior of Mercy Route Test", description: "Test fixture subclass.", slug: "hand-of-harm-route-test-mercy" },
+      }));
+    subclassId = sub.id;
+    await prisma.classFeature.deleteMany({ where: { subclassId } });
+    await prisma.classFeature.create({
+      data: {
+        classId: cls.id, subclassId, name: "Flurry of Healing and Harm", level: 11, edition: "EDITION_2024",
+        description: "row text",
+        resourceKey: "flurryOfHealingAndHarm", resourceRecharge: "longRest",
+        resourceTotals: [{ minLevel: 11, total: { abilityMod: "wisdom", min: 1 } }],
+      },
+    });
+  }
   await prisma.character.create({
     data: {
       ...fixtureBase(experiencePoints),
       ownerId: OWNER_ID,
       resources: resources ?? Prisma.JsonNull,
-      classEntries: { create: [{ name: "monk", classId: cls.id, position: 0, level, subclass }] },
+      classEntries: { create: [{ name: "monk", classId: cls.id, subclassId, position: 0, level, subclass }] },
     },
   });
 }
@@ -89,9 +112,6 @@ describe("POST /api/characters/:id/abilities/hand-of-harm/transactions", () => {
     expect(focusPool.remaining).toBe(2); // 3 total − 1 spent
   });
 
-  // #1275 byte-identity oracle: captured on the per-feature URL before the move to
-  // the shared ability endpoint, so a green run afterwards is evidence the audit
-  // trail is unchanged.
   it("pins the audit trail of one Hand of Harm hit", async () => {
     const res = await agent()
       .post(url)
@@ -245,9 +265,6 @@ describe("Hand of Harm for an under-level or off-subclass monk", () => {
     expect(res.body.error).toMatch(/warrior of mercy/i);
   });
 
-  // #1277: isWarriorOfMercy used to substring-match ("mercy"), so a homebrew
-  // name merely CONTAINING "Mercy" inherited real Warrior of Mercy mechanics —
-  // the same failure class #1339 fixed at the DERIVED_ACTIONS gate.
   it("rejects a homebrew name containing \"Mercy\" that isn't the real subclass", async () => {
     await createMonk(6500, 5, "Way of Mercy Reborn");
     const res = await agent()
@@ -258,10 +275,8 @@ describe("Hand of Harm for an under-level or off-subclass monk", () => {
   });
 });
 
-// #1277: resolveSubclassSlug prefers the catalog FK over the freeform display
-// name. A misleading display name must not override a real subclassId — the
-// FK-fixture twin of the same test in open-hand-technique.test.ts, which
-// asserts the opposite outcome for the SAME character shape.
+// resolveSubclassSlug prefers the catalog FK over the freeform display name —
+// a misleading display name must not override a real subclassId.
 describe("Hand of Harm prefers the subclass catalog FK over a misleading display name (#1277)", () => {
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
@@ -279,6 +294,15 @@ describe("Hand of Harm prefers the subclass catalog FK over a misleading display
       where: { name: CLASS_NAME },
       create: { name: CLASS_NAME, hitDie: "d8", savingThrows: ["strength", "dexterity"], skillChoiceCount: 2, skillChoices: ["acrobatics"], isSpellcaster: false },
       update: {},
+    });
+    await prisma.classFeature.deleteMany({ where: { classId: cls.id, subclassId: null } });
+    await prisma.classFeature.create({
+      data: {
+        classId: cls.id, subclassId: null, name: "Focus", level: 2, edition: "EDITION_2024",
+        description: "You have a pool of Focus Points equal to your monk level.",
+        resourceKey: "focus", resourceLabel: "Focus Points", resourceRecharge: "short-or-long",
+        resourceTotals: [{ minLevel: 2, total: { levelTimes: 1 } }],
+      },
     });
     const mercy = await prisma.subclass.findFirstOrThrow({ where: { slug: "monk-warrior-of-mercy" } });
     await prisma.character.create({

@@ -1,8 +1,5 @@
-// ClassFeature catalog (#1522/#1523): every class's literal seed rows,
-// concatenated into CLASS_FEATURES, plus the zod schema that validates them.
-// DATA MODULE ONLY (#1277 AC 4, machine-enforced by
-// scripts/check-seed-data-modules.sh): no database calls or async write logic
-// here — the executable seeder is seedClassFeatures.
+// DATA MODULE ONLY (#1277 AC 4, machine-enforced): no database calls or
+// async write logic here — seedClassFeatures is the executable counterpart.
 import { z } from "zod";
 
 import {
@@ -35,11 +32,9 @@ import { SORCERER_FEATURES } from "./sorcerer-features.js";
 import { WARLOCK_FEATURES } from "./warlock-features.js";
 import { WIZARD_FEATURES } from "./wizard-features.js";
 
-// Classes whose CLASS_FEATURES rows are authored as literal seed data (all
-// twelve). Exported so tests key off one authoritative set per side — the
-// lowercase LITERAL_ROW_CLASSES twin in class-subclasses.fixture.ts stays
-// separate only because a src file importing anything under prisma/ is a
-// TS6059 compile error (rootDir "src").
+// Exported so tests key off one authoritative set per side — a separate
+// lowercase twin exists only because a src file importing anything under
+// prisma/ is a TS6059 compile error (rootDir "src").
 export const LITERAL_ROW_CLASSES: ReadonlySet<string> = new Set([
   "Fighter",
   "Barbarian",
@@ -55,12 +50,10 @@ export const LITERAL_ROW_CLASSES: ReadonlySet<string> = new Set([
   "Monk",
 ]);
 
-// The seed-authoring shape for one ClassFeature DB row. Descriptor fields
-// mirror ClassFeature's columns 1:1 (writeResolvedRows walks DESCRIPTOR_RESET's
-// key set). `edition` is REQUIRED, unlike other edition-tagged seed rows:
-// each class's own expand() has already split every row one-per-edition, so
-// there is no "omitted = shared" case, mirroring the DB column's
-// non-nullability.
+// `edition` is REQUIRED, unlike other edition-tagged seed rows: each class's
+// own expand() has already split every row one-per-edition, mirroring the DB
+// column's non-nullability. Descriptor fields mirror ClassFeature's columns
+// 1:1 — writeResolvedRows walks DESCRIPTOR_RESET's key set.
 export interface ClassFeatureSeedRow {
   // Must match a CharacterClass.name seed row — title case, not registry.ts's
   // lowercase dispatch key.
@@ -73,10 +66,6 @@ export interface ClassFeatureSeedRow {
   resourceKey?: string;
   resourceLabel?: string;
   resourceRecharge?: string;
-  // `total` is typed ResourceTotalFormula (not inlined): rows are handed to
-  // ClassFeatureRow[]-typed parameters in seed tests, and a structurally
-  // widened local literal would fail that assignment instead of catching a
-  // typo'd ability name at compile time.
   resourceTotals?: { minLevel: number; total: ResourceTotalFormula; shortRestRegain?: number }[];
   resourceDieTiers?: { minLevel: number; die: string }[];
   resourceRechargeTiers?: { minLevel: number; recharge: RechargeOn }[];
@@ -136,31 +125,25 @@ export const CLASS_FEATURES: ClassFeatureSeedRow[] = [
   ...PALADIN_FEATURES,
 ];
 
-// Tier arrays are ASCENDING by minLevel, last-match-wins (#1522). Each tier
-// schema below stays a plain (non-generic) zod object — a generic factory
-// spreading into z.object's shape defeats TS's inference of the merged shape
-// — but every one `.refine`s this same predicate, so the invariant has
-// exactly one definition.
+// Tier arrays are ASCENDING by minLevel, last-match-wins (#1522).
 function isAscendingByMinLevel(tiers: { minLevel: number }[]): boolean {
   return tiers.every((tier, i) => i === 0 || tier.minLevel > tiers[i - 1].minLevel);
 }
 
 const ASCENDING_TIER_MESSAGE = { message: "tier array must be strictly ascending by minLevel" };
 
-// The per-column tier schemas stay un-exported: classFeatureSeedSchema is the
-// one validation surface anything outside this file should parse against.
-// A tier's `total` may be a formula (#1685) — mirrors ResourceTotalFormula
-// field-for-field; evaluateResourceTotal is the one interpreter.
+// classFeatureSeedSchema is the one validation surface anything outside this
+// file should parse against — the per-column tier schemas stay un-exported.
+// Mirrors ResourceTotalFormula field-for-field; evaluateResourceTotal is the
+// one interpreter.
 const resourceTotalFormulaSchema = z.union([
   z.number().int().nonnegative(),
   z.literal("proficiencyBonus"),
   z.object({
     abilityMod: z.enum(["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"]),
-    // An additive offset applied before `min` floors the sum — PHB'14 p.84
-    // cites Divine Sense's own "1 + Charisma modifier" formula, not any floor
-    // (nonnegative: nothing downstream guards a negative pool total).
+    // PHB'14 p.84 — Divine Sense's own "1 + Charisma modifier" formula.
     plus: z.number().int().nonnegative().optional(),
-    // A floor for the modifier (+ plus, if set), never a source of negative totals (#1685).
+    // A floor for the modifier (+ plus); never a source of negative totals (#1685).
     min: z.number().int().nonnegative().optional(),
   }),
   z.object({ levelTimes: z.number().int().positive() }),
@@ -193,11 +176,10 @@ const choiceCountTiersSchema = z
   .min(1) // an empty tier array is authoring garbage, same as resourceRechargeTiers
   .refine(isAscendingByMinLevel, ASCENDING_TIER_MESSAGE);
 
-// resourceDetailTiers' own invariant (#1685): ASCENDING by minLevel PER
-// LABEL, not globally — labels interleave freely in the flat array. Reuses
-// isAscendingByMinLevel per label, never a second ordering predicate.
-// If you change this grouping, also update its resolution twin
-// groupDetailTiersByLabel — both must group identically.
+// resourceDetailTiers is ascending by minLevel PER LABEL, not globally
+// (#1685) — labels interleave freely in the flat array. If you change this
+// grouping, also update its resolution twin groupDetailTiersByLabel — both
+// must group identically.
 function groupMinLevelsByLabel(tiers: { minLevel: number; label: string }[]): number[][] {
   const byLabel = new Map<string, number[]>();
   for (const tier of tiers) {
@@ -212,8 +194,7 @@ function isAscendingByMinLevelPerLabel(tiers: { minLevel: number; label: string 
   return groupMinLevelsByLabel(tiers).every((levels) => isAscendingByMinLevel(levels.map((minLevel) => ({ minLevel }))));
 }
 
-// Not ASCENDING_TIER_MESSAGE: that describes a GLOBAL ascending order, which
-// is not this schema's rule.
+// Distinct from ASCENDING_TIER_MESSAGE, which describes a GLOBAL order.
 const PER_LABEL_ASCENDING_TIER_MESSAGE = { message: "each label's tiers must be ascending by minLevel" };
 
 const resourceDetailTiersSchema = z
@@ -248,9 +229,8 @@ const resourceOnInitiativeSchema = z
     message: "resourceOnInitiative ids must be unique within one row's array (the id disambiguates once-per-long-rest markers)",
   });
 
-// effectBuffs' `modifier` (#1686): evaluateBuffModifier's vocabulary — a
-// formula OR a tier array (same ascending invariant); `value` mirrors
-// derivedStatTiersSchema's naming since this scales a modifier, not a pool.
+// Mirrors evaluateBuffModifier's vocabulary (#1686): a formula OR a tier
+// array (same ascending invariant).
 const buffModifierTiersSchema = z
   .array(z.object({ minLevel: z.number().int().positive(), value: z.number() }))
   .refine(isAscendingByMinLevel, ASCENDING_TIER_MESSAGE);
@@ -264,10 +244,9 @@ const rollEffectSchema = z.object({
   ability: z.string().min(1).optional(),
 });
 
-// Every `target` a row-declared buff may name (#1686): the 18 skill keys plus
-// the derived-stat keys buildTargetModifiers actually sums — widen this list
-// only in the SAME diff that adds a new consumer, never speculatively. A
-// marker buff (`target === key`) is admitted by the `.refine` below instead.
+// Every `target` a row-declared buff may name (#1686) — widen only in the
+// same diff that adds a new consumer in buildTargetModifiers. A marker buff
+// (`target === key`) is admitted separately by the `.refine` below.
 const KNOWN_BUFF_TARGETS: readonly string[] = [
   ...SKILL_KEYS,
   "meleeDamage",
@@ -298,7 +277,7 @@ const effectBuffSchema = z
 const effectBuffsSchema = z.array(effectBuffSchema);
 
 // The closed `activationRequires` vocabulary (#1688). No cross-row check that
-// a requiresActiveBuff key resolves to a real effectBuffs entry — it can
+// requiresActiveBuff resolves to a real effectBuffs entry — it can
 // legitimately name a DIFFERENT row's buff (Song of Defense names Bladesong's).
 const activationRequirementSchema = z.union([
   z.enum(ARMOR_ACTIVATION_REQUIREMENTS),
@@ -316,9 +295,9 @@ interface RechargeGapRow {
   resourceTotals?: { minLevel: number }[] | null;
 }
 
-// classFeatureSeedSchema's refine predicate, split out to stay under the seed
-// CC ceiling (prisma/seed/** carries no coverage instrumentation, so CRAP
-// floors at CC^2+CC). The `.refine` call site's message states the rule.
+// Split out to stay under the seed CC ceiling (prisma/seed/** has no coverage
+// instrumentation, so CRAP floors at CC^2+CC). The `.refine` call site's
+// message states the rule.
 function rechargeTiersCoverPoolStart(row: RechargeGapRow): boolean {
   const rechargeStart = firstMinLevel(row.resourceRechargeTiers);
   if (rechargeStart === undefined || row.resourceRecharge !== undefined) return true;
@@ -372,9 +351,8 @@ function choiceTiersStartAtOrAfterRowLevel(row: ChoiceTierGapRow): boolean {
   return tiersStart === undefined || tiersStart >= row.level;
 }
 
-// Run at seed time (prisma/seed/validate.ts). Only the identity fields are
-// required; descriptor fields are declared so a population pass is validated
-// by this SAME schema, never a second one.
+// Only the identity fields are required; descriptor fields are declared here
+// too so a population pass validates against this SAME schema, never a second one.
 export const classFeatureSeedSchema = z
   .object({
     className: z.string().min(1),

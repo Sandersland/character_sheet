@@ -1,18 +1,7 @@
-/**
- * Monk onInitiative shape tests: EDITION_2024's Uncanny Metabolism (#1243,
- * L2, full Focus refill once/long rest + a bonusHeal descriptor) and Perfect
- * Focus (L15, every-combat top-up to 4); EDITION_2014's Perfect Self (#1500,
- * L20, ki-exhausted-only top-up to 4 via the new `threshold` gate) — 2014 has
- * no L2/L15 analog at all. Pure — exercises the REAL monk.resourceFn
- * descriptors through applyInitiativeRegen (no DB, no dice rolled): the actual
- * HP heal (rolling the Martial Arts die + applying it) needs the impure
- * rollInitiative op and is covered by the DB-backed
- * routes/character/__tests__/resources-roll-initiative.test.ts instead.
- */
-
+// The actual HP heal needs the impure rollInitiative op, covered by the DB-backed resources-roll-initiative suite.
 import { describe, it, expect } from "vitest";
 
-import { monk } from "@/lib/classes/monk.js";
+import { poolsFromRows } from "@/lib/classes/class-feature-rows.js";
 import {
   applyInitiativeRegen,
   clearInitiativeRegenMarkers,
@@ -21,10 +10,22 @@ import {
 } from "@/lib/classes/resources.js";
 import type { DerivedClassInfo } from "@/lib/classes/class-features.js";
 
+import { MONK_BASE_ROWS } from "./test-feature-rows.fixture.js";
+
 const ABILITY_SCORES = { strength: 10, dexterity: 16, constitution: 14, intelligence: 10, wisdom: 14, charisma: 10 };
 
+function baseRow(name: string, edition: "EDITION_2014" | "EDITION_2024") {
+  const row = MONK_BASE_ROWS.find((r) => r.name === name && r.edition === edition);
+  if (!row) throw new Error(`fixture missing monk row ${name}/${edition}`);
+  return row;
+}
+
+const KI_ROW = baseRow("Ki", "EDITION_2014");
+const FOCUS_ROW = baseRow("Focus", "EDITION_2024");
+
 function focusInfo(level: number, profBonus: number, edition: "EDITION_2014" | "EDITION_2024" = "EDITION_2024"): DerivedClassInfo {
-  return { resources: monk.resourceFn!(level, ABILITY_SCORES, profBonus, undefined, edition), features: [] };
+  const row = edition === "EDITION_2014" ? KI_ROW : FOCUS_ROW;
+  return { resources: poolsFromRows([row], level, ABILITY_SCORES, profBonus, edition), features: [] };
 }
 
 function stateWithUsed(used: Record<string, number>): ResourcesMutableState {
@@ -53,10 +54,7 @@ describe("Monk Focus onInitiative — Uncanny Metabolism / Perfect Focus (#1243)
     ]);
   });
 
-  // #1500: 2014's Ki has no Uncanny Metabolism analog at all (SRD 5.1 /
-  // PHB'14 p.78 — the only 2014 onInitiative descriptor is Perfect Self,
-  // L20) — a level-2 EDITION_2014 monk's roll-Initiative is inert, unlike
-  // its 2024 twin above.
+  // SRD 5.1 / PHB'14 p.78.
   it("(EDITION_2014) L2: no onInitiative descriptor at all — 2014 Ki has no Uncanny Metabolism analog", () => {
     const state = stateWithUsed({ ki: 2 });
     const regen = applyInitiativeRegen(state, focusInfo(2, 2, "EDITION_2014"));
@@ -64,10 +62,7 @@ describe("Monk Focus onInitiative — Uncanny Metabolism / Perfect Focus (#1243)
     expect(state.used.ki).toBe(2); // untouched
   });
 
-  // Perfect Self (SRD 5.1 / PHB'14 p.79, L20): "When you roll initiative and
-  // have no ki points remaining, you regain 4 ki points" — threshold:0 means
-  // it does NOT fire with 1+ ki remaining, unlike 2024 Perfect Focus's
-  // "3 or fewer" trigger (#1500's InitiativeRegen.threshold).
+  // SRD 5.1 / PHB'14 p.79 — threshold:0, unlike 2024 Perfect Focus's "3 or fewer" trigger.
   it("(EDITION_2014) L20: Perfect Self is a no-op with 1+ ki remaining, and regains 4 when at 0", () => {
     const state = stateWithUsed({ ki: 19 }); // 1 remaining — above the threshold of 0
     const noop = applyInitiativeRegen(state, focusInfo(20, 6, "EDITION_2014"));

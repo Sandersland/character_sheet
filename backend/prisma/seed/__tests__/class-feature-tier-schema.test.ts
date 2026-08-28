@@ -1,7 +1,7 @@
 // Pure unit test (no database) for classFeatureSeedSchema's tier-array
 // invariants. Driven through classFeatureSeedSchema.safeParse — the surface
-// the production validation path (prisma/seed/validate.ts) actually runs —
-// never the intentionally un-exported per-column tier schemas.
+// assertSeedContentValid actually runs — never the intentionally un-exported
+// per-column tier schemas.
 import { describe, expect, it } from "vitest";
 
 import { classFeatureSeedSchema } from "../class-features.js";

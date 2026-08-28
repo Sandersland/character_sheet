@@ -11,7 +11,7 @@ import {
 import { ATTUNEMENT_LIMIT } from "@/lib/inventory/inventory-attunement.js";
 import { currencyOrEmpty } from "@/lib/inventory/inventory-currency.js";
 import { sneakAttackSpecForEntries } from "@/lib/classes/sneak-attack.js";
-import { monkSaveDC } from "@/lib/classes/monk.js";
+import { monkSaveDC } from "@/lib/classes/ki-focus.js";
 import { hasStunningStrike } from "@/lib/classes/stunning-strike.js";
 import { QUIVERING_PALM_BUFF_KEY, hasQuiveringPalm } from "@/lib/classes/quivering-palm.js";
 import { hasOpenHandTechnique } from "@/lib/classes/open-hand-technique.js";
@@ -57,25 +57,19 @@ import type { SpellEntry } from "@/lib/spellcasting/spell-state.js";
 
 export { buildRollModifiers };
 
-// Riders (#1316): bolt-on effects that piggyback on an attack or a hit and
-// cost no action economy of their own (see `DERIVED_ACTIONS` for why they
-// never live there). Each returns undefined off-class/subclass/level so
-// serializeCharacter can spread it in only when present — absent keys, never
-// null ones.
+// Riders (#1316): bolt-on effects with no action economy of their own. Each
+// returns undefined off-gate so serializeCharacter spreads it in only when
+// present — absent keys, never null ones.
 
-// Sneak Attack: the Nd6 dice spec, undefined for a non-rogue. Scales with
-// rogue class levels via sneak-attack.ts's sneakAttackSpecForEntries (#1231
-// commit 3), the one place the "which class entry is the rogue" lookup lives.
-// The client rolls this spec as a swing damage rider (#1843).
+// sneakAttackSpecForEntries is the one place the "which class entry is the
+// rogue" lookup lives (#1231).
 function sneakAttackRider(classEntries: { name: string; level: number }[]): DiceRider | undefined {
   const spec = sneakAttackSpecForEntries(classEntries);
   return spec ? { dice: { count: spec.count, faces: spec.faces } } : undefined;
 }
 
-// Stunning Strike: the focus save DC, undefined below the gate. Scales with
-// the monk class entry's own level, gated through hasStunningStrike (#1337:
-// the single source of the L5 threshold, also consumed by that module's own
-// cast guard).
+// hasStunningStrike is the single source of the L5 threshold (#1337), also
+// consumed by that module's own cast guard.
 function stunningStrikeRider(
   classEntries: { name: string; level: number }[],
   abilityScores: Record<string, number>,
@@ -87,28 +81,19 @@ function stunningStrikeRider(
 
 type RiderClassEntry = SubclassIdentityInput & { name: string; level: number };
 
-// Both editions' Open Hand subclasses grant Open Hand Technique/Quivering
-// Palm — "Warrior of the Open Hand" (SRD 5.2, EDITION_2024) and "Way of the
-// Open Hand" (SRD 5.1, EDITION_2014, #1501) are SEPARATE subclasses, not one
-// forked across editions, so a character resolves to at most one of the two.
+// SRD 5.2 "Warrior of the Open Hand" and SRD 5.1 "Way of the Open Hand"
+// (#1501) are separate subclasses, not one forked across editions.
 const OPEN_HAND_SLUGS = ["monk-warrior-of-the-open-hand", "monk-way-of-the-open-hand"];
 
-// The Open Hand monk's own class entry, or undefined off-subclass — shared by
-// openHandTechniqueRider/quiveringPalmRider. Resolved via slug (#1277: FK
-// preferred, exact name as fallback) — was substring-matched on the words
-// "open hand", the same failure class #1339 fixed at the DERIVED_ACTIONS gate.
+// resolveSubclassSlug prefers the FK, exact name as fallback (#1277).
 function openHandMonkEntry(classEntries: RiderClassEntry[]): RiderClassEntry | undefined {
   const monk = classEntries.find((c) => c.name.toLowerCase() === "monk");
   const slug = monk && resolveSubclassSlug("monk", monk);
   return slug && OPEN_HAND_SLUGS.includes(slug) ? monk : undefined;
 }
 
-// Open Hand Technique (Warrior of the Open Hand L3, #1245): the focus save DC
-// for the Push/Topple riders, undefined off-subclass or below the gate. Addle
-// carries no save, but the shape stays uniform (saveDC is always present once
-// unlocked). Gated through hasOpenHandTechnique (#1337: the single source of
-// the L3 threshold, also consumed by that module's own cast guard) —
-// live-play automation lives in that module too.
+// hasOpenHandTechnique is the single source of the L3 threshold (#1337).
+// Addle carries no save, but saveDC stays present for shape uniformity.
 function openHandTechniqueRider(
   classEntries: RiderClassEntry[],
   abilityScores: Record<string, number>,
@@ -118,12 +103,9 @@ function openHandTechniqueRider(
   return monk && hasOpenHandTechnique(monk.level) ? { saveDC: monkSaveDC(abilityScores, profBonus) } : undefined;
 }
 
-// Quivering Palm (Warrior of the Open Hand L17, #1245): the focus save DC for
-// the Con-save trigger, plus whether vibrations are currently set (the
-// activeEffects buff registry's inert QUIVERING_PALM_BUFF_KEY marker — see
-// quivering-palm.ts's header for why a buff, not new persisted state). Gated
-// through hasQuiveringPalm (#1337: the single source of the L17 threshold,
-// also consumed by that module's own cast guard).
+// hasQuiveringPalm is the single source of the L17 threshold (#1337).
+// `active` reads the activeEffects buff registry's QUIVERING_PALM_BUFF_KEY
+// marker, not new persisted state.
 function quiveringPalmRider(
   classEntries: RiderClassEntry[],
   abilityScores: Record<string, number>,
@@ -138,18 +120,14 @@ function quiveringPalmRider(
   };
 }
 
-// Assassinate (2014 Assassin L3+, #1526): presence-only — no dice/DC, so a
-// plain `true` rather than the DiceRider/SaveRider `Rider` shapes (riders.ts:
-// "availability via presence" is exactly this case with nothing else to
-// carry). Shares assassinateEligible with resolve-action.ts's op validation
-// — see that function's own header for why it's the ONE gate both sides call.
+// assassinateEligible is the one gate resolve-action's op validation and
+// this rider both call (#1526).
 function assassinateRider(classEntries: RiderClassEntry[], edition: RulesEdition): true | undefined {
   return assassinateEligible(classEntries, edition) ? true : undefined;
 }
 
-// Assembles the rider view (#1316): each key spread in only when present.
-// Kept as its own function (not inlined in serializeCharacter's return) so
-// adding a rider's gate doesn't grow serializeCharacter's own branching.
+// Kept separate so adding a rider's gate doesn't grow serializeCharacter's
+// own branching.
 function buildRiderView(
   classEntries: RiderClassEntry[],
   abilityScores: Record<string, number>,
@@ -176,28 +154,17 @@ function buildRiderView(
     ...(openHandTechnique ? { openHandTechnique } : {}),
     ...(quiveringPalm ? { quiveringPalm } : {}),
     ...(assassinate ? { assassinate } : {}),
-    // Battle Master maneuver save DC, folded into the rider contract (#1316) —
-    // structurally the same shape as stunningStrike, just sourced from
-    // deriveEntryScopedResources via buildResourcesView. maneuverChoiceCount/
-    // toolProfChoiceCount stay in `resources` — they're choice counts,
-    // load-bearing for the clamp-on-read in serialize/classes.ts. Named for
-    // the feature (`maneuvers`), like every other rider, not the field —
-    // `announcedSaveDC` (#1589) is the GENERIC ClassExtras field this rider
-    // happens to be the sole consumer of today; a future Cleric/Monk/
-    // Barbarian/Rogue rider would read the SAME field under its OWN rider
-    // name, never a second `maneuvers`-shaped consumer of it.
+    // maneuverChoiceCount/toolProfChoiceCount stay in `resources` —
+    // load-bearing for buildResourcesView's clamp-on-read. `announcedSaveDC`
+    // (#1589) is a generic ClassExtras field; a future rider reading it must
+    // use its OWN rider name, never a second `maneuvers`-shaped consumer.
     ...(announcedSaveDC !== undefined ? { maneuvers: { saveDC: announcedSaveDC } } : {}),
   };
 }
 
-// Wire portraitUrl (#1615), derived at read time from the persisted blob key
-// (derive-don't-persist — the key itself never leaves the server). The path is
-// RELATIVE, so it stays same-origin in dev (Vite proxies /api) and prod
-// (single-origin static mode) and is covered by the CSP's imgSrc 'self' with
-// no securityHeaders change. `?v=` is the key's uuid filename segment: a
-// re-upload mints a new uuid, so the URL changes per upload, which is what
-// lets the GET endpoint serve Cache-Control: immutable. Exposing the uuid
-// grants nothing — access is enforced by the route, not by URL secrecy.
+// RELATIVE path keeps this same-origin under the dev proxy and prod, and
+// satisfies the CSP's imgSrc 'self'. `?v=` is the blob key's uuid — a
+// re-upload mints a new one, enabling Cache-Control: immutable (#1615).
 function derivePortraitUrl(row: { id: string; portraitKey: string | null }): string | undefined {
   if (!row.portraitKey) return undefined;
   return `/api/characters/${row.id}/portrait?v=${portraitKeyVersion(row.portraitKey)}`;
@@ -216,20 +183,19 @@ export function serializeCharacterSummary(row: {
   return {
     id: row.id,
     name: row.name,
-    // Owning user id (legitimately persisted — see Character.ownerId in
-    // schema.prisma). Access is enforced per-owner via assertCharacterAccess;
-    // emitted here so the frontend can identify/display the owner.
+    // ownerId is legitimately persisted (Character.ownerId); access is
+    // enforced via assertCharacterAccess, not by omitting this field.
     ownerId: row.ownerId,
-    // Shared-campaign link (#246), or undefined — lets the campaign add-picker
-    // exclude characters already in another campaign.
+    // Lets the campaign add-picker exclude characters already in another
+    // campaign (#246).
     campaignId: row.campaignId ?? undefined,
-    // raceSelection/classEntries are optional in Prisma's types only
-    // because they're the non-FK side of the relation — every character
-    // created via POST /characters has exactly one of each.
+    // raceSelection/classEntries are optional in Prisma's types only because
+    // they're the non-FK side of the relation — every character created via
+    // POST /characters has exactly one of each.
     race: row.raceSelection?.name ?? "",
     class: row.classEntries[0]?.name ?? "",
-    // All class entries (name + per-class level) so the card can render a
-    // multiclass line ("Wizard 5 / Cleric 3"); `class` above stays the primary.
+    // Every class entry so the card can render a multiclass line
+    // ("Wizard 5 / Cleric 3"); `class` above stays the primary.
     classes: row.classEntries.map((e) => ({ name: e.name, level: e.level })),
     level: levelForExperience(row.experiencePoints),
     portraitUrl: derivePortraitUrl(row),
@@ -237,23 +203,11 @@ export function serializeCharacterSummary(row: {
 }
 
 // Json columns (hitPoints, hitDice, abilityScores, skills, currency,
-// spellcasting) are round-tripped as-is below — they were written
-// by our own seed/PATCH/POST path, not external input, so they aren't
-// re-validated against the frontend Character type's nested shapes here.
-// (journal is no longer a Json column — it's the relational JournalEntry
-// table, mutated only via journalRouter and mapped to the wire shape below.)
-// inventory is the exception: it's relational (InventoryItem rows, see
-// schema.prisma), mapped into the same JSON shape the frontend already
-// expects below. weaponDetail/armorDetail/consumableDetail (at most one
-// present, matching `category`) nest as nullable `weapon`/`armor`/
-// `consumable` sub-objects via the shared serializeWeaponDetail/serializeArmorDetail/
-// serializeConsumableDetail (also used by itemsRouter for the catalog) rather than flattening
-// back out — `id`/the owning FK aren't meaningful to the client.
+// spellcasting) round-trip as-is — written by our own seed/PATCH/POST path,
+// not external input. serializeWeaponDetail/serializeArmorDetail/
+// serializeConsumableDetail are shared with itemsRouter's catalog reads.
 
-// Journal entries — relational JournalEntry rows (no longer a Json column),
-// already ordered newest-first by the user-entered `date` via the include.
-// `date` is a real DateTime, emitted as an ISO string; sessionId is optional
-// provenance.
+// Newest-first ordering happens in the include, not here.
 function buildJournalView(row: CharacterWithRelations) {
   return row.journalEntries.map((e) => ({
     id: e.id,
@@ -266,8 +220,6 @@ function buildJournalView(row: CharacterWithRelations) {
   }));
 }
 
-// Campaign-scoped play prefs (#537) for the current campaign; undefined when
-// the character isn't attached to a campaign (campaignId null).
 function buildCampaignPreferencesView(row: CharacterWithRelations) {
   if (row.campaignId == null) return undefined;
   const pref = row.campaignPreferences.find((p) => p.campaignId === row.campaignId);
@@ -277,11 +229,9 @@ function buildCampaignPreferencesView(row: CharacterWithRelations) {
   };
 }
 
-// Attach catalog entitlement metadata (#1798, epic #1795 3/6) to whichever
-// spellcasting view buildSpellcastingView produced — every shape it can
-// return (caster, granted-only, multiclass, the legacy blob) carries a
-// `spells` array under the same key, so this reads/replaces that one field
-// generically rather than re-deriving per view shape.
+// Every shape buildSpellcastingView can return carries a `spells` array under
+// the same key, so this reads/replaces that one field generically rather
+// than re-deriving per view shape (#1798).
 async function decorateSpellcastingCatalog(
   row: CharacterWithRelations,
   spellcasting: object | undefined,
@@ -294,20 +244,19 @@ async function decorateSpellcastingCatalog(
 }
 
 export async function serializeCharacter(rawRow: CharacterRow) {
-  // Reconstructs weaponDetail/armorDetail/consumableDetail/capabilities from
-  // `snapshot` (#1649) — every builder below is unchanged from before the
-  // mirror tables were dropped, because this is the only place the shape shifts.
+  // resolveCharacterInventory reconstructs weaponDetail/armorDetail/
+  // consumableDetail from `snapshot` (#1649) — the only place this shape
+  // shift happens; builders below stay unchanged.
   const row = resolveCharacterInventory(rawRow);
   // Derivation order below: later steps read earlier outputs; do not reorder.
-  // 1. XP → level + proficiency bonus (derive-don't-persist; docs/leveling.md).
   const progress = experienceProgress(row.experiencePoints);
   const primaryClass = row.classEntries[0];
   const normalizedHitPoints = normalizeHitPoints(row.hitPoints);
   const hitDice = normalizeHitDice(row.hitDice);
   const abilityScoresMap = row.abilityScores as Record<string, number>;
 
-  // 2. Spellcasting + resources views — each clamps stored mutable state to
-  //    its level-derived caps (clamp-on-read mirrors of LEVEL_GATED_RECONCILERS).
+  // buildSpellcastingView/buildResourcesView clamp stored state to
+  // level-derived caps — the read-side mirror of LEVEL_GATED_RECONCILERS.
   const spellcastingBase = buildSpellcastingView(
     row,
     primaryClass,
@@ -322,20 +271,14 @@ export async function serializeCharacter(rawRow: CharacterRow) {
     abilityScoresMap,
     progress.proficiencyBonus,
   );
-  // Species-granted trait text + improvements (#1682), off the character's
-  // OWN species/variant selection (CharacterRace.speciesId/variantId, #1679)
-  // — see serialize/species.ts for why this needs no level/edition gating of
-  // its own (a species trait row is always active once the species is
-  // picked; edition forking already happened at the Species row level).
+  // Species traits need no level/edition gating of their own — a trait row is
+  // always active once picked; edition forking already happened at the
+  // Species row level (#1682).
   const speciesTraits = buildSpeciesTraitsView(row);
 
-  // 3. Advancement clamp → effective scores/HP/initiative, then the feat layer
-  //    summed over the kept advancements (origin feats + slot-bounded entries)
-  //    TOGETHER WITH active ClassFeature row grants (#1691's classFeatureImprovements)
-  //    AND active SpeciesTrait row grants (#1682's speciesTraits.improvements).
-  //    conditions (exhaustion) is hoisted above applyFeatLayer — #1321's
-  //    effectiveMaxHp composes the feat bonus with exhaustion's PHB'14 p. 291
-  //    tier-4 halving, so the feat layer needs the exhaustion level in hand.
+  // conditions (exhaustion) must be read before applyFeatLayer: effectiveMaxHp
+  // composes the feat bonus with exhaustion's PHB'14 p. 291 tier-4 halving, so
+  // the feat layer needs the exhaustion level already in hand.
   const conditions = normalizeConditionsMutable(row.conditions);
   const {
     effectiveScores,
@@ -360,31 +303,24 @@ export async function serializeCharacter(rawRow: CharacterRow) {
     editionOf(row),
   );
 
-  // 4. Proficiency grants, the per-target modifier channel (active cast buffs
-  //    #438 + item passive bonuses #545), and item-granted traits (#529).
   // Pre-compute weapon proficiency grants so they can be reused both in the
   // inventory serialisation (attack-bonus derivation) and the wire response.
   const weaponGrants = buildMergedWeaponProficiencies(row.classEntries, featProficiencies.weapons);
   const activeEffects = normalizeActiveEffectsMutable(row.activeEffects);
   const buffTargets = buildTargetModifiers(row, activeEffects);
-  // The immune-condition set (#1121) — Mindless Rage/Beguiling Defenses/
-  // Nature's Ward — through the SAME shared rule function the conditions
-  // write-guard calls (deriveImmuneConditions, lib/combat/conditions.ts), so
-  // the sheet can never show a condition as available that the endpoint
-  // would actually reject.
+  // deriveImmuneConditions is the same shared rule function the conditions
+  // write-guard calls (#1121) — the sheet can never show a condition
+  // available that the endpoint would reject.
   const immuneConditions = deriveImmuneConditions(
     immuneConditionEntryRows(row.classEntries, progress.level),
     editionOf(row),
     activeEffects,
   );
   const { itemGrants, itemSkillProfs, itemSaveProfs } = buildItemGrantsView(row);
-  // Archery Fighting Style feat (#1137): +2 to ranged attack rolls, summed from
-  // the kept advancements' rangedAttackRoll improvements.
   const rangedAttackRollBonus = deriveRangedAttackRollBonus(clampedAdvancements);
-  // Bound here rather than inline in the response literal below because the
-  // per-inventory-row `proficient` flag has to read exactly the lists rendered
-  // beside it (#1433) — passing the un-merged `weaponGrants` would re-warn on an
-  // item-granted proficiency the wire array already shows.
+  // Bound here (not inlined below) so the per-row `proficient` flag reads the
+  // exact merged list the wire array shows — the un-merged weaponGrants would
+  // re-warn on an item-granted proficiency (#1433).
   const armorGrants = buildMergedArmorProficiencies(row.classEntries, featProficiencies.armor);
   const itemMergedWeaponGrants = mergeItemWeaponProficiencies(
     weaponGrants,
@@ -404,20 +340,14 @@ export async function serializeCharacter(rawRow: CharacterRow) {
   // compose its rows from the SAME serialized rows the sheet renders (#1434).
   const inventory = row.inventoryItems.map((item) => serializeInventoryItem(item, inventoryContext));
 
-  // 5. Equipped-armor selection feeds AC, speed (Unarmored/Fast Movement), and
-  //    the Monk unarmed strike — all derived, never persisted.
   const { bestArmor, hasShield } = selectEquippedBodyArmor(row, effectiveScores);
-  // Martial Arts blanket condition (Monk Bonus Unarmed Strike, #1218): no armor
-  // or Shield. Computed once here — `deriveActions` is the first consumer, but
-  // the flag is generic (`requiresUnarmored`) so future gated features share it.
+  // Martial Arts' unarmed-strike gate needs "no armor or Shield" — computed
+  // once here since buildAvailableActionsView isn't its only consumer (#1218).
   const unarmoredUnshielded = bestArmor == null && !hasShield;
-  // Eldritch Knight Weapon Bond (#1854): clamp-on-read half of the
-  // reconciler/clamp pair — weaponBondEligible is the SAME rule function
-  // reconcileWeaponBond (level-reconciliation.ts) and the bond/unbond
-  // transaction op (weapon-bond.ts) call. A stale `weaponBonded` flag on a
-  // character who's since lost eligibility (level-down, lost the subclass)
-  // reads as 0 here until reconcileWeaponBond physically clears it on the
-  // next XP transaction.
+  // weaponBondEligible is the same rule function reconcileWeaponBond and the
+  // bond/unbond transaction op call (#1854). A stale `weaponBonded` flag on a
+  // character who's lost eligibility reads as 0 here until reconcileWeaponBond
+  // clears it on the next XP transaction.
   const bondedWeaponCount = weaponBondEligible(row.classEntries, progress.level, editionOf(row)).eligible
     ? row.inventoryItems.filter((item) => item.weaponBonded).length
     : 0;
@@ -453,7 +383,6 @@ export async function serializeCharacter(rawRow: CharacterRow) {
   const { unarmedStrike, improvisedWeapon } = unarmedAttacks;
   const attackRows = buildAttackRowsView(inventory, unarmedAttacks, clampedAdvancements);
 
-  // Riders (#1316) — each key present only when the character has it.
   const riders = buildRiderView(
     row.classEntries,
     effectiveScores,
@@ -463,12 +392,9 @@ export async function serializeCharacter(rawRow: CharacterRow) {
     editionOf(row),
   );
 
-  // 6. Final assembly — one field per line, each fed by a builder above.
   return {
     id: row.id,
     name: row.name,
-    // Owning user id — legitimately persisted (see Character.ownerId comment in
-    // schema.prisma), so it round-trips here rather than being derived.
     ownerId: row.ownerId,
     race: row.raceSelection?.name ?? "",
     class: primaryClass?.name ?? "",
@@ -478,34 +404,28 @@ export async function serializeCharacter(rawRow: CharacterRow) {
     background: row.backgroundSelection?.name ?? "",
     alignment: row.alignment,
     portraitUrl: derivePortraitUrl(row),
-    // Shared-campaign link (#246), or undefined when unassigned.
     campaignId: row.campaignId ?? undefined,
     rulesEdition: row.rulesEdition,
-    // Served alongside the key (#1436, the #1322 precedent) so the sheet's
-    // edition badge stays synchronous — no client copy of the label table, and
-    // no /api/editions round-trip just to render a badge.
+    // Served alongside the key (#1436) so the edition badge stays
+    // synchronous — no client copy of the label table, no extra round-trip.
     rulesEditionLabel: RULES_EDITION_LABELS[editionOf(row)],
-    // Campaign-scoped play prefs (#537), or undefined when unattached.
     campaignPreferences: buildCampaignPreferencesView(row),
 
     armorClass,
     armorClassBreakdown,
     initiativeBonus: effectiveInitBonus + featBonuses.initiative,
     speed,
-    // Dragon Wings (#1123) — 2014 only (PHB'14 p.107; the 2024 form is a
-    // resource-gated activated ability, withheld — see
-    // deriveDragonWingsFlySpeed's header), present only while unarmored at
-    // Draconic L14. Absent (never 0) when not flying, same "key present only
-    // when the character has it" convention as the riders above.
+    // Dragon Wings (PHB'14 p.107, #1123) — 2014 only; the 2024 form is a
+    // resource-gated activated ability, withheld here. Absent (never 0) when
+    // not flying, same convention as the riders above.
     flySpeed,
     proficiencyBonus: progress.proficiencyBonus,
 
     experiencePoints: row.experiencePoints,
     currentLevelThreshold: progress.currentLevelThreshold,
     nextLevelThreshold: progress.nextLevelThreshold,
-    // Pending level-ups: XP-derived level exceeds the number of HP levels
-    // applied so far (hitDice.total tracks how many levels have been "leveled
-    // up" via the /hp endpoint). The UI shows a "Level up" button when > 0.
+    // hitDice.total tracks how many levels have had HP applied via the /hp
+    // endpoint; pendingLevelUps is the gap versus the XP-derived level.
     pendingLevelUps: Math.max(0, progress.level - hitDice.total),
 
     hitPoints: {
@@ -525,91 +445,68 @@ export async function serializeCharacter(rawRow: CharacterRow) {
     skills: buildSkillsView(row, featProficiencies, itemSkillProfs, buffTargets, resources),
     toolProficiencies: buildToolProficienciesView(row, resources, itemGrants),
     // Armor/weapon proficiencies — derived fully at read time from class,
-    // species-trait, and feat grants (species grants arrive feat-sourced since
-    // the #1682 RACE_PROFICIENCY_GRANTS retirement). No persistence needed:
-    // feat-granted additions are already tracked in advancements. Deduped with
-    // precedence class > feat so a feat re-granting an existing class
-    // proficiency renders as a single class-sourced entry.
+    // species-trait, and feat grants. Deduped with precedence class > feat, so
+    // a re-granted proficiency renders once.
     armorProficiencies: armorGrants,
     weaponProficiencies: itemMergedWeaponGrants,
     inventory,
     currency: row.currency,
-    // Encumbrance (#1377): both numbers are derived here so the sheet only
-    // formats them. Capacity reads `effectiveScores`, not row.abilityScores —
-    // the post-clamp score is what the wire reports as `abilityScores`, and
-    // reading the raw column would disagree with it after a STR ASI.
+    // Reads `effectiveScores`, not row.abilityScores — the post-clamp score is
+    // what the wire reports as `abilityScores`, so the raw column would
+    // disagree after a STR ASI (#1377).
     carryCapacity: carryingCapacity(effectiveScores.strength),
     carriedWeight: carriedWeight(row.inventoryItems, currencyOrEmpty(row.currency)),
-    // The 3-item attunement cap as a served number, from the same constant the
-    // attune path's 409 rejects on — the sheet used to re-type the literal in
-    // four places.
+    // Same constant the attune path's 409 rejects on.
     attunementCap: ATTUNEMENT_LIMIT,
-    // Weapon Bond's 2-weapon cap (#1854), same served-constant shape as
-    // attunementCap above — the bond endpoint's 409 rejects on the same
-    // WEAPON_BOND_LIMIT.
+    // Same constant the bond endpoint's 409 rejects on (#1854).
     weaponBondCap: WEAPON_BOND_LIMIT,
     spellcasting,
     resources,
-    // Active status conditions + exhaustion level. Normalized on read (unknown
-    // keys dropped, deduped by key, exhaustion clamped 0–6) — mutate via
-    // POST /characters/:id/conditions/transactions, never PATCH.
+    // Normalized on read (unknown keys dropped, exhaustion clamped 0–6);
+    // mutated only via POST .../conditions/transactions.
     conditions,
-    // Display text for the CURRENT exhaustion level, resolved for this
-    // character's edition (#1322) so the sentence can never contradict `speed`
-    // or the rollModifiers below — the frontend used to author this text,
-    // edition-blind, and printed 2024 text on a 2014 character. NOT folded
-    // into `conditions`: that object is also the write shape and the audit
-    // before/after payload, and a derived string has no business being persisted.
+    // Resolved per this character's edition (#1322) so it can never
+    // contradict `speed`/`rollModifiers`. NOT folded into `conditions` — that
+    // object is also the write shape and audit payload; a derived string has
+    // no business there.
     exhaustionEffectText: exhaustionEffectText(conditions.exhaustion, editionOf(row)),
-    // Condition keys the character is currently immune to (#1121) — Mindless
-    // Rage/Beguiling Defenses/Nature's Ward — so the sheet can show WHY a
-    // condition is unavailable. NOT folded into `conditions` for the same
-    // reason exhaustionEffectText isn't: derived, never persisted.
+    // NOT folded into `conditions` — derived, never persisted (same as
+    // exhaustionEffectText) (#1121).
     immuneConditions,
-    // Active cast-granted passive modifiers (buffs). Normalized on read; each is
-    // also summed into its target skill/stat's tempModifier above.
     activeEffects,
-    // State-driven advantage/disadvantage grants (#486), derived from active
-    // conditions + buffs. The frontend resolves the effective mode per roll.
+    // The frontend resolves the effective per-roll mode from these grants (#486).
     rollModifiers: buildRollModifiers(conditions, activeEffects, editionOf(row)),
 
-    // Item-granted traits (#529), derived from active items — no persisted
-    // columns. resistances also feed the #456 auto-halve at damage-apply time;
-    // the rest render as item-sourced flags/reminders on the sheet.
+    // resistances also feeds the #456 auto-halve at damage-apply time; the
+    // rest render as item-sourced flags/reminders (#529).
     resistances: itemGrants.resistances.map((r) => ({ damageType: r.value, source: r.source })),
     damageImmunities: itemGrants.immunities.map((i) => ({ damageType: i.value, source: i.source })),
     conditionImmunities: itemGrants.conditionImmunities.map((c) => ({ condition: c.value, source: c.source })),
     grantedAdvantages: itemGrants.advantages,
     grantedProficiencies: itemGrants.proficiencies,
 
-    // Advancements (ASI + feats) — top-level so every class sees them,
-    // independent of whether deriveResources returns a non-null value.
+    // Top-level so every class sees them, independent of whether
+    // deriveResources returns a non-null value.
     advancements: clampedAdvancements,
     advancementSlots: {
       total: advSlotTotal,
-      // Origin feats + Fighting Style feats don't consume an ASI slot (#1130/#1137)
-      // — count only ASI-partition entries.
+      // Origin feats + Fighting Style feats don't consume an ASI slot
+      // (#1130/#1137) — count only ASI-partition entries.
       used: usedSlots,
     },
-    // Fighting Style feat slots (#1137): a partition separate from ASI slots
-    // (Fighter L1, Paladin/Ranger L2). The sheet gates its style picker on total.
+    // Separate partition from ASI slots (#1137).
     fightingStyleSlots: {
       total: fightingStyleSlotTotal,
       used: usedFightingStyleSlots,
     },
-    // #1495: the class names that have EARNED the Fighting Style feature at
-    // this level (fightingStyleGrantingClassNames — the level-gated subset,
-    // never `character.classes` as a whole) — the picker and level-up
-    // ceremony pass this straight through as GET /api/feats?classes=' scope,
-    // matching exactly what the write path (resolveCatalogFeat) enforces so
-    // a served option can never 400. CLAUDE.md: the frontend consumes this
-    // resolved value rather than re-deriving the level-threshold rule.
+    // The level-gated subset that has EARNED Fighting Style at this level,
+    // never `character.classes` as a whole — matches exactly what
+    // resolveCatalogFeat enforces on write, so a served option can never 400
+    // (#1495).
     fightingStyleGrantingClasses,
 
-    // Class-specific available actions for the turn tracker (universal ones ride
-    // GET /api/reference instead, resolved per edition — #1430). bondedWeaponCount
-    // (#1854) is the clamp-on-read half of the reconciler/clamp pair — see its
-    // own computation above.
+    // Class-specific actions only — universal ones ride GET /api/reference
+    // instead, resolved per edition (#1430).
     availableActions: buildAvailableActionsView(
       row.classEntries,
       progress.level,
@@ -625,47 +522,35 @@ export async function serializeCharacter(rawRow: CharacterRow) {
       bondedWeaponCount,
     ),
 
-    // Combat attack rows — derived at read time so the session turn sheets render
-    // served numbers instead of recomputing attack math on the client (#1434).
-    // unarmedStrike/improvisedWeapon stay on the payload because other surfaces
-    // read them; the matching `attackRows` entries are built FROM them.
+    // Derived at read time (#1434). unarmedStrike/improvisedWeapon stay on
+    // the payload too — other surfaces read them directly; attackRows'
+    // matching entries are built FROM them.
     unarmedStrike,
     improvisedWeapon,
     attackRows,
-    // Weapon attacks per Attack action (Extra Attack), max across multiclass
-    // (#1530) — row-driven from each entry's seeded ClassFeature rows,
-    // featureRowsOf is the SAME "class"/"subclassRef" -> carrier extractor
-    // buildResourcesView/buildAvailableActionsView already use.
+    // featureRowsOf is the same carrier extractor buildResourcesView and
+    // buildAvailableActionsView already use (#1530).
     attacksPerAction: deriveAttacksPerAction(row.classEntries, editionOf(row), featureRowsOf),
-    // Weapon-attack crit range (#1120): default 20, widened by Champion's
-    // Improved/Superior Critical — edition-invariant (SRD 5.1 p.25 / SRD 5.2
-    // p.49 agree on level AND threshold), so deriveCritRange itself takes no
-    // `edition` parameter; `editionOf(row)` here is only the row filter every
-    // derivedStat reader already takes.
+    // Edition-invariant (SRD 5.1 p.25 / SRD 5.2 p.49 agree on level and
+    // threshold) — deriveCritRange itself takes no `edition`; editionOf(row)
+    // here is only the row filter every derivedStat reader takes (#1120).
     critRange: deriveCritRange(row.classEntries, editionOf(row), featureRowsOf),
-    // A two-handed weapon in MAIN_HAND locks OFF_HAND (#1433) — a property of the
-    // whole loadout, hence one top-level boolean rather than a per-row flag. NOT
-    // the same rule as `offHandBusy` (an internal of buildInventoryContext):
-    // that one is true for a shield OR a second weapon and only picks a versatile
-    // weapon's die, while this one says nothing may occupy the off-hand at all.
+    // Distinct from `offHandBusy` (buildInventoryContext's internal): that one
+    // is true for a shield OR a second weapon and only picks a versatile
+    // weapon's die; offHandLocked says nothing may occupy the off-hand at all
+    // (#1433).
     offHandLocked: isOffHandLocked(row.inventoryItems),
-    // Riders (#1316): sneakAttack/stunningStrike/openHandTechnique/
-    // quiveringPalm/maneuvers/assassinate, each present only when the
-    // character has it.
     ...riders,
 
-    // Species-granted information (#1682): name + cited trait text for the
-    // character's own species/variant selection, darkvision (when present)
-    // rendered like any other trait — announce-only per owner ruling, not a
-    // derived combat stat. [] for a legacy `race`-name-only character (no
-    // species picked, #1679's additive migration) — the section itself
-    // handles an empty list, never a crash.
+    // Announce-only per owner ruling, not a derived combat stat — darkvision
+    // renders like any other trait. [] for a legacy race-name-only character
+    // (no species picked, #1679); the section handles an empty list, never a
+    // crash.
     speciesTraits: speciesTraits.traits,
 
     journal: buildJournalView(row),
 
-    // Multiclass-aware per-class view with the level + subclass clamps-on-read
-    // (issues #124/#125) — see buildClassesView.
+    // Level + subclass clamps-on-read (#124/#125).
     classes: buildClassesView(row, progress.level),
   };
 }

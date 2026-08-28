@@ -1,10 +1,3 @@
-/**
- * Warrior of Shadow cast endpoint (2024 rewrite, #1246 — formerly #441):
- * POST /abilities/shadow-arts/transactions. Real Postgres + supertest. Fixture is a
- * Warrior of Shadow monk whose XP sets the level. The single Shadow Arts
- * Darkness cast and the Cloak of Shadows activation are both exercised here.
- */
-
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -24,7 +17,6 @@ let COOKIE: string;
 const FIXTURE_ID = "test-shadow-cast-monk-1";
 const CLASS_NAME = "Shadow Cast Test Monk";
 
-// XP thresholds → monk level: L2=300, L3=900, L17=225000.
 const XP_L2 = 300;
 const XP_L3 = 900;
 const XP_L17 = 225000;
@@ -101,9 +93,19 @@ describe("Shadow Arts cast endpoint", () => {
     });
     classId = cls.id;
 
-    // Warrior of Shadow grants Minor Illusion at L3 as data (#898) — this is what gives
-    // a pure (non-caster) Shadow monk a serialized spellcasting view at all, so the
-    // cast Shadow Art's concentration can surface on it.
+    await prisma.classFeature.deleteMany({ where: { classId, subclassId: null } });
+    await prisma.classFeature.create({
+      data: {
+        classId, subclassId: null, name: "Focus", level: 2, edition: "EDITION_2024",
+        description: "You have a pool of Focus Points equal to your monk level.",
+        resourceKey: "focus", resourceLabel: "Focus Points", resourceRecharge: "short-or-long",
+        resourceTotals: [{ minLevel: 2, total: { levelTimes: 1 } }],
+      },
+    });
+
+    // Warrior of Shadow grants Minor Illusion at L3 as data (#898) — this is
+    // what gives a pure (non-caster) Shadow monk a serialized spellcasting
+    // view at all, so the cast Shadow Art's concentration can surface on it.
     const shadow = await upsertEditionRow(
       prisma.subclass,
       { classId, name: "Warrior of Shadow", edition: null },
@@ -114,8 +116,7 @@ describe("Shadow Arts cast endpoint", () => {
     );
     const minorIllusion = await prisma.spell.findFirst({ where: { name: "Minor Illusion" }, select: { id: true } });
     if (!minorIllusion) throw new Error("Minor Illusion not seeded — run `prisma db seed` before tests");
-    // upsertEditionRow: the widened (subclassId, spellId, edition) shorthand
-    // can't express a null edition at runtime (#1625).
+    // upsertEditionRow's widened (subclassId, spellId, edition) shorthand can't express a null edition at runtime (#1625).
     await upsertEditionRow(
       prisma.subclassGrantedSpell,
       { subclassId: shadow.id, spellId: minorIllusion.id, edition: null },
@@ -123,9 +124,9 @@ describe("Shadow Arts cast endpoint", () => {
       { gateLevel: 3, castingAbility: "wisdom" },
     );
 
-    // shadowArts/cloakOfShadows are row-driven now (#1912) — the guard
-    // (shadow-arts.ts) reads subclassRef.features, a real subclassId FK
-    // relation, so this bespoke subclass needs its own ClassFeature rows.
+    // shadowArts/cloakOfShadows are row-driven (#1912): the guard reads
+    // subclassRef.features, a real subclassId FK relation, so this bespoke
+    // subclass needs its own ClassFeature rows.
     await prisma.classFeature.deleteMany({ where: { classId, subclassId: shadow.id } });
     await prisma.classFeature.createMany({
       data: [
@@ -142,10 +143,8 @@ describe("Shadow Arts cast endpoint", () => {
       ],
     });
 
-    // This suite's fixtures default to EDITION_2024 (rulesEdition unset) — the
-    // real "Shadow Arts: Darkness" name now exists once per edition (#1502),
-    // so the lookup must pin the 2024 row explicitly or a bare findFirst is
-    // nondeterministic between the two.
+    // "Shadow Arts: Darkness" exists once per edition (#1502), so the lookup
+    // must pin the 2024 row explicitly or a bare findFirst is nondeterministic.
     darknessId = (await prisma.grantedAbility.findFirst({ where: { name: "Shadow Arts: Darkness", edition: "EDITION_2024" } }))!.id;
   });
 
@@ -166,7 +165,6 @@ describe("Shadow Arts cast endpoint", () => {
     await createMonk(XP_L3, "warrior of shadow");
     const res = await cast([{ type: "castShadowArt", shadowArtId: darknessId }]);
     expect(res.status).toBe(200);
-    // The serialized character surfaces the Shadow Arts gate via availableActions (#1315).
     expect((res.body.availableActions as { key: string }[]).some((a) => a.key === "shadowArts")).toBe(true);
     const focus = res.body.resources.pools.find((p: { key: string }) => p.key === "focus");
     expect(focus.used).toBe(1);
@@ -183,9 +181,6 @@ describe("Shadow Arts cast endpoint", () => {
       .toMatchObject({ entryId: prefixedDarkness, spellName: "Shadow Arts: Darkness" });
   });
 
-  // Byte-identical oracle for the shared focus-cast event tail (#642): pins the full
-  // castShadowArt event payloads (before/after/summary/data) so the extraction of
-  // snapshotSpellcasting + the event-emitting tail into a shared helper stays exact.
   it("pins the castShadowArt event payloads exactly (before/after/summary/data)", async () => {
     await createMonk(XP_L3, "warrior of shadow");
     const res = await cast([{ type: "castShadowArt", shadowArtId: darknessId }]);
@@ -219,9 +214,6 @@ describe("Shadow Arts cast endpoint", () => {
     expect(castEvent!.data).toEqual({ shadowArtId: darknessId, focusSpent: 1 });
   });
 
-  // #1275 byte-identity oracle: captured on the per-feature URL before the move to
-  // the shared ability endpoint, so a green run afterwards is evidence the audit
-  // trail is unchanged. Widens the #642 oracle above to the spendResource event.
   it("pins the audit trail of one Shadow Arts cast (incl. the focus spend)", async () => {
     await createMonk(XP_L3, "warrior of shadow");
     const res = await cast([{ type: "castShadowArt", shadowArtId: darknessId }]);
@@ -296,14 +288,8 @@ describe("Shadow Arts cast endpoint", () => {
     expect(res.body.error).toMatch(/level 3/i);
   });
 
-  // #1315 shared-gate proof: the cast guard (shadow-arts.ts) and the wire
-  // availableActions[] value both resolve through deriveEntryScopedActions —
-  // never two independent copies of the level gate (CLAUDE.md's
-  // level-gated-registry rule). If a future edit duplicated the gate (e.g. a
-  // guard hardcoding a different threshold than the DERIVED_ACTIONS row), this
-  // test would catch the resulting divergence at the exact boundary levels:
-  // availableActions would say "available" while the guard still rejected, or
-  // vice versa.
+  // The cast guard and the wire availableActions[] value both resolve through
+  // deriveEntryScopedActions — never two independent copies of the level gate.
   it("shadowArts (L3) / cloakOfShadows (L17): availableActions[] presence and guard accept/reject move together at the boundary", async () => {
     await createMonk(XP_L2, "warrior of shadow");
     const l2 = await agent().get(`/api/characters/${FIXTURE_ID}`);
@@ -329,11 +315,8 @@ describe("Shadow Arts cast endpoint", () => {
     expect(l17Cast.status).toBe(200);
   });
 
-  // #1339: the subclass gate is an EXACT name match, so the 2014 "Way of Shadow"
-  // monk (PHB'14 p.80) cannot reach the 2024 Warrior of Shadow features
-  // (PHB'24 p.91). Asserted at BOTH layers — the wire availableActions[] and the
-  // cast guard — because no test asserted either, which is how the substring
-  // gate shipped past #1315.
+  // The subclass gate is an EXACT name match: 2014 Way of Shadow (PHB'14 p.80)
+  // cannot reach 2024 Warrior of Shadow features (PHB'24 p.91).
   it('a 2014 "Way of Shadow" monk at L17 surfaces neither action and is rejected by both guards', async () => {
     await createMonk(XP_L17, "Way of Shadow");
     const sheet = await agent().get(`/api/characters/${FIXTURE_ID}`);
@@ -382,12 +365,7 @@ describe("Shadow Arts cast endpoint", () => {
   });
 });
 
-// #1502: 2014 Way of Shadow (PHB'14 pp.79-80 — not in SRD 5.1) — its OWN
-// edition-tagged fixture (rulesEdition: EDITION_2014), proving the real cast
-// mechanics: the four-spell 2-ki menu, per-spell concentration (Darkness/Pass
-// without Trace/Silence concentrate, Darkvision does not), Shadow Step at L6,
-// Cloak of Shadows at L11 with no ki cost, and Opportunist at L17 (reminder
-// only, no cast endpoint).
+// PHB'14 pp.79-80 (not in SRD 5.1).
 describe("2014 Way of Shadow — real edition-tagged cast mechanics (#1502)", () => {
   const WAY_ID = "test-way-of-shadow-monk-1";
   const WAY_CLASS_NAME = "Way of Shadow Test Monk";
@@ -402,9 +380,18 @@ describe("2014 Way of Shadow — real edition-tagged cast mechanics (#1502)", ()
     });
     wayClassId = cls.id;
 
-    // Way of Shadow grants Minor Illusion at L3 as data (#898, #1502) — this
-    // is what gives a pure (non-caster) Way of Shadow monk a serialized
-    // spellcasting view at all, mirroring the 2024 fixture's own setup above.
+    await prisma.classFeature.deleteMany({ where: { classId: wayClassId, subclassId: null } });
+    await prisma.classFeature.create({
+      data: {
+        classId: wayClassId, subclassId: null, name: "Ki", level: 2, edition: "EDITION_2014",
+        description: "You have a pool of Ki Points equal to your monk level.",
+        resourceKey: "ki", resourceLabel: "Ki Points", resourceRecharge: "short-or-long",
+        resourceTotals: [{ minLevel: 2, total: { levelTimes: 1 } }],
+      },
+    });
+
+    // Way of Shadow grants Minor Illusion at L3 as data — gives this
+    // non-caster monk a serialized spellcasting view at all.
     const way = await upsertEditionRow(
       prisma.subclass,
       { classId: wayClassId, name: "Way of Shadow", edition: "EDITION_2014" },
@@ -422,9 +409,7 @@ describe("2014 Way of Shadow — real edition-tagged cast mechanics (#1502)", ()
       { gateLevel: 3, castingAbility: "wisdom" },
     );
 
-    // shadowArts/shadowStep/cloakOfShadows/opportunist are row-driven now
-    // (#1912) — see the 2024 fixture's own comment above for why this
-    // bespoke subclass needs its own ClassFeature rows.
+    // Row-driven (#1912) and read off a real subclassId FK, so this bespoke subclass needs its own ClassFeature rows.
     await prisma.classFeature.deleteMany({ where: { classId: wayClassId, subclassId: way.id } });
     await prisma.classFeature.createMany({
       data: [
@@ -509,10 +494,8 @@ describe("2014 Way of Shadow — real edition-tagged cast mechanics (#1502)", ()
     expect(ki.used).toBe(2);
   });
 
-  // The structured audit `data` column must name the resource actually spent
-  // (ki, not focus) — the summary text already says "Ki Points" via the
-  // shared spendResource path; this pins the sibling field shadow-arts.ts's
-  // own castShadowArt event carries.
+  // The structured audit `data` must name the resource actually spent (ki,
+  // not focus); the summary text already says "Ki Points" via the shared spendResource path.
   it("records the audit event's spend under kiSpent, never focusSpent (edition-correct resource key)", async () => {
     await createWayOfShadowMonk(XP_L3);
     const res = await wayCast([{ type: "castShadowArt", shadowArtId: wayArtId["Shadow Arts: Silence"] }]);
@@ -547,8 +530,7 @@ describe("2014 Way of Shadow — real edition-tagged cast mechanics (#1502)", ()
   });
 
   it("activateCloakOfShadows (L11) costs no ki at all", async () => {
-    // XP for level 11 (experience.ts's XP table: level 11 = 85000 XP).
-    await createWayOfShadowMonk(85000);
+    await createWayOfShadowMonk(85000); // 85000 XP = level 11
     const l11 = await agent().get(`/api/characters/${WAY_ID}`);
     expect((l11.body.availableActions as { key: string }[]).some((a) => a.key === "cloakOfShadows")).toBe(true);
     expect((l11.body.availableActions as { key: string }[]).some((a) => a.key === "shadowStep")).toBe(true);
@@ -594,12 +576,9 @@ describe("2014 Way of Shadow — real edition-tagged cast mechanics (#1502)", ()
   });
 });
 
-// #1315: availableActions is entry-scoped (mirrors deriveEntryScopedResources,
-// #1206) — a secondary Warrior of Shadow monk's shadowArts/cloakOfShadows key
-// off the MONK entry's own level, not the primary entry's class or the
-// character's total level. Previously buildAvailableActionsView only ever
-// read the PRIMARY entry at total level, so a secondary monk's gated actions
-// never appeared regardless of level.
+// availableActions is entry-scoped (mirrors deriveEntryScopedResources): a
+// secondary Warrior of Shadow monk's shadowArts/cloakOfShadows key off the
+// MONK entry's own level, not the primary entry's class or total character level.
 describe("GET availableActions — entry-scoped for multiclass (#1315)", () => {
   const MC2_ID = "test-shadow-mc-actions-1";
   const MC2_CLASS_NAME = "Shadow MC Actions Test Class";
@@ -616,21 +595,14 @@ describe("GET availableActions — entry-scoped for multiclass (#1315)", () => {
       update: {},
     });
     mc2ClassId = cls.id;
-    // Second Wind/Action Surge are row-driven now (#1528) and tied to a
-    // specific classId — this fixture's fighter entry shares its classId with
-    // the monk entry (both point at the same bespoke row), so seeding these
-    // rows here covers the "PRIMARY Fighter's own actions still surface too"
-    // assertion below.
+    // Second Wind/Action Surge are row-driven (#1528) and keyed by classId.
     await prisma.classFeature.deleteMany({ where: { classId: mc2ClassId } });
     await prisma.classFeature.createMany({ data: fighterResourceRowsData(mc2ClassId) });
 
-    // shadowArts is row-driven now too (#1912) and tied to a real subclassId
-    // FK (featureRowsOf reads subclassRef.features), unlike the retired
-    // DERIVED_ACTIONS gate this fixture's own comment used to describe
-    // ("Monk needs no classId here … resolves off entry.name/subclass").
-    // The monk entry gets its OWN bespoke class/subclass (not mc2ClassId,
-    // which is the fighter's) so its classRows never collide with the
-    // fighter's Second Wind/Action Surge base rows above.
+    // The monk entry gets its own classId/subclassId (not mc2ClassId, the
+    // fighter's), so its classRows never collide with the fighter's Second
+    // Wind/Action Surge base rows above. shadowArts is row-driven (#1912) and
+    // needs a real subclassId FK (featureRowsOf reads subclassRef.features).
     const monkCls = await prisma.characterClass.upsert({
       where: { name: MC2_MONK_CLASS_NAME },
       create: { name: MC2_MONK_CLASS_NAME, hitDie: "d8", savingThrows: ["strength", "dexterity"], skillChoiceCount: 2, skillChoices: ["acrobatics", "stealth"], isSpellcaster: false },
@@ -689,17 +661,10 @@ describe("GET availableActions — entry-scoped for multiclass (#1315)", () => {
         classEntries: {
           create: [
             { name: "fighter", subclass: null, classId: mc2ClassId, level: 8 - monkLevel, position: 0 },
-            // Its OWN bespoke classId/subclassId (#1912), not mc2ClassId —
-            // sharing one classId across two logically-different class
-            // entries makes BOTH entries see the OTHER'S base classRows
-            // (Second Wind/Action Surge for the monk, or vice versa) since
-            // classRows are scoped by classId alone, independent of
-            // entry.name — an unsanctioned "secondWind"/"actionSurge" pool-key
-            // collision 500s in collectEntryScopedPools. shadowArts is
-            // row-driven now too and needs a real subclassId FK
-            // (featureRowsOf reads subclassRef.features) — the retired
-            // DERIVED_ACTIONS gate this comment used to describe needed
-            // neither.
+            // Its own classId/subclassId, not mc2ClassId: classRows are scoped
+            // by classId alone (independent of entry.name), so sharing one
+            // would let each entry see the other's base classRows, colliding
+            // on the secondWind/actionSurge pool keys in collectEntryScopedPools.
             { name: "monk", subclass: "warrior of shadow", classId: mc2MonkClassId, subclassId: mc2MonkSubclassId, level: monkLevel, position: 1 },
           ],
         },
@@ -802,7 +767,6 @@ describe("resolveConcentration clamp for multiclass Warrior of Shadow", () => {
   });
 });
 
-// Unit + source-guard coverage.
 describe("shadowArtEffectSpec", () => {
   it("builds a flat non-scaling utility spec that always concentrates for Darkness", () => {
     const spec = shadowArtEffectSpec({ name: "Shadow Arts: Darkness" });
@@ -814,8 +778,8 @@ describe("shadowArtEffectSpec", () => {
 
   it("still resolves the generic buff shape (shared catalogEffectSpec builder) for a hypothetical buff row", () => {
     // No real Shadow Art carries an effectKind:"buff" row (every 2014/2024
-    // art is a flat utility cast, #1502) — this pins that the shared
-    // row→spec mapping still works, since it's reused by Channel Divinity too.
+    // art is a flat utility cast); this pins the shared row→spec mapping,
+    // which Channel Divinity also reuses.
     const spec = shadowArtEffectSpec({
       name: "Shadow Arts: Hypothetical Buff",
       effectKind: "buff",
@@ -847,10 +811,8 @@ describe("Shadow Arts source guard", () => {
     });
     sourceClassId = cls.id;
 
-    // shadowArts is row-driven now (#1912) — the guard (shadow-arts.ts) reads
-    // subclassRef.features, a real subclassId FK relation; this fixture's
-    // characters need one to reach the catalog-lookup logic these tests
-    // actually exercise.
+    // shadowArts is row-driven (#1912): the guard reads subclassRef.features,
+    // a real subclassId FK relation, so these fixtures need one.
     const sourceSub = await prisma.subclass.findFirst({ where: { classId: sourceClassId, name: "Warrior of Shadow" } });
     const sourceSubRow =
       sourceSub ??
@@ -889,9 +851,7 @@ describe("Shadow Arts source guard", () => {
     expect((res.body as { name: string }[]).length).toBe(1);
   });
 
-  // #1412: the read-side counterpart to the cast guard below. Own fixture,
-  // deleted by NAME in the finally — this describe's afterAll can't clean up a
-  // row it doesn't know about.
+  // Own fixture, deleted by NAME in the finally — this describe's afterAll can't clean up a row it doesn't know about.
   it("(#1412) requires ?edition= and silently omits a 2014-tagged Shadow Art from a 2024 request", async () => {
     const FIXTURE_NAME = "XEd Shadow Art 2014 read";
     const row = await upsertEditionRow(
@@ -951,11 +911,8 @@ describe("Shadow Arts source guard", () => {
     expect(res.body.error).toMatch(/not found in catalog/);
   });
 
-  // #1345 (Chunk 5, plan audit — not named in the issue as filed): a
-  // transient cast, not a permanent snapshot, but still a wrong-edition rule
-  // applied to one cast and recorded in the audit event. Own fixture id (not
-  // FIXTURE_ID_2) — the sibling test above creates FIXTURE_ID_2 with no
-  // per-test cleanup (only this describe's afterAll clears it).
+  // Own fixture id, not FIXTURE_ID_2 — the sibling test above creates
+  // FIXTURE_ID_2 with no per-test cleanup (only this describe's afterAll clears it).
   const FIXTURE_ID_3 = "test-shadow-source-monk-1345";
 
   it("(#1345) rejects a 2014-tagged Shadow Art against the (default-2024) fixture", async () => {

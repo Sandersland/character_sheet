@@ -1,6 +1,5 @@
-// ClassFeature seeder (#1522/#1523) — the executable counterpart to
-// CLASS_FEATURES, split out because #1277 AC 4 forbids write logic in a seed
-// data module.
+// Executable counterpart to CLASS_FEATURES, split out because #1277 AC 4
+// forbids write logic in a seed data module.
 import { Prisma, type PrismaClient } from "../../src/generated/prisma/client.js";
 import { upsertEditionRow, resolveEditionRow } from "../../src/lib/rules/catalog-edition.js";
 import type { SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
@@ -8,11 +7,9 @@ import type { SeedEdition } from "./edition.js";
 import { CLASS_FEATURES, type ClassFeatureSeedRow } from "./class-features.js";
 import { SUBCLASSES } from "./subclasses.js";
 
-// Every descriptor column's NULL/default state, spread onto every row before
-// the row's own authored descriptors. The Json? columns use Prisma.DbNull
-// (SQL NULL), never Prisma.JsonNull (a stored JSON `null` value): both
-// deserialize to JS null, but only DbNull matches a `WHERE col IS NULL`
-// filter — class-feature-migration.test.ts asserts the SQL-level state.
+// The Json? columns use Prisma.DbNull (SQL NULL), never Prisma.JsonNull (a
+// stored JSON `null` value): both deserialize to JS null, but only DbNull
+// matches a `WHERE col IS NULL` filter.
 const DESCRIPTOR_RESET = {
   resourceKey: null,
   resourceLabel: null,
@@ -64,16 +61,14 @@ function partitionKey(classId: string, subclassId: string | null): string {
   return `${classId}::${subclassId ?? "null"}`;
 }
 
-// Not staleCatalogRowsWhere: that helper always builds a third
-// `edition: null` OR-branch, and Prisma rejects that filter outright for this
-// non-nullable column. Same per-edition partitioning, restricted to the two
-// editions ClassFeature can hold.
+// Not staleCatalogRowsWhere: that builds an `edition: null` OR-branch Prisma
+// rejects for this non-nullable column. Same per-edition partitioning,
+// restricted to ClassFeature's two editions.
 //
-// A partition authoring zero rows for one edition builds `notIn: []` there,
-// which matches — and deletes — EVERY row of that edition. Correct ONLY
-// because pruneStalePartitions scopes `seeded` to one (classId, subclassId)
-// partition before calling this: "removed in 2024" then rightly empties that
-// edition within that partition alone.
+// A partition authoring zero rows for one edition builds `notIn: []`, which
+// matches — and deletes — EVERY row of that edition. Safe only because
+// pruneStalePartitions scopes `seeded` to one (classId, subclassId) partition
+// before calling this.
 function classFeatureStaleWhere(
   seeded: readonly { identity: string; edition: SeedEdition }[],
   extraWhere: { classId: string; subclassId: string | null },
@@ -126,11 +121,9 @@ async function resolveSubclassCandidatesBySlug(
 }
 
 // Subclass rows are edition-shared (edition: null) today; resolveEditionRow
-// keeps this correct the day one forks. Split out of resolveOneRow to stay
-// under the seed CC ceiling: prisma/seed/** carries no coverage
-// instrumentation, so CRAP floors at CC^2+CC regardless of real coverage —
-// splitting branches down is the only lever. Same reason for every other
-// small helper split in this file.
+// keeps this correct the day one forks. Split small (here and elsewhere in
+// this file) to stay under the seed CC ceiling — prisma/seed/** has no
+// coverage instrumentation, so CRAP floors at CC^2+CC regardless.
 function resolveSubclassId(
   row: ClassFeatureSeedRow,
   subclassCandidatesBySlug: Map<SubclassSlug, { id: string; edition: SeedEdition | null }[]>,
@@ -242,12 +235,10 @@ async function sweepAbandonedPartitions(prisma: PrismaClient, byPartition: Map<s
 }
 
 /**
- * Seeds every ClassFeature row and prunes stale ones, scoped per (classId,
- * subclassId) partition: many feature names (Spellcasting, Extra Attack, ...)
- * are shared across scopes, so a global name-keyed prune could never retire a
- * stale row while another scope still seeds the same name.
- *
- * Exported so a test can call it twice in-process and assert idempotency.
+ * Prunes stale rows scoped per (classId, subclassId) partition: many feature
+ * names (Spellcasting, Extra Attack, ...) are shared across scopes, so a
+ * global name-keyed prune could never retire a stale row while another scope
+ * still seeds the same name.
  *
  * Uses find-then-write (upsertEditionRow), never `.upsert()` on the compound
  * key: subclassId is NULL for most rows, and Prisma rejects a literal null
@@ -273,17 +264,15 @@ export async function seedClassFeatures(prisma: PrismaClient): Promise<void> {
 const EDITIONS: readonly SeedEdition[] = ["EDITION_2014", "EDITION_2024"];
 
 // Below this, a (class, edition) pair reads as a half-written partition, not
-// real content. Today's smallest fully authored pair is Warlock's
-// EDITION_2024 at 12 — ten leaves slack while staying tight enough that a
-// half-write (which a bare `>= 1` sails past) can't hide behind it.
+// real content — a bare `>= 1` would sail past a half-write.
 const MIN_ROWS_PER_PAIR = 10;
 
 // Classes whose EDITION_2024 rows are still an unverified verbatim copy of
-// their EDITION_2014 text — a machine-readable disclosure: a class on this
-// list must keep equal row counts per edition (ratchetFailure), and a retab
-// removes it in the SAME diff that makes the class's editions genuinely
-// diverge. Empty since the last retab (#1500, Monk); while empty the ratchet
-// check is dead code — delete it together with this set, never before.
+// their EDITION_2014 text: a class here must keep equal row counts per
+// edition (ratchetFailure), and a retab removes it in the SAME diff that
+// makes its editions genuinely diverge. Empty since the last retab (#1500,
+// Monk); while empty the ratchet check is dead code — delete it together with
+// this set, never before.
 const EDITIONS_STILL_IDENTICAL = new Set<string>([]);
 
 export interface ClassEditionPopulationSummary {
@@ -313,8 +302,6 @@ function pairCount(entry: ClassPairCounts, edition: SeedEdition): number {
   return entry.perEdition.get(edition) ?? 0;
 }
 
-// 0 rows = featureless in that edition; nonzero below MIN_ROWS_PER_PAIR = a
-// half-written partition, which a bare `>= 1` would sail past.
 function pairFloorFailure(name: string, edition: SeedEdition, count: number): string | null {
   if (count === 0) return `  ${name} / ${edition}: 0 rows (expected >= 1)`;
   if (count < MIN_ROWS_PER_PAIR) return `  ${name} / ${edition}: ${count} rows (below the >= ${MIN_ROWS_PER_PAIR} floor)`;
@@ -330,9 +317,6 @@ function pairFloorFailures(entry: ClassPairCounts): string[] {
   return failures;
 }
 
-// A class still on EDITIONS_STILL_IDENTICAL must keep exactly equal row
-// counts per edition — divergence means a retab landed without removing it,
-// or a prune ran unevenly across editions.
 function ratchetFailure(entry: ClassPairCounts): string | null {
   if (!EDITIONS_STILL_IDENTICAL.has(entry.name)) return null;
   const c2014 = pairCount(entry, "EDITION_2014");
@@ -369,18 +353,11 @@ function summarizePairCounts(entries: ClassPairCounts[]): {
  * Post-write presence guard (#1525): every seeded CharacterClass must have at
  * least MIN_ROWS_PER_PAIR ClassFeature rows in EACH edition — a missing
  * partition renders NO features at all, on a sheet that otherwise looks fine.
- *
  * PRESENCE only, never correctness: "a row exists" and "the row is genuine
- * content for that edition" are different assertions, and this makes only the
- * first.
+ * content for that edition" are different assertions.
  *
  * Anchored on `prisma.characterClass.findMany()` — the runtime truth — never
- * an in-memory class registry, which a migration edits in the same diff that
- * most needs this guard armed.
- *
- * Exported so a test can call it against a deliberately broken DB state —
- * routed through seedClassFeatures it could only ever pass, since the seeder
- * rewrites every row first.
+ * an in-memory class registry, which a migration can edit out of step.
  */
 export async function assertEveryClassEditionPopulated(
   prisma: PrismaClient,
@@ -496,8 +473,6 @@ function throwSubclassPopulationFailure(failures: readonly string[]): never {
  * table scan: a long-lived DB can hold a Subclass row the seed no longer
  * emits (reportUnseededSubclassRows owns those, #1562), and scanning it here
  * would fail the deploy for a problem this guard doesn't own.
- *
- * Exported so a test can call it against a deliberately broken DB state.
  */
 export async function assertEverySubclassEditionPopulated(
   prisma: PrismaClient,
