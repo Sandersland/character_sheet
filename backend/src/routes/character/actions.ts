@@ -71,6 +71,7 @@ interface EligibleRowAction {
 }
 
 // Mirrors deriveEntryScopedActions's per-entry gate and toggleActionsFromRow's two-entry split, so availableActions[] and this dispatcher's legality check can never drift apart.
+// The activationCost/resourceKey/toggle shape of this gate must also stay identical to rowIsAnAvailableAction (lib/classes/actions.ts) and action-effect-parity.test.ts's CLASS_FEATURE_ROW_KEYS — update all three together.
 function eligibleRowActions(character: RowActionCharacter): EligibleRowAction[] {
   const totalLevel = levelForExperience(character.experiencePoints);
   const edition = editionOf(character);

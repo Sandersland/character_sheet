@@ -242,7 +242,7 @@ DERIVED_ACTIONS_MAX=1
 
 # awk range from the array's declaration to its closing `];` — stops at the
 # FIRST such line after the start (a second, unrelated `];` closes another array further down in the same file).
-derived_actions_block=$(awk '/^const DERIVED_ACTIONS: DerivedActionRecord\[\] = \[/,/^\];/' backend/src/lib/classes/actions.ts)
+derived_actions_block=$(awk '/^(export )?const DERIVED_ACTIONS: DerivedActionRecord\[\] = \[/,/^\];/' backend/src/lib/classes/actions.ts)
 derived_actions_count=$(printf '%s\n' "$derived_actions_block" | grep -c 'key:' || true)
 
 # Anti-vacuity: if the array's declaration line ever changes shape, the awk

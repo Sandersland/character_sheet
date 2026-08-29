@@ -189,7 +189,9 @@ export interface ResourcePool {
 // reads a synthetic "weaponBond" pool built from a LIVE COUNT of
 // `weaponBonded` inventory rows — no ClassFeature descriptor column expresses
 // a live-inventory gate, so it has no row-driven destination to move to.
-const DERIVED_ACTIONS: DerivedActionRecord[] = [
+// Exported so the seed-side ACTION_EFFECT_FN parity test can check its key
+// against the dispatch table without a second hardcoded copy of "summonBondedWeapon".
+export const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // Fighter / Eldritch Knight — Weapon Bond (2014, PHB'14 p.75). 2014-only:
   // 2024 Eldritch Knight text is unverified/parked, so this stays 2014 until that lands.
   {
@@ -435,6 +437,35 @@ export type ActionOp = SpendResourceOp | AdjustQuantityOp | HealOp | TempHpOp | 
 
 type EffectFn = (ctx: ActionContext) => ActionOp[];
 
+// Universal Action rows and the DERIVED_ACTIONS holdout with no ACTION_EFFECT_FN
+// entry and no ClassFeature-row fallback (they aren't row-driven, so
+// eligibleRowActions can never resolve them either) — dispatching any of these
+// would be the runtime UnknownActionError the module doc above warns about.
+// Two different frontend mechanisms keep that from ever happening. castSpellBonus/
+// shove/summonBondedWeapon have a real ACTION_RESOLVERS entry (actionResolvers.ts)
+// marked serverEffect: false, so planActionClick never sends. study/influence have
+// NO ACTION_RESOLVERS entry at all — and, as universal actions, never appear in
+// availableActions either — so resolverFor(key, undefined) returns undefined and
+// useTurnActions' own no-resolver fallback sends nothing. That's a thinner latch
+// than the other three: a future universal row served with its own resolverKind
+// would flip study/influence into resolverFromRow's serverEffect: true default
+// and start dispatching them for real. Read only by the seed-side
+// action-effect-parity test; not consulted by the dispatcher itself.
+export const NO_DISPATCH_ACTION_KEYS: readonly string[] = [
+  // App affordance, not a distinct action — renders nowhere today, dead
+  // content until #1431/#1439.
+  "castSpellBonus",
+  // Narrated only — no target-combatant model to apply a contest outcome to
+  // (self-or-announce).
+  "shove",
+  // SRD 5.2-only reminder actions (ability-check prompts), no server state.
+  "study",
+  "influence",
+  // The DERIVED_ACTIONS holdout documented above — reminder-only, never sent
+  // to actions/transactions.
+  "summonBondedWeapon",
+];
+
 export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
   // Generic no-op actions — ephemeral only, no server effect needed.
   attack: () => [],
@@ -601,6 +632,8 @@ export interface ActionCastSpec {
 // The row-driven gate: right edition, grant level reached, and the two
 // fields that make a row an action at all. Split out to keep actionFromRow's
 // own cyclomatic count low (fallow's complexity gate).
+// Must stay identical to eligibleRowActions' own gate (routes/character/actions.ts)
+// and action-effect-parity.test.ts's CLASS_FEATURE_ROW_KEYS — update all three together.
 function rowIsAnAvailableAction(row: ClassFeatureRow, level: number, edition: RulesEdition): boolean {
   return row.edition === edition && row.level <= level && Boolean(row.activationCost) && Boolean(row.resourceKey);
 }
