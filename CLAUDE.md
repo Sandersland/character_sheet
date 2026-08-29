@@ -75,6 +75,7 @@ Read on demand — not auto-loaded:
 | `docs/development.md` | You need commands, the Prisma workflow, worktree stacks, or the add-a-domain recipe |
 | `docs/testing.md` | You're running or writing tests (fixture isolation, e2e, visual regression) |
 | `docs/leveling.md` | You're touching XP/level-up/level-down or any level-gated feature |
+| `docs/class-features.md` | You're adding or changing class/subclass content, or touching a class feature's resource, action, or buff columns |
 | `docs/frontend.md` | You're writing frontend code (conventions, Tailwind/contrast rules, dice engine, bundle splitting) |
 | `docs/deployment.md` | You're packaging/hosting the app, or need the backup/restore runbook |
 | `.claude/agent-memory/frontend-design-architect/design_system.md` | You need exact design token names and the design rationale |

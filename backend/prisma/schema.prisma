@@ -582,7 +582,7 @@ model ClassFeature {
   derivedStat      String?
   derivedStatTiers Json? // [{ minLevel, value }] — ASCENDING by minLevel, last-match-wins
 
-  // Closed-form save DC: 8 + proficiency + the higher named ability (PHB'14 p.73 / PHB'24 p.83). A non-empty list IS the trigger — never matched by derivedStat name. Feeds ClassExtras.announcedSaveDC, which throws on a collision — why Cleric keeps its own channelDivinitySaveDC path.
+  // Closed-form save DC: 8 + proficiency + the higher named ability (PHB'14 p.73 / PHB'24 p.83). A non-empty list IS the trigger — never matched by derivedStat name. Feeds ClassExtras.announcedSaveDC; a second class entry also declaring one is a logged-and-dropped collision, not a crash (assignAnnouncedSaveDC keeps the primary entry's DC — throwing here would 500 the character load) — why Cleric keeps its own channelDivinitySaveDC path instead of using this column.
   saveDcAbilities String[] @default([])
 
   // A passive grant no other column expresses. Validated against featImprovementSchema — the same vocabulary a taken feat's `improvements` snapshot uses, reused not forked.
@@ -595,7 +595,7 @@ model ClassFeature {
   conditionImmunities                  String[] @default([])
   // Gates the immunities on a buff of this key being active (e.g. Mindless Rage names "rage"); null = unconditional.
   conditionImmunitiesRequireActiveBuff String?
-  // For an existing matching condition when the gating buff STARTS: "clear" removes it permanently (2024 Mindless Rage, SRD 5.2); "suspend" restores it when the buff ends (2014 Mindless Rage, PHB'14 p.49). Interpreted by applyRowDrivenActionInTx's toggle branch and conditionImmunitiesFromRows.
+  // For an existing matching condition when the gating buff STARTS: "clear" removes it permanently (2024 Mindless Rage, SRD 5.2); "suspend" restores it when the buff ends (2014 Mindless Rage, PHB'14 p.49). Interpreted by syncConditionImmunityOnBuffStartInTx (lib/combat/conditions.ts) and conditionImmunitiesFromRows.
   conditionImmunitiesOnBuffStart       String?
 
   // NULLS NOT DISTINCT is hand-written in the migration (Prisma's DSL cannot express it): subclassId is nullable, so without it two identical base-class rows would both insert.
