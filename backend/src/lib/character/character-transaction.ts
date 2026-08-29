@@ -29,6 +29,18 @@ export interface RunCharacterTransactionOptions<S extends Prisma.CharacterSelect
   }) => Promise<void>;
 }
 
+// Character mutable state (hitPoints, resources, conditions, ...) is whole-JSON read-modify-write:
+// without this lock, two concurrent transactions on the same character each read the pre-update
+// blob and the later write silently clobbers the earlier one.
+// COUPLING LATCH: every top-level transaction that writes Character must call this FIRST, before
+// any read — currently runCharacterTransaction (below), actionsRouter, and revertBatch. A new
+// Character-writing transaction that skips this reintroduces the race. bondWeapon/unbondWeapon and
+// applyAttune also call it, but re-entrantly from inside an already-locked runCharacterTransaction
+// — a harmless re-acquisition of the same lock, not a fourth entry point.
+export async function lockCharacterRow(tx: Prisma.TransactionClient, characterId: string): Promise<void> {
+  await tx.$queryRaw`SELECT id FROM "Character" WHERE id = ${characterId} FOR UPDATE`;
+}
+
 export async function runCharacterTransaction<S extends Prisma.CharacterSelect, Op>(
   characterId: string,
   operations: Op[],
@@ -38,18 +50,25 @@ export async function runCharacterTransaction<S extends Prisma.CharacterSelect, 
   const sessionId =
     opts.sessionId !== undefined ? opts.sessionId : await getActiveSessionId(characterId);
 
-  await prisma.$transaction(async (tx) => {
-    for (const op of operations) {
-      // Re-read per op so a batch of multiple ops sees each previous op's result.
-      const row = (await tx.character.findUnique({
-        where: { id: characterId },
-        select: opts.select,
-      })) as Prisma.CharacterGetPayload<{ select: S }> | null;
-      if (!row) throw opts.notFound(characterId);
-      await opts.applyOp({ tx, row, op, characterId, batchId, sessionId });
-    }
-    if (opts.afterOps) await opts.afterOps({ tx, characterId, batchId, sessionId });
-  });
+  await prisma.$transaction(
+    async (tx) => {
+      await lockCharacterRow(tx, characterId);
+
+      for (const op of operations) {
+        // Re-read per op so a batch of multiple ops sees each previous op's result.
+        const row = (await tx.character.findUnique({
+          where: { id: characterId },
+          select: opts.select,
+        })) as Prisma.CharacterGetPayload<{ select: S }> | null;
+        if (!row) throw opts.notFound(characterId);
+        await opts.applyOp({ tx, row, op, characterId, batchId, sessionId });
+      }
+      if (opts.afterOps) await opts.afterOps({ tx, characterId, batchId, sessionId });
+    },
+    // Generous timeout: the row lock above means real contention (a queued concurrent request)
+    // waits out the whole batch ahead of it, mirroring combineEntities' precedent (entities.ts).
+    { timeout: 30_000 },
+  );
 
   // Returned so endpoints can hand the client the batch id to revert on turn undo (#758).
   return batchId;

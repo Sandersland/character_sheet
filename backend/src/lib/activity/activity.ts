@@ -12,6 +12,7 @@ import {
 } from "@/lib/inventory/inventory.js";
 import { mirrorCapabilityUsedSet, mirrorUsesRemaining } from "@/lib/inventory/inventory-capability-use.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
+import { lockCharacterRow } from "@/lib/character/character-transaction.js";
 
 // Derived from the Prisma-generated enum so it can never drift from the schema.
 const CATEGORY_VALUES = new Set<string>(Object.values(CharacterEventCategory));
@@ -502,6 +503,11 @@ async function applyBatchReversal(
   batchId: string,
   reversed: CharacterEvent[],
 ): Promise<void> {
+  // Locking Character first (before reverseEvent can lock InventoryItem rows) keeps lock
+  // acquisition order consistent with runCharacterTransaction/actionsRouter — reversed order
+  // would deadlock (Postgres 40P01) against a concurrent locked transaction on the same rows.
+  await lockCharacterRow(tx, characterId);
+
   for (const event of reversed) {
     await reverseEvent(tx, characterId, event);
   }
@@ -542,7 +548,10 @@ export async function revertBatch(
   const reversed = [...batchEvents].reverse();
 
   try {
-    await db.$transaction((tx) => applyBatchReversal(tx, characterId, batchId, reversed));
+    await db.$transaction(
+      (tx) => applyBatchReversal(tx, characterId, batchId, reversed),
+      { timeout: 30_000 },
+    );
   } catch (error) {
     // InsufficientCurrencyError/InvalidInventoryOperationError carry their own 400, remapped to 409 here: an undo blocked by later state (e.g. sale proceeds already spent) is a conflict, not a bad request.
     if (

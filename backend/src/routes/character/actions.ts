@@ -13,6 +13,7 @@ import { z } from "zod";
 import { assertCharacterAccess } from "@/lib/auth/access.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
+import { lockCharacterRow } from "@/lib/character/character-transaction.js";
 import { ACTION_EFFECT_FN, castSpecFromRow, endActionKey, toggleRowOps, UnknownActionError } from "@/lib/classes/actions.js";
 import { castAbilityInTx } from "@/lib/spellcasting/ability-cast.js";
 import { ABILITY_SLOT_SUBJECT, type PayCostContext } from "@/lib/spellcasting/ability-cost.js";
@@ -340,11 +341,16 @@ actionsRouter.post<{ id: string }>(
 
     // results is index-aligned 1:1 with operations (mirrors applyManeuverOperations) so the client can fold a row-driven roll into its dice animation without re-deriving it.
     const results: ExecuteActionResult[] = [];
-    await prisma.$transaction(async (tx) => {
-      for (const op of operations) {
-        results.push(await applyActionOpInTx(tx, characterId, op, batchId, sessionId, heightenedFocusTempHp, edition));
-      }
-    });
+    await prisma.$transaction(
+      async (tx) => {
+        await lockCharacterRow(tx, characterId);
+
+        for (const op of operations) {
+          results.push(await applyActionOpInTx(tx, characterId, op, batchId, sessionId, heightenedFocusTempHp, edition));
+        }
+      },
+      { timeout: 30_000 },
+    );
 
     const row = await prisma.character.findUnique({
       where: { id: characterId },

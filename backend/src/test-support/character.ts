@@ -18,7 +18,13 @@ const BASE_CHARACTER = {
 // Cascade-deleted with its owner (Character.owner onDelete: Cascade), so a test that cleans up its users needs no separate character cleanup.
 export async function createTestCharacter(
   ownerId: string,
-  opts: { id?: string; edition?: RulesEdition; name?: string; campaignId?: string } = {},
+  opts: {
+    id?: string;
+    edition?: RulesEdition;
+    name?: string;
+    campaignId?: string;
+    hitPoints?: { current: number; max: number; temp: number };
+  } = {},
 ): Promise<string> {
   const character = await prisma.character.create({
     data: {
@@ -29,6 +35,7 @@ export async function createTestCharacter(
       ownerId,
       rulesEdition: opts.edition ?? "EDITION_2024",
       campaignId: opts.campaignId,
+      hitPoints: opts.hitPoints ?? BASE_CHARACTER.hitPoints,
     },
   });
   return character.id;
