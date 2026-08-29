@@ -202,7 +202,7 @@ referenceRouter.get("/reference", async (req, res) => {
   // Catalog content identical for every character of the edition — not per-character derived state.
   const conditions = conditionRulesText(edition);
 
-  // Only universal: true rows; class-specific Action rows reach the sheet through DERIVED_ACTIONS instead.
+  // Every seeded Action row is universal: true today (#1979) — class-specific actions reach the sheet via a ClassFeature row's actionsFromRows entry, or the DERIVED_ACTIONS holdout (summonBondedWeapon).
   const universalActionRows = await prisma.action.findMany({
     where: withEditionOrShared({ universal: true }, edition),
     select: { key: true, name: true, cost: true, description: true, edition: true },

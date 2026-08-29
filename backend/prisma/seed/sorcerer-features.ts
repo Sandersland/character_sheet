@@ -125,7 +125,7 @@ const SORCERER_BASE_RAW: RawSorcererFeature[] = [
     name: "Metamagic",
     level: 2,
     edition: "EDITION_2024",
-    // SRD 5.2 p.141. DERIVED_ACTIONS' metamagic grantLevel must match this row's level.
+    // SRD 5.2 p.141.
     description:
       "You gain 2 Metamagic options of your choice (2 more at level 10, 2 more at level 17), letting you twist your spells by spending Sorcery Points: Careful Spell (1 SP, protect chosen creatures from your own area spell), Distant Spell (1 SP, double range or make a touch spell reach 30 feet), Empowered Spell (1 SP, reroll damage dice up to your Charisma modifier), Extended Spell (1 SP, double a non-instantaneous duration), Heightened Spell (2 SP, Disadvantage on one target's first save against the spell), Quickened Spell (2 SP, cast an action spell as a Bonus Action), Seeking Spell (1 SP, reroll a missed spell attack roll), Subtle Spell (1 SP, cast without Verbal or Somatic components), Transmuted Spell (1 SP, change a spell's damage type to another type it can deal), or Twinned Spell (SP cost equal to the spell's level, minimum 1, target a second creature).",
     resourceKey: "metamagic",

@@ -78,15 +78,10 @@ async function seedActions(prisma: PrismaClient) {
       description: action.description,
       cost: action.cost,
       universal: action.universal ?? false,
-      grantClass: orNull(action.grantClass),
-      grantSubclass: orNull(action.grantSubclass),
-      grantLevel: orNull(action.grantLevel),
-      resourceKey: orNull(action.resourceKey),
-      resourceAmount: orNull(action.resourceAmount),
-      // edition: null means shared (#1306) across every class row; part of the where key so a 2024 row doesn't overwrite its 2014 twin on reseed.
+      // edition: null means shared (#1306); no seeded row uses it today, but it's still part of the where key so a 2024 row can't silently overwrite its 2014 twin.
       edition,
     };
-    // upsertEditionRow, not .upsert(): the compound-key shorthand can't express a null edition (which every class row has).
+    // upsertEditionRow, not .upsert(): the compound-key shorthand can't express a null edition.
     await upsertEditionRow(prisma.action, { key: action.key, edition }, { key: action.key, ...fields }, fields);
   }
   // Pruning keys on `key`, not `name`: Action.name is not unique ("Channel Divinity" is two rows).

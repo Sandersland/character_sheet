@@ -155,15 +155,16 @@ describe("per-domain business-key uniqueness", () => {
     expect(duplicates(ACTIONS.map((a) => `${a.key}::${a.edition ?? "shared"}`))).toEqual([]);
   });
 
-  // No universal row may stay edition-NULL: resolveEditionCatalog would then
-  // fall back to it for both editions and the fork would be invisible.
-  // metamagic/divineSense/layOnHands are the sanctioned class-row exceptions
-  // — their description text differs per edition even though the real gate
-  // is DERIVED_ACTIONS' own fork, not this catalog row.
-  it("every universal ACTION carries an edition; every class action stays shared, except the sanctioned metamagic/divineSense/layOnHands forks", () => {
-    const SANCTIONED_CLASS_FORKS = new Set(["metamagic", "divineSense", "layOnHands"]);
-    expect(ACTIONS.filter((a) => a.universal && !a.edition).map((a) => a.key)).toEqual([]);
-    expect(ACTIONS.filter((a) => !a.universal && a.edition && !SANCTIONED_CLASS_FORKS.has(a.key)).map((a) => a.key)).toEqual([]);
+  // Every seeded Action row is universal (#1979) — class-specific actions live
+  // on ClassFeature rows / the DERIVED_ACTIONS holdout instead, never here.
+  it("every ACTION row is universal", () => {
+    expect(ACTIONS.every((a) => a.universal)).toBe(true);
+  });
+
+  // No row may stay edition-NULL: resolveEditionCatalog would then fall back
+  // to it for both editions and the fork would be invisible.
+  it("every ACTION carries an edition", () => {
+    expect(ACTIONS.filter((a) => !a.edition).map((a) => a.key)).toEqual([]);
   });
 
   // The two editions must offer the same universal affordances apart from the

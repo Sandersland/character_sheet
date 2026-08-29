@@ -924,7 +924,16 @@ enum SpellSchool {
   transmutation
 }
 
-// Holds DISPLAY + GATING data only. Executable mechanics are hardcoded in backend/src/lib/actions.ts (ACTION_EFFECT_FN keyed by `key`). Adding a new action = append a row to seed.ts + add the effect fn in actions.ts. No migration needed for new actions; only new columns need one.
+// Serves universal actions (available to every character) to GET /api/reference;
+// `key` also doubles as the dispatch identity ACTION_EFFECT_FN is keyed by for the
+// actions/transactions endpoint. Every row is `universal: true` — class/subclass/
+// level gating for class-specific actions lives elsewhere: the one permanent
+// DERIVED_ACTIONS holdout (summonBondedWeapon), or a ClassFeature row's own
+// activationCost/resourceKey columns, post-#1522 retab (#1979). Adding a
+// universal action: append a row here and an ACTION_EFFECT_FN entry (or
+// NO_DISPATCH_ACTION_KEYS if it's reminder-only) — the seed-side
+// ACTION_EFFECT_FN parity test enforces the two stay in sync. No migration
+// needed for a new row; only a new column needs one.
 model Action {
   id          String @id @default(uuid())
   key         String // stable machine key, e.g. "rage" | "dodge"
@@ -934,20 +943,13 @@ model Action {
   // Which economy slot this action consumes on the character's turn.
   cost ActionCost
 
-  // universal actions are available to everyone; class/subclass/level actions are gated by the character's class entry.
-  universal     Boolean @default(false)
-  grantClass    String? // lowercase class name, e.g. "fighter"
-  grantSubclass String? // lowercase subclass name (optional, for subclass-only abilities)
-  grantLevel    Int? // minimum character level for this action to appear
+  // Always true today (see the model comment above) — kept as a real column, not a hardcoded assumption, so a future non-universal use has somewhere to land without a migration.
+  universal Boolean @default(false)
 
-  // Used by deriveActions to check remaining > amount for `enabled` (e.g. Rage costs 1 "rage").
-  resourceKey    String? // matches DerivedResource.key, e.g. "rage"
-  resourceAmount Int? // units required; null means no resource check needed
-
-  // NULL = valid in both editions — still true for every class row. Every `universal: true` row is forked: each `description` is a transcription from ONE named document, so a shared row could only cite "SRD 5.1 and SRD 5.2" and an ambiguous citation is a bug. The business key is (key, edition) rather than plain `key` — `key` is edition-stable identity, so the 2024 Magic row keeps `key: "castSpell"`.
+  // NULL = valid in both editions (#1306); no seeded row uses it today since every universal row forks per edition — each `description` is a transcription from ONE named document, so a shared row could only cite "SRD 5.1 and SRD 5.2" and an ambiguous citation is a bug. The business key is (key, edition) rather than plain `key` — `key` is edition-stable identity, so the 2024 Magic row keeps `key: "castSpell"`.
   edition RulesEdition?
 
-  // NULLS NOT DISTINCT is hand-written in the migration (Prisma's DSL cannot emit it), so a class row's NULL edition still admits at most one row per key.
+  // NULLS NOT DISTINCT is hand-written in the migration (Prisma's DSL cannot emit it), so a shared (NULL-edition) row still admits at most one row per key.
   @@unique([key, edition])
 }
 

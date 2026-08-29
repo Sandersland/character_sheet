@@ -1,25 +1,32 @@
 /**
  * Action catalog: derive-at-read + effect dispatch table.
  *
- * `DERIVED_ACTIONS` + `deriveActions` — hardcoded list of class-specific
- * actions and a pure derive function that filters it for a character's
- * class/level/subclass/edition, cross-referencing resource pools to set
- * `enabled`. Called from serializeCharacter — sync, no DB access.
+ * `actionsFromRows` + `castSpecFromRow` — the general path, post-#1522 retab.
+ * A ClassFeature row with `activationCost` (+ `resourceKey`) populated becomes
+ * an AvailableAction directly; a row with an `effectKind` rolls its die
+ * server-side here rather than trusting a client roll.
+ *
+ * `DERIVED_ACTIONS` + `deriveActions` — a hardcoded list with exactly one
+ * permanent holdout, summonBondedWeapon (see its own comment below for why).
  *
  * `ACTION_EFFECT_FN` — dispatch table keyed by action `key`, returning op
  * arrays (spendResource, adjustQuantity, heal, tempHp, applyBuff, clearBuff)
- * for the actions transactions endpoint.
+ * for the actions transactions endpoint. Reached from a row's own
+ * `resourceKey` (or its toggle end-key) or a seeded universal Action row; the
+ * DERIVED_ACTIONS holdout is a permitted but unused reachability path today —
+ * summonBondedWeapon's key sits in NO_DISPATCH_ACTION_KEYS instead.
  *
- * `actionsFromRows` + `castSpecFromRow` — a ClassFeature row whose
- * `activationCost` column is populated becomes an AvailableAction directly,
- * no DERIVED_ACTIONS entry needed; a row with an `effectKind` rolls its die
- * server-side here rather than trusting a client roll. Only Fighter's rows
- * populate `activationCost` today; every other class still goes through
- * DERIVED_ACTIONS/ACTION_EFFECT_FN until its own retab.
- *
- * Adding a new mechanical action: append the entry to DERIVED_ACTIONS and add
- * its effect fn to ACTION_EFFECT_FN. No migration needed — only new columns
- * need one.
+ * Adding a new mechanical action: give the ClassFeature row an
+ * `activationCost` (+ `resourceKey`, `effectKind` if server-rolled) —
+ * DERIVED_ACTIONS is for the one case no row descriptor can express, not a
+ * general fallback. A row-driven action always resolves through its own
+ * `resourceKey` (spendResource at minimum, via applyRowDrivenActionInTx) —
+ * add an ACTION_EFFECT_FN entry only when it needs a richer effect (heal,
+ * tempHp, …). NO_DISPATCH_ACTION_KEYS is for the other case only: a seeded
+ * universal Action row or the DERIVED_ACTIONS holdout with no ClassFeature-row
+ * fallback to reach — never a row-driven key, which the seed-side
+ * ACTION_EFFECT_FN parity test's orphan check rejects. No migration needed for
+ * a new action; only a new column does.
  */
 
 import type { RulesEdition } from "@character-sheet/shared-types";
@@ -181,10 +188,6 @@ export interface ResourcePool {
   remaining: number;
 }
 
-// The single source of truth for the CLASS action catalog (prisma/seed.ts's
-// ACTIONS class rows are not consumed by any route and don't need to stay in
-// sync — only its universal rows are, via referenceRouter).
-//
 // summonBondedWeapon is the one row that stays TS permanently: its `enabled`
 // reads a synthetic "weaponBond" pool built from a LIVE COUNT of
 // `weaponBonded` inventory rows — no ClassFeature descriptor column expresses
