@@ -1,14 +1,4 @@
-// #1562's seed-time detector: reportUnseededSubclassRows reports (never
-// deletes) a Subclass row whose slug the seed no longer emits at all — for
-// example after a rename drops the old slug outright, rather than just
-// changing which edition it is tagged for. pruneStaleSubclasses only ever
-// removes a row under a slug the seed STILL emits (see its own comment), so
-// a row like this survives every seed run until a human decides what to do
-// with it and any characters that still reference it.
-//
-// Uses this vitest worker's own isolated test database (never the dev
-// database) — every fixture row below uses a class name/slug unique to this
-// file, so nothing here touches the real seeded catalog.
+// reportUnseededSubclassRows reports (never deletes) a Subclass row whose slug the seed no longer emits at all; pruneStaleSubclasses only removes rows under a slug the seed still emits (#1562).
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { prisma } from "@/lib/core/prisma.js";
@@ -22,10 +12,7 @@ const FIXTURE_CLASS_NAME = "ZzzUnseededDetectorClass1562";
 const ORPHAN_SLUG = "zzz-unseeded-orphan-1562";
 const SEEDED_SLUG = "zzz-unseeded-still-seeded-1562";
 
-// The test database this worker uses carries the REAL seeded catalog (other
-// integration tests depend on it), so "still seeded" here means the real
-// SUBCLASSES list plus this file's own fixture slug — not just the fixture
-// slug alone, or every real row would misread as an orphan.
+// The test db carries the real seeded catalog too, so REAL_SEEDED_SLUGS must include SUBCLASSES, not just this file's fixture slug, or every real row misreads as an orphan.
 const REAL_SEEDED_SLUGS = SUBCLASSES.map((s) => s.slug);
 
 async function ensureFixtureClass(): Promise<string> {
@@ -99,11 +86,7 @@ describe("reportUnseededSubclassRows (#1562)", () => {
   });
 
   it("does not name this fixture's own row when its slug is still seeded", async () => {
-    // Not asserting total silence: this detector scans the WHOLE Subclass
-    // table, so a real, pre-existing orphan row on a long-lived database
-    // would also make it log here, and that is not this test's concern.
-    // What this test pins is narrower: THIS fixture's own row, once its slug
-    // is in the seeded list, must never be named in the report.
+    // Not asserting total silence — the detector scans the whole table, so a real pre-existing orphan could also log. Only this fixture's own row must never be named.
     const classId = await ensureFixtureClass();
     await prisma.subclass.create({
       data: { classId, name: "Fixture Still Seeded", description: "still seeded", slug: SEEDED_SLUG, edition: "EDITION_2014" },

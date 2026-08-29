@@ -1,9 +1,3 @@
-// Entitlement supertype (#1796, epic #1795 1/6). Pins the three DB-level
-// invariants Prisma's DSL cannot express and that migration hand-writes as
-// raw SQL: the owner-arm-per-scope CHECK, the NULLS NOT DISTINCT business-key
-// unique, and Spell.catalogEntryId's own FK (ON DELETE CASCADE). Same style
-// as item-scope.integration.test.ts's own DB-constraint pins — real Postgres,
-// no mocks, scoped to rows this file creates.
 import { randomUUID } from "node:crypto";
 
 import { afterEach, describe, expect, it } from "vitest";

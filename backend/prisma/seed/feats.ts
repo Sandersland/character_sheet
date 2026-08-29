@@ -1,25 +1,10 @@
-// ── Feat catalog (2024 + 2014 rules) ────────────────────────────────────────────
-// SRD 5.2.1 pp. 87-88 for the 16 SRD feats; PHB'24 for the re-authored rest;
-// PHB'14 pp. 165-170 (= SRD 5.1 on Grappler only — see #1310) for the 2014 rows.
-// abilityOptions/abilityIncrease drive the half-feat bump; category/levelPrerequisite
-// gate which slot may take a feat (see featOfferedForAsiSlot). Ability Score
-// Improvement is NOT seeded — it stays the takeAsi advancement branch.
-// Deeper per-feat mechanics are surfaced as description text, not automated.
-//
-// Every row is edition-tagged (#1310/#1311) — no shared `edition: null` Feat row
-// remains, per the ACTIONS/#1430 "a transcription can only cite one document"
-// precedent. PHB'14 has no Origin/Fighting Style/Epic Boon taxonomy: every 2014
-// row is `category: "general"` with NO levelPrerequisite (PHB'14 p.165's "forgo
-// an Ability Score Improvement" rule has no per-feat level gate — the earliest
-// ASI in any 2014 class is level 4, which is featOfferedForAsiSlot's `?? 4`
-// default). A 2014 background's Origin-feat grant is suppressed edition-wide by
-// backgroundGrantsOriginFeat (#1504), independent of how these rows are tagged.
+// SRD 5.2.1 pp. 87-88 for the 16 SRD feats; PHB'24 for the re-authored rest; PHB'14 pp. 165-170 (= SRD 5.1 on Grappler only, #1310) for the 2014 rows.
+// abilityOptions/abilityIncrease drive the half-feat bump; category/levelPrerequisite gate which slot may take a feat (see featOfferedForAsiSlot). Ability Score Improvement itself is not seeded — it stays the takeAsi advancement branch.
+// Every row is edition-tagged (#1310/#1311); PHB'14 has no Origin/Fighting Style/Epic Boon taxonomy, so every 2014 row is `category: "general"` with no levelPrerequisite (the earliest 2014 ASI is level 4, featOfferedForAsiSlot's `?? 4` default). A 2014 background's Origin-feat grant is suppressed edition-wide by backgroundGrantsOriginFeat (#1504), independent of how these rows are tagged.
 
 import type { SeedEdition } from "./edition.js";
 
-// Local (unexported) mirror of the backend FeatCategory (lib/srd/feats.ts) and
-// frontend FeatCategory (types/character/leveling.ts) — three copies because the
-// seed can't import from @/lib/ (tsx alias) or the frontend; update all three together.
+// Local mirror of FeatCategory, duplicated in the backend lib and the frontend since this seed module can't import either — keep all three in sync.
 type FeatCategory = "origin" | "general" | "fighting_style" | "epic_boon";
 
 export interface FeatImprovement {
@@ -40,23 +25,16 @@ export interface FeatSeed {
   abilityOptions?: string[];
   abilityIncrease?: number;
   improvements?: FeatImprovement[];
-  // Omitted = shared (NULL column, valid in both editions, #1306). Only a feat
-  // that mechanically diverges between editions sets this.
+  // Omitted = shared (NULL column, valid in both editions, #1306). Only a feat that mechanically diverges between editions sets this.
   edition?: SeedEdition;
-  // Class-name scope (#1495): omitted/[] = any class with the feature may take
-  // it. Only the six 2014 Fighting Style rows set this (PHB'14's per-class
-  // subset) — read through fightingStyleFeatOfferedForClasses (lib/srd/feats.ts).
+  // Class-name scope (#1495): omitted/[] = any class with the feature may take it. Only the six 2014 Fighting Style rows set this, read through fightingStyleFeatOfferedForClasses.
   classes?: string[];
 }
 
 const ALL_ABILITIES = ["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"];
 
 export const FEATS: FeatSeed[] = [
-  // ── Origin feats (SRD 5.2.1 + PHB'24) — no level prerequisite ──────────────
-  // Alert forks by edition (#1306 worked example — SRD 5.2 vs PHB'14 p.165):
-  // 2024 scales the initiative bonus with Proficiency Bonus and adds the
-  // initiative-swap option; 2014 is a flat +5 with no swap. Two rows sharing
-  // the name "Alert", resolved by resolveEditionRow.
+  // Alert forks by edition (PHB'14 p.165 vs SRD 5.2): 2024 scales the initiative bonus with Proficiency Bonus and adds an initiative-swap option; 2014 is a flat +5. Two rows share the name, resolved by resolveEditionRow.
   {
     name: "Alert",
     description:
@@ -69,9 +47,7 @@ export const FEATS: FeatSeed[] = [
     name: "Alert",
     description:
       "You gain a +5 bonus to initiative. You can't be surprised while you are conscious. Other creatures don't gain advantage on attack rolls against you as a result of being unseen by you.",
-    // PHB'14 has no Origin taxonomy (#1310) — "general" is what makes this row
-    // takeable via an ASI slot at all; PHB'14 p.165's feat rule has no level
-    // gate, so levelPrerequisite stays omitted (featOfferedForAsiSlot's `?? 4`).
+    // PHB'14 has no Origin taxonomy (#1310); `category: general` is what makes this row takeable via an ASI slot at all.
     category: "general",
     improvements: [{ target: "initiative", amount: 5 }],
     edition: "EDITION_2014",
@@ -127,14 +103,7 @@ export const FEATS: FeatSeed[] = [
     edition: "EDITION_2024",
   },
 
-  // ── Fighting Style feats (SRD 5.2.1) — granted by a Fighting Style feature ──
-  // Improvements carry the same derived effects the former scalar styles applied
-  // (#1137). Great Weapon Fighting's damage-die floor is not automated, so it stays
-  // descriptive. Stamped EDITION_2024 (#1311): SRD 5.2 has exactly these four names
-  // and any class with the Fighting Style feature may take any of them (no
-  // per-class subset, unlike 2014 below) — content transcribed from SRD 5.2.1, not
-  // a universal row, per the ACTIONS/#1430 "no shared row stays edition-NULL"
-  // precedent.
+  // Great Weapon Fighting's damage-die floor is not automated, so it stays descriptive. Stamped EDITION_2024 (#1311): SRD 5.2 has exactly these four names, and any class with the Fighting Style feature may take any of them (no per-class subset, unlike 2014 below).
   {
     name: "Archery",
     description: "You gain a +2 bonus to attack rolls you make with ranged weapons.",
@@ -170,18 +139,8 @@ export const FEATS: FeatSeed[] = [
     edition: "EDITION_2024",
   },
 
-  // ── 2014 Fighting Style feats (PHB'14 p. 72 Fighter / p. 82 Paladin / p. 91
-  // Ranger, = SRD 5.1) — #1311. A Fighting Style is per-class in 2014 (Fighter
-  // gets all six; Paladin gets Defense/Dueling/Great Weapon Fighting/
-  // Protection; Ranger gets Archery/Defense/Dueling/Two-Weapon Fighting) —
-  // `classes` encodes exactly that subset (#1495), read through
-  // fightingStyleFeatOfferedForClasses. Dueling and Protection have no SRD 5.2
-  // counterpart, so they exist only as EDITION_2014 rows. Archery/Defense/
-  // Two-Weapon Fighting carry the same improvement as their 2024 sibling (the
-  // derived effect is identical; only the transcribed wording differs) —
-  // Great Weapon Fighting's reroll and Protection's imposed-disadvantage-on-
-  // another-creature's-roll stay descriptive (self-or-announce; GWF also
-  // untracked in 2024 above).
+  // PHB'14 p.72 Fighter/p.82 Paladin/p.91 Ranger (= SRD 5.1), #1311. Fighting Style is per-class in 2014 (Fighter gets all six; Paladin gets Defense/Dueling/Great Weapon Fighting/Protection; Ranger gets Archery/Defense/Dueling/Two-Weapon Fighting) — `classes` encodes that subset (#1495), read through fightingStyleFeatOfferedForClasses.
+  // Dueling and Protection have no SRD 5.2 counterpart, so they exist only as EDITION_2014 rows. Archery/Defense/Two-Weapon Fighting carry the same improvement as their 2024 sibling; Great Weapon Fighting and Protection stay descriptive.
   {
     name: "Archery",
     description: "You gain a +2 bonus to attack rolls you make with ranged weapons.",
@@ -238,35 +197,15 @@ export const FEATS: FeatSeed[] = [
     classes: ["Fighter", "Ranger"],
   },
 
-  // ── 2014 catalog: General / Origin feats (PHB'14 pp. 165-170) — #1310 ───────
-  // PHB'14 has ONE feat taxonomy (no Origin/Fighting Style/Epic Boon split), so
-  // every row here is `category: "general"` with no levelPrerequisite — see the
-  // file header. 26 names total: the 24 `6491c528` (#1154) deleted, recovered
-  // verbatim from `git show 6491c528^:backend/prisma/seed/feats.ts` (that file's
-  // own header called its text "concise summaries", not page transcriptions —
-  // preserved as-is here rather than rewritten), plus Grappler and Savage
-  // Attacker, freshly transcribed below since neither was in the deleted 24
-  // (Grappler cites SRD 5.1 — the open-content 2014 feat; Savage Attacker is
-  // PHB'14-only, verified against two independent published transcriptions).
-  // Weapon Master's four hardcoded weapon proficiencies are dropped from the
-  // recovered improvements (the description already reads "of your choice",
-  // matching the 2024 sibling's description-only treatment) — every other
-  // recovered field/improvement is unchanged.
   {
     name: "Grappler",
-    // SRD 5.1 (dnd5eapi.co /api/2014/feats/grappler) — the one 2014 feat that
-    // is open content; every other 2014 row here cites PHB'14 only.
+    // SRD 5.1 — the one 2014 feat that is open content; every other 2014 row here cites PHB'14 only.
     description:
       "You've developed the skills necessary to hold your own in close-quarters grappling. You have advantage on attack rolls against a creature you are grappling. You can use your action to try to pin a creature grappled by you: make another grapple check, and if you succeed, you and the creature are both restrained until the grapple ends.",
     category: "general",
     prerequisite: "Strength 13+",
     edition: "EDITION_2014",
   },
-  // Alert's EDITION_2014 row lives in the Origin-feats block above (it already
-  // existed pre-#1310, #1306) — this section's own count (26 names) includes
-  // it without repeating the row. The four originFeatName values BACKGROUNDS
-  // references (Magic Initiate, Savage Attacker, Skilled, Alert) all have an
-  // EDITION_2014 row after this change.
   {
     name: "Lucky",
     description:
@@ -276,8 +215,7 @@ export const FEATS: FeatSeed[] = [
   },
   {
     name: "Mobile",
-    // The one name #1154 dropped outright with no successor — PHB'24's Speedy
-    // (above, EDITION_2024-only) rewrites its opportunity-attack clause.
+    // PHB'24's Speedy is the successor to this feat, rewriting its opportunity-attack clause.
     description:
       "Your speed increases by 10 feet. When you take the Dash action, difficult terrain doesn't cost you extra movement for the rest of the turn. When you make a melee attack against a creature, you don't provoke opportunity attacks from that creature for the rest of the turn, whether or not you hit.",
     category: "general",
@@ -356,7 +294,6 @@ export const FEATS: FeatSeed[] = [
     improvements: [{ target: "maxHp", amount: 2, perLevel: true }],
     edition: "EDITION_2014",
   },
-  // ── Half-feats (grant +1 to a chosen ability score) ─────────────────────
   {
     name: "Athlete",
     description:
@@ -448,9 +385,7 @@ export const FEATS: FeatSeed[] = [
   },
   {
     name: "Weapon Master",
-    // 2014's four hardcoded weapon proficiencies are dropped (#1310 scope): the
-    // description already reads "of your choice", matching the 2024 sibling's
-    // description-only treatment — no improvement target stands in for a choice.
+    // 2014's four hardcoded weapon proficiencies are dropped (#1310): the description already reads "of your choice", matching the 2024 sibling's description-only treatment.
     description:
       "+1 to Strength or Dexterity. You gain proficiency with four weapons of your choice.",
     category: "general",
@@ -476,17 +411,13 @@ export const FEATS: FeatSeed[] = [
   },
   {
     name: "Savage Attacker",
-    // PHB'14 (verified against two independent published transcriptions,
-    // dnd5e.wikidot.com and aidedd.org, since Savage Attacker is not SRD
-    // content): melee-only, and a straight reroll rather than 2024's
-    // roll-twice-keep-either on any weapon.
+    // PHB'14 (not SRD content): melee-only, a straight reroll — not 2024's roll-twice-keep-either on any weapon.
     description:
       "Once per turn when you roll damage for a melee weapon attack, you can reroll the weapon's damage dice and use either total.",
     category: "general",
     edition: "EDITION_2014",
   },
 
-  // ── General feats (level 4+) — each grants +1 to a listed ability ──────────
   {
     name: "Grappler",
     description:
@@ -700,9 +631,7 @@ export const FEATS: FeatSeed[] = [
     edition: "EDITION_2024",
   },
 
-  // ── Epic Boons (SRD 5.2.1) — level 19+, +1 to an ability (max 30) ──────────
-  // PHB'14 has no Epic Boon feats (2014 epic boons are a DMG option the DM
-  // grants, not a feat) — EDITION_2024-only, no 2014 twin.
+  // PHB'14 has no Epic Boon feats (2014 epic boons are a DMG option the DM grants, not a feat) — EDITION_2024-only, no 2014 twin.
   {
     name: "Boon of Combat Prowess",
     description:

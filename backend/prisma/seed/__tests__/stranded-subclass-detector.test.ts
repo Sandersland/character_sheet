@@ -1,14 +1,4 @@
-// #1598's seed-time detector: reportStrandedSubclassCharacters (seed-subclasses.ts)
-// reports (never throws for) a live character whose held subclass row's
-// `edition` no longer matches the character's OWN `rulesEdition` — the state
-// remapCharactersOffStaleSubclasses (#1559) deliberately preserves rather than
-// nulls, and the read-time fix (buildClassesView's subclassUnavailable, chunk 1)
-// marks rather than repairs. This is the operator-facing report a future retab
-// (wave C, #1336) needs to actually notice it widened the affected set.
-//
-// Uses this vitest worker's own isolated test database (never the dev
-// database) — every fixture row below uses a class name/slug unique to this
-// file, so nothing here touches the real seeded catalog.
+// reportStrandedSubclassCharacters reports (never throws) a live character whose subclass row's edition no longer matches the character's own rulesEdition — state remapCharactersOffStaleSubclasses (#1559) deliberately preserves and buildClassesView's subclassUnavailable marks rather than repairs (#1598).
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { prisma } from "@/lib/core/prisma.js";

@@ -1,38 +1,23 @@
-// Pure 5e-rules sanity checks on the seed catalog data. NO database — this
-// imports the side-effect-free consts from ../catalog-data.js, never seed.ts
-// (which connects to Postgres at module load). These invariants guard the
-// class of data bugs the app has only surfaced during play: absurd item
-// weights (the "ball bearings" 1000-lb bag), a PHB class missing from the
-// dropdown, and versatile weapons missing their second damage die.
+// NO database — imports the side-effect-free consts from ../catalog-data.js, never seed.ts (which connects to Postgres at module load).
 import { describe, it, expect } from "vitest";
 
 import { toolsByCategory, type ToolCategory } from "@/lib/srd/tools.js";
 
 import { CLASSES, BACKGROUNDS, ITEMS, type CatalogItem } from "../catalog-data.js";
 
-// The 12 PHB classes. If any is missing the character-creation dropdown is
-// broken (Warlock/Druid have shipped missing before).
 const PHB_CLASSES = [
   "Barbarian", "Bard", "Cleric", "Druid", "Fighter", "Monk",
   "Paladin", "Ranger", "Rogue", "Sorcerer", "Warlock", "Wizard",
 ] as const;
 
-// Weight ceiling, in pounds. The heaviest legitimate 5e item is plate armor
-// at 65 lb; the next heaviest catalog rows are the equipment packs (~60 lb).
-// 200 sits comfortably above every real item yet well below the kind of
-// data-entry slip we want to catch — e.g. seeding a bag of 1000 ball bearings
-// (really ~2 lb) at weight 1000, which once made a rogue's pack weigh 2000+ lb.
+// The heaviest legitimate 5e item is plate armor at 65 lb, so 200 sits comfortably above every real item while still catching a data-entry slip.
 const MAX_ITEM_WEIGHT = 200;
 
-// A weapon is "versatile" in this catalog iff it carries versatile dice. There
-// is no separate boolean property — the dice fields ARE the marker.
+// A weapon is "versatile" iff it carries versatile dice — there is no separate boolean property.
 const isVersatile = (i: CatalogItem) =>
   i.weapon?.versatileDiceCount !== undefined ||
   i.weapon?.versatileDiceFaces !== undefined;
 
-// camelCase skill/ability key: starts lowercase, letters only, no spaces or
-// Title Case. Guards the recurring "render a raw label as a key" footgun at
-// the data layer.
 const CAMEL_KEY = /^[a-z][a-zA-Z]*$/;
 
 describe("CLASSES catalog", () => {
@@ -83,8 +68,6 @@ describe("BACKGROUNDS catalog", () => {
   });
 
   it("uses camelCase skill-proficiency keys (no spaces / Title Case)", () => {
-    // Background skill grants use the same camelCase keys (sleightOfHand,
-    // animalHandling) that have caused the raw-key-rendered-as-label bug.
     for (const bg of BACKGROUNDS) {
       for (const skill of bg.skillProficiencies) {
         expect(skill, `background "${bg.name}" skill key "${skill}" is not camelCase`)
@@ -93,12 +76,7 @@ describe("BACKGROUNDS catalog", () => {
     }
   });
 
-  // #1570: PHB'24 has sixteen backgrounds and Folk Hero is not among them, so a
-  // shared (NULL) row would keep offering it to 2024 characters as the one
-  // background that cannot give them the ability spread and Origin feat PHB'24
-  // guarantees — a silent forfeit of +3 points and a feat, with nothing in the
-  // UI to explain it. Its 2014-ness is the reason it has no abilityChoices, so
-  // the tag and the empty spread must move together.
+  // Folk Hero isn't among PHB'24's sixteen backgrounds, so a shared (NULL) row would keep offering 2024 characters a background that can't grant the ability spread/Origin feat PHB'24 guarantees (#1570).
   it("tags Folk Hero EDITION_2014 rather than leaving it shared", () => {
     const folkHero = BACKGROUNDS.find((b) => b.name === "Folk Hero");
     expect(folkHero?.edition).toBe("EDITION_2014");
@@ -106,10 +84,7 @@ describe("BACKGROUNDS catalog", () => {
     expect(folkHero?.originFeatName).toBeUndefined();
   });
 
-  // #1779: PHB'14 and PHB'24 both grant Soldier/Noble "one type of Gaming
-  // Set" as a CHOICE, not the fixed Dice Set previously flattened onto these
-  // rows — toolProficiencies must be empty (nothing pre-granted) and
-  // toolChoices must carry every SRD gaming set with a count of 1.
+  // PHB'14 and PHB'24 both grant Soldier/Noble "one type of Gaming Set" as a CHOICE, not a fixed Dice Set (#1779).
   const GAMING_SETS = ["Dice Set", "Dragonchess Set", "Playing Card Set", "Three-Dragon Ante Set"];
   it.each(["Soldier", "Noble"])('gives %s a Gaming Set CHOICE, not a pre-granted "Dice Set"', (name) => {
     const bg = BACKGROUNDS.find((b) => b.name === name);
@@ -131,7 +106,7 @@ describe("BACKGROUNDS catalog", () => {
 describe("ITEMS catalog", () => {
   it("has no implausible weights", () => {
     for (const item of ITEMS) {
-      const w = item.weight ?? 0; // weight is optional; absent means weightless
+      const w = item.weight ?? 0;
       expect(typeof w, `item "${item.name}" weight not numeric`).toBe("number");
       expect(Number.isFinite(w), `item "${item.name}" weight not finite`).toBe(true);
       expect(w, `item "${item.name}" has negative weight`).toBeGreaterThanOrEqual(0);
@@ -150,8 +125,7 @@ describe("ITEMS catalog", () => {
 
   it("gives every versatile weapon both a base and a versatile damage die", () => {
     const versatile = ITEMS.filter(isVersatile);
-    // Sanity: the catalog should actually contain versatile weapons, else the
-    // filter is silently matching nothing and this test guards air.
+    // Fails if the filter silently matches nothing.
     expect(versatile.length, "no versatile weapons found in ITEMS").toBeGreaterThan(0);
 
     for (const item of versatile) {
@@ -160,8 +134,7 @@ describe("ITEMS catalog", () => {
       expect(w.damageDiceFaces, `${item.name}: missing base damageDiceFaces`).toBeGreaterThan(0);
       expect(w.versatileDiceCount, `${item.name}: missing versatileDiceCount`).toBeGreaterThan(0);
       expect(w.versatileDiceFaces, `${item.name}: missing versatileDiceFaces`).toBeGreaterThan(0);
-      // 5e: the two-handed (versatile) die is always at least as large as the
-      // one-handed die — a smaller versatile die means the fields are swapped.
+      // The versatile die is always at least as large as the base die — a smaller versatile die means the fields are swapped.
       expect(
         w.versatileDiceFaces!,
         `${item.name}: versatile die (d${w.versatileDiceFaces}) smaller than base die (d${w.damageDiceFaces})`,
@@ -187,14 +160,7 @@ describe("ITEMS catalog", () => {
   });
 });
 
-// #1564: the twelve items every PHB'24 class package needs that #1534's ITEMS
-// catalog didn't carry yet — parsed from raw HTML (5e24srd.com, CC-BY-4.0,
-// SRD 5.2) and cross-checked against SRD 5.1 (5thsrd.org); every value is
-// identical in both editions (that identity is WHY one untagged Item row can
-// serve both — see this issue's research comment). "Musical Instrument" is a
-// category, not one item: nine of its ten concrete instruments are new here
-// (Lute already existed); each entry below pins name/category/weight/cost so
-// a future edit can't silently drift from the cited SRD 5.2 tables.
+// SRD 5.2 (5e24srd.com, CC-BY-4.0), cross-checked against SRD 5.1 (5thsrd.org).
 describe("ITEMS catalog — PHB'24 additions (#1564, SRD 5.2)", () => {
   const byName = (name: string) => ITEMS.find((i) => i.name === name);
 
@@ -326,18 +292,13 @@ describe("ITEMS catalog — PHB'24 additions (#1564, SRD 5.2)", () => {
     }
   });
 
-  // Lute is untouched by this issue — pinned so a future edit can't drift it
-  // while adding its nine siblings.
   it("leaves the existing Lute (35 gp, 2 lb) unchanged", () => {
     const item = byName("Lute");
     expect(item!.weight).toBe(2);
     expect(item!.cost).toEqual({ cp: 0, sp: 0, gp: 35, pp: 0 });
   });
 
-  // No weapon-mastery properties (Graze/Sap/Nick/Vex/Topple, SRD 5.2) exist
-  // anywhere in WeaponDetailInput — this just documents that Greatsword/
-  // Flail/Spear/Sickle above carry nothing beyond the shared 5.1/5.2 stat
-  // line, rather than a reader wondering if mastery was forgotten.
+  // WeaponDetailInput has no SRD 5.2 weapon-mastery properties (Graze/Sap/Nick/Vex/Topple).
   it("does not model SRD 5.2 weapon-mastery properties on the new weapons", () => {
     for (const name of ["Greatsword", "Flail", "Spear", "Sickle"]) {
       const keys = Object.keys(byName(name)!.weapon ?? {});
@@ -347,10 +308,7 @@ describe("ITEMS catalog — PHB'24 additions (#1564, SRD 5.2)", () => {
     }
   });
 
-  // #1564 commit 4: only the small set of Item rows that ARE tools carry
-  // toolCategory — the open-pick validator reads this column so a Bard's
-  // "musical instrument of your choice" or a Monk's tool-bound pick never
-  // reaches into lib/srd/tools.ts. Everything else stays untagged (null).
+  // Only Item rows that are tools carry toolCategory — the open-pick validator reads this column via toolsByCategory. Everything else stays untagged (null).
   it("tags the ten musical instruments with toolCategory: musicalInstrument", () => {
     for (const name of ["Bagpipes", "Drum", "Dulcimer", "Flute", "Horn", "Lute", "Lyre", "Pan Flute", "Shawm", "Viol"]) {
       expect(byName(name)!.toolCategory, `"${name}" toolCategory`).toBe("musicalInstrument");
@@ -370,19 +328,7 @@ describe("ITEMS catalog — PHB'24 additions (#1564, SRD 5.2)", () => {
   });
 });
 
-// #1570: an UNBOUND open pick ("artisan's tools of your choice") is offered from
-// the Item rows carrying that toolCategory — TOOLS plays no part in the dropdown,
-// it only validates proficiency choices. The two drifted: TOOLS listed all
-// seventeen artisan tools while ITEMS carried one (Calligrapher's Supplies), so
-// Folk Hero's signature choice would have rendered as a one-entry dropdown that
-// looks like a bug and can't express the background. Same species as the nine
-// instruments (#1564) and four gaming sets (#1565), each added when a pick first
-// needed a pool. Scoped to the three categories a filter can name; "other" tools
-// are only ever referenced by exact catalogName (Thieves' Tools, Forgery Kit),
-// never pooled, so their Item rows stay demand-driven.
-// TOOLS omits the zero coin denominations ITEMS spells out (and ITEMS carries a
-// pp field TOOLS has no concept of), so both sides are normalized to the three
-// denominations a tool's price can actually use before being compared.
+// TOOLS omits the zero coin denominations ITEMS spells out (and ITEMS carries a pp field TOOLS has no concept of), so both sides are normalized to the three denominations a tool's price can actually use before being compared.
 function coinTriple(cost?: { gp?: number; sp?: number; cp?: number }) {
   return { gp: cost?.gp ?? 0, sp: cost?.sp ?? 0, cp: cost?.cp ?? 0 };
 }

@@ -1,19 +1,6 @@
-// In-place catalog spell renames (#1132). SRD 5.2 drops the proper-noun prefixes
-// ("Tasha's Hideous Laughter" → "Hideous Laughter"). A name-keyed upsert would
-// strand the old row and cascade-delete its SubclassGrantedSpell grants / dangle
-// InventoryCapability.spellId provenance, so each rename is an UPDATE that
-// preserves the row id. Runs BEFORE seedSpells' upsert loop so the upsert then
-// matches the already-renamed row. Idempotent (source-gone = no-op); a target
-// collision is logged and skipped rather than crashing the seed.
-//
-// Scoped to `edition: "EDITION_2024"` (#1710): these are SRD 5.2 renames only
-// — the "from" name (e.g. "Tasha's Hideous Laughter") is exactly the PHB'14
-// name a future spells-2014/*.ts content slice seeds under its own
-// EDITION_2014 row, and `name` is no longer globally unique now that Spell
-// carries `edition`. An unscoped lookup would risk renaming that 2014 row
-// instead of (or nondeterministically alongside) the intended 2024 one.
-//
-// Imports only prisma types + the SPELL_RENAMES data, per the seed/migration rule.
+// UPDATE, not a name-keyed upsert (#1132): SRD 5.2 drops proper-noun prefixes (e.g. "Tasha's Hideous Laughter" -> "Hideous Laughter"), and a name-keyed upsert would strand the old row, cascade-deleting its SubclassGrantedSpell grants and dangling InventoryCapability.spellId provenance. Must run before seedSpells' upsert loop so it matches the already-renamed row. Idempotent; a target-name collision is logged and skipped rather than crashing the seed.
+// Scoped to EDITION_2024 (#1710): `name` is no longer globally unique now that Spell carries `edition`, and the "from" name is exactly the PHB'14 name a 2014 row could carry — an unscoped lookup risks renaming that row instead.
+// Takes renames as a parameter rather than importing SPELL_RENAMES directly, per the seed/migration import rule.
 import type { PrismaClient } from "../../src/generated/prisma/client.js";
 import type { SpellRename } from "./spells.js";
 
@@ -31,13 +18,7 @@ export async function applySpellRenames(prisma: PrismaClient, renames: SpellRena
       console.log(`applySpellRenames: "${to}" already exists — skipping rename of "${from}"`);
       continue;
     }
-    // Same atomic-write guarantee as custom-spells.ts's POST/PATCH
-    // ($transaction): the linked CatalogEntry (#1796) carries its own `name`,
-    // part of its business key, so the Spell rename and the entry rename
-    // must commit together — a crash between two separate top-level writes
-    // would rename the Spell but leave the entry pointing at the pre-rename
-    // name forever, silently stale for any later slice (grant/fork UI) that
-    // reads the entry's own name.
+    // The linked CatalogEntry (#1796) carries its own `name`, part of its business key, so the Spell rename and the entry rename must commit together — a crash between two separate writes would leave the entry pointing at the pre-rename name forever.
     await prisma.$transaction(async (tx) => {
       await tx.spell.update({ where: { id: source.id }, data: { name: to } });
       await tx.catalogEntry.update({ where: { id: source.catalogEntryId }, data: { name: to } });

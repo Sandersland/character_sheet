@@ -1,11 +1,3 @@
-// #1713 (content slice CS of epic #1517): shape + cross-check invariants for
-// the "3+ class list" shared spell bucket. Pure data tests on the array
-// itself — same pattern as seed-data.test.ts's "SPELLS — structured-field
-// invariants (#1132)" block — because the DB round-trip (one Spell row per
-// name, SpellClass fan-out to every class, `?class=` resolution) is already
-// proven generically by spell-fork-reseed.test.ts (#1710) and spells.test.ts's
-// SpellClass-join describe blocks (#1711); this file's only job is to prove
-// THIS SLICE'S DATA is correct, not re-prove the plumbing.
 import { describe, expect, it } from "vitest";
 
 import type { CatalogSpell } from "../spells.js";
@@ -25,9 +17,7 @@ function duplicates(names: string[]): string[] {
 
 describe("SHARED_SPELLS_2014 — row-ownership rule (epic #1517)", () => {
   it("is non-empty and clears a sane floor (the whole point of this slice)", () => {
-    // Not an exact count — future refinement can still add/move rows — but a
-    // regression that silently emptied the array (e.g. a bad merge) must fail
-    // loudly rather than pass an "empty array has no bad rows" vacuous green.
+    // fails if the array is silently emptied, not an exact count
     expect(SHARED_SPELLS_2014.length).toBeGreaterThanOrEqual(130);
   });
 
@@ -79,11 +69,6 @@ describe("SHARED_SPELLS_2014 — structured-field invariants (mirrors SPELLS' #1
   });
 });
 
-// The critical lesson from a prior content slice (CLAUDE.md): a row's
-// STRUCTURED saveEffect must match its own DESCRIPTION prose, or the frontend
-// shows "half on success" text that contradicts (or omits) what the spell
-// actually does. Every damage spell in this file is checked against its own
-// text, not spot-checked.
 describe("SHARED_SPELLS_2014 — saveEffect matches its own description text (field/text mismatch guard)", () => {
   const HALF_ON_SUCCESS = /half as much damage|half damage|half the damage/i;
 
@@ -100,15 +85,6 @@ describe("SHARED_SPELLS_2014 — saveEffect matches its own description text (fi
   });
 });
 
-// #1746: an audit of every pre-#1717 2014 slice for the same dropped-tail bug
-// PR #1745's review found in Heroism (dnd5eapi's higher_level JSON can be
-// empty despite the real SRD 5.1 text carrying an "At Higher Levels" clause).
-// Ground truth below was cross-checked against 5etools' PHB spell dataset
-// (its entriesHigherLevel field, hand-transcribed from the book) and spot-
-// verified against dnd5e.wikidot.com (an SRD 5.1 mirror) for Animal
-// Friendship, the one row this slice's audit found missing its clause; every
-// other one of this slice's 132 leveled rows was checked and genuinely has
-// no upcast clause in the real SRD text.
 describe("SHARED_SPELLS_2014 — no dropped 'At Higher Levels' tail text (dnd5eapi JSON-vs-real-SRD-text gap, #1746)", () => {
   const HAS_AT_HIGHER_LEVELS_TEXT = new Set([
     "Charm Person",
@@ -172,9 +148,6 @@ function find(name: string): CatalogSpell {
   return s;
 }
 
-// Spot-checks on the widest fan-outs and the trickiest edge cases this slice
-// hand-authored — not exhaustive (144 rows), but enough to catch a transcription
-// or transform regression on the spells most likely to be touched again.
 describe("SHARED_SPELLS_2014 — value spot-checks", () => {
   it("Detect Magic: PHB'14's widest fan-out, all 7 casters that get it (no Warlock in 2014)", () => {
     const s = find("Detect Magic");
@@ -248,14 +221,6 @@ describe("SHARED_SPELLS_2014 — value spot-checks", () => {
     expect(bad).toEqual([]);
   });
 
-  // #1740 review caught two more scraping artifacts live: Shatter's
-  // higher_level text arrived from dnd5eapi as "...for each level of higher
-  // spell slot 2." (a broken ordinal — should read "above 2nd"), and Wall of
-  // Fire's desc paragraphs concatenated a sentence dnd5eapi repeats verbatim
-  // ("The other side of the wall deals no damage." twice). Both classes of
-  // artifact are checked over EVERY row, not spot-checked, so a by-class
-  // slice (#1714-#1721) reusing this same dnd5eapi pipeline inherits the
-  // guard rather than re-discovering these two the hard way.
   it("no description ends a sentence on a bare 'level N.'/'slot N.' (a broken-ordinal artifact, e.g. Shatter's 'higher spell slot 2.')", () => {
     const bad = SHARED_SPELLS_2014.filter((s) => /\b(?:level|slot)s?\s+\d+\.(?:\s|$)/i.test(s.description)).map((s) => s.name);
     expect(bad).toEqual([]);
@@ -269,12 +234,6 @@ describe("SHARED_SPELLS_2014 — value spot-checks", () => {
     expect(bad).toEqual([]);
   });
 
-  // #1718 (Sorcerer) added this row: Witch Bolt is a genuine 3-list PHB'14
-  // spell (Sorcerer/Warlock/Wizard) that was missing from every prior slice
-  // entirely, not API-derived like the rest of this file — dnd5eapi/open5e's
-  // SRD 5.1 dataset doesn't carry it — so it's hand-transcribed and gets its
-  // own spot-check rather than relying on the generic API-sourced checks
-  // above (which don't apply to a row with no API source).
   it("Witch Bolt: 1d12 lightning ranged spell attack, concentration, +1d12 per upcast level, Sorcerer/Warlock/Wizard", () => {
     const s = find("Witch Bolt");
     expect(s.level).toBe(1);
@@ -288,23 +247,12 @@ describe("SHARED_SPELLS_2014 — value spot-checks", () => {
     expect(s.damageType).toBe("lightning");
     expect(s.upcastDicePerLevel).toBe(1);
     expect(s.components).toEqual({ verbal: true, somatic: true, material: true, materialDescription: "a twig from a tree that has been struck by lightning" });
-    // Regression guard: an earlier draft of this row invented a "moves more
-    // than 30 feet away and doesn't return by end of turn" end condition
-    // that doesn't exist in the real spell, dropping the genuine second end
-    // condition (total cover) in the process — caught by the mandatory
-    // rules-accuracy pass, re-verified word-for-word against dnd5e.wikidot.com.
     expect(s.description).toMatch(
       /The spell also ends if the target is ever outside the spell's range or if it has total cover from you\./,
     );
     expect(s.description).not.toMatch(/doesn't return to that range/);
   });
 
-  // #1719 (Warlock) added these three rows: all genuine PHB'14 4-list
-  // spells (Bard/Sorcerer/Warlock/Wizard) missing from every prior slice
-  // entirely, not API-derived — dnd5eapi/open5e's SRD 5.1 dataset doesn't
-  // carry any of them — so they're hand-transcribed and get their own
-  // spot-checks, each cross-checked word-for-word against a second source
-  // (dnd5e.wikidot.com).
   it("Friends: no Verbal component (S + M only — unusual for a cantrip), Concentration duration, no attackType/effectKind (self-buff only)", () => {
     const s = find("Friends");
     expect(s.level).toBe(0);
@@ -343,25 +291,11 @@ describe("SHARED_SPELLS_2014 — value spot-checks", () => {
     expect(s.effectKind).toBeUndefined();
   });
 
-  // #1742: Protection from Energy was never actually missing (5 classes
-  // correctly fanned) — the row just had a stray title-cased "From" that
-  // dnd5eapi's own casing doesn't carry ("Protection from Energy" per
-  // dnd5eapi.co/api/2014/spells/protection-from-energy and PHB'14 p. 270).
-  // Regression guard for the miscapitalization, not a content change.
   it("Protection from Energy: lowercase 'from' (not the stray 'From' this row previously carried)", () => {
     expect(find("Protection from Energy").name).toBe("Protection from Energy");
     expect(SHARED_SPELLS_2014.find((s) => s.name === "Protection From Energy")).toBeUndefined();
   });
 
-  // #1742 closes the non-SRD-3+-list audit its own issue body opened (epic
-  // #1517): dnd5eapi/open5e's SRD 5.1 dataset is SRD-only, so #1713's own
-  // dnd5eapi-intersection approach was structurally blind to any PHB'14 spell
-  // on 3+ of the 8 class lists that isn't SRD content — Witch Bolt/Friends/
-  // Cloud of Daggers/Crown of Madness (#1718/#1719) were the first four found
-  // this way; this slice's own audit (5etools' gendata-spell-source-lookup.json
-  // class-access data, cross-checked against dnd5e.wikidot.com and 5etools'
-  // raw spells-phb.json/spells-xphb.json) found these four more. All eight
-  // are hand-transcribed, cited per-row above.
   it("Feign Death: PHB'14 p. 240, ritual, 3rd-level necromancy, Bard/Cleric/Druid/Wizard 4-list, all-damage resistance except psychic, no attackType/effectKind (status effect, not a save/damage roll)", () => {
     const s = find("Feign Death");
     expect(s.level).toBe(3);
@@ -379,14 +313,6 @@ describe("SHARED_SPELLS_2014 — value spot-checks", () => {
     expect(s.description).toMatch(/resistance to all damage except psychic damage/i);
   });
 
-  // Phantasmal Force is 2nd-level Illusion in BOTH PHB'14 and the 2024 PHB —
-  // cross-checked against 5etools' raw spells-phb.json/spells-xphb.json (both
-  // report level 2) and dnd5e.wikidot.com/spell:phantasmal-force. #1742's own
-  // issue body claimed a 1st-to-2nd level change across editions; that claim
-  // doesn't hold up against either source and is NOT reproduced here — the
-  // repo's existing 2024 row (spells.ts) already carries level 2 too, so
-  // there is no edition fork on level, only on the per-round damage die
-  // (1d6 in 2014 vs. 2024's 2d8, matching this repo's own SPELLS row).
   it("Phantasmal Force: PHB'14 p. 264, 2nd-level illusion (same level as 2024 — NOT a 1st-level PHB'14 spell), Bard/Sorcerer/Wizard 3-list, INT save gates the illusion, no effectKind (the 1d6/round damage is conditional on the target believing a harmful illusion, not the spell's unconditional primary effect)", () => {
     const s = find("Phantasmal Force");
     expect(s.level).toBe(2);

@@ -1,12 +1,3 @@
-// #1225 commit 2 of 3: Cleric's real SRD 5.2 (2024) content. Every assertion
-// below is pinned against an actual SRD 5.2 VALUE (a spell name, a damage
-// die, a saving throw ability, a level) transcribed from the official SRD 5.2
-// CC-BY PDF (base class + Life Domain, pp. 36-40) or mirror-sourced from two
-// independent, non-scraper PHB'24 secondary sources (Trickery Domain — see
-// cleric-features.ts's own header for the citations) — never against
-// "differs from the 2014 row", which a garbage 2024 paraphrase would also
-// satisfy. Mirrors warlock-2024-srd.test.ts's row()/hasRow() shape (same
-// file, same CLERIC_FEATURES export).
 import { describe, expect, it } from "vitest";
 
 import { CLERIC_FEATURES } from "../cleric-features.js";
@@ -17,7 +8,6 @@ function rowsNamed(subclassSlug: string | null, name: string) {
   return CLERIC_FEATURES.filter((r) => r.subclassSlug === subclassSlug && r.name === name);
 }
 
-/** Exactly one row for (subclassSlug, name, edition), or the test fails with a precise locator. */
 function row(subclassSlug: string | null, name: string, edition: Edition) {
   const found = rowsNamed(subclassSlug, name).filter((r) => r.edition === edition);
   expect(found, `${subclassSlug ?? "(base)"}/${name}/${edition}`).toHaveLength(1);

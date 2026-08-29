@@ -1,11 +1,3 @@
-// #1226 commit 2 of 3: Druid's real SRD 5.2 (2024) content. Every assertion
-// below is pinned against an actual SRD 5.2 VALUE (a spell reference, a
-// damage die, a level, a mechanic name) — Circle of the Land is transcribed
-// from SRD 5.2's own raw text; Circle of the Moon is mirror-sourced
-// (dnd2024.wikidot.com + wastedwizardgames.com, see druid-features.ts's own
-// header) — never against "differs from the 2014 row", which a garbage 2024
-// paraphrase would also satisfy. Mirrors ranger-2024-content.test.ts's
-// row()/hasRow() shape (same file, same DRUID_FEATURES export).
 import { describe, expect, it } from "vitest";
 
 import { deriveResources } from "@/lib/classes/class-features.js";
@@ -20,7 +12,6 @@ function rowsNamed(subclassSlug: string | null, name: string) {
   return DRUID_FEATURES.filter((r) => r.subclassSlug === subclassSlug && r.name === name);
 }
 
-/** Exactly one row for (subclassSlug, name, edition), or the test fails with a precise locator. */
 function row(subclassSlug: string | null, name: string, edition: Edition) {
   const found = rowsNamed(subclassSlug, name).filter((r) => r.edition === edition);
   expect(found, `${subclassSlug ?? "(base)"}/${name}/${edition}`).toHaveLength(1);
@@ -286,10 +277,6 @@ const ABILITY_SCORES = {
   charisma: 10,
 };
 
-// Integration-level proof (mirrors ranger-2024-content.test.ts's
-// loadDbFeatureRows pattern): the REAL seeded rows, read through the REAL
-// derivation path, actually reach a serialized character's derived features —
-// not just DRUID_FEATURES' in-memory shape.
 describe("integration (#1226): a level-20 Circle of the Moon Druid's derived features differ by edition exactly where authored", () => {
   it("2024 has Primal Order/Wild Companion/Wild Resurgence/Elemental Fury/Improved Elemental Fury/Epic Boon/Circle of the Moon Spells/Improved Circle Forms/Moonlight Step/Lunar Form and NOT Timeless Body/Combat Wild Shape/Primal Strike/Elemental Wild Shape/Thousand Forms; 2014 is the reverse", async () => {
     const featureRows = await loadDbFeatureRows("druid", "circle of the moon");

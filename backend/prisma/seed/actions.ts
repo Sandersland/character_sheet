@@ -1,15 +1,5 @@
-// ── Action catalog ───────────────────────────────────────────────────────────
-// Turn-economy actions: universal (every character) + class-specific.
-// Display + gating data ONLY — executable mechanics live in lib/actions.ts.
-// Adding a new action = append here + add the effect fn in lib/actions.ts.
-// ActionCost enum values: action | bonusAction | reaction | free | special
-//
-// Every `universal: true` description is transcribed from its own edition's
-// document — SRD 5.1 ("Actions in Combat", pp. 92-95, plus "Grappling"/
-// "Shoving a Creature"/"Opportunity Attacks", pp. 94-95, and "Hiding", p. 80)
-// or SRD 5.2 ("Playing the Game" → Actions, plus the "Rules Glossary" entry
-// per action). These rows are what GET /api/reference serves, so no frontend
-// module holds any of this text (#1430).
+// DATA MODULE ONLY: executable mechanics live in ACTION_EFFECT_FN (lib/classes/actions.ts); adding an action here needs a matching entry there too.
+// Every `universal: true` description is transcribed from SRD 5.1 ("Actions in Combat" pp. 92-95, "Grappling"/"Shoving a Creature"/"Opportunity Attacks" pp. 94-95, "Hiding" p. 80) or SRD 5.2 ("Playing the Game" → Actions, Rules Glossary) (#1430).
 
 import type { SeedEdition } from "./edition.js";
 
@@ -24,28 +14,9 @@ export interface ActionSeed {
   grantLevel?: number;
   resourceKey?: string;
   resourceAmount?: number;
-  /**
-   * Omitted = shared (NULL column, valid in both editions, #1306) — every
-   * class row.
-   *
-   * Every UNIVERSAL row is forked, including `dash`, `disengage`, `ready` and
-   * `opportunityAttack`, whose mechanics agree. The reason is transcription,
-   * not rules: each `description` is a verbatim excerpt from one named
-   * document, so a shared row could only cite "SRD 5.1 and SRD 5.2", and an
-   * ambiguous citation is a bug. A row that agrees mechanically still has two
-   * distinct source texts.
-   *
-   * This diverges from CONDITIONS/CONDITIONS_2014_OVERRIDES, which shares five
-   * of the fourteen conditions across editions — deliberately, so a future
-   * reader does not "fix" one to match the other. The distinction CLAUDE.md
-   * records: an edition-invariant rule FUNCTION does not fork; a content row
-   * whose text is transcribed from an edition document does.
-   *
-   * `key` is edition-stable identity: the 2024 Magic row keeps
-   * `key: "castSpell"` and the Utilize row keeps `key: "useObject"`, because
-   * PRIMARY_ACTION_KEYS and MICRO_CAPTIONS reference keys. Genuinely new 2024
-   * actions get NEW keys (`study`, `influence`).
-   */
+  // Omitted = shared (NULL column, valid in both editions, #1306) — every class row.
+  // Every UNIVERSAL row forks per edition even where mechanics agree, because `description` is a verbatim transcription from one named document.
+  // `key` is edition-stable identity — PRIMARY_ACTION_KEYS and MICRO_CAPTIONS reference it (e.g. the 2024 Magic row keeps `key: "castSpell"`). Genuinely new 2024 actions get new keys (`study`, `influence`).
   edition?: SeedEdition;
 }
 
@@ -53,7 +24,6 @@ export interface ActionSeed {
 export const TWENTY_FOUR_ONLY_ACTION_KEYS = ["study", "influence"] as const;
 
 export const ACTIONS: ActionSeed[] = [
-  // ── Universal actions, 2014 (SRD 5.1) ─────────────────────────────────────
   {
     key: "attack",
     name: "Attack",
@@ -72,16 +42,8 @@ export const ACTIONS: ActionSeed[] = [
     description:
       "Cast a spell with a casting time of 1 action. Casting a spell is not necessarily an action — each spell's casting time specifies whether it takes an action, a reaction, minutes, or hours.",
   },
-  // castSpellBonus / castSpellReaction are app affordances that open a filtered
-  // spell picker, not distinct actions in either edition. Seeded for
-  // completeness and for #1431: `castSpellReaction` renders in ReactionSlot,
-  // but NOTHING renders `castSpellBonus` today — BonusActionSheetBody never
-  // read the universal list — so that row is dead content until #1431/#1439.
-  //
-  // Named "Cast a Spell (…)" only for 2014, where SRD 5.1's Cast a Spell entry
-  // is titled after casting in general and says outright that casting "is not
-  // necessarily an action". SRD 5.2's Magic action covers ONLY a spell with a
-  // casting time of an action, so "Magic (Bonus Action)" would invent a rule.
+  // castSpellBonus/castSpellReaction are app affordances, not distinct actions; castSpellBonus renders nowhere today — dead content until #1431/#1439.
+  // Named "Cast a Spell (...)" only for 2014: SRD 5.1's Cast a Spell entry says casting "is not necessarily an action"; SRD 5.2's Magic action covers only an action-cast spell.
   {
     key: "castSpellBonus",
     name: "Cast a Spell (Bonus Action)",
@@ -162,13 +124,7 @@ export const ACTIONS: ActionSeed[] = [
     description:
       "You normally interact with an object while doing something else, such as drawing a sword as part of an attack. When an object requires your action for its use, you take the Use an Object action — also useful when you want to interact with more than one object on your turn.",
   },
-  // Grapple and Shove are NOT standalone actions in either edition: SRD 5.1
-  // makes each a special melee attack substituted for one attack of the Attack
-  // action, and SRD 5.2 makes each an option of the Unarmed Strike (itself
-  // taken with the Attack action). They stay separate `cost: "action"` cards
-  // here because re-modelling them is out of #1430's scope — but the mechanic
-  // DOES fork (contest → saving throw), and shipping the 2014 contest text to
-  // 2024 characters was a live rules bug this fork fixes.
+  // Grapple/Shove are not standalone actions in either edition (SRD 5.1: a special melee attack; SRD 5.2: an Unarmed Strike option) — kept as separate cards since re-modelling them is out of #1430's scope, but the mechanic does fork (contest vs. saving throw).
   {
     key: "grapple",
     name: "Grapple",
@@ -206,7 +162,6 @@ export const ACTIONS: ActionSeed[] = [
       "Cast a spell with a casting time of 1 reaction, when that spell's trigger occurs. Opens the spell picker filtered to reaction spells.",
   },
 
-  // ── Universal actions, 2024 (SRD 5.2) ─────────────────────────────────────
   {
     key: "attack",
     name: "Attack",
@@ -266,8 +221,7 @@ export const ACTIONS: ActionSeed[] = [
     cost: "action",
     universal: true,
     edition: "EDITION_2024",
-    // The Advantage-on-a-check half requires one of YOUR OWN skill or tool
-    // proficiencies (SRD 5.2) — SRD 5.1 has no such requirement.
+    // The Advantage-on-a-check half requires one of your own skill or tool proficiencies (SRD 5.2) — SRD 5.1 has no such requirement.
     description:
       "Choose one of your skill or tool proficiencies and one ally near enough for you to assist: that ally has Advantage on the next ability check they make with that skill or tool, expiring at the start of your next turn. Or momentarily distract an enemy within 5 feet of you, giving Advantage to the next attack roll one of your allies makes against that enemy.",
   },
@@ -277,8 +231,7 @@ export const ACTIONS: ActionSeed[] = [
     cost: "action",
     universal: true,
     edition: "EDITION_2024",
-    // SRD 5.2 sets a flat DC 15 and grants the Invisible condition on a
-    // success; SRD 5.1 leaves it a contest the GM adjudicates.
+    // SRD 5.2 sets a flat DC 15 and grants Invisible on success; SRD 5.1 leaves it a contest the GM adjudicates.
     description:
       "Succeed on a DC 15 Dexterity (Stealth) check while you are Heavily Obscured or behind Three-Quarters Cover or Total Cover, and while out of every enemy's line of sight. On a success you have the Invisible condition while hidden, and your check's total is the DC for a creature to find you with a Wisdom (Perception) check.",
   },
@@ -288,8 +241,7 @@ export const ACTIONS: ActionSeed[] = [
     cost: "action",
     universal: true,
     edition: "EDITION_2024",
-    // Always a WISDOM check in SRD 5.2 — the Intelligence half of SRD 5.1's
-    // "Perception or Investigation" became the separate Study action.
+    // Always a Wisdom check in SRD 5.2 — the Intelligence half of SRD 5.1's "Perception or Investigation" became the separate Study action.
     description:
       "Make a Wisdom check to discern something that isn't obvious. The GM picks the applicable skill: Insight for a creature's state of mind, Medicine for its ailment or cause of death, Perception for a concealed creature or object, or Survival for tracks or food.",
   },
@@ -367,7 +319,6 @@ export const ACTIONS: ActionSeed[] = [
       "Cast a spell whose casting time is a Reaction, when that spell's trigger occurs. This is not the Magic action — a Reaction spell is cast with your Reaction. Opens the spell picker filtered to reaction spells.",
   },
 
-  // ── Class: Barbarian ───────────────────────────────────────────────────────
   {
     key: "rage",
     name: "Rage",
@@ -389,7 +340,6 @@ export const ACTIONS: ActionSeed[] = [
       "Before your first attack on your turn, choose to attack recklessly: advantage on STR melee attacks this turn, but attacks against you also have advantage.",
   },
 
-  // ── Class: Bard ───────────────────────────────────────────────────────────
   {
     key: "bardicInspiration",
     name: "Bardic Inspiration",
@@ -402,7 +352,6 @@ export const ACTIONS: ActionSeed[] = [
       "Grant a creature within 60 ft a Bardic Inspiration die. They add it to one ability check, attack roll, or saving throw within 10 minutes.",
   },
 
-  // ── Class: Cleric ────────────────────────────────────────────────────────
   {
     key: "channelDivinityCleric",
     name: "Channel Divinity",
@@ -415,7 +364,6 @@ export const ACTIONS: ActionSeed[] = [
       "Channel divine energy for a special effect (Turn Undead, or domain option). Uses one Channel Divinity charge.",
   },
 
-  // ── Class: Druid ────────────────────────────────────────────────────────
   {
     key: "wildShape",
     name: "Wild Shape",
@@ -428,7 +376,6 @@ export const ACTIONS: ActionSeed[] = [
       "Transform into a beast you have seen. Max CR based on level. Uses one Wild Shape charge.",
   },
 
-  // ── Class: Fighter ──────────────────────────────────────────────────────
   {
     key: "secondWind",
     name: "Second Wind",
@@ -452,7 +399,6 @@ export const ACTIONS: ActionSeed[] = [
       "Gain one additional action this turn. One use per short or long rest (two uses at level 17).",
   },
 
-  // ── Class: Monk ──────────────────────────────────────────────────────────
   {
     key: "bonusUnarmedStrike",
     name: "Bonus Unarmed Strike",
@@ -473,9 +419,7 @@ export const ACTIONS: ActionSeed[] = [
     description:
       "Immediately after taking the Attack action, spend 2 focus to make two unarmed strikes as a bonus action.",
   },
-  // Patient Defense / Step of the Wind (PHB'24 p.98, SRD 5.2, #1240): each has
-  // a free variant and a 1-Focus variant that does more — not the 2014 SRD's
-  // flat "always costs 1 ki" shape.
+  // PHB'24 p.98 (SRD 5.2, #1240): Patient Defense/Step of the Wind each have a free variant and a stronger 1-Focus variant, not the 2014 SRD's flat "always costs 1 ki" shape.
   {
     key: "patientDefense",
     name: "Patient Defense",
@@ -514,14 +458,9 @@ export const ACTIONS: ActionSeed[] = [
     description:
       "Spend 1 focus to take the Disengage action and the Dash action as a bonus action. Your jump distance doubles for the turn.",
   },
-  // Stunning Strike (L5) isn't seeded here — it's a post-hit rider (spend +
-  // Con save + fail/success outcome), not a selectable catalog action. See
-  // stunning-strike.ts (#1242 supersedes the #392 bare-spend stub formerly here).
+  // Stunning Strike (L5) isn't seeded here — it's a post-hit rider (spend + Con save + fail/success outcome) handled by applyStunningStrikeOperations, not a selectable catalog action.
 
-  // ── Subclass: Warrior of Shadow monk (2024 rewrite, #1246) ───────────────
-  // Opportunist (2014 L17 reaction) is retired — 2024 replaces it with Cloak
-  // of Shadows at L17 (a resourceKey-gated cast, see shadow-arts.ts), not a
-  // catalog reminder action.
+  // Opportunist (2014 L17 reaction) is retired — 2024 replaces it with Cloak of Shadows at L17 (a resourceKey-gated cast in SHADOW_ARTS), not a catalog reminder action.
   {
     key: "shadowStep",
     name: "Shadow Step",
@@ -533,10 +472,7 @@ export const ACTIONS: ActionSeed[] = [
       "While in dim light or darkness, teleport up to 60 ft as a bonus action to an unoccupied space you can see that is also in dim light or darkness, then make one unarmed strike as part of the same bonus action. You have advantage on the first melee attack you make before the end of this turn.",
   },
 
-  // ── Class: Paladin ──────────────────────────────────────────────────────
-  // divineSense is EDITION_2014-only (#1229) — 2024 folds it into the
-  // Channel Divinity option "Channel Divinity: Divine Sense" instead (see
-  // lib/classes/actions.ts's own comment on its twin row).
+  // divineSense is EDITION_2014-only (#1229) — 2024 folds it into the Channel Divinity option "Channel Divinity: Divine Sense" instead.
   {
     key: "divineSense",
     name: "Divine Sense",
@@ -549,10 +485,7 @@ export const ACTIONS: ActionSeed[] = [
     description:
       "Sense celestials, fiends, and undead within 60 ft until end of next turn. Uses one Divine Sense charge.",
   },
-  // layOnHands' cost forks to a Bonus Action in 2024 (SRD 5.2), and the 2024
-  // description drops the disease clause entirely, keeping only a reworded
-  // Poisoned-condition removal (mirrors paladin-features.ts's own Lay on
-  // Hands row).
+  // layOnHands' cost forks to a Bonus Action in 2024 (SRD 5.2), and the 2024 description drops the disease clause, keeping only a reworded Poisoned-condition removal.
   {
     key: "layOnHands",
     name: "Lay on Hands",
@@ -589,7 +522,6 @@ export const ACTIONS: ActionSeed[] = [
       "Channel divine energy through your sacred oath. Uses one Channel Divinity charge.",
   },
 
-  // ── Class: Rogue ────────────────────────────────────────────────────────
   {
     key: "cunningAction",
     name: "Cunning Action",
@@ -600,10 +532,7 @@ export const ACTIONS: ActionSeed[] = [
       "Take the Dash, Disengage, or Hide action as a bonus action.",
   },
 
-  // ── Class: Sorcerer ─────────────────────────────────────────────────────
-  // SRD 5.2 grants Metamagic at level 2, not PHB'14's level 3 (#1232 commit
-  // 2b) — a same-key edition fork, mirroring the universal rows' own
-  // per-edition split above.
+  // SRD 5.2 grants Metamagic at level 2, not PHB'14's level 3.
   {
     key: "metamagic",
     name: "Metamagic",
@@ -629,9 +558,7 @@ export const ACTIONS: ActionSeed[] = [
       "Apply a Metamagic option to a spell you cast (Careful, Distant, Empowered, Extended, Heightened, Quickened, Seeking, Subtle, Transmuted, Twinned). Costs vary by option.",
   },
 
-  // ── Class: Warlock ──────────────────────────────────────────────────────
   // (Warlock's Pact Magic is reflected in the spellcasting section; no extra action entry needed.)
 
-  // ── Class: Wizard ───────────────────────────────────────────────────────
   // (Arcane Recovery is a short-rest ability, not a turn action; no action entry needed.)
 ];

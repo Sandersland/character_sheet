@@ -1,11 +1,3 @@
-// #1225 commit 3: the Channel Divinity resource pool moved off
-// lib/classes/cleric.ts's retired resourceFn onto its two carrier rows —
-// 2014's "Channel Divinity: Turn Undead" row and 2024's "Channel Divinity"
-// row (see cleric-features.ts's own RESOURCE POOL header block for why each
-// pool rides its particular row). Read here through the SAME poolsFromRows a
-// real character's derivation calls (registry.ts's deriveBaseLayer), never a
-// hand-rolled re-derivation of the tier table. Modelled on
-// barbarian-rage-pool.test.ts / warlock-resource-pools.test.ts.
 import { describe, expect, it } from "vitest";
 
 import { poolsFromRows } from "@/lib/classes/class-feature-rows.js";
@@ -14,8 +6,7 @@ import { CLERIC_FEATURES } from "../cleric-features.js";
 
 const BASE_ROWS = CLERIC_FEATURES.filter((r) => r.subclassSlug === null);
 
-// abilityScores/profBonus are unused — Channel Divinity's tier is a flat
-// number, never a #1685 formula.
+// Channel Divinity's tier is a flat number, never a #1685 formula, so abilityScores/profBonus go unused.
 function poolAt(level: number, edition: "EDITION_2014" | "EDITION_2024") {
   return poolsFromRows(BASE_ROWS, level, {}, 0, edition).find((p) => p.key === "channelDivinity");
 }
@@ -66,10 +57,6 @@ describe("Channel Divinity pool — 2014 tiers: 1/2/3 at L2/6/18, short-or-long,
   });
 });
 
-// The headline bug this issue fixes: pre-#1225, a 2024 Cleric's pool still
-// came from the edition-blind resourceFn, so a level-20 2024 Cleric derived
-// total 3 (the 2014 table) instead of the real SRD 5.2 4, and a level-2 2024
-// Cleric derived 1 instead of the real 2.
 describe("Channel Divinity pool — 2024 tiers: 2/3/4 at L2/6/18, longRest, shortRestRegain 1 on every tier (SRD 5.2)", () => {
   it("absent at level 1", () => {
     expect(poolAt(1, "EDITION_2024")).toBeUndefined();

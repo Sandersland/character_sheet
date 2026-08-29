@@ -1,13 +1,3 @@
-// #1719 (content slice of epic #1517): shape + cross-check invariants for the
-// Warlock by-class spell bucket. Pure data tests on the array itself — same
-// pattern as spells-2014-shared-data.test.ts (#1713), spells-2014-wizard-data
-// .test.ts (#1714), spells-2014-cleric-data.test.ts (#1715), spells-2014-
-// druid-data.test.ts (#1716), spells-2014-bard-data.test.ts (#1717), and
-// spells-2014-sorcerer-data.test.ts (#1718) — because the DB round-trip (one
-// Spell row per name, SpellClass fan-out, `?class=` resolution) is already
-// proven generically by spell-fork-reseed.test.ts (#1710) and spells.test.ts's
-// SpellClass-join describe blocks (#1711); this file's only job is to prove
-// THIS SLICE'S DATA is correct, not re-prove the plumbing.
 import { describe, expect, it } from "vitest";
 
 import type { CatalogSpell } from "../spells.js";
@@ -91,19 +81,6 @@ describe("WARLOCK_SPELLS_2014 — row-ownership rule (epic #1517)", () => {
 });
 
 describe("WARLOCK_SPELLS_2014 — full PHB'14 Warlock membership is complete across all authoring slices", () => {
-  // The full PHB'14 Warlock spell list (74 spells: dnd5eapi.co's
-  // /api/2014/classes/warlock/spells enumerates 64; Witch Bolt, Cloud of
-  // Daggers, Crown of Madness, and Friends are 4 more real PHB'14 Warlock
-  // spells this slice's manual sweep found absent from that SRD-based
-  // dataset entirely — Witch Bolt already added to shared.ts by #1718, the
-  // other 3 added to shared.ts by this slice; Hex, Armor of Agathys, Arms of
-  // Hadar, and Hunger of Hadar are 4 more absent-from-SRD spells, all
-  // Warlock-only, authored in this file; #1742's own non-SRD-3+-list audit
-  // found 2 MORE — Blade Ward and Arcane Gate — bumping the total from 72
-  // to 74) partitioned by which slice authors the row. Every name below
-  // must carry "warlock" in its classes[] wherever it's actually authored —
-  // this test is the permanent guard that the "already fanned" claim in
-  // warlock.ts's header holds.
   const WIZARD_OWNED_WARLOCK_SPELLS = [
     "Ray of Enfeeblement",
     "Vampiric Touch",
@@ -156,9 +133,6 @@ describe("WARLOCK_SPELLS_2014 — full PHB'14 Warlock membership is complete acr
   });
 
   it("no PHB'14 2024-only Warlock addition (e.g. Command, Booming Blade, Toll the Dead under Warlock) is offered anywhere in the 2014 tables — this slice's membership check only counts genuine 2014 Warlock-owned spells", () => {
-    // Command is Cleric/Paladin-only in the 2014 SRD list (dnd5eapi's own
-    // 2014 warlock spell list does NOT include it). It must not carry a
-    // warlock tag in any 2014 file.
     const command = [...WIZARD_SPELLS_2014, ...CLERIC_SPELLS_2014, ...DRUID_SPELLS_2014, ...BARD_SPELLS_2014, ...SHARED_SPELLS_2014].find(
       (s) => s.name === "Command",
     );
@@ -202,11 +176,6 @@ describe("WARLOCK_SPELLS_2014 — structured-field invariants (mirrors wizard.ts
   });
 });
 
-// The critical lesson from a prior content slice (CLAUDE.md): a row's
-// STRUCTURED saveEffect must match its own DESCRIPTION prose, or the frontend
-// shows "half on success" text that contradicts (or omits) what the spell
-// actually does. Every damage spell in this file is checked against its own
-// text, not spot-checked.
 describe("WARLOCK_SPELLS_2014 — saveEffect matches its own description text (field/text mismatch guard)", () => {
   const HALF_ON_SUCCESS = /half as much damage|half damage|half the damage/i;
 
@@ -223,18 +192,6 @@ describe("WARLOCK_SPELLS_2014 — saveEffect matches its own description text (f
   });
 });
 
-// A rules-accuracy pass on the Wizard/Cleric/Druid/Bard/Sorcerer slices found
-// dnd5eapi's own damage/dc JSON has real gaps in some slices (none in Bard or
-// Sorcerer, since neither owns an API-derived damage row past what was
-// already clean). This slice's 2 API-derived rows (Eldritch Blast, Hellish
-// Rebuke) both had fully populated damage/dc JSON — zero gaps — so this
-// describe block audits the PROSE directly against every row's structured
-// fields anyway, as a permanent regression guard, not a one-time spot-check.
-// Two of this slice's 4 hand-transcribed rows (Hex, Hunger of Hadar) are
-// documented exceptions: Hex's damage is a per-hit RIDER (not a direct
-// spell-cast instance, same shape as Hunter's Mark), and Hunger of Hadar has
-// two fixed damage types on two different triggers (same shape as Meteor
-// Swarm) — neither maps to this schema's single effectKind/attackType pair.
 describe("WARLOCK_SPELLS_2014 — prose-vs-structured-field audit (catches what dnd5eapi's own JSON gaps hid)", () => {
   const CONDITIONAL_OR_MULTI_EFFECT = new Set([
     "Hex", // 1d6 necrotic is a RIDER on the caster's own future attacks, not a direct spell-cast damage instance
@@ -269,22 +226,8 @@ describe("WARLOCK_SPELLS_2014 — prose-vs-structured-field audit (catches what 
   });
 });
 
-// PR #1745's review pass found a DIFFERENT bug class than the structured-field
-// audit above catches: dnd5eapi's own JSON can drop a whole trailing sentence
-// (not just a null damage/dc field) — its 2014 Heroism response had
-// higher_level: [] despite real SRD 5.1 genuinely carrying an "At Higher
-// Levels" upcast clause. This is a permanent regression guard against that
-// same class of dropped-tail transcription bug: ground truth below was
-// individually verified against a second source (dnd5e.wikidot.com, and for
-// the 2 API-derived rows also 5thsrd.org) for all 6 of this slice's owned
-// rows, not just a sample.
 describe("WARLOCK_SPELLS_2014 — no dropped 'At Higher Levels' tail text (dnd5eapi JSON-vs-real-SRD-text gap, PR #1745 review finding)", () => {
-  // Verified against a second source: Hellish Rebuke, Hex, Armor of Agathys,
-  // and Arms of Hadar all genuinely have upcast text. Eldritch Blast (a
-  // cantrip — scaling is baked into its own base description, not an "At
-  // Higher Levels" slot-based clause) and Hunger of Hadar (verified against
-  // two independent sources to have NO upcast clause at all in either
-  // edition) do not.
+  // Eldritch Blast's scaling is baked into its base description, not an At Higher Levels clause; Hunger of Hadar has no upcast clause in either edition.
   const HAS_AT_HIGHER_LEVELS_TEXT = new Set(["Hellish Rebuke", "Hex", "Armor of Agathys", "Arms of Hadar"]);
 
   it("every row verified to have real SRD 'At Higher Levels' text actually carries it in its description", () => {
@@ -347,8 +290,6 @@ function find(name: string): CatalogSpell {
   return s;
 }
 
-// Spot-checks on every one of this slice's 6 rows — small enough to be
-// exhaustive rather than a sample.
 describe("WARLOCK_SPELLS_2014 — value spot-checks", () => {
   it("Eldritch Blast: warlock-only cantrip, ranged spell attack, 1d10 force, no cantripScaling flag (the beam-count increase is prose, not a dice-scaling field)", () => {
     const s = find("Eldritch Blast");
@@ -431,9 +372,6 @@ describe("WARLOCK_SPELLS_2014 — value spot-checks", () => {
   });
 
   it("no PHB'14 2024-only Warlock addition (e.g. Booming Blade, Green-Flame Blade, Toll the Dead) is offered here — this slice authors only genuine 2014 Warlock-owned spells", () => {
-    // These are real 2024 additions to the Warlock cantrip list (Tasha's
-    // Cauldron of Everything / 2024 PHB), not PHB'14 core — dnd5eapi's own
-    // 2014 warlock spell list does NOT include any of them.
     expect(WARLOCK_SPELLS_2014.find((s) => s.name === "Booming Blade")).toBeUndefined();
     expect(WARLOCK_SPELLS_2014.find((s) => s.name === "Green-Flame Blade")).toBeUndefined();
     expect(WARLOCK_SPELLS_2014.find((s) => s.name === "Toll the Dead")).toBeUndefined();

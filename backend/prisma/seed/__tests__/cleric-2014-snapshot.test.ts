@@ -1,18 +1,4 @@
-// #1225 commit 1: Cleric's EDITION_2014 rows must be byte-identical
-// transcriptions of what lib/classes/cleric.ts's CLERIC_FEATURES/
-// LIFE_DOMAIN_FEATURES/TRICKERY_DOMAIN_FEATURES said BEFORE this migration —
-// 2014 is a supported edition, not a rewrite target. This snapshot is that
-// pre-change text, pinned by hand from the tree at the commit before #1225
-// landed, NOT re-derived from anything this migration touches — a hardcoded
-// oracle is the whole point, mirroring warlock-2014-snapshot.test.ts's/
-// barbarian-2014-snapshot.test.ts's shape.
-//
-// This is a GUARD, not a red/green cycle: it is green on first run by
-// construction (CLERIC_FEATURES is authored as a byte-identical copy in the
-// same commit that adds this file). Its job is to catch commit 2/3 silently
-// editing a 2014 row while authoring 2024 content or moving the Channel
-// Divinity pool onto a row — this file must stay green, unedited, from
-// commit 1 through commit 3.
+// Guard, not red/green: green by construction, and must stay unedited while cleric-features.ts changes underneath it.
 import { describe, expect, it } from "vitest";
 
 import { CLERIC_FEATURES } from "../cleric-features.js";
@@ -25,7 +11,6 @@ interface Pinned {
 }
 
 const PRE_CHANGE_2014: Pinned[] = [
-  // ---- Base class ----------------------------------------------------------
   {
     subclassSlug: null,
     name: "Spellcasting",
@@ -60,7 +45,6 @@ const PRE_CHANGE_2014: Pinned[] = [
     level: 20,
     description: "Your Divine Intervention call automatically succeeds (no roll required).",
   },
-  // ---- Life Domain -----------------------------------------------------------
   {
     subclassSlug: "cleric-life-domain",
     name: "Domain Spells",
@@ -107,7 +91,6 @@ const PRE_CHANGE_2014: Pinned[] = [
     level: 17,
     description: "When you would normally roll dice to restore HP with a spell, use the highest number possible instead of rolling.",
   },
-  // ---- Trickery Domain -------------------------------------------------------
   {
     subclassSlug: "cleric-trickery-domain",
     name: "Domain Spells",

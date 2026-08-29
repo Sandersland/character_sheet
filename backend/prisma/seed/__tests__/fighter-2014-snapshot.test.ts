@@ -1,12 +1,3 @@
-// #1227: Fighter's EDITION_2014 rows must be byte-identical transcriptions of
-// what lib/classes/fighter.ts's FIGHTER_FEATURES/CHAMPION_FEATURES/
-// BATTLE_MASTER_FEATURES/ELDRITCH_KNIGHT_FEATURES said BEFORE this migration —
-// 2014 is a supported edition, not a rewrite target. This snapshot is that
-// pre-change text, pinned by hand from the tree at the commit before #1227
-// landed (see the PR description for the diff-empty proof), NOT re-derived
-// from anything this migration touches — a hardcoded oracle is the whole
-// point, the same reason class-feature-population.test.ts's floors are
-// measured literals rather than a second read of CLASS_FEATURES.
 import { describe, expect, it } from "vitest";
 
 import { FIGHTER_FEATURES } from "../fighter-features.js";
@@ -19,7 +10,6 @@ interface Pinned {
 }
 
 const PRE_CHANGE_2014: Pinned[] = [
-  // ---- Base class ----------------------------------------------------------
   {
     subclassSlug: null,
     name: "Fighting Style",
@@ -53,7 +43,6 @@ const PRE_CHANGE_2014: Pinned[] = [
     description:
       "Reroll a failed saving throw (you must use the new roll). Regain use(s) on a long rest. Two uses at level 13, three at level 17.",
   },
-  // ---- Champion --------------------------------------------------------
   {
     subclassSlug: "fighter-champion",
     name: "Improved Critical",
@@ -86,7 +75,6 @@ const PRE_CHANGE_2014: Pinned[] = [
     description:
       "At the start of each of your turns, regain HP equal to 5 + your Constitution modifier if you are at or below half your hit point maximum (and not at 0 HP).",
   },
-  // ---- Battle Master ----------------------------------------------------
   {
     subclassSlug: "fighter-battle-master",
     name: "Combat Superiority",
@@ -125,7 +113,6 @@ const PRE_CHANGE_2014: Pinned[] = [
     level: 18,
     description: "Your superiority dice turn into d12s.",
   },
-  // ---- Eldritch Knight ------------------------------------------------------
   {
     subclassSlug: "fighter-eldritch-knight",
     name: "Eldritch Knight Spellcasting",

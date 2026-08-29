@@ -1,25 +1,8 @@
-// --- StartingEquipmentPackage catalog (#1519/#1533/#1535) --------------------
-// Two independently-authored halves per class, never one copied onto the
-// other: EDITION_2014 (PHB'14 p. 72 armor/weapons tables, p. 143 Starting
-// Wealth) migrated verbatim from the old STARTING_EQUIPMENT lookup table, and
-// EDITION_2024 (SRD 5.2) transcribed from the twelve class-equipment tables
-// (parsed from raw HTML, 5e24srd.com, CC-BY-4.0, cross-checked against
-// 5thsrd.org — see #1535's issue thread for the per-class source lines). The
-// two editions genuinely differ in SHAPE, not just content: every 2014
-// package is four-ish (a)/(b) groups; every 2024 package is ONE choice group
-// with two lettered options (Fighter alone has three, (A)/(B)/(C)) whose
-// final option is flat GP with no items — do not force them to look alike.
-//
-// Authored NESTED (the wire shape, ClassStartingEquipment) rather than as
-// flat row literals: `position` is then just the array index (nothing to
-// author, nothing to get wrong — #1545's lesson), and the seed validator
-// (validate.ts) can validate the same tree the client renders. The seeder
-// (seed-starting-equipment.ts) flattens this into the five relational tables.
-//
-// DATA MODULE ONLY (#1277 AC 4, machine-enforced by
-// scripts/check-seed-data-modules.sh): no direct database calls or async
-// write logic may live in this file. The executable seeder is
-// seed-starting-equipment.ts.
+// PHB'14 p. 72 (armor/weapons), p. 143 (Starting Wealth). EDITION_2024: SRD 5.2.
+// 2014 packages are four-ish (a)/(b) groups; 2024 packages are one choice
+// group with lettered options whose final option is flat GP with no items.
+// DATA MODULE ONLY (#1277 AC 4, enforced by
+// scripts/check-seed-data-modules.sh): no DB calls in this file.
 import { z } from "zod";
 
 import type { ClassStartingEquipment } from "@character-sheet/shared-types";
@@ -28,8 +11,7 @@ import type { SeedEdition } from "./edition.js";
 
 const weaponClassSchema = z.enum(["simple", "martial"]);
 const weaponRangeSchema = z.enum(["melee", "ranged"]);
-// Mirrors backend lib/srd/tools.ts's ToolCategory / the ToolCategory Prisma
-// enum (#1564) — the non-weapon open-pick filter axis.
+// Mirrors lib/srd/tools.ts's ToolCategory / the ToolCategory Prisma enum (#1564).
 const toolCategorySchema = z.enum(["artisan", "gamingSet", "musicalInstrument", "other"]);
 
 const fixedItemSchema = z.object({
@@ -45,8 +27,7 @@ const openPickSchema = z.object({
     toolCategory: toolCategorySchema.optional(),
   }),
   quantity: z.number().int().positive().optional(),
-  // Bound to a tool the character already chose proficiency in (Monk's
-  // "chosen for the tool proficiency above") rather than a free pick — #1564.
+  // Bound to a tool the character already chose proficiency in, rather than a free pick — #1564.
   boundToToolChoice: z.boolean().optional(),
 });
 
@@ -58,9 +39,6 @@ const equipmentBundleSchema = z.object({
   gold: z.number().int().positive().optional(),
 });
 
-// options: z.array(...).min(1) — strictly stronger than the deleted
-// starting-equipment-contract.test.ts's "every choice group has >= 1 option"
-// assertion, since it now fails the SEED rather than a separate unit test.
 const equipmentChoiceGroupSchema = z.object({
   label: z.string().min(1),
   options: z.array(equipmentBundleSchema).min(1),
@@ -74,9 +52,7 @@ const startingGoldSchema = z.object({
 
 const classStartingEquipmentSchema = z.object({
   groups: z.array(equipmentChoiceGroupSchema),
-  // Nullable (#1564 commit 3): PHB'24 has no roll-for-gold rule at all. Every
-  // EDITION_2014 package below still sets a real StartingGold; #1535 is where
-  // a null-gold PHB'24 package would first land.
+  // Nullable (#1564 commit 3): PHB'24 has no roll-for-gold rule at all.
   gold: startingGoldSchema.nullable(),
 });
 
@@ -92,11 +68,8 @@ export interface StartingEquipmentSeed {
   package: ClassStartingEquipment;
 }
 
-// #1565: the background family's twin of startingEquipmentSeedSchema/
-// StartingEquipmentSeed above — same classStartingEquipmentSchema tree (the
-// package shape is identical, StartingEquipmentPackage.backgroundId reuses
-// the whole class family, see that model's schema.prisma comment), keyed by
-// backgroundName instead of className.
+// Background twin of startingEquipmentSeedSchema/StartingEquipmentSeed — same
+// package shape, keyed by backgroundName instead of className (#1565).
 export const backgroundStartingEquipmentSeedSchema = z.object({
   backgroundName: z.string().min(1),
   edition: z.enum(["EDITION_2014", "EDITION_2024"]),
@@ -109,11 +82,6 @@ export interface BackgroundStartingEquipmentSeed {
   package: ClassStartingEquipment;
 }
 
-// PHB'14 p. 72 (armor/weapons), p. 143 (Starting Wealth table). Transcribed
-// verbatim from STARTING_EQUIPMENT — see that module's own inline comments
-// for the three deliberate catalog shortcuts (Bard's duplicate Lute, Druid's
-// "Wooden Shield" -> catalogName "Shield") carried onto their groups below,
-// and Warlock's group 4 (items AND openPicks on the same bundle).
 const FIGHTER_2014: ClassStartingEquipment = {
   gold: { diceCount: 5, diceFaces: 4, multiplier: 10 },
   groups: [
@@ -193,7 +161,6 @@ const WIZARD_2014: ClassStartingEquipment = {
       ],
     },
     {
-      // Auto-granted — no choice
       label: "A spellbook",
       options: [{ label: "Spellbook", items: [{ catalogName: "Spellbook" }] }],
     },
@@ -229,7 +196,6 @@ const ROGUE_2014: ClassStartingEquipment = {
       ],
     },
     {
-      // Auto-granted
       label: "Leather armor, two daggers, and thieves' tools",
       options: [
         {
@@ -284,7 +250,6 @@ const CLERIC_2014: ClassStartingEquipment = {
       ],
     },
     {
-      // Auto-granted
       label: "A shield and a holy symbol",
       options: [
         {
@@ -320,7 +285,6 @@ const BARBARIAN_2014: ClassStartingEquipment = {
       ],
     },
     {
-      // Auto-granted
       label: "An explorer's pack and four javelins",
       options: [
         {
@@ -358,16 +322,13 @@ const BARD_2014: ClassStartingEquipment = {
       options: [
         { label: "Lute", items: [{ catalogName: "Lute" }] },
         {
-          // Treat as a free open instrument pick — modeled as a simple gear
-          // item; the filter here is permissive (any gear, by instrument tag)
-          // but since the catalog only has one instrument we just offer it.
+          // Only instrument in the catalog — modeled as a fixed item, not an open pick.
           label: "Lute (only instrument in catalog)",
           items: [{ catalogName: "Lute" }],
         },
       ],
     },
     {
-      // Auto-granted
       label: "Leather armor and a dagger",
       options: [
         {
@@ -385,8 +346,7 @@ const DRUID_2014: ClassStartingEquipment = {
     {
       label: "(a) a wooden shield or (b) any simple weapon",
       options: [
-        // Labelled "Wooden Shield" (PHB'14 text) but resolves catalogName
-        // "Shield" — the catalog has one Shield row, unqualified by material.
+        // PHB'14 "Wooden Shield" maps to catalogName "Shield" — no material-specific row.
         { label: "Wooden Shield", items: [{ catalogName: "Shield" }] },
         {
           label: "Any simple weapon",
@@ -405,7 +365,6 @@ const DRUID_2014: ClassStartingEquipment = {
       ],
     },
     {
-      // Auto-granted
       label: "Leather armor, an explorer's pack, and a druidic focus",
       options: [
         {
@@ -443,7 +402,6 @@ const MONK_2014: ClassStartingEquipment = {
       ],
     },
     {
-      // Auto-granted
       label: "10 darts",
       options: [{ label: "10 Darts", items: [{ catalogName: "Dart", quantity: 10 }] }],
     },
@@ -488,7 +446,6 @@ const PALADIN_2014: ClassStartingEquipment = {
       ],
     },
     {
-      // Auto-granted
       label: "Chain mail and a holy symbol",
       options: [
         {
@@ -531,7 +488,6 @@ const RANGER_2014: ClassStartingEquipment = {
       ],
     },
     {
-      // Auto-granted
       label: "A longbow and 20 arrows",
       options: [
         {
@@ -574,7 +530,6 @@ const SORCERER_2014: ClassStartingEquipment = {
       ],
     },
     {
-      // Auto-granted
       label: "Two daggers",
       options: [{ label: "Two Daggers", items: [{ catalogName: "Dagger", quantity: 2 }] }],
     },
@@ -612,11 +567,7 @@ const WARLOCK_2014: ClassStartingEquipment = {
       ],
     },
     {
-      // Auto-granted — leather armor, a simple weapon of choice, and two
-      // daggers. This bundle carries BOTH `items` (leather armor, two
-      // daggers) AND `openPicks` (any simple weapon) — not "one or the
-      // other". Any schema/mapper that assumes a bundle is exclusively one
-      // shape is wrong; transcribe as-is.
+      // Carries BOTH items and openPicks on one bundle — not either/or; don't assume exclusivity.
       label: "Leather armor, any simple weapon, and two daggers",
       options: [
         {
@@ -644,25 +595,13 @@ const PACKAGES_2014: Record<string, ClassStartingEquipment> = {
   Warlock: WARLOCK_2014,
 };
 
-// --- EDITION_2024 (SRD 5.2) ---------------------------------------------
-// One choice group per class (Fighter alone has three lettered options,
-// (A)/(B)/(C); every other class has two, (A)/(B)). The final option in every
-// package is flat GP with no items — modelled as an EquipmentBundle with
-// `gold` set and no `items`, exactly how SRD 5.2 presents it. Every non-final
-// option's label keeps the book's own inline "and N GP" text (#1535 PR
-// review): StartingEquipmentOption.gold is the machine-readable half, but the
-// picker renders `label`, so dropping the GP from the label would make it
-// invisible in the UI even though it lands in the character's purse.
+// Option labels keep the book's inline GP text (#1535 PR review) — the picker
+// renders `label`, not `gold`, so omitting it would hide the GP in the UI.
 //
-// Four catalogName mappings, settled on the issue thread: `Arcane Focus
-// (crystal)`/`(orb)` -> the Crystal/Orb rows added by #1564; `Arcane Focus
-// (Quarterstaff)` (Wizard) and `Druidic Focus (Quarterstaff)` (Druid) -> the
-// existing Quarterstaff weapon row (a usable staff, not a second abstract
-// focus item); `Druidic Focus (sprig of mistletoe)` (Ranger) -> the existing
-// Druidic Focus row, whose description already names a sprig of mistletoe;
-// `Book (occult lore)` (Warlock) -> the catalog's "Book of Lore" (there is no
-// bare "Book" row), subject carried in the option label instead of a second
-// catalog item — same pattern #1565 will need for Book (prayers)/(history).
+// catalogName mappings: Arcane Focus (crystal/orb) -> Crystal/Orb rows
+// (#1564); Arcane/Druidic Focus (Quarterstaff) -> the Quarterstaff weapon
+// row; Druidic Focus (sprig of mistletoe) -> the Druidic Focus row; Book
+// (occult lore) -> Book of Lore (there is no bare "Book" row).
 const BARBARIAN_2024: ClassStartingEquipment = {
   gold: null,
   groups: [
@@ -755,8 +694,7 @@ const DRUID_2024: ClassStartingEquipment = {
   ],
 };
 
-// The one 2024 package with three lettered options rather than two — SRD 5.2
-// gives Fighter an (a)/(b)/(c) choice, not the (a)/(b) every other class gets.
+// SRD 5.2 gives Fighter an (a)/(b)/(c) choice, not the (a)/(b) every other class gets.
 const FIGHTER_2024: ClassStartingEquipment = {
   gold: null,
   groups: [
@@ -808,11 +746,8 @@ const MONK_2024: ClassStartingEquipment = {
             { catalogName: "Dagger", quantity: 5 },
             { catalogName: "Explorer's Pack" },
           ],
-          // Bound to the tool proficiency chosen at creation (#1564's
-          // boundToToolChoice), not a free pick — the book's own wording
-          // ("chosen for the tool proficiency above") spans BOTH artisan's
-          // tools and musical instruments, so this carries no toolCategory
-          // filter at all (empty filter), unlike Bard's open instrument pick.
+          // Empty filter — spans both artisan's tools and instruments per the book's
+          // wording; bound to the tool choice at creation (#1564), unlike Bard's open pick.
           openPicks: [
             {
               label: "Artisan's Tools or a Musical Instrument (chosen for the tool proficiency above)",
@@ -991,9 +926,6 @@ const PACKAGES_2024: Record<string, ClassStartingEquipment> = {
   Warlock: WARLOCK_2024,
 };
 
-// Flattened below into one row per (className, edition) — PACKAGES_2014 and
-// PACKAGES_2024 are independently-authored siblings (see this module's
-// header), never one derived from the other.
 export const STARTING_EQUIPMENT_PACKAGES: StartingEquipmentSeed[] = [
   ...Object.entries(PACKAGES_2014).map(([className, pkg]) => ({
     className,
@@ -1007,44 +939,15 @@ export const STARTING_EQUIPMENT_PACKAGES: StartingEquipmentSeed[] = [
   })),
 ];
 
-// --- Background starting-equipment packages (#1565) ---------------------
-// The SRD covers less than the app offers, from both ends: SRD 5.1
-// (5thsrd.org) contains ONE background — Acolyte — and SRD 5.2 (5e24srd.com)
-// contains FOUR — Acolyte, Criminal, Sage, Soldier.
-//
-// Charlatan and Noble are PHB'24 backgrounds transcribed from the book's own
-// stat blocks (#1570), which is NOT a new licensing step: this repo already
-// carries their 2024 abilityChoices, originFeatName and tool proficiency in
-// BACKGROUNDS, and an ability spread plus an Origin feat are 2024-only
-// concepts, so the rows were sourced from PHB'24 before any equipment existed.
-// Citations name the edition but no page — an invented page number to satisfy
-// the citation rule is a worse bug than an unpaged one.
-//
-// Folk Hero is PHB'14 only — PHB'24 dropped it, so it has no 2024 package and
-// cannot get one. Its Background row is tagged EDITION_2014 (#1570) rather than
-// left shared, which is what keeps it off 2024 characters entirely; the retag
-// is applied in place by a migration, never delete-and-recreate, because a new
-// row id would strand every character pointing at the old one (#1559's landmine
-// via CharacterBackground's onDelete: SetNull).
-//
-// So this seed covers EIGHT (backgroundName, edition) pairs, not the fourteen
-// a full 7×2 grid would suggest, and the seeder's presence guard is scoped to
-// exactly these pairs (assertEveryBackgroundEditionHasPackage does not exist,
-// on purpose — see seed-starting-equipment.ts's comment on why one was NOT
-// added here).
-//
-// Every package's top-level `gold` is null: unlike classes, NEITHER edition
-// gives a background a roll-for-gold dice alternative — a background's GP is
-// always the fixed/per-option amount on its one option (mirrors PHB'24
-// classes' own null top-level gold, #1564 commit 3, but for a different
-// reason: a background option's gold is never contrasted with a dice-roll
-// choice at all, in either edition).
-//
-// SRD 5.2's four backgrounds are all "Equipment: Choose A or B", B uniformly
-// 50 GP with no items — same shape as the twelve class packages above, so
-// option labels keep the book's own inline GP text for the same reason
-// (#1535 PR review): StartingEquipmentOption.gold is the machine-readable
-// half, but the picker renders `label`.
+// SRD 5.1 has only Acolyte; SRD 5.2 has Acolyte, Criminal, Sage, Soldier.
+// Folk Hero retagged EDITION_2014 in place (#1570), never delete-and-recreate
+// — a new row id would orphan characters (CharacterBackground onDelete:
+// SetNull, #1559).
+// Covers 8 (backgroundName, edition) pairs, not 14 — no
+// assertEveryBackgroundEditionHasPackage guard exists on purpose (see
+// seed-starting-equipment.ts).
+// Background top-level `gold` is always null — no edition gives backgrounds a
+// roll-for-gold alternative (unlike classes, #1564).
 const ACOLYTE_2024: ClassStartingEquipment = {
   gold: null,
   groups: [
@@ -1131,12 +1034,8 @@ const SOLDIER_2024: ClassStartingEquipment = {
             { catalogName: "Quiver" },
             { catalogName: "Traveler's Clothes" },
           ],
-          // Bound to the gaming-set tool proficiency this background already
-          // grants (BACKGROUNDS' Soldier row, catalog-data.ts) — the SAME
-          // #1564 mechanism Monk's tool-or-instrument pick uses, filtered to
-          // just gamingSet (unlike Monk's empty filter, which has to span two
-          // categories). "same as above" in the book's own text refers to
-          // whichever gaming set the background granted proficiency in.
+          // Bound to the gaming-set proficiency this background grants (catalog-data.ts)
+          // — same #1564 mechanism as Monk's pick, filtered to gamingSet.
           openPicks: [
             {
               label: "Gaming Set (same as above)",
@@ -1152,11 +1051,8 @@ const SOLDIER_2024: ClassStartingEquipment = {
   ],
 };
 
-// PHB'24 Charlatan. Not SRD — see this section's header on why transcribing it
-// is finishing a row rather than crossing a new line. "Costume" and "Perfume"
-// (Noble, below) are the book's names for catalog rows seeded as Costume
-// Clothes / Perfume Vial, the same naming gap Acolyte's "Book (occult lore)" →
-// Book of Lore hit in #1565.
+// PHB'24 Charlatan (not SRD). "Costume"/"Perfume" (book names) map to catalog
+// rows Costume Clothes / Perfume Vial.
 const CHARLATAN_2024: ClassStartingEquipment = {
   gold: null,
   groups: [
@@ -1178,9 +1074,7 @@ const CHARLATAN_2024: ClassStartingEquipment = {
   ],
 };
 
-// PHB'24 Noble. Its gaming set is the SAME "same as above" construction
-// Soldier's package uses — bound to the gaming-set proficiency this background
-// grants, not a free pick from the four gaming sets.
+// PHB'24 Noble. Same bound gaming-set construction as Soldier — not a free pick.
 const NOBLE_2024: ClassStartingEquipment = {
   gold: null,
   groups: [
@@ -1214,12 +1108,9 @@ const BACKGROUND_PACKAGES_2024: Record<string, ClassStartingEquipment> = {
   Noble: NOBLE_2024,
 };
 
-// SRD 5.1 (5thsrd.org) Acolyte — the ONLY 2014 background with SRD text to
-// cite. A FIXED list, no A/B choice (unlike every 2024 background above):
-// modelled as one group with one option, the degenerate case of the same
-// group/option shape rather than a special "no choice" variant — the picker
-// already renders a single-option group as an auto-grant (isAutoGrant,
-// StartingEquipmentEditor.tsx).
+// SRD 5.1 Acolyte — the only 2014 background with SRD text. A single-option
+// group is the auto-grant shape (StartingEquipmentEditor.tsx's isAutoGrant
+// renders it with no choice).
 const ACOLYTE_2014: ClassStartingEquipment = {
   gold: null,
   groups: [
@@ -1242,18 +1133,11 @@ const ACOLYTE_2014: ClassStartingEquipment = {
   ],
 };
 
-// PHB'14 Folk Hero. Not SRD (SRD 5.1 carries Acolyte alone), so it is cited by
-// edition without a page, exactly like Charlatan/Noble above. Same fixed-list
-// shape as ACOLYTE_2014 — 2014 backgrounds grant, they don't offer A-or-B — and
-// the "belt pouch containing 10 gp" is modelled as the option's `gold`, not a
-// Pouch item, following that row's precedent.
-//
-// The artisan's tools pick is UNBOUND, unlike Soldier's and Noble's gaming sets:
-// the book says "one of your choice", not "same as above", and this background
-// grants no tool proficiency for a bound pick to resolve against — a bound pick
-// here would offer an empty dropdown and disable Continue forever, the exact
-// #1565 failure. It is offered from Item rows carrying toolCategory "artisan",
-// all seventeen of which now exist (see ITEMS' own note).
+// PHB'14 Folk Hero (not SRD). "Belt pouch containing 10 gp" is modelled as
+// the option's `gold`, not a Pouch item.
+// The artisan's tools pick is UNBOUND — this background grants no tool
+// proficiency to bind against; a bound pick here would leave an empty
+// dropdown and disable Continue (#1565).
 const FOLK_HERO_2014: ClassStartingEquipment = {
   gold: null,
   groups: [
@@ -1280,10 +1164,6 @@ const BACKGROUND_PACKAGES_2014: Record<string, ClassStartingEquipment> = {
   "Folk Hero": FOLK_HERO_2014,
 };
 
-// Flattened the same way STARTING_EQUIPMENT_PACKAGES is above — eight rows,
-// not the fourteen a full cross product would produce (see this section's
-// header on why the 2014 halves of Charlatan/Criminal/Noble/Sage/Soldier and
-// the 2024 half of Folk Hero are deliberately absent, not forgotten).
 export const BACKGROUND_STARTING_EQUIPMENT_PACKAGES: BackgroundStartingEquipmentSeed[] = [
   ...Object.entries(BACKGROUND_PACKAGES_2014).map(([backgroundName, pkg]) => ({
     backgroundName,

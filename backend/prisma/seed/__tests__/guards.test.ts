@@ -1,4 +1,3 @@
-// Unit tests for the pure fail-fast guard extracted from seed.ts main().
 import { describe, it, expect } from "vitest";
 
 import { assertUniqueGrantedAbilityNames } from "../guards.js";
@@ -24,9 +23,6 @@ describe("assertUniqueGrantedAbilityNames", () => {
     ).toThrow(/duplicate GrantedAbility name "Riposte"/);
   });
 
-  // The DB-level twin of this guard was widened to (name, edition) by #1415;
-  // left keyed on name alone it would throw before a single row was written,
-  // so #1313's 2014 fork could never reach the database that now accepts it.
   it("passes a same-name 2014/2024 pair — the fork #1313 needs", () => {
     expect(() =>
       assertUniqueGrantedAbilityNames([

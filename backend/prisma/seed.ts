@@ -2,9 +2,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import pg from "pg";
 
 import { PrismaClient } from "../src/generated/prisma/client.js";
-// This file is the upsert entrypoint (it must stay at prisma/seed.ts per
-// prisma.config.ts); every data array below is imported from a per-domain
-// module under seed/.
+// Must stay at prisma/seed.ts per prisma.config.ts.
 import { CLASSES, BACKGROUNDS, ITEMS, type CatalogItem } from "./seed/catalog-data.js";
 import { ACTIONS } from "./seed/actions.js";
 import { MANEUVERS } from "./seed/maneuvers.js";
@@ -36,8 +34,6 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
-// Keeps the wide mappers flat below — each ?? here would otherwise add a
-// branch to every seeder.
 const orNull = <T>(v: T | null | undefined): T | null => v ?? null;
 const orElse = <T>(v: T | null | undefined, fallback: T): T => v ?? fallback;
 
@@ -49,9 +45,7 @@ function itemDetailCreateFields(item: CatalogItem) {
   };
 }
 
-// A true 1:1 optional relation can nested-upsert directly on update, unlike
-// the 1:many class/inventory relations elsewhere in this file that have to
-// deleteMany+create instead.
+// A true 1:1 optional relation can nested-upsert directly on update, unlike the 1:many relations elsewhere here that need deleteMany+create.
 function itemDetailUpsertFields(item: CatalogItem) {
   return {
     weaponDetail: item.weapon
@@ -76,7 +70,6 @@ async function seedClasses(prisma: PrismaClient) {
   return classIds;
 }
 
-// Upsert the action catalog by (key, edition), then drop stale rows.
 async function seedActions(prisma: PrismaClient) {
   for (const action of ACTIONS) {
     const edition = orNull(action.edition);
@@ -90,21 +83,14 @@ async function seedActions(prisma: PrismaClient) {
       grantLevel: orNull(action.grantLevel),
       resourceKey: orNull(action.resourceKey),
       resourceAmount: orNull(action.resourceAmount),
-      // NULL = shared (#1306) — every class row. Part of the where key: the
-      // 2024 row would otherwise overwrite its 2014 twin on every reseed.
+      // edition: null means shared (#1306) across every class row; part of the where key so a 2024 row doesn't overwrite its 2014 twin on reseed.
       edition,
     };
-    // upsertEditionRow, not .upsert(): the compound-key shorthand can't
-    // express a null edition (which every class row has).
+    // upsertEditionRow, not .upsert(): the compound-key shorthand can't express a null edition (which every class row has).
     await upsertEditionRow(prisma.action, { key: action.key, edition }, { key: action.key, ...fields }, fields);
   }
-  // "key", not "name": Action has both, and `name` is NOT unique here
-  // ("Channel Divinity" is two rows), so pruning on it would delete live
-  // catalog content. No extraWhere — this seeder owns every Action row.
-  //
-  // Each row's OWN edition goes into the seeded list, not a flat null: an
-  // edition absent from it gets `notIn: []`, which matches every row in that
-  // partition, so a forked row listed as shared would be deleted on reseed.
+  // Pruning keys on `key`, not `name`: Action.name is not unique ("Channel Divinity" is two rows).
+  // Each row's own edition goes into the seeded list, not a flat null, so a forked row isn't swept as shared.
   const staleWhere = staleCatalogRowsWhere(
     "key",
     ACTIONS.map((a) => ({ identity: a.key, edition: a.edition ?? null })),
@@ -140,9 +126,7 @@ async function seedManeuvers(prisma: PrismaClient) {
   }
 }
 
-// No scaling on any row (#1502), so effectKind/buffTarget/buffModifier stay
-// fixed nulls rather than per-row fields. costPoolKey/costBase are per-row
-// (ki/2 for 2014, focus/1 for 2024) — the one thing that genuinely forks.
+// No scaling on any row (#1502): effectKind/buffTarget/buffModifier stay fixed null; only costPoolKey/costBase differ by edition (ki/2 for 2014, focus/1 for 2024).
 async function seedShadowArts(prisma: PrismaClient) {
   for (const art of SHADOW_ARTS) {
     const edition = art.edition;
@@ -163,10 +147,8 @@ async function seedShadowArts(prisma: PrismaClient) {
     };
     await upsertEditionRow(prisma.grantedAbility, { name: art.name, edition }, data, data);
   }
-  // source: "shadowArts" passed in as extraWhere so this never touches
-  // maneuvers/channelDivinity rows sharing the same table. Each row's OWN
-  // edition goes into the seeded list, not a flat null — an edition absent
-  // from it gets `notIn: []`, which matches (and deletes) every row in that partition.
+  // source: "shadowArts" scopes this to never touch maneuvers/channelDivinity rows sharing the same table.
+  // Each row's own edition goes into the seeded list, not a flat null, so a forked row isn't swept as shared.
   const staleWhere = staleCatalogRowsWhere(
     "name",
     SHADOW_ARTS.map((a) => ({ identity: a.name, edition: a.edition })),
@@ -177,10 +159,7 @@ async function seedShadowArts(prisma: PrismaClient) {
   await prisma.grantedAbility.deleteMany({ where: staleWhere });
 }
 
-// Seed the Way of the Four Elements discipline catalog (2014-only, #1503) —
-// upsert by (name, edition). Unlike seedSubclassChoiceOptions below, each row
-// carries its own cost (Ki, "pool") and, where the discipline deals damage, an
-// EffectSpec — the cast handler (lib/classes/disciplines.ts) reads both.
+// Way of the Four Elements is 2014-only (#1503). Unlike seedSubclassChoiceOptions below, each row carries its own cost and EffectSpec — disciplineCastSteps reads both.
 async function seedDisciplines(prisma: PrismaClient) {
   for (const discipline of DISCIPLINES) {
     const data = {
@@ -209,12 +188,7 @@ async function seedDisciplines(prisma: PrismaClient) {
       data,
     );
   }
-  // Every seeded row is EDITION_2014 (Way of the Four Elements has no 2024
-  // counterpart), so the NULL and EDITION_2024 partitions both get `notIn:
-  // []`, matching every `source: "discipline"` row — deliberately, to sweep
-  // orphaned pre-retirement rows. The same shape is a DATA-LOSS bug the other
-  // direction (see prune.ts), but with an all-EDITION_2014 seeded list it's
-  // the intended cleanup.
+  // Every seeded row is EDITION_2014, so this sweeps every other-edition `source: "discipline"` row deliberately — the same shape is a data-loss bug elsewhere (see staleCatalogRowsWhere) but is the intended cleanup here.
   const staleWhere = staleCatalogRowsWhere(
     "name",
     DISCIPLINES.map((d) => ({ identity: d.name, edition: d.edition })),
@@ -275,12 +249,8 @@ async function seedChannelDivinities(prisma: PrismaClient) {
     };
     await upsertEditionRow(prisma.grantedAbility, { name: cd.name, edition }, data, data);
   }
-  // Retagging a row from `edition: null` to a concrete edition CREATES a new
-  // row via upsertEditionRow's findFirst-by-(name,edition) and ORPHANS the
-  // pre-existing NULL-edition row — without this prune, withEditionOrShared's
-  // null-is-shared fallback keeps serving that orphan forever. Each row's OWN
-  // edition goes into the seeded list, not a flat null, so a genuinely-forked
-  // name doesn't get its OTHER edition's row swept by the same call.
+  // Retagging a row from `edition: null` to a concrete edition creates a new row (upsertEditionRow finds by name+edition) and orphans the old null-edition row, which withEditionOrShared's null-is-shared fallback would otherwise keep serving forever.
+  // Each row's own edition goes into the seeded list, not a flat null, so a genuinely-forked name doesn't get its other edition's row swept by the same call.
   const staleWhere = staleCatalogRowsWhere(
     "name",
     CHANNEL_DIVINITIES.map((cd) => ({ identity: cd.name, edition: cd.edition ?? null })),
@@ -298,8 +268,7 @@ async function seedChannelDivinities(prisma: PrismaClient) {
 async function seedFeats(prisma: PrismaClient) {
   for (const feat of FEATS) {
     const edition = feat.edition ?? null;
-    // upsertEditionRow, not .upsert(): the compound-key shorthand can't
-    // express a null edition.
+    // upsertEditionRow, not .upsert(): the compound-key shorthand can't express a null edition.
     await upsertEditionRow(
       prisma.feat,
       { name: feat.name, edition },
@@ -318,9 +287,7 @@ async function seedFeats(prisma: PrismaClient) {
     );
   }
   const staleWhere = staleCatalogRowsWhere("name", FEATS.map((f) => ({ identity: f.name, edition: f.edition ?? null })));
-  // Log before the destructive drop so the operator sees what's removed (a future
-  // homebrew feat row not in FEATS would be dropped here — intentional for a
-  // genuinely retired row of either edition).
+  // A homebrew feat row not in FEATS is dropped here too — intentional for a genuinely retired row of either edition.
   const stale = await prisma.feat.findMany({ where: staleWhere, select: { name: true, edition: true } });
   if (stale.length) {
     console.log(`seedFeats: dropping stale catalog rows: ${stale.map((f) => `${f.name} (${f.edition ?? "shared"})`).join(", ")}`);
@@ -328,16 +295,8 @@ async function seedFeats(prisma: PrismaClient) {
   await prisma.feat.deleteMany({ where: staleWhere });
 }
 
-// Two backgrounds (Acolyte/Sage) share the repeatable Magic Initiate row; the
-// class flavor is a creation-time snapshot, not a column.
-//
-// Pinned to EDITION_2024 rather than a bare `edition: null` lookup: Origin
-// feat grants are PHB'24-only, and a null-only match would fail once a
-// background's origin feat has no shared row left. This FK is a
-// REFERENCE-DISPLAY DEFAULT ONLY — a character actually being created
-// re-resolves the origin feat against ITS OWN edition in
-// character-create.ts's buildOriginEntry, so this seed-time pin never reaches
-// a live character's snapshot uncorrected.
+// Origin feat grants are PHB'24-only, so this resolves against EDITION_2024 rather than a null-only lookup.
+// Reference-display default only: buildOriginEntry re-resolves the origin feat against the character's own edition at creation, so this seed-time pin never reaches a live snapshot uncorrected.
 async function resolveOriginFeatId(prisma: PrismaClient, bg: (typeof BACKGROUNDS)[number]): Promise<string | null> {
   if (!bg.originFeatName) return null;
   const candidates = await prisma.feat.findMany({
@@ -349,8 +308,6 @@ async function resolveOriginFeatId(prisma: PrismaClient, bg: (typeof BACKGROUNDS
   return feat.id;
 }
 
-// Split from normalizedBackgroundFields/backgroundSeedData/seedBackgrounds
-// purely to keep each function's own complexity under the repo's health gate.
 function normalizedToolChoiceFields(background: (typeof BACKGROUNDS)[number]) {
   return {
     toolChoices: background.toolChoices ?? [],
@@ -388,9 +345,7 @@ async function seedBackgrounds(prisma: PrismaClient) {
   }
 }
 
-// Every optional Spell column at its reset value (booleans → false, nullable
-// scalars → null). `components` (a Json column) is omitted — Prisma rejects a raw
-// null there, and no spell ever drops it.
+// `components` (a Json column) is omitted — Prisma rejects a raw null there, and no spell ever drops it.
 const SPELL_COLUMN_DEFAULTS = {
   concentration: false, ritual: false, cantripScaling: false,
   effectKind: null, effectDiceCount: null, effectDiceFaces: null,
@@ -399,29 +354,20 @@ const SPELL_COLUMN_DEFAULTS = {
   buffTarget: null, buffModifier: null,
 } as const;
 
-// Layer the spell over the reset defaults so a toggled-OFF/removed optional
-// actually resets on re-seed (#1132): a bare partial update leaves an absent
-// optional column at its prior value (this stranded Barkskin at
-// concentration=true when SRD 5.2 dropped its concentration). `classes` is
-// dropped here (#1711) — seedSpells writes it to SpellClass separately, via
-// seedSpellClassesFor, once the row's id is known.
+// Layering over the reset defaults makes a toggled-off optional actually reset on reseed (#1132) — a bare partial update leaves it at its prior value.
+// `classes` is dropped here (#1711); seedSpellClassesFor writes it to SpellClass separately once the row's id is known.
 function spellSeedData(spell: CatalogSpell) {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to exclude `classes` from `rest`; SpellClass owns membership (#1711)
   const { classes, ...rest } = spell;
   return { ...SPELL_COLUMN_DEFAULTS, ...rest };
 }
 
-// spells.ts entries default to EDITION_2024 (SRD 5.2 text, not "valid in both
-// editions"); SPELLS_2014 rows are already tagged EDITION_2014, so this is a
-// no-op for those. One function, so seedSpells' upsert loop and its prune
-// below can never drift onto two different defaults (#1710).
+// spells.ts entries default to EDITION_2024 (SRD 5.2 text); SPELLS_2014 rows are already tagged, so this is a no-op there. One function so seedSpells' upsert loop and its prune can't drift onto different defaults (#1710).
 function resolvedSpellEdition(spell: Pick<CatalogSpell, "edition">): SeedEdition {
   return spell.edition ?? "EDITION_2024";
 }
 
-// Find-then-create, not a true `.upsert()`: (kind, scope, name, edition) is
-// CatalogEntry's business key, but Prisma's compound-key shorthand can't
-// express a null owner arm any more cleanly than it can a null edition.
+// Find-then-create, not a true `.upsert()`: (kind, scope, name, edition) is CatalogEntry's business key, but Prisma's compound-key shorthand can't express a null owner arm any more cleanly than it can a null edition.
 async function upsertGlobalSpellCatalogEntry(prisma: PrismaClient, name: string, edition: SeedEdition): Promise<string> {
   const existing = await prisma.catalogEntry.findFirst({
     where: { kind: "SPELL", scope: "GLOBAL", name, edition },
@@ -435,23 +381,17 @@ async function upsertGlobalSpellCatalogEntry(prisma: PrismaClient, name: string,
   return created.id;
 }
 
-// Apply in-place renames FIRST (so the upsert matches the renamed row, not a
-// stranded twin), then upsertEditionRow by (name, edition) so a same-name
-// 2014/2024 fork lands as siblings rather than one overwriting the other
-// (#1710). Learned SpellEntry snapshots are unaffected by a catalog drop (no
-// FK); a one-time resync script refreshes them.
+// Renames apply first so the upsert matches the renamed row, not a stranded twin; upsertEditionRow by (name, edition) so a same-name 2014/2024 fork lands as siblings rather than one overwriting the other (#1710).
+// Learned SpellEntry snapshots are unaffected by a catalog drop (no FK); a one-time resync script refreshes them.
 async function seedSpells(prisma: PrismaClient) {
   await applySpellRenames(prisma, SPELL_RENAMES);
   const allSpells: CatalogSpell[] = [...SPELLS, ...SPELLS_2014];
   for (const spell of allSpells) {
     const edition = resolvedSpellEdition(spell);
-    // Every seeded spell is 1:1 with its own GLOBAL CatalogEntry (#1796) —
-    // resolved BEFORE the Spell upsert since catalogEntryId is a required,
-    // uniquely-constrained column with no default.
+    // Every seeded spell is 1:1 with its own GLOBAL CatalogEntry (#1796), resolved before the Spell upsert since catalogEntryId is a required, uniquely-constrained column with no default.
     const catalogEntryId = await upsertGlobalSpellCatalogEntry(prisma, spell.name, edition);
     const data = { ...spellSeedData(spell), edition, catalogEntryId };
-    // upsertEditionRow for consistency with every other editioned catalog
-    // seeder, even though every spell here already resolves to a concrete edition.
+    // upsertEditionRow for consistency with every other editioned catalog seeder, even though every spell here already resolves to a concrete edition.
     const row = await upsertEditionRow(prisma.spell, { name: spell.name, edition }, data, data);
     // #1711: SpellClass rows carry no edition column (Shape 1) — this
     // spell's own row already IS the edition fork, so its membership rows
@@ -464,9 +404,7 @@ async function seedSpells(prisma: PrismaClient) {
     console.log(`seedSpells: dropping stale catalog rows: ${stale.map((s) => `${s.name} (${s.edition ?? "shared"})`).join(", ")}`);
   }
   await prisma.spell.deleteMany({ where: staleWhere });
-  // Spell.catalogEntryId carries no Prisma relation, so dropping a stale
-  // Spell row above does NOT cascade to its CatalogEntry — swept explicitly
-  // here or a stale spell's GLOBAL entry would linger as a phantom entitlement.
+  // Spell.catalogEntryId carries no Prisma relation, so the drop above doesn't cascade to CatalogEntry — swept explicitly or a stale spell's GLOBAL entry would linger as a phantom entitlement.
   if (stale.length) {
     await prisma.catalogEntry.deleteMany({ where: { id: { in: stale.map((s) => s.catalogEntryId) } } });
   }
@@ -478,13 +416,9 @@ async function seedItems(prisma: PrismaClient) {
   for (const item of ITEMS) {
     const { name, category, weight, cost, description, toolCategory } = item;
     const row = await prisma.item.upsert({
-      // Names are unique per scope, not globally (#1645), so the seed has to
-      // say WHICH scope it owns — otherwise a DM's campaign row of the same
-      // name would be a candidate for the catalog's upsert.
+      // Names are unique per scope, not globally (#1645), so the seed must say WHICH scope it owns, or a DM's campaign row of the same name becomes a candidate for the catalog's upsert.
       where: { scopeKey_name: { scopeKey: "global", name } },
-      // scope/scopeKey are create-only: an existing row's scope is not the
-      // seed's to change, and writing them on update would let a reseed
-      // silently re-scope a row #1646 had moved.
+      // scope/scopeKey are create-only: writing them on update would let a reseed silently re-scope a row #1646 had moved.
       create: { name, category, weight, cost, description, toolCategory: orNull(toolCategory), scope: "GLOBAL", scopeKey: "global", ...itemDetailCreateFields(item) },
       update: { name, category, weight, cost, description, toolCategory: orNull(toolCategory), ...itemDetailUpsertFields(item) },
     });
@@ -493,8 +427,7 @@ async function seedItems(prisma: PrismaClient) {
   return itemIdsByName;
 }
 
-// Contents are replaced wholesale (deleteMany + create) since PackContent has
-// no stable business key to upsert against.
+// Contents are replaced wholesale (deleteMany + create) since PackContent has no stable business key to upsert against.
 async function seedPacks(prisma: PrismaClient, itemIdsByName: Map<string, string>) {
   for (const pack of PACKS) {
     const { id: packId } = await prisma.pack.upsert({
@@ -514,8 +447,6 @@ async function seedPacks(prisma: PrismaClient, itemIdsByName: Map<string, string
 }
 
 async function main() {
-  // Fails fast on a malformed row before any upsert runs, rather than writing
-  // a broken catalog row that only 500s later.
   assertSeedContentValid();
   assertUniqueGrantedAbilityNames([
     ...MANEUVERS,
@@ -525,8 +456,7 @@ async function main() {
     ...DISCIPLINES,
   ]);
   await seedSpecies(prisma);
-  // #1682: trait content, resolved against the Species/SpeciesVariant rows
-  // seedSpecies just wrote — must run after it.
+  // #1682: must run after seedSpecies — resolves trait content against the Species/SpeciesVariant rows it just wrote.
   await seedSpeciesTraits(prisma);
   const classIds = await seedClasses(prisma);
   await seedSubclasses(prisma, classIds);
@@ -542,17 +472,13 @@ async function main() {
   await seedBackgrounds(prisma);
   await seedSpells(prisma);
   await seedSubclassGrantedSpells(prisma, classIds);
-  // #1631: the SubclassGrantedSpell sibling family — same ordering
-  // constraint (subclasses AND spells must already be seeded).
+  // #1631: same ordering constraint as seedSubclassGrantedSpells — subclasses AND spells must already be seeded.
   await seedSubclassSpellListExpansions(prisma, classIds);
-  // #1683: 2024 lineage/legacy spell tracks — needs Species (seedSpecies,
-  // above) AND the Spell catalog (seedSpells, just above) both seeded.
+  // #1683: needs both seedSpecies and seedSpells to have already run.
   await seedSpeciesGrantedSpells(prisma);
   const itemIdsByName = await seedItems(prisma);
   await seedPacks(prisma, itemIdsByName);
-  // No reader yet (#1534) — StartingEquipmentPackage rows are inert until
-  // then. Runs after seedPacks/seedItems so its catalogName resolution
-  // reflects the just-seeded catalog rows too.
+  // No reader yet (#1534). Must run after seedPacks/seedItems so its catalogName resolution reflects the just-seeded catalog rows.
   await seedStartingEquipment(prisma);
 }
 

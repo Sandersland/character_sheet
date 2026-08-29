@@ -1,10 +1,3 @@
-// DB-backed proof for #1631's spell-list-expansion seeder — mirrors
-// granted-spell-fork-reseed.test.ts (SUBCLASS_GRANTED_SPELLS' sibling family):
-// the edition-aware subclass resolve and the id-scoped prune that makes a
-// retag (NULL -> per-edition fork) drop its stale shared row on reseed.
-// seedSubclassSpellListExpansions is importable and parameterized on its
-// rows (seed-spell-list-expansions.ts), so this drives the real seeder
-// against fixture rows rather than re-implementing its call shapes.
 import { afterAll, afterEach, describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/core/prisma.js";
@@ -60,8 +53,6 @@ afterEach(async () => {
 afterAll(async () => {
   await prisma.characterClass.deleteMany({ where: { name: FIXTURE_CLASS_NAME } });
 
-  // Proves the prune's slug scoping held: if a test's seeded set leaked, the
-  // real seeded expansion rows are gone and this goes red.
   const fiendExpansions = await prisma.subclassSpellListExpansion.count({
     where: { subclass: { slug: "warlock-the-fiend" } },
   });
@@ -78,7 +69,6 @@ describe("seedSubclassSpellListExpansions — retag and prune (#1631)", () => {
     expect(shared).toHaveLength(1);
     expect(shared[0].edition).toBeNull();
 
-    // The retag: the one shared row forks into a per-edition pair.
     await seedSubclassSpellListExpansions(prisma, classIds, [
       expansion({ edition: "EDITION_2014" }),
       expansion({ edition: "EDITION_2024", spellName: "Elementalism" }),
@@ -141,9 +131,7 @@ describe("upsertExpansionSpell — the edition-aware subclass resolve (#1631)", 
 
     const on2024Fork = await prisma.subclassSpellListExpansion.findMany({ where: { subclassId: forkedSubclassId } });
     expect(on2024Fork.map((r) => r.edition)).toEqual(["EDITION_2024"]);
-    // No EDITION_2014 Subclass fork exists, so the 2014 row falls back to the
-    // shared row — the same exact-else-NULL ordering resolveEditionRow gives
-    // a character of that edition.
+    // With no EDITION_2014 fork, resolveEditionRow's exact-else-NULL fallback lands the 2014 row on the shared subclass.
     const onShared = await prisma.subclassSpellListExpansion.findMany({ where: { subclassId: sharedSubclassId } });
     expect(onShared.map((r) => r.edition)).toEqual(["EDITION_2014"]);
   });

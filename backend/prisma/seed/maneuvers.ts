@@ -1,10 +1,4 @@
-// --- Maneuver catalog -------------------------------------------------------
-// SRD Battle Master maneuvers, seeded as GrantedAbility rows (source "maneuver").
-// Every maneuver costs 1 superiority die (costBase 1, costPoolKey
-// "superiorityDice") and rolls that die (effectDieSource "superiorityDice") —
-// the server owns the roll on castManeuver. `placement` routes the session UI;
-// `actionSlot` is the economy slot consumed; `saveAbility` is the announced DC
-// ability; `selfTempHp` marks Rally (die + Cha mod as self temp HP).
+// SRD Battle Master maneuvers. Every maneuver costs 1 superiority die and rolls it; the server owns the roll on castManeuver.
 import type { SeedEdition } from "./edition.js";
 
 export type ManeuverPlacement = "attackRoll" | "damageRoll" | "reaction" | "effect" | "attackOption";
@@ -16,8 +10,7 @@ export interface ManeuverSeed {
   actionSlot?: "bonusAction" | "reaction";
   saveAbility?: "strength" | "dexterity" | "wisdom" | "constitution";
   selfTempHp?: boolean;
-  // Omitted = shared (NULL column, valid in both editions, #1306); only a
-  // mechanically diverging row forks, which #1415 made expressible.
+  // Omitted = shared (NULL column, valid in both editions, #1306); a diverging row forks (#1415).
   edition?: SeedEdition;
 }
 

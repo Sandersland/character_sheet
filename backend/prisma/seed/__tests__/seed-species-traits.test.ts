@@ -1,6 +1,3 @@
-// DB-backed proof that seedSpeciesTraits (#1682) is idempotent and resolves
-// its (speciesId, variantId) targets correctly — mirrors seed-species.test.ts's
-// own idempotency proof, one level down (traits, not species/variants).
 import { describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/core/prisma.js";

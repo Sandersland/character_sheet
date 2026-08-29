@@ -1,25 +1,11 @@
-// Warlock ClassFeature rows, authored as literal seed data. Base class and
-// The Fiend are transcribed from the official SRD 5.2 CC-BY PDF. The Archfey
-// and The Great Old One's PHB'24 reworks are non-SRD and unverifiable, so
-// every row for both is tagged EDITION_2014-only and no 2024 row exists —
-// assertEverySubclassEditionPopulated hard-fails otherwise, and both
-// Subclass rows are tagged the same way.
-//
+// The Archfey and The Great Old One are EDITION_2014-only — their PHB'24 reworks are non-SRD/unverifiable; assertEverySubclassEditionPopulated hard-fails if a 2024 row is missing without this tag, so both Subclass rows are tagged the same way.
 // DATA MODULE ONLY: no direct database calls or async write logic may live in this file.
-//
-// `edition` omitted on a row -> expand() seeds one row per edition with
-// identical text; `edition` set -> exactly the one row named. A "no 2024
-// successor" feature means NOT authoring a 2024 row for that name, never
-// deleting the 2014 row — a rename gets a new row instead of an edit in place.
-//
-// No contactPatron pool is authored: Mystic Arcanum's uses are already
-// tracked separately as arcanumUsed, not by this ClassFeature machinery.
+// No contactPatron pool is authored: Mystic Arcanum's uses are already tracked separately as arcanumUsed, not by this ClassFeature machinery.
 import type { ResourceTotalFormula } from "../../src/lib/classes/class-feature-rows.js";
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { SeedEdition } from "./edition.js";
 import type { ClassFeatureSeedRow } from "./class-features.js";
 
-// Guards a stray subclass-slug typo below at import time.
 function slug(s: SubclassSlug): SubclassSlug {
   if (!SUBCLASS_SLUGS.includes(s)) throw new Error(`warlock-features: unknown subclass slug "${s}"`);
   return s;
@@ -30,7 +16,7 @@ interface RawWarlockFeature {
   name: string;
   level: number;
   description: string;
-  /** Omitted -> identical text seeded for both editions. */
+  // Omitted -> identical text seeded for both editions.
   edition?: SeedEdition;
   resourceKey?: string;
   resourceLabel?: string;
@@ -71,7 +57,7 @@ const WARLOCK_BASE_RAW: RawWarlockFeature[] = [
     name: "Pact Magic",
     level: 1,
     edition: "EDITION_2024",
-    // SRD 5.2 pp.70-71: same short/long-rest recharge and same-level-slot shape as 2014.
+    // SRD 5.2 pp.70-71.
     description:
       "You form a pact with a mysterious patron to cast spells, using Charisma. You know two Warlock cantrips (more at levels 4 and 10) and prepare a growing list of Warlock spells, each no higher a level than the Slot Level shown for your level. All your Pact Magic spell slots are the same (high) level, and you regain every expended slot when you finish a Short or Long Rest. An Arcane Focus serves as your Spellcasting Focus.",
   },
@@ -88,7 +74,7 @@ const WARLOCK_BASE_RAW: RawWarlockFeature[] = [
     name: "Eldritch Invocations",
     level: 1,
     edition: "EDITION_2024",
-    // SRD 5.2 p.70: level-shifts 2 -> 1, and the known-invocation table is fully rewritten. Caps at 10, not 8.
+    // SRD 5.2 p.70.
     description:
       "You gain one Eldritch Invocation of your choice — a permanent magical ability or lesson unlocked by forbidden knowledge, such as Pact of the Tome — meeting any stated prerequisite. You gain additional invocations as you gain levels: 1 at level 1, 3 at level 2, 5 at level 5, 6 at level 7, 7 at level 9, 8 at level 12, 9 at level 15, and 10 at level 18. Whenever you gain a Warlock level, you can replace one invocation you know with a different one you qualify for, unless it's a prerequisite for another invocation you have.",
   },
@@ -97,7 +83,7 @@ const WARLOCK_BASE_RAW: RawWarlockFeature[] = [
     name: "Magical Cunning",
     level: 2,
     edition: "EDITION_2024",
-    // SRD 5.2 p.71. NEW in 2024 — no 2014 counterpart.
+    // SRD 5.2 p.71. New in 2024 — no 2014 counterpart.
     description:
       "You can perform a 1-minute esoteric rite to regain expended Pact Magic spell slots, up to half your maximum (round up). Once you use this feature, you can't do so again until you finish a Long Rest.",
     resourceKey: "magicalCunning",
@@ -113,13 +99,13 @@ const WARLOCK_BASE_RAW: RawWarlockFeature[] = [
     description:
       "Your patron grants a boon: Pact of the Chain (familiar with special forms), Pact of the Blade (summon a pact weapon), or Pact of the Tome (Book of Shadows with extra cantrips and rituals).",
   },
-  // Pact Boon has NO EDITION_2024 row — Pact of the Blade/Chain/Tome become Eldritch Invocation options from level 1 instead.
+  // Pact Boon has no EDITION_2024 row — Pact of the Blade/Chain/Tome become Eldritch Invocation options from level 1 instead.
   {
     subclassSlug: null,
     name: "Contact Patron",
     level: 9,
     edition: "EDITION_2024",
-    // SRD 5.2 p.71. NEW in 2024 — no 2014 counterpart.
+    // SRD 5.2 p.71. New in 2024 — no 2014 counterpart.
     description:
       "You always have the Contact Other Plane spell prepared, and you can cast it without expending a spell slot to contact your patron directly — you automatically succeed on the spell's saving throw. Once you cast it this way, you can't do so again until you finish a Long Rest.",
   },
@@ -136,7 +122,7 @@ const WARLOCK_BASE_RAW: RawWarlockFeature[] = [
     name: "Mystic Arcanum",
     level: 11,
     edition: "EDITION_2024",
-    // SRD 5.2 p.71: same level tiers as 2014 (13/15/17 -> 7th/8th/9th).
+    // SRD 5.2 p.71.
     description:
       "Your patron grants you a magical secret called an arcanum. Choose one level 6 Warlock spell as this arcanum; you can cast it once without expending a spell slot, and must finish a Long Rest before doing so again. You gain another arcanum spell the same way at level 13 (a 7th-level spell), level 15 (8th-level), and level 17 (9th-level). You regain all uses of your Mystic Arcanum when you finish a Long Rest.",
   },
@@ -161,13 +147,12 @@ const WARLOCK_BASE_RAW: RawWarlockFeature[] = [
     name: "Eldritch Master",
     level: 20,
     edition: "EDITION_2024",
-    // SRD 5.2 p.71: rewritten around 2024's own Magical Cunning feature (regains ALL slots via that rite).
+    // SRD 5.2 p.71. Rewritten around 2024's Magical Cunning feature (regains all slots via that rite).
     description: "When you use your Magical Cunning feature, you regain all your expended Pact Magic spell slots.",
   },
 ];
 
-// The Fiend — SRD 5.2 pp.75-76 (2024) / PHB'14 (2014). Expanded Spell List
-// (2014) renames to Fiend Spells (2024).
+// The Fiend — SRD 5.2 pp.75-76 (2024) / PHB'14 (2014); Expanded Spell List (2014) renames to Fiend Spells (2024).
 const FIEND_SLUG = slug("warlock-the-fiend");
 const FIEND_RAW: RawWarlockFeature[] = [
   {
@@ -175,8 +160,7 @@ const FIEND_RAW: RawWarlockFeature[] = [
     subclassSlug: FIEND_SLUG,
     level: 1,
     edition: "EDITION_2014",
-    // PHB'14, "The Fiend" — Expanded Spell List. Page number deliberately
-    // omitted — could not be verified from a licensed source (see PR).
+    // PHB'14, "The Fiend" — Expanded Spell List; page number omitted, could not be verified from a licensed source.
     description:
       "Add fiend spells to your warlock list — the tiers below are SPELL levels, not warlock levels: Burning Hands, Command (1st); Blindness/Deafness, Scorching Ray (2nd); Fireball, Stinking Cloud (3rd); Fire Shield, Wall of Fire (4th); Flame Strike, Hallow (5th).",
   },
@@ -185,9 +169,7 @@ const FIEND_RAW: RawWarlockFeature[] = [
     subclassSlug: FIEND_SLUG,
     level: 3,
     edition: "EDITION_2024",
-    // SRD 5.2 pp.75-76: renamed from "Expanded Spell List" — keyed by
-    // WARLOCK level (2014's version keys by SPELL level), and its L9 pair
-    // is Geas/Insect Plague, not the 2014 row's Flame Strike/Hallow.
+    // SRD 5.2 pp.75-76.
     description:
       "The magic of your patron ensures you always have certain spells prepared, which don't count against the number of spells you can prepare with Pact Magic: Burning Hands, Command, Scorching Ray, Suggestion (level 3); Fireball, Stinking Cloud (level 5); Fire Shield, Wall of Fire (level 7); Geas, Insect Plague (level 9).",
   },
@@ -204,7 +186,7 @@ const FIEND_RAW: RawWarlockFeature[] = [
     subclassSlug: FIEND_SLUG,
     level: 3,
     edition: "EDITION_2024",
-    // SRD 5.2 p.76: level-shifts 1 -> 3, widens to also trigger when someone else reduces an enemy near you to 0 HP.
+    // SRD 5.2 p.76.
     description:
       "When you reduce an enemy to 0 Hit Points, you gain temporary hit points equal to your Charisma modifier + your warlock level (minimum 1). You also gain this benefit when someone else reduces an enemy within 10 feet of you to 0 Hit Points.",
   },
@@ -224,7 +206,7 @@ const FIEND_RAW: RawWarlockFeature[] = [
     subclassSlug: FIEND_SLUG,
     level: 6,
     edition: "EDITION_2024",
-    // SRD 5.2 p.76: uses become the Charisma modifier (minimum of once); recharge narrows to a Long Rest only.
+    // SRD 5.2 p.76.
     description:
       "You can call on your fiendish patron to alter fate in your favor. When you make an ability check or a saving throw, add 1d10 to the roll after seeing it but before its effects occur. You can do this a number of times equal to your Charisma modifier (minimum of once), but no more than once per roll. Regain all expended uses when you finish a Long Rest.",
     resourceKey: "darkOnesOwnLuck",
@@ -245,7 +227,7 @@ const FIEND_RAW: RawWarlockFeature[] = [
     subclassSlug: FIEND_SLUG,
     level: 10,
     edition: "EDITION_2024",
-    // SRD 5.2 p.76: excludes Force damage from the choice.
+    // SRD 5.2 p.76.
     description:
       "Choose one damage type, other than Force, whenever you finish a Short or Long Rest. You have resistance to that damage type until you choose a different one.",
   },
@@ -266,8 +248,7 @@ const FIEND_RAW: RawWarlockFeature[] = [
     subclassSlug: FIEND_SLUG,
     level: 14,
     edition: "EDITION_2024",
-    // SRD 5.2 p.76: once per turn, target gets a Charisma save (2014 has
-    // none), damage drops 10d10 -> 8d10 and only applies if not a Fiend.
+    // SRD 5.2 p.76.
     description:
       "Once per turn when you hit a creature with an attack, you can try to instantly transport it through the Lower Planes. The target must succeed on a Charisma saving throw against your spell save DC or disappear and hurtle through a nightmare landscape, taking 8d10 psychic damage if it isn't a Fiend and gaining the Incapacitated condition until the end of your next turn, when it returns to its space or the nearest unoccupied one. Once used, you can't use it again until you finish a Long Rest unless you expend a Pact Magic spell slot (no action required) to restore it.",
     resourceKey: "hurlThroughHell",
@@ -277,10 +258,7 @@ const FIEND_RAW: RawWarlockFeature[] = [
   },
 ];
 
-// The Archfey / The Great Old One — EDITION_2014 ONLY: both patrons' PHB'24
-// reworks are non-SRD and no licensed source could verify their text, so
-// every row is tagged EDITION_2014 and no 2024 row exists. A 2024 Warlock can
-// only pick The Fiend until PHB'24 content is authored for these two.
+// The Archfey / The Great Old One are EDITION_2014-only (see file header) — a 2024 Warlock can only pick The Fiend until PHB'24 content is authored for these two.
 const ARCHFEY_SLUG = slug("warlock-the-archfey");
 const ARCHFEY_RAW: RawWarlockFeature[] = [
   {
@@ -288,8 +266,7 @@ const ARCHFEY_RAW: RawWarlockFeature[] = [
     subclassSlug: ARCHFEY_SLUG,
     level: 1,
     edition: "EDITION_2014",
-    // PHB'14, "The Archfey" — Expanded Spell List. Page number deliberately
-    // omitted — could not be verified from a licensed source (see PR).
+    // PHB'14, "The Archfey" — Expanded Spell List; page number omitted, could not be verified from a licensed source.
     description:
       "Add archfey spells to your warlock list — the tiers below are SPELL levels, not warlock levels: Faerie Fire, Sleep (1st); Calm Emotions, Phantasmal Force (2nd); Blink, Plant Growth (3rd); Dominate Beast, Greater Invisibility (4th); Dominate Person, Seeming (5th).",
   },
@@ -348,9 +325,7 @@ const GREAT_OLD_ONE_RAW: RawWarlockFeature[] = [
     subclassSlug: GREAT_OLD_ONE_SLUG,
     level: 1,
     edition: "EDITION_2014",
-    // PHB'14, "The Great Old One" — Expanded Spell List. Page number
-    // deliberately omitted — could not be verified from a licensed source
-    // (see PR).
+    // PHB'14, "The Great Old One" — Expanded Spell List; page number omitted, could not be verified from a licensed source.
     description:
       "Add Great Old One spells to your warlock list — the tiers below are SPELL levels, not warlock levels: Dissonant Whispers, Hideous Laughter (1st); Detect Thoughts, Phantasmal Force (2nd); Clairvoyance, Sending (3rd); Dominate Beast, Black Tentacles (4th); Dominate Person, Telekinesis (5th).",
   },

@@ -1,20 +1,7 @@
-// Sorcerer ClassFeature seed rows. 2014 text: PHB'14. 2024 text: SRD 5.2,
-// except Wild Magic Sorcery, which SRD 5.2 does not ship — those rows are
-// mirror-sourced, not SRD-verified (see the WILD_MAGIC_RAW header).
-//
-// Edition authoring rule: `edition` omitted -> expand() seeds one identical
-// row per edition; `edition` set -> exactly that row. A renamed feature is a
-// different name — the old row disappears from the seed and
-// pruneStalePartitions retires the DB row; a row is never edited in place
-// across editions.
-//
-// The subclass display names stay "Draconic Bloodline"/"Wild Magic":
-// deriveResources looks subclasses up by the persisted
-// CharacterClassEntry.subclass display string, so renaming the key would
-// silently strip subclass features and pools from every existing character.
-//
-// Every Sorcerer pool is row-declared (no resourceFn left); a reintroduced
-// resourceFn pool would shadow a same-keyed row pool in mergePoolSources.
+// 2014 text: PHB'14. 2024 text: SRD 5.2, except Wild Magic Sorcery (not in SRD 5.2, mirror-sourced — see WILD_MAGIC_RAW).
+// A renamed feature is a different name — pruneStalePartitions retires the old DB row when it disappears from the seed; never edited in place.
+// Subclass display names stay "Draconic Bloodline"/"Wild Magic" — deriveResources looks them up by the persisted CharacterClassEntry.subclass string; renaming would silently strip subclass features from existing characters.
+// Every Sorcerer pool is row-declared (no resourceFn left); a reintroduced resourceFn pool would shadow a same-keyed row pool in mergePoolSources.
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { ResourceTotalFormula } from "../../src/lib/classes/class-feature-rows.js";
 import type { SeedEdition } from "./edition.js";
@@ -35,9 +22,7 @@ interface RawSorcererFeature {
   resourceLabel?: string;
   resourceRecharge?: string;
   resourceTotals?: { minLevel: number; total: ResourceTotalFormula; shortRestRegain?: number }[];
-  // On Metamagic's rows, `resourceKey` is the action's identity ("metamagic"),
-  // not the pool it spends (`costPoolKey` "sorceryPoints") — actionFromRow
-  // gates on the cost pool, never this identity key (#1909).
+  // Metamagic's resourceKey is the action's identity ("metamagic"), not the pool it spends (costPoolKey "sorceryPoints") — actionFromRow gates on the cost pool, never this key (#1909).
   activationCost?: string;
   costKind?: string;
   costPoolKey?: string;
@@ -113,8 +98,7 @@ const SORCERER_BASE_RAW: RawSorcererFeature[] = [
     name: "Font of Magic",
     level: 2,
     edition: "EDITION_2024",
-    // SRD 5.2 p.140. sorceryPointCostForSlot enforces the cost/cap but not
-    // this row's minimum-Sorcerer-level clause, which is prose only.
+    // SRD 5.2 p.140. sorceryPointCostForSlot enforces the cost/cap but not this row's minimum-Sorcerer-level clause, which stays prose only.
     description:
       "You have a pool of Sorcery Points equal to your Sorcerer level. As a Bonus Action, expend a spell slot to gain Sorcery Points equal to the slot's level, or spend Sorcery Points to create a spell slot (no action required): 2 SP for a level 1 slot (minimum Sorcerer level 2), 3 SP for level 2 (minimum level 3), 5 SP for level 3 (minimum level 5), 6 SP for level 4 (minimum level 7), 7 SP for level 5 (minimum level 9) — never above level 5. A slot created this way vanishes when you finish a Long Rest. You regain all expended Sorcery Points when you finish a Long Rest.",
     resourceKey: "sorceryPoints",
@@ -141,8 +125,7 @@ const SORCERER_BASE_RAW: RawSorcererFeature[] = [
     name: "Metamagic",
     level: 2,
     edition: "EDITION_2024",
-    // SRD 5.2 p.141. The grant level forks per edition — DERIVED_ACTIONS'
-    // metamagic grantLevel must match this row's level.
+    // SRD 5.2 p.141. DERIVED_ACTIONS' metamagic grantLevel must match this row's level.
     description:
       "You gain 2 Metamagic options of your choice (2 more at level 10, 2 more at level 17), letting you twist your spells by spending Sorcery Points: Careful Spell (1 SP, protect chosen creatures from your own area spell), Distant Spell (1 SP, double range or make a touch spell reach 30 feet), Empowered Spell (1 SP, reroll damage dice up to your Charisma modifier), Extended Spell (1 SP, double a non-instantaneous duration), Heightened Spell (2 SP, Disadvantage on one target's first save against the spell), Quickened Spell (2 SP, cast an action spell as a Bonus Action), Seeking Spell (1 SP, reroll a missed spell attack roll), Subtle Spell (1 SP, cast without Verbal or Somatic components), Transmuted Spell (1 SP, change a spell's damage type to another type it can deal), or Twinned Spell (SP cost equal to the spell's level, minimum 1, target a second creature).",
     resourceKey: "metamagic",
@@ -180,8 +163,7 @@ const SORCERER_BASE_RAW: RawSorcererFeature[] = [
     name: "Sorcerous Restoration",
     level: 5,
     edition: "EDITION_2024",
-    // SRD 5.2 p.141. The pool tracks the once-per-Long-Rest USE limit, not
-    // the Sorcery Point amount regained.
+    // SRD 5.2 p.141. The pool tracks the once-per-Long-Rest USE limit, not the Sorcery Point amount regained.
     description:
       "When you finish a Short Rest, you can regain expended Sorcery Points, up to a number equal to half your Sorcerer level (rounded down). Once you use this feature, you must finish a Long Rest before you can use it again.",
     resourceKey: "sorcerousRestoration",
@@ -203,8 +185,7 @@ const SORCERER_BASE_RAW: RawSorcererFeature[] = [
     name: "Epic Boon",
     level: 19,
     edition: "EDITION_2024",
-    // SRD 5.2 p.141. 2014's plain ASI at 19 is covered by the ASI-level
-    // table, not a ClassFeature row.
+    // SRD 5.2 p.141. 2014's plain ASI at 19 is covered by the ASI-level table, not a ClassFeature row.
     description: "You gain an Epic Boon feat of your choice (Boon of Dimensional Travel recommended). You can take this feat only once.",
   },
   {
@@ -218,8 +199,7 @@ const SORCERER_BASE_RAW: RawSorcererFeature[] = [
   },
 ];
 
-// PHB'24 calls this subclass "Draconic Sorcery"; the display name stays
-// "Draconic Bloodline" — see the file header.
+// PHB'24 calls this subclass "Draconic Sorcery"; display name stays "Draconic Bloodline" (see file header).
 const DRACONIC_BLOODLINE_SLUG = slug("sorcerer-draconic-bloodline");
 const DRACONIC_BLOODLINE_RAW: RawSorcererFeature[] = [
   {
@@ -230,8 +210,7 @@ const DRACONIC_BLOODLINE_RAW: RawSorcererFeature[] = [
     description:
       "Choose a dragon type (black, blue, brass, bronze, copper, gold, green, red, silver, or white). You gain the ability to speak, read, and write Draconic, and have advantage on Charisma checks when interacting with dragons of that type.",
   },
-  // Dragon Ancestor has no 2024 successor: PHB'24 dropped the ancestor-type
-  // concept from this subclass outright.
+  // Dragon Ancestor has no 2024 successor: PHB'24 dropped the ancestor-type concept from this subclass outright.
   {
     subclassSlug: DRACONIC_BLOODLINE_SLUG,
     name: "Draconic Resilience",
@@ -253,10 +232,7 @@ const DRACONIC_BLOODLINE_RAW: RawSorcererFeature[] = [
     name: "Draconic Spells",
     level: 3,
     edition: "EDITION_2024",
-    // PHB'24 p.148 (SRD 5.2 primary). The spell list is fixed — do not
-    // reintroduce a dragon-type clause (2024 has no Dragon Ancestor). Text
-    // only: SubclassGrantedSpell has no edition column, so grant rows would
-    // leak to 2014 characters.
+    // PHB'24 p.148 (SRD 5.2 primary). Text only — SubclassGrantedSpell has no edition column, so a grant row would leak to 2014 characters; don't reintroduce a dragon-type clause (2024 has no Dragon Ancestor).
     description:
       "You always have certain spells prepared; they don't count against the number of spells you can prepare with Spellcasting: Alter Self, Chromatic Orb, Command, Dragon's Breath (level 3); Fear, Fly (level 5); Arcane Eye, Charm Monster (level 7); Legend Lore, Summon Dragon (level 9).",
   },
@@ -273,9 +249,7 @@ const DRACONIC_BLOODLINE_RAW: RawSorcererFeature[] = [
     name: "Elemental Affinity",
     level: 6,
     edition: "EDITION_2024",
-    // PHB'24 p.148 (SRD 5.2 primary). The damage type is an explicit choice
-    // — 2024 has no Dragon Ancestor to derive it from, so 2014's ancestor
-    // phrasing must not survive into this row.
+    // PHB'24 p.148 (SRD 5.2 primary). Damage type is an explicit choice — 2024 has no Dragon Ancestor to derive it from; don't let 2014's ancestor phrasing leak into this row.
     description:
       "Your draconic magic has an affinity with a damage type associated with dragons. Choose one of those types: Acid, Cold, Fire, Lightning, or Poison. You have Resistance to that damage type, and when you cast a spell that deals damage of that type, you can add your Charisma modifier to one damage roll of that spell.",
   },
@@ -313,22 +287,14 @@ const DRACONIC_BLOODLINE_RAW: RawSorcererFeature[] = [
     name: "Dragon Companion",
     level: 18,
     edition: "EDITION_2024",
-    // PHB'24 p.148 (SRD 5.2 primary). Text only — same SubclassGrantedSpell
-    // edition gap as Draconic Spells above.
+    // PHB'24 p.148 (SRD 5.2 primary). Text only — same SubclassGrantedSpell edition gap as Draconic Spells above.
     description:
       "You can cast Summon Dragon without expending a spell slot, a number of times equal to your Proficiency Bonus, regaining all expended uses when you finish a Long Rest. When you cast it this way, roll the die to randomly determine the dragon's type rather than choosing.",
   },
 ];
 
-// Wild Magic Sorcery is NOT in SRD 5.2 — every 2024 row below is
-// mirror-sourced, not SRD-verified (owner decision, #1232). The two
-// independently-agreeing mirrors: `5etools-mirror-3/5etools-src ::
-// data/class/class-sorcerer.json` filtered to `source: "XPHB"`, and
-// `dnd2024.wikidot.com/sorcerer:wild-magic-sorcery`, which agree verbatim on
-// all five features and levels. (`ASNaeem/dnd2024-wikidot-scrapper` is a
-// scrape of the wikidot source, not an independent mirror.)
-// PHB'24 calls this subclass "Wild Magic Sorcery"; the display name stays
-// "Wild Magic" — see the file header.
+// Wild Magic Sorcery is NOT in SRD 5.2 — every 2024 row below is mirror-sourced, not SRD-verified (owner decision, #1232).
+// PHB'24 calls this subclass "Wild Magic Sorcery"; display name stays "Wild Magic" (see file header).
 const WILD_MAGIC_SLUG = slug("sorcerer-wild-magic");
 const WILD_MAGIC_RAW: RawSorcererFeature[] = [
   {
@@ -365,8 +331,7 @@ const WILD_MAGIC_RAW: RawSorcererFeature[] = [
     name: "Tides of Chaos",
     level: 3,
     edition: "EDITION_2024",
-    // PHB'24 p.149 (mirror-sourced; not in SRD 5.2). The surge roll is a
-    // consequence of the cast-to-recharge, not its trigger.
+    // PHB'24 p.149 (mirror-sourced; not in SRD 5.2). The surge roll is a consequence of the cast-to-recharge, not its trigger.
     description:
       "Before you make a D20 Test, you can gain Advantage on it. Once you do so, you must finish a Long Rest or cast a Sorcerer spell using a spell slot before you can use this feature again — doing the latter automatically triggers a roll on the Wild Magic Surge table.",
     resourceKey: "tidesOfChaos",

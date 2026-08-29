@@ -1,17 +1,3 @@
-// #1233 commit 1: Warlock's EDITION_2014 rows must be byte-identical
-// transcriptions of what lib/classes/warlock.ts's WARLOCK_FEATURES/
-// THE_FIEND_FEATURES/THE_ARCHFEY_FEATURES/THE_GREAT_OLD_ONE_FEATURES said
-// BEFORE this migration — 2014 is a supported edition, not a rewrite target.
-// This snapshot is that pre-change text, pinned by hand from the tree at the
-// commit before #1233 landed, NOT re-derived from anything this migration
-// touches — a hardcoded oracle is the whole point, mirroring
-// barbarian-2014-snapshot.test.ts's/fighter-2014-snapshot.test.ts's shape.
-//
-// This is a GUARD, not a red/green cycle: it is green on first run by
-// construction (WARLOCK_FEATURES is authored as a byte-identical copy in the
-// same commit that adds this file). Its job is to catch commit 2/3 silently
-// editing a 2014 row while authoring 2024 content or moving a pool onto a
-// row — this file must stay green, unedited, from commit 1 through commit 3.
 import { describe, expect, it } from "vitest";
 
 import { WARLOCK_FEATURES } from "../warlock-features.js";
@@ -24,7 +10,6 @@ interface Pinned {
 }
 
 const PRE_CHANGE_2014: Pinned[] = [
-  // ---- Base class --------------------------------------------------------
   {
     subclassSlug: null,
     name: "Pact Magic",
@@ -60,7 +45,6 @@ const PRE_CHANGE_2014: Pinned[] = [
     description:
       "Spend 1 minute entreating your patron to regain all expended Pact Magic spell slots. Once used, you must finish a long rest before you can do so again.",
   },
-  // ---- The Fiend ----------------------------------------------------------
   {
     subclassSlug: "warlock-the-fiend",
     name: "Expanded Spell List",
@@ -95,7 +79,6 @@ const PRE_CHANGE_2014: Pinned[] = [
     description:
       "When you hit a creature with an attack, banish it through the Lower Planes until the start of your next turn. It takes 10d10 psychic damage from the horrors of its brief journey and then returns. Once used, regain on a long rest.",
   },
-  // ---- The Archfey ---------------------------------------------------------
   {
     subclassSlug: "warlock-the-archfey",
     name: "Expanded Spell List",
@@ -131,7 +114,6 @@ const PRE_CHANGE_2014: Pinned[] = [
     description:
       "As an action, plunge a creature within 60 ft into an illusory dreamscape (Wisdom save DC = spell save DC). While charmed or frightened (your choice) it is incapacitated and ignores its surroundings. It repeats the save at the end of each turn, or when it takes damage. Once used, regain on a short or long rest.",
   },
-  // ---- The Great Old One ---------------------------------------------------
   {
     subclassSlug: "warlock-the-great-old-one",
     name: "Expanded Spell List",

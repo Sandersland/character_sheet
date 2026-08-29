@@ -1,11 +1,3 @@
-// #1715 (content slice of epic #1517): shape + cross-check invariants for the
-// Cleric by-class spell bucket. Pure data tests on the array itself — same
-// pattern as spells-2014-shared-data.test.ts (#1713) and
-// spells-2014-wizard-data.test.ts (#1714) — because the DB round-trip (one
-// Spell row per name, SpellClass fan-out, `?class=` resolution) is already
-// proven generically by spell-fork-reseed.test.ts (#1710) and spells.test.ts's
-// SpellClass-join describe blocks (#1711); this file's only job is to prove
-// THIS SLICE'S DATA is correct, not re-prove the plumbing.
 import { describe, expect, it } from "vitest";
 
 import type { CatalogSpell } from "../spells.js";
@@ -15,14 +7,7 @@ import { SHARED_SPELLS_2014 } from "../spells-2014/shared.js";
 
 const CLASS_ROSTER = new Set(["wizard", "cleric", "druid", "bard", "sorcerer", "warlock", "paladin", "ranger"]);
 
-// Forbiddance and Spirit Guardians are this slice's two exceptions to
-// "damageType iff effectKind 'damage'": each one's damage type is a CHOICE
-// made outside the caster picking a fixed value at authoring time —
-// Forbiddance lets the caster pick radiant-or-necrotic every time it's cast,
-// Spirit Guardians resolves to radiant or necrotic based on the caster's
-// alignment — so effectKind is still "damage" (dice are real, fixed values)
-// but damageType is intentionally absent. Mirrors wizard.ts's Chromatic
-// Orb/Fire Shield precedent.
+// Forbiddance and Spirit Guardians resolve their damage type outside authoring time (caster's choice, or caster's alignment), so damageType stays unset despite effectKind "damage".
 const DAMAGE_TYPE_EXCEPTIONS = new Set(["Forbiddance", "Spirit Guardians"]);
 
 function duplicates(names: string[]): string[] {
@@ -37,9 +22,7 @@ function duplicates(names: string[]): string[] {
 
 describe("CLERIC_SPELLS_2014 — row-ownership rule (epic #1517)", () => {
   it("is non-empty and clears a sane floor (the whole point of this slice)", () => {
-    // Not an exact count — future refinement can still add/move rows — but a
-    // regression that silently emptied the array (e.g. a bad merge) must fail
-    // loudly rather than pass an "empty array has no bad rows" vacuous green.
+    // Fails if the array were silently emptied.
     expect(CLERIC_SPELLS_2014.length).toBeGreaterThanOrEqual(40);
   });
 
@@ -122,11 +105,7 @@ describe("CLERIC_SPELLS_2014 — structured-field invariants (mirrors wizard.ts'
   });
 });
 
-// The critical lesson from a prior content slice (CLAUDE.md): a row's
-// STRUCTURED saveEffect must match its own DESCRIPTION prose, or the frontend
-// shows "half on success" text that contradicts (or omits) what the spell
-// actually does. Every damage spell in this file is checked against its own
-// text, not spot-checked.
+// A row's structured saveEffect must match its own description prose, or the frontend shows "half on success" text that contradicts what the spell actually does.
 describe("CLERIC_SPELLS_2014 — saveEffect matches its own description text (field/text mismatch guard)", () => {
   const HALF_ON_SUCCESS = /half as much damage|half damage|half the damage/i;
 
@@ -143,21 +122,8 @@ describe("CLERIC_SPELLS_2014 — saveEffect matches its own description text (fi
   });
 });
 
-// A rules-accuracy pass on the Wizard slice found dnd5eapi's own damage/dc
-// JSON has real gaps (Flaming Sphere, Scorching Ray, Weird — dc/attack_type/
-// damage null despite the prose clearly describing one). This slice hit the
-// same gap class twice (Sanctuary, Spirit Guardians — see cleric.ts's own row
-// comments), so this describe block audits the PROSE directly against every
-// row's structured fields — the same sweep that found those gaps — as a
-// permanent regression guard, not a one-time spot-check.
 describe("CLERIC_SPELLS_2014 — prose-vs-structured-field audit (catches what dnd5eapi's own JSON gaps hid)", () => {
-  // Rows where a save/attack/damage-shaped phrase in the prose is NOT the
-  // row's own primary structured effect — each has its own comment at the row
-  // explaining why (a buff granting advantage on FUTURE saves rather than a
-  // save against this spell itself, a conditional/reactive save, a
-  // self-inflicted drawback, or a multi-branch spell with no single
-  // resolution). Every one of these was individually reviewed, not
-  // bulk-excluded.
+  // Rows where a save/attack/damage-shaped phrase in the prose is NOT the row's own primary structured effect (a future-save buff, a conditional/reactive save, a self-inflicted drawback, or a multi-branch spell).
   const CONDITIONAL_OR_MULTI_EFFECT = new Set([
     "Beacon of Hope", // grants ADVANTAGE on future wisdom/death saves — not a save against this spell
     "Bless", // grants a d4 bonus to a FUTURE attack roll/save — not a save against this spell
@@ -236,13 +202,6 @@ describe("CLERIC_SPELLS_2014 — scraping-artifact guards (same shapes spells-20
   });
 });
 
-// #1746: an audit of every pre-#1717 2014 slice for the same dropped-tail bug
-// PR #1745's review found in Heroism (dnd5eapi's higher_level JSON can be
-// empty despite the real SRD 5.1 text carrying an "At Higher Levels" clause).
-// Ground truth below was cross-checked against 5etools' PHB spell dataset
-// (its entriesHigherLevel field, hand-transcribed from the book): every one
-// of this slice's 41 leveled rows was checked, and none was found missing a
-// genuine upcast clause.
 describe("CLERIC_SPELLS_2014 — no dropped 'At Higher Levels' tail text (dnd5eapi JSON-vs-real-SRD-text gap, #1746)", () => {
   const HAS_AT_HIGHER_LEVELS_TEXT = new Set([
     "Bane",
@@ -280,9 +239,6 @@ function find(name: string): CatalogSpell {
   return s;
 }
 
-// Spot-checks on the trickiest edge cases this slice hand-authored — not
-// exhaustive (46 rows), but enough to catch a transcription or transform
-// regression on the rows most likely to be touched again.
 describe("CLERIC_SPELLS_2014 — value spot-checks", () => {
   it("Sacred Flame: DEX save, no benefit from cover, 1d8 radiant, cantrip-scales", () => {
     const s = find("Sacred Flame");

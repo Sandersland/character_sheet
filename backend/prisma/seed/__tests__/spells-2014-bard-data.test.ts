@@ -1,12 +1,3 @@
-// #1717 (content slice of epic #1517): shape + cross-check invariants for the
-// Bard by-class spell bucket. Pure data tests on the array itself — same
-// pattern as spells-2014-shared-data.test.ts (#1713), spells-2014-wizard-data
-// .test.ts (#1714), spells-2014-cleric-data.test.ts (#1715), and
-// spells-2014-druid-data.test.ts (#1716) — because the DB round-trip (one
-// Spell row per name, SpellClass fan-out, `?class=` resolution) is already
-// proven generically by spell-fork-reseed.test.ts (#1710) and spells.test.ts's
-// SpellClass-join describe blocks (#1711); this file's only job is to prove
-// THIS SLICE'S DATA is correct, not re-prove the plumbing.
 import { describe, expect, it } from "vitest";
 
 import type { CatalogSpell } from "../spells.js";
@@ -83,17 +74,6 @@ describe("BARD_SPELLS_2014 — row-ownership rule (epic #1517)", () => {
 });
 
 describe("BARD_SPELLS_2014 — full PHB'14 Bard membership is complete across all four authoring slices", () => {
-  // The full PHB'14 Bard spell list (117 spells: dnd5eapi.co's
-  // /api/2014/classes/bard/spells enumerates 111; #1719 (Warlock)'s own
-  // manual sweep for spells absent from dnd5eapi found 3 more genuine
-  // PHB'14 Bard spells missing from every slice until it added them to
-  // shared.ts — Cloud of Daggers, Crown of Madness, and Friends, each a
-  // Bard/Sorcerer/Warlock/Wizard 4-list spell; #1742's own non-SRD-3+-list
-  // audit found 3 MORE — Feign Death, Phantasmal Force, and Blade Ward)
-  // partitioned by which slice authors the row. Every name below must carry
-  // "bard" in its classes[] wherever it's actually authored — this test is
-  // the permanent guard that the "already fanned" claim in this file's
-  // header holds.
   const WIZARD_OWNED_BARD_SPELLS = [
     "Hideous Laughter",
     "Identify",
@@ -184,11 +164,6 @@ describe("BARD_SPELLS_2014 — structured-field invariants (mirrors wizard.ts/cl
   });
 });
 
-// The critical lesson from a prior content slice (CLAUDE.md): a row's
-// STRUCTURED saveEffect must match its own DESCRIPTION prose, or the frontend
-// shows "half on success" text that contradicts (or omits) what the spell
-// actually does. Every damage spell in this file is checked against its own
-// text, not spot-checked.
 describe("BARD_SPELLS_2014 — saveEffect matches its own description text (field/text mismatch guard)", () => {
   const HALF_ON_SUCCESS = /half as much damage|half damage|half the damage/i;
 
@@ -205,19 +180,8 @@ describe("BARD_SPELLS_2014 — saveEffect matches its own description text (fiel
   });
 });
 
-// A rules-accuracy pass on the Wizard/Cleric/Druid slices found dnd5eapi's
-// own damage/dc JSON has real gaps (9 rows in Wizard, 2 in Cleric, 1 in
-// Druid — dc/attack_type/damage null despite the prose clearly describing
-// one). This slice found ZERO such gaps (Vicious Mockery's dc/damage JSON
-// was fully populated, and the other 4 owned rows have no damage/attack
-// shape at all), so this describe block audits the PROSE directly against
-// every row's structured fields — the same sweep that found the other
-// slices' gaps — as a permanent regression guard, not a one-time spot-check.
 describe("BARD_SPELLS_2014 — prose-vs-structured-field audit (catches what dnd5eapi's own JSON gaps hid)", () => {
-  // No conditional/multi-effect rows in this 5-row slice — kept as an empty
-  // set (rather than omitting the mechanism) so a future edit to this file
-  // that DOES need an exception follows the same documented-allowlist shape
-  // as wizard.ts/cleric.ts/druid.ts's own audits.
+  // Empty on purpose — keeps the same documented-allowlist shape as wizard.ts/cleric.ts/druid.ts's own audits.
   const CONDITIONAL_OR_MULTI_EFFECT = new Set<string>([]);
 
   it("every row mentioning 'saving throw' has attackType 'save', unless documented as conditional/multi-effect", () => {
@@ -248,21 +212,8 @@ describe("BARD_SPELLS_2014 — prose-vs-structured-field audit (catches what dnd
   });
 });
 
-// PR #1745's review pass found a DIFFERENT bug class than the structured-field
-// audit above catches: dnd5eapi's own JSON can drop a whole trailing sentence
-// (not just a null damage/dc field) — its 2014 Heroism response had
-// higher_level: [] despite real SRD 5.1 genuinely carrying an "At Higher
-// Levels" upcast clause. This is a permanent regression guard against that
-// same class of dropped-tail transcription bug: ground truth below was
-// individually verified against a second source (5thsrd.org, which mirrors
-// the OGL SRD 5.1 text) for all 5 of this slice's owned rows, not just
-// Heroism — future edits to this file must keep this set in sync with
-// whichever rows genuinely have upcast text.
 describe("BARD_SPELLS_2014 — no dropped 'At Higher Levels' tail text (dnd5eapi JSON-vs-real-SRD-text gap, PR #1745 review finding)", () => {
-  // Verified against 5thsrd.org: only Heroism has a real upcast clause among
-  // this slice's 5 owned rows (Enthrall/Compulsion/Glibness genuinely have
-  // none; Vicious Mockery's scaling is the cantrip-scaling sentence, not an
-  // "At Higher Levels" heading).
+  // Only Heroism has real "At Higher Levels" text among this slice's 5 rows (verified against 5thsrd.org) — keep in sync with future edits.
   const HAS_AT_HIGHER_LEVELS_TEXT = new Set(["Heroism"]);
 
   it("every row verified to have real SRD 'At Higher Levels' text actually carries it in its description", () => {
@@ -325,8 +276,6 @@ function find(name: string): CatalogSpell {
   return s;
 }
 
-// Spot-checks on every one of this slice's 5 rows — small enough to be
-// exhaustive rather than a sample.
 describe("BARD_SPELLS_2014 — value spot-checks", () => {
   it("Vicious Mockery: WIS save, no half-on-fail, 1d4 psychic + cantrip scaling — the only owned row with a damage shape", () => {
     const s = find("Vicious Mockery");
@@ -381,9 +330,7 @@ describe("BARD_SPELLS_2014 — value spot-checks", () => {
   });
 
   it("no PHB'14 2024-only Bard addition (e.g. Command, Tasha's Hideous Laughter under Bard) is offered here — this slice authors only genuine 2014 Bard-owned spells", () => {
-    // Command is Cleric/Paladin-only in the 2014 SRD list (dnd5eapi's own
-    // 2014 bard spell list does NOT include it) — a prior slice found a 2014
-    // Bard wrongly offered it. It must not appear anywhere in this file.
+    // Command is Cleric/Paladin-only in the 2014 SRD — never Bard.
     expect(BARD_SPELLS_2014.find((s) => s.name === "Command")).toBeUndefined();
   });
 });

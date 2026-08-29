@@ -1,7 +1,4 @@
-// #1588: Expertise pick-count grantor rows (Rogue/Bard/Ranger/Wizard) — reads
-// the SAME derivedStatFromRows every real character derivation calls
-// (registry.ts's deriveRowExtras), never a hand-rolled re-derivation of the
-// tier table. Modelled on sorcerer-resource-pools.test.ts.
+// Reads the same derivedStatFromRows every real character derivation calls — never a hand-rolled re-derivation of the tier table.
 import { describe, expect, it } from "vitest";
 
 import { derivedStatFromRows } from "@/lib/classes/class-feature-rows.js";

@@ -1,42 +1,15 @@
-// Species trait catalog (#1682, epic #1518, slice 4/8) — pure data, no
-// Prisma, no side effects (same split as species-data.ts's SPECIES; the
-// executable upsert logic lives in seed-species-traits.ts, mirroring
-// species-data.ts/seed-species.ts's own split). DATA MODULE ONLY (#1277 AC 4,
-// scripts/check-seed-data-modules.sh).
+// DATA MODULE ONLY: no Prisma, no side effects (#1277 AC 4).
 //
-// Scope (issue #1682, extended by #1683): the 2014 roster's FULL trait text
-// (SRD 5.1, PHB'14 for subrace-only content) and the 2024 roster's traits,
-// INCLUDING lineage/legacy/ancestry content (Elf lineages, Gnome lineages,
-// Tiefling legacies, Goliath giant ancestry) since #1683 landed. Dragonborn's
-// Draconic Ancestry is authored in BOTH editions here (epic review decision 7
-// — the variant rows themselves are seeded in #1679).
+// The FeatImprovement vocabulary (srd/feats.ts) only expresses maxHp
+// (perLevel), armorProficiency, weaponProficiency, and skillProficiency —
+// there's no resistance/advantageOnSave target, so every such trait (Dwarven
+// Resilience, Fey Ancestry, Hellish Resistance, Trance, …) stays
+// announce-only (`improvements` omitted) by design, not a gap.
 //
-// Derived vs announce-only (owner ruling 2026-08-03, including darkvision —
-// visible information, not a derived combat stat): the targets the existing
-// FeatImprovement vocabulary (srd/feats.ts) can express for a species trait
-// are `maxHp` (perLevel), `armorProficiency`, `weaponProficiency`, and
-// `skillProficiency` (a FIXED skill grant is derivable — base 2014 Elf's Keen
-// Senses rides it, #1754; a skill CHOICE is instead a `choice` spec, e.g. the
-// 2024 Elf's Keen Senses, #1690). There is still no `resistance`/
-// `advantageOnSave` target, so every resistance/advantage/spell/Tool-like
-// trait (Dwarven Resilience, Fey Ancestry, Hellish Resistance, Gnome Cunning,
-// Trance, Mask of the Wild, Sunlight Sensitivity, …) stays announce-only cited
-// text (`improvements` omitted); Darkvision/Superior Darkvision stay
-// announce-only by owner ruling. This is not a content gap — extending the
-// vocabulary is out of scope.
-//
-// Choice-bearing traits: Half-Elf Skill Versatility and High Elf Cantrip carry
-// a real `choice` spec as of #1689 (speciesTraitChoiceSchema, lib/srd/
-// species-trait-choices.ts). The 2024 trio (Human Skillful/Versatile, Elf Keen
-// Senses) carries one too as of #1690 — Skillful/Keen Senses ride the SAME
-// chooseSkills spec (Keen Senses restricted via `from`; Skillful unrestricted),
-// and Versatile is the first row to use the new chooseOriginFeat spec.
-//
-// Level-gated traits (2024 Dragonborn's Draconic Flight at level 5, Aasimar's
-// Radiant Soul/Necrotic Shroud/Celestial Revelation, Goliath's Large Form) are
-// OUT of scope this slice: SpeciesTrait carries no `level` column (unlike
-// ClassFeature), so an always-rendered row would misrepresent a level-gated
-// trait as available from level 1. Left for a future slice that adds gating.
+// SpeciesTrait carries no `level` column (unlike ClassFeature); level-gated
+// traits (Dragonborn's Draconic Flight, Aasimar's Radiant Soul/Necrotic
+// Shroud/Celestial Revelation, Goliath's Large Form) are out of scope until
+// a future slice adds gating.
 import { z } from "zod";
 
 import type { FeatImprovement } from "../../src/lib/classes/resources-state.js";
@@ -52,16 +25,14 @@ export interface SpeciesTraitSeed {
   name: string;
   description: string;
   improvements?: FeatImprovement[];
-  /** #1689: the player-choice mechanic this trait grants (Half-Elf's two
-   *  skills, High Elf's cantrip) — omitted for every fixed-only/announce-only
-   *  trait, the vast majority. */
+  /** The player-choice mechanic this trait grants; omitted for every
+   *  fixed-only/announce-only trait, the vast majority. */
   choice?: SpeciesTraitChoice;
 }
 
-// Validated at seed time (prisma/seed/validate.ts). Reuses featImprovementSchema
-// (lib/srd/feats.ts) — the SAME zod a taken feat's improvements snapshot and a
-// ClassFeature row's improvements column validate against (#1691) — rather
-// than a third declaration. `choice` reuses speciesTraitChoiceSchema the same way.
+// Reuses featImprovementSchema (lib/srd/feats.ts) and speciesTraitChoiceSchema
+// rather than separate declarations — the same zod a feat/ClassFeature's
+// improvements validate against.
 export const speciesTraitSeedSchema = z
   .object({
     speciesSlug: z.string().min(1),
@@ -74,9 +45,9 @@ export const speciesTraitSeedSchema = z
   })
   .strict();
 
-// --- Small composition helpers (mirrors species-data.ts's dragonAncestryVariants
-// — generating repetitive rows in TS is still "content is data": the OUTPUT is
-// a flat SpeciesTraitSeed[], these just keep the boilerplate DRY) ------------
+// Generating rows in TS still counts as content-is-data — the OUTPUT is a
+// flat SpeciesTraitSeed[]; these just keep boilerplate DRY (mirrors
+// species-data.ts's dragonAncestryVariants).
 
 function darkvision(speciesSlug: string, edition: SeedEdition, citation: string, range = 60): SpeciesTraitSeed {
   return {
@@ -119,10 +90,9 @@ function draconicAncestryTrait2014(type: string): SpeciesTraitSeed {
   };
 }
 
-// PHB'24 p. 25: single shared shape choice (cone OR line) and a Dexterity
-// save for every dragon type — the 2014 per-type shape/save fork is gone;
-// damage type per ancestry is unchanged from 2014. Usable proficiency-bonus
-// times per long rest (not "once per rest" like 2014); scales 1d10 -> 4d10.
+// PHB'24 p.25: one shared shape choice (cone or line) and a Dexterity save
+// for every type — the 2014 per-type fork is gone. Usable proficiency-bonus
+// times per long rest; scales 1d10 → 4d10.
 function draconicAncestryTrait2024(type: string): SpeciesTraitSeed {
   const info = DRAGON_TYPE_INFO[type];
   return {
@@ -141,8 +111,6 @@ function draconicAncestryTrait2024(type: string): SpeciesTraitSeed {
 }
 
 const DRAGON_TYPES = Object.keys(DRAGON_TYPE_INFO);
-
-// --- 2014 (SRD 5.1 / PHB'14) --------------------------------------------------
 
 const DWARF_2014: SpeciesTraitSeed[] = [
   darkvision("dwarf", "EDITION_2014", "SRD 5.1 p. 18", 60),
@@ -217,10 +185,8 @@ const ELF_2014: SpeciesTraitSeed[] = [
   {
     speciesSlug: "elf",
     speciesEdition: "EDITION_2014",
-    // Species-level (every 2014 elf variant inherits it, #1754). A FIXED
-    // Perception grant, so a real derived skillProficiency improvement, not
-    // announce-only text — the 2024 Elf's Keen Senses is instead a `choice`
-    // (Insight/Perception/Survival, #1690).
+    // A FIXED Perception grant → derived skillProficiency improvement
+    // (unlike 2024 Elf's Keen Senses, a `choice`).
     name: "Keen Senses",
     description: "You have proficiency in the Perception skill. (SRD 5.1 p. 21)",
     improvements: [{ target: "skillProficiency", amount: 1, key: "perception" }],
@@ -291,17 +257,10 @@ const ELF_2014: SpeciesTraitSeed[] = [
       { target: "weaponProficiency", amount: 1, key: "Hand Crossbows" },
     ],
   },
-  // Astral Elf (#1751) — Spelljammer: Astral Adventurer's Guide, non-SRD, so
-  // cited SJ:AAG (not SRD/PHB). Astral Fire is a real chooseCantrip choice
-  // (#1756) — its cantrip + casting-ability pick; Astral Trance's per-rest
-  // skill/tool pick remains announce-only (a per-rest, not creation-time,
-  // choice). Neither is a creation-time FeatImprovement. Keen Senses is NOT
-  // re-declared here: the base Elf's own species-level Keen Senses is a fixed
-  // skillProficiency:perception grant (SRD 5.1 p. 21, #1754) that renders for
-  // this variant exactly the way base Darkvision/Fey Ancestry do
-  // (buildSpeciesTraitsView collects every species-level row), so an
-  // astral-specific row would ship a duplicate. Astral Trance supersedes the
-  // base Trance the way Drow's Superior Darkvision supersedes base Darkvision.
+  // Spelljammer: Astral Adventurer's Guide (non-SRD) — cited SJ:AAG below
+  // (#1751). Keen Senses is NOT re-declared here: buildSpeciesTraitsView
+  // collects every species-level row, so the base Elf's Keen Senses already
+  // renders for this variant; an astral-specific row would duplicate it.
   {
     speciesSlug: "elf",
     speciesEdition: "EDITION_2014",
@@ -309,10 +268,10 @@ const ELF_2014: SpeciesTraitSeed[] = [
     name: "Astral Fire",
     description:
       "You know one cantrip of your choice from Dancing Lights, Light, or Sacred Flame. Intelligence, Wisdom, or Charisma is your spellcasting ability for it (choose when you select this species). (SJ:AAG p. 10)",
-    // #1756: an explicit 3-cantrip list with a player-chosen casting ability —
-    // resolveSpeciesCantripGrant validates the pick against `spells`, and
-    // chooseCantripNeedsPlayerAbility keys the required Int/Wis/Cha choice off
-    // the absent castingAbility.
+    // Explicit 3-cantrip list with a player-chosen ability —
+    // resolveSpeciesCantripGrant validates against `spells`;
+    // chooseCantripNeedsPlayerAbility keys the ability choice off the
+    // absent castingAbility.
     choice: { chooseCantrip: { spells: ["Dancing Lights", "Light", "Sacred Flame"] } },
   },
   {
@@ -434,9 +393,8 @@ const HALF_ORC_2014: SpeciesTraitSeed[] = [
   {
     speciesSlug: "half-orc",
     speciesEdition: "EDITION_2014",
-    // A fixed Intimidation grant, so a real derived skillProficiency
-    // improvement, not announce-only text (SRD 5.1 p. 26, #1762 — the same
-    // pattern as base 2014 Elf's Keen Senses, #1754).
+    // A FIXED Intimidation grant → derived skillProficiency improvement
+    // (same pattern as Elf's Keen Senses, #1762).
     name: "Menacing",
     description: "You gain proficiency in the Intimidation skill. (SRD 5.1 p. 26)",
     improvements: [{ target: "skillProficiency", amount: 1, key: "intimidation" }],
@@ -483,10 +441,6 @@ const SPECIES_TRAITS_2014: SpeciesTraitSeed[] = [
   ...TIEFLING_2014,
   // Human (SRD 5.1 p. 31): no traits beyond the ability score increase — no rows.
 ];
-
-// --- 2024 (SRD 5.2 / PHB'24), non-lineage traits only -------------------------
-// Elf/Gnome/Tiefling lineage-legacy variants and Goliath's giant ancestry are
-// #1683's scope; only their species-level (non-lineage) traits land here.
 
 const AASIMAR_2024: SpeciesTraitSeed[] = [
   darkvision("aasimar", "EDITION_2024", "SRD 5.2 p. 12", 60),
@@ -568,13 +522,9 @@ const ELF_2024_BASE: SpeciesTraitSeed[] = [
   },
 ];
 
-// #1683: Elf Lineages (SRD 5.2 p. 24-25) — each grants a Level 1 benefit plus
-// two more spells at character levels 3 and 5, always-prepared and gated by
-// the SpeciesGrantedSpell rows in species-granted-spells-data.ts. Every
-// lineage's spells share ONE spellcasting ability, chosen from Intelligence,
-// Wisdom, or Charisma when the lineage is picked (#1683's casting-ability
-// picker) — the trait text below is announce-only; the actual grants/ability
-// resolve through deriveGrantedSpells.
+// SRD 5.2 p.24-25. Trait text here is announce-only — actual spell grants
+// are gated by species-granted-spells-data.ts and resolved through
+// deriveGrantedSpells.
 const ELF_LINEAGES_2024: SpeciesTraitSeed[] = [
   {
     speciesSlug: "elf",
@@ -626,9 +576,8 @@ const GNOME_2024_BASE: SpeciesTraitSeed[] = [
   },
 ];
 
-// #1683: Gnomish Lineages (SRD 5.2 p. 30-31) — no leveled spell track (unlike
-// the Elf lineages, both grants land at level 1 only), but the SAME
-// player-chosen Intelligence/Wisdom/Charisma casting-ability trait.
+// SRD 5.2 p.30-31 — no leveled spell track (both grants land at level 1),
+// but the same player-chosen casting-ability mechanic as the Elf lineages.
 const GNOME_LINEAGES_2024: SpeciesTraitSeed[] = [
   {
     speciesSlug: "gnome",
@@ -648,9 +597,8 @@ const GNOME_LINEAGES_2024: SpeciesTraitSeed[] = [
   },
 ];
 
-// #1683: the Giant Ancestry table (SRD 5.2 p. 32) — six non-spell benefits,
-// usable a number of times equal to proficiency bonus per long rest. No
-// SpeciesGrantedSpell rows (none of the six casts a spell).
+// SRD 5.2 p.32 Giant Ancestry table — no SpeciesGrantedSpell rows (none of
+// the six casts a spell).
 const GOLIATH_ANCESTRY_2024: SpeciesTraitSeed[] = [
   {
     speciesSlug: "goliath",
@@ -788,11 +736,9 @@ const TIEFLING_2024_BASE: SpeciesTraitSeed[] = [
   },
 ];
 
-// #1683: Fiendish Legacies (SRD 5.2 p. 47-48) — each grants a damage
-// resistance plus a cantrip/1st-level spell at level 1, a 2nd-level spell at
-// level 3, and a 3rd-level spell at level 5, gated by the SpeciesGrantedSpell
-// rows in species-granted-spells-data.ts. Same player-chosen Int/Wis/Cha
-// casting ability as the Elf/Gnome lineages above.
+// SRD 5.2 p.47-48. Gated by species-granted-spells-data.ts's
+// SpeciesGrantedSpell rows, same player-chosen casting ability as the
+// Elf/Gnome lineages above.
 const TIEFLING_LEGACIES_2024: SpeciesTraitSeed[] = [
   {
     speciesSlug: "tiefling",
