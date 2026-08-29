@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createCharacter } from "@/lib/character/character-create.js";
+import { createCharacter } from "@/lib/character/create/index.js";
 import type { CreateCharacterBody } from "@/lib/character/character-schemas.js";
 
 describe("createCharacter defensive guards", () => {

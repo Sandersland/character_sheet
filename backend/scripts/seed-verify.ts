@@ -187,7 +187,7 @@ async function createCharacter(
       abilityScores: { strength: 15, dexterity: 14, constitution: 13, intelligence: 12, wisdom: 10, charisma: 8 },
       // No `startingEquipment` (#1506, live pre-existing break found here):
       // `mode: "gold"` is a 2014-only path now — PHB'24 has no roll-for-gold
-      // rule at all (character-create.ts's resolveStartingGold), so a
+      // rule at all (lib/character/create/equipment.ts's resolveStartingGold), so a
       // hardcoded gold-mode body 400s for EVERY EDITION_2024 class, not just
       // some. `mode: "package"` needs a per-class optionIndex/openPicks plan
       // this script has no reason to carry — omitting the field entirely
@@ -291,7 +291,7 @@ async function main() {
   // ref.classes is already scoped to EDITION (loadReference's ?edition=), so
   // pickClassChoice's subclasses[0].id below can only ever resolve a
   // same-edition subclassId — a 2014 character can never be created with a
-  // 2024 subclassId (#1506; crossEditionRejection would 400 it, character-create.ts).
+  // 2024 subclassId (#1506; crossEditionRejection would 400 it, in resolveSubclass).
   const ref = await loadReference(cookie);
   const { classChoice } = pickClassChoice(ref.classes);
   const charId = await createCharacter(cookie, ref, classChoice);

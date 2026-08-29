@@ -97,7 +97,7 @@ fi
 #   backend/src/lib/srd/spellcasting-tables.ts             # EXEMPTED pending #1529 (class-name-keyed spellcasting tables)
 #   backend/src/lib/classes/channel-divinity.ts            # PERMANENT: shared Cleric+Paladin dispatch table (#419)
 #   backend/src/lib/combat/rest.ts                         # PERMANENT: Pact Magic short-rest recharge rule fn
-#   backend/src/lib/character/character-create.ts          # No destination column yet: Magic Initiate class-by-background map
+#   backend/src/lib/character/create/background-grants.ts  # No destination column yet: Magic Initiate class-by-background map
 #   frontend/src/features/entities/CampaignItemFields.tsx  # PERMANENT: UI placeholder copy, not rule code
 #   frontend/src/lib/spellList.ts                          # Debt: tracked frontend rule mirror (#1383)
 #   backend/src/lib/character/character-serialize.ts       # PERMANENT: Stunning Strike/Open Hand Technique/Quivering Palm rider assembly, scoped to their own class entry (#1337)
@@ -130,7 +130,7 @@ backend/src/lib/srd/advancement-slots.ts
 backend/src/lib/srd/spellcasting-tables.ts
 backend/src/lib/classes/channel-divinity.ts
 backend/src/lib/combat/rest.ts
-backend/src/lib/character/character-create.ts
+backend/src/lib/character/create/background-grants.ts
 frontend/src/features/entities/CampaignItemFields.tsx
 frontend/src/lib/spellList.ts
 backend/src/lib/character/character-serialize.ts

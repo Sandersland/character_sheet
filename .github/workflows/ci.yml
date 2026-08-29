@@ -198,7 +198,7 @@ jobs:
       #     untested cyc-4 helper (seed.ts, customLogLevel sit at exactly 20.0);
       #     25 still bans untested cyc≥5. Next notch to 20 needs branch tests
       #     for resolveSubclass (21.2) and validateToolChoices (20.1) in
-      #     character-create.ts. A new backend function in the 16–20 cyclomatic
+      #     create/selections.ts. A new backend function in the 16–20 cyclomatic
       #     band passes the local pre-commit audit (config bars) and fails only
       #     here — required check, so it still can't merge.
       # The coverage artifact was generated in this same runner (identical

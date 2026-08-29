@@ -83,7 +83,7 @@ function collectCatalogNames(rows: readonly { package: PackageTree }[]): string[
   return rows.flatMap((row) => row.package.groups.flatMap(catalogNamesInGroup));
 }
 
-// resolveFixedItems (character-create.ts) looks a catalogName up against Pack
+// resolveFixedItems (lib/character/create/equipment.ts) looks a catalogName up against Pack
 // FIRST, then Item — so a catalogName is valid if it resolves against EITHER
 // catalog. All seven packs also exist as ITEMS rows today (#1533 [R4]), so an
 // Item-only check would pass by luck and only diverge the first time they do.

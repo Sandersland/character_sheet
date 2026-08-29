@@ -173,7 +173,7 @@ describe("2014 subclass gate — seeded Cleric (gate 1) and Wizard (gate 2), #13
   });
 });
 
-// character-create.ts's resolveSubclass gates through subclassGateLevel(..., edition) — a brand-new character is always level 1, so this governs whether a subclassId may be supplied at creation.
+// resolveSubclass gates through subclassGateLevel(..., edition) — a brand-new character is always level 1, so this governs whether a subclassId may be supplied at creation.
 describe("character creation subclass gate (#1308)", () => {
   it("rejects a Life Domain subclassId at creation for a 2024 Cleric (gate 3, not creation)", async () => {
     const anchor = await seededSpeciesAnchor("EDITION_2024");

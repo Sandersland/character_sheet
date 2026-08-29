@@ -11,7 +11,7 @@ import { makeCatalogEntry } from "@/test-support/catalog-entry.js";
 import { upsertEditionRow } from "@/lib/rules/catalog-edition.js";
 import { applyInventoryOperations, revertInventoryEvent } from "@/lib/inventory/inventory.js";
 import { awardCampaignItem, revokeCampaignItem } from "@/lib/campaign/campaign-item-award.js";
-import { createCharacter } from "@/lib/character/character-create.js";
+import { createCharacter } from "@/lib/character/create/index.js";
 import { applyHitPointOperations } from "@/lib/combat/hitpoints.js";
 import { applySpellcastingOperations } from "@/lib/spellcasting/spellcasting.js";
 import { revertBatch } from "@/lib/activity/activity.js";

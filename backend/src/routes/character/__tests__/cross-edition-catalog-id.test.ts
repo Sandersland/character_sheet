@@ -232,7 +232,7 @@ describe("Chunk 2 — Subclass / class.setSubclass (lib/classes/class.ts:83)", (
   });
 });
 
-describe("Chunk 3 — Subclass / character-create.resolveSubclass (lib/character/character-create.ts:167)", () => {
+describe("Chunk 3 — Subclass / resolveSubclass (lib/character/create/selections.ts)", () => {
   const CLASS_NAME = "XEd Cleric";
   const SUB_2014 = "XEd Domain 2014";
   const SUB_2024 = "XEd Domain 2024";

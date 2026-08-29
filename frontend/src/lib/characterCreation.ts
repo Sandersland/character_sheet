@@ -105,7 +105,7 @@ function isValidFloatingSpread(assignment: Partial<Record<AbilityName, number>>)
   return isValidSpread(Object.values(assignment));
 }
 
-// Mirrors resolveSpeciesGrants/resolveChosenIncreases in character-create.ts — eligible abilities exclude anything already fixed, and choose wins over floating.
+// Mirrors resolveSpeciesGrants/resolveChosenIncreases — eligible abilities exclude anything already fixed, and choose wins over floating.
 function splitSpeciesIncreases(specs: AbilityIncreaseSpec[]): {
   fixed: Partial<Record<AbilityName, number>>;
   choice: SpeciesAbilityChoice | null;
@@ -384,7 +384,7 @@ export function buildCreatePayload(
     variantId: draft.variantId || undefined,
     // Only sent when the choice is completed — a fixed-only species sends undefined; the backend 400s a speciesAbilities it didn't ask for (#1681).
     speciesAbilities: completedSpeciesAbilities(speciesBonuses),
-    // Only sent when completed — the backend 400s a castingAbility it didn't ask for (resolveCastingAbility, character-create.ts) (#1683).
+    // Only sent when completed — the backend 400s a castingAbility it didn't ask for (resolveCastingAbility) (#1683).
     castingAbility: completedCastingAbility(castingAbilityChoice),
     speciesSkills: completedSpeciesSkills(speciesSkillChoice),
     speciesCantripId: completedSpeciesCantripId(speciesCantripChoice),
