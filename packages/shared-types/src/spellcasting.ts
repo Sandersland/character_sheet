@@ -1,18 +1,4 @@
-// Spellcasting transaction-op wire types — the single source of truth shared by
-// the backend `applySpellcastingOperations` dispatcher and the frontend client
-// (#820, pattern-setter family). Both tiers re-export the consumed names from
-// their existing public surfaces (the modules owning `applySpellcastingOperations`
-// / `normalizeSpellcastingMutable` on the backend, the frontend `Spell` types
-// barrel) so downstream importers are unaffected.
-//
-// Only types consumed by name elsewhere are exported; an op that appears solely
-// as a union member (dropConcentration — handled by `op.type` narrowing, never
-// named) stays module-private, keeping the package clean under the repo's
-// zero-dead-export gate. Add an `export` when a caller first needs one.
-//
-// Where the two hand-mirrors had drifted, the tighter literal unions win: the
-// backend only ever read these fields into wider `string` targets, so narrowing
-// is safe there, while the frontend keeps its exhaustiveness.
+// DropConcentrationOperation stays unexported (reached only via the union) to keep the package clean under the zero-dead-export gate.
 
 export type SpellSchool =
   | "abjuration"
@@ -24,7 +10,6 @@ export type SpellSchool =
   | "necromancy"
   | "transmutation";
 
-/** Spell verbal/somatic/material component flags + optional material text. */
 export interface SpellComponents {
   verbal: boolean;
   somatic: boolean;
@@ -32,16 +17,14 @@ export interface SpellComponents {
   materialDescription?: string;
 }
 
-// Where an applied spell effect lands: the caster, or a consenting ally's sheet
-// (#462). Structurally identical to the backend's CastTarget alias, so the
-// dispatcher forwards `apply.target` to castAbilityInTx unchanged.
+// Structurally identical to the backend's CastTarget alias — the dispatcher forwards `apply.target` to castAbilityInTx unchanged.
 type SpellApplyTarget = "self" | { characterId: string };
 
 /**
- * Cast a spell. For leveled spells `slotLevel` must be >= spell.level with a slot
- * available; cantrips skip slot expenditure. `roll` is the client-computed effect
- * total (0 for utility). `apply` optionally lands the rolled effect in the same
- * atomic batch (self, or an ally's sheet — healing only); omitted for enemies.
+ * For leveled spells `slotLevel` must be >= spell.level with a slot available;
+ * cantrips skip slot expenditure. `roll` is the client-computed effect total
+ * (0 for utility). `apply` optionally lands the rolled effect in the same
+ * atomic batch — self or a consenting ally's sheet (healing only); never an enemy.
  */
 export interface CastSpellOperation {
   type: "castSpell";
@@ -51,10 +34,7 @@ export interface CastSpellOperation {
   apply?: { target: SpellApplyTarget; kind: "heal" | "damage"; amount: number };
 }
 
-/**
- * Cast a spell granted by a held magic item (#528). `entryId` is the derived
- * `item:<inventoryItemId>:<spellId>` seam; spends the item's own resource.
- */
+/** `entryId` is the derived `item:<inventoryItemId>:<spellId>` seam; spends the item's own resource. */
 export interface CastItemSpellOperation {
   type: "castItemSpell";
   entryId: string;
@@ -74,7 +54,7 @@ export interface RestoreSlotOperation {
   level: number;
 }
 
-/** Wizard Arcane Recovery: recover expended slots on a short rest, once per long rest (#904). */
+/** Wizard Arcane Recovery: recover expended slots on a short rest, once per long rest. */
 export interface ArcaneRecoveryOperation {
   type: "arcaneRecovery";
   slots: { level: number; count: number }[];
@@ -109,17 +89,13 @@ interface DropConcentrationOperation {
   type: "dropConcentration";
 }
 
-/** Dismiss an active while-active spell buff by its spell entry id (#363). */
+/** Dismiss an active while-active spell buff by its spell entry id. */
 export interface DismissBuffOperation {
   type: "dismissBuff";
   entryId: string;
 }
 
-/**
- * Sorcerer Font of Magic (#903): convert sorcery points into a spell slot at the
- * 5e cost table, or expend a spell slot to gain SP equal to its level. Mutates
- * the SP pool (resources) and the slot state (spellcasting) atomically.
- */
+/** Sorcerer Font of Magic — mutates the SP pool (resources) and slot state (spellcasting) atomically. */
 export interface ConvertSorceryPointsOperation {
   type: "convertSorceryPoints";
   direction: "toSlot" | "toSorceryPoints";

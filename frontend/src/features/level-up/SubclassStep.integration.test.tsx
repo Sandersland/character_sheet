@@ -27,9 +27,7 @@ const planMock = vi.mocked(fetchLevelUpPlan);
 const refMock = vi.mocked(fetchReference);
 const submitMock = vi.mocked(submitLevelUp);
 
-// hitPoints/hitDice/abilityScores present because step 1 is the real HitPointsStep (#887).
-// resources/advancements present because the real ChoiceStep (maneuvers) reads
-// resources.maneuversKnown to filter already-known options (#1323 C1).
+// hitPoints/hitDice/abilityScores are needed because step 1 is the real HitPointsStep (#887); resources/advancements because ChoiceStep (maneuvers) reads resources.maneuversKnown (#1323 C1).
 const character = {
   id: "c1",
   rulesEdition: "EDITION_2024",
@@ -42,9 +40,7 @@ const character = {
   hitDice: { die: "d10", total: 2 },
 } as unknown as Character;
 
-// artisanTools is read by the toolProficiency choice config even though this
-// suite doesn't reach that step — ChoiceStep's own factory returns only
-// artisanTools and would break SubclassStep, which needs classes/subclasses.
+// artisanTools is required even unused here — ChoiceStep's own factory returns only artisanTools and would break SubclassStep, which needs classes/subclasses.
 const fighterReference = {
   races: [],
   backgrounds: [],
@@ -61,11 +57,7 @@ const fighterReference = {
   ],
 } as unknown as ReferenceData;
 
-// The server re-plans around a pending subclass pick: choosing Battle Master
-// inserts a maneuvers step (built by #896) between subclass and review.
-// Keyed on the actual id (#1323 vacuity hazard) — Champion must NOT also
-// insert the maneuvers step, or a "switch to Champion" leg exercises the
-// wrong plan and the round-trip test proves nothing.
+// #1323 vacuity hazard: Champion must NOT also insert the maneuvers step, or a "switch to Champion" leg exercises the wrong plan and the round-trip test proves nothing.
 function planFor(subclassId: string | undefined): LevelUpPlanResponse {
   const subclass = subclassId === "bm" ? "Battle Master" : subclassId === "champ" ? "Champion" : null;
   return {
@@ -78,8 +70,7 @@ function planFor(subclassId: string | undefined): LevelUpPlanResponse {
   };
 }
 
-// LevelUpCeremony reads useCurrentCharacter(), so every render seeds the
-// cache and mounts CurrentCharacterProvider via renderWithCharacter.
+// LevelUpCeremony reads useCurrentCharacter(), so renderWithCharacter must seed the cache and mount CurrentCharacterProvider.
 function renderCeremony() {
   return renderWithCharacter(
     <MemoryRouter initialEntries={["/characters/c1/level-up"]}>
@@ -135,7 +126,6 @@ describe("SubclassStep in the ceremony", () => {
 
     await waitFor(() => expect(planMock).toHaveBeenCalledWith("c1", expect.anything(), "bm"));
 
-    // Rail grew from 3 to 4 steps; player is still on the subclass step (step 2).
     await waitFor(() => expect(screen.getByText("Step 2 of 4")).toBeInTheDocument());
     const railLabels = screen.getAllByRole("listitem").map((li) => li.getAttribute("aria-label"));
     expect(railLabels).toEqual([
@@ -147,10 +137,7 @@ describe("SubclassStep in the ceremony", () => {
     expect(screen.getByRole("radio", { name: "Battle Master" })).toHaveAttribute("aria-checked", "true");
   });
 
-  // #1323: the headline end-to-end case — maneuvers picked under Battle
-  // Master must survive a detour to Champion and back, and never appear
-  // stashed on the wire (AC 5/6 — nothing weaker than this test satisfies them,
-  // since the stash here is genuinely non-empty across two visited subclasses).
+  // #1323 AC 5/6: maneuvers picked under Battle Master must survive a detour to Champion and back, and never appear stashed on the wire.
   it("keeps maneuvers picked under Battle Master when the player switches away and back", async () => {
     renderCeremony();
     const user = userEvent.setup();
@@ -168,7 +155,6 @@ describe("SubclassStep in the ceremony", () => {
 
     await user.click(screen.getByRole("button", { name: /back/i }));
     await user.click(await screen.findByRole("radio", { name: "Champion" }));
-    // Champion carries no dependent steps — rail shrinks back to 3.
     await waitFor(() => expect(screen.getByText("Step 2 of 3")).toBeInTheDocument());
 
     await user.click(await screen.findByRole("radio", { name: "Battle Master" }));
@@ -189,8 +175,7 @@ describe("SubclassStep in the ceremony", () => {
       { type: "learnManeuver", maneuverId: "m1" },
       { type: "learnManeuver", maneuverId: "m2" },
     ]);
-    // Object.keys, not toHaveBeenCalledWith: vitest's argument matcher uses
-    // toEqual semantics, which treats a present-but-undefined key as absent.
+    // Object.keys, not toHaveBeenCalledWith: vitest's argument matcher uses toEqual semantics, treating a present-but-undefined key as absent.
     expect(Object.keys(body)).not.toContain("dependentPicksBySubclass");
   });
 });

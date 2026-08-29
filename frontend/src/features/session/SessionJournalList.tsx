@@ -2,7 +2,6 @@ import MentionText from "@/features/journal/MentionText";
 import { formatJournalDate } from "@/lib/formatJournalDate";
 import type { CampaignEntity, JournalEntry } from "@/types/character";
 
-// Read-only note row: body inline (with @-mention chips) alongside its date.
 // NOTE rows have no title, so there's nothing to collapse behind.
 function JournalEntryRow({
   entry,

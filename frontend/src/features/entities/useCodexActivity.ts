@@ -3,8 +3,7 @@ import { useEffect, useState } from "react";
 import { fetchEntities, fetchEntityActivity } from "@/api/client";
 import type { CampaignEntity, CodexActivityItem } from "@/types/character";
 
-// Data for the activity rail (#841). Deliberately does NOT prime the shared
-// useCampaignEntities cache: its plain-list primes would clobber our stats.
+// Deliberately doesn't prime the shared useCampaignEntities cache — its plain-list primes would clobber our stats.
 export function useCodexActivity(campaignId: string) {
   const [statsEntities, setStatsEntities] = useState<CampaignEntity[]>([]);
   const [activity, setActivity] = useState<CodexActivityItem[]>([]);

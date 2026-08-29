@@ -1,20 +1,3 @@
-/**
- * CloakOfShadowsSection — the monk's self-invisible activation inside
- * ClassFeaturesSection. Shared by both editions (#1738): a 2024 Warrior of
- * Shadow's version is gated at L17 (3 focus, 1 minute, frees Flurry of
- * Blows), a 2014 Way of Shadow's is gated at L11 (no ki cost, no duration
- * cap — ends only on attack/cast/bright light). Neither shape is hardcoded
- * here: cloakOfShadowsView resolves the description and the affordability
- * gate entirely off the character's own "cloakOfShadows" `availableActions`
- * row (`reminder` + `enabled`/`disabledReason`), which the backend already
- * computes per edition (actions.ts) — this component never re-derives a
- * focus/ki cost.
- * Activation posts an activateCloakOfShadows op through the shadow-arts
- * transaction path (backend pays the edition-correct cost + self-applies
- * invisible atomically). Breaking (attack / cast a spell / bright light) is
- * manual: the player clears the condition from the Conditions section.
- */
-
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { cloakOfShadowsView } from "@/lib/cloakOfShadows";
 
@@ -25,6 +8,8 @@ interface Props {
 
 export default function CloakOfShadowsSection({ busy, onActivate }: Props) {
   const { character } = useCurrentCharacter();
+  // Resolves the description and affordability gate entirely off the character's
+  // own "cloakOfShadows" availableActions row; never re-derives a focus/ki cost here.
   const view = cloakOfShadowsView(character);
 
   return (

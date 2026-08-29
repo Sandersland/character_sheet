@@ -1,10 +1,8 @@
-/**
- * Context boundary between PreferencesProvider (owns the reconcile-on-login +
- * mirror-to-localStorage logic, #1178) and the three preference hooks that
- * consume it. A dependency-free leaf — owns the UserPreferences/
- * ThemePreference/DiceRollStyle types itself so nothing that depends on it can
- * cycle back; the hooks and AuthUser re-export those types from here.
- */
+// Context boundary between PreferencesProvider (owns the reconcile-on-login
+// + mirror-to-localStorage logic) and the three preference hooks that
+// consume it. A dependency-free leaf — owns the UserPreferences/
+// ThemePreference/DiceRollStyle types itself so nothing that depends on it
+// can cycle back; the hooks and AuthUser re-export those types from here.
 import { createContext, useContext } from "react";
 
 export type ThemePreference = "light" | "dark" | "system";
@@ -54,19 +52,15 @@ const NO_SYNC: PreferencesContextValue = {
   sync: { saving: {}, errors: {} },
 };
 
-/**
- * Outside a PreferencesProvider (isolated component/hook tests, or a stray
- * render before App's provider tree mounts) this degrades to pure
- * localStorage with no sync — `synced` stays undefined, `setPreference` is a
- * no-op that can never fail, and `sync` reports every key idle, matching
- * pre-#1178 behavior.
- */
+// Outside a PreferencesProvider (isolated component/hook tests, or a stray
+// render before App's provider tree mounts) this degrades to pure
+// localStorage with no sync — `synced` stays undefined, `setPreference` is a
+// no-op that can never fail, and `sync` reports every key idle.
 export function usePreferencesSync(): PreferencesContextValue {
   const ctx = useContext(PreferencesContext);
   return ctx ?? NO_SYNC;
 }
 
-/** One key's in-flight/error state, for a component that renders a single sync note. */
 export function usePreferenceSync(
   key: PreferenceKey,
 ): { saving: boolean; error: string | null; retry: (() => void) | null } {

@@ -7,9 +7,8 @@ import { renderWithCharacter } from "@/test/renderWithCharacter";
 import { seedItemRarities } from "@/test/rarities";
 import type { Character, InventoryItem } from "@/types/character";
 
-// equippable/allowedSlots/proficient are served per row (#1433) — the fixtures
-// set them rather than letting the component re-derive from category/twoHanded,
-// which is exactly the behaviour this suite now pins.
+// equippable/allowedSlots/proficient are served per row (#1433) — fixtures
+// set them rather than letting the component re-derive from category/twoHanded.
 function item(overrides: Partial<InventoryItem> = {}): InventoryItem {
   return {
     id: "i",
@@ -65,7 +64,7 @@ const ring = (o: Partial<InventoryItem> = {}) => item({ category: "gear", slot: 
 
 // LoadoutList resolves rarity labels through useItemRarities(character
 // .rulesEdition) (#1437), so the fixture carries an edition and every render
-// seeds that edition's reference cache.
+// seeds that edition's reference cache via seedItemRarities.
 function makeCharacter(inventory: InventoryItem[], over: Partial<Character> = {}): Character {
   return {
     id: "char-1",
@@ -82,8 +81,6 @@ function makeCharacter(inventory: InventoryItem[], over: Partial<Character> = {}
   } as unknown as Character;
 }
 
-// LoadoutList reads useCurrentCharacter(), so every render seeds the cache and
-// mounts CurrentCharacterProvider via renderWithCharacter.
 function renderList(
   inventory: InventoryItem[],
   onSubmit = vi.fn().mockResolvedValue(undefined),

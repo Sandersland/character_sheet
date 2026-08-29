@@ -11,8 +11,6 @@ vi.mock("@/features/dice/DiceRoller", () => ({
   default: () => <div data-testid="dice-roller" />,
 }));
 
-// Deterministic stand-in for the quick path's roll — the real engine is
-// exercised by lib/dice's own tests.
 vi.mock("@/lib/dice", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/dice")>();
   return {
@@ -41,7 +39,6 @@ describe("HpDiceReveal", () => {
       </DiceRollStyleProvider>,
     );
 
-    // Suspense-lazy even when the child is mocked, so the mount is async.
     expect(await screen.findByTestId("dice-roller")).toBeInTheDocument();
   });
 

@@ -1,5 +1,3 @@
-// #1689: SpeciesSkillSection (Half-Elf's Skill Versatility) — mirrors
-// SkillSection's own checkbox-grid shape and render-or-not contract.
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";

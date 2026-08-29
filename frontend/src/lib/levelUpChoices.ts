@@ -1,9 +1,4 @@
-// Data-only wiring for the ceremony's Choose-N steps (#896): a config maps a
-// shared UI (ChoiceStep) to its catalog source, the character's already-known
-// set, and the draft field it writes. Three kinds have one config each
-// (CHOICE_KIND_CONFIGS); the repeatable subclassChoice kind resolves PER STEP
-// via choiceConfigForStep, since one draft array (subclassChoices) is shared
-// by several steps keyed on meta.key (a Hunter Ranger's four tiers, e.g.). No JSX.
+// The repeatable subclassChoice kind resolves PER STEP via choiceConfigForStep, since one draft array (subclassChoices) is shared by several steps keyed on meta.key (a Hunter Ranger's four tiers, e.g.).
 
 import { fetchFeats, fetchManeuvers, fetchReference, fetchSubclassChoiceOptions } from "@/api/client";
 import type { LevelUpDraft } from "@/lib/levelUpSteps";
@@ -14,40 +9,25 @@ export interface ChoiceOption {
   id: string;
   name: string;
   description?: string;
-  /** Short gate label rendered after the name, e.g. "L3+". */
   tag?: string;
 }
 
 export interface ChoiceLoadContext {
-  /** Post-level-up class level (LevelUpPlanResponse.target.newLevel), for gates keyed on it. */
+  // Corresponds to LevelUpPlanResponse.target.newLevel.
   targetLevel: number;
-  /** The advancing character's edition — every catalog fetch below is edition-scoped (#1325, #1412). */
+  // Every catalog fetch below is edition-scoped.
   edition: RulesEdition;
-  /**
-   * The character's own class names plus the level-up target's className
-   * (#1495) — fed straight through to fetchFeats' class-scope gate. Only
-   * fightingStyleFeat reads this; maneuvers/toolProficiency/subclassChoice
-   * ignore it.
-   */
+  // Fed straight through to fetchFeats' class-scope gate. Only fightingStyleFeat reads this.
   classNames?: string[];
-  /**
-   * The character's proficient skills (id = skill key, name via skillLabel —
-   * CLAUDE.md: never render a raw skill key) (#1588). Only `expertise` reads
-   * this: unlike every other kind, its option list has no catalog fetch — the
-   * character's own proficient-skill set IS the catalog.
-   */
+  // Only `expertise` reads this: its option list has no catalog fetch — the character's own proficient-skill set IS the catalog.
   proficientSkills?: ChoiceOption[];
 }
 
 export interface ChoiceKindConfig {
   loadOptions(ctx: ChoiceLoadContext): Promise<ChoiceOption[]>;
-  /** Ids the character already owns — excluded from the picker. */
   fromCharacter(character: Character): Set<string>;
-  /** Currently-selected ids in the draft. */
   selected(draft: LevelUpDraft): string[];
-  /** Draft patch that replaces this kind's selection with `ids`. */
   select(draft: LevelUpDraft, ids: string[]): Partial<LevelUpDraft>;
-  /** Single-select kinds (fightingStyleFeat) render radio-style and write one op. */
   single?: boolean;
 }
 
@@ -69,9 +49,7 @@ const maneuvers: ChoiceKindConfig = {
 
 const fightingStyleFeat: ChoiceKindConfig = {
   single: true,
-  // classNames (#1495): the server applies PHB'14's per-class subset via
-  // fightingStyleFeatOfferedForClasses — this config never re-derives it,
-  // only forwards the context's class-name scope.
+  // The server applies the per-class subset via fightingStyleFeatOfferedForClasses; this config never re-derives it, only forwards the class-name scope.
   loadOptions: (ctx) =>
     fetchFeats(ctx.edition, undefined, ctx.classNames).then((list) =>
       list
@@ -102,10 +80,7 @@ const toolProficiency: ChoiceKindConfig = {
   }),
 };
 
-// #1588: no catalog fetch — the option list is the character's own
-// proficient-skill set (ctx.proficientSkills), computed by useChoiceOptions
-// from the character's skills[] the same way the read path resolves
-// "proficient" (#438: feat/item grants included, mirrors buildSkillsView).
+// Mirrors buildSkillsView's own proficiency resolution (feat/item grants included).
 const expertise: ChoiceKindConfig = {
   loadOptions: (ctx) => Promise.resolve(ctx.proficientSkills ?? []),
   fromCharacter: (character) =>
@@ -121,10 +96,7 @@ export const CHOICE_KIND_CONFIGS: Partial<Record<LevelUpStepKind, ChoiceKindConf
   expertise,
 };
 
-// Per-step, not per-kind: a subclass's several tiers share one
-// draft.subclassChoices array, so scoping to meta.key is what stops picks and
-// caps leaking across keys (#1422). meta arrives as `unknown` — narrowed with
-// typeof, as stepKey and stepLabel do.
+// Per-step, not per-kind: a subclass's several tiers share one draft.subclassChoices array, so scoping to meta.key is what stops picks and caps leaking across keys.
 export function choiceConfigForStep(step: LevelUpStep): ChoiceKindConfig | undefined {
   if (step.kind !== "subclassChoice") return CHOICE_KIND_CONFIGS[step.kind];
 
@@ -157,11 +129,6 @@ export function choiceConfigForStep(step: LevelUpStep): ChoiceKindConfig | undef
   };
 }
 
-/**
- * Next selection after toggling `id`, or null when the pick is blocked. Single-
- * select always replaces; multi-select toggles off a chosen id, adds an unchosen
- * one, and refuses an (N+1)th pick (the exact-count gate — #896).
- */
 export function nextChoiceSelection(
   selectedIds: readonly string[],
   id: string,
@@ -173,7 +140,6 @@ export function nextChoiceSelection(
   return [...selectedIds, id];
 }
 
-/** Case-insensitive name/description filter for the options list. */
 export function filterChoiceOptions(options: ChoiceOption[], search: string): ChoiceOption[] {
   const q = search.trim().toLowerCase();
   if (!q) return options;
@@ -182,7 +148,6 @@ export function filterChoiceOptions(options: ChoiceOption[], search: string): Ch
   );
 }
 
-/** Informational text for an empty list from a non-error cause, else null. */
 export function emptyChoiceText(availableCount: number, filteredCount: number): string | null {
   if (availableCount === 0) return "Nothing left to choose — you already know them all.";
   if (filteredCount === 0) return "No options match your search.";

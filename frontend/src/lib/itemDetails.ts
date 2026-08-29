@@ -1,7 +1,6 @@
 import { formatRollSpec } from "@/lib/dice";
 import type { InventoryItem, WeaponDetail } from "@/types/character";
 
-// "1d6 bludgeoning", plus a "versatile: 1d8" fragment if the weapon has an alt grip die.
 function weaponDamageParts(weapon: WeaponDetail): string[] {
   const base = `${formatRollSpec({
     count: weapon.damageDiceCount,
@@ -17,7 +16,6 @@ function weaponDamageParts(weapon: WeaponDetail): string[] {
   return parts;
 }
 
-// Weapon properties folded into natural language rather than separate badges.
 function weaponPropertyTags(weapon: WeaponDetail): string[] {
   const tags = [
     weapon.finesse && "finesse",
@@ -34,7 +32,6 @@ function weaponPropertyTags(weapon: WeaponDetail): string[] {
   return tags;
 }
 
-// The dotted summary line under an item's name: quantity, weight, then per-type stats.
 export function itemDetailParts(item: InventoryItem): string[] {
   const { weapon, armor, consumable } = item;
   const effectRoll =
@@ -66,7 +63,6 @@ export function itemDetailParts(item: InventoryItem): string[] {
   ].filter((part): part is string => part !== null);
 }
 
-// Whether the item has any disclosable prose (description, consumable effect, or notes).
 export function hasItemProse(item: InventoryItem): boolean {
   return Boolean(item.description || item.consumable?.effectDescription || item.notes);
 }

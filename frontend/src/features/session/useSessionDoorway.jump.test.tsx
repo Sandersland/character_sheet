@@ -49,7 +49,6 @@ describe("useSessionDoorway.onAction jumps to Combat in-workspace (#963)", () =>
     );
     const { result } = renderHook(() => useSessionDoorway("c1", onEnterCombat), { wrapper });
 
-    // Wait for the doorway to resolve so summary.action === "start".
     await waitFor(() => expect(result.current.summary.action).toBe("start"));
 
     await act(async () => {
@@ -59,7 +58,7 @@ describe("useSessionDoorway.onAction jumps to Combat in-workspace (#963)", () =>
     await waitFor(() => expect(mockStart).toHaveBeenCalledWith("camp1", "c1"));
     expect(onEnterCombat).toHaveBeenCalledTimes(1);
     expect(navigateMock).not.toHaveBeenCalled();
-    // #1299: the returned character is an exact cache write, not a refetch.
+    // Exact cache write, not a refetch (#1299).
     expect(getQueryClient().getQueryData(characterKeys.detail("c1"))).toBe(startedCharacter);
   });
 });

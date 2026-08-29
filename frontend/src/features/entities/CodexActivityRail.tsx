@@ -174,8 +174,6 @@ function MostMentioned({ campaignId, top }: { campaignId: string; top: StatsEnti
   );
 }
 
-// Codex activity rail (#841): fully controlled — CampaignCodex owns the data
-// via useCodexActivity. Desktop-only; the mobile complement is the banner.
 export default function CodexActivityRail({
   campaignId,
   statsEntities,

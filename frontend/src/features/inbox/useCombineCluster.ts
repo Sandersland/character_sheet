@@ -9,14 +9,7 @@ interface CombineClusterInput {
   survivorId: string;
 }
 
-// The Review-duplicates modal's commit (#1946): one atomic #1942 call
-// absorbing every loser into the survivor at once. All-or-nothing server-
-// side (cross-loser guards run up front, inside one transaction) — a
-// rejection leaves every entity untouched, so there is no partial-landing
-// state to track here; the caller just re-shows the error and lets the DM
-// retry the same combine. invalidateCombineCaches (shared with #1943's
-// useCombineEntity) covers why each cache goes stale, including the
-// mention-token rewrite on Character.journal.
+// invalidateCombineCaches is shared with useCombineEntity — both need it to cover the mention-token rewrite on Character.journal (#1943).
 export function useCombineCluster() {
   const queryClient = useQueryClient();
 

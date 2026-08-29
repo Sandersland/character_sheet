@@ -2,11 +2,9 @@ import AbilityScoreBox from "@/features/abilities/AbilityScoreBox";
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { abilityAbbr, orderedAbilityEntries } from "@/lib/abilities";
 
-// The abilities + saves row across the top of the Overview tab. Skills are NOT
-// here — the inline all-18 AllSkillsCard owns them.
 export default function AbilityScoresPanel() {
   const { character } = useCurrentCharacter();
-  // orderedAbilityEntries gives canonical 5e order (STR-DEX-CON-INT-WIS-CHA), not arbitrary key order.
+  // Canonical 5e order (STR-DEX-CON-INT-WIS-CHA), not arbitrary key order.
   const abilityEntries = orderedAbilityEntries(character.abilityScores);
 
   return (

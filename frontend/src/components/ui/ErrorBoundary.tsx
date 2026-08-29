@@ -4,10 +4,6 @@ import Card from "@/components/ui/Card";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
-  /**
-   * Optional custom fallback. Receives a `reset` callback that clears the
-   * caught error so the boundary re-attempts rendering its children.
-   */
   fallback?: (error: Error, reset: () => void) => ReactNode;
 }
 
@@ -15,13 +11,6 @@ interface ErrorBoundaryState {
   error: Error | null;
 }
 
-/**
- * Catches render-time exceptions in its subtree so a single bad render can't
- * unmount the whole app and leave a blank white page — important for a
- * live-play tool used at the table. React error boundaries must be class
- * components (there is no hook equivalent), and we deliberately avoid adding
- * the `react-error-boundary` dependency for a primitive this small.
- */
 export default class ErrorBoundary extends Component<
   ErrorBoundaryProps,
   ErrorBoundaryState
@@ -33,8 +22,6 @@ export default class ErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
-    // Surface the crash for local debugging. Hook for future client-side
-    // error reporting (e.g. Sentry) would go here.
     console.error("Uncaught render error:", error, info.componentStack);
   }
 
@@ -48,8 +35,6 @@ export default class ErrorBoundary extends Component<
 
     if (error) {
       if (fallback) return fallback(error, this.reset);
-      // Friendly recovery screen. Uses existing design tokens only
-      // (parchment surface, garnet primary action).
       return (
         <div className="flex min-h-dvh items-center justify-center bg-parchment-100 p-4">
           <Card className="max-w-md p-6 text-center">

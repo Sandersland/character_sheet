@@ -16,7 +16,7 @@ export default function RestControls({
 
   return (
     <div className="flex flex-wrap items-end gap-3 border-t border-parchment-200 pt-3">
-      {/* Short rest */}
+      
       <div className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600">
         <span>Short rest — dice to spend</span>
         <div className="flex gap-2">
@@ -68,7 +68,7 @@ export default function RestControls({
         </div>
       </div>
 
-      {/* Long rest */}
+      
       <div className="flex flex-col gap-1">
         <span className="text-xs font-semibold uppercase tracking-wide text-parchment-600">
           Long rest

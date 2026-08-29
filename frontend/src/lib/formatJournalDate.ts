@@ -1,11 +1,4 @@
-/**
- * Format an ISO date string for display, e.g. "Jun 22, 2026". Journal dates are
- * calendar dates with no meaningful time-of-day: the backend stores the picked
- * day at UTC midnight, so we MUST format in UTC. Formatting in local time would
- * shift the day backwards for timezones behind UTC (e.g. "Jun 22" → "Jun 21").
- *
- * An unparseable input is returned verbatim rather than rendered as "Invalid Date".
- */
+// The backend stores the picked day at UTC midnight, so this MUST format in UTC — local time would shift the day backwards for timezones behind UTC.
 export function formatJournalDate(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
@@ -19,8 +12,7 @@ export function formatJournalDate(iso: string): string {
 
 const DAY_MS = 86_400_000;
 
-// "today"/"yesterday"/"N days ago" by UTC calendar-day diff (mention dates are
-// UTC-midnight, see above); absolute date past 30 days, verbatim on parse failure.
+// Calendar-day diff, not elapsed time — dates are UTC-midnight (see formatJournalDate).
 export function formatRelativeDay(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
@@ -31,7 +23,6 @@ export function formatRelativeDay(iso: string): string {
   return formatJournalDate(iso);
 }
 
-// Format a capture timestamp as local time-of-day ("3:45 PM"); returns verbatim on parse failure.
 export function formatJournalTime(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;

@@ -13,15 +13,11 @@ export interface FeatCatalog {
   filter: (search: string) => CatalogFeat[];
 }
 
-// `asiLevel` is what the server gates ASI-slot eligibility on (#1438) — the rule
-// itself lives in the backend's featOfferedForAsiSlot and this hook no longer
-// mirrors it, so `filter` is search-only. Pass `undefined` to read the whole
-// edition catalog: the Fighting Style picker needs the fighting_style rows that
-// rule always rejects.
-//
-// `classNames` gates the offered Fighting Style subset via
-// fightingStyleFeatOfferedForClasses (#1495) — pass the character's class
-// name(s) from the Fighting Style picker; other callers omit it.
+// asiLevel gates ASI-slot eligibility server-side (featOfferedForAsiSlot, #1438);
+// `filter` here is search-only. Pass undefined to read the whole edition catalog
+// — the Fighting Style picker needs rows that rule always rejects.
+// classNames gates the offered Fighting Style subset via
+// fightingStyleFeatOfferedForClasses (#1495); other callers omit it.
 export function useFeatCatalog(
   active: boolean,
   asiLevel: number | undefined,
@@ -37,21 +33,14 @@ export function useFeatCatalog(
     const key = `${edition}|${asiLevel ?? ""}|${(classNames ?? []).join(",")}`;
     if (fetchedKey.current === key) return;
     fetchedKey.current = key;
-    // Clear before refetching, or the rows from the previous asiLevel stay on
-    // screen until the new response lands — and a level-DOWN (XP revoke / LIFO
-    // undo) with the panel open would keep offering Epic Boons that the write
-    // path then 400s. Only asiLevel makes this reachable: Character.rulesEdition
-    // is write-once, so a mounted hook's edition cannot change under it.
+    // Clear before refetching — otherwise stale rows (e.g. Epic Boons from a
+    // higher level) stay visible until the new response lands and get 400'd on write.
     setCatalog(null);
     setError(null);
-    // Omit the third argument entirely when absent, rather than passing
-    // `undefined` — keeps the ASI feat picker's existing pinned call shape
-    // (`fetchFeats(edition, asiLevel)`) unchanged for callers that never pass
-    // classNames (#1495 only touches the Fighting Style picker's call site).
+    // Omit the third argument entirely when absent, rather than passing undefined,
+    // to keep existing callers' pinned fetchFeats(edition, asiLevel) call shape (#1495).
     (classNames === undefined ? fetchFeats(edition, asiLevel) : fetchFeats(edition, asiLevel, classNames))
-      // A superseded request must not win: an asiLevel change can leave the
-      // previous fetch in flight, and a late resolve would repopulate the list
-      // with the old level's rows.
+      // A superseded request must not win a race against a newer asiLevel's fetch.
       .then((rows) => { if (fetchedKey.current === key) setCatalog(rows); })
       .catch(() => { if (fetchedKey.current === key) setError("Couldn't load feat catalog."); });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- classNames is an array literal at most call sites; depending on it by reference would refetch every render. The join() inside `key` above is the real dependency signal.

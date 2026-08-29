@@ -128,9 +128,7 @@ beforeEach(() => {
   vi.mocked(client.fetchEntityBacklinks).mockResolvedValue([BACKLINK]);
   vi.mocked(client.fetchEntityConnections).mockResolvedValue([]);
   vi.mocked(client.fetchCampaign).mockResolvedValue(campaign("PLAYER"));
-  // Only reachable for an ITEM-typed entity (useEntityDetail's own type guard);
-  // default to "fronts no item" so a test that types an entity ITEM without
-  // caring about this signal doesn't hit an unhandled rejection.
+  // Defaults to rejected so a test that doesn't care about item state (useEntityDetail gates this on ITEM type) doesn't hit an unhandled rejection.
   vi.mocked(client.fetchCampaignItemByEntity).mockRejectedValue(new Error("no item"));
   vi.mocked(useCampaignEntities).mockReturnValue({
     entities: [ENTITY],
@@ -286,7 +284,6 @@ describe("EntityDetailPage (#248)", () => {
     expect(vi.mocked(client.updateEntity)).toHaveBeenCalledWith(CAMPAIGN_ID, ENTITY_ID, {
       visibility: "HIDDEN",
     });
-    // After the flip the control offers Reveal and the Hidden badge shows.
     expect(await screen.findByRole("button", { name: /reveal to players/i })).toBeInTheDocument();
     expect(await screen.findAllByText(/Hidden/)).not.toHaveLength(0);
   });
@@ -658,9 +655,7 @@ describe("EntityDetailPage (#248)", () => {
       const pickerDialog = screen.getByRole("dialog");
       await user.click(within(pickerDialog).getByRole("button", { name: /Lili/ }));
 
-      // Same underlying DOM node, not just "a dialog with the same role" —
-      // a remount would hand back a different element, which `toBe` (strict
-      // reference equality) catches even though both pass the same query.
+      // toBe checks strict reference equality, so a remount to a new DOM node fails even though both pass the same role query.
       const confirmDialog = screen.getByRole("dialog");
       expect(confirmDialog).toBe(pickerDialog);
       expect(within(confirmDialog).getByRole("heading", { name: "Combine into Lili" })).toBeInTheDocument();
@@ -679,10 +674,7 @@ describe("EntityDetailPage (#248)", () => {
         within(screen.getByRole("dialog")).getByRole("button", { name: /combine and delete lili/i }),
       );
 
-      // The mutation is deliberately left pending (resolveCombine never
-      // called) — Escape routes through useDialogChrome straight to Modal's
-      // onClose, the same path the Close link and an overlay click use, so
-      // this exercises all three at once.
+      // Escape routes through useDialogChrome straight to Modal's onClose, the same path the Close link and an overlay click use.
       await user.keyboard("{Escape}");
       expect(screen.getByRole("dialog")).toBeInTheDocument();
       expect(
@@ -759,8 +751,6 @@ describe("EntityDetailPage (#248)", () => {
       await user.click(await screen.findByRole("button", { name: /combine into/i }));
       await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /Lili/ }));
 
-      // Folded into the same gold Discarded list as every other loss (#1949)
-      // rather than a separately-styled garnet warning.
       expect(screen.getByText("Prepared identity merge — combining drops it")).toBeInTheDocument();
     });
 
@@ -919,7 +909,6 @@ describe("EntityDetailPage (#248)", () => {
           [itemSurvivor.id, itemSurvivor],
         ]),
       });
-      // beforeEach's default fetchCampaignItemByEntity rejection stands: no item.
       const user = userEvent.setup();
       renderPage();
       await user.click(await screen.findByRole("button", { name: /combine into/i }));
@@ -991,10 +980,6 @@ describe("EntityDetailPage (#248)", () => {
           [itemC.id, itemC],
         ]),
       });
-      // item-b's own fetch is deliberately left pending for the whole test —
-      // if `item` isn't reset synchronously on navigation, its stale value
-      // from item-a (which DOES front one) would still read non-null when the
-      // combine dialog opens for item-b.
       let resolveBFetch: (() => void) | undefined;
       vi.mocked(client.fetchCampaignItemByEntity).mockImplementation((_campaignId, entityId) => {
         if (entityId === "item-a") {
@@ -1031,8 +1016,7 @@ describe("EntityDetailPage (#248)", () => {
       await waitFor(() =>
         expect(vi.mocked(client.fetchCampaignItemByEntity)).toHaveBeenCalledWith(CAMPAIGN_ID, "item-a"),
       );
-      // CampaignItemCard's own heading ("Item") only renders once detail.item
-      // resolves non-null — the item's name doesn't appear on the card itself.
+      // CampaignItemCard's heading reads "Item", not the item's name.
       await screen.findByRole("heading", { name: "Item" });
 
       const rail = await screen.findByRole("navigation", { name: /codex entries/i });

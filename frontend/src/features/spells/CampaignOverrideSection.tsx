@@ -1,8 +1,3 @@
-// "Override for a campaign you run" — extracted out of ForkSpellSheet so its
-// own loading/empty/list branching doesn't add to that component's
-// complexity budget. Renders nothing at all once campaigns are loaded and
-// the caller DMs none of them — a player forking a spell they don't run a
-// table for sees only "Make my version".
 import CampaignOverrideRow from "@/features/spells/CampaignOverrideRow";
 import Spinner from "@/components/ui/Spinner";
 import type { Campaign } from "@/types/character";
@@ -15,11 +10,7 @@ interface CampaignOverrideSectionProps {
 }
 
 export default function CampaignOverrideSection({ entryId, campaigns, loadError, onForked }: CampaignOverrideSectionProps) {
-  // Checked FIRST, ahead of the loading/error guards below: a spell with no
-  // catalog metadata can never be forked regardless of how the campaign
-  // fetch resolves, so there's nothing to show a spinner (or an error) FOR —
-  // rendering either first would flash loading/error state for an outcome
-  // that was always going to be "nothing here."
+  // Must run before the loading/error guards: an entryId-less spell can never be forked, so a loading/error state should never flash for it.
   if (!entryId) return null;
   if (loadError) return <p className="text-xs text-garnet-700">{loadError}</p>;
   if (campaigns === null) return <Spinner />;

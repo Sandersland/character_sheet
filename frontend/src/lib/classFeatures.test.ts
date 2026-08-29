@@ -38,14 +38,7 @@ describe("deriveClassFeatureView", () => {
     expect(view.rosterEntries).toBe(classes);
   });
 
-  // #1598/#1602: needsSubclass/subclassUnavailable are backend-computed
-  // (buildClassesView) and passed through on every roster entry, never
-  // re-derived from character.level/classDef.subclassGateLevel (that mirror
-  // is what stranded a character on a cross-edition subclass row with no way
-  // out, since a held subclass name made the old client-side
-  // `!character.subclass` half of the check false). #1602: this must hold for
-  // EVERY entry, not just the primary one — a multiclass character can be
-  // stranded on a secondary class only.
+  // needsSubclass/subclassUnavailable are backend-computed (buildClassesView) and passed through unchanged for every roster entry, never re-derived from level/subclassGateLevel (#1598/#1602).
   it("passes needsSubclass/subclassUnavailable through unchanged for every roster entry, not just the first", () => {
     const classes = [
       { id: "c1", name: "Fighter", level: 5, needsSubclass: false, subclassUnavailable: false },
@@ -80,8 +73,7 @@ describe("deriveClassFeatureView", () => {
           advancements: [
             { id: "fs1", slot: "fightingStyle", featId: "archery", featName: "Archery" },
           ] as unknown as Character["advancements"],
-          // shadowArts/cloakOfShadows entitlement is availableActions[] presence
-          // (#1315), edition-agnostic since #1738, not a resources boolean.
+          // shadowArts/cloakOfShadows entitlement is availableActions[] presence, edition-agnostic since #1738, not a resources boolean (#1315).
           availableActions: [
             { key: "shadowArts", name: "Shadow Arts (Darkness)", cost: "action", enabled: true },
             { key: "cloakOfShadows", name: "Cloak of Shadows", cost: "action", enabled: true },
@@ -119,11 +111,7 @@ describe("deriveClassFeatureView", () => {
     expect(view.hasElementsWarrior).toBe(false);
   });
 
-  // #1738: 2014 Way of Shadow grants the SAME "shadowArts"/"cloakOfShadows"
-  // keys as 2024 Warrior of Shadow (actions.ts) — #1505 kept both flags false
-  // on a 2014 sheet because only the 2024-shaped UI existed; now that
-  // ShadowArtsSection/CloakOfShadowsSection are wire-driven for both
-  // editions (#1738), bare key-presence is correct here too.
+  // Both editions grant the same shadowArts/cloakOfShadows keys — bare key-presence is correct for either since ShadowArtsSection/CloakOfShadowsSection are wire-driven for both (#1738).
   it("hasShadowArts/hasCloakOfShadows are true on a 2014 character carrying the same action keys", () => {
     const view = deriveClassFeatureView(
       makeChar({
@@ -139,10 +127,7 @@ describe("deriveClassFeatureView", () => {
     expect(view.hasCloakOfShadows).toBe(true);
   });
 
-  // Positive case for hasElementsWarrior — previously untested: a wrong/renamed
-  // key here would silently delete the whole Warrior of the Elements panel
-  // (ClassResourceBlocks.tsx gates WarriorOfElementsSection on this flag) with
-  // no failing test to catch it.
+  // ClassResourceBlocks.tsx gates WarriorOfElementsSection on this flag — a wrong/renamed key here would silently delete that panel.
   it("hasElementsWarrior is true when availableActions contains the row-driven (resolverKind: toggle) elementalAttunement", () => {
     const view = deriveClassFeatureView(
       makeChar({
@@ -155,11 +140,7 @@ describe("deriveClassFeatureView", () => {
     expect(view.hasElementsWarrior).toBe(true);
   });
 
-  // #1505 regression: a 2014 Way of the Four Elements monk's Elemental
-  // Attunement is the SAME key but a static DERIVED_ACTIONS reminder row
-  // (no resolverKind) — hasElementsWarrior must stay false so
-  // WarriorOfElementsSection's 2024 Focus-toggle UI never renders for it
-  // (browser-verification-caught bug, not unit-test-caught).
+  // The 2014 reminder-only elementalAttunement row (no resolverKind) must keep hasElementsWarrior false so WarriorOfElementsSection's Focus-toggle UI never renders for it (#1505).
   it("hasElementsWarrior is false for the 2014 reminder-only elementalAttunement row (no resolverKind)", () => {
     const view = deriveClassFeatureView(
       makeChar({
@@ -174,8 +155,7 @@ describe("deriveClassFeatureView", () => {
     expect(view.hasFourElements).toBe(true);
   });
 
-  // Way of the Four Elements (2014-only, #1505) — same availableActions[]-
-  // presence gate as Warrior of Shadow/Elements, not a resources boolean.
+  // Same availableActions[]-presence gate as Warrior of Shadow/Elements, not a resources boolean — 2014-only (#1505).
   it("hasFourElements is true when availableActions contains castDiscipline, and false otherwise", () => {
     const withDiscipline = deriveClassFeatureView(
       makeChar({ availableActions: [{ key: "castDiscipline", name: "Elemental Discipline", cost: "action", enabled: true }] }),
@@ -211,11 +191,7 @@ describe("deriveClassFeatureView", () => {
     expect(view.isEmpty).toBe(false);
   });
 
-  // #1602: before the fix, isEmpty only looked at the PRIMARY entry's
-  // subclass state. A multiclass character needing or holding a subclass on
-  // a SECONDARY entry only, with no other class features, would show "No
-  // class features available at this level" instead of that entry's own
-  // Subclass section.
+  // isEmpty must consider every roster entry, not just the primary — a secondary entry needing/holding a subclass alone must still count (#1602).
   it("isEmpty stays false when only a SECONDARY roster entry needs a subclass", () => {
     const classes = [
       { id: "c1", name: "Fighter", level: 5, needsSubclass: false, subclassUnavailable: false },

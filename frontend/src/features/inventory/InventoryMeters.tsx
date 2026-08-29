@@ -10,11 +10,9 @@ interface InventoryMetersProps {
   /** The served attunement cap (#1377) — never a local literal. */
   cap: number;
   atCap: boolean;
-  /** Mobile density variant (#1029): a 6px strip with the number right-aligned. */
   slim?: boolean;
 }
 
-// Encumbrance meter + the attunement count/cap readout above the item list.
 export default function InventoryMeters({ slim = false, ...props }: InventoryMetersProps) {
   if (slim) return <InventoryMetersSlim {...props} />;
 

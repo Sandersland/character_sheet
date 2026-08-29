@@ -1,8 +1,6 @@
 import ImageUploadControl from "@/components/ui/ImageUploadControl";
 
-// Label + picker wrapper shared by the codex create (deferred `file`) and edit
-// (immediate `imageUrl`) portrait surfaces (#1617). Hosts render it only for
-// the campaign OWNER — portrait writes are an owner-only act.
+// Shared by codex create (deferred `file`) and edit (immediate `imageUrl`) portrait surfaces (#1617); hosts render it only for the campaign OWNER.
 export default function EntityPortraitField({
   imageUrl,
   file,

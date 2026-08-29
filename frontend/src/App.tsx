@@ -17,30 +17,25 @@ import EntityDetailPage from "@/features/entities/EntityDetailPage";
 import AboutPage from "@/pages/AboutPage";
 import CharacterListPage from "@/pages/CharacterListPage";
 
-// Route-lazy the heavy character-sheet cluster: the sheet itself (#1279 — by far
-// the largest tree, pulling in spells/inventory/journal/session) plus character
-// creation, the journal, and the level-up ceremony. CharacterListPage stays eager
-// as the landing route; the campaign/codex/about routes stay eager too, being
-// small enough that a lazy chunk would cost a round trip for no size win.
+// Heavy pages are route-lazy; a page stays eager only when its bundle cost is smaller than the extra round trip (#1279).
 const CharacterSheetPage = lazy(() => import("@/pages/CharacterSheetPage"));
 const CharacterCreatePage = lazy(() => import("@/pages/CharacterCreatePage"));
 const JournalPage = lazy(() => import("@/pages/JournalPage"));
 const LevelUpPage = lazy(() => import("@/pages/LevelUpPage"));
 
-// Dev-only: the guard is statically false in a production build, so Rollup drops
-// the branch and the dynamic import with it — no devtools chunk is emitted.
-// (A top-level `const X = lazy(() => import(...))` is reachable code and would
-// ship the chunk into `dist` regardless of whether it is ever rendered — verified,
-// see [C2 evidence #2] in the PR body.)
+// Dev-only: the guard is statically false in a production build, so Rollup
+// drops the branch and the dynamic import with it — no devtools chunk is
+// emitted. A top-level `const X = lazy(() => import(...))` would ship the
+// chunk into `dist` regardless of whether it's rendered.
 const ReactQueryDevtools = import.meta.env.DEV
   ? lazy(() =>
       import("@tanstack/react-query-devtools").then((m) => ({ default: m.ReactQueryDevtools })),
     )
   : null;
 
-// #962: the live session now lives on the sheet's Combat tab (#960), so the old
-// `/characters/:id/session` route redirects there. Kept for bookmarks / e2e; a
-// param-aware component is needed since a plain <Navigate> can't read `:id`.
+// The live session lives on the sheet's Combat tab; this route redirects
+// there for bookmarks/e2e. A param-aware component is needed since a plain
+// <Navigate> can't read `:id`.
 function LegacySessionRedirect() {
   const { id } = useParams();
   return <Navigate to={`/characters/${id}?tab=combat`} replace />;
@@ -48,13 +43,13 @@ function LegacySessionRedirect() {
 
 export default function App() {
   return (
-    // Outermost: injects the module-level client (@/api/queryClient) into React
-    // context so useQuery/useQueryClient resolve anywhere in the tree. Server
-    // state is orthogonal to routing/theme/auth, so it wraps rather than nests.
+    // Outermost: injects the module-level client from getQueryClient() into
+    // React context so useQuery/useQueryClient resolve anywhere in the tree.
+    // Server state is orthogonal to routing/theme/auth, so it wraps rather
+    // than nests.
     <QueryClientProvider client={getQueryClient()}>
       <BrowserRouter>
-        {/* Catches any render-time crash in a route so one bad screen can't
-            blank the whole app mid-session. */}
+        
         <ErrorBoundary>
           {/* Auth wraps everything below it (incl. Theme/DiceRollStyle) so
               PreferencesProvider can read useAuth()'s user/status to reconcile
@@ -62,18 +57,17 @@ export default function App() {
               renders no themed UI, so this nesting doesn't delay paint. */}
           <AuthProvider>
             <PreferencesProvider>
-              {/* Theme wraps everything visible so data-theme is applied app-wide. */}
+              
               <ThemeProvider>
-                {/* Dice-roll presentation preference (Animated vs Quick, #945). */}
+                
                 <DiceRollStyleProvider>
-                  {/* Flex-column shell: header + routes share one dvh column (#1171). */}
+                  
                   <div className="flex min-h-dvh flex-col">
-                    {/* AuthGate shows the login screen for an anonymous user
-                        (incl. after a 401), the app otherwise. */}
+                    
                     <AuthGate>
                       <AppHeader />
                       <div className="flex min-h-0 flex-1 flex-col">
-                        {/* Suspense catches the lazy route chunks while they load. */}
+                        
                         <Suspense fallback={null}>
                           <Routes>
                             <Route path="/" element={<CharacterListPage />} />
@@ -81,17 +75,16 @@ export default function App() {
                                 can never be swallowed by it. */}
                             <Route path="/characters/new" element={<CharacterCreatePage />} />
                             <Route path="/characters/:id" element={<CharacterSheetPage />} />
-                            {/* Field-chronicle journal page (#864) */}
+                            
                             <Route path="/characters/:id/journal" element={<JournalPage />} />
-                            {/* Level-up ceremony (#886) */}
+                            
                             <Route path="/characters/:id/level-up" element={<LevelUpPage />} />
-                            {/* Live-play now lives on the sheet's Combat tab (#960/#962);
-                                the old session route redirects there. */}
+                            
                             <Route
                               path="/characters/:id/session"
                               element={<LegacySessionRedirect />}
                             />
-                            {/* Shared campaigns (#246) */}
+                            
                             <Route path="/campaigns" element={<CampaignsPage />} />
                             <Route path="/campaigns/:id" element={<CampaignDetailPage />} />
                             {/* Codex tab (#367) — explicit route, not an optional :tab param,
@@ -100,13 +93,13 @@ export default function App() {
                             {/* Owner-only Manage tab (#379) — route access is guarded inside
                                 the page, which redirects a non-owner back to Overview. */}
                             <Route path="/campaigns/:id/manage" element={<CampaignDetailPage />} />
-                            {/* Entity registry detail + backlinks (#248) */}
+                            
                             <Route
                               path="/campaigns/:id/entities/:entityId"
                               element={<EntityDetailPage />}
                             />
                             <Route path="/join/:code" element={<JoinCampaignRoute />} />
-                            {/* About / third-party asset credits (#566) */}
+                            
                             <Route path="/about" element={<AboutPage />} />
                           </Routes>
                         </Suspense>

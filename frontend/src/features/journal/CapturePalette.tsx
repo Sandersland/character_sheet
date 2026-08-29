@@ -1,9 +1,3 @@
-// Fast in-session note capture over a per-session NOTE feed with inline edit/delete.
-// Per-breakpoint presentation: a full-height, keyboard-pinned chat-style surface on
-// mobile (#866), and a non-modal margin dock at md+ (#865). Both share the same NOTE
-// feed, journal mutations, and the growing composer; only the shell + feed layout
-// (and the composer's lock/send arrangement) differ.
-
 import { useRef } from "react";
 
 import CaptureDock from "@/features/journal/CaptureDock";
@@ -17,9 +11,7 @@ import { useIsBelowMd } from "@/hooks/useIsBelowMd";
 import type { EntryVisibility, Session } from "@/types/character";
 
 interface CapturePaletteProps {
-  /** Active session to scope the feed to; omitted shows all NOTE rows. */
   sessionId?: string;
-  /** Live session, when known: the dock header shows its title + elapsed time. */
   session?: Session | null;
   onClose: () => void;
 }
@@ -35,7 +27,6 @@ export default function CapturePalette({
   const { byId } = useCampaignEntities(character.campaignId);
   const { busy, error, create, update, remove } = useJournalMutations(character.id);
 
-  // The NOTE feed: newest-first, scoped to the active session when one is given.
   const notes = character.journal
     .filter((e) => e.kind === "NOTE" && (!sessionId || e.sessionId === sessionId))
     .sort((a, b) => new Date(b.loggedAt).getTime() - new Date(a.loggedAt).getTime());
@@ -44,8 +35,6 @@ export default function CapturePalette({
     return create({ kind: "NOTE", body, sessionId, ...(visibility ? { visibility } : {}) });
   }
 
-  // Mobile: the full-height keyboard-pinned chat surface (#866) with the mobile
-  // composer variant (lock icon-button · field · circular send).
   if (isMobile) {
     return (
       <MobileCaptureSheet

@@ -47,9 +47,6 @@ const FULL_ENTITIES: CampaignEntity[] = [
     id: "e1",
     name: "Lil",
     visibility: "HIDDEN",
-    // combineDiscardedItems' "notes" category reads notes directly
-    // (hasDescription(notes) === notes trimmed non-empty on the backend, the
-    // same invariant) — real text here, not just a stats flag.
     notes: "A hedge witch.",
     stats: { mentionCount: 1, firstMentioned: null, lastMentioned: null, chroniclers: [], hasDescription: true },
   }),
@@ -87,9 +84,6 @@ describe("ReviewDuplicatesModal", () => {
   it("fills in the Discarded box's fuller categories once the full entity/merge fetch lands", async () => {
     render(<ReviewDuplicatesModal row={ROW} onClose={vi.fn()} onDisregard={vi.fn()} disregarding={false} />);
 
-    // "Hidden visibility"/"Descriptions" need stats.hasDescription off the
-    // full-entity fetch — a ready-state-only fact, unlike the summary line
-    // above, which is already showing from row.entities alone.
     await waitFor(() => expect(screen.getByText(/Hidden visibility — Lil/)).toBeInTheDocument());
     expect(screen.getByText("Discarded")).toBeInTheDocument();
     expect(screen.getByText(/Descriptions — Lil/)).toBeInTheDocument();
@@ -134,12 +128,8 @@ describe("ReviewDuplicatesModal", () => {
 
     await user.click(screen.getByRole("button", { name: "Combine and delete 2 entries" }));
 
-    // Atomic combine: nothing landed, so there's no "which one failed" — just
-    // the backend's own message, verbatim.
     expect(await screen.findByText("Both entities are linked to an item")).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
-    // No locking — a rejected atomic combine touched nothing, so the DM can
-    // still freely re-pick the survivor before retrying.
     for (const radio of screen.getAllByRole("radio")) expect(radio).not.toBeDisabled();
 
     await user.click(screen.getByRole("button", { name: "Combine and delete 2 entries" }));
@@ -190,11 +180,8 @@ describe("ReviewDuplicatesModal", () => {
         <ReviewDuplicatesModal row={HIDDEN_SURVIVOR_ROW} onClose={vi.fn()} onDisregard={vi.fn()} disregarding={false} />,
       );
 
-      // Wait for a ready-state-only fact — "rows deleted" alone also matches
-      // the pending placeholder, so it would resolve before the fetch lands.
       await waitFor(() => expect(screen.getByText("Hidden visibility — lili")).toBeInTheDocument());
 
-      // The REVEALED loser's mentions will redact once absorbed into the HIDDEN survivor…
       expect(
         screen.getByText('Mentions from Lil will render as "Hidden" until Lili is revealed'),
       ).toBeInTheDocument();
@@ -215,10 +202,6 @@ describe("ReviewDuplicatesModal", () => {
       fullEntity({ id: "e3", name: "Lili" }),
     ];
 
-    // A single loser still renders under the bare "Discarded" heading (no
-    // "Discarded with X" the way CombineConfirmDialog has) — an unnamed
-    // label here would be exactly as ambiguous as a 3-loser one, and would
-    // silently point at a different entity once the survivor radio flips.
     it("still names the loser — labels aren't unnamed just because the cluster happens to have only one loser", async () => {
       fetchEntities.mockResolvedValue(TWO_ENTITY_FULL);
       render(
@@ -235,10 +218,6 @@ describe("ReviewDuplicatesModal", () => {
     fetchEntityMerges.mockReturnValue(new Promise((r) => { resolveMerges = r; }));
     render(<ReviewDuplicatesModal row={ROW} onClose={vi.fn()} onDisregard={vi.fn()} disregarding={false} />);
 
-    // Entities have already landed (FULL_ENTITIES resolves synchronously in
-    // beforeEach), but merges hasn't — the fuller categories must not
-    // render yet, or the box would look complete while still missing a
-    // possible "Prepared identity merges" item.
     await waitFor(() => expect(fetchEntities).toHaveBeenCalled());
     expect(screen.queryByText(/Hidden visibility — Lil/)).not.toBeInTheDocument();
 

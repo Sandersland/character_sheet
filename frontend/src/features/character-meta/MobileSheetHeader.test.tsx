@@ -10,9 +10,7 @@ import { DiceRollStyleProvider } from "@/features/dice/DiceRollStyleProvider";
 import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character } from "@/types/character";
 
-// The switcher sheet fetches the character list on open; keep it inert here.
-// fetchEditions is stubbed so the badge spec below can prove it is NEVER called
-// — the badge reads the label served with the sheet (#1436).
+// fetchEditions is stubbed to prove the rules-edition badge below never calls it — the label is served with the character (#1436).
 vi.mock("@/api/client", async (importActual) => ({
   ...(await importActual<typeof import("@/api/client")>()),
   fetchCharacters: vi.fn().mockResolvedValue([]),
@@ -41,11 +39,7 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
   } as Character;
 }
 
-// MobileSheetHeader (and its nested ManageHpButton/AcBadge) reads
-// useCurrentCharacter(), so every render seeds the cache and mounts
-// CurrentCharacterProvider via renderWithCharacter. Theme/DiceRollStyle
-// providers wrap it too — the "Preferences…" overflow item (#1167) mounts
-// PreferencesSheet, which reads both via useTheme()/useDiceRollStyle().
+// ThemeProvider/DiceRollStyleProvider wrap this because PreferencesSheet (opened from the overflow menu) reads useTheme()/useDiceRollStyle().
 function renderHeader(
   props: Partial<Parameters<typeof MobileSheetHeader>[0]> = {},
   character: Character = makeCharacter(),
@@ -104,12 +98,9 @@ describe("MobileSheetHeader", () => {
 
   it("shows HP numbers and the AC badge, but not the Init/Speed/Prof tiles", () => {
     renderHeader();
-    // HP readout (current / max).
     expect(screen.getByText("44")).toBeInTheDocument();
-    // AC badge value via its breakdown trigger.
     expect(screen.getByRole("button", { name: /armor class/i })).toBeInTheDocument();
     expect(screen.getByText("18")).toBeInTheDocument();
-    // The old vitals tiles are gone (Init/Speed/Prof now live on Overview).
     expect(screen.queryByText("Init")).not.toBeInTheDocument();
     expect(screen.queryByText("Speed")).not.toBeInTheDocument();
     expect(screen.queryByText("Prof")).not.toBeInTheDocument();
@@ -132,7 +123,6 @@ describe("MobileSheetHeader", () => {
     const onEnd = vi.fn();
     renderHeader({ sessionActions: { busy: false, onLeave, onEnd } });
 
-    // Selecting an item closes the menu, so re-open it between the two clicks.
     fireEvent.click(screen.getByRole("button", { name: /sheet actions/i }));
     fireEvent.click(screen.getByRole("menuitem", { name: "End Session" }));
     expect(onEnd).toHaveBeenCalledTimes(1);
@@ -184,16 +174,13 @@ describe("MobileSheetHeader", () => {
     expect(screen.queryByRole("menuitem", { name: /campaign settings/i })).not.toBeInTheDocument();
   });
 
-  // #1167: unconditional (unlike Campaign settings) — needed because this
-  // immersive mobile shell hides AppHeader/AccountMenu (`hidden md:flex`); other
-  // mobile routes (/, /campaigns, journal) keep AppHeader's own Preferences entry.
+  // Preferences is unconditional (#1167) — this mobile shell hides AppHeader, unlike other mobile routes.
   it("adds an unconditional 'Preferences…' item and opens the surface, even with no campaignId", () => {
     renderHeader({}, makeCharacter({ campaignId: undefined }));
     fireEvent.click(screen.getByRole("button", { name: /sheet actions/i }));
     fireEvent.click(screen.getByRole("menuitem", { name: /preferences/i }));
 
     expect(screen.getByRole("dialog", { name: /preferences/i })).toBeInTheDocument();
-    // No campaign in view ⇒ no contextual link.
     expect(screen.queryByRole("button", { name: /campaign settings/i })).not.toBeInTheDocument();
   });
 
@@ -206,8 +193,7 @@ describe("MobileSheetHeader", () => {
     fireEvent.click(screen.getByRole("button", { name: /campaign settings/i }));
 
     expect(onOpenCampaignSettings).toHaveBeenCalledTimes(1);
-    // Routes through BottomSheet's requestClose (#782): onClose defers to the
-    // slide-out transitionend rather than unmounting instantly.
+    // Routes through BottomSheet's requestClose (#782): onClose defers to the slide-out transitionend rather than unmounting instantly.
     act(() => {
       const e = new Event("transitionend", { bubbles: true });
       Object.defineProperty(e, "propertyName", { value: "transform" });
@@ -230,8 +216,6 @@ describe("MobileSheetHeader", () => {
   });
 });
 
-// #1026: the live pill replaces the "Session live" banner — shown whenever a
-// session is live+joined, carrying round/live state and tapping through to Combat.
 describe("MobileSheetHeader live pill (#1026)", () => {
   it("shows a Round pill while live and taps through to Combat", () => {
     const onGoToCombat = vi.fn();
@@ -260,8 +244,6 @@ describe("MobileSheetHeader live pill (#1026)", () => {
   });
 });
 
-// #1026: collapse-on-scroll — a `scrolled` sheet collapses the header to a single
-// bar (name + HP + pill); the identity remains the switcher trigger (#1027).
 describe("MobileSheetHeader collapse-on-scroll (#1026)", () => {
   it("collapses to a single bar once scrolled, hiding the AC badge and subtitle", () => {
     renderHeader({ scrolled: true });
@@ -289,13 +271,8 @@ describe("MobileSheetHeader collapse-on-scroll (#1026)", () => {
   });
 });
 
-// #1286: the acceptance criterion is unqualified ("visible on its sheet
-// header") — the desktop banner alone isn't enough, since mobile is the only
-// header shown below the md breakpoint.
 describe("MobileSheetHeader rules edition (#1286)", () => {
-  // Both fields set explicitly (#1436): deriving one from the other in a fixture
-  // would re-implement the mapping this issue moved server-side. The editions
-  // cache is deliberately unseeded — this header never calls useEditions.
+  // Both fields set explicitly (#1436) — deriving the label client-side would re-implement the mapping this issue moved server-side.
   it("shows the character's rules edition in the expanded header, with no /api/editions request", () => {
     renderHeader({}, makeCharacter({ rulesEdition: "EDITION_2014", rulesEditionLabel: "2014 rules" }));
     expect(screen.getByText("2014 rules")).toBeInTheDocument();
@@ -303,8 +280,6 @@ describe("MobileSheetHeader rules edition (#1286)", () => {
   });
 });
 
-// #1027: the identity block is the mobile route back out — tapping it opens the
-// character switcher sheet in both the expanded and collapsed header states.
 describe("MobileSheetHeader character switcher (#1027)", () => {
   it("opens the switcher sheet when the identity is tapped (expanded)", () => {
     renderHeader();
@@ -325,9 +300,6 @@ describe("MobileSheetHeader character switcher (#1027)", () => {
   });
 });
 
-// #1083: the expanded⇄collapsed swap is animated — the outgoing variant lingers
-// as an inert (aria-hidden) crossfading overlay until the height transition (or a
-// 250ms fallback) finalizes. Reduced-motion + first mount take the instant swap.
 describe("MobileSheetHeader animated collapse (#1083)", () => {
   // Both raw DOM buttons (in-flow + overlay) vs only the accessible ones.
   const allSwitchButtons = (c: HTMLElement) =>
@@ -385,11 +357,8 @@ describe("MobileSheetHeader animated collapse (#1083)", () => {
     it("mounts an inert overlay during collapse, then finalizes to just the bar", () => {
       const { container, toggle } = renderToggle(false);
       toggle(true);
-      // Both variants are in the DOM (in-flow collapsed + outgoing expanded overlay)…
       expect(allSwitchButtons(container)).toHaveLength(2);
-      // …but the overlay is inert/aria-hidden, so only one is accessible.
       expect(screen.getAllByRole("button", { name: /switch character/i })).toHaveLength(1);
-      // The outgoing expanded subtitle is still mounted (in the overlay).
       expect(screen.getByText("Human · Fighter 7")).toBeInTheDocument();
 
       act(() => vi.advanceTimersByTime(260));
@@ -399,7 +368,6 @@ describe("MobileSheetHeader animated collapse (#1083)", () => {
 
     it("animates the reverse (expand) the same way, settling on the full header", () => {
       const { container, toggle } = renderToggle(true);
-      // First mount collapsed ⇒ no overlay.
       expect(allSwitchButtons(container)).toHaveLength(1);
       toggle(false);
       expect(allSwitchButtons(container)).toHaveLength(2);
@@ -420,7 +388,6 @@ describe("MobileSheetHeader animated collapse (#1083)", () => {
       const { container, toggle } = renderToggle(false);
       toggle(true);
       toggle(false);
-      // Never more than one outgoing overlay (2 = in-flow + a single overlay).
       expect(allSwitchButtons(container).length).toBeLessThanOrEqual(2);
       act(() => vi.advanceTimersByTime(260));
       expect(allSwitchButtons(container)).toHaveLength(1);

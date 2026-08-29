@@ -51,8 +51,7 @@ const defaultCharacter = () =>
     spell({ name: "Burning Hands", level: 1, prepared: true }),
   ]);
 
-// CastSpellDoor reads useCurrentCharacter(), so every render seeds the cache
-// and mounts CurrentCharacterProvider via renderWithCharacter.
+// CastSpellDoor reads useCurrentCharacter(), so renderWithCharacter must seed the cache for it.
 function renderDoor(
   propsOver: Partial<Parameters<typeof CastSpellDoor>[0]> = {},
   character: Character = defaultCharacter(),
@@ -126,8 +125,7 @@ describe("CastSpellDoor", () => {
   });
 
   it("shows the live-session notice only when a session is live", () => {
-    // The "Combat" tab name renders in its own <span>, so match on the
-    // paragraph's full text content rather than a single text node.
+    // "Combat" renders in its own <span>, so match the paragraph's full text content, not a single text node.
     const notice = () =>
       screen.queryByText((_, el) => el?.tagName === "P" && /casting happens on the .*Combat.* tab/i.test(el.textContent ?? ""));
     const { rerender } = renderDoor({ isLive: false });

@@ -3,7 +3,6 @@ import { useRef, type ReactNode, type KeyboardEvent } from "react";
 interface TabItem {
   id: string;
   label: string;
-  /** Optional badge/pill rendered to the right of the label (e.g. a count). */
   badge?: ReactNode;
 }
 
@@ -12,26 +11,12 @@ interface TabsProps {
   active: string;
   onChange: (id: string) => void;
   className?: string;
-  /**
-   * When set, each tab button gets a stable `id` (`${idBase}-tab-${tabId}`) and
-   * `aria-controls` (`${idBase}-panel-${tabId}`) so a separately-rendered panel
-   * can point back with `aria-labelledby`. Omit when the switcher and its panel
-   * live together and no cross-reference is needed.
-   */
+  // When set, gives each tab button a stable `${idBase}-tab-${tabId}` id and
+  // `${idBase}-panel-${tabId}` aria-controls, so a separately-rendered panel
+  // can point back with aria-labelledby.
   idBase?: string;
 }
 
-/**
- * Segmented-control tab switcher — domain-agnostic, controlled.
- *
- * Renders only the switcher; the caller renders the active panel below it.
- * Follows WAI-ARIA Tabs pattern: role="tablist", role="tab" on buttons,
- * aria-selected, roving tabindex, ArrowLeft/Right/Home/End keyboard nav. Pass
- * `idBase` to wire tab↔panel ids when the panel is rendered elsewhere.
- *
- * Design: filled garnet pill for the active tab inside a parchment-100 track;
- * consistent with rounded-control radius and existing garnet/parchment tokens.
- */
 export default function Tabs({ tabs, active, onChange, className = "", idBase }: TabsProps) {
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 

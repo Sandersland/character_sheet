@@ -6,10 +6,8 @@ import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character, CharacterResources } from "@/types/character";
 import type { ClassFeatureView } from "@/lib/classFeatures";
 
-// #1422: explicitly typed so a drift between this fixture and the real
-// CharacterResources shape (e.g. a field the server always sends but the
-// frontend type omits) fails tsc instead of hiding behind the outer
-// `as unknown as Character` cast below.
+// Explicitly typed so drift from the real CharacterResources shape fails tsc
+// instead of hiding behind the `as unknown as Character` cast below (#1422).
 const resources: CharacterResources = {
   features: [],
   maneuverChoiceCount: 3,
@@ -49,11 +47,8 @@ function makeView(overrides: Partial<ClassFeatureView> = {}): ClassFeatureView {
   };
 }
 
-// Guards the ClassResourceBlocks -> ManeuversSection wiring (#1316): the DC is
-// a top-level rider field (character.maneuvers), not part of `resources`, so
-// nothing type-checks if the wiring line is dropped — only a render assertion
-// catches it. (Regression case: a reviewer deleted the wiring line and both
-// tsc and the rest of the frontend suite stayed green.)
+// character.maneuvers is a top-level rider field, not part of `resources`, so
+// nothing type-checks if the wiring is dropped — only a render assertion catches it (#1316).
 describe("ClassResourceBlocks maneuver Save DC wiring (#1316)", () => {
   it("renders the Maneuver Save DC when the character has the maneuvers rider", () => {
     const character = makeCharacter({ maneuvers: { saveDC: 14 } });

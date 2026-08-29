@@ -58,9 +58,7 @@ describe("CampaignManagePanel (#379/#523)", () => {
 
     renderPanel();
 
-    // The Identity-merges section still renders...
     expect(await screen.findByRole("heading", { name: /identity merges/i })).toBeInTheDocument();
-    // ...but the entity row, its reveal/delete actions, and the new-entity form are gone.
     expect(screen.queryByText("Secret Cult")).not.toBeInTheDocument();
     expect(screen.queryByRole("searchbox", { name: /search entities/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /new entity/i })).not.toBeInTheDocument();

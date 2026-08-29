@@ -25,8 +25,7 @@ const character = {
   hitDice: { total: 7, die: "d10", spent: 0 },
 } as unknown as Character;
 
-// The hitPoints step arrives with its numbers already resolved (#1380);
-// this fixture is what the planner serves for a d10 class at Con 10.
+// This fixture is what the planner serves for a d10 class at Con 10 (#1380).
 const HP_META = { die: "d10", faces: 10, conMod: 0, fixedAverage: 6, averageGain: 6, minRoll: 1, maxRoll: 10 };
 
 function plan(steps: LevelUpStep[], target?: Partial<LevelUpPlanResponse["target"]>): LevelUpPlanResponse {
@@ -75,7 +74,6 @@ describe("LevelUpCeremony", () => {
       "Step 3: Review",
     ]);
     expect(screen.getByText(/fighter · Champion/i)).toBeInTheDocument();
-    // "Level 7 → 8" is split across spans — anchor on the heading.
     expect(screen.getByRole("heading", { name: /Level\s*7\s*→\s*8/ })).toBeInTheDocument();
   });
 
@@ -93,8 +91,6 @@ describe("LevelUpCeremony", () => {
     await user.click(cont);
 
     expect(screen.getByText("Step 2 of 3")).toBeInTheDocument();
-    // AbilityScoreStep writes nothing to the draft until a pick is made, so
-    // draftSatisfies keeps Continue off.
     expect(screen.getByRole("button", { name: /continue/i })).toBeDisabled();
 
     await user.click(screen.getByRole("button", { name: /back/i }));
@@ -167,8 +163,6 @@ describe("LevelUpCeremony", () => {
   });
 });
 
-// #1170: the class-choice front door replaces the sheet-side AddClassPanel —
-// a multiclass-eligible character sees a chooser before the ceremony's rail.
 describe("LevelUpCeremony — class choice (#1170)", () => {
   const rogueEligible = {
     ...character,
@@ -199,7 +193,6 @@ describe("LevelUpCeremony — class choice (#1170)", () => {
 
     expect(await screen.findByRole("heading", { name: /which class levels up/i })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: /fighter/i })).toBeEnabled();
-    // New classes are collapsed behind the drill-in (#1209) — open it to reach them.
     expect(screen.queryByRole("radio", { name: "Rogue" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /add a new class/i }));
     expect(screen.getByRole("radio", { name: "Rogue" })).toBeEnabled();
@@ -268,8 +261,6 @@ describe("LevelUpCeremony — class choice (#1170)", () => {
   });
 });
 
-// #1170: BG3-style per-level choice — Confirm on a level that leaves more
-// pending offers "Level up again" instead of leaving the ceremony.
 describe("LevelUpCeremony — level up again (#1170)", () => {
   it("shows the interstitial (not the sheet) when levels remain, and writes the submitted character to the cache", async () => {
     planMock.mockResolvedValue(plan([{ kind: "hitPoints", meta: HP_META }, { kind: "review" }]));
@@ -290,11 +281,9 @@ describe("LevelUpCeremony — level up again (#1170)", () => {
 
   it("'Level up again' re-enters the ceremony's first step with a clean draft", async () => {
     planMock.mockResolvedValue(plan([{ kind: "hitPoints", meta: HP_META }, { kind: "review" }]));
-    // Unlike the previous test, this one re-enters the ceremony after the
-    // submit response lands in the cache — LevelUpCeremony now reads the
-    // character via useCurrentCharacter(), so the response must carry the
-    // full fixture (classes/hitDice/etc.), not just the bumped fields, or
-    // the re-mounted HitPointsStep has nothing to render.
+    // LevelUpCeremony reads the character via useCurrentCharacter(), so the
+    // submit response must carry the full fixture, not just the bumped
+    // fields, or the re-mounted HitPointsStep has nothing to render.
     submitMock.mockResolvedValue({ ...character, pendingLevelUps: 1 } as Character);
     const user = userEvent.setup();
     renderCeremony();
@@ -310,7 +299,6 @@ describe("LevelUpCeremony — level up again (#1170)", () => {
     await user.click(screen.getByRole("button", { name: /level up again/i }));
 
     await waitFor(() => expect(screen.getByText("Step 1 of 2")).toBeInTheDocument());
-    // Fresh draft — Continue is disabled again until HP is re-chosen.
     expect(screen.getByRole("button", { name: /continue/i })).toBeDisabled();
   });
 

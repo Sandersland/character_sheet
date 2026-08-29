@@ -1,5 +1,3 @@
-// Pure per-mode HP op builder — keeps handleApply's branching out of the hook.
-
 import type { HitPointOperation } from "@/types/character";
 import type { HpMode } from "@/lib/hpAmount";
 
@@ -9,7 +7,6 @@ export interface HpApplyMeta {
   autoRollConcentration?: boolean;
 }
 
-/** Build the op batch for an HP apply; null = invalid amount, caller no-ops. */
 export function buildHpOps(
   mode: HpMode,
   amount: number,

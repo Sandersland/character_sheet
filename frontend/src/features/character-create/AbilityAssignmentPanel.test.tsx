@@ -25,7 +25,6 @@ const INERT_BONUSES: CreationBackgroundBonuses = {
   complete: false,
 };
 
-// #1681: the inert default for every test that doesn't exercise species bonuses.
 const INERT_SPECIES_BONUSES: CreationSpeciesBonuses = {
   applicable: false,
   fixed: {},
@@ -78,10 +77,9 @@ describe("AbilityAssignmentPanel — point buy", () => {
   it("disables + at the ceiling / budget and − at the floor", () => {
     const spent: AbilityScores = { ...ALL_EIGHT, strength: 15, dexterity: 15, constitution: 15 };
     renderPanel({ method: "pointBuy", scores: spent });
-    // strength at the 15 ceiling — can't increase; at floor'd int — can't decrease.
     expect(screen.getByRole("button", { name: "Increase Strength" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Increase Intelligence" })).toBeDisabled(); // budget spent
-    expect(screen.getByRole("button", { name: "Decrease Intelligence" })).toBeDisabled(); // floor
+    expect(screen.getByRole("button", { name: "Increase Intelligence" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Decrease Intelligence" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Decrease Strength" })).toBeEnabled();
   });
 
@@ -170,9 +168,7 @@ describe("AbilityAssignmentPanel — background bonus columns", () => {
     });
     expect((screen.getByRole("radio", { name: "+2 to Constitution" }) as HTMLInputElement).checked).toBe(true);
     expect((screen.getByRole("radio", { name: "+1 to Intelligence" }) as HTMLInputElement).checked).toBe(true);
-    // Only the three background abilities carry radios.
     expect(screen.queryByRole("radio", { name: "+2 to Strength" })).toBeNull();
-    // Exactly one +2 checked.
     const plusTwoChecked = screen
       .getAllByRole("radio", { name: /^\+2 to/ })
       .filter((r) => (r as HTMLInputElement).checked);
@@ -215,7 +211,6 @@ describe("AbilityAssignmentPanel — background bonus columns", () => {
       scores: { ...ALL_EIGHT, constitution: 13 },
       bonuses: sageBonuses({ constitution: 2, intelligence: 1 }),
     });
-    // CON 13 + 2 = 15.
     expect(screen.getByText("15")).toBeInTheDocument();
   });
 
@@ -236,8 +231,6 @@ describe("AbilityAssignmentPanel — no-bonus background", () => {
 
 describe("AbilityAssignmentPanel — mobile grid alignment (#1182)", () => {
   it("renders header + rows as ONE grid so columns align regardless of radio eligibility", () => {
-    // A bonus fixture mixes eligible (radio) and ineligible rows. Separate grids
-    // sized their `auto` tracks independently and misaligned — the regression.
     const { container } = renderPanel({
       method: "manual",
       bonuses: sageBonuses({ constitution: 2, intelligence: 1 }),
@@ -264,7 +257,6 @@ describe("AbilityAssignmentPanel — recommended", () => {
   });
 });
 
-// #1681: 2014 species/subrace ability increases.
 const hillDwarfBonuses: CreationSpeciesBonuses = {
   applicable: true,
   fixed: { constitution: 2, wisdom: 1 },
@@ -283,8 +275,6 @@ function halfElfBonuses(assignment: Partial<Record<AbilityName, number>> = {}): 
   };
 }
 
-// #1758: Astral Elf — a floating spread with no fixed increases (replace drops
-// the base +2 DEX), every ability eligible.
 const ALL_SIX_ABILITIES: AbilityName[] = ["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"];
 function astralElfBonuses(assignment: Partial<Record<AbilityName, number>> = {}): CreationSpeciesBonuses {
   return {
@@ -309,7 +299,6 @@ describe("AbilityAssignmentPanel — species bonuses (#1681)", () => {
       speciesBonuses: hillDwarfBonuses,
     });
     expect(screen.getByText("+2 Constitution, +1 Wisdom")).toBeInTheDocument();
-    // CON 13 + 2 = 15; no choose UI for a fixed-only species.
     expect(screen.getByText("15")).toBeInTheDocument();
     expect(screen.queryByRole("group", { name: "Species ability choice" })).toBeNull();
   });
@@ -322,14 +311,12 @@ describe("AbilityAssignmentPanel — species bonuses (#1681)", () => {
     await user.click(dex);
     expect(update).toHaveBeenCalledWith({ speciesAbilities: { strength: 1, dexterity: 1 } });
 
-    // Charisma isn't offered — it's the fixed ability, not a choice.
     expect(screen.queryByRole("button", { name: "Charisma" })).toBeNull();
   });
 
   it("disables unchecked options once `count` is reached", () => {
     renderPanel({ method: "manual", speciesBonuses: halfElfBonuses({ strength: 1, dexterity: 1 }) });
     expect(screen.getByRole("button", { name: "Constitution" })).toBeDisabled();
-    // A checked one stays enabled (so it can be unchecked).
     expect(screen.getByRole("button", { name: "Strength" })).toBeEnabled();
   });
 
@@ -346,7 +333,6 @@ describe("AbilityAssignmentPanel — floating species spread (#1758, Astral Elf)
     const user = userEvent.setup();
     const { update } = renderPanel({ method: "manual", speciesBonuses: astralElfBonuses({ dexterity: 2 }) });
 
-    // twoOne is the default mode — a +2 and +1 radio per ability, all six eligible.
     expect((screen.getByRole("radio", { name: "+2 to Dexterity" }) as HTMLInputElement).checked).toBe(true);
     expect(screen.getByRole("radio", { name: "+2 to Charisma" })).toBeInTheDocument();
 
@@ -359,12 +345,10 @@ describe("AbilityAssignmentPanel — floating species spread (#1758, Astral Elf)
     const { update } = renderPanel({ method: "manual", speciesBonuses: astralElfBonuses() });
 
     await user.click(screen.getByRole("button", { name: "+1 / +1 / +1" }));
-    // Switching clears the pool.
     expect(update).toHaveBeenCalledWith({ speciesAbilities: {} });
   });
 
   it("caps the +1/+1/+1 chips at three selections", () => {
-    // Three already chosen — a fourth is disabled.
     renderPanel({ method: "manual", speciesBonuses: astralElfBonuses({ strength: 1, dexterity: 1, constitution: 1 }) });
     expect(screen.getByRole("button", { name: "Intelligence" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Strength" })).toBeEnabled();

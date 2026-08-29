@@ -18,9 +18,7 @@ type HeaderVariant = "expanded" | "collapsed";
 
 type SheetMenuItem = { label: string; onSelect: () => void; danger?: boolean; disabled?: boolean; separatorBefore?: boolean };
 
-// Shared shape for the two breakpoint sub-headers (CollapsedBar / ExpandedSheetHeader):
-// the live pill + the "Sheet actions" ⋯ menu — both read the character
-// themselves via useCurrentCharacter() rather than taking it as a prop.
+// CollapsedBar and ExpandedSheetHeader each read the character via useCurrentCharacter() rather than taking it as a prop.
 interface SubHeaderProps {
   pill: React.ReactNode;
   menuItems: SheetMenuItem[];
@@ -28,28 +26,18 @@ interface SubHeaderProps {
 }
 
 interface MobileSheetHeaderProps {
-  /** Live-session controls folded into the "Sheet actions" menu while joined
-   *  (#979). Non-null ⇒ a session is live and this character is in it. onLeave is
-   *  omitted for a solo session (#1082) — Leave is campaign-only, End is not. */
+  // Non-null ⇒ a session is live and this character is in it; onLeave is omitted for a solo session (#1082) — Leave is campaign-only, End is not.
   sessionActions?: { busy: boolean; onLeave?: () => void; onEnd: () => void } | null;
-  /** Active combat round for the live pill (null → "Live"). */
   liveRound?: number | null;
-  /** Jump to the Combat tab — the live pill's tap target (#1026). */
   onGoToCombat?: () => void;
-  /** The sheet's scroll region has scrolled past the top; collapses the header to
-   *  a single bar (#1026). */
   scrolled?: boolean;
   onOpenCapture: () => void;
   onOpenSessions: () => void;
   onOpenActivity: () => void;
   onOpenDelete: () => void;
-  /** Opens the Campaign settings sheet (#1087); the ⋮ item shows only when the
-   *  caller passes a handler (gated on campaign attachment upstream). */
   onOpenCampaignSettings?: () => void;
 }
 
-/** Pulsing garnet live pill — the single live-state indicator (#1026), replacing
- *  the full-width "Session live" banner. Tapping it jumps to the Combat tab. */
 function LivePill({ round, onGoToCombat }: { round: number | null; onGoToCombat?: () => void }) {
   const state = round != null ? `Round ${round}` : "Live";
   return (
@@ -65,8 +53,6 @@ function LivePill({ round, onGoToCombat }: { round: number | null; onGoToCombat?
   );
 }
 
-/** Compact bordered AC badge (shield glyph + derived AC) that opens the AC
- *  breakdown. Reads `character.armorClass`, so equipping armor updates it live. */
 function AcBadge() {
   const { character } = useCurrentCharacter();
   return (
@@ -86,7 +72,6 @@ function AcBadge() {
   );
 }
 
-// The HP numbers (current/max/temp) — tabular so the meter edge stays put.
 function HpNumbers({ current, max, temp }: { current: number; max: number; temp: number }) {
   return (
     <span className="flex-none font-display text-sm font-semibold tabular-nums text-garnet-800">
@@ -97,12 +82,7 @@ function HpNumbers({ current, max, temp }: { current: number; max: number; temp:
   );
 }
 
-// One menu, not two (#979): while joined, Leave/End Session join Note/Sessions/
-// Activity/All characters (above Delete). "All characters" (#1027) is the ⋮
-// discoverability fallback for the identity-tap switcher. "Preferences…" is
-// unconditional (#1167): this immersive mobile shell hides AppHeader/AccountMenu
-// (`hidden md:flex`), so without this item mobile would lose that route entirely
-// while the sheet is open — other mobile routes (/, /campaigns, journal) keep it.
+// "Preferences…" is unconditional (#1167): this mobile shell hides AppHeader/AccountMenu, so without it mobile has no other way to reach Preferences while the sheet is open.
 function buildMenuItems(
   handlers: Pick<MobileSheetHeaderProps, "onOpenCapture" | "onOpenSessions" | "onOpenActivity" | "onOpenDelete" | "onOpenCampaignSettings">,
   onAllCharacters: () => void,
@@ -118,8 +98,7 @@ function buildMenuItems(
       ? [{ label: "Campaign settings…", onSelect: handlers.onOpenCampaignSettings }]
       : []),
     { label: "All characters", onSelect: onAllCharacters, separatorBefore: true },
-    // Leave is campaign-only (#1082): a solo session omits onLeave, so only End
-    // surfaces. The separator rides whichever item leads the session group.
+    // separatorBefore rides whichever of Leave/End leads the session group.
     ...(sessionActions?.onLeave
       ? [{ label: "Leave Session", onSelect: sessionActions.onLeave, disabled: sessionActions.busy, separatorBefore: true }]
       : []),
@@ -130,13 +109,6 @@ function buildMenuItems(
   ];
 }
 
-/**
- * Mobile-only (`md:hidden`) sticky mini-header — the phone counterpart to the
- * desktop garnet banner. A compact two-row strip: identity + live pill on row 1,
- * HP meter + AC badge on row 2 (#1026). Scrolling the sheet collapses it to a
- * single {@link CollapsedBar}. In both states the identity block is a button
- * opening the {@link CharacterSwitcherSheet} — the mobile route back out (#1027).
- */
 export default function MobileSheetHeader({
   sessionActions = null,
   liveRound = null,
@@ -151,9 +123,6 @@ export default function MobileSheetHeader({
   const { character } = useCurrentCharacter();
   const navigate = useNavigate();
   const [switcherOpen, setSwitcherOpen] = useState(false);
-  // Self-contained like switcherOpen (#1027) — the mobile sheet's own
-  // Preferences entry point (#1167), needed because this route's own chrome
-  // hides AppHeader/AccountMenu on mobile (`hidden md:flex`).
   const [prefsOpen, setPrefsOpen] = useState(false);
   const reducedMotion = usePrefersReducedMotion();
 
@@ -191,14 +160,7 @@ export default function MobileSheetHeader({
   );
 }
 
-/**
- * Animates the expanded⇄collapsed swap (#1083): pins the wrapper to the outgoing
- * height, eases it to the incoming height over 200ms, and crossfades the outgoing
- * variant out as an inert overlay (kept in normal a11y-hidden until it unmounts).
- * First mount and reduced-motion take the plain swap. transitionend finalizes,
- * with a 250ms fallback because that event is swallowed when the md breakpoint is
- * crossed or the tab is backgrounded (would otherwise leave height pinned).
- */
+// 250ms fallback because transitionend is swallowed when the md breakpoint is crossed or the tab is backgrounded.
 function CollapseAnimator({
   variant,
   render,
@@ -225,8 +187,7 @@ function CollapseAnimator({
       setCurrent(variant);
       return;
     }
-    // Capture the outgoing height BEFORE the swap so the wrapper can hold it,
-    // then (next effect) ease to the incoming height.
+    // Capture the outgoing height before the swap so the wrapper can hold it; the next effect eases to the incoming height.
     setHeight(wrapperRef.current?.offsetHeight ?? null);
     setOutgoing(current);
     setCurrent(variant);
@@ -269,8 +230,7 @@ function CollapseAnimator({
       {outgoing !== null && (
         <div
           key={`out-${outgoing}`}
-          // React 18 has no typed `inert` prop; set it imperatively so the
-          // fading-out overlay is untabbable while it lingers.
+          // React 18 has no typed `inert` prop; set it imperatively so the fading-out overlay is untabbable while it lingers.
           ref={(el) => {
             el?.setAttribute("inert", "");
           }}
@@ -284,11 +244,6 @@ function CollapseAnimator({
   );
 }
 
-/**
- * The collapsed one-line bar (#1026): avatar · name · HP + mini meter · live pill
- * · ⋯. The scroll-collapsed default — calm paper chrome so the panel below stays
- * the subject. Tapping the identity region opens the character switcher (#1027).
- */
 function CollapsedBar({ pill, menuItems, onOpenSwitcher }: SubHeaderProps) {
   const { character } = useCurrentCharacter();
   const { current, max, temp } = character.hitPoints;
@@ -302,7 +257,6 @@ function CollapsedBar({ pill, menuItems, onOpenSwitcher }: SubHeaderProps) {
   );
   return (
     <header className="z-30 flex shrink-0 items-center gap-2 border-b border-parchment-200 bg-parchment-50 px-4 py-2 shadow-sm md:hidden">
-      {/* Identity — opens the switcher (avatar + name + caret). */}
       <button
         type="button"
         onClick={onOpenSwitcher}
@@ -318,7 +272,6 @@ function CollapsedBar({ pill, menuItems, onOpenSwitcher }: SubHeaderProps) {
         <ChevronDown className="h-3.5 w-3.5 flex-none text-parchment-400" aria-hidden />
       </button>
 
-      {/* HP — its own tap target (#982): opens the shared "Hit Points" sheet. */}
       <ManageHpButton
         className="flex flex-none items-center gap-1.5 rounded-control px-1 py-0.5 transition-colors hover:bg-parchment-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600"
       >
@@ -331,28 +284,20 @@ function CollapsedBar({ pill, menuItems, onOpenSwitcher }: SubHeaderProps) {
   );
 }
 
-/**
- * The full (expanded) two-row header (#1026). Row 1: avatar + identity + caret +
- * live pill + ⋯. Row 2: HP numbers + full-width meter + AC badge. The identity
- * (avatar + name + subtitle) is a button opening the character switcher (#1027).
- */
 function ExpandedSheetHeader({ pill, menuItems, onOpenSwitcher }: SubHeaderProps) {
   const { character } = useCurrentCharacter();
   const { current, max, temp } = character.hitPoints;
 
-  // "Race · Class Level" — classSummary carries per-class levels for multiclass;
-  // single-class shows its own level (subclass moves to the trailing pill).
+  // classSummary carries per-class levels for multiclass; single-class shows its own level (subclass moves to the trailing pill).
   const multiclass = isMulticlass(character.classes);
   const classLine = multiclass
     ? classSummary(character.classes, { name: character.class })
     : `${character.class} ${character.level}`;
-  // Pill carries new info: subclass for single-class; for multiclass the
-  // subclasses already ride in classLine, so show the level instead.
+  // For multiclass the subclasses already ride in classLine, so the pill shows the level instead.
   const levelPill = !multiclass && character.subclass ? character.subclass : `Lvl ${character.level}`;
 
   return (
     <header className="z-30 shrink-0 border-b border-parchment-200 bg-parchment-50 px-4 py-2.5 shadow-sm md:hidden">
-      {/* Row 1: identity (switcher trigger) + live pill + actions */}
       <div className="flex items-center gap-2">
         <button
           type="button"
@@ -373,9 +318,7 @@ function ExpandedSheetHeader({ pill, menuItems, onOpenSwitcher }: SubHeaderProps
             <span className="block truncate text-xs text-parchment-600">
               {character.race} · {classLine}
             </span>
-            {/* Same Badge as the desktop banner (#1286) — kept out of the race/class
-                text node above so existing exact-text assertions don't need touching.
-                Label served with the sheet (#1436), never resolved client-side. */}
+            {/* Label served with the character (#1436), never resolved client-side. */}
             <Badge tone="neutral" className="mt-0.5">
               {character.rulesEditionLabel}
             </Badge>
@@ -388,8 +331,6 @@ function ExpandedSheetHeader({ pill, menuItems, onOpenSwitcher }: SubHeaderProps
         <OverflowMenu label="Sheet actions" items={menuItems} />
       </div>
 
-      {/* Row 2: HP numbers + full-width meter + AC badge. HP taps through to the
-          shared "Hit Points" sheet (#982). */}
       <div className="mt-2 flex items-center gap-2.5">
         <ManageHpButton
           className="flex min-w-0 flex-1 items-center gap-2.5 rounded-control px-1 py-0.5 text-left transition-colors hover:bg-parchment-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600"

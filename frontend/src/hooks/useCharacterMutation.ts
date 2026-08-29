@@ -30,16 +30,14 @@ export interface CharacterMutationResult<TVars, TResult> {
 }
 
 /**
- * The shared write path for every character transaction endpoint (#1283):
- * fires `mutationFn`, writes the ONLY authoritative copy of the result into the
+ * Writes the ONLY authoritative copy of a mutation's result into the
  * character query cache (no `invalidateQueries` — a refetch would race a
- * correct value backwards), and surfaces a friendly error via the existing
- * `errorMessage()` convention.
+ * correct value backwards), and surfaces a friendly error via
+ * `errorMessage()`.
  *
  * `scope` serializes same-character mutations — without it, `useMutation`'s
- * default concurrent execution lets the last RESPONSE win instead of the last
- * REQUEST (spamming HP buttons could persist a stale character); see
- * useCharacterMutation.test.ts's out-of-order test.
+ * default concurrent execution lets the last RESPONSE win instead of the
+ * last REQUEST (spamming HP buttons could persist a stale character).
  */
 export function useCharacterMutation<TVars, TResult>({
   characterId,

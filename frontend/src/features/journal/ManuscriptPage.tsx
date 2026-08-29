@@ -1,11 +1,3 @@
-// The manuscript "page" of the field chronicle (#864): the reading + writing
-// surface for one selected chapter. A centered chapter heading (overline, serif
-// title, ornamental rule + gold diamond) sits over the chapter's ENTRY rows —
-// rendered as serif prose with a drop cap — and its NOTE rows as a "Field notes"
-// list with margin timestamps and a lock glyph for private notes. Inked @-mentions
-// come from MentionText. Writing happens through a bottom NOTE composer and a
-// "＋ New entry" long-form flow; edit/delete are inline (never a Modal).
-
 import { useEffect, useRef, useState } from "react";
 
 import { Lock, Plus } from "@/components/ui/icons";
@@ -21,9 +13,7 @@ import type { CampaignEntity, EntryVisibility, JournalEntry } from "@/types/char
 interface ManuscriptPageProps {
   chapter: ChronicleChapter;
   entities: Map<string, CampaignEntity>;
-  /** True when this character participates in the session (may rename the chapter). */
   canRename: boolean;
-  /** Persist a new chapter title (PATCH session); resolves true on success. */
   onRename: (title: string) => Promise<boolean>;
 }
 
@@ -38,7 +28,6 @@ const ORNAMENT = (
   </div>
 );
 
-// Shared row-level UI state: which row is open for edit / delete-confirm.
 interface RowState {
   editingId: string | null;
   confirmDeleteId: string | null;
@@ -160,8 +149,6 @@ export default function ManuscriptPage({
   );
 }
 
-// The chapter's ENTRY rows (prose) and NOTE rows (field notes), each already
-// sorted for reading: prose oldest-first, field notes chronological.
 function splitChapterEntries(journal: JournalEntry[], chapter: ChronicleChapter) {
   const chapterEntries = journal.filter((e) =>
     chapter.sessionId ? e.sessionId === chapter.sessionId : !e.sessionId,
@@ -215,7 +202,6 @@ function ChronicleHeader({
   );
 }
 
-// ENTRY prose — the first paragraph carries a drop cap.
 function EntryList({
   entries,
   row,
@@ -254,7 +240,6 @@ function EntryList({
   );
 }
 
-// Field notes — the fast in-session NOTE rows with margin timestamps.
 function FieldNotes({
   notes,
   row,
@@ -310,7 +295,6 @@ function FieldNotes({
   );
 }
 
-// The centered chapter title, editable in place by a session participant.
 function ChapterTitle({
   title,
   canRename,
@@ -388,7 +372,6 @@ function ChapterTitle({
   );
 }
 
-// Inline edit/delete affordances for a prose entry or a field note.
 function RowActions({
   entry,
   row,
@@ -438,7 +421,6 @@ function RowActions({
   );
 }
 
-// Bottom inline NOTE composer — Enter saves, Shift+Enter newlines (mirrors CapturePalette).
 function ChapterComposer({
   campaignId,
   busy,

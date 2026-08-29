@@ -4,13 +4,6 @@ import Popover from "@/components/ui/Popover";
 import ArmorClassBreakdown from "@/features/character-meta/ArmorClassBreakdown";
 import RollButton from "@/features/dice/RollButton";
 
-/**
- * Always-on stat cards for the sheet banner — AC / Initiative / Speed /
- * Proficiency. The only combat numbers that stay visible across every tab; HP
- * lives in the Combat tab, not here (#1085). Styled for the light parchment
- * banner (bordered cards, garnet values). AC keeps its labeled breakdown popover
- * and Initiative stays rollable.
- */
 const CHIP =
   "flex min-w-[68px] flex-col items-center justify-center rounded-control border border-parchment-200 bg-parchment-50 px-4 py-2 shadow-card";
 const VALUE = "font-display text-xl font-semibold leading-none text-garnet-700";
@@ -30,7 +23,7 @@ export default function BannerVitals() {
   const { character } = useCurrentCharacter();
   return (
     <div className="flex flex-wrap gap-2">
-      {/* AC — read-only; click discloses the labeled breakdown. */}
+      
       <Popover
         label="Armor Class breakdown"
         triggerClassName={`${CHIP} ${FOCUS}`}
@@ -44,7 +37,7 @@ export default function BannerVitals() {
         <ArmorClassBreakdown />
       </Popover>
 
-      {/* Initiative — rollable. */}
+      
       <RollButton
         spec={{ count: 1, faces: 20, modifier: character.initiativeBonus }}
         label="Initiative"
@@ -57,7 +50,7 @@ export default function BannerVitals() {
 
       <StatChip label="Speed" value={`${character.speed} ft`} />
 
-      {/* Dragon Wings (#1123) — present only while unarmored at Draconic L14. */}
+      
       {character.flySpeed !== undefined && <StatChip label="Fly Speed" value={`${character.flySpeed} ft`} />}
 
       <StatChip label="Proficiency" value={formatModifier(character.proficiencyBonus)} />

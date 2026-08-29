@@ -1,24 +1,6 @@
 /**
- * useDeflectAttacksReaction — Deflect Attacks (SRD 5.2, Monk L3/L13) /
- * Deflect Missiles (SRD 5.1, Monk L3, #1505) reaction. A sibling hook
- * composed directly in TurnHub (like useTallyResolve) rather than nested
- * inside useTurnActions (#1241) — keeps that hook's own hook-count/
- * complexity budget clear of a self-contained, occasionally-used reaction;
- * mirrors useManeuverDie's shape (owns its own API call and busy/error state
- * rather than routing through useTurnActions).
- *
- * The base reduction is free (no persisted resource, like the Warrior of Shadow
- * shadowStep reminder in actionResolvers.ts): the client rolls 1d10 + Dex + monk
- * level and never calls the transactions endpoint. Only the optional redirect —
- * once a ranged hit is reduced to 0 — spends a resource (1 Focus/2024, 1
- * ki/2014), a real persisted spend. Which base row and which redirect key are
- * live is read off `availableActions` (#1505) — a character is served exactly
- * one edition's pair, never both, so `deflectBaseAction` alone decides every
- * branch below.
- *
- * The pending-redirect flag resets itself off `reactionUsed` (turnState already
- * flips this back to false at start-of-turn / end-of-turn / end-of-combat), so
- * no caller needs to remember to reset it explicitly.
+ * Deflect Attacks (SRD 5.2, Monk L3/L13) / Deflect Missiles (SRD 5.1, Monk L3, #1505) reaction.
+ * A character is served exactly one edition's action pair, never both, so `deflectBaseAction` decides every branch below.
  */
 
 import { useEffect, useState } from "react";
@@ -47,14 +29,7 @@ export interface UseDeflectAttacksReactionArgs {
 }
 
 export interface UseDeflectAttacksReactionReturn {
-  /** True once the base roll fired and the redirect's resource remains — gates the redirect button. */
   deflectRedirectAvailable: boolean;
-  /** The redirect button's label — the served redirect row's own `name`
-   *  ("Deflect Attacks — Redirect" in SRD 5.2, "Deflect Missiles — Throw Back"
-   *  in SRD 5.1) plus the character's served spend-pool label ("Focus Points" /
-   *  "Ki Points"), e.g. "Deflect Attacks — Redirect · spend 1 Focus Points".
-   *  Fully served-derived — no per-edition literal. Empty when no redirect row
-   *  is served; just the name when the pool isn't. */
   redirectLabel: string;
   busy: boolean;
   error: string | null;
@@ -91,13 +66,10 @@ export function useDeflectAttacksReaction({
     fallbackMessage: "Redirect failed.",
   });
 
-  // Reuses deriveActions' own resourceKey gating (pool remaining >= its cost)
-  // rather than re-checking the pool here, same as every other resource-gated action.
+  // Relies on backend deriveActions' resourceKey gating for `enabled` — don't re-check the pool here.
   const redirectAction = availableActions.find((a) => a.key === redirectKey);
   const deflectRedirectAvailable = pending && (redirectAction?.enabled ?? false);
-  // The redirect follow-up spends exactly one point in either edition (SRD 5.2 /
-  // PHB'24 p.90 Deflect Attacks; SRD 5.1 / PHB'14 p.77 Deflect Missiles), so the
-  // count is a fixed connective — only the served pool's label (focus vs ki) varies.
+  // Redirect spends exactly one point in either edition (PHB'24 p.90 Deflect Attacks; PHB'14 p.77 Deflect Missiles).
   const redirectPool = redirectAction
     ? character.resources?.pools?.find((p) => p.key === "focus" || p.key === "ki")
     : undefined;
@@ -110,9 +82,6 @@ export function useDeflectAttacksReaction({
   function handleDeflectAttacks() {
     if (mutation.isPending || !baseAction) return;
     const reductionSpec = deflectRollFromAction(baseAction);
-    // An enabled button must never silently no-op: a stale character whose row
-    // is missing its served spec surfaces an error rather than swallowing the
-    // click, and leaves the reaction unspent so a refetch can retry.
     if (!reductionSpec) {
       setShowReactionMenu(false);
       setReactionMessage("Deflect couldn't roll — reload the character sheet and try again.");
@@ -129,8 +98,7 @@ export function useDeflectAttacksReaction({
     if (!deflectRedirectAvailable || mutation.isPending) return;
     const redirectSpec = deflectRollFromAction(redirectAction);
     if (!redirectSpec) {
-      // Reset pending too, or the redirect button stays enabled all turn with
-      // no path to recovery but End Turn.
+      // Reset pending too, or the redirect button stays enabled all turn with no path to recovery but End Turn.
       setPending(false);
       setReactionMessage((prev) => `${prev ?? ""} Redirect couldn't roll — reload the character sheet and try again.`.trim());
       return;
@@ -145,10 +113,7 @@ export function useDeflectAttacksReaction({
       setReactionMessage((prev) => `${prev ?? ""} ${redirectMessage}`.trim());
       setPending(false);
     } catch {
-      // Reset pending so the failed redirect can't re-enable and double-spend
-      // once mutation.isPending clears; surface the failure in the toast — the
-      // reactionUsed result strip shows reactionMessage, not mutation.error
-      // (that renders only in the pre-use branch, closed after consumeReaction).
+      // Resets pending so a failed redirect can't re-enable and double-spend; the post-use result strip shows reactionMessage, not mutation.error.
       setPending(false);
       setReactionMessage((prev) => `${prev ?? ""} Redirect failed — try again.`.trim());
     }

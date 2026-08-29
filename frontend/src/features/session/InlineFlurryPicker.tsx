@@ -1,17 +1,5 @@
-// The Flurry of Blows sheet (#1217, rewired onto the shared resolver #1845):
-// SRD 5.2 Focus — "Expend 1 Focus Point to make two Unarmed Strikes as a
-// Bonus Action" (three at Heightened Focus, monk L10, #1244 — not yet built).
-// Modeled on InlineOffHandPicker's rail shell but looping over
-// `turnState.bonusAttack.total` strikes instead of TWF's fixed single swing:
-// forms is always [Unarmed Strike] (buildUnarmedOnlyForms), so there is no
-// weapon toggle — matching the 2024 rule (unlike the pre-#1217 generic
-// attack-picker this replaced). The roll/commit wiring is shared with
-// InlineOffHandPicker via useBonusAttackSheet.
-//
-// The 1 Focus spend is deferred to the first strike roll (onCommitFocusSpend,
-// wired to useBonusAttackSheet's onFirstStrike) rather than fired when the
-// sheet opens — opening the sheet only consumes the (reversible) bonus
-// action, so cancelling before rolling any strike costs no Focus at all.
+// SRD 5.2 Focus: "Expend 1 Focus Point to make two Unarmed Strikes as a Bonus Action."
+// The Focus spend is deferred to the first strike roll (onCommitFocusSpend), not fired on open, so cancelling before rolling any strike costs no Focus.
 
 import { useState } from "react";
 
@@ -30,13 +18,9 @@ import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 
 interface InlineFlurryPickerProps {
   turnState: TurnState & TurnStateActions;
-  /** Commit and dismiss (bonus action already spent on open; Focus was spent on the first strike, if any). */
   onClose: () => void;
-  /** Back out before rolling any strike — refunds the bonus action. No Focus is spent yet, so there's nothing to refund there. */
   onCancel: () => void;
-  /** Called after a roll is logged so the Session Log can refresh. */
   onLogChanged: () => void;
-  /** Spends the 1 Focus Point — fired once, on the first strike roll (#1217). */
   onCommitFocusSpend: () => void;
 }
 
@@ -48,7 +32,6 @@ export default function InlineFlurryPicker({
   onCommitFocusSpend,
 }: InlineFlurryPickerProps) {
   const { character } = useCurrentCharacter();
-  // The sheet's own ADV/DIS choice (#958), same as the main Attack sheet.
   const [attackMode, setAttackMode] = useState<RollMode>("normal");
 
   const forms = buildUnarmedOnlyForms(character);
@@ -103,12 +86,7 @@ export default function InlineFlurryPicker({
       {commitError && <p className="text-xs font-semibold text-garnet-700">{commitError}</p>}
     </div>
   );
-  // Mirrors InlineAttackPicker's own footer-timing comment: keyed off
-  // `completedSwings` (only advances once a strike's resolveAction commit
-  // lands), NOT `turnState.bonusAttack.used` — that counter ticks the
-  // instant to-hit rolls (the tally bridge's own `record` call), which would
-  // otherwise show the footer's OWN "Done"/"Close" one beat ahead of
-  // ResolutionRail's completion tap for the strike still in flight.
+  // Keyed off completedSwings, not turnState.bonusAttack.used, which ticks the instant to-hit rolls — avoids the footer flipping to Done/Close ahead of ResolutionRail's own completion tap.
   const preRoll = completedSwings === 0 && !resolutionView.toHitRoll;
   const attacksRemain = !preRoll && completedSwings < totalSwings;
   const footer = (

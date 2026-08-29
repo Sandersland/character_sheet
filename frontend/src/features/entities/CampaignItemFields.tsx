@@ -237,9 +237,8 @@ export function IdentityFieldset({ form, setters }: FieldsProps) {
 
 export function CategoryDetailsFieldset({ form, setters }: FieldsProps) {
   const { set } = setters;
-  // Weapon/armor placement is derived from detail data — show it read-only so the
-  // DM sees where it lands without a picker. No character and no saved row exists
-  // yet, so this previews the form state rather than reading a served flag.
+  // No saved item row exists yet, so this previews slot placement from form
+  // state rather than a served flag.
   const equipsToSlots = previewEquipSlots(form);
 
   return (
@@ -311,9 +310,9 @@ export function MagicFieldset({ form, setters, rarities, edition }: FieldsProps 
   return (
     <fieldset className={fieldsetCls}>
       <legend className={legendCls}>Magic</legend>
-      {/* Disabled until the served tiers land (#1437): an enabled dropdown whose
-          only selectable value is "Mundane (none)" would let one click strip an
-          existing magic item's rarity, attunement gating and this whole fieldset. */}
+      {/* Disabled until the served tiers land (#1437) — an enabled empty dropdown
+          would let one click strip an existing item's rarity, attunement gating,
+          and this whole fieldset. */}
       <Field label="Rarity" htmlFor="item-rarity" hint={isMagic ? rarityHint : undefined}>
         <Select
           id="item-rarity"
@@ -327,10 +326,8 @@ export function MagicFieldset({ form, setters, rarities, edition }: FieldsProps 
               {o.label}
             </option>
           ))}
-          {/* An existing magic item's tier before the rows land: without an
-              option carrying it, the select would fall back to the first one and
-              tell the DM a Very Rare item is Mundane. The raw enum key still
-              never paints — the label waits for the wire. */}
+          {/* Without this option carrying the existing rarity, the select would
+              fall back to "Mundane" before the label lands. */}
           {form.rarity !== "" && rarities.length === 0 && (
             <option value={form.rarity}>Loading…</option>
           )}

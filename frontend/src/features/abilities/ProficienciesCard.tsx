@@ -1,17 +1,5 @@
-/**
- * ProficienciesCard — unified display of weapon, armor, and tool proficiencies.
- *
- * All three sub-sections (Weapons / Armor / tool categories) use the same
- * `ProficiencyRow` chip (dot · name · source pill · optional [+PB] · optional
- * [✕]) so the card fills its horizontal space instead of stretching one
- * centered column. Weapon/armor rows omit the bonus and forget slots
- * entirely rather than reserving a spacer for cross-section alignment —
- * that width goes to the label instead (#1168).
- *
- * Tool interactivity (Student-of-War picker, forget buttons) is folded in here
- * so the call site can render a single component. Weapons and armor are derived
- * server-side at read time (class + race + feats) and are read-only.
- */
+// Weapon and armor proficiencies are derived server-side at read time
+// (class + race + feats); this card only displays them, never edits them.
 
 import { applyResourceTransactions } from "@/api/client";
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
@@ -35,7 +23,6 @@ interface Props {
   artisanTools: ToolOption[];
 }
 
-// Tool grouping helpers — identical to the ones that were in ToolProficienciesCard.
 const CATEGORY_LABELS: Record<ToolProficiency["category"], string> = {
   artisan:           "Artisan's Tools",
   gamingSet:         "Gaming Sets",
@@ -63,7 +50,6 @@ function groupByCategory(
     .map((cat) => ({ category: cat, tools: grouped.get(cat)! }));
 }
 
-/** Sort armor proficiencies in canonical display order (light → medium → heavy → shield). */
 function sortedArmor(profs: ArmorProficiency[]): ArmorProficiency[] {
   return [...profs].sort(
     (a, b) =>
@@ -74,14 +60,9 @@ function sortedArmor(profs: ArmorProficiency[]): ArmorProficiency[] {
 
 interface ProficiencyRowProps {
   label: string;
-  /** Accepts the full ProficiencySource union; narrowed types (weapon/armor/tool)
-   *  are all subsets so TypeScript is happy at each call site. */
+  // Accepts the full ProficiencySource union so narrower call-site types satisfy it.
   source: ProficiencySource;
-  /** "+3" etc. — tool rows only. When omitted the slot is skipped entirely;
-   *  weapon/armor rows reclaim that width for the label instead of reserving
-   *  a spacer (#1168). */
   bonus?: string;
-  /** Forget callback — subclass-granted tools only. */
   onForget?: () => void;
   disabled?: boolean;
 }
@@ -95,15 +76,13 @@ function ProficiencyRow({
 }: ProficiencyRowProps) {
   return (
     <div className="flex items-center gap-2.5 border-b border-parchment-200/70 py-1.5 last:border-b-0">
-      {/* Proficiency dot */}
+      
       <span
         className="block h-2 w-2 shrink-0 rounded-full bg-garnet-500"
         aria-hidden="true"
       />
 
-      {/* Name — left-aligned, wraps instead of truncating so long labels
-          (category names, subclass-granted tools) are always fully
-          readable (#1168); title tooltip is a hover backstop */}
+      {/* No truncate class — long labels must stay fully readable (#1168); title is a hover backstop. */}
       <span
         className="min-w-0 flex-1 text-sm font-medium text-parchment-900"
         title={label}
@@ -111,9 +90,7 @@ function ProficiencyRow({
         {label}
       </span>
 
-      {/* Source pill — abbreviates when the source label is long (e.g. a
-          subclass name) so it can't crowd out the proficiency label; the
-          full label is still reachable via title (#1168) */}
+      {/* Abbreviated pill so a long source name can't crowd the label; full name stays reachable via title (#1168). */}
       <span
         className="shrink-0 rounded-full bg-parchment-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-parchment-600"
         title={SOURCE_LABELS[source]}
@@ -121,14 +98,14 @@ function ProficiencyRow({
         {sourcePillLabel(source)}
       </span>
 
-      {/* Bonus — tools only; weapon/armor rows omit it rather than reserve a spacer */}
+      
       {bonus !== undefined && (
         <span className="shrink-0 text-right text-sm font-semibold tabular-nums text-parchment-900">
           {bonus}
         </span>
       )}
 
-      {/* Forget — subclass-granted tools only; omitted (no spacer) everywhere else */}
+      
       {onForget && (
         <button
           onClick={onForget}
@@ -156,10 +133,7 @@ function ProficiencySection({
       <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
         {title}
       </h4>
-      {/* Chip grid sized off the card's own rendered width via container
-          queries, not viewport breakpoints — a narrow Overview sub-column
-          used to still get the wide-viewport column count and clip labels
-          (#1168). Capped at 2 columns; 1 below @sm. */}
+      {/* @container-based sizing — viewport breakpoints would revert to wide-viewport column counts and clip labels (#1168). */}
       <div className="grid grid-cols-1 gap-x-6 gap-y-1.5 @sm:grid-cols-2">
         {children}
       </div>
@@ -167,11 +141,8 @@ function ProficiencySection({
   );
 }
 
-// Two mutations (not one) — learn/forget keep distinct fallback copy; both
-// share one `character-${id}` scope so they (and every other character
-// mutation) can never race each other. Split out of ProficienciesCard so its
-// own hook-composition + try/catch branches don't count against that
-// component's complexity budget.
+// learnMutation and forgetMutation share one character-${id} scope so they
+// (and every other character mutation) can't race each other.
 function useToolProficiencyMutations(character: Character) {
   const learnMutation = useCharacterMutation({
     characterId: character.id,
@@ -222,13 +193,11 @@ export default function ProficienciesCard({
   const tools = character.toolProficiencies ?? [];
   const resources = character.resources;
 
-  // Student-of-War picker is shown when the subclass grants a choice not yet filled.
   const toolProfChoiceCount = resources?.toolProfChoiceCount ?? 0;
   const toolProfKnownCount = resources?.toolProficienciesKnown.length ?? 0;
   const canChooseArtisanTool =
     toolProfChoiceCount > 0 && toolProfKnownCount < toolProfChoiceCount;
 
-  // Names already chosen via subclass — don't offer them again.
   const alreadyChosenSubclassNames = new Set(
     (resources?.toolProficienciesKnown ?? []).map((t) => t.name)
   );
@@ -251,7 +220,7 @@ export default function ProficienciesCard({
         </p>
       )}
 
-      {/* Weapons */}
+      
       {weapons.length > 0 && (
         <ProficiencySection title="Weapons">
           {weapons.map((p) => (
@@ -260,7 +229,7 @@ export default function ProficienciesCard({
         </ProficiencySection>
       )}
 
-      {/* Armor */}
+      
       {armor.length > 0 && (
         <ProficiencySection title="Armor">
           {armor.map((p) => (
@@ -273,7 +242,7 @@ export default function ProficienciesCard({
         </ProficiencySection>
       )}
 
-      {/* Tools — grouped by category */}
+      
       {grouped.map(({ category, tools: catTools }) => (
         <ProficiencySection key={category} title={CATEGORY_LABELS[category]}>
           {catTools.map((tool) => {
@@ -300,7 +269,7 @@ export default function ProficienciesCard({
         </ProficiencySection>
       ))}
 
-      {/* Student of War artisan's-tool picker */}
+      
       {canChooseArtisanTool && (
         <div>
           <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-parchment-600">

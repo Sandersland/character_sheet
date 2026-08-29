@@ -167,10 +167,6 @@ describe("spellToResolution", () => {
     expect(spellToResolution(noCastCost, 0, STATS).cost).toEqual({ kind: "action" });
   });
 
-  // #1848 review (plausible finding): a "save"-type spell with no saveAbility
-  // is broken catalog data — previously this silently fell through to the
-  // auto-hit shape (effect present, no save announced), which would deal
-  // real rolled damage with no save prompt at all. Suppress the effect too.
   it("a broken save spell (attackType save, no saveAbility) resolves to a bare no-roll shape — never a false auto-hit", () => {
     const brokenSaveSpell: Spell = { ...SACRED_FLAME, saveAbility: null };
 

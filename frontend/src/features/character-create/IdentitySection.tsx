@@ -5,22 +5,18 @@ import { ABILITY_LABELS } from "@/lib/abilities";
 import type { CharacterDraft } from "@/hooks/useCharacterDraft";
 import type { ReferenceData } from "@/types/character";
 
-// #1683: the three abilities a 2024 spell-granting lineage/legacy may use —
-// "choose the ability when you select the lineage" (PHB'24). A fixed
-// sub-list of AbilityName, not the full six-ability set the sheet's other
-// pickers offer.
+// PHB'24: choose one of three abilities (not the full six) when you select a spell-granting lineage/legacy.
 const CASTING_ABILITIES = ["intelligence", "wisdom", "charisma"] as const;
 
 interface IdentitySectionProps {
   draft: CharacterDraft;
   update: (patch: Partial<CharacterDraft>) => void;
   reference: ReferenceData;
-  /** #1616: staged locally (deferred mode) — uploaded by save() after create. */
+  // Staged locally (deferred mode); uploaded by save() after create.
   portraitFile: File | null;
   onPortraitChange: (file: File | null) => void;
 }
 
-// Inline marker for required form fields.
 function RequiredMark() {
   return (
     <span className="text-garnet-700" aria-hidden="true" title="Required">
@@ -88,10 +84,7 @@ export default function IdentitySection({
           <select
             value={draft.speciesId}
             onChange={(e) =>
-              // Changing species resets the variant — a variant id only ever
-              // means something relative to its own parent species (#1680) —
-              // and the casting-ability choice, which only ever means
-              // something relative to its own variant/species (#1683).
+              // A variantId and castingAbility only mean something relative to their own species, so changing species resets both (#1680, #1683).
               update({ speciesId: e.target.value, variantId: "", castingAbility: "" })
             }
             className="rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1.5 text-sm font-normal normal-case text-parchment-900"
@@ -105,9 +98,6 @@ export default function IdentitySection({
           </select>
         </label>
 
-        {/* Variant panel — renders ONLY when the chosen species has variant rows
-            (2014 subrace / 2024 lineage-legacy-ancestry); a variantless species
-            (2014 Human) shows no second panel at all (#1680). */}
         {(() => {
           const selectedSpecies = reference.species.find((s) => s.id === draft.speciesId);
           if (!selectedSpecies || selectedSpecies.variants.length === 0) return null;
@@ -120,9 +110,7 @@ export default function IdentitySection({
               <select
                 value={draft.variantId}
                 onChange={(e) =>
-                  // Changing variant resets the casting-ability choice — it
-                  // only ever means something relative to the CHOSEN variant
-                  // (#1683: a Wood Elf pick has no such choice at all).
+                  // castingAbility only means something relative to the chosen variant, so changing variant resets it (#1683).
                   update({ variantId: e.target.value, castingAbility: "" })
                 }
                 className="rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1.5 text-sm font-normal normal-case text-parchment-900"
@@ -138,12 +126,7 @@ export default function IdentitySection({
           );
         })()}
 
-        {/* Casting-ability picker (#1683) — renders ONLY when the resolved
-            species+variant grants a spell (needsCastingAbility, server-
-            resolved, never re-derived here): 2024 Elf's Drow/High Elf/Wood
-            Elf, Gnome's Forest/Rock, Tiefling's Abyssal/Chthonic/Infernal. The
-            variant's own flag wins when a variant is chosen; falls back to
-            the species' own flag for a variantless grant (none seeded yet). */}
+        {/* needsCastingAbility is server-resolved (#1683) — never re-derived here. */}
         {(() => {
           const selectedSpecies = reference.species.find((s) => s.id === draft.speciesId);
           const selectedVariant = selectedSpecies?.variants.find((v) => v.id === draft.variantId);
@@ -187,7 +170,6 @@ export default function IdentitySection({
           <select
             value={draft.className}
             onChange={(e) => {
-              // Changing class resets skill choices, equipment, and subclass.
               const newClassName = e.target.value;
               const newClassDef = reference.classes.find((c) => c.name === newClassName);
               update({
@@ -212,7 +194,6 @@ export default function IdentitySection({
           </select>
         </label>
 
-        {/* Subclass picker — a select for L1 subclasses; disabled with explanatory text for classes that grant later. */}
         {(() => {
           const classDef = reference.classes.find((c) => c.name === draft.className);
           if (!classDef || classDef.subclasses.length === 0) return null;
@@ -284,10 +265,6 @@ export default function IdentitySection({
                 aria-label="Background"
                 value={draft.background}
                 onChange={(e) => {
-                  // Changing background resets skills/tools/ability-spread AND
-                  // its own equipment draft (#1565) — same reset-on-change shape
-                  // as the class select above, mirrored for the background's
-                  // independent package.
                   const newBackgroundName = e.target.value;
                   const newBackgroundDef = reference.backgrounds.find((b) => b.name === newBackgroundName);
                   update({

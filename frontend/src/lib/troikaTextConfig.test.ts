@@ -1,8 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Spy on troika's global config setter so we can assert the worker is disabled
-// at bootstrap (the #408 fix: main-thread text avoids the blob: importScripts the
-// single-origin CSP blocks). Mock must be declared before importing the module.
+// vi.mock must be declared before importing the module under test.
 vi.mock("troika-three-text", () => ({
   configureTextBuilder: vi.fn(),
 }));

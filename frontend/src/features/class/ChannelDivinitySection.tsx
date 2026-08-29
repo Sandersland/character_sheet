@@ -1,11 +1,3 @@
-/**
- * ChannelDivinitySection — the Cleric/Paladin Channel Divinity block inside
- * ClassFeaturesSection. Fetches the character-scoped entitled options (gated per
- * class/subclass/level server-side) and wires each use to the orchestrator.
- * Mirrors ShadowArtsSection; each use spends 1 CD charge and surfaces its result
- * (save DC, applied buff/condition, or reminder) through the re-rendered character.
- */
-
 import { useEffect, useState } from "react";
 
 import { fetchChannelDivinity } from "@/api/client";
@@ -26,7 +18,7 @@ export default function ChannelDivinitySection({ busy, onCast }: Props) {
   const [catalog, setCatalog] = useState<CatalogChannelDivinity[] | null>(null);
   const [catalogError, setCatalogError] = useState<string | null>(null);
 
-  // The mounted flag alone is the StrictMode-safe fetch guard (see ShadowArtsSection).
+  // The mounted flag alone is the StrictMode-safe fetch guard.
   useEffect(() => {
     let mounted = true;
     fetchChannelDivinity(character.id)

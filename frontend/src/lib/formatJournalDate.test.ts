@@ -8,8 +8,6 @@ describe("formatJournalDate", () => {
   });
 
   it("does not shift the day backwards for a UTC-midnight date", () => {
-    // Formatted in UTC, so the calendar day must be preserved regardless of the
-    // host timezone.
     expect(formatJournalDate("2026-01-01T00:00:00.000Z")).toBe("Jan 1, 2026");
   });
 
@@ -42,7 +40,6 @@ describe("formatRelativeDay", () => {
   });
 
   it("diffs UTC calendar days, not elapsed 24h windows", () => {
-    // Less than 24h before now, but the previous UTC day → yesterday.
     expect(formatRelativeDay("2026-07-11T23:59:00.000Z")).toBe("yesterday");
   });
 

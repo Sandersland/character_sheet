@@ -1,20 +1,4 @@
-// Shared step-rail wiring for a bonus-action attack sheet driven by the
-// shared resolver (epic #1827; rewired off useAttackRolls/AttackStepCard onto
-// useResolution/ResolutionRail, #1845) — the TWF off-hand swing
-// (InlineOffHandPicker, #732, 1 swing) or Flurry of Blows' Unarmed Strikes
-// (InlineFlurryPicker, #1217, 2+ swings). Mirrors InlineAttackPicker's own
-// wiring (#1832: useResolution + useAttackTallyBridge + a resolveAction
-// commit), generalized over `totalSwings`/`record` so TWF's always-1 swing
-// and Flurry's multi-strike loop share one hook instead of two copies — each
-// picker still owns its own forms/footer/kicker composition (TWF has no
-// Resume; Flurry loops with a live counter and its own ADV/DIS control).
-//
-// Split into useBonusResolution (the resolveAction wiring) and
-// useBonusAttackSheet (adds the tally-strip/maneuvers JSX on top) so neither
-// function's own closure count trips the complexity gate — fallow scores a
-// hook's cognitive load by its delegating closures, so branch-only extraction
-// doesn't help; splitting the closures across two hooks does (same reasoning
-// as the pre-#1845 version of this file).
+// Split into useBonusResolution and useBonusAttackSheet because fallow scores a hook's cognitive load by its delegating closures — splitting the closures across two hooks (not just branches) is what keeps this under the complexity gate.
 
 import { useRef, useState } from "react";
 
@@ -36,13 +20,7 @@ import type { RecordedAttack, TurnState, TurnStateActions } from "@/features/ses
 import type { ResolveActionEventEffect, TurnResolution } from "@character-sheet/shared-types";
 import type { Character } from "@/types/character";
 
-// A bonus swing always resolves ONE served AttackEntry (buildBonusSwingEntry
-// for TWF, the Flurry Unarmed Strike row) — but `entry` can be null (no
-// off-hand weapon equipped), and useResolution/useAttackTallyBridge must stay
-// UNCONDITIONAL hook calls either way. This placeholder's `cost` carries no
-// toHit/save/effect, so every useResolution handler is a permanent no-op
-// (its own guards), and it's never rendered — the picker shows its "No
-// off-hand weapon" message instead of the rail when `entry` is null.
+// `entry` can be null (no off-hand weapon), but useResolution/useAttackTallyBridge must stay unconditional hook calls — this placeholder's cost carries no toHit/save/effect, so every handler is a permanent no-op, and it's never rendered.
 const NO_ENTRY_RESOLUTION: TurnResolution = { source: "", cost: { kind: "bonusAction" } };
 const NO_ENTRY_PLACEHOLDER: AttackEntry = {
   id: "__none__",
@@ -58,16 +36,7 @@ const NO_ENTRY_PLACEHOLDER: AttackEntry = {
   damageRiders: [],
 };
 
-// The economy shim useResolution spends against (mirrors InlineAttackPicker's
-// attackResolutionTurnState, #1831 review comment 2): enterTwfMode/
-// enterFlurryMode already consumed the REAL bonusActionUsed flag before this
-// sheet mounts, so `consumeBonusAction` is deliberately inert — the actual
-// per-swing spend is the tally bridge's own `record` call (recordTwfAttack/
-// recordFlurryAttack), fired the instant to-hit rolls. `bonusActionUsed`
-// here reads the LOCAL completedSwings/totalSwings count, not the
-// already-true turnState.bonusActionUsed — deriving `disabled` from the real
-// flag would self-disable the swing's own remaining steps (Call it/Damage/
-// Done) the instant it started.
+// consumeBonusAction is deliberately inert here — the tally bridge's record() call is the real per-swing spend. bonusActionUsed reflects local completedSwings/totalSwings, not the already-true turnState.bonusActionUsed, so the swing's own remaining steps don't self-disable the instant it starts.
 function bonusResolutionTurnState(completedSwings: number, totalSwings: number): ResolutionTurnState {
   return {
     actionsRemaining: 0,
@@ -77,13 +46,7 @@ function bonusResolutionTurnState(completedSwings: number, totalSwings: number):
   };
 }
 
-// Driving-layer guard (mirrors InlineAttackPicker's own #1831 review comment
-// 2, second half): ResolutionRail's Damage button stays visually enabled
-// before Roll to hit — this keeps the STATE ordering honest for a bonus
-// swing too. The crit-over-already-rolled-damage half of that guard does NOT
-// need reproducing here: useResolution's own onCallCrit carries it now that
-// this hook drives useResolution directly (see useResolution.ts's own
-// "#1845's off-hand path" comment).
+// Keeps the Damage button from firing before Roll to hit for a bonus swing too; the crit-over-already-rolled-damage half of this guard lives in useResolution's own onCallCrit now, so it doesn't need reproducing here.
 function guardDamageOrder(view: ResolutionView): ResolutionView {
   return {
     ...view,
@@ -97,25 +60,16 @@ function guardDamageOrder(view: ResolutionView): ResolutionView {
 interface UseBonusAttackRollArgs {
   character: Character;
   turnState: TurnState & TurnStateActions;
-  /** The single form this sheet resolves — null when nothing is resolvable (e.g. no off-hand weapon). */
   entry: AttackEntry | null;
-  /** How many swings this bonus action resolves — 1 for TWF, 2+ for Flurry (#1244 Heightened Focus). */
   totalSwings: number;
-  /** Spends this swing AND appends its `bonusAction`-source tally row; recordTwfAttack or recordFlurryAttack. */
+  /** Spends this swing and appends its bonusAction-source tally row (recordTwfAttack or recordFlurryAttack). */
   record: (recorded?: RecordedAttack) => void;
   onLogChanged: () => void;
-  /** The sheet's own ADV/DIS choice (#958) — Flurry has one, TWF doesn't yet. */
   manualMode?: RollMode;
-  /**
-   * Fires exactly once, on the FIRST strike roll — the deferred-commit point
-   * for a resource spend that must survive a pre-roll cancel (Flurry's 1
-   * Focus, #1217: opening the sheet must not spend it). Omit for a sheet
-   * with no deferred spend (TWF, Bonus Unarmed Strike).
-   */
+  /** Fires exactly once, on the first strike roll — the deferred-commit point for a resource spend that must survive a pre-roll cancel. */
   onFirstStrike?: () => void;
 }
 
-/** The resolveAction/tally-bridge/rider core — no tally-strip/maneuvers JSX (that's useBonusAttackSheet's job). */
 function useBonusResolution({
   character,
   turnState,
@@ -127,16 +81,7 @@ function useBonusResolution({
   onFirstStrike,
 }: UseBonusAttackRollArgs) {
   const { roll } = useRoll();
-  // Lazy initializer mirrors InlineAttackPicker's own completedSwings seed —
-  // `turnState.bonusAttack?.used ?? 0` is correct at every render this hook
-  // actually mounts on: enterTwfMode/enterFlurryMode arm `bonusAttack` in the
-  // SAME synchronous click handler that opens this sheet (see
-  // useTurnActions.handleTwfAction/handleFlurryAction), so the very first
-  // render already sees the armed `{total,used:0}` counter — a null
-  // bonusAttack at first mount means nothing has been recorded yet either
-  // way, so 0 is correct there too. `completedSwings` only advances
-  // afterward via THIS hook's own handleCommit, never re-read off
-  // turnState.bonusAttack again.
+  // turnState.bonusAttack?.used ?? 0 is correct at every render this hook mounts on: enterTwfMode/enterFlurryMode arm bonusAttack synchronously in the same click that opens this sheet, and completedSwings only advances afterward via this hook's own handleCommit, never re-read off turnState.bonusAttack again.
   const [local, setLocal] = useState(() => ({
     riderEffects: {} as Record<string, ResolveActionEventEffect>,
     completedSwings: turnState.bonusAttack?.used ?? 0,
@@ -147,18 +92,13 @@ function useBonusResolution({
   const armedEntry = entry ?? NO_ENTRY_PLACEHOLDER;
   const resolutionTurnState = bonusResolutionTurnState(local.completedSwings, totalSwings);
 
-  // Fires the resolveAction transaction and advances the completed-swings
-  // count — mirrors InlineAttackPicker's handleCommit (both now share
-  // useResolveActionCommit). The tally row + the real bonusAttack advance
-  // already happened earlier, at roll-to-hit time, via the tally bridge's
-  // `record` call below.
+  // The tally row and the real bonusAttack advance already happened earlier, at roll-to-hit time, via the tally bridge's record() call — this only fires the resolveAction transaction and advances completedSwings.
   const { commit, pending: commitPending, error: commitError } = useResolveActionCommit({
     characterId: character.id,
     onLogChanged,
     onCommitted: (batchId) => {
       setLocal((s) => ({ ...s, completedSwings: s.completedSwings + 1, riderEffects: {} }));
-      // Same undo tagging as InlineAttackPicker's onCommitted (#758): the
-      // recordTwfAttack/recordFlurryAttack entry gets this strike's batch.
+      // Tags the recordTwfAttack/recordFlurryAttack entry with this strike's batch so undo can revert it.
       turnState.attachBatchId(batchId);
     },
   });
@@ -173,8 +113,6 @@ function useBonusResolution({
     manualMode,
   });
 
-  // The deferred first-strike spend (Flurry's 1 Focus) wraps onRollToHit —
-  // committed before the very first roll of this sheet's lifetime, never again.
   function onRollToHit() {
     if (onFirstStrike && !firstStrikeCommittedRef.current) {
       firstStrikeCommittedRef.current = true;
@@ -196,10 +134,7 @@ function useBonusResolution({
     record,
   );
 
-  // On-hit dice riders (rare on an off-hand/unarmed swing, but the shape is
-  // generic) — same treatment as InlineAttackPicker's handleDamageRider
-  // (#1843): routed into the SAME resolveAction event via local.riderEffects,
-  // never a standalone logRoll event.
+  // Riders route into the SAME resolveAction event via local.riderEffects, never a standalone logRoll event.
   function handleDamageRider(rider: DamageRider) {
     const spec = resolutionView.isCrit ? critDamageSpec(rider.spec) : rider.spec;
     const result = roll(spec, rider.rollLabel);

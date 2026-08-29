@@ -1,7 +1,6 @@
 import DeathSaveTracker from "@/features/hitpoints/DeathSaveTracker";
 import type { useDeathSaves } from "@/features/hitpoints/useDeathSaves";
 
-// Death-save tracker + error, shown only at 0 HP (#736).
 export default function HpDeathSaveBlock({ ctl }: { ctl: ReturnType<typeof useDeathSaves> }) {
   if (!ctl.isDying) return null;
   return (

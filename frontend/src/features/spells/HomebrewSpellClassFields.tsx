@@ -1,7 +1,4 @@
-// Class-access multi-select for the homebrew-spell form: checkboxes sourced
-// from GET /api/reference's own class catalog (#1787) — the same catalog
-// validateCustomSpellClasses checks server-side, so every option offered
-// here is guaranteed to pass that check.
+// Options come from the same class catalog validateCustomSpellClasses checks server-side, so every option here is guaranteed to pass.
 import type { ClassOption } from "@/types/character";
 
 interface HomebrewSpellClassFieldsProps {

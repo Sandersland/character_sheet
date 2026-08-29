@@ -9,7 +9,6 @@ interface InventoryToolbarProps {
   onFilterChange: (filter: FilterKey) => void;
 }
 
-// The Bag view's search box + category filter chips.
 export default function InventoryToolbar({
   search,
   onSearchChange,

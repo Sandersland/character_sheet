@@ -21,7 +21,6 @@ interface CampaignItemFormProps {
   busyId: string | null;
   /** Served rarity rows (#1437), passed in so the form holds no query observer. */
   rarities: ItemRarityOption[];
-  /** The campaign's edition (#1712) — threaded to MagicFieldset's spell picker. */
   edition: RulesEdition;
   onSubmit: () => void;
   onCancel: () => void;

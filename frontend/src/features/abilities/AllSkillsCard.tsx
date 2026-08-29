@@ -13,19 +13,9 @@ interface AllSkillsCardProps {
   skills: Skill[];
   abilityScores: AbilityScores;
   proficiencyBonus: number;
-  /**
-   * Flow the six ability groups two-up (#1086) so the card is half as tall — the
-   * Overview's 3fr/2fr left column keeps pace with the XP/features/advancements
-   * stack on its right. `divide-y` between groups is dropped in this mode (the
-   * column split reads the grouping); defaults off (single stacked column).
-   */
   twoColumn?: boolean;
 }
 
-// All 18 skills inline on the Overview, grouped by ability (D1: flat, no
-// accordion); every skill is a one-tap RollButton so the roll fires with no
-// dialog open and its result is un-suppressed (#957). Replaces the
-// proficient-only card + "All Skills" modal.
 export default function AllSkillsCard({
   skills,
   abilityScores,
@@ -76,14 +66,14 @@ function SkillGroupHeading({ ability }: { ability: AbilityName }) {
   );
 }
 
-// Non-color-only proficiency signal: gold expertise / garnet proficient / faint.
+// Proficiency dot color is not the only signal — pair with a text cue elsewhere, never color alone.
 function skillDotClass(skill: Skill): string {
   if (skill.expertise) return "bg-gold-500";
   if (skill.proficient) return "bg-garnet-500";
   return "bg-parchment-200";
 }
 
-// Active cast-granted buff badge (#438): free-text source label, safe to render.
+// Source label is free text from the backend — safe to render as-is (#438).
 function SkillBuffBadge({ skill }: { skill: Skill }) {
   if (!skill.tempModifier) return null;
   const source = skill.tempModifierSources?.map((s) => s.label).join(", ") ?? "";

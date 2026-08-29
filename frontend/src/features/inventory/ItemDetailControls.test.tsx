@@ -31,9 +31,8 @@ function renderControls(overrides: Partial<Parameters<typeof ItemDetailControls>
 }
 
 // ItemDetailControls is the mobile detail-sheet twin of InventoryRow's own
-// pill cluster (#1029/#1854) — both delegate to the same InventoryRowControls,
-// so this locks the mobile path independently of InventoryRow.test.tsx's bag
-// coverage, matching claude-review's ask for both surfaces.
+// pill cluster — both delegate to the same InventoryRowControls, so this locks
+// the mobile path independently of InventoryRow.test.tsx's bag coverage.
 describe("ItemDetailControls — Weapon Bond toggle (#1854)", () => {
   it("shows an enabled Bond pill when neither pending flag is set", () => {
     renderControls();

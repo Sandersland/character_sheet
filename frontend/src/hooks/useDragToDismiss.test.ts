@@ -36,10 +36,6 @@ describe("shouldDismissDrag", () => {
   });
 });
 
-// Stateful gesture-machine coverage: drive the returned pointer handlers with
-// real JSDOM PointerEvents against a live panel element and assert the CSS
-// mutations (transform follows the finger; spring-back restores translateY(0))
-// plus the dismiss verdict.
 describe("useDragToDismiss gesture machine", () => {
   let panel: HTMLElement;
   let handle: HTMLElement;
@@ -188,14 +184,11 @@ describe("useDragToDismiss gesture machine", () => {
   it("reduced motion: decides the verdict without following or springing", () => {
     stubMatchMedia(true);
     const { onDismiss } = render();
-    // No follow while dragging.
     fire(handle, "pointerdown", 0, 0);
     fire(handle, "pointermove", 250, 1000);
     expect(panel.style.transform).toBe("");
-    // Spring-back path mutates nothing…
     fire(handle, "pointerup", 250, 2000);
     expect(panel.style.transform).toBe("");
-    // …but the dismiss verdict still fires.
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 
@@ -279,7 +272,6 @@ describe("useDragToDismiss gesture machine", () => {
     result.current.beginExit();
     fire(handle, "pointerdown", 0, 0);
     fire(handle, "pointermove", 300, 16);
-    // Still parked at the exit transform — the drag never engaged.
     expect(panel.style.transform).toBe("translateY(100%)");
     expect(onDismiss).not.toHaveBeenCalled();
     fireTransitionEnd(panel, "transform");
@@ -302,10 +294,8 @@ describe("useDragToDismiss gesture machine", () => {
       result.current.beginExit();
       expect(panel.style.transform).toBe("translateY(100%)");
       unmount();
-      // The fallback timer is cleared…
       vi.advanceTimersByTime(600);
       expect(onDismiss).not.toHaveBeenCalled();
-      // …and a late transitionend after unmount is inert (listener removed).
       fireTransitionEnd(panel, "transform");
       expect(onDismiss).not.toHaveBeenCalled();
     } finally {

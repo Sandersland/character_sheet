@@ -4,8 +4,6 @@ import { login } from "./helpers/auth";
 import { collectConsoleErrors } from "./helpers/console";
 import { closeSpellbook, findCharacterByName, gotoSheet, openSpellbook, restoreResourcePool } from "./helpers/api";
 
-// The Shadow Monk persona (seeded in global-setup) is Monk L6 with the Warrior
-// of Shadow subclass — Shadow Arts unlock at L3, and Minor Illusion is granted.
 async function focusRemaining(request: APIRequestContext, id: string): Promise<number> {
   const res = await request.get(`/api/characters/${id}`);
   const body = (await res.json()) as { resources?: { pools?: { key: string; remaining: number }[] } };
@@ -21,10 +19,8 @@ test("shadow arts: a Warrior of Shadow monk casts Darkness for 1 focus, taking c
   await page.goto(`/characters/${id}`);
   await expect(page.getByRole("heading", { name: /Shadow Monk/, level: 1 })).toBeVisible();
 
-  // Class features (incl. Shadow Arts) moved to their own tab (#1169).
   await page.getByRole("tab", { name: "Class" }).click();
 
-  // The Shadow Arts block renders with the single 1-focus Darkness cast (2024 rewrite, #1246).
   await expect(page.getByRole("heading", { name: "Shadow Arts" })).toBeVisible();
   const darknessRow = page
     .locator("li")
@@ -33,7 +29,6 @@ test("shadow arts: a Warrior of Shadow monk casts Darkness for 1 focus, taking c
     .first();
   await expect(darknessRow).toBeVisible();
 
-  // ── Cast Darkness: 1 focus drops and the concentration handoff appears ──
   const focusBefore = await focusRemaining(page.request, id);
   await darknessRow.getByRole("button", { name: "Cast" }).click();
   await expect.poll(() => focusRemaining(page.request, id)).toBe(focusBefore - 1);
@@ -47,28 +42,19 @@ test("shadow arts: a granted Minor Illusion shows a subclass badge, no Remove, a
   const id = await findCharacterByName(page.request, "Shadow Monk");
 
   const errors = collectConsoleErrors(page);
-  // The spellbook (with the granted Minor Illusion) lives on the Magic tab.
   await gotoSheet(page, id, "magic");
   await expect(page.getByRole("heading", { name: /Shadow Monk/, level: 1 })).toBeVisible();
 
-  // The spellbook rows live in the grimoire, opened via "Manage spellbook →" —
-  // view/manage only (#1162), no Cast affordance there anymore.
   await openSpellbook(page);
 
-  // The granted Minor Illusion appears in the spellbook with a subclass badge.
-  // Scope to the spellbook row (has the "Open …" detail-card button) — the
-  // Shadow Arts class-feature description row also names Minor Illusion but
-  // has no such button.
   const illusionRow = page
     .getByRole("listitem")
     .filter({ has: page.getByRole("button", { name: "Open Minor Illusion" }) });
   await expect(illusionRow).toBeVisible();
   await expect(illusionRow.getByText("subclass")).toBeVisible();
-  // No Remove ✕ for a derived grant.
   await expect(illusionRow.getByRole("button", { name: /Remove Minor Illusion/ })).toHaveCount(0);
   await closeSpellbook(page);
 
-  // Casting a granted cantrip goes through the record's single Cast door.
   await page.getByRole("button", { name: "Cast a spell" }).click();
   await page.getByRole("button", { name: "Open Minor Illusion" }).click();
   const dialog = page.getByRole("dialog");

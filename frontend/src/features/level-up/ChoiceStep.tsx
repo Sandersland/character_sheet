@@ -1,10 +1,5 @@
-// Generic Choose-N ceremony body (#896): one component drives every
-// catalog-backed level-up pick — maneuvers, tool proficiencies, fighting
-// style, and (repeatable) subclass choices — via choiceConfigForStep, which
-// resolves per STEP rather than per kind: a subclass's several choice tiers
-// (e.g. a Hunter Ranger's four) share one draft array, keyed on step.meta.key.
-// Enforces the plan's exact count; already-known options are hidden. The
-// catalog fetch, selection, and list rendering each live in their own unit.
+// choiceConfigForStep resolves per step (not per kind), so a subclass's
+// several choice tiers can share one draft array keyed on step.meta.key.
 
 import { useMemo } from "react";
 

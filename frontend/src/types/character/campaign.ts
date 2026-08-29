@@ -1,26 +1,15 @@
-/**
- * Shared-campaign wire types: campaigns, entity registry, campaign items, and identity merges.
- */
-
 import type { RulesEdition } from "@character-sheet/shared-types";
 
 import type { ArmorDetail, ArmorDetailInput, AttunementPrereqKind, ConsumableDetail, EquipSlot, ItemCapability, ItemCategory, ItemRarity, WeaponDetail, WeaponDetailInput } from "./inventory";
 import type { JournalEntryKind } from "./journal";
 import type { Currency } from "./primitives";
 
-/**
- * A character's play preferences for its current campaign (#537). Always present
- * on the wire (defaulting both flags to false) when the character is attached to
- * a campaign; absent otherwise. Toggles land with #116 / #462.
- */
+/** Always present, both flags defaulting false, when the character is attached to a campaign; absent otherwise. */
 export interface CampaignPreferences {
-  /** Let the DM read this character's sheet. */
   shareWithDm: boolean;
-  /** Auto-roll healing when this character targets a friendly. */
   autoFriendlyHealing: boolean;
 }
 
-/** Shared campaigns (#246). */
 export type CampaignRole = "OWNER" | "PLAYER";
 
 export interface CampaignMember {
@@ -34,28 +23,19 @@ export interface Campaign {
   id: string;
   name: string;
   ownerId: string;
-  /** The DM's default edition for characters created into this campaign (#1285).
-   *  Never authoritative for a sheet — Character.rulesEdition is. */
+  /** Default edition for characters created here — never authoritative; `Character.rulesEdition` is. */
   rulesEdition: RulesEdition;
-  /** The edition's display label, resolved server-side (#1436). REQUIRED, not
-   *  optional: it is always served, and optional would let a fixture omit it and
-   *  the badge silently render empty. */
+  /** Resolved server-side; always served, non-optional so a fixture can't silently omit it. */
   rulesEditionLabel: string;
   inviteCode: string;
   createdAt: string;
   members: CampaignMember[];
-  /** Present on GET /api/campaigns/:id — each member character (id, name, ownerId). */
+  /** Present on the detail route (`GET /api/campaigns/:id`) only. */
   characters?: { id: string; name: string; ownerId: string }[];
-  /** The caller's role in this campaign — surfaced by the list + detail reads. */
   role?: CampaignRole;
 }
 
-/**
- * Campaign arc / "part" (#863): a named grouping the journal page files sessions
- * ("chapters") under so a long campaign stays navigable. Ordered by `position`
- * (story order → roman numeral I, II, III on the spine). Mirrors the backend
- * `serializeArc` shape.
- */
+/** Ordered by `position`; mirrors backend `serializeArc`. */
 export interface CampaignArc {
   id: string;
   campaignId: string;
@@ -64,10 +44,9 @@ export interface CampaignArc {
   createdAt: string;
 }
 
-/** Campaign entity registry & @-tagging (#248). */
 export type EntityType = "NPC" | "LOCATION" | "FACTION" | "ITEM" | "PC" | "OTHER";
 
-// DM reveal state (#379): non-owner members only ever see REVEALED entities.
+// Non-owner members only ever see REVEALED entities.
 export type EntityVisibility = "HIDDEN" | "REVEALED";
 
 export interface CampaignEntity {
@@ -77,24 +56,24 @@ export interface CampaignEntity {
   name: string;
   aliases: string[];
   notes: string | null;
-  /** Optional portrait image URL (#844); monogram fallback when null/absent. */
+  /** Monogram fallback when null/absent. */
   portraitUrl?: string | null;
   visibility: EntityVisibility;
   createdAt: string;
   updatedAt: string;
-  /** Linked character for PC entities (#842); null elsewhere, list-route only. */
+  /** null elsewhere; served on the list route only. */
   characterId?: string | null;
-  /** Linked campaign item this entity fronts (#380/#1942); null elsewhere, list-route and combine-response only. */
+  /** null elsewhere; served on the list route and combine response only. */
   itemId?: string | null;
-  /** Which field a `q=` search hit (#839); present only on searched lists. */
+  /** Present only on searched lists. */
   matchedIn?: EntityMatchField;
-  /** Derived mention stats (#839); present only with `?include=stats`. */
+  /** Present only with `?include=stats`. */
   stats?: EntityStats;
 }
 
 export type EntityMatchField = "name" | "alias" | "notes";
 
-/** Session context of a first/last mention; ordinal derived from startedAt order (#839). */
+/** `sessionOrdinal` is derived from startedAt order. */
 export interface EntityMentionRef {
   sessionId: string | null;
   sessionTitle: string | null;
@@ -102,7 +81,7 @@ export interface EntityMentionRef {
   date: string;
 }
 
-/** Per-entity derived mention stats (#839), visibility-filtered server-side. */
+/** Visibility-filtered server-side. */
 export interface EntityStats {
   mentionCount: number;
   firstMentioned: EntityMentionRef | null;
@@ -111,13 +90,12 @@ export interface EntityStats {
   hasDescription: boolean;
 }
 
-/** One co-mentioned entity with its distinct-entry count (#839). */
 export interface EntityConnection {
   entity: { id: string; name: string; type: EntityType };
   count: number;
 }
 
-/** One campaign-wide Codex activity item (#839), newest-first. */
+/** Newest-first. */
 export type CodexActivityItem =
   | {
       kind: "mention";
@@ -132,7 +110,6 @@ export type CodexActivityItem =
       date: string;
     };
 
-/** One current holder of an awarded campaign item (#381). */
 export interface CampaignItemHolder {
   characterId: string;
   characterName: string;
@@ -145,7 +122,7 @@ export interface CampaignItem {
   name: string;
   description?: string;
   category: ItemCategory;
-  /** Declared paper-doll slot for wearable gear (#571); absent = carried. */
+  /** Absent = carried (not worn). */
   slot?: EquipSlot;
   rarity?: ItemRarity;
   requiresAttunement: boolean;
@@ -154,26 +131,27 @@ export interface CampaignItem {
   isUnique: boolean;
   weight?: number;
   cost?: Currency;
+  /** Scrubbed server-side from every player response. */
   dmNotes?: string;
   weapon?: WeaponDetail;
   armor?: ArmorDetail;
   consumable?: ConsumableDetail;
   capabilities?: ItemCapability[];
 
-  /** The fronting ITEM CampaignEntity — its `visibility` drives player reveal. */
+  /** Its `visibility` drives player reveal. */
   entity?: { id: string; name: string; visibility: EntityVisibility };
-  /** Current holders derived from live inventory rows (#381). */
+  /** Derived live from inventory rows, not persisted. */
   holders?: CampaignItemHolder[];
   createdAt: string;
   updatedAt: string;
 }
 
-/** Create/update body for a campaign item; detail block matches `category`. */
+/** Detail block (weapon/armor/consumable) matches `category`. */
 export interface CampaignItemInput {
   name: string;
   description?: string;
   category: ItemCategory;
-  /** Worn-slot placement for gear; null clears it (mirrors backend #571). */
+  /** null clears it. */
   slot?: EquipSlot | null;
   rarity?: ItemRarity;
   requiresAttunement?: boolean;
@@ -189,16 +167,14 @@ export interface CampaignItemInput {
   consumable?: ConsumableDetail;
   /** REPLACE semantics server-side: the full set the item should have, [] clears. */
   capabilities?: ItemCapability[];
-
 }
 
-/** One note that @-tags an entity, surfaced on the entity detail page. */
 export interface EntityBacklink {
   entry: {
     id: string;
     characterId: string;
     sessionId?: string | null;
-    /** Session context (#839): title + startedAt-derived ordinal, null off-session. */
+    /** null when off-session. */
     sessionTitle?: string | null;
     sessionOrdinal?: number | null;
     kind: JournalEntryKind;
@@ -208,19 +184,13 @@ export interface EntityBacklink {
     body: string;
   };
   characterName: string;
-  /** Which identity was tagged — a survivor unions its merged-in ids (#387). */
+  /** A survivor's id unions its merged-in identities' ids. */
   identity: { id: string; name: string };
 }
 
-/** Entity identity merges (#387). */
 export type MergeStatus = "PREPARED" | "EXECUTED";
 
-/**
- * A non-destructive "revealed to be" link: `mergedEntity` (old identity) is the
- * same being as `survivorEntity` (true identity). PREPARED is the DM's secret
- * prep (never in a player payload); EXECUTED is the public reveal. Chains resolve
- * transitively (Jenkins→Vecna→Whispered One).
- */
+/** PREPARED is the DM's secret prep (never in a player payload); EXECUTED is the public reveal. */
 export interface CampaignEntityMerge {
   id: string;
   campaignId: string;
@@ -232,17 +202,7 @@ export interface CampaignEntityMerge {
   executedAt: string | null;
 }
 
-/**
- * App-level inbox (#1945): derived DM housekeeping flags across every
- * campaign the caller OWNS. Recomputed on every GET — nothing here is
- * persisted server-side except a dismissal. `kind` + `signature` together are
- * the flag's stable identity for POST /api/inbox/dismissals; a duplicate
- * cluster's signature changes (and it resurfaces) when its membership does.
- * `kind` is hardcoded per row below rather than drawn from a shared
- * `InboxFlagKind` alias — the only place that needs the KIND-independent
- * union is the dismiss request, which derives it from
- * @character-sheet/contracts' DismissInboxFlagInput instead (#1949).
- */
+/** `kind` + `signature` together are the flag's stable identity for `POST /api/inbox/dismissals`. */
 export interface InboxDuplicateEntity {
   id: string;
   name: string;
@@ -259,7 +219,7 @@ export interface InboxDuplicateClusterRow {
   entities: InboxDuplicateEntity[];
   /** Most-mentioned entity, oldest as tiebreak — the pre-selected keeper in the combine UI. */
   defaultSurvivorId: string;
-  /** ISO timestamp this row was sorted by (#1946: relative-time meta for the UI). */
+  /** ISO timestamp this row was sorted by. */
   signalAt: string;
 }
 
@@ -270,7 +230,7 @@ export interface InboxNeedsChroniclingRow {
   signature: string;
   /** Entities with >=1 mention and no description in this campaign. */
   count: number;
-  /** ISO timestamp this row was sorted by (#1946: relative-time meta for the UI). */
+  /** ISO timestamp this row was sorted by. */
   signalAt: string;
 }
 

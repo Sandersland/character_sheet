@@ -9,8 +9,6 @@ import { axe } from "@/test/axe";
 import { cachedCharacter, renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character } from "@/types/character";
 
-// The default setup stub reports matches:false → below md → BottomSheet. Flip to
-// md+ (top palette) for the desktop-presentation cases; afterEach restores it.
 function useDesktopViewport() {
   window.matchMedia = ((query: string) =>
     ({
@@ -56,10 +54,6 @@ function makeCharacterWithNote(): Character {
   } as unknown as Character;
 }
 
-// CapturePalette reads useCurrentCharacter(), so every render mounts
-// CurrentCharacterProvider via renderWithCharacter. Every character fixture in
-// this file shares id "char-1", so any of them seeds the same cache entry —
-// the cache write keys off the provider's id, not this exact reference.
 function render(ui: ReactElement, character: Character = makeCharacter()) {
   return renderWithCharacter(ui, character);
 }
@@ -134,8 +128,6 @@ describe("CapturePalette (#247)", () => {
     const [charId, entry] = vi.mocked(client.createJournalEntry).mock.calls[0];
     expect(charId).toBe("char-1");
     expect(entry).toEqual({ kind: "NOTE", body: "The bridge collapsed", sessionId: "sess-1" });
-    // The returned character reaches the cache — useJournalMutations writes it
-    // through useCharacterMutation, with no callback in between.
     expect(cachedCharacter("char-1")).toEqual(makeCharacter());
   });
 
@@ -205,7 +197,6 @@ describe("CapturePalette (#247)", () => {
         makeCampaignCharacter(),
       );
 
-      // Mobile lock is a compact icon toggle (aria-pressed), not a checkbox (#866).
       expect(screen.getByRole("button", { name: /private/i })).toHaveAttribute(
         "aria-pressed",
         "false",
@@ -234,9 +225,7 @@ describe("CapturePalette (#247)", () => {
 
     it("resets the lock to shared after a successful save (privacy never leaks forward)", async () => {
       const user = userEvent.setup();
-      // Both saves' mutation responses must keep campaignId — the component now
-      // re-reads the character from the cache (not its own prop) after each
-      // write, so a response that dropped it would hide the Private lock.
+      // The component re-reads the character from the cache after each write, not its own prop, so the mock response must keep campaignId or the Private lock disappears.
       vi.mocked(client.createJournalEntry).mockResolvedValue(makeCampaignCharacter());
       render(
         <CapturePalette onClose={vi.fn()} />,
@@ -279,9 +268,6 @@ describe("CapturePalette (#247)", () => {
       render(<CapturePalette onClose={vi.fn()} />, character);
 
       await user.click(screen.getByRole("button", { name: /^edit$/i }));
-      // Scope to the editor row (its nearest wrapping div) — the composer's own
-      // Private control is a lock button, not a checkbox, so the editor's
-      // checkbox is unambiguous either way.
       const editorRow = screen.getByRole("textbox", { name: /edit note/i }).closest("div")!;
       const editorToggle = within(editorRow).getByRole("checkbox", { name: /private/i });
       expect(editorToggle).not.toBeChecked();
@@ -348,8 +334,6 @@ describe("CapturePalette (#247)", () => {
       const { baseElement } = render(
         <CapturePalette onClose={vi.fn()} />,
       );
-      // The keyboard-pinned capture is a modal dialog with a "Done" close button —
-      // the old BottomSheet grabber (aria-label="Close") is gone (#866).
       const surface = screen.getByRole("dialog", { name: /quick capture/i });
       expect(surface).toHaveAttribute("aria-modal", "true");
       expect(screen.getByRole("button", { name: /^done$/i })).toBeInTheDocument();
@@ -380,7 +364,6 @@ describe("CapturePalette (#247)", () => {
       render(<CapturePalette onClose={vi.fn()} />, character);
       const older = screen.getByText("older note");
       const newer = screen.getByText("newer note");
-      // Ascending order downward: the older note precedes the newer one in the DOM.
       expect(older.compareDocumentPosition(newer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
@@ -399,7 +382,6 @@ describe("CapturePalette (#247)", () => {
       );
       const dock = screen.getByRole("dialog", { name: /quick capture/i });
       expect(dock).toBeInTheDocument();
-      // Non-modal: the sheet behind stays interactive (no aria-modal, no scrim).
       expect(dock).not.toHaveAttribute("aria-modal");
       expect(dock.closest("[data-capture-dock]")).not.toBeNull();
       expect(screen.getByText(/↵ save · shift/i)).toBeInTheDocument();
@@ -436,11 +418,7 @@ describe("CapturePalette (#247)", () => {
   });
 
   describe("feed scrollability", () => {
-    // jsdom has no layout engine, so the clipping itself can't be measured here;
-    // these pin the CSS contract instead. justify-end on a scrollport makes
-    // start-edge overflow unreachable (scrollHeight collapses to clientHeight,
-    // older notes clip above the top edge with no scroll range), so the
-    // bottom-pinning of a short feed must come from mt-auto on the content.
+    // jsdom has no layout engine, so these pin the CSS contract instead: justify-end on a scrollport collapses scrollHeight to clientHeight, clipping start-edge overflow, so bottom-pinning must come from mt-auto on the content.
     function stubScrollHeight(value: number) {
       const original = Object.getOwnPropertyDescriptor(Element.prototype, "scrollHeight")!;
       Object.defineProperty(Element.prototype, "scrollHeight", {

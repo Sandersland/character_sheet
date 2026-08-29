@@ -4,14 +4,10 @@ import { login } from "./helpers/auth";
 import { collectConsoleErrors } from "./helpers/console";
 import { enterLiveCombat, createCharacter, createSessionCharacter, gotoSheet, uniqueName } from "./helpers/api";
 
-// A fresh, session-ready character keeps the inventory (and thus the in-session
-// attack-form selector) unambiguous: exactly one weapon exists, so its equipped
-// state maps cleanly onto the weapon segment.
 test("inventory: add catalog item shows weight/qty; equip/unequip drives the attack selector", async ({
   page,
 }) => {
   await login(page);
-  // Name avoids the word "Inventory" so it can't collide with the section heading/tab.
   const id = await createSessionCharacter(page.request, {
     name: uniqueName("Pack Fighter"),
     className: "Fighter",
@@ -21,23 +17,18 @@ test("inventory: add catalog item shows weight/qty; equip/unequip drives the att
   await gotoSheet(page, id, "inventory");
   await expect(page.getByRole("heading", { name: "Inventory", exact: true })).toBeVisible();
 
-  // ── Add a catalog Dagger (weight 1 lb) with quantity 2 ──────────────────────
   await page.getByRole("button", { name: "+ Add item" }).first().click();
   await page.getByLabel("Item").selectOption({ label: "Dagger" });
   await page.getByLabel("Quantity").fill("2");
-  // Zero the prefilled catalog cost so the acquire doesn't overdraw a 0-gp purse.
   await page.getByLabel("gp", { exact: true }).fill("0");
   await page.getByRole("button", { name: "Add", exact: true }).click();
 
-  // The row's dotted detail line carries both quantity and computed weight.
   await expect(page.getByText("Dagger")).toBeVisible();
   await expect(page.getByText(/2x · 2 lb/)).toBeVisible();
 
-  // Equip it from the sheet (the only Equip control here is this row's pill).
   await page.getByRole("button", { name: "Equip", exact: true }).click();
   await expect(page.getByRole("button", { name: "Equipped" })).toBeVisible();
 
-  // ── Into the live session, where the attack row reflects equipped weapons ────
   await enterLiveCombat(page);
   await expect(page).toHaveURL(/[?&]tab=combat/);
 
@@ -46,21 +37,14 @@ test("inventory: add catalog item shows weight/qty; equip/unequip drives the att
   await page.getByRole("button", { name: /Use Action/ }).click();
   await page.getByRole("button", { name: "Attack", exact: true }).click();
 
-  // Equipped → the Dagger is a form segment in the "Attacking with" selector, and
-  // the attack card carries the single "Roll to hit" button (#786).
   await expect(page.getByText(/no target AC tracked/i)).toBeVisible();
   await expect(page.getByRole("radio", { name: "Dagger" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Roll to hit/ })).toBeVisible();
 
-  // (The mid-session unequip half relied on the /session Inventory reference tab
-  // to strip the weapon while the picker is open; that reference tab is gone from
-  // the Combat tab after #963, and the sheet-Inventory-tab flow returns in #962.)
   await page.keyboard.press("Escape");
   expect(errors).toEqual([]);
 });
 
-// Partial sell: a stack of 3 gems (10 gp each) — the player sells one at the
-// single-total half-value prefill and keeps the other two.
 test("inventory: sell lets you pick quantity + a single total; remainder stays", async ({
   page,
 }) => {
@@ -70,7 +54,6 @@ test("inventory: sell lets you pick quantity + a single total; remainder stays",
     className: "Fighter",
   });
 
-  // Seed a 3-stack of custom gear worth 10 gp each (found treasure — no purchase cost).
   const acquire = await page.request.post(`/api/characters/${id}/inventory/transactions`, {
     data: {
       operations: [
@@ -89,25 +72,21 @@ test("inventory: sell lets you pick quantity + a single total; remainder stays",
   await gotoSheet(page, id, "inventory");
   await expect(page.getByRole("heading", { name: "Inventory", exact: true })).toBeVisible();
 
-  // Enter select mode, pick the stack, open the sell review.
   await page.getByRole("button", { name: "Sell items" }).click();
   await page.getByRole("checkbox", { name: "Select Ruby" }).check();
   await page.getByRole("button", { name: "Sell", exact: true }).click();
 
-  // Prefill: quantity is the full stack; the single sale total is half catalog value.
   const qty = page.getByRole("spinbutton", { name: "Quantity to sell of Ruby" });
   const total = page.getByRole("spinbutton", { name: "Total gold received" });
   await expect(qty).toHaveValue("3");
   await expect(total).toHaveValue("15");
 
-  // Sell only one — the auto total follows the quantity down to the single-unit half value.
   await qty.fill("1");
   await expect(total).toHaveValue("5");
   await expect(page.getByText("= 5 gp")).toBeVisible();
 
   await page.getByRole("button", { name: "Sell", exact: true }).click();
 
-  // Two rubies remain, and the purse reflects exactly the amount received.
   await expect(page.getByText("Ruby")).toBeVisible();
   await expect(page.getByText(/2x/)).toBeVisible();
   await expect(page.getByText("5 gp")).toBeVisible();

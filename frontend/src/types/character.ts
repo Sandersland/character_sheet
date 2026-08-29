@@ -1,8 +1,4 @@
-/**
- * Barrel for the character wire types, split by domain under ./character/.
- * This file (character.ts) resolves ahead of the character/ dir, so every
- * `@/types/character` import stays valid with zero call-site churn.
- */
+// character.ts resolves ahead of the character/ dir, so every `@/types/character` import stays valid.
 export * from "./character/primitives";
 export * from "./character/inventory";
 export * from "./character/activity";

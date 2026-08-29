@@ -4,25 +4,12 @@ import { QuickBtn } from "@/features/session/TurnControls";
 import SlotLevelSelector from "@/features/session/SlotLevelSelector";
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 
-/**
- * Slot-level picker for Bladesinger's Song of Defense (#1676) — the deferred
- * UI #1687 (costKind: "slot") left for its first real consumer: the player
- * picks which spell slot to expend on an incoming hit, and this component
- * sends that choice as `slotLevel`. Reuses SlotLevelSelector (the upcast
- * picker InlineSpellPicker's cast sheet already renders, generalized off
- * `Spell` to a plain `baseLevel` for this non-spell consumer) rather than a
- * second hand-rolled level strip. The 5x-slot-level damage reduction is
- * announce text (decision 5, #1676 — no damage-reduction machinery exists),
- * so this component only interpolates the number for display; the player
- * applies it themselves.
- */
 export default function SongOfDefenseInput({
   onSend,
   onCommit,
   onClose,
 }: {
   onSend: (actionKey: string, opts?: { slotLevel?: number }) => Promise<unknown>;
-  /** Commit the reaction slot when the reaction fires (#765's pattern). */
   onCommit: () => void;
   onClose: () => void;
 }) {
@@ -36,7 +23,7 @@ export default function SongOfDefenseInput({
     if (slotLevel === undefined || busy) return;
     setBusy(true);
     try {
-      // Commit first so send's attachBatchId tags this entry (Lay on Hands order).
+      // Commit before send so attachBatchId tags this entry.
       onCommit();
       await onSend("songOfDefense", { slotLevel });
       onClose();

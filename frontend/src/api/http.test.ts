@@ -3,8 +3,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { apiFetch, jsonBody, postTransactions, rawFetch, request, send, setUnauthorizedHandler } from "@/api/http";
 import { createCampaign, fetchCampaigns } from "@/api/campaign";
 
-// New direct coverage for the shared plumbing (#1270) — previously only
-// exercised indirectly through domain callers in client.test.ts.
 describe("apiFetch", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -34,8 +32,8 @@ describe("apiFetch", () => {
   });
 });
 
-// rawFetch is the deliberately-un-hooked seam behind fetchMe's "am I signed
-// in?" probe: a 401 there is the expected answer, not a dead session.
+// rawFetch deliberately skips the 401 hook — fetchMe's "am I signed in?"
+// probe expects a 401 as a valid answer, not a dead session.
 describe("rawFetch", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -103,9 +101,6 @@ describe("request<T> / send direct coverage", () => {
   });
 });
 
-// Verbatim regression pin from client.test.ts (#1270) — assertions unchanged,
-// only the import specifier retargeted (now exercises the plumbing through
-// api/campaign.ts's fetchCampaigns/createCampaign as representative callers).
 describe("request<T> (json flow, via fetchCampaigns / createCampaign)", () => {
   afterEach(() => {
     vi.unstubAllGlobals();

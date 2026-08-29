@@ -3,8 +3,6 @@ import type { EffectSpec } from "@character-sheet/shared-types";
 // needs this import despite the re-export below.
 import type { OpenHandRider } from "@character-sheet/contracts";
 
-// Op shapes live once in shared-types (#1273); re-exported so this module stays
-// the frontend's class-types entry point.
 export type {
   CastElementalBurstOperation,
   ElementalDamageType,
@@ -24,14 +22,10 @@ export type {
   WarriorOfElementsOperation,
   WarriorOfElementsResult,
 } from "@character-sheet/shared-types";
-// The shared declaration is named ResourceOpAudit (what the server logs);
-// aliased here because the client sees it as a per-op result.
+// Shared declaration is named ResourceOpAudit; aliased since the client sees it as a per-op result.
 export type { ResourceOpAudit as ResourceOpResult } from "@character-sheet/shared-types";
 
-// Derived from the route zod schemas in @character-sheet/contracts (#1370) —
-// `import type` only, so zod never enters the client bundle. Only names with
-// frontend call sites are forwarded: a forwarded-only name is a dead export
-// under the fallow gate.
+// `import type` only, so zod never enters the client bundle.
 export type {
   AttemptStunningStrikeOperation,
   BondWeaponOperation,
@@ -64,22 +58,13 @@ export interface CatalogShadowArt {
   effect: EffectSpec;
 }
 
-/**
- * One selectable ki amount in a Four Elements discipline's cast picker (#1505).
- * The client reads `roll` verbatim off the step — never computes ki-scaled dice.
- */
+/** The client reads `roll` verbatim off the step — never computes ki-scaled dice. */
 export interface DisciplineCastStep {
   ki: number;
   roll: { count: number; faces: number; modifier: number };
 }
 
-/**
- * A Way of the Four Elements discipline (2014-only, #1503/#1505) from GET
- * /api/disciplines. `steps` is empty for no-dice utility disciplines and for
- * `cost.kind !== "pool"`. `steps` may offer more ki than the monk can afford:
- * the per-cast cap (`maxKiPerDiscipline`) is enforced server-side at cast time,
- * never clamped client-side.
- */
+/** 2014-only. Per-cast ki cap (`maxKiPerDiscipline`) is enforced server-side; never clamp client-side. */
 export interface CatalogDiscipline {
   id: string;
   name: string;
@@ -90,10 +75,9 @@ export interface CatalogDiscipline {
   steps: DisciplineCastStep[];
 }
 
-/** How a Channel Divinity option expresses through the declarative core (#419). */
 export type ChannelDivinityKind = "announce" | "buff" | "advantage" | "invisible" | "reminder";
 
-/** An entitled Channel Divinity option from GET /api/characters/:id/channel-divinity (#419). */
+/** From GET /api/characters/:id/channel-divinity. */
 export interface CatalogChannelDivinity {
   id: string;
   name: string;
@@ -110,11 +94,10 @@ export interface ResourcePool {
   key: string;
   label: string;
   total: number;
-  die?: string;        // e.g. "d8"
+  die?: string;
   recharge: RechargeOn;
   description?: string;
-  // Labeled display parts rendered verbatim next to the description (the
-  // armorClassBreakdown pattern) — never parsed.
+  // Rendered verbatim next to the description; never parsed.
   details?: { label: string; value: string }[];
   used: number;
   remaining: number;
@@ -127,11 +110,7 @@ export interface ClassFeature {
   source: "class" | "subclass";
 }
 
-/**
- * Where a maneuver's session UI lives. "attackRoll"/"damageRoll" fold the die
- * into that roll; "reaction"/"attackOption" consume a slot with reminder text;
- * "effect" is a gold strip.
- */
+/** attackRoll/damageRoll fold into that roll; reaction/attackOption consume a slot; effect is a gold strip. */
 export type ManeuverPlacement =
   | "attackRoll"
   | "damageRoll"
@@ -139,18 +118,15 @@ export type ManeuverPlacement =
   | "effect"
   | "attackOption";
 
-/** A known maneuver on a character, with catalog provenance. */
 export interface ManeuverEntry {
   id: string;
   maneuverId?: string;   // catalog GrantedAbility.id provenance — undefined for custom
   name: string;
   description: string;
-  // Session-UI routing snapshot from the catalog (undefined for custom/legacy
-  // → session components treat as "damageRoll").
+  // Undefined for custom/legacy — session components then treat it as "damageRoll".
   placement?: ManeuverPlacement;
   actionSlot?: "bonusAction" | "reaction" | null;
-  // Resolved by deriveManeuverEffect against the character's current superiority
-  // die (#1381) — never re-derived client-side. Undefined for custom/legacy.
+  // Resolved by deriveManeuverEffect; never re-derived client-side. Undefined for custom/legacy.
   effect?: EffectSpec;
 }
 
@@ -214,46 +190,35 @@ export type QuiveringPalmResult = SetQuiveringPalmResult | TriggerQuiveringPalmR
 export interface ToolProficiency {
   name: string;
   category: "artisan" | "gamingSet" | "musicalInstrument" | "other";
-  /** Where this proficiency came from ("item" = a magic item grant, #529). */
+  /** "item" means a magic item grant. */
   source: "background" | "class" | "subclass" | "item";
 }
 
-/** Armor category that a character is proficient with. */
 export type ArmorProficiencyCategory = "light" | "medium" | "heavy" | "shield";
 
-/**
- * One armor proficiency — derived at read time; species grants arrive
- * feat-sourced (#1682). `source` is the highest-priority origin: class wins
- * over feat for the same category.
- */
+/** `source` is the highest-priority origin: class wins over feat for the same category. */
 export interface ArmorProficiency {
   category: ArmorProficiencyCategory;
   source: "class" | "feat";
 }
 
-/**
- * One weapon proficiency — derived at read time; species grants arrive
- * feat-sourced (#1682). `name` may be a category ("Martial Weapons") or a
- * specific weapon ("Longswords"). `source` is the highest-priority origin.
- */
+/** `name` may be a category or a specific weapon; `source` is the highest-priority origin. */
 export interface WeaponProficiency {
   name: string;
   source: "class" | "feat" | "item";
 }
 
-/** Level-gated tool proficiency entry within the resources JSON. */
 export interface ToolProfEntry {
-  id: string;   // per-character entry UUID
+  id: string;
   name: string; // matches a TOOLS entry name
 }
 
-/** Level-gated Expertise skill entry within the resources JSON (#1588). */
 export interface ExpertiseEntry {
-  id: string;    // per-character entry UUID
-  skill: string; // camelCase skill key, e.g. "stealth"
+  id: string;
+  skill: string; // camelCase skill key
 }
 
-/** One picked option of a subclass "choose N" feature (#899) — a snapshot, not mechanics. */
+/** A snapshot, not mechanics. */
 export interface ChoiceEntry {
   id: string;
   optionId?: string; // catalog provenance; absent for a custom (non-catalog) pick
@@ -261,27 +226,21 @@ export interface ChoiceEntry {
   description: string;
 }
 
-/** Derived class/subclass resource data merged with stored mutable state. */
 export interface CharacterResources {
   features: ClassFeature[];
   maneuverChoiceCount?: number;
-  /** Number of artisan's-tool proficiency choices from a subclass feature. */
   toolProfChoiceCount?: number;
-  /** Number of Expertise skill picks at this level (#1588 — Rogue/Bard/Ranger/Wizard). */
   expertiseChoiceCount?: number;
   pools: ResourcePool[];
   maneuversKnown: ManeuverEntry[];
-  /** Level-gated tool proficiency choices (e.g. Student of War). */
   toolProficienciesKnown: ToolProfEntry[];
-  /** Level-gated Expertise skill choices (#1588). */
   expertiseKnown: ExpertiseEntry[];
-  // buildResourcesPayload always sends both, so required here — optional would
-  // reopen the drift these fields closed (#1422).
+  // `buildResourcesPayload` always sends both, so required here — keep it that way.
   subclassChoices: { key: string; label: string; catalogSource: string; count: number }[];
   choicesKnown: Record<string, ChoiceEntry[]>;
 }
 
-/** One entry in `Character.classes` — structured multiclass-aware view. */
+/** Structured multiclass-aware view of one entry in `Character.classes`. */
 export interface ClassEntry {
   /** CharacterClassEntry row id — the levelUp "existing" target. */
   id: string;
@@ -290,28 +249,14 @@ export interface ClassEntry {
   subclass?: string;
   subclassId?: string;
   classId?: string;
-  /**
-   * Backend-computed by buildClassesView (#1598): true once this entry's
-   * subclass-gate level has passed AND (no subclass chosen, or the held one is
-   * `subclassUnavailable`). Read it verbatim — never re-derive
-   * `level >= subclassGateLevel` client-side.
-   */
+  /** Computed by `buildClassesView`; never re-derive `level >= subclassGateLevel` client-side. */
   needsSubclass: boolean;
-  /**
-   * True when the held subclass row is edition-tagged for a DIFFERENT edition
-   * than the character's (a catalog retag after the pick — fresh cross-edition
-   * picks are blocked, #1598). The name still renders but features derive to
-   * zero, so the sheet must explain the split rather than hide it.
-   */
+  /** True when the held subclass is tagged for a different edition than the character's; name still renders but features derive to zero. */
   subclassUnavailable: boolean;
 }
 
-/**
- * Class operation types — mirror of `applyClassOperations`. Sent as
- * `{ operations: ClassOperation[] }` to POST /api/characters/:id/class/transactions.
- */
+// Sent as { operations: ClassOperation[] } to POST /api/characters/:id/class/transactions.
 export interface SetSubclassOperation { type: "setSubclass"; subclassId: string }
 
-// Only ops the frontend dispatches are mirrored — applyClassOperations accepts
-// more (addClass, #1131/#1170).
+// Only ops the frontend dispatches are mirrored; `applyClassOperations` accepts more server-side.
 export type ClassOperation = SetSubclassOperation;

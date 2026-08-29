@@ -14,7 +14,6 @@ function groupHeading(group: ChronicleGroup): string {
   return group.sessionTitle ? `${label} — ${group.sessionTitle}` : label;
 }
 
-// Sheets are owner-only views: only the viewer's own character gets a link (#842).
 function ownsCharacter(
   characters: { id: string; ownerId: string }[],
   characterId: string,
@@ -79,8 +78,6 @@ function ChronicleEntry({
   );
 }
 
-// Session-grouped timeline of the notes that @-tag this entity (#842); the
-// latest three session groups show, the rest sit behind an expander.
 export default function EntityChronicle({
   backlinks,
   entityId,

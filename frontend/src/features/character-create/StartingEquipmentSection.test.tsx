@@ -18,22 +18,11 @@ const PACKAGE: ClassStartingEquipment = {
   gold: null,
 };
 
-// A package with BOTH modes (gold: not null) — the realistic shape for a
-// 2014 class, used only to prove the toggle's kind-label still threads
-// through Section -> Editor when the toggle actually renders (#1565 reviewer
-// fix: PACKAGE above's gold:null, the realistic BACKGROUND shape, hides the
-// toggle row entirely, so it can't exercise the label).
 const PACKAGE_WITH_GOLD_ALT: ClassStartingEquipment = {
   ...PACKAGE,
   gold: { diceCount: 5, diceFaces: 4, multiplier: 10 },
 };
 
-// #1565: this section is reused for BOTH the class's package (default title/
-// kind) and the background's own package (title="Background Equipment",
-// kind="background") — the acceptance criterion is that the picker renders a
-// background choice when the background HAS a package and renders nothing at
-// all when it doesn't (any 2014 background but Acolyte and Folk Hero — see
-// BackgroundOption's own comment), same as a class with none.
 describe("StartingEquipmentSection — background reuse (#1565)", () => {
   it("renders nothing when startingEquipment is null (a background with no seeded package)", () => {
     render(
@@ -60,7 +49,6 @@ describe("StartingEquipmentSection — background reuse (#1565)", () => {
       />,
     );
     expect(screen.getByRole("heading", { name: "Starting Equipment" })).toBeInTheDocument();
-    // #1565 reviewer fix: a one-mode package renders no toggle row at all.
     expect(screen.queryByRole("button", { name: "Class equipment package" })).not.toBeInTheDocument();
   });
 
@@ -96,12 +84,7 @@ describe("StartingEquipmentSection — background reuse (#1565)", () => {
     expect(screen.getByRole("button", { name: "Background equipment package" })).toBeInTheDocument();
   });
 
-  // The creation step mounts both editors at once, and a native radio group is
-  // keyed by `name` across the WHOLE document — so a shared name would make
-  // picking a background option clear the class one on screen while the draft
-  // silently kept both (#1565). Asserting the names are disjoint is what pins
-  // that; asserting on `checked` alone would not, since these radios are
-  // React-controlled and re-render from state either way.
+  // A native radio group is keyed by `name` across the whole document, so a shared name across two mounted editors would let one clear the other on screen.
   it("namespaces each editor's radio group so two mounted editors stay independent", () => {
     const { container } = render(
       <>

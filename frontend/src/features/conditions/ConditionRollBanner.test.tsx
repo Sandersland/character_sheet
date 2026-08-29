@@ -17,7 +17,6 @@ const rage: RollModifier[] = [
 describe("ConditionRollBanner (#984)", () => {
   it("renders one banner naming the condition and its roll effect", () => {
     render(<ConditionRollBanner modifiers={poisoned} />);
-    // The two Poisoned grants collapse into ONE banner, stated once.
     expect(screen.getAllByText("Poisoned")).toHaveLength(1);
     expect(
       screen.getByText("Disadvantage on attack rolls, ability checks, and initiative"),
@@ -52,8 +51,6 @@ describe("ConditionRollBanner (#984)", () => {
   });
 
   it("renders a single banner joining both clauses for a mixed-tone source", () => {
-    // One source granting both advantage and disadvantage collapses to ONE
-    // banner (name appears once) with both clauses joined by "; ".
     const mixed: RollModifier[] = [
       { mode: "advantage", kind: "check", source: "Enlarge/Reduce" },
       { mode: "disadvantage", kind: "save", source: "Enlarge/Reduce" },

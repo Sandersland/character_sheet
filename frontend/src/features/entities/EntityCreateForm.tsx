@@ -15,24 +15,19 @@ const inputCls =
   "w-full min-w-0 box-border rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-garnet-500 focus:outline-none";
 const labelCls = "block text-xs font-semibold text-parchment-700";
 
-// Shared codex create panel (#840): hosted inline in the desktop rail and in the
-// mobile bottom sheet. Escape dismisses; the host returns focus to its toggle.
 export default function EntityCreateForm({ campaignId, isOwner, onClose }: EntityCreateFormProps) {
   const [type, setType] = useState<EntityType>("NPC");
   const [name, setName] = useState("");
   const [aliases, setAliases] = useState("");
   const [notes, setNotes] = useState("");
   const [startHidden, setStartHidden] = useState(false);
-  // Deferred portrait staging + create/upload sequencing (#1617) live in the
-  // hook; the portrait control renders only for the owner — portrait writes
-  // are a campaign-OWNER act.
+  // Portrait staging and create/upload sequencing live in useEntityCreate; portrait writes are a campaign-OWNER act.
   const { busy, formError, portraitFile, setPortraitFile, createdEntity, submit } = useEntityCreate(
     campaignId,
     isOwner,
     onClose,
   );
 
-  // Escape dismisses the open create panel (document-level, same pattern as DropdownMenu).
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();

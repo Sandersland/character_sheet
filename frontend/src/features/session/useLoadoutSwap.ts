@@ -1,17 +1,5 @@
 /**
- * useLoadoutSwap — the mid-turn weapon-swap economy for the turn UI (#733,
- * interaction-budget model #1165).
- *
- * Each equip/unequip is an interaction unit (loadoutPicker.planInteractionSpend):
- * paid from the turn's free interaction + attack-earned credits first, then the
- * Action, else blocked. The swap persists through the audited `setEquipped`/
- * `equip` inventory transaction; a `refund` affordance (Decision #2) reverses
- * the exact inverse batch and returns whatever was spent (budget units or the
- * Action).
- *
- * The local turn undo (#730) deliberately can't reverse a server-committed
- * loadout swap (see useTurnState's `undo` doc) — this hook is that explicit
- * refund surface.
+ * The turn's local undo (#730) can't reverse a server-committed loadout swap (see useTurnState's `undo` doc) — `refund` is the explicit surface for that.
  */
 
 import { useState } from "react";
@@ -23,24 +11,14 @@ import { NO_BUDGET_REASON, planInteractionSpend, type InteractionSpend } from "@
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { Character, EquipSlot, InventoryItem, InventoryOperation } from "@/types/character";
 
-/** A committed swap this turn, retained so the refund can reverse it exactly. */
 interface CommittedSwap {
   inverseOps: InventoryOperation[];
-  /** What paid for the swap — budget units, or null when the Action paid instead. */
+  /** Budget units, or null when the Action paid instead. */
   spend: InteractionSpend | null;
-  /** The loadout we swapped away from — the refund returns to it. */
   previousLabel: string;
 }
 
-/**
- * The forward + inverse inventory batches for equipping `incoming` into `slot`,
- * given the current MAIN/OFF hand occupants. Stows the target slot's occupant
- * plus — for a two-handed incoming weapon — the OTHER hand's occupant too (a
- * two-handed weapon needs a free off-hand), then draws the incoming; the inverse
- * re-equips each stowed item into its original slot. `interactionsNeeded` is one
- * unit per stow plus the draw itself (mirrors loadoutPicker's interactionsForEquip).
- * Mirrors LoadoutList's replace batching.
- */
+/** Mirrors loadoutPicker's interactionsForEquip and LoadoutList's replace batching — keep in sync. */
 function buildSwapOps(
   incoming: InventoryItem,
   mainOcc: InventoryItem | undefined,
@@ -71,14 +49,10 @@ export type LoadoutSwapControls = ReturnType<typeof useLoadoutSwap>;
 
 export function useLoadoutSwap(character: Character, turnState: TurnState & TurnStateActions) {
   const [lastSwap, setLastSwap] = useState<CommittedSwap | null>(null);
-  // The "nothing can pay for this" guard fires before either mutation starts,
-  // so it needs its own slot — a mutation's own error clears the moment its
-  // NEXT mutate() call fires, but this guard never calls mutate() at all.
+  // budgetError needs its own slot — a mutation's error only clears on its NEXT mutate() call, and this guard never calls mutate().
   const [budgetError, setBudgetError] = useState<string | null>(null);
 
-  // Two separate mutations (not one shared instance) because swap and refund
-  // keep distinct fallback copy ("Swap failed" vs "Refund failed") — both
-  // still share one `character-${id}` scope, so a swap and its refund never race.
+  // Two separate mutations (distinct fallback copy per action) sharing one `character-${id}` scope, so a swap and its refund never race.
   const swapMutation = useCharacterMutation({
     characterId: character.id,
     mutationFn: (ops: InventoryOperation[]) => applyInventoryTransactions(character.id, ops),
@@ -94,8 +68,6 @@ export function useLoadoutSwap(character: Character, turnState: TurnState & Turn
   const busy = swapMutation.isPending || refundMutation.isPending;
   const error = budgetError ?? swapMutation.error ?? refundMutation.error;
 
-  // Plan how `unitsNeeded` interactions get paid: from the budget when it
-  // covers them, else the Action, else null (nothing can pay).
   function planPayment(unitsNeeded: number): InteractionSpend | null | "action" {
     const spend = planInteractionSpend(
       { attackEquipCredits: turnState.attackEquipCredits, freeInteractionUsed: turnState.freeInteractionUsed },
@@ -123,7 +95,7 @@ export function useLoadoutSwap(character: Character, turnState: TurnState & Turn
     const mainOcc = itemsInSlot(character.inventory, "MAIN_HAND")[0];
     const offOcc = itemsInSlot(character.inventory, "OFF_HAND")[0];
     const targetOcc = slot === "MAIN_HAND" ? mainOcc : offOcc;
-    if (targetOcc?.id === incoming.id) return; // no-op: already equipped in this slot
+    if (targetOcc?.id === incoming.id) return;
 
     const { ops, inverseOps, interactionsNeeded } = buildSwapOps(incoming, mainOcc, offOcc, slot);
     const payment = planPayment(interactionsNeeded);
@@ -138,8 +110,7 @@ export function useLoadoutSwap(character: Character, turnState: TurnState & Turn
     if (busy) return;
     const occupant = itemsInSlot(character.inventory, slot)[0];
     if (!occupant) return;
-    // Stowing a held weapon is one object interaction (2024 RAW has no free
-    // stow) — budget/Action-gated like any other, not unconditionally free.
+    // Stowing a held weapon is one object interaction (2024 RAW has no free stow) — budget/Action-gated like any other, not unconditionally free.
     const payment = planPayment(1);
     if (payment === null) {
       setBudgetError(NO_BUDGET_REASON);
@@ -150,10 +121,7 @@ export function useLoadoutSwap(character: Character, turnState: TurnState & Turn
     await commitSwap(ops, inverseOps, payment);
   }
 
-  // Clear the committed-swap affordance — called at end of turn so the Refund
-  // is bounded to the turn of the swap (no cross-turn action-economy leak).
-  // All three error sources must clear together: the exposed `error` folds
-  // budgetError over both mutations, so clearing one still shows a stale one.
+  // reset() must clear all three error sources together — error folds budgetError over both mutations, so clearing only one leaves a stale message.
   function reset() {
     setLastSwap(null);
     setBudgetError(null);

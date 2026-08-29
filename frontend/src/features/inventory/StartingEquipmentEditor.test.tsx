@@ -150,9 +150,6 @@ describe("StartingEquipmentEditor open picks", () => {
   });
 });
 
-// #1564 commit 3: PHB'24 packages have no roll-for-gold rule at all —
-// gold: null on the wire. The picker must not offer that path at all rather
-// than rendering a broken range (0-0, or a crash reading .diceCount off null).
 describe("StartingEquipmentEditor — null gold (#1564)", () => {
   it("does not render the starting-gold toggle when the class has no gold dice", () => {
     const startingEquipment: ClassStartingEquipment = {
@@ -173,9 +170,6 @@ describe("StartingEquipmentEditor — null gold (#1564)", () => {
     );
 
     expect(screen.queryByText(/Starting gold/)).not.toBeInTheDocument();
-    // #1565 reviewer fix: with no gold alternative, package is the ONLY mode
-    // — a one-option toggle is meaningless, so the whole toggle row (package
-    // button included) is hidden, not just the gold button.
     expect(screen.queryByRole("button", { name: "Class equipment package" })).not.toBeInTheDocument();
   });
 
@@ -190,9 +184,6 @@ describe("StartingEquipmentEditor — null gold (#1564)", () => {
   });
 });
 
-// #1564 commit 4: open picks widen past weapons — a genuine "musical
-// instrument of your choice" pick filters the dropdown on toolCategory
-// instead of weaponClass/range.
 describe("StartingEquipmentEditor — toolCategory open pick (#1564)", () => {
   it("filters the dropdown to matching tools, not weapons, for a toolCategory pick", async () => {
     const startingEquipment: ClassStartingEquipment = {
@@ -237,13 +228,7 @@ describe("StartingEquipmentEditor — toolCategory open pick (#1564)", () => {
   });
 });
 
-// PR #1567 review, fix 2: a boundToToolChoice pick (Monk's "Artisan's Tools
-// or Musical Instrument chosen for the tool proficiency above") spans two
-// tool categories with no single filter.toolCategory, so matchesPick's old
-// fallback offered every weapon in the catalog — options the backend's
-// boundToolChoiceError would then reject, a dead-end #1336 was filed against.
-// The dropdown must instead offer ONLY the character's own chosen tool
-// proficiencies (selectedToolChoices), regardless of category.
+// matchesPick must filter a boundToToolChoice pick to selectedToolChoices only, never by toolCategory (#1336).
 describe("StartingEquipmentEditor — boundToToolChoice open pick (#1564, #1336)", () => {
   const startingEquipment: ClassStartingEquipment = {
     groups: [
@@ -305,14 +290,6 @@ describe("StartingEquipmentEditor — boundToToolChoice open pick (#1564, #1336)
   });
 });
 
-// #1565: reusing this editor for a background's OWN package (rather than a
-// class's). The two real shapes background packages take: SRD 5.2's
-// multi-option "Choose A or B" (a real choice, radio buttons) and SRD 5.1
-// Acolyte's single fixed-list option (auto-granted display, same as any
-// single-option class group — e.g. Wizard's spellbook). No new rendering
-// logic exists for this — it's the SAME isAutoGrant branch every existing
-// single-option class group already takes; these tests pin that a
-// background reusing this component gets the SAME behavior.
 describe("StartingEquipmentEditor — background reuse (#1565)", () => {
   const acolyte2024Shaped: ClassStartingEquipment = {
     groups: [
@@ -336,10 +313,7 @@ describe("StartingEquipmentEditor — background reuse (#1565)", () => {
     gold: null,
   };
 
-  // The toggle row (package/gold buttons) needs a SECOND mode to be
-  // meaningful (#1565 reviewer fix, below) — real background packages never
-  // have one (gold: null always), so the label tests below use a synthetic
-  // package WITH a gold alternative purely to exercise that row at all.
+  // Synthetic fixture: real background packages always have gold: null (one mode); this one adds a gold alternative to exercise the toggle row.
   const packageWithGoldAlt: ClassStartingEquipment = {
     groups: [{ label: "Weapon", options: [{ label: "Dagger", items: [{ catalogName: "Dagger" }] }] }],
     gold: { diceCount: 5, diceFaces: 4, multiplier: 10 },
@@ -373,10 +347,6 @@ describe("StartingEquipmentEditor — background reuse (#1565)", () => {
     expect(screen.queryByRole("button", { name: "Class equipment package" })).not.toBeInTheDocument();
   });
 
-  // #1565 reviewer fix: every real background package (and every 2024 class
-  // package) has gold: null, so there is only ONE mode — the toggle row
-  // itself (not just the gold button) must not render at all in that case,
-  // for either `kind`.
   it("hides the toggle row entirely for a background package with no gold alternative (the real shape)", () => {
     render(
       <StartingEquipmentEditor

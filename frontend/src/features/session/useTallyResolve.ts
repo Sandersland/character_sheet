@@ -1,12 +1,5 @@
-// Shared resolve handlers for tally rows (#811): the "unresolved = tappable,
-// resolved = final (quiet Change)" rule renders in two places — the in-sheet
-// AttackTallyStrip and the Turn-summary banner — and both must behave
-// identically, so the verdict writes and the inline damage roll live here.
-//
-// The damage spec is looked up at resolve time from the row's formId against the
-// character's live served attack rows rather than persisted on the tally row — if
-// the form no longer exists (weapon dropped mid-turn), the inline roll is simply
-// not offered and the verdict buttons still work.
+// The "unresolved = tappable, resolved = final" rule must behave identically in AttackTallyStrip and the Turn-summary banner — kept here so both share it.
+// Damage spec is looked up live by formId at resolve time, not persisted on the row — if the form's gone (weapon dropped mid-turn), the roll just isn't offered; verdict buttons still work.
 
 import { useCallback } from "react";
 
@@ -18,11 +11,8 @@ import type { AttackTallyRow, TallyVerdict } from "@/lib/attackTallySummary";
 import type { Character } from "@/types/character";
 
 export interface TallyResolve {
-  /** Write a verdict on row `index`; nat-locked rows refuse in state. */
   setVerdict: (index: number, verdict: TallyVerdict | undefined) => void;
-  /** Whether the inline damage roll can be offered for this row. */
   canRollDamage: (row: AttackTallyRow) => boolean;
-  /** Roll the row's damage (crit-doubled for crit rows), log it, write the tally. */
   rollDamageFor: (index: number, row: AttackTallyRow) => void;
 }
 
@@ -40,9 +30,7 @@ export function useTallyResolve({
   const { roll } = useRoll();
   const logRollSafe = useRollLogger(character.id, onLogChanged);
 
-  // A bonusAction row resolves against the off-hand entry (its served damage has
-  // the ability mod already dropped) — never the main-hand form, which carries the
-  // SAME id: the two rows are told apart by the off-hand flag alone (#813).
+  // A bonusAction row resolves against the off-hand entry, never the main-hand form (same formId) — told apart by the off-hand flag alone (#813).
   const formFor = useCallback(
     (row: AttackTallyRow) => {
       if (row.source === "bonusAction") {
@@ -65,9 +53,7 @@ export function useTallyResolve({
       if (!form) return;
       const spec = isCritRow(row) ? critDamageSpec(form.damageSpec) : form.damageSpec;
       const result = roll(spec, form.damageRollLabel);
-      // Carries the row's own swingId (#1235/#1354) — minted at attack time
-      // and threaded onto the row since this hook has no access to
-      // useAttackRolls' swingIdRef.
+      // Carries the row's own swingId (#1235/#1354), minted at attack time and threaded onto the row rather than recomputed here.
       logRollSafe("damage", form.logSource, result, spec, form.damageType, { swingId: row.swingId });
       setTallyDamageAt(index, result.total);
     },

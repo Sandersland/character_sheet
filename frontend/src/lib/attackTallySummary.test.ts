@@ -32,18 +32,11 @@ describe("autoVerdict", () => {
     expect(autoVerdict(roll())).toBeUndefined();
   });
 
-  // #1120: a literal nat 20 with criticalHit unset must NOT auto-crit — this
-  // shape is unreachable through useAttackRolls today (nat20 always implies
-  // criticalHit there, since 20 >= any critRange), but autoVerdict itself
-  // must key off criticalHit, not nat20, or a future critRange > 20 caller
-  // would silently regress to the old nat20-only rule.
+  // Unreachable via useAttackRolls today, but autoVerdict must key off criticalHit, not nat20, or a future critRange > 20 caller would regress to the old nat20-only rule (#1120).
   it("nat20 alone (criticalHit false) does not auto-crit", () => {
     expect(autoVerdict(roll({ nat20: true, criticalHit: false }))).toBeUndefined();
   });
 
-  // The Champion case this issue exists for: a natural 19 that met a widened
-  // critRange (server-computed into criticalHit) auto-crits even though
-  // nat20 is false.
   it("a natural 19 within a widened crit range (Champion L3) auto-crits", () => {
     expect(autoVerdict(roll({ keptFace: 19, nat20: false, criticalHit: true }))).toBe("crit");
   });
@@ -59,7 +52,7 @@ describe("verdict predicates", () => {
   it("isMissRow only for an explicit miss verdict", () => {
     expect(isMissRow(row({ verdict: "miss" }))).toBe(true);
     expect(isMissRow(row({ verdict: "hit" }))).toBe(false);
-    expect(isMissRow(row())).toBe(false); // unset → treated as a hit
+    expect(isMissRow(row())).toBe(false);
   });
 
   it("isCritRow for an explicit crit verdict OR a crit-range hit", () => {

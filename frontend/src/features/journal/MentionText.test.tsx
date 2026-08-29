@@ -126,7 +126,6 @@ describe("MentionText inked-name styling (#862)", () => {
     expect(link).toHaveClass(inkClass);
     expect(link.className).toContain("[font-variant-caps:small-caps]");
     expect(link).toHaveClass("font-semibold", "border-b", "border-dotted");
-    // No pill: never a rounded background chip.
     expect(link.className).not.toMatch(/\brounded-full\b/);
     expect(link.className).not.toMatch(/\bbg-/);
   });

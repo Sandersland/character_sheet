@@ -1,22 +1,4 @@
-/**
- * useManeuverDie — shared Battle Master superiority-die spend hook.
- *
- * Encapsulates the "cast a known maneuver, let the server roll the die, write
- * the result to the character cache" pattern so it isn't duplicated in
- * ManeuverPrompt, InlineAttackPicker, and TurnHub. The server owns the roll
- * (#418): spend posts the castManeuver op and returns the die value it
- * rolled, which the caller folds into the relevant attack/damage total (or
- * shows in reminder text).
- *
- * Returns:
- *   pool       — the superiorityDice ResourcePool (undefined if character has none).
- *   diceFaces  — the numeric face count parsed from pool.die (defaults to 8).
- *   dieLabel   — e.g. "d8", "d10".
- *   busy       — true while a spend is in flight.
- *   spend(entryId) — casts the maneuver by its known-entry id, writes the
- *                    updated character into the cache, and returns the
- *                    server-rolled die result. Throws (or rejects) on API error.
- */
+/** The server rolls the die (#418); `spend` returns that value for the caller to fold into attack/damage or reminder text. */
 
 import { castManeuverTransaction } from "@/api/client";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
@@ -42,9 +24,7 @@ export function useManeuverDie(character: Character): UseManeuverDieReturn {
     fallbackMessage: "Failed to cast maneuver",
   });
 
-  // No try/catch here (unchanged from pre-#1283): a spend failure propagates to
-  // the caller (useManeuverActions' handleReactionManeuver/handleEffectManeuver),
-  // which is what surfaces it — this hook itself has never exposed `error`.
+  // No try/catch here — a spend failure propagates to the caller (useManeuverActions), which is what surfaces it; this hook never exposes `error`.
   async function spend(entryId: string): Promise<number> {
     const { results } = await mutation.mutateAsync(entryId);
     return results[0]?.roll ?? 0;

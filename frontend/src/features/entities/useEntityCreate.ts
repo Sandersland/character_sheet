@@ -26,13 +26,7 @@ function buildCreatePayload(input: EntityCreateInput, isOwner: boolean) {
   };
 }
 
-/**
- * Create-panel submission flow (#840, #1617): create the entity, prime the
- * shared cache, then upload the deferred portrait File (the entity id doesn't
- * exist until createEntity resolves). A failed upload flips the panel into
- * retry state — `createdEntity` set, submit re-runs ONLY the upload — because
- * the create itself already stuck and must never run twice.
- */
+// A failed portrait upload flips into retry state (createdEntity set) so submit re-runs only the upload — the create already stuck and must never run twice.
 export function useEntityCreate(campaignId: string, isOwner: boolean, onClose: () => void) {
   const { entities } = useCampaignEntities(campaignId);
   const [busy, setBusy] = useState(false);
@@ -40,9 +34,7 @@ export function useEntityCreate(campaignId: string, isOwner: boolean, onClose: (
   const [portraitFile, setPortraitFile] = useState<File | null>(null);
   const [createdEntity, setCreatedEntity] = useState<CampaignEntity | null>(null);
 
-  // Uploads the staged portrait for an already-created entity, closing on
-  // success (or when nothing is staged). Failures are caught here — not
-  // rethrown — so they read as retry state, never as a failed create.
+  // Failures are caught here, not rethrown, so they read as retry state rather than a failed create.
   async function uploadStagedPortrait(created: CampaignEntity) {
     if (!portraitFile) {
       onClose();

@@ -1,7 +1,5 @@
 import Card from "@/components/ui/Card";
 
-// About / credits surface — houses third-party asset attribution. The paper-doll
-// slot glyphs (#566) come from game-icons.net, used under CC BY 3.0.
 export default function AboutPage() {
   return (
     <main className="mx-auto flex max-w-2xl flex-col gap-6 px-6 py-8">

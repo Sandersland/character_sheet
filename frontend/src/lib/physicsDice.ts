@@ -1,29 +1,19 @@
 /**
  * Shared, React-free cannon-es physics for the real-physics dice roller
- * (PhysicsDiceRoller). Builds the world/tray/bodies, throws
- * dice with randomized velocity, steps the simulation, and reads the
- * settled face value off each die — physics *is* the source of randomness
- * here, unlike `rollDie`. Kept separate from the React
- * component so the same throw/step/read logic can run either across many
- * animation frames (the normal tumble) or synchronously in a tight loop
- * (the reduced-motion/skip path) without duplicating it.
+ * (PhysicsDiceRoller). Physics *is* the source of randomness here, unlike
+ * `rollDie`.
  */
 import * as CANNON from "cannon-es";
 import * as THREE from "three";
 
 import { D6_SIZE, DIE_GAP, UP_AXIS, d10FaceData, type FaceGroup } from "./dieFaces";
 
-// Exaggerated well past Earth gravity (9.8) for snappy, readable game feel —
-// matches the scale the Codrops cannon-es dice article settled on for the
-// same reason: a "physically correct" 9.8 reads as floaty in a ~2-unit-tall
-// scene that settles in a second or two.
+// Exaggerated well past real gravity (9.8) — a "physically correct" value
+// reads as floaty in this ~2-unit-tall scene that settles in a second or two.
 const GRAVITY_Y = -50;
 
-// Fixed simulation timestep; cannon-es internally sub-steps real frame time
-// against this when stepped with `timeSinceLastCalled` (see useFrame call
-// site), so motion stays stable regardless of the browser's actual frame rate.
-// Exported so the React roller's synchronous fast-forward path advances sim
-// time by the exact same step as an animated frame — single source of truth.
+// Exported so the synchronous fast-forward path advances sim time by the
+// exact same step as an animated frame.
 export const FIXED_DT = 1 / 60;
 const MAX_SUB_STEPS = 6;
 
@@ -35,55 +25,36 @@ const FLOOR_RESTITUTION = 0.3;
 
 const SLEEP_SPEED_LIMIT = 0.15;
 const SLEEP_TIME_LIMIT = 0.2;
-// Secondary settle check (belt-and-suspenders alongside cannon's own sleep
-// state) for any body that's effectively stopped but hasn't formally slept
-// yet — e.g. dice resting close enough together that tiny mutual nudges keep
-// re-arming cannon's own sleep timer indefinitely. Deliberately the *same*
-// magnitude as SLEEP_SPEED_LIMIT above: this isn't a looser threshold, just
-// an alternate, ungated path to the same "basically stopped" conclusion —
-// see SETTLE_FALLBACK_GRACE_MS below for why it can't fire immediately.
+// Secondary settle check alongside cannon's own sleep state, for a body
+// that's effectively stopped but hasn't formally slept yet (e.g. dice
+// resting close enough that mutual nudges keep re-arming cannon's sleep
+// timer). Same magnitude as SLEEP_SPEED_LIMIT — not looser, just an
+// alternate, ungated path to the same conclusion; see
+// SETTLE_FALLBACK_GRACE_MS for why it can't fire immediately.
 const SETTLE_VELOCITY_THRESHOLD = 0.15;
-// How long a die must have been awake since its last throw before the
-// instantaneous fallback above is even consulted. Without this gate, the
-// fallback — checking the *same* speed limit cannon's own sleepState uses,
-// but with no sustain requirement — can report "settled" on whichever
-// single tick a die's velocity happens to dip during one of its small
-// decaying bounces, well before it's actually finished rocking to a stop;
-// since the resolver waits for *every* die to settle before reading any of
-// them, that one premature read is enough to misread a die that was about
-// to land flat for real a few frames later. 900ms is comfortably longer
-// than a normal landing takes to reach true `SLEEPING` via cannon's own
-// sustained check, so in the common case this fallback never actually
-// fires — it only kicks in for the close-neighbors-jittering edge case
-// above, well before MAX_ROLL_MS's full safety-timeout would.
+// Delays the instantaneous fallback above so a die mid-decaying-bounce isn't
+// misread as settled before it actually finishes rocking to a stop; 900ms
+// comfortably exceeds how long a normal landing takes to reach cannon's own
+// sustained SLEEPING check.
 const SETTLE_FALLBACK_GRACE_MS = 900;
 
-// Matches DiceScene's <ContactShadows position={[0, -1.1, 0]}> — the tray
-// floor sits exactly where the shadow is already painted.
+// Matches DiceScene's ContactShadows Y position — the tray floor sits where
+// the shadow is already painted.
 export const FLOOR_Y = -1.1;
-// Conservative fixed tray Z extent, sized to stay within the visible band of
-// the fixed-height (`h-44`), variable-width, non-resizing canvas (see
-// DiceScene) rather than computed from the actual rendered width, which we
-// deliberately never read. X is handled separately (see trayHalfXFor below)
-// since it has to scale with how many dice are thrown side by side.
+// Sized to stay within the fixed-height (`h-44`), variable-width,
+// non-resizing canvas (DiceScene) rather than computed from actual rendered
+// width, which is deliberately never read.
 const TRAY_HALF_Z = 2;
 const TRAY_WALL_HEIGHT = 4;
 const TRAY_WALL_THICKNESS = 0.5;
-// How far a die's start x can jitter off its lane center before being
-// thrown — small, for the same neighbor-clipping reason DiceRoller's
-// scripted skitter stays z-only (see the DIE_GAP comment).
+// Small, for the same neighbor-clipping reason DiceRoller's scripted skitter
+// stays z-only (see its DIE_GAP usage).
 const START_X_JITTER = 0.4;
-// Room beyond a die's outermost resting lane for its own half-width, the
-// start jitter above, and some margin to actually scatter/bounce around in
-// rather than touching the wall at rest — without this, a multi-die roll's
-// outer lanes (at `((count-1)/2) * DIE_GAP`) can start *outside* a
-// fixed-width tray, which visibly clips/scatters that die past the canvas
-// edge instead of containing it.
+// Room beyond a die's outermost resting lane for its half-width, the jitter
+// above, and scatter margin — without it a multi-die roll's outer lanes (at
+// `((count-1)/2) * DIE_GAP`) can start outside a fixed-width tray.
 const TRAY_LANE_MARGIN = D6_SIZE / 2 + START_X_JITTER + 1.5;
 
-/** The tray's X half-extent for a roll of `count` dice spaced `DIE_GAP`
- *  apart — wide enough that every die's lane sits comfortably inside the
- *  walls, however many dice are thrown side by side. */
 function trayHalfXFor(count: number): number {
   const outermostLaneX = count > 1 ? ((count - 1) / 2) * DIE_GAP : 0;
   return outermostLaneX + TRAY_LANE_MARGIN;

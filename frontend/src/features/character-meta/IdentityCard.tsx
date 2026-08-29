@@ -8,21 +8,11 @@ import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
 import type { Character } from "@/types/character";
 
-/**
- * Identity summary (#927) + portrait editor (#1616, merged here by #1618 so
- * the portrait sits beside the identity fields instead of floating in its own
- * near-empty card). The portrait region is both the sheet's portrait render
- * site and the post-creation surface to add/replace/remove one. The returned
- * Character's portraitUrl carries a fresh ?v= per upload (#1615's immutable
- * cache contract), so useCharacterMutation's setQueryData alone makes the
- * <img> refetch — no reload, no manual cache busting. The background/alignment
- * fields stay read-only display; editable narrative fields land in #930.
- */
+// The portrait response carries a fresh ?v= per upload (#1615's immutable cache contract), so setQueryData alone makes the <img> refetch.
 export default function IdentityCard() {
   const { character } = useCurrentCharacter();
   const queryClient = useQueryClient();
-  // Character-list summaries carry their own portraitUrl copies — invalidate
-  // so the CharacterCard thumbnail matches the sheet after a write.
+  // Character-list summaries carry their own portraitUrl copies, so invalidate that cache too.
   const invalidateList = () =>
     void queryClient.invalidateQueries({ queryKey: characterKeys.list() });
 
@@ -44,15 +34,13 @@ export default function IdentityCard() {
   return (
     <Card title="Identity" className="p-4 sm:p-5">
       <div className="flex flex-col gap-5 sm:flex-row sm:gap-6">
-        {/* w-48 keeps the pair of action buttons on one row and stays under the
-            stored image's 256px sharpness ceiling (uploads are ≤512px WebP). */}
+        {/* w-48 keeps the action buttons on one row, under the stored image's 256px sharpness ceiling (uploads are <=512px WebP). */}
         <div className="mx-auto w-48 shrink-0 sm:mx-0">
           <ImageUploadControl
             imageUrl={character.portraitUrl ?? null}
             pending={upload.isPending || remove.isPending}
             error={upload.error ?? remove.error}
-            // Cross-reset the sibling mutation so a stale error from the previous
-            // action can't outlive (or shadow) the outcome of this one.
+            // Cross-reset the sibling mutation so its stale error can't shadow this one's outcome.
             onSelect={(file) => {
               remove.reset();
               upload.mutate(file);

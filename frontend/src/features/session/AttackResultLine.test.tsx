@@ -19,7 +19,6 @@ describe("AttackResultLine (#745)", () => {
     expect(screen.getByText("18")).toBeInTheDocument();
     expect(screen.getByText("d20")).toBeInTheDocument();
     expect(screen.getByText("25")).toBeInTheDocument();
-    // modifier surfaced (rendered "+ 7")
     expect(screen.getByText(/\+\s*7/)).toBeInTheDocument();
   });
 
@@ -75,7 +74,6 @@ describe("AttackResultLine (#745)", () => {
   });
 
   it("omits the modifier term when the modifier is zero", () => {
-    // Two dice so the total (7) is distinct from either face (1, 6).
     const dmg: RollResult = {
       dice: [
         { value: 1, dropped: false },
@@ -87,7 +85,6 @@ describe("AttackResultLine (#745)", () => {
     };
     render(<AttackResultLine result={dmg} kind="damage" damageType="bludgeoning" />);
     expect(screen.getByText("7")).toBeInTheDocument();
-    // No "+ 0" / "− 0" noise.
     expect(screen.queryByText(/[+−]\s*0/)).not.toBeInTheDocument();
   });
 

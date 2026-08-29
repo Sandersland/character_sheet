@@ -1,9 +1,6 @@
-/**
- * LoadoutRefundStrip — persistent Refund affordance under the turn slots after a
- * mid-turn weapon change (#815). The local turn undo can't reverse a
- * server-committed swap, so this strip (and the in-sheet banner) is the explicit
- * refund surface; it stays until the swap is refunded or the turn ends.
- */
+// The local turn undo can't reverse a server-committed loadout swap, so this
+// strip is the explicit refund surface until the swap is refunded or the turn
+// ends (#815).
 
 import type { LoadoutSwapControls } from "@/features/session/useLoadoutSwap";
 

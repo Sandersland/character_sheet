@@ -1,7 +1,3 @@
-// The full-screen level-up ceremony (#886) over the shared ceremony chrome
-// (#1176): dark stage, parchment double-rule card, the adaptive step rail, a
-// step-body slot, and the Cancel/Back/Continue footer that flips to Confirm.
-
 import Spinner from "@/components/ui/Spinner";
 import { CeremonyCard, CeremonyFooter, CeremonyStage, GHOST_BTN } from "@/features/ceremony/CeremonyShell";
 import CeremonyStepRail from "@/features/ceremony/CeremonyStepRail";
@@ -23,9 +19,8 @@ import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 import { stepKey, stepLabel } from "@/lib/levelUpSteps";
 import type { LevelUpStep, LevelUpStepKind, LevelUpTarget } from "@/types/character";
 
-// Step-body slot: #887–#891 register their real bodies per kind here. Total
-// over LevelUpStepKind (#1422) so an unregistered kind is a compile error
-// here rather than an unsatisfiable placeholder shipping to a player.
+// Total over LevelUpStepKind, so an unregistered kind is a compile error here
+// rather than an unsatisfiable placeholder shipping to a player.
 const STEP_BODIES: Record<LevelUpStepKind, React.ComponentType<{ step: LevelUpStep }>> = {
   hitPoints: HitPointsStep,
   advancement: AbilityScoreStep,
@@ -56,8 +51,6 @@ function PaperNotice({ title, body, onBack }: { title: string; body: string; onB
   );
 }
 
-// #1170: shown after Confirm when pendingLevelUps remain — BG3-style per-level
-// choice loops back to the class chooser instead of leaving the ceremony.
 function LevelAgainNotice({ remaining, onContinue, onFinish }: LevelAgainPhase) {
   return (
     <CeremonyCard className="px-6 py-10 text-center">
@@ -107,8 +100,6 @@ type CeremonyPhase =
   | { kind: "notice"; planError: string }
   | { kind: "ready"; plan: NonNullable<Ceremony["plan"]>; currentStep: LevelUpStep; target: LevelUpTarget };
 
-// Reduces the ceremony hook's flat field set to one of five mutually exclusive
-// render phases, so the component below picks a branch instead of re-deriving it.
 function ceremonyPhase(c: Ceremony): CeremonyPhase {
   if (c.classChoice) return { kind: "classChoice", classChoice: c.classChoice };
   if (c.levelAgain) return { kind: "levelAgain", levelAgain: c.levelAgain };
@@ -174,8 +165,8 @@ export default function LevelUpCeremony() {
   const showSpinner = useDelayedFlag(c.plan === null && !c.planError);
   const phase = ceremonyPhase(c);
 
-  // Loading renders bare (no stage chrome) — matches CreationCeremony so a slow
-  // plan fetch doesn't flash the dark stage before there's anything to show on it.
+  // Renders bare (no stage chrome), matching CreationCeremony, so a slow plan
+  // fetch doesn't flash the dark stage before there's anything to show on it.
   if (phase.kind === "loading") return showSpinner ? <Spinner variant="page" /> : null;
 
   if (phase.kind === "classChoice") {

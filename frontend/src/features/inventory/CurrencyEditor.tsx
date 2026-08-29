@@ -7,7 +7,7 @@ import type { Currency } from "@/types/character";
 import CurrencyEditForm from "@/features/inventory/CurrencyEditForm";
 import { formatCurrency } from "@/lib/currency";
 
-// Display-first purse: shows the formatted currency with an "Edit purse" toggle revealing the denomination inputs. Reuses PATCH /api/characters/:id (a bare currency edit has no item and isn't ledgered).
+// Reuses PATCH /api/characters/:id: a bare currency edit has no item and isn't ledgered.
 export default function CurrencyEditor() {
   const { character } = useCurrentCharacter();
   const [editing, setEditing] = useState(false);

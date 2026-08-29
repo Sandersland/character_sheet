@@ -14,15 +14,12 @@ interface ItemDetailSheetProps {
   pending: boolean;
   atCap: boolean;
   onSubmit: (operations: InventoryOperation[]) => Promise<void>;
-  // Bundled (#1854) — see WeaponBondProps' own comment.
   bond: WeaponBondProps;
   onClose: () => void;
 }
 
-// The mobile row-tap surface (#1029): the per-item actions that live inline on
-// desktop, collected into one bottom sheet with edit + sell sub-views. Every
-// action funnels through the same onSubmit transaction (bond/unbond through
-// the separate bond.onSubmit — a different transaction endpoint, #1854).
+// Every action funnels through the same onSubmit transaction; bond/unbond
+// goes through the separate bond.onSubmit instead.
 export default function ItemDetailSheet({ item, pending, atCap, onSubmit, bond, onClose }: ItemDetailSheetProps) {
   const [mode, setMode] = useState<"view" | "edit" | "sell">("view");
   const details = itemDetailParts(item).join(" · ");

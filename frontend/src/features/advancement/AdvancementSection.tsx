@@ -1,15 +1,3 @@
-/**
- * AdvancementSection — orchestrator for Ability Score Improvements and Feats.
- *
- * Owns busy + error state, fires API calls through the client module, and
- * writes the updated Character into the character query cache. Renders:
- *   - Summary header showing slots used/total
- *   - List of taken advancements (each with a Remove button)
- *   - AdvancementPanel inline picker when slots remain
- *
- * Mirrors ClassFeaturesSection / SpellsSection in structure.
- */
-
 import { applyAdvancementTransactions } from "@/api/client";
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { useCharacterMutation } from "@/hooks/useCharacterMutation";
@@ -18,12 +6,10 @@ import { entryDetail } from "@/lib/advancement";
 import type { AdvancementEntry, AdvancementOperation } from "@/types/character";
 import AdvancementPanel from "@/features/advancement/AdvancementPanel";
 
-/** Pretty-print a single AdvancementEntry for the list view. */
 function entryLabel(entry: AdvancementEntry): string {
   if (entry.kind === "feat") {
     return entry.featName ?? "Custom feat";
   }
-  // ASI — e.g. "STR +2" or "DEX +1, CON +1"
   return Object.entries(entry.abilityDeltas)
     .map(([ab, d]) => `${abilityAbbr(ab)} +${d}`)
     .join(", ");
@@ -41,8 +27,7 @@ export default function AdvancementSection() {
   const error = mutation.error;
 
   const { advancementSlots } = character;
-  // Fighting Style feats (#1137) occupy their own slot partition and render in the
-  // class-features section — exclude them from the ASI/feat list here.
+  // Fighting Style feats occupy their own slot partition and render in the class-features section instead (#1137).
   const advancements = character.advancements.filter((a) => a.slot !== "fightingStyle");
   const slotsRemaining = advancementSlots.total - advancementSlots.used;
 
@@ -64,14 +49,14 @@ export default function AdvancementSection() {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Error banner */}
+      
       {error && (
         <p className="rounded-control bg-garnet-50 px-3 py-2 text-xs font-semibold text-garnet-700">
           {error}
         </p>
       )}
 
-      {/* Slot summary */}
+      
       <div className="flex items-center gap-2">
         <div className="flex gap-1">
           {Array.from({ length: advancementSlots.total }, (_, i) => (
@@ -92,7 +77,7 @@ export default function AdvancementSection() {
         {busy && <span className="text-[10px] text-parchment-600">Saving…</span>}
       </div>
 
-      {/* Taken advancements list */}
+      
       {advancements.length > 0 && (
         <ul className="flex flex-col gap-3">
           {advancements.map((entry) => (
@@ -110,7 +95,7 @@ export default function AdvancementSection() {
                       entry.origin ? "text-vitality-700" : entry.kind === "feat" ? "text-arcane-700" : "text-gold-800"
                     }`}
                   >
-                    {/* Origin feats (background grants, #1130) are slot-exempt and not removable. */}
+                    
                     {entry.origin ? "Origin" : entry.kind === "feat" ? "Feat" : "ASI"}
                   </span>
                 </div>
@@ -140,14 +125,14 @@ export default function AdvancementSection() {
         </ul>
       )}
 
-      {/* Empty state */}
+      
       {advancements.length === 0 && advancementSlots.total > 0 && (
         <p className="text-sm text-parchment-600">
           No advancements taken yet. You have {advancementSlots.total} slot{advancementSlots.total > 1 ? "s" : ""} available.
         </p>
       )}
 
-      {/* Inline picker */}
+      
       <AdvancementPanel
         currentScores={character.abilityScores as unknown as Record<string, number>}
         slotsRemaining={slotsRemaining}

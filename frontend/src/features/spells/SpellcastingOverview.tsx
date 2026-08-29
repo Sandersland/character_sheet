@@ -1,7 +1,3 @@
-// The spellcasting block on the record: an arcane-keyed ruled-ledger card with
-// boxed stat readouts, slot pips, a read-only prepared roster, the single Cast
-// door (#1162), the inline cast-result/error banners, and a Manage-spellbook
-// opener (caster-spellbook.html §1).
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { abilityLabel } from "@/lib/abilities";
 import { derivePreparedSummary } from "@/lib/preparedSummary";
@@ -21,7 +17,6 @@ interface SpellcastingOverviewProps {
   busy: boolean;
   error: string | null;
   castResult: CastResult | null;
-  /** A live session is active — the Cast door defers to the Combat tab (#1162). */
   isLive: boolean;
   onExpend: (level: number) => void;
   onRestore: (level: number) => void;
@@ -33,7 +28,6 @@ interface SpellcastingOverviewProps {
   onDismissResult: () => void;
 }
 
-// The card's title row: "Spellcasting" + the governing ability, when known.
 function OverviewHeader({ ability }: { ability: string | undefined }) {
   return (
     <div className="flex items-center gap-2.5 text-[11px] font-bold uppercase tracking-wider text-arcane-800">
@@ -48,8 +42,6 @@ function OverviewHeader({ ability }: { ability: string | undefined }) {
   );
 }
 
-// The post-cast result/error banners + the Manage-spellbook opener, split out
-// so the top-level component's own branching stays under fallow's cognitive gate.
 function OverviewFooter({
   castResult,
   error,

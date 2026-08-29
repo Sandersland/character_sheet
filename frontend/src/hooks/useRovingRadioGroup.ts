@@ -3,29 +3,12 @@ import { useCallback, useRef, type KeyboardEvent, type RefCallback } from "react
 interface UseRovingRadioGroupResult {
   itemRef: (index: number) => RefCallback<HTMLButtonElement>;
   tabIndexFor: (index: number) => 0 | -1;
-  /**
-   * Bound per-button (not on the container) to match `Tabs`/`Segmented` --
-   * jsx-a11y's interactive-supports-focus rule rejects a keydown on a
-   * non-focusable role="radiogroup" wrapper, and roving tabindex means only
-   * one button is ever focused, so the two attachment points are
-   * behaviorally identical.
-   */
+  // Bound per-button, not the container: jsx-a11y disallows keydown on a non-focusable role="radiogroup" wrapper.
   keyDownFor: (index: number) => (e: KeyboardEvent<HTMLButtonElement>) => void;
 }
 
 const noneDisabled = () => false;
 
-/**
- * ARIA APG radiogroup keyboard pattern (#1111, extended #1324): exactly one
- * card is in the Tab order (roving tabindex, falling back to the first
- * *enabled* card when none is checked yet -- otherwise the group is
- * unreachable by Tab), arrow keys move focus *and* selection together
- * (wrapping at both ends, skipping disabled options), and Home/End jump to
- * the first/last enabled option.
- *
- * `isDisabled` is optional -- omitting it keeps every option eligible for
- * navigation.
- */
 export function useRovingRadioGroup(
   count: number,
   checkedIndex: number,
@@ -34,9 +17,7 @@ export function useRovingRadioGroup(
 ): UseRovingRadioGroupResult {
   const itemsRef = useRef<(HTMLButtonElement | null)[]>([]);
 
-  // Cached by index so the same index yields the same function reference
-  // across renders -- an inline `(el) => ...` per call makes React detach
-  // and reattach the ref (null, then the element) on every render.
+  // Cached by index so the same index yields the same function reference across renders, since an inline callback per call would make React detach/reattach the ref every render.
   const refCallbacksRef = useRef<Map<number, RefCallback<HTMLButtonElement>>>(new Map());
 
   const itemRef = useCallback((index: number): RefCallback<HTMLButtonElement> => {
@@ -73,9 +54,6 @@ export function useRovingRadioGroup(
 
   const step = useCallback(
     (from: number, delta: 1 | -1): number => {
-      // Scan the count-1 candidates away from `from` in direction `delta`
-      // (offsets 1..count-1 never revisit `from`); first enabled wins, else
-      // -1 when `from` is the only enabled option or all are disabled.
       for (let i = 1; i < count; i++) {
         const next = (((from + delta * i) % count) + count) % count;
         if (!isDisabled(next)) return next;
@@ -88,9 +66,7 @@ export function useRovingRadioGroup(
   const moveFocus = useCallback(
     (next: number) => {
       itemsRef.current[next]?.focus();
-      // UA-default focus scrolling has unspecified alignment (Chrome tends to
-      // centre); a card list capped by an overflow ancestor (#1343) needs to
-      // nudge by one row instead.
+      // UA-default focus scrolling has unspecified alignment; a card list capped by an overflow ancestor (#1343) needs one-row nudges instead.
       itemsRef.current[next]?.scrollIntoView({ block: "nearest" });
       onSelect(next);
     },
@@ -109,7 +85,7 @@ export function useRovingRadioGroup(
       else return;
 
       e.preventDefault();
-      if (next < 0) return; // no other enabled option to move to
+      if (next < 0) return;
       moveFocus(next);
     },
     [count, step, firstEnabled, lastEnabled, moveFocus],

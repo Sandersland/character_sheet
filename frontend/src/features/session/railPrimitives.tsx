@@ -1,10 +1,3 @@
-// Shared rail primitives (#1831 fallow-flagged clone extraction): the numbered
-// dot + connector step shell and the verdict/crit call widgets AttackStepCard
-// and ResolutionRail both render. Extracted here rather than left duplicated —
-// AttackStepCard's own behavior/API is unchanged, only its internal Step/
-// VerdictChip/CritButton definitions now import from here; ResolutionRail is
-// the second, generalized consumer.
-
 import DamageRiderList from "@/features/session/DamageRiderList";
 import type { ResolutionView } from "@/features/session/useResolution";
 import type { AttackState } from "@/features/session/useTurnState";
@@ -23,7 +16,6 @@ const LABEL_STYLE: Record<StepState, string> = {
   pending: "text-parchment-400",
 };
 
-/** One rail step: numbered dot + connector, label, and the step's content. */
 export function RailStep({
   number,
   state,
@@ -58,7 +50,6 @@ export function RailStep({
   );
 }
 
-/** Small verdict chip (nat-locked calls, ✓ Hit, Crit!, Miss). */
 export function VerdictChip({ tone, children }: { tone: "crit" | "miss" | "hit"; children: React.ReactNode }) {
   const cls =
     tone === "crit"
@@ -73,12 +64,6 @@ export function VerdictChip({ tone, children }: { tone: "crit" | "miss" | "hit";
   );
 }
 
-/**
- * The name + magical badge + "+N to hit · damage label" stats line (#1832
- * fallow-flagged clone extraction): AttackStepCard's own SelectedFormSummary
- * wraps this with its roll-mode chip; InlineAttackPicker's AttackFormSummary
- * renders it bare (ResolutionRail shows the chip separately, #1831).
- */
 export function AttackFormSummaryCore({ selected }: { selected: AttackEntry }) {
   return (
     <>
@@ -101,9 +86,6 @@ export function AttackFormSummaryCore({ selected }: { selected: AttackEntry }) {
   );
 }
 
-/** "Attacks · N of M remaining" kicker with spent/remaining pips (total > 1
- *  only) — shared by the Attack sheet's Extra Attack loop and Flurry's
- *  2+-strike loop (moved out of AttackStepCard.tsx, retired #1845). */
 export function AttackKickerPips({ attack }: { attack: AttackState | null }) {
   if (!attack || attack.total <= 1) return null;
   return (
@@ -125,12 +107,6 @@ export function AttackKickerPips({ attack }: { attack: AttackState | null }) {
   );
 }
 
-/**
- * On-hit dice riders (Flame Tongue +2d6 fire) — visible once a to-hit roll
- * exists for this swing and it isn't a called/auto miss (#1832/#1845 shared
- * gate — every useResolution-driven picker, weapon or bonus, hides riders the
- * same way the pre-#1832 boundView binding did).
- */
 export function DamageRidersPanel({
   resolutionView,
   armedEntry,
@@ -150,7 +126,6 @@ export function DamageRidersPanel({
   );
 }
 
-/** The small garnet "Crit!" call/upgrade button. */
 export function CritButton({
   onCallCrit,
   tall = false,

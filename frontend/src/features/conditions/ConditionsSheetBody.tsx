@@ -1,11 +1,4 @@
-/**
- * ConditionsSheetBody — the interactive innards of the conditions surface:
- * active-condition chips with a remove control, the exhaustion stepper, and the
- * inline AddConditionPanel. Owns busy + error state and fires the API calls, so
- * the applyConditionTransactions logic stays single-sourced across both
- * hosts: the desktop card (ConditionsStrip) and the live-Combat utility strip
- * (CombatUtilityStrip, #982).
- */
+// Owns busy/error + applyConditionTransactions so the logic stays single-sourced across ConditionsStrip and CombatUtilityStrip (#982).
 
 import { Minus, Plus, X } from "lucide-react";
 
@@ -20,20 +13,14 @@ import type { ConditionEntry, ConditionKey, ConditionOperation, ConditionOption,
 import AddConditionPanel from "@/features/conditions/AddConditionPanel";
 
 interface Props {
-  /** Open the add-condition picker expanded — set when a host launches this body
-   *  straight into "add" mode (the live-Combat "+ Add" trigger, #982). */
+  // Set true when a host launches this body straight into add mode, e.g. the live-Combat + Add trigger (#982).
   defaultAddOpen?: boolean;
 }
 
-/** A condition choice with rules text absent — the shape AddConditionPanel and
- *  the chip strip fall back to before /reference resolves (#1322). */
+// The shape AddConditionPanel and the chip strip fall back to before /reference resolves (#1322).
 type ConditionChoice = ConditionOption | { key: ConditionKey; label: string };
 
-// Rules text for the viewing character's edition (#1322) — falls back to the
-// edition-invariant key+label list while /reference is still loading (or
-// failed): a missing sentence degrades, a wrong-edition sentence lies. Pulled
-// out of the component so its nullish-coalescing/map logic doesn't add to the
-// component's own complexity count.
+// A missing sentence degrades to the edition-invariant key+label list; a wrong-edition sentence lies (#1322).
 function resolveConditionChoices(reference: ReferenceData | null): {
   options: readonly ConditionChoice[];
   descriptions: Map<ConditionKey, string>;
@@ -45,9 +32,6 @@ function resolveConditionChoices(reference: ReferenceData | null): {
   };
 }
 
-// A chip's tooltip: the condition's rules text (if resolved yet) plus an
-// applied source, each on its own line — omitting either that's absent rather
-// than rendering an empty line.
 function chipTooltip(description: string | undefined, source: string | null | undefined): string {
   return [description, source ? `Source: ${source}` : null].filter(Boolean).join("\n");
 }
@@ -136,10 +120,8 @@ export default function ConditionsSheetBody({ defaultAddOpen }: Props) {
         </p>
       )}
 
-      {/* Active condition chips */}
       <ActiveConditionChips active={active} descriptions={descriptions} busy={busy} onRemove={handleRemove} />
 
-      {/* Exhaustion stepper (0–6) */}
       <div className="mt-4 flex items-center gap-3 border-t border-parchment-200 pt-3">
         <span className="text-xs font-semibold text-parchment-700">Exhaustion</span>
         <div className="flex items-center gap-2">
@@ -173,7 +155,6 @@ export default function ConditionsSheetBody({ defaultAddOpen }: Props) {
         )}
       </div>
 
-      {/* Inline add-condition panel */}
       <div className="mt-3">
         <AddConditionPanel
           activeKeys={activeKeys}

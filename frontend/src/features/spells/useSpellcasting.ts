@@ -1,6 +1,3 @@
-// Spellcasting orchestration state + op handlers for SpellsSection. Feature-local
-// (not a shared hook): batches ops through applySpellcastingTransactions and owns
-// busy/error/castResult/panel state. Pure cast planning lives in spellCast.
 import { useState } from "react";
 
 import { applySpellcastingTransactions } from "@/api/client";
@@ -17,8 +14,7 @@ import type {
 export function useSpellcasting(character: Character) {
   const [castResult, setCastResult] = useState<CastResult | null>(null);
   const [addPanelOpen, setAddPanelOpen] = useState(false);
-  // The prepared-cap pre-block fires before any request is sent, so it needs
-  // its own slot — a mutation's error only clears on its NEXT mutate() call.
+  // prepareCapError needs its own state — mutation.error only clears on the mutation's NEXT mutate() call, but this pre-block fires before any request is sent.
   const [prepareCapError, setPrepareCapError] = useState<string | null>(null);
 
   const mutation = useCharacterMutation({
@@ -57,7 +53,6 @@ export function useSpellcasting(character: Character) {
     send([{ type: "prepareSpell", entryId: spell.id }]);
   }
 
-  // Swap = unprepare one + prepare another in a single atomic batch.
   function handleSwap(dropId: string, addId: string) {
     send([
       { type: "unprepareSpell", entryId: dropId },

@@ -8,7 +8,6 @@ import {
   updateJournalEntry,
 } from "@/api/journal";
 
-// New direct coverage (#1270) — previously only exercised transitively.
 describe("createJournalEntry", () => {
   afterEach(() => {
     vi.unstubAllGlobals();

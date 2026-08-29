@@ -22,9 +22,6 @@ interface InventoryListMobileProps {
   onAdd: () => void;
 }
 
-// The mobile (<md) inventory layout (#1029): full-bleed card, a one-row toolbar,
-// slim encumbrance, dense rows that open a detail sheet, and an add-item FAB —
-// the desktop header Sell/Add actions drop out here.
 export default function InventoryListMobile({
   search,
   onSearchChange,

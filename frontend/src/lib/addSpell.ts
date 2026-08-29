@@ -1,4 +1,3 @@
-// Pure catalog-filtering + shared field styling for the spell panels.
 import { levelLabel } from "@/lib/spellMeta";
 import type { CatalogSpell, SpellSchool } from "@/types/character";
 
@@ -25,7 +24,6 @@ export const INPUT_CLS =
   "w-full rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-arcane-500 focus:outline-none";
 export const LABEL_CLS = "block text-xs font-semibold text-parchment-700";
 
-// Catalog search + level filter (name or school substring, exact level match).
 export function filterCatalog(
   catalog: CatalogSpell[] | null,
   search: string,
@@ -41,7 +39,6 @@ export function filterCatalog(
   });
 }
 
-// "Level 3 · evocation · conc · ritual" meta line for a catalog result.
 export function catalogMetaLine(spell: CatalogSpell): string {
   let line = `${levelLabel(spell.level)} · ${spell.school}`;
   if (spell.concentration) line += " · conc";
@@ -49,10 +46,7 @@ export function catalogMetaLine(spell: CatalogSpell): string {
   return line;
 }
 
-// "fire damage — 8d6 + 2" effect preview for a catalog result; null for utility
-// spells and diceless effects (Mage Armor carries effectKind but no dice). The
-// param is structural so both CatalogSpell and the per-character Spell (nullable
-// effect fields) share this one wording (effectPillLabel delegates here).
+// Structural param type so effectPillLabel can share this wording for both CatalogSpell and per-character Spell.
 export function catalogEffectLine(spell: {
   effectKind?: "damage" | "heal" | "buff" | null;
   effectDiceCount?: number | null;

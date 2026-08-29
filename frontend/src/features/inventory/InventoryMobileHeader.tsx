@@ -25,8 +25,6 @@ interface InventoryMobileHeaderProps {
   configuringSell: boolean;
 }
 
-// The mobile inventory header (#1029): the one-row toolbar + slim encumbrance
-// when a pack is present, or just the slim strip for a coins-only carry.
 export default function InventoryMobileHeader({
   search,
   onSearchChange,

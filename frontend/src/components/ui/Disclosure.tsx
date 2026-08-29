@@ -9,7 +9,6 @@ interface DisclosureProps {
   className?: string;
 }
 
-// Collapsible section: a disclosure button (aria-expanded/-controls) + region.
 export default function Disclosure({ summary, children, defaultOpen = false, className = "" }: DisclosureProps) {
   const [open, setOpen] = useState(defaultOpen);
   const regionId = useId();

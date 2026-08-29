@@ -1,10 +1,4 @@
-// A contenteditable wrapper that drives an @-tag autocomplete popover and shows
-// each stored @[<uuid>] token as an atomic @Name chip while editing (#248, #269).
-// Public contract is unchanged: `value` is the raw @[<uuid>] body string in,
-// onChange(rawBody) out — the DOM is serialized back to tokens on every input so
-// hosts and entity backlinks are unaffected. Editor/chip DOM wiring lives in
-// useMentionEditor; the popover list is MentionSuggestionList (#609).
-
+// `value`/`onChange` carry the raw @[<uuid>] body string; the DOM re-serializes to tokens on every input.
 import { forwardRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { Link } from "react-router-dom";
 
@@ -19,23 +13,16 @@ interface MentionAutocompleteProps {
   campaignId?: string | null;
   rows?: number;
   className?: string;
-  /** Extra inline styles merged onto the editor (e.g. a max-height cap). */
   style?: React.CSSProperties;
   placeholder?: string;
   id?: string;
   required?: boolean;
-  /** Anchor the @-suggestion popover above the field vs. below (default). */
   popoverPlacement?: "above" | "below";
   "aria-label"?: string;
   "aria-labelledby"?: string;
   onKeyDown?: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
 }
 
-// Below md the suggestions render in-flow, capped to a share of the keyboard-aware
-// viewport so they clear the on-screen keyboard (#785). The exception is an
-// "above"-anchored field — the keyboard-docked composers (dock #865, mobile
-// capture #866) sit flush above the keyboard, so a popover anchored above opens up
-// into the visible feed (never clipped) and keeps the absolute popover on mobile.
 function renderSuggestionsInFlow(isMobile: boolean, placement: "above" | "below"): boolean {
   return isMobile && placement !== "above";
 }
@@ -72,11 +59,7 @@ const MentionAutocomplete = forwardRef<HTMLDivElement, MentionAutocompleteProps>
           aria-activedescendant={editor.activeOptionId}
           contentEditable
           suppressContentEditableWarning
-          // Prose-note input hints; autoComplete="off" asks iOS not to offer the
-          // Passwords/Cards/Contacts AutoFill toolbar over this free-text editor
-          // (#879) — WebKit treats the role="textbox" contenteditable as a fillable
-          // field. Best-effort: Safari may still show it, so this is device-verified.
-          // (autoComplete isn't in React's div prop types but renders at runtime.)
+          // autoComplete isn't in React's div prop types but is set via spread below; iOS needs it off to suppress AutoFill on this contenteditable (#879).
           autoCapitalize="sentences"
           autoCorrect="on"
           spellCheck

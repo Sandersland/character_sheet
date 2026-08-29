@@ -1,19 +1,10 @@
-/**
- * AddConditionPanel — inline expand-in-place picker for applying a status
- * condition. Not a modal — follows the same "inline panel, collapsed by
- * default" pattern as AddManeuverPanel. The condition list (with rules text)
- * is resolved server-side per edition and passed in via `options` (#1322).
- * This panel renders whatever it is given and owns no fallback of its own —
- * resolving and degrading is the host's job.
- */
+// This panel renders whatever `options` it is given and owns no fallback of its own — resolving and degrading is the host's job (#1322).
 
 import { useState } from "react";
 
 import type { ApplyConditionOperation, ConditionKey } from "@/types/character";
 
-/** Named for what this panel accepts, not for the host's union of the same
- *  shape: `description` is optional here because the host degrades to a
- *  key+label list before /reference resolves (#1322). */
+// description is optional because a host may pass a key+label list before /reference resolves (#1322).
 interface ConditionPickerOption {
   key: ConditionKey;
   label: string;
@@ -21,14 +12,11 @@ interface ConditionPickerOption {
 }
 
 interface Props {
-  /** Keys already active — filtered out of the picker. */
   activeKeys: ConditionKey[];
   busy: boolean;
   onApply: (op: ApplyConditionOperation) => void;
-  /** Start expanded — used when a host opens the picker directly in an overlay
-   *  (the live-Combat utility strip's "+ Add", #982). Defaults to collapsed. */
+  // Set true when a host opens the picker already expanded, e.g. the live-Combat utility strip's + Add trigger (#982).
   defaultOpen?: boolean;
-  /** The 14 conditions to list, resolved for the viewing character's edition. */
   options: readonly ConditionPickerOption[];
 }
 

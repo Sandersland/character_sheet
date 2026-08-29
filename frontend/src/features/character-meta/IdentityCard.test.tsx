@@ -30,8 +30,6 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-// IdentityCard reads useCurrentCharacter(), so every render seeds the cache
-// and mounts CurrentCharacterProvider via renderWithCharacter.
 describe("IdentityCard (#927)", () => {
   it("renders the Identity heading and the background + alignment strings", () => {
     renderWithCharacter(
@@ -50,8 +48,6 @@ describe("IdentityCard (#927)", () => {
   });
 });
 
-// Portrait editor region, merged in from the retired standalone Portrait card
-// (#1616, folded into Identity by #1618).
 describe("IdentityCard portrait region", () => {
   it("offers Choose image when the character has no portrait", () => {
     renderWithCharacter(<IdentityCard />, makeCharacter());
@@ -119,8 +115,7 @@ describe("IdentityCard portrait region", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Portrait exceeds the 5 MB limit");
   });
 
-  // The two mutations cross-reset: without it, an earlier upload failure would
-  // keep shadowing the alert after a later remove fails (error = upload ?? remove).
+  // Mutations cross-reset (error = upload ?? remove); without it a stale upload error would shadow a later remove failure.
   it("sequential failures show only the LATEST action's error", async () => {
     vi.mocked(client.uploadCharacterPortrait).mockRejectedValue(new Error("upload boom"));
     vi.mocked(client.deleteCharacterPortrait).mockRejectedValue(new Error("remove boom"));
@@ -138,7 +133,6 @@ describe("IdentityCard portrait region", () => {
     );
     expect(screen.getByRole("alert")).not.toHaveTextContent("upload boom");
 
-    // And back the other way: a new select clears the stale remove error.
     vi.mocked(client.uploadCharacterPortrait).mockResolvedValue(
       makeCharacter({ portraitUrl: "/api/characters/char-1/portrait?v=v2" }),
     );

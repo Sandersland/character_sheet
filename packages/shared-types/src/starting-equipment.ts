@@ -1,22 +1,9 @@
-// Starting-equipment wire types (#1273) — de-duplicates the declarations that
-// were hand-mirrored between the backend's (since-deleted) STARTING_EQUIPMENT
-// module and frontend/src/types/character/reference.ts. These types are now
-// ALSO the wire contract for the DB-backed choice-group schema
-// (StartingEquipmentPackage/Group/Option/Item/OpenPick, #1519/#1533/#1534):
-// mapStartingEquipmentPackage (backend lib/inventory/starting-equipment-package.ts)
-// maps rows onto exactly this shape. The frontend receives a package per class
-// from GET /api/reference; pack expansion runs server-side at character
-// creation from the DB-backed packs.
+// Wire contract for the DB-backed choice-group schema, mapped onto this shape by `mapStartingEquipmentPackage`.
+// The frontend receives one package per class from GET /api/reference; pack expansion runs server-side at character creation.
 
 import type { ToolCategory, WeaponClass, WeaponRange } from "./item-detail-inputs.js";
 
-/**
- * Filter used for open picks — omitting a field means "any" on that axis.
- * Renamed from WeaponPoolFilter (#1564): it now also filters the tool/
- * instrument pool (`toolCategory`), not only weapons. weaponClass/range and
- * toolCategory are mutually exclusive in practice — a pick is either
- * weapon-shaped or tool-shaped, never both.
- */
+/** Omitting a field means "any" on that axis; weaponClass/range and toolCategory are mutually exclusive — a pick is weapon-shaped or tool-shaped, never both. */
 export interface OpenPickFilter {
   weaponClass?: WeaponClass;
   range?: WeaponRange;
@@ -29,13 +16,7 @@ export interface FixedItemRef {
   quantity?: number; // default 1
 }
 
-/**
- * An open pick from a filtered catalog pool, e.g. "any martial weapon" or
- * "musical instrument of your choice" (#1564). `boundToToolChoice: true`
- * means this isn't a free pick at all — the chosen item must be one of the
- * character's own creation tool choices (Monk's "Artisan's Tools or Musical
- * Instrument chosen for the tool proficiency above"; omitted when false).
- */
+/** `boundToToolChoice: true` means the chosen item must match one of the character's own creation tool choices (e.g. Monk's tool-or-instrument pick), not a free pick from the catalog. */
 export interface OpenPick {
   label: string;
   filter: OpenPickFilter;
@@ -43,25 +24,19 @@ export interface OpenPick {
   boundToToolChoice?: boolean;
 }
 
-/**
- * One selectable bundle within a choice group — a set of fixed items plus
- * zero or more open picks the player fills in from the filtered catalog, and/
- * or a flat GP amount (PHB'24: every non-final option carries GP, and the
- * final flat-gold option is just an option with `gold` set and no items).
- * Omitted (not 0) when the option grants none — every 2014 option.
- */
 export interface EquipmentBundle {
   label: string;
   items?: FixedItemRef[];
   openPicks?: OpenPick[];
+  /**
+   * PHB'24: every non-final option carries GP, and the final flat-gold option
+   * is just an option with `gold` set and no items. Omitted (not 0) when the
+   * option grants none — true for every 2014 option.
+   */
   gold?: number;
 }
 
-/**
- * A choice group within a class's starting equipment.
- * options.length === 1 → auto-granted (no player choice needed).
- * options.length > 1  → player picks exactly one bundle.
- */
+/** options.length === 1 → auto-granted (no player choice needed); options.length > 1 → player picks exactly one bundle. */
 export interface EquipmentChoiceGroup {
   label: string;
   options: EquipmentBundle[];
@@ -76,8 +51,6 @@ export interface StartingGold {
 
 export interface ClassStartingEquipment {
   groups: EquipmentChoiceGroup[];
-  // NULL = this edition has no roll-for-gold alternative at all (PHB'24 —
-  // its gold is reached through a lettered EquipmentBundle.gold option
-  // instead, #1564). Every EDITION_2014 package keeps a real StartingGold.
+  // NULL means this edition has no roll-for-gold alternative (PHB'24 reaches gold through a lettered EquipmentBundle.gold option instead); every EDITION_2014 package keeps a real StartingGold.
   gold: StartingGold | null;
 }

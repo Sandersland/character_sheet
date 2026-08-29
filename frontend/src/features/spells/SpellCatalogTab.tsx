@@ -1,11 +1,5 @@
-// Catalog tab: filter strip + scrollable results list. Owns search/level
-// state; the catalog fetch itself is lifted to AddSpellPanel (#1788, epic
-// #1782 5/5) so the sibling Homebrew tab's manage list can derive from the
-// SAME GET /api/spells result instead of running a second fetch.
-//
-// Also owns the ForkSpellSheet's open/closed state (#1801, epic #1795 6/6):
-// only one row can be forking at a time, so the sheet lives here rather than
-// per-row in SpellCatalogRow.
+// The catalog fetch is lifted to AddSpellPanel so the sibling Homebrew tab's manage list can derive from the same GET /api/spells result.
+// ForkSpellSheet's open/closed state lives here, not per-row in SpellCatalogRow, so only one row can be forking at a time.
 import { useState } from "react";
 
 import Spinner from "@/components/ui/Spinner";
@@ -21,7 +15,6 @@ interface SpellCatalogTabProps {
   catalog: CatalogSpell[] | null;
   error: string | null;
   showSpinner: boolean;
-  /** A fork was created — caller refetches the catalog (#1801). */
   onForked: () => void;
 }
 

@@ -5,9 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { getQueryClient } from "@/api/queryClient";
 
-// Proves the setupFiles-level provider mechanism reaches every test file's
-// `render`/`renderHook` — the assumption the whole migration rests on, since it
-// is what let ~200 existing test files keep calling a bare `render` (#1282).
+// Proves the setupFiles-level provider mechanism reaches every test file's render/renderHook, which is what lets existing test files keep calling a bare render.
 function Probe() {
   const { data } = useQuery({ queryKey: ["probe"], queryFn: () => Promise.resolve("ok") });
   return <div>{data ?? "loading"}</div>;
@@ -29,8 +27,7 @@ describe("query harness", () => {
     expect(screen.getByText("loading")).toBeInTheDocument();
   });
 
-  // This test and the next are a pair: one writes, the next proves the fresh
-  // per-test client dropped it. Splitting or reordering them defeats both.
+  // This test and the next are a pair: one writes, the next proves the fresh per-test client dropped it. Splitting or reordering them defeats both.
   it("the cache does not bleed between tests", () => {
     getQueryClient().setQueryData(["bleed"], "leftover");
     expect(getQueryClient().getQueryData(["bleed"])).toBe("leftover");
@@ -49,9 +46,7 @@ describe("query harness", () => {
     const { result } = renderHook(() =>
       useQuery({ queryKey: ["probe-error"], queryFn: () => Promise.reject(new Error("nope")) }),
     );
-    // The short timeout is the assertion: retry's first backoff is ~1s, so a
-    // query that retried could not reach isError inside this window. Polling
-    // rather than flushing one tick — a fixed tick count is a CI flake.
+    // The short timeout is the assertion: retry's first backoff is ~1s, so a query that retried could not reach isError inside this window.
     await waitFor(() => expect(result.current.isError).toBe(true), { timeout: 250 });
   });
 });

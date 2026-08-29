@@ -1,11 +1,5 @@
-// New Spells ceremony body (#890): scribe the level's new spells into the book,
-// gated to the plan's count, spell-level ceiling, and class list (#1440: served
-// via step.meta.spellLists/cantripLists, edition-correct by construction since
-// they come from the backend's spellListsFor). Eligibility + the hard
-// cap live in lib/newSpells and useNewSpellsSelection; this component only wires
-// the catalog fetch, search, and the tri-state rows. Rows + the full-description
-// detail card (#1158) are the same shared SpellPickerRow/SpellDetailCard the
-// creation Spells step (#1160) uses — never a level-up-specific copy.
+// #1440: spellLists/cantripLists (step.meta) are edition-correct by construction, sourced from the backend's spellListsFor.
+// Rows + the full-description detail card (#1158) are the same shared SpellPickerRow/SpellDetailCard the creation Spells step (#1160) uses — never a level-up-specific copy.
 import { useState } from "react";
 
 import Spinner from "@/components/ui/Spinner";
@@ -32,11 +26,7 @@ import type { CatalogSpell, Character, LevelUpStep } from "@/types/character";
 
 const NO_KNOWN: ReadonlySet<string> = new Set();
 
-// #1101: the budget header — a staged swap raises "Choose N" to "Choose N+1
-// (N + 1 swap)"; a swap-only level (count 0) reads as optional, and once its
-// swap is staged the "(0 + 1 swap)" arithmetic is hidden as "(swap replacement)".
-// #1509 D5: the swapped noun ("known"/"prepared") is the served casterModel,
-// never re-derived — see casterModelNoun.
+// #1509: the swapped noun ("known"/"prepared") is the served casterModel, never re-derived — see casterModelNoun.
 function budgetHeadline(count: number, chosen: number, swapping: boolean, casterModel: "known" | "prepared" | null): string {
   const cap = count + (swapping ? 1 : 0);
   if (cap === 0) return `No new spells at this level, but you may swap one ${casterModelNoun(casterModel)}`;
@@ -45,19 +35,13 @@ function budgetHeadline(count: number, chosen: number, swapping: boolean, caster
   return `${label} — ${chosen} of ${cap} chosen`;
 }
 
-// #1139: spell out that the N learns and the optional swap are separate rules.
 function learnSummary(count: number, canSwap: boolean, casterModel: "known" | "prepared" | null): string | null {
   if (count === 0) return null;
   const swap = canSwap ? ` You may also swap one ${casterModelNoun(casterModel)} for another.` : "";
   return `You learn ${count} new spell${count === 1 ? "" : "s"}.${swap}`;
 }
 
-// The shared tri-state row list (leveled spells + #1131 cantrips both use it):
-// SpellPickerRow renders each quiet row, and a row/ⓘ tap opens the shared
-// SpellDetailCard (#1158) with the full description and a Learn CTA — the same
-// components the creation Spells step (#1160) renders, so the two ceremonies
-// never drift. `spells` is the unfiltered eligible list, kept separate from
-// `filtered` so the open detail card survives a search-text edit.
+// `spells` is the unfiltered eligible list, kept separate from `filtered` so the open detail card survives a search-text edit.
 function SpellRowList({
   spells, filtered, learnedSpellIds, selectedIds, cap, onToggle, spellSchools = null, freeSchoolPicks = 0,
 }: {
@@ -67,8 +51,7 @@ function SpellRowList({
   selectedIds: string[];
   cap: number;
   onToggle: (spellId: string) => void;
-  /** #1855: the Eldritch Knight (2014) school gate — omitted (null/0) for the
-   * cantrip section, which is never school-restricted. */
+  // #1855: omitted (null/0) for the cantrip section, which is never school-restricted.
   spellSchools?: string[] | null;
   freeSchoolPicks?: number;
 }) {
@@ -76,9 +59,7 @@ function SpellRowList({
   const atCap = selectedIds.length >= cap;
   const openSpell = openId ? spells.find((s) => s.id === openId) : undefined;
   const openState = openSpell ? pickRowState(openSpell, learnedSpellIds, selectedIds, atCap) : null;
-  // #1855: how many already-selected picks are spending the free-school
-  // budget — a row past that budget disables even though the overall `cap`
-  // isn't reached yet (the level-3 EK "2 of 3" case: cap 3, freeSchoolPicks 1).
+  // #1855: a row past the free-school budget disables even though the overall `cap` isn't reached yet.
   const offList = offListSelectedCount(selectedIds, spells, spellSchools);
 
   return (
@@ -117,26 +98,14 @@ function SpellRowList({
   );
 }
 
-// The SHARED fetch state of the one useSpellCatalog call — error or spinner.
-// Rendered ONCE at the step level (not per section), because a level granting
-// both cantrips and leveled spells drives both from the same fetch: showing it
-// inside each section stacked the message twice on a fetch failure/load.
+// Rendered once at the step level, not per section — a level granting both cantrips and leveled spells drives both from the same fetch, so per-section rendering stacked the message twice.
 function SpellFetchStatus({ catalog, error, showSpinner }: { catalog: CatalogSpell[] | null; error: string | null; showSpinner: boolean }) {
   if (error) return <p className="mt-2 text-xs text-garnet-700">{error}</p>;
   if (catalog === null) return showSpinner ? <Spinner /> : null;
   return null;
 }
 
-// The PER-POOL state, disjoint per section (a level's cantrip pool and leveled
-// pool are searched and filtered independently). An empty eligible list
-// (`spells`, pre-search) is a resolver bug — e.g. the Eldritch Knight case:
-// "Choose N of N" against zero rows — distinct copy from an ordinary search
-// that filtered a non-empty list to zero. Suppressed while the fetch is not in
-// a trusted-loaded state — `catalog === null` (initial load) OR `error`. When
-// a fetch fails, useSpellCatalog sets catalog to null AND sets error, so
-// catalog === null already covers the failure case; checking error too is
-// just an extra safety check, so an empty pool never reads as misconfigured
-// on top of SpellFetchStatus's single error line.
+// useSpellCatalog sets catalog to null AND sets error on a failed fetch, so `catalog === null` already covers it; checking `error` too is just an extra safety check.
 function SpellPoolStatus({ catalog, error, spells, filtered }: { catalog: CatalogSpell[] | null; error: string | null; spells: CatalogSpell[]; filtered: CatalogSpell[] }) {
   if (catalog === null || error) return null;
   if (spells.length === 0) {
@@ -152,10 +121,7 @@ function SpellPoolStatus({ catalog, error, spells, filtered }: { catalog: Catalo
   return null;
 }
 
-// The catalog result region: per-pool status plus the tri-state rows. The
-// shared fetch error/spinner is rendered once above, by SpellFetchStatus.
-// Extracted so NewSpellsStep stays under the complexity gate once the #1101 swap
-// panel is layered on top.
+// Extracted so NewSpellsStep stays under the complexity gate once the #1101 swap panel is layered on top.
 function SpellResults({
   catalog, error, spells, filtered, learnedSpellIds, selectedIds, cap, onToggle, spellSchools, freeSchoolPicks,
 }: {
@@ -167,7 +133,7 @@ function SpellResults({
   selectedIds: string[];
   cap: number;
   onToggle: (spellId: string) => void;
-  /** #1855: forwarded to SpellRowList; omitted by the cantrip section. */
+  // #1855: forwarded to SpellRowList; omitted by the cantrip section.
   spellSchools?: string[] | null;
   freeSchoolPicks?: number;
 }) {
@@ -188,13 +154,7 @@ function SpellResults({
   );
 }
 
-// #1131: the cantrip subsection shown above the leveled picker when the level
-// grants new cantrips. Its own search + hard cap, disjoint from the spell
-// learns. #1826: routes through SpellResults (not SpellRowList directly) so a
-// required cantrip pick gets the same empty-eligible/search-miss states as the
-// leveled picker below it — this section previously showed nothing at all when
-// its eligible list was empty. The shared fetch error/spinner is owned by
-// SpellFetchStatus at the step level, not repeated here.
+// #1826: routes through SpellResults (not SpellRowList directly) so a required cantrip pick gets the same empty-eligible/search-miss states as the leveled picker below it.
 function CantripSection({
   cantrips, catalog, error, spells, filtered, learnedSpellIds, selectedIds, onToggle, search, setSearch,
 }: {
@@ -236,12 +196,7 @@ function CantripSection({
   );
 }
 
-// #1855: the Eldritch Knight (2014) school-gate note, PHB'14 p. 74 — leveled
-// picks are restricted to Abjuration/Evocation, except the free any-school
-// grant at class level 3/8/14/20 (freeSchoolPicks). Split out of
-// LeveledSpellsSection purely to keep that function's own complexity under
-// the fallow health gate, mirroring this file's own SwapPanel/magicalSecrets
-// note split.
+// #1855: Eldritch Knight (2014) leveled picks are restricted to Abjuration/Evocation except a free any-school grant at class level 3/8/14/20 (PHB'14 p. 74).
 function SchoolGateNote({ spellSchools, freeSchoolPicks }: { spellSchools: string[]; freeSchoolPicks: number }) {
   return (
     <p className="mt-1 text-center text-xs text-arcane-700">
@@ -253,9 +208,6 @@ function SchoolGateNote({ spellSchools, freeSchoolPicks }: { spellSchools: strin
   );
 }
 
-// The 2024 Magical Secrets note (level 10+ Bard) — split out of
-// LeveledSpellsSection alongside SchoolGateNote (#1855) purely to keep that
-// function's own complexity under the fallow health gate.
 function MagicalSecretsNote({ spellLists }: { spellLists: string[] | null }) {
   return (
     <p className="mt-1 text-center text-xs text-arcane-700">
@@ -268,9 +220,6 @@ function MagicalSecretsNote({ spellLists }: { spellLists: string[] | null }) {
   );
 }
 
-// The leveled-spell picker: budget header, optional swap panel, Magical Secrets
-// note, search + results. Split from NewSpellsStep so the cantrip subsection can
-// sit above it without pushing the parent past the complexity gate.
 function LeveledSpellsSection({
   selection, character, catalog, error, learnedSpellIds, framed,
 }: {
@@ -342,8 +291,6 @@ export default function NewSpellsStep({ step }: { step: LevelUpStep }) {
 
   return (
     <div>
-      {/* The one useSpellCatalog fetch feeds both sections; its error/spinner
-          renders once here, never duplicated per section (#1826). */}
       <SpellFetchStatus catalog={catalog} error={error} showSpinner={showSpinner} />
       {selection.cantrips > 0 && (
         <CantripSection

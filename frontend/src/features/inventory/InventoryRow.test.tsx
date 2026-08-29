@@ -119,7 +119,6 @@ describe("InventoryRow (view mode)", () => {
     const { props } = renderRow();
     await user.click(screen.getByRole("button", { name: "Actions for Club" }));
     await user.click(screen.getByRole("menuitem", { name: "Remove" }));
-    // Nothing removed yet — a confirm step appears first.
     expect(props.onSubmit).not.toHaveBeenCalled();
     expect(screen.getByText(/Remove Club\?/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Confirm" }));
@@ -154,12 +153,9 @@ describe("InventoryRow (view mode)", () => {
     expect(screen.getByRole("button", { name: "Equip" })).toBeDisabled();
   });
 
-  // Bond/unbond goes through a SEPARATE transaction endpoint (the shared
-  // ability endpoint, #1275) than attune/equip/use (inventory/transactions),
-  // so its own in-flight state is tracked by `bond.pending`, not the row's
-  // generic `pending` — a prior wiring bug fed the generic `pending` into
-  // WeaponBondToggle instead, which left the Bond pill never disabling
-  // mid-request.
+  // Bond/unbond goes through a separate transaction endpoint than
+  // attune/equip/use, so its own in-flight state is tracked by `bond.pending`,
+  // not the row's generic `pending`.
   describe("Weapon Bond toggle (#1854)", () => {
     function renderBondableRow(bondOverrides: Partial<Parameters<typeof InventoryRow>[0]["bond"]> = {}) {
       return renderRow({
@@ -192,8 +188,7 @@ describe("InventoryRow (view mode)", () => {
         bond: { eligible: true, atCap: false, pending: false, onSubmit: vi.fn().mockResolvedValue(undefined) },
       });
       expect(screen.getByRole("button", { name: "Bond" })).not.toBeDisabled();
-      // Equip — a genuine `pending` consumer — stays disabled, proving this
-      // render actually exercised `pending: true` rather than a no-op.
+      // Equip stays disabled, proving pending:true was actually exercised, not a no-op.
       expect(screen.getByRole("button", { name: "Equip" })).toBeDisabled();
     });
   });
@@ -211,8 +206,6 @@ describe("InventoryRow (view mode)", () => {
   });
 });
 
-// Characterization tests locking the edit-form submit payload before the
-// InventoryRow decomposition (#292). Exact InventoryOperation[] assertions.
 describe("InventoryRow (edit mode)", () => {
   const weaponItem: InventoryItem = {
     id: "w1",

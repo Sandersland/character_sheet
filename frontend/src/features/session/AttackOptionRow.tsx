@@ -1,5 +1,3 @@
-// One "attackOption" maneuver row (e.g. Commander's Strike) that forfeits an attack.
-
 interface AttackOptionRowProps {
   name: string;
   enabled: boolean;

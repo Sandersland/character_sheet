@@ -20,14 +20,10 @@ interface InventorySectionsProps {
   onEdit: (id: string) => void;
   onCancelEdit: () => void;
   onSubmit: (operations: InventoryOperation[]) => Promise<void>;
-  // Bundled (#1854) — see WeaponBondProps' own comment.
   bond: WeaponBondProps;
   onToggleSelect: (id: string) => void;
 }
 
-// The category-sectioned list of inventory rows. Desktop keeps padded rows in an
-// inner scroller; mobile (#1029) renders dense full-bleed rows that open a detail
-// sheet, sticky section headers, and no nested scroller (the page scrolls).
 export default function InventorySections({
   sections,
   editingId,

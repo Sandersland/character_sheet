@@ -12,7 +12,6 @@ interface CurrencyEditFormProps {
 const inputClass =
   "rounded-control border border-parchment-300 bg-parchment-50 px-1.5 py-0.5 text-xs tabular-nums";
 
-// The purse's denomination inputs + Save/Cancel; state lives in CurrencyEditor.
 export default function CurrencyEditForm({
   currency,
   pending,

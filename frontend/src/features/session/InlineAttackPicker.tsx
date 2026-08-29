@@ -1,29 +1,3 @@
-// Attack sheet (#811, rewired to the shared resolver #1827 Slice 5 / #1832):
-// weapons now drive `useResolution`/`ResolutionRail` (#1831) instead of the
-// bespoke `useAttackRolls`/`AttackStepCard` pair — an "Attacking with" form
-// selector, the shared numbered step-rail (Roll to hit → Call it → Damage),
-// the "This action" tally strip, and a collapsed Battle Master maneuvers
-// disclosure. Weapons-only as of #1833: attack cantrips (#734/#786) left this
-// sheet for the Cast-a-Spell picker (InlineSpellPicker) — Attack and Cast a
-// Spell are the mutually-exclusive Action choices they are in 5e. At md+ the
-// sheet widens (~42rem) and the counter + tally + maneuvers move into a right
-// rail beside the step card so the step column never scrolls — placement
-// switches via useIsBelowMd (single mount per widget, like BottomSheet's own
-// breakpoint gating).
-//
-// `useAttackRolls`/`AttackStepCard` are retired (#1845): InlineOffHandPicker/
-// InlineFlurryPicker (useBonusAttackSheet) now drive this same
-// useResolution/ResolutionRail pair too — every weapon/bonus-swing picker
-// shares one resolver.
-//
-// One real behavior gap from the migration: `ResolutionRail`'s completion
-// model requires a swing fully resolved (hit-and-damaged, or missed) before
-// advancing — there is no "Skip, roll the next attack, leave this one
-// unresolved" affordance the old AttackStepCard offered. That escape hatch
-// doesn't exist in the shared rail (#1831) and stays out of scope — #1845
-// carried the same gap into the bonus-action pickers rather than reproducing
-// AttackStepCard's Skip link, matching this file's own accepted shape.
-
 import { useState } from "react";
 
 import Segmented from "@/components/ui/Segmented";
@@ -66,12 +40,6 @@ import type { TurnState, TurnStateActions } from "@/features/session/useTurnStat
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { Character } from "@/types/character";
 
-// Pure per-render derivations for the picker shell, extracted so the component
-// stays a composition layer (the pre-#811 pattern, kept). `preRoll`/
-// `attacksRemain` (the footer's own two flags) are deliberately NOT derived
-// here — see the component body's own comment: they read `completedSwings`/
-// `resolutionView`, not `turnState.attack`, so the footer's "Done" and the
-// rail's own "Done" (ResolutionRail, #1831) never render at the same time.
 function pickerView(character: Character, attack: TurnState["attack"], forms: AttackEntry[]) {
   return {
     // buildAttackForms always appends Unarmed + Improvised, so any other id is a weapon.
@@ -81,7 +49,6 @@ function pickerView(character: Character, attack: TurnState["attack"], forms: At
   };
 }
 
-// With a weapon: the sheet's ADV/DIS control (#958); without: the empty hint.
 function WeaponRollModeRow({
   hasWeapon,
   mode,
@@ -108,10 +75,6 @@ function WeaponRollModeRow({
   );
 }
 
-// The "Attacking with" form selector — hosted here (not inside ResolutionRail,
-// which is weapon/spell-generic) and locked once a to-hit roll exists for the
-// current swing, mirroring the old card's per-swing binding (you declare your
-// weapon before you swing).
 function AttackingWithRow({
   forms,
   selectedId,
@@ -126,12 +89,6 @@ function AttackingWithRow({
   return <Segmented label="Attacking with" options={options} value={selectedId} onChange={onSelect} />;
 }
 
-// The armed form's stats preview ("+5 to hit · 1d8+3 piercing") — ported from
-// the old AttackStepCard's SelectedFormSummary (#786; the shared core lives in
-// railPrimitives.tsx, #1832 fallow-flagged clone extraction). ResolutionRail
-// (generic across weapon/spell shapes) doesn't reproduce this on its own, and
-// unlike AttackStepCard's own summary, this one has no roll-mode chip — the
-// rail already renders it (ResolutionRail's own ToHitStepContent).
 function AttackFormSummary({ selected }: { selected: AttackEntry }) {
   return (
     <span className="min-w-0">
@@ -140,12 +97,6 @@ function AttackFormSummary({ selected }: { selected: AttackEntry }) {
   );
 }
 
-// Post-hit rider sections with the plain {turnState, currentRow} prop shape
-// (StunningStrikeSection) render only once a hit row exists — one generic
-// wrapper instead of a `currentRow && (<X .../>)` JSX branch (fallow flagged
-// InlineAttackPicker's own complexity, #1832 review: every inline `&&` in the
-// component body is a decision point on BOTH its cyclomatic and cognitive
-// score).
 function HitGatedSection({
   currentRow,
   turnState,
@@ -159,13 +110,6 @@ function HitGatedSection({
   return <Section turnState={turnState} currentRow={currentRow} />;
 }
 
-// Sneak Attack panel: client-rolls the served spec as a rider like any other
-// (#902) — the shared onDamageRider path gives it crit doubling, the 3D roll,
-// and a seat in the swing's single undoable op (the retired server roll had
-// none of those). Extracted alongside ManeuversPanel for the same reason: the
-// gate/fallback branches stay off InlineAttackPicker's own complexity score.
-// The per-swing `key` reproduces the old HitGatedSection unmount-between-
-// swings, so the eligibility checkbox resets each swing.
 function SneakAttackPanel({
   turnState,
   currentRow,
@@ -183,6 +127,7 @@ function SneakAttackPanel({
   const rider = sneakAttackDamageRider(sneak);
   return (
     <SneakAttackSection
+      // key forces a remount per swing so the eligibility checkbox resets.
       key={currentRow?.id ?? "pre-roll"}
       turnState={turnState}
       currentRow={currentRow}
@@ -195,11 +140,6 @@ function SneakAttackPanel({
   );
 }
 
-// Battle Master maneuvers disclosure, gated on the character having a
-// superiority-die pool — extracted alongside HitGatedSection for the same
-// reason (moves the `&&` branch off InlineAttackPicker's own score). Also
-// owns its OWN useManeuverDie call (only this panel needs it) rather than
-// receiving `die` as a prop — one less hook-density point on the parent.
 function ManeuversPanel({
   show,
   character,
@@ -220,25 +160,8 @@ function ManeuversPanel({
   );
 }
 
-// The economy shim useResolution spends against (#1831 review comment 2):
-// Extra Attack's real economy spend already happened via enterAttackMode
-// (useTurnActions.handleAttackAction, BEFORE this sheet mounts) — the
-// Extra-Attack counter (turnState.attack) is what actually gates/advances a
-// swing, so `consumeAction` is deliberately inert: a real spend here would
-// double-decrement `actionsRemaining` under Action Surge.
-//
-// `actionsRemaining` is `attackTotal - completedSwings`, NOT derived from
-// `turnState.attack.used` — `used` increments the moment to-hit is rolled
-// (the provisional-row effect below), matching the kicker's pre-#1832
-// display timing, but useResolution's `disabled` gates EVERY handler
-// (onRollEffect/onCallCrit/onComplete, not just onRollToHit) — deriving it
-// from `used` would self-disable the swing's own remaining steps the instant
-// it started. `completedSwings` only advances in handleCommit, once a swing
-// is actually done. `consume*` is the shared INERT_RESOLUTION_CONSUMERS
-// (useResolution.ts, #1848 review) — InlineSpellPicker's own
-// spellResolutionTurnState spreads the SAME constant rather than a second
-// verbatim-copied trio, so a future ResolutionTurnState consume method can't
-// be added to one shim and missed on the other.
+// consumeAction is deliberately inert: the real spend already happened via enterAttackMode, before this sheet mounts — a spend here would double-decrement actionsRemaining under Action Surge.
+// actionsRemaining is attackTotal - completedSwings, not turnState.attack.used, because `used` increments the moment to-hit is rolled and would self-disable the swing's own remaining steps via useResolution's `disabled`.
 function attackResolutionTurnState(attackTotal: number, completedSwings: number): ResolutionTurnState {
   return {
     actionsRemaining: attackTotal - completedSwings,
@@ -248,17 +171,6 @@ function attackResolutionTurnState(attackTotal: number, completedSwings: number)
   };
 }
 
-// Two driving-layer guards over the shared ResolutionView (#1831) — neither
-// edits useResolution.ts, which this slice drives but does not own:
-//
-// 1. #1831 review (NICE): once damage is already rolled, a later "Crit!" tap
-//    must not silently flag `effect.crit: true` over non-doubled dice — inert
-//    once `effectRoll` exists.
-// 2. `onRollEffect` is gated only on the economy slot + a called miss inside
-//    useResolution, not on a to-hit roll existing at all — ResolutionRail's
-//    Damage button visually stays enabled before Roll to hit (a pre-existing
-//    #1831 shape this slice didn't introduce), so this guard at least keeps
-//    the STATE ordering honest: rolling damage before any to-hit is inert.
 function guardResolutionView(view: ResolutionView): ResolutionView {
   return {
     ...view,
@@ -273,32 +185,12 @@ function guardResolutionView(view: ResolutionView): ResolutionView {
   };
 }
 
-// Bundles the picker's own local UI state — the ADV/DIS choice (#958), rolled
-// rider effects, the armed form, and the completed-swings counter — into ONE
-// useState instead of four (fallow flagged InlineAttackPicker's own
-// complexity, #1832 review: every hook call this component makes directly
-// adds cognitive weight). `completedSwings`' lazy initializer mirrors its
-// own prior comment: seeded from `attack.used` (not 0) so re-opening the
-// sheet mid Extra Attack (Resume) doesn't grant back already-recorded
-// swings — a sheet closed mid-swing (to-hit rolled, never completed) leaves
-// its row unresolved in the tally, same as the pre-#1832 "Skip" affordance did.
-//
-// `riderEffects` (#1843) is keyed by rider id (overwrite-on-reroll, same as
-// the pre-#1843 riderTotals map) and is the single source of truth for BOTH
-// the DamageRiderList display total AND the riders[] array merged into the
-// swing's resolveAction op at commit — `clearRiders` resets it after every
-// commit so a rider rolled on swing 1 of an Extra Attack sequence never rides
-// along into swing 2's op.
-//
-// `assassinateSurprised` (#1526) follows the SAME per-swing lifecycle as
-// `riderEffects` — cleared in `onCommitted`, never carried into the next
-// Extra Attack swing — so a later, non-toggled swing starts unchecked (AC:
-// "changes only that swing").
 function usePickerLocalState(initialSelectedId: string, turnState: TurnState) {
   const [state, setState] = useState(() => ({
     attackMode: "normal" as RollMode,
     riderEffects: {} as Record<string, ResolveActionEventEffect>,
     selectedId: initialSelectedId,
+    // Seeded from attack.used, not 0, so re-opening the sheet mid Extra Attack (Resume) doesn't grant back already-recorded swings.
     completedSwings: turnState.attack?.used ?? 0,
     assassinateSurprised: false,
   }));
@@ -307,10 +199,12 @@ function usePickerLocalState(initialSelectedId: string, turnState: TurnState) {
     setAttackMode: (attackMode: RollMode) => setState((s) => ({ ...s, attackMode })),
     setRiderEffect: (riderId: string, effect: ResolveActionEventEffect) =>
       setState((s) => ({ ...s, riderEffects: { ...s.riderEffects, [riderId]: effect } })),
+    // riderEffects is the single source of truth for both the display total and the riders[] merged at commit; clear it every commit or a rider bleeds into the next Extra Attack swing.
     clearRiders: () => setState((s) => ({ ...s, riderEffects: {} })),
     setSelectedId: (selectedId: string) => setState((s) => ({ ...s, selectedId })),
     recordSwingComplete: () => setState((s) => ({ ...s, completedSwings: s.completedSwings + 1 })),
     setAssassinateSurprised: (assassinateSurprised: boolean) => setState((s) => ({ ...s, assassinateSurprised })),
+    // Cleared on every commit, same as riderEffects, so a non-toggled swing always starts unchecked.
     clearAssassinateSurprised: () => setState((s) => ({ ...s, assassinateSurprised: false })),
   };
 }
@@ -318,12 +212,7 @@ function usePickerLocalState(initialSelectedId: string, turnState: TurnState) {
 interface InlineAttackPickerProps {
   turnState: TurnState & TurnStateActions;
   onClose: () => void;
-  /**
-   * Called when the player cancels before rolling any attacks — refunds the
-   * action and returns to the action menu.
-   */
   onCancel: () => void;
-  /** Called after a roll is logged so the Session Log can refresh. */
   onLogChanged: () => void;
 }
 
@@ -341,22 +230,11 @@ export default function InlineAttackPicker({
   const local = usePickerLocalState(forms[0].id, turnState);
   const armedEntry = forms.find((f) => f.id === local.selectedId) ?? forms[0];
 
-  // Both cheap pure computations off render-fresh values — no useMemo: forms
-  // (and armedEntry within them) are rebuilt every render by buildAttackForms,
-  // so memoizing on armedEntry's identity would risk serving a stale
-  // attack/damage snapshot if the character's numbers changed under the same
-  // weapon id (e.g. a mid-combat buff).
+  // No useMemo: forms (and armedEntry within them) are rebuilt every render by buildAttackForms, so memoizing on armedEntry's identity risks a stale snapshot under a mid-combat buff.
   const resolution = weaponToResolution(armedEntry, character.critRange, character.attacksPerAction);
   const attackTotal = turnState.attack?.total ?? 1;
   const resolutionTurnState = attackResolutionTurnState(attackTotal, local.completedSwings);
 
-  // Fires the resolveAction transaction and advances the completed-swings
-  // count — the two things left to do at completion. Recording the tally row
-  // happens EARLIER, the instant to-hit rolls (see useAttackTallyBridge):
-  // SneakAttack/StunningStrike/QuiveringPalm/ManeuversDisclosure all need
-  // `currentRow` DURING the swing, not just after it commits, mirroring the
-  // pre-#1832 useAttackRolls timing. `clearRiders` always fires so a swing's
-  // rider state never bleeds into the NEXT Extra Attack swing, rolled or not.
   const { commit, pending: commitPending, error: commitError } = useResolveActionCommit({
     characterId: character.id,
     onLogChanged,
@@ -364,19 +242,12 @@ export default function InlineAttackPicker({
       local.recordSwingComplete();
       local.clearRiders();
       local.clearAssassinateSurprised();
-      // Tag this swing's recordAttack history entry with its audit batch so
-      // turn undo reverts the swing server-side (#758) — without it the undo
-      // was local-only, stranding the swing event and deadlocking the LIFO
-      // revert of anything committed before it.
+      // Tags the swing's recordAttack history entry with its audit batch, or turn undo can't revert it server-side (#758).
       turnState.attachBatchId(batchId);
     },
   });
-  // Only true when the toggle was actually checked AND it's what this swing's
-  // hit resolved to — a box checked after "it Missed" already settled the
-  // verdict (AssassinateSection's own onCallCrit effect no-ops on a miss)
-  // must NOT send `assassinate: true` on a non-crit op (the server's own
-  // schema requires toHit.verdict === "crit" whenever it's set).
   function handleCommit(rolls: ResolutionRolls) {
+    // The server schema requires toHit.verdict === "crit" whenever assassinate is set, so a miss (verdict settled by "it Missed") must never send true.
     const assassinate = local.assassinateSurprised && rolls.toHit?.verdict === "crit";
     commit(resolution, rolls, local.riderEffects, assassinate);
   }
@@ -401,14 +272,6 @@ export default function InlineAttackPicker({
 
   const { roll } = useRoll();
 
-  // On-hit dice riders (Flame Tongue +2d6 fire, #1235) route into the SAME
-  // resolveAction event as the swing's own effect (#1843) — riders[] is an
-  // additive sibling to effect (a genuinely different damage TYPE, not
-  // another same-type instance), so this no longer writes its own roll-log
-  // event (retired #1822/#1823 regression: a rider used to render as an
-  // orphaned second feed row that undo couldn't reach). The rolled term is
-  // held in local.riderEffects (overwrite-on-reroll, same as the pre-#1843
-  // riderTotals map) and merged into the op at handleCommit.
   function handleDamageRider(rider: DamageRider) {
     const spec = resolutionView.isCrit ? critDamageSpec(rider.spec) : rider.spec;
     const result = roll(spec, rider.rollLabel);
@@ -424,9 +287,6 @@ export default function InlineAttackPicker({
     if (currentRow) turnState.addTallyDamageRider(currentRow.id, result.total);
   }
 
-  // A damage maneuver's die rides the swing's op through the SAME riders[] map
-  // as weapon riders (#1843/#1844) — one stable key, overwrite-on-respend,
-  // cleared with every other rider after commit.
   const maneuverView = buildManeuverView(resolutionView, armedEntry, currentRow, turnState, (effect) =>
     local.setRiderEffect(MANEUVER_DAMAGE_RIDER_ID, effect),
   );
@@ -461,18 +321,9 @@ export default function InlineAttackPicker({
   const stunningStrike = (
     <HitGatedSection currentRow={currentRow} turnState={turnState} Section={StunningStrikeSection} />
   );
-  // Unlike the hit-gated riders above, Quivering Palm's Trigger isn't tied to a
-  // hit this turn (it ends a prior Set, any time as a Magic action) — so this
-  // mounts unconditionally rather than gating on currentRow; the section itself
-  // gates Set on currentRow and Trigger on the active flag (#1245).
   const quiveringPalm = (
     <QuiveringPalmSection turnState={turnState} currentRow={currentRow} />
   );
-  // Assassinate (#1526): mounted unconditionally like Quivering Palm — the
-  // player may declare surprise before OR after rolling to hit, so it isn't
-  // gated on currentRow the way SneakAttack/StunningStrike are (those roll
-  // extra dice that need a bound hit row to fold into; this only flips the
-  // SAME swing's own verdict). The section itself gates on character.assassinate.
   const assassinate = (
     <AssassinateSection
       resolutionView={resolutionView}
@@ -488,10 +339,7 @@ export default function InlineAttackPicker({
       onDamageRider={handleDamageRider}
     />
   );
-  // Locks the "Attacking with" selector once a to-hit roll exists for the
-  // current swing — the already-rolled toHitState was built off the ARMED
-  // form's bonus at roll time, so switching forms underneath it would
-  // desync the displayed weapon from the number already on the die.
+  // Locked once a to-hit roll exists: the roll was built off the armed form's bonus, so switching forms underneath it would desync the weapon from the number already on the die.
   function handleSelectForm(id: string) {
     if (resolutionView.toHitRoll) return;
     local.setSelectedId(id);
@@ -507,14 +355,7 @@ export default function InlineAttackPicker({
       {commitError && <p className="text-xs font-semibold text-garnet-700">{commitError}</p>}
     </div>
   );
-  // The footer's own two flags — keyed off `completedSwings`, NOT
-  // `turnState.attack.used` (pickerView no longer computes these): `used`
-  // increments the instant to-hit rolls (useAttackTallyBridge), which would
-  // otherwise flip the footer to "Done" WHILE the swing is still being
-  // resolved — showing two identically-labeled "Done" buttons at once (the
-  // footer's own, and ResolutionRail's own completion tap). `preRoll`
-  // additionally checks `!resolutionView.toHitRoll` so "Cancel — refund
-  // action" disappears the instant a roll happens, same as before.
+  // Keyed off completedSwings, not turnState.attack.used, which increments the instant to-hit rolls — that would flip the footer to "Done" while ResolutionRail's own completion tap is still pending.
   const preRoll = local.completedSwings === 0 && !resolutionView.toHitRoll;
   const attacksRemain = !preRoll && local.completedSwings < attackTotal;
   const footer = (
@@ -529,11 +370,6 @@ export default function InlineAttackPicker({
     <WeaponRollModeRow hasWeapon={view.hasWeapon} mode={local.attackMode} onSelect={local.setAttackMode} />
   );
 
-  // Mobile: one column in journey order. md+: the step card keeps the left
-  // column and the counter/tally/maneuvers form the right rail (final-spec
-  // frame 12) so the step column never scrolls. Cantrips left this sheet in
-  // #1833 — the Attack sheet is weapons-only; Attack and Cast a Spell are the
-  // mutually-exclusive Action choices they are in 5e.
   if (isMobile) {
     return (
       <div className="flex flex-col gap-2">

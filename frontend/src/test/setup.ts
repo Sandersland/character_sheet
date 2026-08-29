@@ -9,12 +9,7 @@ import { toHaveNoViolations } from "jest-axe";
 
 import { createQueryClient, getQueryClient, __setQueryClientForTests } from "@/api/queryClient";
 
-// Every test file gets a live QueryClient without declaring a provider, so the
-// ~200 existing `render(...)` call sites did not have to change (#1282).
-// `vi.mock` here reaches every test file's `import { render } from
-// "@testing-library/react"` because vitest resolves that import against the
-// same mocked module registry the setup file ran in. A test's own `wrapper`
-// still nests INSIDE ours — we compose rather than replace it.
+// vi.mock here reaches every test file's own `import { render } from "@testing-library/react"`, since vitest resolves that import against the same mocked module registry this setup file ran in. A test's own `wrapper` still nests INSIDE ours — we compose rather than replace it.
 vi.mock("@testing-library/react", async () => {
   const actual = await vi.importActual<typeof RTL>("@testing-library/react");
   function withQueryClient(ui: React.ReactElement) {
@@ -42,15 +37,12 @@ vi.mock("@testing-library/react", async () => {
   };
 });
 
-// Fresh (not cleared) client per test: a cleared client keeps stale query
-// observers around, which is the #282 flake class. A fresh instance has none.
+// Fresh (not cleared) client per test: a cleared client keeps stale query observers around; a fresh instance has none.
 beforeEach(() => __setQueryClientForTests(createQueryClient()));
 
 // Explicit cleanup because globals: false disables RTL's auto-cleanup.
 afterEach(() => cleanup());
 
-// Register the jest-axe matcher globally so any component test can assert
-// `expect(await axe(container)).toHaveNoViolations()`. Imported via @/test/axe.
 expect.extend(toHaveNoViolations);
 
 // jsdom lacks scrollIntoView; stub it so keyboard-nav scroll-into-view is a no-op.
@@ -58,8 +50,7 @@ if (!Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = () => {};
 }
 
-// jsdom lacks PointerEvent; polyfill a minimal one over MouseEvent so gesture
-// tests dispatch real pointer events carrying pointerId.
+// jsdom lacks PointerEvent; polyfill a minimal one over MouseEvent so gesture tests dispatch real pointer events carrying pointerId.
 if (typeof globalThis.PointerEvent === "undefined") {
   class PointerEventPolyfill extends MouseEvent {
     pointerId: number;
@@ -71,8 +62,7 @@ if (typeof globalThis.PointerEvent === "undefined") {
   globalThis.PointerEvent = PointerEventPolyfill as unknown as typeof PointerEvent;
 }
 
-// jsdom lacks IntersectionObserver; stub a no-op so the header's scroll-collapse
-// observer (useScrollCollapse) can construct without throwing.
+// jsdom lacks IntersectionObserver; stub a no-op so useScrollCollapse can construct without throwing.
 if (typeof globalThis.IntersectionObserver === "undefined") {
   class IntersectionObserverStub {
     root = null;

@@ -5,10 +5,8 @@ interface InventoryRowRemoveConfirmProps {
   onCancel: () => void;
 }
 
-// The two-step Remove confirm bar shown under a row once the kebab's Remove
-// item is chosen — kept as its own component, not inlined into InventoryRow,
-// so InventoryRow's own cyclomatic/cognitive score stays under the fallow
-// complexity gate (.fallowrc.jsonc).
+// Kept as its own component, not inlined into InventoryRow, so InventoryRow's
+// own cyclomatic/cognitive score stays under the fallow complexity gate.
 export default function InventoryRowRemoveConfirm({
   itemName,
   pending,

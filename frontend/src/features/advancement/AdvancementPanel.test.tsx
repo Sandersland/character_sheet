@@ -82,8 +82,6 @@ function renderPanel(characterLevel: number) {
   );
 }
 
-// Opens the panel and switches to the Feat tab, which is what activates the
-// useFeatCatalog fetch.
 async function openFeatTab(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: "+ Choose advancement" }));
   await user.click(screen.getByRole("button", { name: "Feat" }));
@@ -91,9 +89,6 @@ async function openFeatTab(user: ReturnType<typeof userEvent.setup>) {
 
 describe("AdvancementPanel — server-gated feat eligibility (#1438)", () => {
   it("renders exactly the rows the server returned, with no client re-filtering", async () => {
-    // An Origin feat is the proof: featOfferedForAsiSlot always rejects the
-    // category, so the deleted client mirror dropped this row unconditionally.
-    // Only a server-gated picker can render it.
     vi.mocked(client.fetchFeats).mockResolvedValue([
       catalogFeat({ id: "mi", name: "Magic Initiate", category: "origin" }),
     ]);
@@ -129,9 +124,6 @@ describe("AdvancementPanel — server-gated feat eligibility (#1438)", () => {
   });
 
   it("clears the previous level's rows before the refetch for a lower level resolves", async () => {
-    // The level-DOWN case (XP revoke / LIFO undo): the gate moved from a
-    // render-time filter to a fetch-time param, so without an explicit clear the
-    // Epic Boon rows from level 19 stay clickable and the write path 400s them.
     const boon = catalogFeat({ id: "bt", name: "Boon of Truesight", category: "epic_boon", levelPrerequisite: 19 });
     let resolveSecond: (rows: CatalogFeat[]) => void = () => {};
     vi.mocked(client.fetchFeats)

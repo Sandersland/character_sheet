@@ -16,7 +16,6 @@ function character(): Character {
   } as unknown as Character;
 }
 
-// Only the slice useLoadoutSwap reads; one Action available so a stow is payable.
 function turnState(): TurnState & TurnStateActions {
   return {
     attackEquipCredits: 0,
@@ -32,9 +31,6 @@ function turnState(): TurnState & TurnStateActions {
 describe("useLoadoutSwap", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  // Regression (#1283 review): `error` folds budgetError over BOTH mutations, so
-  // a reset that clears only budgetError leaves a failed swap's message on screen
-  // into the next turn. Pre-migration there was one error slot and one clear.
   it("reset() clears a failed swap's error, not just the budget error", async () => {
     vi.mocked(applyInventoryTransactions).mockRejectedValue(new Error("server said no"));
     const c = character();
@@ -45,8 +41,7 @@ describe("useLoadoutSwap", () => {
     });
     await waitFor(() => expect(result.current.error).toBe("server said no"));
 
-    // waitFor, not a bare read: mutation.reset() lands through TanStack's
-    // batched notifier, which a synchronous act() does not flush.
+    // waitFor, not a bare read: mutation.reset() lands through TanStack's batched notifier, which a synchronous act() does not flush.
     act(() => result.current.reset());
     await waitFor(() => expect(result.current.error).toBeNull());
   });

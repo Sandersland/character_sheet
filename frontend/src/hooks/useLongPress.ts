@@ -4,12 +4,6 @@ import { useRef } from "react";
 // is far shorter, so it fires `onTap` without ever arming `onLongPress`).
 const LONG_PRESS_MS = 400;
 
-/**
- * Distinguish a tap from a press-and-hold on a pointer target (#958). `onTap`
- * fires on a normal click; `onLongPress` fires once the hold passes the
- * threshold, and the trailing click that follows a hold is swallowed so it
- * doesn't also fire `onTap`. Spread the returned handlers onto the element.
- */
 export function useLongPress(onTap: () => void, onLongPress: () => void) {
   const timer = useRef<number | undefined>(undefined);
   // Set once the long-press fires so the trailing click is ignored.

@@ -71,14 +71,10 @@ function Harness({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // Clear module-level cache/subscribers/inflight FIRST so no prior test's state
-  // (a leaked subscriber or a still-inflight fetch) bleeds into this one (#282).
+  // Reset module-level cache/subscribers/inflight first — leftover state from a prior test bleeds into this one (#282).
   __resetCampaignEntitiesCacheForTests();
-  // Default the fetch to a resolved value so the effect's loadCampaignEntities
-  // never calls .finally on `undefined` (vi.fn()'s default return).
+  // vi.fn()'s default return is undefined; mock a resolved value so loadCampaignEntities can call .finally on it.
   vi.mocked(client.fetchEntities).mockResolvedValue(ENTITIES);
-  // Seed the module cache so entities are present synchronously at mount — keeps
-  // the popover deterministic regardless of fetch timing / prior-test state.
   primeCampaignEntities("camp-1", ENTITIES);
 });
 
@@ -102,7 +98,6 @@ describe("MentionAutocomplete (#248)", () => {
     const inked = within(option).getByText("Goblin Chief");
     expect(inked).toHaveClass("text-garnet-800", "font-semibold");
     expect(inked.className).toContain("[font-variant-caps:small-caps]");
-    // The type diamond is present; the old rounded-full badge pill is gone.
     expect(option.querySelector(".rotate-45")).not.toBeNull();
     expect(option.querySelector(".rounded-full")).toBeNull();
   });
@@ -138,15 +133,7 @@ describe("MentionAutocomplete (#248)", () => {
     );
   });
 
-  // Longest typed query in this suite (12 chars through the debounce). Under heavy
-  // CPU contention — lefthook runs this suite parallel to the two tsc jobs on
-  // pre-push, oversubscribing cores against vitest's own worker pool — the
-  // keystroke/debounce/render chain starved and blew vitest's default 5000ms
-  // per-test ceiling, flaking the required gate and forcing push retries. Raising
-  // findByRole's wait alone can't help (the test-level timeout fires first), so we
-  // lift the test timeout to 15s and let findByRole poll up to 12s. Both only
-  // spend wall-time on genuine failure, never on the happy path; behaviour is
-  // unchanged.
+  // 15s test timeout / 12s poll absorbs CI CPU contention without slowing the happy path.
   it("still matches a multiword apostrophe name (Baldur's Ga)", async () => {
     const user = userEvent.setup({ delay: null });
     render(<Harness campaignId="camp-1" />);
@@ -206,7 +193,6 @@ describe("MentionAutocomplete (#248)", () => {
 
     const editor = await screen.findByLabelText("Note body");
     const chip = await screen.findByText("@Goblin Chief");
-    // Place the caret immediately after the chip, then Backspace deletes it atomically.
     editor.focus();
     const range = document.createRange();
     range.setStartAfter(chip);
@@ -230,8 +216,7 @@ describe("MentionAutocomplete input attributes (#879)", () => {
   it("marks the editor as a prose field and opts out of iOS AutoFill", () => {
     render(<Harness campaignId="camp-1" />);
     const editor = screen.getByLabelText("Note body");
-    // autoComplete renders via spread (not in React's div prop types); the rest
-    // are standard. Together they hint iOS this is free-text, not a fillable form.
+    // autoComplete renders via spread — not in React's div prop types.
     expect(editor).toHaveAttribute("autocomplete", "off");
     expect(editor).toHaveAttribute("autocapitalize", "sentences");
     expect(editor).toHaveAttribute("autocorrect", "on");

@@ -6,8 +6,6 @@ interface HpNoticesProps {
   error: string | null;
 }
 
-// Below-the-fold HP notices: concentration save note + apply error. (Level-up and
-// advancement nudges moved to the header-level LevelUpBanner, #892.)
 export default function HpNotices({ concentrationNote, error }: HpNoticesProps) {
   return (
     <>

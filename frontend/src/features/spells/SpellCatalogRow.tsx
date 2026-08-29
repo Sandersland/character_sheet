@@ -1,7 +1,4 @@
-// A single catalog result row with its Learn button. `onFork` (#1801, epic
-// #1795 6/6) is optional so every OTHER SpellCatalogRow caller (level-up,
-// creation — none of them today) stays unaffected; only AddSpellPanel's own
-// catalog tab wires it up.
+// `onFork` is optional so other SpellCatalogRow callers (level-up, creation) stay unaffected; only AddSpellPanel's catalog tab wires it up.
 import Badge from "@/components/ui/Badge";
 import { catalogEffectLine, catalogMetaLine } from "@/lib/addSpell";
 import { isForkable, isForkedSpell, scopeBadgeLabel } from "@/lib/catalogProvenance";

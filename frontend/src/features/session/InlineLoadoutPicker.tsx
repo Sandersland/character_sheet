@@ -1,13 +1,3 @@
-/**
- * InlineLoadoutPicker — the per-hand weapon-swap picker (#789) hosted inside the
- * Action sheet's "Change weapons" resolution (#815). A Main-hand and Off-hand
- * card, each expanding an inline disclosure of deduped bag candidates + a Stow.
- * Per-option gating (loadoutPicker, interaction-budget model #1165): each
- * equip/unequip is paid from the turn's free interaction + attack-earned
- * credits first, falls back to the Action, else is blocked. A committed swap
- * keeps the sheet open and surfaces a Refund (also mirrored under the turn slots).
- */
-
 import { useState } from "react";
 
 import { equipSlotLabel, equippedLoadoutLabel, itemsInSlot } from "@/lib/paperDoll";
@@ -25,9 +15,7 @@ import type { EquipSlot, InventoryItem } from "@/types/character";
 
 const HANDS: EquipSlot[] = ["MAIN_HAND", "OFF_HAND"];
 
-// The verb names the MECHANIC (does this stow an existing occupant), not the
-// cost — a budget-paid swap into an occupied hand still stows something, so
-// it reads "Swap in" even when it's free (#1165).
+// Names the mechanic (does this stow an existing occupant), not the cost — a free budget-paid swap into an occupied hand still reads "Swap in".
 function optionVerb(opt: PickerOption, occupied: boolean): string {
   if (opt.item === null) return "Stow";
   return occupied ? "Swap in" : "Equip";

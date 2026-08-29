@@ -1,5 +1,3 @@
-// Pure gating/derivation for ClassFeaturesSection — no JSX.
-
 import type {
   AdvancementEntry,
   Character,
@@ -15,11 +13,9 @@ export interface ClassFeatureFlags {
   hasShadowArts: boolean;
   hasChannelDivinity: boolean;
   hasCloakOfShadows: boolean;
-  /** Way of the Four Elements monk (2014-only, #1505) — castDiscipline presence. */
   hasFourElements: boolean;
   hasFeatures: boolean;
   hasFightingStyle: boolean;
-  /** Fighting Style feats taken (#1137) — the fightingStyle-slot advancements. */
   fightingStyleFeats: AdvancementEntry[];
 }
 
@@ -30,10 +26,7 @@ export interface ClassFeatureView extends ClassFeatureFlags {
   isEmpty: boolean;
 }
 
-// Serialized roster, or a synthesized single entry before classes[] loads.
-// needsSubclass/subclassUnavailable default false in the synthesized stub —
-// never computed here (that would be the exact rule-mirror #1598 retired);
-// the real values only ever come from the backend-emitted classes[] entry.
+// needsSubclass/subclassUnavailable stay false in the synthesized stub — never re-derive them here; only the backend-emitted classes[] entry carries the real values (#1598).
 function deriveRoster(character: Character): ClassEntry[] {
   if (character.classes && character.classes.length > 0) return character.classes;
   return [{
@@ -53,35 +46,22 @@ function deriveManeuverIds(resources: CharacterResources | undefined): string[] 
     .map((m) => m.maneuverId as string);
 }
 
-// A feature's entitlement is availableActions[] presence (#1315) — the same
-// gated DERIVED_ACTIONS rows the turn tracker reads — rather than a
-// resources boolean, so it's independent of the resources block. Bare
-// key-presence is only safe for a key that names ONE feature across both
-// editions (castDiscipline, 2014-only, no 2024 counterpart at all); a key
-// two editions both grant needs one of the collision-aware helpers below.
+// hasAction is safe only for a key naming ONE feature across both editions (e.g. castDiscipline, 2014-only); a key both editions grant needs one of the collision-aware helpers below.
 function hasAction(character: Character, key: string): boolean {
   return (character.availableActions ?? []).some((a) => a.key === key);
 }
 
-// "elementalAttunement" collides across editions (#1505): the 2024 Warrior toggle
-// sets resolverKind "toggle" (only toggleActionsFromRow does); the 2014 reminder row
-// doesn't — so bare hasAction leaked the 2024 Focus UI onto a 2014 sheet.
+// elementalAttunement collides across editions — only the 2024 toggle sets resolverKind "toggle"; bare hasAction would leak the 2024 UI onto a 2014 sheet (#1505).
 function hasElementsWarriorToggle(character: Character): boolean {
   return (character.availableActions ?? []).some((a) => a.key === "elementalAttunement" && a.resolverKind === "toggle");
 }
 
 function deriveFlags(character: Character): ClassFeatureFlags {
-  // Fighting Style is a feat partition (#1137): entitlement follows the slot
-  // total, and the taken feats are the fightingStyle-slot advancements — both
-  // independent of the resources block.
+  // Fighting Style entitlement follows fightingStyleSlots.total, and the taken feats are the fightingStyle-slot advancements — both independent of the resources block (#1137).
   const hasFightingStyle = (character.fightingStyleSlots?.total ?? 0) > 0;
   const fightingStyleFeats = (character.advancements ?? []).filter((a) => a.slot === "fightingStyle");
   const hasElementsWarrior = hasElementsWarriorToggle(character);
-  // "shadowArts"/"cloakOfShadows" collide across editions (same keys, #1505),
-  // but unlike elementalAttunement above, both editions now have a correct,
-  // fully wire-driven UI (ShadowArtsSection/CloakOfShadowsSection, #1738 —
-  // pool label, cost and reminder text all come off the served row), so bare
-  // key-presence is the right gate for both.
+  // shadowArts/cloakOfShadows collide across editions too, but unlike elementalAttunement both editions have a correct wire-driven UI, so bare key-presence is the right gate for both (#1505).
   const hasShadowArts = hasAction(character, "shadowArts");
   const hasCloakOfShadows = hasAction(character, "cloakOfShadows");
   const hasFourElements = hasAction(character, "castDiscipline");
@@ -114,13 +94,7 @@ function deriveFlags(character: Character): ClassFeatureFlags {
   };
 }
 
-// Data-driven so a new flag (hasFourElements, #1505) is one more array entry,
-// not another branch — keeps this function's own cyclomatic complexity flat
-// regardless of how many entitlement flags ClassFeatureFlags grows to.
-//
-// Checks every roster entry, not just the primary one (#1602): a multiclass
-// character can hold or need a subclass on a SECONDARY entry only, and the
-// section must still render for them.
+// Checks every roster entry, not just the primary one: a multiclass character can hold or need a subclass on a secondary entry only, and the section must still render for them (#1602).
 function isFeatureViewEmpty(flags: ClassFeatureFlags, roster: ClassEntry[]): boolean {
   const signals = [
     flags.hasPools,
@@ -137,7 +111,6 @@ function isFeatureViewEmpty(flags: ClassFeatureFlags, roster: ClassEntry[]): boo
   return signals.every((signal) => !signal);
 }
 
-/** Class-name to ClassOption lookup; shared by deriveClassFeatureView and ClassFeaturesSection. */
 export function resolveClassDef(className: string, referenceClasses: ClassOption[]): ClassOption | undefined {
   return referenceClasses.find((c) => c.name === className);
 }

@@ -49,8 +49,7 @@ describe("DeleteCharacterModal", () => {
 
     await waitFor(() => expect(navigateMock).toHaveBeenCalledWith("/", { replace: true }));
     expect(client.deleteCharacter).toHaveBeenCalledWith("char-1");
-    // The list is corrected in place, not refetched — inside the 30s staleTime
-    // window a remount serves this exact array, so it must already be right.
+    // Cache is corrected in place, not invalidated — within the 30s staleTime a remount would otherwise serve the stale array.
     expect(getQueryClient().getQueryData(characterKeys.list())).toEqual([
       { id: "char-2", name: "Ralrak" },
     ]);

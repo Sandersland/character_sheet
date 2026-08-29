@@ -14,11 +14,9 @@ interface SheetBottomNavProps {
   tabs: SheetTab[];
   activeTab: SheetTabId;
   onTabChange: (id: SheetTabId) => void;
-  /** Tab to mark with a live pip (the Combat tab while a session is live, #961). */
   livePipTab?: SheetTabId | null;
 }
 
-// One flavor glyph per tab; the label stays the accessible name.
 const TAB_ICONS: Record<SheetTabId, IconType> = {
   overview: GiVisoredHelm,
   class: GiRank3,
@@ -28,13 +26,7 @@ const TAB_ICONS: Record<SheetTabId, IconType> = {
   story: GiQuillInk,
 };
 
-/**
- * Mobile-only (`md:hidden`) bottom nav that swaps the top tab bar on phones.
- * Renders the character's tabs (Magic hidden for non-casters) as equal-width
- * icon+label targets. It's an in-flow child of CharacterSheetContent's 100dvh
- * app-shell (not `position: fixed`), so iOS Safari's dynamic toolbar can't shift
- * it; the safe-area padding only lifts labels clear of the home indicator.
- */
+// In-flow, not position: fixed, so iOS Safari's dynamic toolbar can't shift it; the safe-area padding only lifts labels clear of the home indicator.
 export default function SheetBottomNav({ tabs, activeTab, onTabChange, livePipTab }: SheetBottomNavProps) {
   return (
     <nav

@@ -23,8 +23,7 @@ function stubVisualViewport(initialHeight: number) {
 
 describe("useVisualViewportHeight", () => {
   beforeEach(() => {
-    // useVisualViewport (the source hook) rAF-coalesces its resize/scroll updates
-    // (#877); run frames synchronously so these unit assertions stay direct.
+    // useVisualViewport rAF-coalesces resize/scroll updates (#877); run frames synchronously so assertions stay direct.
     vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
       cb(0);
       return 1;

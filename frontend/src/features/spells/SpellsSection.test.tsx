@@ -8,15 +8,11 @@ import { renderWithCharacter } from "@/test/renderWithCharacter";
 import * as client from "@/api/client";
 import type { Character, Spell } from "@/types/character";
 
-// Mock the API client — SpellsSection is the orchestrator that batches
-// spellcasting ops and swaps the returned Character straight into the
-// character query cache.
 vi.mock("@/api/client", () => ({
   applySpellcastingTransactions: vi.fn(),
 }));
 
-// SpellsSection reads useCurrentCharacter(), so every render seeds the cache
-// and mounts CurrentCharacterProvider via renderWithCharacter.
+// SpellsSection reads useCurrentCharacter(), so tests must render via renderWithCharacter to seed the cache and mount CurrentCharacterProvider.
 function render(character: Character) {
   return renderWithCharacter(<SpellsSection />, character);
 }
@@ -61,8 +57,6 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-// The grimoire (prepare runes, spellbook rows) is a separate view opened from the
-// record block's "Manage spellbook →"; open it before asserting on its contents.
 async function openGrimoire(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: /manage spellbook/i }));
 }
@@ -98,11 +92,8 @@ describe("SpellsSection concentration", () => {
   it("opens the grimoire view (not stacked) when Manage spellbook is clicked", async () => {
     const user = userEvent.setup();
     render(makeCharacter(null));
-    // Record block is showing, grimoire is not.
     expect(screen.queryByRole("button", { name: /^done$/i })).not.toBeInTheDocument();
     await openGrimoire(user);
-    // Grimoire is now the active view (its Done control appears); the record's
-    // "Manage spellbook" opener is gone — the two are never on screen together.
     expect(screen.getByRole("button", { name: /^done$/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /manage spellbook/i })).not.toBeInTheDocument();
   });
@@ -115,8 +106,6 @@ describe("SpellsSection concentration", () => {
   });
 });
 
-// A prepared caster with a known-but-unprepared leveled spell + a configurable cap.
-// withBless adds a prepared Bless — a droppable swap candidate for the at-cap bar (#938).
 function makeWizard(
   over: {
     prepared?: boolean;
@@ -174,7 +163,6 @@ describe("SpellsSection preparation (grimoire runes)", () => {
     expect(mockApply).toHaveBeenCalledWith("wiz-1", [{ type: "unprepareSpell", entryId: "entry-shield" }]);
   });
 
-  // No prepared spell in the book → nothing to swap out, so the plain error remains (#938).
   it("blocks an at-cap prepare with zero swap candidates: no client call, shows the reason", async () => {
     const user = userEvent.setup();
     const mockApply = vi.mocked(client.applySpellcastingTransactions);
@@ -206,9 +194,7 @@ describe("SpellsSection preparation (grimoire runes)", () => {
 
     result.current.handleSwap("entry-drop", "entry-add");
 
-    // A mutation's mutationFn call is dispatched via TanStack Query's internal
-    // notify batching (a microtask hop), not synchronously like the old raw
-    // fetch call — so this assertion now needs a tick.
+    // TanStack Query dispatches mutationFn via internal notify batching (a microtask hop), not synchronously — this assertion needs a tick.
     await waitFor(() => expect(mockApply).toHaveBeenCalledTimes(1));
     expect(mockApply).toHaveBeenCalledWith("wiz-1", [
       { type: "unprepareSpell", entryId: "entry-drop" },
@@ -282,8 +268,6 @@ describe("SpellsSection at-cap swap bar (#938)", () => {
   });
 });
 
-// #1511: the grimoire renders the SERVED casterModel — a 2014 Bard's known
-// spells relabel the meter and roster and drop the toggleable prepare rune.
 describe("SpellsSection grimoire — known caster (#1511)", () => {
   function makeKnownBard(): Character {
     const vm: Spell = {
@@ -346,7 +330,6 @@ describe("SpellsSection grimoire — known caster (#1511)", () => {
 });
 
 describe("SpellsSection slot labelling", () => {
-  // Single-class warlock: pact slots live in `slots` and carry the Pact Magic label.
   function warlockOnly(): Character {
     return {
       id: "char-wl",
@@ -369,8 +352,6 @@ describe("SpellsSection slot labelling", () => {
     } as unknown as Character;
   }
 
-  // Warlock 1 / Sorcerer 1: merged full-caster L1 slots (total 2) in `slots`, plus a
-  // separate 1/1 Pact Magic slot in `pact`.
   function warlockSorcerer(): Character {
     return {
       id: "char-mc",
@@ -396,8 +377,6 @@ describe("SpellsSection slot labelling", () => {
     } as unknown as Character;
   }
 
-  // Warlock 5: a level-3 pact slot pool and a level-3 spell, so the grimoire
-  // renders a Level 3 group whose slot line carries the Pact Magic label.
   function warlockGrimoire(): Character {
     return {
       id: "char-wl3",
@@ -447,9 +426,7 @@ describe("SpellsSection slot labelling", () => {
 
   it("labels a multiclass warlock's merged pool 'Spell Slots' with one dedicated Pact Magic block", () => {
     render(warlockSorcerer());
-    // Merged pool is neutral "Spell Slots"…
     expect(screen.getByRole("heading", { name: /^Spell Slots$/i })).toBeInTheDocument();
-    // …and Pact Magic appears exactly once (the dedicated pact block, level 1).
     const pactHeadings = screen.getAllByRole("heading", { name: /Pact Magic/i });
     expect(pactHeadings).toHaveLength(1);
     expect(pactHeadings[0]).toHaveTextContent(/level 1/i);

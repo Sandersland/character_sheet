@@ -11,8 +11,6 @@ interface InventoryMetersSlimProps {
   atCap: boolean;
 }
 
-// Mobile density variant of the encumbrance readout (#1029): a 6px strip with
-// the weight right-aligned, garnet + an "Over capacity" badge only when over.
 export default function InventoryMetersSlim({
   totalWeight,
   capacity,

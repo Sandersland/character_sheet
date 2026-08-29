@@ -10,7 +10,6 @@ interface FieldProps {
   children: ReactNode;
 }
 
-// Label + control + hint/error wrapper. Error takes precedence over hint.
 export default function Field({ label, htmlFor, hint, error, required, className = "", children }: FieldProps) {
   return (
     <div className={`flex flex-col gap-1 ${className}`}>

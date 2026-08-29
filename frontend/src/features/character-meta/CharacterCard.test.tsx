@@ -47,23 +47,18 @@ describe("CharacterCard", () => {
 
   it("shows initials when no portraitUrl", () => {
     renderCard({ ...base, portraitUrl: undefined });
-    // "Gandalf the Grey" → "G" + "t" → but initials() takes first 2 words → "GT"
-    // Actually: split by space → ["Gandalf", "the", "Grey"], take first 2 → ["G", "t"] → "GT"
     expect(screen.getByText("GT")).toBeInTheDocument();
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
   });
 
   it("shows an img when portraitUrl is set", () => {
     const { container } = renderCard({ ...base, portraitUrl: "https://example.com/portrait.jpg" });
-    // Query the node directly rather than by role to assert on its src attribute.
     const img = container.querySelector("img");
     expect(img).toBeInTheDocument();
     expect(img).toHaveAttribute("src", "https://example.com/portrait.jpg");
   });
 
-  // Regression for #180: the card title must be an <h2> so the list page
-  // (page <h1> → card titles) has no skipped heading level. A standalone
-  // <h3> here used to trip axe's heading-order rule in page context.
+  // Card title must stay <h2> — page's <h1> to card <h2> keeps no skipped heading level (regression #180).
   it("renders the card title as an h2", () => {
     renderCard();
     expect(

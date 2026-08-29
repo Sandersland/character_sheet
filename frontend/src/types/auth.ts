@@ -1,14 +1,8 @@
-// Account-synced player preferences (#1178), riding the /auth/me payload.
-// Defined in usePreferencesSync (a dependency-free leaf) and re-exported here
-// rather than duplicated, so this module can't cycle back into the hooks that
-// also depend on it.
+// Re-exported from `usePreferencesSync` rather than duplicated, so this module can't cycle back into hooks that also depend on it.
 export type { UserPreferences } from "@/hooks/usePreferencesSync";
 import type { UserPreferences } from "@/hooks/usePreferencesSync";
 
-// The signed-in user as returned by GET /api/auth/me (`{ user }`). `preferences`
-// is null when this account has never stored any (distinct from a stored
-// object equal to the defaults) — see PreferencesProvider for the migration
-// this distinction drives.
+/** `preferences` null (never stored) is distinct from a stored object equal to the defaults — `PreferencesProvider` reads this to drive migration. */
 export interface AuthUser {
   id: string;
   email: string | null;
@@ -17,8 +11,7 @@ export interface AuthUser {
   preferences: UserPreferences | null;
 }
 
-// One enabled sign-in provider from GET /api/auth/providers. `startUrl` is the
-// absolute URL the login button links to (begins the OAuth redirect dance).
+/** From GET /api/auth/providers; `startUrl` begins the OAuth redirect dance. */
 export interface AuthProviderInfo {
   id: string;
   displayName: string;

@@ -5,16 +5,7 @@ import { dismissInboxFlag } from "@/api/client";
 import { inboxKeys } from "@/api/queryKeys";
 import type { InboxRow } from "@/types/character";
 
-// "Disregard" (row or Review-modal footer, #1946): posts a dismissal (#1945)
-// and removes the row from the inbox list immediately — the POST is fire-and-
-// confirm, not something the DM waits on. On success the optimistic removal
-// is already exactly what the server now reflects, so it's marked stale
-// (refetchType "none") rather than eagerly re-fetched — a full clustering
-// scan the DM's own click didn't ask to pay for. On failure, roll the
-// optimistic removal back AND actually refetch (default refetchType) to
-// reconcile with the server, since the rollback itself might already be
-// stale by the time the request failed. The caller (InboxBell) is
-// responsible for surfacing `error` — this hook only manages the cache.
+// onSuccess invalidates with refetchType: "none" (the optimistic removal is already exact); onError invalidates with the default refetchType because the rollback itself may already be stale.
 export function useDismissInboxFlag() {
   const queryClient = useQueryClient();
 
@@ -33,8 +24,7 @@ export function useDismissInboxFlag() {
     },
     onError: (_err, _input, context) => {
       if (context?.previous) queryClient.setQueryData(inboxKeys.all, context.previous);
-      // No context means onMutate itself threw before touching the cache —
-      // nothing to reconcile, so don't pay a clustering refetch for it.
+      // No context means onMutate itself threw before touching the cache, so there's nothing to reconcile — skip the refetch.
       if (context) void queryClient.invalidateQueries({ queryKey: inboxKeys.all });
     },
   });

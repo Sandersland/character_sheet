@@ -7,7 +7,6 @@ interface SellModeActionsProps {
   onExitSelect: () => void;
 }
 
-// Title accessory while multi-select sell is active: the selection tally + Sell/Cancel.
 export default function SellModeActions({
   configuringSell,
   selectedCount,

@@ -16,9 +16,6 @@ import {
   updateCampaignItem,
 } from "@/api/campaign";
 
-// New direct coverage (#1270) — these were only exercised transitively before
-// the split. The request<T> json-flow pin (fetchCampaigns/createCampaign) now
-// lives in http.test.ts, exercising the shared plumbing through this module.
 describe("fetchCampaigns", () => {
   afterEach(() => {
     vi.unstubAllGlobals();

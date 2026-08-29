@@ -143,11 +143,6 @@ const EMPTY_DRAFT: CharacterDraft = {
   createdId: null,
 };
 
-/**
- * Stages the in-progress form in localStorage so a player can fill in what
- * they know now, navigate away, and come back to finish later — the form
- * only talks to the backend once, on the first Save.
- */
 export function useCharacterDraft() {
   const [draft, setDraft] = useState<CharacterDraft>(() => {
     try {
@@ -162,9 +157,8 @@ export function useCharacterDraft() {
     try {
       localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
     } catch {
-      // localStorage may be unavailable (private browsing, quota, etc).
-      // Creation still works for the current session — it just won't
-      // survive a reload.
+      // localStorage may be unavailable (private browsing, quota, etc) —
+      // creation still works this session, it just won't survive a reload.
     }
   }, [draft]);
 

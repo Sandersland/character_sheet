@@ -70,8 +70,7 @@ describe("d10 pentagonal trapezohedron (#1102)", () => {
     const geometry = createVisualDieGeometry(10);
     const position = geometry.getAttribute("position");
     expect(position).toBeDefined();
-    // The sharp d10 is 60 positions (10 kites x 2 tris x 3); the rounded hull
-    // is far denser, and the box fallback would be only 36.
+    // The sharp d10 is 60 positions (10 kites x 2 tris x 3); the rounded hull is far denser, and the box fallback would be only 36.
     expect(position.count).toBeGreaterThan(100);
   });
 });

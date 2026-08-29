@@ -41,10 +41,6 @@ function makeClass(overrides: Partial<ClassOption> = {}): ClassOption {
   };
 }
 
-// #1565: a real (multi-option) background package, used by
-// resolveBackgroundEquipmentInput/buildCreatePayload tests below — shaped
-// like Criminal's real SRD 5.2 package (a choice group, two lettered
-// options).
 const CRIMINAL_PACKAGE: ClassStartingEquipment = {
   groups: [
     {
@@ -177,9 +173,6 @@ describe("resolveSelections", () => {
   });
 });
 
-// #1679/#1681: SpeciesOption fixtures — a variant-bearing species (Dwarf-shape:
-// species-level fixed +2 CON, variant-level fixed +1 WIS) and a choose-bearing
-// one (Half-Elf-shape: fixed +2 CHA + choose 2 of {str,dex,con,int,wis} at +1).
 const DWARF_SPECIES: SpeciesOption = {
   id: "sp-dwarf",
   name: "Dwarf",
@@ -213,15 +206,11 @@ const HALF_ELF_SPECIES: SpeciesOption = {
     { choose: { count: 2, amount: 1, from: ["strength", "dexterity", "constitution", "intelligence", "wisdom"] } },
   ],
   needsCastingAbility: false,
-  // #1689: Skill Versatility — no `from` restriction (any of the 18 skills).
   chooseSkills: { count: 2 },
   chooseCantrip: null, chooseOriginFeat: false,
   variants: [],
 };
 
-// #1689/#1756: Elf-shape species with a High Elf variant carrying a class-list
-// chooseCantrip (wizard, Intelligence-keyed) and an Astral Elf variant carrying
-// a named-spells chooseCantrip with NO fixed ability (needsCastingAbility:true).
 const ELF_SPECIES: SpeciesOption = {
   id: "sp-elf2",
   name: "Elf",
@@ -256,9 +245,6 @@ const ELF_SPECIES: SpeciesOption = {
     },
   ],
 };
-// #1690: 2024 Human-shape species carrying BOTH a chooseSkills spec
-// (Skillful, unrestricted, count 1) and chooseOriginFeat (Versatile) —
-// matches the real seeded content's species-level shape (no variants).
 const HUMAN_SPECIES: SpeciesOption = {
   id: "sp-human2024",
   name: "Human",
@@ -273,9 +259,6 @@ const HUMAN_SPECIES: SpeciesOption = {
 };
 const speciesReference: ReferenceData = { ...reference, species: [DWARF_SPECIES, HALF_ELF_SPECIES, ELF_SPECIES, HUMAN_SPECIES] };
 
-// #1758: Astral Elf — an Elf variant carrying a floating +2/+1-or-+1/+1/+1
-// spread that REPLACES the base Elf's +2 DEX (abilityIncreasesReplace), matching
-// the real seeded content (#1751).
 const ASTRAL_ELF_SPECIES: SpeciesOption = {
   id: "sp-elf-astral", name: "Elf", slug: "elf", speed: 30,
   abilityIncreases: [{ ability: "dexterity", amount: 2 }],
@@ -320,12 +303,7 @@ describe("deriveSpeciesBonuses (#1681)", () => {
     expect(bonuses.complete).toBe(false);
   });
 
-  // #1758 (repro): Astral Elf carries a FLOATING spread ({ floating: 3 }) on its
-  // variant AND replaces the base Elf's +2 DEX (abilityIncreasesReplace). The
-  // frontend must treat it as an unmade choice and stay INCOMPLETE until
-  // assigned — before the fix splitSpeciesIncreases dropped the floating form,
-  // so the Abilities step went green with nothing collected and the create 400d
-  // ("speciesAbilities required").
+  // Floating spread on a replacing variant must stay INCOMPLETE until assigned (#1758).
   it("an Astral Elf floating spread is applicable but NOT complete until assigned (#1758)", () => {
     const draft = makeDraft({ speciesId: "sp-elf-astral", variantId: "var-astral" });
     const bonuses = deriveSpeciesBonuses(draft, resolveSelections(ASTRAL_ELF_REFERENCE, draft));
@@ -333,9 +311,7 @@ describe("deriveSpeciesBonuses (#1681)", () => {
     expect(bonuses.complete).toBe(false);
   });
 
-  // #1758: the replacing variant drops the base Elf's +2 DEX — the ONLY spec is
-  // the variant's floating pool, so `fixed` is empty (mirrors the backend's
-  // fetchMergedAbilityIncreases). Every eligible ability is choosable.
+  // fixed is empty because the replacing variant drops the base's +2 DEX — mirrors the backend's fetchMergedAbilityIncreases (#1758).
   it("an Astral Elf drops the base species' fixed +2 DEX (abilityIncreasesReplace honored) (#1758)", () => {
     const draft = makeDraft({ speciesId: "sp-elf-astral", variantId: "var-astral" });
     const bonuses = deriveSpeciesBonuses(draft, resolveSelections(ASTRAL_ELF_REFERENCE, draft));
@@ -377,8 +353,6 @@ describe("deriveSpeciesBonuses (#1681)", () => {
   });
 });
 
-// #1683: DROW_VARIANT needs the choice (needsCastingAbility: true), the base
-// Elf species does not — mirrors DWARF_SPECIES/HALF_ELF_SPECIES's fixture role.
 const DROW_VARIANT_ELF: SpeciesOption = {
   id: "sp-elf-2024",
   name: "Elf",
@@ -538,7 +512,7 @@ describe("deriveSkillChoices", () => {
     const draft = makeDraft({
       className: "Rogue",
       background: "Sage",
-      skillProficiencies: ["stealth", "perception"], // perception is granted, not a choice
+      skillProficiencies: ["stealth", "perception"],
     });
     const result = deriveSkillChoices(draft, resolveSelections(reference, draft));
     expect(result.selected).toEqual(["stealth"]);
@@ -561,8 +535,6 @@ describe("resolveEquipmentInput", () => {
   });
 });
 
-// #1565's twin of resolveEquipmentInput's own tests above, for the
-// background's OWN package.
 describe("resolveBackgroundEquipmentInput", () => {
   it("is undefined when the background equipment draft is untouched (null)", () => {
     const draft = makeDraft({ background: "Criminal" });
@@ -641,7 +613,7 @@ describe("deriveBackgroundBonuses (#1130)", () => {
     expect(bonuses.applicable).toBe(true);
     expect(bonuses.abilities).toEqual(["dexterity", "constitution", "intelligence"]);
     expect(bonuses.originFeat?.name).toBe("Alert");
-    expect(bonuses.complete).toBe(false); // nothing assigned yet
+    expect(bonuses.complete).toBe(false);
   });
 
   it("is complete for a valid +2/+1 and incomplete for an illegal shape", () => {
@@ -669,10 +641,9 @@ describe("derivePreview with background bonuses", () => {
       speciesId: "sp-elf",
       className: "Rogue",
       background: "Criminal",
-      backgroundAbilities: { constitution: 2, dexterity: 1 }, // CON 10→12 (+1), DEX 10→11 (+0)
+      backgroundAbilities: { constitution: 2, dexterity: 1 },
     });
     const preview = derivePreview(draft, resolveSelections(reference, draft));
-    // Rogue d8 (8) + CON mod +1 = 9.
     expect(preview.maxHp).toBe(9);
   });
 });
@@ -717,8 +688,7 @@ describe("buildCreatePayload", () => {
     expect(buildCreatePayload(incompleteChoice, sel2, deriveSkillChoices(incompleteChoice, sel2), []).speciesAbilities).toBeUndefined();
   });
 
-  // #1758: an Astral Elf's completed floating spread rides speciesAbilities like
-  // any completed choice; an illegal shape sends nothing (the backend re-validates).
+  // An illegal floating shape sends nothing — the backend re-validates (#1758).
   it("sends an Astral Elf's completed floating speciesAbilities and omits an illegal one (#1758)", () => {
     const valid = makeDraft({ name: "X", className: "Rogue", speciesId: "sp-elf-astral", variantId: "var-astral", speciesAbilities: { dexterity: 2, wisdom: 1 } });
     const sel1 = resolveSelections(ASTRAL_ELF_REFERENCE, valid);
@@ -817,10 +787,7 @@ describe("buildCreatePayload", () => {
     expect(buildCreatePayload(unset, sel2, deriveSkillChoices(unset, sel2), []).speciesOriginFeatId).toBeUndefined();
   });
 
-  // speciesId is the required mechanical anchor (#1684) — sent as-is, with no
-  // `|| undefined` normalization (CreationCeremony's step validity gates
-  // submission before an empty draft value could ever reach here). variantId
-  // stays optional and IS normalized, mirroring subclassId's own "" → undefined shape.
+  // speciesId is the required anchor, sent as-is; variantId is optional and normalized "" → undefined, mirroring subclassId (#1684).
   it("omits variantId when the draft's own empty-string default is untouched (`|| undefined` normalization)", () => {
     const draft = makeDraft({ name: "X", className: "Rogue" });
     const selections = resolveSelections(speciesReference, draft);
@@ -845,15 +812,12 @@ describe("buildCreatePayload", () => {
     expect(payload.classes).toEqual([{ name: "Rogue", subclass: null, subclassId: undefined }]);
     expect(payload.skillProficiencies).toEqual(["perception", "stealth"]);
     expect(payload.toolChoices).toBeUndefined();
-    // #1616: portraits are uploaded blobs — the create payload never carries a URL.
+    // portraits are uploaded blobs — the create payload never carries a URL (#1616).
     expect("portraitUrl" in payload).toBe(false);
     expect(payload.startingEquipment).toBeUndefined();
     expect(payload.backgroundStartingEquipment).toBeUndefined();
   });
 
-  // #1680/#1684: the two-step picker's real selection rides speciesId/variantId
-  // (ids, like subclassId) — the sole mechanical anchor since the flat `race`
-  // field was pruned.
   it("sends speciesId/variantId", () => {
     const variantReference: ReferenceData = {
       ...reference,
@@ -889,8 +853,7 @@ describe("buildCreatePayload", () => {
     expect(payload.variantId).toBe("var-hill");
   });
 
-  // variantId is omitted (never an empty string) for a variantless species —
-  // mirrors subclassId's "" → undefined shape.
+  // Omitted (never an empty string) for a variantless species, mirroring subclassId's "" → undefined shape.
   it("omits variantId for a variantless species", () => {
     const draft = makeDraft({ name: "Alric", className: "Rogue", background: "Sage", speciesId: "sp-elf" });
     const selections = resolveSelections(reference, draft);
@@ -908,9 +871,7 @@ describe("buildCreatePayload", () => {
     expect(payload.toolChoices).toEqual(["Thieves' Tools"]);
   });
 
-  // #1779: backgroundToolChoices is a SEPARATE field from toolChoices (the
-  // class's own pick) — both can be sent in the same request, and each is
-  // independently omitted when empty (never a phantom [] on the wire).
+  // backgroundToolChoices is separate from toolChoices — each independently omitted when empty, never a phantom [] (#1779).
   it("omits backgroundToolChoices when no background pick was made", () => {
     const draft = makeDraft({ name: "X", className: "Rogue" });
     const selections = resolveSelections(reference, draft);
@@ -928,8 +889,7 @@ describe("buildCreatePayload", () => {
     expect(payload.backgroundToolChoices).toEqual(["Dice Set"]);
   });
 
-  // #1565: the background's own package selections ride a SEPARATE field,
-  // never merged into (or overwriting) `startingEquipment` (the class's).
+  // Background package selections ride a separate field, never merged into startingEquipment (the class's) (#1565).
   it("includes backgroundStartingEquipment alongside a class package, never merged into one field", () => {
     const draft = makeDraft({
       name: "X",
@@ -949,11 +909,7 @@ describe("buildCreatePayload", () => {
 });
 
 describe("creation spells (#1131)", () => {
-  // #1513: spellbookSize marks the Wizard's spellbook (6) as distinct from its
-  // prepared cap (4, never served on ClassOption) — buildCreatePayload just
-  // passes the draft's picks through, so this fixture change is documentation,
-  // not a behavior assertion (see creationSpells.test.ts / creationSteps.test.ts
-  // for the count-cap assertions).
+  // spellbookSize is documentation here, not a behavior assertion — buildCreatePayload passes picks through as-is; see creationSpells.test.ts for the count-cap assertions (#1513).
   const caster = makeClass({
     name: "Wizard",
     level1SpellPicks: { cantrips: 3, spells: 6, maxSpellLevel: 1, spellbookSize: 6 },

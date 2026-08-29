@@ -12,10 +12,10 @@ vi.mock("@/hooks/useCampaignEntities", () => ({
   primeCampaignEntities: vi.fn(),
 }));
 
-// fetchReference must be present even though renderPanel seeds the reference
-// cache directly (never calling it): useItemRarities imports it from this same
-// barrel, and an omitted export is `undefined`, which the query would call the
-// moment a test renders without a seed.
+// fetchReference must stay in this mock even though renderPanel seeds the
+// reference cache directly: useItemRarities imports it from this same barrel,
+// and an omitted export is `undefined`, which the query would call on any
+// render that skips the seed.
 vi.mock("@/api/client", () => ({
   fetchCampaignItems: vi.fn(),
   fetchItems: vi.fn(() => Promise.resolve([])),
@@ -55,8 +55,8 @@ const baseItem: CampaignItem = {
 
 const characters = [{ id: "c1", name: "Bruenor", ownerId: "u1" }];
 
-// `seedRarities: false` leaves the reference query pending — the cold-cache
-// state the serve-only labels have to survive (#1437).
+// `seedRarities: false` leaves the reference query pending, the cold-cache
+// state serve-only labels (#1437) must survive.
 function renderPanel({ seedRarities = true } = {}) {
   if (seedRarities) seedItemRarities("EDITION_2024");
   return render(
@@ -77,8 +77,7 @@ describe("CampaignItemsPanel query cache (#1299)", () => {
     vi.mocked(fetchCampaignItems).mockResolvedValue([baseItem]);
     renderPanel();
 
-    // Cache is fresh (default staleTime), so the primed data renders on the
-    // very first paint — no network round trip needed.
+    // Cache is fresh (default staleTime), so the primed data renders on the first paint.
     expect(screen.getByText("Flametongue")).toBeInTheDocument();
     expect(fetchCampaignItems).not.toHaveBeenCalled();
   });
@@ -101,7 +100,6 @@ describe("CampaignItemsPanel query cache (#1299)", () => {
       {
         ...baseItem,
         holders: [{ characterId: "c1", characterName: "Bruenor", quantity: 1 }],
-        // Award also reveals the fronting entity.
         entity: { ...baseItem.entity, visibility: "REVEALED" },
       },
     ]);
@@ -181,7 +179,6 @@ describe("CampaignItemsPanel edit (#505)", () => {
     const nameInput = screen.getByLabelText("Name *") as HTMLInputElement;
     expect(nameInput.value).toBe("Flametongue");
     expect((screen.getByLabelText("Damage type") as HTMLInputElement).value).toBe("fire");
-    // Edit mode drops the clone-from-catalog control.
     expect(screen.queryByLabelText("Clone from catalog (optional)")).not.toBeInTheDocument();
 
     await userEvent.clear(nameInput);
@@ -195,14 +192,12 @@ describe("CampaignItemsPanel edit (#505)", () => {
         expect.objectContaining({ name: "Flametongue +2" }),
       ),
     );
-    // List reflects the rename; the fronting entity is renamed in the shared cache.
     await screen.findByText("Flametongue +2");
     await waitFor(() =>
       expect(primeCampaignEntities).toHaveBeenCalledWith("camp-1", [
         { id: "ent-1", name: "Flametongue +2", visibility: "HIDDEN" },
       ]),
     );
-    // Form closes after a successful save.
     expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
   });
 
@@ -255,11 +250,9 @@ describe("CampaignItemsPanel field parity (#527/#542)", () => {
     await userEvent.type(screen.getByLabelText("Damage modifier"), "1");
     await userEvent.click(screen.getByRole("radio", { name: "Martial" }));
     await userEvent.click(screen.getByRole("radio", { name: "Melee" }));
-    // Versatile die is revealed only after toggling versatile on (defaults 1d10).
     await userEvent.click(screen.getByRole("button", { name: "versatile" }));
     await userEvent.clear(screen.getByLabelText("Versatile damage dice faces"));
     await userEvent.type(screen.getByLabelText("Versatile damage dice faces"), "8");
-    // Range is revealed only after thrown (or ranged) is set.
     await userEvent.click(screen.getByRole("button", { name: "thrown" }));
     await userEvent.click(screen.getByRole("button", { name: "reach" }));
     await userEvent.type(screen.getByLabelText("Range (normal)"), "20");
@@ -316,7 +309,6 @@ describe("CampaignItemsPanel field parity (#527/#542)", () => {
     await userEvent.click(screen.getByRole("button", { name: "thrown" }));
     await userEvent.type(screen.getByLabelText("Range (normal)"), "20");
     await userEvent.type(screen.getByLabelText("Range (long)"), "60");
-    // Turn thrown back off — range disappears and must not be persisted.
     await userEvent.click(screen.getByRole("button", { name: "thrown" }));
     expect(screen.queryByLabelText("Range (normal)")).not.toBeInTheDocument();
 
@@ -523,7 +515,7 @@ describe("CampaignItemsPanel rarity (#497/#542)", () => {
   });
 
   // #1437: labels are serve-only, so a cold cache paints no badge rather than
-  // flashing the raw key while /reference is in flight.
+  // the raw key while /reference is in flight.
   it("renders no rarity badge on a row while the served rows are unresolved", async () => {
     const { container } = renderPanel({ seedRarities: false });
     await screen.findByText("Flametongue");
@@ -540,7 +532,6 @@ describe("CampaignItemsPanel rarity (#497/#542)", () => {
     const rarity = screen.getByLabelText("Rarity") as HTMLSelectElement;
     expect(rarity.tagName).toBe("SELECT");
     expect(rarity).toBeEnabled();
-    // Mundane empty option + the six tiers, ascending.
     expect([...rarity.querySelectorAll("option")].map((o) => o.textContent)).toEqual([
       "Mundane (none)",
       "Common",
@@ -556,9 +547,9 @@ describe("CampaignItemsPanel rarity (#497/#542)", () => {
     expect(screen.getByText("Standard value: 4,000 gp")).toBeInTheDocument();
   });
 
-  // Data-loss guard (#1437): with only "Mundane (none)" selectable, editing an
-  // existing magic item and touching the dropdown would strip rarity,
-  // attunement gating and the whole Magic fieldset in one click.
+  // Data-loss guard (#1437): with only "Mundane (none)" selectable, touching the
+  // dropdown would strip an existing magic item's rarity, attunement gating,
+  // and the whole Magic fieldset in one click.
   it("disables the rarity dropdown until the served rows resolve", async () => {
     renderPanel({ seedRarities: false });
     await screen.findByText("Flametongue");
@@ -571,9 +562,9 @@ describe("CampaignItemsPanel rarity (#497/#542)", () => {
     ]);
   });
 
-  // The gp figures are the server's too (#1437) — with no rows there is nothing
-  // to quote, so the hint stays absent rather than guessing. The select must
-  // still hold the item's real tier instead of falling back to "Mundane (none)".
+  // #1437: with no rows there is nothing to quote, so the hint stays absent
+  // rather than guessing, and the select still holds the item's real tier
+  // instead of falling back to "Mundane (none)".
   it("keeps an existing magic item's tier, and no value hint, while the rows are unresolved", async () => {
     renderPanel({ seedRarities: false });
     await screen.findByText("Flametongue");
@@ -614,7 +605,6 @@ describe("CampaignItemsPanel rarity (#497/#542)", () => {
     await userEvent.selectOptions(screen.getByLabelText("Rarity"), "RARE");
     await userEvent.click(screen.getByRole("button", { name: "Requires attunement" }));
     await userEvent.click(screen.getByRole("button", { name: "Unique" }));
-    // Demote to mundane — the flags are hidden and must not persist.
     await userEvent.selectOptions(screen.getByLabelText("Rarity"), "");
 
     await userEvent.click(screen.getByRole("button", { name: "Create item" }));
@@ -656,7 +646,6 @@ describe("CampaignItemsPanel slot authoring (#572)", () => {
     vi.mocked(fetchCampaignItems).mockResolvedValue([]);
   });
 
-  // DM-1: a gear item saves its chosen slot.
   it("saves the chosen worn slot on a gear item", async () => {
     vi.mocked(createCampaignItem).mockResolvedValue({ ...baseItem, id: "g-1", name: "Ring of X", category: "gear" });
     renderPanel();
@@ -676,7 +665,6 @@ describe("CampaignItemsPanel slot authoring (#572)", () => {
     );
   });
 
-  // DM-2: leaving the default "Carried (not worn)" saves a null slot.
   it("sends a null slot when gear stays carried", async () => {
     vi.mocked(createCampaignItem).mockResolvedValue({ ...baseItem, id: "g-2", name: "Rope", category: "gear" });
     renderPanel();
@@ -691,7 +679,6 @@ describe("CampaignItemsPanel slot authoring (#572)", () => {
     expect(vi.mocked(createCampaignItem).mock.calls[0][1].slot).toBeNull();
   });
 
-  // DM-1 (re-open): editing a slotted gear item pre-selects its slot.
   it("pre-selects the stored slot when editing a gear item", async () => {
     vi.mocked(fetchCampaignItems).mockResolvedValue([
       { ...baseItem, name: "Amulet", category: "gear", slot: "NECK" },
@@ -703,12 +690,10 @@ describe("CampaignItemsPanel slot authoring (#572)", () => {
     expect((screen.getByLabelText("Slot") as HTMLSelectElement).value).toBe("NECK");
   });
 
-  // DM-3: no Slot picker for weapon/armor/consumable; weapon/armor show Equips to.
   it("shows no Slot picker for weapon/armor/consumable and a read-only Equips-to for weapon/armor", async () => {
     renderPanel();
     await userEvent.click(screen.getByRole("button", { name: "New item" }));
 
-    // Default category is weapon: no picker, read-only placement instead.
     expect(screen.queryByLabelText("Slot")).not.toBeInTheDocument();
     expect(screen.getByText(/Equips to:/)).toHaveTextContent("Main hand / Off hand");
 
@@ -720,13 +705,11 @@ describe("CampaignItemsPanel slot authoring (#572)", () => {
     expect(screen.queryByLabelText("Slot")).not.toBeInTheDocument();
     expect(screen.queryByText(/Equips to:/)).not.toBeInTheDocument();
 
-    // Gear reveals the picker and drops the read-only line.
     await userEvent.click(screen.getByRole("radio", { name: "Gear" }));
     expect(screen.getByLabelText("Slot")).toBeInTheDocument();
     expect(screen.queryByText(/Equips to:/)).not.toBeInTheDocument();
   });
 
-  // DM-4: switching category away from gear clears the selected slot in the form.
   it("clears a selected slot when category switches away from gear", async () => {
     vi.mocked(createCampaignItem).mockResolvedValue({ ...baseItem, id: "g-3", name: "Belt", category: "gear" });
     renderPanel();
@@ -736,7 +719,6 @@ describe("CampaignItemsPanel slot authoring (#572)", () => {
     await userEvent.selectOptions(screen.getByLabelText("Slot"), "BELT");
     expect((screen.getByLabelText("Slot") as HTMLSelectElement).value).toBe("BELT");
 
-    // Leave gear, then return: the previously-chosen slot must be gone.
     await userEvent.click(screen.getByRole("radio", { name: "Weapons" }));
     await userEvent.click(screen.getByRole("radio", { name: "Gear" }));
     expect((screen.getByLabelText("Slot") as HTMLSelectElement).value).toBe("");

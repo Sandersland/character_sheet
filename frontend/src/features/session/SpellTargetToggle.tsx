@@ -1,10 +1,3 @@
-/**
- * Target picker for a spell row. Damage spells toggle self/other (other relays
- * to the DM). Healing spells offer self plus one button per opted-in ally, so a
- * rolled heal lands on that party member's sheet (#462). Locked to self when the
- * spell's range is exactly "Self".
- */
-
 import { isAllyTarget, type AllyOption, type Target } from "@/lib/spellMeta";
 
 interface SpellTargetToggleProps {

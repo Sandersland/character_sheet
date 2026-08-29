@@ -1,17 +1,6 @@
-// Pure Cloak of Shadows view derivation — extracted from CloakOfShadowsSection
-// (#1738) so its branching lives in one directly-tested unit rather than
-// inflating the component's own complexity. Shared by both editions: a 2024
-// Warrior of Shadow row costs 3 focus with a duration cap, a 2014 Way of
-// Shadow row costs nothing with no cap — both shapes come entirely off the
-// served "cloakOfShadows" availableActions row (reminder + enabled/
-// disabledReason), never a hardcoded pool amount. No JSX.
-
 import type { Character } from "@/types/character";
 
-// Must match CLOAK_OF_SHADOWS_NAME (backend shadow-arts.ts) — the literal
-// source string applyConditionInTx stamps on the invisible ConditionEntry it
-// applies. Matching on source, not just key, keeps this view from claiming a
-// DIFFERENT invisible source (e.g. the Invisibility spell) as an active Cloak.
+// Must match backend CLOAK_OF_SHADOWS_NAME, the source string applyConditionInTx stamps on the invisible ConditionEntry — matching source, not just key, keeps this from claiming a different invisible source (e.g. Invisibility) as an active Cloak.
 const CLOAK_OF_SHADOWS_SOURCE = "Cloak of Shadows";
 
 export interface CloakOfShadowsView {

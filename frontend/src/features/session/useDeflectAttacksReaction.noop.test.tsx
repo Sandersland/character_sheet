@@ -1,9 +1,3 @@
-/**
- * An enabled Deflect button must never silently no-op (#1435 review): when the
- * served row is missing its resolved `effect` spec (a stale serialized
- * character), the click surfaces an error toast instead of swallowing itself,
- * and leaves the reaction unspent so a refetch can retry.
- */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { act } from "@testing-library/react";
 
@@ -20,8 +14,6 @@ vi.mock("@/api/client", () => ({
 }));
 vi.mock("@/features/session/turnStatePersistence", () => ({ clearTurnState: vi.fn() }));
 
-// A Monk served the deflectAttacks row WITHOUT an `effect` spec — the enabled
-// button a stale character can present before the resolved spec is in hand.
 function monkMissingSpec(): Character {
   return {
     id: "char-1",
@@ -58,7 +50,6 @@ describe("useDeflectAttacksReaction — missing served spec", () => {
     act(() => result.current.handleDeflectAttacks());
 
     expect(setReactionMessage).toHaveBeenCalledWith(expect.stringMatching(/reload the character sheet and try again/i));
-    // The click did not fire the reaction — no slot spent, so a refetch can retry.
     expect(consumeReaction).not.toHaveBeenCalled();
   });
 });

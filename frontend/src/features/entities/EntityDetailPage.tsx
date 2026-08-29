@@ -189,9 +189,6 @@ function EntityArticle({
   );
 }
 
-// Wiki-article entity page (#842): a desktop split view — sibling-list rail +
-// reading pane — that collapses to a full-page article on mobile. Loading and
-// not-found render inside the pane so the rail keeps its state across row nav.
 export default function EntityDetailPage() {
   const { id: campaignId, entityId } = useParams();
   const navigate = useNavigate();
@@ -201,9 +198,7 @@ export default function EntityDetailPage() {
   const { entity } = detail;
   const { user } = useAuth();
   const combinedToast = useCombinedToast();
-  // The campaign's edition only picks a /reference cache slot here — the rarity
-  // tiers it resolves are edition-invariant (#1437). Undefined until the campaign
-  // read lands, which keeps the query skipped rather than fetching for a guess.
+  // rulesEdition only picks a /reference cache slot (#1437) — rarity tiers are edition-invariant; it's undefined until the campaign read lands, keeping the query skipped rather than fetching for a guess.
   const rarities = useItemRarities(detail.rulesEdition);
   const { survivorChain, formerIdentityIds, nameFor } = useEntityMerges(
     campaignId,
@@ -211,12 +206,7 @@ export default function EntityDetailPage() {
     detail.byId,
   );
 
-  // The duplicate's own page is gone after a combine — land on the survivor's
-  // instead, replacing history so Back can't return to a 404'd entity, and
-  // carry the toast text through location.state (useCombinedToast reads it).
-  // Spreads the CURRENT state first so a `from` this page carried (see
-  // useEntityBackTo) survives onto the survivor's page too, instead of the
-  // combine silently resetting its back-link to the default Codex target.
+  // Current state is spread first so a `from` carried via useEntityBackTo survives onto the survivor's page instead of resetting to the default Codex target; replace: true keeps Back from returning to the now-404'd entity.
   function handleCombined(survivorId: string, message: string) {
     if (!campaignId) return;
     navigate(`/campaigns/${campaignId}/entities/${survivorId}`, {

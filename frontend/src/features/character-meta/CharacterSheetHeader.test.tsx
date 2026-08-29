@@ -11,17 +11,15 @@ import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { SheetTab } from "@/features/character-meta/sheetTabs";
 import type { Character } from "@/types/character";
 
-// Both the mobile and desktop chrome render a "Sheet actions" trigger; the
-// desktop one is last. Indexing by position broke the moment their DOM order moved.
+// Desktop's "Sheet actions" trigger is always last in DOM order — indexing by position broke when it moved.
 function desktopSheetActions(): HTMLElement {
   const triggers = screen.getAllByRole("button", { name: /sheet actions/i });
   return triggers[triggers.length - 1];
 }
 
 
-// BackendStatus pings the API on mount; keep it quiet + healthy in tests.
-// fetchEditions is listed only so the badge spec below can prove it is NEVER
-// called — the badge reads the label served with the sheet (#1436).
+// fetchEditions is mocked only so the badge spec below can prove it's never called —
+// the label is served with the sheet (#1436), no separate fetch.
 vi.mock("@/api/client", () => ({
   checkHealth: vi.fn().mockResolvedValue(true),
   fetchEditions: vi.fn(),
@@ -55,11 +53,6 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
   } as Character;
 }
 
-// CharacterSheetHeader (and its nested MobileSheetHeader/CampaignIndicator)
-// reads useCurrentCharacter(), so every render seeds the cache and mounts
-// CurrentCharacterProvider via renderWithCharacter. Theme/DiceRollStyle
-// providers wrap it too — both breakpoints' "Preferences…" overflow item
-// (#1167) mounts PreferencesSheet, which reads both via useTheme()/useDiceRollStyle().
 function renderHeader(
   props: Partial<Parameters<typeof CharacterSheetHeader>[0]> = {},
   character: Character = makeCharacter(),
@@ -119,8 +112,6 @@ describe("CharacterSheetHeader desktop session controls (#979)", () => {
     const onEndSession = vi.fn();
     renderHeader({ isLive: true, isLiveJoined: true, onLeaveSession, onEndSession });
 
-    // The desktop banner buttons (role=button); the mobile menu items are
-    // role=menuitem and only exist after opening the ⋮, so no ambiguity here.
     fireEvent.click(screen.getByRole("button", { name: "End Session" }));
     expect(onEndSession).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole("button", { name: "Leave Session" }));
@@ -145,8 +136,6 @@ describe("CharacterSheetHeader desktop session controls (#979)", () => {
 });
 
 describe("CharacterSheetHeader campaign settings (#1087)", () => {
-  // Both breakpoints render in jsdom; the desktop banner's kebab is the second
-  // "Sheet actions" menu (MobileSheetHeader renders first).
   it("shows 'Campaign settings…' in the desktop ⋮ and fires its handler when campaign-attached", () => {
     const onOpenCampaignSettings = vi.fn();
     renderHeader({ activeTab: "overview", onOpenCampaignSettings });
@@ -198,11 +187,8 @@ describe("CharacterSheetHeader desktop Preferences entry (#1167)", () => {
 describe("CharacterSheetHeader banner chrome (#985)", () => {
   it("puts Delete behind the ⋯ overflow, never as a bare banner button", () => {
     renderHeader({ activeTab: "overview" });
-    // No bare Delete button — it lives in the menu.
     expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
 
-    // The desktop banner's kebab is "Sheet actions" (mobile header is md:hidden
-    // but also renders one in jsdom; scope to the first opened menu's item).
     fireEvent.click(screen.getAllByRole("button", { name: /sheet actions/i })[0]);
     expect(screen.getByRole("menuitem", { name: "Delete" })).toBeInTheDocument();
   });
@@ -220,8 +206,6 @@ describe("CharacterSheetHeader banner chrome (#985)", () => {
     expect(screen.getByRole("button", { name: /Note/ })).toBeInTheDocument();
     unmount();
 
-    // Joined: the live pill + Leave/End join the same cluster, but ＋ Note is not
-    // duplicated (the old separate live strip is gone, #1085).
     renderHeader({
       activeTab: "overview",
       isLive: true,
@@ -232,9 +216,7 @@ describe("CharacterSheetHeader banner chrome (#985)", () => {
     expect(screen.getAllByRole("button", { name: /Note/ })).toHaveLength(1);
   });
 
-  // #1085: the old under-tabs LiveSessionStrip is deleted — the banner's right
-  // cluster is now the ONLY desktop live indicator. jsdom also paints the mobile
-  // header pill, so scope the count to the desktop <header>.
+  // jsdom renders both breakpoints; scope the live-pill count to the desktop <header> (md:block).
   it("shows the live pill exactly once in the desktop header (no duplicate live state)", () => {
     renderHeader({
       activeTab: "overview",
@@ -268,9 +250,8 @@ describe("CharacterSheetHeader banner chrome (#985)", () => {
   });
 });
 
-// Both cases set rulesEdition AND rulesEditionLabel explicitly (#1436) — a
-// fixture that derived one from the other would re-implement the mapping this
-// issue moved server-side, and would pass even against a client-side lookup.
+// Both fields set explicitly — deriving one from the other would re-implement
+// the mapping this test proves moved server-side (#1436).
 describe("CharacterSheetHeader rules edition (#1286)", () => {
   it("shows the character's 2024 rules edition in the desktop banner", () => {
     renderHeader(
@@ -290,9 +271,8 @@ describe("CharacterSheetHeader rules edition (#1286)", () => {
     expect(within(desktopHeader).getByText("2014 rules")).toBeInTheDocument();
   });
 
-  // The stronger claim than "the query is pending": after #1436 this component
-  // never calls useEditions at all, so "never requested" is the observable one.
-  // The editions cache is deliberately left unseeded here.
+  // Never calls useEditions at all (#1436) — "never requested" is the observable
+  // claim, so the editions cache is deliberately left unseeded.
   it("renders the badge without ever requesting /api/editions", () => {
     renderHeader(
       { activeTab: "overview" },

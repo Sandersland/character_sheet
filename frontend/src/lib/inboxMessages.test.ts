@@ -71,9 +71,7 @@ describe("groupInboxRowsByCampaign", () => {
 });
 
 describe("formatInboxSignalAge", () => {
-  // Anchored via the LOCAL Date constructor (not a UTC ISO literal) so the
-  // test is deterministic on any host timezone: "now" and every fixture below
-  // are built from the same local wall-clock frame.
+  // Anchored via the LOCAL Date constructor, not a UTC ISO literal, so the test is deterministic on any host timezone.
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 6, 12, 15, 0, 0));

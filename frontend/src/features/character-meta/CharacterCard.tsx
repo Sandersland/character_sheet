@@ -18,16 +18,10 @@ function initials(name: string): string {
 }
 
 /**
- * Top-image-style preview card (components.md: "Top-image cards fit
- * grids") — portrait placeholder, name as the lead, race/class/level as
- * de-emphasized supporting metadata (principles.md: avoid naked
- * label:value, fold the count into natural language instead).
- *
- * The media slot is one fixed 4:5 box in BOTH states so a grid row of mixed
- * portrait/monogram cards keeps uniform geometry. The img is absolute-fill:
- * left in flow, its intrinsic height becomes the flex item's min-content
- * floor and pushes the box past its *preferred* aspect-ratio, which is what
- * stretched portrait cards taller than their monogram siblings.
+ * The media slot must stay a fixed 4:5 box in both states: an absolute-fill
+ * img sits in flow, so its intrinsic height sets the flex item's min-content
+ * floor and stretches the box past its aspect-ratio — pushing portrait cards
+ * taller than monogram siblings if not fixed-size.
  */
 export default function CharacterCard({ character }: CharacterCardProps) {
   return (

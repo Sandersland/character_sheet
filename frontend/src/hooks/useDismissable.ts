@@ -7,7 +7,6 @@ interface UseDismissableOptions {
   onOutsideClick: () => void;
 }
 
-// Escape-to-close + mousedown-outside-to-close, listeners tied to `open`.
 export function useDismissable({
   open,
   wrapperRef,

@@ -25,9 +25,7 @@ interface CampaignCodexProps {
   campaignName?: string;
 }
 
-// Codex browse shell (#840): orchestrates the filter rail + chronicle ledger.
-// Rows link to EntityDetailPage, which owns edit/delete/reveal. Members see
-// only revealed entities (server-filtered); the owner also sees HIDDEN ones.
+// Members see only revealed entities (server-filtered); the owner also sees HIDDEN ones.
 export default function CampaignCodex({ campaignId, role, campaignName }: CampaignCodexProps) {
   const { entities } = useCampaignEntities(campaignId);
   const { statsEntities, activity, loaded } = useCodexActivity(campaignId);
@@ -47,7 +45,6 @@ export default function CampaignCodex({ campaignId, role, campaignName }: Campai
       ),
     [entities, query, typeFilter],
   );
-  // Rows carry mention stats (#853) from the activity fetch when available.
   const groups = useMemo(
     () =>
       buildLedgerGroups(
@@ -71,7 +68,6 @@ export default function CampaignCodex({ campaignId, role, campaignName }: Campai
     toggleRef.current?.focus();
   }
 
-  // lg grid: [filter rail | ledger]; the activity rail (#841) joins at xl.
   return (
     <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[280px_minmax(0,1fr)] lg:items-start lg:gap-8 xl:grid-cols-[280px_minmax(0,1fr)_280px]">
       <CodexRail

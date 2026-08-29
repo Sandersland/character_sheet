@@ -1,18 +1,5 @@
-/**
- * spellCast.ts — pure lookup/planning helpers for spell casting.
- *
- * `planCast` backs the out-of-session grimoire cast flow (SpellsSection /
- * useSpellcasting.ts). The in-session Cast-a-Spell picker moved onto the
- * shared resolver in #1833 (`spellToResolution`, `resolveAction`) and no
- * longer builds a `castSpell` op here — it still reuses `computeCastSpec`
- * (the served-roll lookup both surfaces share) and `castAnnounceLine`. The
- * dice math itself (cantrip scaling / upcast dice / heal ability-modifier)
- * resolves backend-side (#1381) — this module only looks up the served roll,
- * never re-derives it.
- *
- * No React, no JSX, no side effects — output is deterministic given the inputs.
- */
-
+// Pure lookup/planning helpers for spell casting; casts read the backend-served
+// roll (#1381) and never re-derive dice math.
 import { rollSpec } from "@/lib/dice";
 import { saveDcLabel } from "@/lib/spellMeta";
 import type {
@@ -22,7 +9,6 @@ import type {
 } from "@/types/character";
 import type { RollSpec, RollResult } from "@/lib/dice";
 
-// The inline result banner shown immediately after a cast.
 export interface CastResult {
   spellName: string;
   total: number;
@@ -32,14 +18,13 @@ export interface CastResult {
   slotLevel?: number;
 }
 
-// The ops to send + the banner to show for a cast — no React/state.
 export interface CastPlan {
   ops: SpellcastingOperation[];
   result: CastResult | null;
 }
 
-// A cast produces a display banner only for damage/heal spells; buff/utility
-// spells have no effect dice (computeCastRoll returns null).
+// Buff/utility spells have no effect dice, so computeCastRoll returns null and
+// this yields no banner — only damage/heal casts show one.
 function bannerFor(
   spell: Spell,
   roll: { spec: RollSpec; total: number },
@@ -56,8 +41,7 @@ function bannerFor(
   };
 }
 
-// Item-granted spell (#528): cast from the item's own resource at its configured
-// slot level (may upcast above the spell's base level), never a spell slot.
+// Item-granted spell (#528) casts from the item's own resource, never a spell slot.
 function planItemCast(spell: Spell): CastPlan {
   const castLevel = spell.item?.castLevel ?? spell.level;
   const castRoll = computeCastRoll(spell, castLevel);
@@ -65,8 +49,6 @@ function planItemCast(spell: Spell): CastPlan {
   return { ops: [{ type: "castItemSpell", entryId: spell.id, roll: castRoll?.total ?? 0 }], result };
 }
 
-// Plan a cast: which ops to send and whether to show a roll banner. Rolls dice
-// via computeCastRoll but holds no React state — SpellsSection wires the result.
 export function planCast(spell: Spell, slotLevel?: number): CastPlan {
   if (spell.source === "item") return planItemCast(spell);
 
@@ -75,7 +57,7 @@ export function planCast(spell: Spell, slotLevel?: number): CastPlan {
   const castRoll = computeCastRoll(spell, resolvedSlotLevel);
 
   if (!castRoll) {
-    // No effect dice — just expend the slot (cantrips expend nothing).
+    // No effect dice: just expend the slot (cantrips expend nothing).
     const ops: SpellcastingOperation[] = isCantrip
       ? []
       : [{ type: "castSpell", entryId: spell.id, slotLevel: resolvedSlotLevel, roll: 0 }];
@@ -89,26 +71,16 @@ export function planCast(spell: Spell, slotLevel?: number): CastPlan {
   return { ops: [op], result };
 }
 
-/**
- * The dice spec for casting `spell` at `slotLevel` — a lookup into the spell's
- * served `effectRolls` (#1381), not a re-derivation. The rules (cantrip
- * scaling, upcast dice, heal ability-modifier) resolve backend-side in
- * buildSpellcastingView; this only finds the entry keyed by the slot level the
- * player picked. Returns null when the spell has no served roll at that level
- * (a utility spell, or a level with no matching effectRolls entry).
- *
- * Hands back a COPY of the served roll: the entry lives in shared react-query
- * cache state, and callers (e.g. InlineSpellAttackSection's crit path) mutate
- * their local copy (`{ ...spec, crit: true }`) rather than the cached object.
- */
+// Reads the served roll (#1381) for slotLevel — never re-derives it (see
+// buildSpellcastingView) — and returns a copy since the entry lives in shared
+// query cache state and callers mutate their own copy (e.g. crit flag).
 export function computeCastSpec(spell: Spell, slotLevel: number): RollSpec | null {
   const entry = spell.effectRolls?.find((e) => e.slotLevel === slotLevel);
   return entry ? { ...entry.roll } : null;
 }
 
-// Roll the effect dice for casting `spell` at `slotLevel` — null when the spell
-// has no effect dice. Internal to planCast; session mode uses computeCastSpec +
-// RollContext.roll() so the result surfaces in the shared toast.
+// Internal to planCast; session mode instead uses computeCastSpec + RollContext.roll()
+// so the result surfaces in the shared toast.
 function computeCastRoll(
   spell: Spell,
   slotLevel: number,
@@ -119,9 +91,6 @@ function computeCastRoll(
   return { spec, total: result.total, result };
 }
 
-/** The save DC / half-on-success line to read to the DM — the Cast-a-Spell
- *  resolver's cast-tally announce line (#1164, carried into #1833's
- *  onCastSettled). Null when the cast doesn't force a save. */
 export function castAnnounceLine(spell: Spell, spellSaveDC: number | undefined): string | null {
   if (spell.attackType !== "save" || spellSaveDC === undefined) return null;
   const dc = saveDcLabel(spell, spellSaveDC);

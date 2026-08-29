@@ -82,7 +82,6 @@ describe("applyTarget", () => {
   it("preserves a still-valid targetKey but resets an incompatible one", () => {
     const withStealth: ItemCapability = { kind: "passiveBonus", target: "skill", targetKey: "stealth" };
     expect(applyTarget(withStealth, "skill").targetKey).toBe("stealth");
-    // A skill key is invalid for an ability-keyed save target → falls to first ability.
     expect(applyTarget(withStealth, "save").targetKey).toBe(keyOptions("save")[0].key);
   });
 

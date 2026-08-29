@@ -30,7 +30,7 @@ export default function CustomFeatForm({ currentScores, skillNames, busy, custom
         ← Back to list
       </button>
 
-      {/* Name + description */}
+      
       <div className="flex flex-col gap-2">
         <input
           type="text"
@@ -176,7 +176,7 @@ export default function CustomFeatForm({ currentScores, skillNames, busy, custom
             />
           </label>
         )}
-        {/* Player choice picker — only shown when taking the feat and >1 option */}
+        
         {abilityOptionsArr.length > 1 && (
           <div className="mt-2">
             <label className="mb-1 block text-xs font-semibold text-parchment-700">

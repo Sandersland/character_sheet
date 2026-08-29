@@ -8,13 +8,7 @@ interface WeaponBondToggleProps {
   onSubmit: (operations: WeaponBondOperation[]) => Promise<void>;
 }
 
-// The bond/unbond pill for a weapon-category item on an eligible Eldritch
-// Knight's sheet (2014, L3+, PHB'14 p.75) — only rendered by InventoryRow when
-// the character's own availableActions carry summonBondedWeapon (#1854), the
-// same "backend already resolved eligibility" signal AttuneToggle's caller
-// uses for atCap. Mirrors AttuneToggle's shape exactly; bonding a new weapon
-// is blocked at the derived 2-weapon cap, and the server also enforces the
-// L3+ EK gate and surfaces the reason on attempt.
+// atCap is pre-resolved by the caller from availableActions, the same pattern AttuneToggle uses.
 export default function WeaponBondToggle({ item, pending, atCap, onSubmit }: WeaponBondToggleProps) {
   const blocked = !item.weaponBonded && atCap;
   const title = blocked

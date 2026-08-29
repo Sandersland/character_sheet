@@ -1,8 +1,3 @@
-// #1690: SpeciesOriginFeatSection (2024 Human's Versatile) — mirrors
-// CreationSpellsStep's SpeciesCantripGate render-or-not contract +
-// catalog-fetch shape (#1778), reusing the SAME useFeatCatalog/fetchFeats
-// seam the level-up ASI/feat picker uses (AdvancementPanel.test.tsx's own
-// mocking pattern).
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";

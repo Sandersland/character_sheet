@@ -2,7 +2,6 @@ import { Link } from "react-router-dom";
 
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 
-// Mounted outside the tab scroller (#892) so it arms on every tab when a level-up is pending.
 export default function LevelUpBanner() {
   const { character } = useCurrentCharacter();
   const { pendingLevelUps, level, id } = character;

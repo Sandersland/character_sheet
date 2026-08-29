@@ -23,9 +23,6 @@ const CATALOG: CatalogFeat[] = [
     abilityIncrease: 1,
     improvements: [],
   },
-  // A category the real /api/feats?asiLevel= would never return (#1129: Origin
-  // feats come from backgrounds). Kept deliberately unrealistic so the picker
-  // renders it iff no client-side copy of that rule survives (#1438).
   { id: "lucky", name: "Lucky", description: "Luck points.", category: "origin", abilityOptions: [], abilityIncrease: 0, improvements: [] },
 ];
 
@@ -57,7 +54,6 @@ function renderStep(draft: LevelUpDraft = {} as LevelUpDraft) {
   return { setDraft, ...utils };
 }
 
-/** Resolve setDraft's functional-update calls against a starting draft. */
 function applied(setDraft: ReturnType<typeof vi.fn>, from: LevelUpDraft = {} as LevelUpDraft): LevelUpDraft {
   return setDraft.mock.calls.reduce<LevelUpDraft>((d, [update]) => (typeof update === "function" ? update(d) : update), from);
 }
@@ -72,7 +68,6 @@ describe("AbilityScoreStep — scaffold + branch toggle", () => {
     renderStep();
     expect(screen.getByRole("button", { name: /improve ability scores/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /take a feat/i })).toBeInTheDocument();
-    // ASI body is the default — the point counter is visible, no feat filter yet.
     expect(screen.getByText(/remaining/i)).toBeInTheDocument();
     expect(screen.queryByPlaceholderText(/filter feats/i)).not.toBeInTheDocument();
   });
@@ -172,18 +167,12 @@ describe("AbilityScoreStep — feat branch", () => {
 
   it("lists catalog feats after switching to the feat branch, fetched for the advancing character's edition and target level", async () => {
     await toFeatBranch();
-    // The level being REACHED (plan.target.newLevel = 8), not the current one —
-    // this is the whole reason the ceremony can offer a feat the sheet can't yet.
     expect(feats).toHaveBeenCalledWith("EDITION_2014", 8);
     expect(screen.getByText("Alert")).toBeInTheDocument();
     expect(screen.getByText("Resilient")).toBeInTheDocument();
   });
 
   it("renders every row the server returned, including one the deleted client mirror dropped (#1438)", async () => {
-    // Was `hides Origin feats` (#1129) — that gate is server-side now, so the old
-    // assertion only tested the mock. Inverted: CATALOG's Origin row is one
-    // featOfferedForAsiSlot always rejects, so it renders here iff nothing on the
-    // client re-applies the rule.
     await toFeatBranch();
     expect(screen.getByText("Resilient")).toBeInTheDocument();
     expect(screen.getByText("Lucky")).toBeInTheDocument();
@@ -203,7 +192,6 @@ describe("AbilityScoreStep — feat branch", () => {
     const resilientRow = screen.getByText("Resilient").closest("li")!;
     await user.click(within(resilientRow).getByRole("button", { name: /select/i }));
 
-    // Half-feat: Take button gates on a choice.
     expect(screen.getByRole("button", { name: "Take Resilient" })).toBeDisabled();
 
     await user.click(screen.getByRole("radio", { name: /constitution/i }));

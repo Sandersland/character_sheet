@@ -1,10 +1,4 @@
-// Structured auto-roll effect fields for the homebrew-spell form (#1787):
-// the shared effect-kind/dice/modifier core (SpellEffectDiceFields) plus, for
-// effectKind "damage" only, the
-// damage-specific fields (HomebrewSpellDamageFields — damage type,
-// attack-vs-save, and save ability/effect). Conditional nesting mirrors
-// validateCustomSpellCoherence, so the fields a submission could carry
-// always match what buildHomebrewSpellPayload actually sends.
+// The effectKind "damage" nesting mirrors validateCustomSpellCoherence, so submitted fields always match what buildHomebrewSpellPayload sends.
 import HomebrewSpellDamageFields from "@/features/spells/HomebrewSpellDamageFields";
 import SpellEffectDiceFields from "@/features/spells/SpellEffectDiceFields";
 import { INPUT_CLS, LABEL_CLS } from "@/lib/addSpell";

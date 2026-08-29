@@ -44,16 +44,14 @@ vi.mock("@/api/client", () => ({
   rollInitiativeTransaction: vi.fn(),
   // Must be present even though every test seeds the reference cache directly
   // and never calls it (#1430): useTurnActions' useUniversalActions imports it
-  // from this same barrel, and an omitted export here is `undefined`, which the
-  // query CALLS the moment it enables — the trap ConditionsStrip.test.tsx
-  // documents.
+  // from this barrel, and an omitted export here is `undefined`, which the
+  // query calls the moment it enables.
   fetchReference: vi.fn(),
 }));
 
-// The turn sheets render the served attackRows (#1434); `weaponRows` states the
-// weapon rows the server would have served, and the two always-present rows are
-// appended. A fixture that also equips the weapon in `inventory` is doing so for
-// the paper-doll surfaces, not for the attack sheets.
+// The turn sheets render the served attackRows (#1434), not a derivation of
+// `inventory` — so `weaponRows` and any equipped item in `inventory` are two
+// independent fixture inputs.
 function makeCharacter(overrides: Partial<Character> = {}, weaponRows: AttackRow[] = []): Character {
   return {
     id: "char-1",
@@ -194,8 +192,7 @@ describe("TurnHub — combat lifecycle", () => {
 
     await user.click(screen.getByRole("button", { name: "End turn" }));
 
-    // No round number is sent — the server decides it (#1030) and the
-    // displayed round comes from its response via syncCombat.
+    // No round number is sent — the server decides it (#1030) via syncCombat.
     expect(advanceCombatRound).toHaveBeenCalledWith("char-1", "sess-1");
     await waitFor(() => expect(screen.getByText(/Round 2/)).toBeInTheDocument());
   });
@@ -206,10 +203,7 @@ describe("TurnHub — combat lifecycle", () => {
     await user.click(screen.getByRole("button", { name: /Start combat/ }));
     expect(screen.getByText(/Round 1/)).toBeInTheDocument();
 
-    // The End Combat call fails — the server never actually left combat.
     vi.mocked(endCombat).mockRejectedValueOnce(new Error("network blip"));
-    // Re-fetch reports the truth: still active, at the same round/timestamp
-    // as the last confirmed sync (the failed call changed nothing server-side).
     vi.mocked(fetchCombatState).mockResolvedValueOnce({
       round: 1,
       combatActive: true,
@@ -219,7 +213,6 @@ describe("TurnHub — combat lifecycle", () => {
 
     await user.click(screen.getByRole("button", { name: "End combat" }));
 
-    // Reconciled back to "in combat" — NOT stuck showing the optimistic exit.
     await waitFor(() => expect(fetchCombatState).toHaveBeenCalledWith("char-1", "sess-1"));
     await waitFor(() => expect(screen.getByText(/Round 1/)).toBeInTheDocument());
     expect(screen.queryByText("Not in combat")).not.toBeInTheDocument();
@@ -230,7 +223,6 @@ describe("TurnHub — combat lifecycle", () => {
     renderHub();
 
     vi.mocked(startCombat).mockRejectedValueOnce(new Error("network blip"));
-    // Re-fetch reports the truth: combat never actually started.
     vi.mocked(fetchCombatState).mockResolvedValueOnce({
       round: 0,
       combatActive: false,
@@ -241,7 +233,6 @@ describe("TurnHub — combat lifecycle", () => {
     await user.click(screen.getByRole("button", { name: /Start combat/ }));
 
     await waitFor(() => expect(fetchCombatState).toHaveBeenCalledWith("char-1", "sess-1"));
-    // Reconciled back to "not in combat" — NOT stuck showing the optimistic Round 1.
     await waitFor(() => expect(screen.getByText("Not in combat")).toBeInTheDocument());
   });
 
@@ -281,7 +272,6 @@ describe("TurnHub — action economy", () => {
     renderHub();
     await startTurn(user);
 
-    // No undo affordance until something is spent.
     expect(screen.queryByRole("button", { name: /Undo/ })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /Use Action/ }));
@@ -290,7 +280,6 @@ describe("TurnHub — action economy", () => {
 
     await user.click(screen.getByRole("button", { name: /Undo/ }));
 
-    // Action available again; the undo affordance is gone.
     expect(screen.getByRole("button", { name: "Use Action" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Undo/ })).not.toBeInTheDocument();
   });
@@ -315,7 +304,6 @@ describe("TurnHub — action economy", () => {
     renderHub();
     await startTurn(user);
 
-    // Spend the action first so the refund is observable.
     await user.click(screen.getByRole("button", { name: /Use Action/ }));
     await user.click(screen.getByRole("button", { name: "Dodge" }));
     expect(screen.getByText("used")).toBeInTheDocument();
@@ -327,7 +315,6 @@ describe("TurnHub — action economy", () => {
         { type: "executeAction", actionKey: "actionSurge" },
       ]),
     );
-    // The action slot's Use button returns once the surge refunds the slot.
     expect(screen.getByRole("button", { name: "Use Action" })).toBeInTheDocument();
   });
 
@@ -424,7 +411,6 @@ describe("TurnHub — deferred item/heal commit (#765)", () => {
         { type: "executeAction", actionKey: "useObject", inventoryItemId: "inv-potion", roll: expect.any(Number) },
       ]),
     );
-    // Action committed only now — the slot reads "used".
     expect(screen.getByText("used")).toBeInTheDocument();
   });
 
@@ -501,7 +487,6 @@ describe("TurnHub — server-effect undo (#758)", () => {
 
     await user.click(await screen.findByRole("button", { name: /Undo/ }));
 
-    // Reverts THIS batch server-side, then the bonus slot is available again.
     await waitFor(() => expect(revertBatch).toHaveBeenCalledWith("char-1", "batch-sw"));
     expect(await screen.findByRole("button", { name: "Use Bonus" })).toBeInTheDocument();
   });
@@ -540,7 +525,6 @@ describe("TurnHub — server-effect undo (#758)", () => {
     expect(
       (await screen.findAllByText(/Only the most recent action can be undone\./)).length,
     ).toBeGreaterThan(0);
-    // Slot stays consumed — no local restore on a failed revert.
     expect(screen.queryByRole("button", { name: "Use Bonus" })).not.toBeInTheDocument();
   });
 });
@@ -553,7 +537,6 @@ describe("TurnHub — More-actions disclosure", () => {
 
     await user.click(screen.getByRole("button", { name: /Use Action/ }));
 
-    // Collapsed: the tail actions are not rendered yet.
     expect(screen.queryByRole("button", { name: "Hide" })).not.toBeInTheDocument();
     const disclosure = screen.getByRole("button", { name: /More actions/ });
     expect(disclosure).toHaveAttribute("aria-expanded", "false");
@@ -566,7 +549,6 @@ describe("TurnHub — More-actions disclosure", () => {
 
     await user.click(screen.getByRole("button", { name: "Hide" }));
 
-    // Universal action: slot consumed locally, no server call.
     expect(applyActionTransactions).not.toHaveBeenCalled();
     expect(screen.getByText("used")).toBeInTheDocument();
   });
@@ -629,12 +611,10 @@ describe("TurnHub — bonus-spell cards", () => {
 
     await user.click(screen.getByRole("button", { name: "Healing Word" }));
 
-    // The cast sheet opens focused on the tapped spell only.
     expect(screen.getByText("Bonus-Action Spell")).toBeInTheDocument();
     expect(screen.getByText("Healing Word")).toBeInTheDocument();
     expect(screen.queryByText("Spiritual Weapon")).not.toBeInTheDocument();
 
-    // The escape hatch reveals the full grouped list.
     await user.click(screen.getByRole("button", { name: "Show all spells" }));
     expect(screen.getByText("Spiritual Weapon")).toBeInTheDocument();
   });
@@ -646,13 +626,12 @@ describe("TurnHub — bonus-spell cards", () => {
 
     await user.click(screen.getByRole("button", { name: "Use Bonus" }));
     await user.click(screen.getByRole("button", { name: "Healing Word" }));
-    // The fixture's spell carries no served effectRolls → no-roll shape, one "Cast" tap.
+    // No served effectRolls on this fixture's spell → no-roll shape, one "Cast" tap.
     await user.click(screen.getByRole("button", { name: "Cast" }));
     await waitFor(() => expect(applyResolveActionOperations).toHaveBeenCalledTimes(1));
     const closeBtns = within(screen.getByRole("dialog")).getAllByRole("button", { name: "Close" });
-    await user.click(closeBtns[closeBtns.length - 1]); // footer Close (grab-handle + header share the name)
+    await user.click(closeBtns[closeBtns.length - 1]); // grab-handle + header share the "Close" name
 
-    // The cast's receipt shows on the turn card.
     expect(await screen.findByText("Spells cast")).toBeInTheDocument();
     expect(screen.getByText(/Healing Word/)).toBeInTheDocument();
 
@@ -785,11 +764,10 @@ describe("TurnHub — live multi-attack counter (#757)", () => {
   });
 
   it("opens at 2 of 2, decrements per attack as each swing is rolled, and exhausts at 0 of 2", async () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5); // deterministic: no nat 20/1 auto-verdicts
+    vi.spyOn(Math, "random").mockReturnValue(0.5); // avoids nat 20/1 auto-verdicts
     const user = userEvent.setup();
     renderHub(extraAttackFighter());
     await openAttackPicker(user);
-    // Scope to the picker sheet — the Action tile behind it shows its own counter.
     const sheet = () => within(screen.getByRole("dialog"));
 
     expect(sheet().getByText(/Attacks · 2 of 2 remaining/)).toBeInTheDocument();
@@ -802,7 +780,6 @@ describe("TurnHub — live multi-attack counter (#757)", () => {
     await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
     expect(sheet().getByText(/Attacks · 0 of 2 remaining/)).toBeInTheDocument();
     await user.click(sheet().getByRole("button", { name: /^Roll damage$/ }));
-    // Exhausted after this swing's own Done — no further Roll-to-hit affordance.
     await user.click(sheet().getByRole("button", { name: /^Done$/ }));
     expect(sheet().queryByRole("button", { name: /Roll to hit/ })).not.toBeInTheDocument();
     vi.restoreAllMocks();
@@ -818,7 +795,6 @@ describe("TurnHub — live multi-attack counter (#757)", () => {
     expect(sheet().getByRole("button", { name: /Cancel — refund action/ })).toBeInTheDocument();
 
     await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
-    // One of two spent — the action stays live for Resume, so the footer reads Close.
     const closeButtons = sheet().getAllByRole("button", { name: /^Close$/ });
     expect(closeButtons.length).toBeGreaterThan(0);
     expect(sheet().queryByRole("button", { name: /Cancel — refund action/ })).not.toBeInTheDocument();
@@ -838,16 +814,14 @@ describe("TurnHub — live multi-attack counter (#757)", () => {
     await openAttackPicker(user);
     const sheet = () => within(screen.getByRole("dialog"));
 
-    await user.click(sheet().getByRole("button", { name: /Roll to hit/ })); // 1 of 2
+    await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
     const closeBtns = sheet().getAllByRole("button", { name: /^Close$/ });
-    await user.click(closeBtns[closeBtns.length - 1]); // footer Close
+    await user.click(closeBtns[closeBtns.length - 1]);
 
-    // Sheet closed; the Action slot offers Resume for the remaining attack.
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     const resume = screen.getByRole("button", { name: /Resume attack — 1 of 2 remaining/ });
     expect(resume).toBeInTheDocument();
 
-    // Reopening shows the tally with attack 1 intact.
     await user.click(resume);
     expect(within(screen.getByRole("dialog")).getByText("This action")).toBeInTheDocument();
   });
@@ -864,9 +838,9 @@ describe("TurnHub — live multi-attack counter (#757)", () => {
     await user.click(sheet().getByRole("button", { name: /^Done$/ })); // rail's own Done re-arms for attack 2
     await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
     await user.click(sheet().getByRole("button", { name: /^Roll damage$/ }));
-    await user.click(sheet().getByRole("button", { name: /^Done$/ })); // rail's own Done — commits attack 2
-    // Both spent — the footer's OWN Done (separate from the rail's per-swing
-    // one) is what actually closes the sheet and fires finishAttack().
+    await user.click(sheet().getByRole("button", { name: /^Done$/ }));
+    // The rail's per-swing Done and the footer's own Done share the "Done"
+    // name; this second click is the footer's, closing the sheet via finishAttack().
     await user.click(sheet().getByRole("button", { name: /^Done$/ }));
 
     expect(screen.getByText("Turn summary")).toBeInTheDocument();
@@ -919,14 +893,11 @@ describe("TurnHub — live multi-attack counter (#757)", () => {
     await user.click(sheet().getByRole("button", { name: /^Roll damage$/ }));
     await user.click(sheet().getByRole("button", { name: /^Done$/ }));
     await waitFor(() => expect(applyResolveActionOperations).toHaveBeenCalledTimes(2));
-    await user.click(sheet().getByRole("button", { name: /^Done$/ })); // footer Done — finishAttack
+    await user.click(sheet().getByRole("button", { name: /^Done$/ }));
 
-    // Undo #1 pops the local finishAttack entry (no server batch on it).
     await user.click(screen.getByRole("button", { name: /Undo/ }));
     expect(revertBatch).not.toHaveBeenCalled();
 
-    // Undo #2/#3 revert the swings newest-first — LIFO against the server's
-    // "only the most recent batch" guard.
     await user.click(screen.getByRole("button", { name: /Undo/ }));
     await waitFor(() => expect(revertBatch).toHaveBeenNthCalledWith(1, "char-1", "batch-swing-2"));
     await user.click(screen.getByRole("button", { name: /Undo/ }));
@@ -935,30 +906,25 @@ describe("TurnHub — live multi-attack counter (#757)", () => {
   });
 
   it("Turn-summary banner renders resolved hit/miss lines and still offers Change verdict recovery", async () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5); // d20 face 11 → 11+6 = 17 to hit; d8 face 5
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
     const user = userEvent.setup();
     renderHub(extraAttackFighter());
     await openAttackPicker(user);
     const sheet = () => within(screen.getByRole("dialog"));
 
-    // Swing 1: implicit hit via a damage roll (d8 face 5 + modifier 3 = 8).
     await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
     await user.click(sheet().getByRole("button", { name: /^Roll damage$/ }));
-    await user.click(sheet().getByRole("button", { name: /^Done$/ })); // rail's own Done re-arms for attack 2
+    await user.click(sheet().getByRole("button", { name: /^Done$/ }));
 
-    // Swing 2: called miss.
     await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
     await user.click(sheet().getByRole("button", { name: /it Missed/ }));
-    await user.click(sheet().getByRole("button", { name: /^Done$/ })); // rail's own Done — commits attack 2
-    // Both spent — the footer's own Done closes the sheet + fires finishAttack().
+    await user.click(sheet().getByRole("button", { name: /^Done$/ }));
     await user.click(sheet().getByRole("button", { name: /^Done$/ }));
 
     expect(screen.getByText(/17 — 8 damage/)).toBeInTheDocument();
     expect(screen.getByText(/miss \(to-hit 17\)/)).toBeInTheDocument();
     expect(vi.mocked(applyResolveActionOperations)).toHaveBeenCalledTimes(2);
 
-    // Mistaken-verdict recovery: tapping a resolved line reveals the quiet
-    // Change row (take the miss line, rendered last).
     const changeTargets = screen.getAllByRole("button", { name: /Change verdict — / });
     await user.click(changeTargets[changeTargets.length - 1]);
     expect(screen.getByText(/Change ·/)).toBeInTheDocument();
@@ -977,7 +943,6 @@ describe("TurnHub — death saves (#736/#744)", () => {
     renderHub(downed());
     await startTurn(user);
 
-    // The primary moment a downed player rolls a save is on their own turn.
     expect(screen.getByText("Your turn")).toBeInTheDocument();
     expect(screen.getByText(/Unconscious — Roll Death Saves/i)).toBeInTheDocument();
   });

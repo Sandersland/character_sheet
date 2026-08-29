@@ -1,36 +1,15 @@
-// Catalog entitlement wire types (#1796, epic #1795 1/6) — locked here so
-// Waves 1-3 (resolver, grant/fork routes, reads rewiring) build against one
-// shape instead of each inventing its own. Mirrors the Prisma CatalogKind/
-// CatalogScope enums as string unions, same pattern as edition.ts's
-// RulesEdition: pure types, no dependency on the generated client.
 import type { SpellSchool } from "./spellcasting.js";
 
 /** Only "SPELL" exists today; a future kind (Item, …) widens this union. */
 export type CatalogKind = "SPELL";
 
-/**
- * GLOBAL = seeded system content, visible to everyone. USER = a player's
- * homebrew, visible only to them until granted into a campaign. CAMPAIGN = a
- * DM's homebrew, scoped to their campaign.
- */
+/** GLOBAL = seeded system content; USER = player homebrew, private until granted; CAMPAIGN = DM homebrew scoped to their campaign. */
 export type CatalogScope = "GLOBAL" | "USER" | "CAMPAIGN";
 
 /**
- * The entitlement metadata every catalog-content wire row now carries.
- *
- * `editable` (#1808 leak-fix, epic #1795 8/9 combined-state review): true iff
- * the VIEWER receiving this row can edit/delete the underlying CatalogEntry —
- * mirrors assertSpellOwnership's own rule (backend/src/lib/auth/access.ts):
- * `scope === "USER" && ownerUserId === viewer`, or `scope === "CAMPAIGN" &&
- * viewer is that campaign's DM`; always false for GLOBAL. Server-computed,
- * never re-derived client-side (CLAUDE.md "rules logic is backend-owned") —
- * once #1811 (epic #1795 9/9) started serving a CAMPAIGN row to every
- * campaign member (not just its DM), `scope === "CAMPAIGN"` alone stopped
- * being a safe "mine, offer edit/delete" signal on the client; this flag is
- * the replacement. Every builder of a CatalogMeta object (GET /api/spells,
- * serializeCharacter's spell-catalog overlay, the custom-spells and fork
- * routes) must set it correctly — see backend/src/lib/catalog/entitlement.ts's
- * isCatalogEntryEditable, the one shared predicate for this field.
+ * `editable` mirrors `isCatalogEntryEditable`, computed server-side only —
+ * never re-derive it client-side. `scope === "CAMPAIGN"` is not a "mine"
+ * signal: a CAMPAIGN row is served to every campaign member, not just its DM.
  */
 export interface CatalogMeta {
   entryId: string;
@@ -47,14 +26,6 @@ export interface GrantWire {
   campaignId: string;
 }
 
-/**
- * `GET /api/spells` row shape, with the CatalogEntry metadata every catalog
- * row now carries alongside it (#1796). `catalog` is additive over the
- * pre-#1796 response — every other field matches what
- * `backend/src/routes/catalog/spells.ts`'s `serializeCatalogSpellRow` already
- * serves. Slice 1 only locks the type; slice 3 is what makes the route
- * actually populate `catalog` off the resolver.
- */
 export interface SpellWire {
   id: string;
   name: string;

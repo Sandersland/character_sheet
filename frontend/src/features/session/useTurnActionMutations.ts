@@ -1,14 +1,6 @@
 /**
- * useTurnActionMutations — the applyActionTransactions/revertBatch/
- * rollInitiativeTransaction mutations behind useTurnActions, split into its
- * own module so their hook-composition doesn't count against that hub's own
- * complexity budget (mirrors ProficienciesCard's useToolProficiencyMutations).
- *
- * Each endpoint gets its own useCharacterMutation instance (distinct fallback
- * copy per action), all sharing one `character-${id}` scope. `applyAction` and
- * `rollInitiative` both return `Character & { batchId?/results }` (#1283 shape
- * C) — `toCharacter` strips the extra key before caching, but the caller still
- * gets it back from `mutateAsync`'s raw result to fold into turn-undo/combat-log.
+ * Each mutation has its own instance (distinct fallback copy) but all share one `character-${id}` scope.
+ * applyAction/rollInitiative return `Character & { batchId?, results? }`; toCharacter strips those before caching, but mutateAsync's raw result still carries them for the caller to fold into turn-undo/combat-log.
  */
 
 import { applyActionTransactions, revertBatch, rollInitiativeTransaction } from "@/api/client";
@@ -44,8 +36,7 @@ export function useTurnActionMutations(characterId: string) {
     fallbackMessage: "Action Surge failed.",
   });
 
-  // Best-effort (no UI error surface, mirrors pre-#1283 console.error-only
-  // behaviour) — a failed combat-start regen shouldn't block starting combat.
+  // Best-effort — a failed combat-start regen shouldn't block starting combat (no UI error surface).
   const initiativeMutation = useCharacterMutation({
     characterId,
     mutationFn: () => rollInitiativeTransaction(characterId),
@@ -56,16 +47,9 @@ export function useTurnActionMutations(characterId: string) {
     fallbackMessage: "Failed to roll initiative.",
   });
 
-  // Return type carries `results` (#1528) alongside `batchId` — a row-driven
-  // cast-core action (Second Wind) rolls server-side and reports it there;
-  // `toCharacter` above strips both before caching (#1283 shape B/C), but the
-  // caller still reads the raw mutateAsync result to fold the roll into a
-  // dice animation, same as it already does for `batchId` (#758).
   async function sendAction(
     actionKey: string,
-    // slotLevel (#1687): the chosen slot level for a row-driven
-    // `{costKind:"slot"}` ability — the executeAction counterpart to
-    // castSpell's slotLevel picker.
+    // slotLevel (#1687): the executeAction counterpart to castSpell's slotLevel picker for a `{costKind:"slot"}` ability.
     opts?: { roll?: number; inventoryItemId?: string; slotLevel?: number },
   ): Promise<Character & { batchId?: string; results?: ExecuteActionResult[] }> {
     return actionMutation.mutateAsync([{ type: "executeAction", actionKey, ...opts }]);
@@ -83,8 +67,6 @@ export function useTurnActionMutations(characterId: string) {
     return initiativeMutation.mutateAsync(undefined);
   }
 
-  // Clear every mutation's stale error — called at the turn-phase boundaries
-  // (start/end turn, end combat) that used to reset the old shared error state.
   function resetErrors() {
     actionMutation.reset();
     undoMutation.reset();

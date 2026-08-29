@@ -13,9 +13,7 @@ import type { Campaign } from "@/types/character";
 vi.mock("@/api/client", () => ({
   fetchCampaigns: vi.fn(),
   createCampaign: vi.fn(),
-  // Never actually called in the seeded cases (seedEditions makes the
-  // staleTime: Infinity entry permanently fresh) — stubbed so the cold-cache and
-  // fetch-failed cases can drive it explicitly.
+  // Not called in seeded cases (seedEditions makes staleTime:Infinity fresh) — cold-cache/fetch-failed cases drive it explicitly.
   fetchEditions: vi.fn(),
 }));
 
@@ -85,8 +83,6 @@ describe("CampaignsPage (#246)", () => {
     expect(await screen.findByRole("link", { name: /new campaign/i })).toBeInTheDocument();
   });
 
-  // #1372 restores this to a positive assertion: the DM's picked edition is
-  // sent as-is now that 2014's content has shipped (reverses #1371's gate).
   it("sends the picked edition when the DM chooses 2014 (#1286)", async () => {
     const user = userEvent.setup();
     vi.mocked(client.fetchCampaigns).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
@@ -106,9 +102,7 @@ describe("CampaignsPage (#246)", () => {
     expect(vi.mocked(client.createCampaign)).toHaveBeenCalledWith("Classic Table", "EDITION_2014");
   });
 
-  // #1286: there is no PATCH /campaigns/:id — the edition is immutable from the
-  // moment of creation, not just "until the first character joins" (that copy
-  // implied an editing window that doesn't exist).
+  // No PATCH /campaigns/:id — the edition is immutable from creation (#1286).
   it("states the edition is fixed at creation, not editable-until-first-join", async () => {
     vi.mocked(client.fetchCampaigns).mockResolvedValue([]);
 
@@ -138,14 +132,8 @@ describe("CampaignsPage (#246)", () => {
   });
 });
 
-// #1436: a campaign's edition can never be changed, so this form must never
-// write one the DM didn't see. That makes the /api/editions load states part of
-// the contract, not incidental loading polish.
 describe("CampaignsPage rules edition (#1436)", () => {
-  // The fixture deliberately makes display order and the default DISAGREE: rows
-  // are 2014-FIRST while the served default is 2024. No positional implementation
-  // can satisfy both assertions at once, which is what makes this test durable
-  // against a reintroduced `editions[0]`.
+  // Rows are 2014-first while the served default is 2024, so no positional read of editions[0] can pass this.
   it("checks the SERVED default, not the first row, when the two disagree", async () => {
     const [row2024, row2014] = SERVED_EDITIONS;
     seedEditions({ editions: [row2014, row2024], defaultEdition: "EDITION_2024" });
@@ -164,8 +152,6 @@ describe("CampaignsPage rules edition (#1436)", () => {
     expect(screen.getByRole("radio", { name: "2024 rules" })).toHaveAttribute("aria-checked", "true");
   });
 
-  // The seam that shipped a one-click data-loss path last wave: a control offering
-  // only its fallback value before its rows resolved.
   it("cold cache: renders the field's label and notice but NO picker, and disables submit", async () => {
     getQueryClient().removeQueries({ queryKey: catalogKeys.editions() });
     vi.mocked(client.fetchEditions).mockReturnValue(new Promise(() => {}));

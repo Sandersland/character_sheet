@@ -24,9 +24,9 @@ const CATALOG: CatalogSpell[] = [
   spell("Firebolt", 0, ["wizard"], "A mote of fire streaks toward a creature or object within range."),
   spell("Shield", 1, ["wizard"], "An invisible barrier of magical force appears and protects you."),
   spell("MistyStep", 2, ["wizard"]),
-  spell("Fireball", 3, ["wizard"]),        // above a level-2 ceiling
-  spell("CureWounds", 1, ["cleric"]),      // off-class for a wizard
-  spell("EnsnaringStrike", 1, ["ranger"]), // ranger-only — off every served list except null (#1440)
+  spell("Fireball", 3, ["wizard"]),
+  spell("CureWounds", 1, ["cleric"]),
+  spell("EnsnaringStrike", 1, ["ranger"]),
 ];
 
 function caster(learnedSpellId?: string): Character {
@@ -38,7 +38,6 @@ function caster(learnedSpellId?: string): Character {
   } as unknown as Character;
 }
 
-// A known caster whose spellbook carries swap candidates (#1101).
 function casterWithBook(book: Array<{ id: string; name: string; level: number; source?: "subclass" | "item" }>): Character {
   const spells = book.map((b) => ({ school: "evocation", castingTime: "1a", range: "self", duration: "1m", prepared: false, ...b }));
   return {
@@ -48,9 +47,7 @@ function casterWithBook(book: Array<{ id: string; name: string; level: number; s
   } as unknown as Character;
 }
 
-// #1440: spellLists/cantripLists default to ["wizard"] — without this, absent
-// meta now reads as unrestricted (null), which would silently offer CureWounds/
-// EnsnaringStrike in every plain test that doesn't opt into Magical Secrets.
+// #1440: spellLists/cantripLists default to ["wizard"] so absent meta doesn't silently read as unrestricted.
 function newSpellsStep(
   count = 2,
   meta: Record<string, unknown> = { maxSpellLevel: 2, spellLists: ["wizard"], cantripLists: ["wizard"] },
@@ -131,7 +128,7 @@ describe("NewSpellsStep", () => {
       />,
     );
     expect(await screen.findByText("CureWounds")).toBeInTheDocument();
-    expect(screen.queryByText("EnsnaringStrike")).not.toBeInTheDocument(); // ranger-only — off every served list
+    expect(screen.queryByText("EnsnaringStrike")).not.toBeInTheDocument();
     expect(screen.getByText(/Bard, Cleric, Druid, or Wizard/i)).toBeInTheDocument();
   });
 
@@ -170,12 +167,9 @@ describe("NewSpellsStep", () => {
   });
 });
 
-// #1826: an EMPTY eligible list (a resolver bug, e.g. the Eldritch Knight
-// case) must read as distinctly different from a search that just matched
-// nothing — the latter is normal, the former blocks the ceremony silently.
+// #1826: an empty eligible list (resolver bug) must render distinctly from an ordinary search-miss.
 describe("NewSpellsStep — empty eligible list vs. search miss (#1826)", () => {
   it("shows a misconfiguration message when the served spell list has no eligible spells", async () => {
-    // spellLists: ["druid"] — none of the CATALOG entries are on the druid list.
     render(
       <Harness
         step={newSpellsStep(2, { maxSpellLevel: 2, spellLists: ["druid"], cantripLists: ["wizard"] })}
@@ -198,7 +192,6 @@ describe("NewSpellsStep — empty eligible list vs. search miss (#1826)", () => 
   });
 
   it("shows the misconfiguration message for a required cantrip pick with an empty eligible list", async () => {
-    // cantripLists: ["druid"] — Firebolt is wizard-only, so no eligible cantrips.
     render(
       <Harness
         step={newSpellsStep(1, { maxSpellLevel: 2, spellLists: ["wizard"], cantrips: 1, cantripLists: ["druid"] })}
@@ -219,9 +212,7 @@ describe("NewSpellsStep — empty eligible list vs. search miss (#1826)", () => 
     expect(screen.queryByText(/configuration problem/i)).not.toBeInTheDocument();
   });
 
-  // A level granting BOTH cantrips and leveled spells drives both sections from
-  // the one useSpellCatalog fetch; a fetch failure must render the shared error
-  // ONCE (SpellFetchStatus at the step level), not once per section.
+  // A level granting both cantrips and leveled spells shares one fetch; a failure must render the error once, not per section.
   it("renders the shared fetch error once on a level with both cantrips and leveled spells", async () => {
     fetchMock.mockRejectedValue(new Error("boom"));
     render(<Harness step={newSpellsStep(2, { maxSpellLevel: 2, spellLists: ["wizard"], cantrips: 1, cantripLists: ["wizard"] })} character={caster()} />);
@@ -235,7 +226,6 @@ describe("NewSpellsStep — cantrip picks (#1131)", () => {
     const user = userEvent.setup();
     render(<Harness step={newSpellsStep(1, { maxSpellLevel: 2, cantrips: 1 })} character={caster()} />);
     expect(await screen.findByText(/Choose 1 cantrip/)).toBeInTheDocument();
-    // The cantrip (Firebolt) is offered in the cantrip section; the leveled picker still lists Shield.
     await user.click(await screen.findByRole("button", { name: "Add Firebolt" }));
     await waitFor(() =>
       expect(screen.getByTestId("cantrips")).toHaveTextContent(
@@ -243,7 +233,6 @@ describe("NewSpellsStep — cantrip picks (#1131)", () => {
       ),
     );
     expect(screen.getByRole("button", { name: "Add Shield" })).toBeInTheDocument();
-    // A leveled pick stays in spellsLearned, never in cantripsLearned.
     await user.click(screen.getByRole("button", { name: "Add Shield" }));
     expect(screen.getByTestId("picks")).toHaveTextContent(
       JSON.stringify([{ type: "learnSpell", spellId: "Shield" }]),
@@ -287,13 +276,9 @@ describe("NewSpellsStep — cantrip picks (#1131)", () => {
 
 const BOOK = [
   { id: "k-old", name: "OldChant", level: 1 },
-  { id: "k-hex", name: "GrantedChant", level: 1, source: "subclass" as const }, // granted — excluded
-  { id: "k-light", name: "CantripChant", level: 0 },                            // cantrip — excluded
+  { id: "k-hex", name: "GrantedChant", level: 1, source: "subclass" as const },
+  { id: "k-light", name: "CantripChant", level: 0 },
 ];
-// Defaults casterModel to "known" — the pre-existing swap-panel copy ("Swap a
-// known spell") already modeled a known caster (a personal spellbook with
-// swap candidates); #1509 makes that noun served rather than hardcoded, so the
-// default here keeps this describe block's existing assertions accurate.
 const swapStep = (count = 1, casterModel: "known" | "prepared" | null = "known"): LevelUpStep =>
   newSpellsStep(count, { maxSpellLevel: 2, canSwap: true, ...(casterModel ? { casterModel } : {}) });
 
@@ -308,11 +293,9 @@ describe("NewSpellsStep — swap panel visibility (#1101)", () => {
     const user = userEvent.setup();
     render(<Harness step={swapStep()} character={casterWithBook(BOOK)} />);
     const toggle = await screen.findByRole("button", { name: /swap a known spell/i });
-    // Collapsed: the swap candidates are not yet listed.
     expect(screen.queryByRole("button", { name: /OldChant/ })).not.toBeInTheDocument();
     await user.click(toggle);
     expect(await screen.findByRole("button", { name: /OldChant/ })).toBeInTheDocument();
-    // Granted + cantrip entries are never swap candidates.
     expect(screen.queryByRole("button", { name: /GrantedChant/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /CantripChant/ })).not.toBeInTheDocument();
   });
@@ -335,7 +318,6 @@ describe("NewSpellsStep — swap selection (#1101)", () => {
     expect(screen.getByText(/Choose 2 \(1 \+ 1 swap\)/)).toBeInTheDocument();
     expect(screen.getByTestId("forgets")).toHaveTextContent(JSON.stringify([{ type: "forgetSpell", entryId: "k-old" }]));
 
-    // The cap is now 2 — both catalog picks are allowed.
     await user.click(screen.getByRole("button", { name: "Add Shield" }));
     await user.click(screen.getByRole("button", { name: "Add MistyStep" }));
     expect(screen.getByTestId("picks")).toHaveTextContent(
@@ -351,7 +333,6 @@ describe("NewSpellsStep — swap selection (#1101)", () => {
     await user.click(await screen.findByRole("button", { name: /OldChant/ }));
     await user.click(screen.getByRole("button", { name: "Add Shield" }));
     await user.click(screen.getByRole("button", { name: "Add MistyStep" }));
-    // Deselect the swap — cap drops to 1, so one learn is trimmed.
     await user.click(screen.getByRole("button", { name: /OldChant/ }));
 
     await waitFor(() => expect(screen.getByTestId("forgets")).toHaveTextContent("[]"));
@@ -379,10 +360,7 @@ describe("NewSpellsStep — swap selection (#1101)", () => {
   });
 });
 
-// #1855: Eldritch Knight (2014) leveled-spell school gate — this is a DISPLAY
-// filter over the served spellSchools/freeSchoolPicks; the hard enforcement is
-// assertSpellSchoolEligibility on the transaction endpoint. School-varied
-// catalog, distinct from the shared CATALOG (which is all-evocation).
+// #1855: Eldritch Knight (2014) school gate is a DISPLAY filter only; hard enforcement is assertSpellSchoolEligibility on the transaction endpoint.
 const SCHOOL_CATALOG: CatalogSpell[] = [
   spell("MageArmor", 1, ["wizard"]),
   { ...spell("DetectMagic", 1, ["wizard"]), school: "divination" },
@@ -420,10 +398,7 @@ describe("NewSpellsStep — Eldritch Knight (2014) spell-school gate (#1855)", (
 
     await user.click(detectMagic);
 
-    // The free-school budget (1) is spent — a SECOND off-school spell disables,
-    // even though the overall cap (2) isn't reached yet.
     await waitFor(() => expect(screen.getByRole("button", { name: "Add CharmPerson" })).toBeDisabled());
-    // The on-school spell stays pickable — only the school gate, not the cap, moved.
     expect(screen.getByRole("button", { name: "Add MageArmor" })).not.toBeDisabled();
   });
 

@@ -4,8 +4,6 @@ interface AddItemFabProps {
   onClick: () => void;
 }
 
-// Mobile add-item FAB (#1029): a 52px thumb-reach target floating above the
-// bottom nav, respecting the home-indicator safe area.
 export default function AddItemFab({ onClick }: AddItemFabProps) {
   return (
     <button

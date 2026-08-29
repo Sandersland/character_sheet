@@ -11,24 +11,15 @@ import { buildInput, emptyForm, formFromItem, type FormState } from "@/lib/campa
 import type { CampaignItem } from "@/types/character";
 import type { RulesEdition } from "@character-sheet/shared-types";
 
-/**
- * All of CampaignItemsPanel's non-render state + handlers (#1299), split out
- * so the component's own function stays under fallow's cognitive-complexity
- * gate — try/catch branching in five inline handlers was the cost driver, not
- * raw line count. The panel becomes a template over what this returns.
- */
 export function useCampaignItemsPanelController(campaignId: string, edition: RulesEdition) {
   const { entities } = useCampaignEntities(campaignId);
-  // The single query observer for the served rarity tiers (#1437) — the rows are
-  // threaded to the row/form leaves as props so an N-item list stays at one.
+  // Single query observer for the served rarity tiers, threaded to row/form leaves as props so an N-item list stays at one query.
   const rarities = useItemRarities(edition);
   const [creating, setCreating] = useState(false);
-  // Non-null while editing an existing item; drives the shared form's mode.
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // Per-item chosen award target (character id).
   const [awardTarget, setAwardTarget] = useState<Record<string, string>>({});
 
   const itemsQuery = useQuery({
@@ -37,8 +28,7 @@ export function useCampaignItemsPanelController(campaignId: string, edition: Rul
   });
   const items = itemsQuery.data ?? [];
 
-  // Static SRD catalog for the clone-from-catalog picker (#1332): shared with
-  // every other /items reader via useItemCatalog/catalogKeys.items().
+  // Shared with every other /items reader via useItemCatalog/catalogKeys.items().
   const catalog = useItemCatalog();
 
   const { createMutation, updateMutation, toggleRevealMutation, deleteMutation, awardMutation, revokeMutation } =
@@ -111,8 +101,7 @@ export function useCampaignItemsPanelController(campaignId: string, edition: Rul
   }
 
   async function handleAward(item: CampaignItem) {
-    // The Award button is disabled until a recipient is picked, so awardTarget
-    // is always set here; the guard is a defensive backstop, not a fallback.
+    // Award is disabled until a recipient is picked, so this guard is a defensive backstop, not a real fallback path.
     const characterId = awardTarget[item.id];
     if (!characterId) return;
     setBusyId(item.id);

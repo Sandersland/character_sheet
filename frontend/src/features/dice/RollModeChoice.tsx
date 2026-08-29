@@ -1,13 +1,3 @@
-/**
- * The compact ADV / Normal / DIS control that rides the roll surface (#958),
- * replacing the global `RollModeToggle` footer. Presentational only — the
- * caller decides what a pick means: the long-press `RollModeMenu` fires the
- * roll immediately, the attack sheet stores it as the next attack's mode.
- *
- * `selected` highlights the active choice (attack sheet); leave it undefined for
- * the fire-and-forget menu where nothing stays selected.
- */
-
 import type { RollMode } from "@/lib/dice";
 
 const OPTIONS: { mode: RollMode; label: string; short: string }[] = [
@@ -28,10 +18,9 @@ function toneClass(mode: RollMode, active: boolean): string {
 }
 
 interface RollModeChoiceProps {
-  /** The active mode to highlight; omit for a menu where no choice persists. */
+  // Omit for a menu where no choice persists.
   selected?: RollMode;
   onSelect: (mode: RollMode) => void;
-  /** Accessible label for the group (e.g. "Roll mode for Stealth"). */
   ariaLabel: string;
 }
 

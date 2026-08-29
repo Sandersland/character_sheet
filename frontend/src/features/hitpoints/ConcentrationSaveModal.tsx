@@ -4,10 +4,8 @@ import Modal from "@/components/ui/Modal";
 import { useRoll } from "@/features/dice/RollContext";
 import type { RollResult } from "@/lib/dice";
 
-// Lazy so the 3D dice stack loads only when the player actually rolls the save.
 const DiceRoller = lazy(() => import("@/features/dice/DiceRoller"));
 
-/** The deferred concentration save awaiting a manual roll (issue #76). */
 export interface PendingConcentrationSave {
   entryId: string;
   spellName: string;
@@ -18,18 +16,10 @@ export interface PendingConcentrationSave {
 
 interface ConcentrationSaveModalProps {
   save: PendingConcentrationSave;
-  /** Persist the rolled save (natural d20). Fired once the die settles. */
   onResolve: (roll: number) => void | Promise<void>;
   onClose: () => void;
 }
 
-/**
- * Modal for a manual concentration CON save (issue #76). Lives in an overlay
- * rather than inline in the HP card so the surrounding UI never shifts and the
- * player's focus lands on the dice. The die stays on screen with its result
- * after it settles — the player dismisses with "Done" — so the roll is actually
- * readable rather than vanishing the instant it lands.
- */
 export default function ConcentrationSaveModal({
   save,
   onResolve,
@@ -44,14 +34,10 @@ export default function ConcentrationSaveModal({
   const bonusLabel = save.saveBonus >= 0 ? `+${save.saveBonus}` : String(save.saveBonus);
 
   function handleResult(result: RollResult) {
-    // The die lands on the natural d20; the save total adds the CON bonus on top.
-    // Track both so the readout matches the face that's showing (the bonus is
-    // applied in text, not on the die — otherwise the face wouldn't match).
     const natural = result.dice[0]?.value ?? 1;
     const total = natural + save.saveBonus;
     setOutcome({ natural, total, held: total >= save.dc });
     setPhase("result");
-    // Emit a saveRoll to the Session Log (no-op outside an active session).
     logSessionRoll({
       kind: "save",
       source: `Concentration save (${save.spellName})`,
@@ -104,8 +90,7 @@ export default function ConcentrationSaveModal({
 
         {phase === "result" && outcome && (
           <div className="flex w-full flex-col items-center gap-3">
-            {/* Breakdown so the die face (the natural d20) reads clearly and the
-                CON bonus that produces the total is explicit. */}
+            
             <p className="text-sm text-parchment-600">
               Rolled <span className="font-semibold text-parchment-900">{outcome.natural}</span>
               {save.saveBonus !== 0 && (

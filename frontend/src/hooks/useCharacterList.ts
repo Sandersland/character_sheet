@@ -10,6 +10,6 @@ export function useCharacterList() {
   });
 
   // `error` means "nothing to show" — a failed background refetch must not
-  // discard a loaded list. See useCharacter for the same guard.
+  // discard a loaded list.
   return { characters: data ?? null, error: isError && data === undefined };
 }

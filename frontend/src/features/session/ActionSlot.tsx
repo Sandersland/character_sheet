@@ -6,7 +6,6 @@ import type { AttackState } from "@/features/session/useTurnState";
 import type { ActionSheetModel } from "@/lib/turnOptions";
 import type { AvailableAction, UniversalActionOption } from "@/types/character";
 
-// Pure slot derivations, extracted so the component stays a composition layer.
 function slotView(
   actionsRemaining: number,
   attack: AttackState | null,
@@ -17,8 +16,6 @@ function slotView(
     (u) => u.cost === "action" && u.key !== "attack" && !classActions.some((c) => c.key === u.key),
   );
   const available = actionsRemaining > 0;
-  // An Attack action closed with attacks still to spend (#802) — offer Resume
-  // without touching the action economy.
   const resuming = attack !== null && attack.used > 0 && attack.used < attack.total;
   return {
     // Reads the SERVED name, so a 2024 character's preview says "Magic", not
@@ -45,7 +42,6 @@ function ResumeAttackButton({ attack, onResume }: { attack: AttackState; onResum
   );
 }
 
-/** The Action economy slot — Attack path, class actions, and universal actions. */
 export default function ActionSlot({
   actionsRemaining,
   attack,
@@ -81,15 +77,8 @@ export default function ActionSlot({
         used={view.used}
         badge={view.badge}
         onUse={() => setShowActionMenu(true)}
-        // Once the Action is spent, the button stays tappable for interaction-
-        // budget options (#1165) but must NOT keep announcing "Use Action" —
-        // a screen-reader user shouldn't hear an offer to use an action that
-        // isn't there. Rename the accessible name to match what's actually
-        // still reachable.
+        // Accessible name must not announce "Use Action" once none is left.
         useLabel={view.available ? "Use Action" : "Interaction options"}
-        // Once the Action is spent, the menu still opens in free-only mode
-        // (interaction budget, #1165) — replaces the old standalone
-        // "Change weapons" strip that existed only as an escape hatch (#815).
         alwaysTappable
       >
         {attack !== null && (

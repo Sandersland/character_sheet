@@ -1,10 +1,3 @@
-/**
- * Session-lifecycle primitives (#960) behind the workspace `useCombatLifecycle`:
- * the pending/error wrapper, the leave call, and the End-Session confirm flow
- * (guarded XP award → end). Once shared with the `/session` page's lifecycle;
- * that host was retired in #962, leaving `useCombatLifecycle` the sole consumer.
- */
-
 import { useCallback, useRef, useState, type MutableRefObject } from "react";
 import { useMutation } from "@tanstack/react-query";
 
@@ -13,21 +6,11 @@ import { clearTurnState } from "@/features/session/turnStatePersistence";
 import { errorMessage } from "@/lib/errorMessage";
 import type { Session } from "@/types/character";
 
-/**
- * The pending/error state + try-catch wrapper both lifecycle hooks share for an
- * async lifecycle action (End, Leave). `run(fn, fallback)` clears the error,
- * runs `fn` through a plain useMutation (no character-cache write here — these
- * endpoints don't return a Character, see #1283 shape D), and surfaces a
- * message on failure. `fallbackMsg` stays per-call (not fixed at the hook's
- * construction like useCharacterMutation) since End and Leave share this one
- * instance but want different copy.
- */
+// fallbackMsg stays per-call (not fixed at construction) since End and Leave share this one instance but want different copy.
 export function usePendingAction() {
   const [error, setError] = useState<string | null>(null);
   const mutation = useMutation({ mutationFn: (fn: () => Promise<void>) => fn() });
-  // Depend on mutateAsync, not the mutation object: the object is rebuilt on
-  // every idle→pending→settled transition, so depending on it would hand out a
-  // new `run` after each call and defeat the memo entirely.
+  // Depend on mutateAsync, not the mutation object — it's rebuilt on every transition, so depending on it would defeat useCallback's memo.
   const { mutateAsync } = mutation;
 
   const run = useCallback(
@@ -44,12 +27,7 @@ export function usePendingAction() {
   return { pending: mutation.isPending, error, setError, run };
 }
 
-/**
- * Award end-of-session XP (guarded against a double-award on retry via
- * `awardedRef`) while the session is still active — so it's auto-tagged with
- * this sessionId → recap `xpGained` — then clear the local turn state and end
- * the session. Returns the ended `Session` (with its recap summary).
- */
+// XP must be awarded while the session is still active so it's tagged into this session's recap.
 async function awardXpThenEndSession(
   characterId: string,
   session: Session,
@@ -61,8 +39,6 @@ async function awardXpThenEndSession(
     awardedRef.current = true;
   }
   clearTurnState(session.id);
-  // A solo session (campaignId null, #1082) ends through the character-scoped
-  // route; a campaign session through the campaign route.
   const { session: ended } =
     session.campaignId === null
       ? await endSoloSession(characterId, session.id)
@@ -70,27 +46,16 @@ async function awardXpThenEndSession(
   return ended;
 }
 
-/** Leave the campaign session and drop this browser's local turn state for it.
- *  Leaving is campaign-only — a solo session has no party to leave behind — so a
- *  null campaignId fails loud rather than silently no-op, in case a future
- *  refactor re-exposes Leave for solo (the UI gates it out via canLeave). */
+// Leaving is campaign-only; a null campaignId fails loud rather than silently no-op, in case a future refactor re-exposes Leave for solo (the UI gates it out via canLeave).
 export async function leaveAndClearTurnState(session: Session, characterId: string): Promise<void> {
   if (session.campaignId === null) throw new Error("Cannot leave a solo (campaign-less) session");
   await leaveSession(session.campaignId, session.id, characterId);
   clearTurnState(session.id);
 }
 
-/**
- * The End-Session prompt + confirm flow. Owns the prompt open-state and the
- * XP-award-then-end call (guarded); the caller supplies `onEnded` (the workspace
- * stashes the recap in the provider + refreshes). Once shared with the retired
- * `/session` host's lifecycle; `useCombatLifecycle` is the sole consumer now.
- */
 export function useEndSessionFlow(
   characterId: string,
-  // Nullable so the flow can be lifted above the join guard (#979) — the prompt
-  // is only openable while a session is live+joined, so confirmEnd never runs
-  // with a null session, but the hook itself must call unconditionally.
+  // Nullable so the flow can be lifted above the join guard — the hook must be called unconditionally even though confirmEnd never actually runs with a null session.
   session: Session | null,
   end: ReturnType<typeof usePendingAction>,
 ) {

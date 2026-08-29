@@ -9,7 +9,8 @@ interface ItemSummaryProps {
   onToggleSelect?: () => void;
 }
 
-// An item's leading block: optional sell checkbox, name (must stay the first <p>), and the dotted detail line.
+// Name must stay the first <p>: some callers select it via querySelector("p")
+// rather than an accessible query.
 export default function ItemSummary({
   item,
   details,

@@ -1,16 +1,3 @@
-/**
- * ShadowArtsSection — the monk Shadow Arts block inside ClassFeaturesSection.
- * Fetches the edition-scoped catalog (#1412: a 2024 Warrior of Shadow gets the
- * single 1-focus Darkness row, a 2014 Way of Shadow gets the four-spell 2-ki
- * menu — Darkness/Darkvision/Pass without Trace/Silence, #1738) and wires the
- * cast up to the orchestrator. Casts are roll-less, and route their
- * concentration result through the re-rendered character (concentration
- * banner) rather than a dice toast. The catalog fetch lives in
- * useShadowArtsCatalog and the pool-resolution/concentration-id derivations
- * in lib/shadowArts.ts (both pure/directly tested), keeping this component to
- * layout + wiring.
- */
-
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { concentratingArtState, poolForArt, summaryPools } from "@/lib/shadowArts";
 import type { CastShadowArtOperation } from "@/types/character";

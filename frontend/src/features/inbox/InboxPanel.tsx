@@ -8,17 +8,9 @@ interface InboxPanelProps {
   onReviewDuplicates: (row: InboxDuplicateClusterRow) => void;
   onDisregard: (row: InboxRow) => void;
   disregardingSignature: string | null;
-  /** Closes whichever surface (Popover/BottomSheet) is hosting this panel. */
   onRequestClose: () => void;
 }
 
-// Row list shared by the desktop popover and the mobile BottomSheet (#1946).
-//
-// Owns the "close the host surface, then act" wrapping itself (both callers
-// used to duplicate it) — Review Duplicates opens a NEW modal, which reads
-// oddly stacked behind an already-open popover/sheet, so the host closes
-// first. Open Codex is a real navigation, and its own close request is just
-// onRequestClose passed straight through to InboxRowItem.
 export default function InboxPanel({
   rows,
   mobile,

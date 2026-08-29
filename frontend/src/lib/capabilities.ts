@@ -18,9 +18,7 @@ import type {
   ProficiencyKind,
 } from "@/types/character";
 
-// Fixed display labels for each passiveBonus target. A `keyed` target draws its
-// specifics from targetKey, resolved through the ability/skill label helpers
-// (never a raw key) in capabilitySummary below.
+// keyed targets resolve targetKey through the ability/skill label helpers below — never a raw key.
 const TARGET_LABELS: Record<CapabilityTarget, string> = {
   ac: "AC",
   attack: "Attack rolls",
@@ -35,7 +33,6 @@ const TARGET_LABELS: Record<CapabilityTarget, string> = {
   maxHp: "Max HP",
 };
 
-// Canonical target order for the authoring picker.
 export const CAPABILITY_TARGET_OPTIONS: readonly { value: CapabilityTarget; label: string }[] = (
   Object.keys(TARGET_LABELS) as CapabilityTarget[]
 ).map((value) => ({ value, label: TARGET_LABELS[value] }));
@@ -45,10 +42,7 @@ export const CAPABILITY_OP_OPTIONS: readonly { value: CapabilityOp; label: strin
   { value: "setTo", label: "Set to" },
 ];
 
-// Authorable capability kinds. passiveBonus grants a stat (#546); castSpell casts
-// a spell from the item's own resource (#528); grant confers a resistance/immunity/
-// advantage/proficiency (#529); charges is the item's shared charge pool (#555).
-// activatedEffect isn't authorable yet.
+// activatedEffect isn't authorable yet — omitted from this list.
 export const CAPABILITY_KIND_OPTIONS: readonly { value: CapabilityKind; label: string }[] = [
   { value: "passiveBonus", label: "Passive bonus" },
   { value: "castSpell", label: "Cast a spell" },
@@ -65,7 +59,7 @@ export const CAST_RESOURCE_OPTIONS: readonly { value: CastResource; label: strin
   { value: "charges", label: "Spends item charges" },
 ];
 
-// Charges-pool recharge triggers (#555); dawn/dusk approximate to a long rest.
+// dawn/dusk approximate to a long rest (#555).
 export const CHARGE_TRIGGER_OPTIONS: readonly { value: ChargeTrigger; label: string }[] = [
   { value: "dawn", label: "At dawn" },
   { value: "dusk", label: "At dusk" },
@@ -78,11 +72,9 @@ export const CAST_STAT_MODE_OPTIONS: readonly { value: CastStatMode; label: stri
   { value: "wielder", label: "Wielder's own" },
 ];
 
-/** castSpell save-DC/attack summary phrasing, e.g. "DC 15" or "wielder DC". */
 export function castSpellSummary(cap: ItemCapability): string {
   const name = cap.spellName ?? "spell";
   const dc = cap.dcMode === "wielder" ? "wielder DC" : cap.dcValue != null ? `DC ${cap.dcValue}` : "";
-  // A charges-costed cast (#555) shows its pool cost instead of the resource label.
   const resource =
     cap.resource === "charges"
       ? `costs ${cap.chargeCost ?? 1} charge${(cap.chargeCost ?? 1) === 1 ? "" : "s"}`
@@ -90,7 +82,6 @@ export function castSpellSummary(cap: ItemCapability): string {
   return [`Casts ${name}`, resource, dc].filter(Boolean).join(" · ");
 }
 
-/** One-line human summary of a charges pool, e.g. "7 charges · regains 1d6+1 at dawn". */
 function chargesSummary(cap: ItemCapability): string {
   if (cap.maxCharges == null) return cap.description ?? "Charges";
   const count = `${cap.maxCharges} charge${cap.maxCharges === 1 ? "" : "s"}`;
@@ -113,18 +104,14 @@ export const ATTUNEMENT_PREREQ_OPTIONS: readonly { value: AttunementPrereqKind |
   { value: "alignment", label: "An alignment" },
 ];
 
-/** A save or ability-score target names an ability via targetKey. */
 export function targetUsesAbilityKey(target: CapabilityTarget): boolean {
   return target === "save" || target === "abilityScore";
 }
 
-/** A skill target names a skill via targetKey. */
 export function targetUsesSkillKey(target: CapabilityTarget): boolean {
   return target === "skill";
 }
 
-// The specific "what" a capability affects, resolving targetKey through the
-// label helpers — e.g. skill → "Stealth", save → "Dexterity save".
 function targetPhrase(cap: ItemCapability): string {
   if (!cap.target) return "";
   if (targetUsesSkillKey(cap.target) && cap.targetKey) return skillLabel(cap.targetKey);
@@ -134,7 +121,6 @@ function targetPhrase(cap: ItemCapability): string {
   return TARGET_LABELS[cap.target];
 }
 
-// The bonus magnitude: a dice roll (e.g. "+2d6 fire") or a signed/absolute scalar.
 function valuePhrase(cap: ItemCapability): string {
   if (cap.dice) {
     const dice = `${cap.dice.count}d${cap.dice.faces}`;
@@ -168,8 +154,6 @@ export const PROFICIENCY_KIND_OPTIONS: readonly { value: ProficiencyKind; label:
   { value: "language", label: "Language" },
 ];
 
-// Resolve a grant value (damage type / condition / skill / ability key) through
-// the right label helper — never a raw key. Free-text values pass through as-is.
 function grantValueLabel(kind: GrantValueKind | undefined, value: string): string {
   switch (kind) {
     case "damageType":
@@ -187,7 +171,6 @@ function grantValueLabel(kind: GrantValueKind | undefined, value: string): strin
   }
 }
 
-/** One-line human summary of a grant capability, resolved through label helpers. */
 export function grantSummary(cap: ItemCapability): string {
   if (cap.kind !== "grant" || !cap.grantType) return cap.description ?? cap.kind;
   const value = cap.grantValue ? grantValueLabel(cap.grantValueKind, cap.grantValue) : "";
@@ -212,7 +195,6 @@ export function grantSummary(cap: ItemCapability): string {
   }
 }
 
-/** Reminder text for an item-granted advantage on the relevant sheet surface. */
 export function advantageGrantSummary(grant: ItemAdvantageGrant): string {
   const on = ADVANTAGE_ON_OPTIONS.find((o) => o.value === grant.on)?.label ?? "rolls";
   // initiative/attack are whole-axis — ignore any stale skill/ability qualifier.
@@ -222,7 +204,6 @@ export function advantageGrantSummary(grant: ItemAdvantageGrant): string {
   return grant.cantBeSurprised ? `${core}; can't be surprised` : core;
 }
 
-/** One-line human summary, e.g. "+2 Stealth", "+2d6 fire Damage (when on hit)". */
 export function capabilitySummary(cap: ItemCapability): string {
   if (cap.kind === "castSpell") return castSpellSummary(cap);
   if (cap.kind === "grant") return grantSummary(cap);

@@ -1,8 +1,3 @@
-/**
- * Reconcile-on-login + mirror-to-localStorage logic (#1178). Real AuthProvider
- * (mocked @/api/client) wraps PreferencesProvider, matching their actual
- * nesting order — a Probe reads usePreferencesSync() to observe synced state.
- */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -37,9 +32,6 @@ function Probe() {
       <span data-testid="sync">{JSON.stringify(sync)}</span>
       <button onClick={() => setPreference("theme", "dark")}>Set theme dark</button>
       <button onClick={() => setPreference("diceRollStyle", "quick")}>Set dice quick</button>
-      {/* Renders the real Retry affordance end-to-end (#1365 chunk 4) — the
-          hand-built context fixtures in PreferenceSyncNote.test.tsx can't
-          exercise retry's actual setPreference-closure wiring. */}
       <PreferenceSyncNote preferenceKey="theme" />
     </div>
   );
@@ -125,9 +117,6 @@ describe("PreferencesProvider", () => {
     expect(localStorage.getItem("cs:pref:autoRollConcentration")).toBe("false");
   });
 
-  // Fix for the realistic form of the clobber bug: a mutant that treats
-  // "stored value happens to equal defaults" the same as "never stored" would
-  // wrongly migrate local values up here instead of letting the server win.
   it("server-stored defaults win over differing local values (never-stored vs. stored-as-default)", async () => {
     localStorage.setItem("cs:pref:theme", "dark");
     const user: AuthUser = { ...BASE_USER, preferences: DEFAULT_PREFERENCES };
@@ -153,10 +142,7 @@ describe("PreferencesProvider", () => {
       expect(screen.getByTestId("synced")).toHaveTextContent(JSON.stringify(serverPrefs)),
     );
 
-    // Synchronous native click (not userEvent, which yields to microtasks
-    // internally) — pins AC2: the optimistic local write and the "saving" flag
-    // both land synchronously with the click, before the mocked PATCH's own
-    // already-resolved promise gets a chance to settle.
+    // Synchronous native click, not userEvent (which yields to microtasks) — pins the optimistic write and saving flag landing synchronously with the click, before the mocked PATCH's promise settles.
     act(() => {
       screen.getByRole("button", { name: "Set theme dark" }).click();
     });

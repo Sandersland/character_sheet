@@ -82,8 +82,7 @@ describe("FourElementsSection", () => {
     expect(screen.getByText("4")).toBeInTheDocument();
     expect(client.fetchDisciplines).toHaveBeenCalledWith("EDITION_2014");
 
-    // Description renders in the row's expandable body (AbilityRowShell) —
-    // the LEARNED snapshot text, not the catalog's own description.
+    // The row shows the learned snapshot text, not the catalog's own description.
     await user.click(screen.getByRole("button", { name: /Fangs of the Fire Snake/ }));
     expect(screen.getByText("Learned snapshot text.")).toBeInTheDocument();
   });

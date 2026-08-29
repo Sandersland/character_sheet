@@ -1,8 +1,3 @@
-// #1354: rollDamageFor is the inline damage roll the AttackTallyStrip/
-// Turn-summary banner offer when a player resolves a tally row — it must
-// carry the row's own swingId (minted at attack time, #1235) so its damage
-// event still correlates with the attack event even though this hook can't
-// reach useAttackRolls' internal swingIdRef.
 import type { ReactNode } from "react";
 import { describe, it, expect, vi } from "vitest";
 import { renderHook } from "@testing-library/react";

@@ -11,16 +11,12 @@ interface CampaignTabPanelsProps {
   onCampaignChange: (campaign: Campaign) => void;
 }
 
-// The active tab's content: Manage (owner admin), Codex (entity ledger), or Overview.
 export default function CampaignTabPanels({ campaign, active, onCampaignChange }: CampaignTabPanelsProps) {
   if (active === "manage") {
     return (
       <>
         <CampaignManagePanel campaignId={campaign.id} />
-        {/* Campaign.rulesEdition is legitimate here and is NOT a rules-authority
-            regression: this is a DM campaign surface, not a sheet, and the rarity
-            tiers it selects are edition-invariant — the parameter only picks a
-            /reference cache slot (#1437). A sheet still reads Character.rulesEdition. */}
+        {/* Campaign.rulesEdition is fine here — a DM surface picking an edition-invariant reference-cache slot, not sheet rules authority (#1437). */}
         <CampaignItemsPanel
           campaignId={campaign.id}
           characters={campaign.characters ?? []}

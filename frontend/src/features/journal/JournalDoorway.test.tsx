@@ -7,8 +7,6 @@ import * as client from "@/api/client";
 import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character, ChronicleSession, JournalEntry } from "@/types/character";
 
-// useChronicle fetches arcs + sessions; stub both. Campaign-less characters skip
-// the calls entirely, so the sessions mock only matters for campaign fixtures.
 vi.mock("@/api/client", () => ({
   fetchCampaignArcs: vi.fn().mockResolvedValue([]),
   fetchChronicleSessions: vi.fn().mockResolvedValue([]),
@@ -69,7 +67,6 @@ describe("JournalDoorway", () => {
 
   it("shows note counts for a campaign-less character", () => {
     renderDoorway(makeCharacter([ENTRY, { ...ENTRY, id: "e2" }]));
-    // 2 notes, no chapters (no sessions), with a last-written stamp.
     expect(screen.getByText(/2 notes/)).toBeInTheDocument();
     expect(screen.queryByText(/chapter/)).not.toBeInTheDocument();
   });

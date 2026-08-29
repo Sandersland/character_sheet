@@ -1,11 +1,3 @@
-// "Turn summary" banner on the turn card (#802/#812, interactive since #811):
-// one line per recorded attack. Unresolved lines are tappable ("hit or miss?")
-// and expand Hit / Miss / Crit! in place; choosing Hit/Crit grows an inline
-// Roll-damage button on the line (3D dice + session log + tally write — no
-// sheet reopen). Resolved lines are final but tappable for a quiet Change row
-// (never on nat-locked lines). Dismiss clears the tally itself, so dismissal
-// survives a page reload of the persisted turn snapshot.
-
 import { useState } from "react";
 
 import {
@@ -53,8 +45,6 @@ function VerdictPick({
   );
 }
 
-// Unresolved line: the question is the affordance — the same dotted-underline
-// rule as the in-sheet tally strip.
 function UnresolvedLine({
   row,
   expanded,
@@ -86,7 +76,6 @@ function UnresolvedLine({
   );
 }
 
-/** The on-line damage roll that grows on a resolved hit/crit line without damage. */
 function LineDamageButton({
   row,
   crit,
@@ -112,8 +101,6 @@ function LineDamageButton({
   );
 }
 
-// Resolved line: final text; tappable (unless nat-locked) for the quiet Change
-// row, plus the inline damage roll while the hit/crit line has no damage yet.
 function ResolvedLine({
   row,
   index,
@@ -142,8 +129,6 @@ function ResolvedLine({
       {locked ? (
         <span>{text}</span>
       ) : (
-        // Resolved lines carry no visible affordance — tapping reveals the quiet
-        // Change row below (mistaken-verdict recovery).
         <button
           type="button"
           onClick={onToggle}

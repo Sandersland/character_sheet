@@ -1,16 +1,9 @@
-// Rogue Sneak Attack on the attack card (#902): a manual eligibility toggle
-// (advantage OR an ally adjacent — never auto-detected) plus a roll button.
-// The roll is client-side and rides the swing's single resolveAction op as a
-// damage rider (#1843) — the parent owns the roll (`onRoll`) and the rolled
-// total (`rolled`); once-per-turn is turnState's guard.
-
 import { useState } from "react";
 
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { AttackTallyRow } from "@/lib/attackTallySummary";
 
-// Why the roll button is disabled, in priority order — surfaced as its tooltip.
 function rollBlockedReason(used: boolean, eligible: boolean): string | undefined {
   if (used) return "Already used this turn";
   if (!eligible) return "Confirm eligibility first";
@@ -19,11 +12,8 @@ function rollBlockedReason(used: boolean, eligible: boolean): string | undefined
 
 interface SneakAttackSectionProps {
   turnState: TurnState & TurnStateActions;
-  /** The current hit row the roll folds into; null before a hit lands. */
   currentRow: AttackTallyRow | null;
-  /** Rolls the sneak dice into the swing's rider map and marks the turn's use. */
   onRoll: () => void;
-  /** The rolled rider total for this swing, if any. */
   rolled: number | null;
 }
 
@@ -39,7 +29,6 @@ export default function SneakAttackSection({
   const used = turnState.sneakAttackUsedThisTurn;
   const canRoll = eligible && !used;
 
-  // Only rogues have Sneak Attack; nothing to fold into until a hit lands.
   if (!sneakAttack || !currentRow) return null;
 
   const label = `${sneakAttack.dice.count}d${sneakAttack.dice.faces}`;

@@ -1,10 +1,3 @@
-/**
- * The redirect button label is fully served-derived (#1435): the served
- * redirect row's own `name` plus the character's served spend-pool label, so it
- * carries the resource cost without a per-edition client literal. Pinned for
- * both editions because a regression here silently breaks the monk e2e specs
- * (the button renders but its accessible name stops matching).
- */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 import { useDeflectAttacksReaction } from "@/features/session/useDeflectAttacksReaction";
@@ -56,7 +49,6 @@ describe("useDeflectAttacksReaction — redirectLabel (served name + served pool
       { key: "deflectAttacksRedirect", name: "Deflect Attacks — Redirect", cost: "free", enabled: true },
     );
     expect(label).toBe("Deflect Attacks — Redirect · spend 1 Focus Points");
-    // Substring the monk-2024 e2e matches.
     expect(label).toContain("Redirect · spend 1 Focus Points");
   });
 
@@ -66,7 +58,6 @@ describe("useDeflectAttacksReaction — redirectLabel (served name + served pool
       { key: "deflectMissilesThrow", name: "Deflect Missiles — Throw Back", cost: "free", enabled: true },
     );
     expect(label).toBe("Deflect Missiles — Throw Back · spend 1 Ki Points");
-    // Substring the monk-2014 e2e matches.
     expect(label).toContain("Throw Back · spend 1 Ki Points");
   });
 

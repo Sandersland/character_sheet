@@ -1,7 +1,4 @@
-// Shared effect-kind + dice-count/faces/modifier fields — the common core of
-// HomebrewSpellEffectFields (catalog homebrew spell, #1787). A narrow
-// structural prop type here — rather than importing the concrete
-// HomebrewSpellInput — lets the consumer pass its own `update` straight through.
+// EffectDiceDraft is a narrow structural type, not the concrete HomebrewSpellInput, so the consumer's own `update` passes straight through.
 import { INPUT_CLS, LABEL_CLS } from "@/lib/addSpell";
 
 interface EffectDiceDraft {

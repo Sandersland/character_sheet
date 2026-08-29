@@ -11,9 +11,7 @@ interface SessionRecapDetail {
   applyRefreshed: (full: Session) => void;
 }
 
-// Holds the recap/participants/journals shown in the summary modal, lazily
-// fetching full detail when the session was seeded from a list (SessionsModal
-// carries no journals/summaries); the end-session path already supplies them.
+// Lazily fetches full detail only when session.journalEntries is undefined — SessionsModal seeds without journals/summaries; end-session already supplies them.
 export function useSessionRecapDetail(characterId: string, session: Session): SessionRecapDetail {
   const [recap, setRecap] = useState<CampaignRecap | null | undefined>(session.summary);
   const [participants, setParticipants] = useState<SummarizedParticipant[]>(

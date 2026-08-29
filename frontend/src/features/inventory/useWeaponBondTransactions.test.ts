@@ -14,12 +14,7 @@ beforeEach(() => {
   unbondWeaponTransaction.mockReset();
 });
 
-// resolveWeaponBondMutation is the pure dispatch this hook's mutationFn calls
-// (#1854) — a prior version destructured `const [op] = operations` directly,
-// which crashed on `op.type` of undefined for an empty batch and silently
-// dropped every op past the first for a >1 batch (claude-review finding on
-// #1887). WeaponBondToggle only ever submits exactly one op, so both cases
-// reject loudly rather than misbehave.
+// WeaponBondToggle only ever submits exactly one op, so an empty or >1 batch rejects loudly rather than misbehaving.
 describe("resolveWeaponBondMutation", () => {
   it("dispatches a single bondWeapon op to bondWeaponTransaction", () => {
     resolveWeaponBondMutation("char-1", [{ type: "bondWeapon", inventoryItemId: "item-1" }]);

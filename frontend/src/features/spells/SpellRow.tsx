@@ -1,6 +1,3 @@
-// SpellRow — per-spell view in the grimoire: badges, prepare/forget actions, and
-// a tap-to-expand into the shared spell detail card. View/manage only (#1162) —
-// casting left this row entirely for the record view's "Cast a spell" door.
 import { useState } from "react";
 
 import { alwaysAvailableLabelOf, canPrepare, type PreparedBudget } from "@/lib/spellList";
@@ -13,20 +10,14 @@ import type { Spell } from "@/types/character";
 
 interface SpellRowProps {
   spell: Spell;
-  /** True if the spellcasting section is busy (disables buttons). */
   busy: boolean;
   onPrepare: (spell: Spell) => void;
   onForget: (spell: Spell) => void;
-  /** Prepared-spell budget (#883) gating the rune toggle. */
   budget: PreparedBudget;
-  /** Available slot levels — still drives the "no slots" dimming/badge. */
   availableSlots: number[];
-  /** True when this spell is the character's active concentration spell. */
   isConcentrating?: boolean;
 }
 
-// The detail card's single CTA mirrors the row's own prepare rune (the grimoire's
-// only mutating action besides Swap/Forget, which stay row-level).
 function prepareCta(
   spell: Spell,
   budget: PreparedBudget,
@@ -36,7 +27,7 @@ function prepareCta(
 ) {
   const state = runeState(spell, budget.casterModel);
   if (state === "locked") {
-    // #1511 D4: served, not hardcoded — see SpellRowActions.
+    // #1511: label is served via alwaysAvailableLabelOf — keep in sync with SpellRowActions, never hardcode text here.
     return { label: alwaysAvailableLabelOf(budget), disabled: true, onPress: () => {} };
   }
   const blocked = state === "unprepared" && !canPrepare(spell, budget);
@@ -68,7 +59,6 @@ export default function SpellRow({
   return (
     <li className={`py-3 ${derived.noBudget ? "opacity-50" : ""}`}>
       <div className="flex flex-wrap items-start justify-between gap-2">
-        {/* Left: name + badges */}
         <div className="flex min-w-0 flex-col gap-1">
           <div className="flex flex-wrap items-baseline gap-2">
             <button
@@ -85,7 +75,6 @@ export default function SpellRow({
           {compStr && <p className="text-[11px] text-parchment-600">{compStr}</p>}
         </div>
 
-        {/* Right: action buttons */}
         <SpellRowActions
           spell={spell}
           derived={derived}

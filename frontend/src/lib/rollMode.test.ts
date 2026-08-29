@@ -47,7 +47,6 @@ describe("resolveRollMode (#486)", () => {
   });
 
   it("cancels advantage + disadvantage from different sources to normal (RAW)", () => {
-    // Rage advantage on STR check + Poisoned disadvantage on any check → neither.
     const r = resolveRollMode([...rage, ...poisoned], { kind: "check", ability: "strength" });
     expect(r.mode).toBe("normal");
     expect(r.sources.map((s) => s.source).sort()).toEqual(["Poisoned", "Rage"]);
@@ -100,13 +99,10 @@ describe("resolveRollMode flat modifiers (#1136)", () => {
     const r = resolveRollMode([...exhaustion2, ...poisoned], { kind: "attack" }, "advantage");
     expect(r.mode).toBe("advantage");
     expect(r.modifier).toBe(-4);
-    // The adv/dis grants are overridden away; only the flat penalty's source remains.
     expect(r.sources.map((s) => s.source)).toEqual(["Exhaustion"]);
   });
 
-  // Regression guard for the resolver-widening approach REJECTED in #1327: if
-  // `applies` let a `check` grant match an initiative roll, sumFlat would add
-  // BOTH exhaustion entries and return −8 here instead of −4.
+  // Regression guard (#1327): if `applies` let a `check` grant match initiative, `sumFlat` would double-count exhaustion and return −8, not −4.
   it("applies the flat exhaustion penalty to Initiative exactly once (−2×level, not doubled)", () => {
     expect(resolveRollMode(exhaustion2, { kind: "initiative" }).modifier).toBe(-4);
   });

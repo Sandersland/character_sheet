@@ -1,12 +1,11 @@
 /**
- * Twin of shared-types-barrel.test.ts, scoped to @character-sheet/contracts
- * (#1370). Guards the @/types/character barrel's re-export of the names
- * derived from route zod schemas: every migrated name must stay reachable
- * from the barrel, and the import list below IS the assertion — tsc fails if
- * a name stops resolving. Only names with a real frontend call site are
- * re-exported (see classes.ts's why-comment); CastManeuverOperation,
- * ActivateCloakOfShadowsOperation, and the Hand of Harm / Hand of Ultimate
- * Mercy op types are deliberately absent from both (no frontend consumer).
+ * Guards the @/types/character barrel's re-export of names derived from route
+ * zod schemas (#1370): every migrated name must stay reachable from the
+ * barrel, and the import list below IS the assertion — tsc fails if a name
+ * stops resolving. Only names with a real frontend call site are re-exported;
+ * CastManeuverOperation, ActivateCloakOfShadowsOperation, and the Hand of Harm
+ * / Hand of Ultimate Mercy op types are deliberately absent (no frontend
+ * consumer).
  */
 
 import { describe, expectTypeOf, it } from "vitest";

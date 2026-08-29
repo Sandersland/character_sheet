@@ -45,7 +45,6 @@ describe("SheetBottomNav (#928)", () => {
     expect(screen.getByRole("button", { name: "Class" })).toBeInTheDocument();
   });
 
-  // #961: the Combat tab gains a "session live" pip while a session is live.
   it("marks the Combat tab with a live pip only when livePipTab is set", () => {
     const tabs = getSheetTabs(nonCaster);
     const { rerender } = render(

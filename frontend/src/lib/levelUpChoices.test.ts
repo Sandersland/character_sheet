@@ -84,17 +84,12 @@ describe("CHOICE_KIND_CONFIGS", () => {
       ]);
     });
 
-    // Without this the test above still passes if the edition never reaches the
-    // wire — the mock ignores its argument — and the picker silently offers the
-    // other edition's styles (#1411).
     it("passes the context edition through to fetchFeats", async () => {
       await cfg.loadOptions({ targetLevel: 1, edition: "EDITION_2014", classNames: ["Ranger"] });
       expect(vi.mocked(fetchFeats)).toHaveBeenCalledWith("EDITION_2014", undefined, ["Ranger"]);
     });
 
-    // #1495: the server, not this hook, decides which styles a class offers
-    // (fightingStyleFeatOfferedForClasses) — this config's only job is to
-    // forward the context's class-name scope, unfiltered on its end.
+    // The server, not this hook, decides which styles a class offers, via fightingStyleFeatOfferedForClasses.
     it("forwards the context's classNames through to fetchFeats, for the class gate", async () => {
       await cfg.loadOptions({ targetLevel: 1, edition: "EDITION_2014", classNames: ["Fighter", "Paladin"] });
       expect(vi.mocked(fetchFeats)).toHaveBeenCalledWith("EDITION_2014", undefined, ["Fighter", "Paladin"]);
@@ -130,9 +125,6 @@ describe("CHOICE_KIND_CONFIGS", () => {
       expect(await cfg.loadOptions({ targetLevel: 1, edition: "EDITION_2024" })).toEqual([{ id: "Smith's Tools", name: "Smith's Tools" }]);
     });
 
-    // Without this the test passes even if the edition never reaches the wire —
-    // artisanTools is edition-invariant, so the returned options look right
-    // either way. This is the only caller outside useReferenceData (#1325).
     it("passes the context edition through to fetchReference", async () => {
       await cfg.loadOptions({ targetLevel: 1, edition: "EDITION_2014" });
       expect(vi.mocked(fetchReference)).toHaveBeenCalledWith("EDITION_2014");
@@ -155,8 +147,6 @@ describe("CHOICE_KIND_CONFIGS", () => {
   describe("expertise", () => {
     const cfg = CHOICE_KIND_CONFIGS.expertise!;
 
-    // #1588: unlike maneuvers/toolProficiency (own catalog fetch), the option
-    // list IS the character's proficient skills — no server round-trip.
     it("options are the context's proficientSkills, no catalog fetch", async () => {
       const proficientSkills = [{ id: "stealth", name: "Stealth" }, { id: "perception", name: "Perception" }];
       expect(await cfg.loadOptions({ targetLevel: 1, edition: "EDITION_2014", proficientSkills })).toEqual(proficientSkills);

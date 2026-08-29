@@ -15,10 +15,8 @@ interface FilledRowActionsProps {
   onReplace: (incoming: InventoryItem, outgoing: InventoryItem) => void;
 }
 
-// A filled loadout row's trailing action popover: Unequip, or Swap →
-// SlotPickerPanel. Its own module (used by LoadoutFilledRow) rather than
-// inlined there, so LoadoutList's own row-map callback stays under the
-// fallow complexity gate (.fallowrc.jsonc).
+// Its own module (used by LoadoutFilledRow) rather than inlined there, so
+// LoadoutList's own row-map callback stays under the fallow complexity gate.
 export default function FilledRowActions({
   row,
   candidates,

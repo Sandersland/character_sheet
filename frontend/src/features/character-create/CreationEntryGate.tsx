@@ -1,11 +1,3 @@
-// The precondition gate for the "new character" entry point (#1286): resolves
-// which campaign (if any) a character is being created for, and therefore its
-// rulesEdition, BEFORE the creation ceremony's identity step can be reached.
-// Picking a campaign displays its inherited edition; "Solo" surfaces the
-// picker instead. Deliberately NOT a ceremony step (creationSteps) — a step
-// that auto-skips whenever a campaign is picked is a step built and maintained
-// for the uncommon case (settled 2026-07-26, issue #1286 decisions).
-
 import { useEffect, useState } from "react";
 
 import type { RulesEdition } from "@character-sheet/shared-types";
@@ -21,12 +13,10 @@ import type { Campaign, EditionOption } from "@/types/character";
 interface CreationEntryGateProps {
   onResolved: (choice: {
     campaignId: string | null;
-    /** The chosen campaign's display name, so Review can echo it without a
-     *  second fetch — null for solo. */
+    /** So Review can echo the campaign's display name without a second fetch — null for solo. */
     campaignName: string | null;
     rulesEdition: RulesEdition;
   }) => void;
-  /** Leave the page instead of resolving (mirrors the ceremony's own Cancel). */
   onCancel?: () => void;
 }
 
@@ -34,9 +24,8 @@ interface CreationEntryGateProps {
 // can never be the empty string, so this never collides with one.
 const SOLO = "";
 
-// #1343: below this count the list is shorter than the cap at every supported
-// viewport, so capping would only draw an empty scroll gutter (AC4) — Solo + 3
-// campaigns is the largest uncapped roster.
+// Below this count the list is shorter than the cap at every supported
+// viewport, so capping would only draw an empty scroll gutter (#1343).
 const SCROLL_ABOVE = 3;
 
 const CARD_BASE =
@@ -46,8 +35,6 @@ const CARD_IDLE = "border-parchment-300 bg-parchment-50 hover:border-garnet-400"
 const PRIMARY_BTN =
   "min-h-11 rounded-control border border-garnet-surface-hover bg-garnet-surface px-5 text-sm font-semibold text-garnet-on-surface transition-colors hover:bg-garnet-surface-hover";
 
-// One "which campaign" card per membership + a leading Solo option. Extracted
-// so CreationEntryGate's own render stays a plain if/else over load state.
 function CampaignChoiceCards({
   campaigns,
   choice,
@@ -63,13 +50,11 @@ function CampaignChoiceCards({
     onChoose(options[index].id),
   );
 
-  // #1343: FeatFlow's cap-and-scroll shape (FeatCatalogList). p-0.5 is bundled
-  // into the scrolls-only classes (not applied unconditionally) so the
-  // uncapped case stays byte-identical to the pre-#1343 markup (AC4) — a
-  // padding shift would be a visible regression for the 0-3-campaign majority.
-  // pr-3 clears the focus-visible:ring-2 from the scrollbar; overflow-x-hidden
-  // stops that ring computing a spurious horizontal scrollbar (overflow-y:auto
-  // with overflow-x:visible resolves x to auto too).
+  // p-0.5 is bundled into the scrolls-only classes so the uncapped case stays
+  // byte-identical to the pre-#1343 markup. pr-3 clears the focus-visible:ring-2
+  // from the scrollbar; overflow-x-hidden stops that ring computing a spurious
+  // horizontal scrollbar (overflow-y:auto with overflow-x:visible resolves x to
+  // auto too).
   const scrolls = campaigns.length > SCROLL_ABOVE;
   const listClass = [
     "grid gap-3 sm:grid-cols-2",
@@ -103,9 +88,6 @@ function CampaignChoiceCards({
   );
 }
 
-// The edition sub-section: a picker for Solo, a read-only inherited line for a
-// chosen campaign — either way, the irreversibility notice is always shown so
-// it's stated at the moment of choosing, never discovered later (#1286).
 function EditionSection({
   campaign,
   rows,
@@ -121,10 +103,9 @@ function EditionSection({
     <div className="mt-5">
       {campaign ? (
         <p className="text-sm text-parchment-700">
-          {/* Off the campaign row's own served label (#1436), NOT a lookup in the
-              editions rows: the inherited edition is a fact about that campaign,
-              and resolving it through the picker's catalog would make an
-              already-known value depend on a second request. */}
+          {/* Off the campaign row's own served label, not a lookup in the editions
+              rows: resolving it through the picker's catalog would make an
+              already-known value depend on a second request (#1436). */}
           This character will use the{" "}
           <span className="font-semibold text-parchment-900">{campaign.rulesEditionLabel}</span> — inherited
           from {campaign.name}.
@@ -143,12 +124,11 @@ function EditionSection({
 export default function CreationEntryGate({ onResolved, onCancel }: CreationEntryGateProps) {
   const [campaigns, setCampaigns] = useState<Campaign[] | null>(null);
   const [loadError, setLoadError] = useState(false);
-  // Bumped by "Try again" to re-run the fetch effect below.
   const [retryToken, setRetryToken] = useState(0);
   const [choice, setChoice] = useState<string>(SOLO);
-  // null = "the player hasn't touched the picker", not "2024": a character's
-  // edition is locked in at creation, so the pre-checked card must come from the
-  // server's defaultEdition rather than a client-side literal (#1436).
+  // null = "the player hasn't touched the picker", not "2024": the pre-checked
+  // card must come from the server's defaultEdition, not a client-side literal
+  // (#1436).
   const [soloEdition, setSoloEdition] = useState<RulesEdition | null>(null);
   const { editions, error: editionsFailed, refetch: refetchEditions } = useEditions();
 
@@ -163,12 +143,11 @@ export default function CreationEntryGate({ onResolved, onCancel }: CreationEntr
     };
   }, [retryToken]);
 
-  // #1286: the choice is irreversible, so a fetch failure must never silently
-  // fall through to "no campaigns" — that would steer a player who meant to
-  // join a campaign into picking an edition for a character that can't move.
-  // A failed /api/editions takes the same branch (#1436) for the same reason: a
-  // fallback edition IS a guess, and this copy already says we won't make one.
-  // "Try again" retries both, since either one alone leaves this screen unusable.
+  // A fetch failure must never silently fall through to "no campaigns" — that
+  // would steer a player who meant to join a campaign into picking an edition
+  // for a character that can't move. A failed /api/editions takes the same
+  // branch (#1436): a fallback edition IS a guess. "Try again" retries both,
+  // since either one alone leaves this screen unusable.
   if (loadError || editionsFailed) {
     return (
       <CeremonyStage layout="page">
@@ -193,9 +172,8 @@ export default function CreationEntryGate({ onResolved, onCancel }: CreationEntr
     );
   }
 
-  // Both round-trips gated behind one spinner: showing the campaign cards before
-  // the editions arrive would flash a section with no picker in it, and showing a
-  // picker before its rows arrive is the fallback-value bug this issue removes.
+  // Both round-trips gated behind one spinner: showing the campaign cards
+  // before the editions arrive would flash a section with no picker in it.
   if (campaigns === null || editions === null) {
     return (
       <CeremonyStage layout="page">
@@ -207,8 +185,6 @@ export default function CreationEntryGate({ onResolved, onCancel }: CreationEntr
   }
 
   const chosenCampaign = campaigns.find((c) => c.id === choice);
-  // Past the guard above, the served default is known — so an untouched picker
-  // resolves to it rather than to any literal in this file.
   const effectiveSoloEdition = soloEdition ?? editions.defaultEdition;
 
   function handleContinue() {

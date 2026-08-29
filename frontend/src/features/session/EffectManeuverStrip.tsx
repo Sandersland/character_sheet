@@ -1,6 +1,5 @@
 import { QuickBtn } from "@/features/session/TurnControls";
 
-/** Gold strip of effect maneuvers (no slot consumed) — e.g. Evasive Footwork. */
 export default function EffectManeuverStrip({
   effectManeuvers,
   superiorityRemaining,

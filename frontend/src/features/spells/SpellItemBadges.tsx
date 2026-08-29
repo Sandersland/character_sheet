@@ -1,4 +1,3 @@
-// Item-provenance badges (name, uses/charges, DC, exhaustion) for an item-granted spell.
 import Badge from "@/components/ui/Badge";
 import type { SpellRowDerived } from "@/lib/spellRow";
 

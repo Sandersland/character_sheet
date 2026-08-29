@@ -10,8 +10,7 @@ interface CampaignItemRowProps {
   item: CampaignItem;
   campaignId: string;
   characters: { id: string; name: string; ownerId: string }[];
-  /** Served rarity rows (#1437), passed in rather than fetched: one observer on
-   *  the panel beats one per row in an N-item list. */
+  /** Rarity rows are served pre-fetched (#1437): one observer on the panel beats one per row in an N-item list. */
   rarities: ItemRarityOption[];
   busyId: string | null;
   awardTargetValue: string;

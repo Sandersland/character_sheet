@@ -36,8 +36,8 @@ describe("CampaignItemCard (#380)", () => {
     expect(screen.getByText("A blade wreathed in fire.")).toBeInTheDocument();
   });
 
-  // #1437: serve-only labels — the Codex item card is the cold-cache surface, so
-  // it must paint no rarity badge at all rather than the raw enum key.
+  // #1437: the Codex item card must paint no rarity badge at all while
+  // rarity rows are unresolved, rather than the raw enum key.
   it("renders no rarity badge while the served rows are unresolved", () => {
     const { container } = render(
       <CampaignItemCard item={item({ rarity: "VERY_RARE" })} isOwner={false} rarities={[]} />,
@@ -45,7 +45,6 @@ describe("CampaignItemCard (#380)", () => {
     expect(screen.queryByText("VERY_RARE")).toBeNull();
     expect(screen.queryByText("Very Rare")).toBeNull();
     expect(container.querySelector(".bg-arcane-50")).toBeNull();
-    // The rest of the card still renders — only the badge waits on the rows.
     expect(screen.getByText("Requires attunement")).toBeInTheDocument();
   });
 
@@ -88,7 +87,6 @@ describe("CampaignItemCard (#380)", () => {
     expect(screen.getByText("Disadvantage")).toBeInTheDocument();
   });
 
-  // #687 gap pins — the branches the detail-row extraction most endangers.
   it("renders a consumable's dice + description joined with an em dash", () => {
     render(
       <CampaignItemCard

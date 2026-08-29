@@ -172,9 +172,6 @@ describe("useToolProficiencyChoices", () => {
     expect(update).toHaveBeenCalledWith({ toolChoices: ["Drum"] });
   });
 
-  // #1779: a background with its own toolChoices/toolChoiceCount (2024
-  // Soldier's Gaming Set) surfaces an INDEPENDENT choice group — its own
-  // options/cap, untouched by the class's pool/cap.
   it("surfaces a background choice group independent of the class group", () => {
     const result = run({
       draft: makeDraft(),
@@ -186,7 +183,6 @@ describe("useToolProficiencyChoices", () => {
     });
     expect(result.backgroundChoices.options).toEqual(["Dice Set", "Playing Card Set"]);
     expect(result.backgroundChoices.max).toBe(1);
-    // The class group is completely unaffected by the background's own pool.
     expect(result.classChoices.options).toEqual(["Lute", "Drum"]);
     expect(result.classChoices.max).toBe(1);
   });

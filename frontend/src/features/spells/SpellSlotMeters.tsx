@@ -1,5 +1,3 @@
-// Spell-slot / Pact Magic / Mystic Arcanum pip blocks. A filled pip is an
-// available slot (click to expend); a spent pip clicks to restore.
 import type { ReactNode } from "react";
 
 import { slotOrdinal } from "@/lib/spellMeta";
@@ -107,7 +105,6 @@ function arcanaGroup(arcana: SpellSlots[], { onRestore }: Handlers): GroupSpec {
         </span>
       </>
     ),
-    // Arcanum charges have no manual expend — only restore (undo a mis-cast).
     meters: arcana.map((charge) => ({
       level: charge.level,
       remaining: charge.total - charge.used,
@@ -119,7 +116,6 @@ function arcanaGroup(arcana: SpellSlots[], { onRestore }: Handlers): GroupSpec {
   };
 }
 
-// Assemble the merged-slot, dedicated Pact Magic, and Mystic Arcanum groups.
 function buildGroups(props: SpellSlotMetersProps): GroupSpec[] {
   const groups: GroupSpec[] = [];
   if (props.slots.length > 0) groups.push(slotsGroup(props.slots, props.slotsArePactMagic, props));
@@ -165,7 +161,6 @@ function SlotMeter({ meter, busy }: { meter: MeterSpec; busy: boolean }) {
         />
       );
     }
-    // Available Mystic Arcanum charge — no manual expend affordance.
     return (
       <span key={i} data-testid="slot-pip" aria-hidden="true" className={`${PIP_BASE} ${PIP_FILL[meter.tone]}`} />
     );

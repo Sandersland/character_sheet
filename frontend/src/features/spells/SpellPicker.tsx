@@ -1,8 +1,3 @@
-// The shared spell picker (#1160): quiet rows grouped by pick-list (cantrips /
-// spells), one search box across every group, and the big SpellDetailCard on a
-// row tap. The API is caller-owned — options are pre-filtered to eligibility, and
-// each group carries its own cap + onToggle — so level-up (#1158) can adopt it
-// without any creation-specific coupling here.
 import { useState } from "react";
 
 import SpellDetailCard from "@/features/spells/SpellDetailCard";
@@ -24,18 +19,12 @@ export interface SpellPickerGroup {
 export interface SpellPickerProps {
   groups: SpellPickerGroup[];
   knownSpellIds?: ReadonlySet<string>;
-  /** Override the default budget headline (e.g. a level-up ceremony line). */
   headline?: string;
-  /** Verb for the detail-card CTA; the row pill always reads "Add". */
   ctaVerb?: string;
 }
 
 const NO_KNOWN: ReadonlySet<string> = new Set();
 
-// #1826: an empty eligible pool (a group present but its `options` empty, before
-// any search) is a resolver bug, not a search miss — distinct copy so it never
-// reads as "try a different search" when nothing was ever pickable here. A
-// non-empty pool searched to zero keeps the neutral copy.
 function PickerStatusMessage({ anyEligible, anyResults }: { anyEligible: boolean; anyResults: boolean }) {
   if (!anyEligible) {
     return (
@@ -56,9 +45,7 @@ export default function SpellPicker({ groups, knownSpellIds = NO_KNOWN, headline
     headline ?? budgetHeadline(groups.map((g) => ({ label: g.label, selected: g.selectedIds.length, cap: g.cap })));
   const rendered = groups.map((g) => ({ group: g, filtered: filterCatalog(g.options, search, "") }));
   const anyResults = rendered.some((r) => r.filtered.length > 0);
-  // No groups AT ALL is a benign "nothing to pick" shape (a homebrew class, a
-  // {cantrips:0,spells:0} response), so it keeps the neutral search-miss copy
-  // rather than crying misconfiguration — see PickerStatusMessage.
+  // Zero groups is a benign empty state, not misconfiguration — PickerStatusMessage keeps the neutral copy.
   const anyEligible = groups.length === 0 || groups.some((g) => g.options.length > 0);
 
   const openGroup = open ? groups.find((g) => g.key === open.groupKey) : undefined;

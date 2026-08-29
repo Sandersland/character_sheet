@@ -25,8 +25,7 @@ describe("useClassTransactions", () => {
 
     await act(async () => { resolve(updated); await pending; });
 
-    // A mutation's success dispatch is notified via TanStack Query's internal
-    // batching (a microtask hop beyond `run`'s own await), so these need a tick.
+    // TanStack Query notifies a mutation's success via its own internal batching, a microtask hop beyond `run`'s await, so this needs a tick.
     await waitFor(() => expect(result.current.busy).toBe(false));
     expect(cachedCharacter("char-1")).toEqual(updated);
     expect(result.current.error).toBeNull();

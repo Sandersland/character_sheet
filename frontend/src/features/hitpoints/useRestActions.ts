@@ -2,7 +2,6 @@ import { rollDie } from "@/lib/dice";
 import { dieFaces } from "@/lib/hitDice";
 import type { Character, HitPointOperation } from "@/types/character";
 
-// Short/long rest ops shared by HitPointTracker and the session rest button.
 export function useRestActions(
   character: Character,
   submit: (ops: HitPointOperation[]) => Promise<boolean>,

@@ -1,10 +1,4 @@
-// State machine for the level-up ceremony (#886): composes the class-choice
-// step, the plan fetch, and the submit into one API. Position is keyed by
-// stepKey (never index) so a subclass re-plan that inserts steps doesn't move
-// the player. Split into small sub-hooks (useClassChoice, useLevelAgain,
-// usePruneDraftToPlan, useLevelUpPlan, useLevelUpSubmit, useDeepLinkTarget) so
-// each stays independently simple rather than piling every branch into one
-// function.
+// Position is keyed by stepKey, never index, so a subclass re-plan that inserts steps doesn't move the player.
 
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -70,9 +64,6 @@ type ClassChoiceResult =
   | { status: "choosing"; target: null; classChoice: ClassChoicePhase }
   | { status: "resolved"; target: LevelUpTarget | null; classChoice: null };
 
-// Decides whether the ceremony needs the front-door class-choice step (#1170)
-// and owns the player's pick once made. A guard-clause ladder (not nested
-// branches) keeps this independently simple rather than inflating the parent.
 function useClassChoice(
   character: Character,
   deepLinkTarget: LevelUpTarget | null,
@@ -83,12 +74,7 @@ function useClassChoice(
     [character, reference],
   );
   const needsClassChoice = selectableClassChoiceCount(classChoiceOptions) > 1;
-  // A character who already owns 2+ classes definitely needs the chooser —
-  // that's known without reference data. Otherwise (single class today)
-  // whether a *new* eligible class exists depends on reference — wait for it
-  // to settle (loaded or errored) before committing to the fast auto-skip
-  // path, or a late-arriving eligible class would yank the player out of an
-  // already-started ready phase.
+  // Wait for reference to settle before auto-skipping the single-class case — otherwise a late-arriving eligible class would yank the player out of an already-started ready phase.
   const priorMulticlass = (character.classes?.length ?? 0) > 1;
   const decisionReady = priorMulticlass || reference != null || referenceError;
 
@@ -109,9 +95,6 @@ function useClassChoice(
   };
 }
 
-// Owns the "level up again" interstitial (#1170): a successful submit that
-// leaves pendingLevelUps > 0 loops back to the chooser instead of leaving the
-// ceremony (BG3-style per-level choice).
 function useLevelAgain(goToSheet: () => void, resetForNextLevel: () => void) {
   const [remaining, setRemaining] = useState<number | null>(null);
 
@@ -135,22 +118,8 @@ function useLevelAgain(goToSheet: () => void, resetForNextLevel: () => void) {
   return { levelAgain, reportSubmitted };
 }
 
-// A subclass switch can retire a step (e.g. Eldritch Knight → Champion
-// drops newSpells) while its picks still sit in the draft — pruneDraftToPlan
-// (#1421) keeps the draft honest so the Review ledger and confirm() agree
-// with what the server will actually accept. Deliberate-coupling latch: the
-// dependency array must stay exactly [plan, setDraft], never [plan.steps]
-// (a fresh array identity every render would re-prune constantly and eat the
-// #1323 stash restore) and never [plan, draft] (draft is what this writes).
-// Keying on the plan object fires this once per served plan, which is
-// correct because useLevelUpPlan leaves the previous plan in place for the
-// whole duration of a subclass-driven refetch. setDraft is a useState setter
-// and is stable across renders, so its presence in the deps array (required
-// once it's a parameter rather than a same-scope closure) doesn't change
-// firing behaviour. Guard on plan == null: useLevelUpPlan clears plan to
-// null while the class chooser and the level-again interstitial own the
-// screen, and steps falls back to [] — pruning against that empty list
-// would wipe the entire draft.
+// Deliberate-coupling latch: deps must stay exactly [plan, setDraft] — never [plan.steps] (re-prunes every render, eating the #1323 stash restore) or [plan, draft] (draft is what this writes).
+// Guards plan == null: useLevelUpPlan clears plan while the class chooser/level-again interstitial own the screen, and pruning against the empty-steps fallback would wipe the entire draft.
 function usePruneDraftToPlan(
   plan: LevelUpPlanResponse | null,
   setDraft: React.Dispatch<React.SetStateAction<LevelUpDraft>>,
@@ -161,10 +130,7 @@ function usePruneDraftToPlan(
   }, [plan, setDraft]);
 }
 
-// Fetches the served plan, refetching when the pending subclass pick changes
-// (the server re-plans around it). `skip` pauses fetching (and clears any prior
-// plan) while the class-choice chooser or the "level up again" interstitial is
-// showing — those own the screen and a stale plan/error must not race them.
+// `skip` pauses fetching (and clears any prior plan) while the class-choice chooser or the level-again interstitial is showing — those own the screen and a stale plan/error must not race them.
 function useLevelUpPlan(
   characterId: string,
   target: LevelUpTarget | null,
@@ -202,9 +168,6 @@ function useLevelUpPlan(
   return { plan, planError };
 }
 
-// Owns the atomic commit: POSTs { target, ...draft } and reports the updated
-// character back — the caller decides whether that means "done" or "one more
-// pending level to loop through" (#1170).
 function useLevelUpSubmit(
   characterId: string,
   target: LevelUpTarget | null,
@@ -222,8 +185,7 @@ function useLevelUpSubmit(
   async function confirm(): Promise<void> {
     if (!target || !draft.hp) return;
     try {
-      // #1131: one ceremony advances an existing class OR adds a first level in a
-      // new one — the chooser (#1170) resolves target to either shape.
+      // #1131: target is either an existing class entry or a first level in a new class — the chooser (#1170) resolves it to either shape.
       await mutation.mutateAsync(levelUpSubmissionOf(draft, target, draft.hp));
     } catch {
       // mutation.error already carries the message.
@@ -233,9 +195,7 @@ function useLevelUpSubmit(
   return { confirm, submitting: mutation.isPending, submitError: mutation.error };
 }
 
-// #1131/#1170: `?classId=` seeds a NEW class, `?entry=` seeds a specific
-// existing entry (defaulting to the primary) — both are now just the class
-// chooser's *initial* selection, not a bypass of it.
+// `?classId=` seeds a new class, `?entry=` seeds a specific existing entry (defaulting to the primary) — both are just the class chooser's initial selection, not a bypass of it.
 function useDeepLinkTarget(character: Character): LevelUpTarget | null {
   const [searchParams] = useSearchParams();
   const classIdParam = searchParams.get("classId");

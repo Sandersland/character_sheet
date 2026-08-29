@@ -10,8 +10,7 @@ import type { CampaignRecap, Session } from "@/types/character";
 
 vi.mock("@/api/client", () => ({
   fetchCampaignSessions: vi.fn(),
-  // SessionSummaryModal's own reads (useSessionRecapDetail + useCampaignEntities)
-  // — opening a recap from the list needs these too.
+  // Opening a recap from the list also needs SessionSummaryModal's own reads: useSessionRecapDetail + useCampaignEntities.
   fetchSession: vi.fn(),
   fetchEntities: vi.fn().mockResolvedValue([]),
 }));
@@ -80,8 +79,7 @@ describe("SessionsModal (#1299 review — session list onto sessionKeys)", () =>
   it("opens a session's recap when it has a summary", async () => {
     const user = userEvent.setup();
     mockFetch.mockResolvedValue([
-      // journalEntries: [] means useSessionRecapDetail treats this as already
-      // fully seeded and skips its own fetchSession call.
+      // journalEntries: [] makes useSessionRecapDetail treat this as already seeded, skipping its own fetchSession call.
       makeSession({ id: "s1", title: "The Sunless Citadel", summary: recap, journalEntries: [] }),
     ]);
     render(<SessionsModal characterId="c1" campaignId="camp-1" onClose={vi.fn()} />);
@@ -90,9 +88,7 @@ describe("SessionsModal (#1299 review — session list onto sessionKeys)", () =>
     expect(await screen.findByText("XP gained")).toBeInTheDocument();
   });
 
-  // The query cache backs this now (not a hand-rolled module Map) — priming it
-  // renders the list instantly, and remounting the modal still confirms with a
-  // fresh network call (staleTime:0) so a just-ended session can't linger.
+  // staleTime:0 means a cache-primed list still gets a confirming network call on every open.
   it("renders a cache-primed list instantly, then still refetches on open", async () => {
     getQueryClient().setQueryData(sessionKeys.campaignList("camp-1"), [
       makeSession({ id: "s1", title: "Cached Session" }),
@@ -105,10 +101,7 @@ describe("SessionsModal (#1299 review — session list onto sessionKeys)", () =>
     await waitFor(() => expect(mockFetch).toHaveBeenCalledWith("camp-1"));
   });
 
-  // Re-review: query-core sets status:'error' even when `data` is retained —
-  // opening the modal offline with a warm cache must still show the
-  // last-known list, with the error line ADDED alongside it, not instead of it
-  // (the pre-#1299 render always emitted both side by side).
+  // query-core sets status:'error' even when `data` is retained, so the error line must render alongside the last-known list, not instead of it.
   it("shows the error line alongside a cached list when a background refetch fails", async () => {
     getQueryClient().setQueryData(sessionKeys.campaignList("camp-1"), [
       makeSession({ id: "s1", title: "Cached Session" }),

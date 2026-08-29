@@ -9,7 +9,6 @@ interface EmptyStateProps {
   className?: string;
 }
 
-// Shared warm empty-state: decorative hero + display title + optional prompt/CTA.
 export default function EmptyState({
   icon,
   title,

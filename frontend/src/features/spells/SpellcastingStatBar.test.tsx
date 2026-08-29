@@ -29,7 +29,6 @@ describe("SpellcastingStatBar", () => {
     expect(screen.queryByText("Prepared")).not.toBeInTheDocument();
   });
 
-  // #1511: a 2014 known caster's box reads the served label, not "Prepared".
   it("renders the served label for a known caster", () => {
     render(
       <SpellcastingStatBar

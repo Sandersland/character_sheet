@@ -57,7 +57,6 @@ describe("combineSummaryLine", () => {
     ];
     const line = combineSummaryLine(entities, "e3");
     expect(line).toContain("plus any in players' private notes");
-    // No stray digit sits inside the hedge clause itself.
     expect(line.split("plus any in players' private notes")[1].split("·")[0]).not.toMatch(/\d/);
   });
 });

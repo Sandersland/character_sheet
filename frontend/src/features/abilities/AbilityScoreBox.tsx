@@ -11,16 +11,6 @@ interface AbilityScoreBoxProps {
   proficiencyBonus: number;
 }
 
-/**
- * The classic D&D sheet "ability box": modifier is the primary value
- * (largest, highest contrast), raw score is secondary metadata tucked
- * into a small pill below it — per principles.md's "avoid naked
- * label:value pairs," the modifier *is* the number players read at the
- * table, so it gets the visual weight, not the label.
- *
- * The modifier and "Save" link are clickable roll affordances that emit
- * to `RollResultSeal` via `RollContext`.
- */
 export default function AbilityScoreBox({
   ability,
   label,

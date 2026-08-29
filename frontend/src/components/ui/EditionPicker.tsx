@@ -4,12 +4,10 @@ import { useRovingRadioGroup } from "@/hooks/useRovingRadioGroup";
 import type { EditionOption } from "@/types/character";
 
 interface EditionPickerProps {
-  /** The served rows (#1436). Rendered in the order given — that is now the whole
-   *  contract; this component holds no order of its own and no copy tables. */
+  // Rendered in the order given; this component holds no order or copy of its own.
   rows: EditionOption[];
   value: RulesEdition;
   onChange: (edition: RulesEdition) => void;
-  /** Overrides the radiogroup's accessible name (defaults to "Rules edition"). */
   label?: string;
 }
 
@@ -18,16 +16,9 @@ const CARD_BASE =
 const CARD_SELECTED = "border-garnet-600 bg-parchment-50 ring-2 ring-garnet-50";
 const CARD_IDLE = "border-parchment-300 bg-parchment-50 hover:border-garnet-400";
 
-/**
- * Radio-card picker for the supported rules editions (#1286). Reuses the #1111
- * roving-tabIndex hook (see SubclassStep/FeatFlow) rather than a fourth
- * hand-rolled implementation (#1324 tracks consolidating all of them). Every
- * served row is selectable (#1372 removed 2014's visible-but-unselectable gate,
- * #1371's `unavailableReason` card branch, since content parity shipped). A
- * caller whose rows haven't arrived must render nothing at all rather than an
- * empty or fallback-valued picker: the value written here is irreversible (see
- * CampaignsPage and CreationEntryGate).
- */
+// A caller whose rows haven't arrived must render nothing rather than an empty
+// or fallback-valued picker: the value written here is irreversible (see
+// CampaignsPage and CreationEntryGate).
 export default function EditionPicker({ rows, value, onChange, label = "Rules edition" }: EditionPickerProps) {
   const checkedIndex = rows.findIndex((row) => row.key === value);
   const { itemRef, tabIndexFor, keyDownFor } = useRovingRadioGroup(rows.length, checkedIndex, (index) =>

@@ -6,19 +6,14 @@ interface SlotPickerPanelProps {
   slotLabel: string;
   candidates: InventoryItem[];
   pending: boolean;
-  // "equip" for an empty slot; "replace" for swapping into a filled one.
   action: "equip" | "replace";
-  /** Served rarity rows (#1437), passed in rather than fetched: this panel is
-   *  rendered once per bag item, and a hook here would be one query observer
-   *  per row for a table the parent already holds. */
+  // Passed in rather than fetched: rendered once per bag item, a hook here would be one query observer per row (#1437).
   rarities: ItemRarityOption[];
   onPick: (item: InventoryItem) => void;
   onClose: () => void;
 }
 
-// Slot picker rendered inside an anchored Popover (NOT a Modal): lists the bag
-// items that fit a paper-doll slot; picking one fires the equip/replace op. The
-// Popover provides the card chrome, so this stays bare content.
+// Rendered inside an anchored Popover, which supplies the card chrome — stays bare content.
 export default function SlotPickerPanel({
   slotLabel,
   candidates,
@@ -47,8 +42,6 @@ export default function SlotPickerPanel({
       ) : (
         <ul className="flex max-h-48 flex-col gap-1 overflow-y-auto">
           {candidates.map((item) => {
-            // Null until the served rows land (#1437), so a cold cache paints no
-            // badge rather than the raw enum key.
             const label = paperDollRarityLabel(item.rarity, rarities);
             return (
               <li key={item.id}>

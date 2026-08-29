@@ -1,7 +1,3 @@
-// The turn card's "Spells cast" tally (#1164) — TurnSummaryBanner's precedent,
-// simplified: a cast already resolved by the time it lands here (no hit/miss
-// verdict to interact with), so this is a quiet read-only list + Dismiss.
-
 import { castTallyLine } from "@/lib/spellPickerView";
 import type { CastTallyRow } from "@/features/session/useTurnState";
 

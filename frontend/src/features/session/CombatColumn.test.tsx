@@ -5,8 +5,6 @@ import CombatColumn from "@/features/session/CombatColumn";
 import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character } from "@/types/character";
 
-// The idle↔live parity contract (#1086): the slot order is fixed, so switching
-// idle→live moves only the turn + HP slot contents and nothing else shifts.
 function makeCharacter(overrides: Partial<Character> = {}): Character {
   return {
     id: "c1",
@@ -19,9 +17,6 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
   } as unknown as Character;
 }
 
-// CombatColumn's nested ItemGrantsCard reads useCurrentCharacter(), so every
-// render seeds the cache and mounts CurrentCharacterProvider via
-// renderWithCharacter.
 describe("CombatColumn", () => {
   it("renders the fixed slot order: turn → HP → conditions → grants → log", () => {
     const character = makeCharacter();

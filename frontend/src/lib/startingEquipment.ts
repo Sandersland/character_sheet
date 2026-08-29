@@ -1,10 +1,5 @@
-/**
- * Types and pure helpers for the starting-equipment draft used by
- * StartingEquipmentEditor and CharacterCreatePage. Lives here so the
- * component file exports only the React component (required for Vite's
- * Fast Refresh to work reliably).
- */
-
+// Lives here, not in StartingEquipmentEditor, so that component file exports
+// only the React component (required for Vite's Fast Refresh to work reliably).
 import type {
   ClassStartingEquipment,
   PackageSelection,
@@ -12,30 +7,21 @@ import type {
   StartingGold,
 } from "@/types/character";
 
-// One set of selections for a "package" mode submission — parallel array to
-// the class's groups, one entry per group with the chosen optionIndex and
-// (for bundles with open picks) the resolved catalog item names.
 export type PackageState = PackageSelection[];
 
 export type EquipmentDraft =
   | { mode: "package"; selections: PackageState }
   | { mode: "gold"; gold: number };
 
-/** Returns an empty PackageState for a class definition. */
 export function emptyPackageState(startingEquipment: ClassStartingEquipment): PackageState {
   return startingEquipment.groups.map((group) => ({
-    // Auto-grant groups (exactly one option) start pre-selected; the UI
-    // renders them as a static label with no radio button, so the player
-    // never interacts with them and optionIndex must not stay at -1.
+    // Auto-grant groups (exactly one option) start pre-selected: the UI renders
+    // them as a static label with no radio button, so a player never sets this.
     optionIndex: group.options.length === 1 ? 0 : -1,
     openPicks: [],
   }));
 }
 
-/**
- * Returns true if the package selections are fully complete (every group has
- * an optionIndex chosen and every open pick in the chosen bundle is filled).
- */
 export function isPackageComplete(
   startingEquipment: ClassStartingEquipment,
   selections: PackageState
@@ -56,10 +42,8 @@ export function isPackageComplete(
 }
 
 // These four take a non-null StartingGold, never ClassStartingEquipment["gold"]
-// directly — that keeps the null case (PHB'24: no roll-for-gold rule at all,
-// #1564 commit 3) a caller-side guard (isGoldValid below, and the picker
-// hiding the gold-mode toggle entirely) rather than a fifth null-check
-// duplicated into every one of these.
+// directly, so the null case (PHB'24 has no roll-for-gold rule) stays a
+// caller-side guard (isGoldValid below) rather than duplicated into each one.
 export function goldMin(gold: StartingGold): number {
   return gold.diceCount * gold.multiplier;
 }
@@ -68,18 +52,13 @@ export function goldMax(gold: StartingGold): number {
   return gold.diceCount * gold.diceFaces * gold.multiplier;
 }
 
-/** Returns true if the gold draft is a valid amount within the class range.
- *  Always false when this edition has no roll-for-gold rule (gold: null) —
- *  there is no range to be valid within. */
+// Always false when this edition has no roll-for-gold rule (gold: null) —
+// there is no range to be valid within.
 export function isGoldValid(startingEquipment: ClassStartingEquipment, gold: number): boolean {
   if (!startingEquipment.gold) return false;
   return gold >= goldMin(startingEquipment.gold) && gold <= goldMax(startingEquipment.gold);
 }
 
-/**
- * Converts an EquipmentDraft into the StartingEquipmentInput shape the API expects.
- * Returns null if the draft is incomplete or invalid.
- */
 export function draftToInput(
   startingEquipment: ClassStartingEquipment,
   draft: EquipmentDraft
@@ -98,12 +77,10 @@ export function draftToInput(
   };
 }
 
-/** Formats a gold dice expression like "5d4×10". */
 export function goldLabel(gold: StartingGold): string {
   return `${gold.diceCount}d${gold.diceFaces}×${gold.multiplier}`;
 }
 
-/** Rolls the gold dice client-side and returns the total. */
 export function rollGold(gold: StartingGold): number {
   let total = 0;
   for (let i = 0; i < gold.diceCount; i++) {

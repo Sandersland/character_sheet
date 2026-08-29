@@ -4,9 +4,9 @@ import { renderHook } from "@testing-library/react";
 import { useMobileScrollLock } from "@/hooks/useMobileScrollLock";
 
 describe("useMobileScrollLock", () => {
-  // jsdom doesn't implement scrollTo; give it a durable noop so React's cleanup
-  // (which may run in RTL's post-test auto-cleanup) never hits the real stub and
-  // warns. The restore-scroll test installs its own spy over this.
+  // jsdom doesn't implement scrollTo; give it a durable noop so React's
+  // cleanup (which may run in RTL's post-test auto-cleanup) doesn't warn.
+  // The restore-scroll test installs its own spy over this.
   beforeEach(() => {
     window.scrollTo = () => {};
   });

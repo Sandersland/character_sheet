@@ -43,8 +43,7 @@ describe("SlotPickerPanel", () => {
     expect(onPick).toHaveBeenCalledWith(expect.objectContaining({ id: "hat" }));
   });
 
-  // #1437: serve-only labels — nothing paints until the rows resolve, so a cold
-  // cache must never leak the raw enum key into the badge.
+  // A cold rarities cache must never leak the raw enum key into the badge (#1437).
   it("renders no rarity badge at all while the served rows are unresolved", () => {
     const { container } = render(
       <SlotPickerPanel

@@ -1,14 +1,3 @@
-// The two-size quick-capture composer (#865). ONE control that grows: it starts a
-// single-line pill and, as the note wraps past one line, relaxes its corners into a
-// ruled serif writing card (a faint rule per line) up to ~8 lines, then scrolls
-// internally. Enter saves, Shift+Enter breaks a line, IME commits are respected.
-// A Private lock toggle and a fixed circular send button sit beneath the field, and
-// the @-mention autocomplete anchors ABOVE (the composer lives at a panel's bottom).
-//
-// Standalone + self-contained so the mobile capture rewrite (#866) can reuse it: it
-// owns the draft + Private state and, on a successful save, clears the field, resets
-// Private (privacy never leaks forward), and returns focus to the editor.
-
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import type { MutableRefObject } from "react";
 
@@ -17,27 +6,18 @@ import MentionAutocomplete from "@/features/journal/MentionAutocomplete";
 import { PrivateLockButton, PrivateToggle } from "@/features/journal/NoteFeed";
 import type { EntryVisibility } from "@/types/character";
 
-const LINE_PX = 27; // ruled-line rhythm; also the editor line-height.
-const CARD_PAD_Y = 16; // editor top+bottom padding in card mode (pt-1 + pb-3).
+const LINE_PX = 27; // must match EDITOR_BASE's leading-[27px].
+const CARD_PAD_Y = 16; // must match EDITOR_CARD's pt-1 + pb-3.
 
 export interface GrowingComposerProps {
   campaignId?: string | null;
   busy: boolean;
   error: string | null;
   onSave: (body: string, visibility?: EntryVisibility) => Promise<boolean>;
-  /** Forwarded to the editor element so a host (the dock) can place initial focus. */
   composerRef?: React.MutableRefObject<HTMLDivElement | null>;
   placeholder?: string;
-  /** Show the "↵ save · shift+↵ new line" hint (desktop). */
   showHints?: boolean;
-  /** Grow to this many lines before scrolling internally (default 8). */
   maxLines?: number;
-  /**
-   * Presentation: "dock" (default) stacks the field over a control row with the
-   * Private checkbox + hint + send. "mobile" (#866) lays the field between a
-   * compact lock icon-button and a larger circular send in one keyboard-docked
-   * row — the ≥44px chat-composer arrangement.
-   */
   variant?: "dock" | "mobile";
 }
 
@@ -46,20 +26,15 @@ const FIELD_BASE =
 const FIELD_PILL = `${FIELD_BASE} flex min-h-10 items-center rounded-full`;
 const FIELD_CARD = `${FIELD_BASE} rounded-[10px]`;
 
-// text-base at mobile widths keeps the field ≥16px so iOS Safari doesn't auto-zoom
-// on focus; the 15px serif register kicks in at md+ (the dock).
+// text-base (≥16px) avoids iOS Safari auto-zoom on focus; md:text-[15px] only applies at the dock breakpoint.
 const EDITOR_BASE =
   "block w-full font-display text-base leading-[27px] md:text-[15px] text-parchment-900 caret-garnet-700 outline-none";
 const EDITOR_PILL = `${EDITOR_BASE} px-3.5 py-[6px]`;
-// Ruled writing card: a faint rule under each 27px line, tracking the text as it
-// scrolls (background-attachment:local) and aligned to the content box.
+// background-attachment:local keeps the ruled lines tracking the text as it scrolls.
 const EDITOR_CARD =
   `${EDITOR_BASE} rounded-[10px] px-3.5 pt-1 pb-3 overflow-y-auto [background-origin:content-box] [background-attachment:local] ` +
   "bg-[repeating-linear-gradient(to_bottom,transparent_0,transparent_26px,var(--color-parchment-100)_26px,var(--color-parchment-100)_27px)]";
 
-// Measure the editor's wrapped-line count from its scrollHeight/line-height and
-// derive the pill↔card threshold + the scroll cap. Re-measures on every edit and
-// on width changes (ResizeObserver), keeping the component body thin.
 function useGrowthMeasure(
   ref: MutableRefObject<HTMLDivElement | null>,
   value: string,
@@ -114,7 +89,7 @@ export default function GrowingComposer({
 
   async function handleSave() {
     if (!canSave) return;
-    // Shared (the in-campaign default) omits visibility; only the opt-out is sent.
+    // Omitting visibility means shared — the backend default — so only the PRIVATE opt-out is ever sent.
     const ok = await onSave(value.trim(), campaignId && isPrivate ? "PRIVATE" : undefined);
     if (ok) {
       setValue("");
@@ -124,7 +99,6 @@ export default function GrowingComposer({
   }
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
-    // Enter saves; Shift+Enter newlines; isComposing skips an IME-commit Enter.
     if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault();
       void handleSave();
@@ -167,9 +141,7 @@ interface ComposerLayoutProps {
   onSave: () => void;
 }
 
-// Mobile (#866): lock icon-button · growing field · circular send, docked in one
-// row above the keyboard. The field grows upward; items-end keeps the controls
-// pinned to the composing line.
+// items-end keeps the controls pinned to the composing line as the field grows upward.
 function MobileComposerLayout({ field, campaignId, isPrivate, setIsPrivate, canSave, error, onSave }: ComposerLayoutProps) {
   return (
     <div className="flex flex-col gap-1">
@@ -183,8 +155,6 @@ function MobileComposerLayout({ field, campaignId, isPrivate, setIsPrivate, canS
   );
 }
 
-// Dock/desktop (#865): field stacked over a control row (Private checkbox +
-// keyboard hint + compact send).
 function DockComposerLayout({
   field,
   campaignId,
@@ -210,8 +180,7 @@ function DockComposerLayout({
   );
 }
 
-// The circular save button, shared by both variants (the mobile row uses the
-// larger ≥44px hit target; the dock row the compact 36px control).
+// The mobile row uses the ≥44px touch-target minimum; the dock row a compact 36px control.
 function SendButton({
   size,
   disabled,

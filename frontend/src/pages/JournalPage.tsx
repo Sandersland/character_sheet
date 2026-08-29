@@ -1,9 +1,3 @@
-// Route: /characters/:id/journal — the field-chronicle page (#864). A chapter
-// spine (sessions grouped by arcs into parts) on the left, a manuscript reading +
-// writing page on the right. On mobile the spine collapses to a chapters list that
-// pushes to the page, with a floating "✎ Note" quick-capture button. Design:
-// option A "Quiet Manuscript" + frame A′ (desktop) / frame C (mobile).
-
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -34,8 +28,6 @@ export default function JournalPage() {
   );
 }
 
-// Per-chapter note counts from the live journal, so the spine stays current as
-// notes are added/removed without refetching the chronicle.
 function deriveNoteCounts(journal: Character["journal"]) {
   const bySession = new Map<string, number>();
   let between = 0;
@@ -69,10 +61,9 @@ function JournalPageBody() {
     [arcs, sessions, counts],
   );
 
-  // Honor an explicit selection while it stays valid; otherwise follow the default
-  // (newest chapter). Deriving it — rather than storing the default in state — means
-  // the selection tracks the newest session once the chronicle finishes loading,
-  // instead of sticking on the between-sessions bucket picked from the empty spine.
+  // Derived (not stored) so the selection tracks the newest session as the
+  // chronicle loads, instead of sticking on the between-sessions default from
+  // the empty spine.
   const effectiveId = selectedId && findChapter(spine, selectedId) ? selectedId : defaultChapterId(spine);
   const selectedChapter = findChapter(spine, effectiveId);
 
@@ -143,7 +134,6 @@ function BackLink() {
   );
 }
 
-// Desktop: fixed spine + manuscript, side by side.
 function JournalDesktopView(props: JournalViewProps) {
   const { spine, effectiveId, filter, onFilterChange, onSelect, error, manuscript } = props;
   // useCaptureDock (not a bare useState) so ⌘J/Ctrl+J toggles the dock here too,
@@ -185,7 +175,6 @@ function JournalDesktopView(props: JournalViewProps) {
   );
 }
 
-// Mobile: a chapters list that pushes to the manuscript page.
 function JournalMobileView(props: JournalViewProps) {
   const { spine, effectiveId, filter, onFilterChange, onSelect, error, manuscript } = props;
   const [pageOpen, setPageOpen] = useState(false);

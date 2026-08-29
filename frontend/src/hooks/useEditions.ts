@@ -20,16 +20,12 @@ interface UseEditionsResult {
   refetch: () => void;
 }
 
-/**
- * The selectable rules editions and the edition to pre-select (#1436).
- *
- * staleTime: Infinity, like useReferenceData — this is catalog content that
- * cannot change mid-session, and a permanently-fresh entry means a test that
- * seeds the cache never fires a request at all (see seedEditions).
- *
- * No edition argument, by construction: the query key is edition-free because
- * this is the endpoint a caller reads in order to CHOOSE an edition.
- */
+// staleTime: Infinity, like useReferenceData — this is catalog content that
+// cannot change mid-session, and a permanently-fresh entry means a test that
+// seeds the cache never fires a request at all.
+//
+// No edition argument, by construction: the query key is edition-free
+// because this is the endpoint a caller reads in order to CHOOSE an edition.
 export function useEditions(): UseEditionsResult {
   const { data, isError, refetch } = useQuery({
     queryKey: catalogKeys.editions(),
@@ -38,6 +34,6 @@ export function useEditions(): UseEditionsResult {
   });
 
   // `error` means "nothing to show" — a failed background refetch must not
-  // discard a payload already on screen. Same guard as useReferenceData.
+  // discard a payload already on screen.
   return { editions: data ?? null, error: isError && data === undefined, refetch: () => void refetch() };
 }

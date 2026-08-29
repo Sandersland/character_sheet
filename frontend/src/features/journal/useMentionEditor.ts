@@ -1,9 +1,3 @@
-// Editor state + contentEditable/chip DOM wiring for MentionAutocomplete (#609).
-// useMentionSuggest owns the @-trigger + suggestion model; useMentionEditor adds
-// the editor ref, DOM-sync effect, and DOM-mutating handlers. The heavy branching
-// lives in the module-level helpers below and in @/lib/mentions — the hooks are
-// thin glue so neither trips the complexity gate.
-
 import {
   useCallback,
   useEffect,
@@ -37,12 +31,10 @@ type Resolve = (id: string) => MentionResolved | null;
 
 const MAX_MATCHES = 6;
 
-// Keys handled on keydown for popover nav — keyup must not resync (which resets
-// the active option), or aria-activedescendant can't track arrowing.
+// keyup must not resync (which resets the active option), or aria-activedescendant can't track arrowing.
 const NAV_KEYS = new Set(["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"]);
 
-// Signature of the resolved names/types for the tokens in `value`; changes only
-// when an entity loads or is renamed (so we re-render chips), not while typing.
+// Changes only when an entity loads or is renamed (so we re-render chips), not while typing.
 function computeNamesKey(value: string, byId: Map<string, CampaignEntity>): string {
   return parseMentionBody(value)
     .filter((s): s is Extract<MentionSegment, { type: "mention" }> => s.type === "mention")
@@ -60,13 +52,11 @@ function computeMatches(
   entities: CampaignEntity[],
 ): CampaignEntity[] {
   if (!trigger || !campaignId) return [];
-  // Never surface hidden entities in the tag picker, even to the owner (#534).
   const visible = entities.filter((e) => e.visibility !== "HIDDEN");
   const scoped = trigger.typeFilter ? visible.filter((e) => e.type === trigger.typeFilter) : visible;
   return matchEntities(scoped, trigger.query).slice(0, MAX_MATCHES);
 }
 
-// The create-row + popover open/close model derived from the live trigger.
 function deriveSuggestState(
   trigger: ActiveTrigger | null,
   campaignId: string | null | undefined,
@@ -80,8 +70,7 @@ function deriveSuggestState(
   return { createName, showCreate, createType, totalItems, popoverOpen };
 }
 
-// Reflect `value` into the editor DOM only when the structure differs from
-// what's typed or a name resolved — never mid-keystroke, so the caret holds.
+// Sync into the DOM only when structure differs — never mid-keystroke, so the caret holds.
 function syncEditorDom(
   el: HTMLDivElement,
   value: string,
@@ -94,7 +83,6 @@ function syncEditorDom(
   el.replaceChildren(mentionBodyToFragment(value, resolve));
 }
 
-// Replace the in-progress @-query with `@[id] ` and pin the caret past it.
 function insertMentionAt(
   el: HTMLDivElement,
   trigger: ActiveTrigger,
@@ -119,7 +107,6 @@ function insertMentionAt(
   });
 }
 
-// Remove the chip adjacent to a collapsed caret, pinning the caret at its start.
 function removeAdjacentChip(
   el: HTMLDivElement,
   forward: boolean,
@@ -132,8 +119,7 @@ function removeAdjacentChip(
   if (!range.collapsed) return false;
   const chip = resolveAdjacentChip(range, forward);
   if (!chip) return false;
-  // Measure the chip's body offset, then pin the caret there after removal so it
-  // lands deterministically across browsers instead of browser-default.
+  // Pin the caret to the chip's measured body offset so it lands deterministically across browsers.
   const anchor = document.createRange();
   anchor.setStartBefore(chip);
   anchor.collapse(true);
@@ -143,8 +129,7 @@ function removeAdjacentChip(
   chip.remove();
   onChange(serializeMentionDom(el));
   afterRemove();
-  // Defer past the value-driven re-render (which replaces the editor DOM) so the
-  // caret pins to the chip-start offset instead of the browser default.
+  // Deferred past the value-driven re-render (which replaces the editor DOM), or the caret pin below is overwritten.
   requestAnimationFrame(() => {
     el.focus();
     placeCaretAtBodyOffset(el, chipStart);
@@ -160,7 +145,6 @@ interface NavContext {
   close: () => void;
 }
 
-// Handle a popover-nav keydown; returns true when the key was consumed.
 function runNavKey(event: ReactKeyboardEvent<HTMLDivElement>, ctx: NavContext): boolean {
   if (!ctx.active) return false;
   switch (event.key) {
@@ -202,8 +186,7 @@ function runEditorKeyDown(event: ReactKeyboardEvent<HTMLDivElement>, ctx: KeyDow
   ctx.onKeyDown?.(event);
 }
 
-// Insert pasted text as plain text at the caret (contentEditable would otherwise
-// paste rich HTML), then resync value + trigger through handleInput.
+// preventDefault + insertNode keeps this plain text — contentEditable's default paste is rich HTML.
 function applyPaste(event: React.ClipboardEvent<HTMLDivElement>, handleInput: () => void) {
   event.preventDefault();
   const text = event.clipboardData.getData("text/plain");
@@ -218,7 +201,6 @@ function applyPaste(event: React.ClipboardEvent<HTMLDivElement>, handleInput: ()
   handleInput();
 }
 
-// Create/error state + the createEntity side effect, isolated from the editor.
 function useEntityCreation(campaignId: string | null | undefined, entities: CampaignEntity[]) {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -242,7 +224,6 @@ function useEntityCreation(campaignId: string | null | undefined, entities: Camp
   return { creating, error, create };
 }
 
-// The @-trigger + suggestion model: what to show and the raw entity data.
 function useMentionSuggest(campaignId: string | null | undefined, value: string) {
   const listboxId = useId();
   const { entities, byId } = useCampaignEntities(campaignId);
@@ -294,7 +275,6 @@ function commitSuggestion(s: SuggestModel, insertToken: (id: string) => void, cr
   else if (s.showCreate) void create();
 }
 
-// Editor ref + every DOM-mutating handler, wired to the suggestion model.
 function useMentionHandlers(
   innerRef: React.RefObject<HTMLDivElement | null>,
   s: SuggestModel,
@@ -303,7 +283,6 @@ function useMentionHandlers(
   onKeyDown?: (event: ReactKeyboardEvent<HTMLDivElement>) => void,
 ) {
   const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Cancel the deferred blur-close on unmount so it never fires post-teardown.
   useEffect(() => () => void (blurTimer.current && clearTimeout(blurTimer.current)), []);
 
   // Destructure the stable setters so callbacks depend on them, not the whole `s` model (which changes every render) — preserves callback identity without a suppression.

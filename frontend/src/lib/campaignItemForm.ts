@@ -65,7 +65,6 @@ export interface FormState {
   valueUnit: CurrencyUnit;
   description: string;
   dmNotes: string;
-  // weapon
   damageDiceCount: string;
   damageDiceFaces: string;
   damageModifier: string;
@@ -84,14 +83,12 @@ export interface FormState {
   rangeLong: string;
   weaponClass: WeaponClass | "";
   weaponRange: WeaponRange | "";
-  // armor
   armorCategory: string;
   baseArmorClass: string;
   dexModifierApplies: boolean;
   dexModifierMax: string;
   stealthDisadvantage: boolean;
   strengthRequirement: string;
-  // consumable
   effectDiceCount: string;
   effectDiceFaces: string;
   effectModifier: string;
@@ -153,7 +150,6 @@ export const num = (s: string): number | undefined => {
 
 export const str = (n: number | undefined): string => (n === undefined ? "" : n.toString());
 
-// Map a persisted detail block back onto the string/boolean FormState slice.
 function currencyFields(cost: Currency | undefined) {
   return {
     costCp: str(cost?.cp),
@@ -205,8 +201,6 @@ function armorFields(a: ArmorDetail | undefined) {
   };
 }
 
-// Prefill the from-scratch form from a chosen catalog Item (clone path):
-// category/weight/cost/description + the matching detail block.
 export function formFromCatalog(item: Item): FormState {
   return {
     ...emptyForm,
@@ -225,8 +219,7 @@ export function formFromCatalog(item: Item): FormState {
   };
 }
 
-// Prefill the shared form from an existing campaign item (edit path):
-// every base field + the matching detail block, so a save re-sends the full item.
+// Every base field + detail block — a save re-sends the full item, not a partial patch.
 export function formFromItem(item: CampaignItem): FormState {
   return {
     ...emptyForm,
@@ -253,33 +246,21 @@ export function formFromItem(item: CampaignItem): FormState {
   };
 }
 
-// Range is shown/sent only for a ranged or thrown weapon.
 export const hasRange = (f: FormState): boolean => f.weaponRange === "ranged" || f.thrown;
 
-/**
- * The slots a weapon/armor item BEING AUTHORED would equip to, for the DM form's
- * read-only "Equips to" line. The only surviving client-side copy of the
- * backend's `allowedSlotsForItem` (#1433): it previews UNSAVED form state, so
- * there is no character and no inventory row to ask, and no payload flag can
- * serve it — the same shape as `rarityValueHint`. Weapon/armor only, because the
- * preview line renders for exactly those two categories (gear authors its slot
- * with a picker; consumables have none).
- */
+// Only surviving client-side copy of the backend's allowedSlotsForItem — previews unsaved form state, so there's no character/inventory row to ask (#1433).
 export function previewEquipSlots(f: FormState): EquipSlot[] {
   if (f.category === "weapon") return f.twoHanded ? ["MAIN_HAND"] : ["MAIN_HAND", "OFF_HAND"];
   if (f.category === "armor") return f.armorCategory === "shield" ? ["OFF_HAND"] : ["BODY"];
   return [];
 }
 
-// Highest populated denomination, so the single Value field faithfully shows an
-// existing cost on edit (e.g. {sp:50} → "sp"). Defaults to gp for a blank cost.
 const UNIT_ORDER: readonly CurrencyUnit[] = ["pp", "gp", "sp", "cp"];
 export function unitForCost(cost: Currency | undefined): CurrencyUnit {
   if (!cost) return "gp";
   return UNIT_ORDER.find((u) => (cost[u] ?? 0) > 0) ?? "gp";
 }
 
-// The four-denomination cost, or undefined when every field is blank.
 export function currencyFromForm(f: FormState): Currency | undefined {
   const cp = num(f.costCp);
   const sp = num(f.costSp);
@@ -289,8 +270,7 @@ export function currencyFromForm(f: FormState): Currency | undefined {
   return { cp: cp ?? 0, sp: sp ?? 0, gp: gp ?? 0, pp: pp ?? 0 };
 }
 
-// Versatile/range only persist when their gate is on — mirror the hidden-field
-// rule so a melee weapon can't keep phantom values.
+// Only persist when their gate is on, mirroring the hidden-field rule — a melee weapon can't keep phantom values.
 function versatileValues(f: FormState) {
   return {
     versatileDiceCount: f.versatile ? num(f.versatileDiceCount) : undefined,
@@ -347,16 +327,14 @@ function buildConsumable(f: FormState): CampaignItemInput["consumable"] {
   return Object.values(effect).some((v) => v !== undefined) ? effect : undefined;
 }
 
-// Prereq only meaningful for an attunable magic item; a value-bearing kind
-// without a value degrades to null (attunable by anyone).
+// A value-bearing prereq kind with no typed value degrades to null (attunable by anyone).
 function attunementFields(f: FormState, attunable: boolean) {
   const kind = attunable && f.attunementPrereqKind ? f.attunementPrereqKind : null;
   const value = kind && kind !== "spellcaster" ? f.attunementPrereqValue.trim() || null : null;
   return { attunementPrereqKind: kind, attunementPrereqValue: value };
 }
 
-// Base fields common to every category; attunement/unique only apply to a magic
-// item — gate them like versatile/range so a mundane item can't carry stale flags.
+// attunement/unique only apply to a magic item, gated like versatile/range so a mundane item can't carry stale flags.
 function buildBase(f: FormState): CampaignItemInput {
   const magic = f.rarity !== "";
   const attunable = magic && f.requiresAttunement;

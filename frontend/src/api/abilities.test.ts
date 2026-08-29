@@ -16,9 +16,6 @@ import {
   triggerQuiveringPalmTransaction,
 } from "@/api/abilities";
 
-// Verbatim regression pin from client.test.ts (#1270) — assertions unchanged,
-// only the import specifier retargeted. This is the shared seam every other
-// test in this file rides on (#1275).
 describe("applyAbilityTransactions", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -38,8 +35,6 @@ describe("applyAbilityTransactions", () => {
   });
 });
 
-// New direct coverage (#1270) — the twelve named wrappers below were only
-// exercised transitively (through component tests) before the split.
 describe("applyWarriorOfElementsTransactions", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -51,8 +46,6 @@ describe("applyWarriorOfElementsTransactions", () => {
       .mockResolvedValue({ ok: true, json: async () => ({ character: { id: "1" }, results: [] }) });
     vi.stubGlobal("fetch", fetchMock);
 
-    // Elemental Attunement's own toggle moved off this endpoint (#1686) —
-    // elementalStrike is a still-live WarriorOfElementsOperation.
     await applyWarriorOfElementsTransactions("1", [{ type: "elementalStrike", damageType: "fire" }]);
 
     expect(fetchMock).toHaveBeenCalledWith(

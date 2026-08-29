@@ -14,13 +14,8 @@ interface SheetTabsState {
   onTabChange: (id: SheetTabId) => void;
 }
 
-/**
- * Owns the sheet's tab state: which tabs this character has, the active one, and
- * how switching updates the URL. The active tab lives in the `?tab=` query param
- * so it's linkable, reload-safe, and back-button navigable (switching pushes a
- * history entry). Falls back to the first available tab for a missing/unavailable
- * value. Safe to call before the character has loaded (returns no tabs).
- */
+// The active tab lives in the ?tab= query param, so it's linkable, reload-safe, and back-button navigable.
+// Safe to call before the character has loaded — returns no tabs.
 export function useSheetTabs(character: Character | null | undefined): SheetTabsState {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabs = character ? getSheetTabs(character) : [];

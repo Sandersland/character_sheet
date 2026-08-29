@@ -198,8 +198,7 @@ describe("previewEquipSlots (#1433)", () => {
     expect(previewEquipSlots(form({ category: "armor", armorCategory: "heavy" }))).toEqual(["BODY"]);
   });
 
-  // Gear authors its slot with a picker and a consumable has none, so the
-  // preview line never renders for them — no branch here to keep in sync.
+  // Gear authors its slot via a picker and a consumable has none — no branch here to keep in sync.
   it("has no preview for gear or a consumable", () => {
     expect(previewEquipSlots(form({ category: "gear", slot: "HEAD" }))).toEqual([]);
     expect(previewEquipSlots(form({ category: "consumable" }))).toEqual([]);

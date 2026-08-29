@@ -1,9 +1,3 @@
-// Loads the caller's own campaigns (#1801, epic #1795 6/6) — shared by
-// ShareSpellSheet (who can I share into?) and ForkSpellSheet (which of these
-// do I DM?), each of which otherwise duplicated the identical fetch-on-mount
-// effect. No filtering here: `fetchCampaigns()` already scopes to the
-// caller's own memberships server-side; a consumer narrows further (e.g. to
-// `role === "OWNER"`) itself.
 import { useEffect, useState } from "react";
 
 import { fetchCampaigns } from "@/api/client";
@@ -15,6 +9,9 @@ export function useCallerCampaigns(): { campaigns: Campaign[] | null; error: str
 
   useEffect(() => {
     let mounted = true;
+    // fetchCampaigns() already scopes to the caller's own memberships
+    // server-side; a consumer narrows further (e.g. to role === "OWNER")
+    // itself.
     fetchCampaigns()
       .then((list) => { if (mounted) setCampaigns(list); })
       .catch(() => { if (mounted) setError("Couldn't load your campaigns."); });

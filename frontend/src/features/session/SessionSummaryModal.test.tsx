@@ -14,19 +14,17 @@ import type {
   SessionParticipant,
 } from "@/types/character";
 
-// SessionAddXpForm reads/writes the character via useCurrentCharacter() (#1284);
-// every fixture below uses characterId "c1", so one seed covers all of them.
+// SessionAddXpForm reads/writes the character via useCurrentCharacter(); every
+// fixture below uses characterId "c1", so one seed covers all of them.
 const seedCharacter = { id: "c1" } as Character;
 
-// A well-formed entity uuid for @[<uuid>] mention-token tests. Inlined in the
-// (hoisted) vi.mock factory below to avoid a temporal-dead-zone reference.
+// Inlined in the hoisted vi.mock factory below — referencing DRAGON_ID there would hit a temporal-dead-zone error.
 const DRAGON_ID = "11111111-1111-1111-1111-111111111111";
 
 vi.mock("@/api/client", () => ({
   applyExperienceOperations: vi.fn(),
   fetchSession: vi.fn(),
-  // useCampaignEntities (chip resolver) reads this; default to a Dragon NPC so
-  // the mention-chip render can be asserted.
+  // useCampaignEntities (chip resolver) reads this.
   fetchEntities: vi.fn(async () => [
     { id: "11111111-1111-1111-1111-111111111111", type: "NPC", name: "Dragon" },
   ]),
@@ -107,8 +105,7 @@ const participants: SessionParticipant[] = [
   }),
 ];
 
-// journalEntries is set (even if empty) so the modal does NOT lazily fetch
-// session detail — these tests exercise the rendered props directly.
+// journalEntries is set (even if empty) so the modal does not lazily fetch session detail.
 const baseSession: Session = {
   id: "s1",
   campaignId: "camp1",
@@ -128,17 +125,14 @@ describe("SessionSummaryModal", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText(/Session Recap — The Sunless Citadel/)).toBeInTheDocument();
 
-    // Recap tiles + party size.
-    expect(screen.getByText("450")).toBeInTheDocument(); // XP gained (recap)
+    expect(screen.getByText("450")).toBeInTheDocument();
     expect(screen.getByText("XP gained")).toBeInTheDocument();
     expect(screen.getByText("Attack rolls")).toBeInTheDocument();
     expect(screen.getByText(/2 players/)).toBeInTheDocument();
 
-    // Secondary facts.
     expect(screen.getByText(/Gained 1 level/)).toBeInTheDocument();
     expect(screen.getByText(/4 combat rounds/)).toBeInTheDocument();
 
-    // Items acquired (party-wide).
     expect(screen.getByText("Healing Potion")).toBeInTheDocument();
     expect(screen.getByText("Longsword")).toBeInTheDocument();
   });
@@ -148,7 +142,6 @@ describe("SessionSummaryModal", () => {
     expect(screen.getByText("Participants")).toBeInTheDocument();
     expect(screen.getByText("Aldric")).toBeInTheDocument();
     expect(screen.getByText("Bromm")).toBeInTheDocument();
-    // Each participant card shows their present duration.
     expect(screen.getAllByText(/present/).length).toBeGreaterThanOrEqual(2);
   });
 
@@ -185,12 +178,9 @@ describe("SessionSummaryModal", () => {
       seedCharacter,
     );
 
-    // The note body is visible immediately — no title, no collapse (#278 regression).
     expect(screen.getByText(/Slew the/)).toBeInTheDocument();
-    // The @[<uuid>] token resolves to the entity's inked name once entities load
-    // (inked-name mentions drop the leading @ sigil, #862).
+    // Inked-name mentions drop the leading @ sigil.
     expect(await screen.findByText("Dragon")).toBeInTheDocument();
-    // The raw token never leaks through as text.
     expect(screen.queryByText(new RegExp(DRAGON_ID))).not.toBeInTheDocument();
   });
 
@@ -208,7 +198,6 @@ describe("SessionSummaryModal", () => {
     expect(screen.getByText("Items sold")).toBeInTheDocument();
     expect(screen.getByText("Alms Box")).toBeInTheDocument();
     expect(screen.getByText("×2")).toBeInTheDocument();
-    // The mislabel bug: a sold item must never appear as a negative acquisition.
     expect(screen.queryByText("×-2")).not.toBeInTheDocument();
   });
 
@@ -234,9 +223,7 @@ describe("SessionSummaryModal", () => {
     };
     renderWithCharacter(<SessionSummaryModal characterId="c1" session={session} onClose={() => {}} />, seedCharacter);
 
-    // Aggregate is still shown…
     expect(screen.getByText("XP gained")).toBeInTheDocument();
-    // …but the duplicate Participants section is gone.
     expect(screen.queryByText("Participants")).not.toBeInTheDocument();
   });
 
@@ -258,9 +245,7 @@ describe("SessionSummaryModal", () => {
   });
 
   it("renders a legacy recap blob missing itemsSold/slotsSpent/featsOrAsis without crashing", () => {
-    // Sessions ended before these fields shipped have stored summary blobs that
-    // lack them; the recap is read from storage (not recomputed), so the modal
-    // must tolerate their absence rather than throwing on `.length`/`Object.keys`.
+    // The recap is read from storage, not recomputed, so old stored blobs may lack these fields.
     const legacyRecap = {
       startedAt: recap.startedAt,
       endedAt: recap.endedAt,
@@ -279,7 +264,6 @@ describe("SessionSummaryModal", () => {
 
     renderWithCharacter(<SessionSummaryModal characterId="c1" session={session} onClose={() => {}} />, seedCharacter);
 
-    // The aggregate still renders; the missing-field sections are simply absent.
     expect(screen.getByText("XP gained")).toBeInTheDocument();
     expect(screen.queryByText("Items sold")).not.toBeInTheDocument();
     expect(screen.queryByText("Slots spent")).not.toBeInTheDocument();
@@ -352,10 +336,8 @@ describe("SessionSummaryModal", () => {
     const solo: Session = { ...baseSession, campaignId: null };
     renderWithCharacter(<SessionSummaryModal characterId="c1" session={solo} onClose={() => {}} />, seedCharacter);
 
-    // The recap still renders off the session's own summary…
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText("XP gained")).toBeInTheDocument();
-    // …but there is no campaign to resolve @-mention chips against.
     expect(mockFetchEntities).not.toHaveBeenCalled();
   });
 

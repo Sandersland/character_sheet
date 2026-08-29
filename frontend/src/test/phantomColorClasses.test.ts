@@ -4,14 +4,10 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-// #1406 — a numbered color utility whose ramp step is not declared anywhere is
-// silently dropped by Tailwind: no build error, no type error, no runtime
-// warning, just an element that renders with nothing applied. A background
-// fill on `ink-900` shipped two invisible scrims that way, because `--color-ink`
-// is a single fixed label token with NO ramp behind it. Nothing else in the
-// toolchain can catch it, so this guard reads the checked-in index.css and
-// the checked-in sources and proves every `<prefix>-<family>-<step>` in the app
-// resolves to a real declaration.
+// A numbered color utility whose ramp step isn't declared is silently dropped
+// by Tailwind — no build/type/runtime error, just an unstyled element. This
+// guard proves every `<prefix>-<family>-<step>` used in the app resolves to a
+// real --color-* declaration (#1406).
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const SRC_DIR = join(TEST_DIR, "..");
@@ -37,7 +33,6 @@ function declaredRampSteps(css: string): Set<string> {
   return steps;
 }
 
-/** Every ramp utility in `source` whose family-step pair resolves nowhere. */
 function findPhantomRampClasses(source: string, declared: Set<string>): string[] {
   const phantoms: string[] = [];
   for (const [utility, family, step] of source.matchAll(RAMP_UTILITY)) {
@@ -59,9 +54,8 @@ const files = sourceFiles();
 
 describe("phantom color classes (#1406)", () => {
   it("index.css declares a non-trivial set of ramp steps", () => {
-    // Anti-vacuity: if the --color-* scan silently returns {} (a renamed token
-    // convention, a selector-parse miss), the sweep below would report every
-    // utility in the app as a phantom — or, with an inverted check, none at all.
+    // Anti-vacuity: an empty scan would make every utility look phantom, or
+    // none, depending on the check's polarity.
     expect(declared.size).toBeGreaterThan(40);
     expect(declared.has("parchment-100")).toBe(true);
   });
@@ -81,8 +75,8 @@ describe("phantom color classes (#1406)", () => {
         offenders.push(`${file.slice(SRC_DIR.length + 1)}: ${phantom}`);
       }
     }
-    // Anti-vacuity: prove the regex matched real utilities, not that the app
-    // happens to contain none for it to judge.
+    // Anti-vacuity: proves the regex matched real utilities, not that none
+    // exist to judge.
     expect(utilitiesSeen).toBeGreaterThan(100);
     expect(offenders).toEqual([]);
   });

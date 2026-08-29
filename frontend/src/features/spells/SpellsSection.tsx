@@ -1,14 +1,3 @@
-/**
- * SpellsSection — interactive orchestrator for spellcasting on the character sheet.
- * State + op batching live in useSpellcasting; pure list derivation in spellList;
- * pure cast planning in spellCast. This shell wires derived data + handlers into
- * the presentational subcomponents (overview, spellbook list, add-spell panel).
- *
- * Two mutually-exclusive views (caster-spellbook.html §1 vs §2/§4): the record block
- * (SpellcastingOverview, Cast door) is the default; "Manage spellbook →" opens the
- * grimoire (SpellbookList) as its own view with a Done control. They are never stacked.
- */
-
 import { useState } from "react";
 
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
@@ -22,7 +11,6 @@ import SpellcastingOverview from "@/features/spells/SpellcastingOverview";
 import { useSpellcasting } from "@/features/spells/useSpellcasting";
 
 interface SpellsSectionProps {
-  /** A live session is active — the Cast door defers to the Combat tab (#1162). */
   isLive?: boolean;
   onGoToCombat?: () => void;
 }
@@ -45,14 +33,9 @@ export default function SpellsSection({
     handleCast, handlePrepare, handleForget, handleLearn, handleSwap,
   } = useSpellcasting(character);
 
-  // The grimoire (prepare/swap/learn) is a distinct view reached from the record's
-  // "Manage spellbook →" — not rendered alongside the record block.
   if (grimoireOpen) {
     return (
-      // #1859: px-4 supplies the mobile inset CharacterSheetBody's <main> doesn't
-      // (px-0 there, md:px-6) — same pattern as ClassPanel's own gutter — so spell
-      // names/×/the Prepared bar don't run to the screen edge; md:px-0 defers to
-      // main's own desktop padding so the frame isn't doubled.
+      // #1859: px-4 md:px-0 compensates for CharacterSheetBody's <main> having no mobile padding (matches ClassPanel's gutter pattern) without doubling desktop padding.
       <div className="flex flex-col gap-5 px-4 md:px-0">
         <SpellbookList
           spells={spells}
@@ -89,15 +72,7 @@ export default function SpellsSection({
           />
         )}
 
-        {/* #1859: sticky footer — the grimoire's own scroll region has no reserved
-            space for SheetBottomNav (CharacterSheetBody's <main> is pb-0 on mobile),
-            so at max scroll this row used to land flush against the nav with zero
-            clearance and become untappable. Pinning it to the scroller's bottom
-            keeps Learn/Done reachable regardless of spell count; bg-parchment-100
-            matches the page background (index.css `body`) so scrolled spell rows
-            don't show through. md:static reverts to plain flow — desktop doesn't
-            scroll this region, so stickiness would otherwise pin the row against
-            the browser viewport instead. */}
+        {/* #1859: sticky bottom pins Learn/Done above SheetBottomNav's missing mobile clearance; bg-parchment-100 matches index.css body so scrolled rows don't show through; md:static reverts since desktop doesn't scroll this region. */}
         <div className="sticky bottom-0 flex items-center justify-between gap-3 border-t border-parchment-200 bg-parchment-100 pt-4 pb-4 md:static md:pb-0">
           {addPanelOpen ? (
             <span />

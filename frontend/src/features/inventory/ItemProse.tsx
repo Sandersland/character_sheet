@@ -4,7 +4,6 @@ interface ItemProseProps {
   item: InventoryItem;
 }
 
-// The disclosed prose body: description, consumable effect text, and notes.
 export default function ItemProse({ item }: ItemProseProps) {
   return (
     <div className="flex flex-col gap-1 pl-0.5">

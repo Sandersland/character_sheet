@@ -1,5 +1,3 @@
-// Shared 0-9 spell-level dropdown ("Cantrip" for 0) — used by HomebrewSpellForm
-// (catalog homebrew spell, #1787).
 import { INPUT_CLS, LABEL_CLS } from "@/lib/addSpell";
 
 interface SpellLevelSelectProps {

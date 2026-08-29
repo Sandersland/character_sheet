@@ -1,8 +1,4 @@
-/**
- * DisciplineRow — a scalable Way of the Four Elements cast row (#1505); picks among
- * server-resolved CatalogDiscipline.steps and never computes a roll's dice itself.
- */
-
+// Picks among server-resolved CatalogDiscipline.steps; never computes a roll's dice itself.
 import { useState } from "react";
 
 import AbilityRowShell, { CastAbilityButton } from "@/features/class/AbilityRowShell";
@@ -12,16 +8,14 @@ import type { CatalogDiscipline, ChoiceEntry, DisciplineOperation } from "@/type
 
 interface Props {
   entry: ChoiceEntry;
-  /** Undefined until GET /api/disciplines resolves — the row still shows
-   *  name/description from the entry's own snapshot, just with casting disabled. */
+  // Undefined until GET /api/disciplines resolves — the row still shows
+  // name/description from the entry's own snapshot, just with casting disabled.
   catalog: CatalogDiscipline | undefined;
   kiAvailable: number;
   busy: boolean;
   onCast: (op: DisciplineOperation) => void;
 }
 
-// The op a cast sends, given the live ki selection — split out of the
-// component body so its own branching stays out of DisciplineRow's budget.
 // `catalog`/`view` are known non-null here (handleCast's own guard).
 function buildCastOp(
   entryId: string,
@@ -38,20 +32,16 @@ function buildCastOp(
   };
 }
 
-// The ki the picker/cast actually use, given the live selection — split out
-// (like buildCastOp/castTitle) so its own null-check stays out of DisciplineRow's budget.
 function effectiveKiFor(view: DisciplineCastView | undefined, selectedKi: number | undefined): number | undefined {
   return view ? effectiveStep(view, selectedKi)?.ki : undefined;
 }
 
-// Cast-button title: explains a disabled button, or names the spend.
 function castTitle(entryName: string, catalog: CatalogDiscipline | undefined, view: DisciplineCastView | undefined): string {
   if (!catalog || !view) return "Loading discipline data…";
   if (!view.canAfford) return `Not enough ki (needs ${view.costBase})`;
   return `Cast ${entryName} (${view.kiLabel})`;
 }
 
-/** The ki-amount `<select>` for a scalable discipline — hidden entirely for a flat-cost one. */
 function KiPicker({
   entryId,
   entryName,
@@ -95,7 +85,7 @@ export default function DisciplineRow({ entry, catalog, kiAvailable, busy, onCas
   const view = catalog ? disciplineCastView(catalog, kiAvailable) : undefined;
   // Normalised through effectiveStep so a mid-session ki spend that drops the
   // selected option from view.options can't leave the picker showing a value
-  // no <option> renders (blank select) while the op submits a different one.
+  // no <option> renders while the op submits a different one.
   const effectiveKi = effectiveKiFor(view, selectedKi);
 
   function handleCast() {

@@ -84,8 +84,6 @@ describe("equippedLoadoutLabel (#733)", () => {
     expect(equippedLoadoutLabel(inv, false)).toBe("Two daggers");
   });
 
-  // The served flag decides, not the row's own twoHanded bit: a one-handed
-  // main-hand weapon still collapses to the two-handed label when locked.
   it("omits the off-hand segment when the served flag says the hands are locked", () => {
     const inv = [inSlot("MAIN_HAND", weapon(false, { name: "Greatsword" }))];
     expect(equippedLoadoutLabel(inv, true)).toBe("Greatsword (two-handed)");
@@ -113,8 +111,6 @@ describe("itemsInSlot", () => {
 });
 
 describe("bagItemsForSlot", () => {
-  // Filters the SERVED allowedSlots, so a row's category/detail data no longer
-  // decides candidacy — this is what the fixtures below set.
   it("lists only unequipped, slot-compatible items", () => {
     const inv = [
       weapon(false, { id: "sword", name: "Sword" }),
@@ -131,11 +127,8 @@ describe("bagItemsForSlot", () => {
   });
 
   it("honours the served flag over the row's own category/detail data", () => {
-    // A two-handed greatsword the server reports as off-hand-legal IS offered:
-    // the client no longer second-guesses allowedSlots.
     const inv = [weapon(true, { id: "gs", name: "Greatsword", allowedSlots: ["MAIN_HAND", "OFF_HAND"] })];
     expect(bagItemsForSlot(inv, "OFF_HAND").map((i) => i.id)).toEqual(["gs"]);
-    // And a one-handed sword the server reports as main-hand-only is NOT.
     const restricted = [weapon(false, { id: "ls", name: "Longsword", allowedSlots: ["MAIN_HAND"] })];
     expect(bagItemsForSlot(restricted, "OFF_HAND")).toEqual([]);
   });

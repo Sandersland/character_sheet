@@ -1,10 +1,4 @@
-// Roll + selection state for the HP step (#887, #1172). Holds the rolled hit
-// die locally so toggling average↔roll reuses the same roll — HitPointsStep
-// keeps the reveal mounted (hidden, not torn down) so a settled die lingers.
-// Drops a held roll when the advancing class (hence the die) changes, so a d10
-// roll never carries onto a d6 class; the reveal's `key={meta.faces}` then
-// forces the one legitimate remount, re-rolling the new die. Owns every draft
-// write for the step.
+// Drops the held roll when the advancing class's die changes (meta.faces) so a d10 roll never carries onto a d6 class; HitPointsStep's reveal remounts via key={meta.faces} to re-roll.
 
 import { useEffect, useState } from "react";
 
