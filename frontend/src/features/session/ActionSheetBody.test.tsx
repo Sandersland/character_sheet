@@ -13,7 +13,7 @@ function model(over: Partial<ActionSheetModel> = {}): ActionSheetModel {
     hasSpellcasting: false,
     classActionOptions: [],
     loadoutLabel: "Unarmed",
-    interactionBudgetRemaining: 1, // fresh turn: the free interaction unspent
+    interactionBudgetRemaining: 1,
     universalActions: SERVED_ACTIONS_2024,
     ...over,
   };
@@ -32,10 +32,6 @@ function renderBody(m: ActionSheetModel, actionAvailable = true) {
 }
 
 describe("ActionSheetBody (#815)", () => {
-  // Deliberate (PR #824 review finding 2, declined): the card stays visible even
-  // unarmed with an empty bag — cards are stable, the picker owns its empty state
-  // (same convention as "Use an item" at zero consumables). The session e2e
-  // exercises exactly this persona.
   it("offers Change weapons even when unarmed with an empty bag", () => {
     renderBody(model());
     expect(screen.getByText("Change weapons")).toBeInTheDocument();
@@ -75,10 +71,6 @@ describe("ActionSheetBody — free-only mode after the Action is spent (#1165)",
   });
 });
 
-// The tile grid is now driven entirely by the served rows (#1430) — still a
-// plain render test, because the rows arrive on the model rather than through a
-// hook this component calls. The collapsed preview string pins the tile SET and
-// its ORDER in one assertion (the route sorts by name after resolution).
 describe("ActionSheetBody — the More-actions grid follows the served rows (#1430)", () => {
   it("2024: nine tiles, alphabetical, with Study and Influence", async () => {
     renderBody(model());
@@ -101,9 +93,6 @@ describe("ActionSheetBody — the More-actions grid follows the served rows (#14
     expect(screen.getByRole("button", { name: "Grapple" })).toBeInTheDocument();
   });
 
-  // Cache unseeded: the disclosure must be ABSENT, not showing a wrong-edition
-  // list — a missing card degrades, a wrong-edition card lies. The hardcoded
-  // primary cards are unaffected either way.
   it("renders no More-actions disclosure at all while the reference cache is unresolved", () => {
     renderBody(model({ universalActions: [] }));
     expect(screen.queryByRole("button", { name: /More actions/ })).toBeNull();

@@ -11,8 +11,6 @@ interface AdvantageGrantFieldsProps {
   onUpdate: (patch: Partial<ItemCapability>) => void;
 }
 
-// The advantage grant branch (#529): an axis (check/save/initiative/attack) plus
-// an optional per-skill (check) or per-ability (save) qualifier.
 export default function AdvantageGrantFields({ cap, index, onUpdate }: AdvantageGrantFieldsProps) {
   const keyed = cap.grantOn === "check" || cap.grantOn === "save" || cap.grantOn === undefined;
   return (

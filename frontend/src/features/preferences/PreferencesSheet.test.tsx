@@ -8,18 +8,14 @@ import { ThemeProvider } from "@/features/theme/ThemeProvider";
 import { DiceRollStyleProvider } from "@/features/dice/DiceRollStyleProvider";
 import { PreferencesContext, type PreferenceSyncState } from "@/hooks/usePreferencesSync";
 
-// jsdom's matchMedia stub reports matches:false for every query, so BottomSheet
-// resolves to its mobile drag-to-dismiss close — synthesize the transitionend
-// it waits for, mirroring BottomSheet's own convention.
+// jsdom's matchMedia stub reports matches:false for every query, so BottomSheet resolves to its mobile drag-to-dismiss close — synthesize the transitionend it waits for.
 function fireTransitionEnd(el: HTMLElement) {
   const e = new Event("transitionend", { bubbles: true });
   Object.defineProperty(e, "propertyName", { value: "transform" });
   el.dispatchEvent(e);
 }
 
-// #1167: the dedicated Preferences surface, reachable with or without a
-// character/campaign in view. No PreferencesProvider wrapper — mirrors
-// AccountMenu's own tests, which rely on the hooks' pure-localStorage fallback.
+// No PreferencesProvider wrapper — relies on the hooks' pure-localStorage fallback.
 function renderSheet(props: Partial<Parameters<typeof PreferencesSheet>[0]> = {}) {
   return render(
     <ThemeProvider>
@@ -30,10 +26,7 @@ function renderSheet(props: Partial<Parameters<typeof PreferencesSheet>[0]> = {}
   );
 }
 
-// #1365: a SECOND helper (never modify renderSheet above) that wraps in a
-// real PreferencesContext.Provider — renderSheet's no-provider tree makes
-// setPreference a no-op that can never fail, so a sync-error test built on it
-// would pass for the wrong reason (vacuous — see M-CTRL-B in the PR).
+// A second helper (never modify renderSheet above) — renderSheet's no-provider tree makes setPreference a no-op, so a sync-error test built on it would pass vacuously.
 function renderSheetWithSync(
   sync: PreferenceSyncState,
   props: Partial<Parameters<typeof PreferencesSheet>[0]> = {},
@@ -79,7 +72,6 @@ describe("PreferencesSheet (#1167)", () => {
   });
 
   it("has no campaign/character context requirement — every player-scoped control is reachable solo", () => {
-    // No campaignId/onOpenCampaignSettings prop — the solo-reachability case.
     renderSheet();
     expect(screen.getByRole("radio", { name: /light/i })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: /animated/i })).toBeInTheDocument();
@@ -122,8 +114,6 @@ describe("PreferencesSheet (#1167)", () => {
   });
 
   it("toggles when the row's label TEXT is clicked, not just the box", async () => {
-    // The retired AutoRollConcentrationToggle wrapped its row in a <label>, so
-    // clicking the text worked; a <span> row would silently drop that (#1166).
     const user = userEvent.setup();
     renderSheet();
 
@@ -141,8 +131,6 @@ describe("PreferencesSheet (#1167)", () => {
   it("shows a Campaign settings link when campaignId is supplied, and it does not duplicate campaign toggles", () => {
     renderSheet({ campaignId: "camp-1", onOpenCampaignSettings: vi.fn() });
     expect(screen.getByRole("button", { name: /campaign settings/i })).toBeInTheDocument();
-    // Campaign-scoped toggles (shareWithDm, autoFriendlyHealing) stay in
-    // CampaignSettingsSheet — this surface only links there, never duplicates.
     expect(screen.queryByRole("checkbox", { name: /share sheet with dm/i })).not.toBeInTheDocument();
   });
 
@@ -155,8 +143,7 @@ describe("PreferencesSheet (#1167)", () => {
     await user.click(screen.getByRole("button", { name: /campaign settings/i }));
 
     expect(onOpenCampaignSettings).toHaveBeenCalledTimes(1);
-    // Routes through BottomSheet's requestClose (#782), not an instant unmount —
-    // onClose defers to the slide-out transitionend, same as every other close path.
+    // onClose defers to BottomSheet's slide-out transitionend, not an instant unmount.
     expect(onClose).not.toHaveBeenCalled();
     fireTransitionEnd(baseElement.querySelector('[role="dialog"]') as HTMLElement);
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -169,7 +156,6 @@ describe("PreferencesSheet (#1167)", () => {
 
     const [closeButton] = screen.getAllByRole("button", { name: "Close" });
     await user.click(closeButton);
-    // Mobile grabber: onClose fires only after the slide-out transition ends.
     expect(onClose).not.toHaveBeenCalled();
     fireTransitionEnd(baseElement.querySelector('[role="dialog"]') as HTMLElement);
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -198,10 +184,7 @@ describe("PreferencesSheet (#1167)", () => {
     });
 
     it("keeps every control enabled while a write is in flight", () => {
-      // The executable form of the F2 decision: unlike CampaignPreferencesFields'
-      // ToggleRow, nothing here goes `disabled` while saving — this write is
-      // optimistic, so disabling would blur a keyboard-focused control and
-      // regress the #1166 click-the-label-text behaviour for no benefit.
+      // Nothing here goes disabled while saving (unlike CampaignPreferencesFields' ToggleRow) — this write is optimistic, and disabling would blur a keyboard-focused control.
       renderSheetWithSync({ saving: { theme: true, diceRollStyle: true, autoRollConcentration: true }, errors: {} });
       screen.getAllByRole("radio").forEach((radio) => expect(radio).not.toBeDisabled());
       expect(

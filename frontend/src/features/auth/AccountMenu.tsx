@@ -17,11 +17,9 @@ import {
 import type { PreferenceKey } from "@/hooks/usePreferencesSync";
 import type { AuthUser } from "@/types/auth";
 
-// A titled radio group of preference options (Appearance, Dice rolls). Each row
-// is a menuitemradio so the dropdown's roving focus and aria state stay correct.
-// preferenceKey scopes the shared PreferenceSyncNote (#1365) to this group —
-// it's nested inside the existing role="group" div (not a direct child of the
-// role="menu" panel) so axe's aria-required-children stays satisfied.
+// preferenceKey scopes the shared PreferenceSyncNote (#1365) to this group; it's
+// nested inside this role="group" div, not a direct child of DropdownMenu's
+// role="menu" panel, so axe's aria-required-children stays satisfied.
 function PreferenceRadioGroup<T extends string>({
   label,
   preferenceKey,
@@ -59,14 +57,12 @@ function PreferenceRadioGroup<T extends string>({
           </button>
         );
       })}
-      {/* announce=false: this panel is DropdownMenu's role="menu" (#1365) — see
-          PreferenceSyncNote's own comment for why a live role can't nest here. */}
+      
       <PreferenceSyncNote preferenceKey={preferenceKey} className="px-3 pb-1" announce={false} />
     </div>
   );
 }
 
-// Signed-in identity row at the top of the dropdown: avatar + name/email.
 function AccountIdentityHeader({ user }: { user: AuthUser | null }) {
   const name = user?.name ?? null;
   const email = user?.email ?? null;
@@ -84,17 +80,14 @@ function AccountIdentityHeader({ user }: { user: AuthUser | null }) {
   );
 }
 
-// Avatar-triggered account dropdown: identity, appearance + dice pickers, and logout.
 export default function AccountMenu() {
   const { user, logout } = useAuth();
   const { preference, setPreference } = useTheme();
   const { style: diceStyle, setStyle: setDiceStyle } = useDiceRollStyle();
   // AppHeader mounts as a sibling of the routed pages, never a descendant of
-  // CurrentCharacterProvider — so AccountMenu has no campaignId to hand
-  // PreferencesSheet even while a character IS on screen (e.g. /characters/:id
-  // at md+). The account-global entry point (#1167) stays reachable with no
-  // character/campaign in view at all; CharacterSheetHeader's own desktop kebab
-  // is the surface that threads campaignId.
+  // CurrentCharacterProvider, so AccountMenu has no campaignId to hand
+  // PreferencesSheet even while a character is on screen — CharacterSheetHeader's
+  // own desktop kebab is the surface that threads campaignId (#1167).
   const [prefsOpen, setPrefsOpen] = useState(false);
 
   return (
@@ -112,8 +105,7 @@ export default function AccountMenu() {
         {(close) => (
           <>
             <AccountIdentityHeader user={user} />
-            {/* Quick shortcuts — the full surface (Appearance/Dice/Play
-                automation) lives in PreferencesSheet below (#1167). */}
+            
             <PreferenceRadioGroup
               label="Appearance"
               preferenceKey="theme"

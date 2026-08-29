@@ -30,8 +30,6 @@ const SKILL_LABELS: Record<SkillName, string> = {
   survival: "Survival",
 };
 
-// Canonical 5e ability order. The single source for any UI that iterates
-// abilities (ability-score editor, ASI/feat pickers, saving throws).
 export const ABILITY_ORDER: readonly AbilityName[] = [
   "strength",
   "dexterity",
@@ -41,15 +39,9 @@ export const ABILITY_ORDER: readonly AbilityName[] = [
   "charisma",
 ];
 
-// Ready-made option lists derived from the label tables above so keys and
-// labels can never drift. Selection UIs should iterate these instead of
-// hand-rolling { key, label } arrays.
 export const ABILITY_OPTIONS: readonly { key: AbilityName; label: string }[] =
   ABILITY_ORDER.map((key) => ({ key, label: ABILITY_LABELS[key] }));
 
-/** Ability scores in canonical 5e rail order (STR-DEX-CON-INT-WIS-CHA),
- *  regardless of the input object's key order. Single source of ability-rail
- *  ordering shared by the page and its regression test. */
 export function orderedAbilityEntries(
   scores: Record<AbilityName, number>
 ): [AbilityName, number][] {
@@ -58,8 +50,7 @@ export function orderedAbilityEntries(
   );
 }
 
-// Each skill's governing ability — display/selection metadata mirroring the
-// backend srd.ts SKILLS order (rules logic stays on the backend).
+// Key order mirrors backend SKILLS (lib/srd/alignments.ts) so skill lists render in SRD order.
 const SKILL_ABILITY: Record<SkillName, AbilityName> = {
   acrobatics: "dexterity",
   animalHandling: "wisdom",
@@ -91,18 +82,15 @@ export const SKILL_OPTIONS: readonly {
   ability: SKILL_ABILITY[key],
 }));
 
-/** Display label for a skill key (e.g. "animalHandling" → "Animal Handling").
- *  Tolerant: an unknown key degrades to itself rather than `undefined`. */
+// Tolerant: an unknown key degrades to itself rather than `undefined`.
 export function skillLabel(key: string): string {
   return SKILL_LABELS[key as SkillName] ?? key;
 }
 
-/** Display label for an ability key (e.g. "strength" → "Strength"). */
 export function abilityLabel(key: string): string {
   return ABILITY_LABELS[key as AbilityName] ?? key;
 }
 
-/** Display labels for armor proficiency categories. */
 export const ARMOR_CATEGORY_LABELS: Record<ArmorProficiencyCategory, string> = {
   light:  "Light Armor",
   medium: "Medium Armor",
@@ -110,20 +98,12 @@ export const ARMOR_CATEGORY_LABELS: Record<ArmorProficiencyCategory, string> = {
   shield: "Shields",
 };
 
-/** Canonical display order for armor categories (light → medium → heavy → shields). */
 export const ARMOR_CATEGORY_ORDER: readonly ArmorProficiencyCategory[] = [
   "light", "medium", "heavy", "shield",
 ];
 
-/** Union of all proficiency grant sources used across weapons, armor, and tools.
- *  No "race" member: species-granted armor/weapon proficiencies arrive
- *  feat-sourced since the #1682 RACE_PROFICIENCY_GRANTS retirement, and no
- *  species-granted tool-proficiency mechanism exists (#1684 confirmed the
- *  flat Race model's own toolProficiencies column was always empty). */
 export type ProficiencySource = "class" | "feat" | "background" | "subclass" | "item";
 
-/** Human-readable labels for every proficiency source. Used by ProficienciesCard
- *  across all three sub-sections so weapons, armor, and tools share one map. */
 export const SOURCE_LABELS: Record<ProficiencySource, string> = {
   class:      "Class",
   feat:       "Feat",
@@ -132,20 +112,15 @@ export const SOURCE_LABELS: Record<ProficiencySource, string> = {
   item:       "Item",
 };
 
-/** Compact pill text for a proficiency source chip. Multi-word labels (e.g.
- *  a subclass name) abbreviate to initials so the pill can't crowd out the
- *  proficiency label; the full label stays reachable via `title` (#1168). */
 export function sourcePillLabel(source: ProficiencySource): string {
   const words = SOURCE_LABELS[source].split(" ");
   return words.length > 1 ? words.map((w) => w[0]).join("").toUpperCase() : words[0];
 }
 
-/** Three-letter uppercase ability abbreviation (e.g. "strength" → "STR"). */
 export function abilityAbbr(key: string): string {
   return abilityLabel(key).slice(0, 3).toUpperCase();
 }
 
-/** Standard 5e modifier: floor((score - 10) / 2). */
 export function abilityModifier(score: number): number {
   return Math.floor((score - 10) / 2);
 }

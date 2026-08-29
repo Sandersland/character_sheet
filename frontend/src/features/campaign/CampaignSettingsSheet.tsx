@@ -9,13 +9,6 @@ interface CampaignSettingsSheetProps {
   onClose: () => void;
 }
 
-/**
- * Campaign-scoped play preferences, reached from the sheet header's ⋮ menu on
- * both breakpoints (#1087) — the toggles used to live on the Story tab but are
- * settings, not story. Header shows the campaign name + DM; body is the shared
- * CampaignPreferencesFields. The campaign line is best-effort: a failed fetch is
- * swallowed and the segment omitted (the toggles are the actual settings).
- */
 export default function CampaignSettingsSheet({
   onClose,
 }: CampaignSettingsSheetProps) {

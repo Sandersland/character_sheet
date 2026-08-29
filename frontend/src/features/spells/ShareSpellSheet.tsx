@@ -1,16 +1,4 @@
-// Share/unshare a homebrew spell into a campaign (#1799/#1801, epic #1795
-// 4/6+6/6): opened from HomebrewSpellManageRow's "Share" action on the
-// caller's own USER-scope catalog entries. Calls the grant endpoints via
-// api/client — never fetch() directly (CLAUDE.md).
-//
-// There is no GET …/grants list endpoint (grants.ts only exposes POST/
-// DELETE), so this sheet has no way to learn which campaigns the entry is
-// ALREADY shared into before the caller acts here. Both calls are idempotent
-// server-side (a repeat POST 200s instead of erroring, DELETE 204s even if
-// the grant is already gone — see grants.ts's own comment), so every row
-// starts in the neutral "Share" state and flips to "Shared ✓ / Unshare"
-// only once THIS sheet has confirmed a grant this session — never claiming
-// to know a prior session's state it can't see.
+// There is no GET …/grants list endpoint, so every row starts "Share" and only flips to "Shared / Unshare" once this sheet confirms a grant this session.
 import { useState } from "react";
 
 import { shareCatalogEntry, unshareCatalogEntry } from "@/api/client";
@@ -24,11 +12,6 @@ interface ShareSpellSheetProps {
   onClose: () => void;
 }
 
-// Four states, not three: "busy" alone can't tell a claude-review finding's
-// exact bug — an in-flight unshare needs its OWN busy state ("unsharing"),
-// distinct from an in-flight share ("sharing"), so the button on the
-// "already shared" side reads "Unsharing…" instead of falling through to
-// the share-side button's "Sharing…"/"Share" label.
 type RowState = "idle" | "sharing" | "shared" | "unsharing";
 
 export default function ShareSpellSheet({ spell, onClose }: ShareSpellSheetProps) {

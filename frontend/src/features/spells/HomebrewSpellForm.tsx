@@ -1,10 +1,3 @@
-// Homebrew-spell creation + edit form (#1787/#1788, epic #1782 4/5-5/5):
-// authors or updates a user-owned catalog Spell row (POST/PATCH
-// /api/spells/custom) that becomes reusable across all of the caller's
-// characters and is served back by GET /api/spells (#1786,
-// resolveSpellCatalogForEdition). The level/school selects and the
-// effect-toggle wrapper live in SpellLevelSelect/SpellSchoolSelect/
-// SpellEffectToggle.
 import { useState } from "react";
 
 import { createCustomSpell, updateCustomSpell } from "@/api/client";
@@ -22,15 +15,9 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 
 interface HomebrewSpellFormProps {
   edition: RulesEdition;
-  /** The character being authored for — the server derives the new spell's
-   *  edition from it on create (#1819). Unused on the PATCH (editing) path,
-   *  where edition is write-once on the existing row. */
+  // Unused on the PATCH (editing) path, where edition is write-once on the existing row.
   characterId: string;
-  /** Present when editing an existing homebrew spell (HomebrewTab's manage
-   *  list, #1788): prefills the draft from the served row and submits via
-   *  PATCH instead of POST. Absent for the plain creation flow. */
   editing?: { id: string; draft: HomebrewSpellInput };
-  /** Called after a successful create/update — the caller refetches/shows the catalog picker. */
   onSaved: () => void;
   onClose: () => void;
 }
@@ -142,7 +129,7 @@ export default function HomebrewSpellForm({ edition, characterId, editing, onSav
         </div>
 
         <div className="sm:col-span-2">
-          {/* Non-null: BLANK_HOMEBREW_SPELL and toHomebrewSpellInput both always set `components`. */}
+          {/* Non-null: BLANK_HOMEBREW_SPELL and toHomebrewSpellInput always set `components`. */}
           <HomebrewSpellComponentsFields
             components={draft.components!}
             onChange={(components) => update({ components })}

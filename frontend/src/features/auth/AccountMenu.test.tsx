@@ -29,10 +29,9 @@ function renderMenu() {
   );
 }
 
-// #1365: a SECOND helper (never modify renderMenu above) that wraps in a real
+// A second helper (never modify renderMenu above) that wraps in a real
 // PreferencesContext.Provider — renderMenu's no-provider tree makes
-// setPreference a no-op that can never fail, so a sync-error test built on it
-// would pass for the wrong reason (vacuous — see M-CTRL-B in the PR).
+// setPreference a no-op, which would make a sync-error test pass vacuously (#1365).
 function renderMenuWithSync(sync: PreferenceSyncState) {
   return render(
     <MemoryRouter>
@@ -95,7 +94,6 @@ describe("AccountMenu", () => {
     expect(dark).toBeInTheDocument();
     expect(system).toBeInTheDocument();
 
-    // Defaults to system.
     expect(system).toHaveAttribute("aria-checked", "true");
     expect(light).toHaveAttribute("aria-checked", "false");
     expect(dark).toHaveAttribute("aria-checked", "false");
@@ -130,7 +128,6 @@ describe("AccountMenu", () => {
     renderMenu();
     await user.click(screen.getByRole("button", { name: "Account" }));
 
-    // Roving focus starts on the first menu item; Arrow keys reach the options.
     await user.keyboard("{ArrowDown}");
     await user.keyboard("{Enter}");
     expect(localStorage.getItem("cs:pref:theme")).toBe("dark");
@@ -172,14 +169,9 @@ describe("AccountMenu", () => {
     expect(await axe(container)).toHaveNoViolations();
   });
 
-  // #1167: the account-global entry point into the full Preferences surface —
-  // this harness has NO character/campaign context at all. Nested here (not a
-  // sibling describe) so it inherits the localStorage/matchMedia/theme-dataset
-  // beforeEach/afterEach above — a prior sibling-describe version silently
-  // relied on whatever state an earlier suite left behind (#1166/#1167 fix).
-  // A passing suite proves only that this entry point renders and opens
-  // Preferences in a context-free harness — not route/viewport reachability
-  // elsewhere (that's MobileSheetHeader's and CharacterSheetHeader's own tests).
+  // Nested here (not a sibling describe) to inherit the beforeEach/afterEach
+  // above — a prior sibling-describe version silently relied on leftover state
+  // from an earlier suite (#1166/#1167).
   describe("AccountMenu Preferences entry (#1167)", () => {
     it("opens the Preferences sheet from a 'Preferences…' item, with no campaign/character in view", async () => {
       const user = userEvent.setup();
@@ -193,7 +185,6 @@ describe("AccountMenu", () => {
       expect(screen.getByText("Appearance")).toBeInTheDocument();
       expect(screen.getByText("Dice")).toBeInTheDocument();
       expect(screen.getByText("Play automation")).toBeInTheDocument();
-      // Solo/no-campaign entry point: no character in view ⇒ no campaign link.
       expect(screen.queryByRole("button", { name: /campaign settings/i })).not.toBeInTheDocument();
     });
 
@@ -217,10 +208,8 @@ describe("AccountMenu", () => {
 
       const [closeButton] = screen.getAllByRole("button", { name: /close/i });
       await user.click(closeButton);
-      // Mobile grabber: onClose fires only after the slide-out transition ends
-      // (matches BottomSheet's own convention for this close path).
-      // act() flushes the resulting setState — the listener runs off a raw
-      // dispatchEvent, outside React's own event batching.
+      // onClose fires only after the slide-out transitionend event, dispatched
+      // outside React's batching — act() flushes the setState it triggers.
       act(() => {
         const e = new Event("transitionend", { bubbles: true });
         Object.defineProperty(e, "propertyName", { value: "transform" });
@@ -231,11 +220,9 @@ describe("AccountMenu", () => {
   });
 
   describe("sync note (#1365)", () => {
-    // Queried by text, not role="alert": the note renders with announce={false}
-    // inside AccountMenu (see PreferenceSyncNote's own comment) — a role="alert"
-    // here would fail aria-required-children on DropdownMenu's role="menu"
-    // panel (confirmed via axe below), so this surface is visual-only; the
-    // Preferences sheet, one click away via "Preferences…", carries the live role.
+    // Queried by text, not role="alert": a role="alert" here would fail
+    // aria-required-children on DropdownMenu's role="menu" panel, so this
+    // surface is visual-only — the Preferences sheet carries the live role.
     const SYNC_ERROR = "Not saved — this change stays on this device.";
 
     it("surfaces a failed theme sync inside the Appearance quick controls", async () => {
@@ -251,8 +238,7 @@ describe("AccountMenu", () => {
       renderMenuWithSync({ saving: {}, errors: { diceRollStyle: { message: SYNC_ERROR, retry: vi.fn() } } });
       await user.click(screen.getByRole("button", { name: "Account" }));
 
-      // These groups ARE aria-labeled — getByRole("group", { name }) is safe
-      // here, unlike the sheet's unlabeled <fieldset>s.
+      // These groups ARE aria-labeled — getByRole("group", { name }) is safe here.
       const appearanceGroup = screen.getByRole("group", { name: "Appearance" });
       const diceGroup = screen.getByRole("group", { name: "Dice rolls" });
       expect(within(appearanceGroup).queryByText(SYNC_ERROR)).not.toBeInTheDocument();

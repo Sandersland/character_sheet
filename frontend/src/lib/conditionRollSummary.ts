@@ -1,28 +1,16 @@
-// Pure presenter for the ConditionRollBanner (#984). Turns the character's
-// derived `rollModifiers` (condition/exhaustion/buff-sourced advantage &
-// disadvantage grants — see backend buildRollModifiers) into ONE plain-English
-// line per source, e.g. "Poisoned → Disadvantage on attack rolls, ability
-// checks, and initiative". This is the single home for the "why" the sheet
-// used to stamp under every ability box and all 18 skill rows; `resolveRollMode`
-// still resolves the mode per roll (unchanged). No JSX here — the banner
-// component consumes this.
+// Turns the character's derived rollModifiers (see backend buildRollModifiers) into one plain-English line per source; resolveRollMode still resolves the mode per roll.
 
 import { abilityLabel } from "@/lib/abilities";
 import type { FlatRollEffect, RollModifier } from "@/types/character";
 
-/** One roll-modifying state, summarized for the banner. */
 export interface ConditionRollSummary {
-  /** Provenance label, e.g. "Poisoned", "Rage", "Exhaustion". */
   source: string;
-  /** Overall tone — `mixed` when a source grants more than one direction; `penalty` for a flat modifier (#1136). */
+  /** `mixed` when a source grants more than one direction; `penalty` for a flat modifier. */
   tone: "advantage" | "disadvantage" | "mixed" | "penalty";
-  /** e.g. "Disadvantage on attack rolls, ability checks, and initiative" or "−4 on d20 Tests". */
   effect: string;
 }
 
-// Read order for the roll categories so a source's clause always lists them the
-// same way (attack → check → save → initiative), matching the PHB phrasing
-// "Disadvantage on attack rolls and ability checks".
+// Fixed order (attack → check → save → initiative) matching the PHB phrasing "Disadvantage on attack rolls and ability checks".
 const KIND_ORDER: Record<RollModifier["kind"], number> = {
   attack: 0,
   check: 1,
@@ -30,10 +18,7 @@ const KIND_ORDER: Record<RollModifier["kind"], number> = {
   initiative: 3,
 };
 
-// The noun phrase for one grant. Ability-scoped grants (Rage → Strength checks,
-// Restrained → Dexterity saving throws) name the ability via abilityLabel so we
-// never render a raw lowercase key. Takes just the kind/ability (not a full
-// RollModifier) so flat entries can be phrased without a lossy cast.
+// Takes just kind/ability, not a full RollModifier, so flat entries can be phrased without a lossy cast.
 function categoryPhrase(mod: { kind: RollModifier["kind"]; ability?: string }): string {
   switch (mod.kind) {
     case "attack":
@@ -60,20 +45,15 @@ function clause(mode: "advantage" | "disadvantage", mods: RollModifier[]): strin
   return `${label} on ${joinPhrases(phrases)}`;
 }
 
-// Signed display for a flat modifier, e.g. "+2" / "−4" (Unicode minus).
+// Uses a Unicode minus, not a hyphen, for negative values.
 function formatSigned(n: number): string {
   return n >= 0 ? `+${n}` : `−${Math.abs(n)}`;
 }
 
-// Every d20-Test category — the collapse to "d20 Tests" (SRD 5.2) fires only
-// when all four are covered, so a future attack+check+save-only modifier lists
-// its categories rather than silently claiming Initiative too.
+// The collapse to "d20 Tests" (SRD 5.2) fires only when all four are covered, so a future attack+check+save-only modifier lists its categories instead of silently claiming Initiative too.
 const ALL_D20_KINDS: RollModifier["kind"][] = ["attack", "check", "save", "initiative"];
 
-// Flat-modifier clause (#1136): a single value hitting every d20 Test collapses
-// to "−N on d20 Tests"; any narrower coverage lists the categories explicitly.
-// Grouped as full entries (not bare kinds) so an ability-scoped flat modifier
-// still names its ability. Distinct values (rare) each get a "; "-joined clause.
+// Grouped as full entries, not bare kinds, so an ability-scoped flat modifier still names its ability; distinct values (rare) each get a "; "-joined clause.
 function flatClause(mods: FlatRollEffect[]): string {
   const byValue = new Map<number, FlatRollEffect[]>();
   for (const m of mods) {
@@ -94,11 +74,6 @@ function flatClause(mods: FlatRollEffect[]): string {
     .join("; ");
 }
 
-/**
- * Collapse the flat `rollModifiers` list into one summary per source, preserving
- * first-appearance order. A source that grants both advantage and disadvantage
- * (rare, but legal) gets both clauses joined with "; " and a `mixed` tone.
- */
 export function summarizeRollModifiers(modifiers: RollModifier[]): ConditionRollSummary[] {
   const order: string[] = [];
   const bySource = new Map<string, RollModifier[]>();

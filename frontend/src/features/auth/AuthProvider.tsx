@@ -5,8 +5,6 @@ import type { ReactNode } from "react";
 import { fetchMe, logout as clientLogout, setUnauthorizedHandler } from "@/api/client";
 import type { AuthUser } from "@/types/auth";
 
-// "loading" until the initial fetchMe resolves; then "authenticated" (user set)
-// or "anonymous". Route gating keys off this (see App.tsx).
 type AuthStatus = "loading" | "authenticated" | "anonymous";
 
 interface AuthContextValue {
@@ -26,7 +24,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus("anonymous");
   }, []);
 
-  // Bootstrap auth state from the session cookie once on mount.
   useEffect(() => {
     let active = true;
     fetchMe()
@@ -47,8 +44,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [goAnonymous]);
 
-  // A 401 from any domain call (expired/cleared session) drops us to anonymous,
-  // so the router shows the login screen. Registered once; cleared on unmount.
+  // A 401 from any domain call drops us to anonymous so the router shows the
+  // login screen. Registered once; cleared on unmount.
   useEffect(() => {
     setUnauthorizedHandler(goAnonymous);
     return () => setUnauthorizedHandler(null);

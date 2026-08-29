@@ -1,8 +1,6 @@
 import { fetchEntities, fetchEntityConnections } from "@/api/client";
 import type { EntityConnection, EntityStats } from "@/types/character";
 
-// Hover-preview lazy caches: one stats fetch per campaign, one connections fetch per entity.
-
 const statsCache = new Map<string, Map<string, EntityStats>>();
 const statsInflight = new Map<string, Promise<Map<string, EntityStats>>>();
 const connectionsCache = new Map<string, EntityConnection[]>();

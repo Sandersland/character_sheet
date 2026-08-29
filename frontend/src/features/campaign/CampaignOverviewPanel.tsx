@@ -11,7 +11,6 @@ interface CampaignOverviewPanelProps {
   onCampaignChange: (campaign: Campaign) => void;
 }
 
-// Overview tab of the campaign hub: invite link, add-a-character, and roster.
 export default function CampaignOverviewPanel({
   campaign,
   onCampaignChange,
@@ -32,8 +31,7 @@ export default function CampaignOverviewPanel({
     };
   }, []);
 
-  // Characters the caller owns that can join: not already in this campaign and
-  // not committed to a different one (a cross-campaign attach would 409).
+  // Excludes characters already attached here or committed elsewhere — cross-campaign attach 409s.
   const attachedIds = new Set((campaign.characters ?? []).map((c) => c.id));
   const addable = characters.filter(
     (c) => !attachedIds.has(c.id) && (!c.campaignId || c.campaignId === campaign.id),

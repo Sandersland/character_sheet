@@ -16,13 +16,7 @@ function sortedByName(list: CampaignItem[]): CampaignItem[] {
   return [...list].sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/**
- * The six campaign-item write paths (#1299), split out of CampaignItemsPanel so
- * that component's own body stays under fallow's size/complexity gate. Each
- * mutation's onSuccess writes an exact splice into campaignKeys.items(campaignId)
- * — never an invalidate/refetch — and mirrors reveal/rename onto the shared
- * Codex entities cache, same as the panel always has.
- */
+// Each mutation's onSuccess writes an exact splice into campaignKeys.items(campaignId) instead of invalidating.
 export function useCampaignItemMutations(campaignId: string, entities: CampaignEntity[]) {
   const queryClient = useQueryClient();
 
@@ -32,9 +26,6 @@ export function useCampaignItemMutations(campaignId: string, entities: CampaignE
   function writeItems(list: CampaignItem[]): void {
     queryClient.setQueryData(campaignKeys.items(campaignId), list);
   }
-  // Mirror a saved reveal/rename onto the fronting entity in the shared Codex
-  // cache (revealInCache/renameInCache before #1299 — merged, same one-liner
-  // each call site used, just patching a different field).
   function patchEntityInCache(entityId: string, patch: Partial<CampaignEntity>) {
     const target = entities.find((e) => e.id === entityId);
     if (target) {
@@ -108,7 +99,6 @@ export function useCampaignItemMutations(campaignId: string, entities: CampaignE
     mutationFn: ({ item, characterId }: { item: CampaignItem; characterId: string }) =>
       awardCampaignItem(campaignId, item.id, { characterId }),
     onSuccess: ({ holders }, { item, characterId }) => {
-      // Award reveals the fronting entity — reflect it in the cache too.
       writeItems(
         itemsCache().map((i) =>
           i.id === item.id
@@ -117,9 +107,7 @@ export function useCampaignItemMutations(campaignId: string, entities: CampaignE
         ),
       );
       if (item.entity) patchEntityInCache(item.entity.id, { visibility: "REVEALED" });
-      // #1283: an award touches both the items list (exact write above) AND
-      // the recipient's character (their inventory gained the item) — that
-      // side isn't returned here, so invalidate rather than guess its shape.
+      // An award also touches the recipient's character inventory, not returned here — invalidate rather than guess its shape (#1283).
       void queryClient.invalidateQueries({ queryKey: characterKeys.detail(characterId) });
     },
   });

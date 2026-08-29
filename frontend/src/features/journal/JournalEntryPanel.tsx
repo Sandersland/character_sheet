@@ -1,16 +1,3 @@
-/**
- * JournalEntryPanel — inline expand-in-place composer for adding or editing a
- * journal entry. Not a modal — the overlay primitive is reserved for read-only
- * review surfaces (see CLAUDE.md). Reused for add and edit via `mode` + `initial`,
- * and for both journal kinds via `kind`:
- *   • "NOTE" (default) — the fast, body-only, date-less capture used by
- *     the chronicle chapter's quick add.
- *   • "ENTRY" — the long-form flow behind the chronicle's "＋ New entry": adds a
- *     calendar date (required server-side for an ENTRY), rendered as prose with a
- *     drop cap on the manuscript page.
- * The parent owns the API call and busy/error state.
- */
-
 import { useState } from "react";
 
 import MentionAutocomplete from "@/features/journal/MentionAutocomplete";
@@ -27,12 +14,9 @@ export interface JournalEntryDraft {
 
 interface JournalEntryPanelProps {
   mode: "add" | "edit";
-  /** Which journal kind this composer writes. Defaults to the body-only NOTE. */
   kind?: JournalEntryKind;
-  /** Pre-fill values (edit mode, or to re-open a draft). */
   initial?: JournalEntry;
   busy: boolean;
-  /** Campaign the character belongs to (enables @-tagging in the body). */
   campaignId?: string | null;
   onSubmit: (draft: JournalEntryDraft) => void;
   onClose: () => void;
@@ -48,9 +32,7 @@ const INPUT_CLS =
   "w-full min-w-0 box-border rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-base md:text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-garnet-500 focus:outline-none";
 const LABEL_CLS = "block text-xs font-semibold text-parchment-700";
 
-// Assemble the submit payload: a NOTE omits `date`; campaign-less writes omit
-// `visibility` (the server coerces them to PRIVATE). Pure so it stays out of the
-// component's branch budget.
+// Campaign-less writes omit `visibility` — the server coerces them to PRIVATE.
 function buildDraft(args: {
   kind: JournalEntryKind;
   isEntry: boolean;
@@ -65,7 +47,6 @@ function buildDraft(args: {
   return draft;
 }
 
-// Ready to submit: a non-empty body, a date when the kind requires one, not busy.
 function canSubmitDraft(body: string, isEntry: boolean, date: string, busy: boolean): boolean {
   return body.trim() !== "" && (!isEntry || date !== "") && !busy;
 }

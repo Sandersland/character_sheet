@@ -1,13 +1,3 @@
-// The mobile quick-capture surface (#866): a full-height, chat-style capture
-// pinned to the visible viewport so the composer docks flush above the iOS
-// keyboard. Header (small-caps label · serif session line · Done), a feed that
-// reads downward with the newest note adjacent to the composer, and the shared
-// growing composer docked at the bottom. Replaces the old BottomSheet mobile
-// path; BottomSheet itself is untouched for its other consumers. Dark mode is
-// the "Campfire" register automatically via token flips (+ a dark-only gold
-// glow low in the feed, in index.css). Focus-trap / Escape / scroll-lock are
-// shared with the app's other dialogs via useDialogChrome.
-
 import { useEffect, useRef } from "react";
 import type { MutableRefObject, ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -18,9 +8,7 @@ import { useVisualViewport } from "@/hooks/useVisualViewport";
 import type { Session } from "@/types/character";
 
 interface MobileCaptureSheetProps {
-  /** Live session, when one is active: the header shows its title. */
   session?: Session | null;
-  /** The editor element, for placing the deferred initial focus (#784). */
   composerRef: MutableRefObject<HTMLDivElement | null>;
   onClose: () => void;
   feed: ReactNode;
@@ -37,9 +25,7 @@ export default function MobileCaptureSheet({
   composer,
   anchorKey,
 }: MobileCaptureSheetProps) {
-  // Body scroll-lock (#877) — before useDialogChrome so its scroll-restore cleanup
-  // runs after the dialog's focus-restore (reverse mount order), else the opener
-  // refocus could reveal-scroll the page back off-origin on close.
+  // useMobileScrollLock must run before useDialogChrome — reverse mount order avoids the opener's focus-restore revealing a scroll offset on close (#877).
   useMobileScrollLock();
   const panelRef = useDialogChrome(onClose);
   const feedRef = useRef<HTMLDivElement>(null);
@@ -47,17 +33,13 @@ export default function MobileCaptureSheet({
   useDeferredComposerFocus(composerRef);
   const sessionTitle = session?.title?.trim() ?? "";
 
-  // Auto-anchor to the bottom on open and whenever a note is added, and again if
-  // the keyboard reflows the panel — the newest entry stays beside the composer.
   useEffect(() => {
     const el = feedRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [anchorKey, height]);
 
   return createPortal(
-    // Opaque safety net behind the pinned panel: any region the panel doesn't
-    // cover shows parchment, never the sheet (reliable once the body-lock pins
-    // the layout viewport — #877).
+    // Safety-net background behind the pinned panel — relies on the body-lock pinning the layout viewport (#877).
     <div role="presentation" className="fixed inset-0 z-50 bg-parchment-50">
       <div
         ref={panelRef}
@@ -70,9 +52,7 @@ export default function MobileCaptureSheet({
       >
         <CaptureHeader sessionTitle={sessionTitle} onClose={onClose} />
 
-        {/* mt-auto (not justify-end) pins a short feed to the bottom — end-aligning
-            a scrollport clips start-edge overflow with no scroll range, which made
-            older notes unreachable and the anchor effect a no-op. */}
+        {/* mt-auto (not justify-end) — justify-end clips start-edge overflow with no scroll range, making older notes unreachable. */}
         <div
           ref={feedRef}
           data-mobile-capture-feed=""
@@ -90,8 +70,6 @@ export default function MobileCaptureSheet({
   );
 }
 
-// Small-caps "Quick capture" label over the optional serif session title, with a
-// garnet Done close button; top padding clears the notch via the safe-area inset.
 function CaptureHeader({ sessionTitle, onClose }: { sessionTitle: string; onClose: () => void }) {
   return (
     <header className="flex shrink-0 items-center justify-between gap-3 border-b border-parchment-100 px-[18px] pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
@@ -116,10 +94,7 @@ function CaptureHeader({ sessionTitle, onClose }: { sessionTitle: string; onClos
   );
 }
 
-// Deferred initial focus + the #784 iOS mitigations: focus is placed past first
-// paint (double rAF) with preventScroll so Safari doesn't offset the fixed panel
-// as the keyboard animates in, and any reveal-scroll that still leaks is pinned
-// back to the top.
+// Double rAF + preventScroll stops Safari offsetting the fixed panel as the keyboard animates in (#784); any leak is repinned to 0.
 function useDeferredComposerFocus(composerRef: MutableRefObject<HTMLDivElement | null>) {
   useEffect(() => {
     let raf1 = 0;

@@ -30,9 +30,7 @@ const filterOn = "bg-garnet-surface text-garnet-on-surface";
 const filterOff =
   "bg-parchment-200/60 text-parchment-700 hover:bg-parchment-200 hover:text-parchment-900 lg:bg-transparent lg:hover:bg-parchment-100";
 
-// The codex browse rail (#840): title block, search, type filter list with tone
-// dots + counts, sort control, and the create toggle. Fully controlled — all
-// state lives in CampaignCodex.
+// Fully controlled — all state lives in CampaignCodex.
 export default function CodexRail({
   campaignName,
   entryCount,

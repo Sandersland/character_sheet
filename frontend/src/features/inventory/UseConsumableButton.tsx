@@ -9,11 +9,6 @@ interface UseConsumableButtonProps {
   onSubmit: (operations: InventoryOperation[]) => Promise<void>;
 }
 
-// "Use" affordance for a consumable row (#121). Stackable items decrement
-// quantity; charged items decrement usesRemaining and disable at 0 until a long
-// rest recharges. When the consumable has effect dice, the player's roll plays
-// the 3D dice animation + result toast; the server applies the effect (healing
-// auto-applies, other effects are recorded only).
 export default function UseConsumableButton({ item, pending, onSubmit }: UseConsumableButtonProps) {
   const { rollAnimated } = useRoll();
   const consumable = item.consumable;
@@ -21,8 +16,7 @@ export default function UseConsumableButton({ item, pending, onSubmit }: UseCons
   const depleted = charged && (consumable?.usesRemaining ?? 0) <= 0;
 
   const handleUse = () => {
-    // With effect dice: play the 3D roll and forward the SAME settled die values
-    // to the server (via `rolls`) so the shown roll is exactly the applied one.
+    // Forwards the same settled die values shown in the animation to the server, so the shown roll is exactly the applied one.
     if (consumable?.effectDiceCount && consumable.effectDiceFaces) {
       rollAnimated(
         {

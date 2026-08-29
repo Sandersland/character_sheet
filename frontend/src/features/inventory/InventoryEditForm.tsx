@@ -21,7 +21,6 @@ const checkboxLabelClass = "flex items-center gap-1.5 text-xs text-parchment-700
 const linkButtonClass =
   "text-xs font-semibold text-garnet-700 hover:underline disabled:opacity-40 disabled:no-underline";
 
-// The inline edit form for one inventory row: name/qty/equipped/notes plus the per-type sub-form.
 export default function InventoryEditForm({ item, pending, onCancel, onSubmit }: InventoryEditFormProps) {
   const { weapon, armor, consumable } = item;
 

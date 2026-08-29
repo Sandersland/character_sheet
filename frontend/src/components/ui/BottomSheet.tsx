@@ -7,44 +7,24 @@ import { useVisualViewportHeight } from "@/hooks/useVisualViewportHeight";
 
 interface BottomSheetProps {
   title: string;
-  /** Optional muted line under the title (e.g. "Pick one — nothing is spent until you choose"). */
   subtitle?: string;
-  /** Widen the md+ centered dialog to 42rem for two-column bodies (#811). Mobile is unaffected. */
   wide?: boolean;
   onClose: () => void;
-  /** A render-prop form hands the child `requestClose` — the same slide-out/close
-   *  path the grabber, Escape, and scrim already use (#782) — for a content button
-   *  that both fires its own handler and closes the sheet (e.g. a cross-link). */
   children: ReactNode | ((requestClose: () => void) => ReactNode);
 }
 
-/**
- * The turn UI's picker surface (#729). Shares `Modal`'s focus-trap / Escape /
- * body-scroll-lock machinery via `useDialogChrome`, and is **responsive** (#747):
- * on mobile it's a bottom-anchored slide-up sheet (`items-end`, full width, top
- * corners rounded, grabber handle — thumb-reachable); at `md`+ it presents as a
- * centered dialog (`md:items-center`, all corners rounded, no grabber), matching
- * `Modal`, since a full-width bottom drawer reads as awkward on a desktop screen.
- * On mobile the grabber is a real Close button and the sheet drags down to
- * dismiss (#767); both are inert at `md`+, where the text Close button returns.
- * On mobile every close path (grabber/Escape/scrim/drag) slides the sheet off
- * the bottom edge and fades the scrim in sync before onClose fires (#782); at
- * `md`+ the centered dialog keeps today's instant close.
- */
 export default function BottomSheet({ title, subtitle, wide = false, onClose, children }: BottomSheetProps) {
-  // Escape routes through the same close path; indirection keeps useDialogChrome
-  // stable while requestClose is defined below (it needs beginExit first).
+  // requestClose is defined below and needs beginExit first; the ref lets Escape
+  // call it anyway without useDialogChrome's callback identity depending on it.
   const closeRef = useRef<() => void>(() => {});
   const panelRef = useDialogChrome(() => closeRef.current());
   const titleId = useId();
   const [closing, setClosing] = useState(false);
 
-  // Gate the gesture off at md+, matching the pure-CSS breakpoint.
   const isMobile = useIsBelowMd();
 
-  // On mobile cap the panel to the visible viewport so the body sits above the
-  // on-screen keyboard, not behind it (#784). min() keeps the 85vh scrim gap
-  // when no keyboard is up; the px value wins once the keyboard shrinks it.
+  // min() keeps the 85vh scrim gap when no keyboard is up; the px value wins
+  // once an on-screen keyboard shrinks the viewport (#784).
   const viewportHeight = useVisualViewportHeight();
   const panelMaxHeight = isMobile ? `min(85vh, ${viewportHeight}px)` : undefined;
 
@@ -62,8 +42,7 @@ export default function BottomSheet({ title, subtitle, wide = false, onClose, ch
 
   return createPortal(
     <div
-      // Presentational scrim: mouse-down-to-close is a pointer convenience only —
-      // closing is keyboard-accessible via the Escape handler above.
+      // Mouse-down-to-close is a pointer convenience only; Escape covers keyboard users.
       role="presentation"
       className={`fixed inset-0 z-50 flex items-end justify-center bg-backdrop backdrop-blur-sm md:items-center md:p-4 ${isMobile ? "transition-opacity duration-500" : ""} ${closing ? "opacity-0" : ""}`}
       onMouseDown={(e) => {
@@ -79,8 +58,7 @@ export default function BottomSheet({ title, subtitle, wide = false, onClose, ch
         style={panelMaxHeight ? { maxHeight: panelMaxHeight } : undefined}
         className={`flex max-h-[85vh] w-full flex-col rounded-t-card border border-b-0 border-parchment-200 bg-parchment-50 shadow-raised focus-visible:outline-none md:max-h-[80vh] md:rounded-card md:border-b ${wide ? "max-w-[36rem] md:max-w-2xl" : "max-w-[36rem]"}`}
       >
-        {/* handleProps is spread on both grabber and header on purpose: a wide
-            drag target. They're siblings, so the gesture never double-fires. */}
+        {/* handleProps spread on both grabber and header on purpose (siblings, so the drag gesture never double-fires). */}
         <button
           type="button"
           aria-label="Close"
@@ -88,8 +66,7 @@ export default function BottomSheet({ title, subtitle, wide = false, onClose, ch
           {...handleProps}
           className="mx-auto mt-2 h-1 w-9 shrink-0 touch-none rounded-full bg-parchment-300 md:hidden"
         />
-        {/* md:pt-3 restores Modal's header padding on desktop, where the
-            grabber (which fills the gap on mobile) is hidden. */}
+        {/* md:pt-3 matches Modal's header padding, filled by the grabber on mobile. */}
         <div
           {...handleProps}
           className="flex shrink-0 touch-none items-start justify-between gap-3 px-4 pb-3 pt-2 md:touch-auto md:pt-3"

@@ -1,12 +1,3 @@
-/**
- * useManeuverActions — the superiority-die spend handlers behind TurnHub's
- * reaction (Parry/Riposte) and effect (Evasive Footwork/Rally) maneuver
- * slots, split out of useTurnActions so composing useManeuverDie (plus its
- * own error slot) doesn't count against that hub's own hook-count/complexity
- * budget (mirrors ProficienciesCard's useToolProficiencyMutations,
- * useTurnActions' own useTurnActionMutations).
- */
-
 import { useState } from "react";
 
 import { useManeuverDie } from "@/features/session/useManeuverDie";

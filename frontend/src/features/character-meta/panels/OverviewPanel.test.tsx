@@ -7,7 +7,6 @@ import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character } from "@/types/character";
 import type { SheetPanelProps } from "@/features/character-meta/sheetTabs";
 
-// Stub the heavy domain sections so the smoke test targets only the layout.
 vi.mock("@/features/abilities/AbilityScoresPanel", () => ({ default: () => <div>abilities</div> }));
 vi.mock("@/features/experience/ExperienceTracker", () => ({ default: () => <div>xp</div> }));
 vi.mock("@/features/advancement/AdvancementSection", () => ({ default: () => <div>advancements</div> }));
@@ -56,14 +55,11 @@ describe("OverviewPanel", () => {
         },
       } as Partial<Character>)
     );
-    // Left column: Skills + Proficiencies.
     expect(screen.getByText("Skills")).toBeInTheDocument();
     expect(screen.getByText("proficiencies")).toBeInTheDocument();
-    // Right column: XP, Spell Slots (caster), Advancements.
     expect(screen.getByText("xp")).toBeInTheDocument();
     expect(screen.getByText("Spell Slots")).toBeInTheDocument();
     expect(screen.getByText("advancements")).toBeInTheDocument();
-    // Equipped gear now lives on the Inventory tab (#1086).
     expect(screen.queryByText("Equipped")).toBeNull();
   });
 
@@ -74,8 +70,6 @@ describe("OverviewPanel", () => {
     expect(screen.queryByText("Equipped")).toBeNull();
   });
 
-  // #1169: Class Features moved to its own tab — Overview no longer renders it,
-  // but AdvancementSection stays (it's cross-class, not per-class).
   it("no longer renders Class Features — it moved to the Class tab", () => {
     renderPanel(makeCharacter({ spellcasting: undefined }));
     expect(screen.queryByText("Class Features")).toBeNull();

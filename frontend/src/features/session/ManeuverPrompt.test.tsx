@@ -12,7 +12,6 @@ vi.mock("@/api/client", () => ({
   castManeuverTransaction: vi.fn(),
 }));
 
-// Server rolls a 5 on the superiority die for every cast in these tests.
 const SERVER_ROLL = 5;
 
 function makeCharacter(): Character {
@@ -62,7 +61,6 @@ describe("ManeuverPrompt — die folds into the total", () => {
         { type: "castManeuver", entryId: "m-precision" },
       ]),
     );
-    // 14 (attack) + 5 (server die), damage untouched (null).
     expect(onRollsUpdated).toHaveBeenCalledWith(14 + SERVER_ROLL, null);
   });
 
@@ -83,7 +81,6 @@ describe("ManeuverPrompt — die folds into the total", () => {
     await user.click(screen.getByRole("button", { name: /Trip Attack/ }));
 
     await waitFor(() => expect(castManeuverTransaction).toHaveBeenCalled());
-    // Attack untouched (null), 9 (damage) + 5 (server die).
     expect(onRollsUpdated).toHaveBeenCalledWith(null, 9 + SERVER_ROLL);
   });
 
@@ -102,9 +99,6 @@ describe("ManeuverPrompt — die folds into the total", () => {
   });
 });
 
-// #809 — each mount renders ONLY its own section, so a maneuver never appears on
-// both cards. The attack card hosts section="attack" (Precision), the damage card
-// hosts section="damage".
 describe("ManeuverPrompt — per-card section hosting (#809)", () => {
   function renderSection(section: "attack" | "damage") {
     const character = makeCharacter();
@@ -164,9 +158,6 @@ describe("ManeuverPrompt — per-card section hosting (#809)", () => {
   });
 });
 
-// #689 gap pins — the placement-filtering / section-visibility / selection
-// branches the lib extraction most endangers. Green before the refactor;
-// unedited through it.
 describe("ManeuverPrompt — placement filtering and damage selection (#689)", () => {
   type Maneuver = { id: string; name: string; description: string; placement?: string };
 
@@ -228,7 +219,6 @@ describe("ManeuverPrompt — placement filtering and damage selection (#689)", (
       14,
       null,
     );
-    // Attack was rolled but no attackRoll maneuvers → the attack card stays empty.
     expect(container).toBeEmptyDOMElement();
   });
 
@@ -277,7 +267,6 @@ describe("ManeuverPrompt — placement filtering and damage selection (#689)", (
       9,
     );
 
-    // Untouched select shows the fallback (first maneuver) and spends it.
     expect(screen.getByRole("combobox")).toHaveValue("Trip Attack");
     await user.click(screen.getByRole("button", { name: /Spend d8/ }));
     await waitFor(() =>

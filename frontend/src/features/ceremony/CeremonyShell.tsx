@@ -1,31 +1,18 @@
-// Shared chrome for the full-screen ceremonies (#886 level-up, #1176 creation):
-// the dark stage, the parchment double-rule card, the Cancel/Back/Continue
-// footer, and the button style constants. Step bodies and headers live in each
-// ceremony's own feature folder.
-
 import type { ReactNode } from "react";
 
-// The stage vignette is ALWAYS dark (mockup's fixed hexes, not parchment tokens):
-// riding the tokens flipped it to light-cream in dark theme under a dark nav.
-// The gold-400 step kicker keeps ≥6:1 contrast on it in both themes.
+// Stage vignette uses fixed hex colors, not parchment tokens — riding the tokens flipped it to light-cream in dark theme under a dark nav.
 const STAGE_BG = "bg-[radial-gradient(ellipse_70%_55%_at_50%_12%,#4a4230,#1c1913_68%)]";
 const STAGE_PAGE = `min-h-dvh ${STAGE_BG} px-4 py-8 sm:px-6 sm:py-12`;
-// Viewport: pin the whole ceremony to the dynamic viewport so the rail + footer
-// stay on screen and only the card body scrolls (creation's and level-up's longer steps).
+// Pinned to the dynamic viewport so the rail + footer stay on screen and only the card body scrolls.
 const STAGE_VIEWPORT = `flex h-dvh flex-col ${STAGE_BG} px-4 py-6 sm:px-6 sm:py-8`;
 
-// The mockup's paper card: outer rule + a second rule inset 8px (the ::after).
 const PAPER =
   "relative rounded border border-parchment-300 bg-parchment-50 shadow-raised after:pointer-events-none after:absolute after:inset-2 after:rounded-sm after:border after:border-parchment-300 after:content-['']";
 
 export const GHOST_BTN =
   "min-h-11 rounded-control border border-parchment-300 px-4 text-sm font-semibold text-parchment-600 transition-colors hover:bg-parchment-100";
 
-// No label color here — equal-specificity `.text-*` utilities collide by
-// emitted-CSS order, not by class-attribute order, so a shared constant that
-// carries one can silently lose to a second appended by a caller (#994).
-// Callers supply their own text color alongside their fill (see confirmClassName
-// call sites and the Continue button below).
+// No label color here — equal-specificity `.text-*` utilities collide by emitted-CSS order, so a shared constant carrying one can silently lose to a caller-appended one (#994).
 const PRIMARY_BTN =
   "min-h-11 rounded-control border px-5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40";
 
@@ -57,11 +44,8 @@ interface CeremonyFooterProps {
   canContinue: boolean;
   onConfirm: () => void;
   confirmLabel: string;
-  /** Confirm-button colour variant (level-up = vitality, creation = garnet). */
   confirmClassName: string;
-  /** True while a save is in flight — disables confirm and marks it busy. */
   submitting: boolean;
-  /** True when the form is invalid — a static block distinct from submitting. */
   confirmDisabled?: boolean;
 }
 

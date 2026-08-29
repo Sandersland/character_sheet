@@ -21,7 +21,6 @@ interface CodexLedgerProps {
 
 const ALPHABET = [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ", "#"];
 
-// The row's right meta: badges over the "N ✎ · Session M" mention line (#853).
 function RowMeta({ entity, isOwner }: { entity: CampaignEntity; isOwner: boolean }) {
   const ordinal = entity.stats?.lastMentioned?.sessionOrdinal;
   return (
@@ -102,8 +101,6 @@ function EntityRow({
   );
 }
 
-// The chronicle ledger (#840): A→Z letter-divided entity rows with type-tinted
-// serif monogram tiles, plus an alphabet jump rail on the list's right edge.
 export default function CodexLedger({
   campaignId,
   groups,

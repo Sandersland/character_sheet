@@ -10,9 +10,7 @@ interface ChargesFieldsProps {
   onUpdate: (patch: Partial<ItemCapability>) => void;
 }
 
-// DM authoring for the item's shared charge pool (#555): max charges, recharge
-// trigger, and an optional dice formula ("regains 1d6+1 at dawn"; unchecked =
-// refills to max). castSpell capabilities spend from this via "Spends item charges".
+// CastResourceFields' "charges" resource spends from this shared charge pool.
 export default function ChargesFields({ cap, index, onUpdate }: ChargesFieldsProps) {
   const recharge = cap.recharge ?? { trigger: "dawn" as ChargeTrigger };
   const rollToRegain = Boolean(recharge.dice);

@@ -1,9 +1,8 @@
-// The frontend's only import path for backend calls (#1270): every component
-// imports from "@/api/client", never a domain module directly — that's what
-// keeps `vi.mock("@/api/client")` full-factory replacement working across the
-// ~85 test files that use it. `export *` (not a named list) so adding an
-// endpoint to a domain module never touches this file — the merge-conflict
-// convergence point this split exists to kill.
+// Every component imports from "@/api/client", never a domain module
+// directly — that's what keeps `vi.mock("@/api/client")` full-factory
+// replacement working across the frontend test suite. `export *` (not a
+// named list) so adding an endpoint to a domain module never touches this
+// file.
 export { setUnauthorizedHandler } from "@/api/http";
 export * from "@/api/auth";
 export * from "@/api/catalog";

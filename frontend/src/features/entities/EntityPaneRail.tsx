@@ -11,8 +11,7 @@ const chipBase =
 const chipOn = "bg-garnet-surface text-garnet-on-surface";
 const chipOff = "bg-parchment-200/60 text-parchment-700 hover:bg-parchment-200";
 
-// Compact sibling list beside the reading pane (#842). Filter state is local on
-// purpose: row navigation swaps only the pane, so this rail never unmounts.
+// Filter state stays local: row navigation swaps only the pane, so this rail never unmounts.
 export default function EntityPaneRail({
   campaignId,
   entities,

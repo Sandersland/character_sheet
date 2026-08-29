@@ -1,16 +1,5 @@
-/**
- * A snapshotted item capability (#1647, epic #1644). The relational form is
- * ~40 nullable columns because SQL cannot hold a discriminated union; JSON can,
- * so this stores the union directly and a `charges` entry with no `maxCharges`
- * becomes unrepresentable instead of reading as an opaque capability.
- *
- * Field names match the backend adapter's five Capability interfaces on
- * purpose, so #1649's mapping is a copy rather than a translation.
- *
- * `key` is the stable identity an InventoryCapabilityUse row addresses — the
- * job the capability row's id does today. `used` is deliberately absent: it is
- * the runtime counter and stays a column.
- */
+/** Field names match backend `PassiveBonusCapability`/`CastSpellCapability`/`ActivatedEffectCapability`/`GrantCapability`/`ChargesCapability` on purpose, so mapping between them is a copy, not a translation. */
+/** `key` is the stable identity an `InventoryCapabilityUse` row addresses; `used` is deliberately absent — it's the runtime counter and stays a column. */
 import { z } from "zod";
 
 import {
@@ -91,9 +80,7 @@ export const snapshotCapabilitySchema = z.discriminatedUnion("kind", [
     cantBeSurprised: z.boolean(),
     description: z.string().nullish(),
   }),
-  // maxCharges is REQUIRED though the column is nullable: a charges pool with
-  // no ceiling is exactly the malformed row readCapability had to tolerate, and
-  // rejecting it at the boundary is the reason this is a union at all.
+  // `maxCharges` is required even though the column is nullable — an uncapped charges pool is exactly the malformed shape this union exists to reject.
   z.strictObject({
     key: capabilityKey,
     kind: z.literal("charges"),

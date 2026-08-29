@@ -49,7 +49,6 @@ describe("CharacterSwitcherSheet (#1027)", () => {
     expect(screen.getByText("Fighter 7")).toBeInTheDocument();
     expect(screen.getByText("Sylwen")).toBeInTheDocument();
     expect(screen.getByText("Druid 5")).toBeInTheDocument();
-    // Current row carries aria-current; others do not.
     expect(screen.getByRole("button", { name: /Aldric/ })).toHaveAttribute("aria-current", "true");
     expect(screen.getByRole("button", { name: /Sylwen/ })).not.toHaveAttribute("aria-current");
   });

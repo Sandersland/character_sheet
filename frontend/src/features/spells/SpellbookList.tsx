@@ -1,6 +1,3 @@
-// The grimoire spellbook: a Prepared N/M budget meter, a filter strip, and spells
-// inked by level into a two-page desktop spread (single scroll on mobile).
-// caster-spellbook.html §2 & §4.
 import { useState } from "react";
 
 import EmptyState from "@/components/ui/EmptyState";
@@ -45,9 +42,7 @@ type GroupProps = Pick<
   "slots" | "slotsArePactMagic" | "budget" | "busy" | "concentratingOnEntryId" | "onPrepare" | "onForget" | "availableSlotsFor"
 > & { level: number; levelSpells: Spell[] };
 
-// The right-aligned slot line for a level group. A single-class warlock's one slot
-// pool is all Pact Magic, so it's labelled to avoid reading as "only level N has
-// slots" (#1139); cantrips have no pool.
+// Labelled "Pact Magic —" so a single-class warlock's one slot pool doesn't read as "only level N has slots" (#1139).
 function slotSummary(level: number, slotInfo: SpellSlots | undefined, pact: boolean): string {
   if (level === 0) return "always prepared";
   if (!slotInfo) return "";
@@ -93,8 +88,7 @@ function SpellLevelGroup({
 
 const EMPTY_FILTER: SpellbookFilter = { level: null, school: null, prepared: false, ritual: false };
 
-// The budget meter, split out so SpellbookList's own branching stays under
-// fallow's complexity gate. #1511 D5: served noun, not "Prepared" hardcoded.
+// #1511: label is a served noun via preparedLabelOf, never hardcoded as "Prepared".
 function SpellbookMeter({ budget }: { budget: PreparedBudget }) {
   const label = preparedLabelOf(budget);
   return (
@@ -106,9 +100,7 @@ function SpellbookMeter({ budget }: { budget: PreparedBudget }) {
       <div className="mt-1">
         <MeterBar
           current={budget.count}
-          // Never actually 0: the caller only renders this component when
-          // budget.limit != null, but that narrowing doesn't cross the
-          // component boundary for MeterBar's non-null `max` prop.
+          // budget.limit is never actually null here — the caller only renders this when limit != null, but that narrowing doesn't cross the component boundary for MeterBar's non-null max prop.
           max={budget.limit ?? 0}
           tone="arcane"
           label={`${budget.count} of ${budget.limit} ${label.toLowerCase()}`}
@@ -118,9 +110,7 @@ function SpellbookMeter({ budget }: { budget: PreparedBudget }) {
   );
 }
 
-// The filter strip, split out for the same reason as SpellbookMeter above.
-// #1511 D6: the "Prepared" chip is hidden for a known caster — every leveled
-// row is "locked", so the predicate it drives would filter nothing.
+// #1511: the Prepared chip is hidden for a known caster — every leveled row is locked, so the predicate would filter nothing.
 function SpellbookFilterStrip({
   filter,
   setFilter,
@@ -182,8 +172,6 @@ export default function SpellbookList({
     (s) => s.id === swapForId && runeState(s, budget.casterModel) === "unprepared",
   );
 
-  // Intercept a cap-blocked prepare tap into swap mode when there's something to drop;
-  // otherwise fall through to handlePrepare's existing error path (#938).
   function handlePrepareIntent(spell: Spell) {
     if (!canPrepare(spell, budget) && candidates.length > 0) {
       setSwapForId(spell.id);

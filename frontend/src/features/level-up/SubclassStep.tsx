@@ -1,6 +1,4 @@
-// Subclass pick step for the level-up ceremony (#889). Its only job is to write
-// draft.subclassId; useLevelUpCeremony re-plans around the new pick (a chosen
-// subclass can insert maneuver/tool-proficiency steps into the rail).
+// useLevelUpCeremony re-plans around a new subclass pick — it can insert maneuver/tool-proficiency steps into the rail.
 
 import Spinner from "@/components/ui/Spinner";
 import { useLevelUpStepContext } from "@/features/level-up/useLevelUpStepContext";
@@ -21,18 +19,12 @@ export default function SubclassStep() {
   const subclasses = classDef?.subclasses ?? [];
   const checkedIndex = subclasses.findIndex((sub) => sub.id === draft.subclassId);
 
-  // Back-navigation makes this step re-reachable after dependent picks
-  // (maneuvers, tool proficiencies, subclass choices) have been made under the
-  // current subclass — applySubclassPick (#1323) stashes them under the
-  // outgoing subclass's id and restores the incoming one's, so arrowing A→B→A
-  // doesn't lose A's picks the way a plain clear-on-pick (#889) would.
+  // applySubclassPick (#1323) stashes dependent picks under the outgoing subclass's id and restores the incoming one's, so arrowing A→B→A doesn't lose A's picks.
   function pick(subclassId: string) {
     setDraft((d) => applySubclassPick(d, subclassId));
   }
 
-  // Called unconditionally (before the `!reference` early return below) so the
-  // hook order stays stable across renders -- subclasses is [] until reference
-  // loads, which is a valid (inert) input.
+  // Called unconditionally, before the `!reference` early return, so hook order stays stable across renders — subclasses is [] until reference loads, a valid inert input.
   const { itemRef, tabIndexFor, keyDownFor } = useRovingRadioGroup(subclasses.length, checkedIndex, (index) =>
     pick(subclasses[index].id),
   );

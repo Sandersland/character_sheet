@@ -1,7 +1,3 @@
-// The castable spells shown in the spellcasting block: at-will cantrips plus
-// prepared leveled spells, each sorted. derivePreparedCastable feeds both the
-// read-only prepared roster and (narrowed further by slot availability, via
-// deriveCastableSpells) the Cast door's picker (#1162).
 import { deriveSpellRow } from "@/lib/spellRow";
 import { availableSlotsForSpell } from "@/lib/spellPicker";
 import type { Character, Spell } from "@/types/character";
@@ -29,12 +25,7 @@ export function derivePreparedCastable(sc: Spellcasting): PreparedCastable {
   };
 }
 
-/**
- * The Cast door's list (#1162): at-will cantrips plus prepared leveled spells
- * that currently have a slot to spend — everything else (unprepared, or
- * prepared but out of slots) stays off the list rather than surfacing a
- * disabled/error-prone row.
- */
+// Everything else (unprepared, or prepared but out of slots) stays off the list — no disabled/error-prone rows.
 export function deriveCastableSpells(
   character: Character,
   availableSlotLevels: number[],

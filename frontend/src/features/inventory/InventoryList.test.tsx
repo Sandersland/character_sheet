@@ -9,9 +9,6 @@ import { characterKeys } from "@/api/queryKeys";
 import { renderWithCharacter } from "@/test/renderWithCharacter";
 import type { Character, Currency, InventoryItem } from "@/types/character";
 
-// useIsBelowMd reads matchMedia; the setup stub reports matches:false (mobile).
-// The multi-select sell bar + the header Add/Sell actions are desktop-only after
-// #1029, so those suites force the desktop layout; the rest run mobile.
 function setMatchMedia(matcher: (query: string) => boolean) {
   window.matchMedia = (query: string) =>
     ({
@@ -30,14 +27,10 @@ const forceMobile = () => setMatchMedia(() => false);
 
 afterEach(() => forceMobile());
 
-// Consumable rows render a Use button that reads useRoll(); this suite doesn't
-// exercise rolling, so stub the roll context instead of wrapping every render.
 vi.mock("@/features/dice/RollContext", () => ({
   useRoll: () => ({ rollAnimated: vi.fn() }),
 }));
 
-// InventoryList calls fetchItems() on mount to load the catalog; stub the
-// client so the component renders without a real network request.
 vi.mock("@/api/client", () => ({
   fetchItems: vi.fn().mockResolvedValue([]),
   applyInventoryTransactions: vi.fn(),
@@ -62,11 +55,8 @@ function makeItem(overrides: Partial<InventoryItem> = {}): InventoryItem {
   };
 }
 
-// Minimal Character stub — InventoryList reads id, inventory, currency, and the
-// three served numbers. carriedWeight/carryCapacity are SERVED (#1377), so they
-// are fixture inputs here, never derived: any test that both supplies and
-// asserts a weight number would be a tautology. Real encumbrance arithmetic is
-// covered in backend/src/lib/srd/__tests__/encumbrance.test.ts.
+// carriedWeight/carryCapacity are SERVED (#1377), not derived — a test that
+// both supplies and asserts a weight number would be a tautology.
 function makeCharacter(
   inventory: InventoryItem[],
   overrides: Partial<Character> = {}
@@ -86,11 +76,8 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-// InventoryList reads useCurrentCharacter() directly (#1284), so every render
-// seeds the cache and mounts CurrentCharacterProvider via renderWithCharacter.
 // rerender writes the new character straight into the cache — the same
-// mechanism a mutation's onSuccess uses in production — since the component
-// no longer has a prop to receive a fresh value through.
+// mechanism a mutation's onSuccess uses in production.
 function render(character: Character) {
   const result = renderWithCharacter(<InventoryList />, character);
   return {
@@ -102,10 +89,6 @@ function render(character: Character) {
   };
 }
 
-// What survives the move to the wire (#1377) is the over-capacity COMPARISON —
-// still a client-side `>` over two served numbers — and the render gates. The
-// six tests that used to re-check STR × 15 and 50-coins-per-pound are gone;
-// their coverage is backend/src/lib/srd/__tests__/encumbrance.test.ts.
 describe("InventoryList encumbrance readout", () => {
   it("flags over capacity when the served carried weight exceeds the served capacity", () => {
     render(makeCharacter([makeItem()], { carriedWeight: 130, carryCapacity: 120 }));
@@ -114,7 +97,6 @@ describe("InventoryList encumbrance readout", () => {
   });
 
   it("does not flag when carried weight exactly equals capacity", () => {
-    // 5e lets you carry UP TO capacity, so the boundary must use `>`, not `>=`.
     render(makeCharacter([makeItem()], { carriedWeight: 120, carryCapacity: 120 }));
     expect(screen.queryByText(/over capacity/i)).not.toBeInTheDocument();
   });
@@ -130,8 +112,7 @@ describe("InventoryList encumbrance readout", () => {
   });
 });
 
-// The cap comes off the wire (#1377). Both fixtures use a cap of 5 rather than
-// 3 so a surviving local literal fails instead of coincidentally passing.
+// Cap 5, not 3, so a surviving local literal would fail rather than pass by coincidence.
 describe("InventoryList attunement readout", () => {
   const attunable = [
     makeItem({ id: "r1", name: "Ring of Protection", category: "gear", requiresAttunement: true, attuned: true }),
@@ -156,7 +137,6 @@ describe("InventoryList sectioning", () => {
       makeItem({ id: "g1", name: "Torch", category: "gear", weight: 1, quantity: 2 }),
     ];
     render(makeCharacter(inventory));
-    // Mobile headers carry the caps label + a right-aligned count · weight payoff.
     const weapons = screen.getByRole("heading", { level: 4, name: /Weapons/ });
     expect(weapons).toHaveTextContent(/Weapons/);
     expect(weapons).toHaveTextContent(/1 · 3 lb/);
@@ -209,7 +189,6 @@ describe("InventoryList empty state", () => {
     forceDesktop();
     render(makeCharacter([]));
     expect(screen.getByText(/your pack is empty/i)).toBeInTheDocument();
-    // Two "+ Add item" affordances when empty: the header button + the empty-state CTA.
     expect(screen.getAllByRole("button", { name: "+ Add item" })).toHaveLength(2);
     expect(screen.queryByRole("meter")).toBeNull();
     expect(screen.queryByRole("heading", { level: 4 })).toBeNull();
@@ -218,7 +197,6 @@ describe("InventoryList empty state", () => {
   it("mobile: shows only the empty-state CTA (no header add, no FAB) and no meter", () => {
     render(makeCharacter([]));
     expect(screen.getByText(/your pack is empty/i)).toBeInTheDocument();
-    // Header actions and the FAB drop out when empty — only the CTA remains.
     expect(screen.getAllByRole("button", { name: "+ Add item" })).toHaveLength(1);
     expect(screen.queryByRole("button", { name: "Add item" })).toBeNull();
     expect(screen.queryByRole("meter")).toBeNull();
@@ -231,7 +209,7 @@ describe("InventoryList empty state", () => {
       makeCharacter([makeItem({ id: "w1", name: "Longsword", category: "weapon" })]),
     );
     await user.click(screen.getByRole("radio", { name: "Worn" }));
-    // Remove the last item: parent re-renders with an empty inventory while `view` stays "worn".
+    // `view` stays "worn" when the parent re-renders with an empty inventory.
     rerender(makeCharacter([]));
     expect(screen.getByText(/your pack is empty/i)).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "+ Add item" }).length).toBeGreaterThan(0);
@@ -267,7 +245,7 @@ describe("InventoryList search and filter", () => {
   it("filters to equipped items via the Equipped chip", async () => {
     const user = userEvent.setup();
     render(makeCharacter(inventory));
-    // Scope to the filter group — an equipped row's toggle is also named "Equipped".
+    // An equipped row's toggle is also named "Equipped", so scope to the filter group.
     const filters = screen.getByRole("group", { name: /filter items/i });
     await user.click(within(filters).getByRole("button", { name: "Equipped" }));
     expect(screen.getByText("Longsword")).toBeInTheDocument();
@@ -316,8 +294,6 @@ describe("InventoryList purse", () => {
   });
 });
 
-// Bulk multi-select sell lives in the desktop header; on mobile a single item is
-// sold from its detail sheet (see the mobile suite below).
 describe("InventoryList multi-select sell", () => {
   beforeEach(() => forceDesktop());
   const inventory = [
@@ -344,11 +320,8 @@ describe("InventoryList multi-select sell", () => {
     await user.click(screen.getByRole("checkbox", { name: "Select Longsword" }));
     await user.click(screen.getByRole("button", { name: "Sell" }));
 
-    // One total box, prefilled to the full stack's half value (3 × 5 gp).
     expect(screen.getByRole("spinbutton", { name: "Total gold received" })).toHaveValue(15);
-    // Quantity is still per line…
     expect(screen.getByRole("spinbutton", { name: "Quantity to sell of Longsword" })).toHaveValue(3);
-    // …but the old four-denomination boxes are gone.
     expect(screen.queryByRole("spinbutton", { name: /received for Longsword/ })).toBeNull();
   });
 
@@ -370,7 +343,6 @@ describe("InventoryList multi-select sell", () => {
 
   it("splits an edited total evenly across the selected lines", async () => {
     const user = userEvent.setup();
-    // Longsword half = 5 gp, Shield half = 2.5 gp → auto total 7.5 gp.
     render(makeCharacter(inventory));
     await user.click(screen.getByRole("button", { name: "Sell items" }));
     await user.click(screen.getByRole("checkbox", { name: "Select Longsword" }));
@@ -380,7 +352,6 @@ describe("InventoryList multi-select sell", () => {
     const total = screen.getByRole("spinbutton", { name: "Total gold received" });
     expect(total).toHaveValue(7.5);
 
-    // Negotiate a round 10 gp for the pair → 5 gp each.
     fireEvent.change(total, { target: { value: "10" } });
     await user.click(screen.getByRole("button", { name: "Sell" }));
 
@@ -398,13 +369,11 @@ describe("InventoryList multi-select sell", () => {
     await user.click(screen.getByRole("checkbox", { name: "Select Shield" }));
     await user.click(screen.getByRole("button", { name: "Sell" }));
 
-    // Set a bundle total of 10 gp, then pin the Longsword at 6 gp → Shield gets the rest (4 gp).
     fireEvent.change(screen.getByRole("spinbutton", { name: "Total gold received" }), { target: { value: "10" } });
     await user.click(screen.getByRole("button", { name: "Set a custom price for Longsword" }));
     fireEvent.change(screen.getByRole("spinbutton", { name: "Custom price in gold for Longsword" }), {
       target: { value: "6" },
     });
-    // Resolved readout reflects the pin + the remainder: 6 gp + 4 gp = 10 gp.
     expect(screen.getByText("= 10 gp")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Sell" }));
@@ -422,13 +391,11 @@ describe("InventoryList multi-select sell", () => {
     await user.click(screen.getByRole("checkbox", { name: "Select Shield" }));
     await user.click(screen.getByRole("button", { name: "Sell" }));
 
-    // Open the Longsword price, type a value, then clear it back to empty.
     await user.click(screen.getByRole("button", { name: "Set a custom price for Longsword" }));
     const price = screen.getByRole("spinbutton", { name: "Custom price in gold for Longsword" });
     fireEvent.change(price, { target: { value: "6" } });
     fireEvent.change(price, { target: { value: "" } });
 
-    // Cleared → not a 0 gp pin: both lines fall back to the even split of the auto total (7.5 gp → 3.75 each).
     await user.click(screen.getByRole("button", { name: "Sell" }));
     expect(applyInventoryTransactions).toHaveBeenCalledWith("char-1", [
       { type: "sell", inventoryItemId: "w1", quantity: 1, currencyDelta: { cp: 5, sp: 7, gp: 3, pp: 0 } },
@@ -438,18 +405,15 @@ describe("InventoryList multi-select sell", () => {
 
   it("treats a cleared total as auto, not a 0 gp sale", async () => {
     const user = userEvent.setup();
-    // Longsword half = 5 gp, Shield half = 2.5 gp → auto total 7.5 gp.
     render(makeCharacter(inventory));
     await user.click(screen.getByRole("button", { name: "Sell items" }));
     await user.click(screen.getByRole("checkbox", { name: "Select Longsword" }));
     await user.click(screen.getByRole("checkbox", { name: "Select Shield" }));
     await user.click(screen.getByRole("button", { name: "Sell" }));
 
-    // Type a total, then clear it back to empty before confirming.
     const total = screen.getByRole("spinbutton", { name: "Total gold received" });
     fireEvent.change(total, { target: { value: "20" } });
     fireEvent.change(total, { target: { value: "" } });
-    // Empty box falls back to the auto total, and the Auto reset hides.
     expect(screen.queryByRole("button", { name: "Reset total to the automatic amount" })).toBeNull();
 
     await user.click(screen.getByRole("button", { name: "Sell" }));
@@ -468,7 +432,6 @@ describe("InventoryList multi-select sell", () => {
 
     expect(screen.queryByText(/copper is the smallest coin/i)).toBeNull();
     await user.click(screen.getByRole("button", { name: "How pricing works" }));
-    // Help renders as a modal dialog (portal overlay), not an inline block.
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText(/copper is the smallest coin/i)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Close" }));

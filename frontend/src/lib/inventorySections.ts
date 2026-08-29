@@ -4,7 +4,6 @@ import { ITEM_CATEGORY_OPTIONS, ITEM_CATEGORY_ORDER } from "@/lib/items";
 
 export type FilterKey = "all" | "equipped" | ItemCategory;
 
-// Filter chips: All, one per category (labels via ITEM_CATEGORY_OPTIONS), then Equipped.
 export const FILTERS: { key: FilterKey; label: string }[] = [
   { key: "all", label: "All" },
   ...ITEM_CATEGORY_OPTIONS,
@@ -19,7 +18,6 @@ export interface InventorySection {
 
 const ZERO_CURRENCY: Currency = { cp: 0, sp: 0, gp: 0, pp: 0 };
 
-// Compact weight: drop a trailing ".0" so section headers read "8 lb" not "8.0 lb".
 export function formatWeight(weight: number): string {
   return (Math.round(weight * 10) / 10).toString();
 }
@@ -28,7 +26,7 @@ export function itemsWeight(items: InventoryItem[]): number {
   return items.reduce((sum, item) => sum + (item.weight ?? 0) * item.quantity, 0);
 }
 
-// Apply the active filter chip + name search; encumbrance still reflects the full pack.
+// Encumbrance is computed off the full pack, not this filtered result.
 export function filterInventory(
   inventory: InventoryItem[],
   filter: FilterKey,
@@ -43,7 +41,6 @@ export function filterInventory(
   });
 }
 
-// Group into the canonical category order, equipped-first then alphabetical; drop empty sections.
 export function buildSections(filtered: InventoryItem[]): InventorySection[] {
   return ITEM_CATEGORY_ORDER.map((category) => {
     const items = filtered
@@ -55,7 +52,7 @@ export function buildSections(filtered: InventoryItem[]): InventorySection[] {
   }).filter((section) => section.items.length > 0);
 }
 
-// Rough gp estimate for the selection bar; the sale itself uses exact per-denomination prices.
+// Rough estimate only — the sale itself uses exact per-denomination prices.
 export function selectionGp(selectedItems: InventoryItem[]): number {
   return Math.round(
     selectedItems.reduce(

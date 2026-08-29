@@ -7,9 +7,7 @@ import UseConsumableButton from "@/features/inventory/UseConsumableButton";
 import type { RollSpec, RollResult } from "@/lib/dice";
 import type { InventoryItem as InvItem } from "@/types/character";
 
-// Stub the 3D DiceRoller (a Three.js Canvas that doesn't render in jsdom): fire
-// onResult on mount with one fixed face per die in the spec so the settled roll
-// is deterministic and matches spec.count.
+// Stub the 3D DiceRoller (a Three.js Canvas that doesn't render in jsdom) with a deterministic fixed-face roll.
 const FIXED_FACE = 3;
 vi.mock("@/features/dice/DiceRoller", () => ({
   default: function MockDiceRoller({

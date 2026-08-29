@@ -23,38 +23,25 @@ interface SellPanelProps {
 const inputClass =
   "rounded-control border border-parchment-300 bg-parchment-50 px-1.5 py-0.5 text-xs tabular-nums";
 
-// Copper as the gold string a decimal-gold input shows: "37.5", "55", "0.25".
 function gpString(copper: number): string {
   return String(copperToGp(copper));
 }
 
-// Normalized gp/sp/cp total the sale actually pays out, for the denominational
-// readout — sum in copper, then decompose (carrying up, no platinum roll-up) so
-// "24 sp 10 cp" reads as the "2 gp 5 sp" it really is.
+// toGoldSilverCopper never rolls up to platinum, so totals stay comparable to catalog prices.
 function resolvedTotalObject(prices: Record<string, Currency>, items: InventoryItem[]): Currency {
   const copper = items.reduce((sum, item) => sum + toCopper(prices[item.id]), 0);
   return toGoldSilverCopper(copper);
 }
 
-/**
- * Bulk-sale review. The money is entered as a single gold total (split evenly
- * across the selected lines); a line can optionally be pinned to its own price
- * via "Set price", and the remaining total then splits across the rest. Each
- * line keeps its own editable quantity. Resolves to a per-line price map that
- * flows through `buildSellOperations`.
- */
 export default function SellPanel({ items, pending, onConfirm, onCancel }: SellPanelProps) {
   const [quantities, setQuantities] = useState<Record<string, number>>(() =>
     Object.fromEntries(items.map((item) => [item.id, item.quantity]))
   );
-  // Per-line price overrides, as raw gold-input text. Presence = the line is
-  // pinned to that price; absent = it shares the total evenly.
+  // overrides: presence of an entry pins that line to its price; absence shares the total evenly.
   const [overrides, setOverrides] = useState<Record<string, string>>({});
-  // Which rows have their price editor open.
   const [openRows, setOpenRows] = useState<Set<string>>(new Set());
-  // The sale total as raw gold-input text; `null` means "follow the auto total".
+  // totalText null means "follow the auto total".
   const [totalText, setTotalText] = useState<string | null>(null);
-  // Toggles the inline "how pricing works" help disclosure.
   const [showHelp, setShowHelp] = useState(false);
 
   const lines: SellLine[] = items.map((item) => ({
@@ -62,15 +49,13 @@ export default function SellPanel({ items, pending, onConfirm, onCancel }: SellP
     quantity: quantities[item.id],
   }));
 
-  // An empty input means the row is open but not yet priced — it must NOT count
-  // as a pin (else `Number("") = 0` would silently sell the item for 0 gp).
+  // An empty override text must NOT count as a pin: Number("") = 0 would silently sell for 0 gp.
   const overridesCopper: Record<string, number> = Object.fromEntries(
     Object.entries(overrides)
       .filter(([, text]) => text.trim() !== "")
       .map(([id, text]) => [id, gpToCopper(Number(text))])
   );
 
-  // Auto total: each pinned line at its override, each other at half catalog value.
   const autoTotalCopper = items.reduce((sum, item) => {
     const copper =
       item.id in overridesCopper
@@ -79,8 +64,7 @@ export default function SellPanel({ items, pending, onConfirm, onCancel }: SellP
     return sum + copper;
   }, 0);
 
-  // A blank box (null before first edit, or "" after the user clears it) means
-  // "use the auto total" — never a 0 gp sale (mirrors an empty override → unpinned).
+  // Blank totalText (null, or "" after clearing) means "use the auto total", never a 0 gp sale.
   const targetCopper = !totalText?.trim() ? autoTotalCopper : gpToCopper(Number(totalText));
   const prices = resolveSellPrices(lines, overridesCopper, targetCopper);
   const resolvedTotal = resolvedTotalObject(prices, items);

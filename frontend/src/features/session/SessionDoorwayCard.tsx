@@ -2,18 +2,10 @@ import { useSessionDoorway } from "@/features/session/useSessionDoorway";
 
 interface SessionDoorwayCardProps {
   characterId: string;
-  /** Called after a successful start/join; defaults to a no-op (idle Combat is
-   *  already the active tab, so the live panel supersedes in place). */
+  /** Defaults to a no-op: idle Combat is already the active tab, so the live panel supersedes in place. */
   onEnterCombat?: () => void;
 }
 
-/**
- * The idle Combat tab's doorway card (#1086) — the turn-slot placeholder when no
- * session is live. Reads `useSessionDoorway` directly (no prop threading) so it
- * dispatches start/join off the shared live-session state and disables/errors
- * inline. When the summary offers no action (a player with nothing to start), the
- * card is informational only.
- */
 export default function SessionDoorwayCard({ characterId, onEnterCombat }: SessionDoorwayCardProps) {
   const { summary, pending, error, onAction } = useSessionDoorway(characterId, onEnterCombat);
   const actionLabel = summary.action === "join" ? "Join session" : "Start session";

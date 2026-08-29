@@ -8,8 +8,6 @@ interface InventoryRowCompactProps {
   onOpen: () => void;
 }
 
-// Dense mobile item row (#1029): a full-bleed 56pt tap target that opens the
-// item detail sheet. Name never truncates mid-word; the meta line ellipsises.
 export default function InventoryRowCompact({ item, onOpen }: InventoryRowCompactProps) {
   const meta = itemDetailParts(item).join(" · ");
   return (

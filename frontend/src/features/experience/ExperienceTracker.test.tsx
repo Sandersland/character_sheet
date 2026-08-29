@@ -21,8 +21,6 @@ function makeCharacter(): Character {
   } as unknown as Character;
 }
 
-// ExperienceTracker reads useCurrentCharacter(), so every render seeds the
-// cache and mounts CurrentCharacterProvider via renderWithCharacter.
 function render(character: Character) {
   return renderWithCharacter(<ExperienceTracker />, character);
 }
@@ -58,7 +56,6 @@ describe("ExperienceTracker (issue #225)", () => {
     const user = userEvent.setup();
     render(makeCharacter());
 
-    // Hidden by default.
     expect(
       screen.queryByRole("spinbutton", { name: /exact xp total/i }),
     ).not.toBeInTheDocument();
@@ -76,7 +73,6 @@ describe("ExperienceTracker (issue #225)", () => {
 
   it("captions the XP remaining to the next level", () => {
     render(makeCharacter());
-    // 2700 next − 900 current = 1800 to Level 4.
     expect(screen.getByText(/1,800 XP to Level 4/i)).toBeInTheDocument();
   });
 

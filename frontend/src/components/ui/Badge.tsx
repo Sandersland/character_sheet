@@ -16,11 +16,6 @@ const TONE_CLASSES: Record<BadgeTone, string> = {
   neutral: "bg-parchment-100 text-parchment-700",
 };
 
-/**
- * Soft-background / full-rounded badge — the "safe default for status/
- * category tags" per components.md, used for class/level chips, spell
- * school tags, and the backend health indicator.
- */
 export default function Badge({
   children,
   tone = "neutral",

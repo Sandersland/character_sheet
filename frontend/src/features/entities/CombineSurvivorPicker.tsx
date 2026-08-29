@@ -10,11 +10,10 @@ interface CombineSurvivorPickerProps {
   onPick: (survivor: CampaignEntity) => void;
 }
 
-// The "Combine into…" survivor list (#1943): a plain search-filtered list, not
-// the full @-mention autocomplete (useMentionEditor) — that machinery is bound
-// to a rich-text caret this modal doesn't have. matchEntities is the same
-// name/alias matcher the autocomplete and the entity pane rail both use, so
-// searching here behaves the same way it does everywhere else in the Codex.
+// Not the full @-mention autocomplete (useMentionEditor) — that machinery is
+// bound to a rich-text caret this modal doesn't have. matchEntities is the
+// same matcher the autocomplete and the entity pane rail use, so search here
+// behaves the same way it does everywhere else in the Codex.
 export default function CombineSurvivorPicker({
   duplicateId,
   entities,

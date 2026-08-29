@@ -14,26 +14,21 @@ interface CombineConfirmDialogProps {
   duplicate: CampaignEntity;
   survivor: CampaignEntity;
   merges: CampaignEntityMerge[];
-  // The duplicate's own fronted campaign item, if any (already on the wire
-  // for the page being combined away, via fetchCampaignItemByEntity) — drives
-  // the item-link-transfer warning below alongside survivor.itemId.
+  // Prefetched via fetchCampaignItemByEntity for the page being combined away —
+  // drives the item-link-transfer warning below alongside survivor.itemId.
   duplicateItem: CampaignItem | null;
   // Owned by CombineEntityAction, not created here — it needs the same
-  // instance to gate the Modal's own dismiss paths (Close link, overlay
-  // click, Escape) while pending, so a user can't make an irreversible
-  // combine look cancelled by dismissing the dialog mid-flight.
+  // instance to gate the Modal's dismiss paths while pending, so a user can't
+  // make an irreversible combine look cancelled by dismissing mid-flight.
   mutation: ReturnType<typeof useCombineEntity>;
   onCancel: () => void;
   onCombined: (survivorId: string, message: string) => void;
 }
 
-// The consequence-preview body of the "Combine into…" dialog (#1943). Every
-// number here is derived from data already on the wire (entity.stats,
-// aliases/notes/portrait/type/visibility) — combining never fetches anything
-// new just to render this preview. A 409 from the endpoint (both-linked,
-// ITEM-link-to-non-ITEM, EXECUTED-revealed duplicate) lands in mutation.error
-// and renders inline here, same treatment as any other failure — never a toast,
-// since the whole point is the dialog staying open for the DM to read why.
+// Every number here is derived from data already on the wire — combining
+// never fetches anything new just to render this preview. A 409 from the
+// endpoint lands in mutation.error and renders inline, never a toast, since
+// the whole point is the dialog staying open for the DM to read why.
 export default function CombineConfirmDialog({
   duplicate,
   survivor,

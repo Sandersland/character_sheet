@@ -1,9 +1,3 @@
-// Fighting Style feats (#1137): the sheet section for the fightingStyle slot
-// partition. Shows taken Fighting Style feats and, while a slot is open, an
-// inline picker of the catalog's fighting_style feats (excluding taken ones).
-// Taking one routes through the advancement endpoint with a slot:"fightingStyle"
-// takeFeat op — never the removed setFightingStyle class scalar.
-
 import { useState } from "react";
 
 import Spinner from "@/components/ui/Spinner";
@@ -28,9 +22,6 @@ function TakenFeat({ entry }: { entry: AdvancementEntry }) {
   );
 }
 
-// The open picker's status + results — error/spinner/empty-message/list, split
-// out of FeatPicker so that component's own branching stays around open/closed
-// and catalog-fetch wiring, not this block's four independent render conditions.
 function FeatPickerResults({
   feats,
   options,
@@ -88,15 +79,12 @@ function FeatPicker({
   const { character } = useCurrentCharacter();
   const [open, setOpen] = useState(false);
   // No asiLevel (#1438): featOfferedForAsiSlot always rejects fighting_style, so
-  // asking the server for the ASI-legal set would empty this picker. It reads
-  // feats.catalog raw for the same reason — feats.filter is search-only.
+  // asking the server for the ASI-legal set would empty this picker.
   //
-  // classNames (#1495): character.fightingStyleGrantingClasses — the classes
-  // that have EARNED the feature, server-computed by
-  // fightingStyleGrantingClassNames — never `character.classes` as a whole.
-  // A class that merely HAS a fightingStyleFeatLevel but hasn't reached it
-  // yet (a Fighter1/Ranger1 multiclass's Ranger entry) must not widen the
-  // offered set, or the write path 400s a style the picker just offered.
+  // character.fightingStyleGrantingClasses — the classes that have EARNED the
+  // feature — is passed instead of `character.classes` as a whole: a class
+  // that merely has a fightingStyleFeatLevel but hasn't reached it yet must
+  // not widen the offered set, or the write path 400s a style the picker just offered.
   const feats = useFeatCatalog(open, undefined, character.rulesEdition, character.fightingStyleGrantingClasses);
   const options = (feats.catalog ?? []).filter(
     (f) => f.category === "fighting_style" && !takenIds.has(f.id),

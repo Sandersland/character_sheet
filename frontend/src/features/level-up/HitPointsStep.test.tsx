@@ -10,10 +10,6 @@ import type { RollResult } from "@/lib/dice";
 import type { LevelUpDraft } from "@/lib/levelUpSteps";
 import type { Character, LevelUpPlanResponse, LevelUpStep, LevelUpTarget } from "@/types/character";
 
-// Stub the 3D roller: fires onResult only when its "settle" button is clicked
-// (not on mount), so tests can observe the tumbling gap before a roll settles.
-// Each mount's settle value is distinct, so a forbidden re-roll (a second
-// mount) is observably different from the first.
 let rollValues = [7, 3];
 let rollMountCount = 0;
 vi.mock("@/features/dice/DiceRoller", () => ({
@@ -37,13 +33,9 @@ vi.mock("@/features/dice/DiceRoller", () => ({
   },
 }));
 
-// The step's numbers arrive resolved on the wire (#1380) — these fixtures are
-// what the backend planner serves, not something the component re-derives.
-// #1497: effectiveMaxAverage/effectiveMaxByRoll are ALSO served — every test in
-// this file uses baseCharacter's max 52, unaffected by exhaustion (below tier
-// 4/2024), so these are exactly 52 + each outcome's gain, matching what
-// effectiveMaxHitPoints itself reduces to off that tier — see
-// level-up-plan.test.ts for the exhaustion-4+ halving coverage.
+// These fixtures are what the backend planner serves (#1380);
+// effectiveMaxAverage/effectiveMaxByRoll (#1497) are also server-computed,
+// not re-derived here.
 const D10_CON_0: LevelUpStep = {
   kind: "hitPoints",
   meta: {
@@ -72,7 +64,6 @@ const D6_CON_0: LevelUpStep = {
     effectiveMaxByRoll: [0, 53, 54, 55, 56, 57, 58],
   },
 };
-// Con 1 → −5: every gain is pinned to the max(1, …) level-up floor.
 const D6_CON_MINUS_5: LevelUpStep = {
   kind: "hitPoints",
   meta: {
@@ -124,7 +115,6 @@ function renderStep(over?: { draft?: LevelUpDraft; character?: Character; step?:
   return { setDraft };
 }
 
-// Stateful host so card clicks and dice results flow through a real setDraft.
 function StatefulStep({
   onDraft,
   character = baseCharacter,
@@ -215,19 +205,16 @@ describe("HitPointsStep", () => {
 
     await user.click(screen.getByRole("button", { name: /take average/i }));
     expect(await screen.findByText(/52\s*→\s*58/)).toBeInTheDocument();
-    // The reveal wrapper stays mounted (hidden), not torn down, while average is selected.
     expect(screen.getByTestId("dice-roller").parentElement).toHaveAttribute("hidden");
 
     await user.click(screen.getByRole("button", { name: /roll 1d10/i }));
     expect(screen.getByTestId("dice-roller").parentElement).not.toHaveAttribute("hidden");
-    // Still 59 (the held 7), not 55 (a fresh mount's 3) — the die never re-rolled.
     expect(await screen.findByText(/52\s*→\s*59/)).toBeInTheDocument();
     expect(rollMountCount).toBe(1);
   });
 
-  // #1170 decided WHICH class advances upstream; #1380 moved resolving that
-  // class's die to the server, so the step renders the served die and no longer
-  // consults the reference catalog or the level-up target at all.
+  // The step renders the server-served die; it never consults the reference
+  // catalog or the level-up target.
   it("renders the served die even when it differs from the character's persisted one", async () => {
     renderStep({ step: D6_CON_0 });
 
@@ -243,11 +230,10 @@ describe("HitPointsStep", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  // #1497: at 2014 exhaustion 4+ (PHB'14 p. 291), `character.hitPoints.max` is
-  // already the halved EFFECTIVE max, so `currentMax + gain` (15 + 8 = 23) is
-  // NOT what the level-up transaction actually commits — the server-computed
-  // effectiveMaxAverage (19, halving the post-level raw max's own parity) is.
-  // This step renders the served number, never that addition.
+  // 2014 exhaustion 4+ (PHB'14 p. 291) halves max HP, so `character.hitPoints.max`
+  // is already the halved effective max — `currentMax + gain` (15 + 8 = 23) is
+  // NOT what the level-up transaction commits; the server-computed
+  // effectiveMaxAverage (19) is, and that's what this step renders.
   it("renders the served effective max, not currentMax + gain, once exhaustion 4+ has halved the served max", async () => {
     const exhaustedStep: LevelUpStep = {
       kind: "hitPoints",
@@ -273,8 +259,6 @@ describe("HitPointsStep", () => {
     expect(screen.queryByText(/15\s*→\s*23/)).not.toBeInTheDocument();
   });
 
-  // The preview used to add conMod unclamped while the ledger and the server
-  // both floored at 1 — a negative-Con roll of 1 made the two screens disagree.
   it("floors a negative-Con roll at the served minRoll (d6, −5 Con: 52 → 53)", async () => {
     rollValues = [1];
     render(<StatefulStep step={D6_CON_MINUS_5} />);

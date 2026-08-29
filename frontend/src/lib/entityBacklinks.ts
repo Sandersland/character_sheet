@@ -1,7 +1,5 @@
 import type { EntityBacklink } from "@/types/character";
 
-// One chronicle section (#842): a session (or the "none" bucket) with its
-// context and entries, dated by its first (newest) item.
 export interface ChronicleGroup {
   key: string;
   sessionId: string | null;
@@ -11,7 +9,7 @@ export interface ChronicleGroup {
   items: EntityBacklink[];
 }
 
-// Session-primary chronicle grouping (#842), preserving API newest-first order.
+// Relies on backlinks already arriving in newest-first order from the API.
 export function chronicleGroups(backlinks: EntityBacklink[]): ChronicleGroup[] {
   const groups = new Map<string, ChronicleGroup>();
   for (const link of backlinks) {
@@ -33,7 +31,6 @@ export function chronicleGroups(backlinks: EntityBacklink[]): ChronicleGroup[] {
   return [...groups.values()];
 }
 
-// Cap the chronicle at the latest few session groups; the rest sit behind an expander.
 export function splitChronicle(
   groups: ChronicleGroup[],
   visibleCount = 3,

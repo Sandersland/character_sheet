@@ -1,17 +1,3 @@
-/**
- * CastSpellDoor — the record view's single casting entry point (#1162). Replaces
- * the old per-row quick-cast pills: one "Cast a spell" button opens an in-place
- * picker over the castable roster (at-will cantrips + prepared leveled spells
- * with a slot to spend, deriveCastableSpells), and tapping a spell opens the SAME
- * shared SpellDetailCard the grimoire and the in-session cast sheet use — reusing
- * SlotLevelSelector for the upcast step rather than hand-rolling a second one
- * (mirrors CastSpellDetailSheet, #1163, which can't be reused directly here: it's
- * typed against the session turn-economy picker, and camp casting has no turn to
- * spend).
- *
- * While a session is live, casting belongs to the Combat tab (its economy/roll
- * log is the source of truth), so the door defers there instead of opening.
- */
 import { useState } from "react";
 
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
@@ -25,7 +11,6 @@ import type { Spell } from "@/types/character";
 interface CastSpellDoorProps {
   derived: { availableSlotLevels: number[]; availableArcanaLevels: number[] };
   busy: boolean;
-  /** A live session is active — casting defers to the Combat tab instead of opening the picker. */
   isLive: boolean;
   onCast: (spell: Spell, slotLevel?: number) => void;
   onGoToCombat: () => void;
@@ -49,7 +34,6 @@ function CastableRow({ spell, onOpen }: { spell: Spell; onOpen: () => void }) {
   );
 }
 
-// The in-place picker box (not a live session): empty state or the castable rows.
 function CastPickerList({ castable, onOpen }: { castable: Spell[]; onOpen: (spell: Spell) => void }) {
   return (
     <div className="rounded-card border border-parchment-200 bg-parchment-50 p-3">

@@ -1,27 +1,3 @@
-// A single "Your homebrew spells" row (#1788, epic #1782 5/5): Edit/Delete
-// controls, with delete a two-step inline confirm — same
-// confirm-then-cancel-row shape as ItemDetailFooter's Drop control. Awaits
-// `onDelete` itself (rather than firing-and-forgetting) so a rejected delete
-// resets `confirming` here instead of leaving the row stuck showing BOTH the
-// confirm prompt and HomebrewTab's error banner.
-//
-// "Share" (#1799/#1801, epic #1795 4/6+6/6) opens ShareSpellSheet, offered
-// only for a USER-scope row: grants.ts's POST …/grants 400s any other scope
-// ("Only USER-scope catalog entries can be granted"), and since #1808 (epic
-// #1795 8/8) this list also carries a DM's CAMPAIGN-scope forks (already
-// campaign-wide by construction — nothing to share). A "Forked" badge
-// surfaces when the row is itself a fork of some other entry (isForkedSpell).
-//
-// Edit/Delete are gated on `catalog.editable` (#1808 leak-fix, epic #1795
-// 8/9 combined-state review), not just "this row reached the manage list at
-// all": since #1811 (epic #1795 9/9) the campaign-aware picker can serve a
-// CAMPAIGN row to a non-DM member too (ownedHomebrewSpells' own list-level
-// filter already excludes those — this is the same check again at the row,
-// defense in depth, not a second source of truth: both read the ONE
-// server-computed field). `catalog === undefined` (an older/no-metadata
-// fixture) defaults to editable — that shape only ever reaches this
-// component via ownerId-based ownership, which is real ownership regardless
-// of whether catalog metadata rode along.
 import { useState } from "react";
 
 import Badge from "@/components/ui/Badge";
@@ -40,12 +16,14 @@ interface HomebrewSpellManageRowProps {
 export default function HomebrewSpellManageRow({ spell, busy, onEdit, onDelete }: HomebrewSpellManageRowProps) {
   const [confirming, setConfirming] = useState(false);
   const [sharing, setSharing] = useState(false);
+  // `catalog === undefined` defaults to editable — that shape only reaches this component via real ownerId ownership.
   const editable = spell.catalog === undefined || spell.catalog.editable;
 
   async function handleConfirmDelete() {
     try {
       await onDelete(spell);
     } catch {
+      // Reset instead of leaving the row stuck showing both the confirm prompt and HomebrewTab's error banner.
       setConfirming(false);
     }
   }
@@ -88,6 +66,7 @@ export default function HomebrewSpellManageRow({ spell, busy, onEdit, onDelete }
         <p className="text-xs text-parchment-600">{catalogMetaLine(spell)}</p>
       </div>
       <div className="flex shrink-0 items-center gap-3 text-xs font-semibold">
+        {/* grants.ts's POST /grants 400s any non-USER scope. */}
         {spell.catalog?.scope === "USER" && (
           <button
             type="button"
@@ -99,6 +78,7 @@ export default function HomebrewSpellManageRow({ spell, busy, onEdit, onDelete }
             Share
           </button>
         )}
+        {/* Defense in depth: ownedHomebrewSpells already filters non-DM CAMPAIGN rows out of this list; both read the one server-computed `editable` field. */}
         {editable && (
           <>
             <button

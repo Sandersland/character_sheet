@@ -98,13 +98,12 @@ describe("Popover", () => {
 
     afterEach(() => {
       vi.restoreAllMocks();
-      // Remove the instance override so the prototype getter shows through again.
+      // Undoes the instance override so the prototype getter shows through again.
       delete (document.documentElement as unknown as Record<string, unknown>).clientWidth;
     });
 
     it("flips a left-aligned panel to right-0 when it would overflow the right edge", async () => {
-      // Trigger near the right edge of a 390px viewport: left-aligned 224px panel
-      // would end at 300 + 224 = 524 > 390 → must flip right.
+      // left-aligned 224px panel would end at 300 + 224 = 524 > 390 viewport width.
       mockViewport(390, { left: 300, right: 360 });
       const user = userEvent.setup();
       renderPopover();
@@ -113,8 +112,7 @@ describe("Popover", () => {
     });
 
     it("flips a right-aligned panel to left-0 when it would overflow the left edge", async () => {
-      // Trigger near the left edge: right-aligned 224px panel would start at
-      // 90 - 224 = -134 < 0 → must flip left.
+      // right-aligned 224px panel would start at 90 - 224 = -134 < 0.
       mockViewport(390, { left: 30, right: 90 });
       const user = userEvent.setup();
       renderPopover({ align: "right" });
@@ -135,7 +133,7 @@ describe("Popover", () => {
       // guard suppresses the flip and it stays on the caller's preferred side.
       mockViewport(180, { left: 40, right: 100 });
       const user = userEvent.setup();
-      renderPopover(); // default align="left"
+      renderPopover();
       await user.click(screen.getByRole("button", { name: "Armor Class breakdown" }));
       expect(screen.getByRole("dialog").className).toContain("left-0");
     });
@@ -152,14 +150,14 @@ describe("Popover", () => {
     const user = userEvent.setup();
     renderPopover({ onClose });
     const trigger = screen.getByRole("button", { name: "Armor Class breakdown" });
-    await user.click(trigger); // open — must NOT fire onClose
+    await user.click(trigger);
     expect(onClose).not.toHaveBeenCalled();
-    await user.click(trigger); // toggle closed
+    await user.click(trigger);
     expect(onClose).toHaveBeenCalledTimes(1);
-    await user.click(trigger); // open again
+    await user.click(trigger);
     fireEvent.keyDown(document, { key: "Escape" });
     expect(onClose).toHaveBeenCalledTimes(2);
-    await user.click(trigger); // open again
+    await user.click(trigger);
     fireEvent.mouseDown(document.body);
     expect(onClose).toHaveBeenCalledTimes(3);
   });

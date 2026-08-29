@@ -9,8 +9,6 @@ function makeCharacter(partial: Partial<Character>): Character {
   return { id: "char-1", ...partial } as unknown as Character;
 }
 
-// ItemGrantsCard reads useCurrentCharacter(), so every render seeds the cache
-// and mounts CurrentCharacterProvider via renderWithCharacter.
 describe("ItemGrantsCard (#529)", () => {
   it("renders nothing when there are no item grants", () => {
     const { container } = renderWithCharacter(

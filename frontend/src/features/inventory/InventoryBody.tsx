@@ -22,14 +22,12 @@ interface InventoryBodyProps {
   onCancelSell: () => void;
   onAddItem: () => void;
   onSubmit: (operations: InventoryOperation[]) => Promise<void>;
-  // Bundled (#1854) — see WeaponBondProps' own comment.
   bond: WeaponBondProps;
   onEdit: (id: string) => void;
   onCancelEdit: () => void;
   onToggleSelect: (id: string) => void;
 }
 
-// Picks the inventory content region: sell panel, empty state, or the pack view.
 export default function InventoryBody({
   configuringSell,
   selectedItems,
@@ -47,9 +45,9 @@ export default function InventoryBody({
   }
 
   if (!hasItems) {
-    // Empty state wins over the view: if the last item is removed while on the
-    // Worn tab (the Segmented toggle is hidden when !hasItems), fall back to the
-    // Add-item CTA rather than stranding the user on an empty doll.
+    // Empty state wins over the view: the Worn tab's toggle is hidden when
+    // !hasItems, so fall back to the Add-item CTA rather than stranding the
+    // user on an empty doll.
     return (
       <EmptyState
         icon={<GiKnapsack />}

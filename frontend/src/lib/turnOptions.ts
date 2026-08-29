@@ -1,14 +1,3 @@
-/**
- * turnOptions.ts — pure render models for the TurnHub option-card sheets.
- *
- * No React, no JSX, no side effects. Composes the existing derivations
- * (attackMath, spellPicker, resource pools, resolver metadata) into the
- * display strings the Action / Bonus Action / Reaction pickers render, so
- * the sheet components stay presentational and this logic stays unit-testable.
- *
- * Icons deliberately live in the components (key → IconType maps), not here.
- */
-
 import { buildAttackEntries, buildOffHandEntry } from "@/lib/attackMath";
 import { formatRollSpec } from "@/lib/dice";
 import { effectPreview } from "@/lib/spellMeta";
@@ -28,28 +17,22 @@ import type {
   UniversalActionOption,
 } from "@/types/character";
 
-/** "Longsword · +7 to hit · 1d8 + 4 slashing" for the first attack row
- *  (first equipped weapon, falling back naturally to Unarmed Strike). */
 export function mainWeaponSummary(character: Character): string {
   const entry = buildAttackEntries(character)[0];
   return `${entry.name} · ${entry.attackLabel} to hit · ${entry.damageLabel}`;
 }
 
-/** Off-hand (TWF) equivalent, or null when the loadout can't dual-wield. */
 export function offHandSummary(character: Character): string | null {
   const entry = buildOffHandEntry(character);
   return entry ? `${entry.name} · ${entry.attackLabel} to hit · ${entry.damageLabel}` : null;
 }
 
-/** Total consumable quantity in the pack — the "×N" badge on Use an item. */
 export function consumableCount(character: Character): number {
   return character.inventory
     .filter((item) => item.category === "consumable")
     .reduce((sum, item) => sum + item.quantity, 0);
 }
 
-/** Resource-pool badge for a class action, e.g. "1 / rest", or undefined
- *  when the action spends no pool (or the pool isn't on the character). */
 export function poolBadgeFor(
   resourceKey: string | undefined,
   pools: ResourcePool[] | undefined,
@@ -68,76 +51,43 @@ export function poolBadgeFor(
   }
 }
 
-/** Render model for one class-action option card. */
 export interface ClassActionOption {
   key: string;
   title: string;
   enabled: boolean;
   disabledReason?: string;
-  /** e.g. "Regain 1d10 + 3 HP" for heal-roll resolvers; undefined otherwise. */
   subtitle?: string;
-  /** Pool badge, e.g. "1 / rest". */
   badge?: string;
-  /** True for self-heal resolvers — the card renders in the vitality tone. */
   heal: boolean;
-  /**
-   * Names of the universal actions this class row re-costs (#1431), resolved
-   * from the served rows for the character's edition. Absent when the row
-   * regrants nothing OR when nothing resolved — an unresolved key is dropped
-   * silently, because the reference query is simply not in yet on first paint;
-   * the seed/route drift tests are the gate against a genuinely bogus key, not
-   * this renderer.
-   */
+  // regrantNames omits unresolved keys silently (#1431) — first-paint races the
+  // reference query; seed/route drift tests, not this renderer, catch a
+  // genuinely bad key.
   regrantNames?: string[];
 }
 
-/**
- * Flurry of Blows spends "focus" (2024) or "ki" (2014, #1500) — the served
- * AvailableAction carries no resourceKey on the wire (only a row-driven
- * action does), so the client can't read the edition-correct pool key off
- * anything server-sent; it looks for whichever of the two the character
- * actually has instead (a monk only ever has one).
- */
+// Flurry's served action carries no resourceKey on the wire, so this reads
+// whichever edition-specific pool ("focus" 2024 / "ki" 2014, #1500) the
+// character actually has instead.
 function monkFlurryPool(pools: ResourcePool[] | undefined): ResourcePool | undefined {
   return pools?.find((p) => p.key === "focus" || p.key === "ki");
 }
 
-/**
- * "Spend 1 Focus Points" / "Spend 1 Ki Points" caption for Flurry of Blows —
- * its card otherwise shows only the pool's REMAINING total (the badge),
- * never the per-use cost (#1217). Reads the pool's own `label` (never the
- * raw resourceKey) so this never renders a bare camelCase key in the UI.
- * Undefined when neither pool is on the character (e.g. a non-monk somehow
- * seeing this action).
- */
+// Shows the per-use cost (#1217), unlike the badge which shows only the pool's
+// remaining total; reads the pool's own `label`, never the raw resourceKey.
 function flurrySpendLabel(pools: ResourcePool[] | undefined): string | undefined {
   const pool = monkFlurryPool(pools);
   return pool ? `Spend 1 ${pool.label}` : undefined;
 }
 
-/**
- * Pool badge for one class action — split out of classActionOption to keep
- * that function's own branching budget low (fallow's complexity gate).
- * Flurry of Blows (#1500) is the one exception to "read resolver.resourceKey":
- * it resolves off whichever monk pool the character actually has (see
- * monkFlurryPool) rather than the static ACTION_RESOLVERS table's hardcoded
- * "focus" — a 2014 monk's card would otherwise show no badge at all.
- */
+// Split out of classActionOption to keep its complexity under fallow's gate.
 function classActionBadge(action: AvailableAction, resolver: ActionResolver | undefined, character: Character): string | undefined {
   const pools = character.resources?.pools;
   const resourceKey = action.key === "flurryOfBlows" ? monkFlurryPool(pools)?.key : resolver?.resourceKey;
   return poolBadgeFor(resourceKey, pools);
 }
 
-/**
- * Subtitle for one class action — split out of classActionOption for the
- * same complexity-budget reason as classActionBadge above. Heal-roll actions
- * preview their heal; a resolver-level static subtitle (Bonus Unarmed
- * Strike, #1218) wins next; Flurry surfaces its Focus/Ki cost (#1217/#1500,
- * singled out rather than generalized to every resource-costing action — a
- * broader "spend N" caption is a separate design call); every other
- * reminder-only action (e.g. Shadow Step) shows its rule text.
- */
+// Split out of classActionOption for the same complexity-budget reason as
+// classActionBadge above.
 function classActionSubtitle(action: AvailableAction, resolver: ActionResolver | undefined, character: Character): string | undefined {
   if (resolver?.kind === "heal-roll" && resolver.healRoll) {
     return `Regain ${formatRollSpec(resolver.healRoll(character))} HP`;
@@ -147,14 +97,13 @@ function classActionSubtitle(action: AvailableAction, resolver: ActionResolver |
   return action.reminder;
 }
 
-/** Enrich a backend AvailableAction with resolver-derived subtitle + pool badge. */
 export function classActionOption(
   action: AvailableAction,
   resolver: ActionResolver | undefined,
   character: Character,
-  // The rows GET /api/reference served for this character's edition (#1430) —
-  // the only place a regranted key's display name exists, since one key can
-  // resolve to two names across editions.
+  // The rows GET /api/reference served for this edition (#1430) — the only
+  // place a regranted key's display name exists, since one key can name
+  // differently across editions.
   universalActions: UniversalActionOption[],
 ): ClassActionOption {
   const regrantNames = (action.regrants ?? [])
@@ -175,32 +124,23 @@ export function classActionOption(
   };
 }
 
-/** The three turn-hub menu partitions of `character.availableActions`. */
 export interface ClassActionPartitions {
   classActions: AvailableAction[];
   classBonusActions: AvailableAction[];
   classReactions: AvailableAction[];
 }
 
-/**
- * Partitions `availableActions` by action-economy cost for the three TurnHub
- * menus. Only actions with a registered ACTION_RESOLVERS entry are included —
- * a DERIVED_ACTIONS row with no resolver (e.g. Shadow Arts/Cloak of
- * Shadows/Elemental Burst, #1315: cast through their own dedicated
- * /abilities/* endpoints + Class-tab sections, not this generic dispatch)
- * would otherwise render a clickable card whose click just consumes the slot
- * and does nothing (planActionClick's no-resolver fallback is
- * `{consumeSlot:true, send:"none"}`).
- */
+// Drops any AvailableAction row with no registered resolver (e.g. Shadow
+// Arts/Cloak of Shadows/Elemental Burst, #1315, which cast through their own
+// dedicated endpoints) — otherwise it would render a card whose click just
+// burns the slot via planActionClick's no-resolver fallback.
 export function partitionClassActions(
   availableActions: AvailableAction[],
   raging: boolean,
 ): ClassActionPartitions {
-  // resolverFor(a.key, a) — passing the action itself (#1528) so a row-driven
-  // key (Second Wind/Action Surge, no ACTION_RESOLVERS entry anymore) still
-  // resolves via its served `resolverKind` instead of being filtered out here
-  // silently (the exact "vanishes with no test failure" hazard the ordering
-  // matters for).
+  // Passes the action itself (#1528) so a row-driven key (Second Wind, no
+  // ACTION_RESOLVERS entry) resolves via its served resolverKind instead of
+  // silently vanishing from this filter.
   const withResolver = availableActions.filter((a) => resolverFor(a.key, a) !== undefined);
   return {
     classActions: withResolver.filter((a) => a.cost === "action"),
@@ -212,25 +152,18 @@ export function partitionClassActions(
   };
 }
 
-/** Render model for one castable bonus-action spell card. */
 export interface BonusSpellOption {
   /** Spellbook entry id (Spell.id) — passed to the pre-selected cast flow. */
   spellId: string;
   name: string;
-  /** "Bonus-action cast · 1d4 + 3 healing" (effect preview when derivable). */
   subtitle: string;
-  /** "at will" for cantrips, "L1 slot" etc. for leveled spells. */
   badge: string;
 }
 
-/**
- * Castable bonus-action spells for the Bonus Action sheet. Shares
- * InlineSpellPicker's own deriveSpellList filtering by calling the same pure
- * spellPicker.ts predicates — including `restrictionFlagsForSlot`, the one
- * projection of the server-resolved interlock (#1439) both surfaces read — so
- * the card list and the picker that opens from it can never disagree. `economy`
- * is the served `SpellEconomyState`; the client never re-derives the rule.
- */
+// Shares InlineSpellPicker's deriveSpellList filtering via the same
+// spellPicker.ts predicates (incl. restrictionFlagsForSlot's server-resolved
+// interlock, #1439) so the card list and the picker it opens can never
+// disagree; economy is the served SpellEconomyState, never re-derived.
 export function bonusSpellOptions(
   character: Character,
   economy: SpellEconomyState,
@@ -261,23 +194,15 @@ export function bonusSpellOptions(
   });
 }
 
-/**
- * Whether the served off-hand / Two-Weapon Fighting affordance is enabled
- * (#1435) — the eligibility rule (both equipped weapons Light) is resolved
- * server-side onto the `offHandAttack` action row; the client reads the flag,
- * never re-derives it from inventory. False when the row isn't served yet.
- */
+// Eligibility (#1435, both equipped weapons Light) is resolved server-side
+// onto the offHandAttack row; this only reads the served flag.
 export function offHandAttackEnabled(character: Character): boolean {
   return character.availableActions?.find((a) => a.key === "offHandAttack")?.enabled ?? false;
 }
 
-/**
- * Footer hint for the Bonus Action sheet when TWF is unavailable. Names a
- * concrete owned light-weapon pair when one exists ("equip Two Shortswords…"),
- * else falls back to the generic requirement. Null when TWF is already live.
- * The eligibility comes off the served row (offHandAttackEnabled); the
- * item-name suggestion below stays client-side chrome (issue #1435 decision).
- */
+// Names a concrete owned light-weapon pair when one exists, else the generic
+// requirement; item-name suggestion is client-side chrome (#1435), eligibility
+// itself comes from offHandAttackEnabled.
 export function twfHint(character: Character): string | null {
   if (offHandAttackEnabled(character)) return null;
   const lightWeapons = character.inventory.filter(
@@ -287,20 +212,16 @@ export function twfHint(character: Character): string | null {
     return "Off-hand attack needs two light weapons equipped.";
   }
   const [first, second] = lightWeapons;
-  // Same-name pair: "Two Shortswords" — but an s-ending name (custom items)
-  // can't take the naive plural, so fall back to "a pair of Cutlass".
+  // An s-ending name (custom items) can't take the naive plural ("Two Cutlasss"),
+  // so that case falls back to "a pair of Cutlass".
   const samePair = first.name.endsWith("s") ? `a pair of ${first.name}` : `Two ${first.name}s`;
   const pair = first.name === second.name ? samePair : `${first.name} & ${second.name}`;
   return `Off-hand attack needs two light weapons — equip ${pair} to enable it.`;
 }
 
-/** Which universal actions render as primary rich cards on the Action sheet;
- *  everything else falls into the "More actions" disclosure grid.
- *
- *  Keys, not names, so this survives the 2024 renames (Magic / Utilize) — and
- *  this set plus MICRO_CAPTIONS are the two client-side key lists that would
- *  silently not cover a future 2014-ONLY universal action. No such action
- *  exists in either SRD; every fork today is a rename or a 2024 addition. */
+// Keyed, not named, to survive 2024 renames (Magic/Utilize); this set plus
+// MICRO_CAPTIONS are the two client-side lists a future 2014-only universal
+// action would need added to.
 export const PRIMARY_ACTION_KEYS: ReadonlySet<string> = new Set([
   "attack",
   "castSpell",
@@ -309,9 +230,8 @@ export const PRIMARY_ACTION_KEYS: ReadonlySet<string> = new Set([
   "dodge",
 ]);
 
-/** Micro-captions for the compact card variants (Dash/Dodge pair + More grid).
- *  `search`'s caption stays edition-neutral: SRD 5.1 offers Perception OR
- *  Investigation, SRD 5.2 a Wisdom check the GM picks a skill for. */
+// search's caption stays edition-neutral: SRD 5.1 offers Perception OR
+// Investigation, SRD 5.2 a GM-picked Wisdom check.
 export const MICRO_CAPTIONS: Record<string, string> = {
   dash: "×2 move",
   dodge: "defensive",
@@ -326,23 +246,19 @@ export const MICRO_CAPTIONS: Record<string, string> = {
   influence: "persuade",
 };
 
-/** Collapsed-row preview line: "Disengage · Hide · Help · …" (CSS truncates). */
 export function moreActionsPreview(actions: UniversalActionOption[]): string {
   return actions.map((a) => a.name).join(" · ");
 }
 
-/** Sheet models built in useTurnActions, consumed by the sheet bodies. */
 export interface ActionSheetModel {
   attackSummary: string;
-  /** Universal actions for the requested edition, served by GET /api/reference
-   *  (#1430) and threaded through the model so the sheet bodies stay
-   *  presentational — they never call the hook themselves. Empty until the
-   *  reference query resolves. */
+  // Served by GET /api/reference (#1430); threaded through so sheet bodies
+  // stay presentational and never call the hook themselves. Empty until the
+  // query resolves.
   universalActions: UniversalActionOption[];
   consumableCount: number;
   hasSpellcasting: boolean;
   classActionOptions: ClassActionOption[];
-  /** Current hands summary for the "Change weapons" card (#815). */
   loadoutLabel: string;
   /** Free interaction units left this turn (#1165) — gates the Change weapons card independent of the Action. */
   interactionBudgetRemaining: number;
@@ -357,7 +273,7 @@ export interface BonusSheetModel {
 
 export interface ReactionSheetModel {
   attackSummary: string;
-  /** See ActionSheetModel.universalActions. */
+  // See ActionSheetModel.universalActions.
   universalActions: UniversalActionOption[];
   hasSpellcasting: boolean;
   classReactionOptions: ClassActionOption[];

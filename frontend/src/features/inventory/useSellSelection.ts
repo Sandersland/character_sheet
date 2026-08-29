@@ -13,8 +13,6 @@ export interface SellSelection {
   stopConfiguring: () => void;
 }
 
-// Multi-select "sell items" flow: which rows are picked and whether the sell
-// panel is open. exitSelectMode clears the whole flow on every ending path.
 export function useSellSelection(): SellSelection {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());

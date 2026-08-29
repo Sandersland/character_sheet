@@ -9,12 +9,7 @@ import { renderWithCharacter } from "@/test/renderWithCharacter";
 import * as client from "@/api/client";
 import type { Character, ConditionsState } from "@/types/character";
 
-// The strip drives conditions through the shared ConditionsSheetBody (which
-// batches ops via applyConditionTransactions and also imports fetchReference
-// via useReferenceData — must be present here even though these fixtures omit
-// rulesEdition (skipToken keeps the query pending, so it's never actually
-// called), or a future fixture that adds rulesEdition would call `undefined(...)`)
-// and rest through RestButton.
+// fetchReference must stay mocked: skipToken keeps it pending only while fixtures omit rulesEdition; a fixture adding it would call undefined(...).
 vi.mock("@/api/client", () => ({
   applyConditionTransactions: vi.fn(),
   applyHitPointOperations: vi.fn(),
@@ -34,9 +29,6 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-// CombatUtilityStrip (and RestButton/ConditionsSheetBody nested inside) reads
-// useCurrentCharacter(), so every render seeds the cache and mounts
-// CurrentCharacterProvider via renderWithCharacter.
 function renderStrip(character: Character) {
   const result = renderWithCharacter(<CombatUtilityStrip />, character);
   return {
@@ -54,13 +46,11 @@ describe("CombatUtilityStrip (#982)", () => {
     expect(screen.getByText("none")).toBeInTheDocument();
     expect(screen.getByText("Exhaustion")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Rest" })).toBeInTheDocument();
-    // The full-height empty-state card is NOT rendered inline.
     expect(screen.queryByText(/no active conditions/i)).not.toBeInTheDocument();
   });
 
   it("shows the hit-dice count inline on the mobile Rest row (#1028)", () => {
     renderStrip(makeCharacter({ active: [], exhaustion: 0 }));
-    // hitDice total 5, none spent → 5/5d10 available, shown on the Rest row itself.
     expect(screen.getByText(/Hit dice 5\/5d10/)).toBeInTheDocument();
   });
 
@@ -75,8 +65,7 @@ describe("CombatUtilityStrip (#982)", () => {
     expect(screen.queryByText("poisoned")).not.toBeInTheDocument();
   });
 
-  // a11y (#989 review): the manage-conditions button's accessible name must name
-  // the active conditions (via conditionLabel), never leave them hidden.
+  // a11y: the manage-conditions button's accessible name must name the active conditions, never leave them hidden.
   it("the manage-conditions accessible name lists active condition labels", () => {
     renderStrip(
       makeCharacter({
@@ -94,7 +83,6 @@ describe("CombatUtilityStrip (#982)", () => {
 
   it("the manage-conditions accessible name is unadorned when nothing is active", () => {
     renderStrip(makeCharacter({ active: [], exhaustion: 0 }));
-    // Exactly "Manage conditions" (no trailing ": ..." list).
     expect(screen.getByRole("button", { name: "Manage conditions" })).toBeInTheDocument();
   });
 
@@ -105,9 +93,7 @@ describe("CombatUtilityStrip (#982)", () => {
 
     renderStrip(makeCharacter({ active: [], exhaustion: 0 }));
 
-    // "+ Add" opens the picker already expanded (no extra inline expand click).
-    // Accessible name is the standalone "Add condition" (#986 review), not the
-    // context-dependent visible "+ Add".
+    // a11y: the accessible name is the standalone "Add condition", not the context-dependent visible "+ Add".
     await user.click(screen.getByRole("button", { name: "Add condition" }));
     const proneRow = screen.getByText("Prone").closest("li")!;
     await user.click(within(proneRow).getByRole("button", { name: "Apply" }));
@@ -127,7 +113,6 @@ describe("CombatUtilityStrip (#982)", () => {
       }),
     );
 
-    // Active-condition summary button — its name now carries the condition list.
     await user.click(screen.getByRole("button", { name: /manage conditions: stunned/i }));
     await user.click(screen.getByRole("button", { name: /remove stunned/i }));
     expect(mockApply).toHaveBeenCalledWith("char-1", [{ type: "removeCondition", key: "stunned" }]);
@@ -140,7 +125,6 @@ describe("CombatUtilityStrip (#982)", () => {
 
     renderStrip(makeCharacter({ active: [], exhaustion: 2 }));
 
-    // Inline stepper — no sheet, no "manage conditions" name collision.
     await user.click(screen.getByRole("button", { name: "Increase exhaustion" }));
     expect(mockApply).toHaveBeenCalledWith("char-1", [{ type: "setExhaustion", level: 3 }]);
   });
@@ -171,8 +155,6 @@ describe("CombatUtilityStrip (#982)", () => {
         exhaustion: 2,
       }),
     );
-    // getAllByRole with a name regex would throw in strict e2e if 2 matched;
-    // here we assert exactly one control carries a "manage conditions" name.
     expect(screen.getAllByRole("button", { name: /manage conditions/i })).toHaveLength(1);
   });
 });

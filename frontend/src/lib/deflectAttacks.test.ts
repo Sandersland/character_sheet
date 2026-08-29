@@ -86,9 +86,8 @@ describe("deflectAttacksDamageTypeClause", () => {
   });
 });
 
-// The roll math itself moved server-side to deriveDeflectSpec (#1435,
-// backend lib/srd/__tests__/deflect.test.ts); here the client only reads the
-// spec off the served row's `effect.dice`, never re-deriving it.
+// The client only reads the roll spec off the served row's `effect.dice`
+// (deriveDeflectSpec on the backend), never re-deriving it.
 describe("deflectRollFromAction", () => {
   it("reads the served reduction spec off the base row's effect.dice", () => {
     const row: AvailableAction = {

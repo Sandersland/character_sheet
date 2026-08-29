@@ -21,8 +21,6 @@ describe("useItemCatalog", () => {
     await waitFor(() => expect(result.current).toEqual([CLUB]));
   });
 
-  // A rejected fetch must not throw through the hook — the old .catch(() =>
-  // setCatalog([])) behavior it replaced left the picker empty, not crashed.
   it("returns an empty list when the fetch rejects", async () => {
     fetchItems.mockReset().mockRejectedValue(new Error("network down"));
     const { result } = renderHook(() => useItemCatalog());
@@ -30,12 +28,11 @@ describe("useItemCatalog", () => {
     expect(result.current).toEqual([]);
   });
 
-  // #1332: catalogKeys.items() is the shared cache entry every /items reader
-  // rides. Mounting the second consumer only AFTER the first has already
-  // resolved proves the staleTime: Infinity CACHE HIT — mounting both
-  // concurrently (as an earlier version of this test did) would pass even at
-  // staleTime: 0, since TanStack dedupes simultaneously in-flight requests to
-  // the same key regardless of staleTime.
+  // Mounted only after the first resolves: catalogKeys.items() is the shared
+  // cache entry every /items reader rides. TanStack dedupes simultaneous
+  // in-flight requests to the same key regardless of staleTime, so mounting
+  // concurrently wouldn't prove the staleTime: Infinity cache hit this test
+  // targets.
   it("serves a second consumer mounted after the first resolves from cache, with no second fetch", async () => {
     const first = renderHook(() => useItemCatalog());
     await waitFor(() => expect(first.result.current).toEqual([CLUB]));

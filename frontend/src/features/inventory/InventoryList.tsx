@@ -19,7 +19,6 @@ import { buildSections, filterInventory, selectionGp, type FilterKey } from "@/l
 import { bondedWeaponCount, weaponBondEligible, type WeaponBondProps } from "@/lib/weaponBond";
 import { useState } from "react";
 
-// The sheet's inventory editor: category-sectioned rows + add/sell panels, all funneling through one submitOperations that calls POST .../inventory/transactions and swaps in the returned character.
 export default function InventoryList() {
   const { character } = useCurrentCharacter();
   const catalog = useItemCatalog();
@@ -32,9 +31,8 @@ export default function InventoryList() {
   const [filter, setFilter] = useState<FilterKey>("all");
   const [view, setView] = useState<"bag" | "worn">("bag");
 
-  // Both numbers arrive resolved (#1377) — the pack-plus-purse sum and STR × 15
-  // are 5e rules and live in the backend's srd/encumbrance. Only the comparison
-  // below is ours: 5e lets you carry UP TO capacity, so `>` and not `>=`.
+  // totalWeight/capacity are resolved server-side (#1377); only the comparison
+  // is ours — 5e lets you carry UP TO capacity, so `>` and not `>=`.
   const totalWeight = character.carriedWeight;
   const capacity = character.carryCapacity;
   const hasItems = character.inventory.length > 0;
@@ -42,10 +40,8 @@ export default function InventoryList() {
   // Counting the live rows stays local; the limit itself never does.
   const attunedCount = character.inventory.filter((item) => item.attuned).length;
   const atCap = attunedCount >= character.attunementCap;
-  // Same served-cap shape as attunement (#1854): weaponBondEligible reads the
-  // server-resolved availableActions signal rather than re-deriving the 2014
-  // EK L3+ gate client-side. Bundled into one WeaponBondProps (see that
-  // type's own comment) rather than threaded as discrete props.
+  // weaponBondEligible reads the server-resolved availableActions signal
+  // rather than re-deriving the 2014 EK L3+ gate client-side.
   const bond: WeaponBondProps = {
     eligible: weaponBondEligible(character),
     atCap: bondedWeaponCount(character) >= character.weaponBondCap,
@@ -111,8 +107,6 @@ export default function InventoryList() {
     />
   );
 
-  // Mobile (#1029): a dedicated full-bleed layout — one-row toolbar, slim
-  // encumbrance, dense detail-sheet rows, and an add-item FAB (no header actions).
   if (isMobile) {
     return (
       <InventoryListMobile

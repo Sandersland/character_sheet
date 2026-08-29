@@ -6,10 +6,9 @@ import Spinner from "@/components/ui/Spinner";
 import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 import type { AuthProviderInfo } from "@/types/auth";
 
-// Sign-in screen. Provider buttons are data-driven from GET /api/auth/providers,
-// so enabling another provider server-side needs no change here. Each button is
-// a plain anchor: it begins a full-page OAuth redirect (not an XHR), so the
-// browser follows the provider redirect chain and lands back on the app.
+// Provider buttons are data-driven from GET /api/auth/providers. Each is a
+// plain anchor (not an XHR) so the browser follows the full OAuth redirect
+// chain back to the app.
 type LoadState =
   | { status: "loading" }
   | { status: "ready"; providers: AuthProviderInfo[] }

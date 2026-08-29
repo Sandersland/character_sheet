@@ -12,25 +12,16 @@ export function primeCampaignMerges(campaignId: string, merges: CampaignEntityMe
   getQueryClient().setQueryData(campaignKeys.merges(campaignId), merges);
 }
 
-// Test-only, and now redundant for the same reason as its entities twin: the
-// vitest setup file's per-test fresh QueryClient already prevents leakage.
 export function __resetCampaignMergesCacheForTests(): void {
   getQueryClient().clear();
 }
 
-// The list is server-scrubbed by role — a non-owner only ever holds EXECUTED
-// merges between revealed identities (#387).
+// Server-scrubbed by role — a non-owner only ever holds EXECUTED merges
+// between revealed identities (#387).
 //
-// isPending/isError ride alongside `merges` for a caller that needs to know
-// whether the list is COMPLETE, not just present-or-empty — `merges ?? []`
-// alone can't distinguish "still loading" from "loaded, empty".
-// ReviewDuplicatesModal is that caller: without this, its previewReady gate
-// only watched the entities query, so a still-in-flight merges fetch could
-// let the Discarded box render as complete while a "Prepared identity
-// merges" item was still on its way (#1949). The list's own direct
-// consumers (reveal banner, Manage tab) still swallow a fetch error the same
-// way they always have — `merges ?? []` — this just exposes isError too, for
-// a caller that wants to tell "empty" apart from "failed".
+// isPending/isError ride alongside `merges` so ReviewDuplicatesModal's
+// previewReady gate can tell "still loading" from "loaded, empty" — `merges
+// ?? []` alone can't. Removing them breaks that gate (#1949).
 export function useCampaignMerges(campaignId?: string | null) {
   const { data, isPending, isError } = useQuery({
     queryKey: campaignKeys.merges(campaignId),

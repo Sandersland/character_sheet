@@ -1,11 +1,3 @@
-/**
- * Shared roll-result readout (#945): source label, total, and the
- * dice/modifier breakdown, with crit / fumble / advantage flags. Rendered by
- * the shared result seal (RollResultSeal), which both the Quick path and the
- * Animated-mode 3D tray (DiceRollModal) settle onto, so the readout carries
- * identical information regardless of preference and can never drift.
- */
-
 import { usesAdvantage, type RollResult } from "@/lib/dice";
 
 function modifierSuffix(modifier: number): string {
@@ -18,7 +10,6 @@ interface RollFlagBanner {
   className: string;
 }
 
-// The total's color echoes the standout flag: gold on a crit, muted on a fumble.
 function totalColorClass(isCrit: boolean, isFumble: boolean): string {
   if (isCrit) return "text-gold-800";
   if (isFumble) return "text-parchment-600";
@@ -29,11 +20,8 @@ function advantageLabel(mode: RollResult["spec"]["mode"]): string {
   return mode === "advantage" ? "Advantage" : "Disadvantage";
 }
 
-/**
- * Derive the crit/fumble/advantage banner rows and the total's color from a
- * roll. Crit and advantage can co-occur (a nat-20 rolled with advantage), so
- * banners is an ordered list, not one exclusive choice.
- */
+// Crit and advantage can co-occur (a nat-20 with advantage), so banners is a
+// list, not one exclusive choice.
 function deriveRollFlags(result: RollResult): {
   banners: RollFlagBanner[];
   totalClassName: string;
@@ -42,7 +30,6 @@ function deriveRollFlags(result: RollResult): {
   // Crit/fumble only applies to a single d20 roll (checks, saves, attacks, initiative).
   const isD20Single = spec.faces === 20 && spec.count === 1;
   const advantage = usesAdvantage(spec);
-  // The taken die under advantage/disadvantage is the kept (non-dropped) one.
   const takenDie = dice.find((d) => !d.dropped) ?? dice[0];
   const naturalRoll = isD20Single ? (takenDie?.value ?? 0) : 0;
   const isCrit = naturalRoll === 20;

@@ -32,9 +32,7 @@ const character = {
   level: 7,
 } as unknown as Character;
 
-// The hitPoints step arrives with its numbers already resolved (#1380):
-// Fighter d10 at Con 14 (+2). #1497: effectiveMaxAverage is ALSO served —
-// character's max 40 + averageGain 8.
+// #1380: the hitPoints step arrives with its numbers already resolved; #1497 effectiveMaxAverage is also served (character's max 40 + averageGain 8).
 const HP_META = {
   die: "d10",
   faces: 10,
@@ -53,8 +51,7 @@ const plan: LevelUpPlanResponse = {
   grantedSpells: [],
 };
 
-// LevelUpCeremony reads useCurrentCharacter(), so every render seeds the
-// cache and mounts CurrentCharacterProvider via renderWithCharacter.
+// LevelUpCeremony reads useCurrentCharacter(), so renderWithCharacter must seed the cache and mount CurrentCharacterProvider.
 function renderCeremony() {
   return renderWithCharacter(
     <MemoryRouter initialEntries={["/characters/c1/level-up"]}>
@@ -67,7 +64,6 @@ function renderCeremony() {
   );
 }
 
-// Drives hitPoints (take average) → advancement (+2 Strength) → review.
 async function walkToReview(user: ReturnType<typeof userEvent.setup>) {
   await waitFor(() => expect(screen.getByText("Step 1 of 3")).toBeInTheDocument());
   await user.click(screen.getByRole("button", { name: /take average/i }));
@@ -93,11 +89,9 @@ describe("ReviewStep in the ceremony", () => {
 
     await walkToReview(user);
 
-    // The review ledger mirrors the staged draft.
     expect(await screen.findByText("Confirm your advancement")).toBeInTheDocument();
     expect(screen.getByText("Level")).toBeInTheDocument();
     expect(screen.getByText("8")).toBeInTheDocument();
-    // Con 14 (+2), d10 average = 8; max 40 → 48.
     expect(screen.getByText("48")).toBeInTheDocument();
     // ASI resolved through abilityLabel, never a raw key.
     expect(screen.getByText("Strength")).toBeInTheDocument();
@@ -124,7 +118,6 @@ describe("ReviewStep in the ceremony", () => {
     // The shell owns the error surface; the review body must not render its own copy.
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("The scribe spilled ink."));
     expect(screen.getAllByText("The scribe spilled ink.")).toHaveLength(1);
-    // Still on the review step — no navigation to the sheet.
     expect(screen.getByText("Confirm your advancement")).toBeInTheDocument();
     expect(screen.queryByText("SHEET")).not.toBeInTheDocument();
   });

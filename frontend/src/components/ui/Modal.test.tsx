@@ -4,7 +4,6 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import Modal from "@/components/ui/Modal";
 
 beforeEach(() => {
-  // Reset overflow so each test starts clean.
   document.body.style.overflow = "";
 });
 
@@ -88,9 +87,7 @@ describe("Modal", () => {
         <button>Inner</button>
       </Modal>
     );
-    // Focus the last focusable element in the panel (Inner button)
     screen.getByRole("button", { name: "Inner" }).focus();
-    // Tab should wrap back to Close (first)
     fireEvent.keyDown(document, { key: "Tab", shiftKey: false });
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Close" }));
   });
@@ -101,9 +98,7 @@ describe("Modal", () => {
         <button>Inner</button>
       </Modal>
     );
-    // Focus the first focusable element (Close button)
     screen.getByRole("button", { name: "Close" }).focus();
-    // Shift+Tab should wrap to Inner (last)
     fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Inner" }));
   });

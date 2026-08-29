@@ -2,32 +2,25 @@ import { useEffect, useRef, useState } from "react";
 
 import { selectAndCopy, writeToClipboard } from "@/lib/clipboard";
 
-// No "failed" state: every outcome that isn't a copy now lands in "manual",
-// which is actionable — the link is selected and the hint says how to take it.
+// No "failed" state: every non-copy outcome lands in "manual", which is actionable.
 type CopyStatus = "idle" | "copied" | "manual";
 
 const MANUAL_HINT = "Link selected — press Ctrl+C (Cmd+C on Mac) to copy it.";
 
-// Read-only invite URL with a copy button — shared by the campaign detail header.
 export default function CampaignInviteLink({ inviteCode }: { inviteCode: string }) {
   const [status, setStatus] = useState<CopyStatus>("idle");
   const inputRef = useRef<HTMLInputElement>(null);
   const inviteUrl = `${window.location.origin}/join/${inviteCode}`;
 
-  // Only "copied" self-clears. "manual" is the one state that asks the user to
-  // act, and the pre-#1467 unconditional setTimeout wiped it 2s into being read.
-  // Arming the timer in an effect (rather than in the handler) is also what gives
-  // us the clearTimeout that stops timers stacking across repeat clicks.
+  // Only "copied" self-clears; arming the timer in an effect gives us the
+  // clearTimeout that stops timers stacking on repeat clicks.
   useEffect(() => {
     if (status !== "copied") return;
     const timer = setTimeout(() => setStatus("idle"), 2000);
     return () => clearTimeout(timer);
   }, [status]);
 
-  // Fallback ladder (#1467): async clipboard, then select + execCommand, then
-  // leave the link selected with a hint. navigator.clipboard is missing outright
-  // on the plain-http LAN origin the dev server is deliberately reachable at, and
-  // writeToClipboard reports that as false rather than throwing.
+  // writeToClipboard reports a missing clipboard API as false rather than throwing (#1467).
   async function copyInvite() {
     if (await writeToClipboard(inviteUrl)) {
       setStatus("copied");
@@ -59,9 +52,7 @@ export default function CampaignInviteLink({ inviteCode }: { inviteCode: string 
           {status === "copied" ? "Copied" : "Copy"}
         </button>
       </div>
-      {/* Always mounted: text injected into a freshly-mounted aria-live region is
-          unreliably announced, which is why the old conditional <p> announced
-          nothing. */}
+      {/* Always mounted: text injected into a freshly-mounted aria-live region is unreliably announced. */}
       <p role="status" className="text-xs font-semibold text-garnet-700">
         {status === "copied" && "Copied to clipboard."}
         {status === "manual" && MANUAL_HINT}

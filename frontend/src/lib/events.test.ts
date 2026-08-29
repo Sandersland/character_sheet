@@ -63,7 +63,6 @@ describe("categoryTone", () => {
   });
 
   it("falls back to neutral for an unknown category", () => {
-    // Exercised with an off-union value to prove the tolerant fallback.
     expect(categoryTone("mystery" as never)).toBe("neutral");
   });
 });
@@ -76,7 +75,6 @@ describe("damageTypeTone (#1237 chat-log color table)", () => {
     ];
     const classes = types.map((t) => damageTypeTone(t));
     for (const c of classes) expect(c).toMatch(/^text-dmg-/);
-    // Every type gets its OWN hue — no two share a class (a full, non-aliased set).
     expect(new Set(classes).size).toBe(types.length);
   });
 

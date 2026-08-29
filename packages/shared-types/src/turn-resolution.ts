@@ -1,18 +1,5 @@
-// TurnResolution descriptor (epic #1827 Slice 1, #1828) — a normalized "thing
-// you resolve on your turn," assembled ONLY from wire values the serializer
-// already supplies: weapon attack bonus/damage spec/critRange (AttackRow +
-// Character.critRange/attacksPerAction), spellAttackBonus/spellSaveDC/ability
-// (the spellcasting view), and a spell's own attackType/saveAbility/
-// effectRolls (SpellEntry, decorated by decorateSpellEffects). A weapon swing
-// and every spell shape (attack roll / saving throw / auto-hit / no-roll)
-// reduce to this one shape — see CLAUDE.md "rules logic is backend-owned":
-// the future resolver (#1831) composes a TurnResolution by copying already-
-// served fields, never by re-deriving a 5e rule.
-//
-// Deliberately excludes the design spec's illustrative `commit(rolls)`
-// member: that's a FUNCTION supplied by the resolver hook (#1831) once the
-// backend `resolveAction` transaction op exists (#1829) — this package holds
-// only the descriptor's DATA contract, not a not-yet-built op union.
+// Assembled only from wire values the serializer already supplies — the resolver composes this by copying already-served fields, never re-deriving a 5e rule.
+// Deliberately excludes the design spec's illustrative `commit(rolls)` member — that's a function supplied by the resolver hook, not part of this package's data contract.
 
 import type { AttackRollSpec } from "./attack-row.js";
 import type { RollEventAttackComponents, RollEventDamageComponents } from "./roll-event.js";
@@ -20,14 +7,7 @@ import type { RollEventAttackComponents, RollEventDamageComponents } from "./rol
 /** Action-economy slot a resolution spends — the three slots the turn hub tracks. */
 export type TurnResolutionCostKind = "action" | "bonusAction" | "reaction";
 
-/**
- * How a spell's free-text `castingTime` classifies for action-economy
- * purposes — served per spell entry (character-serialize/serialize/
- * spellcasting.ts's decorateSpellEffects) so a resolution's `cost.kind` is a
- * served enum, never a client-side parse of "1 bonus action" text.
- * `"other"` covers rituals/minutes/hours castingTime — spells the in-combat
- * turn economy doesn't track.
- */
+/** Served per spell entry so `cost.kind` is never a client-side parse of `castingTime` text; "other" covers rituals/minutes/hours. */
 export type SpellCastCostKind = "action" | "bonusAction" | "reaction" | "other";
 
 export interface TurnResolutionCost {
@@ -40,14 +20,7 @@ export interface TurnResolutionCost {
 export interface TurnResolutionToHit {
   bonus: number;
   critRange: number;
-  /**
-   * Decomposed to-hit addends (ability mod / proficiency / ranged / flat
-   * bonus) — served alongside `bonus` so the resolver (#1831) can echo them
-   * into a `resolveAction` event's `toHit.components` unchanged (#1829/#1830),
-   * the same breakdown a roll-log event's `attackComponents` already carries.
-   * Optional: only weapon rows serve it today (deriveWeaponAttackComponents);
-   * a spell's attack bonus is currently a flat served number.
-   */
+  /** Echoed unchanged into a `resolveAction` event's `toHit.components` — the same breakdown roll-log's `attackComponents` carries; optional since only weapon rows serve it today. */
   components?: RollEventAttackComponents;
 }
 
@@ -57,34 +30,17 @@ export interface TurnResolutionSave {
   ability: string;
 }
 
-/**
- * A resolved damage or healing roll, already-resolved dice (the served
- * `AttackRow.damageSpec` for a weapon, or the served `EffectRoll.roll` for
- * the spell's chosen slot level) — absent entirely for a no-roll utility
- * resolution (Druidcraft).
- */
+/** Already-resolved dice: the served `AttackRow.damageSpec` for a weapon, or `EffectRoll.roll` for the spell's chosen slot level; absent for a no-roll utility resolution (Druidcraft). */
 export interface TurnResolutionEffect {
   spec: AttackRollSpec;
   kind: "damage" | "heal";
   /** Damage type — absent for a heal. */
   damageType?: string;
-  /**
-   * Decomposed damage addends (ability mod + melee damage bonus) — same
-   * echo-through-unchanged treatment as `TurnResolutionToHit.components`;
-   * absent for a spell effect (only a weapon's damage row serves it today via
-   * deriveWeaponDamage) and always absent for a heal.
-   */
+  /** Same echo-through-unchanged treatment as `TurnResolutionToHit.components`; absent for a spell effect (only weapon rows serve it today) and always absent for a heal. */
   components?: RollEventDamageComponents;
 }
 
-/**
- * TurnResolution — a normalized "thing you resolve on your turn" (epic
- * #1827). `toHit`/`save` are mutually exclusive by shape: a weapon swing or
- * an attack-roll spell (Fire Bolt) populates `toHit`; a saving-throw spell
- * (Sacred Flame) populates `save`; an auto-hit spell (Magic Missile) or a
- * no-roll utility spell (Druidcraft) populates neither. `effect` carries the
- * damage/heal roll and is absent for a no-roll resolution.
- */
+/** `toHit`/`save` are mutually exclusive: a weapon swing or attack-roll spell sets `toHit`, a saving-throw spell sets `save`, an auto-hit or no-roll spell sets neither; `effect` is absent for a no-roll resolution. */
 export interface TurnResolution {
   source: string;
   cost: TurnResolutionCost;

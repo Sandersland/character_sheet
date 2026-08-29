@@ -18,8 +18,7 @@ import type {
 } from "@/types/character";
 
 export interface CreationSelections {
-  /** #1680: the two-step picker's own selection — the sole species/variant
-   *  source of truth since #1684 pruned the flat `Race` catalog. */
+  // The sole species/variant source of truth — the flat Race catalog was pruned (#1684).
   species: SpeciesOption | undefined;
   variant: SpeciesVariantOption | undefined;
   class: ClassOption | undefined;
@@ -41,15 +40,10 @@ export interface CreationPreview {
 }
 
 export interface CreationBackgroundBonuses {
-  /** True when the selected (non-custom) background carries a 2024 ability spread. */
   applicable: boolean;
-  /** The three abilities the spread draws from (empty when not applicable). */
   abilities: AbilityName[];
-  /** The Origin feat the background grants, if any. */
   originFeat: OriginFeatOption | null;
-  /** Current per-ability assignment restricted to the three choices. */
   assignment: Partial<Record<AbilityName, number>>;
-  /** Whether the assignment is a legal +2/+1 or +1/+1/+1 spread. */
   complete: boolean;
 }
 
@@ -61,7 +55,6 @@ function isValidSpread(values: number[]): boolean {
   return isTwoOne || isOneOneOne;
 }
 
-// Restrict the draft's raw assignment to the three abilities with positive bumps.
 function pickAssignment(
   raw: Partial<Record<AbilityName, number>>,
   abilities: AbilityName[],
@@ -74,9 +67,7 @@ function pickAssignment(
   return assignment;
 }
 
-// Derives the background ability-spread state for the form: which abilities are
-// in play, the origin feat, the current assignment, and whether it's complete.
-// Inert (applicable:false) for custom or spec-less (Folk Hero) backgrounds (#1130).
+// Inert (applicable:false) for a custom or spec-less (Folk Hero) background (#1130).
 export function deriveBackgroundBonuses(
   draft: CharacterDraft,
   selections: CreationSelections,
@@ -94,49 +85,27 @@ export function deriveBackgroundBonuses(
   };
 }
 
-/** The interactive species ability-increase choice, one of two shapes (#1758):
- *  - `choose`: pick exactly `count` distinct abilities, +`amount` each
- *    (Half-Elf's "+1 to two of your choice").
- *  - `floating`: assign a `points` pool as +2/+1 (two abilities) or +1/+1/+1
- *    (three) across distinct abilities (Astral Elf's Tasha's-era spread).
- *  `abilities` is the eligible set in both — every ability not already fixed. */
+// choose = pick count distinct abilities at +amount each (Half-Elf); floating = assign a points pool as +2/+1 or +1/+1/+1 (Astral Elf) (#1758).
 export type SpeciesAbilityChoice =
   | { kind: "choose"; count: number; amount: number; abilities: AbilityName[] }
   | { kind: "floating"; points: number; abilities: AbilityName[] };
 
 export interface CreationSpeciesBonuses {
-  /** True when the matched species+variant's merged spec carries a fixed
-   *  increase, a choice, or both. False renders no panel — 2024 always false
-   *  (every 2024 row's spec is []), matching #1681's backend gate. */
+  // False for every 2024 species (spec is always []), matching the backend's #1681 gate.
   applicable: boolean;
-  /** Fixed increases, auto-applied server-side — already summed across
-   *  species + variant (Hill Dwarf: {constitution: 2, wisdom: 1}). */
   fixed: Partial<Record<AbilityName, number>>;
-  /** The interactive requirement (choose or floating), or null when the merged
-   *  spec has neither. Only the FIRST such spec is supported — no roster row
-   *  seeds more than one, and choose wins over floating if a future row ever
-   *  carries both (mirrors backend resolveChosenIncreases' priority). */
+  // Only the first spec is used; choose wins over floating if a row ever carries both, mirroring the backend's resolveChosenIncreases priority.
   choice: SpeciesAbilityChoice | null;
-  /** Current assignment, restricted to the choice's eligible abilities. */
   assignment: Partial<Record<AbilityName, number>>;
-  /** True when there's no choice to make, or the assignment satisfies it. */
   complete: boolean;
 }
 
-// A legal floating spread is +2/+1 (two abilities) or +1/+1/+1 (three) — the
-// SAME shape isValidSpread checks for the background spread. Mirrors the
-// backend floatingSpreadShapeValid (lib/rules/background-grants.ts) purely to
-// drive the form; the create endpoint re-validates (#1758).
+// Mirrors the backend's floatingSpreadShapeValid purely to drive the form — the create endpoint re-validates (#1758).
 function isValidFloatingSpread(assignment: Partial<Record<AbilityName, number>>): boolean {
   return isValidSpread(Object.values(assignment));
 }
 
-// Splits a merged species+variant abilityIncreases spec array into its fixed
-// spread (summed per ability) and its first interactive spec — a choose
-// (Half-Elf) or a floating pool (Astral Elf, #1758). Eligible abilities are
-// narrowed to exclude anything already fixed, and choose wins over floating,
-// both mirroring resolveSpeciesGrants/resolveChosenIncreases in
-// character-create.ts.
+// Mirrors resolveSpeciesGrants/resolveChosenIncreases in character-create.ts — eligible abilities exclude anything already fixed, and choose wins over floating.
 function splitSpeciesIncreases(specs: AbilityIncreaseSpec[]): {
   fixed: Partial<Record<AbilityName, number>>;
   choice: SpeciesAbilityChoice | null;
@@ -164,26 +133,18 @@ function splitSpeciesIncreases(specs: AbilityIncreaseSpec[]): {
   return { fixed, choice };
 }
 
-// True when the assignment satisfies the choice — a floating spread must be a
-// legal +2/+1-or-+1/+1/+1 shape, a choose must be exactly `count` distinct
-// abilities at `amount` each. Distinctness is free (a Record's keys are unique).
+// Distinctness is free — a Record's keys are already unique.
 function speciesChoiceComplete(choice: SpeciesAbilityChoice, assignment: Partial<Record<AbilityName, number>>): boolean {
   if (choice.kind === "floating") return isValidFloatingSpread(assignment);
   return Object.keys(assignment).length === choice.count && Object.values(assignment).every((v) => v === choice.amount);
 }
 
-// Derives the species ability-increase state for the form: the auto-applied
-// fixed bumps, the choose requirement (if any), the current assignment, and
-// whether it's complete. Inert (applicable:false) for a variantless/unmatched
-// race name or a species whose merged spec is empty (every 2024 species).
+// Inert (applicable:false) when the merged spec is empty — every 2024 species, or an unmatched species/variant.
 export function deriveSpeciesBonuses(
   draft: CharacterDraft,
   selections: CreationSelections,
 ): CreationSpeciesBonuses {
-  // #1758: a replacing variant (Astral Elf) supplies the ENTIRE spec — the base
-  // species' increases are dropped, not stacked — mirroring the backend's
-  // fetchMergedAbilityIncreases; every real subrace leaves the flag false and
-  // stacks additively.
+  // A replacing variant supplies the entire spec (base species increases dropped, not stacked) — mirrors the backend's fetchMergedAbilityIncreases (#1758).
   const variantIncreases = selections.variant?.abilityIncreases ?? [];
   const specs = selections.variant?.abilityIncreasesReplace
     ? variantIncreases
@@ -196,24 +157,13 @@ export function deriveSpeciesBonuses(
 }
 
 export interface CreationCastingAbilityChoice {
-  /** True when the resolved variant (or species, for a future species-level
-   *  grant) needs the Int/Wis/Cha choice — SpeciesVariantOption/SpeciesOption's
-   *  own served `needsCastingAbility` flag, never re-derived client-side. */
+  // Server-served needsCastingAbility flag — never re-derived client-side.
   applicable: boolean;
-  /** The current draft value, narrowed to the wire enum (or "" = unset). */
   value: "" | "intelligence" | "wisdom" | "charisma";
-  /** True when there's no choice to make, or a value has been picked. */
   complete: boolean;
 }
 
-/**
- * Derives the #1683 casting-ability choice state for the form: whether the
- * chosen species+variant needs it (server-resolved, via needsCastingAbility)
- * and whether the draft has answered it. The variant's own flag wins when a
- * variant is chosen (mirrors deriveSpeciesBonuses' merge precedent); falls
- * back to the species' own flag for a variantless species (no real PHB'24
- * row needs this yet — every 2024 grant this wave is variant-scoped).
- */
+// Variant's flag wins when a variant is chosen (mirrors deriveSpeciesBonuses' merge precedent), else falls back to the species' own flag (#1683).
 export function deriveCastingAbilityChoice(
   draft: CharacterDraft,
   selections: CreationSelections,
@@ -227,28 +177,16 @@ export function deriveCastingAbilityChoice(
 }
 
 export interface CreationSpeciesSkillChoice {
-  /** False renders no panel — driven purely by the served spec (#1572
-   *  trick), never a client edition check. */
+  // Driven purely by the served spec, never a client edition check (#1572).
   applicable: boolean;
   count: number;
-  /** Eligible skill options for the picker, already resolved to the served
-   *  `from` restriction (or every skill, absent one) MINUS whatever the
-   *  class/background step already granted/picked — a species pick may not
-   *  duplicate those (server-enforced; this list keeps the picker from ever
-   *  offering an option that would 400). */
+  // Excludes class/background-granted skills — a species pick may not duplicate those (server-enforced; keeps the picker from ever offering a 400).
   options: { key: SkillName; label: string }[];
   selected: SkillName[];
   complete: boolean;
 }
 
-// Derives the species skill-choice state for the form (#1689, Half-Elf's
-// Skill Versatility): the served spec (species-level OR variant-level — only
-// one is ever populated this wave), the eligible options narrowed by BOTH the
-// spec's own `from` restriction and the class/background skills already
-// spoken for, and whether the current selection satisfies the count. Inert
-// (applicable:false) whenever the server serves no chooseSkills for this
-// species+variant — every 2024 species, Half-Elf's own is the only 2014 row
-// this wave.
+// Only one of species-level/variant-level chooseSkills is ever populated this wave (#1689).
 export function deriveSpeciesSkillChoice(
   draft: CharacterDraft,
   selections: CreationSelections,
@@ -264,32 +202,18 @@ export function deriveSpeciesSkillChoice(
 }
 
 export interface CreationSpeciesCantripChoice {
-  /** False renders no panel — same server-spec-driven shape as the skill
-   *  choice above. */
   applicable: boolean;
-  /** #1756: lowercase class name the cantrip must come from (High Elf) —
-   *  forwarded to `GET /api/spells?className=` unchanged, the SAME
-   *  server-filtering seam (#1377/#1572) the class's own creation-spells step
-   *  uses. Mutually exclusive with `spells`. */
+  // Forwarded to GET /api/spells?className= unchanged — the same server-filtering seam the class's own creation-spells step uses. Mutually exclusive with spells (#1756).
   list?: string;
-  /** #1756: explicit cantrip NAMES the pick is narrowed to (Astral Fire) —
-   *  the picker fetches all cantrips and filters to these. */
+  // Explicit cantrip names to filter the picker's fetched list to (#1756).
   spells?: string[];
-  /** #1756: undefined = the player picks the ability via the identity step's
-   *  Int/Wis/Cha control (Astral Fire); set = a fixed ability (High Elf's
-   *  Intelligence) named in this panel's copy. */
+  // undefined = player picks via the identity step's Int/Wis/Cha control; set = a fixed ability (#1756).
   castingAbility?: AbilityName;
   selectedId: string;
   complete: boolean;
 }
 
-// Derives the species cantrip-choice state for the form (#1689 High Elf, #1756
-// Astral Fire). Unlike the skill choice above, this is independent of the
-// character's own class — a non-caster class still needs the picker (a High
-// Elf Fighter gets the cantrip too), which is why `creationSteps` (#1689)
-// adds the spells step for THIS reason alone even when `level1SpellPicks` is
-// null. Forwards the server-resolved spec verbatim (list/spells/castingAbility
-// are all narrowing display, never a client rule).
+// Independent of the character's class — a non-caster still needs the picker (a High Elf Fighter gets the cantrip too); forwards the server spec verbatim, never a client rule.
 export function deriveSpeciesCantripChoice(
   draft: CharacterDraft,
   selections: CreationSelections,
@@ -307,18 +231,13 @@ export function deriveSpeciesCantripChoice(
 }
 
 export interface CreationSpeciesOriginFeatChoice {
-  /** False renders no panel — driven purely by the served chooseOriginFeat
-   *  boolean (#1572 trick), never a client edition check. */
+  // Driven purely by the served chooseOriginFeat boolean, never a client edition check (#1572).
   applicable: boolean;
   selectedId: string;
   complete: boolean;
 }
 
-// Derives the species Origin-feat-choice state for the form (#1690, 2024
-// Human's Versatile). Unlike the skill/cantrip choices above there is no
-// further spec to resolve here — chooseOriginFeat is a bare boolean, and
-// "Origin category" is enforced server-side against the live Feat catalog
-// (resolveSpeciesOriginFeatGrant), never a client-side filter of a fixed list.
+// "Origin category" is enforced server-side against the live Feat catalog (resolveSpeciesOriginFeatGrant), never a client-side filter (#1690).
 export function deriveSpeciesOriginFeatChoice(
   draft: CharacterDraft,
   selections: CreationSelections,
@@ -332,9 +251,7 @@ function hitDieFace(hitDie: string): number {
   return Number(hitDie.replace(/^d/i, ""));
 }
 
-// Match the draft's chosen species/variant/class/background to reference
-// entries. species/variant resolve by id (#1680, like subclassId); class/
-// background still resolve by name.
+// species/variant resolve by id (like subclassId); class/background resolve by name (#1680).
 export function resolveSelections(
   reference: ReferenceData | null,
   draft: CharacterDraft
@@ -349,8 +266,6 @@ export function resolveSelections(
   };
 }
 
-// Granted skills come from the (non-custom) background; the player picks the
-// rest from the class list, excluding already-granted ones, up to the cap.
 export function deriveSkillChoices(
   draft: CharacterDraft,
   selections: CreationSelections
@@ -362,13 +277,10 @@ export function deriveSkillChoices(
   return { granted, options, max, selected };
 }
 
-// Custom backgrounds submit the trimmed free-text name; otherwise the list pick.
 export function resolveBackgroundName(draft: CharacterDraft): string {
   return draft.useCustomBackground ? draft.customBackground.trim() : draft.background;
 }
 
-// An untouched (null) equipment draft submits nothing — the character simply
-// starts with no inventory.
 export function resolveEquipmentInput(
   draft: CharacterDraft,
   selectedClass: ClassOption | undefined
@@ -377,10 +289,7 @@ export function resolveEquipmentInput(
   return draftToInput(selectedClass.startingEquipment, draft.equipmentDraft) ?? undefined;
 }
 
-// #1565's twin of resolveEquipmentInput above, for the background's OWN
-// package (a background with no seeded package — a 2014 background other than
-// Acolyte and Folk Hero, or homebrew — never has a draft to resolve, same
-// "untouched submits nothing" shape).
+// Mirrors resolveEquipmentInput for the background's own package (#1565).
 export function resolveBackgroundEquipmentInput(
   draft: CharacterDraft,
   selectedBackground: BackgroundOption | undefined
@@ -389,11 +298,7 @@ export function resolveBackgroundEquipmentInput(
   return draftToInput(selectedBackground.startingEquipment, draft.backgroundEquipmentDraft) ?? undefined;
 }
 
-// Fold the background spread's AND the species increases' (#1681) current
-// assignments into the base scores so the preview (AC / init / HP) reflects
-// what the backend will bake in (#1130 / #1681) — the two never both
-// contribute in practice (opposite-edition mechanics), but folding both here
-// unconditionally means the preview needs no edition branch of its own.
+// Background and species assignments never both contribute in practice (opposite-edition mechanics) — folding both unconditionally avoids an edition branch here (#1130/#1681).
 function effectiveCreationScores(
   draft: CharacterDraft,
   selections: CreationSelections
@@ -420,9 +325,7 @@ export function derivePreview(
   return {
     armorClass: 10 + dexModifier,
     dexModifier,
-    // #1680: species.speed, not the legacy race match — it's the edition-
-    // accurate value GET /api/reference actually serves for the chosen
-    // species (e.g. 2024 Dwarf is 30 ft, not the flat catalog's 2014 25 ft).
+    // species.speed is the edition-accurate value GET /api/reference serves — not the legacy race-catalog match (#1680).
     speed: selections.species?.speed,
     maxHp: selections.class
       ? Math.max(1, hitDieFace(selections.class.hitDie) + conModifier)
@@ -430,11 +333,7 @@ export function derivePreview(
   };
 }
 
-// Only a COMPLETED choice is ever sent — an incomplete or inert one sends
-// undefined, same "the backend 400s a field it didn't ask for" shape as
-// speciesAbilities. Split out purely to keep buildCreatePayload's own
-// cyclomatic/cognitive complexity under the repo's health gate; each of
-// these three collapses one ternary out of that function's own body.
+// Only a completed choice is ever sent — incomplete/inert sends undefined, since the backend 400s a field it didn't ask for.
 function completedSpeciesAbilities(bonuses: CreationSpeciesBonuses): Partial<Record<AbilityName, number>> | undefined {
   return bonuses.choice && bonuses.complete ? bonuses.assignment : undefined;
 }
@@ -451,10 +350,7 @@ function completedCastingAbility(choice: CreationCastingAbilityChoice): "intelli
   return choice.applicable && choice.value ? choice.value : undefined;
 }
 
-// #1131/#1689: a level-1 caster's own creation picks — a species cantrip
-// choice rides the SAME `spells` step but a DIFFERENT request field
-// (speciesCantripId above), so a non-caster class with one omits this
-// entirely while still sending that field.
+// Species cantrip choice rides the same spells step but a different request field (speciesCantripId) — a non-caster omits this while still sending that (#1131/#1689).
 function creationSpellsField(
   selections: CreationSelections,
   draft: CharacterDraft,
@@ -469,37 +365,26 @@ export function buildCreatePayload(
   selections: CreationSelections,
   skills: CreationSkillChoices,
   selectedToolChoices: string[],
-  // #1779: the background's own pick, independent of selectedToolChoices
-  // above (the class's) — defaulted so every pre-#1779 call site (none of
-  // which knows about a background pick) still compiles unchanged.
+  // Independent of selectedToolChoices (the class's); defaulted so pre-#1779 call sites still compile (#1779).
   selectedBackgroundToolChoices: string[] = []
 ): CreateCharacterInput {
   const backgroundBonuses = deriveBackgroundBonuses(draft, selections);
   const speciesBonuses = deriveSpeciesBonuses(draft, selections);
   const castingAbilityChoice = deriveCastingAbilityChoice(draft, selections);
   const classBackgroundSkills = [...skills.granted, ...skills.selected];
-  // #1689: species creation choices, independent of the #1681 ability spread
-  // above — a species may carry both (Half-Elf: CHA+2/choose-two AND Skill
-  // Versatility) in the same request.
+  // Independent of the ability spread above — a species may carry both in the same request (e.g. Half-Elf) (#1689).
   const speciesSkillChoice = deriveSpeciesSkillChoice(draft, selections, classBackgroundSkills);
   const speciesCantripChoice = deriveSpeciesCantripChoice(draft, selections);
   const speciesOriginFeatChoice = deriveSpeciesOriginFeatChoice(draft, selections);
   return {
     name: draft.name.trim(),
     alignment: draft.alignment,
-    // #1684: speciesId is the sole mechanical anchor (the flat `race` field
-    // and its legacy create path are gone) — always set by submit time, the
-    // same "gated by CreationCeremony's step validity" guarantee `rulesEdition`
-    // below relies on.
+    // The sole mechanical anchor — the flat race field and its legacy create path are gone; always set by submit time (same guarantee rulesEdition below relies on) (#1684).
     speciesId: draft.speciesId,
     variantId: draft.variantId || undefined,
-    // Only send a completed CHOICE; a fixed-only species (or none) sends
-    // undefined — the backend applies fixed increases unconditionally with no
-    // request field and 400s a speciesAbilities it didn't ask for (#1681).
+    // Only sent when the choice is completed — a fixed-only species sends undefined; the backend 400s a speciesAbilities it didn't ask for (#1681).
     speciesAbilities: completedSpeciesAbilities(speciesBonuses),
-    // #1683: only send a completed choice; a species/variant that grants no
-    // spell (or an unanswered choice) sends undefined — the backend 400s a
-    // castingAbility it didn't ask for (resolveCastingAbility, character-create.ts).
+    // Only sent when completed — the backend 400s a castingAbility it didn't ask for (resolveCastingAbility, character-create.ts) (#1683).
     castingAbility: completedCastingAbility(castingAbilityChoice),
     speciesSkills: completedSpeciesSkills(speciesSkillChoice),
     speciesCantripId: completedSpeciesCantripId(speciesCantripChoice),
@@ -520,8 +405,7 @@ export function buildCreatePayload(
     startingEquipment: resolveEquipmentInput(draft, selections.class) ?? undefined,
     backgroundStartingEquipment: resolveBackgroundEquipmentInput(draft, selections.background) ?? undefined,
     ...creationSpellsField(selections, draft),
-    // #1286: resolved by CreationEntryGate before the ceremony is reachable, so
-    // this is always set by the time a real submit happens (never a silent default).
+    // Resolved by CreationEntryGate before the ceremony is reachable — always set by submit time, never a silent default (#1286).
     rulesEdition: draft.rulesEdition ?? undefined,
   };
 }

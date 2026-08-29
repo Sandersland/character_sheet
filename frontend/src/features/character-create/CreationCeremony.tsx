@@ -1,7 +1,3 @@
-// The full-screen character-creation ceremony (#1176) over the shared ceremony
-// chrome: a viewport-pinned rail + footer with the current step's body scrolling
-// between them. Each step body reuses its existing section component.
-
 import Spinner from "@/components/ui/Spinner";
 import AbilityAssignmentPanel from "@/features/character-create/AbilityAssignmentPanel";
 import CreationEntryGate from "@/features/character-create/CreationEntryGate";
@@ -37,9 +33,6 @@ function IdentityStepBody({ c, reference }: StepBodyProps) {
 }
 
 function AbilitiesStepBody({ c }: StepBodyProps) {
-  // The unified panel (#1161) drives all four methods and folds in the #1130
-  // background spread itself, so it replaces the old AbilityScores +
-  // BackgroundBonuses section pair here.
   return (
     <AbilityAssignmentPanel
       method={c.draft.abilityMethod}
@@ -66,12 +59,11 @@ function SkillsStepBody({ c }: StepBodyProps) {
         selected={c.skills.selected}
         onToggle={c.skills.toggle}
       />
-      {/* #1689/#1690: Half-Elf's Skill Versatility / 2024 Human's Skillful /
-          2024 Elf's Keen Senses — renders only when the server serves a
-          chooseSkills spec for the chosen species+variant. */}
+      {/* Renders only when the server serves a chooseSkills spec for the chosen
+          species+variant (#1689/#1690). */}
       <SpeciesSkillSection choice={c.speciesSkillChoice} onToggle={c.speciesSkillChoice.toggle} />
-      {/* #1690: 2024 Human's Versatile — renders only when the server serves a
-          chooseOriginFeat spec for the chosen species+variant. */}
+      {/* Renders only when the server serves a chooseOriginFeat spec for the
+          chosen species+variant (#1690). */}
       <SpeciesOriginFeatSection
         choice={c.speciesOriginFeatChoice}
         edition={c.draft.rulesEdition}
@@ -88,16 +80,15 @@ function SkillsStepBody({ c }: StepBodyProps) {
 
 function SpellsStepBody({ c }: StepBodyProps) {
   const picks = c.selections.class?.level1SpellPicks;
-  // draft.rulesEdition is RulesEdition | null (unresolved until the entry
-  // gate, CreationCeremony's own early return above) — narrowed here so the
-  // spell-catalog fetches below can take a required RulesEdition (#1712).
-  // Unreachable in practice: this step never renders before the gate resolves it.
+  // Narrowed to a required RulesEdition for the spell-catalog fetches below
+  // (#1712); unreachable in practice since this step never renders before the
+  // entry gate resolves it.
   const { rulesEdition } = c.draft;
   if (!rulesEdition) return null;
-  // #1778: one merged host — species cantrip (#1689, when the server serves a
-  // chooseCantrip spec) and the class's own cantrips/spells share ONE tabbed
-  // picker now, so a non-caster High Elf's species cantrip is still reachable
-  // even though `picks` is undefined for it.
+  // Species cantrip (when the server serves a chooseCantrip spec) and the
+  // class's own cantrips/spells share one tabbed picker, so a non-caster High
+  // Elf's species cantrip is still reachable even though `picks` is undefined
+  // for it (#1689/#1778).
   return (
     <CreationSpellsStep
       className={c.draft.className}
@@ -115,18 +106,10 @@ function SpellsStepBody({ c }: StepBodyProps) {
 
 function EquipmentStepBody({ c }: StepBodyProps) {
   const startingEquipment = c.selections.class?.startingEquipment;
-  // #1565: the background's OWN package rides the same step, as a second card
-  // — many backgrounds have none (every homebrew name, and any 2014 background
-  // but Acolyte and Folk Hero), so this is often absent.
   const backgroundEquipment = c.selections.background?.startingEquipment;
-  // GRANTED tools as well as chosen ones — the same union the server's
-  // creationToolProfs assembles (background + class grants, plus the
-  // player's class AND background picks, #1779). A boundToToolChoice pick
-  // filtered on chosen tools alone offered NOTHING for a 2024 Soldier before
-  // #1565's grantedToolProfs fix; #1779 moved Soldier's Gaming Set from a
-  // grant to a background CHOICE, so backgroundChoices.selected must ride
-  // along too or the same empty-dropdown bug returns. The picker must admit
-  // exactly what boundToolChoiceError admits, no less.
+  // boundToolCandidates must admit exactly what boundToolChoiceError admits —
+  // dropping backgroundChoices.selected reintroduces an empty-dropdown bug for
+  // a 2024 Soldier (#1565, #1779).
   const boundToolCandidates = [
     ...c.toolChoices.grantedToolProfs,
     ...c.toolChoices.classChoices.selected,
@@ -175,8 +158,6 @@ function ReviewStepBody({ c }: StepBodyProps) {
   );
 }
 
-// Per-step body registry (mirrors LevelUpCeremony's STEP_BODIES) so the ceremony
-// shell stays flat — each step's section wiring lives in its own component.
 const STEP_BODIES: Record<CreationStepKey, React.ComponentType<StepBodyProps>> = {
   identity: IdentityStepBody,
   abilities: AbilitiesStepBody,
@@ -217,14 +198,10 @@ function StartOverButton({ onClear }: { onClear: () => void }) {
 export default function CreationCeremony() {
   const c = useCharacterCreation();
 
-  // #1286: the entry gate resolves campaign + rulesEdition before the ceremony's
-  // own step model (creationSteps) is reachable at all — it is impossible to
-  // reach the identity step with rulesEdition unresolved. This early return only
-  // gates the JSX below it: useCharacterCreation() (and its useReferenceData /
-  // catalogKeys.items() queries, #1332) already ran above, unconditionally — but
-  // useReferenceData now takes draft.rulesEdition (#1325) and skipTokens while
-  // it's null, so the reference fetch genuinely waits for this gate to resolve
-  // rather than firing early for a wrong/default edition.
+  // This early return only gates the JSX: useCharacterCreation()'s
+  // useReferenceData query already ran above but skip-tokens while
+  // draft.rulesEdition is null, so it won't fire early for a wrong/default
+  // edition (#1286, #1325).
   if (c.draft.rulesEdition === null) {
     return (
       <CreationEntryGate

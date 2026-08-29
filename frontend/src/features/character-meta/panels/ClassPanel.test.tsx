@@ -14,15 +14,11 @@ function makeCharacter(overrides: Partial<Character>): Character {
   return { id: "c1", class: "Fighter", ...overrides } as unknown as Character;
 }
 
-// ClassPanel reads useCurrentCharacter() directly (#1284), so every render
-// seeds the cache and mounts CurrentCharacterProvider via renderWithCharacter.
 function renderPanel(character: Character) {
   const props: SheetPanelProps = { reference: null };
   return renderWithCharacter(<ClassPanel {...props} />, character);
 }
 
-// #1169: the Class tab's panel — the same ClassFeaturesSection orchestrator that
-// used to live inside a card on Overview, now full-width on its own tab.
 describe("ClassPanel", () => {
   it("renders ClassFeaturesSection for a character with a class", () => {
     renderPanel(makeCharacter({}));
@@ -34,9 +30,7 @@ describe("ClassPanel", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  // #1208: mobile Class tab ran edge-to-edge — CharacterSheetBody has zero
-  // horizontal padding on mobile (md:px-6 only), so ClassPanel must supply its
-  // own gutter to match sibling tabs' p-4 cards.
+  // CharacterSheetBody has zero horizontal padding on mobile (md:px-6 only), so ClassPanel supplies its own gutter to match sibling tabs' p-4 cards.
   it("wraps ClassFeaturesSection in a mobile gutter that collapses on desktop", () => {
     renderPanel(makeCharacter({}));
     const sentinel = screen.getByText("class-features-section");

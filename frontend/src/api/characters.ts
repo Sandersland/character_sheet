@@ -21,9 +21,9 @@ export async function fetchCharacters(): Promise<CharacterSummary[]> {
 
 export async function fetchCharacter(id: string): Promise<Character | null> {
   const response = await apiFetch(`/characters/${id}`);
-  // 404 (missing) and 403 (not the caller's) both resolve to null so the sheet
-  // page renders its graceful "not found" screen — and a 403 doesn't reveal that
-  // the character exists. (A 401 is handled globally by apiFetch → login.)
+  // 404 and 403 both resolve to null (the sheet's not-found screen) — a 403
+  // must not reveal that the character exists. A 401 is handled globally by
+  // apiFetch.
   if (response.status === 404 || response.status === 403) return null;
   if (!response.ok) {
     throw new Error(`Failed to fetch character ${id} (${response.status})`);
@@ -40,9 +40,6 @@ export async function updateCharacter(
   return request<Character>(`/characters/${id}`, jsonBody(patch, "PATCH"), `Failed to update character ${id}`);
 }
 
-// Updates the character's campaign-scoped play preferences (#537) — a thin
-// owner-only PATCH that upserts the row for the character's current campaign.
-// Partial: only the sent flags change. Returns the full updated Character.
 export async function updateCampaignPreferences(
   id: string,
   patch: Partial<CampaignPreferences>,
@@ -54,15 +51,9 @@ export async function updateCampaignPreferences(
   );
 }
 
-// Applies a batch of HP operations atomically (damage, heal, rest, level-up,
-// death saves). Mirrors applyInventoryTransactions — same intent-bearing
-// batch pattern, full updated Character returned on success.
-//
-// The response is the serialized character plus `concentrationChecks` — the
-// auto-rolled CON save(s) made when a concentrating character takes damage
-// (issue #41). We split them apart so callers get a clean Character to store and
-// the check list to surface (toast). `concentrationChecks` defaults to [] for
-// older servers / non-damage ops.
+// The response is the serialized character plus `concentrationChecks` —
+// split apart so callers get a clean Character to store and a list to
+// surface (toast). Defaults to [] for older servers / non-damage ops.
 export async function applyHitPointOperations(
   characterId: string,
   operations: HitPointOperation[]
@@ -81,13 +72,9 @@ export async function createCharacter(input: CreateCharacterInput): Promise<Char
   return request<Character>("/characters", jsonBody(input), "Failed to create character");
 }
 
-// Applies a batch of XP operations (award/set) via the intent-bearing
-// endpoint that logs events and auto-reverses HP on level-down.
-//
-// `sessionId` (optional) tags the resulting events to a SPECIFIC session
-// instead of the active one — used to retroactively award XP to a past,
-// already-ended session, which also recomputes that session's stored summary
-// server-side.
+// `sessionId` (optional) tags events to a specific session instead of the
+// active one — used to retroactively award XP to an already-ended session,
+// which also recomputes that session's stored summary server-side.
 export async function applyExperienceOperations(
   characterId: string,
   operations: ExperienceOperation[],
@@ -100,13 +87,6 @@ export async function applyExperienceOperations(
   );
 }
 
-// Fetches the unified activity timeline — all events across all domains in
-// one chronological stream, newest-first. Optional params:
-//   category — filter to one domain (inventory|hitPoints|experience|currency)
-//   type — filter to one event type (e.g. sold, damage, castSpell)
-//   sessionId — filter to events recorded during one play session
-//   entityId — filter to events for one entity (e.g. one InventoryItem id)
-//   includeFields — when true, include per-field diff rows on each event
 // type/sessionId/entityId compose with category via AND server-side.
 export async function fetchActivity(
   characterId: string,
@@ -127,11 +107,9 @@ export async function fetchActivity(
   );
 }
 
-// Uploads a portrait image as a multipart body under the `portrait` field
-// (#1615's contract). No Content-Type header on purpose: the browser must
-// generate the multipart boundary itself — setting one manually breaks the
-// upload. Returns the full serialized Character, whose `portraitUrl` carries a
-// fresh ?v= version so a cached <img> naturally refetches.
+// No Content-Type header on purpose: the browser must generate the
+// multipart boundary itself — setting one manually breaks the upload.
+// `portraitUrl` carries a fresh ?v= version so a cached <img> refetches.
 export async function uploadCharacterPortrait(id: string, file: File): Promise<Character> {
   const form = new FormData();
   form.append("portrait", file);
@@ -142,8 +120,7 @@ export async function uploadCharacterPortrait(id: string, file: File): Promise<C
   );
 }
 
-// Removes the character's portrait (idempotent server-side) and returns the
-// full serialized Character, `portraitUrl` now absent.
+// Idempotent; the returned Character has portraitUrl absent.
 export async function deleteCharacterPortrait(id: string): Promise<Character> {
   return request<Character>(
     `/characters/${id}/portrait`,
@@ -152,8 +129,6 @@ export async function deleteCharacterPortrait(id: string): Promise<Character> {
   );
 }
 
-// Applies a batch of resource operations atomically (spend/restore resource
-// pools, learn/forget maneuvers). Full updated Character returned on success.
 export async function applyResourceTransactions(
   characterId: string,
   operations: ResourceOperation[]
@@ -161,13 +136,9 @@ export async function applyResourceTransactions(
   return postTransactions(characterId, "resources", operations, "Failed to apply resource operations");
 }
 
-// Rolls Initiative / combat start (#1239/#1243): applies every onInitiative-
-// declaring pool's regen (Monk Uncanny Metabolism's Focus refill + HP heal,
-// Perfect Focus's top-up) server-side and returns the updated Character plus
-// the per-op result the caller reads for its combat-start toast. A dedicated
-// call (not the generic applyResourceTransactions) since existing callers of
-// that one expect a bare Character; results rides alongside here the same way
-// castManeuverTransaction's does.
+// A dedicated call, not applyResourceTransactions: existing callers of that
+// one expect a bare Character, so `results` rides alongside here instead
+// (mirrors castManeuverTransaction).
 export async function rollInitiativeTransaction(
   characterId: string,
 ): Promise<Character & { results: ResourceOpResult[] }> {
@@ -178,8 +149,6 @@ export async function rollInitiativeTransaction(
   );
 }
 
-// Applies a batch of condition operations atomically (apply/remove a status
-// condition, set exhaustion level). Full updated Character returned on success.
 export async function applyConditionTransactions(
   characterId: string,
   operations: ConditionOperation[]
@@ -187,9 +156,8 @@ export async function applyConditionTransactions(
   return postTransactions(characterId, "conditions", operations, "Failed to apply condition operations");
 }
 
-// Reverts the most-recent non-reverted batch (LIFO undo). Returns the updated
-// character if the revert succeeds, or throws with a human-readable message
-// (409 if the batch isn't the most recent, or it's already reverted).
+// Reverts the most-recent non-reverted batch (LIFO undo) — 409s if the
+// batch isn't the most recent or is already reverted.
 export async function revertBatch(
   characterId: string,
   batchId: string
@@ -201,16 +169,12 @@ export async function revertBatch(
   );
 }
 
-// Applies a batch of action operations atomically via the Phase-C orchestrator:
-// each action's effect function (spend resource, consume item, heal, etc.) runs
-// in a single Prisma transaction with a shared batchId, so "drink potion" is
-// atomic and LIFO-undoable. Rolls (e.g. a potion's healing) are client-computed
-// and passed as `op.roll`; the server validates and records but does not re-roll.
-// batchId rides alongside the character (#758) so turn undo can revert this exact
+// Rolls (e.g. a potion's healing) are client-computed and passed as
+// `op.roll`; the server validates and records but does not re-roll.
+// batchId rides alongside the character so turn undo can revert this exact
 // batch server-side before restoring the local economy slot.
-// `results` (#1528) is index-aligned 1:1 with `operations` — a row-driven
-// cast-core op (Second Wind) reports its server roll there; every other op
-// reports `{}`. Mirrors rollInitiativeTransaction's own `results` shape below.
+// `results` is index-aligned 1:1 with `operations` — a row-driven cast-core
+// op (Second Wind) reports its server roll there; every other op reports {}.
 export async function applyActionTransactions(
   characterId: string,
   operations: ActionOperation[]

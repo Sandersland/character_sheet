@@ -1,11 +1,4 @@
 /* eslint-disable react-refresh/only-export-components -- provider module co-exports its use* hook beside the component; same-file hook+provider is intentional, HMR-only caveat */
-/**
- * App-wide dice-roll presentation context (#945). Persists the player's
- * Animated (3D) vs Quick (compact chip) preference via useDiceRollStyle,
- * mirroring ThemeProvider. `useDiceRollStyle()` degrades to the `animated`
- * default outside a provider so roll-context test harnesses need no wrapper.
- */
-
 import { createContext, useContext, type ReactNode } from "react";
 
 import { useDiceRollStylePreference, type DiceRollStyle } from "@/hooks/useDiceRollStyle";

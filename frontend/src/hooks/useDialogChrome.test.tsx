@@ -62,12 +62,10 @@ describe("useDialogChrome", () => {
     fireEvent.click(screen.getByText("add"));
     expect(screen.getByTestId("probe")).toHaveTextContent("open");
 
-    // A second dialog keeps it open; closing one still leaves it open.
     fireEvent.click(screen.getByText("add"));
     fireEvent.click(screen.getByText("remove"));
     expect(screen.getByTestId("probe")).toHaveTextContent("open");
 
-    // Closing the last dialog clears it.
     fireEvent.click(screen.getByText("remove"));
     expect(screen.getByTestId("probe")).toHaveTextContent("closed");
   });

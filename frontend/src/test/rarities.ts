@@ -14,8 +14,7 @@ export const SERVED_RARITIES: ItemRarityOption[] = [
   { key: "ARTIFACT", label: "Artifact", standardValueGp: null },
 ];
 
-/** Seeds the reference cache so useItemRarities resolves with no fetch — the
- *  staleTime: Infinity entry is permanently fresh, so the query never fires. */
+// Seeds the reference cache with a staleTime: Infinity entry so useItemRarities resolves with no fetch.
 export function seedItemRarities(edition: RulesEdition, itemRarities = SERVED_RARITIES): void {
   getQueryClient().setQueryData(referenceKeys.byEdition(edition), {
     races: [],

@@ -12,7 +12,6 @@ export interface DragDecisionInput {
   velocity: number;
 }
 
-/** Pure verdict: does this released drag dismiss, or spring back? */
 export function shouldDismissDrag({ dy, sheetHeight, velocity }: DragDecisionInput): boolean {
   if (dy <= 0) return false;
   if (velocity >= FLICK_VELOCITY) return true;
@@ -25,17 +24,6 @@ interface Options {
   enabled?: boolean;
 }
 
-/**
- * Drag-down-to-dismiss for a bottom-anchored panel: the finger translates the
- * panel via a CSS transform, and on release it either dismisses (past ~1/3 the
- * sheet height or a downward flick) or springs back. Returns pointer handlers
- * for an always-draggable region (grabber/header) and a content region that
- * only engages when scrolled to the top and dragged downward. Honors
- * prefers-reduced-motion by deciding the same verdict without the follow/spring.
- * A dismiss animates the panel off the bottom edge (iOS-style) and defers
- * onDismiss to the exit's transitionend; beginExit is returned so non-drag
- * closes reuse the same slide-out.
- */
 export function useDragToDismiss(
   panelRef: RefObject<HTMLElement>,
   { onDismiss, onExitStart, enabled = true }: Options,

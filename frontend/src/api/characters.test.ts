@@ -20,8 +20,6 @@ import {
 } from "@/api/characters";
 import type { CreateCharacterInput, HitPointOperation } from "@/types/character";
 
-// Verbatim regression pins from client.test.ts (#1270) — assertions
-// unchanged, only the import specifier retargeted.
 describe("fetchCharacters", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -118,7 +116,6 @@ describe("applyHitPointOperations", () => {
       expect.stringContaining("/characters/1/hp"),
       expect.objectContaining({ method: "POST", body: JSON.stringify({ operations }) })
     );
-    // Returns the character split apart from concentrationChecks (defaulting to []).
     expect(result.character.id).toBe("1");
     expect(result.concentrationChecks).toEqual([]);
   });
@@ -213,8 +210,6 @@ describe("createCharacter", () => {
   });
 });
 
-// New direct coverage (#1270) — the remaining characters.ts exports were only
-// exercised transitively before the split.
 describe("deleteCharacter", () => {
   afterEach(() => {
     vi.unstubAllGlobals();

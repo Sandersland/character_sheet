@@ -6,8 +6,6 @@ import { TurnSlotCard, ReactionResult } from "@/features/session/TurnControls";
 import type { ReactionSheetModel } from "@/lib/turnOptions";
 import type { AvailableAction, UniversalActionOption } from "@/types/character";
 
-/** One universal reaction as an option card — OA gets the weapon summary,
- *  reaction-speed casting is gated on the character being a caster. */
 function UniversalReactionCard({
   action,
   sheetModel,
@@ -43,7 +41,6 @@ function UniversalReactionCard({
   return <OptionCard icon={GiCycle} title={action.name} onClick={onClick} />;
 }
 
-/** Battle Master reaction maneuver (Parry, Riposte) — spends a superiority die. */
 function ManeuverReactionCard({
   name,
   dieLabel,
@@ -74,12 +71,9 @@ function ManeuverReactionCard({
   );
 }
 
-/**
- * Deflect Attacks redirect (#1241): a ranged hit reduced to 0 can spend 1 Focus
- * to redirect it, as part of the same reaction — self-adjudicated by the player
- * (the app doesn't track incoming attacks), same trust model as "ranged" and
- * "free hand" in the reaction's reminder text.
- */
+// Deflect Attacks (#1241): self-adjudicated by the player since the app
+// doesn't track incoming attacks — same trust model as the reaction's
+// reminder text.
 function DeflectRedirectButton({
   available,
   label,
@@ -87,7 +81,7 @@ function DeflectRedirectButton({
   onRedirect,
 }: {
   available: boolean;
-  /** The served redirect row's `name` + served spend-pool label — see useDeflectAttacksReaction. */
+  /** The served redirect row's name + spend-pool label, composed server-side by useDeflectAttacksReaction. */
   label: string;
   busy: boolean;
   onRedirect: () => void;
@@ -105,12 +99,6 @@ function DeflectRedirectButton({
   );
 }
 
-/**
- * The result strip inside the Reaction slot card: the die-spend error (before
- * use), or the spent-reaction message plus the Deflect Attacks redirect
- * follow-up (after use). Split out of ReactionSlot to keep its own branching
- * budget for the menu/sheet wiring below.
- */
 function ReactionSlotResult({
   reactionUsed,
   error,
@@ -139,7 +127,6 @@ function ReactionSlotResult({
   );
 }
 
-/** Universal reactions the class doesn't already provide + the slot's preview line. */
 function deriveReactionOptions(
   classReactions: AvailableAction[],
   reactionManeuvers: Array<{ id: string; name: string }>,
@@ -159,7 +146,6 @@ function deriveReactionOptions(
   return { universalReactions, preview };
 }
 
-/** The option-card list inside the Reaction sheet. */
 function ReactionSheetBody({
   sheetModel,
   universalReactions,
@@ -226,10 +212,6 @@ function ReactionSheetBody({
   );
 }
 
-/**
- * The Reaction economy slot — shared between idle and active render branches
- * so both always show the same state and the same result strip.
- */
 // fallow-ignore-next-line complexity -- threading `redirectLabel` (the served redirect row's own name, #1435) is one more pass-through prop on an already-flat JSX-composition component, not new branchy logic — every existing prop here is likewise a plain pass-through to ReactionSlotResult/ReactionSheetBody.
 export default function ReactionSlot({
   reactionUsed,
@@ -265,11 +247,10 @@ export default function ReactionSlot({
   error: string | null;
   handleActionClick: (key: string, cost: "action" | "bonusAction" | "reaction") => void;
   handleReactionManeuver: (entryId: string, name: string) => Promise<void>;
-  /** "Other reaction" catch-all — consume the slot without a specific action. */
   consumeReaction: () => void;
-  /** Deflect Attacks/Deflect Missiles (#1241/#1505): true once the base roll fired and the redirect's resource remains. */
+  /** True once the base Deflect Attacks/Missiles roll fired and the redirect's resource remains. */
   deflectRedirectAvailable: boolean;
-  /** See useDeflectAttacksReaction's own doc — edition-resolved, never hardcoded here. */
+  /** Composed by useDeflectAttacksReaction — edition-resolved, never hardcoded here. */
   redirectLabel: string;
   handleDeflectAttacksRedirect: () => Promise<void>;
 }) {

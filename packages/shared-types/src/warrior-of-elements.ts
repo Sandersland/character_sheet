@@ -1,17 +1,8 @@
-// Warrior of the Elements wire types (#1273) — de-duplicates the declarations
-// that were hand-mirrored between the backend's applyWarriorOfElementsOperations
-// module and frontend/src/types/character/classes.ts. Sent as
-// `{ operations: WarriorOfElementsOperation[] }` to POST /api/characters/:id/elements/transactions.
+// Sent as `{ operations: WarriorOfElementsOperation[] }` to
+// POST /api/characters/:id/elements/transactions.
 
 /** The five elemental damage types a Warrior of the Elements can deal (PHB'24 p.90). */
 export type ElementalDamageType = "acid" | "cold" | "fire" | "lightning" | "thunder";
-
-// ToggleElementalAttunementOperation/ToggleAttunementResult retired (#1686):
-// Elemental Attunement's activate/end toggle is a plain executeAction
-// "elementalAttunement"/"endElementalAttunement" op on the generic actions
-// endpoint now (ExecuteActionOperation, contracts/actions), not a
-// WarriorOfElementsOperation — this file's own header still describes the
-// two ops that DO remain bespoke (they're save-DC damage ops, not buffs).
 
 /** Elemental Burst (L6): Magic action, 2 Focus, 3× Martial Arts die, Dex save. */
 export interface CastElementalBurstOperation {
@@ -21,8 +12,7 @@ export interface CastElementalBurstOperation {
   roll: number;
 }
 
-/** Elemental Strikes rider (part of Elemental Attunement): swap the Unarmed
- *  Strike's damage type and force a Strength save to move the target 10 ft. */
+/** Elemental Strikes rider (part of Elemental Attunement): swaps the Unarmed Strike's damage type and forces a Strength save to move the target 10 ft. */
 export interface ElementalStrikeOperation {
   type: "elementalStrike";
   damageType: ElementalDamageType;
@@ -55,8 +45,7 @@ export interface ElementalStrikeResult {
   summary: string;
 }
 
-// A union, not an all-optional bag: each op returns exactly one member, so a
-// caller narrows on the fields it finds rather than null-checking every field.
+// A union, not an all-optional bag: each op returns exactly one member, so a caller narrows on the fields it finds rather than null-checking every field.
 export type WarriorOfElementsResult =
   | ElementalBurstResult
   | ElementalStrikeResult;

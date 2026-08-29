@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import { summarizeSessionDoorway } from "@/features/session/sessionDoorwaySummary";
 import type { SessionDoorwayState, SessionDoorwaySessionState } from "@/types/character";
 
-// A live/active session row for the doorway state (round/joined overridable).
 function activeSession(over: Partial<SessionDoorwaySessionState> = {}): SessionDoorwaySessionState {
   return {
     id: "s1",

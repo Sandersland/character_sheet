@@ -1,7 +1,4 @@
-// Pure helpers for entity identity merges (#387), in parity with the backend
-// entity-merges module. Operate on the flat merge list the API returns plus an
-// id→entity map, resolving transitive "revealed to be" chains for the UI.
-
+// Must stay in parity with the backend entity-merges module.
 import type { CampaignEntity, CampaignEntityMerge } from "@/types/character";
 
 interface ChainOpts {
@@ -12,7 +9,6 @@ function included(m: CampaignEntityMerge, opts: ChainOpts): boolean {
   return opts.executedOnly ? m.status === "EXECUTED" : true;
 }
 
-// Ordered survivor ids up the chain from `entityId` (nearest identity first).
 export function resolveSurvivorChain(
   merges: CampaignEntityMerge[],
   entityId: string,
@@ -31,7 +27,6 @@ export function resolveSurvivorChain(
   return chain;
 }
 
-// Every identity that merged transitively INTO `survivorId` (nearest first).
 export function collectMergedInIdentities(
   merges: CampaignEntityMerge[],
   survivorId: string,
@@ -53,7 +48,6 @@ export function collectMergedInIdentities(
   return collected;
 }
 
-// The merge in which `entityId` is the old (merged) identity, if any.
 export function mergeForMerged(
   merges: CampaignEntityMerge[],
   entityId: string,
@@ -61,8 +55,6 @@ export function mergeForMerged(
   return merges.find((m) => m.mergedEntityId === entityId);
 }
 
-// The ultimate survivor's name for an EXECUTED-merged identity — the autocomplete
-// annotation ("Jenkins → Vecna"). Empty string when not merged or unresolved.
 export function ultimateSurvivorName(
   merges: CampaignEntityMerge[],
   byId: Map<string, CampaignEntity>,

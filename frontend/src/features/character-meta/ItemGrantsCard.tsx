@@ -4,9 +4,6 @@ import { advantageGrantSummary } from "@/lib/capabilities";
 import { conditionLabel } from "@/lib/conditions";
 import { damageTypeLabel } from "@/lib/damageTypes";
 
-// Item-granted traits (#529) derived from active (equipped/attuned) items:
-// resistances, damage/condition immunities, and advantage reminders. Each row
-// carries its item source. Hidden entirely when nothing is active.
 export default function ItemGrantsCard() {
   const { character } = useCurrentCharacter();
   const resistances = character.resistances ?? [];

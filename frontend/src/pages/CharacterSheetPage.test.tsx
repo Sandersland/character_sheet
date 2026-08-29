@@ -7,10 +7,6 @@ import { fetchSessionDoorway, joinSession, startCampaignSession } from "@/api/cl
 import { useCharacter } from "@/hooks/useCharacter";
 import type { Character, SessionDoorwayState, SessionDoorwaySessionState } from "@/types/character";
 
-// Stub the data hooks + client; stub heavy sheet child components so the test
-// targets only the session doorway's state matrix (#942, formerly the header
-// session button #245).
-
 const navigateMock = vi.fn();
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
@@ -60,7 +56,6 @@ vi.mock("@/features/spells/SpellSlotSummary", () => ({ default: () => null }));
 vi.mock("@/features/spells/SpellsSection", () => ({ default: () => null }));
 vi.mock("@/features/abilities/ProficienciesCard", () => ({ default: () => null }));
 vi.mock("@/features/character-meta/BannerVitals", () => ({ default: () => null }));
-// Stub the mobile mini-header (the desktop banner keeps the campaign-less link).
 vi.mock("@/features/character-meta/MobileSheetHeader", () => ({ default: () => null }));
 vi.mock("@/features/character-meta/MobileQuickBar", () => ({ default: () => null }));
 vi.mock("@/features/conditions/ConditionsStrip", () => ({ default: () => null }));
@@ -147,8 +142,6 @@ describe("CharacterSheetPage session doorway (#942)", () => {
 
     const link = await screen.findByRole("link", { name: /join a campaign/i });
     expect(link).toHaveAttribute("href", "/campaigns");
-    // No session doorway button for a campaign-less character (the banner's
-    // "Sessions" action is a different control).
     expect(
       screen.queryByRole("button", { name: /(start|resume|join) session/i }),
     ).not.toBeInTheDocument();
@@ -173,9 +166,6 @@ describe("CharacterSheetPage session doorway (#942)", () => {
     mockFetchDoorway.mockResolvedValue(doorwayState({ kind: "liveJoined", session: liveSession({ joined: true }) }));
 
     renderPage();
-    // Wait for the live-joined header controls (doorway resolved). Live state now
-    // lives only in the header cluster — the old "Go to fight" strip is gone, and
-    // there's no "Resume session" doorway either (#1085).
     await screen.findByRole("button", { name: /end session/i });
     expect(screen.queryByRole("button", { name: /go to fight/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /resume session/i })).not.toBeInTheDocument();
@@ -239,7 +229,6 @@ describe("CharacterSheetPage session doorway (#942)", () => {
 
     renderPage();
 
-    // Palette is closed until the button is pressed — no keyboard shortcut needed.
     expect(screen.queryByText("capture-palette-open")).not.toBeInTheDocument();
     const noteButton = await screen.findByRole("button", { name: /note/i });
     noteButton.click();

@@ -112,14 +112,12 @@ describe("draftSatisfies", () => {
   });
 
   it("newSpells also requires the meta.cantrips count of cantripsLearned (#1131)", () => {
-    // Cleric 3→4: count 0, cantrips 1 — needs one cantrip and nothing else.
     const cantripOnly: LevelUpStep = { kind: "newSpells", count: 0, meta: { cantrips: 1 } };
     expect(draftSatisfies(cantripOnly, empty)).toBe(false);
     expect(
       draftSatisfies(cantripOnly, { ...empty, cantripsLearned: [{ type: "learnSpell", spellId: "c1" }] }),
     ).toBe(true);
 
-    // Warlock 3→4: 1 spell AND 1 cantrip — the spell alone is not enough.
     const both: LevelUpStep = { kind: "newSpells", count: 1, meta: { cantrips: 1, canSwap: true } };
     expect(
       draftSatisfies(both, { ...empty, spellsLearned: [{ type: "learnSpell", spellId: "s1" }] }),
@@ -135,13 +133,10 @@ describe("draftSatisfies", () => {
 
   it("newSpells swap: a count-0 step needs a replacement learn per forget (#1101)", () => {
     const swapStep: LevelUpStep = { kind: "newSpells", count: 0, meta: { canSwap: true } };
-    // No swap taken → trivially satisfied.
     expect(draftSatisfies(swapStep, empty)).toBe(true);
-    // Forget with no replacement learn → unsatisfied (net count would be −1).
     expect(
       draftSatisfies(swapStep, { ...empty, spellsForgotten: [{ type: "forgetSpell", entryId: "e1" }] }),
     ).toBe(false);
-    // Forget + one replacement learn → satisfied.
     expect(
       draftSatisfies(swapStep, {
         ...empty,
@@ -191,8 +186,6 @@ describe("applySubclassPick (#1323)", () => {
       maneuvers: [m1, m2],
       toolProficiencies: [t1],
     };
-    // Vacuity guard (A2 is only meaningful if the seed is non-empty): A3 below
-    // confirms this same seed survives into the stash intact.
     expect(d.maneuvers).toHaveLength(2);
 
     const next = applySubclassPick(d, "champ");
@@ -243,15 +236,9 @@ describe("applySubclassPick (#1323)", () => {
 
   it("creates no stash bucket for the first subclass pick", () => {
     const d: LevelUpDraft = { hp: { method: "average" } };
-    // Must be toEqual({}), not toBeUndefined() — a bucket-write condition that
-    // fires unconditionally (even from no prior subclass) would pass a
-    // toBeUndefined() check here just as readily as correct code (M4).
     expect(applySubclassPick(d, "bm").dependentPicksBySubclass).toEqual({});
   });
 
-  // #1421: behavioural stand-in for "SUBCLASS_DEPENDENT_KEYS still contains
-  // exactly the three" — the constant is module-private, so this asserts the
-  // externally-visible contract instead of the private list itself.
   it("clears only the subclass-dependent keys, never the spell fields", () => {
     const d: LevelUpDraft = {
       hp: { method: "average" },
@@ -324,7 +311,6 @@ describe("pruneDraftToPlan (#1421)", () => {
       dependentPicksBySubclass: { bm: { maneuvers: [m1] } },
     };
     const next = pruneDraftToPlan(draft, steps);
-    // Vacuity guard: prove something was actually dropped, not just untouched.
     expect(next.maneuvers).toBeUndefined();
     expect(next.dependentPicksBySubclass).toEqual({ bm: { maneuvers: [m1] } });
   });
@@ -346,8 +332,6 @@ describe("pruneDraftToPlan (#1421)", () => {
   });
 
   it("keeps advancement, fightingStyleFeat, maneuvers and toolProficiencies when their step kinds are present", () => {
-    // Note: the singular step kind `toolProficiency` licenses the plural
-    // draft field `toolProficiencies`.
     const steps: LevelUpStep[] = [
       { kind: "hitPoints" },
       { kind: "advancement", count: 1 },
@@ -406,9 +390,6 @@ describe("pruneDraftToPlan (#1421)", () => {
     expect(next.subclassChoices).toEqual(draft.subclassChoices);
   });
 
-  // Regression guard: the rebuild path must not manufacture a fresh
-  // subclassChoices array when every entry survives — only spellsLearned
-  // (a different field) is what should force the rebuild here.
   it("preserves the subclassChoices array reference when another field is pruned but every choice survives", () => {
     const steps: LevelUpStep[] = [
       { kind: "hitPoints" },
@@ -422,9 +403,6 @@ describe("pruneDraftToPlan (#1421)", () => {
       subclassChoices,
     };
     const next = pruneDraftToPlan(draft, steps);
-    // Vacuity guard: prove the rebuild path actually ran (a different field
-    // was in fact pruned) — otherwise this test would trivially pass via the
-    // same-reference early return, proving nothing about the rebuild path.
     expect(next.spellsLearned).toBeUndefined();
     expect(next.subclassChoices).toBe(subclassChoices);
   });

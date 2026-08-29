@@ -15,8 +15,6 @@ export interface InventoryTransactions {
   submitOperations: (operations: InventoryOperation[]) => Promise<void>;
 }
 
-// Owns the async write path: POST .../inventory/transactions, write the returned
-// character straight into the query cache, and close the add/edit panels on success.
 export function useInventoryTransactions(character: Character): InventoryTransactions {
   const [addOpen, setAddOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);

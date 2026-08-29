@@ -3,14 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { combineEntities } from "@/api/client";
 import { invalidateCombineCaches } from "@/lib/combineCacheInvalidation";
 
-// The single combine write (#1943), a 1-length loserEntityIds call onto
-// #1942's now-batch endpoint: absorbs `duplicateId` into `survivorId` and
-// deletes it. invalidateCombineCaches (shared with #1946's useCombineCluster)
-// covers entities/merges/inbox/character-detail; the caller navigates to the
-// survivor's own page after success, whose backlinks/connections/activity
-// reads are plain per-entity effects that refetch on their own from the
-// entityId change, not TanStack Query, so there is no further cache to
-// invalidate for them.
+// Backlinks/connections/activity on the survivor's page are plain per-entity effects that refetch from the entityId change, not TanStack Query — no further cache to invalidate here.
 export function useCombineEntity(campaignId: string) {
   const queryClient = useQueryClient();
 

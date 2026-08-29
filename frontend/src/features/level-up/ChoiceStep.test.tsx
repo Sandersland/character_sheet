@@ -17,9 +17,6 @@ vi.mock("@/api/client", () => ({
   fetchSubclassChoiceOptions: vi.fn(),
 }));
 
-// Defaults restored per-test so a test's mockResolvedValue override can't
-// leak; clearAllMocks also resets call counts, needed for the memo
-// regression test below (fires exactly one catalog fetch...).
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(fetchManeuvers).mockResolvedValue([
@@ -35,8 +32,6 @@ beforeEach(() => {
     { id: "defense", name: "Defense", description: "def", category: "fighting_style" },
     { id: "sentinel", name: "Sentinel", description: "sent", category: "general" },
   ] as unknown as Awaited<ReturnType<typeof fetchFeats>>);
-  // Hunter's Prey (L3, huntersPrey) rows, verified against
-  // backend/prisma/seed/subclass-choices.ts.
   vi.mocked(fetchSubclassChoiceOptions).mockResolvedValue([
     { id: "prey1", name: "Colossus Slayer", description: "colossus", minLevel: 3 },
     { id: "prey2", name: "Giant Killer", description: "giant", minLevel: 3 },
@@ -152,12 +147,10 @@ describe("ChoiceStep", () => {
     });
   });
 
-  // #1495: the picker's class-name scope is the union of the character's
-  // ALREADY-EARNED Fighting Style classes (fightingStyleGrantingClasses,
-  // server-computed) plus the level-up target's className (a brand-new
-  // multiclass entry, or a class earning FS for the first time at THIS
-  // level-up, isn't in that pre-level-up set yet) — both must reach
-  // fetchFeats so the server can apply fightingStyleFeatOfferedForClasses.
+  // Class-name scope is the union of fightingStyleGrantingClasses
+  // (server-computed, already earned) and the level-up target's className
+  // (not yet earned) — fetchFeats needs both to apply
+  // fightingStyleFeatOfferedForClasses.
   it("forwards the character's earned Fighting Style classes plus the target's className to fetchFeats' class gate", async () => {
     const character = {
       rulesEdition: "EDITION_2014",
@@ -181,11 +174,6 @@ describe("ChoiceStep", () => {
     );
   });
 
-  // The differentiating case (review finding): a Fighter1/Ranger1 multiclass
-  // has BOTH classes in `classes`, but Ranger hasn't earned Fighting Style
-  // yet (grant at L2, entry only L1) — using `classes` here (the pre-fix
-  // bug) would offer Ranger's styles in the ceremony and the write path
-  // would 400 the pick.
   it("excludes a class on `classes` that hasn't earned Fighting Style, even mid-multiclass", async () => {
     const character = {
       rulesEdition: "EDITION_2014",
@@ -193,7 +181,6 @@ describe("ChoiceStep", () => {
         { id: "entry-0", name: "Fighter", level: 1 },
         { id: "entry-1", name: "Ranger", level: 1 },
       ],
-      // Ranger's own entry is only L1 — its L2 Fighting Style grant is unmet.
       fightingStyleGrantingClasses: ["Fighter"],
       resources: {},
       advancements: [],
@@ -219,9 +206,8 @@ describe("ChoiceStep", () => {
     expect(await axe(container)).toHaveNoViolations();
   });
 
-  // STEP_BODIES maps several kinds to the same ChoiceStep; navigating between two
-  // adjacent choice steps re-renders the SAME instance with a new step.kind, which
-  // must refetch that kind's catalog (regression: a fetch-once guard stranded it).
+  // STEP_BODIES reuses one ChoiceStep instance across adjacent step kinds; it
+  // must refetch the catalog when step.kind changes.
   it("refetches for the new kind when the same instance is reused (maneuvers → toolProficiency)", async () => {
     vi.mocked(fetchReference).mockResolvedValue({
       artisanTools: [{ name: "Smith's Tools" }, { name: "Brewer's Supplies" }],
@@ -234,12 +220,9 @@ describe("ChoiceStep", () => {
 
     expect(await screen.findByText("Smith's Tools")).toBeInTheDocument();
     expect(screen.getByText("Brewer's Supplies")).toBeInTheDocument();
-    // The prior kind's options must be gone, not lingering as stale rows.
     expect(screen.queryByText("Riposte")).not.toBeInTheDocument();
   });
 
-  // The reused instance also holds the filter text; a filter typed on one kind
-  // must not survive to hide the next kind's options (comment 3609483577).
   it("resets the search filter when the reused instance switches kind", async () => {
     const user = userEvent.setup();
     vi.mocked(fetchManeuvers).mockResolvedValue(
@@ -256,7 +239,6 @@ describe("ChoiceStep", () => {
 
     rerender(<Harness step={{ kind: "toolProficiency", count: 1 }} />);
 
-    // Every tool is visible — a stale "Maneuver 3" filter would hide them all.
     expect(await screen.findByText("Tool 0")).toBeInTheDocument();
     expect(screen.getByText("Tool 9")).toBeInTheDocument();
     expect(screen.getByRole("searchbox")).toHaveValue("");
@@ -272,8 +254,8 @@ describe("ChoiceStep", () => {
     expect(await screen.findByText("Riposte")).toBeInTheDocument();
   });
 
-  // #1422: subclassChoice's config is resolved per step (choiceConfigForStep),
-  // not looked up in the per-kind CHOICE_KIND_CONFIGS map.
+  // subclassChoice's config resolves per step (choiceConfigForStep), not the
+  // per-kind CHOICE_KIND_CONFIGS map.
   it("renders the step's option catalog for a subclassChoice step", async () => {
     render(<Harness step={preyStep} />);
 
@@ -298,9 +280,7 @@ describe("ChoiceStep", () => {
     } as unknown as Character;
     render(<Harness step={preyStep} character={character} />);
 
-    // Assert the positive anchor FIRST -- without it this test passes
-    // vacuously today (nothing renders at all, so the "not present" assertion
-    // below is trivially true).
+    // Assert the positive case first — otherwise this passes vacuously (nothing renders).
     expect(await screen.findByText("Giant Killer")).toBeInTheDocument();
     expect(screen.queryByText("Colossus Slayer")).not.toBeInTheDocument();
   });

@@ -4,8 +4,6 @@ import { useNavigate, useParams } from "react-router-dom";
 import Spinner from "@/components/ui/Spinner";
 import { joinCampaign } from "@/api/client";
 
-// Deep-link target for an invite link (/join/:code): joins on mount, then sends
-// the user to the Campaigns hub. Shows an inline error if the code is invalid.
 export default function JoinCampaignRoute() {
   const { code } = useParams();
   const navigate = useNavigate();

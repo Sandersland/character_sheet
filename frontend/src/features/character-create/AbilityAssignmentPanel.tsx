@@ -34,11 +34,11 @@ interface AbilityAssignmentPanelProps {
   assignments: AbilityAssignments;
   scores: AbilityScores;
   bonuses: CreationBackgroundBonuses;
-  /** #1681: 2014 species/subrace ability increases — inert when applicable is false. */
+  /** Inert when `applicable` is false (#1681). */
   speciesBonuses: CreationSpeciesBonuses;
-  /** PHB'24 primary ability/abilities to flag as recommended (#1161). */
+  /** PHB'24 primary ability/abilities, flagged as recommended (#1161). */
   primaryAbility: AbilityName[];
-  /** Class display name shown beside a recommended row (e.g. "◆ Fighter"). */
+  /** Display name of the class, not a CSS class list — shown beside a recommended row. */
   className: string;
   update: (patch: Partial<CharacterDraft>) => void;
 }
@@ -308,10 +308,10 @@ interface AbilityRowProps extends RowScoreCellProps {
   bonusAssignment: BonusAssignment;
 }
 
-// display:contents so each cell is a direct item of the shared parent grid —
-// header + all six rows size their `auto` tracks together and align by
-// construction (#1182). A contents box paints nothing, so per-cell padding /
-// self-center must live on the cells, not this wrapper.
+// display:contents makes each cell a direct item of the shared parent grid, so
+// header and rows size their `auto` tracks together and align by construction
+// (#1182); it paints nothing, so per-cell padding/self-center must live on the
+// cells, not this wrapper.
 function AbilityRow(props: AbilityRowProps) {
   const { row, className, applicable, mode, bonusAbilities } = props;
   const label = ABILITY_LABELS[row.ability];
@@ -319,7 +319,7 @@ function AbilityRow(props: AbilityRowProps) {
   return (
     <div className="contents">
       <span className="flex flex-wrap items-baseline gap-x-2 self-center text-sm font-semibold text-parchment-800">
-        {/* Abbreviate below sm so the score/radio/total cells fit a phone; aria-labels keep the full name. */}
+        
         <span className="sm:hidden">{abilityAbbr(row.ability)}</span>
         <span className="hidden sm:inline">{label}</span>
         {row.recommended && (
@@ -346,10 +346,10 @@ function AbilityRow(props: AbilityRowProps) {
   );
 }
 
-// display:contents (see AbilityRow): header cells join the shared grid; the
-// wrapper's text utilities still reach the cells because they're inherited CSS.
-// The underline can't ride the wrapper's border (contents paints nothing), so
-// it's a full-width divider row spanning every column.
+// display:contents joins these header cells to the shared grid; text utilities
+// still reach the cells since they're inherited CSS. The underline can't ride
+// the wrapper's border (contents paints nothing), so it's a full-width divider
+// row spanning every column.
 function RowHeader({ applicable, mode }: { applicable: boolean; mode: SpreadMode }) {
   return (
     <div className="contents text-[10px] font-bold uppercase tracking-wide text-parchment-500">
@@ -412,8 +412,6 @@ function SpreadControls({
   );
 }
 
-// #1681: uniform-amount choose picker (Half-Elf's "+1 to two of your choice") —
-// checkbox-per-ability, capped at `count` selections.
 function SpeciesChooseControl({
   choice,
   assignment,
@@ -463,11 +461,9 @@ function SpeciesChooseControl({
 
 const FLOATING_ONE_ONE_ONE_COUNT = 3;
 
-// #1758: floating-spread picker (Astral Elf) — a +2/+1 (two abilities) or
-// +1/+1/+1 (three) assignment across the eligible abilities. Mode is local
-// (not derived from the assignment) because +1/+1/+1 has an empty intermediate
-// state that spreadMode would misread as +2/+1; switching mode clears the pool.
-// Reuses the background spread's setPlusTwo/setPlusOne over the eligible set.
+// Mode is local, not derived from the assignment: +1/+1/+1 has an empty
+// intermediate state that spreadMode would misread as +2/+1. Switching mode
+// clears the pool (#1758).
 function SpeciesFloatingControl({
   choice,
   assignment,
@@ -579,12 +575,10 @@ function SpeciesFloatingControl({
   );
 }
 
-// #1681/#1758: 2014 species/subrace ability increases. Fixed increases (Dwarf's
-// +2 CON) are announce-only text — the backend applies them with no player
-// input — while an interactive choice gets a picker: a uniform-amount choose
-// (Half-Elf) or a floating spread (Astral Elf). Separate block from
-// SpreadControls above: the two mechanics never both apply to one character
-// (opposite editions).
+// Fixed species increases are announce-only text — the backend applies them
+// with no player input. Kept separate from SpreadControls: species and
+// background bonuses never both apply to one character (opposite editions)
+// (#1681/#1758).
 function SpeciesBonusBlock({
   bonuses,
   update,
@@ -609,19 +603,11 @@ function SpeciesBonusBlock({
   );
 }
 
-// Column template: Ability | Base | [ +2 | +1 ] or [ +1 dot ] | Total/Mod.
 function gridColumns(applicable: boolean, mode: SpreadMode): string {
   if (!applicable) return "minmax(0,1fr) auto auto";
   return mode === "twoOne" ? "minmax(0,1fr) auto auto auto auto" : "minmax(0,1fr) auto auto auto";
 }
 
-/**
- * BG3-style ability generation + assignment for the creation ceremony (#1161).
- * One panel drives all four methods (manual, roll, standard array, point buy)
- * plus the PHB'24 background +2/+1 (or +1/+1/+1) spread. Presentation only —
- * every rule lives in abilityAssignment / abilityGen. The spread mode is derived
- * from the assignment, so switching background no longer needs a remount.
- */
 export default function AbilityAssignmentPanel({
   method,
   pool,
@@ -633,14 +619,12 @@ export default function AbilityAssignmentPanel({
   className,
   update,
 }: AbilityAssignmentPanelProps) {
-  // Which pool chip the player is holding, waiting to drop into a row.
   const [held, setHeld] = useState<number | null>(null);
   const pooled = isPoolMethod(method);
   const { applicable, abilities: bonusAbilities, assignment: bonusAssignment, originFeat } = bonuses;
   const mode = spreadMode(bonusAssignment);
-  // #1681: the grid's Total/Mod columns fold in species increases too (fixed +
-  // chosen) — the two mechanisms never both apply to one character, but
-  // summing unconditionally means this needs no edition branch of its own.
+  // Species and background bonuses never both apply to one character, so
+  // summing them unconditionally needs no edition branch of its own (#1681).
   const combinedBonus = sumBonusMaps(bonusAssignment, speciesBonuses.fixed, speciesBonuses.assignment);
 
   function selectMethod(next: AbilityMethod) {

@@ -2,8 +2,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { fetchFeats, fetchItems, fetchReference, fetchSpells, forkCatalogEntry, shareCatalogEntry, unshareCatalogEntry } from "@/api/catalog";
 
-// Verbatim regression pins from client.test.ts (#1270) — assertions unchanged,
-// only the import specifier retargeted.
 describe("fetchReference", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -24,8 +22,8 @@ describe("fetchReference", () => {
     await expect(fetchReference("EDITION_2024")).resolves.toMatchObject({
       races: [{ name: "Human", speed: 30 }],
     });
-    // Proves the edition reaches the wire (#1325) — a query param, not a header,
-    // so it participates in the queryKey/cache identity structurally.
+    // Edition must be a query param (not a header) so it participates in the
+    // queryKey identity.
     expect(fetchMock.mock.calls[0][0]).toMatch(/\/reference\?edition=EDITION_2024$/);
   });
 
@@ -62,8 +60,6 @@ describe("fetchItems", () => {
   });
 });
 
-// New coverage (#1270) — fetchSpells/fetchFeats were never directly asserted
-// in client.test.ts (only exercised transitively through other suites).
 describe("fetchSpells", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -81,8 +77,7 @@ describe("fetchSpells", () => {
     await expect(fetchSpells("EDITION_2024")).resolves.toMatchObject([{ name: "Fireball", level: 3 }]);
   });
 
-  // #1712: `?edition=` is now REQUIRED (the route 400s without it) — same pin
-  // shape as fetchFeats/fetchReference above.
+  // edition is required — the route 400s without it.
   it("always sends ?edition=, with class/maxLevel appended when given", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => [] });
     vi.stubGlobal("fetch", fetchMock);
@@ -100,11 +95,6 @@ describe("fetchSpells", () => {
     await expect(fetchSpells("EDITION_2024")).rejects.toThrow();
   });
 
-  // #1811, epic #1795 9/9: the campaign-aware learn picker threads the
-  // viewing character through so GET /api/spells can resolve granted +
-  // CAMPAIGN entries for that character's campaign (see spells.ts's own
-  // resolveCharacterViewer). Omitted entirely when absent — the creation
-  // ceremony and other non-character callers stay on the pre-#1811 shape.
   it("appends ?characterId= when given, omits it when absent", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => [] });
     vi.stubGlobal("fetch", fetchMock);
@@ -130,8 +120,8 @@ describe("fetchFeats", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(fetchFeats("EDITION_2014")).resolves.toMatchObject([{ name: "Alert" }]);
-    // Same pin as fetchReference above: the route 400s without it (#1411), and
-    // Alert is the seeded row that actually forks by edition.
+    // Alert is the seeded feat that actually forks by edition — picking any
+    // other row would pass vacuously.
     expect(fetchMock.mock.calls[0][0]).toMatch(/\/feats\?edition=EDITION_2014$/);
   });
 
@@ -143,9 +133,8 @@ describe("fetchFeats", () => {
     await fetchFeats("EDITION_2024");
     await fetchFeats("EDITION_2024", undefined);
 
-    // The absent cases must not send `asiLevel=undefined`: the route treats any
-    // present-but-unparseable value as a 400 (#1438), so a stringified undefined
-    // would break the non-ASI consumers rather than serving them the full catalog.
+    // Must omit asiLevel (not send the string "undefined") — the route 400s
+    // on an unparseable value, which would break every non-ASI caller.
     expect(fetchMock.mock.calls[0][0]).toMatch(/\/feats\?edition=EDITION_2024&asiLevel=19$/);
     expect(fetchMock.mock.calls[1][0]).toMatch(/\/feats\?edition=EDITION_2024$/);
     expect(fetchMock.mock.calls[2][0]).toMatch(/\/feats\?edition=EDITION_2024$/);
@@ -157,9 +146,8 @@ describe("fetchFeats", () => {
     await expect(fetchFeats("EDITION_2024")).rejects.toThrow();
   });
 
-  // #1495: the Fighting Style class gate — the server filters the offered
-  // set via ?classes=, so the frontend never re-derives PHB'14's per-class
-  // subset (CLAUDE.md: rules logic is backend-owned).
+  // The server filters via ?classes= — the frontend never re-derives the
+  // per-class Fighting Style subset (rules logic stays backend-owned).
   it("appends ?classes= only when a non-empty class name list is given", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => [] });
     vi.stubGlobal("fetch", fetchMock);
@@ -173,16 +161,11 @@ describe("fetchFeats", () => {
     expect(fetchMock.mock.calls[2][0]).toMatch(/\/feats\?edition=EDITION_2014$/);
   });
 
-  // No "combines ?asiLevel= and ?classes=" test: the route now 400s that
-  // combination (asiLevel's own gate always strips fighting_style rows
-  // first, making classes a silent no-op — see feats.ts's route comment and
-  // feats.test.ts's "cannot be combined" case). No real caller sends both —
-  // AdvancementPanel passes asiLevel only, the Fighting Style picker and
-  // level-up ceremony pass classNames only — so this unit doesn't need to
-  // document a request shape that's illegal on the wire.
+  // asiLevel and classes cannot combine — the route 400s that combination
+  // (asiLevel's gate always strips fighting_style rows first). No real
+  // caller sends both.
 });
 
-// #1801, epic #1795 6/6: share (grant) + fork API coverage.
 describe("shareCatalogEntry", () => {
   afterEach(() => {
     vi.unstubAllGlobals();

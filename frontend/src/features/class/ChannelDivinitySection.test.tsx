@@ -44,8 +44,6 @@ function makeCharacter(cdRemaining: number): Character {
   } as unknown as Character;
 }
 
-// ChannelDivinitySection reads useCurrentCharacter(), so every render seeds
-// the cache and mounts CurrentCharacterProvider via renderWithCharacter.
 function renderSection(character: Character) {
   const onCast = vi.fn();
   renderWithCharacter(<ChannelDivinitySection busy={false} onCast={onCast} />, character);

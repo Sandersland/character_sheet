@@ -10,11 +10,6 @@ interface SurvivorPickerProps {
   onSelect: (entityId: string) => void;
 }
 
-// The Review-duplicates modal's bordered survivor list (#1946), split out of
-// the modal body to keep its own complexity — one row per cluster entity —
-// separate from the modal's commit state. Combine is atomic (#1942): a
-// rejection leaves every entity untouched, so the radios stay live through a
-// failed attempt — no locking, no per-entity landed state.
 export default function SurvivorPicker({ entities, groupName, survivorId, onSelect }: SurvivorPickerProps) {
   return (
     <fieldset className="flex flex-col divide-y divide-parchment-200 rounded-card border border-parchment-200">

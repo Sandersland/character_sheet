@@ -1,11 +1,8 @@
-// Keys live here so no call site ever string-literals one — a typo'd key is a
-// silent cache miss, not a crash. Ids are nullable because a hook with no id
-// still needs a stable key while its query is skipped. Campaign-scoped resources
-// nest under one prefix so a cross-resource mutation can invalidate a whole
-// campaign in one call (#1283).
-//
-// Namespaces are added incrementally, one per commit, alongside their first
-// consumer — an export with no importer yet fails fallow's unused-exports gate.
+// Keys live here so no call site ever string-literals one — a typo'd key
+// is a silent cache miss, not a crash. Ids are nullable because a hook
+// with no id still needs a stable key while its query is skipped.
+// Campaign-scoped resources nest under one prefix so a cross-resource
+// mutation can invalidate a whole campaign in one call.
 
 import type { RulesEdition } from "@character-sheet/shared-types";
 
@@ -38,38 +35,36 @@ export const referenceKeys = {
     [...referenceKeys.all, edition] as const,
 };
 
-// The SRD item catalog (`GET /items`) — a separate endpoint from `/reference`,
-// so it gets its own key rather than overloading referenceKeys.
+// Separate endpoint from /reference, so it gets its own key rather than
+// overloading referenceKeys.
 export const catalogKeys = {
   items: () => ["catalog", "items"] as const,
-  // Takes NO edition argument, unlike referenceKeys.byEdition above: /editions is
-  // edition-independent by construction (#1436), because it is what the client
-  // reads in order to CHOOSE an edition. Adding one "for symmetry" would
-  // reintroduce edition-dependence into the one endpoint that must be answerable
-  // BEFORE an edition exists.
+  // Takes no edition argument, unlike referenceKeys.byEdition: /editions
+  // must be answerable before an edition exists (#1436) — adding one "for
+  // symmetry" would reintroduce that dependency.
   editions: () => ["catalog", "editions"] as const,
 };
 
-// The character's session-doorway + full-active-session reads (#1299), lifted
-// out of LiveSessionProvider's own useState so a lifecycle mutation elsewhere
-// (join/start/leave/end) can invalidate them instead of poking a callback.
+// Lifted out of LiveSessionProvider's own useState so a lifecycle mutation
+// elsewhere (join/start/leave/end) can invalidate these instead of poking a
+// callback.
 export const sessionKeys = {
   all: ["sessions"] as const,
   doorway: (characterId: string | null | undefined) => [...sessionKeys.all, "doorway", characterId] as const,
   active: (characterId: string | null | undefined) => [...sessionKeys.all, "active", characterId] as const,
-  // A campaign's session list (SessionsModal) — distinct from `chronicle`
-  // below: same campaign, but a different endpoint/shape (fetchCampaignSessions
-  // vs fetchChronicleSessions), so they cannot share one cache entry.
+  // Distinct from `chronicle` below: same campaign, but a different
+  // endpoint/shape (fetchCampaignSessions vs fetchChronicleSessions), so
+  // they cannot share one cache entry.
   campaignList: (campaignId: string | null | undefined) =>
     [...sessionKeys.all, "campaignList", campaignId] as const,
-  // The journal's per-character chronicle read (arcs + sessions together, since
-  // useChronicle always fetches both in parallel and treats them as one unit).
+  // arcs + sessions together: useChronicle always fetches both in parallel
+  // and treats them as one unit.
   chronicle: (campaignId: string | null | undefined, characterId: string | null | undefined) =>
     [...sessionKeys.all, "chronicle", campaignId, characterId] as const,
 };
 
-// App-level inbox (#1945/#1946): one flat list across every campaign the
-// caller owns, so there is no per-id variant — `all` doubles as the query key.
+// One flat list across every campaign — no per-id variant, so `all`
+// doubles as the query key.
 export const inboxKeys = {
   all: ["inbox"] as const,
 };

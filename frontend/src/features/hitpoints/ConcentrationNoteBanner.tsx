@@ -1,6 +1,5 @@
 import type { ConcentrationNote } from "@/features/hitpoints/useHitPointApply";
 
-/** Resolved concentration-save result banner (issue #41, auto-roll path). */
 export default function ConcentrationNoteBanner({ note }: { note: ConcentrationNote }) {
   return (
     <div

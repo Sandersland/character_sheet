@@ -66,7 +66,6 @@ describe("useVisualViewport", () => {
       fire("scroll");
       fire("resize");
     });
-    // Three events, one scheduled frame.
     expect(raf).toHaveBeenCalledTimes(1);
     act(() => queued?.(0));
   });

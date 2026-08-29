@@ -21,7 +21,6 @@ function restYFor(groups: FaceGroup[]): number {
   return groups.length > 0 ? groups[0].normal.dot(groups[0].centroid) : 0.65;
 }
 
-// One die placed flat on a chosen face, at its true rest height, for readUpFace.
 function placeOnFace(body: CANNON.Body, groups: FaceGroup[], faceIndex: number, restY: number): void {
   const q = quaternionForUpFace(groups[faceIndex].normal);
   body.quaternion.set(q.x, q.y, q.z, q.w);

@@ -178,7 +178,6 @@ describe("FeatFlow — detail / confirm (frame D)", () => {
     expect(radios).toHaveLength(3);
     radios.forEach((r) => expect(r).toHaveAttribute("aria-checked", "false"));
 
-    // Constitution card previews 16 → 17 from currentScores.
     const conRadio = within(group).getByRole("radio", { name: /constitution/i });
     expect(within(conRadio).getByText(/16\s*→\s*17/)).toBeInTheDocument();
 
@@ -264,7 +263,7 @@ describe("FeatFlow — ability-score radiogroup keyboard nav (#1111)", () => {
   it("ArrowRight/ArrowDown move focus and selection forward, wrapping at the end", async () => {
     const user = await selectFeat("Resilient");
     const group = screen.getByRole("radiogroup");
-    const radios = within(group).getAllByRole("radio"); // Strength, Dexterity, Constitution
+    const radios = within(group).getAllByRole("radio");
     radios[0].focus();
 
     await user.keyboard("{ArrowRight}");

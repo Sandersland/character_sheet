@@ -37,7 +37,6 @@ describe("Card", () => {
       </Card>
     );
     expect(screen.getByText("Accessory")).toBeInTheDocument();
-    // Both should be present when title is given
     expect(screen.getByRole("heading", { name: "Inventory" })).toBeInTheDocument();
   });
 
@@ -45,7 +44,6 @@ describe("Card", () => {
     render(
       <Card titleAccessory={<span>Hidden</span>}>Content</Card>
     );
-    // Without title the header div is never rendered, so accessory is also absent
     expect(screen.queryByText("Hidden")).not.toBeInTheDocument();
   });
 

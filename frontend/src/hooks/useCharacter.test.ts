@@ -43,7 +43,6 @@ describe("useCharacter", () => {
     });
   });
 
-  // Pin (green-first): rejection.
   it("rejection -> error true, character undefined", async () => {
     fetchCharacter.mockRejectedValue(new Error("boom"));
     const { result } = renderHook(() => useCharacter("c1"));
@@ -51,17 +50,15 @@ describe("useCharacter", () => {
     expect(result.current.character).toBeUndefined();
   });
 
-  // Pin (green-first): no id.
   it("no id -> stays undefined, error false, fetchCharacter never called", () => {
     const { result } = renderHook(() => useCharacter(undefined));
     expect(result.current).toMatchObject({ character: undefined, error: false });
     expect(fetchCharacter).not.toHaveBeenCalled();
   });
 
-  // RED (new behaviour, deliberate): not expressible against the old hook —
-  // it has no refetch. Pins the `isError && data === undefined` guard that
-  // stops a transient background-refetch blip from replacing a working sheet
-  // with CharacterLoadError.
+  // Pins the `isError && data === undefined` guard that stops a transient
+  // background-refetch blip from replacing a working sheet with
+  // CharacterLoadError.
   it("a failed background refetch keeps the loaded character and does not raise error", async () => {
     const character = makeCharacter();
     fetchCharacter.mockResolvedValueOnce(character);
@@ -77,8 +74,8 @@ describe("useCharacter", () => {
     expect(result.current.error).toBe(false);
   });
 
-  // RED: pins the 30s staleTime choice — a remount inside that window must
-  // not re-fetch a character already in the cache.
+  // Pins the 30s staleTime choice — a remount inside that window must not
+  // re-fetch a character already in the cache.
   it("a remount within staleTime does not refetch", async () => {
     fetchCharacter.mockResolvedValue(makeCharacter());
     const first = renderHook(() => useCharacter("c1"));

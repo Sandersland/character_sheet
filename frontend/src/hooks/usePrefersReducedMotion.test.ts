@@ -3,8 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 
-// A single shared, mutable MediaQueryList so subscribe() and getSnapshot() —
-// which each call matchMedia() — observe the same object we drive.
+// Shared mutable MediaQueryList so subscribe() and getSnapshot() (each calling matchMedia()) observe the same object we drive.
 function makeMql(initial: boolean) {
   const listeners = new Set<(e: MediaQueryListEvent) => void>();
   return {

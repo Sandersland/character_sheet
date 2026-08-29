@@ -1,13 +1,3 @@
-// Renders a stored note body with @[<uuid>] tokens as inked entity names (#248,
-// restyled #862). Plain text is verbatim; a known id becomes a scribe-inked
-// name — small-caps, entity-colored, dotted underline, no pill — linking to the
-// entity detail page (name resolved AT RENDER so a rename reflects instantly).
-// The ink inherits its font family from context (serif in journal prose, sans
-// elsewhere). An unresolved id — a now-hidden entity a non-owner can't see
-// (#379), or a deleted one — renders redacted (no link, no preview), never the
-// raw token. Mentions carry the shared desktop hover preview (#843), hover-lazy
-// so a long session log costs zero fetches to render.
-
 import { Fragment } from "react";
 import { Link } from "react-router-dom";
 
@@ -26,7 +16,6 @@ type MentionEntity = Pick<CampaignEntity, "name" | "type" | "aliases" | "notes" 
 
 interface MentionTextProps {
   body: string;
-  /** id→entity lookup (from useCampaignEntities). */
   entities: Map<string, MentionEntity>;
   campaignId?: string | null;
   className?: string;

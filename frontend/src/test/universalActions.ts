@@ -56,8 +56,6 @@ export const SERVED_ACTIONS_2024: UniversalActionOption[] = [
   row("useObject", "Utilize", "action"),
 ];
 
-// Module-local: the per-edition consts are what tests import; this only backs
-// seedUniversalActions' default argument.
 const SERVED_ACTIONS: Record<RulesEdition, UniversalActionOption[]> = {
   EDITION_2014: SERVED_ACTIONS_2014,
   EDITION_2024: SERVED_ACTIONS_2024,

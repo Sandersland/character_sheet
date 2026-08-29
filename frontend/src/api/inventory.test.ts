@@ -3,8 +3,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { applyInventoryTransactions } from "@/api/inventory";
 import type { InventoryOperation } from "@/types/character";
 
-// Verbatim regression pin from client.test.ts (#1270) — assertions unchanged,
-// only the import specifier retargeted.
 describe("applyInventoryTransactions", () => {
   afterEach(() => {
     vi.unstubAllGlobals();

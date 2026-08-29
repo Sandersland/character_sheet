@@ -91,18 +91,14 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
 }
 
 const rogue = makeClass();
-// #1513: spellbookSize marks the Wizard's split — its 6-spell spellbook (spells)
-// differs from its 4-spell prepared cap (never served on ClassOption).
+// spellbookSize marks the Wizard's split — its 6-spell spellbook (spells) differs from its 4-spell prepared cap (never served on ClassOption).
 const wizard = makeClass({
   name: "Wizard",
   level1SpellPicks: { cantrips: 3, spells: 6, maxSpellLevel: 1, spellbookSize: 6 },
 });
-// #1510 AC-7: a 2014 Ranger IS spellcasting-flagged (unlike rogue above) but
-// has no Spellcasting feature until level 2, so the served level1SpellPicks is
-// null for a different reason — the step must still be omitted either way.
+// A 2014 Ranger is spellcasting-flagged but has no Spellcasting feature until level 2, so level1SpellPicks is null for a different reason than a genuine non-caster.
 const ranger2014 = makeClass({ name: "Ranger", isSpellcaster: true, level1SpellPicks: null });
-// #1510 AC-8 (gate half): a 2014 Cleric/Druid-shaped class — cantrips-only,
-// zero level-1 spells to choose (no creation-time list exists in SRD 5.1).
+// A 2014 Cleric/Druid-shaped class is cantrips-only — SRD 5.1 offers no creation-time leveled-spell list.
 const cleric2014 = makeClass({
   name: "Cleric",
   isSpellcaster: true,
@@ -121,9 +117,6 @@ const specBackground = {
   startingEquipment: null,
 };
 
-// Variantless (2014 Human-shaped) species fixture — the identity step's
-// generic "a species is chosen" tests use this so they don't also have to
-// carry a variant pick.
 const elfSpecies: SpeciesOption = {
   id: "sp-elf",
   name: "Elf",
@@ -135,8 +128,6 @@ const elfSpecies: SpeciesOption = {
   chooseCantrip: null, chooseOriginFeat: false,
   variants: [],
 };
-// Variant-bearing (2014 Dwarf-shaped) species fixture for the #1680
-// variant-required gate.
 const dwarfSpecies: SpeciesOption = {
   id: "sp-dwarf",
   name: "Dwarf",
@@ -162,8 +153,6 @@ function sel(overrides: Partial<CreationSelections> = {}): CreationSelections {
   return { species: undefined, variant: undefined, class: undefined, background: undefined, ...overrides };
 }
 
-// #1683: a 2024 Elf-shaped species with a spell-granting lineage (Drow) —
-// the identity step's casting-ability gate fixture.
 const drowLineageElf: SpeciesOption = {
   id: "sp-elf-2024",
   name: "Elf",
@@ -180,9 +169,7 @@ const drowLineageElf: SpeciesOption = {
   }],
 };
 
-// #1681: Half-Elf-shape species fixture (fixed +2 CHA + choose 2 of 5 at +1) —
-// the one shape that actually gates the abilities step (a fixed-only species
-// never does, per deriveSpeciesBonuses.complete).
+// A fixed-only species never gates the abilities step (per deriveSpeciesBonuses.complete) — this fixture's choose-2-of-5 spread does.
 const halfElfSpecies: SpeciesOption = {
   id: "sp-half-elf",
   name: "Half-Elf",
@@ -193,15 +180,11 @@ const halfElfSpecies: SpeciesOption = {
     { choose: { count: 2, amount: 1, from: ["strength", "dexterity", "constitution", "intelligence", "wisdom"] } },
   ],
   needsCastingAbility: false,
-  // #1689: Skill Versatility — used by the "skills" step's own missing-gate tests below.
   chooseSkills: { count: 2 },
   chooseCantrip: null, chooseOriginFeat: false,
   variants: [],
 };
 
-// #1758: Astral Elf-shape species — a variant carrying a floating spread that
-// REPLACES the base Elf's +2 DEX. Gates the abilities step until assigned, the
-// same as Half-Elf's choose above.
 const astralElfSpecies: SpeciesOption = {
   id: "sp-elf-astral",
   name: "Elf",
@@ -222,8 +205,6 @@ const astralElfSpecies: SpeciesOption = {
   ],
 };
 
-// #1689: Elf-shape species with a High Elf variant carrying chooseCantrip —
-// used by the "spells" step's own inclusion + missing-gate tests below.
 const highElfSpecies: SpeciesOption = {
   id: "sp-elf2",
   name: "Elf",
@@ -245,8 +226,6 @@ const highElfSpecies: SpeciesOption = {
       chooseCantrip: { list: "wizard", castingAbility: "intelligence" },
       chooseOriginFeat: false,
     },
-    // #1756: Astral Elf — a named-spells chooseCantrip with NO fixed ability, so
-    // it ALSO gates the identity step on a casting-ability pick.
     {
       id: "var-astral",
       name: "Astral Elf",
@@ -263,8 +242,6 @@ const highElfSpecies: SpeciesOption = {
 const highElfVariant = highElfSpecies.variants[0];
 const astralElfVariant = highElfSpecies.variants[1];
 
-// #1690: 2024 Human-shape species fixture carrying chooseOriginFeat — used by
-// the "skills" step's own missing-gate tests below, alongside halfElfSpecies.
 const humanSpecies2024: SpeciesOption = {
   id: "sp-human2024",
   name: "Human",
@@ -301,9 +278,6 @@ describe("creationSteps", () => {
     expect(creationSteps(sel())).toEqual(["identity", "abilities", "skills", "equipment", "review"]);
   });
 
-  // #1510 AC-7: null removes the step regardless of WHY it's null — a
-  // spellcasting-flagged class below its edition's spellcastingStartLevel
-  // (2014 Ranger) is excluded the same as a genuine non-caster (rogue above).
   it("excludes the spells step for a 2014 Ranger (level1SpellPicks: null pre-level-2)", () => {
     expect(creationSteps(sel({ class: ranger2014 }))).toEqual([
       "identity",
@@ -314,8 +288,6 @@ describe("creationSteps", () => {
     ]);
   });
 
-  // #1689: a species cantrip choice (High Elf) includes the step even for a
-  // non-caster class — the mechanism is independent of the class's own picks.
   it("includes the spells step for a non-caster class when the species serves a chooseCantrip spec", () => {
     expect(creationSteps(sel({ class: rogue, species: highElfSpecies, variant: highElfVariant }))).toEqual([
       "identity",
@@ -373,8 +345,6 @@ describe("creationStepMissing", () => {
     expect(creationStepMissing("identity", draft, sel({ class: rogue, species: elfSpecies }))).toEqual(["Background"]);
   });
 
-  // #1680: a variant-bearing species (2014 Dwarf) cannot Continue without a
-  // variant chosen; picking one clears the step.
   it("identity blocks a variant-bearing species with no variant, and clears once one is chosen", () => {
     const draft = makeDraft({
       name: "A",
@@ -395,7 +365,6 @@ describe("creationStepMissing", () => {
     ).toEqual([]);
   });
 
-  // A variantless species (2014 Human-shaped) never asks for a variant.
   it("identity never gates a variantless species on a variant", () => {
     const draft = makeDraft({
       name: "A",
@@ -407,9 +376,6 @@ describe("creationStepMissing", () => {
     expect(creationStepMissing("identity", draft, sel({ class: rogue, species: elfSpecies }))).toEqual([]);
   });
 
-  // #1683: a spell-granting lineage (Drow) blocks Continue without a chosen
-  // casting ability; picking one clears the step. Gated in the IDENTITY step
-  // (not abilities) — the choice is made when the lineage is picked.
   it("identity blocks a spell-granting variant with no castingAbility, and clears once one is chosen", () => {
     const draft = makeDraft({
       name: "A",
@@ -426,8 +392,6 @@ describe("creationStepMissing", () => {
     expect(creationStepMissing("identity", withChoice, selection)).toEqual([]);
   });
 
-  // #1756: Astral Elf's open-ability chooseCantrip gates the identity step the
-  // same way a spell-granting lineage does — needsCastingAbility drives both.
   it("identity blocks an Astral Elf draft with no castingAbility, and clears once one is chosen", () => {
     const draft = makeDraft({
       name: "A",
@@ -467,7 +431,6 @@ describe("creationStepMissing", () => {
     const complete = makeDraft({ background: "Criminal", backgroundAbilities: { dexterity: 2, intelligence: 1 } });
     expect(creationStepMissing("abilities", complete, sel({ background: specBackground }))).toEqual([]);
 
-    // Spec-less / inert background never gates abilities.
     expect(creationStepMissing("abilities", makeDraft(), sel())).toEqual([]);
   });
 
@@ -480,7 +443,6 @@ describe("creationStepMissing", () => {
     const complete = makeDraft({ speciesId: "sp-half-elf", speciesAbilities: { strength: 1, dexterity: 1 } });
     expect(creationStepMissing("abilities", complete, sel({ species: halfElfSpecies }))).toEqual([]);
 
-    // A fixed-only (or unmatched) species never gates abilities.
     expect(creationStepMissing("abilities", makeDraft(), sel())).toEqual([]);
   });
 
@@ -489,7 +451,6 @@ describe("creationStepMissing", () => {
     const unassigned = makeDraft({ speciesId: "sp-elf-astral", variantId: "var-astral" });
     expect(creationStepMissing("abilities", unassigned, selection)).toEqual(["Species ability scores"]);
 
-    // An illegal shape (+1/+1 only) still gates.
     const illegal = makeDraft({ speciesId: "sp-elf-astral", variantId: "var-astral", speciesAbilities: { dexterity: 1, wisdom: 1 } });
     expect(creationStepMissing("abilities", illegal, selection)).toEqual(["Species ability scores"]);
 
@@ -538,7 +499,6 @@ describe("creationStepMissing", () => {
     expect(creationStepMissing("review", makeDraft(), sel({ class: rogue }))).toEqual([]);
   });
 
-  // #1689: Half-Elf's Skill Versatility — the "skills" step's own gate.
   it("skills gates an incomplete species skill choice (Half-Elf) and clears once satisfied", () => {
     const incomplete = makeDraft({ className: "Rogue", speciesId: "sp-half-elf", speciesSkills: ["stealth"] });
     expect(creationStepMissing("skills", incomplete, sel({ class: rogue, species: halfElfSpecies }))).toEqual([
@@ -548,9 +508,6 @@ describe("creationStepMissing", () => {
     expect(creationStepMissing("skills", complete, sel({ class: rogue, species: halfElfSpecies }))).toEqual([]);
   });
 
-  // #1690: 2024 Human's Versatile — the "skills" step's own gate, alongside
-  // (and independent of) the skill-choice gate above; both apply at once for
-  // a 2024 Human (Skillful AND Versatile).
   it("skills gates an incomplete species Origin feat choice (2024 Human) and clears once satisfied", () => {
     const incomplete = makeDraft({ className: "Rogue", speciesId: "sp-human2024", speciesSkills: ["stealth"] });
     expect(creationStepMissing("skills", incomplete, sel({ class: rogue, species: humanSpecies2024 }))).toEqual([
@@ -573,16 +530,11 @@ describe("creationStepMissing", () => {
     ]);
   });
 
-  // #1510 AC-8 (gate half): a 2014 Cleric/Druid needs 0 spellIds — the
-  // Continue gate must clear on 3 chosen cantrips alone, never asking for a
-  // spell pick that SRD 5.1 never offers.
   it("spells clears with 3 cantrips and no spells for a 2014 Cleric/Druid-shaped class", () => {
     const draft = makeDraft({ className: "Cleric", cantripIds: ["c1", "c2", "c3"], spellIds: [] });
     expect(creationStepMissing("spells", draft, sel({ class: cleric2014 }))).toEqual([]);
   });
 
-  // #1689: High Elf's Cantrip — independent of the class's own picks; a
-  // non-caster class reaches this step gated solely by the species choice.
   it("spells gates an incomplete species cantrip choice (High Elf) for a non-caster class", () => {
     const missing = makeDraft({ className: "Rogue", speciesId: "sp-elf2", variantId: "var-high" });
     expect(creationStepMissing("spells", missing, sel({ class: rogue, species: highElfSpecies, variant: highElfVariant }))).toEqual([
@@ -592,8 +544,6 @@ describe("creationStepMissing", () => {
     expect(creationStepMissing("spells", complete, sel({ class: rogue, species: highElfSpecies, variant: highElfVariant }))).toEqual([]);
   });
 
-  // #1756: Astral Fire — same spells-step gate as High Elf, driven by the
-  // named-spells chooseCantrip spec rather than a class list.
   it("spells gates an incomplete species cantrip choice (Astral Elf) until one is picked", () => {
     const missing = makeDraft({ className: "Rogue", speciesId: "sp-elf2", variantId: "var-astral" });
     expect(creationStepMissing("spells", missing, sel({ class: rogue, species: highElfSpecies, variant: astralElfVariant }))).toEqual([
@@ -612,15 +562,12 @@ describe("creationStepMissing", () => {
       ['Equipment: choose "Weapon"'],
     );
 
-    // Untouched (null) draft starts with no inventory — nothing gated.
     const untouched = makeDraft({ className: "Rogue" });
     expect(
       creationStepMissing("equipment", untouched, sel({ class: makeClass({ startingEquipment: PACKAGE }) })),
     ).toEqual([]);
   });
 
-  // #1565: the background's own package rides the SAME "equipment" step —
-  // its missing-labels must show up here too, not just the class's.
   it("equipment also gates a started-but-incomplete BACKGROUND package", () => {
     const started = makeDraft({
       className: "Rogue",
@@ -632,7 +579,6 @@ describe("creationStepMissing", () => {
       creationStepMissing("equipment", started, sel({ class: rogue, background: backgroundWithPackage })),
     ).toEqual(['Background equipment: choose "Weapon"']);
 
-    // Untouched (null) background draft — nothing gated, same as the class's own.
     const untouched = makeDraft({ className: "Rogue", background: "Criminal" });
     expect(
       creationStepMissing("equipment", untouched, sel({ class: rogue, background: backgroundWithPackage })),
@@ -688,7 +634,6 @@ describe("creationMissing", () => {
     const incomplete = makeDraft({ ...caster, cantripIds: ["c1"], spellIds: [] });
     expect(creationMissing(incomplete, sel({ class: wizard, species: elfSpecies }))).toEqual(["Cantrips: choose 3", "Spells: choose 6"]);
 
-    // #1513: a complete Wizard book needs 6 leveled picks, not 4.
     const complete = makeDraft({
       ...caster,
       cantripIds: ["c1", "c2", "c3"],

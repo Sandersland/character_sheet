@@ -4,16 +4,6 @@ import { Eye } from "@/components/ui/icons";
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import type { SpeciesTrait } from "@/types/character";
 
-/**
- * Species-granted information (#1682) — the sheet's new domain component for
- * `character.speciesTraits` (name + cited text, server-resolved, no rule
- * arithmetic here — CLAUDE.md: the frontend never originates a rule). Darkvision
- * renders in its own accented row above the rest (owner ruling 2026-08-03:
- * visible information, not a derived combat stat, but still prominent) —
- * everything else is a plain name/description list, ordered exactly as served.
- * Renders nothing for a legacy `race`-name-only character with no species
- * picked yet (speciesTraits: []) — the species picker itself ships in #1680.
- */
 export default function SpeciesTraitsCard() {
   const { character } = useCurrentCharacter();
   const traits = character.speciesTraits;
@@ -38,9 +28,6 @@ export default function SpeciesTraitsCard() {
   );
 }
 
-// Darkvision gets its own accented row (amber, matching ConditionRollBanner's
-// "say the fact once, prominently" treatment) rather than blending into the
-// plain trait list below — the owner asked for it visible, not buried.
 function DarkvisionRow({ trait }: { trait: SpeciesTrait }) {
   return (
     <GoldWarningBox variant="row" icon={<Eye className="h-3.5 w-3.5" />}>

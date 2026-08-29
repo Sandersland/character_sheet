@@ -79,12 +79,11 @@ export interface CharacterCreation {
    *  generic "check the form" — by the time save() can run, the form IS valid. */
   submitError: string | null;
   save: () => Promise<void>;
-  /** The ceremony walk (#1176) — spells step only for a level-1 caster. */
+  /** Spells step included only for a level-1 caster. */
   steps: CreationStepKey[];
   stepIndex: number;
   currentStep: CreationStepKey;
   isLast: boolean;
-  /** Whether the current step's own gate is satisfied. */
   canContinue: boolean;
   next: () => void;
   back: () => void;
@@ -92,8 +91,6 @@ export interface CharacterCreation {
   cancel: () => void;
 }
 
-// Orchestrates the character-creation form: draft state, reference-driven
-// derivations (in characterCreation), validation gating, and submit.
 export function useCharacterCreation(): CharacterCreation {
   const navigate = useNavigate();
   const { draft, update, clear: clearDraft } = useCharacterDraft();
@@ -149,8 +146,6 @@ export function useCharacterCreation(): CharacterCreation {
     }
   }
 
-  // #1689: same add/remove-respecting-the-cap shape as toggleSkill above, over
-  // its own draft.speciesSkills field.
   function toggleSpeciesSkill(skill: SkillName) {
     if (speciesSkillChoice.selected.includes(skill)) {
       update({ speciesSkills: draft.speciesSkills.filter((s) => s !== skill) });

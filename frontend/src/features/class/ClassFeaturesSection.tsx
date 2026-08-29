@@ -1,7 +1,3 @@
-// ClassFeaturesSection — orchestrator for class feature interaction on the sheet.
-// Owns busy/error via useClassTransactions, derives its view via deriveClassFeatureView,
-// and composes per-feature subcomponents. Mirrors SpellsSection's orchestrator/row split.
-
 import { applyAdvancementTransactions, applyClassTransactions } from "@/api/client";
 import type { ClassOption } from "@/types/character";
 import { deriveClassFeatureView, resolveClassDef } from "@/lib/classFeatures";
@@ -32,7 +28,7 @@ export default function ClassFeaturesSection({ referenceClasses }: Props) {
 
       <ClassRosterSection rosterEntries={view.rosterEntries} />
 
-      {/* One SubclassSection per roster entry; each renders null when the entry has no subclass state. */}
+      
       {view.rosterEntries.map((entry) => (
         <SubclassSection
           key={entry.id}

@@ -1,13 +1,4 @@
-/**
- * useShadowArtsCatalog — fetches the edition-scoped Shadow Arts catalog for
- * ShadowArtsSection (#1738), split out of the component so its own
- * StrictMode-safe fetch-guard effect doesn't inflate ShadowArtsSection's
- * complexity score. The catalog is edition-scoped server-side (#1412), so the
- * edition belongs in the deps — Character.rulesEdition is write-once, so in
- * practice this never re-fires on its own; `retry` is the other trigger, for
- * a transient fetch failure (a page reload should not be the only recovery).
- */
-
+// The catalog is edition-scoped server-side (#1412), so rulesEdition belongs in the effect deps.
 import { useCallback, useEffect, useState } from "react";
 
 import type { RulesEdition } from "@character-sheet/shared-types";

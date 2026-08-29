@@ -89,8 +89,7 @@ describe("rarityValueHint", () => {
     expect(rarityValueHint("VERY_RARE", [])).toBeNull();
   });
 
-  // "Priceless" is presentation, not a served value — it holds even before the
-  // rows land, because ARTIFACT's standardValueGp is null either way.
+  // "Priceless" is presentation, not a served value — ARTIFACT's standardValueGp is null either way, so it holds even before rows land.
   it("still shows Priceless for Artifact with no served rows", () => {
     expect(rarityValueHint("ARTIFACT", [])).toBe("Priceless");
   });

@@ -1,16 +1,5 @@
-/**
- * OptionCard — the rich option cards inside the TurnHub picker sheets.
- *
- * Three variants:
- *   row  — full-width card: icon tile · bold title + one-line subtitle · right Badge.
- *   half — compact half-width card for a `grid grid-cols-2` pair (Dash / Dodge).
- *   tile — vertical compact tile for the "More actions" disclosure grid.
- *
- * `ariaLabel` defaults to the bare title so tests and assistive tech address
- * options by name regardless of subtitle/badge content. Session-scoped on
- * purpose (like TurnSlotCard) — the tone palette and variants exist solely
- * for the turn pickers.
- */
+// ariaLabel defaults to the bare title so tests and assistive tech address
+// options by name regardless of subtitle/badge content.
 
 import Badge, { type BadgeTone } from "@/components/ui/Badge";
 
@@ -51,23 +40,17 @@ const OPTION_TONES: Record<OptionTone, { border: string; tile: string; hover: st
 interface OptionCardProps {
   icon: OptionIcon;
   title: string;
-  /** One-line muted context (weapon summary, spell effect, "Just mark it used"). */
   subtitle?: string;
-  /** Right-aligned cost/uses badge ("×2", "1 / rest", "L1 slot", "free"). */
   badge?: string;
-  /** Defaults to the card tone (neutral badge on a neutral card, etc.). */
   badgeTone?: BadgeTone;
   tone?: OptionTone;
   variant?: "row" | "half" | "tile";
   disabled?: boolean;
-  /** Shown as the button title (hover/long-press) when disabled. */
   disabledReason?: string;
   onClick: () => void;
-  /** Accessible name — defaults to the bare title. */
   ariaLabel?: string;
 }
 
-/** Vertical compact tile for the "More actions" 3-col grid. */
 function OptionTile({
   icon: Icon,
   title,

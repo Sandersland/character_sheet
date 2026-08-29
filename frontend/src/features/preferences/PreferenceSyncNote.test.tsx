@@ -5,9 +5,6 @@ import { act, render, screen } from "@testing-library/react";
 import PreferenceSyncNote from "@/features/preferences/PreferenceSyncNote";
 import { PreferencesContext, PREFERENCE_SYNC_ERROR, type PreferenceSyncState } from "@/hooks/usePreferencesSync";
 
-// Stands in for PreferencesProvider with a hand-built sync state — unit tests
-// of the note alone, not the provider's own write path (that's
-// PreferencesProvider.test.tsx).
 function renderNote(
   preferenceKey: "theme" | "diceRollStyle",
   sync: PreferenceSyncState,
@@ -80,10 +77,7 @@ describe("PreferenceSyncNote", () => {
   });
 
   describe("retry (#1365 chunk 4)", () => {
-    // Native click via act(), not userEvent: this file runs under fake timers
-    // (needed for the Saving-hint-delay tests above), and userEvent's own
-    // internal delays would need advanceTimers bridging that isn't worth it
-    // for a single synchronous click — see the plan's explicit fake-timers note.
+    // Native click via act(), not userEvent — this file runs under fake timers, and userEvent's own delays would need timer bridging not worth it for a single synchronous click.
     it("renders a Retry button that calls the error's retry closure", () => {
       const retry = vi.fn();
       renderNote("theme", errorState(retry));

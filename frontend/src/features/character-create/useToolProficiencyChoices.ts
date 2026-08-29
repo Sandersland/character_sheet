@@ -8,9 +8,6 @@ interface ToolProficiencyChoicesArgs {
   update: (patch: Partial<CharacterDraft>) => void;
 }
 
-/** One independent tool-choice pick group — the class's own pool/cap, or
- *  (#1779) the background's own, rendered as its own labeled group rather
- *  than merged into one pool (settled in #1779: separate 5e quotas). */
 export interface ToolChoiceGroup {
   label: string;
   options: string[];
@@ -25,10 +22,6 @@ export interface ToolProficiencyChoices {
   backgroundChoices: ToolChoiceGroup;
 }
 
-// Granted = fixed from background/class (read-only); choices = player-selectable,
-// each source's own pool up to its own cap. No species/race source: the flat
-// Race model never actually seeded a toolProficiencies row (confirmed empty,
-// #1684) and no species-granted tool-proficiency mechanism exists yet either.
 export function useToolProficiencyChoices({
   draft,
   selectedClass,
@@ -56,8 +49,6 @@ export function useToolProficiencyChoices({
     }
   }
 
-  // #1779: the background's own pool/cap — inert (no options, no cap) for a
-  // custom background, same rule grantedToolProfs already applies above.
   const backgroundOptions = draft.useCustomBackground
     ? []
     : (selectedBackground?.toolChoices ?? []).filter((name) => !grantedToolProfs.includes(name));

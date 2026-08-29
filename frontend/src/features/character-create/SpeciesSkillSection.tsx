@@ -1,8 +1,3 @@
-// #1689: the species-granted skill choice (Half-Elf's Skill Versatility) —
-// driven purely by the served spec (CreationSpeciesSkillChoice.applicable);
-// renders nothing when the server serves no chooseSkills for the chosen
-// species+variant (every 2024 species, a fixed-only 2014 one). Mirrors
-// SkillSection's own checkbox-grid shape, sibling section on the same step.
 import Card from "@/components/ui/Card";
 import { skillLabel } from "@/lib/abilities";
 import type { CreationSpeciesSkillChoice } from "@/lib/characterCreation";

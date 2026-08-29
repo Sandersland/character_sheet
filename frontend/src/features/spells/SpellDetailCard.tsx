@@ -1,7 +1,4 @@
-// The "big spell card" for the shared spell picker (#1160): the full description,
-// a stat grid, and a what-to-expect line, presented in the responsive BottomSheet
-// (mobile sheet / desktop dialog) with a single CTA. The spell prop is a
-// structural SpellDetailView so both CatalogSpell and the sheet's Spell satisfy it.
+// SpellDetailView is a structural type so both CatalogSpell and the sheet's Spell satisfy it without conversion.
 import type { ReactNode } from "react";
 
 import BottomSheet from "@/components/ui/BottomSheet";
@@ -49,8 +46,6 @@ function StatCell({ label, value }: { label: string; value: string }) {
   );
 }
 
-// The what-to-expect line: the effect (damage/heal) tinted to its type, plus the
-// save-vs-attack resolution — the same detail the in-session cast surface shows.
 function ExpectChips({ spell }: { spell: SpellDetailView }) {
   const effect = effectPillLabel(spell);
   const effectTint = spell.effectKind === "heal" ? "bg-vitality-100 text-vitality-800" : damagePillClass(spell.damageType);
@@ -76,8 +71,6 @@ export default function SpellDetailCard({
   spell: SpellDetailView;
   cta: CtaSlot;
   onClose: () => void;
-  /** Extra controls between the description and the CTA (e.g. the in-session
-   *  cast sheet's upcast slot picker, #1163) — omitted by the plain picker use. */
   belowDescription?: ReactNode;
 }) {
   const upcast = upcastHint(spell);

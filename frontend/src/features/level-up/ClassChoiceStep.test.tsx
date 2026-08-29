@@ -21,8 +21,6 @@ const EXISTING_ONLY_OPTIONS: ClassChoiceOption[] = [
   { target: { kind: "existing", classEntryId: "entry-1" }, name: "Fighter", levelLine: "Level 5 → 6", eligible: true },
 ];
 
-// A disabled option sandwiched between two enabled ones, so skip-over and
-// wrap are distinguishable in the arrow-navigation tests (#1324).
 const KEYBOARD_OPTIONS: ClassChoiceOption[] = [
   { target: { kind: "existing", classEntryId: "entry-1" }, name: "Fighter", levelLine: "Level 5 → 6", eligible: true },
   { target: { kind: "new", classId: "cls-rogue" }, name: "Rogue", levelLine: "New class — Level 1", eligible: true },
@@ -102,8 +100,6 @@ describe("ClassChoiceStep", () => {
     await user.click(screen.getByRole("radio", { name: "Rogue" }));
     expect(screen.getByRole("button", { name: /continue/i })).toBeEnabled();
 
-    // Back in the top view the Rogue pick isn't on screen, so Continue can't
-    // silently submit it — the enabled state must track the visible selection.
     await user.click(screen.getByRole("button", { name: /back to class selection/i }));
     expect(screen.getByRole("button", { name: /continue/i })).toBeDisabled();
   });
@@ -117,11 +113,9 @@ describe("ClassChoiceStep", () => {
     await user.click(screen.getByRole("radio", { name: "Fighter" }));
     expect(screen.getByRole("button", { name: /continue/i })).toBeEnabled();
 
-    // Peeking into the drill-in gates Continue off (Fighter isn't shown there)…
     await user.click(screen.getByRole("button", { name: /new class/i }));
     expect(screen.getByRole("button", { name: /continue/i })).toBeDisabled();
 
-    // …and returning restores the Fighter selection rather than dropping it.
     await user.click(screen.getByRole("button", { name: /back to class selection/i }));
     expect(screen.getByRole("radio", { name: "Fighter" })).toHaveAttribute("aria-checked", "true");
     expect(screen.getByRole("button", { name: /continue/i })).toBeEnabled();
@@ -211,7 +205,6 @@ describe("ClassChoiceStep", () => {
         <ClassChoiceStep options={OPTIONS} initialTarget={null} onContinue={vi.fn()} onCancel={vi.fn()} />,
       );
       await user.click(screen.getByRole("button", { name: /new class/i }));
-      // Rogue (eligible) is first in the drill-in; Wizard (ineligible) is second.
       expect(screen.getByRole("radio", { name: "Rogue" })).toHaveAttribute("tabindex", "0");
       expect(screen.getByRole("radio", { name: "Wizard" })).toHaveAttribute("tabindex", "-1");
     });
@@ -222,7 +215,6 @@ describe("ClassChoiceStep", () => {
         <ClassChoiceStep options={KEYBOARD_OPTIONS} initialTarget={null} onContinue={vi.fn()} onCancel={vi.fn()} />,
       );
       await user.click(screen.getByRole("button", { name: /new class/i }));
-      // Drill-in order: Rogue (enabled), Wizard (disabled), Cleric (enabled).
       screen.getByRole("radio", { name: "Rogue" }).focus();
       await user.keyboard("{ArrowDown}");
       expect(screen.getByRole("radio", { name: "Cleric" })).toHaveFocus();

@@ -1,13 +1,3 @@
-/**
- * BonusActionSheetBody — the option-card list inside the Bonus Action sheet.
- *
- * Off-hand attack (when the loadout allows TWF), class bonus actions
- * (Second Wind, Rage, Cunning Action, …), each castable bonus-action spell as
- * its own card jumping straight into the cast flow, and the neutral
- * "Other bonus action" catch-all. A footer hint explains how to unlock the
- * off-hand attack when TWF is unavailable.
- */
-
 import {
   GiCrossedSwords,
   GiSpellBook,
@@ -34,7 +24,6 @@ export default function BonusActionSheetBody({
   handleFlurryAction: () => void;
   handleActionClick: (key: string, cost: "bonusAction") => void;
   handleBonusSpellCast: (spellId: string) => void;
-  /** "Other bonus action" — consume the slot and close the sheet. */
   onOther: () => void;
 }) {
   return (
@@ -54,9 +43,7 @@ export default function BonusActionSheetBody({
           key={option.key}
           option={option}
           busy={busy}
-          // Flurry needs its own dispatch path (arms the strike counter via
-          // enterFlurryMode, #1217) — every other class bonus action still
-          // goes through the generic handleActionClick.
+          // flurryOfBlows dispatches via handleFlurryAction, which arms enterFlurryMode's strike counter (#1217).
           onClick={
             option.key === "flurryOfBlows"
               ? handleFlurryAction

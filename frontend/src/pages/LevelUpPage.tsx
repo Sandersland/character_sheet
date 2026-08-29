@@ -1,7 +1,3 @@
-// Route: /characters/:id/level-up — the guided level-up ceremony (#886).
-// Load/guard shell on the JournalPage pattern; with nothing pending there is no
-// ceremony to run, so it bounces straight back to the sheet.
-
 import { Navigate, useParams } from "react-router-dom";
 
 import Spinner from "@/components/ui/Spinner";

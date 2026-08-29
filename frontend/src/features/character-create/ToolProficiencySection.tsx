@@ -6,9 +6,6 @@ type ToolProficiencySectionProps = Pick<
   "grantedToolProfs" | "classChoices" | "backgroundChoices"
 >;
 
-// #1779: class and background tool choices render as SEPARATE labeled groups
-// (independent 5e quotas, settled decision on #1779) rather than one merged
-// pool — each group is inert (renders nothing) when its own options are empty.
 function ToolChoiceGroupSection({ group }: { group: ToolChoiceGroup }) {
   if (group.options.length === 0) return null;
   return (

@@ -25,14 +25,6 @@ const inputClass =
   "rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1 text-sm";
 const labelClass = "flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600";
 
-/**
- * Inline panel (no modal/dialog component exists anywhere in this app —
- * AbilityAssignmentPanel's method-chip pattern is the precedent) for gaining a
- * new InventoryItem: either picked from the catalog or fully homebrew.
- * Both submit a single `acquire` operation; cost is just an optional field
- * (0 = free, matching the "Add vs Buy" merge) prefilled from the selected
- * catalog item's cost but always editable.
- */
 export default function AddItemPanel({ items, pending, onSubmit, onClose }: AddItemPanelProps) {
   const [tab, setTab] = useState<"catalog" | "custom">("catalog");
   const [quantity, setQuantity] = useState("1");

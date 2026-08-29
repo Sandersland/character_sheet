@@ -10,12 +10,7 @@ import * as client from "@/api/client";
 import type { Character, ConditionOption, ConditionsState } from "@/types/character";
 import type { RulesEdition } from "@character-sheet/shared-types";
 
-// Mock the API client — ConditionsStrip batches condition ops and swaps the
-// returned Character straight into the character query cache. fetchReference
-// must be present even though these tests seed the reference cache directly
-// (never call it) — ConditionsSheetBody's useReferenceData imports it from
-// this same barrel, and an omitted export here is `undefined`, which the
-// skipped-then-enabled query would call the moment a real edition arrives.
+// fetchReference must stay mocked here even though these tests never call it: useReferenceData imports it from this same barrel, and an omitted export is `undefined`, which the skipped-then-enabled query would call once a real edition arrives.
 vi.mock("@/api/client", () => ({
   applyConditionTransactions: vi.fn(),
   fetchReference: vi.fn(),
@@ -46,11 +41,7 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-// ConditionsStrip's nested ConditionsSheetBody reads useCurrentCharacter(), so
-// every render seeds the cache and mounts CurrentCharacterProvider. "rerender"
-// writes the new character straight into the cache — the same mechanism a
-// mutation's onSuccess uses in production — since the component no longer has
-// a prop to receive a fresh value through.
+// rerender writes the new character straight into the query cache, the same mechanism a mutation's onSuccess uses in production.
 function render(character: Character) {
   const result = renderWithCharacter(<ConditionsStrip />, character);
   return {
@@ -75,10 +66,8 @@ describe("ConditionsStrip", () => {
         exhaustion: 2,
       }),
     );
-    // Label, not the raw key.
     expect(screen.getByText("Poisoned")).toBeInTheDocument();
     expect(screen.queryByText("poisoned")).not.toBeInTheDocument();
-    // Exhaustion value rendered.
     expect(screen.getByText("2")).toBeInTheDocument();
   });
 
@@ -90,7 +79,6 @@ describe("ConditionsStrip", () => {
     render(makeCharacter({ active: [], exhaustion: 0 }));
 
     await user.click(screen.getByRole("button", { name: /add condition/i }));
-    // Picker is open; apply Prone.
     const proneRow = screen.getByText("Prone").closest("li")!;
     await user.click(within(proneRow).getByRole("button", { name: "Apply" }));
 
@@ -111,7 +99,6 @@ describe("ConditionsStrip", () => {
     const proneRow = screen.getByText("Prone").closest("li")!;
     await user.click(within(proneRow).getByRole("button", { name: "Apply" }));
 
-    // Source is trimmed and passed through.
     expect(mockApply).toHaveBeenCalledWith("char-1", [
       { type: "applyCondition", key: "prone", source: "Giant Spider" },
     ]);
@@ -171,11 +158,6 @@ describe("ConditionsStrip", () => {
     expect(screen.getByRole("button", { name: /increase exhaustion/i })).toBeDisabled();
   });
 
-  // #1322: a 2014-stamped character used to render exhaustionEffect(3)'s 2024
-  // text (a flat "−6 on d20 Tests…") regardless of edition — contradicting the
-  // Speed value and roll chips rendered right beside it. The sentence now
-  // comes off the wire (exhaustionEffectText), authored server-side beside the
-  // same numbers that drive Speed and rollModifiers.
   it("a 2014 character at exhaustion 3 sees 2014 text, not 2024's", () => {
     render(
       makeCharacter(
@@ -252,7 +234,6 @@ describe("ConditionsStrip", () => {
 
     await user.click(screen.getByRole("button", { name: /add condition/i }));
     expect(screen.queryByText("2014-only text that must never leak.")).not.toBeInTheDocument();
-    // Falls back to the edition-invariant label-only list — still lists Grappled.
     expect(screen.getByText("Grappled")).toBeInTheDocument();
   });
 

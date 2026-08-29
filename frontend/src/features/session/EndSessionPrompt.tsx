@@ -1,22 +1,10 @@
-/**
- * EndSessionPrompt — interruptive confirm dialog shown when ending a session.
- * Per the inline-vs-Modal rule this is a focused, blocking flow (not a row-bound
- * edit), so it uses the Modal primitive.
- *
- * It collects an OPTIONAL XP award for the session. On confirm the parent awards
- * the XP (tagged to the active session, so it flows into the recap's xpGained)
- * BEFORE ending the session. A blank / 0 amount ends cleanly with no award.
- */
-
 import { useState } from "react";
 
 import Modal from "@/components/ui/Modal";
 
 interface EndSessionPromptProps {
   busy: boolean;
-  /** Error from the last attempt, if any (e.g. endSession failed). */
   error?: string | null;
-  /** Confirm with the parsed XP amount (0 = skip / no award). */
   onConfirm: (xpAmount: number) => void;
   onCancel: () => void;
 }
@@ -29,7 +17,6 @@ export default function EndSessionPrompt({
 }: EndSessionPromptProps) {
   const [xp, setXp] = useState("");
 
-  // Empty input → 0 (skip). Only non-negative integers are awardable here.
   const parsed = xp.trim() === "" ? 0 : Number(xp);
   const valid = Number.isInteger(parsed) && parsed >= 0;
 

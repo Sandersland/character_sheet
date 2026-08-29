@@ -40,8 +40,7 @@ describe("derivePreparedSummary", () => {
     expect(derivePreparedSummary(sc({}))).toBeNull();
   });
 
-  // #1511 D2/D4: a 2014 known caster's limit is non-null too — casterModel is
-  // what forks the mechanic, not this null check — and the label is served.
+  // A 2014 known caster's limit is non-null too — casterModel forks the mechanic, not this null check; the label is served.
   it("reads the served label for a known caster", () => {
     const summary = derivePreparedSummary(
       sc({ preparedSpellLimit: 8, preparedSpellCount: 8, casterModel: "known", preparedLabel: "Spells known" }),

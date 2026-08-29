@@ -8,13 +8,11 @@ export interface AbilityScorePreview {
   after: number;
 }
 
-// Title-case abbreviation (e.g. "Cha") derived from abilityAbbr — never from the raw key.
 function abilityChipName(key: string): string {
   const abbr = abilityAbbr(key);
   return abbr[0] + abbr.slice(1).toLowerCase();
 }
 
-// Compact half-feat chip like "+1 Str, Dex or Con"; null for a full feat.
 export function featAbilityChipLabel(feat: CatalogFeat): string | null {
   if (feat.abilityOptions.length === 0) return null;
   const names = feat.abilityOptions.map(abilityChipName);
@@ -23,7 +21,6 @@ export function featAbilityChipLabel(feat: CatalogFeat): string | null {
   return `+${feat.abilityIncrease} ${joined}`;
 }
 
-// Ordered before/after previews for each ability a half-feat may bump.
 export function abilityScorePreviews(
   feat: CatalogFeat,
   currentScores: Record<string, number>,

@@ -12,14 +12,10 @@ interface InventoryMobileToolbarProps {
   onFilterChange: (filter: FilterKey) => void;
   view: "bag" | "worn";
   onViewChange: (view: "bag" | "worn") => void;
-  /** The slim encumbrance strip, rendered between the toolbar row and chips. */
   metersSlot: ReactNode;
-  /** Chips only apply to the Bag view. */
   showChips: boolean;
 }
 
-// Mobile Bag/Worn header: search + view toggle share one 44pt row, then the slim
-// encumbrance strip, then a single horizontally-scrolling filter-chip line (#1029).
 export default function InventoryMobileToolbar({
   search,
   onSearchChange,
@@ -32,7 +28,6 @@ export default function InventoryMobileToolbar({
 }: InventoryMobileToolbarProps) {
   const activeChip = useRef<HTMLButtonElement | null>(null);
 
-  // Keep the selected chip in view when the filter changes off-screen.
   useEffect(() => {
     activeChip.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [filter]);

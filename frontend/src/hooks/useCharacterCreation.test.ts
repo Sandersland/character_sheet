@@ -116,8 +116,6 @@ function seedDraft(overrides: Partial<CharacterDraft>) {
     equipmentDraft: null,
     backgroundEquipmentDraft: null,
     step: "identity",
-    // Every test here exercises post-gate ceremony behavior (#1286); the gate
-    // itself is CreationEntryGate.test.tsx's job.
     rulesEdition: "EDITION_2024",
     campaignId: null,
     campaignName: null,
@@ -269,12 +267,9 @@ describe("useCharacterCreation", () => {
     expect(navigate).toHaveBeenCalledWith("/characters/char-99", { replace: true });
     expect(result.current.submitError).toBeNull();
     expect(addCharacterToCampaign).not.toHaveBeenCalled();
-    // #1616: no staged portrait means no upload call at all.
     expect(uploadCharacterPortrait).not.toHaveBeenCalled();
   });
 
-  // #1616: the create payload no longer carries any portrait field — portraits
-  // are uploaded blobs, never client-supplied URLs.
   it("sends no portraitUrl in the create payload", async () => {
     seedDraft(validDraft());
     const { result } = await mount();
@@ -286,8 +281,6 @@ describe("useCharacterCreation", () => {
     expect("portraitUrl" in createCharacter.mock.calls[0][0]).toBe(false);
   });
 
-  // #1616: a staged portrait file is uploaded AFTER the character exists (and
-  // after the campaign attach), against the created id.
   it("uploads the staged portrait after create and attach, then navigates", async () => {
     seedDraft({ ...validDraft(), campaignId: "camp-1" });
     const { result } = await mount();
@@ -299,7 +292,6 @@ describe("useCharacterCreation", () => {
     });
 
     expect(uploadCharacterPortrait).toHaveBeenCalledWith("char-99", file);
-    // Sequencing: the upload ran after both create and attach.
     expect(uploadCharacterPortrait.mock.invocationCallOrder[0]).toBeGreaterThan(
       createCharacter.mock.invocationCallOrder[0],
     );
@@ -310,8 +302,6 @@ describe("useCharacterCreation", () => {
     expect(result.current.submitError).toBeNull();
   });
 
-  // The character exists by the time the upload can fail — the message must say
-  // so, and a retry must not re-create.
   it("an upload failure keeps the created character, surfaces a retryable error, and does not navigate", async () => {
     uploadCharacterPortrait
       .mockRejectedValueOnce(new Error("network down"))
@@ -332,7 +322,6 @@ describe("useCharacterCreation", () => {
     await act(async () => {
       await result.current.save();
     });
-    // Retry reuses the created id: no second create, one more upload.
     expect(createCharacter).toHaveBeenCalledTimes(1);
     expect(uploadCharacterPortrait).toHaveBeenCalledTimes(2);
     expect(navigate).toHaveBeenCalledWith("/characters/char-99", { replace: true });
@@ -397,8 +386,6 @@ describe("useCharacterCreation", () => {
     expect(navigate).toHaveBeenCalledWith("/characters/char-99", { replace: true });
   });
 
-  // #1286: the campaign-inherited flow is this issue's primary use case — pin
-  // that a resolved campaignId is actually acted on, not just carried in the draft.
   it("attaches the created character to the resolved campaign after a successful create", async () => {
     seedDraft({ ...validDraft(), campaignId: "camp-1" });
     const { result } = await mount();
@@ -412,9 +399,6 @@ describe("useCharacterCreation", () => {
     expect(result.current.submitError).toBeNull();
   });
 
-  // The create-then-attach split (#1286) is two network calls; a failure on the
-  // second must not orphan-and-duplicate: the character already exists, so a
-  // retry must attach it rather than calling createCharacter again.
   it("an attach failure after a successful create keeps the character and retries only the attach", async () => {
     addCharacterToCampaign.mockRejectedValueOnce(new Error("Campaign not found")).mockResolvedValueOnce({});
     seedDraft({ ...validDraft(), campaignId: "camp-1" });
@@ -431,19 +415,12 @@ describe("useCharacterCreation", () => {
     await act(async () => {
       await result.current.save();
     });
-    // Retry: the character from the first attempt is reused — no second create.
     expect(createCharacter).toHaveBeenCalledTimes(1);
     expect(addCharacterToCampaign).toHaveBeenCalledTimes(2);
     expect(addCharacterToCampaign).toHaveBeenLastCalledWith("char-99", "camp-1");
     expect(navigate).toHaveBeenCalledWith("/characters/char-99", { replace: true });
   });
 
-  // #1286: CharacterDraft (including campaignId) is persisted to localStorage,
-  // but a plain useState-held "pending created id" would NOT survive a page
-  // refresh — a remounted hook reads only what's in the draft, sees no id, and
-  // would call createCharacter again, orphaning the first character. This test
-  // exercises that exact sequence: unmount (tears down all React state, as a
-  // refresh would) then mount a brand-new hook instance before retrying.
   it("survives a refresh: a remounted hook resumes the pending created id instead of re-creating", async () => {
     addCharacterToCampaign.mockRejectedValueOnce(new Error("Campaign not found")).mockResolvedValueOnce({});
     seedDraft({ ...validDraft(), campaignId: "camp-1" });
@@ -455,8 +432,6 @@ describe("useCharacterCreation", () => {
     expect(createCharacter).toHaveBeenCalledTimes(1);
     expect(first.result.current.submitError).toMatch(/Campaign not found/);
 
-    // Simulate a refresh: the component tree — and any plain useState — is
-    // torn down. Only what useCharacterDraft persisted to localStorage survives.
     first.unmount();
 
     const second = await mount();
@@ -464,9 +439,6 @@ describe("useCharacterCreation", () => {
       await second.result.current.save();
     });
 
-    // Exactly one createCharacter across the whole sequence, spanning the
-    // "refresh" — the remount must resume the pending id, not create a second
-    // character.
     expect(createCharacter).toHaveBeenCalledTimes(1);
     expect(addCharacterToCampaign).toHaveBeenCalledTimes(2);
     expect(addCharacterToCampaign).toHaveBeenLastCalledWith("char-99", "camp-1");
@@ -490,12 +462,10 @@ describe("useCharacterCreation", () => {
     await act(async () => {
       await result.current.save();
     });
-    // A fresh create, not a retry of the abandoned attempt's id.
     expect(createCharacter).toHaveBeenCalledTimes(2);
     expect(navigate).toHaveBeenCalledWith("/characters/char-100", { replace: true });
   });
 
-  // #1131: a class switch invalidates the chosen spells (different list + counts).
   it("clears chosen spells when the class changes", async () => {
     seedDraft({ className: "Rogue", cantripIds: ["c1"], spellIds: ["s1"] });
     const { result } = await mount();
@@ -521,7 +491,6 @@ describe("useCharacterCreation", () => {
     expect(result.current.draft.spellIds).toEqual(["s1"]);
   });
 
-  // #1176: the ceremony walk.
   it("derives the walk steps, skipping spells for a non-caster", async () => {
     seedDraft({ className: "Rogue", background: "Sage" });
     const { result } = await mount();
@@ -582,15 +551,11 @@ describe("useCharacterCreation", () => {
     expect(result.current.currentStep).toBe("identity");
   });
 
-  // #1332: useCharacterCreation's item fetch reuses useItemCatalog, sharing
-  // catalogKeys.items() with every other /items reader
-  // (useCampaignItemsPanelController) — a second consumer mounted AFTER this
-  // one has already resolved must read the cache, not fetch again. Mounting
-  // both concurrently would pass even at staleTime: 0 (TanStack dedupes
-  // simultaneously in-flight requests to the same key regardless of
-  // staleTime), so the second mount happens only once the first has settled —
-  // and to a non-empty resolved value, so the waitFor actually waits for the
-  // fetch rather than matching the pre-resolution [] on tick 0.
+  // Mounted only after the first resolves, to a non-empty value: TanStack
+  // dedupes simultaneous in-flight requests to the same key regardless of
+  // staleTime, so mounting concurrently wouldn't prove the shared-cache read
+  // this test targets — useCampaignItemsPanelController shares the same
+  // catalogKeys.items() key.
   it("shares the item catalog cache with another /items consumer mounted after it resolves", async () => {
     const club: Item[] = [{ id: "i1", name: "Club", category: "weapon" } as Item];
     fetchItems.mockReset().mockResolvedValue(club);

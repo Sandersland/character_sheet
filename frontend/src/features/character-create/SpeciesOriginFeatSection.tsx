@@ -1,13 +1,4 @@
-// #1690: the species-granted Origin feat choice (2024 Human's Versatile) —
-// driven purely by the served spec (CreationSpeciesOriginFeatChoice.applicable);
-// renders nothing when the server serves no chooseOriginFeat for the chosen
-// species+variant. Reuses the SAME useFeatCatalog hook the level-up ASI/feat
-// picker uses (features/advancement/useFeatCatalog.ts) — the full edition
-// catalog (no asiLevel filter), narrowed to category:"origin" here in the
-// component: a UI-level filter of an already-resolved server field, not a
-// rule origination (the category itself, and "is this feat legal here" —
-// including the duplicate-vs-background check — are both decided server-side
-// by resolveSpeciesOriginFeatGrant, character-create.ts).
+// category:"origin" filters an already-resolved server field; resolveSpeciesOriginFeatGrant decides legality (including the duplicate-vs-background check) server-side, not this component.
 import Spinner from "@/components/ui/Spinner";
 import Card from "@/components/ui/Card";
 import { useFeatCatalog, type FeatCatalog } from "@/features/advancement/useFeatCatalog";
@@ -17,10 +8,7 @@ import type { RulesEdition } from "@character-sheet/shared-types";
 
 interface SpeciesOriginFeatSectionProps {
   choice: CreationSpeciesOriginFeatChoice;
-  /** RulesEdition | null mirrors CreationReviewStep's own draft.rulesEdition
-   *  prop — null only pre-CreationEntryGate, before ANY species spec (and so
-   *  `choice.applicable`) could ever resolve true, so the picker below never
-   *  actually renders with a null edition. */
+  // null only pre-CreationEntryGate; by the time choice.applicable can be true, edition is always resolved.
   edition: RulesEdition | null;
   onChange: (featId: string) => void;
 }
@@ -50,10 +38,6 @@ function OriginFeatRow({ feat, selected, onSelect }: { feat: CatalogFeat; select
   );
 }
 
-// Extracted from SpeciesOriginFeatPicker purely to keep that component's own
-// cyclomatic/cognitive complexity under the repo's health gate — same
-// reasoning as reference.ts's/character-create.ts's split-out helpers, and
-// FeatCatalogRows' own split out of FeatFlow's FeatCatalogList above.
 function OriginFeatRows({
   originFeats,
   selectedId,
@@ -77,9 +61,6 @@ function OriginFeatRows({
   );
 }
 
-// The catalog-state branches (loading/error/empty/list) as their own
-// component, split out for the same complexity-gate reason as OriginFeatRows
-// above — SpeciesOriginFeatPicker itself only wires the hook + Card chrome.
 function OriginFeatCatalogBody({
   feats,
   selectedId,
@@ -98,17 +79,13 @@ function OriginFeatCatalogBody({
   return <OriginFeatRows originFeats={originFeats} selectedId={selectedId} onChange={onChange} />;
 }
 
-// The `applicable` guard lives in the PARENT (below), not here — same "hooks
-// run unconditionally, fetch only once mounted" shape as CreationSpellsStep's
-// SpeciesCantripGate (#1778).
+// The applicable check lives in the parent below — hooks must run unconditionally, same shape as CreationSpellsStep's SpeciesCantripGate.
 function SpeciesOriginFeatPicker({
   choice,
   edition,
   onChange,
 }: SpeciesOriginFeatSectionProps) {
-  // Fallback is unreachable at runtime (see the prop's own comment) — kept only
-  // so useFeatCatalog's non-nullable signature is satisfied without an unsound
-  // non-null assertion at this call site.
+  // edition ?? "EDITION_2024" is unreachable at runtime; it only satisfies useFeatCatalog's non-nullable signature without an unsound assertion.
   const feats = useFeatCatalog(true, undefined, edition ?? "EDITION_2024");
 
   return (

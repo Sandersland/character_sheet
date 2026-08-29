@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import { weaponToResolution } from "@/lib/weaponToResolution";
 import type { AttackEntry } from "@/lib/attackMath";
 
-// Mirrors decorateWeaponRow's output shape (attackMath.ts) — a served weapon
-// row already carrying its decomposed to-hit/damage addends (#1235).
+// Mirrors decorateWeaponRow's served output shape — a weapon row already
+// carrying its decomposed to-hit/damage addends (#1235).
 const LONGBOW: AttackEntry = {
   id: "inv-1",
   name: "Longbow",

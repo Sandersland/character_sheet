@@ -10,7 +10,6 @@
 
 import type { AttackRow } from "@character-sheet/shared-types";
 
-/** One served row; `id`/`kind`/`name` are always the fixture's business. */
 export function attackRow(
   over: Partial<AttackRow> & Pick<AttackRow, "id" | "kind" | "name">,
 ): AttackRow {

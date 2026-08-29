@@ -25,12 +25,8 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-// The Codex item card: badges (rarity/attunement/unique), category-specific
-// mechanical detail (rows derived in itemDetailRows), description, and —
-// owner only — the DM's private notes.
 function ItemBadges({ item, rarities }: Pick<CampaignItemCardProps, "item" | "rarities">) {
-  // Null until the served rows land (#1437): the badge renders nothing rather
-  // than flashing the raw enum key on a cold Codex page.
+  // Null until the served rows land (#1437) — no raw enum key ever paints.
   const rarityText = item.rarity ? rarityLabel(item.rarity, rarities) : null;
   return (
     <div className="flex flex-wrap items-center gap-2">

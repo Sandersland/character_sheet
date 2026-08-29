@@ -11,8 +11,6 @@ const WARRIOR_OF_SHADOW_ACTION: AvailableAction = {
   reminder: "Magic action, entirely within dim light or darkness: spend 3 focus to become invisible…",
 };
 
-// #1738: the 2014 Way of Shadow row carries no resourceKey at all — enabled
-// is always true and disabledReason never appears.
 const WAY_OF_SHADOW_ACTION: AvailableAction = {
   key: "cloakOfShadows",
   name: "Cloak of Shadows",
@@ -64,9 +62,6 @@ describe("cloakOfShadowsView (#1738)", () => {
     expect(cloakOfShadowsView(makeCharacter(WARRIOR_OF_SHADOW_ACTION, [invisible])).isInvisible).toBe(true);
   });
 
-  // Regression: isInvisible must NOT fire for invisibility from a different
-  // source (e.g. the Invisibility spell) — only Cloak of Shadows' own
-  // condition entry should show the "active" banner and hide the cast button.
   it("does not report isInvisible for invisibility applied by a different source", () => {
     const invisibleFromSpell: ConditionEntry = { key: "invisible", source: "Invisibility", appliedAt: new Date().toISOString() };
     const view = cloakOfShadowsView(makeCharacter(WARRIOR_OF_SHADOW_ACTION, [invisibleFromSpell]));

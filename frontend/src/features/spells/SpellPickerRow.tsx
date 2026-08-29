@@ -1,7 +1,4 @@
-// One quiet spell row for the shared picker (#1160): the row body opens the big
-// SpellDetailCard; a tri-state pill on the right toggles the pick directly. The
-// two are siblings (never nested buttons) so both stay valid, keyboard-reachable
-// controls.
+// The row-open button and the toggle pill are sibling buttons, never nested, so both stay keyboard-reachable.
 import { damagePillClass, schoolInk, schoolRibbon } from "@/lib/spellFlavor";
 import { schoolLabel } from "@/lib/spellMeta";
 import { effectPillLabel, pickerMetaLine, type SpellPickRowState } from "@/lib/spellPickerView";

@@ -28,8 +28,7 @@ describe("buildResolveActionOp", () => {
     });
   });
 
-  // #1831 review comment 1: the op's ResolveActionEventCost.kind is "bonus",
-  // not "bonusAction" — TurnResolutionCost keeps the useTurnState spelling.
+  // ResolveActionEventCost.kind spells it "bonus"; TurnResolutionCost keeps the useTurnState spelling "bonusAction".
   it("maps cost.kind bonusAction → bonus", () => {
     const resolution: TurnResolution = { source: "Off-hand Dagger", cost: { kind: "bonusAction" } };
 
@@ -61,7 +60,6 @@ describe("buildResolveActionOp", () => {
     expect(buildResolveActionOp(resolution, rolls())).not.toHaveProperty("slotLevel");
   });
 
-  // #1843: typed damage riders — additive riders[] sibling to effect.
   describe("riders (#1843)", () => {
     const FIRE_RIDER: ResolveActionEventEffect = {
       spec: "2d6",
@@ -106,7 +104,6 @@ describe("buildResolveActionOp", () => {
     });
   });
 
-  // #1833: entryId/apply — the spell adapter's side-effect-preserving fields.
   describe("entryId/apply (#1833)", () => {
     it("carries entryId when the options supply it — omits it otherwise", () => {
       const resolution: TurnResolution = { source: "Cure Wounds", cost: { kind: "action" } };

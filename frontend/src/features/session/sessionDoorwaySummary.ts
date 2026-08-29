@@ -1,14 +1,4 @@
-// Pure summary model for the sheet's session doorway (#942) — the one
-// always-visible, state-aware session affordance. Mirrors the journal doorway
-// pattern (journalDoorwaySummary.ts): the SessionDoorway component is a dumb
-// renderer of what this distills. The doorway state arrives from
-// GET /api/characters/:id/sessions/doorway; this maps it to the four render
-// facts plus a dispatchable action.
-//
-// All five contract kinds are handled here so the client is complete before
-// scheduling (#951) starts emitting the scheduled kinds server-side. Today the
-// server only returns none/liveJoined/liveNotJoined; the scheduled branches are
-// exercised by unit tests against fixture states.
+// All five contract kinds are handled here already; the server only returns none/liveJoined/liveNotJoined today — scheduledUpcoming/earlyJoin are exercised by unit tests against fixture states until scheduling ships server-side.
 
 import type { SessionDoorwayState } from "@/types/character";
 
@@ -23,7 +13,6 @@ export interface SessionDoorwaySummary {
   visible: boolean;
   tone: DoorwayTone;
   label: string;
-  /** Secondary line (round, "Live now", schedule) — null when there's none. */
   sub: string | null;
   action: DoorwayAction;
 }
@@ -38,14 +27,12 @@ const HIDDEN: SessionDoorwaySummary = {
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
-/** Whole calendar days from `now` to `then` (both floored to local midnight). */
 function calendarDaysUntil(then: Date, now: Date): number {
   const a = new Date(then.getFullYear(), then.getMonth(), then.getDate()).getTime();
   const b = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   return Math.round((a - b) / 86_400_000);
 }
 
-/** "Fri 7:00 · in 2 days" — weekday + time + a calm relative phrase. */
 function formatSchedule(iso: string, now: Date): string {
   const when = new Date(iso);
   const time = `${when.getHours()}:${String(when.getMinutes()).padStart(2, "0")}`;
@@ -55,17 +42,12 @@ function formatSchedule(iso: string, now: Date): string {
   return `${WEEKDAYS[when.getDay()]} ${time} · ${relative}`;
 }
 
-/**
- * Distill the doorway state into what the bar renders. `now` is injectable so the
- * relative schedule phrasing is deterministic under test.
- */
+// `now` is injectable so the relative schedule phrasing is deterministic under test.
 export function summarizeSessionDoorway(
   state: SessionDoorwayState,
   now: Date = new Date(),
 ): SessionDoorwaySummary {
-  // A null campaignId is a solo character (#1082), not a hidden bar: it still
-  // gets Start (canStart) / Resume off the same kind switch — the only
-  // campaign-specific paths (join/schedule) are unreachable for it server-side.
+  // A null campaignId is a solo character, not a hidden bar — it still gets Start/Resume off the same kind switch; only the campaign-specific paths (join/schedule) are unreachable for it.
   const round = state.session?.round ?? null;
 
   switch (state.kind) {
@@ -88,7 +70,6 @@ export function summarizeSessionDoorway(
       const sub = state.session?.scheduledAt
         ? formatSchedule(state.session.scheduledAt, now)
         : null;
-      // DM (canStart) can start early; a player just sees the informational strip.
       return {
         visible: true,
         tone: "scheduled",
@@ -100,7 +81,6 @@ export function summarizeSessionDoorway(
 
     case "none":
     default:
-      // A member who can start gets the quiet invite; everyone else — nothing.
       return state.canStart
         ? { visible: true, tone: "invite", label: "Start session", sub: null, action: "start" }
         : HIDDEN;

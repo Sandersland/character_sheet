@@ -3,12 +3,6 @@ import { POINT_BUY_BUDGET, STANDARD_ARRAY, pointBuyCost, totalPointBuyCost } fro
 import type { AbilityMethod } from "@/hooks/useCharacterDraft";
 import type { AbilityName, AbilityScores } from "@/types/character";
 
-// Pure ability-assignment logic for the creation ability panel (#1161): the
-// point-buy budget maths, pool slot assignment, and the PHB'24 background spread
-// transitions — kept out of AbilityAssignmentPanel so it stays presentation-only.
-// The generation methods themselves (dice, standard array, cost table) still
-// live in abilityGen.
-
 export type AbilityAssignments = Record<AbilityName, number | null>;
 
 const POINT_BUY_FLOOR = 8;
@@ -23,12 +17,10 @@ export const EMPTY_ASSIGNMENTS: AbilityAssignments = {
   charisma: null,
 };
 
-/** Point-buy points left over `scores` (out of the 27-point budget). */
 export function remainingPoints(scores: AbilityScores): number {
   return POINT_BUY_BUDGET - totalPointBuyCost(Object.values(scores));
 }
 
-/** Whether `ability` can go up one point buy step (ceiling + budget gated). */
 export function canIncrement(scores: AbilityScores, ability: AbilityName): boolean {
   const current = scores[ability];
   if (current >= POINT_BUY_CEILING) return false;
@@ -36,12 +28,10 @@ export function canIncrement(scores: AbilityScores, ability: AbilityName): boole
   return stepCost <= remainingPoints(scores);
 }
 
-/** Whether `ability` can go down one point buy step (floor gated). */
 export function canDecrement(scores: AbilityScores, ability: AbilityName): boolean {
   return scores[ability] > POINT_BUY_FLOOR;
 }
 
-/** Applies a ±1 point-buy step; returns `scores` unchanged if the step is illegal. */
 export function adjustPointBuy(scores: AbilityScores, ability: AbilityName, delta: number): AbilityScores {
   const next = scores[ability] + delta;
   if (next < POINT_BUY_FLOOR || next > POINT_BUY_CEILING) return scores;
@@ -50,8 +40,6 @@ export function adjustPointBuy(scores: AbilityScores, ability: AbilityName, delt
   return candidate;
 }
 
-/** Assigns pool `slotIndex` to `ability`, stealing it from any prior owner and
- *  re-materializing the derived scores from the pool. */
 export function assignSlot(
   assignments: AbilityAssignments,
   scores: AbilityScores,
@@ -73,12 +61,10 @@ export function assignSlot(
   return { assignments: nextAssignments, scores: nextScores };
 }
 
-/** Clears the pool slot on a single ability, leaving the others untouched. */
 export function clearSlot(assignments: AbilityAssignments, ability: AbilityName): AbilityAssignments {
   return { ...assignments, [ability]: null };
 }
 
-/** Pool indices currently backing an ability. */
 export function usedSlotIndices(assignments: AbilityAssignments): Set<number> {
   const used = new Set<number>();
   for (const a of ABILITY_ORDER) {
@@ -96,7 +82,6 @@ export function spreadMode(assignment: Partial<Record<AbilityName, number>>): Sp
   return values.length === 3 && values.every((v) => v === 1) ? "oneOneOne" : "twoOne";
 }
 
-/** Sets the +2 ability, keeping an existing +1 (unless it's the new pick) and evicting the prior +2. */
 export function setPlusTwo(
   assignment: Partial<Record<AbilityName, number>>,
   abilities: AbilityName[],
@@ -106,7 +91,6 @@ export function setPlusTwo(
   return { [ability]: 2, ...(plusOne ? { [plusOne]: 1 } : {}) };
 }
 
-/** Sets the +1 ability, keeping an existing +2 (unless it's the new pick) and evicting the prior +1. */
 export function setPlusOne(
   assignment: Partial<Record<AbilityName, number>>,
   abilities: AbilityName[],
@@ -116,17 +100,14 @@ export function setPlusOne(
   return { ...(plusTwo ? { [plusTwo]: 2 } : {}), [ability]: 1 };
 }
 
-/** +1 to each of the background's three abilities. */
 export function toOneOneOne(abilities: AbilityName[]): Partial<Record<AbilityName, number>> {
   return Object.fromEntries(abilities.map((a) => [a, 1]));
 }
 
-/** The +2/+1 mode starts empty — the player picks each target. */
 export function toTwoOne(): Partial<Record<AbilityName, number>> {
   return {};
 }
 
-/** Pool + assignment + score defaults when the player switches to a method. */
 export function methodDefaults(method: AbilityMethod): {
   pool: number[] | null;
   assignments: AbilityAssignments;
@@ -149,19 +130,13 @@ export function methodDefaults(method: AbilityMethod): {
       },
     };
   }
-  // roll + manual both start with an empty, poolless slate.
   return { pool: null, assignments: EMPTY_ASSIGNMENTS };
 }
 
-/** A pool-backed method reads its base scores from assigned slots, not a stored score. */
 export function isPoolMethod(method: AbilityMethod): boolean {
   return method === "roll" || method === "standardArray";
 }
 
-/** Sums N partial ability→bump maps into one, adding (never overwriting) when
- *  the same ability appears in more than one map — the background spread and
- *  #1681's species increases can share an ability, though in practice they
- *  never both apply (opposite-edition mechanics). */
 export function sumBonusMaps(
   ...maps: Partial<Record<AbilityName, number>>[]
 ): Partial<Record<AbilityName, number>> {

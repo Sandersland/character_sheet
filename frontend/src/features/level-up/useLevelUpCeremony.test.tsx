@@ -24,8 +24,7 @@ const character = {
   abilityScores: { strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 },
 } as unknown as Character;
 
-// The hitPoints step arrives with its numbers already resolved (#1380);
-// this fixture is what the planner serves for a d10 class at Con 10.
+// #1380: this fixture is what the planner serves for a d10 class at Con 10.
 const HP_META = { die: "d10", faces: 10, conMod: 0, fixedAverage: 6, averageGain: 6, minRoll: 1, maxRoll: 10 };
 
 function plan(steps: LevelUpStep[], target?: Partial<LevelUpPlanResponse["target"]>): LevelUpPlanResponse {
@@ -102,7 +101,6 @@ describe("useLevelUpCeremony", () => {
     act(() => result.current.next());
     expect(result.current.currentStep?.kind).toBe("subclass");
 
-    // The subclass pick triggers a refetch that inserts new steps after it.
     planMock.mockResolvedValue(
       plan(
         [
@@ -141,9 +139,7 @@ describe("useLevelUpCeremony", () => {
     });
   });
 
-  // #1323: dependentPicksBySubclass is ceremony-local (the subclass re-pick
-  // stash, #1323) and must never reach the wire — the endpoint strips unknown
-  // keys silently (no 400), so this frontend assertion is the only guard.
+  // #1323: dependentPicksBySubclass must never reach the wire — the endpoint strips unknown keys silently (no 400), so this frontend assertion is the only guard.
   it("strips ceremony-local draft state from the submitted body (#1323)", async () => {
     planMock.mockResolvedValue(plan([{ kind: "hitPoints", meta: HP_META }, { kind: "review" }]));
     submitMock.mockResolvedValue({ id: "c1" } as Character);
@@ -160,8 +156,7 @@ describe("useLevelUpCeremony", () => {
     act(() => result.current.next());
     await act(() => result.current.confirm());
 
-    // Object.keys, not toHaveBeenCalledWith: vitest's argument matcher uses
-    // toEqual semantics, which treats a present-but-undefined key as absent.
+    // Object.keys, not toHaveBeenCalledWith: vitest's argument matcher uses toEqual semantics, treating a present-but-undefined key as absent.
     const body = submitMock.mock.calls[0][1];
     expect(Object.keys(body)).not.toContain("dependentPicksBySubclass");
     expect(body.maneuvers).toEqual([{ type: "learnManeuver", maneuverId: "m1" }]);
@@ -197,17 +192,13 @@ describe("useLevelUpCeremony", () => {
 
     act(() => result.current.setDraft((d) => ({ ...d, hp: { method: "average" } })));
     await act(() => result.current.confirm());
-    // A mutation's error dispatch is notified via TanStack Query's internal
-    // batching (a microtask hop beyond confirm()'s own await), so this needs a tick.
+    // A mutation's error dispatch is notified via TanStack Query's internal batching (a microtask hop beyond confirm()'s own await), so this needs a tick.
     await waitFor(() =>
       expect(result.current.submitError).toBe("expected 1 advancement for this level-up, got 0"),
     );
   });
 });
 
-// #1170: the front door — a class-choice step at ceremony start when the
-// character can advance more than one class (existing entries + eligible new
-// classes), replacing the sheet-side AddClassPanel dropdown.
 describe("useLevelUpCeremony — class choice (#1170)", () => {
   const rogueEligibleCharacter = {
     ...character,
@@ -301,8 +292,7 @@ describe("useLevelUpCeremony — class choice (#1170)", () => {
         { id: "entry-2", name: "wizard", level: 3 },
       ],
     } as unknown as Character;
-    // Never resolves — 2 owned classes alone already answer "needs a choice";
-    // the chooser must not block on the reference fetch to show that.
+    // Never resolves — 2 owned classes alone already answer "needs a choice"; the chooser must not block on the reference fetch to show that.
     referenceMock.mockReturnValue(new Promise(() => {}));
     const { result } = renderHook(() => useLevelUpCeremony(multiChar), { wrapper: makeWrapper() });
 
@@ -310,9 +300,7 @@ describe("useLevelUpCeremony — class choice (#1170)", () => {
     expect(result.current.classChoice!.options.map((o) => o.name)).toEqual(["fighter", "wizard"]);
   });
 
-  // Review finding: decisionReady's `referenceError` arm exists so a failed
-  // reference fetch doesn't hang the ceremony forever — it degrades to
-  // existing-entries-only, same as an empty reference response.
+  // decisionReady's referenceError arm exists so a failed reference fetch doesn't hang the ceremony forever — it degrades to existing-entries-only.
   it("auto-skips (doesn't hang) when the reference fetch fails, for a single-class character", async () => {
     referenceMock.mockRejectedValue(new Error("network error"));
     planMock.mockResolvedValue(plan(HP_ADV_REVIEW));
@@ -323,10 +311,7 @@ describe("useLevelUpCeremony — class choice (#1170)", () => {
     expect(planMock).toHaveBeenCalledWith("c1", { kind: "existing", classEntryId: "entry-1" }, undefined);
   });
 
-  // Review finding: an ineligible `?classId=` deep link (prereq not met) must
-  // not be routed through as the target just because it's the only *deep-link*
-  // candidate — the auto-skip path should still land on the sole ELIGIBLE
-  // option (here, the character's own primary class).
+  // An ineligible ?classId= deep link (prereq not met) must not be routed through just because it's the only deep-link candidate — the auto-skip path should land on the sole eligible option.
   it("ignores an ineligible ?classId= deep link, falling back to the sole eligible option", async () => {
     referenceWithClasses([
       {
@@ -347,8 +332,6 @@ describe("useLevelUpCeremony — class choice (#1170)", () => {
   });
 });
 
-// #1170: BG3-style per-level choice — Confirm loops back to the chooser instead
-// of leaving the ceremony while pendingLevelUps remain.
 describe("useLevelUpCeremony — level up again (#1170)", () => {
   it("shows the level-again interstitial instead of navigating away when levels remain", async () => {
     planMock.mockResolvedValue(plan([{ kind: "hitPoints", meta: HP_META }, { kind: "review" }]));
@@ -396,10 +379,6 @@ describe("useLevelUpCeremony — level up again (#1170)", () => {
     await waitFor(() => expect(planMock).toHaveBeenCalledTimes(1));
   });
 
-  // Review finding: the prior "level up again" tests only used the
-  // single-class fixture, which auto-skips the chooser — the actual BG3
-  // headline scenario (a multiclassed character re-choosing per level) was
-  // never exercised end-to-end.
   it("re-enters the class chooser after 'Level up again' for a multiclassed character", async () => {
     const multiChar = {
       ...character,
@@ -412,7 +391,6 @@ describe("useLevelUpCeremony — level up again (#1170)", () => {
     submitMock.mockResolvedValue({ id: "c1", pendingLevelUps: 1 } as Character);
     const { result } = renderHook(() => useLevelUpCeremony(multiChar), { wrapper: makeWrapper() });
 
-    // First level: pick the fighter entry from the chooser, then complete it.
     await waitFor(() => expect(result.current.classChoice).not.toBeNull());
     act(() => result.current.classChoice!.onChoose({ kind: "existing", classEntryId: "entry-1" }));
     await waitFor(() => expect(result.current.plan).not.toBeNull());
@@ -425,8 +403,6 @@ describe("useLevelUpCeremony — level up again (#1170)", () => {
     planMock.mockResolvedValue(plan([{ kind: "hitPoints", meta: HP_META }, { kind: "review" }]));
     act(() => result.current.levelAgain!.onContinue());
 
-    // The headline scenario: the chooser reappears for the next pending level
-    // instead of silently re-advancing whatever was picked last time.
     expect(result.current.classChoice).not.toBeNull();
     expect(planMock).not.toHaveBeenCalled();
 
@@ -439,13 +415,9 @@ describe("useLevelUpCeremony — level up again (#1170)", () => {
   });
 });
 
-// #1421: a subclass switch away from Eldritch Knight retires the newSpells
-// step, but spellsLearned/cantripsLearned/spellsForgotten survive in the
-// draft unless pruned — leaving a dead-end Review screen and a 400 on confirm.
+// #1421: a subclass switch away from Eldritch Knight retires the newSpells step, but spellsLearned/cantripsLearned/spellsForgotten survive in the draft unless pruned — leaving a dead-end Review screen and a 400 on confirm.
 describe("useLevelUpCeremony — pruning the draft to the served plan (#1421)", () => {
-  // Multiclass Wizard 5 / Fighter 2→3 taking Eldritch Knight: needs a real
-  // spellbook entry so the Forgotten-row ledger assertion (test 3) resolves a
-  // name rather than covering nothing, per the issue's fixture note.
+  // Needs a real spellbook entry so the Forgotten-row ledger assertion (test 3) resolves a name rather than covering nothing.
   const wizardFighter = {
     id: "c1",
     rulesEdition: "EDITION_2024",
@@ -476,8 +448,6 @@ describe("useLevelUpCeremony — pruning the draft to the served plan (#1421)", 
     feat: () => undefined,
   };
 
-  // Drives the ceremony to "EK plan loaded, spell picks staged", ready for a
-  // subclass switch to Champion.
   async function setupWithStagedSpells() {
     planMock.mockResolvedValue(plan(EK_STEPS, { className: "fighter", newLevel: 3, subclass: "Eldritch Knight" }));
     const { result } = renderHook(() => useLevelUpCeremony(wizardFighter), { wrapper: makeWrapper() });
@@ -557,10 +527,7 @@ describe("useLevelUpCeremony — pruning the draft to the served plan (#1421)", 
   });
 });
 
-// #1421: useLevelUpPlan sets plan to null while the class-chooser and the
-// level-again interstitial own the screen (see useLevelUpPlan's `skip`), and
-// useLevelUpCeremony falls back to `plan?.steps ?? []` — pruning against that
-// empty fallback would wipe the entire draft mid-ceremony.
+// #1421: useLevelUpPlan sets plan to null while the class-chooser/level-again interstitial own the screen (its `skip`), and useLevelUpCeremony falls back to `plan?.steps ?? []` — pruning against that empty fallback would wipe the entire draft mid-ceremony.
 describe("useLevelUpCeremony — never prune before a plan has arrived (#1421)", () => {
   const multiChar = {
     ...character,
@@ -570,11 +537,7 @@ describe("useLevelUpCeremony — never prune before a plan has arrived (#1421)",
     ],
   } as unknown as Character;
 
-  // Honest status: this is GREEN both before and after the guard — the
-  // effect's dependency is [plan], and plan never becomes non-null while the
-  // chooser owns the screen, so there's nothing yet to (wrongly) prune
-  // against. Kept for the AC's literal wording and to catch a future refactor
-  // to a steps-keyed effect; the level-again test below is the real driver.
+  // This test is green before and after the guard (plan never becomes non-null while the chooser owns the screen) — kept to catch a future refactor to a steps-keyed effect; the level-again test below is the real driver.
   it("does not prune while the class chooser owns the screen (no plan has arrived)", async () => {
     const { result } = renderHook(() => useLevelUpCeremony(multiChar), { wrapper: makeWrapper() });
     await waitFor(() => expect(result.current.classChoice).not.toBeNull());
@@ -604,9 +567,7 @@ describe("useLevelUpCeremony — never prune before a plan has arrived (#1421)",
     await act(() => result.current.confirm());
     expect(result.current.levelAgain).not.toBeNull();
 
-    // The submit flips skipPlan true → useLevelUpPlan sets plan to null → the
-    // [plan] effect fires again — proving the guard, not just its absence of
-    // a crash.
+    // The submit flips skipPlan true → useLevelUpPlan sets plan to null → the [plan] effect fires again — proving the guard, not just its absence of a crash.
     expect(result.current.draft.spellsLearned).toEqual([{ type: "learnSpell", spellId: "s1" }]);
   });
 });

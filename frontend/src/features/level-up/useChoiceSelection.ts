@@ -1,8 +1,3 @@
-// Selection state for a Choose-N step (#896): reads the current picks out of the
-// ceremony draft and writes them back through the config, enforcing the plan's
-// exact count via nextChoiceSelection. Kept apart from the catalog fetch so
-// neither concern carries the other's complexity.
-
 import { useLevelUpStepContext } from "@/features/level-up/useLevelUpStepContext";
 import { nextChoiceSelection, type ChoiceKindConfig } from "@/lib/levelUpChoices";
 import type { LevelUpStep } from "@/types/character";

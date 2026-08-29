@@ -33,15 +33,7 @@ function makeCharacter(over: Partial<Character> = {}): Character {
   return { id: "c1", name: "Aldric", campaignId: null, journal: [], ...over } as unknown as Character;
 }
 
-// Adversarial review, should-fix #2: useCharacterMutation's own mutations for a
-// character share `scope: { id: 'character-<id>' }` specifically so a slow HP
-// response can't land after a faster, later one and drag the sheet backward
-// (useCharacterMutation.test.ts's out-of-order test). The doorway mutation
-// writes into that SAME cache slot (characterKeys.detail) via dispatchDoorwayAction's
-// returned character, but is a wholly separate `useMutation` — without a shared
-// scope, TanStack Query runs the two families concurrently, so a Start/Join
-// whose response predates an in-flight HP transaction can write a stale
-// character back over it.
+// Doorway mutation shares character-<id> scope with useCharacterMutation so a slow HP response can't land after a faster Start/Join and vice versa.
 describe("useSessionDoorway mutation scope (#1299 review)", () => {
   beforeEach(() => {
     mockStart.mockClear();
@@ -72,23 +64,17 @@ describe("useSessionDoorway mutation scope (#1299 review)", () => {
     const { result: doorwayResult } = renderHook(() => useSessionDoorway("c1"), { wrapper });
     await waitFor(() => expect(doorwayResult.current.summary.action).toBe("start"));
 
-    // Request 1: an HP transaction starts and hangs.
     act(() => {
       hpResult.current.mutate();
     });
-    // Request 2: a start action fires right behind it.
     act(() => {
       doorwayResult.current.onAction();
     });
 
-    // Let any already-scheduled microtasks run. If the two mutations share a
-    // scope, the doorway's mutationFn must not have started yet — it's queued
-    // behind the still-pending HP mutation.
     await Promise.resolve();
     await Promise.resolve();
     expect(mockStart).not.toHaveBeenCalled();
 
-    // Resolving the HP mutation lets the queued doorway mutation proceed.
     resolveHp(makeCharacter({ name: "post-hp" }));
     await waitFor(() => expect(mockStart).toHaveBeenCalled());
   });

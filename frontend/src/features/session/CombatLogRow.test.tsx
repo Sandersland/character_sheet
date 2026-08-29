@@ -30,10 +30,6 @@ function makeEvent(overrides: Partial<CharacterEvent>): CharacterEvent {
   };
 }
 
-// #1237 §4: the badge must count rendered FEED ROWS, not raw events — this is
-// what a revert to `data.events.length` breaks. Both assertions below fail
-// under that mutation. A resolveAction event was always one event (#1827
-// model B), so the "merged swing" case is now just "one event, one row".
 describe("CombatLogRow live count (#1237 §4 — count parity with the rendered feed)", () => {
   it("counts a resolution as ONE event", async () => {
     mockFetchSession.mockResolvedValue({
@@ -73,8 +69,6 @@ describe("CombatLogRow live count (#1237 §4 — count parity with the rendered 
 
     render(<CombatLogRow mode="live" characterId="char-1" sessionId="sess-1" onOpen={() => {}} />);
 
-    // 5 rows collapse to a 3-visible disclosure in the rendered feed, but all 5
-    // are still log content — the badge must not drop to 3.
     expect(await screen.findByText("Session log · 5 events")).toBeInTheDocument();
   });
 });

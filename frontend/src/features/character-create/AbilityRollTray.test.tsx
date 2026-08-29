@@ -12,8 +12,6 @@ import type { CreationBackgroundBonuses, CreationSpeciesBonuses } from "@/lib/ch
 import type { RollResult } from "@/lib/dice";
 import type { AbilityScores } from "@/types/character";
 
-// The physics roller mounts a Three.js canvas that won't render in jsdom — mock
-// it to fire a fixed d-total whenever its rollKey changes, driving the sequence.
 vi.mock("@/features/dice/PhysicsDiceRoller", () => ({
   default: function MockPhysicsRoller({
     onResult,
@@ -96,9 +94,7 @@ describe("AbilityRollTray", () => {
       </DiceRollStyleProvider>,
     );
     await user.click(screen.getByRole("button", { name: "Roll scores" }));
-    // The physics stage mounts once a roll is in flight.
     expect(screen.getByTestId("physics-die")).toBeInTheDocument();
-    // Cascade the six sets instantly via the sequence's Skip control.
     await user.click(screen.getByRole("button", { name: "Skip" }));
     await waitFor(() => expect(onRolled).toHaveBeenCalledTimes(1));
     expect(onRolled.mock.calls[0][0]).toEqual([12, 12, 12, 12, 12, 12]);

@@ -5,7 +5,6 @@ import { Lock } from "@/components/ui/icons";
 import { ENTITY_TYPE_LABELS, ENTITY_TYPE_TONE } from "@/lib/mentions";
 import type { CampaignEntity, CampaignRole } from "@/types/character";
 
-// Wiki-article masthead (#842): serif H1 + type badge, alias line, hairline rule.
 export default function EntityArticleHeader({
   entity,
   role,

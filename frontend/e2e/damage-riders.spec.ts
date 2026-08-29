@@ -4,17 +4,7 @@ import { login } from "./helpers/auth";
 import { collectConsoleErrors } from "./helpers/console";
 import { enterLiveCombat, createCharacter, uniqueName } from "./helpers/api";
 
-// A Flame Tongue-style weapon (dice-valued passiveBonus damage cap, requires
-// attunement) adds a typed +2d6 fire rider to its damage roll in the attack
-// picker while attuned/equipped, rolled through the dice engine (#547). Since
-// #1843 the rider merges into the SAME resolveAction commit as the swing's own
-// effect — it renders as ONE typed term inside the ONE consolidated swing row,
-// not a second roll event (#1822/#1823 regression fix) — so this drives the
-// swing through the rail's own "Done" before reading the log: nothing persists
-// until that commit fires (#1831).
 test("damage riders: attuned Flame Tongue adds a typed +2d6 fire term to its attack", async ({ page }) => {
-  // Deterministic dice (face = 1 + floor(0.5 * faces) → d20 always 11) keeps
-  // the swing an ordinary hit — no die-locked crit/miss branch to juggle.
   await page.addInitScript(() => {
     Math.random = () => 0.5;
   });
@@ -55,7 +45,6 @@ test("damage riders: attuned Flame Tongue adds a typed +2d6 fire term to its att
   });
   expect(award.ok(), `award: ${award.status()}`).toBeTruthy();
 
-  // Equip + attune the awarded weapon through the same transactions endpoint the app uses.
   const sheet = await page.request.get(`/api/characters/${characterId}`);
   const { inventory } = (await sheet.json()) as { inventory: { id: string; name: string }[] };
   const inventoryItemId = inventory.find((i) => i.name === "Flame Tongue")!.id;
@@ -81,46 +70,28 @@ test("damage riders: attuned Flame Tongue adds a typed +2d6 fire term to its att
 
   const attackSheet = page.getByRole("dialog");
 
-  // The Damage step's on-hit riders are inert until the first Roll to hit
-  // binds the rail to the selected form — the default is the equipped Flame
-  // Tongue (#786).
   await attackSheet.getByRole("button", { name: "Roll to hit" }).click();
 
-  // The bound rail exposes a typed on-hit rider button; rolling it stages a
-  // fire term into the swing (merged into the ONE commit, not logged on its
-  // own — #1843).
   const rider = attackSheet.getByRole("button", { name: /Roll \+2d6 fire/ });
   await expect(rider).toBeVisible();
   await rider.click();
 
-  // Resolve the swing's own effect (implicit hit) and commit the ONE
-  // resolveAction event for it.
   await attackSheet.getByRole("button", { name: "Roll damage", exact: true }).click();
   const done = attackSheet.getByRole("button", { name: /^Done$/ });
-  // Two-step dismiss (#1832 review): the rail's own "Done" (ResolutionRail's
-  // CompleteButton) commits the swing but doesn't close the sheet. With no
-  // attacks left afterward, AttackSheetFooter's button relabels from "Close"
-  // to "Done" (same onClose handler it always had — only the label is
-  // conditional) — the SAME accessible name, so re-resolving this locator and
-  // clicking again hits that footer button and actually dismisses the dialog.
+  // ResolutionRail's CompleteButton ("Done") commits the swing without closing
+  // the sheet; AttackSheetFooter then relabels its own close button to "Done"
+  // too (same handler, same accessible name) — this second click is that one.
   await done.click();
   await done.click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
 
-  // The rider lands in the SAME consolidated swing row as the main effect —
-  // opened on demand from the one-line log row (#1086; the always-visible rail
-  // is gone).
   await page.getByRole("button", { name: /open session log/i }).click();
   const logDrawer = page.getByRole("dialog", { name: "Session Log" });
-  // One consolidated swing row carries BOTH damage terms in a single sentence
-  // (#1843) — sessionLogFeed.ts's effectTailSegments format: "<source> — hit
-  // for <total> slashing + <riderTotal> fire." — pinned exactly, not just
-  // "fire" appearing anywhere.
+  // Pins sessionLogFeed.ts's effectTailSegments format: one swing row carries
+  // both damage terms in a single sentence, not a separate roll-log row.
   await expect(logDrawer.getByText(/hit for \d+ slashing \+ \d+ fire/).first()).toBeVisible();
-  // No orphaned second roll-log row for the rider or the swing itself
-  // (#1822/#1823 regression fix) — the only other "Rolled " line in this log
-  // is the legitimate "Rolled Initiative" entry from starting combat
-  // (buildAbilityRollRow), which this excludes rather than a bare "Rolled ".
+  // The only legitimate "Rolled " line left is buildAbilityRollRow's own
+  // "Rolled Initiative" from starting combat.
   await expect(logDrawer.getByText(/^Rolled (?!Initiative)/)).toHaveCount(0);
 
   expect(errors).toEqual([]);

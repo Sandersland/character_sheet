@@ -1,6 +1,4 @@
-// Pure builder for the level-up Review step's change ledger (#891): reads the
-// staged draft into ordered before→after rows. Kept sync/pure — the ReviewStep
-// injects catalog id→name lookups as `resolvers` so this never fetches.
+// Kept sync/pure — the ReviewStep injects catalog id→name lookups as `resolvers` so this never fetches.
 
 import { abilityLabel, abilityModifier, formatModifier } from "@/lib/abilities";
 import { effectiveMaxForRoll, readHitPointsMeta } from "@/lib/hitDice";
@@ -31,14 +29,12 @@ export interface LedgerRow {
   variant: LedgerRowVariant;
 }
 
-/** Catalog id→name lookups injected by the ReviewStep so the builder stays pure. */
 export interface LedgerResolvers {
   maneuver: (id: string) => string | undefined;
   spell: (id: string) => string | undefined;
   feat: (id: string) => string | undefined;
 }
 
-/** Custom name wins; else the catalog lookup; else the raw id as a last resort. */
 function resolvedName(
   id: string | undefined,
   custom: { name: string } | undefined,
@@ -49,14 +45,7 @@ function resolvedName(
   return "Unknown";
 }
 
-// Both branches read the SERVED meta, which is why HP is still on the PRE-level
-// Con mod (the backend applies HP before the ASI, so a Con bump this same level
-// must not retroactively raise the gain) and why the die is the ADVANCING
-// class's rather than the persisted position-0 one (#1441). Reads the SERVED
-// effective max (#1497, meta.effectiveMaxAverage/effectiveMaxByRoll) rather
-// than adding the gain to `character.hitPoints.max` client-side — that
-// addition disagrees with the committed max once 2014 exhaustion 4+ (PHB'14
-// p. 291) halves it.
+// Reads the SERVED effective max rather than adding the gain to `character.hitPoints.max` client-side, which disagrees with the committed max once 2014 exhaustion 4+ (PHB'14 p. 291) halves it.
 function hpEffectiveMax(hp: NonNullable<LevelUpDraft["hp"]>, meta: HitPointsStepMeta): number {
   if (hp.method === "roll") return effectiveMaxForRoll(meta, hp.roll ?? 0);
   return meta.effectiveMaxAverage;
@@ -103,9 +92,7 @@ function advancementRows(
   return featRows(advancement, scores, resolvers);
 }
 
-// ledgerRows is pure and synchronous with no catalog in hand, so a non-custom
-// pick shows its step label rather than the option's real name; resolving the
-// name would mean threading the loaded catalog into Review (#1422).
+// Pure and synchronous with no catalog in hand, so a non-custom pick shows its step label rather than the option's real name.
 function subclassChoiceName(op: LearnSubclassChoiceOperation, plan: LevelUpPlanResponse): string {
   if (op.custom) return op.custom.name;
   const step = plan.steps.find((s) => s.kind === "subclassChoice" && s.meta?.key === op.choiceKey);
@@ -117,9 +104,7 @@ function listRow(label: string, items: string[]): LedgerRow | null {
   return items.length ? { label, items, variant: "list" } : null;
 }
 
-// Auto-granted subclass spells get their own card variant (#1159) rather than the
-// bare name-list `listRow` — Review needs each spell's level + school to render
-// the unlock-card treatment, not just a resolved display string.
+// Own card variant rather than the bare name-list `listRow` — Review needs each spell's level + school to render the unlock-card treatment.
 function grantedSpellsRow(plan: LevelUpPlanResponse): LedgerRow | null {
   if (!plan.grantedSpells.length) return null;
   return {
@@ -129,8 +114,7 @@ function grantedSpellsRow(plan: LevelUpPlanResponse): LedgerRow | null {
   };
 }
 
-// #1101: a forgotten spell is a per-character ENTRY id, so its name resolves from
-// the character's own spellbook — not resolvers.spell (which is catalog-id space).
+// A forgotten spell is a per-character ENTRY id, so its name resolves from the character's own spellbook, not resolvers.spell (catalog-id space).
 function forgottenNames(draft: LevelUpDraft, character: Character): string[] {
   const book = character.spellcasting?.spells ?? [];
   return (draft.spellsForgotten ?? []).map((op) => book.find((s) => s.id === op.entryId)?.name ?? op.entryId);
@@ -147,21 +131,13 @@ function learnedListRows(
     listRow("Tool Proficiencies", (draft.toolProficiencies ?? []).map((op) => op.name)),
     listRow("Subclass Features", (draft.subclassChoices ?? []).map((op) => subclassChoiceName(op, plan))),
     listRow("Forgotten", forgottenNames(draft, character)),
-    // #1157: cantrips get their own row above New Spells, same catalog as spells.
     listRow("New Cantrips", (draft.cantripsLearned ?? []).map((op) => resolvedName(op.spellId, undefined, r.spell))),
     listRow("New Spells", (draft.spellsLearned ?? []).map((op) => resolvedName(op.spellId, undefined, r.spell))),
   ];
   return rows.filter((row): row is LedgerRow => row !== null);
 }
 
-/**
- * Ordered ledger rows for the draft; absent draft fields drop their rows.
- *
- * The HP numbers come off the plan's own hitPoints step (#1380) — the same
- * served meta HitPointsStep renders — so Review and the HP step cannot disagree
- * about the gain or the advancing die without the server having disagreed with
- * itself.
- */
+// The HP numbers come off the plan's own hitPoints step, the same served meta HitPointsStep renders, so Review and the HP step cannot disagree.
 export function buildLevelUpLedger(
   character: Character,
   draft: LevelUpDraft,
@@ -173,8 +149,7 @@ export function buildLevelUpLedger(
   const max = character.hitPoints.max;
   const { total, die } = character.hitDice;
   const rows: (LedgerRow | null)[] = [
-    // `character.level` is the XP-derived level (already the post-up value while a
-    // level-up is pending); the applied "before" is one below the target.
+    // `character.level` is already the post-up value while a level-up is pending, so "before" is one below the target, not character.level.
     { label: "Level", before: String(plan.target.newLevel - 1), after: String(plan.target.newLevel), variant: "delta" },
     draft.hp
       ? {
@@ -186,9 +161,7 @@ export function buildLevelUpLedger(
       : null,
     ...advancement.rows,
     advancement.affected.length ? { label: "Recalculated", note: advancement.affected.join(", "), variant: "note" } : null,
-    // #1075: `die` is knowingly the position-0 die from the persisted hitDice
-    // blob — a multiclass character has no single correct die to render until
-    // hit dice are pooled per die type. Deliberately not half-fixed here.
+    // `die` is knowingly the position-0 die from the persisted hitDice blob — a multiclass character has no single correct die to render until hit dice are pooled per die type.
     { label: "Hit Dice", before: `${total}${die}`, after: `${total + 1}${die}`, variant: "delta" },
     draft.subclassId ? { label: "Subclass", after: plan.target.subclass ?? "New subclass", variant: "delta" } : null,
     draft.fightingStyleFeat
@@ -199,8 +172,7 @@ export function buildLevelUpLedger(
         }
       : null,
     ...learnedListRows(draft, plan, resolvers, character),
-    // Auto-granted subclass spells are derived on the plan, not the draft — surface
-    // them so Review's "applied together" claim covers them too (#1139).
+    // Derived on the plan, not the draft — surface them so Review's "applied together" claim covers them too.
     grantedSpellsRow(plan),
   ];
   return rows.filter((row): row is LedgerRow => row !== null);

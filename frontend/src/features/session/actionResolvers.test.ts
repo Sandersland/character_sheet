@@ -1,21 +1,9 @@
-/**
- * Parity test: every frontend resolver with serverEffect:true must have a
- * corresponding key in the backend ACTION_EFFECT_FN dispatch table.
- *
- * If this test fails after adding a new action, add the matching entry in
- * the backend ACTION_EFFECT_FN table (and vice versa).
- */
+// If this test fails after adding a new action, add the matching entry in the backend ACTION_EFFECT_FN table (and vice versa).
 
 import { describe, it, expect } from "vitest";
 import { SERVER_EFFECT_KEYS, resolverFor, ACTION_RESOLVERS } from "./actionResolvers";
 
-// The backend ACTION_EFFECT_FN keys, copied here as a stable reference list.
-// Update this list when adding new actions to the backend. secondWind/
-// actionSurge are row-driven now (#1528) — dispatched via
-// routes/character/actions.ts's row-driven path, not this table, so they're
-// deliberately absent here too (parity would otherwise falsely fail).
-// rage/endRage joined that same row-driven set (#1686, a "toggle"
-// resolverKind row) — also deliberately absent.
+// Update this list when adding new backend ACTION_EFFECT_FN actions; secondWind/actionSurge/rage/endRage are row-driven and deliberately absent here.
 const BACKEND_ACTION_EFFECT_KEYS = new Set([
   "attack", "castSpell", "dodge", "dash", "disengage", "help", "hide",
   "search", "ready", "grapple", "opportunityAttack", "castSpellReaction",
@@ -72,7 +60,7 @@ describe("actionResolvers", () => {
     expect(r).toBeDefined();
     expect(r!.kind).toBe("twf-picker");
     expect(r!.slot).toBe("bonusAction");
-    expect(r!.serverEffect).toBe(false); // local roll, like `attack` — not in backend ACTION_EFFECT_FN
+    expect(r!.serverEffect).toBe(false);
   });
 
   it("bonusUnarmedStrike reuses the twf-picker economy path, locked-in subtitle (#1218)", () => {
@@ -80,7 +68,7 @@ describe("actionResolvers", () => {
     expect(r).toBeDefined();
     expect(r!.kind).toBe("twf-picker");
     expect(r!.slot).toBe("bonusAction");
-    expect(r!.serverEffect).toBe(false); // gated at derive time (requiresUnarmored), not spent server-side
+    expect(r!.serverEffect).toBe(false);
     expect(r!.resourceKey).toBeUndefined();
     expect(r!.subtitle).toBe("One Unarmed Strike as a Bonus Action (Dex + Martial Arts die).");
   });
@@ -89,7 +77,7 @@ describe("actionResolvers", () => {
     const r = resolverFor("changeWeapons");
     expect(r).toBeDefined();
     expect(r!.kind).toBe("loadout-picker");
-    expect(r!.serverEffect).toBe(false); // the swap posts inventory transactions, not applyActionTransactions
+    expect(r!.serverEffect).toBe(false);
   });
 
   it("Stunning Strike has no resolver — it's a post-hit rider, not a selectable action (#1242)", () => {
@@ -101,7 +89,7 @@ describe("actionResolvers", () => {
     expect(step).toBeDefined();
     expect(step!.kind).toBe("simple-confirm");
     expect(step!.slot).toBe("bonusAction");
-    expect(step!.serverEffect).toBe(false); // reminder only — no backend ACTION_EFFECT_FN
+    expect(step!.serverEffect).toBe(false);
   });
 
   it("has no opportunist resolver (2014 L17 feature retired — Cloak of Shadows is L17 now)", () => {
@@ -113,7 +101,7 @@ describe("actionResolvers", () => {
     expect(patient).toBeDefined();
     expect(patient!.kind).toBe("simple-confirm");
     expect(patient!.slot).toBe("bonusAction");
-    expect(patient!.serverEffect).toBe(false); // free variant — no backend ACTION_EFFECT_FN
+    expect(patient!.serverEffect).toBe(false);
     expect(patient!.resourceKey).toBeUndefined();
 
     const step = resolverFor("stepOfTheWind");
@@ -141,12 +129,12 @@ describe("actionResolvers", () => {
     expect(deflect).toBeDefined();
     expect(deflect!.kind).toBe("simple-confirm");
     expect(deflect!.slot).toBe("reaction");
-    expect(deflect!.serverEffect).toBe(false); // reminder only — the dynamic roll is bespoke in useTurnActions
+    expect(deflect!.serverEffect).toBe(false);
 
     const redirect = resolverFor("deflectAttacksRedirect");
     expect(redirect).toBeDefined();
     expect(redirect!.kind).toBe("simple-confirm");
-    expect(redirect!.slot).toBe("free"); // decided within the same reaction, not its own slot
+    expect(redirect!.slot).toBe("free");
     expect(redirect!.serverEffect).toBe(true);
     expect(redirect!.resourceKey).toBe("focus");
   });
@@ -202,15 +190,12 @@ describe("actionResolvers", () => {
     expect(r!.serverEffect).toBe(false);
   });
 
-  // Without this entry partitionClassActions filters the backend's fastHands row
-  // out and no card renders at all — the resolver registry is the gate, not the
-  // payload (#1431).
   it("Thief's Fast Hands is an economy-only bonus-action confirm (#1431)", () => {
     const r = resolverFor("fastHands");
     expect(r).toBeDefined();
     expect(r!.kind).toBe("simple-confirm");
     expect(r!.slot).toBe("bonusAction");
-    expect(r!.serverEffect).toBe(false); // no backend ACTION_EFFECT_FN, like patientDefense
+    expect(r!.serverEffect).toBe(false);
     expect(r!.resourceKey).toBeUndefined();
   });
 
@@ -231,7 +216,7 @@ describe("actionResolvers", () => {
 
   it("secondWind has no ACTION_RESOLVERS entry — it resolves via the row-driven fallback now (#1528)", () => {
     expect(ACTION_RESOLVERS.secondWind).toBeUndefined();
-    expect(resolverFor("secondWind")).toBeUndefined(); // no `action` context → no fallback
+    expect(resolverFor("secondWind")).toBeUndefined();
   });
 
   it("secondWind's fallback resolver (#1528) is synthesized from the served action, with no client healRoll — the server rolls it", () => {
@@ -264,11 +249,6 @@ describe("actionResolvers", () => {
   });
 
   it("resolverFor's row-driven fallback rejects a resolverKind outside ResolutionKind (#1528 finding 4) — never synthesizes a bogus resolver", () => {
-    // A served resolverKind that names no real ResolutionKind (a future class
-    // retab shipping a typo, or client/server skew) must be treated exactly
-    // like "no resolver" — partitionClassActions filters the action out —
-    // rather than reaching planActionClick's switch with a value outside its
-    // exhaustive union (that used to crash useTurnActions on click).
     const action = { key: "unknownRowAction", name: "Unknown Row Action", cost: "action" as const, enabled: true, resolverKind: "not-a-real-kind" };
     expect(resolverFor("unknownRowAction", action)).toBeUndefined();
   });

@@ -5,20 +5,14 @@ import { useDismissable } from "@/hooks/useDismissable";
 interface PopoverProps {
   trigger: ReactNode;
   label: string;
-  /** ReactNode, or a render fn receiving a `close()` so panel controls can dismiss the popover. */
   children: ReactNode | ((close: () => void) => ReactNode);
-  /** Preferred horizontal alignment; auto-flips if that side would overflow the viewport. */
   align?: "right" | "left";
   className?: string;
   triggerClassName?: string;
-  /** DOM id for the trigger button — lets another control move focus here (e.g. the paper-doll off-hand lock focusing its two-handed main-hand owner). */
   id?: string;
-  /** Fired whenever the popover transitions open → closed (Escape, click-outside, or toggle). */
   onClose?: () => void;
 }
 
-// Owned-trigger disclosure popover for read-only detail panels (role=dialog);
-// unlike DropdownMenu it has no menuitem semantics or roving focus.
 export default function Popover({
   trigger,
   label,
@@ -30,33 +24,29 @@ export default function Popover({
   onClose,
 }: PopoverProps) {
   const [open, setOpen] = useState(false);
-  // `align` is the caller's *preferred* side; this is what actually renders after
-  // the overflow check below (may flip so the panel stays inside the viewport).
+  // `align` is the caller's preferred side; `resolvedAlign` is what actually
+  // renders once the overflow check below may flip it.
   const [resolvedAlign, setResolvedAlign] = useState(align);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const wasOpen = useRef(false);
 
-  // Stable close() handed to a render-prop child (setOpen is stable, triggerRef is a
-  // ref) so it never defeats memoization of the panel content.
+  // setOpen is stable and triggerRef is a ref, so this identity never changes
+  // and never defeats memoization of the panel content.
   const closePanel = useCallback(() => {
     setOpen(false);
     triggerRef.current?.focus();
   }, []);
 
-  // Notify the parent on every open → closed transition, whatever the cause
-  // (Escape, click-outside, or a toggle-off) — lets callers reset panel state.
   useEffect(() => {
     if (wasOpen.current && !open) onClose?.();
     wasOpen.current = open;
   }, [open, onClose]);
 
-  // Auto-flip: an anchored `left-0` panel near the viewport's right edge (e.g. a
-  // right-column paper-doll slot on mobile) would extend past the screen and widen
-  // the page. Measure on open — layout effect, so the flip lands before paint —
-  // and fall back to the opposite side only when the preferred one overflows and
-  // the other side actually fits. Recomputed on window resize while open.
+  // Auto-flip so an anchored panel doesn't extend past the viewport edge and
+  // widen the page. Measured in a layout effect so the flip lands before paint,
+  // and only flips when the preferred side overflows but the other side fits.
   useLayoutEffect(() => {
     if (!open) return;
 
@@ -109,7 +99,7 @@ export default function Popover({
         <div
           ref={panelRef}
           role="dialog"
-          // Deliberately non-modal (no aria-modal/focus trap): anchored disclosure, background stays readable.
+          // Deliberately non-modal: no aria-modal or focus trap, so the background stays readable.
           aria-label={label}
           tabIndex={-1}
           className={`absolute ${resolvedAlign === "left" ? "left-0" : "right-0"} z-10 mt-1 min-w-[12rem] rounded-card border border-parchment-200 bg-parchment-50 shadow-raised focus:outline-none`}

@@ -26,7 +26,6 @@ const ALL_EIGHT: AbilityScores = {
   charisma: 8,
 };
 
-// Spends exactly the 27-point budget: three 15s (cost 9 each). Remaining 0.
 const SPENT: AbilityScores = {
   strength: 15,
   dexterity: 15,
@@ -55,7 +54,6 @@ describe("point buy", () => {
   });
 
   it("cannot increment when the next step's cost exceeds the remaining budget", () => {
-    // Budget fully spent (remaining 0), so even the 1-point 8→9 step is blocked.
     expect(canIncrement(SPENT, "intelligence")).toBe(false);
   });
 
@@ -66,9 +64,7 @@ describe("point buy", () => {
 
   it("adjustPointBuy bumps a legal step and refuses an illegal one", () => {
     expect(adjustPointBuy(ALL_EIGHT, "strength", 1).strength).toBe(9);
-    // At the floor a decrement is a no-op.
     expect(adjustPointBuy(ALL_EIGHT, "strength", -1)).toEqual(ALL_EIGHT);
-    // Over budget is a no-op.
     expect(adjustPointBuy(SPENT, "intelligence", 1)).toEqual(SPENT);
   });
 });
@@ -124,7 +120,6 @@ describe("background spread", () => {
     expect(spreadMode({})).toBe("twoOne");
     expect(spreadMode({ dexterity: 1, constitution: 1, intelligence: 1 })).toBe("oneOneOne");
     expect(spreadMode({ dexterity: 2, constitution: 1 })).toBe("twoOne");
-    // A three-entry assignment that isn't all +1s is still a +2/+1 spread.
     expect(spreadMode({ dexterity: 2, constitution: 1, intelligence: 1 })).toBe("twoOne");
   });
 

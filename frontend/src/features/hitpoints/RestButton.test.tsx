@@ -34,8 +34,6 @@ beforeEach(() => {
   });
 });
 
-// RestButton reads useCurrentCharacter(), so every render seeds the cache and
-// mounts CurrentCharacterProvider via renderWithCharacter.
 function render(character: Character) {
   return renderWithCharacter(<RestButton />, character);
 }
@@ -55,7 +53,6 @@ describe("RestButton (#814)", () => {
 
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByRole("heading", { name: /rest/i })).toBeInTheDocument();
-    // 3 total, 1 spent → 2/3d10 available.
     expect(within(dialog).getByText(/2\/3d10/)).toBeInTheDocument();
   });
 
@@ -97,7 +94,6 @@ describe("RestButton (#814)", () => {
     render(makeCharacter());
     const btn = screen.getByRole("button", { name: "Rest" });
     expect(btn).toHaveAttribute("aria-label", "Rest");
-    // Tighter padding under sm, full padding restored at sm+.
     expect(btn.className).toMatch(/\bpx-3\b/);
     expect(btn.className).toMatch(/sm:px-4/);
   });

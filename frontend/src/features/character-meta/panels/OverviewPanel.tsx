@@ -11,23 +11,12 @@ import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { hasAdvancements, hasProficiencies } from "@/lib/characterSections";
 import type { SheetPanelProps } from "@/features/character-meta/sheetTabs";
 
-/**
- * Overview tab — abilities + saves full-width on top, then a 3fr/2fr grid (#1086):
- * left is the two-up all-18 skills + proficiencies; right is the XP · spell slots ·
- * advancements stack. Equipped gear moved to the Inventory tab; class features
- * moved to their own Class tab (#1169) — it was dwarfing this page on multiclass
- * characters. Saving throws stay inside AbilityScoresPanel; full slot/spell
- * management is on Magic.
- */
 export default function OverviewPanel({ reference }: SheetPanelProps) {
   const { character } = useCurrentCharacter();
   return (
     <div className="flex flex-col gap-6">
-      {/* Prof/Speed/Init left the compact header (#1026); on phones they sit
-          here as a slim quick-bar (#1084). Desktop keeps them in the banner. */}
       <MobileQuickBar />
-      {/* One home for active roll-modifying states (#984) — above the rails, so
-          the fact is said once, not stamped under every box + skill row. */}
+      {/* Single home for active roll-modifying states, above the rails, so the fact is said once — not stamped under every box + skill row. */}
       <ConditionRollBanner modifiers={character.rollModifiers} />
       <AbilityScoresPanel />
 

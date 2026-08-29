@@ -3,8 +3,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { checkHealth, fetchAuthProviders, fetchMe, logout } from "@/api/auth";
 import { setUnauthorizedHandler } from "@/api/http";
 
-// Verbatim regression pin from client.test.ts (#1270) — assertions unchanged,
-// only the import specifier retargeted.
 describe("checkHealth", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -29,10 +27,6 @@ describe("checkHealth", () => {
   });
 });
 
-// Verbatim regression pin from authClient.test.ts's describe blocks that
-// covered fetchAuthProviders/fetchMe/logout — authClient.test.ts itself stays
-// untouched (see its own file) since its 401-handler-wiring test is the
-// load-bearing proof that http.ts's module state is shared across domains.
 describe("fetchAuthProviders", () => {
   afterEach(() => {
     vi.unstubAllGlobals();

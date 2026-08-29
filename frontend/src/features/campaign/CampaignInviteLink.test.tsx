@@ -7,21 +7,14 @@ import { axe } from "@/test/axe";
 const INVITE_CODE = "GLIMMERWOOD7";
 const inviteUrl = () => `${window.location.origin}/join/${INVITE_CODE}`;
 
-// fireEvent, never userEvent.setup(): setup() calls attachClipboardStubToView
-// unconditionally, installing a working navigator.clipboard. Every
-// insecure-context spec below would then be green for the wrong reason — it
-// would exercise userEvent's stub instead of the missing-API path this file
-// exists to pin (#1467).
+// fireEvent, not userEvent.setup(): setup() stubs navigator.clipboard, hiding the insecure-context path this file pins (#1467).
 function clickCopy() {
   return act(async () => {
     fireEvent.click(screen.getByRole("button", { name: /^Copy$/ }));
   });
 }
 
-// jsdom has no navigator.clipboard at all (not even on Navigator.prototype), so
-// the SUCCESS path is the one needing a stub and the insecure-context path is
-// the default. Never gate on window.isSecureContext: jsdom leaves it undefined,
-// so a truthiness check there would silently pass for the wrong reason.
+// jsdom has no navigator.clipboard and leaves window.isSecureContext undefined — never gate on it.
 function stubClipboard(writeText: () => Promise<void>) {
   Object.defineProperty(window.navigator, "clipboard", {
     configurable: true,
@@ -70,13 +63,11 @@ describe("CampaignInviteLink", () => {
       });
 
       expect(screen.getByRole("button", { name: "Copy" })).toBeInTheDocument();
-      // The live region stays mounted; only its text clears.
       expect(screen.getByRole("status")).toBeEmptyDOMElement();
     });
 
     it("falls through to the manual path when the write is rejected", async () => {
-      // Permission-denied rejects rather than throwing synchronously, so it is
-      // invisible to the plain-http repro yet lands the user in the same place.
+      // Permission-denied rejects rather than throwing synchronously.
       stubClipboard(vi.fn<() => Promise<void>>().mockRejectedValue(new Error("NotAllowedError")));
       render(<CampaignInviteLink inviteCode={INVITE_CODE} />);
 
@@ -99,9 +90,6 @@ describe("CampaignInviteLink", () => {
       expect(screen.getByRole("button", { name: "Copied" })).toBeInTheDocument();
     });
 
-    // AC 2 (#1467): both assertions below must fail against the component as it
-    // stood at b8d9a802 — it never selected the link, and its unconditional
-    // setTimeout wiped the manual instruction 2s into being read.
     it("leaves the link focused and fully selected when no copy API works", async () => {
       render(<CampaignInviteLink inviteCode={INVITE_CODE} />);
 

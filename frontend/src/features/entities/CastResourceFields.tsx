@@ -10,8 +10,6 @@ interface CastResourceFieldsProps {
   onChange: (patch: Partial<ItemCapability>) => void;
 }
 
-// The cast resource picker plus its count: charges spend a per-cast cost, timed
-// resources take uses-per-period, at-will takes neither (#528).
 export default function CastResourceFields({ cap, index, onChange }: CastResourceFieldsProps) {
   return (
     <>

@@ -1,8 +1,3 @@
-/**
- * Unified activity-timeline event types (the audit-log stream).
- */
-
-/** The unified activity timeline — every domain covered by the audit-log event stream. */
 export type CharacterEventCategory =
   | "inventory"
   | "hitPoints"
@@ -18,30 +13,30 @@ export type CharacterEventCategory =
   | "roll";
 
 export type CharacterEventType =
-  | "acquired" | "consumed" | "sold" | "bought" | "removed"  // inventory
-  | "awarded" | "revoked"                                     // inventory (DM award/revoke)
-  | "damage" | "heal" | "setTemp" | "shortRest" | "longRest" // hitPoints
-  | "levelUp" | "levelDown" | "deathSave" | "stabilize"      // hitPoints (cont.)
-  | "xpAward" | "xpSet"                                       // experience
-  | "currencyAdjust"                                           // currency
-  | "castSpell" | "castAbilitySlot" | "expendSlot" | "restoreSlot" // spellcasting
-  | "learnSpell" | "forgetSpell" | "prepareSpell" | "unprepareSpell" // spellcasting (cont.)
-  | "concentrationDropped"                                     // spellcasting (cont.)
-  | "subclassChosen" | "subclassRemoved"                       // class
-  | "fightingStyleChosen" | "fightingStyleRemoved"            // class (cont.)
-  | "spendResource" | "restoreResource"                       // resources
-  | "learnManeuver" | "forgetManeuver" | "maneuversReconciled" // resources (cont.)
-  | "learnToolProficiency" | "forgetToolProficiency" | "toolProficienciesReconciled" // resources
-  | "abilityScoreImprovement" | "featTaken"                   // advancement
-  | "advancementRemoved" | "advancementsReconciled"           // advancement (cont.)
-  | "equipped" | "unequipped"                                  // inventory (equip)
-  | "sessionStarted" | "sessionEnded"                          // session lifecycle
-  | "combatStarted" | "combatEnded" | "combatRoundAdvanced"   // combat lifecycle
-  | "resolveAction"                                            // combat action resolution (#1829/#1830)
-  | "conditionApplied" | "conditionRemoved" | "exhaustionSet" // conditions
-  | "attackRoll" | "damageRoll"                               // roll (attack/damage, legacy — rendering retired #1830)
-  | "checkRoll" | "saveRoll" | "initiativeRoll"               // roll (check/save/initiative)
-  | "revert";                                                  // meta
+  | "acquired" | "consumed" | "sold" | "bought" | "removed"
+  | "awarded" | "revoked"
+  | "damage" | "heal" | "setTemp" | "shortRest" | "longRest"
+  | "levelUp" | "levelDown" | "deathSave" | "stabilize"
+  | "xpAward" | "xpSet"
+  | "currencyAdjust"
+  | "castSpell" | "castAbilitySlot" | "expendSlot" | "restoreSlot"
+  | "learnSpell" | "forgetSpell" | "prepareSpell" | "unprepareSpell"
+  | "concentrationDropped"
+  | "subclassChosen" | "subclassRemoved"
+  | "fightingStyleChosen" | "fightingStyleRemoved"
+  | "spendResource" | "restoreResource"
+  | "learnManeuver" | "forgetManeuver" | "maneuversReconciled"
+  | "learnToolProficiency" | "forgetToolProficiency" | "toolProficienciesReconciled"
+  | "abilityScoreImprovement" | "featTaken"
+  | "advancementRemoved" | "advancementsReconciled"
+  | "equipped" | "unequipped"
+  | "sessionStarted" | "sessionEnded"
+  | "combatStarted" | "combatEnded" | "combatRoundAdvanced"
+  | "resolveAction"
+  | "conditionApplied" | "conditionRemoved" | "exhaustionSet"
+  | "attackRoll" | "damageRoll"
+  | "checkRoll" | "saveRoll" | "initiativeRoll"
+  | "revert";
 
 export interface CharacterEventField {
   id: string;
@@ -50,13 +45,6 @@ export interface CharacterEventField {
   newValue?: unknown;
 }
 
-/**
- * One row from `GET /api/characters/:id/activity` — the unified event log
- * that covers all domains (inventory, HP, XP, currency) in a single
- * chronological stream. `summary` is a human-readable snapshot rendered
- * at write time. `before`/`after` carry the affected sub-state for field
- * diffs and undo. `fields` is included only when `?includeFields=1`.
- */
 export interface CharacterEvent {
   id: string;
   category: CharacterEventCategory;
@@ -71,5 +59,6 @@ export interface CharacterEvent {
   reverted: boolean;
   batchId?: string;
   createdAt: string;
+  /** Included only when the request passes `?includeFields=1`. */
   fields?: CharacterEventField[];
 }

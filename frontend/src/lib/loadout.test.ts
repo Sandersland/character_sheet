@@ -124,8 +124,7 @@ describe("buildLoadoutGroups", () => {
     expect(rowsByKind(rings, "filled")).toHaveLength(2);
   });
 
-  // The served character flag locks the row, not the main-hand item's own
-  // twoHanded bit — a ONE-handed weapon here proves the client stopped deriving it.
+  // The served character flag locks the row, not the main-hand item's own twoHanded bit — a ONE-handed weapon here proves the client stopped deriving it.
   it("locks the off-hand from the served offHandLocked flag", () => {
     const groups = buildLoadoutGroups(
       makeCharacter([weapon(false, { id: "ls", name: "Longsword", equippedSlot: "MAIN_HAND" })], {
@@ -146,8 +145,7 @@ describe("buildLoadoutGroups", () => {
     expect(off.kind).toBe("empty");
   });
 
-  // notProficient is the negation of the served per-row flag; the proficient case
-  // deliberately leaves character.weaponProficiencies EMPTY.
+  // notProficient is the negation of the served per-row flag; the proficient case deliberately leaves character.weaponProficiencies EMPTY.
   it("propagates notProficient from the served proficient flag", () => {
     const martial = (proficient: boolean) =>
       weapon(false, {
@@ -177,9 +175,7 @@ describe("buildLoadoutGroups", () => {
   });
 });
 
-// The cap is a served number (#1377), so these pass it in. A cap of 2 is not a
-// real 5e value — it is deliberately not 3, which is what proves the function
-// echoes the argument instead of a surviving local literal.
+// The cap is a served number (#1377); a cap of 2 is deliberately not 3, which is what proves the function echoes the argument instead of a surviving local literal.
 describe("attunementSummary", () => {
   it("reports zero attuned as below the served cap", () => {
     expect(attunementSummary([], 3)).toEqual({ count: 0, cap: 3, atCap: false });

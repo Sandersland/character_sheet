@@ -1,4 +1,3 @@
-// Inline at-cap swap bar (#938): pick a prepared spell to drop so addSpell fits.
 import { useEffect } from "react";
 
 import type { Spell } from "@/types/character";

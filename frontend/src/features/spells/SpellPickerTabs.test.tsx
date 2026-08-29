@@ -1,8 +1,3 @@
-// #1778: one full-height SpellPicker at a time. The segmented control is a
-// thin presentational shell over the existing SpellPicker — these tests pin
-// segment count/labels, tab switching, progress/✓ state, and the
-// single-group no-bar shortcut. Content within the active picker (search,
-// row toggling, detail card) is already covered by SpellPicker.test.tsx.
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

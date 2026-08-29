@@ -12,8 +12,6 @@ describe("SlotLevelSelector", () => {
     expect(onSelect).toHaveBeenCalledWith(2);
   });
 
-  // #1163: the level already reads off the section header — a single legal
-  // slot needs no on-row echo ("Slot: L1"), not even for a Mystic Arcanum charge.
   it("renders nothing when only one slot is legal", () => {
     const { container } = render(
       <SlotLevelSelector baseLevel={1} availableSlots={[1]} spellSlot={1} onSelect={vi.fn()} />,
@@ -28,8 +26,6 @@ describe("SlotLevelSelector", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  // #1676: Bladesinger's Song of Defense is the first non-spell consumer —
-  // baseLevel is its own minLevel (1), never a Spell's own `.level`.
   it("marks every slot above baseLevel with the upcast arrow, for a non-spell ability", () => {
     render(<SlotLevelSelector baseLevel={1} availableSlots={[1, 2, 3]} spellSlot={2} onSelect={vi.fn()} />);
     expect(screen.getByRole("button", { name: "L1" })).toBeInTheDocument();

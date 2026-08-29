@@ -72,8 +72,7 @@ function makeCharacter(pools: ResourcePool[]): Character {
   } as unknown as Character;
 }
 
-// #1738: poolForArt/summaryPools resolve the served pool by the catalog row's
-// own cost.key — the same functions serve a 2024 (focus) or 2014 (ki) menu.
+// poolForArt/summaryPools resolve the served pool by the catalog row's own cost.key — the same functions serve a 2024 (focus) or 2014 (ki) menu.
 describe("poolForArt (#1738)", () => {
   it("resolves the pool matching the row's cost.key", () => {
     const character = makeCharacter([focusPool, kiPool]);

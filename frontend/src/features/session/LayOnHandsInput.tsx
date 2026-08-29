@@ -3,17 +3,12 @@ import { useState } from "react";
 import { QuickBtn } from "@/features/session/TurnControls";
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 
-/** Numeric pool-draw input for Lay on Hands — owns its own amount/busy state. */
 export default function LayOnHandsInput({
   onSend,
   onCommit,
   onClose,
 }: {
-  // Return type widened to `unknown` (#1528): useTurnActions' send() now
-  // resolves with the server's per-op ExecuteActionResult (a row-driven
-  // action's roll) instead of void — this caller awaits but never reads it.
   onSend: (actionKey: string, opts?: { roll?: number }) => Promise<unknown>;
-  /** Commit the action slot when the heal is applied (#765). */
   onCommit: () => void;
   onClose: () => void;
 }) {

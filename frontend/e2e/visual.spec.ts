@@ -11,41 +11,25 @@ import {
 } from "./helpers/api";
 import { passEntryGate } from "./helpers/creation";
 
-// Visual regression baselines for the key screens. Baselines live in
-// e2e/__screenshots__/ (checked in) and are regenerated with
-// `npm run e2e:update-snapshots` when a visual change is intentional.
-//
-// Determinism: animations/caret are frozen in playwright.config; each spec pins
-// fonts to the e2e image's bundled set (blocking the Google Fonts network load)
-// and waits for document.fonts.ready. Character names (the only per-run-unique
-// pixels on full-page shots) are masked; scoped section/modal shots exclude the
-// name entirely.
-
 const WIZARD_L5_XP = 6500;
 
-// Block the Google Fonts stylesheet + files so text falls back to the pinned
-// e2e image's local fonts — identical at baseline-capture and comparison time.
 async function pinFonts(page: Page): Promise<void> {
   await page.route(/fonts\.(googleapis|gstatic)\.com/, (route) => route.abort());
 }
 
-// Pin the AppHeader inbox to empty so its bell (#1946) never enters a baseline:
-// the specs share one backend user, so real inbox rows — and the bell + badge
+// The specs share one backend user, so real inbox rows — and the bell + badge
 // pixels they add to every header — depend on what campaign/entity state
-// earlier specs left behind. Inbox rendering has its own dedicated coverage.
+// earlier specs left behind.
 async function pinInbox(page: Page): Promise<void> {
   await page.route("**/api/inbox", (route) => route.fulfill({ json: [] }));
 }
 
-// Pin the theme before the SPA boots so the pre-paint script in index.html reads
-// it (addInitScript runs before page scripts on the next navigation). Also pins
-// it server-side: every spec shares one backend user (dev-user-local), and
-// PreferencesProvider adopts the server's stored preferences as authoritative
-// on every load — so an earlier spec's write otherwise survives into this one
-// and overrides this local pin the moment a later navigation re-fetches
-// /auth/me. diceRollStyle/autoRollConcentration are reset to their defaults
-// here too, even though only theme is pinned today, so neither becomes the
-// same kind of cross-spec leak later.
+// Pins both the pre-paint local value (addInitScript, read before the SPA
+// boots) and the server value: PreferencesProvider re-adopts the server's
+// stored preferences as authoritative on every load, so without the server
+// PATCH too, an earlier spec's write would override this pin on the next
+// /auth/me fetch — read as a UI regression, not a broken fixture, so the PATCH
+// result is asserted rather than fire-and-forget.
 async function setTheme(page: Page, theme: "light" | "dark"): Promise<void> {
   await page.addInitScript((t) => {
     try {
@@ -54,10 +38,6 @@ async function setTheme(page: Page, theme: "light" | "dark"): Promise<void> {
       // private-mode restriction — fall through to the default theme
     }
   }, theme);
-  // Asserted, not fire-and-forget: a silently-failing PATCH (expired cookie,
-  // route moved) would leave the stale server value winning and quietly restore
-  // the cross-spec bleed this exists to prevent — as a wrong-theme screenshot
-  // diff, which reads as a UI regression rather than a broken fixture.
   const res = await page.request.patch("/api/preferences", {
     data: { theme, diceRollStyle: "animated", autoRollConcentration: true },
   });
@@ -135,8 +115,6 @@ test("visual: inventory section and ledger modal", async ({ page }) => {
   await gotoSheet(page, id, "inventory");
   await expect(page.getByRole("heading", { name: "Inventory", exact: true })).toBeVisible();
 
-  // Acquire one catalog Dagger so both the inventory row and its ledger event are
-  // present and deterministic (fixed name/weight; the ledger groups it under TODAY).
   await page.getByRole("button", { name: "+ Add item" }).first().click();
   await page.getByLabel("Item").selectOption({ label: "Dagger" });
   await page.getByLabel("gp", { exact: true }).fill("0");
@@ -148,7 +126,6 @@ test("visual: inventory section and ledger modal", async ({ page }) => {
     maxDiffPixelRatio: 0.01,
   });
 
-  // Ledger (the Character Activity modal — this app's audit log with LIFO undo).
   await page.getByRole("button", { name: "Activity" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByText("Dagger").first()).toBeVisible();
@@ -175,10 +152,6 @@ test("visual: spells section", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Spell Slots" })).toBeVisible();
   await ready(page);
 
-  // The Magic tab's default view is the self-styled spellcasting record block
-  // (stat bar, slot pips, the Cast door, #1162); the grimoire is a separate
-  // view behind "Manage spellbook →". Snapshot the record — the tab panel's
-  // default state.
   await expect(page.locator("#sheet-panel-magic")).toHaveScreenshot("spells-section.png", {
     maxDiffPixelRatio: 0.01,
   });
@@ -215,20 +188,15 @@ test("visual: creation ceremony — steps", async ({ page }) => {
 
   await page.getByRole("link", { name: "New Character" }).first().click();
   await expect(page).toHaveURL(/\/characters\/new$/);
-  // #1286: the entry gate (campaign/edition) sits ahead of the ceremony now —
-  // accept its Solo + 2024 defaults before the Identity step ever renders.
   await passEntryGate(page);
-  // The ceremony (#1176) opens on the Identity step behind the dark stage.
   await expect(page.getByLabel(/^Name/)).toBeVisible();
   await ready(page);
 
-  // Step 1 — the empty Identity step (a fresh browser context starts draft-free).
   await expect(page).toHaveScreenshot("creation-step1.png", {
     maxDiffPixelRatio: 0.01,
   });
 
-  // Step 2 — identity chosen, advanced to the Abilities step (Soldier's 2024
-  // spread). A fixed name keeps the "Forging · …" kicker pixels stable.
+  // A fixed name (not uniqueName) keeps the "Forging · …" kicker pixels stable.
   await page.getByLabel(/^Name/).fill("Aria Brightwood");
   await page.getByLabel(/^Alignment/).selectOption({ label: "True Neutral" });
   await page.getByLabel(/^Species/).selectOption({ label: "Human" });
@@ -243,11 +211,9 @@ test("visual: creation ceremony — steps", async ({ page }) => {
   });
 });
 
-// #994: sheet-dark's fullPage maxDiffPixelRatio (0.02, ~51k px on this shot)
-// comfortably exceeds the brand-surface fix's actual footprint (~17k px), so
-// that baseline alone could pass unchanged — the flagship fix would ship with
-// zero baseline movement. These two tight, scoped shots exist to make the
-// salmon-vs-garnet difference an actual gate instead of a rounding error.
+// The sheet-dark fullPage baseline's diff tolerance is loose enough to pass
+// unchanged even on a real brand-surface regression — these two tight, scoped
+// shots exist to make that kind of color drift an actual gate.
 test("visual: brand surfaces — dark, desktop", async ({ page }) => {
   await login(page);
   await pinFonts(page);
@@ -265,8 +231,6 @@ test("visual: brand surfaces — dark, desktop", async ({ page }) => {
   await expect(doorway).toBeVisible();
   await ready(page);
 
-  // Clip from the tab rail down through the SessionDoorwayCard "Start session"
-  // button — the two migrated fills a full-page shot's budget would hide.
   const tabBox = await tablist.boundingBox();
   const doorwayBox = await doorway.boundingBox();
   if (!tabBox || !doorwayBox) throw new Error("brand-surface region not visible");
@@ -294,8 +258,7 @@ test("visual: bottom nav — dark, mobile", async ({ page }) => {
     background: "Soldier",
   });
 
-  // The acceptance surface (#994's "worst case" per the issue) has zero
-  // coverage otherwise: it's md:hidden and every other spec runs at 1280×800.
+  // md:hidden, and every other spec here runs at 1280×800 — this is its only coverage.
   await page.setViewportSize({ width: 390, height: 844 });
   await setTheme(page, "dark");
   await gotoSheet(page, id, "overview");

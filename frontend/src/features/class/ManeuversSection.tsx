@@ -1,14 +1,13 @@
-// #1516: no forget affordance here — a maneuver replacement is bound to
-// learn-time (PHB'14 Battle Master p.73 / SRD 5.2 equivalent) and only
-// reachable through the level-up ceremony's own "maneuvers" step, which
-// serves its own canSwap entitlement; the sheet never renders one.
+// No forget affordance here — a maneuver replacement is bound to learn-time
+// (PHB'14 Battle Master p.73 / SRD 5.2 equivalent) and only reachable through
+// the level-up ceremony (#1516).
 import type { CharacterResources, LearnManeuverOperation } from "@/types/character";
 import AddManeuverPanel from "@/features/class/AddManeuverPanel";
 import ManeuverRow from "@/features/class/ManeuverRow";
 
 interface Props {
   resources: CharacterResources;
-  /** The `maneuvers` rider's saveDC (#1316) — a top-level Character field, not part of `resources`. */
+  // The `maneuvers` rider's saveDC — a top-level Character field, not part of `resources`.
   maneuverSaveDC?: number;
   maneuverKnownIds: string[];
   busy: boolean;

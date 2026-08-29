@@ -19,8 +19,6 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-// ClassFeaturesSection reads useCurrentCharacter(), so every render seeds the
-// cache and mounts CurrentCharacterProvider via renderWithCharacter.
 function render(character: Character) {
   return renderWithCharacter(<ClassFeaturesSection referenceClasses={[]} />, character);
 }
@@ -31,12 +29,8 @@ const FS_CATALOG = [
   { id: "sentinel", name: "Sentinel", description: "not a style", category: "general" },
 ] as unknown as CatalogFeat[];
 
-// A fighter with a Fighting Style slot partition (#1137). `taken` are the
-// fightingStyle-slot advancements; `used` derives from their count by default.
-// `classes` carries the real ClassEntry[] wire shape; `fightingStyleGrantingClasses`
-// (#1495) is the server-computed EARNED subset FightingStyleFeatSection
-// forwards to fetchFeats' class gate — a single-class Fighter's earned set
-// is trivially just itself.
+// fightingStyleGrantingClasses (#1495) is the server-computed earned subset
+// forwarded to fetchFeats' class gate.
 function makeFighter(opts: { total: number; taken?: AdvancementEntry[] }): Character {
   const taken = opts.taken ?? [];
   return {
@@ -83,10 +77,7 @@ describe("ClassFeaturesSection — Fighting Style", () => {
     render(makeFighter({ total: 1 }));
 
     await user.click(screen.getByRole("button", { name: /choose a fighting style/i }));
-    // No asiLevel (#1438): the server's ASI gate rejects every fighting_style row,
-    // so a level here would render this picker permanently empty. classNames
-    // (#1495) forwards the character's own class(es) for the server-side
-    // per-class subset gate.
+    // No asiLevel (#1438): the server's ASI gate rejects every fighting_style row.
     expect(client.fetchFeats).toHaveBeenCalledWith("EDITION_2014", undefined, ["Fighter"]);
     // A general-category feat must not leak into the fighting-style picker.
     expect(await screen.findByText("Archery")).toBeInTheDocument();
@@ -106,10 +97,6 @@ describe("ClassFeaturesSection — Cloak of Shadows (2024 rewrite, #1246: L11 ->
     return {
       id: "char-1",
       class: "Monk",
-      // "cloakOfShadows" is a same-key collision with 2014 Way of Shadow's own
-      // free-at-L11 row (#1505); this fixture is explicitly the 2024 rewrite
-      // per this describe block's title. Both editions share one wire-driven
-      // component since #1738 — the gate is now key-presence, not edition.
       rulesEdition: "EDITION_2024",
       level: cloakAvailable ? 17 : 11,
       subclass: "Warrior of Shadow",
@@ -154,14 +141,9 @@ describe("ClassFeaturesSection — Cloak of Shadows (2024 rewrite, #1246: L11 ->
   });
 });
 
-// #1598: needsSubclass is now read off the backend-emitted classes[0] entry,
-// never re-derived from character.level/classDef.subclassGateLevel (that
-// mirror — #1325's own fix — is exactly what stranded a character on a
-// cross-edition subclass row with no way out: a held subclass NAME made the
-// old `!character.subclass` half of the check false, so the picker never
-// rendered). classDef here supplies only display data (the gate-level
-// wording, the subclasses list) — the gate decision itself comes from
-// classes[0].needsSubclass.
+// needsSubclass is read off the backend-emitted classes[0] entry, never
+// re-derived from character.level/classDef.subclassGateLevel — re-deriving it
+// stranded a character on a cross-edition subclass row with no way out (#1598).
 describe("ClassFeaturesSection — subclass gate is backend-computed (#1598)", () => {
   function clericDef(subclassGateLevel: number): ClassOption {
     return {
@@ -200,9 +182,7 @@ describe("ClassFeaturesSection — subclass gate is backend-computed (#1598)", (
   }
 
   it("offers the subclass prompt + picker when the wire entry says needsSubclass, regardless of the LOCAL classDef gate number", () => {
-    // gate 3 in the local classDef would have failed the old client-side
-    // `level >= subclassGateLevel` check at level 1 — proving the component
-    // no longer looks at that number to decide whether to show the picker.
+    // gate 3 in the local classDef would fail a `level >= subclassGateLevel` check at level 1.
     renderWithReference([clericDef(3)], clericWithEntry(true));
     expect(screen.getByText(/You have reached level 3 — choose a subclass/)).toBeInTheDocument();
     expect(screen.getByRole("combobox")).toBeInTheDocument();
@@ -215,12 +195,8 @@ describe("ClassFeaturesSection — subclass gate is backend-computed (#1598)", (
   });
 });
 
-// #1602: #1598 wired the explanation + re-pick to the PRIMARY class entry
-// only. A multiclass character stranded on a cross-edition subclass in their
-// SECONDARY entry got no explanation and no re-pick — the same dead end #1598
-// closed for the primary entry, surviving for multiclass characters. The wire
-// data was already per-entry (buildClassesView); this pins that the frontend
-// now reads every roster entry instead of just classes[0].
+// The frontend reads every roster entry, not just classes[0], so a stranded
+// cross-edition subclass on a SECONDARY class entry also gets an explanation + re-pick (#1602).
 describe("ClassFeaturesSection — stranded SECONDARY class entry (#1602)", () => {
   function fighterDef(): ClassOption {
     return {
@@ -286,13 +262,10 @@ describe("ClassFeaturesSection — stranded SECONDARY class entry (#1602)", () =
       strandedMulticlassCharacter(),
     );
 
-    // Primary entry: healthy, name only, no picker, no explanation. "Champion"
-    // appears twice (once in the roster list, once in the primary Subclass
-    // section) — getAllByText just proves the primary section rendered too.
+    // "Champion" appears twice (roster list + primary Subclass section).
     expect(screen.getAllByText("Champion").length).toBeGreaterThan(0);
     expect(screen.getByText("Fighter Subclass")).toBeInTheDocument();
 
-    // Secondary entry: the stranded name, the plain-language explanation, and a picker.
     expect(screen.getByText("Warlock Subclass")).toBeInTheDocument();
     expect(screen.getAllByText("The Archfey").length).toBeGreaterThan(0);
     expect(screen.getByText(/The Archfey isn't part of 2024 rules/)).toBeInTheDocument();

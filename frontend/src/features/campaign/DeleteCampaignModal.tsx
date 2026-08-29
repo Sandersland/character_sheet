@@ -12,11 +12,7 @@ interface DeleteCampaignModalProps {
   onClose: () => void;
 }
 
-/**
- * Confirmation dialog before permanently deleting a campaign. Navigates to
- * /campaigns after a successful delete — replacing history so the now-dead
- * campaign URL can't be reached by pressing Back.
- */
+// {replace: true}: the now-dead campaign URL shouldn't be reachable by pressing Back.
 export default function DeleteCampaignModal({
   campaignId,
   campaignName,

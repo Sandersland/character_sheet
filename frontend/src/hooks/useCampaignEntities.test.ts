@@ -30,14 +30,12 @@ describe("useCampaignEntities", () => {
     fetchEntities.mockReset();
   });
 
-  // Pin (green-first): no campaignId.
   it("no campaignId -> [], fetchEntities never called", () => {
     const { result } = renderHook(() => useCampaignEntities(null));
     expect(result.current.entities).toEqual([]);
     expect(fetchEntities).not.toHaveBeenCalled();
   });
 
-  // Pin (green-first): success -> list + byId keyed by id.
   it("success -> list + byId keyed by id", async () => {
     const list = [entity({ id: "e1" }), entity({ id: "e2" })];
     fetchEntities.mockResolvedValue(list);
@@ -47,8 +45,8 @@ describe("useCampaignEntities", () => {
     expect(result.current.byId.get("e2")).toEqual(list[1]);
   });
 
-  // Pin (green-first): the subscriber-fanout EntityCreateForm/CampaignItemsPanel
-  // depend on — priming after a create must reach an already-mounted consumer.
+  // Priming after a create must reach an already-mounted consumer
+  // (EntityCreateForm, CampaignItemsPanel).
   it("a primeCampaignEntities call is seen by an already-mounted consumer", async () => {
     fetchEntities.mockResolvedValue([]);
     const { result } = renderHook(() => useCampaignEntities("camp-1"));
@@ -60,8 +58,7 @@ describe("useCampaignEntities", () => {
     await waitFor(() => expect(result.current.entities).toEqual(created));
   });
 
-  // RED: fails against a naive `data ?? []`, which allocates a new array every
-  // render — pins the module-level NONE constant that protects useMentionEditor's
+  // Pins the module-level NONE constant that protects useMentionEditor's
   // memoisation on `entities` identity.
   it("entities keeps the same identity across re-renders when nothing changed", () => {
     const { result, rerender } = renderHook(() => useCampaignEntities(null));
@@ -70,8 +67,8 @@ describe("useCampaignEntities", () => {
     expect(result.current.entities).toBe(before);
   });
 
-  // Pin (green-first): two consumers mounting together share one request —
-  // dedupe is TanStack Query's job now, not the deleted inflight Map.
+  // Two consumers mounting together share one request — dedupe is TanStack
+  // Query's job, not a manual inflight map.
   it("two consumers mounting together issue one fetchEntities call", async () => {
     fetchEntities.mockResolvedValue([]);
     const first = renderHook(() => useCampaignEntities("camp-1"));

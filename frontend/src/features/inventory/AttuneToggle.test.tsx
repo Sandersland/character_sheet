@@ -4,9 +4,7 @@ import { render, screen } from "@testing-library/react";
 import AttuneToggle from "@/features/inventory/AttuneToggle";
 import type { InventoryItem } from "@/types/character";
 
-// The fixture deliberately carries attunementPrereqText and NOT
-// attunementPrereqKind: the tooltip must come off the served string, so a
-// component that still mapped kind → phrase client-side would fail here (#1382).
+// Tooltip must come off the served attunementPrereqText, not a client-side kind→phrase mapping (#1382).
 const mockItem: InventoryItem = {
   id: "item-1",
   name: "Staff of Testing",

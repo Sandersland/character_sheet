@@ -17,8 +17,7 @@ interface DiceInputProps {
   className?: string;
 }
 
-// Compound NdF (+M) [type] dice control. Numeric inputs force text-parchment-900
-// so the digits stay legible against the dark-mode control surface.
+// text-parchment-900 forced so the digits stay legible against the dark-mode control surface.
 const numCls = "w-14 text-center text-parchment-900";
 
 export default function DiceInput({

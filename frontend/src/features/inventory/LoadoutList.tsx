@@ -17,9 +17,6 @@ interface LoadoutListProps {
   onSubmit: (operations: InventoryOperation[]) => Promise<void>;
 }
 
-// The interactive "Worn" loadout list (#925): grouped Weapons / Armor /
-// Accessories rows replacing the rejected tile grid. Reuses the paper-doll slot
-// model + equip/unequip ops; swaps batch an unequip + equip atomically.
 export default function LoadoutList({ pending, onSubmit }: LoadoutListProps) {
   const { character } = useCurrentCharacter();
   const inventory = character.inventory;

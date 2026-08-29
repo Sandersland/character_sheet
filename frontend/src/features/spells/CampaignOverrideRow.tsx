@@ -1,8 +1,3 @@
-// One "Override for a campaign you run" row (#1801, epic #1795 6/6),
-// extracted out of ForkSpellSheet: each row owns its own busy/done/error
-// state so the parent sheet doesn't need a Record-keyed state map + inline
-// per-row handler closures for what's otherwise a one-shot POST per
-// campaign (a fork is NOT idempotent — ForkSpellSheet's own file banner).
 import { useState } from "react";
 
 import { forkCatalogEntry } from "@/api/client";

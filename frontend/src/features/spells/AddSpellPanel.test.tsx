@@ -28,7 +28,6 @@ const REFERENCE: ReferenceData = {
   itemRarities: [],
 };
 
-// #1817: the panel exposes exactly two tabs.
 describe("AddSpellPanel tab set (#1817)", () => {
   beforeEach(() => {
     vi.mocked(client.fetchSpells).mockResolvedValue([]);
@@ -78,10 +77,6 @@ describe("AddSpellPanel accessibility", () => {
   });
 });
 
-// #1811, epic #1795 9/9: the picker must pass the viewing character through
-// to GET /api/spells (via fetchSpells' `characterId` filter, api/catalog.ts)
-// so a fellow campaign member's granted/shared spell reaches this picker —
-// the actual gap #1811 closes, not just plumbing for its own sake.
 describe("AddSpellPanel campaign-aware picker (#1811)", () => {
   beforeEach(() => {
     vi.mocked(client.fetchSpells).mockReset();
@@ -108,9 +103,6 @@ describe("AddSpellPanel campaign-aware picker (#1811)", () => {
   });
 });
 
-// #1787, epic #1782 4/5: creating a homebrew spell must land the picker back
-// on the catalog tab with GET /api/spells refetched, so the new row shows up
-// without the user having to close/reopen the panel.
 describe("AddSpellPanel homebrew tab integration", () => {
   const HOMEBREW_CATALOG_SPELL: CatalogSpell = {
     id: "s1",
@@ -168,25 +160,13 @@ describe("AddSpellPanel homebrew tab integration", () => {
     await user.type(screen.getByLabelText(/description/i), "A bolt of test energy.");
     await user.click(screen.getByRole("button", { name: /create homebrew spell/i }));
 
-    // #1819: the authoring character must reach createCustomSpell as the 2nd
-    // arg — a broken characterId thread anywhere in AddSpellPanel → HomebrewTab
-    // → HomebrewSpellForm would pass undefined and go uncaught otherwise.
     await waitFor(() => expect(client.createCustomSpell).toHaveBeenCalledWith(expect.anything(), "char-1"));
 
-    // Back on the catalog tab, with the second (post-create) fetchSpells page showing the new spell.
     expect(await screen.findByText("Test Bolt")).toBeInTheDocument();
     expect(client.fetchSpells).toHaveBeenCalledTimes(2);
   });
 });
 
-// #1808 (epic #1795 8/8) + #1811 (9/9), reconciled by the #1808-leak-fix
-// combined-state review (epic #1795 8/9): #1811's campaign-aware picker
-// (`characterId` threaded into GET /api/spells) now re-supplies a DM's
-// CAMPAIGN fork on the ordinary post-fork refetch — the #1808-era local-
-// override workaround this describe block used to test is gone (see git
-// history). `catalog.editable` (server-computed) is what the Homebrew tab
-// now gates Edit/Delete on, so these tests drive that signal through
-// fetchSpells' mock instead of a fork flow.
 describe("AddSpellPanel — Homebrew tab gates Edit/Delete on catalog.editable (#1808/#1811)", () => {
   const SEEDED_SPELL: CatalogSpell = {
     id: "seeded-1",
@@ -229,9 +209,6 @@ describe("AddSpellPanel — Homebrew tab gates Edit/Delete on catalog.editable (
       id: "fork-1",
       catalog: { entryId: "entry-campaign-fork", scope: "CAMPAIGN", isFork: true, forkedFromId: "entry-fireball", editable: true },
     };
-    // First call is the initial load (no fork yet); every call after the
-    // fork (the picker's own refetch, real #1811 campaign-aware behavior)
-    // includes it, editable: true for the DM who owns it.
     vi.mocked(client.fetchSpells).mockResolvedValueOnce([SEEDED_SPELL]).mockResolvedValue([SEEDED_SPELL, forkedRow]);
     vi.mocked(client.fetchCampaigns).mockResolvedValue([DM_CAMPAIGN]);
     vi.mocked(client.forkCatalogEntry).mockResolvedValue({ entryId: "entry-campaign-fork", spell: forkedRow });
@@ -258,13 +235,9 @@ describe("AddSpellPanel — Homebrew tab gates Edit/Delete on catalog.editable (
     expect(await screen.findByText("Fireball")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Edit Fireball" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Delete Fireball" })).toBeInTheDocument();
-    // Not shareable — see HomebrewSpellManageRow's own comment.
     expect(screen.queryByRole("button", { name: "Share Fireball" })).not.toBeInTheDocument();
   });
 
-  // The leak an Opus review of the combined state caught: a non-DM member's
-  // picker gets the SAME CAMPAIGN row too (#1811), just with editable: false
-  // — it must never surface as manageable in THEIR Homebrew tab.
   it("excludes a fellow (non-DM) member's non-editable CAMPAIGN row from the Homebrew tab entirely", async () => {
     const notMyFork: CatalogSpell = {
       ...SEEDED_SPELL,
@@ -285,8 +258,6 @@ describe("AddSpellPanel — Homebrew tab gates Edit/Delete on catalog.editable (
       />,
     );
 
-    // Both rows are named "Fireball" (the fork copies its origin's name) —
-    // wait for the fetch itself rather than a name that now matches twice.
     await waitFor(() => expect(client.fetchSpells).toHaveBeenCalled());
     await user.click(screen.getByRole("button", { name: "Homebrew" }));
 

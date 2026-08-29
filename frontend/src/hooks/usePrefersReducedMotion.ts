@@ -14,10 +14,7 @@ function getSnapshot(): boolean {
   return window.matchMedia(QUERY).matches;
 }
 
-/** Live `prefers-reduced-motion: reduce` state; degrades to false without
- *  matchMedia (SSR/old jsdom). Callers gate motion so reduce-motion users get an
- *  instant swap (#1083). */
+/** Degrades to false without matchMedia (SSR/old jsdom); callers gate motion so reduce-motion users get an instant swap (#1083). */
 export function usePrefersReducedMotion(): boolean {
-  // getServerSnapshot returns false: no motion preference assumed pre-hydration.
   return useSyncExternalStore(subscribe, getSnapshot, () => false);
 }

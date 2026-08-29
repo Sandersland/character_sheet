@@ -15,8 +15,7 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
   } as unknown as Character;
 }
 
-// LevelUpBanner reads useCurrentCharacter(), so every render seeds the cache
-// and mounts CurrentCharacterProvider via renderWithCharacter.
+// LevelUpBanner reads useCurrentCharacter(), so renderWithCharacter must seed the cache and mount CurrentCharacterProvider.
 function renderBanner(character: Character) {
   return renderWithCharacter(
     <MemoryRouter>

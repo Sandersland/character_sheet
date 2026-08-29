@@ -9,8 +9,6 @@ import {
 import { getPreviewConnections, getPreviewStats } from "@/features/entities/entityPreviewData";
 import type { CampaignEntity, EntityConnection, EntityStats } from "@/types/character";
 
-// Hover-intent controller for EntityPreviewCard: desktop-only (pointer: fine), 300ms delay.
-
 export type PreviewEntity = Pick<
   CampaignEntity,
   "id" | "name" | "type" | "aliases" | "notes" | "portraitUrl" | "visibility"

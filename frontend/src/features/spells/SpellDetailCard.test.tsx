@@ -5,8 +5,7 @@ import userEvent from "@testing-library/user-event";
 import SpellDetailCard, { type SpellDetailView } from "@/features/spells/SpellDetailCard";
 import { axe } from "@/test/axe";
 
-// jsdom's matchMedia reports matches:false, so BottomSheet defaults to mobile;
-// desktop cases stub a min-width match for the instant (non-animated) close path.
+// jsdom's matchMedia reports matches:false (mobile); this stubs a min-width match for desktop's instant close path.
 function stubDesktop() {
   vi.stubGlobal("matchMedia", (query: string) => ({
     matches: query.includes("min-width"),
@@ -62,7 +61,6 @@ describe("SpellDetailCard", () => {
   it("renders the save pill via abilityAbbr, never the raw ability key", () => {
     render(<SpellDetailCard spell={holdPerson} cta={cta()} onClose={vi.fn()} />);
     expect(screen.getByText(/WIS save/)).toBeInTheDocument();
-    // The raw lowercase ability key must never reach the UI (abilityAbbr resolves it).
     expect(screen.queryByText(/wisdom/)).not.toBeInTheDocument();
   });
 

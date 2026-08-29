@@ -1,4 +1,3 @@
-// Central icon barrel: lucide-react for UI chrome, react-icons/gi for D&D flavor.
 import type { IconType } from "react-icons";
 import {
   GiBiceps,
@@ -41,8 +40,7 @@ export const ITEM_CATEGORY_ICONS: Record<ItemCategory, IconType> = {
   consumable: GiHealthPotion,
 };
 
-// Paper-doll slot glyphs (#566) — game-icons.net via react-icons/gi. RING shares
-// the ring glyph across both sub-slots. CC BY 3.0 attribution lives on /about.
+// game-icons.net via react-icons/gi; CC BY 3.0 attribution lives on /about.
 export const EQUIP_SLOT_ICONS: Record<EquipSlot, IconType> = {
   MAIN_HAND: GiSwordWound,
   OFF_HAND: GiShield,
@@ -58,13 +56,10 @@ export const EQUIP_SLOT_ICONS: Record<EquipSlot, IconType> = {
 };
 
 export { GiQuillInk, GiKnapsack, GiSpellBook, GiHealthNormal, GiHealthPotion, GiVisoredHelm, GiRank3 } from "react-icons/gi";
-// Turn-economy slot glyphs (#729): Action / Bonus Action / Reaction.
 export { GiCrossedSwords, GiSparkles, GiCycle } from "react-icons/gi";
-// Attack-sheet damage-card glyph (#756), surfaced when #864 touched this file.
 // fallow-ignore-next-line unused-export -- public re-export kept available for the attack sheet; no current importer yet
 export { GiSwordWound } from "react-icons/gi";
-// Turn-picker option-card glyphs: universal actions on the Action sheet.
-// GiOpenBook/GiPublicSpeaker are the 2024-only Study/Influence tiles (#1430).
+// GiOpenBook/GiPublicSpeaker are the 2024-only Study/Influence tiles.
 export {
   GiRun,
   GiDodging,
@@ -85,8 +80,7 @@ export {
   Plus,
   Zap,
   VenetianMask,
-  // The typo-dedup "Combine into…" glyph (#1943) — deliberately not VenetianMask,
-  // which reads as identity-merge (a secret) rather than combine (a mistake).
+  // Deliberately distinct from VenetianMask, which reads as identity-merge (a secret) rather than combine (a mistake).
   Combine,
   ChevronDown,
   ChevronRight,
@@ -95,11 +89,7 @@ export {
   Trash2,
   TriangleAlert,
   ScrollText,
-  // #1682 — SpeciesTraitsCard's Darkvision accent (owner ruling: prominent,
-  // visible info, not a derived combat stat).
   Eye,
-  // App inbox (#1946): AppHeader's bell trigger, and the duplicate-cluster
-  // row glyph — ScrollText above doubles as the needs-chronicling row glyph.
   Bell,
   Copy,
 } from "lucide-react";

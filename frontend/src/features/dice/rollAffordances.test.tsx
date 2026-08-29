@@ -69,7 +69,6 @@ describe("roll affordances log their category event", () => {
       <AllSkillsCard skills={skills} abilityScores={scores} proficiencyBonus={2} />,
     );
 
-    // WIS 16 → +3, proficient +2 = +5.
     await user.click(screen.getByTitle(/Roll Perception check/));
 
     await waitFor(() => expect(mockLogRoll).toHaveBeenCalledTimes(1));
@@ -106,9 +105,7 @@ describe("roll affordances log their category event", () => {
   it("initiative logs an initiative roll", async () => {
     const user = userEvent.setup();
     const character = { id: "char-1", initiativeBonus: 2, armorClass: 13, armorClassBreakdown: [], speed: 30, proficiencyBonus: 2, hitPoints: { current: 10, max: 10, temp: 0 } } as unknown as Character;
-    // BannerVitals reads useCurrentCharacter(), so this render seeds the
-    // cache and mounts CurrentCharacterProvider via renderWithCharacter
-    // (renderInSession only supplies RollProvider).
+    // BannerVitals reads useCurrentCharacter(), so this uses renderWithCharacter for CurrentCharacterProvider instead of renderInSession.
     renderWithCharacter(
       <RollProvider characterId="char-1" sessionId="sess-1">
         <BannerVitals />

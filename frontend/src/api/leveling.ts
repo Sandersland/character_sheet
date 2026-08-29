@@ -8,7 +8,6 @@ import type {
 } from "@/types/character";
 import { jsonBody, postTransactions, request } from "@/api/http";
 
-// Applies class-level mutations (today: setSubclass). Returns the updated character.
 export async function applyClassTransactions(
   characterId: string,
   operations: ClassOperation[]
@@ -16,8 +15,6 @@ export async function applyClassTransactions(
   return postTransactions(characterId, "class", operations, "Failed to apply class operations");
 }
 
-// Applies advancement operations (takeAsi / takeFeat / removeAdvancement).
-// Returns the full updated Character on success.
 export async function applyAdvancementTransactions(
   characterId: string,
   operations: AdvancementOperation[]
@@ -25,9 +22,8 @@ export async function applyAdvancementTransactions(
   return postTransactions(characterId, "advancement", operations, "Failed to apply advancement operations");
 }
 
-// The derived level-up ceremony plan (#886): resolved target + ordered steps.
-// `subclassId` triggers the server-side re-plan for a not-yet-committed subclass
-// pick. Read-only — nothing is mutated.
+// `subclassId` triggers the server-side re-plan for a not-yet-committed
+// subclass pick. Read-only — nothing is mutated.
 export async function fetchLevelUpPlan(
   characterId: string,
   target: LevelUpTarget,
@@ -44,9 +40,8 @@ export async function fetchLevelUpPlan(
   );
 }
 
-// Commits one whole level-up ceremony atomically. Bypasses postTransactions
-// because the body is the LevelUpSubmission verbatim, not an { operations }
-// batch; returns the leveled Character.
+// Bypasses postTransactions: the body is the LevelUpSubmission verbatim,
+// not an { operations } batch.
 export async function submitLevelUp(
   characterId: string,
   submission: LevelUpSubmission,

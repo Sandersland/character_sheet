@@ -1,4 +1,3 @@
-// V/S/M component flags + material text for the homebrew-spell form (#1787).
 import { INPUT_CLS, LABEL_CLS } from "@/lib/addSpell";
 import type { HomebrewSpellInput } from "@/types/character";
 

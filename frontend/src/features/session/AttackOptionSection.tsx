@@ -1,8 +1,3 @@
-// "attackOption" maneuvers (Commander's Strike, etc.) in the attack sheet: each
-// forfeits one of the Attack action's attacks, spends a superiority die, and
-// leaves reminder text. Extracted from InlineAttackPicker so its spend branching
-// is scored on its own (#778).
-
 import { useState } from "react";
 
 import AttackOptionRow from "@/features/session/AttackOptionRow";
@@ -18,7 +13,6 @@ interface AttackOptionSectionProps {
   die: UseManeuverDieReturn;
 }
 
-// Whether an attackOption row's "Use" button is enabled, and why not.
 function attackOptionEnabled(
   m: ManeuverEntry,
   pool: { remaining: number } | null | undefined,
@@ -62,7 +56,6 @@ export default function AttackOptionSection({
     } else if (m.actionSlot === "reaction" && !turnState.reactionUsed) {
       turnState.consumeReaction();
     }
-    // Forfeit one of the Attack action's attacks.
     turnState.recordAttack();
     setMessages((prev) => ({
       ...prev,

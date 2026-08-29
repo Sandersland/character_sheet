@@ -1,7 +1,3 @@
-/**
- * Inventory + item catalog wire types: items, weapon/armor/consumable detail, capabilities, and inventory operations.
- */
-
 import type {
   ActivationType,
   ArmorCategory,
@@ -21,10 +17,6 @@ import type {
 
 import type { Currency } from "./primitives";
 
-// The item/capability wire vocabulary is the single cross-tier source of truth in
-// shared-types (#1273); re-exported here so this module stays the frontend's
-// inventory-types entry point (flowing through the @/types/character barrel).
-// The names imported above are also used locally by the shapes below.
 export type {
   ActivationType,
   ArmorCategory,
@@ -50,19 +42,11 @@ export type {
   ItemAdvantageGrant,
   ItemProficiencyGrant,
 } from "@character-sheet/shared-types";
-// The wire capability keeps its frontend name: the shared declaration is called
-// SerializedCapability to distinguish it from the backend's kind-discriminated
-// internal Capability union, a distinction the client doesn't have. Aliasing
-// beats renaming 80+ call sites — it is still one declaration (#1273).
+// Aliased so this module doesn't need to rename its 80+ call sites.
 export type { SerializedCapability as ItemCapability };
 
-/**
- * Weapon-specific mechanics, present (as `weapon`) only on a row whose
- * category is "weapon". Dice are decomposed (count/faces/modifier) to match
- * the `RollSpec` shape rather than a "1d6" string, so a future damage-roll
- * feature reads these directly — mirrors the `ItemWeaponDetail` model.
- */
-// fallow-ignore-next-line code-duplication -- pre-existing field mirror against packages/shared-types/src/item-detail-inputs.ts's WeaponDetailInput (the frontend/backend wire-type split, #1272/#1273); surfaced only because #1854 touched this file elsewhere, not introduced by it
+/** Dice are decomposed to match the `RollSpec` shape rather than a "1d6" string. */
+// fallow-ignore-next-line code-duplication -- mirrors shared-types' WeaponDetailInput field-for-field, by design (#1272)
 export interface WeaponDetail {
   damageDiceCount: number;
   damageDiceFaces: number;
@@ -84,38 +68,18 @@ export interface WeaponDetail {
   weaponClass?: WeaponClass;
   /** Melee vs. ranged; undefined for unclassified homebrew weapons. */
   weaponRange?: WeaponRange;
-  /**
-   * Attack bonus = ability modifier (STR/DEX/finesse-best) + proficiency bonus
-   * if proficient. Derived server-side in `serializeCharacter` — never persisted.
-   * Present on `InventoryItem.weapon`; absent on catalog `Item.weapon`.
-   */
+  /** Present on `InventoryItem.weapon`; absent on catalog `Item.weapon`. */
   attackBonus?: number;
-  /**
-   * The addends of `attackBonus` (ability mod / applied proficiency bonus /
-   * ranged Archery bonus / attack-roll buff) — server-derived alongside it via
-   * `deriveWeaponAttackComponents`, for the combat-log drill-in (#1235). Sums to
-   * `attackBonus` by construction; present on `InventoryItem.weapon` only.
-   */
+  /** Sums to `attackBonus` by construction; present on `InventoryItem.weapon` only. */
   attackBonusComponents?: RollEventAttackComponents;
-  /**
-   * Derived damage roll spec — grip-resolved at read time by `deriveWeaponDamage`.
-   * Encodes the correct die for versatile weapons based on what else
-   * is equipped (1d10 when off-hand is free; 1d8 when a shield or second weapon
-   * is equipped). Present on `InventoryItem.weapon`; absent on catalog `Item.weapon`.
-   */
+  /** Grip-resolved at read time by `deriveWeaponDamage`; present on `InventoryItem.weapon` only, absent on catalog `Item.weapon`. */
   damage?: {
     damageDiceCount: number;
     damageDiceFaces: number;
     damageModifier: number;
-    /**
-     * The governing ability modifier component of `damageModifier` (before any
-     * melee-damage buff). Server-derived alongside `damageModifier`; used to
-     * implement the Two-Weapon Fighting off-hand rule client-side — an off-hand
-     * bonus attack omits the ability mod from damage unless the character has the
-     * Two-Weapon Fighting style (#732).
-     */
+    /** Used client-side to implement the Two-Weapon Fighting off-hand rule: an off-hand bonus attack omits the ability mod unless the character has that fighting style. */
     abilityModifier?: number;
-    /** The OTHER addend folded into `damageModifier` (an active meleeDamage buff, e.g. Rage) — #1235 combat-log decomposition. */
+    /** The other addend folded into `damageModifier` (an active meleeDamage buff). */
     meleeDamageBonus?: number;
     damageType: string;
     grip: "one-handed" | "two-handed" | "versatile-two-handed";
@@ -134,29 +98,18 @@ export interface ArmorDetail {
   strengthRequirement?: number;
 }
 
-/**
- * A consumable's roll-based effect (e.g. a potion's "2d4 + 2" healing),
- * present only on `category: "consumable"` items that actually have one —
- * a torch wouldn't. Same RollSpec-shaped dice fields as WeaponDetail.
- */
+/** Present only on consumables that actually have a roll effect — not every consumable does. */
 export interface ConsumableDetail {
   effectDiceCount?: number;
   effectDiceFaces?: number;
   effectModifier?: number;
-  effectDescription?: string; // e.g. "Restores hit points"
-  // Limited-use charges (#121). Undefined = stackable (use decrements quantity);
-  // set = charged (use decrements usesRemaining, recharges on long rest).
+  effectDescription?: string;
+  // Undefined = stackable (use decrements quantity); set = charged (use decrements usesRemaining, recharges on long rest).
   maxUses?: number;
   usesRemaining?: number;
 }
 
-/**
- * Baseline equipment catalog served by `GET /api/items` — the "pick a
- * club, don't hand-author one" path for the inventory editor (Phase B).
- * `InventoryItem` below snapshots these fields (including `weapon`/`armor`/
- * `consumable`) rather than referencing this type live — mirrors the `Item`
- * and `InventoryItem` models.
- */
+/** `InventoryItem` snapshots these fields rather than referencing this type live. */
 export interface Item {
   id: string;
   name: string;
@@ -167,13 +120,11 @@ export interface Item {
   weapon?: WeaponDetail;
   armor?: ArmorDetail;
   consumable?: ConsumableDetail;
-  // Set only for the small set of Item rows that ARE tools (the ten musical
-  // instruments, Herbalism Kit, Thieves' Tools) — lets the starting-equipment
-  // open-pick dropdown filter on it directly (#1564).
+  // Set only for Item rows that are tools; lets the starting-equipment dropdown filter on it directly.
   toolCategory?: ToolCategory;
 }
 
-/** Item-granted-spell metadata on a Spell whose source is "item" (#528). */
+/** Metadata on a Spell whose source is "item". */
 export interface ItemSpellMeta {
   inventoryItemId: string;
   capabilityId: string;
@@ -186,22 +137,19 @@ export interface ItemSpellMeta {
   dc?: number | null;
   attackMode: CastStatMode;
   attack?: number | null;
-  /** Pool charges per cast when resource is "charges" (#555); usesRemaining/Total mirror the pool. */
+  /** Pool charges per cast when resource is "charges"; usesRemaining/Total mirror the pool. */
   chargeCost?: number;
 }
 
-/** Derived charge-pool state on an inventory item (#555): remaining is derived
- * (maxCharges − used) server-side; recharge is the human tooltip text. */
+/** `remaining` is derived server-side (max − used); `recharge` is human tooltip text. */
 export interface ItemChargesState {
   max: number;
   remaining: number;
   recharge: string;
 }
 
-// The two trait grants below have no shared declaration (unlike their advantage
-// and proficiency siblings) because deriveItemGrants produces a generic
-// {value, source} internally and serializeCharacter remaps `value` to
-// `damageType` / `condition` on the way out — these ARE the wire shapes (#529).
+// Unlike their advantage/proficiency siblings, these ARE the wire shapes — `serializeCharacter`
+// remaps a generic {value, source} to `damageType`/`condition`.
 export interface ItemDamageTrait {
   damageType: string;
   source: string;
@@ -212,16 +160,7 @@ export interface ItemConditionImmunity {
   source: string;
 }
 
-/**
- * A character's own copy of an item's stats, optionally traced back to a
- * catalog `Item` via `itemId` (undefined means homebrew/no catalog match —
- * same nullable-FK-plus-own-fields shape as race/background selections).
- * Every field below — including `weapon`/`armor`/`consumable`, at most one
- * of which is present, matching `category` — is this row's own value, free
- * to diverge from the catalog (e.g. renaming "Club" to "Club +1" and
- * bumping its own `weapon.damageModifier` after a magic bonus).
- */
-/** Paper-doll placement slot (#565) — mirrors the backend `EquipSlot` enum. */
+/** Mirrors the backend `EquipSlot` enum. */
 export type EquipSlot =
   | "MAIN_HAND"
   | "OFF_HAND"
@@ -235,6 +174,7 @@ export type EquipSlot =
   | "FEET"
   | "RING";
 
+/** `itemId` undefined means homebrew/no catalog match; every field below is this row's own value, free to diverge from the catalog. */
 export interface InventoryItem {
   id: string;
   itemId?: string;
@@ -245,50 +185,27 @@ export interface InventoryItem {
   cost?: Currency;
   description?: string;
   equipped: boolean;
-  /** The slot this item currently occupies (#565); absent = in the bag. */
+  /** The slot this item currently occupies; absent = in the bag. */
   equippedSlot?: EquipSlot;
-  /** Declared paper-doll slot for wearable gear (#565); absent = bag-only. */
+  /** Declared paper-doll slot for wearable gear; absent = bag-only. */
   slot?: EquipSlot;
-  /**
-   * Server-resolved: whether this item's CATEGORY can be worn/wielded at all
-   * (#1433) — the gate on the inventory row's equip toggle. Deliberately NOT
-   * `allowedSlots.length > 0`: worn gear declaring a slot is placeable but not
-   * equippable, so a ring gets no equip toggle while the loadout RING picker
-   * still offers it.
-   */
+  /** Not equivalent to `allowedSlots.length > 0` — a ring is placeable in the loadout picker but gets no equip toggle. */
   equippable: boolean;
-  /** Server-resolved slots this item may legally occupy (#1433); empty = bag-only. */
+  /** Empty = bag-only. */
   allowedSlots: EquipSlot[];
-  /**
-   * Server-resolved: whether the character is proficient with this item (#1433).
-   * Reads the character's merged weapon/armor grants INCLUDING item grants, so it
-   * never contradicts `Character.weaponProficiencies` rendered beside it. Items
-   * with no derivable requirement (gear, consumables, an unclassified weapon) are
-   * `true` — a no-warn display policy, not a rules claim.
-   */
+  /** `true` for items with no derivable requirement is a no-warn display policy, not a rules claim. */
   proficient: boolean;
   /** Magic-item rarity tier snapshot; absent for mundane gear. */
   rarity?: ItemRarity;
-  /** Attunement state (#546); the 3-item cap is derived, never stored. */
+  /** Attunement state; the 3-item cap is derived, never stored. */
   attuned: boolean;
   /** Snapshotted from the source item — whether attunement is required to activate. */
   requiresAttunement: boolean;
   attunementPrereqKind?: AttunementPrereqKind;
   attunementPrereqValue?: string;
-  /**
-   * Server-resolved 5e phrasing of the prerequisite ("a Wizard"), byte-identical
-   * to the string an unmet-prerequisite attune is rejected with (#1382). Absent
-   * when there is no prerequisite; never composed client-side from the two fields
-   * above, which remain on the wire for the DM item form's round-trip.
-   */
+  /** Byte-identical to the string an unmet-prerequisite attune is rejected with; never compose it client-side. */
   attunementPrereqText?: string;
-  /**
-   * Eldritch Knight Weapon Bond (2014, PHB'14 p.75, #1854). May read stale
-   * `true` on a character no longer eligible (level-down, lost the subclass)
-   * until the server's reconciler runs — the served `availableActions`
-   * Summon Bonded Weapon action is already clamped, so this flag is display
-   * only.
-   */
+  /** 2014 Eldritch Knight Weapon Bond, PHB'14 p.75 — may read stale until the reconciler runs; display only, since `availableActions` is already clamped. */
   weaponBonded: boolean;
 
   notes?: string;
@@ -296,14 +213,12 @@ export interface InventoryItem {
   armor?: ArmorDetail;
   consumable?: ConsumableDetail;
   capabilities?: SerializedCapability[];
-  /** Activate/deactivate control state for an item's activatedEffect capability (#543). */
+  /** Activate/deactivate control state for an item's activatedEffect capability. */
   activated?: ActivatedEffectState;
-  /** Shared charge-pool state for an item with a charges capability (#555). */
+  /** Shared charge-pool state for an item with a charges capability. */
   charges?: ItemChargesState;
 }
 
-// The derived activate/deactivate control state the API serializes for an
-// activatedEffect item (#543). Absent when the item has no such capability.
 export interface ActivatedEffectState {
   activation: ActivationType;
   reminder: string;
@@ -313,12 +228,7 @@ export interface ActivatedEffectState {
   available: boolean;
 }
 
-/**
- * Body for a custom (homebrew) `acquire` operation — same shape as `Item`
- * minus `id`, plus the category's required minimal detail block (the acquire
- * route rejects e.g. a "weapon" with no `weapon` block, since those columns
- * are NOT NULL). Matches the backend `CustomItemInput`.
- */
+/** The acquire route rejects a category missing its required detail block — those columns are NOT NULL server-side. */
 export type CustomItemInput =
   | {
       name: string;
@@ -346,11 +256,7 @@ export type CustomItemInput =
     }
   | { name: string; category: "gear"; weight?: number; cost?: Currency; description?: string };
 
-/**
- * One operation in a `POST /api/characters/:id/inventory/transactions`
- * batch — see `applyInventoryOperations` for the full semantics (which ops
- * get logged to the ledger, atomicity, etc). A request batches 1+ of these.
- */
+/** One operation in a `POST /api/characters/:id/inventory/transactions` batch; see `applyInventoryOperations` for full semantics. */
 export type InventoryOperation =
   | {
       type: "acquire";
@@ -362,8 +268,7 @@ export type InventoryOperation =
       currencyDelta?: Currency;
     }
   | { type: "adjustQuantity"; inventoryItemId: string; delta: number }
-  /** Consumes one use of a consumable (#121). `rolls` are client-rolled effect
-   *  dice for the 3D animation; omit to have the server roll. */
+  /** `rolls` are client-rolled effect dice for the 3D animation; omit to have the server roll. */
   | { type: "use"; inventoryItemId: string; rolls?: number[] }
   | {
       type: "update";
@@ -382,24 +287,14 @@ export type InventoryOperation =
   | { type: "sell"; inventoryItemId: string; quantity?: number; currencyDelta: Currency }
   /** Equips or unequips an item. Unlike `update`, this IS logged on the timeline. */
   | { type: "setEquipped"; inventoryItemId: string; equipped: boolean }
-  /** Equips an item into an explicit paper-doll slot (#565); logged + undoable. */
+  /** Equips an item into an explicit paper-doll slot; logged + undoable. */
   | { type: "equip"; inventoryItemId: string; slot: EquipSlot }
-  /** Attunes an item — enforces the derived 3-item cap + prereq server-side (#546). */
+  /** Enforces the derived 3-item cap + prereq server-side. */
   | { type: "attune"; inventoryItemId: string }
-  /** Ends attunement; always legal (#546). */
+  /** Ends attunement; always legal. */
   | { type: "unattune"; inventoryItemId: string }
-  /** Activates / deactivates an item's activatedEffect capability (#543). */
   | { type: "activate"; inventoryItemId: string }
   | { type: "deactivate"; inventoryItemId: string };
 
-/**
- * DM-authored campaign item (#380): loot/magic-item prep that lives in a
- * campaign, not on any sheet. Mirrors `Item` plus DM-only fields (rarity,
- * attunement, isUnique, dmNotes) and a reference to the fronting ITEM entity.
- * `dmNotes` is present only in owner-facing payloads — it's scrubbed server-side
- * from every player response.
- */
-/** The six 5e magic-item rarity tiers. Their labels and standard gp values are
- *  served as ItemRarityOption rows on GET /api/reference (#1437), never held
- *  client-side; rarityLabel resolves a key against those rows. */
+/** Labels and gp values are served as `ItemRarityOption` rows on `GET /api/reference`, never held client-side; `rarityLabel` resolves against those rows. */
 export type ItemRarity = "COMMON" | "UNCOMMON" | "RARE" | "VERY_RARE" | "LEGENDARY" | "ARTIFACT";

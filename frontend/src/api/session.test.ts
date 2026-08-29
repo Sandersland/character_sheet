@@ -80,10 +80,6 @@ describe("endSoloSession", () => {
   });
 });
 
-// Verbatim regression pin from client.test.ts (#1270) — assertions unchanged,
-// only the import specifier retargeted. This is the last leg of the "send
-// (void flow)" describe: it stayed in client.test.ts through C8-C10 because
-// joinSession hadn't moved into a final module yet.
 describe("send (void flow, via joinSession)", () => {
   afterEach(() => {
     vi.unstubAllGlobals();

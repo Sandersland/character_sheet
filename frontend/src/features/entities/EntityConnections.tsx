@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { MENTION_CHIP_TONE_CLASS } from "@/lib/mentions";
 import type { EntityConnection } from "@/types/character";
 
-// Co-mention chips (#842): entities sharing notes with this one, tinted + linked.
 export default function EntityConnections({
   connections,
   campaignId,

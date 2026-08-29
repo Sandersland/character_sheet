@@ -16,13 +16,6 @@ interface AbilityRollTrayProps {
 const ROLL_SPEC: RollSpec = { count: 4, faces: 6, dropLowest: 1 };
 const POOL_SIZE = 6;
 
-/**
- * The roll-4d6 stage for the ability panel (#1161). Honors the Dice-rolls
- * preference (#945): `animated` plays the shared DiceRollSequence with the
- * physics roller (4d6 drop-lowest, six sets one at a time), `quick` fills the
- * pool instantly. Either way the settled totals flow up via `onRolled` — the
- * panel's chip bar is the pool display, so this only owns the roll itself.
- */
 export default function AbilityRollTray({ pool, hasAssignments, onRolled }: AbilityRollTrayProps) {
   const { style } = useDiceRollStyle();
   const [nonce, setNonce] = useState(0);

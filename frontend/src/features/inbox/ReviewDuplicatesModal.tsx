@@ -23,19 +23,6 @@ interface ReviewDuplicatesModalProps {
   disregarding: boolean;
 }
 
-// The Review-duplicates modal (#1946) — the cluster sibling of #1943's
-// CombineConfirmDialog, and this feature's only confirm surface (no second
-// dialog): survivor radios default from the feed's defaultSurvivorId, a live
-// summary line off the inbox row's own entities (no fetch wait — see
-// combineSummaryLine), a gold Discarded box that fills in once the fuller
-// entity/merge fetch lands, then ONE atomic #1942 call absorbing every loser
-// at once. All-or-nothing server-side, so a rejection leaves every entity
-// untouched — the radios stay live and the DM can just retry, no per-entity
-// landed/locked state to track. BottomSheet (not Modal) because it's already
-// the responsive Modal/BottomSheet split this app uses everywhere else
-// (centered dialog at md+, bottom sheet on mobile) — matching the spec's
-// "Modal/BottomSheet-appropriate" instruction with one component instead of
-// two.
 export default function ReviewDuplicatesModal({
   row,
   onClose,
@@ -50,13 +37,7 @@ export default function ReviewDuplicatesModal({
     const clusterIds = new Set(row.entities.map((e) => e.id));
     return fullEntities.filter((e) => clusterIds.has(e.id));
   }, [row.entities, fullEntities]);
-  // Full data hasn't landed (still loading, merges still pending, an entity
-  // was deleted out from under us concurrently, or the merges fetch failed)
-  // — the picker list and summary line below still render from the inbox
-  // row's own summary shape; only the Discarded box's fuller categories
-  // (dropped descriptions, prepared merges) wait on this. isLoading already
-  // folds in the merges query (see useReviewClusterEntities); isError keeps
-  // a failed merges fetch from looking like a complete, merge-free preview.
+  // Length-checks against row.entities, not just isLoading/isError, so an entity deleted out from under this fetch doesn't look like a complete preview.
   const previewReady = !isLoading && !isError && clusterEntities.length === row.entities.length;
 
   const loserIds = useMemo(
@@ -71,32 +52,22 @@ export default function ReviewDuplicatesModal({
     );
   }
 
-  // Typed over {id, name, mentionCount} — row.entities already carries that,
-  // so this renders on first paint rather than waiting on clusterEntities.
   const summaryLine = useMemo(
     () => combineSummaryLine(row.entities, survivorId),
     [row.entities, survivorId],
   );
 
-  // Only needs visibility, already on the inbox row's own lightweight
-  // entities — shows immediately, no fetch wait.
   const redactionWarning = useMemo(
     () => hiddenSurvivorRedactsRevealedMentions(row.entities, survivorId),
     [row.entities, survivorId],
   );
-  // The full-entity/merge fetch's own losers/survivor, shared by
-  // combineDiscardedItems and preparedMergeDiscardedItem — both from
-  // combinePreview.ts, the one source of truth for "what is lost by a
-  // combine" (#1949).
+  // combineDiscardedItems and preparedMergeDiscardedItem are the one source of truth for what a combine discards (#1949).
   const clusterLosers = useMemo(() => losersOf(clusterEntities, survivorId), [clusterEntities, survivorId]);
   const survivorEntity = useMemo(
     () => clusterEntities.find((e) => e.id === survivorId),
     [clusterEntities, survivorId],
   );
 
-  // "named": this modal has no per-entity heading (bare "Discarded", not
-  // "Discarded with X") for any cluster size, including a 2-entity cluster
-  // (1 loser) — so every label must name which loser it's about.
   const discardedItems = useMemo((): CombineDiscardedItem[] => {
     if (!previewReady || !survivorEntity) {
       return redactionWarning ? [redactionWarning] : [];
@@ -146,8 +117,6 @@ export default function ReviewDuplicatesModal({
           onCombine={handleCombine}
           disregarding={disregarding}
           combining={combineMutation.isPending}
-          // The gate can't stand behind warnings it failed to load — a broken
-          // preview blocks the no-undo commit, not just decorates it.
           combineDisabled={isError}
           loserCount={loserIds.length}
         />

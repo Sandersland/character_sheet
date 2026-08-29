@@ -175,7 +175,6 @@ describe("OverflowMenu", () => {
     expect(item.className).toContain("focus-visible:bg-parchment-100");
     await user.click(item);
     expect(onSelect).not.toHaveBeenCalled();
-    // menu stays open — a no-op click shouldn't dismiss it
     expect(screen.getByRole("menu")).toBeInTheDocument();
   });
 

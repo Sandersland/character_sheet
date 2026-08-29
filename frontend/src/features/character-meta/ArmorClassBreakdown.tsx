@@ -2,9 +2,8 @@ import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
 import { formatModifier } from "@/lib/abilities";
 
 /**
- * The Armor Class breakdown `<dl>` shown inside the AC disclosure popover —
- * shared by the desktop banner (`BannerVitals`) and the mobile mini-header
- * (`MobileSheetHeader`) so the labeled parts + total render identically in both.
+ * Shared by `BannerVitals` and `MobileSheetHeader` so the AC breakdown
+ * renders identically in both.
  */
 export default function ArmorClassBreakdown() {
   const { character } = useCurrentCharacter();

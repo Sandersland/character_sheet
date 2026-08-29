@@ -3,8 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useScrollCollapse } from "@/features/character-meta/useScrollCollapse";
 
-// Controllable IntersectionObserver: capture each construction so a test can
-// drive the collapse/expand observers independently and assert their options.
 type IOEntry = { isIntersecting: boolean };
 class MockIO {
   static instances: MockIO[] = [];
@@ -67,7 +65,6 @@ describe("useScrollCollapse hysteresis (#1083)", () => {
     expect(collapseObs().options.rootMargin).toBe("16px 0px 0px 0px");
     // Expand observer uses no explicit margin (browser default 0px) so it re-enters at the very top.
     expect(expandObs().options.rootMargin ?? "0px").not.toContain("16");
-    // Both watch the same sentinel.
     expect(collapseObs().observed).toHaveLength(1);
     expect(expandObs().observed).toHaveLength(1);
     expect(collapseObs().observed[0]).toBe(expandObs().observed[0]);
@@ -83,8 +80,7 @@ describe("useScrollCollapse hysteresis (#1083)", () => {
   it("does NOT flip on expand-observer jitter inside the dead zone (core flicker guard)", () => {
     render(<Harness />);
     expect(collapsedState).toBe(false);
-    // Resting at ~8px: the 0px expand sentinel is out of view, but the collapse
-    // threshold (16px) is not crossed — a naive single-observer would collapse here.
+    // Resting inside the dead zone: neither observer has crossed its threshold — a naive single-observer would collapse here.
     expandObs().emit(false);
     expect(collapsedState).toBe(false);
     expandObs().emit(true);
@@ -95,11 +91,9 @@ describe("useScrollCollapse hysteresis (#1083)", () => {
     render(<Harness />);
     collapseObs().emit(false);
     expect(collapsedState).toBe(true);
-    // Scrolled back into the dead zone: collapse observer re-enters — held collapsed.
     collapseObs().emit(true);
     expect(collapsedState).toBe(true);
-    // Only reaching the very top (expand observer enters) re-expands, and only
-    // once the debounce window (#1859) elapses without a reversal.
+    // Re-expand needs both the expand observer to enter and the debounce window to elapse without a reversal.
     expandObs().emit(true);
     expect(collapsedState).toBe(true);
     act(() => vi.advanceTimersByTime(120));
@@ -110,8 +104,7 @@ describe("useScrollCollapse hysteresis (#1083)", () => {
     render(<Harness />);
     collapseObs().emit(false);
     expect(collapsedState).toBe(true);
-    // Momentum scroll grazes the top, then immediately bounces back out —
-    // never committed, so the header never visibly re-opens.
+    // Simulates a momentum-scroll graze past the top that immediately bounces back out.
     expandObs().emit(true);
     act(() => vi.advanceTimersByTime(60));
     expect(collapsedState).toBe(true);
@@ -142,16 +135,11 @@ describe("useScrollCollapse hysteresis (#1083)", () => {
     const { unmount } = render(<Harness />);
     collapseObs().emit(false);
     expect(collapsedState).toBe(true);
-    // Reaches the top — arms the 120ms re-expand commit.
     expandObs().emit(true);
     expect(collapsedState).toBe(true);
     expect(vi.getTimerCount()).toBe(1);
     unmount();
-    // The load-bearing assertion: React silently no-ops a setState dispatched
-    // after unmount (Harness never re-renders, so collapsedState alone can't
-    // tell a cleared timer from an uncleared one that just fired into the
-    // void) — checking the fake-timer queue directly is what actually pins
-    // clearPendingReexpand() running in the effect cleanup before disconnect().
+    // React no-ops a setState dispatched after unmount, so collapsedState alone can't distinguish a cleared timer from one that fired into the void — check the timer queue directly.
     expect(vi.getTimerCount()).toBe(0);
     act(() => vi.advanceTimersByTime(120));
     expect(collapsedState).toBe(true);

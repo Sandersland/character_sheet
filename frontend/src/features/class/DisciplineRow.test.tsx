@@ -1,10 +1,5 @@
-/**
- * DisciplineRow — KiPicker stale-selection regression (#1737 review). A
- * scalable discipline's `view.options` refilters by `kiAvailable` on every
- * render; a `selectedKi` picked before a mid-session spend can fall outside
- * the newly-filtered list. The picker and the submitted op must both fall
- * back to the same `effectiveStep` result, never diverge.
- */
+// The picker and the submitted op must both fall back to the same
+// `effectiveStep` result when a selected ki amount falls out of range (#1737).
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -61,25 +56,18 @@ describe("DisciplineRow — KiPicker stale selection (#1737)", () => {
       </ul>,
     );
 
-    // Select the 4-ki step while it's still affordable.
     const select = screen.getByLabelText("Ki to spend on Water Whip");
     await user.selectOptions(select, "4");
     expect(select).toHaveValue("4");
 
-    // Simulate a mid-session ki spend: kiAvailable drops to 3, so the 4-ki
-    // option disappears from view.options, but component state still holds
-    // selectedKi = 4.
     rerender(
       <ul>
         <DisciplineRow entry={ENTRY} catalog={WATER_WHIP} kiAvailable={3} busy={false} onCast={onCast} />
       </ul>,
     );
 
-    // The picker must fall back to the cheapest still-affordable option (2
-    // ki) instead of rendering blank/stale.
     expect(select).toHaveValue("2");
 
-    // The submitted op must agree with what the picker shows.
     await user.click(screen.getByRole("button", { name: "Cast" }));
     expect(onCast).toHaveBeenCalledWith(
       expect.objectContaining({ type: "castDiscipline", entryId: ENTRY.id, requestedKi: 2 }),

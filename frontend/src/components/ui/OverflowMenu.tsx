@@ -8,11 +8,8 @@ interface OverflowMenuItem {
   onSelect: () => void;
   danger?: boolean;
   separatorBefore?: boolean;
-  /**
-   * When true the item is shown greyed and its activation is a no-op. Uses
-   * aria-disabled (not the native `disabled` attribute) so the item stays
-   * focusable and roving-focus keyboard nav still passes over it (WAI-ARIA).
-   */
+  // Uses aria-disabled, not the native `disabled` attribute, so the item stays
+  // focusable and roving-focus keyboard nav still passes over it (WAI-ARIA).
   disabled?: boolean;
 }
 
@@ -20,16 +17,12 @@ interface OverflowMenuProps {
   items: OverflowMenuItem[];
   label?: string;
   className?: string;
-  /** Overrides the default (parchment) trigger styling — e.g. a light kebab for
-   *  the garnet banner. The dropdown panel is unaffected. */
   triggerClassName?: string;
 }
 
-// Default parchment-surface trigger; hosts on a dark surface pass `triggerClassName`.
 const DEFAULT_TRIGGER =
   "flex h-7 w-7 items-center justify-center rounded-control text-lg leading-none text-parchment-600 transition-colors hover:bg-parchment-200 hover:text-parchment-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600";
 
-// Icon-only kebab menu-button: WAI-ARIA menu pattern, roving tabindex, focus returns to trigger.
 export default function OverflowMenu({ items, label, className = "", triggerClassName }: OverflowMenuProps) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);

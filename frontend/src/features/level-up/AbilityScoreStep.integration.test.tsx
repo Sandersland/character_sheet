@@ -13,7 +13,6 @@ vi.mock("@/api/client", () => ({
   fetchLevelUpPlan: vi.fn(),
   submitLevelUp: vi.fn(),
   fetchFeats: vi.fn(),
-  // HitPointsStep (#887) renders on step 1; it falls back to character.hitDice when reference is empty.
   fetchReference: vi.fn().mockResolvedValue({ races: [], backgrounds: [], alignments: [], artisanTools: [], classes: [] }),
 }));
 const planMock = vi.mocked(fetchLevelUpPlan);
@@ -24,7 +23,6 @@ const CATALOG: CatalogFeat[] = [
   { id: "alert", name: "Alert", description: "Always on guard.", category: "general", abilityOptions: [], abilityIncrease: 0, improvements: [] },
 ];
 
-// hitPoints/hitDice present because step 1 is the real HitPointsStep (#887).
 const character = {
   id: "c1",
   rulesEdition: "EDITION_2024",
@@ -71,7 +69,6 @@ describe("AbilityScoreStep in the ceremony", () => {
     await user.click(screen.getByRole("button", { name: /take average/i }));
     await user.click(screen.getByRole("button", { name: /continue/i }));
 
-    // On the advancement step, Continue is blocked until the ASI is complete.
     expect(screen.getByText("Step 2 of 3")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /continue/i })).toBeDisabled();
 

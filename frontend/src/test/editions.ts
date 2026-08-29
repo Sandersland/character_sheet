@@ -17,13 +17,7 @@ export const SERVED_EDITIONS: EditionOption[] = [
   },
 ];
 
-/** Seeds the editions cache so useEditions resolves with no fetch — the
- *  staleTime: Infinity entry is permanently fresh, so the query never fires and
- *  no test needs a fetchEditions mock merely to render a picker.
- *
- *  Pass `editions`/`defaultEdition` to make display order and the default
- *  DISAGREE — the scrambled-order fixture no positional implementation can
- *  satisfy. */
+// Seeds the editions cache with a staleTime: Infinity entry so useEditions resolves with no fetch — no test needs a fetchEditions mock merely to render a picker.
 export function seedEditions(overrides: Partial<EditionsResponse> = {}): void {
   getQueryClient().setQueryData<EditionsResponse>(catalogKeys.editions(), {
     defaultEdition: "EDITION_2024",

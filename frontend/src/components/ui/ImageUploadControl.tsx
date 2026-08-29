@@ -4,35 +4,21 @@ import Spinner from "@/components/ui/Spinner";
 import { ACCEPTED_IMAGE_TYPES, validateImageFile } from "@/lib/imageUpload";
 
 interface ImageUploadControlProps {
-  /** Persisted image URL — the preview when no locally staged file exists. */
   imageUrl?: string | null;
-  /** Locally staged file (deferred mode) — previewed via an object URL and
-   *  shown in preference to `imageUrl`. */
   file?: File | null;
-  /** Disables both actions while the caller's write is in flight. */
   pending?: boolean;
-  /** Caller-owned failure (e.g. an upload mutation's error) shown under the
-   *  control; a local refusal from validateImageFile takes precedence. */
   error?: string | null;
-  /** Fires only with a file that passed validateImageFile — refusals are
-   *  rendered here and never reach the caller. */
+  /** Refusals from validateImageFile are rendered here and never reach the caller. */
   onSelect: (file: File) => void;
   onRemove: () => void;
-  /** Accessible name for the file input and the preview image. */
   label: string;
-  /** "inline" (default) puts the actions beside a small square preview;
-   *  "stacked" puts them under the preview so the caller can size the image
-   *  as the dominant element (IdentityCard's portrait region). */
   layout?: "inline" | "stacked";
-  /** Sizing classes for the preview box; default keeps the compact square
-   *  the inline consumers (EntityPortraitField, IdentitySection) rely on. */
+  /** Default is the compact square the inline consumers (EntityPortraitField, IdentitySection) rely on. */
   previewClassName?: string;
-  /** Placeholder text inside the empty preview box. */
   emptyLabel?: string;
 }
 
-// Object-URL lifecycle: one URL per staged file, revoked on replace/unmount so
-// staged previews never leak blob registrations.
+// Revoked on replace/unmount so staged previews never leak blob registrations.
 function useObjectUrl(file: File | null | undefined): string | null {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
@@ -66,8 +52,7 @@ function PreviewBox({
       className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-card border border-parchment-300 bg-gradient-to-br from-garnet-100 to-parchment-200 ${className}`}
     >
       {url ? (
-        // Absolute fill keeps an aspect-ratio-sized box honest: an in-flow
-        // img's intrinsic height can push a preferred aspect-ratio taller.
+        // Absolute fill: an in-flow img's intrinsic height can push a preferred aspect-ratio taller.
         <img
           src={url}
           alt={`${label} preview`}
@@ -115,13 +100,6 @@ function ActionRow({
   );
 }
 
-/**
- * Domain-agnostic image picker with preview (portraits today, campaign
- * entities via #1617): a hidden file input behind visible buttons, so the
- * native control's styling never leaks into the sheet. Deferred mode (create
- * ceremony) passes `file`/`onSelect` and uploads later; immediate mode (edit
- * surfaces) passes `imageUrl` and wires `onSelect`/`onRemove` to mutations.
- */
 export default function ImageUploadControl({
   imageUrl = null,
   file = null,
@@ -143,8 +121,7 @@ export default function ImageUploadControl({
 
   function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
     const picked = event.target.files?.[0];
-    // Reset the input so re-picking the same file fires change again
-    // (e.g. retrying after a failed upload).
+    // Reset so re-picking the same file still fires change (e.g. retrying after a failed upload).
     event.target.value = "";
     if (!picked) return;
     const validation = validateImageFile(picked);
@@ -163,8 +140,7 @@ export default function ImageUploadControl({
         type="file"
         accept={ACCEPTED_IMAGE_TYPES.join(",")}
         aria-label={label}
-        // Keyboard users reach the visible button instead — a focusable
-        // sr-only input would take focus with nothing visible to show for it.
+        // A focusable sr-only input would take focus with nothing visible to show for it.
         tabIndex={-1}
         className="sr-only"
         onChange={handleChange}

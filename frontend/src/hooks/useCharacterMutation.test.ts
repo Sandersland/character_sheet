@@ -21,19 +21,15 @@ describe("useCharacterMutation", () => {
     fetchCharacter.mockReset();
   });
 
-  // GENUINE RED (plan §4/§9.1): without `scope`, useMutation runs concurrently.
-  // Request A (the HP "damage" click) is issued first but its response is
-  // slower; request B (the very next click) is issued second but resolves
-  // faster. Without scope both mutationFns fire immediately, so B's fast
-  // response lands first and A's slow, STALE response overwrites it last —
-  // exactly the "spam the HP buttons" bug (AC). `scope` fixes this by never
-  // starting B's mutationFn until A's has fully settled, so completion order
-  // always matches request order regardless of each call's own latency.
+  // Without `scope`, useMutation runs mutations concurrently, so a slower-
+  // resolving earlier request (A) can overwrite a faster-resolving later one
+  // (B) — last RESPONSE wins instead of last REQUEST. `scope` serializes
+  // same-character mutations so completion order matches request order.
   it("out-of-order responses still leave the SECOND request's character in the cache (mutation scope)", async () => {
     const mutationFn = vi.fn(
       (vars: { tag: "A" | "B" }) =>
         new Promise<Character>((resolve) => {
-          const delayMs = vars.tag === "A" ? 30 : 0; // A: issued first, resolves slower.
+          const delayMs = vars.tag === "A" ? 30 : 0;
           setTimeout(() => resolve(makeCharacter({ name: `${vars.tag}-response` })), delayMs);
         }),
     );
@@ -48,10 +44,10 @@ describe("useCharacterMutation", () => {
     );
 
     act(() => {
-      result.current.mutate({ tag: "A" }); // request 1
+      result.current.mutate({ tag: "A" });
     });
     act(() => {
-      result.current.mutate({ tag: "B" }); // request 2, issued second
+      result.current.mutate({ tag: "B" });
     });
 
     await waitFor(() => {
@@ -60,9 +56,9 @@ describe("useCharacterMutation", () => {
     });
   });
 
-  // GENUINE RED (plan §1/§9.3): shape C is `Character & { results }` — an
-  // intersection, so `(r) => r` type-checks but writes `results`/`batchId` into
-  // the cached character. `toCharacter` must strip them explicitly.
+  // Shape C is `Character & { results }` — an intersection, so `(r) => r`
+  // type-checks but writes `results`/`batchId` into the cached character;
+  // toCharacter must strip them explicitly.
   it("strips extra keys from an intersection response (shape C) before caching", async () => {
     type IntersectionResult = Character & { results: unknown[]; batchId?: string };
     const response: IntersectionResult = {
@@ -96,8 +92,8 @@ describe("useCharacterMutation", () => {
     expect(cached).not.toHaveProperty("batchId");
   });
 
-  // New coverage (plan §9): the cache write is authoritative — no mutation
-  // should ever trigger a character refetch on success.
+  // The cache write is authoritative — no mutation should ever trigger a
+  // character refetch on success.
   it("does not refetch the character on success", async () => {
     fetchCharacter.mockResolvedValue(makeCharacter());
     const { result: characterResult } = renderHook(() => useCharacter("c1"));
@@ -118,11 +114,11 @@ describe("useCharacterMutation", () => {
       mutationResult.current.mutate(undefined);
     });
     await waitFor(() => expect(characterResult.current.character?.name).toBe("Aldric the Bold"));
-    expect(fetchCharacter).toHaveBeenCalledTimes(1); // still just the initial load
+    expect(fetchCharacter).toHaveBeenCalledTimes(1);
   });
 
-  // Pin: a mutation failure surfaces the fallback message when the thrown
-  // value isn't an Error (mirrors errorMessage()'s own contract).
+  // A mutation failure surfaces the fallback message when the thrown value
+  // isn't an Error (mirrors errorMessage()'s own contract).
   it("surfaces the fallback message on a non-Error rejection", async () => {
     const mutationFn = vi.fn().mockRejectedValue("nope");
     const { result } = renderHook(() =>
@@ -141,8 +137,8 @@ describe("useCharacterMutation", () => {
     await waitFor(() => expect(result.current.error).toBe("Something went wrong."));
   });
 
-  // Pin: onCharacterWritten receives the raw TResult (not the narrowed
-  // Character) so callers can still read `results`/`concentrationChecks`/etc.
+  // onCharacterWritten receives the raw TResult (not the narrowed Character)
+  // so callers can still read `results`/`concentrationChecks`/etc.
   it("onCharacterWritten fires with the raw result after a successful write", async () => {
     const response = { character: makeCharacter(), results: [{ roll: 3 }] };
     const mutationFn = vi.fn().mockResolvedValue(response);

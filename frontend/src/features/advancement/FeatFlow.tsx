@@ -19,13 +19,13 @@ interface Props {
   dispatchView: Dispatch<FeatViewAction>;
   custom: CustomFeatDraft;
   onSubmit: () => void;
-  /** #1173: the level-up ceremony's step body is already the single scroll region
-   *  (post-#1192), so its own inner cap would double-scroll — only the plain sheet
-   *  Overview panel (AdvancementSection, unbounded page flow) needs this list capped. */
+  // The ceremony step body is already the single scroll region, so its own inner
+  // cap would double-scroll — only AdvancementSection's unbounded page flow needs
+  // this list capped (#1173).
   scrollList?: boolean;
 }
 
-// Named element, not Badge — Badge's gold tone is bg-gold-50; overriding via className is stylesheet-order roulette.
+// Not Badge — Badge's gold tone is bg-gold-50, and overriding it via className is stylesheet-order roulette.
 function AbilityChip({ feat }: { feat: CatalogFeat }) {
   const label = featAbilityChipLabel(feat);
   if (!label) return null;
@@ -183,9 +183,6 @@ function FeatListRow({
   );
 }
 
-// Extracted from FeatCatalogList (#1173) so the scrollList ternary and the row
-// .map live outside the parent's branch count — keeps FeatCatalogList under the
-// CRAP gate now that it carries a 5th (scrollList) prop.
 function FeatCatalogRows({
   filteredCatalog,
   busy,

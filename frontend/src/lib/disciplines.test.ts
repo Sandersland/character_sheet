@@ -3,8 +3,7 @@ import { describe, expect, it } from "vitest";
 import { affordableSteps, disciplineCastView, effectiveStep } from "@/lib/disciplines";
 import type { CatalogDiscipline } from "@/types/character";
 
-// Fangs of the Fire Snake, as GET /api/disciplines actually serves it: base 1
-// ki, scaling +1d10 per extra ki, ceiling 6 (the PHB'14 table's asymptote).
+// Ceiling 6 is the PHB'14 table's asymptote.
 const FANGS: CatalogDiscipline = {
   id: "fangs",
   name: "Fangs of the Fire Snake",
@@ -22,7 +21,6 @@ const FANGS: CatalogDiscipline = {
   ],
 };
 
-// Fist of Four Thunders: flat 2 ki, no scaling — every step is identical.
 const FIST: CatalogDiscipline = {
   id: "fist",
   name: "Fist of Four Thunders",
@@ -33,7 +31,6 @@ const FIST: CatalogDiscipline = {
   steps: [{ ki: 2, roll: { count: 2, faces: 8, modifier: 0 } }],
 };
 
-// Shape the Flowing River: 1 ki, no dice at all.
 const SHAPE: CatalogDiscipline = {
   id: "shape",
   name: "Shape the Flowing River",
@@ -47,8 +44,7 @@ const SHAPE: CatalogDiscipline = {
 describe("affordableSteps", () => {
   it("filters to steps whose ki is within the pool, never clamping to a real per-cast cap", () => {
     expect(affordableSteps(FANGS, 3).map((s) => s.ki)).toEqual([1, 2, 3]);
-    // 8 ki in the pool offers every served step (1-6) even though no monk can
-    // ever actually cast Fangs at 8 ki — the server is the one that refuses that.
+    // 8 ki in the pool offers every served step (1-6) even though no monk can ever actually cast Fangs at 8 ki — the server is the one that refuses that.
     expect(affordableSteps(FANGS, 8).map((s) => s.ki)).toEqual([1, 2, 3, 4, 5, 6]);
   });
 

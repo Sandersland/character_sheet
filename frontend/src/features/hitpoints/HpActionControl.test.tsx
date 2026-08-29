@@ -23,7 +23,6 @@ describe("HpActionControl accumulator chips (#796)", () => {
   it("builds the amount via chips + ±1 flanks and applies it, no typing", async () => {
     const { onApply, user } = setup();
 
-    // +10 +5 then two Increase-amount taps = 17 damage, then Apply.
     await user.click(screen.getByRole("button", { name: "Add 10" }));
     await user.click(screen.getByRole("button", { name: "Add 5" }));
     await user.click(screen.getByRole("button", { name: "Increase amount" }));
@@ -97,7 +96,6 @@ describe("HpActionControl projected-result line (#796)", () => {
     await user.click(screen.getByRole("radio", { name: /heal/i }));
     await user.click(screen.getByRole("button", { name: "Add 20" }));
     await user.click(screen.getByRole("button", { name: "Add 20" }));
-    // 20 current + 40 chips = 60, capped to 40.
     expect(screen.getByText("→ 40 / 40")).toBeInTheDocument();
   });
 
@@ -115,7 +113,6 @@ describe("HpActionControl projected-result line (#796)", () => {
     await user.click(screen.getByRole("button", { name: "Increase amount" }));
     await user.selectOptions(screen.getByRole("combobox", { name: /damage type/i }), "slashing");
 
-    // 12 slashing halves to 6 → projection matches the applied damage, not the raw 12.
     expect(screen.getByText("→ 14 / 40")).toBeInTheDocument();
   });
 

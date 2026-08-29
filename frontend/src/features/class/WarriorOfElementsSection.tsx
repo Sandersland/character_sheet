@@ -1,19 +1,8 @@
-/**
- * WarriorOfElementsSection — the 2024 Warrior of the Elements block inside
- * ClassFeaturesSection. Renders the subclass's two Focus-spending session
- * actions: the Elemental Attunement toggle (1 Focus, a 10-minute while-active
- * buff) and Elemental Burst (2 Focus, three rolls of the Martial Arts die vs a
- * Dexterity save). The Burst damage total is rolled client-side off the
- * character's already-derived Martial Arts die (unarmedStrike.damage.faces);
- * the server decides full vs half from its own save roll.
- *
- * The Attunement toggle no longer flows through `onOperations` (#1686) — it's
- * a row-driven "toggle" now, dispatched as a plain executeAction
- * "elementalAttunement"/"endElementalAttunement" op via the SEPARATE
- * `onToggleAttunement` prop (POST /actions/transactions, not this section's
- * own /elements/transactions endpoint). Only Burst stays on `onOperations`.
- */
-
+// Burst damage is rolled client-side off the character's already-derived
+// Martial Arts die (unarmedStrike.damage.faces); the server decides full vs
+// half from its own save roll. The Attunement toggle is dispatched as a plain
+// executeAction op through the separate `onToggleAttunement` prop; only Burst
+// stays on `onOperations`.
 import { useState } from "react";
 
 import { useCurrentCharacter } from "@/hooks/CurrentCharacterProvider";
@@ -33,7 +22,6 @@ interface Props {
   onToggleAttunement: (activate: boolean) => void;
 }
 
-// Remaining Focus from the character's derived resource pools.
 function focusRemaining(character: Character): number {
   return character.resources?.pools.find((p) => p.key === "focus")?.remaining ?? 0;
 }
@@ -80,7 +68,6 @@ function BurstRow({
   onCast: (damageType: ElementalDamageType, roll: number) => void;
 }) {
   const [burstType, setBurstType] = useState<ElementalDamageType>("fire");
-  // Three rolls of the Martial Arts die (faces derived backend); server halves on a made save.
   const cast = () => onCast(burstType, rollSpec({ count: 3, faces, modifier: 0 }).total);
   return (
     <div className="flex items-center justify-between gap-2">

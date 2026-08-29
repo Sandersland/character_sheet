@@ -26,7 +26,7 @@ function spell(partial: Partial<CatalogSpell> & Pick<CatalogSpell, "id" | "name"
 
 const FIREBALL = spell({ id: "sp-fireball", name: "Fireball", level: 3, attackType: "save", saveAbility: "dexterity" });
 const FIRE_BOLT = spell({ id: "sp-firebolt", name: "Fire Bolt", level: 0, attackType: "attack" });
-const FLY = spell({ id: "sp-fly", name: "Fly", level: 3 }); // utility — no attackType
+const FLY = spell({ id: "sp-fly", name: "Fly", level: 3 });
 
 const NEW_CAST: ItemCapability = {
   kind: "castSpell",
@@ -38,8 +38,8 @@ const NEW_CAST: ItemCapability = {
   attackValue: 5,
 };
 
-// The editor is a controlled component; drive it through a stateful harness so a
-// spell selection (onChange) is applied and re-rendered, mirroring real usage.
+// The editor is controlled — drive it through a stateful harness so a
+// selection's onChange re-renders, mirroring real usage.
 function Harness({ onChange }: { onChange?: (caps: ItemCapability[]) => void }) {
   const [caps, setCaps] = useState<ItemCapability[]>([{ ...NEW_CAST }]);
   return (
@@ -56,9 +56,8 @@ function Harness({ onChange }: { onChange?: (caps: ItemCapability[]) => void }) 
 }
 
 async function pickSpell(spellId: string) {
-  // Catalog loaded once any spell option (labelled "Name (L<n>)") is present —
-  // findAll (not findBy) so we don't key off one spell and don't trip the
-  // single-match rule when the mock has several.
+  // findAll, not findBy: findBy's single-match rule trips once the mock has
+  // more than one spell option.
   await screen.findAllByRole("option", { name: /\(L\d+\)/ });
   await userEvent.selectOptions(screen.getByLabelText("Spell"), spellId);
 }
@@ -108,7 +107,7 @@ describe("CapabilityEditor — castSpell DC/attack fields are conditional on the
 
   it("no DC/attack fields before a spell is chosen", async () => {
     render(<Harness />);
-    await screen.findAllByRole("option", { name: /\(L\d+\)/ }); // catalog loaded
+    await screen.findAllByRole("option", { name: /\(L\d+\)/ });
 
     expect(screen.queryByLabelText("Save DC")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Attack bonus")).not.toBeInTheDocument();

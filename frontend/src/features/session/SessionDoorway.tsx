@@ -2,22 +2,15 @@ import type { SessionDoorwaySummary } from "@/features/session/sessionDoorwaySum
 
 interface SessionDoorwayProps {
   summary: SessionDoorwaySummary;
-  /** Full state for the aria-label, e.g. the chapter title. */
+  /** Used only to build the aria-label — never rendered visibly. */
   sessionTitle?: string | null;
   pending: boolean;
-  /** Inline action error (start/join failure). */
   error: string | null;
   onAction: () => void;
-  /**
-   * Mobile: a slim in-flow bar between the panels and the bottom nav.
-   * Desktop: a strip pinned under the garnet banner, at content width.
-   */
   placement: "mobile" | "desktop";
 }
 
-// Per-tone chrome. `live` = act now (garnet gradient); `scheduled` = informational
-// (parchment + gold); `invite` = a DM's quiet dashed empty-state. Color never
-// carries meaning alone — the label always states the action.
+// Color never carries meaning alone — the label always states the action.
 const TONE_INTERACTIVE: Record<SessionDoorwaySummary["tone"], string> = {
   live: "bg-gradient-to-r from-garnet-surface to-garnet-surface-deep text-garnet-on-surface hover:from-garnet-surface-hover hover:to-garnet-surface-deep",
   scheduled: "border border-gold-300 bg-gold-50 text-parchment-800 hover:bg-gold-100",
@@ -30,12 +23,7 @@ const TONE_STATIC: Record<SessionDoorwaySummary["tone"], string> = {
   invite: "border border-dashed border-parchment-300 bg-parchment-50 text-garnet-700",
 };
 
-/**
- * The sheet's one always-visible, state-aware session doorway (#942) — a dumb
- * renderer of the summary from useSessionDoorway. Renders nothing when the
- * summary is hidden (solo character, or a player with nothing to act on), so its
- * height is reclaimed rather than left as a disabled bar. Not a swipe target.
- */
+// Not a swipe target.
 export default function SessionDoorway({
   summary,
   sessionTitle,
@@ -46,7 +34,6 @@ export default function SessionDoorway({
 }: SessionDoorwayProps) {
   if (!summary.visible) return null;
 
-  // The full state, spoken for screen readers: "Resume session, Round 3, The Sunless Citadel".
   const ariaLabel = [summary.label, summary.sub, sessionTitle].filter(Boolean).join(", ");
 
   const wrapper =
@@ -83,7 +70,6 @@ export default function SessionDoorway({
             {content}
           </button>
         ) : (
-          // Informational (scheduled, player) — no button, just the strip.
           <div role="status" aria-label={ariaLabel} className={`${barBase} ${TONE_STATIC[summary.tone]}`}>
             {content}
           </div>

@@ -1,9 +1,5 @@
 import { describe, it, expect } from "vitest";
 
-// The 5e rule cases this file used to cover (fixed average, the max(1, …)
-// floor, and which class's die advances) did not disappear with #1380 — they
-// moved to the backend planner's own suite (level-up-plan.test.ts), which is
-// now the only place that arithmetic lives.
 import { dieFaces, effectiveMaxForRoll, hpGainForRoll, readHitPointsMeta } from "@/lib/hitDice";
 
 describe("readHitPointsMeta", () => {
@@ -47,8 +43,7 @@ describe("readHitPointsMeta", () => {
     });
   });
 
-  // #1497: a malformed/absent effectiveMaxByRoll must render as nothing (an
-  // empty array), never as a plausible-looking but wrong number.
+  // #1497: a malformed/absent effectiveMaxByRoll must render as an empty array, never a plausible-looking wrong number.
   it("falls back to an empty effectiveMaxByRoll for a non-array or mistyped value", () => {
     expect(readHitPointsMeta({ kind: "hitPoints", meta: { effectiveMaxByRoll: "nope" } })).toMatchObject({
       effectiveMaxByRoll: [],
@@ -106,9 +101,7 @@ describe("hpGainForRoll", () => {
   });
 });
 
-// #1497: reads the served array directly — no `currentMax + hpGainForRoll(...)`
-// arithmetic, which is exactly what silently disagreed with the commit once
-// 2014 exhaustion 4+ (PHB'14 p. 291) halved the max.
+// #1497: reads the served array directly, not `currentMax + hpGainForRoll(...)`, which disagrees once 2014 exhaustion 4+ (PHB'14 p. 291) halves the max.
 describe("effectiveMaxForRoll", () => {
   const meta = {
     die: "d10",

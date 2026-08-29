@@ -89,19 +89,11 @@ describe("partyHealAllies", () => {
   });
 
   it("returns [] for a solo (null-campaign) session — no party to heal (#1082)", () => {
-    // A solo session has campaignId null and no co-participants; the campaign-pref
-    // match can never fire, so the friendly-heal picker stays empty.
     const solo = { id: "s", campaignId: null, status: "active", startedAt: "x", participants: [] } as unknown as Session;
     expect(partyHealAllies(solo, "me")).toEqual([]);
   });
 });
 
-// Migrated from spellCast.test.ts (#1381): effectPreview is now a lookup into
-// the served effectRolls (rules resolve backend-side), and the cantrip-
-// scaling-across-levels golden case moved to the backend test that proves the
-// rule (spell-effect-rolls.test.ts). effectPreviewWithMod is deleted —
-// effectPreview absorbs it because the served roll always carries the heal
-// ability modifier now.
 function previewSpell(overrides: Partial<Spell>): Spell {
   return {
     id: "s",

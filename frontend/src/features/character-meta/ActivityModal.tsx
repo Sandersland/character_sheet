@@ -21,13 +21,9 @@ import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 interface ActivityModalProps {
   characterId: string;
   onClose: () => void;
-  /** When set, scopes the timeline to one entity (e.g. a single InventoryItem). */
   entityId?: string;
 }
 
-// Category filter options: an "All" sentinel followed by every event category,
-// in a stable order. Labels resolve through `CATEGORY_LABELS` so keys never leak.
-// These feed a compact <select> (not a tab strip) so all 11 categories fit the modal.
 const CATEGORY_FILTER_IDS = Object.keys(CATEGORY_LABELS) as CharacterEventCategory[];
 
 function FieldDiffs({ fields }: { fields: CharacterEventField[] }) {
@@ -50,12 +46,8 @@ function FieldDiffs({ fields }: { fields: CharacterEventField[] }) {
   );
 }
 
-// The batch shape groupByBatch produces for this timeline (rows are CharacterEvents).
 type TimelineBatch = { key: string; createdAt: string; rows: CharacterEvent[] };
 
-// One event row: badge + summary + optional field-diff toggle. Extracted so the
-// modal's render tree stays shallow (the nested date→batch→row maps were the
-// source of its complexity).
 function ActivityEventRow({
   event,
   allReverted,
@@ -93,8 +85,6 @@ function ActivityEventRow({
   );
 }
 
-// One batch: an optional undo affordance, then either the collapsed bulk-sale
-// summary line or the expanded per-event list.
 function ActivityBatchGroup({
   batch,
   isUndoable,
@@ -115,7 +105,6 @@ function ActivityBatchGroup({
   onToggleBatch: (key: string) => void;
 }) {
   const allReverted = batch.rows.every((r) => r.reverted);
-  // A bulk sale (>1 row, all `sold`) collapses to one summary line unless expanded.
   const sell = summarizeSellBatch(batch.rows);
   const collapsed = sell !== null && !batchExpanded;
   return (
@@ -183,8 +172,6 @@ function ActivityBatchGroup({
   );
 }
 
-// Whether any filter predicate is active (disables the undo affordance, and
-// changes the empty-state copy).
 function hasActiveFilters(f: {
   categoryFilter: string;
   typeFilter: string | null;
@@ -194,23 +181,18 @@ function hasActiveFilters(f: {
   return f.categoryFilter !== "all" || f.typeFilter !== null || f.sessionFilter !== "" || !!f.entityId;
 }
 
-// A superseded load is aborted via its AbortSignal; that rejection is expected
-// and must not surface as an error banner.
+// Aborting a superseded load rejects its promise; that rejection is expected, not an error.
 function isAbortError(err: unknown, signal?: AbortSignal): boolean {
   return Boolean(signal?.aborted) || (err instanceof DOMException && err.name === "AbortError");
 }
 
-// The most-recent fully-unreverted batch is the only one eligible for undo — but
-// only against the FULL, unfiltered timeline. Under any active filter the top
-// batch may not be the global most-recent one, so the server's LIFO guard would
-// reject with 409; hide the affordance (return null) instead.
+// Under a filter the top batch might not be globally most-recent; the server's
+// LIFO undo guard would 409 on it, so hide the affordance instead.
 function pickUndoableBatchKey(batches: TimelineBatch[], filtersActive: boolean): string | null {
   if (filtersActive) return null;
   return batches.find((b) => b.rows.every((r) => !r.reverted))?.key ?? null;
 }
 
-// Only defined filters are forwarded so an unfiltered load sends exactly
-// { includeFields: true }; typed to fetchActivity's query param so it stays in sync.
 function buildActivityQuery(filters: {
   categoryFilter: string;
   typeFilter: string | null;
@@ -226,8 +208,6 @@ function buildActivityQuery(filters: {
   };
 }
 
-// The filter bar: category + session selects (a matched pair) plus the
-// inventory-only event-type chips. Extracted so the modal render stays flat.
 function ActivityFilters({
   categoryFilter,
   onSelectCategory,
@@ -247,7 +227,7 @@ function ActivityFilters({
 }) {
   return (
     <div className="flex flex-col gap-2">
-      {/* Category + Session as a matched pair of compact selects. */}
+      
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <label className="flex items-center gap-2 text-xs text-parchment-600">
           <span className="font-semibold">Category</span>
@@ -284,7 +264,7 @@ function ActivityFilters({
         )}
       </div>
 
-      {/* Inventory event-type chips — only meaningful under Inventory. */}
+      
       {categoryFilter === "inventory" && (
         <div className="flex flex-wrap items-center gap-1.5" aria-label="Inventory event type filter">
           {INVENTORY_EVENT_TYPES.map((type) => {
@@ -309,7 +289,6 @@ function ActivityFilters({
   );
 }
 
-// The load/empty/error banners shown above the timeline list.
 function ActivityStatus({
   events,
   error,
@@ -345,7 +324,6 @@ interface ActivityFilterState {
   entityId?: string;
 }
 
-// Owns the activity-timeline load (mount + filter/character change) and exposes `reload` for the undo handler; the abort teardown drops a superseded load so a stale response can't overwrite a fresher one, and the extraction keeps the modal under the complexity gate with no exhaustive-deps suppression (#1056).
 function useActivityEvents(filters: ActivityFilterState) {
   const { characterId, categoryFilter, typeFilter, sessionFilter, entityId } = filters;
   const [events, setEvents] = useState<CharacterEvent[] | null>(null);
@@ -362,7 +340,7 @@ function useActivityEvents(filters: ActivityFilterState) {
       )
         .then(setEvents)
         .catch((err) => {
-          if (isAbortError(err, signal)) return; // superseded load — the newer one wins
+          if (isAbortError(err, signal)) return;
           setError("Couldn't load the activity log — try again.");
         });
     },
@@ -380,9 +358,7 @@ function useActivityEvents(filters: ActivityFilterState) {
 
 export default function ActivityModal({ characterId, onClose, entityId }: ActivityModalProps) {
   const [expandedFields, setExpandedFields] = useState<Set<string>>(new Set());
-  // Bulk-sale summary collapse (issue #104). Keyed by batch.key, kept INDEPENDENT
-  // of expandedFields (keyed by event.id) so the summary line and the per-row
-  // field-diff toggles can't collide.
+  // Keyed independently from expandedFields (batch.key vs. event.id) so the two toggles can't collide.
   const [expandedBatches, setExpandedBatches] = useState<Set<string>>(new Set());
   const undoMutation = useCharacterMutation({
     characterId,
@@ -391,8 +367,6 @@ export default function ActivityModal({ characterId, onClose, entityId }: Activi
     fallbackMessage: "Undo failed — try again.",
   });
 
-  // Filter state. "all" category disables the category predicate; an empty
-  // typeFilter/sessionFilter disables those. Type chips are inventory-only.
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [sessionFilter, setSessionFilter] = useState<string>("");
@@ -407,7 +381,6 @@ export default function ActivityModal({ characterId, onClose, entityId }: Activi
   });
   const showSpinner = useDelayedFlag(events === null && !error);
 
-  // Populate the session picker once per character.
   useEffect(() => {
     fetchSessions(characterId)
       .then(setSessions)
@@ -416,8 +389,7 @@ export default function ActivityModal({ characterId, onClose, entityId }: Activi
 
   function selectCategory(id: string) {
     setCategoryFilter(id);
-    // Type chips only make sense under Inventory; clear the type predicate when
-    // leaving that category so a stale filter doesn't hide everything.
+    // Reset the type predicate when leaving Inventory — a stale filter would otherwise hide everything silently.
     if (id !== "inventory") setTypeFilter(null);
   }
 
@@ -436,17 +408,14 @@ export default function ActivityModal({ characterId, onClose, entityId }: Activi
   async function handleUndo(batchId: string) {
     try {
       await undoMutation.mutateAsync(batchId);
-      reload(); // Refresh the timeline so reverted events are dimmed.
+      reload();
     } catch {
       // undoMutation.error already carries the message.
     }
   }
 
-  // Non-reverted, non-meta events in newest-first order.
   const activeEvents = (events ?? []).filter((e) => e.type !== "revert");
   const batches = groupByBatch(activeEvents);
-  // Collapse batches that share a calendar date under one date header so the
-  // label (TODAY, JUN 21, …) isn't repeated per batch.
   const dateGroups = groupByDate(batches);
 
   const filtersActive = hasActiveFilters({ categoryFilter, typeFilter, sessionFilter, entityId });

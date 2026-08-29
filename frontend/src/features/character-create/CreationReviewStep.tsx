@@ -1,7 +1,3 @@
-// Review step of the creation ceremony (#1176): the derived level-1 stats
-// (formerly PreviewSection) plus the still-needed list + submit error (formerly
-// CreateActions). The confirm button itself lives in the ceremony footer.
-
 import type { RulesEdition } from "@character-sheet/shared-types";
 
 import { useEditions } from "@/hooks/useEditions";
@@ -26,17 +22,11 @@ export default function CreationReviewStep({
 }: {
   preview: CreationPreview;
   missing: string[];
-  /** The real error text (create OR campaign-attach failure), or null. */
   submitError: string | null;
-  /** Resolved by CreationEntryGate; null for a solo build. */
   campaignName: string | null;
-  /** Resolved by CreationEntryGate — always set by Review; null only defensively. */
   rulesEdition: RulesEdition | null;
 }) {
-  // Mid-creation there is no server row to hang a rulesEditionLabel on, so the
-  // label is resolved out of the served rows (#1436). Null until they arrive —
-  // the fragment below then renders nothing while the rest of the line still
-  // does, rather than flashing a raw EDITION_* key.
+  // #1436: no server row exists mid-creation to resolve a rulesEditionLabel from, so editionLabel stays null until /api/editions loads.
   const { editions } = useEditions();
   const editionLabel = editions?.editions.find((row) => row.key === rulesEdition)?.label ?? null;
 
@@ -52,8 +42,6 @@ export default function CreationReviewStep({
         </div>
       </div>
 
-      {/* #1286: the last screen before an irreversible write echoes the choice —
-          otherwise it's invisible here and only changeable via Start Over. */}
       <p className="text-sm text-parchment-700">
         {campaignName ? `Joining ${campaignName}` : "Solo character"}
         {editionLabel && (

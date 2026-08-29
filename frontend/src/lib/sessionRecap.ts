@@ -23,7 +23,6 @@ export function formatTimeRange(startedAt: string, endedAt: string): string {
   )} – ${end.toLocaleTimeString(undefined, timeFmt)}`;
 }
 
-// Slots spent as [level, count] pairs, dropping zero counts, ascending by level.
 export function sortSlotsSpent(slotsSpent: Record<string, number>): [string, number][] {
   return Object.entries(slotsSpent)
     .filter(([, count]) => count > 0)

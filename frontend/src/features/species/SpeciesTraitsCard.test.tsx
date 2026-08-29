@@ -9,9 +9,6 @@ function makeCharacter(partial: Partial<Character>): Character {
   return { id: "char-1", race: "Hill Dwarf", speciesTraits: [], ...partial } as unknown as Character;
 }
 
-// SpeciesTraitsCard reads useCurrentCharacter() and renders served data only
-// (no rule arithmetic, CLAUDE.md) — every test asserts on TEXT the fixture
-// supplies, never a value the component itself computes.
 describe("SpeciesTraitsCard (#1682)", () => {
   it("renders nothing for a legacy race-name-only character (speciesTraits: [])", () => {
     const { container } = renderWithCharacter(<SpeciesTraitsCard />, makeCharacter({}));

@@ -1,9 +1,8 @@
 import type { CampaignArc, Character, ChronicleSession, EntryVisibility, JournalEntryKind } from "@/types/character";
 import { jsonBody, request } from "@/api/http";
 
-// Journal CRUD. Plain REST (no transaction/op batching) — journal entries carry no mechanical
-// effect, so they aren't routed through the audit log. Each call returns the
-// full updated Character so the caller can swap its state in one assignment.
+// Journal entries carry no mechanical effect, so they aren't routed through
+// the audit log/transactions pattern — plain REST CRUD instead.
 
 // kind defaults to ENTRY; NOTE omits date (server fills it with today).
 export async function createJournalEntry(
@@ -46,13 +45,9 @@ export async function deleteJournalEntry(
   );
 }
 
-// Journal chronicle (#863/#864). The read model behind the field-chronicle page:
-// the campaign's arcs ("parts") and its sessions ("chapters") with derived
-// sessionNumber + this character's per-session noteCount. A member sees every
-// session of their campaign; passing a characterId that isn't the caller's own
-// 403s server-side.
+// Passing a characterId that isn't the caller's own 403s server-side.
 
-/** The campaign's arcs / "parts", ordered by position asc (story order). */
+/** Ordered by position asc (story order). */
 export async function fetchCampaignArcs(campaignId: string): Promise<CampaignArc[]> {
   return request<CampaignArc[]>(
     `/campaigns/${campaignId}/arcs`,
@@ -61,7 +56,7 @@ export async function fetchCampaignArcs(campaignId: string): Promise<CampaignArc
   );
 }
 
-/** The chronicle session list (newest first) for a character — chapters + parts. */
+/** Newest first. */
 export async function fetchChronicleSessions(
   campaignId: string,
   characterId: string,

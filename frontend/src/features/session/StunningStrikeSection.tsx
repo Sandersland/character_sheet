@@ -1,13 +1,3 @@
-// Monk Stunning Strike on the attack card (#1242): once per turn, after hitting
-// with an Unarmed Strike or monk weapon, spend 1 focus to force the target's
-// Constitution save against the focus DC. The server rolls the save (flat
-// d20 — the target's ability scores aren't tracked by this app, see
-// stunning-strike.ts) and returns the fail(Stunned)/success(half-speed +
-// next-attack advantage) outcome, surfaced inline exactly like SneakAttackSection — no
-// toast: the app has no forced-result toast primitive (#956 retired the old
-// RollResultToast in favor of the player-rolled-only RollResultSeal), so the
-// result reads inline here plus the persisted session-log event.
-
 import { useState } from "react";
 
 import { attemptStunningStrikeTransaction } from "@/api/client";
@@ -17,15 +7,12 @@ import type { TurnState, TurnStateActions } from "@/features/session/useTurnStat
 import type { AttackTallyRow } from "@/lib/attackTallySummary";
 import type { Character, StunningStrikeAttemptResult } from "@/types/character";
 
-// Why the attempt button is disabled, in priority order — surfaced as its tooltip.
 function attemptBlockedReason(currentRow: AttackTallyRow | null, used: boolean): string | undefined {
   if (currentRow === null) return "Roll a hit first";
   if (used) return "Already used this turn";
   return undefined;
 }
 
-// Attempt state + the server round-trip: the server spends 1 focus, rolls the
-// target's save, and enforces once-per-turn; the result surfaces inline.
 function useStunningStrikeAttempt(
   character: Character,
   turnState: TurnState & TurnStateActions,
@@ -42,9 +29,6 @@ function useStunningStrikeAttempt(
   });
   const canAttempt = !used && !mutation.isPending && currentRow !== null;
 
-  // No try/catch (unchanged from pre-#1283): this hook has never surfaced an
-  // error and never awaits its own promise elsewhere — a rejection propagates
-  // same as before.
   async function handleAttempt() {
     if (!canAttempt) return;
     const { results } = await mutation.mutateAsync(used);
@@ -57,7 +41,6 @@ function useStunningStrikeAttempt(
 
 interface StunningStrikeSectionProps {
   turnState: TurnState & TurnStateActions;
-  /** The bound hit row this attempt is riding on; null before a hit lands. */
   currentRow: AttackTallyRow | null;
 }
 
@@ -73,7 +56,6 @@ export default function StunningStrikeSection({
     currentRow,
   );
 
-  // Only monks (L5+) have Stunning Strike; nothing to attempt until a hit lands.
   if (!stunningStrike) return null;
 
   return (

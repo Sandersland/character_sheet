@@ -14,8 +14,6 @@ interface GrantFieldsProps {
   onUpdate: (patch: Partial<ItemCapability>) => void;
 }
 
-// DM authoring for a grant capability (#529). Value pickers resolve through the
-// label helpers — a skill/ability/condition/damage-type is chosen, never typed.
 export default function GrantFields({ cap, index, onUpdate }: GrantFieldsProps) {
   const type = cap.grantType ?? "resistance";
   return (

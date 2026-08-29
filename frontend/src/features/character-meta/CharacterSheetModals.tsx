@@ -58,8 +58,7 @@ export default function CharacterSheetModals({
         />
       )}
 
-      {/* Guard on campaignId too: the sheet fetches the campaign, so it's
-          meaningless for a campaign-less character (#1087). */}
+      
       {campaignSettingsOpen && character.campaignId && (
         <CampaignSettingsSheet onClose={onCloseCampaignSettings} />
       )}

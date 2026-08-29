@@ -42,7 +42,7 @@ describe("useRestActions", () => {
 
     await result.current.shortRest(0);
     await result.current.shortRest(-1);
-    await result.current.shortRest(3); // only 2 available
+    await result.current.shortRest(3);
 
     expect(submit).not.toHaveBeenCalled();
     expect(dice.rollDie).not.toHaveBeenCalled();

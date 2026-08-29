@@ -10,8 +10,7 @@ interface DropdownMenuProps {
   className?: string;
 }
 
-// Owned-trigger popup menu: arbitrary render-prop children, keyboard nav driven
-// by a live `[role^="menuitem"]` query (covers menuitemradio) so presentational rows are skipped.
+// Keyboard nav queries `[role^="menuitem"]` live, which also matches menuitemradio, so presentational rows are skipped.
 export default function DropdownMenu({
   trigger,
   label,

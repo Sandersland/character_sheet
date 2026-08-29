@@ -53,8 +53,6 @@ describe("derivePreparedCastable", () => {
   });
 });
 
-// The Cast door's castable list (#1162): at-will cantrips + prepared leveled
-// spells that currently have a slot to spend.
 describe("deriveCastableSpells", () => {
   function character(spells: Spell[]): Character {
     return { spellcasting: sc(spells) } as unknown as Character;

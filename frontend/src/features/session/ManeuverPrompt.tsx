@@ -1,19 +1,6 @@
-/**
- * ManeuverPrompt — inline Battle Master maneuver die spend, hosted per card of
- * the attack sheet (#809). `section` selects which half renders:
- *   - "attack" → Precision Attack, mounted under AttackFormCard once a to-hit
- *      roll exists for the selected form.
- *   - "damage" → damage-roll maneuvers (Trip/Menacing…), mounted under
- *      WeaponDamageCard once a damage roll exists.
- *
- * Both mounts share the pure `planManeuverPrompt` split; each renders only its
- * own section so a maneuver never appears on both cards. Maneuvers routed to
- * "attackOption" (Commander's Strike), "reaction" (Parry/Riposte), or "effect"
- * (Evasive Footwork) are handled at the TurnHub / InlineAttackPicker level and
- * do NOT appear here.
- *
- * Styling: compact gold-tinted strip — gold = resources in the design system.
- */
+// attackOption/reaction/effect-placement maneuvers are handled by
+// AttackOptionSection, not here.
+// Gold styling marks resources in the design system.
 
 import { useState } from "react";
 
@@ -24,16 +11,10 @@ import type { ManeuverEntry } from "@/types/character";
 import type { RollResult } from "@/lib/dice";
 
 interface ManeuverPromptProps {
-  /** Which half to render: attack-roll (Precision) or damage-roll maneuvers. */
   section: "attack" | "damage";
-  /** The last attack roll result for this weapon row (null = not yet rolled). */
   lastAttackRoll: RollResult | null;
-  /** The last damage roll result for this weapon row (null = not yet rolled). */
   lastDamageRoll: RollResult | null;
-  /**
-   * Called with updated totals after a die is spent and auto-summed.
-   * Pass null for a total that wasn't changed.
-   */
+  /** Pass null for whichever total wasn't changed by this spend. */
   onRollsUpdated: (newAttackTotal: number | null, newDamageTotal: number | null) => void;
 }
 
@@ -43,17 +24,14 @@ export default function ManeuverPrompt({
   lastDamageRoll,
   onRollsUpdated,
 }: ManeuverPromptProps) {
-  // All hooks at the top — no hooks after the early returns below.
   const { character } = useCurrentCharacter();
   const { pool, dieLabel, busy, spend } = useManeuverDie(character);
   const [spentFor, setSpentFor] = useState<string | null>(null);
   const [selectedDamageManeuver, setSelectedDamageManeuver] = useState("");
 
-  // Derive maneuver lists (pure planning in planManeuverPrompt).
   const maneuversKnown = character.resources?.maneuversKnown ?? [];
 
-  // Guard: only render when the character is a Battle Master with dice left.
-  // (The explicit !pool check narrows the type; the helper owns the full rule.)
+  // The explicit !pool check narrows the type; canPromptManeuvers owns the full gating rule.
   if (!pool || !canPromptManeuvers(pool, maneuversKnown)) {
     return null;
   }
@@ -64,7 +42,6 @@ export default function ManeuverPrompt({
     return null;
   }
 
-  // Resolved current damage maneuver selection — fall back to first if state is stale.
   const activeDamageManeuver = resolveDamageSelection(plan.damageRollManeuvers, selectedDamageManeuver);
 
   async function handlePrecision(m: ManeuverEntry) {
@@ -113,7 +90,6 @@ export default function ManeuverPrompt({
   );
 }
 
-/** Precision Attack (and any attackRoll maneuver): one direct spend button each. */
 function AttackManeuverSection({
   maneuvers,
   dieLabel,
@@ -139,7 +115,6 @@ function AttackManeuverSection({
   );
 }
 
-/** The gold-tinted spend affordance both sections share. */
 function SpendButton({
   disabled,
   onClick,
@@ -161,7 +136,6 @@ function SpendButton({
   );
 }
 
-/** One damage maneuver → a direct button; several → a select + a Spend button. */
 function DamageManeuverPicker({
   maneuvers,
   dieLabel,

@@ -6,10 +6,6 @@ import { formatSessionDate } from "@/lib/sessionDate";
 import { buildFeedItems, feedItemRowCount } from "@/lib/sessionLogFeed";
 import type { CharacterEvent, Session } from "@/types/character";
 
-// Idle: surface the most recent ended session, tapping opens its log. Live: a
-// running event count for the active session, tapping opens the live log. Both
-// collapse the log to a single line (#1086) — desktop opens a right Drawer, mobile
-// a BottomSheet, wired by the parent.
 type CombatLogRowProps =
   | { mode: "idle"; characterId: string; onOpen: (sessionId: string) => void }
   | { mode: "live"; characterId: string; sessionId: string; refreshKey?: unknown; onOpen: () => void };
@@ -31,8 +27,7 @@ function IdleLogRow({ characterId, onOpen }: { characterId: string; onOpen: (id:
   const [session, setSession] = useState<Session | null>(null);
 
   useEffect(() => {
-    // Guard the async setState: the idle Combat panel unmounts the moment a
-    // session starts (the live panel supersedes it).
+    // Guard the async setState: the idle Combat panel unmounts the moment a session starts.
     let alive = true;
     fetchSessions(characterId)
       .then((list) => {
@@ -76,9 +71,7 @@ function LiveLogRow({
     fetchSession(characterId, sessionId)
       .then((data) => {
         if (!alive) return;
-        // `feedItemRowCount` over `buildFeedItems` — the SAME pipeline SessionLog
-        // renders from — so this badge counts rendered feed rows, not raw events
-        // (a merged swing is 2 events/1 row).
+        // Must use the same buildFeedItems/feedItemRowCount pipeline as SessionLog, or this count drifts from the rendered feed.
         setCount(feedItemRowCount(buildFeedItems(data.events as CharacterEvent[])));
       })
       .catch(() => {

@@ -3,7 +3,6 @@ import { render, screen } from "@testing-library/react";
 
 import MeterBar from "@/components/ui/MeterBar";
 
-/** Returns the inner fill element (the coloured bar). */
 function getFill(container: HTMLElement) {
   return container.querySelector(".h-full") as HTMLElement;
 }

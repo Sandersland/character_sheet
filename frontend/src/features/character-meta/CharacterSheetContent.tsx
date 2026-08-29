@@ -26,22 +26,8 @@ import SessionSummaryModal from "@/features/session/SessionSummaryModal";
 import type { SheetTab, SheetTabId } from "@/features/character-meta/sheetTabs";
 import type { ReferenceData, Session } from "@/types/character";
 
-// #1279: the live turn tracker pulls the session domain's heaviest trees
-// (TurnHub/useTurnActions/InlineAttackPicker) — lazied so a sheet that never goes
-// live never fetches them. Import fires once a live+joined session actually
-// exists (renderLivePanel below), not on every sheet load.
 const CombatLivePanel = lazy(() => import("@/features/session/CombatLivePanel"));
 
-/**
- * The loaded-sheet view. Takes NO props (#1284 C17) — reads the character via
- * useCurrentCharacter() (the page's CurrentCharacterProvider is already
- * mounted above this) and the catalog via useReferenceData(), instead of
- * receiving either threaded down from CharacterSheetPage. Wraps the workspace
- * in the shared session providers (#959) — `LiveSessionProvider` (is a
- * session live + am I in it) above `TurnStateProvider` (the single turn-state
- * instance) — so the Combat tab, the live strip, the nav pip, and the doorway
- * all read one server-derived source.
- */
 export default function CharacterSheetContent() {
   const { character } = useCurrentCharacter();
   const { reference } = useReferenceData(character.rulesEdition);
@@ -54,35 +40,19 @@ export default function CharacterSheetContent() {
   );
 }
 
-/**
- * The sheet body: banner + tab panels + the roll/modal chrome. Split from
- * CharacterSheetContent so the providers above stay uncluttered and this owns
- * the per-character interaction state (tabs, modals, capture dock, doorway).
- * Reads the character itself (#1284) — CharacterSheetContent only needed it
- * for LiveSessionProvider's characterId, not to forward it here.
- */
 function CharacterSheetWorkspace({ reference }: { reference: ReferenceData | null }) {
   const { character, tabs, activeTab, onTabChange } = useCharacterTabs();
   const modals = useSheetModals();
-  // Cmd/Ctrl+J toggles the quick-capture dock from anywhere on the sheet.
   const { captureOpen, openCapture, closeCapture } = useCaptureDock();
-  // Session-log invalidation is shared with RollProvider so a logged roll and
-  // the log view use one counter (#959).
+  // Shared with RollProvider so a logged roll and the log view use one invalidation counter (#959).
   const live = useLiveSession();
-  // Bumps the log for EVERY character-cache write (#1284) — a strict superset
-  // of the old combat-only bump (see useCombatLifecycle's docblock).
   useSessionLogBumpOnCharacterWrite(live.bumpLog);
   const turnState = useTurnStateContext();
   const liveRound = useLiveRound();
-  // Start/Join from the doorway jumps to the Combat tab in-workspace (#963).
   const session = useSessionDoorway(character.id, () => onTabChange("combat"));
   const { swipe, collapse } = useMobileSheetGestures(tabs, activeTab, onTabChange);
   const goToCombat = () => onTabChange("combat");
 
-  // #1085: while live + joined the header cluster is the sole live indicator —
-  // SessionCue renders nothing on either breakpoint (the Combat nav item still
-  // carries a live pip). Non-joined/starting states keep the existing doorway;
-  // on the Combat tab nothing renders (D4) — the panel is the context.
   const isLiveJoined = live.status === "liveJoined";
   const isLive = isLiveJoined || live.status === "liveNotJoined";
   const cueProps = {
@@ -91,9 +61,6 @@ function CharacterSheetWorkspace({ reference }: { reference: ReferenceData | nul
     session,
   };
 
-  // The End/Leave-session lifecycle lifts here (#979) so the persistent sheet
-  // header — a sibling of the panel region — can drive it (there is no separate
-  // in-panel controls strip anymore). Handlers no-op until a session is joined.
   const life = useCombatLifecycle({ character, session: live.session, live });
   const livePanel = renderLivePanel(live.session, Boolean(turnState), activeTab === "combat");
 
@@ -104,11 +71,7 @@ function CharacterSheetWorkspace({ reference }: { reference: ReferenceData | nul
       onRollLogged={live.bumpLog}
       rollModifiers={character.rollModifiers}
     >
-      {/* Mobile: a 100dvh app-shell — fixed header + in-flow bottom nav with the
-          panels scrolling in the middle, so iOS Safari's dynamic toolbar can't
-          shift a body-scrolled fixed nav (no gap; nav always flush). Desktop
-          reverts to normal flex-1 body scroll within the app shell (nav is
-          md:hidden, #1171). */}
+      {/* 100dvh app-shell keeps the bottom nav flush — iOS Safari's dynamic toolbar shifts a body-scrolled fixed nav otherwise. */}
       <div className="flex h-[100dvh] flex-col overflow-hidden bg-parchment-100 md:block md:h-auto md:flex-1 md:overflow-visible">
         <CharacterSheetHeader
           tabs={tabs}
@@ -118,8 +81,6 @@ function CharacterSheetWorkspace({ reference }: { reference: ReferenceData | nul
           liveRound={liveRound}
           isLiveJoined={isLiveJoined}
           sessionActionBusy={life.sessionActionBusy}
-          // Leave is campaign-only (#1082): omit the handler for a solo session
-          // so the header hides Leave while keeping End.
           onLeaveSession={life.canLeave ? life.handleLeave : undefined}
           onEndSession={life.openEndPrompt}
           scrolled={collapse.collapsed}
@@ -131,12 +92,10 @@ function CharacterSheetWorkspace({ reference }: { reference: ReferenceData | nul
           onOpenCampaignSettings={modals.openCampaignSettings}
         />
 
-        {/* Armed level-up entry (#892): pinned under the header on every tab,
-            above the mobile scroller so it can't scroll away. */}
+        
         <LevelUpBanner />
 
-        {/* Desktop: session doorway for non-joined states, pinned under the
-            header; absent on the Combat tab and while joined (#1085). */}
+        
         <SessionCue placement="desktop" {...cueProps} />
 
         <CharacterSheetModals
@@ -154,9 +113,7 @@ function CharacterSheetWorkspace({ reference }: { reference: ReferenceData | nul
           onCloseCapture={closeCapture}
         />
 
-        {/* min-h-0 lets the scroll region shrink below its content so it actually
-            scrolls (the flexbox overflow gotcha). Desktop: normal flow. Mobile:
-            horizontal swipe here walks the panel tabs. */}
+        {/* min-h-0 lets this region shrink below its content height so it can scroll (flexbox overflow gotcha). */}
         <div
           ref={collapse.scrollRef}
           className="min-h-0 flex-1 overflow-y-auto md:flex-none md:overflow-visible"
@@ -164,9 +121,7 @@ function CharacterSheetWorkspace({ reference }: { reference: ReferenceData | nul
           onTouchEnd={swipe.onTouchEnd}
           onTouchCancel={swipe.onTouchCancel}
         >
-          {/* Collapse-on-scroll sentinel: once it leaves the scroller the mobile
-              header collapses (#1026). Mobile-only — desktop doesn't collapse and
-              must not gain the 1px this adds to the flow. */}
+          {/* Mobile-only — must not add its 1px to desktop's flow. */}
           <div ref={collapse.sentinelRef} aria-hidden className="h-px w-full md:hidden" />
           <CharacterSheetBody
             reference={reference}
@@ -179,8 +134,7 @@ function CharacterSheetWorkspace({ reference }: { reference: ReferenceData | nul
         </div>
         <WorkspaceSessionModals characterId={character.id} live={live} life={life} />
         <RollResultSeal />
-        {/* Mobile: the session cue (live-strip / doorway), between the panels
-            and the bottom nav; absent on the Combat tab (#961). */}
+        
         <SessionCue placement="mobile" {...cueProps} />
         <SheetBottomNav
           tabs={tabs}
@@ -193,12 +147,6 @@ function CharacterSheetWorkspace({ reference }: { reference: ReferenceData | nul
   );
 }
 
-/**
- * The two workspace-level session overlays (#960/#979), extracted to keep the
- * workspace under the complexity ceiling: the end-of-session recap (outlives the
- * live panel unmounting once the session goes static) and the End-Session confirm
- * prompt (a Modal, triggerable from the sheet header on any tab, not just Combat).
- */
 function WorkspaceSessionModals({
   characterId,
   live,
@@ -225,8 +173,7 @@ function WorkspaceSessionModals({
           onCancel={life.closeEndPrompt}
         />
       )}
-      {/* Leave has no modal, so a failed "Leave Session" (from the header) shows
-          here as a dismissible toast — otherwise the failure would be silent. */}
+      
       {life.leaveError && (
         <div
           role="alert"
@@ -246,12 +193,6 @@ function WorkspaceSessionModals({
   );
 }
 
-/**
- * The live turn tracker (#960), mounted once (persists across tab switches, so an
- * in-progress picker + economy survive a swipe round-trip). Returns null — not an
- * element — when there's no live session so CharacterSheetBody falls back to the
- * static Combat panel. Extracted so the workspace render stays under the ceiling.
- */
 function renderLivePanel(
   session: Session | null,
   hasTurnState: boolean,
@@ -265,12 +206,6 @@ function renderLivePanel(
   );
 }
 
-/**
- * The off-Combat session cue (#961): the existing doorway (start / join /
- * scheduled) for characters not yet in the session. Live-joined state now lives
- * only in the sheet header cluster (#1085), so a joined character sees no cue
- * here on either breakpoint; also nothing on the Combat tab (D4).
- */
 function SessionCue({
   placement,
   activeTab,
@@ -296,28 +231,19 @@ function SessionCue({
   );
 }
 
-/** The character plus its derived tab list — grouped into one hook so the
- *  workspace calls it once instead of two (fallow scores a hook's cognitive
- *  load by its delegating closures, so keeping the workspace's own hook count
- *  down matters more than branch-level extraction). */
+// Grouped into one hook: fallow scores a hook's cognitive load by its delegating closures.
 function useCharacterTabs() {
   const { character } = useCurrentCharacter();
   const { tabs, activeTab, onTabChange } = useSheetTabs(character);
   return { character, tabs, activeTab, onTabChange };
 }
 
-/** The panel region's two mobile-only scroll affordances — horizontal swipe
- *  walks the tabs, vertical scroll collapses the header — grouped into one
- *  hook so the workspace calls it once instead of two. */
 function useMobileSheetGestures(tabs: SheetTab[], activeTab: SheetTabId, onTabChange: (id: SheetTabId) => void) {
   const swipe = useSwipeTabs(tabs, activeTab, onTabChange);
   const collapse = useScrollCollapse();
   return { swipe, collapse };
 }
 
-/** The sheet's modal open-state + toggles (delete / activity / sessions /
- *  campaign settings), factored out so the workspace body stays free of inline
- *  handler closures. */
 function useSheetModals() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);

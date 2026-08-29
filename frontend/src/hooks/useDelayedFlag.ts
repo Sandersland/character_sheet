@@ -1,10 +1,6 @@
 import { useEffect, useState } from "react";
 
-/**
- * Returns true only after `active` has been continuously true for `delayMs`.
- * Flipping `active` to false resets immediately. Used to gate loading
- * indicators so fast operations never flash one on screen.
- */
+// Delayed to become true; resets to false immediately when `active` goes false.
 export function useDelayedFlag(active: boolean, delayMs = 400): boolean {
   const [shown, setShown] = useState(false);
 
