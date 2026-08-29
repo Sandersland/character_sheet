@@ -1,0 +1,48 @@
+-- S5 (maintenance hardening): at most one `active` Session per campaign.
+-- startCampaignSession already re-checks for a rival active session inside
+-- its transaction, but under Postgres's default READ COMMITTED isolation two
+-- concurrent starts can both run that SELECT before either INSERT commits,
+-- so both pass and two active Session rows land for one campaign (reproduced
+-- by a concurrent-start test in the session start route's test suite).
+--
+-- This is the first index in this repo that is FULLY invisible to Prisma's
+-- schema DSL. Every other hand-written NULLS NOT DISTINCT / CHECK constraint
+-- here (e.g. 20260802120000_item_scope_discriminator,
+-- 20260807130000_catalog_entitlement) decorates a column or unique
+-- constraint that DOES have a `@@unique` counterpart in schema.prisma; a
+-- partial (WHERE-clause) index has no DSL representation at all, so there is
+-- no schema.prisma line for this one to attach to.
+-- item_scope_discriminator's own header warned that "a raw partial index is
+-- invisible to drift detection — every later migration would propose
+-- dropping it," and added a denormalized scopeKey column to stay visible
+-- instead. That warning is verified FALSE on the Prisma 7.8 this repo runs:
+-- `migrate dev`'s diff against this schema proposes only the one known
+-- artifact (the Spell FK drop, #1571) and leaves this index alone —
+-- introspection ignores partial indexes rather than flagging them for
+-- removal. That's why this needs no denormalized column of its own.
+--
+-- campaignId IS NOT NULL does not follow from status = 'active' — a solo
+-- session (campaignId null) is exactly active + null, so the two predicates
+-- are independent. The clause is redundant for uniqueness purposes (Postgres
+-- treats NULLs as distinct, so a plain `WHERE status = 'active'` index would
+-- never collide on a null campaignId regardless), but it's kept so the
+-- index's row set excludes solo sessions outright rather than relying on
+-- that NULL-distinctness behavior to make the exclusion self-evident.
+--
+-- If a database already holds two or more active sessions for the same
+-- campaign, this CREATE UNIQUE INDEX aborts, and the existing rows need
+-- manual cleanup (end all but one) before `prisma migrate resolve --applied`
+-- can mark this migration applied. Verified clean against the owner's dev DB
+-- before merge; the app is unreleased, so there is no production data to
+-- reconcile.
+--
+-- This does NOT close the mirror-image solo-session race (at most one active
+-- solo session per CHARACTER, campaignId null): a solo session's character
+-- association lives on SessionParticipant, a separate table, and a partial
+-- unique index can only constrain columns of the table it's defined on. That
+-- half stays lib-enforced only (see the Session model comment in
+-- schema.prisma) — a fix would need a denormalized characterId column on
+-- Session, or a trigger, which is out of scope here.
+CREATE UNIQUE INDEX "Session_campaignId_active_key"
+  ON "Session"("campaignId")
+  WHERE "status" = 'active' AND "campaignId" IS NOT NULL;

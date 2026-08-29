@@ -107,6 +107,29 @@ describe("POST /api/campaigns/:campaignId/sessions — start", () => {
       .send({ characterId: CHAR_OWNER });
     expect(res.status).toBe(403);
   });
+
+  // Two truly concurrent starts can both pass the lib-level pre-check and tx-scoped re-check before either
+  // commits (#1600 shipped the listening-server fix that makes concurrent supertest calls actually race).
+  // Session_campaignId_active_key (see schema.prisma) closes this at the database; the loser's P2002 must map
+  // to the same "already active" SessionError the sequential check raises, not a 500.
+  it("two concurrent starts for the same campaign yield exactly one active session and no 500", async () => {
+    const campaignId = await setupCampaign();
+
+    const [resA, resB] = await Promise.all([
+      agent(cookieOwner).post(startUrl(campaignId)).send({ characterId: CHAR_OWNER }),
+      agent(cookiePlayer).post(startUrl(campaignId)).send({ characterId: CHAR_PLAYER }),
+    ]);
+
+    const statuses = [resA.status, resB.status].sort();
+    expect(statuses).toEqual([201, 409]);
+    const loser = resA.status === 409 ? resA : resB;
+    expect(loser.body.error).toMatch(/already active/i);
+
+    const activeSessions = await prisma.session.findMany({
+      where: { campaignId, status: "active" },
+    });
+    expect(activeSessions).toHaveLength(1);
+  });
 });
 
 describe("join / leave", () => {
