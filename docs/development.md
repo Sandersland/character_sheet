@@ -15,6 +15,8 @@ npm run dev                                  # backend :4000 + frontend :5173
 docker compose --profile tools up pgadmin    # pgAdmin :5050 (opt-in)
 ```
 
+**First login:** a fresh clone configures no sign-in provider, so the login page offers no button. Either set a Google client (`docs/deployment.md`, "OAuth setup (dev)") or use the dev-login session `seed:verify` mints (below).
+
 **The app runs on the host; only Postgres and the Playwright e2e runner are containers (#1458).** The dev images existed to make `docker compose up` boot everything, and paid for it with `node_modules` volumes shadowing the source mount — the split that made host `tsc` check the wrong tree, hid `fallow` from lefthook, and cost a rebuild per dependency change. CI has always run this way (`ci.yml` boots the same servers on a bare runner with a Postgres service), so the containerless path is the tested one.
 
 The seed is **catalog-only** (no users/characters); use `npm run seed:verify` for a signed-in user + representative character. After a schema change, re-run `prisma migrate deploy` yourself — nothing does it on boot any more.
