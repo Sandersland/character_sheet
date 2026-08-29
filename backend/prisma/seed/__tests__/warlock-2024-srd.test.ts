@@ -1,9 +1,4 @@
-// #1233 commit 2 of 3: Warlock's real SRD 5.2 (2024) content. Every assertion
-// below is pinned against an actual SRD 5.2 VALUE (a spell name, a damage
-// die, a saving throw ability, a level) transcribed from the official SRD 5.2
-// CC-BY PDF — never against "differs from the 2014 row", which a garbage
-// 2024 paraphrase would also satisfy. Mirrors barbarian-2024-content.test.ts's
-// row()/hasRow() shape (same file, same WARLOCK_FEATURES export).
+// Pinned against actual SRD 5.2 values (official SRD 5.2 CC-BY PDF) — never against "differs from 2014", which a garbage paraphrase would also satisfy.
 import { describe, expect, it } from "vitest";
 
 import { deriveResources } from "@/lib/classes/class-features.js";
@@ -18,7 +13,6 @@ function rowsNamed(subclassSlug: string | null, name: string) {
   return WARLOCK_FEATURES.filter((r) => r.subclassSlug === subclassSlug && r.name === name);
 }
 
-/** Exactly one row for (subclassSlug, name, edition), or the test fails with a precise locator. */
 function row(subclassSlug: string | null, name: string, edition: Edition) {
   const found = rowsNamed(subclassSlug, name).filter((r) => r.edition === edition);
   expect(found, `${subclassSlug ?? "(base)"}/${name}/${edition}`).toHaveLength(1);
@@ -186,10 +180,7 @@ const ABILITY_SCORES = {
   charisma: 18,
 };
 
-// Integration-level proof (mirrors barbarian-2024-content.test.ts's
-// loadDbFeatureRows pattern): the REAL seeded rows, read through the REAL
-// derivation path, actually reach a serialized character's derived features —
-// not just WARLOCK_FEATURES' in-memory shape.
+// Integration-level proof: the real seeded rows, read through the real derivation path, reach a serialized character's derived features — not just WARLOCK_FEATURES' in-memory shape.
 describe("integration (#1233): a level-14 Fiend Warlock's derived features differ by edition exactly where authored", () => {
   it("2024 has Fiend Spells/Magical Cunning/Contact Patron and NOT Pact Boon/Expanded Spell List; 2014 is the reverse", async () => {
     const featureRows = await loadDbFeatureRows("warlock", "the fiend");

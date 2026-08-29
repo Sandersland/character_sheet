@@ -1,17 +1,5 @@
-// Content-correctness audit for the discipline catalog (#1503 review fix):
-// PHB'14 p.81 every save-based damage discipline explicitly halves damage on
-// a successful save ("takes half damage on a success" / "half on a
-// success") — Fist of Unbroken Air and Water Whip's own DESCRIPTIONS already
-// said so, but their seed rows omitted `saveEffect: "half"`, so
-// catalogEffectSpec (lib/combat/effects.ts) resolved `saveEffect: null` and a
-// successful save would have wrongly dealt FULL damage. Asserted as a
-// general invariant (not just the two named rows) so the same field/text
-// mismatch can't reappear on a future discipline.
-//
-// Lives under prisma/seed/__tests__ (not backend/src/**) because it imports
-// DISCIPLINES directly — backend/tsconfig.json's `rootDir: "src"` makes a
-// src file importing anything under prisma/ a compile error (TS6059), the
-// same constraint literal-fixture-parity.test.ts's own header documents.
+// PHB'14 p.81: every save-based damage discipline halves damage on a successful save.
+// Lives here, not backend/src/**, because importing DISCIPLINES from src hits tsconfig's rootDir:"src" (TS6059).
 import { describe, expect, it } from "vitest";
 
 import { DISCIPLINES } from "../disciplines.js";
@@ -19,11 +7,7 @@ import { DISCIPLINES } from "../disciplines.js";
 describe("discipline catalog content audit (#1503 review fix)", () => {
   it("every save-based damage discipline resolves saveEffect \"half\" (PHB'14 p.81: all are save-for-half)", () => {
     const saveForDamage = DISCIPLINES.filter((d) => d.effectKind === "damage" && d.attackType === "save");
-    // Anti-vacuity: today's catalog has 8 such rows (Fist of Four Thunders,
-    // Fist of Unbroken Air, Sweeping Cinder Strike, Water Whip, Gong of the
-    // Summit, Flames of the Phoenix, Breath of Winter, River of Hungry
-    // Flame) — a filter that stopped matching any of them would make this
-    // test pass by iterating nothing.
+    // fails if the filter stops matching rows and iterates nothing
     expect(saveForDamage.length).toBeGreaterThanOrEqual(8);
     const missing = saveForDamage.filter((d) => d.saveEffect !== "half").map((d) => d.name);
     expect(missing, `save-for-damage discipline(s) missing saveEffect "half": ${missing.join(", ")}`).toEqual([]);

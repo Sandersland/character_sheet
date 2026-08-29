@@ -1,16 +1,4 @@
-// #1234: Wizard's EDITION_2014 rows must be byte-identical transcriptions of
-// what lib/classes/wizard.ts's WIZARD_FEATURES/SCHOOL_OF_EVOCATION_FEATURES/
-// SCHOOL_OF_ABJURATION_FEATURES/SCHOOL_OF_ILLUSION_FEATURES said BEFORE this
-// migration — 2014 is a supported edition, not a rewrite target. This
-// snapshot is that pre-change text, pinned by hand from the tree at the
-// commit before #1234 landed, NOT re-derived from anything this migration
-// touches — a hardcoded oracle is the whole point, mirroring
-// barbarian-2014-snapshot.test.ts's shape.
-//
-// This is a GUARD, not a red/green cycle: it is green on first run by
-// construction (WIZARD_FEATURES is authored as a byte-identical copy in the
-// same commit that adds this file). Its job is to catch commit 2 silently
-// editing a 2014 row while authoring 2024 content.
+// Guard, not red/green: WIZARD_FEATURES' EDITION_2014 rows must stay byte-identical to the pre-#1234 tree, pinned by hand, not re-derived from anything this migration touches.
 import { describe, expect, it } from "vitest";
 
 import { WIZARD_FEATURES } from "../wizard-features.js";
@@ -23,7 +11,6 @@ interface Pinned {
 }
 
 const PRE_CHANGE_2014: Pinned[] = [
-  // ---- Base class ------------------------------------------------------
   {
     subclassSlug: null,
     name: "Spellcasting",
@@ -52,7 +39,6 @@ const PRE_CHANGE_2014: Pinned[] = [
     description:
       "Choose two 3rd-level wizard spells in your spellbook as signature spells. They are always prepared and don't count against your prepared spells count. You can cast each once without expending a slot; regain both uses after a short or long rest.",
   },
-  // ---- School of Evocation -----------------------------------------------
   {
     subclassSlug: "wizard-school-of-evocation",
     name: "Evocation Savant",
@@ -85,7 +71,6 @@ const PRE_CHANGE_2014: Pinned[] = [
     description:
       "When you cast a wizard spell of 1st–5th level that deals damage, you can deal maximum damage with it. The first time per long rest you do so, you suffer no ill effect. Each use thereafter costs 2d12 necrotic per spell level (before the rest).",
   },
-  // ---- School of Abjuration ------------------------------------------------
   {
     subclassSlug: "wizard-school-of-abjuration",
     name: "Abjuration Savant",
@@ -117,7 +102,6 @@ const PRE_CHANGE_2014: Pinned[] = [
     level: 14,
     description: "You have advantage on saving throws against spells, and resistance to spell damage.",
   },
-  // ---- School of Illusion --------------------------------------------------
   {
     subclassSlug: "wizard-school-of-illusion",
     name: "Illusion Savant",
@@ -160,10 +144,7 @@ function key(p: { subclassSlug: string | null; name: string }): string {
 
 describe("Wizard EDITION_2014 rows are byte-identical to the pre-#1234 tree (2014 is a transcription, not a rewrite)", () => {
   it("count matches: exactly the 19 pre-change 2014 features, among the pre-#1234 subclasses", () => {
-    // Scoped the same way as the "no EXTRA row" test below — #1676
-    // (Bladesinging) added 4 genuinely new EDITION_2014 rows (Training in War
-    // and Song, Bladesong, Extra Attack, Song of Defense) under a fifth
-    // subclass this snapshot predates.
+    // Filtered to pinnedSlugs: #1676 (Bladesinging) added 4 more EDITION_2014 rows under a fifth subclass this snapshot predates.
     const pinnedSlugs = new Set(PRE_CHANGE_2014.map((p) => p.subclassSlug));
     const actual2014 = WIZARD_FEATURES.filter((r) => r.edition === "EDITION_2014" && pinnedSlugs.has(r.subclassSlug));
     expect(actual2014).toHaveLength(PRE_CHANGE_2014.length);
@@ -181,13 +162,7 @@ describe("Wizard EDITION_2014 rows are byte-identical to the pre-#1234 tree (201
   });
 
   it("no EXTRA EDITION_2014 row exists beyond the 19 pinned above, among the pre-#1234 subclasses", () => {
-    // Scoped to the four subclasses this snapshot covers (null/evocation/
-    // abjuration/illusion) — #1676 (Bladesinging) added a FIFTH subclass's
-    // worth of genuinely new EDITION_2014 rows after this file was pinned,
-    // which this snapshot was never meant to catch (it guards against a
-    // pre-#1234 row being silently edited, not against new subclasses being
-    // added later). Filtering by the pinned subclassSlugs keeps that guard
-    // intact without hand-listing Bladesinging's own five rows here too.
+    // Scoped to the four pinned subclasses; #1676 (Bladesinging) added a fifth subclass's worth of new EDITION_2014 rows this snapshot doesn't cover.
     const pinnedSlugs = new Set(PRE_CHANGE_2014.map((p) => p.subclassSlug));
     const actualKeys = new Set(
       WIZARD_FEATURES.filter((r) => r.edition === "EDITION_2014" && pinnedSlugs.has(r.subclassSlug)).map((r) => key(r)),

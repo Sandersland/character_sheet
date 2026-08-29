@@ -1,52 +1,12 @@
-// PHB'14 spells offered to three or more of the eight classes above (the
-// "3+-list" bucket) — kept in one file instead of duplicated across every
-// class file that offers it, per epic #1517's row-ownership rule. #1710
-// (foundation slice 1/3 of epic #1517) created the empty array + wiring;
-// this slice (#1713) fills it in.
+// Source: SRD 5.1 (dnd5eapi.co's 2014 spell set), except per-row-cited
+// hand-transcribed exceptions.
 //
-// Source: every row below except eight is verbatim SRD 5.1 text (dnd5eapi.co's
-// 2014 spell set — see `/api/2014/spells/<slug>`), cited SRD 5.1 as a whole
-// rather than per-row since all 136 of those rows share that one source. The
-// eight exceptions — Witch Bolt (#1718); Friends, Cloud of Daggers, and Crown
-// of Madness (#1719); and Phantasmal Force, Feign Death, Arcane Gate, and
-// Blade Ward (#1742, closing the non-SRD-3+-list audit epic #1517 left open)
-// — are hand-transcribed and cited per-row, each cross-checked word-for-word
-// against a second source (dnd5e.wikidot.com) and, for the #1742 four,
-// 5etools' own gendata-spell-source-lookup.json class-access data plus its
-// raw spells-phb.json/spells-xphb.json (the same authoritative-lookup
-// approach the Ranger slice, #1721, established for real PHB'14 spells
-// dnd5eapi omits): dnd5eapi/open5e's SRD 5.1 dataset doesn't include any of
-// the eight at all. A handful of
-// the SRD rows fix a scraping artifact from that source, not a rules choice:
-// dnd5eapi genericizes PHB'14's "the DM" to "the GM" (restored here — this
-// repo's own term, see feats.ts's "the DM"), a few entries had a stray-space typo
-// ("o f" for "of", "10d 10" for "10d10"), and five spells whose reference
-// tables (Confusion's d10 behavior table, Animate Objects' size statblock,
-// Scrying's/Teleport's/Control Weather's modifier and stage tables) render as
-// literal markdown pipe tables in the API response were hand-converted to
-// prose — SpellDetailCard renders `description` `whitespace-pre-line` with
-// no markdown parser, so a literal "| Stage | Condition |" would render as
-// raw pipe characters. Every number in those five stays the source's own.
-//
-// effectKind/damage fields are set only where the API's own structured
-// damage/heal/dc data describes the spell's PRIMARY, unconditional effect —
-// left as a plain utility row (numbers still in the prose) wherever a
-// spell's damage is: a non-damage-type roll (Sleep's 5d8 "hit points
-// affected" pool), split across two damage types in one entry (Ice Storm's
-// bludgeoning + cold, which one damageType/effectDiceFaces pair can't
-// represent — same reason the existing 2024 Ice Storm row, spells.ts:1241,
-// carries no effectKind), or conditional on a choice/mishap that isn't the
-// spell's default use (Control Water's Whirlpool option out of four, Dream's
-// optional nightmare-message damage, Dimension Door's arrive-in-an-occupied-
-// space mishap). Feeblemind is a damage row whose save (dc_success: "other")
-// never gates the damage itself — only the INT/CHA-to-1 effect — so it sets
-// attackType/saveAbility but no saveEffect, since neither "half" nor "none"
-// (both describe a save that changes the damage) is accurate; the prose
-// says the damage is unconditional.
+// effectKind/damage are set only for a spell's primary, unconditional
+// effect — omitted for non-damage-type rolls, dual-damage-type splits, and
+// damage conditional on a non-default choice or mishap.
 import type { CatalogSpell } from "../spells.js";
 
 export const SHARED_SPELLS_2014: CatalogSpell[] = [
-  // ── Cantrips ──────────────────────────────────────────────────────────────
   {
     name: "Chill Touch",
     level: 0,
@@ -175,17 +135,7 @@ export const SHARED_SPELLS_2014: CatalogSpell[] = [
     classes: ["wizard", "bard", "sorcerer", "warlock"],
     components: { verbal: false, somatic: true, material: false },
   },
-  // PHB'14 p. 244. Not in dnd5eapi/open5e's SRD 5.1 dataset (same gap class
-  // as Witch Bolt, #1718) — Bard/Sorcerer/Warlock/Wizard is a 4-list spell
-  // so it belongs here per the row-ownership rule, but was missing from
-  // every slice authored so far; added here rather than left for a future
-  // slice to rediscover (found by #1719/Warlock's manual sweep for real
-  // PHB'14 spells absent from the API). Verified word-for-word against a
-  // second source (dnd5e.wikidot.com/spell:friends), which corroborates
-  // 5e-spellbook.app's 2014-edition text exactly, including the
-  // distinctive, error-prone detail that this spell has NO Verbal
-  // component — only Somatic + Material (unusual among cantrips) — and a
-  // Concentration duration (also unusual for a cantrip).
+  // PHB'14 p. 244.
   {
     name: "Friends",
     level: 0,
@@ -199,15 +149,7 @@ export const SHARED_SPELLS_2014: CatalogSpell[] = [
     classes: ["wizard", "bard", "sorcerer", "warlock"],
     components: { verbal: false, somatic: true, material: true, materialDescription: "a small amount of makeup applied to the face as this spell is cast" },
   },
-  // PHB'14 p. 218. Not in dnd5eapi/open5e's SRD 5.1 dataset (same gap class
-  // as Witch Bolt, #1718) — Bard/Sorcerer/Warlock/Wizard is a 4-list spell
-  // so it belongs here per the row-ownership rule, but was missing from
-  // every slice authored so far — a real gap #1742's own non-SRD-3+-list
-  // audit found. Verified against dnd5e.wikidot.com/spell:blade-ward and
-  // 5etools' spells-phb.json (level 0, school "A" = abjuration, self range,
-  // 1-round duration, V/S only). A pure resistance grant with no dice to
-  // roll, so it carries no effectKind — same shape as this file's own
-  // Protection from Energy.
+  // PHB'14 p. 218.
   {
     name: "Blade Ward",
     level: 0,
@@ -220,7 +162,6 @@ export const SHARED_SPELLS_2014: CatalogSpell[] = [
     classes: ["wizard", "bard", "sorcerer", "warlock"],
     components: { verbal: true, somatic: true, material: false },
   },
-  // ── Level 1 ───────────────────────────────────────────────────────────────
   {
     name: "Animal Friendship",
     level: 1,
@@ -485,20 +426,7 @@ export const SHARED_SPELLS_2014: CatalogSpell[] = [
     classes: ["wizard", "bard", "warlock"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "a piece of string and a bit of wood" },
   },
-  // PHB'14 p. 302. Not in dnd5eapi/open5e's SRD 5.1 dataset (both cap out at
-  // the same 319-spell set — see wizard.ts's header). Sorcerer/Warlock/Wizard
-  // is a 3-list spell so it belongs here per the row-ownership rule, but it
-  // was missing from every slice authored so far (#1713-#1717) — a real gap
-  // that blocked #1718 (Sorcerer)'s "every PHB'14 Sorcerer spell resolves"
-  // acceptance criterion, so it's added here rather than left for a future
-  // slice to rediscover. Verified word-for-word against a second source
-  // (dnd5e.wikidot.com) since it's hand-transcribed, not API-derived — the
-  // mandatory rules-accuracy pass caught an earlier draft of this row
-  // inventing a "moves more than 30 feet away and doesn't return by end of
-  // turn" end condition that doesn't exist in the real spell, which also
-  // dropped the real second end condition (total cover); fixed, the two real
-  // end conditions are "outside the spell's range" and "total cover from
-  // you."
+  // PHB'14 p. 302.
   {
     name: "Witch Bolt",
     level: 1,
@@ -518,7 +446,6 @@ export const SHARED_SPELLS_2014: CatalogSpell[] = [
     damageType: "lightning",
     upcastDicePerLevel: 1,
   },
-  // ── Level 2 ───────────────────────────────────────────────────────────────
   {
     name: "Animal Messenger",
     level: 2,
@@ -801,16 +728,7 @@ export const SHARED_SPELLS_2014: CatalogSpell[] = [
     classes: ["cleric", "bard", "paladin"],
     components: { verbal: true, somatic: true, material: false },
   },
-  // PHB'14 p. 222. Not in dnd5eapi/open5e's SRD 5.1 dataset (same gap class
-  // as Witch Bolt, #1718) — Bard/Sorcerer/Warlock/Wizard is a 4-list spell
-  // so it belongs here per the row-ownership rule, but was missing from
-  // every slice authored so far; added here (found by #1719/Warlock's
-  // manual sweep). Verified word-for-word against a second source
-  // (dnd5e.wikidot.com/spell:cloud-of-daggers), which corroborates
-  // 5e-spellbook.app's 2014-edition text exactly. Damage is automatic (no
-  // attack roll or save — matches Magic Missile's "effectKind:'damage' with
-  // no attackType" shape), triggered by entering/starting a turn in the
-  // area rather than at cast time.
+  // PHB'14 p. 222.
   {
     name: "Cloud of Daggers",
     level: 2,
@@ -829,14 +747,7 @@ export const SHARED_SPELLS_2014: CatalogSpell[] = [
     damageType: "slashing",
     upcastDicePerLevel: 2,
   },
-  // PHB'14 p. 229. Not in dnd5eapi/open5e's SRD 5.1 dataset (same gap class
-  // as Witch Bolt, #1718) — Bard/Sorcerer/Warlock/Wizard is a 4-list spell
-  // so it belongs here per the row-ownership rule, but was missing from
-  // every slice authored so far; added here (found by #1719/Warlock's
-  // manual sweep). Verified word-for-word against a second source
-  // (dnd5e.wikidot.com/spell:crown-of-madness), which corroborates
-  // 5e-spellbook.app's 2014-edition text exactly, including that neither
-  // source carries an "At Higher Levels" clause for this spell.
+  // PHB'14 p. 229.
   {
     name: "Crown of Madness",
     level: 2,
@@ -852,22 +763,8 @@ export const SHARED_SPELLS_2014: CatalogSpell[] = [
     attackType: "save",
     saveAbility: "wisdom",
   },
-  // PHB'14 p. 264. Not in dnd5eapi/open5e's SRD 5.1 dataset (same gap class
-  // as Witch Bolt, #1718) — Bard/Sorcerer/Wizard is a 3-list spell so it
-  // belongs here per the row-ownership rule, but was missing from every
-  // slice authored so far (flagged as a real gap in wizard.ts's own header,
-  // left unfixed there to avoid touching a sibling slice's file) — closed
-  // by #1742. Verified against dnd5e.wikidot.com/spell:phantasmal-force and
-  // 5etools' spells-phb.json/spells-xphb.json, both of which report level 2
-  // for BOTH editions — #1742's own issue body claimed a 1st-to-2nd level
-  // change across editions that does not hold up against either source, so
-  // it is NOT reproduced here (the repo's existing 2024 row, spells.ts,
-  // already carries level 2 too). The per-round damage DOES fork by edition
-  // (1d6 psychic in 2014 vs. 2024's 2d8) and is conditional on the target
-  // believing a harmful illusion, not the spell's unconditional primary
-  // effect (matches Dream's optional-damage precedent in this file's own
-  // header) — so it carries attackType/saveAbility for the INT save that
-  // gates the illusion taking hold, but no effectKind.
+  // PHB'14 p. 264. Per-round damage forks by edition: 1d6 psychic here vs.
+  // 2024's 2d8 (spells.ts).
   {
     name: "Phantasmal Force",
     level: 2,
@@ -883,7 +780,6 @@ export const SHARED_SPELLS_2014: CatalogSpell[] = [
     attackType: "save",
     saveAbility: "intelligence",
   },
-  // ── Level 3 ───────────────────────────────────────────────────────────────
   {
     name: "Bestow Curse",
     level: 3,
@@ -1170,17 +1066,7 @@ export const SHARED_SPELLS_2014: CatalogSpell[] = [
     classes: ["cleric", "druid", "sorcerer", "ranger"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "a piece of cork" },
   },
-  // PHB'14 p. 240. Not in dnd5eapi/open5e's SRD 5.1 dataset (same gap class
-  // as Witch Bolt, #1718) — Bard/Cleric/Druid/Wizard is a 4-list spell so it
-  // belongs here per the row-ownership rule, but was missing from every
-  // slice authored so far (wizard.ts's own header flagged it as "Bard/
-  // Cleric/Wizard," a real gap left unfixed there to avoid touching a
-  // sibling slice's file — that class list was itself incomplete, missing
-  // Druid) — closed by #1742. Verified against dnd5e.wikidot.com/spell:feign-
-  // death and 5etools' spells-phb.json, which both confirm the full 4-class
-  // list (Bard, Cleric, Druid, Wizard) and every field below. A status
-  // effect with no save and no damage roll, so it carries no attackType/
-  // effectKind.
+  // PHB'14 p. 240.
   {
     name: "Feign Death",
     level: 3,
@@ -1194,7 +1080,6 @@ export const SHARED_SPELLS_2014: CatalogSpell[] = [
     classes: ["wizard", "cleric", "druid", "bard"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "a pinch of graveyard dirt" },
   },
-  // ── Level 4 ───────────────────────────────────────────────────────────────
   {
     name: "Banishment",
     level: 4,
@@ -1382,7 +1267,6 @@ export const SHARED_SPELLS_2014: CatalogSpell[] = [
     saveAbility: "dexterity",
     saveEffect: "half",
   },
-  // ── Level 5 ───────────────────────────────────────────────────────────────
   {
     name: "Animate Objects",
     level: 5,
@@ -1578,7 +1462,6 @@ export const SHARED_SPELLS_2014: CatalogSpell[] = [
     classes: ["wizard", "druid", "sorcerer"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "a small block of granite" },
   },
-  // ── Level 6 ───────────────────────────────────────────────────────────────
   {
     name: "Circle of Death",
     level: 6,
@@ -1690,14 +1573,7 @@ export const SHARED_SPELLS_2014: CatalogSpell[] = [
     classes: ["wizard", "cleric", "bard", "sorcerer", "warlock"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "an ointment for the eyes that costs 25gp; is made from mushroom powder, saffron, and fat; and is consumed by the spell" },
   },
-  // PHB'14 p. 214. Not in dnd5eapi/open5e's SRD 5.1 dataset (same gap class
-  // as Witch Bolt, #1718) — Sorcerer/Warlock/Wizard is a 3-list spell so it
-  // belongs here per the row-ownership rule, but was missing from every
-  // slice authored so far — a real gap #1742's own non-SRD-3+-list audit
-  // found (5etools' gendata-spell-source-lookup.json base-class-access data,
-  // cross-checked against dnd5e.wikidot.com/spell:arcane-gate and 5etools'
-  // spells-phb.json). A pure utility teleportation-portal spell with no
-  // save/attack roll, so it carries no attackType/effectKind.
+  // PHB'14 p. 214.
   {
     name: "Arcane Gate",
     level: 6,
@@ -1711,7 +1587,6 @@ export const SHARED_SPELLS_2014: CatalogSpell[] = [
     classes: ["wizard", "sorcerer", "warlock"],
     components: { verbal: true, somatic: true, material: false },
   },
-  // ── Level 7 ───────────────────────────────────────────────────────────────
   {
     name: "Etherealness",
     level: 7,
@@ -1846,7 +1721,6 @@ export const SHARED_SPELLS_2014: CatalogSpell[] = [
     classes: ["wizard", "bard", "sorcerer"],
     components: { verbal: true, somatic: false, material: false },
   },
-  // ── Level 8 ───────────────────────────────────────────────────────────────
   {
     name: "Control Weather",
     level: 8,
@@ -1931,7 +1805,6 @@ export const SHARED_SPELLS_2014: CatalogSpell[] = [
     saveAbility: "constitution",
     saveEffect: "half",
   },
-  // ── Level 9 ───────────────────────────────────────────────────────────────
   {
     name: "Astral Projection",
     level: 9,

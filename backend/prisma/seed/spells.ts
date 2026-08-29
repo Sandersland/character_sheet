@@ -1,14 +1,5 @@
-// ── Spell catalog ─────────────────────────────────────────────────────────────
-// A curated SRD subset (cantrips–L3) seeded for the spell-catalog picker and
-// auto-rolling feature. Structured effect fields (effectKind/effectDiceCount
-// etc.) mirror ItemWeaponDetail / ItemConsumableDetail so the frontend can roll
-// damage/healing at cast time using the same dice.ts engine.
-//
-// Every row below is SRD 5.2 (2024) text (renamed spells, narrowed
-// components) rather than "valid in both editions" — seedSpells defaults an
-// untagged entry's `edition` to EDITION_2024, not to Feat's NULL/shared
-// convention (#1710). A 2014 fork lives in a sibling spells-2014/*.ts file
-// instead of an `edition: "EDITION_2014"` override here.
+// Structured effect fields (effectKind/effectDiceCount, etc.) mirror ItemWeaponDetail/ItemConsumableDetail so the frontend rolls damage/healing with the same dice engine.
+// Every row here is SRD 5.2 (2024) text; seedSpells defaults an untagged entry's `edition` to EDITION_2024, not Feat's NULL/shared convention (#1710) — a 2014 fork lives in a sibling spells-2014/*.ts file.
 import type { SeedEdition } from "./edition.js";
 
 export type SpellSchoolSeed =
@@ -32,7 +23,7 @@ export interface CatalogSpell {
     material: boolean;
     materialDescription?: string;
   };
-  saveEffect?: "half" | "none"; // for save-based damage spells
+  saveEffect?: "half" | "none";
   effectKind?: "damage" | "heal" | "buff";
   effectDiceCount?: number;
   effectDiceFaces?: number;
@@ -42,23 +33,14 @@ export interface CatalogSpell {
   saveAbility?: string;
   upcastDicePerLevel?: number;
   cantripScaling?: boolean;
-  // AC-buff effect (#363): target consumed at the AC-assembly seam. buffModifier
-  // is the ABSOLUTE value the target reads, not a delta — a flat add for "ac"
-  // (Shield of Faith 2), the full unarmored base for "acUnarmoredBase" (Mage Armor
-  // 13, not 3), the floor for "acFloor" (Barkskin 17).
+  // buffModifier is the ABSOLUTE value the target reads, not a delta — flat add for "ac" (Shield of Faith 2), full unarmored base for "acUnarmoredBase" (Mage Armor 13), floor for "acFloor" (Barkskin 17).
   buffTarget?: "ac" | "acUnarmoredBase" | "acFloor";
   buffModifier?: number;
-  // Omitted here = EDITION_2024 (this file's own default, see the header
-  // comment) — NOT "shared", unlike Feat/Background/Subclass's `edition?`.
-  // Set explicitly only for a row that genuinely applies to both editions.
+  // Omitted = EDITION_2024 (this file's own default) — NOT "shared", unlike Feat/Background/Subclass's `edition?`.
   edition?: SeedEdition;
 }
 
-// SRD 5.2 (2024) renamed the proper-noun spells (#1132). Each entry renames the
-// catalog row in place at seed time (applySpellRenames, before the upsert loop),
-// preserving its id so SubclassGrantedSpell FKs / InventoryCapability.spellId
-// provenance survive. `to` MUST be a live SPELLS name; `from` MUST NOT be (the
-// seed-data shape test enforces both).
+// Renames the catalog row in place at seed time (applySpellRenames), preserving its id so SubclassGrantedSpell/InventoryCapability.spellId FKs survive. `to` must be a live SPELLS name; `from` must not be.
 export interface SpellRename {
   from: string;
   to: string;
@@ -70,7 +52,6 @@ export const SPELL_RENAMES: SpellRename[] = [
 ];
 
 export const SPELLS: CatalogSpell[] = [
-  // ── Cantrips ──────────────────────────────────────────────────────────────
   {
     name: "Fire Bolt",
     level: 0,
@@ -126,8 +107,7 @@ export const SPELLS: CatalogSpell[] = [
     saveEffect: "none",
     cantripScaling: true,
   },
-  // Toll the Dead removed (#1132): no SRD 5.2 version exists, so it can't satisfy
-  // the class-list criterion. Learned copies keep working via their snapshots.
+  // No SRD 5.2 version of Toll the Dead exists; learned copies keep working via their snapshots.
   {
     name: "Mage Hand",
     level: 0,
@@ -170,13 +150,10 @@ export const SPELLS: CatalogSpell[] = [
     duration: "1 minute",
     description: "Create a sound or an image of an object within range that lasts for the duration. The illusion ends if you dismiss it or cast this spell again. A creature that uses its action to examine the illusion can determine it is illusory with a successful Investigation check against your spell save DC.",
     classes: ["bard", "sorcerer", "warlock", "wizard"],
-    // SRD 5.2: components are S, M only — no verbal (fixes a pre-existing seed bug).
+    // SRD 5.2: components are S, M only — no verbal.
     components: { verbal: false, somatic: true, material: true, materialDescription: "a bit of fleece" },
   },
-  // #1247: Warrior of the Elements' Manipulate Elements grants Elementalism, the
-  // 2024 utility cantrip (PHB'24). No roll — it produces one of several minor
-  // elemental effects (a sensory flourish, snuff/light a flame, shape earth or
-  // mist, etc.). Wisdom is the monk's casting ability for it (set at grant time).
+  // Granted by Warrior of the Elements' Manipulate Elements; no roll. Wisdom is the monk's casting ability for it, set at grant time (#1247).
   {
     name: "Elementalism",
     level: 0,
@@ -189,8 +166,6 @@ export const SPELLS: CatalogSpell[] = [
     classes: ["monk"],
     components: { verbal: true, somatic: true, material: false },
   },
-  // #1131: SRD 5.2 (2024) cantrips added so every caster's creation picker has
-  // real choice. Eldritch Blast is the issue's acceptance-criterion warlock spell.
   {
     name: "Eldritch Blast",
     level: 0,
@@ -292,7 +267,6 @@ export const SPELLS: CatalogSpell[] = [
     classes: ["cleric"],
     components: { verbal: true, somatic: false, material: false },
   },
-  // ── Level 1 ───────────────────────────────────────────────────────────────
   {
     name: "Magic Missile",
     level: 1,
@@ -308,7 +282,7 @@ export const SPELLS: CatalogSpell[] = [
     effectDiceFaces: 4,
     effectModifier: 3,
     damageType: "force",
-    upcastDicePerLevel: 1,   // +1 dart (1d4+1) per level; effectModifier also increases by 1
+    upcastDicePerLevel: 1,
   },
   {
     name: "Cure Wounds",
@@ -350,8 +324,7 @@ export const SPELLS: CatalogSpell[] = [
     description: "Touch a willing creature not wearing armor. Until the spell ends, the target's base AC becomes 13 + its Dexterity modifier. The spell ends if the target dons armor.",
     classes: ["wizard", "sorcerer"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "a piece of cured leather" },
-    // Non-concentration → seeded as a while-active buff; ends on long rest, on
-    // dismiss, or when the wearer dons body armor (true-end equip hook, #363).
+    // Non-concentration: seeded as a while-active buff, ending on long rest, dismiss, or donning body armor (true-end equip hook, #363).
     effectKind: "buff",
     buffTarget: "acUnarmoredBase",
     buffModifier: 13,
@@ -367,8 +340,7 @@ export const SPELLS: CatalogSpell[] = [
     concentration: true,
     classes: ["cleric", "paladin"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "a small parchment with a bit of holy text written on it" },
-    // Flat +2 AC — rides the #383 additive `ac` breakdown channel; drops when
-    // concentration breaks.
+    // Rides the #383 additive `ac` breakdown channel; drops when concentration breaks.
     effectKind: "buff",
     buffTarget: "ac",
     buffModifier: 2,
@@ -435,8 +407,7 @@ export const SPELLS: CatalogSpell[] = [
     concentration: true,
     ritual: true,
   },
-  // Granted-list additions (#912): referenced by official oath/domain/patron
-  // spell lists (#913). Utility unless the spell rolls single-type damage/heal.
+  // Utility unless the spell rolls single-type damage/heal.
   {
     name: "Bane",
     level: 1,
@@ -608,7 +579,6 @@ export const SPELLS: CatalogSpell[] = [
     classes: ["bard", "warlock", "wizard"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "a tiny tart and a feather" },
   },
-  // ── Level 2 ───────────────────────────────────────────────────────────────
   {
     name: "Barkskin",
     level: 2,
@@ -619,9 +589,7 @@ export const SPELLS: CatalogSpell[] = [
     description: "You touch a willing creature. Until the spell ends, the target's skin has a rough, bark-like appearance, and the target's AC can't be less than 17, regardless of what kind of armor it is wearing.",
     classes: ["druid", "ranger"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "a handful of oak bark" },
-    // SRD 5.2: floor 17, non-concentration (while-active, ends on long rest /
-    // dismiss). Applied last at the AC-assembly seam, stacking as a floor over
-    // armor/Dex.
+    // SRD 5.2: floor 17, non-concentration (while-active, ends on long rest/dismiss); applied last at the AC-assembly seam, stacking as a floor over armor/Dex.
     effectKind: "buff",
     buffTarget: "acFloor",
     buffModifier: 17,
@@ -641,7 +609,7 @@ export const SPELLS: CatalogSpell[] = [
     effectDiceFaces: 6,
     damageType: "fire",
     attackType: "attack",
-    upcastDicePerLevel: 2,   // +1 ray (+2d6) per slot level above 2nd
+    upcastDicePerLevel: 2,
   },
   {
     name: "Gust of Wind",
@@ -701,7 +669,6 @@ export const SPELLS: CatalogSpell[] = [
     attackType: "save",
     saveAbility: "wisdom",
   },
-  // Granted-list additions (#912/#913).
   {
     name: "Blindness/Deafness",
     level: 2,
@@ -832,8 +799,6 @@ export const SPELLS: CatalogSpell[] = [
     classes: ["bard", "cleric", "paladin"],
     components: { verbal: true, somatic: true, material: false },
   },
-  // 2024 additions (#1132) — spells the grant/origin-feat lists and creation
-  // pickers need, seeded with full SRD 5.2 data.
   {
     name: "Aid",
     level: 2,
@@ -841,8 +806,7 @@ export const SPELLS: CatalogSpell[] = [
     castingTime: "1 action",
     range: "30 ft",
     duration: "8 hours",
-    // Flat +5 HP-max/current is inexpressible as a dice heal — utility row; the
-    // description carries the numbers.
+    // Flat +5 HP-max/current is inexpressible as a dice heal — utility row; the description carries the numbers.
     description: "Up to three creatures within range each have their Hit Point maximum and current Hit Points increased by 5 for the duration. At higher levels: +5 per slot level above 2nd.",
     classes: ["bard", "cleric", "druid", "paladin", "ranger"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "a strip of white cloth" },
@@ -871,7 +835,6 @@ export const SPELLS: CatalogSpell[] = [
     classes: ["bard", "sorcerer", "warlock", "wizard"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "an eyelash in gum arabic" },
   },
-  // ── Level 3 ───────────────────────────────────────────────────────────────
   {
     name: "Fireball",
     level: 3,
@@ -960,7 +923,6 @@ export const SPELLS: CatalogSpell[] = [
     components: { verbal: true, somatic: true, material: true, materialDescription: "a wing feather from any bird" },
     concentration: true,
   },
-  // Granted-list additions (#912/#913).
   {
     name: "Beacon of Hope",
     level: 3,
@@ -1100,7 +1062,6 @@ export const SPELLS: CatalogSpell[] = [
     classes: ["bard", "ranger", "wizard"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "a pinch of diamond dust worth 25+ GP, which the spell consumes" },
   },
-  // ── Level 4 ───────────────────────────────────────────────────────────────
   {
     name: "Stoneskin",
     level: 4,
@@ -1133,7 +1094,6 @@ export const SPELLS: CatalogSpell[] = [
     concentration: true,
     upcastDicePerLevel: 1,
   },
-  // Granted-list additions (#912/#913).
   {
     name: "Banishment",
     level: 4,
@@ -1284,7 +1244,6 @@ export const SPELLS: CatalogSpell[] = [
     classes: ["bard", "druid", "sorcerer", "wizard"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "three nutshells" },
   },
-  // ── Level 5 ───────────────────────────────────────────────────────────────
   {
     name: "Wall of Stone",
     level: 5,
@@ -1316,7 +1275,6 @@ export const SPELLS: CatalogSpell[] = [
     saveEffect: "half",
     upcastDicePerLevel: 1,
   },
-  // Granted-list additions (#912/#913).
   {
     name: "Commune",
     level: 5,
@@ -1514,9 +1472,7 @@ export const SPELLS: CatalogSpell[] = [
     classes: ["bard", "cleric", "druid", "ranger"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "diamond dust worth 100+ GP, which the spell consumes" },
   },
-  // #1683: the 2024 Elf/Gnome/Tiefling lineage spell tracks (SpeciesGrantedSpell
-  // rows, species-granted-spells-data.ts) reference these eight — none were in
-  // the prior curated subset.
+  // These eight spells are referenced by the 2024 Elf/Gnome/Tiefling lineage SpeciesGrantedSpell rows (#1683).
   {
     name: "Dancing Lights",
     level: 0,

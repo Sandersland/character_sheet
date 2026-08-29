@@ -1,9 +1,3 @@
-// #1233 commit 3: every Warlock pool that is a flat, level-tiered total moved
-// off lib/classes/warlock.ts's resourceFns onto its ClassFeature row's own
-// resourceKey/resourceLabel/resourceRecharge/resourceTotals columns, read here
-// through the SAME poolsFromRows a real character's derivation calls
-// (registry.ts's deriveBaseLayer/deriveSubclassLayer) — never a hand-rolled
-// re-derivation of the tier table. Modelled on barbarian-rage-pool.test.ts.
 import { describe, expect, it } from "vitest";
 
 import { poolsFromRows } from "@/lib/classes/class-feature-rows.js";
@@ -15,9 +9,6 @@ const FIEND_ROWS = WARLOCK_FEATURES.filter((r) => r.subclassSlug === "warlock-th
 const ARCHFEY_ROWS = WARLOCK_FEATURES.filter((r) => r.subclassSlug === "warlock-the-archfey");
 const GOO_ROWS = WARLOCK_FEATURES.filter((r) => r.subclassSlug === "warlock-the-great-old-one");
 
-// abilityScores/profBonus default to `{}`/`0`; darkOnesOwnLuckPoolAt below
-// overrides abilityScores for the one #1685 formula-shaped pool this file
-// covers.
 function poolAt(
   rows: typeof WARLOCK_FEATURES,
   key: string,

@@ -1,11 +1,3 @@
-// #1234 commit 2 of 4: Wizard's real SRD 5.2 (2024) content. Every assertion
-// below is pinned against an actual SRD 5.2 / PHB'24 VALUE (a level, a
-// restriction, a mechanic delta) transcribed from the researched source list
-// (dndbeyond.com/srd for the base class + Evoker, cross-checked against two
-// independent mirrors for Abjurer/Illusionist, which aren't in SRD 5.2) —
-// never against "differs from the 2014 row", which a garbage 2024 paraphrase
-// would also satisfy. Mirrors wizard-2014-snapshot.test.ts's shape (same
-// file, same WIZARD_FEATURES export) but pins the OTHER edition.
 import { describe, expect, it } from "vitest";
 
 import { deriveResources } from "@/lib/classes/class-features.js";
@@ -20,7 +12,6 @@ function rowsNamed(subclassSlug: string | null, name: string) {
   return WIZARD_FEATURES.filter((r) => r.subclassSlug === subclassSlug && r.name === name);
 }
 
-/** Exactly one row for (subclassSlug, name, edition), or the test fails with a precise locator. */
 function row(subclassSlug: string | null, name: string, edition: Edition) {
   const found = rowsNamed(subclassSlug, name).filter((r) => r.edition === edition);
   expect(found, `${subclassSlug ?? "(base)"}/${name}/${edition}`).toHaveLength(1);
@@ -216,15 +207,11 @@ describe("Per-partition counts: base 4/8, evocation 5/5, abjuration 5/5, illusio
     expect(count(EVOCATION, "EDITION_2014")).toBe(5);
     expect(count(EVOCATION, "EDITION_2024")).toBe(5);
     expect(count(ABJURATION, "EDITION_2014")).toBe(5);
-    // Same total as 2014 — Improved Abjuration drops out, Spell Breaker fills
-    // its slot, so the row COUNT matches while the NAME set doesn't (see the
-    // "Spell Breaker" describe block above).
+    // Count matches 2014 but the NAME set doesn't — Improved Abjuration drops out and Spell Breaker fills its slot.
     expect(count(ABJURATION, "EDITION_2024")).toBe(5);
     expect(count(ILLUSION, "EDITION_2014")).toBe(5);
     expect(count(ILLUSION, "EDITION_2024")).toBe(5);
-    // Bladesinging (#1676): 4 rows (Training in War and Song, Bladesong,
-    // Extra Attack, Song of Defense), EDITION_2014 only — TCoE has no
-    // SRD 5.2/PHB'24 printing, so 0 EDITION_2024 rows for this subclass.
+    // Bladesinging (#1676): TCoE has no SRD 5.2/PHB'24 printing, so 0 EDITION_2024 rows for this subclass.
     expect(count("wizard-bladesinging", "EDITION_2014")).toBe(4);
     expect(count("wizard-bladesinging", "EDITION_2024")).toBe(0);
     const total2014 = WIZARD_FEATURES.filter((r) => r.edition === "EDITION_2014").length;
@@ -250,16 +237,6 @@ const ABILITY_SCORES = {
   charisma: 8,
 };
 
-// Integration-level proof (mirrors barbarian-2024-content.test.ts's own
-// loadDbFeatureRows pattern): the REAL seeded rows, read through the REAL
-// derivation path, actually reach a serialized character's derived features —
-// not just WIZARD_FEATURES' in-memory shape. L6 does NOT distinguish the two
-// editions here — by L6 a 2014 Evoker has reached BOTH Sculpt Spells (gate 2)
-// and Potent Cantrip (gate 6), same as a 2024 Evoker (gates 6 and 3) — the
-// level where the swapped gates actually diverge is L3: a 2024 Evoker has
-// reached Potent Cantrip (gate 3) but not Sculpt Spells (gate 6 in 2024); a
-// 2014 Evoker at the same level 3 has reached Sculpt Spells (gate 2 in 2014)
-// but not Potent Cantrip (gate 6 in 2014) — the exact opposite pairing.
 describe("integration (#1234): a L3 2024 Wizard/Evoker has Potent Cantrip but not yet Sculpt Spells; a L3 2014 Wizard has the reverse", () => {
   it("proves the swapped level gates reach a serialized character", async () => {
     const featureRows = await loadDbFeatureRows("wizard", "school of evocation");

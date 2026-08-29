@@ -1,10 +1,3 @@
-// DB-backed proof that seedSpecies (#1679) is idempotent — `prisma db seed`
-// run twice must not duplicate rows or thrash stale-row deletes. Runs against
-// the real seeded catalog (the template every vitest worker clones already
-// ran seedSpecies once via seed.ts's main()), so this re-invokes it directly
-// rather than building a throwaway fixture — seed.ts self-invokes main() at
-// module load and can't be re-run from a test, but seedSpecies itself is a
-// plain exported function.
 import { describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/core/prisma.js";

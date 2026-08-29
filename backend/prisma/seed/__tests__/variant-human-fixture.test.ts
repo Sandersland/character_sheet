@@ -1,27 +1,5 @@
-// Proves the epic's AC for #1690: Variant Human (PHB'14 p. 31) is expressible
-// with the existing choice vocabulary as pure seed content — no schema or
-// mechanism change needed, just rows. NOT shipped as real SPECIES/
-// SPECIES_TRAITS content this wave (a future wave's scope, per the epic
-// review decision cited in species-traits-data.ts's file header); this is a
-// test-authored fixture, created and torn down here, mirroring
-// species-floating-spread-fixture.test.ts's (#1679) Astral Elf precedent.
-//
-// Variant Human's three creation-time choices, each a real row against the
-// SAME vocabulary the seeded 2014/2024 content uses:
-//   - "+1 to two ability scores of your choice" -> Species.abilityIncreases:
-//     [{ choose: { count: 2, amount: 1 } }] (species-ability-increases.ts,
-//     #1679/#1681 — no `from` restriction, same shape as Half-Elf's own).
-//   - "one skill proficiency of your choice" -> a SpeciesTrait row with
-//     choice: { chooseSkills: { count: 1 } } (#1689, unrestricted like 2024
-//     Human's own Skillful).
-//   - "one feat of your choice" -> a SpeciesTrait row with
-//     choice: { chooseOriginFeat: true } (#1690's new spec form). PHB'14's
-//     Variant Human feat is any feat the character qualifies for, not
-//     specifically an Origin-category one — chooseOriginFeat's create-time
-//     validation (resolveSpeciesOriginFeatGrant, character-create.ts) is
-//     narrower than that, so this fixture proves the SPEC is expressible,
-//     not that 2014 Variant Human's exact eligibility rule is already wired;
-//     widening that validation is the future wave's own scope, not this one's.
+// Proves #1690's AC: Variant Human (PHB'14 p. 31) is expressible with the existing choice vocabulary as pure seed rows, not shipped as real content this wave.
+// chooseOriginFeat's create-time validation (resolveSpeciesOriginFeatGrant) is narrower than PHB'14's actual any-feat rule; this fixture proves the spec is expressible, not that eligibility is fully wired.
 import { afterEach, describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/core/prisma.js";

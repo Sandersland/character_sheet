@@ -1,6 +1,3 @@
-// DB-backed proof that seedSpeciesGrantedSpells (#1683) is idempotent and
-// resolves its (speciesId, variantId, spellId) targets correctly — mirrors
-// seed-species-traits.test.ts's own idempotency proof.
 import { describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/core/prisma.js";
@@ -40,10 +37,7 @@ describe("Drow lineage spell track, directly off the DB", () => {
   });
 
   it("the parent Elf species carries no SPECIES-LEVEL grants — every 2024 grant this slice is variant-scoped", async () => {
-    // Species.grantedSpells is the plain back-relation (every row FK'd to this
-    // speciesId, regardless of variantId — same gotcha activeTraitRows'
-    // comment documents for species.traits); filter to variantId === null to
-    // ask "species-level", not "this species or any of its variants".
+    // Species.grantedSpells includes every variant's rows too; variantId === null isolates species-level grants.
     const elf = await prisma.species.findFirstOrThrow({
       where: { slug: "elf", edition: "EDITION_2024" },
       include: { grantedSpells: true },

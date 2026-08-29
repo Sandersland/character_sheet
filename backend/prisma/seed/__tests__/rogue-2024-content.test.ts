@@ -1,11 +1,3 @@
-// #1231 commit 2 of 4: Rogue's real SRD 5.2 (2024) content. Every assertion
-// below is pinned against an actual SRD 5.2 / PHB'24 VALUE (a duration, a DC
-// formula, a level, a specific term) transcribed from the researched delta
-// list — never against "differs from the 2014 row", which a garbage 2024
-// paraphrase would also satisfy. Mirrors barbarian-2024-content.test.ts's
-// shape (same file, same ROGUE_FEATURES export) but pins Rogue's own deltas,
-// plus the same-name-fork structural check Infiltration Expertise exists to
-// prove (absorbing Impostor, never a phantom feature name).
 import { describe, expect, it } from "vitest";
 
 import { deriveResources } from "@/lib/classes/class-features.js";
@@ -20,7 +12,6 @@ function rowsNamed(subclassSlug: string | null, name: string) {
   return ROGUE_FEATURES.filter((r) => r.subclassSlug === subclassSlug && r.name === name);
 }
 
-/** Exactly one row for (subclassSlug, name, edition), or the test fails with a precise locator. */
 function row(subclassSlug: string | null, name: string, edition: Edition) {
   const found = rowsNamed(subclassSlug, name).filter((r) => r.edition === edition);
   expect(found, `${subclassSlug ?? "(base)"}/${name}/${edition}`).toHaveLength(1);
@@ -246,11 +237,6 @@ const ABILITY_SCORES = {
   charisma: 10,
 };
 
-// Integration-level proof (mirrors feature-edition.test.ts's/
-// barbarian-2024-content.test.ts's loadDbFeatureRows pattern): the REAL
-// seeded rows, read through the REAL derivation path, actually reach a
-// serialized character's derived features — not just ROGUE_FEATURES'
-// in-memory shape.
 describe("integration (#1231): a level-14 Rogue's derived features differ by edition exactly where authored", () => {
   it("2024 has Steady Aim/Cunning Strike/Improved Cunning Strike/Devious Strikes and NOT Blindsense; 2014 is the reverse", async () => {
     const featureRows = await loadDbFeatureRows("rogue", undefined);

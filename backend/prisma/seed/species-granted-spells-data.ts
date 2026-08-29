@@ -1,42 +1,22 @@
-// 2024 lineage/legacy spell tracks (#1683, epic #1518 slice 6/8) — the
-// content half of SpeciesGrantedSpell, mirroring subclass-granted-spells.ts's
-// split (data here, executable upsert in seed-species-granted-spells.ts).
-//
-// Unlike SubclassGrantedSpell, a row here carries no `castingAbility` (the
-// column doesn't exist on SpeciesGrantedSpell) and no `edition` (species
-// children inherit edition through their parent Species row, never their
-// own column — schema.prisma's SpeciesGrantedSpell comment). The lineage's
-// Int/Wis/Cha choice is made ONCE, per character, when the lineage is picked
-// (#1683's casting-ability picker) and snapshotted onto
-// CharacterRace.castingAbility — every row below inherits that one value at
-// read time (buildSpeciesGrantedSpellSource, granted-spells.ts), never a
-// fixed catalog value.
-//
-// Content verified against SRD 5.2 / PHB'24 at build time (2026-08-04
-// research pass): Elf Lineages p. 24-25, Gnomish Lineages p. 30-31, Fiendish
-// Legacy p. 47. Per-day free casting of the gate-3/5 spells (the book's
-// "once per long rest without a slot") is #1628's mechanism — these rows
-// grant always-prepared + announce text until then, consistent with
-// SubclassGrantedSpell rows today (see the module header there).
+// The content half of SpeciesGrantedSpell (#1683) — data here, executable upsert in seedSpeciesGrantedSpells.
+// Unlike SubclassGrantedSpell, a row here carries no `castingAbility` (the column doesn't exist on SpeciesGrantedSpell) and no `edition` (species children inherit edition through their parent Species row).
+// The lineage's Int/Wis/Cha choice is made once, per character, when the lineage is picked, and snapshotted onto CharacterRace.castingAbility — every row below inherits that one value at read time (buildSpeciesGrantedSpellSource), never a fixed catalog value.
+// Elf Lineages SRD 5.2 p.24-25, Gnomish Lineages p.30-31, Fiendish Legacy p.47. Per-day free casting of the gate-3/5 spells is #1628's mechanism — these rows grant always-prepared + announce text until then.
 import { z } from "zod";
 
 export interface SpeciesGrantedSpellSeed {
-  /** Must match a SPECIES entry's slug (species-data.ts), scoped by edition. */
+  // Must match a SPECIES entry's slug, scoped by edition.
   speciesSlug: string;
   speciesEdition: "EDITION_2024";
-  /** Must match a SpeciesVariantSeed.slug scoped to this species. Every 2024
-   *  spell-granting row this slice is variant-level — no species grants a
-   *  spell with no lineage/legacy chosen. */
+  // Must match a SpeciesVariantSeed.slug scoped to this species — every 2024 spell-granting row this slice is variant-level.
   variantSlug: string;
-  /** Must match a SPELLS catalog entry by its unique name. */
+  // Must match a SPELLS catalog entry by its unique name.
   spellName: string;
-  /** Character level at which the grant activates (1/3/5 for every lineage
-   *  and legacy this slice; Gnomish Lineages grant both their rows at 1). */
+  // Character level at which the grant activates (1/3/5 for every lineage and legacy this slice; Gnomish Lineages grant both their rows at 1).
   gateLevel: number;
 }
 
-// Validated at seed time (prisma/seed/validate.ts), same per-row-shape role
-// as subclassGrantedSpellSeedSchema.
+// Validated at seed time (assertSeedContentValid), like subclassGrantedSpellSeedSchema.
 export const speciesGrantedSpellSeedSchema = z
   .object({
     speciesSlug: z.string().min(1),

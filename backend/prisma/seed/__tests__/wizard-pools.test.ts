@@ -1,17 +1,3 @@
-// #1234 commit 3 of 4: Arcane Recovery's and Illusory Self's resource pools
-// move off lib/classes/wizard.ts's two retired resourceFns onto their rows'
-// resourceKey/resourceLabel/resourceRecharge/resourceTotals columns
-// (wizard-features.ts), read here through the SAME poolsFromRows a real
-// character's derivation calls (registry.ts's deriveBaseLayer/
-// deriveSubclassLayer) — never a hand-rolled re-derivation. Mirrors
-// barbarian-rage-pool.test.ts's shape.
-//
-// This file is red until both rows' resource columns are populated to match
-// the retired resourceFns' exact outputs (the "pools derive identically
-// after the move" proof) and wizard.ts's resourceFns are deleted in the same
-// commit (a resourceFn pool wins over a row pool of the same key —
-// mergePoolSources, registry.ts — so the row is inert while either
-// resourceFn survives).
 import { describe, expect, it } from "vitest";
 
 import { poolsFromRows } from "@/lib/classes/class-feature-rows.js";
@@ -21,14 +7,11 @@ import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 
 import { WIZARD_FEATURES } from "../wizard-features.js";
 
-// Base-class rows only (subclassSlug null) — mirrors the `classRows` half of
-// the real ClassFeatureRowsCarrier a Wizard's own class.features relation
-// loads (characterInclude; subclassId: null).
+// Mirrors the `classRows` half of the real ClassFeatureRowsCarrier a Wizard's class.features relation loads.
 const BASE_ROWS = WIZARD_FEATURES.filter((r) => r.subclassSlug === null);
 const ILLUSION_ROWS = WIZARD_FEATURES.filter((r) => r.subclassSlug === "wizard-school-of-illusion");
 
-// abilityScores/profBonus are unused — both pools are flat numbers, never a
-// #1685 formula tier.
+// abilityScores/profBonus are unused — both pools are flat numbers, never a formula tier (#1685).
 function arcaneRecoveryAt(level: number, edition: "EDITION_2014" | "EDITION_2024") {
   return poolsFromRows(BASE_ROWS, level, {}, 0, edition).find((p) => p.key === "arcaneRecovery");
 }
@@ -85,9 +68,6 @@ const ABILITY_SCORES = {
   charisma: 8,
 };
 
-// DB-backed, through the REAL derivation path (mirrors barbarian-rage-
-// pool.test.ts's own integration case, and the pattern wizard-2024-
-// content.test.ts's own integration describes use).
 describe("integration (#1234): loadDbFeatureRows('wizard','school of illusion') -> deriveResources at L10 yields both pools, both editions", () => {
   it("both arcaneRecovery and illusorySelf resolve", async () => {
     const featureRows = await loadDbFeatureRows("wizard", "school of illusion");

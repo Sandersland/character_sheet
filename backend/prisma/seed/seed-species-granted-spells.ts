@@ -1,14 +1,5 @@
-// --- Species granted-spell seeder (#1683, epic #1518 slice 6/8) --------------
-// The executable counterpart to species-granted-spells-data.ts's DATA
-// (SPECIES_GRANTED_SPELLS) — split the same way seed-species-traits.ts splits
-// from species-traits-data.ts. Runs after seedSpecies (targets resolve
-// against just-seeded Species/SpeciesVariant rows) AND seedSpells (spellId
-// resolves against the just-seeded Spell catalog) — see seed.ts's call order.
-//
-// SpeciesGrantedSpell carries no @@unique constraint (same nullable-variantId
-// NULLS-NOT-DISTINCT shape SpeciesTrait's header explains) — reuses
-// upsertEditionRow (lib/rules/catalog-edition.ts) generically, exactly as
-// seed-species-traits.ts already does for SpeciesTrait.
+// #1683: must run after seedSpecies (targets resolve against just-seeded Species/SpeciesVariant rows) AND seedSpells (spellId resolves against the just-seeded Spell catalog).
+// SpeciesGrantedSpell carries no @@unique constraint (same nullable-variantId shape as SpeciesTrait) — reuses upsertEditionRow generically, exactly as seedSpeciesTraits does.
 import type { PrismaClient } from "../../src/generated/prisma/client.js";
 import { upsertEditionRow } from "../../src/lib/rules/catalog-edition.js";
 import { SPECIES_GRANTED_SPELLS, type SpeciesGrantedSpellSeed } from "./species-granted-spells-data.js";
@@ -19,11 +10,7 @@ interface GrantTarget {
   variantId: string;
 }
 
-// Resolves a grant row's (speciesId, variantId) target — every row this
-// slice seeds is variant-level (no species-level 2024 spell grant exists),
-// so unlike seed-species-traits.ts's resolveTarget this never returns a null
-// variantId. Split out purely to keep seedSpeciesGrantedSpells' own
-// cyclomatic complexity under the seed-file budget (CC <= 4).
+// Every row this slice seeds is variant-level (no species-level 2024 spell grant exists), so unlike resolveTarget in seedSpeciesTraits, this never returns a null variantId.
 function resolveGrantTarget(grant: SpeciesGrantedSpellSeed, speciesByKey: Map<string, SpeciesLookupRow>): GrantTarget {
   const species = speciesByKey.get(`${grant.speciesSlug}::${grant.speciesEdition}`);
   if (!species) {
@@ -56,9 +43,7 @@ async function upsertGrant(
   return row.id;
 }
 
-// Drops grant rows no longer authored, scoped to the exact variant ids this
-// run touched — the same "never a bare deleteMany over the whole table"
-// discipline pruneStaleTraits/pruneStaleVariants document.
+// Scoped to the exact variant ids this run touched — never a bare deleteMany over the whole table, same discipline as pruneStaleTraits/pruneStaleVariants.
 async function pruneStaleGrants(prisma: PrismaClient, touchedVariantIds: readonly string[], seededIds: readonly string[]): Promise<void> {
   await prisma.speciesGrantedSpell.deleteMany({
     where: { variantId: { in: [...new Set(touchedVariantIds)] }, id: { notIn: [...seededIds] } },

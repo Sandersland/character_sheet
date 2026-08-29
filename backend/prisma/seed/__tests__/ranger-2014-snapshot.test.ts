@@ -1,17 +1,4 @@
-// #1230 commit 1: Ranger's EDITION_2014 rows must be byte-identical
-// transcriptions of what lib/classes/ranger.ts's RANGER_FEATURES/
-// HUNTER_FEATURES/BEAST_MASTER_FEATURES said BEFORE this migration — 2014 is
-// a supported edition, not a rewrite target. This snapshot is that
-// pre-change text, pinned by hand from the tree at the commit before #1230
-// landed, NOT re-derived from anything this migration touches — a hardcoded
-// oracle is the whole point, mirroring barbarian-2014-snapshot.test.ts's/
-// warlock-2014-snapshot.test.ts's shape.
-//
-// This is a GUARD, not a red/green cycle: it is green on first run by
-// construction (RANGER_FEATURES is authored as a byte-identical copy in the
-// same commit that adds this file). Its job is to catch commit 2/3 silently
-// editing a 2014 row while authoring 2024 content or moving a pool onto a
-// row — this file must stay green, unedited, from commit 1 through commit 3.
+// This snapshot must stay green and unedited through commit 3 — its job is to catch a later commit silently editing a 2014 row while authoring 2024 content or moving a pool onto a row.
 import { describe, expect, it } from "vitest";
 
 import { RANGER_FEATURES } from "../ranger-features.js";
@@ -24,7 +11,6 @@ interface Pinned {
 }
 
 const PRE_CHANGE_2014: Pinned[] = [
-  // ---- Base class --------------------------------------------------------
   {
     subclassSlug: null,
     name: "Favored Enemy",
@@ -101,7 +87,6 @@ const PRE_CHANGE_2014: Pinned[] = [
     description:
       "Once per turn when you hit a favored enemy with a weapon, you may add your Wisdom modifier to the attack roll or the damage roll.",
   },
-  // ---- Hunter --------------------------------------------------------------
   {
     subclassSlug: "ranger-hunter",
     name: "Hunter's Prey",
@@ -130,7 +115,6 @@ const PRE_CHANGE_2014: Pinned[] = [
     description:
       "Choose one: Evasion (no damage on successful Dex save, half on failure); Stand Against the Tide (redirect a missed melee attack to another creature within range); or Uncanny Dodge (halve damage from one attack per reaction).",
   },
-  // ---- Beast Master ----------------------------------------------------
   {
     subclassSlug: "ranger-beast-master",
     name: "Ranger's Companion",

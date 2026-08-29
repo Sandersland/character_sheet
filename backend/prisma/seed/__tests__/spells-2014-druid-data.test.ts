@@ -1,12 +1,3 @@
-// #1716 (content slice of epic #1517): shape + cross-check invariants for the
-// Druid by-class spell bucket. Pure data tests on the array itself — same
-// pattern as spells-2014-shared-data.test.ts (#1713), spells-2014-wizard-data
-// .test.ts (#1714), and spells-2014-cleric-data.test.ts (#1715) — because the
-// DB round-trip (one Spell row per name, SpellClass fan-out, `?class=`
-// resolution) is already proven generically by spell-fork-reseed.test.ts
-// (#1710) and spells.test.ts's SpellClass-join describe blocks (#1711); this
-// file's only job is to prove THIS SLICE'S DATA is correct, not re-prove the
-// plumbing.
 import { describe, expect, it } from "vitest";
 
 import type { CatalogSpell } from "../spells.js";
@@ -112,11 +103,6 @@ describe("DRUID_SPELLS_2014 — structured-field invariants (mirrors wizard.ts's
   });
 });
 
-// The critical lesson from a prior content slice (CLAUDE.md): a row's
-// STRUCTURED saveEffect must match its own DESCRIPTION prose, or the frontend
-// shows "half on success" text that contradicts (or omits) what the spell
-// actually does. Every damage spell in this file is checked against its own
-// text, not spot-checked.
 describe("DRUID_SPELLS_2014 — saveEffect matches its own description text (field/text mismatch guard)", () => {
   const HALF_ON_SUCCESS = /half as much damage|half damage|half the damage/i;
 
@@ -133,19 +119,7 @@ describe("DRUID_SPELLS_2014 — saveEffect matches its own description text (fie
   });
 });
 
-// A rules-accuracy pass on the Wizard slice found dnd5eapi's own damage/dc
-// JSON has real gaps (Flaming Sphere, Scorching Ray, Weird — dc/attack_type/
-// damage null despite the prose clearly describing one). The Cleric slice hit
-// the same gap class twice (Sanctuary, Spirit Guardians). This slice found it
-// ONCE (Call Lightning — see druid.ts's own row comment), so this describe
-// block audits the PROSE directly against every row's structured fields — the
-// same sweep that found those gaps — as a permanent regression guard, not a
-// one-time spot-check.
 describe("DRUID_SPELLS_2014 — prose-vs-structured-field audit (catches what dnd5eapi's own JSON gaps hid)", () => {
-  // Rows where a save/attack/damage-shaped phrase in the prose is NOT the
-  // row's own primary structured effect — each has its own comment at the row
-  // explaining why. Every one of these was individually reviewed, not
-  // bulk-excluded.
   const CONDITIONAL_OR_MULTI_EFFECT = new Set([
     "Heat Metal", // the fire damage is UNCONDITIONAL; the CON save only gates a separate consequence (dropping the object)
     "Wall of Thorns", // TWO damage instances (piercing on appearance, slashing while moving through) — no single damageType (matches Flame Strike/Meteor Swarm precedent)
@@ -222,13 +196,6 @@ describe("DRUID_SPELLS_2014 — scraping-artifact guards (same shapes spells-201
   });
 });
 
-// #1746: an audit of every pre-#1717 2014 slice for the same dropped-tail bug
-// PR #1745's review found in Heroism (dnd5eapi's higher_level JSON can be
-// empty despite the real SRD 5.1 text carrying an "At Higher Levels" clause).
-// Ground truth below was cross-checked against 5etools' PHB spell dataset
-// (its entriesHigherLevel field, hand-transcribed from the book): every one
-// of this slice's 29 leveled rows was checked, and none was found missing a
-// genuine upcast clause.
 describe("DRUID_SPELLS_2014 — no dropped 'At Higher Levels' tail text (dnd5eapi JSON-vs-real-SRD-text gap, #1746)", () => {
   const HAS_AT_HIGHER_LEVELS_TEXT = new Set([
     "Flame Blade",
@@ -261,9 +228,6 @@ function find(name: string): CatalogSpell {
   return s;
 }
 
-// Spot-checks on the trickiest edge cases this slice hand-authored — not
-// exhaustive (30 rows), but enough to catch a transcription or transform
-// regression on the rows most likely to be touched again.
 describe("DRUID_SPELLS_2014 — value spot-checks", () => {
   it("Call Lightning: DEX save, half on success, 3d10 lightning + upcast — dnd5eapi's own dc field was null despite the prose", () => {
     const s = find("Call Lightning");

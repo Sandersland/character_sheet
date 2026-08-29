@@ -1,16 +1,4 @@
-// --- Species trait seeder (#1682, epic #1518) --------------------------------
-// The executable counterpart to species-traits-data.ts's DATA (SPECIES_TRAITS)
-// — split out the same way seed-species.ts is split from species-data.ts.
-//
-// SpeciesTrait carries no @@unique constraint (unlike Species/SpeciesVariant's
-// real compound-unique keys, #1679 review — the natural key (speciesId,
-// variantId, name) has a nullable `variantId`, the same NULLS-NOT-DISTINCT
-// shape that made ClassFeature's own compound key require find-then-write
-// instead of `.upsert()`, seed-class-features.ts's own header) — no schema
-// change this slice (worktree note: #1679 already made the tables), so this
-// reuses upsertEditionRow (lib/rules/catalog-edition.ts) generically: that
-// helper only needs findFirst/create/update, it isn't edition-specific despite
-// its name/JSDoc being framed around Feat/Subclass's nullable-edition case.
+// SpeciesTrait has no @@unique constraint — its natural key (speciesId, variantId, name) has a nullable variantId, the same shape that makes ClassFeature need find-then-write. upsertEditionRow is reused here despite the name: it only needs findFirst/create/update and isn't actually edition-specific.
 import { Prisma } from "../../src/generated/prisma/client.js";
 import type { PrismaClient } from "../../src/generated/prisma/client.js";
 import { upsertEditionRow } from "../../src/lib/rules/catalog-edition.js";
@@ -22,12 +10,7 @@ interface SpeciesTarget {
   variantId: string | null;
 }
 
-// Resolves a trait row's (speciesId, variantId) target from the just-seeded
-// Species/SpeciesVariant rows (seedSpecies runs immediately before this in
-// seed.ts's main()). Split out purely to keep seedSpeciesTraits' own
-// cyclomatic complexity low (prisma/seed/** floors at the UNCOVERED CRAP
-// formula regardless of real test coverage — mirrors resolveOneRow's own
-// split in seed-species-features.ts's sibling, seed-class-features.ts).
+// Resolves a trait row's (speciesId, variantId) target from the just-seeded Species/SpeciesVariant rows — seedSpecies must run immediately before this.
 function resolveTarget(
   trait: SpeciesTraitSeed,
   speciesByKey: Map<string, { id: string; variants: { id: string; slug: string }[] }>,
@@ -48,15 +31,9 @@ function resolveTarget(
 }
 
 async function upsertTrait(prisma: PrismaClient, trait: SpeciesTraitSeed, target: SpeciesTarget): Promise<void> {
-  // Prisma types a Json column as opaque InputJsonValue — cast once here,
-  // mirroring seedClassFeatures' identical `improvements` write (seed-class-
-  // features.ts) and character-create.ts's `toolProficiencies as unknown as
-  // Prisma.InputJsonValue` precedent; validated at SEED time
-  // (speciesTraitSeedSchema), not re-validated on write.
+  // Prisma types a Json column as opaque InputJsonValue — cast once here; validated at seed time (speciesTraitSeedSchema), not re-validated on write.
   const improvements = (trait.improvements ?? []) as unknown as Prisma.InputJsonValue;
-  // #1689: NULL (Prisma.DbNull, not a bare `null` — nullable Json columns
-  // reject the literal per Prisma's own type) for every trait with no choice
-  // mechanic, the vast majority.
+  // #1689: NULL must be Prisma.DbNull, not a bare `null` — nullable Json columns reject the literal per Prisma's own type.
   const choice = (trait.choice as unknown as Prisma.InputJsonValue | undefined) ?? Prisma.DbNull;
   const data = {
     speciesId: target.speciesId,
@@ -74,10 +51,7 @@ async function upsertTrait(prisma: PrismaClient, trait: SpeciesTraitSeed, target
   );
 }
 
-// De-dupes the run's targets by their (speciesId, variantId) prune key — the
-// same key seededNamesByTargetKey is built with — so pruneStaleTraits stays
-// under the seed-file cyclomatic budget (CC <= 4: seed code runs uncovered in
-// globalSetup, so CRAP is complexity-driven, #1682/#1679).
+// De-dupes the run's targets by the same (speciesId, variantId) key seededNamesByTargetKey is built with below — keep them in sync.
 function uniqueTargetsByPruneKey(targets: readonly SpeciesTarget[]): Map<string, SpeciesTarget> {
   const byKey = new Map<string, SpeciesTarget>();
   for (const target of targets) {
@@ -87,10 +61,7 @@ function uniqueTargetsByPruneKey(targets: readonly SpeciesTarget[]): Map<string,
   return byKey;
 }
 
-// Drops trait rows no longer authored, scoped to the exact (speciesId,
-// variantId) targets this seed run touched — never a bare `deleteMany` over
-// the whole table, for the same "don't nuke content a sibling row still needs"
-// reason pruneStaleVariants gives in seed-species.ts.
+// Drops trait rows no longer authored, scoped to the exact (speciesId, variantId) targets this seed run touched — never a bare `deleteMany` over the whole table, for the same reason pruneStaleVariants is scoped.
 async function pruneStaleTraits(
   prisma: PrismaClient,
   targets: readonly SpeciesTarget[],

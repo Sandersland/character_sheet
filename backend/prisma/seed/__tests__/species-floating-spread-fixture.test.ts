@@ -1,10 +1,4 @@
-// Proves the epic's no-migration AC for a later-printing floating-spread row
-// (Astral Elf's Tasha's-era +2/+1-or-+1/+1/+1, MPMM/Spelljammer) — the schema
-// must already hold this shape even though real Astral Elf content lands in a
-// future wave-2 seed, not this slice. A dedicated fixture row, not a change to
-// the real SPECIES roster: wave 1 is PHB parity only (species-data.test.ts
-// pins the exact 9/10-row rosters), so this stays a test-authored row created
-// and torn down here, never a seeded catalog entry.
+// Proves the no-migration AC for a later-printing floating-spread row (Astral Elf's Tasha's-era +2/+1-or-+1/+1/+1, MPMM/Spelljammer, #1679) — the schema must already hold this shape even though real Astral Elf content lands in a future wave.
 import { afterEach, describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/core/prisma.js";

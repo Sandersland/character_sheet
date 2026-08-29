@@ -1,11 +1,4 @@
-// DB-backed proof for #1529: five class-name-keyed lib/srd/ records
-// (CLASS_PROFICIENCY_GRANTS, EXTRA_ASI_LEVELS, fightingStyleFeatSlots'
-// per-class levels, MULTICLASS_PREREQUISITES, PRIMARY_ABILITIES) moved onto
-// CharacterClass columns. The template DB vitest.global-setup.ts clones from
-// already ran `prisma migrate deploy` + `prisma db seed` once, so every row
-// asserted against below is the REAL seeded catalog (never a fixture) — this
-// suite is a positive control on that real seed, the same shape
-// class-feature-migration.test.ts uses.
+// vitest.global-setup.ts clones a template DB that already ran `prisma migrate deploy` + `prisma db seed` — every row asserted against below is the real seeded catalog, never a fixture.
 import { afterEach, describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/core/prisma.js";
@@ -41,11 +34,6 @@ describe("CharacterClass column migration (#1529) — the twelve rows round-trip
     }
   });
 
-  // Mutation proof (manual, recorded in the PR): editing Fighter's
-  // extraAsiLevels in CLASSES without re-seeding leaves the DB row unchanged,
-  // failing this test's per-row equality — confirmed by temporarily changing
-  // Fighter's `extraAsiLevels: [6, 14]` to `[6]` in catalog-data.ts and
-  // re-running without `prisma db seed`, which goes red naming "Fighter".
   it("Fighter's OR-shaped multiclass prerequisite round-trips as an array of option objects, not a flattened list", async () => {
     const fighter = await prisma.characterClass.findFirstOrThrow({
       where: { name: "Fighter" },
@@ -59,8 +47,7 @@ describe("CharacterClass column migration (#1529) — schema defaults on an exis
   const TRANSIENT_NAME = "Test Transient Class (#1529 migration)";
 
   afterEach(async () => {
-    // Cleanup — #1543: a leftover transient CharacterClass row trips
-    // assertEveryClassEditionPopulated in a later test file.
+    // A leftover transient CharacterClass row trips assertEveryClassEditionPopulated in a later test file.
     await prisma.characterClass.deleteMany({ where: { name: TRANSIENT_NAME } });
   });
 

@@ -1,16 +1,3 @@
-// #1232 commit 1: Sorcerer's EDITION_2014 rows must be byte-identical
-// transcriptions of what lib/classes/sorcerer.ts's SORCERER_FEATURES/
-// DRACONIC_BLOODLINE_FEATURES/WILD_MAGIC_FEATURES said BEFORE this migration —
-// 2014 is a supported edition, not a rewrite target. This snapshot is that
-// pre-change text, pinned by hand from the tree at the commit before #1232
-// landed, NOT re-derived from anything this migration touches — a hardcoded
-// oracle is the whole point, mirroring warlock-2014-snapshot.test.ts's shape.
-//
-// This is a GUARD, not a red/green cycle: it is green on first run by
-// construction (SORCERER_FEATURES is authored as a byte-identical copy in the
-// same commit that adds this file). Its job is to catch commit 2/3 silently
-// editing a 2014 row while authoring 2024 content or moving a pool onto a
-// row — this file must stay green, unedited, from commit 1 through commit 3.
 import { describe, expect, it } from "vitest";
 
 import { SORCERER_FEATURES } from "../sorcerer-features.js";
@@ -23,7 +10,6 @@ interface Pinned {
 }
 
 const PRE_CHANGE_2014: Pinned[] = [
-  // ---- Base class ---------------------------------------------------------
   {
     subclassSlug: null,
     name: "Spellcasting",
@@ -58,7 +44,6 @@ const PRE_CHANGE_2014: Pinned[] = [
     level: 20,
     description: "You regain 4 expended Sorcery Points whenever you finish a short rest.",
   },
-  // ---- Draconic Bloodline ---------------------------------------------------
   {
     subclassSlug: "sorcerer-draconic-bloodline",
     name: "Dragon Ancestor",
@@ -93,7 +78,6 @@ const PRE_CHANGE_2014: Pinned[] = [
     description:
       "As an action, spend 5 Sorcery Points to channel draconic majesty for 1 minute (concentration). Each hostile creature within 60 ft that can see you must succeed on a Wisdom save (spell save DC) or be charmed (awed) or frightened (your choice) for the duration.",
   },
-  // ---- Wild Magic ------------------------------------------------------------
   {
     subclassSlug: "sorcerer-wild-magic",
     name: "Wild Magic Surge",

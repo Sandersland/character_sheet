@@ -1,14 +1,3 @@
-// #1720 (content slice of epic #1517): shape + cross-check invariants for the
-// Paladin by-class spell bucket. Pure data tests on the array itself — same
-// pattern as spells-2014-shared-data.test.ts (#1713), spells-2014-wizard-data
-// .test.ts (#1714), spells-2014-cleric-data.test.ts (#1715), spells-2014-
-// druid-data.test.ts (#1716), spells-2014-bard-data.test.ts (#1717), spells-
-// 2014-sorcerer-data.test.ts (#1718), and spells-2014-warlock-data.test.ts
-// (#1719) — because the DB round-trip (one Spell row per name, SpellClass
-// fan-out, `?class=` resolution) is already proven generically by
-// spell-fork-reseed.test.ts (#1710) and spells.test.ts's SpellClass-join
-// describe blocks (#1711); this file's only job is to prove THIS SLICE'S
-// DATA is correct, not re-prove the plumbing.
 import { describe, expect, it } from "vitest";
 
 import type { CatalogSpell } from "../spells.js";
@@ -96,12 +85,6 @@ describe("PALADIN_SPELLS_2014 — row-ownership rule (epic #1517)", () => {
 });
 
 describe("PALADIN_SPELLS_2014 — full PHB'14 Paladin membership is complete across all authoring slices", () => {
-  // The full PHB'14 Paladin spell list (44 spells, levels 1-5 only — Paladin
-  // has no cantrips and caps at 5th-level spells as a half-caster) partitioned
-  // by which slice authors the row. Every name below must carry "paladin" in
-  // its classes[] wherever it's actually authored — this test is the
-  // permanent guard that the "already fanned" claim in paladin.ts's header
-  // holds.
   const CLERIC_OWNED_PALADIN_SPELLS = [
     "Bless",
     "Command",
@@ -157,10 +140,6 @@ describe("PALADIN_SPELLS_2014 — full PHB'14 Paladin membership is complete acr
   });
 
   it("no PHB'14 2024-only or SCAG/XGE/TCE/UA Paladin addition (e.g. Ceremony, or Find Vehicle) is offered anywhere in the 2014 tables — this slice's membership check only counts genuine 2014 core-PHB Paladin-owned spells", () => {
-    // Ceremony is a real 2014-ruleset spell but sourced from Xanathar's Guide
-    // to Everything (roll20.net's compendium redirects it to the Xanathar's
-    // bundle, not Player's Handbook) — out of this epic's "Full PHB'14" scope.
-    // It must not carry a paladin tag in any 2014 file.
     const ceremony = [
       ...WIZARD_SPELLS_2014,
       ...CLERIC_SPELLS_2014,
@@ -216,11 +195,7 @@ describe("PALADIN_SPELLS_2014 — structured-field invariants (mirrors wizard.ts
   });
 });
 
-// The critical lesson from a prior content slice (CLAUDE.md): a row's
-// STRUCTURED saveEffect must match its own DESCRIPTION prose, or the frontend
-// shows "half on success" text that contradicts (or omits) what the spell
-// actually does. Every damage spell in this file is checked against its own
-// text, not spot-checked.
+// A row's structured saveEffect must match its own description prose, or the frontend shows contradicting "half on success" text.
 describe("PALADIN_SPELLS_2014 — saveEffect matches its own description text (field/text mismatch guard)", () => {
   const HALF_ON_SUCCESS = /half as much damage|half damage|half the damage/i;
 
@@ -234,13 +209,6 @@ describe("PALADIN_SPELLS_2014 — saveEffect matches its own description text (f
   });
 });
 
-// This slice owns zero direct-cast damage/save rows (every smite/rider spell
-// is a documented conditional/multi-effect exception, matching Hex/Armor of
-// Agathys/Hunger of Hadar's precedent in warlock.ts) — so, unlike prior
-// slices, the prose-vs-structured-field audit here is ALL exceptions. Every
-// exception's rationale is spelled out per-row in paladin.ts's own comments;
-// this describe block is the permanent regression guard that the exception
-// set doesn't silently grow or shrink out from under those comments.
 describe("PALADIN_SPELLS_2014 — prose-vs-structured-field audit (catches what dnd5eapi's own JSON gaps hid)", () => {
   const CONDITIONAL_OR_MULTI_EFFECT = new Set([
     "Divine Favor", // 1d4 radiant is a RIDER on the caster's own future attacks, not a direct spell-cast damage instance
@@ -293,30 +261,12 @@ describe("PALADIN_SPELLS_2014 — prose-vs-structured-field audit (catches what 
   it("every one of this slice's 16 rows is accounted for by either the exception set or a clean pass — no row silently escapes both", () => {
     const exceptionCount = PALADIN_SPELLS_2014.filter((s) => CONDITIONAL_OR_MULTI_EFFECT.has(s.name)).length;
     const cleanCount = PALADIN_SPELLS_2014.length - exceptionCount;
-    // Find Steed (pure utility, no dice/save at all) and Aura of Vitality (a
-    // hit-point count, not a "damage" phrase) and Compelled Duel (a genuine
-    // clean attackType:"save" row) are this slice's only 3 non-exception rows.
     expect(cleanCount).toBe(3);
     expect(exceptionCount).toBe(13);
   });
 });
 
-// PR #1745's review pass found a DIFFERENT bug class than the structured-field
-// audit above catches: dnd5eapi's own JSON can drop a whole trailing sentence
-// (not just a null damage/dc field) — its 2014 Heroism response had
-// higher_level: [] despite real SRD 5.1 genuinely carrying an "At Higher
-// Levels" upcast clause. This is a permanent regression guard against that
-// same class of dropped-tail transcription bug: ground truth below was
-// individually verified against a second source (dnd5e.wikidot.com) for all
-// 16 of this slice's owned rows, not just a sample.
 describe("PALADIN_SPELLS_2014 — no dropped 'At Higher Levels' tail text (dnd5eapi JSON-vs-real-SRD-text gap, PR #1745 review finding)", () => {
-  // Verified against a second source: Searing Smite, Branding Smite, and
-  // Elemental Weapon all genuinely have upcast text. The other 13 rows were
-  // verified against two independent sources to have NO upcast clause at all
-  // in 2014 (several — Thunderous Smite, Wrathful Smite, Blinding Smite,
-  // Staggering Smite, Banishing Smite, Circle of Power, Destructive Wave —
-  // are PHB'14 spells that simply never got one; the 2024 PHB later added
-  // upcast text to some of these, which is out of this epic's 2014 scope).
   const HAS_AT_HIGHER_LEVELS_TEXT = new Set(["Searing Smite", "Branding Smite", "Elemental Weapon"]);
 
   it("every row verified to have real SRD 'At Higher Levels' text actually carries it in its description", () => {
@@ -379,8 +329,6 @@ function find(name: string): CatalogSpell {
   return s;
 }
 
-// Spot-checks on every one of this slice's 16 rows — small enough to be
-// exhaustive rather than a sample.
 describe("PALADIN_SPELLS_2014 — value spot-checks", () => {
   it("Divine Favor: paladin-only, bonus action, concentration, 1d4 radiant rider, no effectKind (matches Hex's shape)", () => {
     const s = find("Divine Favor");

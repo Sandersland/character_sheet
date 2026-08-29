@@ -1,60 +1,14 @@
-// --- Fighter ClassFeature rows, authored as LITERAL data (#1227) -----------
-// The pilot for #1522's "content is data" direction: Fighter's rows no longer
-// derive from lib/classes/fighter.ts's AuthoredFeature[] arrays. That module
-// stayed alive only for its resourceFn/deriveExtras/subclass-registration
-// stubs (retired piecemeal by #1528/#1546) until #1532 deleted it outright,
-// once nothing depended on it any more — they are transcribed/authored
-// directly here, once, in their final DB-row shape. class-features.ts
-// concatenates FIGHTER_FEATURES onto the eleven still-derived classes' rows
-// to build CLASS_FEATURES; see
-// its LITERAL_ROW_CLASSES export for the set of classes (today: just this
-// one) whose rows tests must not compare against a TS-array "old" side.
+// DATA MODULE ONLY (#1277 AC 4): no direct database calls in this file.
 //
-// DATA MODULE ONLY (#1277 AC 4, scripts/check-seed-data-modules.sh): no
-// direct database calls or async write logic may live in this file.
-// expand() below is pure content assembly, not seeding logic — the same
-// shape class-features.ts's own expandFeatureRow/collectRawFeatures already
-// establishes in this same directory.
-//
-// SCOPE (#1227) then #1528 then #1530 then #1120: #1227 authored Fighter's
-// FEATURE TEXT only, with every descriptor column left NULL (resource pools
-// stayed in fighter.ts's resourceFn, every activation in classes/actions.ts's
-// DERIVED_ACTIONS). #1528 populated the base class's resource+activation+
-// cost+effect columns for Second Wind/Action Surge/Indomitable (the pilot's
-// proof-of-authoring) and retired the matching resourceFn/DERIVED_ACTIONS
-// entries — see fighter.ts's own header. #1530 populated the base class's L5
-// Extra Attack row's derivedStat/derivedStatTiers (see that row's own comment
-// below). #1120 populated Champion's Improved Critical row with the
-// critRange derivedStat. Every OTHER row below (Battle Master/Eldritch
-// Knight, and Fighting Style/Weapon Mastery on the base, Champion's own
-// Remarkable Athlete/Additional Fighting Style/Heroic Warrior/Survivor) still
-// leaves its descriptor columns NULL: some because the feature has no such
-// axis (a passive), some because it isn't done yet (Tactical Mind's
-// conditional-refund wrinkle has no AbilityCost shape yet) — see each row's
-// own comment for which.
-//
-// EDITION RULE: `edition` omitted -> expand() seeds ONE row per edition with
-// IDENTICAL text (the 2014-is-a-transcription invariant; today that's only
-// Eldritch Knight, parked below). `edition` set -> exactly the one row named.
-// A 2014 row's text is NEVER edited by this issue for any reason other than
-// the #1221 short-rest-recharge fix (which lives on Second Wind/Action
-// Surge's own resourceRecharge/resourceTotals columns below, #1528 — no
-// top-level resourceFn remains in fighter.ts to hold it) — every EDITION_2014
-// row below is a byte-identical copy of what
-// fighter.ts's FIGHTER_FEATURES/CHAMPION_FEATURES/BATTLE_MASTER_FEATURES/
-// ELDRITCH_KNIGHT_FEATURES said before this migration (pinned by
-// class-feature-migration.test.ts's 2014-snapshot test). A "removed in 2024"
-// feature (the original issue's framing) means simply NOT authoring a 2024
-// row for that name — never deleting the 2014 row. A level-shift (e.g.
-// Champion's Remarkable Athlete 2014 L7 -> 2024 L3) is two rows with two
-// `level` values, never one row edited in place.
+// EDITION RULE: `edition` omitted on a row -> expand() seeds identical text
+// for both editions. `edition` set -> exactly the one row named. A "removed
+// in 2024" feature means not authoring a 2024 row, never deleting the 2014
+// row. A level-shift is two rows with two `level` values, never one row
+// edited in place.
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type { SeedEdition } from "./edition.js";
 import type { ClassFeatureSeedRow } from "./class-features.js";
 
-// Guards a stray subclass-slug typo below at import time, same intent as
-// classFeatureSeedSchema's z.enum(SUBCLASS_SLUGS) — cheaper than a zod parse
-// for a fixed, tiny, module-local list.
 function slug(s: SubclassSlug): SubclassSlug {
   if (!SUBCLASS_SLUGS.includes(s)) throw new Error(`fighter-features: unknown subclass slug "${s}"`);
   return s;
@@ -65,15 +19,8 @@ interface RawFighterFeature {
   name: string;
   level: number;
   description: string;
-  /** Omitted -> identical text seeded for both editions (see file header). */
+  /** Omitted -> identical text seeded for both editions. */
   edition?: SeedEdition;
-  // ---- Descriptor columns (#1528/#1530/#1546) — resourceKey through
-  // ---- saveDcAbilities below are populated only for Second Wind/Action
-  // ---- Surge/Indomitable (#1528), Extra Attack (#1530), and Combat
-  // ---- Superiority/Student of War (#1546 Part B); every other row leaves
-  // ---- these undefined, which `expand()` passes straight through as
-  // ---- `undefined` (never writing a stray `null`/`Prisma.DbNull` override
-  // ---- for a row this issue doesn't touch).
   resourceKey?: string;
   resourceLabel?: string;
   resourceRecharge?: string;
@@ -88,18 +35,10 @@ interface RawFighterFeature {
   effectDiceCount?: number;
   effectDiceFaces?: number;
   effectModifierSource?: string;
-  // #1530: populated on the base class's L5 "Extra Attack" row (both
-  // editions) — Two/Three Extra Attacks stay text-only, see that row's own
-  // comment for why. #1546 Part B: ALSO populated on Combat Superiority
-  // (maneuverChoiceCount) and Student of War (toolProfChoiceCount) — see
-  // each row's own comment.
   derivedStat?: string;
   derivedStatTiers?: { minLevel: number; value: number | string }[];
-  // #1546 Part B: the ability list Combat Superiority's announcedSaveDC
-  // (#1589, renamed from maneuverSaveDC) is computed from (8 + PB + max of
-  // these). Deliberately NOT matched against `derivedStat` by name — see
-  // class-feature-rows.ts's saveDcAbilitiesFromRows for why the same row
-  // needs both axes at once.
+  // announcedSaveDC = 8 + PB + max of these abilities — a separate axis from
+  // `derivedStat` on the same row (saveDcAbilitiesFromRows, class-feature-rows.ts).
   saveDcAbilities?: string[];
 }
 
@@ -132,30 +71,7 @@ function expand(raw: RawFighterFeature): ClassFeatureSeedRow[] {
   return editions.map((edition) => ({ ...base, edition }));
 }
 
-// ---- Base class — SRD 5.1 p. 23-24 (2014) / SRD 5.2 p. 47-48 (2024) -------
-// 2014: 5 rows, byte-identical transcriptions of fighter.ts's old
-// FIGHTER_FEATURES. 2024: 13 rows (not the 8 the pre-arbiter issue draft
-// implied) — Weapon Mastery and Fighting Style are text rows this issue owns
-// even though their MECHANICS are #1138/#1137's; Extra Attack decomposes into
-// three separately-named/leveled 2024 features instead of one feature whose
-// text describes all three tiers.
-// Every row below EXCEPT Second Wind/Action Surge/Indomitable (populated
-// above) and Extra Attack (populated by #1530, see that row below) leaves
-// every descriptor column NULL because the feature has NO SUCH AXIS:
-// Fighting Style/Weapon Mastery/Tactical Shift/Studied Attacks/Epic Boon/
-// Tactical Master are all passive text or feat grants with no resource pool,
-// no clickable action, and no roll this app computes. Two Extra Attacks and
-// Three Extra Attacks are the SAME no-such-axis NULL for a more specific
-// reason: their tier is already carried by the L5 Extra Attack row's
-// derivedStatTiers (#1528's decision, populated by #1530) — attaching a
-// second copy here would need deriveAttacksPerAction to dedupe instead of
-// simply composing, for no benefit, since these rows have no `level` of
-// their own left to gate anything else. Extra Attack (L5) is the one row
-// per edition that sets derivedStat/derivedStatTiers — byte-identical across
-// both, since the tier progression is edition-invariant even though the row
-// SHAPE (one row vs three) forks. Tactical Mind is the last "not done yet"
-// row: its conditional not-expended-on-failure refund has no AbilityCost
-// shape (see its own comment below).
+// Base class — SRD 5.1 p. 23-24 (2014) / SRD 5.2 p. 47-48 (2024)
 const FIGHTER_BASE_RAW: RawFighterFeature[] = [
   {
     subclassSlug: null,
@@ -170,11 +86,9 @@ const FIGHTER_BASE_RAW: RawFighterFeature[] = [
     name: "Fighting Style",
     level: 1,
     edition: "EDITION_2024",
-    // SRD 5.2 p. 47: a Fighting Style FEAT, not a class-feature menu, and
-    // retrainable on every Fighter level gained. Only carries the four
-    // Fighting Style feats SRD 5.2 itself has (Archery, Defense, Great Weapon
-    // Fighting, Two-Weapon Fighting) — Dueling/Protection are 2014-only, and
-    // the wider PHB'24 feat list is unverified (do not widen this text).
+    // SRD 5.2 p. 47: a Fighting Style feat, retrainable each Fighter level.
+    // Only the four feats SRD 5.2 itself has — do not widen this text with
+    // unverified PHB'24 options.
     description:
       "You gain a Fighting Style feat of your choice: Archery, Defense, Great Weapon Fighting, or Two-Weapon Fighting. Whenever you gain a Fighter level, you can replace the feat you chose with a different Fighting Style feat.",
   },
@@ -184,10 +98,7 @@ const FIGHTER_BASE_RAW: RawFighterFeature[] = [
     level: 1,
     edition: "EDITION_2014",
     description: "As a bonus action, regain 1d10 + your fighter level HP. Regain use on a short or long rest.",
-    // #1528: resourceFn's pools moved onto this row. SRD 5.1 p. 23 fully
-    // resets on EITHER rest (no #1221 partial shape) — "short-or-long" is the
-    // #1227 live-bug fix (was "shortRest" only, which never recharged on a
-    // long rest despite the feature's own text promising it).
+    // SRD 5.1 p. 23: fully resets on either rest (no partial shape).
     resourceKey: "secondWind",
     resourceLabel: "Second Wind",
     resourceRecharge: "short-or-long",
@@ -200,9 +111,6 @@ const FIGHTER_BASE_RAW: RawFighterFeature[] = [
     effectKind: "heal",
     effectDiceCount: 1,
     effectDiceFaces: 10,
-    // classLevel: SRD 5.1's "regain 1d10 + your fighter level HP" — the ONE
-    // new EffectSpec axis #1528 adds (effectModifierSource), earned by this
-    // row + Rally's analogous (out-of-scope) case.
     effectModifierSource: "classLevel",
   },
   {
@@ -212,9 +120,7 @@ const FIGHTER_BASE_RAW: RawFighterFeature[] = [
     edition: "EDITION_2024",
     description:
       "As a Bonus Action, regain Hit Points equal to 1d10 plus your Fighter level. You have 2 uses of this feature (3 at level 4, 4 at level 10). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
-    // #1528: SRD 5.2 p. 48's 2/3/4-at-L1/4/10 tiering plus the #1221 partial
-    // short-rest top-up (shortRestRegain: 1 on every tier — it's flat, not
-    // level-scaled) now live on this row instead of fighter.ts's resourceFn.
+    // SRD 5.2 p. 48: short-rest regain is flat 1 per tier, not level-scaled.
     resourceKey: "secondWind",
     resourceLabel: "Second Wind",
     resourceRecharge: "longRest",
@@ -251,10 +157,7 @@ const FIGHTER_BASE_RAW: RawFighterFeature[] = [
     edition: "EDITION_2014",
     description:
       "Take one additional action on your turn. Regain use(s) on a short or long rest. You have 2 uses starting at level 17.",
-    // #1528: genuinely no edition fork on the pool mechanics (SRD 5.1 p. 24 /
-    // SRD 5.2 p. 48 both read "you can't do so again until you finish a Short
-    // or Long Rest") — "short-or-long" is the #1227 live-bug fix, both
-    // editions, unlike Second Wind's genuine 2014/2024 shape difference.
+    // SRD 5.1 p. 24 / SRD 5.2 p. 48: both recharge on Short or Long Rest.
     resourceKey: "actionSurge",
     resourceLabel: "Action Surge",
     resourceRecharge: "short-or-long",
@@ -267,20 +170,15 @@ const FIGHTER_BASE_RAW: RawFighterFeature[] = [
     costKind: "pool",
     costPoolKey: "actionSurge",
     costBase: 1,
-    // No effectKind (NULL, "no such axis"): Action Surge is a pure counter —
-    // the extra-action grant is a client-side economy effect with no roll/
-    // heal to compute, same as before #1528.
+    // No effectKind: Action Surge is a pure counter, no roll/heal to compute.
   },
   {
     subclassSlug: null,
     name: "Action Surge",
     level: 2,
     edition: "EDITION_2024",
-    // SRD 5.2 p. 48. Recharge is "Short or Long Rest" in BOTH editions — NOT
-    // the #1221 partial shape (only Second Wind is). The live recharge bug
-    // (was "shortRest" only, in both editions) is fixed by this row's own
-    // resourceRecharge: "short-or-long" below (#1528) — no top-level
-    // resourceFn remains in fighter.ts to hold it.
+    // SRD 5.2 p. 48: recharges on Short or Long Rest (not the partial
+    // short-rest-regain shape).
     description:
       "Take one additional action on your turn, except the Magic action. Regain your use of this feature on a Short or Long Rest. You have 2 uses starting at level 17, but only once on a turn.",
     resourceKey: "actionSurge",
@@ -301,8 +199,8 @@ const FIGHTER_BASE_RAW: RawFighterFeature[] = [
     name: "Tactical Mind",
     level: 2,
     edition: "EDITION_2024",
-    // SRD 5.2 p. 48. The use-not-expended-on-failure wrinkle has no
-    // AbilityCost/EffectSpec shape yet (#1528's problem) — text only here.
+    // SRD 5.2 p. 48. Text only — the not-expended-on-failure wrinkle has no
+    // AbilityCost shape yet.
     description:
       "When you fail an ability check, you can expend a use of your Second Wind to roll 1d10 and add the number rolled to the check, potentially turning failure into success. If the check still fails, this use of Second Wind isn't expended.",
   },
@@ -312,10 +210,8 @@ const FIGHTER_BASE_RAW: RawFighterFeature[] = [
     level: 5,
     edition: "EDITION_2014",
     description: "You can attack twice when taking the Attack action. Three times at level 11; four times at level 20.",
-    // #1530: the full three-tier progression rides THIS row even though 2014
-    // describes all three tiers in one feature's text — ascending/last-match-
-    // wins (tierAt, class-feature-rows.ts). Byte-identical to the 2024 row's
-    // tiers below: the rule is edition-invariant, only the row SHAPE forks.
+    // Tiers resolve ascending, last-match-wins (tierAt, class-feature-rows.ts).
+    // Edition-invariant; only the row SHAPE forks in 2024.
     derivedStat: "attacksPerAction",
     derivedStatTiers: [
       { minLevel: 5, value: 2 },
@@ -328,13 +224,8 @@ const FIGHTER_BASE_RAW: RawFighterFeature[] = [
     name: "Extra Attack",
     level: 5,
     edition: "EDITION_2024",
-    // SRD 5.2 p. 48. 2024 decomposes the L11/L20 tiers into their own named
-    // features below (Two/Three Extra Attacks) instead of folding them into
-    // this row's text — transcribe the document as structured, don't
-    // recombine it. Consequence for #1530: derivedStat/derivedStatTiers
-    // attach to THIS row; the L11/L20 rows stay text-only (see their own
-    // comments below for why NULL there is "no such axis", not "not done
-    // yet").
+    // SRD 5.2 p. 48: decomposes L11/L20 into their own named rows below (Two/
+    // Three Extra Attacks); derivedStatTiers stays on this row only.
     description: "You can attack twice instead of once whenever you take the Attack action on your turn.",
     derivedStat: "attacksPerAction",
     derivedStatTiers: [
@@ -348,8 +239,8 @@ const FIGHTER_BASE_RAW: RawFighterFeature[] = [
     name: "Tactical Shift",
     level: 5,
     edition: "EDITION_2024",
-    // SRD 5.2 p. 48. Trigger is the Second Wind BONUS ACTION heal itself, not
-    // a Tactical Mind use — stated explicitly since it's easy to conflate.
+    // SRD 5.2 p. 48: triggers on Second Wind's Bonus Action heal, not a
+    // Tactical Mind use.
     description:
       "Whenever you activate your Second Wind with a Bonus Action, you can move up to half your Speed without provoking Opportunity Attacks.",
   },
@@ -360,12 +251,8 @@ const FIGHTER_BASE_RAW: RawFighterFeature[] = [
     edition: "EDITION_2014",
     description:
       "Reroll a failed saving throw (you must use the new roll). Regain use(s) on a long rest. Two uses at level 13, three at level 17.",
-    // #1528: resource block only — no activationCost/resolverKind/cost*/
-    // effect* ("no such axis"): Indomitable was never a DERIVED_ACTIONS entry
-    // (it has no action-economy cost; it's a reactive reroll the player
-    // narrates, not a button this app dispatches through the actions
-    // endpoint), so there is no activation to populate here, before or after
-    // #1528.
+    // No activation columns: Indomitable is a reactive reroll the player
+    // narrates, not a dispatched action.
     resourceKey: "indomitable",
     resourceLabel: "Indomitable",
     resourceRecharge: "longRest",
@@ -407,12 +294,8 @@ const FIGHTER_BASE_RAW: RawFighterFeature[] = [
     level: 11,
     edition: "EDITION_2024",
     description: "You can attack three times whenever you take the Attack action on your turn.",
-    // derivedStat/derivedStatTiers NULL here because there is NO SUCH AXIS on
-    // THIS row (#1530): the count this row's text describes is already
-    // carried by the L5 "Extra Attack" row's derivedStatTiers, which has this
-    // row's own level (11) as one of its tiers. A second derivedStat here
-    // would have deriveAttacksPerAction take the max of two rows describing
-    // the SAME number, not a new one — never "not done yet".
+    // No derivedStat here — already carried by the L5 Extra Attack row's
+    // derivedStatTiers (this row's level, 11, is one of its tiers).
   },
   {
     subclassSlug: null,
@@ -427,9 +310,8 @@ const FIGHTER_BASE_RAW: RawFighterFeature[] = [
     name: "Epic Boon",
     level: 19,
     edition: "EDITION_2024",
-    // SRD 5.2 p. 48. 2014 keeps a plain ASI at 19 instead (already covered by
-    // the edition-invariant ASI-level table, not a ClassFeature row). The
-    // feat system itself is deferred — text only.
+    // SRD 5.2 p. 48. Text only — feat system deferred. 2014 keeps a plain ASI
+    // at 19 instead.
     description: "You gain an Epic Boon feat of your choice (Boon of Combat Prowess recommended). You can take this feat only once.",
   },
   {
@@ -438,27 +320,12 @@ const FIGHTER_BASE_RAW: RawFighterFeature[] = [
     level: 20,
     edition: "EDITION_2024",
     description: "You can attack four times whenever you take the Attack action on your turn.",
-    // NULL for the same reason as Two Extra Attacks above: no such axis on
-    // THIS row — the L5 Extra Attack row's derivedStatTiers already carries
-    // level 20's value.
+    // No derivedStat here — the L5 Extra Attack row's derivedStatTiers
+    // already carries level 20's value.
   },
 ];
 
-// ---- Champion — SRD 5.1 p. 25 (2014) / SRD 5.2 p. 49 (2024) ---------------
-// Remarkable Athlete / Additional Fighting Style / Heroic Warrior / Survivor
-// have NO SUCH AXIS (passive text with no roll/pool/action this app
-// computes) and leave every descriptor column NULL. Improved Critical /
-// Superior Critical are #1120: crit range is edition-invariant (identical
-// level AND threshold in both editions, verified against both source docs),
-// so both rows carry the SAME derivedStat/derivedStatTiers regardless of
-// `edition` — only their TEXT forks (2024 additionally covers Unarmed
-// Strikes). Both tiers ride the "Improved Critical" row's own
-// derivedStatTiers (minLevel 3 -> 19, minLevel 15 -> 18); "Superior Critical"
-// stays text-only, the same shape "Improved Combat Superiority (d10)/(d12)"
-// use below for their own die-size bump — a second row on this axis would
-// need deriveCritRange to take a cross-row MIN rather than
-// deriveAttacksPerAction's MAX, which one row's own last-match-wins tier
-// array already resolves without any cross-row aggregation.
+// Champion — SRD 5.1 p. 25 (2014) / SRD 5.2 p. 49 (2024)
 const CHAMPION_SLUG = slug("fighter-champion");
 const CRIT_RANGE_TIERS = [
   { minLevel: 3, value: 19 },
@@ -479,9 +346,8 @@ const CHAMPION_RAW: RawFighterFeature[] = [
     name: "Improved Critical",
     level: 3,
     edition: "EDITION_2024",
-    // SRD 5.2 p. 49: extends the crit range to Unarmed Strikes too. Crit
-    // RANGE itself is an edition-invariant derivedStat axis (#1120) — text
-    // forks, mechanics don't.
+    // SRD 5.2 p. 49: extends crit range to Unarmed Strikes too; the
+    // derivedStat itself is edition-invariant.
     description: "Your weapon attacks and Unarmed Strikes score a critical hit on a roll of 19 or 20.",
     derivedStat: "critRange",
     derivedStatTiers: CRIT_RANGE_TIERS,
@@ -499,11 +365,8 @@ const CHAMPION_RAW: RawFighterFeature[] = [
     name: "Remarkable Athlete",
     level: 3,
     edition: "EDITION_2024",
-    // SRD 5.2 p. 49: level-shifts 7 -> 3 AND is a full rewrite (Initiative +
-    // Athletics advantage, post-crit half-Speed move) — a wholly different
-    // mechanic under the same name, not an edit of the 2014 row (which stays
-    // at L7, untouched). #1124's half-proficiency implementation is the 2014
-    // row's mechanics, not a 2024 gap.
+    // SRD 5.2 p. 49: level-shifts 7 -> 3 and is a full rewrite (Initiative +
+    // Athletics advantage, post-crit move), not an edit of the 2014 row.
     description:
       "You have Advantage on Initiative rolls and Strength (Athletics) checks. Immediately after you score a Critical Hit, you can move up to half your Speed without provoking Opportunity Attacks.",
   },
@@ -519,8 +382,8 @@ const CHAMPION_RAW: RawFighterFeature[] = [
     name: "Additional Fighting Style",
     level: 7,
     edition: "EDITION_2024",
-    // SRD 5.2 p. 49: level-shifts 10 -> 7; grants another Fighting Style FEAT
-    // (base's #1137 feat-partition, not a class-feature menu option).
+    // SRD 5.2 p. 49: level-shifts 10 -> 7; grants another Fighting Style feat
+    // (not a class-feature menu option).
     description: "You gain another Fighting Style feat of your choice.",
   },
   {
@@ -558,45 +421,20 @@ const CHAMPION_RAW: RawFighterFeature[] = [
     name: "Survivor",
     level: 18,
     edition: "EDITION_2024",
-    // SRD 5.2 p. 49: two named benefits. Defy Death's 18-20 COUNTS AS a 20
-    // outright (not merely advantage); Heroic Rally requires Bloodied AND >=1
-    // HP — the same threshold the 2014 row states as "no more than half your
-    // hit points left", pre-Bloodied vocabulary.
+    // SRD 5.2 p. 49: Defy Death's 18-20 counts as a 20 outright (not merely
+    // advantage).
     description:
       "Defy Death: you have Advantage on Death Saving Throws, and rolling 18-20 on one counts as a 20 outright. Heroic Rally: at the start of each of your turns, regain Hit Points equal to 5 plus your Constitution modifier while you are Bloodied and have at least 1 Hit Point.",
   },
 ];
 
-// ---- Battle Master — PHB'24 (mirror-sourced; not in SRD 5.2 — the subclass ---
-// ---- appears in neither SRD). 2014: SRD 5.1 p. 25. -------------------------
+// Battle Master — PHB'24 (mirror-sourced; not in SRD 5.2). 2014: SRD 5.1 p. 25.
 // Mirrors: dnd2024.wikidot.com/fighter:battle-master and Roll20's licensed
-// compendium agree verbatim; no first-party SRD text exists for this
-// subclass in either edition, so it is never cited as "SRD 5.2".
-// #1546 Part B: Combat Superiority and Student of War are DONE now — the
-// superiority-dice pool (resourceKey/resourceTotals/resourceDieTiers), the
-// maneuver-choice count (derivedStat/derivedStatTiers), the tool-choice count
-// (Student of War's own derivedStat/derivedStatTiers), and the maneuver save
-// DC (saveDcAbilities, resolved by lib/srd/announced-save-dc.ts) are all row
-// data — the "no tier array expresses a computed DC" blocker Finding 2
-// disproved: the OLD resourceFn's pool description was a computed string
-// embedding the DC, but that string is dead (nothing renders
-// ResourcePool.description — the wire DC comes from the #1316
-// `maneuvers.saveDC` rider instead), so the row's own authored `description`
-// text (below) simply replaces it, and the DC itself moved to a dedicated
-// column + resolver rather than a tier. Know Your Enemy / Improved Combat
-// Superiority / Relentless / Ultimate Combat Superiority still have NO SUCH
-// AXIS (passive text/proficiency grants with no clickable action this app
-// dispatches — maneuvers themselves are their own GrantedAbility catalog,
-// castManeuver/maneuvers.ts, not ClassFeature rows at all).
+// compendium agree verbatim.
 const BATTLE_MASTER_SLUG = slug("fighter-battle-master");
 
-// #1546 Part B: dice 4/5/6 @ L3/7/15, die d8/d10/d12 @ L3/10/18, maneuvers
-// known 3/5/7/9 @ L3/7/10/15, DC 8 + PB + max(Str, Dex) — edition-invariant
-// (PHB'14 p.73), byte-identical between the 2014 and 2024 Combat Superiority
-// rows; only each row's TEXT forks (transcribed from a different document —
-// CLAUDE.md's ACTIONS precedent). Extracted to one object spread into both
-// rows below rather than authored twice — a fallow duplication finding on two
-// literal copies of this exact block, not a suppression.
+// PHB'14 p.73: edition-invariant mechanics — extracted to one object spread
+// into both rows below rather than authored twice.
 const COMBAT_SUPERIORITY_MECHANICS: Pick<
   RawFighterFeature,
   "resourceKey" | "resourceLabel" | "resourceRecharge" | "resourceTotals" | "resourceDieTiers" | "derivedStat" | "derivedStatTiers" | "saveDcAbilities"
@@ -640,12 +478,7 @@ const BATTLE_MASTER_RAW: RawFighterFeature[] = [
     level: 3,
     edition: "EDITION_2024",
     // PHB'24 (mirror-sourced; not in SRD 5.2). No numeric change from 2014 —
-    // 4/5/6 dice at L3/7/15, d8 base, all restored on a short or long rest,
-    // maneuvers known 3/5/7/9 at L3/7/10/15, DC 8 + PB + max(Str, Dex) — only
-    // the maneuver CATALOG changed (out of scope, #1138-adjacent). Still
-    // authored as its own 2024 row: the text is transcribed from a different
-    // document than the 2014 row (mirror vs SRD 5.1), which forks even where
-    // the mechanics agree (CLAUDE.md's ACTIONS precedent).
+    // only the maneuver catalog changed (out of scope).
     description:
       "You learn maneuvers fueled by Superiority Dice. You have 4 d8s (5 at level 7, 6 at level 15), and you know 3 maneuvers (5 at level 7, 7 at level 10, 9 at level 15). The save DC for a maneuver that requires one equals 8 + your Proficiency Bonus + your Strength or Dexterity modifier. You regain all expended dice on a short or long rest.",
     ...COMBAT_SUPERIORITY_MECHANICS,
@@ -656,7 +489,7 @@ const BATTLE_MASTER_RAW: RawFighterFeature[] = [
     level: 3,
     edition: "EDITION_2014",
     description: "You gain proficiency with one type of artisan's tools of your choice.",
-    // #1546 Part B: flat 1 from L3 (the subclass grant level), edition-invariant.
+    // Flat 1 from L3 (the subclass grant level), edition-invariant.
     derivedStat: "toolProfChoiceCount",
     derivedStatTiers: [{ minLevel: 3, value: 1 }],
   },
@@ -665,10 +498,8 @@ const BATTLE_MASTER_RAW: RawFighterFeature[] = [
     name: "Student of War",
     level: 3,
     edition: "EDITION_2024",
-    // PHB'24 (mirror-sourced; not in SRD 5.2). Adds a skill choice from the
-    // Fighter's level-1 list, which gained Persuasion in 2024 (SRD 5.2 p.
-    // 47). The skill grant's mechanics (a second choice-count) are out of
-    // scope — text row only.
+    // PHB'24 (mirror-sourced; not in SRD 5.2). Adds a skill choice; that
+    // grant's mechanics are out of scope here.
     description:
       "You gain proficiency with one type of artisan's tools of your choice, and you gain proficiency in one skill of your choice from the Fighter's level 1 skill list.",
     derivedStat: "toolProfChoiceCount",
@@ -688,9 +519,7 @@ const BATTLE_MASTER_RAW: RawFighterFeature[] = [
     level: 7,
     edition: "EDITION_2024",
     // PHB'24 (mirror-sourced; not in SRD 5.2). Total rewrite at the same
-    // level: a Bonus Action, ranged, in-combat-usable probe with a
-    // once-per-Long-Rest cap (restorable by spending a Superiority Die),
-    // replacing 2014's uncapped 1-minute out-of-combat comparison.
+    // level.
     description:
       "As a Bonus Action, choose a creature you can see within 30 feet of yourself and learn whether it has any damage Immunities, Resistances, or Vulnerabilities, and what they are if any. You can use this feature once, and you regain your use of it when you finish a Long Rest or when you expend a Superiority Die to restore it (no action required).",
   },
@@ -706,9 +535,8 @@ const BATTLE_MASTER_RAW: RawFighterFeature[] = [
     name: "Improved Combat Superiority (d10)",
     level: 10,
     edition: "EDITION_2024",
-    // PHB'24 (mirror-sourced; not in SRD 5.2). Unchanged name and level from
-    // the 2014 row (2024 splits the d12 step out to its own L18 feature
-    // instead — see Ultimate Combat Superiority below).
+    // PHB'24 (mirror-sourced; not in SRD 5.2). Unchanged from 2014; the d12
+    // step splits into its own L18 feature below.
     description: "Your Superiority Dice turn into d10s.",
   },
   {
@@ -723,11 +551,9 @@ const BATTLE_MASTER_RAW: RawFighterFeature[] = [
     name: "Relentless",
     level: 15,
     edition: "EDITION_2024",
-    // PHB'24 (mirror-sourced; not in SRD 5.2). Total rewrite: a once-per-turn
-    // maneuver-cost substitute (flat 1d8, regardless of current Superiority
-    // Die size) replacing 2014's initiative-triggered refund. The spend-path
-    // behavior change (castManeuver's cost path) is a follow-up — text only
-    // here.
+    // PHB'24 (mirror-sourced; not in SRD 5.2). Total rewrite: once-per-turn
+    // maneuver-cost substitute, not 2014's initiative-triggered refund. Text
+    // only.
     description:
       "Once per turn when you use a maneuver, you can roll 1d8 and use the number rolled instead of expending a Superiority Die.",
   },
@@ -743,42 +569,16 @@ const BATTLE_MASTER_RAW: RawFighterFeature[] = [
     name: "Ultimate Combat Superiority",
     level: 18,
     edition: "EDITION_2024",
-    // PHB'24 (mirror-sourced; not in SRD 5.2). Renamed from the 2014 row's
-    // "Improved Combat Superiority (d12)" — a DIFFERENT name at the same
-    // level, so this does not pair with the 2014 row as a same-name fork (the
-    // migration test's KNOWN_FORKED_NAMES check never sees it; the edition-
-    // tagged-feature ledger doesn't either — see feature-edition.test.ts's
-    // comment on this exact row). PHB'14 folds this d12 step into its L10
-    // feature's own text rather than a separate L18 feature; today's 2014
-    // rows split it — left as-is on purpose (#1227: changing it would break
-    // "2014 serializes identically").
+    // PHB'24 (mirror-sourced; not in SRD 5.2). Renamed from 2014's "Improved
+    // Combat Superiority (d12)" — a different name at the same level, so it
+    // does not pair as a same-name fork in KNOWN_FORKED_NAMES.
     description: "Your Superiority Dice turn into d12s.",
   },
 ];
 
-// ---- Eldritch Knight — TEXT still PARKED; third-caster identity SHIPPED (#1531) --
-// Research could not verify PHB'24's Eldritch Knight text against any
-// first-party source (unlike Battle Master, no independent mirrors agreed).
-// Authoring unverified text as "real 2024 content" is exactly the failure
-// #1227 exists to end, so no EDITION_2024-tagged row is authored here — every
-// row below is UNTAGGED (`edition` omitted), meaning expand() seeds the SAME
-// (byte-identical, from fighter.ts's old ELDRITCH_KNIGHT_FEATURES) text for
-// both editions. This is the one Fighter subclass EDITIONS_STILL_IDENTICAL's
-// removal comment (seed-class-features.ts) discloses as a residual — do not
-// read Fighter's removal from that ratchet as "all of Fighter's 2024 text is
-// verified". #1531's arbiter pre-flight ruled that authoring EK's real 2024
-// text and populating its OTHER FIVE rows' descriptor columns (Weapon Bond,
-// War Magic, Eldritch Strike, Arcane Charge, Improved War Magic — all still
-// NOT DONE YET, not NO SUCH AXIS: their on-hit riders and bonus-action
-// triggers plausibly need real resource/activation/effect columns) stays
-// PARKED for a future issue with a citable source; #1531 does not author
-// either here. What #1531 DID ship: the third-caster identity mechanic
-// itself moved off a lowercase-name-keyed lookup (THIRD_CASTER_SUBCLASSES,
-// spellcasting-tables.ts — the last one in lib/srd/, #1339's failure shape)
-// onto this subclass's own catalog row (Subclass.casterFraction /
-// .spellcastingAbility, seeded "third" / "intelligence" in subclasses.ts) —
-// see the "Eldritch Knight Spellcasting" row below for the resulting axis
-// distinction on ITS OWN descriptor columns.
+// Eldritch Knight — text unverified against any first-party 2024 source;
+// every row below is UNTAGGED (`edition` omitted per the EDITION RULE) rather
+// than authoring unverified 2024 content.
 const ELDRITCH_KNIGHT_SLUG = slug("fighter-eldritch-knight");
 const ELDRITCH_KNIGHT_RAW: RawFighterFeature[] = [
   {
@@ -787,14 +587,9 @@ const ELDRITCH_KNIGHT_RAW: RawFighterFeature[] = [
     level: 3,
     description:
       "You learn spells from the wizard list (primarily abjuration and evocation), casting with Intelligence. Third-caster progression: spell slots start at level 3. You know cantrips and a limited number of spells.",
-    // Unlike the other five EK rows below (still NOT DONE YET — real content
-    // debt), this ONE row's descriptor columns are NO SUCH AXIS (#1531): the
-    // mechanic this feature grants — third-caster fraction + spellcasting
-    // ability — is entirely carried by the Subclass row's own
-    // casterFraction/spellcastingAbility columns (subclasses.ts), read
-    // through deriveSpellcasting/derivePreparedSpellLimit/etc.
-    // (spellcasting-tables.ts), not a resource/activation/effect descriptor
-    // on THIS row. There is nothing here for a future pass to populate.
+    // No descriptor columns here — third-caster fraction + spellcasting
+    // ability are carried by Subclass.casterFraction/spellcastingAbility
+    // (subclasses.ts), not this row.
   },
   {
     subclassSlug: ELDRITCH_KNIGHT_SLUG,

@@ -1,15 +1,4 @@
-// #1223: Barbarian's EDITION_2014 rows must be byte-identical transcriptions
-// of what lib/classes/barbarian.ts's BARBARIAN_FEATURES/TOTEM_WARRIOR_FEATURES/
-// BERSERKER_FEATURES said BEFORE this migration — 2014 is a supported edition,
-// not a rewrite target. This snapshot is that pre-change text, pinned by hand
-// from the tree at the commit before #1223 landed, NOT re-derived from
-// anything this migration touches — a hardcoded oracle is the whole point,
-// mirroring fighter-2014-snapshot.test.ts's shape.
-//
-// This is a GUARD, not a red/green cycle: it is green on first run by
-// construction (BARBARIAN_FEATURES is authored as a byte-identical copy in
-// the same commit that adds this file). Its job is to catch commit 2 (#1223)
-// silently editing a 2014 row while authoring 2024 content.
+// This snapshot must stay green and unedited — its job is to catch a later commit silently editing a 2014 row while authoring 2024 content.
 import { describe, expect, it } from "vitest";
 
 import { BARBARIAN_FEATURES } from "../barbarian-features.js";
@@ -22,7 +11,6 @@ interface Pinned {
 }
 
 const PRE_CHANGE_2014: Pinned[] = [
-  // ---- Base class ------------------------------------------------------
   {
     subclassSlug: null,
     name: "Rage",
@@ -100,7 +88,6 @@ const PRE_CHANGE_2014: Pinned[] = [
     level: 20,
     description: "Your Strength and Constitution scores each increase by 4, and their maximums become 24.",
   },
-  // ---- Path of the Totem Warrior ----------------------------------------
   {
     subclassSlug: "barbarian-totem-warrior",
     name: "Spirit Seeker",
@@ -134,7 +121,6 @@ const PRE_CHANGE_2014: Pinned[] = [
     description:
       "Gain a benefit from a third totem animal while raging. Bear: threatening presence — enemies within 5 ft have disadvantage on attacks against non-you targets. Eagle: fly speed equal to walking speed. Wolf: knock prone when you hit with melee attack as a bonus action.",
   },
-  // ---- Path of the Berserker ---------------------------------------------
   {
     subclassSlug: "barbarian-berserker",
     name: "Frenzy",

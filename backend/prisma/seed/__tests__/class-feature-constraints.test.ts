@@ -1,13 +1,4 @@
-// DB-backed proof for #1523's NULLS NOT DISTINCT clause on
-// ClassFeature(classId, subclassId, name, edition) — hand-written because
-// Prisma's DSL cannot express it (20260730120000_add_class_feature).
-//
-// Unlike catalog-edition-constraints.test.ts's Feat/GrantedAbility proofs
-// (where `edition` is the nullable column NULLS NOT DISTINCT protects),
-// ClassFeature's `edition` is NON-NULLABLE — every row forks (#1522 decision).
-// The nullable column here is `subclassId` (NULL = base-class feature, the
-// MAJORITY of the 522 rows), so this file's probe is a same-(class, NULL
-// subclass, name, edition) duplicate, not a same-name/null-edition one.
+// ClassFeature.edition is NON-NULLABLE (#1522) — the nullable column NULLS NOT DISTINCT protects here is subclassId (NULL = base-class feature).
 import { afterEach, describe, expect, it } from "vitest";
 
 import { Prisma } from "@/generated/prisma/client.js";

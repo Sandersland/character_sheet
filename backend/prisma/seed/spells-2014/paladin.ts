@@ -1,74 +1,8 @@
-// PHB'14 (2014) Paladin spell list — content slice of epic #1517 (#1720).
-// Per the epic's row-ownership rule (tie-break Wizard > Cleric > Druid > Bard >
-// Sorcerer > Warlock > Paladin > Ranger), Paladin is 7th priority (2nd-to-last)
-// — this file authors only the spells where NO higher-priority class (Wizard,
-// Cleric, Druid, Bard, Sorcerer, Warlock) is also on the PHB'14 list.
-//
-// Source: dnd5eapi.co's 2014 spell set (/api/2014/classes/paladin/spells, which
-// enumerates 31 spells) plus a manual sweep for real PHB'14 Paladin spells that
-// dataset omits entirely (the same gap class prior slices found — Warlock's
-// Hex/Armor of Agathys/Arms of Hadar/Hunger of Hadar, Sorcerer's Witch Bolt):
-//   - Of the 31 in dnd5eapi's list, 28 sit on 2+ class lists with a
-//     higher-priority owner and are ALREADY authored + membership-tagged
-//     "paladin" in shared.ts/cleric.ts/bard.ts/wizard.ts — individually
-//     verified below, zero edits needed to any of those four files for this
-//     slice: Bless, Command, Detect Evil and Good, Shield of Faith, Aid,
-//     Revivify, Death Ward, Dispel Evil and Good (cleric.ts); Cure Wounds,
-//     Detect Magic, Detect Poison and Disease, Protection from Evil and Good,
-//     Purify Food and Drink, Lesser Restoration, Locate Object, Protection
-//     from Poison, Zone of Truth, Create Food and Water, Daylight, Dispel
-//     Magic, Magic Circle, Remove Curse, Banishment, Locate Creature, Geas,
-//     Raise Dead (shared.ts); Heroism (bard.ts); Magic Weapon (wizard.ts).
-//   - The remaining 3 of the 31 (Divine Favor, Find Steed, Branding Smite)
-//     are genuinely Paladin-only and authored below.
-//
-// Beyond the API's 31, a manual sweep (cross-checked class-list membership
-// per spell via roll20.net's compendium redirect, which routes each spell to
-// the exact sourcebook bundle required to unlock it — Player's Handbook vs.
-// Xanathar's/Tasha's/SCAG/UA — and independently via dnd5e.wikidot.com's own
-// "Spell Lists" line, which tags a later book's class-list ADDITION as
-// "(Optional)") found 12 more real PHB'14 Paladin-only spells absent from
-// dnd5eapi's dataset entirely: Compelled Duel, Searing Smite, Thunderous
-// Smite, Wrathful Smite (all 1st level); Aura of Vitality, Blinding Smite,
-// Crusader's Mantle, Elemental Weapon (all 3rd level); Aura of Purity,
-// Staggering Smite (4th level); Banishing Smite, Circle of Power, Destructive
-// Wave (5th level) — 13, not 12; see the per-row citations below.
-//
-// Two spells this sweep considered and REJECTED as out-of-scope (2014-real but
-// not PHB'14-core): Ceremony (roll20 redirects to the Xanathar's Guide to
-// Everything bundle, not Player's Handbook) and, initially suspected but
-// disproven, Compelled Duel itself (roll20 AND D&D Beyond both redirect it to
-// the Player's Handbook bundle — it reads as an Oath of the Crown "oath spell"
-// in SCAG, but the spell itself, like Bane on the Oath of Vengeance list, was
-// always on Paladin's general PHB'14 list; SCAG only made it auto-prepared for
-// that oath). Aura of Vitality/Aura of Purity's apparent Cleric/Druid access
-// (5e-spellbook.app lists "Cleric, Druid, Paladin" for 2014) is likewise a
-// later-book ADDITION — dnd5e.wikidot.com's own per-spell page tags Cleric and
-// Druid "(Optional)" there, i.e. a Tasha's Cauldron of Everything optional
-// expanded-list grant, not core 2014 access — so both stay Paladin-only rows.
-// Elemental Weapon similarly shows Druid/Ranger access tagged "(Optional)" and
-// Artificer (a class that didn't exist in 2014) — core 2014 access is
-// Paladin-only.
-//
-// Net: 16 rows owned here (3 API-derived: Divine Favor, Find Steed, Branding
-// Smite; 13 hand-transcribed, each cross-checked word-for-word against a
-// second source beyond the primary source used — 5e-spellbook.app, which
-// publishes 2014-vs-2024 diffed spell text — namely dnd5e.wikidot.com), 44
-// total PHB'14 Paladin spells across all authoring files (28 shared/other-
-// class-owned + 16 owned here — see spells-2014-paladin-data.test.ts for the
-// permanent membership-completeness guard). Paladin is a half-caster capped at
-// 5th-level spells in PHB'14 (spells of level 6-9 don't exist on this list),
-// and has no cantrips.
 import type { CatalogSpell } from "../spells.js";
 
 export const PALADIN_SPELLS_2014: CatalogSpell[] = [
-  // ── Level 0 — none (Paladin has no PHB'14 cantrips) ──
-  // ── Level 1 ────────────────────────────────────────────────────────────
-  // PHB'14 p. 234. dnd5eapi-derived (paladin-only in its own classes[]). A
-  // per-hit RIDER on the caster's own future weapon attacks for the spell's
-  // duration, not a direct spell-cast damage instance — same shape as Hex
-  // (warlock.ts) — so no effectKind/attackType is set; documented as a
-  // conditional/multi-effect exception in this slice's data test.
+  // Level 0: none (Paladin has no PHB'14 cantrips).
+  // PHB'14 p. 234.
   {
     name: "Divine Favor",
     level: 1,
@@ -82,12 +16,7 @@ export const PALADIN_SPELLS_2014: CatalogSpell[] = [
     classes: ["paladin"],
     components: { verbal: true, somatic: true, material: false },
   },
-  // PHB'14 p. 224. Not in dnd5eapi/open5e's dataset. Cross-checked
-  // word-for-word against a second source (dnd5e.wikidot.com/spell:compelled-
-  // duel), which corroborates 5e-spellbook.app's 2014-edition text exactly.
-  // Genuinely a save-gated non-damage effect (Wisdom save controls whether
-  // the target is compelled at all) — same shape as Command (cleric.ts):
-  // attackType "save" + saveAbility, no effectKind.
+  // PHB'14 p. 224.
   {
     name: "Compelled Duel",
     level: 1,
@@ -103,17 +32,7 @@ export const PALADIN_SPELLS_2014: CatalogSpell[] = [
     attackType: "save",
     saveAbility: "wisdom",
   },
-  // PHB'14 p. 274. Not in dnd5eapi/open5e's dataset. Cross-checked
-  // word-for-word against a second source (dnd5e.wikidot.com/spell:searing-
-  // smite), which corroborates 5e-spellbook.app's 2014-edition text exactly,
-  // including the +1d6-per-upcast-level clause. The initial hit's damage is
-  // unconditional (a per-hit rider, not a direct spell-cast instance); the
-  // ongoing burn is a SEPARATE Constitution save each turn — a genuine
-  // multi-effect shape (like Hunger of Hadar, warlock.ts) — so no
-  // effectKind/attackType is set; documented as a conditional/multi-effect
-  // exception in this slice's data test. dnd5e.wikidot.com also notes an
-  // "(Optional)" Ranger access (a later-book addition) not present in 2014
-  // core, so this row stays Paladin-only.
+  // PHB'14 p. 274.
   {
     name: "Searing Smite",
     level: 1,
@@ -127,13 +46,7 @@ export const PALADIN_SPELLS_2014: CatalogSpell[] = [
     classes: ["paladin"],
     components: { verbal: true, somatic: false, material: false },
   },
-  // PHB'14 p. 282. Not in dnd5eapi/open5e's dataset. Cross-checked
-  // word-for-word against a second source (dnd5e.wikidot.com/spell:
-  // thunderous-smite), which corroborates 5e-spellbook.app's 2014-edition
-  // text exactly; neither source carries an "At Higher Levels" clause. The
-  // damage is unconditional on hit; the Strength save only gates the
-  // separate push/prone rider — a multi-effect shape, no effectKind/
-  // attackType; documented as a conditional/multi-effect exception.
+  // PHB'14 p. 282.
   {
     name: "Thunderous Smite",
     level: 1,
@@ -147,13 +60,7 @@ export const PALADIN_SPELLS_2014: CatalogSpell[] = [
     classes: ["paladin"],
     components: { verbal: true, somatic: false, material: false },
   },
-  // PHB'14 p. 289. Not in dnd5eapi/open5e's dataset. Cross-checked
-  // word-for-word against a second source (dnd5e.wikidot.com/spell:wrathful-
-  // smite), which corroborates 5e-spellbook.app's 2014-edition text exactly;
-  // neither source carries an "At Higher Levels" clause. The damage is
-  // unconditional; the Wisdom save only gates the separate fear rider — a
-  // multi-effect shape, no effectKind/attackType; documented as a
-  // conditional/multi-effect exception.
+  // PHB'14 p. 289.
   {
     name: "Wrathful Smite",
     level: 1,
@@ -167,12 +74,7 @@ export const PALADIN_SPELLS_2014: CatalogSpell[] = [
     classes: ["paladin"],
     components: { verbal: true, somatic: false, material: false },
   },
-  // ── Level 2 ────────────────────────────────────────────────────────────
-  // PHB'14 p. 240. dnd5eapi-derived (paladin-only in its own classes[]).
-  // higher_level: [] confirmed by the API — a purely instantaneous summon,
-  // no upcast clause, no damage/save at all. The API's own text genericizes
-  // "DM" to "GM" (the same cross-system scraping artifact prior slices'
-  // guards catch) — corrected back to "DM" here, matching real PHB'14 text.
+  // PHB'14 p. 240.
   {
     name: "Find Steed",
     level: 2,
@@ -185,13 +87,7 @@ export const PALADIN_SPELLS_2014: CatalogSpell[] = [
     classes: ["paladin"],
     components: { verbal: true, somatic: true, material: false },
   },
-  // PHB'14 p. 220. dnd5eapi-derived (paladin-only in its own classes[]);
-  // cross-checked against a second source (dnd5e.wikidot.com/spell:branding-
-  // smite), which corroborates the API's text and upcast clause exactly. A
-  // per-hit rider (no effectKind/attackType), same reasoning as Divine Favor
-  // above; documented as a conditional/multi-effect exception (the "extra
-  // 2d6 radiant damage" phrase would otherwise trip the prose-vs-field
-  // audit's damage-phrase check).
+  // PHB'14 p. 220.
   {
     name: "Branding Smite",
     level: 2,
@@ -205,19 +101,7 @@ export const PALADIN_SPELLS_2014: CatalogSpell[] = [
     classes: ["paladin"],
     components: { verbal: true, somatic: false, material: false },
   },
-  // ── Level 3 ────────────────────────────────────────────────────────────
-  // PHB'14 p. 216. Not in dnd5eapi/open5e's dataset. Cross-checked
-  // word-for-word against a second source (dnd5e.wikidot.com/spell:aura-of-
-  // vitality), which corroborates 5e-spellbook.app's 2014-edition text
-  // exactly. dnd5e.wikidot.com tags this spell's Cleric AND Druid access
-  // "(Optional)" — a Tasha's Cauldron of Everything expanded-list addition,
-  // not 2014 core — so core 2014 access is Paladin-only, confirmed via
-  // roll20.net's compendium redirect to the Player's Handbook bundle (not
-  // SCAG, despite this spell's associaton with the SCAG-introduced Oath of
-  // the Crown's oath-spell list — same "already on the general list, oath
-  // just auto-prepares it" shape as Compelled Duel above). A repeatable
-  // per-turn bonus-action heal trigger, not a single cast-time roll — no
-  // effectKind (matches Aid's "inexpressible as a dice heal" precedent).
+  // PHB'14 p. 216.
   {
     name: "Aura of Vitality",
     level: 3,
@@ -231,14 +115,7 @@ export const PALADIN_SPELLS_2014: CatalogSpell[] = [
     classes: ["paladin"],
     components: { verbal: true, somatic: false, material: false },
   },
-  // PHB'14 p. 219. Not in dnd5eapi/open5e's dataset. Cross-checked
-  // word-for-word against a second source (dnd5e.wikidot.com/spell:blinding-
-  // smite), which corroborates 5e-spellbook.app's 2014-edition text exactly;
-  // neither source carries an "At Higher Levels" clause. Damage is
-  // unconditional; the Constitution save only gates the separate blind
-  // rider (with its own repeated end-of-turn save) — multi-effect shape, no
-  // effectKind/attackType; documented as a conditional/multi-effect
-  // exception.
+  // PHB'14 p. 219.
   {
     name: "Blinding Smite",
     level: 3,
@@ -252,13 +129,7 @@ export const PALADIN_SPELLS_2014: CatalogSpell[] = [
     classes: ["paladin"],
     components: { verbal: true, somatic: false, material: false },
   },
-  // PHB'14 p. 230. Not in dnd5eapi/open5e's dataset. Cross-checked
-  // word-for-word against a second source (dnd5e.wikidot.com/spell:
-  // crusaders-mantle), which corroborates 5e-spellbook.app's 2014-edition
-  // text exactly. A per-hit rider on every non-hostile creature's future
-  // attacks for the duration (same shape as Divine Favor above), no
-  // effectKind/attackType; documented as a conditional/multi-effect
-  // exception.
+  // PHB'14 p. 230.
   {
     name: "Crusader's Mantle",
     level: 3,
@@ -272,17 +143,7 @@ export const PALADIN_SPELLS_2014: CatalogSpell[] = [
     classes: ["paladin"],
     components: { verbal: true, somatic: false, material: false },
   },
-  // PHB'14 p. 237. Not in dnd5eapi/open5e's dataset. Cross-checked
-  // word-for-word against a second source (dnd5e.wikidot.com/spell:
-  // elemental-weapon), which corroborates 5e-spellbook.app's 2014-edition
-  // text exactly, including the +2/2d4 (5th-6th slot) and +3/3d4 (7th+ slot)
-  // upcast tiers. dnd5e.wikidot.com tags Druid and Ranger access
-  // "(Optional)" and lists Artificer (a class that didn't exist in 2014) —
-  // core 2014 access is Paladin-only. A weapon-enchantment buff, not a
-  // direct damage roll — no effectKind, same shape as Magic Weapon
-  // (wizard.ts); documented as a conditional/multi-effect exception (the
-  // "extra 1d4 damage" phrase would otherwise trip the prose-vs-field
-  // audit's damage-phrase check).
+  // PHB'14 p. 237.
   {
     name: "Elemental Weapon",
     level: 3,
@@ -296,18 +157,7 @@ export const PALADIN_SPELLS_2014: CatalogSpell[] = [
     classes: ["paladin"],
     components: { verbal: true, somatic: true, material: false },
   },
-  // ── Level 4 ────────────────────────────────────────────────────────────
-  // PHB'14 p. 216. Not in dnd5eapi/open5e's dataset. Cross-checked
-  // word-for-word against a second source (dnd5e.wikidot.com/spell:aura-of-
-  // purity), which corroborates 5e-spellbook.app's 2014-edition text
-  // exactly. dnd5e.wikidot.com tags this spell's Cleric access "(Optional)"
-  // — a Tasha's Cauldron of Everything addition, not 2014 core — so core
-  // 2014 access is Paladin-only. A pure defensive utility aura (no dice, no
-  // save the caster's target makes) — no effectKind/attackType; documented
-  // as a conditional/multi-effect exception (the aura grants OTHER
-  // creatures advantage on THEIR OWN future saving throws — the prose-vs-
-  // field audit's "saving throw" check would otherwise misflag this as a
-  // missing attackType:"save").
+  // PHB'14 p. 216.
   {
     name: "Aura of Purity",
     level: 4,
@@ -321,13 +171,7 @@ export const PALADIN_SPELLS_2014: CatalogSpell[] = [
     classes: ["paladin"],
     components: { verbal: true, somatic: false, material: false },
   },
-  // PHB'14 p. 278. Not in dnd5eapi/open5e's dataset. Cross-checked
-  // word-for-word against a second source (dnd5e.wikidot.com/spell:
-  // staggering-smite), which corroborates 5e-spellbook.app's 2014-edition
-  // text exactly; neither source carries an "At Higher Levels" clause.
-  // Damage is unconditional; the Wisdom save only gates the separate
-  // disadvantage/no-reactions rider — multi-effect shape, no effectKind/
-  // attackType; documented as a conditional/multi-effect exception.
+  // PHB'14 p. 278.
   {
     name: "Staggering Smite",
     level: 4,
@@ -341,17 +185,7 @@ export const PALADIN_SPELLS_2014: CatalogSpell[] = [
     classes: ["paladin"],
     components: { verbal: true, somatic: false, material: false },
   },
-  // ── Level 5 ────────────────────────────────────────────────────────────
-  // PHB'14 p. 218. Not in dnd5eapi/open5e's dataset. Cross-checked
-  // word-for-word against a second source (dnd5e.wikidot.com/spell:
-  // banishing-smite), which corroborates 5e-spellbook.app's 2014-edition
-  // text exactly (the wikidot copy has an "of fewer" typo for "or fewer" —
-  // this row uses the grammatically-correct "or fewer" both sources
-  // otherwise agree on). Damage is unconditional; the banish is conditional
-  // on a raw HP threshold, not a saving throw at all — no effectKind/
-  // attackType; documented as a conditional/multi-effect exception (the
-  // "extra 5d10 force damage" phrase would otherwise trip the prose-vs-
-  // field audit's damage-phrase check).
+  // PHB'14 p. 218.
   {
     name: "Banishing Smite",
     level: 5,
@@ -365,15 +199,7 @@ export const PALADIN_SPELLS_2014: CatalogSpell[] = [
     classes: ["paladin"],
     components: { verbal: true, somatic: false, material: false },
   },
-  // PHB'14 p. 221. Not in dnd5eapi/open5e's dataset. Cross-checked
-  // word-for-word against a second source (dnd5e.wikidot.com/spell:circle-
-  // of-power), which corroborates 5e-spellbook.app's 2014-edition text
-  // exactly (the wikidot copy has a "saving throws" plural typo at the very
-  // end for "saving throw" — this row uses the grammatically-correct
-  // singular both sources otherwise agree on). A pure defensive utility
-  // aura — no effectKind/attackType; documented as a conditional/multi-
-  // effect exception (grants OTHERS advantage on THEIR OWN future saves,
-  // same reasoning as Aura of Purity above).
+  // PHB'14 p. 221.
   {
     name: "Circle of Power",
     level: 5,
@@ -387,16 +213,7 @@ export const PALADIN_SPELLS_2014: CatalogSpell[] = [
     classes: ["paladin"],
     components: { verbal: true, somatic: false, material: false },
   },
-  // PHB'14 p. 231. Not in dnd5eapi/open5e's dataset. Cross-checked
-  // word-for-word against a second source (dnd5e.wikidot.com/spell:
-  // destructive-wave), which corroborates 5e-spellbook.app's 2014-edition
-  // text exactly; neither source carries an "At Higher Levels" clause.
-  // Genuinely TWO damage components on ONE Constitution save (5d6 thunder
-  // AND 5d6 radiant-or-necrotic, caster's choice) plus a knock-prone rider —
-  // no single effectKind/damageType captures both, the same "two damage
-  // types, no single instance" shape as Hunger of Hadar (warlock.ts);
-  // documented as a conditional/multi-effect exception in this slice's data
-  // test.
+  // PHB'14 p. 231.
   {
     name: "Destructive Wave",
     level: 5,
@@ -409,8 +226,5 @@ export const PALADIN_SPELLS_2014: CatalogSpell[] = [
     classes: ["paladin"],
     components: { verbal: true, somatic: false, material: false },
   },
-  // ── Level 6 — none (Paladin caps at 5th-level spells, half-caster) ──
-  // ── Level 7 — none (Paladin caps at 5th-level spells, half-caster) ──
-  // ── Level 8 — none (Paladin caps at 5th-level spells, half-caster) ──
-  // ── Level 9 — none (Paladin caps at 5th-level spells, half-caster) ──
+  // Levels 6-9: none (Paladin caps at 5th-level spells, half-caster).
 ];

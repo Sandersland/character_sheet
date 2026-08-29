@@ -1,15 +1,5 @@
-// DB-touching pin (#1645, epic #1644): the rule is "a name is unique among
-// GLOBAL rows only", and a non-null scopeKey is its only expressible form here.
-// @@unique([campaignId, name]) is SILENTLY wrong — Postgres treats NULLs as
-// distinct, so two catalog rows named 'Longsword' would both insert — and
-// Prisma 7.8 rejects `nullsNotDistinct`. These assertions prove the index and
-// the agreement CHECK behave as intended rather than merely existing; a
-// shape-only assertion would have passed against the broken form too.
-//
-// Scoped to rows this file creates (plus three named catalog rows): the worker
-// DB is shared across the whole suite and other files create throwaway Item
-// rows with no cleanup, so a full-table assertion would be a false negative on
-// THEIR fixture leak.
+// Postgres treats NULLs as distinct, so @@unique([campaignId, name]) alone would silently let two GLOBAL rows share a name — scopeKey is the actual uniqueness key.
+// Scoped to this file's own rows — other files leave throwaway Item rows uncleaned, so a full-table assertion would false-negative on their leak.
 import { randomUUID } from "node:crypto";
 
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
@@ -19,8 +9,7 @@ import { ensureTestOwner } from "@/test-support/owner.js";
 
 const OWNER_ID = "item-scope-owner";
 const MADE: string[] = [];
-// Every campaign this file creates, so one that outlives a mid-test failure
-// still gets swept — the cascade test deletes its own as an assertion.
+// Every campaign this file creates, so one that outlives a mid-test failure still gets swept.
 const MADE_CAMPAIGNS: string[] = [];
 let campaignId: string;
 
@@ -88,8 +77,7 @@ describe("Item scope discriminator (#1645)", () => {
     await expect(makeCampaignItem("Scope Fixture Relic")).rejects.toMatchObject({ code: "P2002" });
   });
 
-  // The CHECK is what lets scopeKey be stored-but-derived without drifting.
-  // Without it a CAMPAIGN row could sit in the catalog's uniqueness namespace.
+  // The CHECK is what lets scopeKey be stored-but-derived without drifting — otherwise a CAMPAIGN row could sit in the catalog's namespace.
   it("refuses a row whose scopeKey disagrees with its scope", async () => {
     await expect(
       prisma.item.create({

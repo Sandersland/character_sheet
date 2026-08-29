@@ -1,21 +1,4 @@
-// Wizard ClassFeature rows, authored as literal seed data. Base class and
-// Evoker are transcribed from the SRD 5.2 CC-BY document, cross-checked
-// against two independent mirrors. Abjurer and Illusionist aren't in SRD 5.2
-// at all, so their 2024 text is mirror-sourced from those same two sources.
-//
 // DATA MODULE ONLY: no direct database calls or async write logic may live in this file.
-//
-// `edition` omitted on a row -> expand() seeds one row per edition with
-// identical text; `edition` set -> exactly the one row named. A "removed in
-// 2024" feature means NOT authoring a 2024 row for that name, never deleting
-// the 2014 row, and a level-shift is two rows with two `level` values, never
-// one row edited in place.
-//
-// Arcane Recovery's and Illusory Self's resource-pool descriptor columns
-// reproduce their retired resourceFns' totals exactly (flat total 1,
-// longRest; flat total 1 from level 10, short-or-long). Neither pool gets a
-// shortRestRegain tier — Illusory Self's 2024 slot-expend restore is a
-// player-initiated cost, not a rest regain, and stays text-only.
 import { SUBCLASS_SLUGS, type SubclassSlug } from "../../src/lib/classes/subclass-slug.js";
 import type {
   ActivationRequirement,
@@ -26,25 +9,23 @@ import type { FeatImprovement } from "../../src/lib/classes/resources-state.js";
 import type { SeedEdition } from "./edition.js";
 import type { ClassFeatureSeedRow } from "./class-features.js";
 
-// Guards a stray subclass-slug typo below at import time.
 function slug(s: SubclassSlug): SubclassSlug {
   if (!SUBCLASS_SLUGS.includes(s)) throw new Error(`wizard-features: unknown subclass slug "${s}"`);
   return s;
 }
 
 interface RawWizardFeature {
-  // fallow-ignore-next-line code-duplication -- the descriptor-column field list intentionally mirrors fighter-features.ts's/class-features.ts's own shape (#1676's "widen to fighter's field set" instruction); each Raw*Feature interface is authored independently per class file by existing convention (barbarian-features.ts, cleric-features.ts, ...), never a shared base type
+  // fallow-ignore-next-line code-duplication -- mirrors fighter-features.ts's Raw*Feature field list; each class file authors its own interface, not a shared base type
   subclassSlug: SubclassSlug | null;
   name: string;
   level: number;
   description: string;
-  /** Omitted -> identical text seeded for both editions. */
+  // Omitted -> identical text seeded for both editions.
   edition?: SeedEdition;
-  // Only Arcane Recovery's/Illusory Self's/Bladesong's rows below ever set these.
   resourceKey?: string;
   resourceLabel?: string;
   resourceRecharge?: string;
-  // fallow-ignore-next-line code-duplication -- same intentional per-class-file mirror as the comment two fields up (fighter-features.ts's own resourceTotals..saveDcAbilities block)
+  // fallow-ignore-next-line code-duplication -- mirrors fighter-features.ts's resourceTotals..saveDcAbilities block, same per-class-file convention as above
   resourceTotals?: { minLevel: number; total: ResourceTotalFormula; shortRestRegain?: number }[];
   resourceDieTiers?: { minLevel: number; die: string }[];
   activationCost?: string;
@@ -67,7 +48,7 @@ interface RawWizardFeature {
 function expand(raw: RawWizardFeature): ClassFeatureSeedRow[] {
   const base: Omit<ClassFeatureSeedRow, "edition"> = {
     className: "Wizard",
-    // fallow-ignore-next-line code-duplication -- expand()'s field-by-field copy intentionally mirrors fighter-features.ts's own expand() (every Raw*Feature -> ClassFeatureSeedRow adapter across this file family repeats this shape by convention, never a shared helper)
+    // fallow-ignore-next-line code-duplication -- expand()'s field-by-field copy mirrors fighter-features.ts's own expand(), same per-class-file convention, never a shared helper
     subclassSlug: raw.subclassSlug,
     name: raw.name,
     level: raw.level,
@@ -112,7 +93,7 @@ const WIZARD_BASE_RAW: RawWizardFeature[] = [
     name: "Spellcasting",
     level: 1,
     edition: "EDITION_2024",
-    // SRD 5.2: Prepared Spells is now a flat table, not an Intelligence-modifier formula.
+    // SRD 5.2.
     description:
       "You cast spells using Intelligence. Full-caster progression. You know three Wizard cantrips (one more at levels 4 and 10), replacing one on a Long Rest. Your spellbook holds your level 1+ spells: it starts with six 1st-level spells, and you add two spells of your choice whenever you gain a Wizard level after 1st. You regain all expended spell slots on a Long Rest, and you change your list of prepared spells whenever you finish a Long Rest.",
   },
@@ -123,7 +104,7 @@ const WIZARD_BASE_RAW: RawWizardFeature[] = [
     edition: "EDITION_2014",
     description:
       "Once per day when finishing a short rest, choose expended spell slots to recover. Total levels of slots recovered can be up to half your wizard level (rounded up, max 5th-level slots).",
-    // The slot-level cap itself is computed at op time (resolveArcaneRecoveryContext), not a tier.
+    // Slot-level cap computed at op time in resolveArcaneRecoveryContext, not a tier.
     resourceKey: "arcaneRecovery",
     resourceLabel: "Arcane Recovery",
     resourceRecharge: "longRest",
@@ -134,7 +115,7 @@ const WIZARD_BASE_RAW: RawWizardFeature[] = [
     name: "Arcane Recovery",
     level: 1,
     edition: "EDITION_2024",
-    // SRD 5.2: the same mechanic as 2014 (once per Long Rest, recover slots up to half Wizard level, none 6th or higher).
+    // SRD 5.2.
     description:
       "When you finish a Short Rest, you can choose expended spell slots to recover, their combined level no higher than half your Wizard level (rounded up) and none 6th level or higher. You can use this feature only once per Long Rest.",
     resourceKey: "arcaneRecovery",
@@ -147,7 +128,7 @@ const WIZARD_BASE_RAW: RawWizardFeature[] = [
     name: "Ritual Adept",
     level: 1,
     edition: "EDITION_2024",
-    // SRD 5.2. NEW in 2024 — no 2014 counterpart.
+    // SRD 5.2. New in 2024 — no 2014 counterpart.
     description:
       "You can cast any spell in your spellbook as a Ritual if the spell has the Ritual tag, without needing it prepared — you must read from the book to cast it this way.",
   },
@@ -156,13 +137,11 @@ const WIZARD_BASE_RAW: RawWizardFeature[] = [
     name: "Scholar",
     level: 2,
     edition: "EDITION_2024",
-    // SRD 5.2. NEW in 2024 — no 2014 counterpart.
+    // SRD 5.2. New in 2024 — no 2014 counterpart.
     description:
       "Choose one skill in which you're proficient from Arcana, History, Investigation, Medicine, Nature, or Religion. You have Expertise in the chosen skill.",
-    // The pick cap is per-character (shared across every grantor), not a
-    // per-feature allowed-skill list, so this is over-permissive relative to
-    // RAW's six-skill restriction — disclosed, not silently narrower.
     derivedStat: "expertiseChoiceCount",
+    // expertiseChoiceCount caps picks per character, not per skill list — over-permissive vs RAW's six skills, deliberately.
     derivedStatTiers: [{ minLevel: 2, value: 1 }],
   },
   {
@@ -170,7 +149,7 @@ const WIZARD_BASE_RAW: RawWizardFeature[] = [
     name: "Memorize Spell",
     level: 5,
     edition: "EDITION_2024",
-    // SRD 5.2. NEW in 2024 — no 2014 counterpart.
+    // SRD 5.2. New in 2024 — no 2014 counterpart.
     description:
       "When you finish a Short Rest, you can study your spellbook and replace one of the level 1+ Wizard spells you have prepared with another level 1+ spell from the book.",
   },
@@ -187,7 +166,7 @@ const WIZARD_BASE_RAW: RawWizardFeature[] = [
     name: "Spell Mastery",
     level: 18,
     edition: "EDITION_2024",
-    // SRD 5.2: restricts both picks to spells with a casting time of an action, and requires a full Long Rest, not 8 hours, to change them.
+    // SRD 5.2.
     description:
       "Choose a 1st-level and a 2nd-level spell in your spellbook, each with a casting time of an action. You always have both prepared, and you can cast each at its lowest level without expending a spell slot — casting at a higher level still costs a slot. Whenever you finish a Long Rest, you can study your spellbook and replace either choice with an eligible spell of the same level.",
   },
@@ -212,7 +191,7 @@ const WIZARD_BASE_RAW: RawWizardFeature[] = [
     name: "Signature Spells",
     level: 20,
     edition: "EDITION_2024",
-    // SRD 5.2: no "casting time of an action" restriction on these two picks (that restriction belongs only to Spell Mastery above).
+    // SRD 5.2.
     description:
       "Choose two 3rd-level spells in your spellbook as your signature spells. You always have them prepared, and you can cast each once at 3rd level without expending a spell slot. To cast either at a higher level, you must expend a spell slot; regain both uses after a Short Rest or Long Rest.",
   },
@@ -233,7 +212,7 @@ const EVOCATION_RAW: RawWizardFeature[] = [
     name: "Evocation Savant",
     level: 3,
     edition: "EDITION_2024",
-    // SRD 5.2: drops the halved-copy-cost mechanic, replaced by free Evocation spells added to the spellbook.
+    // SRD 5.2.
     description:
       "Add two Evocation spells (each level 2 or lower) to your spellbook for free. Thereafter, whenever you gain access to a new level of spell slots, add one more Evocation spell of an eligible level to your spellbook for free.",
   },
@@ -250,7 +229,7 @@ const EVOCATION_RAW: RawWizardFeature[] = [
     name: "Sculpt Spells",
     level: 6,
     edition: "EDITION_2024",
-    // SRD 5.2: level-shifts 2 -> 6; mechanic unchanged.
+    // SRD 5.2.
     description:
       "When you cast an Evocation spell that affects other creatures you can see, choose a number of them equal to 1 plus the spell's level. Those creatures automatically succeed on their saving throws against the spell, and they take no damage if they would normally take half damage on a success.",
   },
@@ -266,7 +245,7 @@ const EVOCATION_RAW: RawWizardFeature[] = [
     name: "Potent Cantrip",
     level: 3,
     edition: "EDITION_2024",
-    // SRD 5.2: level-shifts 6 -> 3, and now also triggers on a missed attack roll.
+    // SRD 5.2.
     description:
       "When you cast a damaging cantrip at a creature and you miss with the attack roll, or the target succeeds on its saving throw against the cantrip, the target still takes half the cantrip's damage (if any), but suffers no other effect from it.",
   },
@@ -297,7 +276,7 @@ const EVOCATION_RAW: RawWizardFeature[] = [
     name: "Overchannel",
     level: 14,
     edition: "EDITION_2024",
-    // SRD 5.2: the necrotic cost rises by a further 1d12 per spell level on each use — the 2014 row's flat cost every time is a genuine mechanical difference.
+    // SRD 5.2.
     description:
       "When you cast a Wizard spell with a spell slot of levels 1-5 that deals damage, you can deal maximum damage with it. The first time you do this before finishing a Long Rest, you suffer no adverse effect. Each further time before that Long Rest, you take 2d12 Necrotic damage for each level of the spell slot, and that damage per spell level increases by 1d12 for each additional use — this damage ignores Resistance and Immunity.",
   },
@@ -318,7 +297,7 @@ const ABJURATION_RAW: RawWizardFeature[] = [
     name: "Abjuration Savant",
     level: 3,
     edition: "EDITION_2024",
-    // PHB'24 (mirror-sourced). Drops the halved-copy-cost mechanic for the same free-spells shape as Evocation Savant above.
+    // PHB'24 (mirror-sourced).
     description:
       "Add two Abjuration spells (each level 2 or lower) to your spellbook for free. Thereafter, whenever you gain access to a new level of spell slots, add one more Abjuration spell of an eligible level to your spellbook for free.",
   },
@@ -335,7 +314,7 @@ const ABJURATION_RAW: RawWizardFeature[] = [
     name: "Arcane Ward",
     level: 3,
     edition: "EDITION_2024",
-    // PHB'24 (mirror-sourced). Level-shifts 2 -> 3; the ward can also be recharged as a Bonus Action by expending a spell slot outright.
+    // PHB'24 (mirror-sourced).
     description:
       "When you cast an Abjuration spell with a spell slot, form (or recharge) a magical ward on yourself lasting until you finish a Long Rest, with HP equal to twice your Wizard level plus your Intelligence modifier. The ward absorbs damage before you do — apply any Resistances or Vulnerabilities you have before its HP is reduced — and it regains HP equal to twice the spell slot's level each time you cast an Abjuration spell with a slot, or, as a Bonus Action, by expending a spell slot for the same regain.",
   },
@@ -362,15 +341,13 @@ const ABJURATION_RAW: RawWizardFeature[] = [
     edition: "EDITION_2014",
     description: "When you cast an abjuration spell that requires an ability check, you add your proficiency bonus to that check.",
   },
-  // Improved Abjuration has NO EDITION_2024 row — Spell Breaker below fills its L10 slot instead.
+  // Improved Abjuration has no EDITION_2024 row — Spell Breaker below fills its L10 slot instead.
   {
     subclassSlug: ABJURATION_SLUG,
     name: "Spell Breaker",
     level: 10,
     edition: "EDITION_2024",
-    // PHB'24 (mirror-sourced). NEW in 2024. Text only: Counterspell/Dispel
-    // Magic being always-prepared can't be a SubclassGrantedSpell row —
-    // that model has no `edition` column, and Subclass rows are edition-shared.
+    // PHB'24 (mirror-sourced). Always-prepared spells can't be a SubclassGrantedSpell row — that model has no `edition` column and Subclass rows are edition-shared.
     description:
       "You always have Counterspell and Dispel Magic prepared. You can cast Dispel Magic as a Bonus Action, and you add your Proficiency Bonus to its ability check. A spell slot spent on either spell isn't expended if the spell fails to stop what it targeted.",
   },
@@ -405,7 +382,7 @@ const ILLUSION_RAW: RawWizardFeature[] = [
     name: "Illusion Savant",
     level: 3,
     edition: "EDITION_2024",
-    // PHB'24 (mirror-sourced). Same free-spells shape as Evocation/Abjuration Savant above.
+    // PHB'24 (mirror-sourced).
     description:
       "Add two Illusion spells (each level 2 or lower) to your spellbook for free. Thereafter, whenever you gain access to a new level of spell slots, add one more Illusion spell of an eligible level to your spellbook for free.",
   },
@@ -423,8 +400,7 @@ const ILLUSION_RAW: RawWizardFeature[] = [
     name: "Improved Illusions",
     level: 3,
     edition: "EDITION_2024",
-    // PHB'24 (mirror-sourced). Renamed, level-shifted 2 -> 3, drops the
-    // Verbal-component requirement, and extends range on longer-range spells.
+    // PHB'24 (mirror-sourced).
     description:
       "You can cast Illusion spells without a Verbal component, and any Illusion spell you cast with a range of 10 feet or more has its range extended by 60 feet. You also know the Minor Illusion cantrip (or learn a different Wizard cantrip if you already know it, not counting against your cantrips known); you can create both a sound and an image with a single casting of it, and you can cast it as a Bonus Action.",
   },
@@ -436,14 +412,13 @@ const ILLUSION_RAW: RawWizardFeature[] = [
     description:
       "When you cast an illusion spell with a duration of 1 minute or longer, you can use your action to change the nature of that illusion (within its original parameters) while you can see it.",
   },
-  // Malleable Illusions has NO EDITION_2024 row — Phantasmal Creatures below fills its L6 slot instead.
+  // Malleable Illusions has no EDITION_2024 row — Phantasmal Creatures below fills its L6 slot instead.
   {
     subclassSlug: ILLUSION_SLUG,
     name: "Phantasmal Creatures",
     level: 6,
     edition: "EDITION_2024",
-    // PHB'24 (mirror-sourced). NEW in 2024. Same schema gap as Abjurer's
-    // Spell Breaker above: always-prepared grants can't be a SubclassGrantedSpell row.
+    // PHB'24 (mirror-sourced).
     description:
       "You always have the Summon Beast and Summon Fey spells prepared. Casting either as its Illusion-school version (the summoned creature appears spectral) costs no spell slot, but halves the creature's Hit Points. Once you cast either spell this way, you must finish a Long Rest before doing so again.",
   },
@@ -454,8 +429,7 @@ const ILLUSION_RAW: RawWizardFeature[] = [
     edition: "EDITION_2014",
     description:
       "When a creature makes an attack roll against you, use your reaction to interpose an illusory duplicate — the attack automatically misses. Once used, you regain this ability on a short or long rest.",
-    // Row's own `level: 10` is the gate; resourceTotals' minLevel: 10 restates
-    // it for poolsFromRows, which reads tiers independent of the row's level filter.
+    // resourceTotals' minLevel: 10 restates the row's own level gate — poolsFromRows reads tiers independent of the row's level filter.
     resourceKey: "illusorySelf",
     resourceLabel: "Illusory Self",
     resourceRecharge: "short-or-long",
@@ -466,9 +440,7 @@ const ILLUSION_RAW: RawWizardFeature[] = [
     name: "Illusory Self",
     level: 10,
     edition: "EDITION_2024",
-    // PHB'24 (mirror-sourced). Adds a second recharge path: expending a level
-    // 2+ spell slot restores the use early. That path has no descriptor
-    // column (a player-initiated cost, not a rest regain) and stays text-only.
+    // PHB'24 (mirror-sourced); the slot-expend restore has no descriptor column — a player-initiated cost, not a rest regain, stays text-only.
     description:
       "When a creature hits you with an attack roll, you can take a Reaction to interpose an illusory duplicate of yourself between the attacker and yourself. The attack automatically misses you, then the illusion dissipates. You regain your use of this feature on a Short Rest or Long Rest, or you can restore it early by expending a level 2+ spell slot (no action required).",
     resourceKey: "illusorySelf",
@@ -489,24 +461,16 @@ const ILLUSION_RAW: RawWizardFeature[] = [
     name: "Illusory Reality",
     level: 14,
     edition: "EDITION_2024",
-    // PHB'24 (mirror-sourced). Mechanic unchanged; can now be made real as a Bonus Action while the spell is ongoing.
+    // PHB'24 (mirror-sourced).
     description:
       "When you cast an Illusion spell with a spell slot, you can make one inanimate, nonmagical object that's part of the illusion real for 1 minute — usable as a Bonus Action while the spell is ongoing. The object can't deal damage or otherwise cause harm.",
   },
 ];
 
-// Bladesinging — TCoE p.76 (2014). EDITION_2014 only — no SRD 5.2/PHB'24
-// printing exists; crossEditionRejection + the tagged Subclass row are the
-// whole 2024 story (a 2024 wizard picking this slug 400s). Every mechanic
-// below rides the F1-F5 engine (formula pool totals,
-// row-declared effectBuffs + generic toggle resolver, slot-shaped ability
-// costs, declarative activationRequires + equip-driven clearing, passive
-// improvements) with zero new ACTION_EFFECT_FN/resourceFn/hand-written gate.
+// TCoE p.76 (2014 only) — crossEditionRejection 400s a 2024 wizard picking this slug; no SRD 5.2/PHB'24 printing exists.
 const BLADESINGING_SLUG = slug("wizard-bladesinging");
 
-// Bladesong can't be activated in medium/heavy armor or with a shield, and
-// ends early if you don any of the three — light armor is deliberately
-// absent from both lists (TCoE's whole point is that it doesn't interfere).
+// Light armor is deliberately absent from both lists below — TCoE's whole point is that it doesn't interfere with Bladesong.
 const BLADESONG_ARMOR_GATE = ["noMediumArmor", "noHeavyArmor", "noShield"] as const;
 const BLADESONG_CLEAR_ON = ["equipMediumArmor", "equipHeavyArmor", "equipShield"] as const;
 
@@ -519,8 +483,7 @@ const BLADESINGING_RAW: RawWizardFeature[] = [
     // TCoE p.76.
     description:
       "You gain proficiency with light armor, one type of one-handed melee weapon of your choice, and the Performance skill.",
-    // The one-handed-weapon TYPE choice has no subclass-choice machinery to
-    // back it — announce-only, the description above carries the instruction.
+    // The one-handed-weapon TYPE choice has no subclass-choice machinery to back it — announce-only, the description above carries the instruction.
     improvements: [
       { target: "armorProficiency", amount: 1, key: "light" },
       { target: "skillProficiency", amount: 1, key: "performance" },
@@ -531,10 +494,7 @@ const BLADESINGING_RAW: RawWizardFeature[] = [
     name: "Bladesong",
     level: 2,
     edition: "EDITION_2014",
-    // TCoE p.76. The Acrobatics/concentration bonuses and the end conditions
-    // stay announce-only text (endReminder below), not a turn-hook predicate.
-    // Song of Victory (L14) rides this same toggle via a level-gated
-    // effectBuffs entry rather than its own row.
+    // TCoE p.76. Acrobatics/concentration bonuses and end conditions stay announce-only text (endReminder below); Song of Victory (L14) rides this toggle via a level-gated effectBuffs entry, not its own row.
     description:
       "As a bonus action, weave a Bladesong that lasts 1 minute. While it lasts, you gain a bonus to your AC equal to your Intelligence modifier (minimum +1), your walking speed increases by 10 feet, you have advantage on Dexterity (Acrobatics) checks, and you gain a bonus to concentration checks equal to your Intelligence modifier (minimum +1). You have a number of uses of this feature equal to your proficiency bonus, regained on a long rest. You can't activate Bladesong while wearing medium or heavy armor or wielding a shield. At 14th level (Song of Victory), while your Bladesong is active you also add your Intelligence modifier to your melee weapon damage rolls.",
     resourceKey: "bladesong",
@@ -548,11 +508,7 @@ const BLADESINGING_RAW: RawWizardFeature[] = [
     costPoolKey: "bladesong",
     costBase: 1,
     activationRequires: [...BLADESONG_ARMOR_GATE],
-    // One ActiveBuff carries exactly one target/modifier pair, so a 3-target
-    // toggle needs 3 entries, each with its own key (appendActiveBuffInTx
-    // dedupes by key). Only the AC entry uses the row's identity key
-    // ("bladesong") itself, which is what Song of Defense's
-    // requiresActiveBuff gate below checks for.
+    // One ActiveBuff carries one target/modifier pair, so this 3-target toggle needs 3 entries (appendActiveBuffInTx dedupes by key). The AC entry keeps the row's identity key "bladesong" — Song of Defense's requiresActiveBuff gate below depends on it.
     effectBuffs: [
       {
         key: "bladesong",
@@ -601,10 +557,7 @@ const BLADESINGING_RAW: RawWizardFeature[] = [
     description:
       "While your Bladesong is active, you can use your reaction when you take damage to expend a spell slot and reduce that damage to yourself by 5 times the slot's level.",
     activationCost: "reaction",
-    // costKind "slot": no dedicated resource pool, so resourceKey here is a
-    // pure identity, not a poolsFromRows consumer. effectKind "utility" (no
-    // dice) routes this through castAbilityWithSlotInTx rather than
-    // applyRowDrivenActionInTx's pure-counter branch.
+    // costKind "slot" (no pool, resourceKey is identity only) routes this through castAbilityWithSlotInTx, not applyRowDrivenActionInTx's pure-counter branch.
     resourceKey: "songOfDefense",
     resolverKind: "slot-picker",
     costKind: "slot",

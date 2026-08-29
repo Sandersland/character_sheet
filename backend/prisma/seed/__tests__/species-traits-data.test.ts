@@ -1,8 +1,3 @@
-// Pure 5e-rules sanity checks on SPECIES_TRAITS (#1682) — no database, same
-// role as species-data.test.ts. Guards the derived-vs-announce-only split the
-// issue names explicitly: Dwarven Toughness/Dwarven (Armor|Combat) Training/
-// Elf Weapon Training are the ONLY improvement-bearing rows; everything else
-// (including darkvision, owner ruling) is announce-only cited text.
 import { describe, it, expect } from "vitest";
 
 import { SPECIES } from "../species-data.js";

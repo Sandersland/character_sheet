@@ -1,8 +1,5 @@
-// --- Subclass catalog -------------------------------------------------------
-// Class-keyed subclass catalog powering the character-creation dropdown and
-// post-creation setSubclass transaction. Classes/subclasses with full
-// mechanics support in srd.ts drive automation; others are included for
-// creation UX completeness.
+// Classes/subclasses with full mechanics support in srd.ts drive automation;
+// others exist for creation UX completeness.
 import { z } from "zod";
 
 import type { SeedEdition } from "./edition.js";
@@ -13,32 +10,20 @@ export interface SubclassSeed {
   className: string;    // must match an entry in CLASSES
   name: string;
   description: string;
-  // Stable mechanics-identity join key (#1277) — see subclass-slug.ts's header.
-  // Authored once per row at seed-authoring time (never derived at read time);
-  // must equal this slug's entry in SUBCLASS_IDENTITY.
+  // Stable mechanics-identity join key (#1277) — authored once per row, never
+  // derived at read time; must equal this slug's entry in SUBCLASS_IDENTITY.
   slug: SubclassSlug;
-  // Omitted = shared (NULL column, valid in both editions, #1306). Path of
-  // the Totem Warrior (Barbarian) is the first row to set this —
-  // EDITION_2014 only, since SRD 5.2 replaces it with Path of the Wild Heart
-  // rather than retabbing it (#1559) — so a 2024 character is no longer
-  // offered a subclass with zero features in its edition. The Archfey and The
-  // Great Old One (Warlock, #1233) are the same shape: their PHB'24 reworks
-  // are non-SRD and unverifiable, so no 2024 rows are authored and both are
-  // tagged EDITION_2014 here in the same commit.
+  // Omitted = shared (NULL column, valid in both editions, #1306).
   edition?: SeedEdition;
-  // Third-caster identity (#1531) — omitted (both NULL) for every subclass
-  // that grants no spellcasting of its own. Both must be set together (a
-  // caster without an ability, or vice versa, is a malformed row) — enforced
-  // below by subclassSeedSchema's refine.
+  // Third-caster identity (#1531); both must be set together — enforced by
+  // subclassSeedSchema's refine.
   casterFraction?: "third";
   spellcastingAbility?: string;
 }
 
-// Validated at seed time (prisma/seed/validate.ts) — a malformed row fails the
-// seed with a row-indexed message instead of writing a broken catalog row.
-// z.enum(SUBCLASS_SLUGS) rejects a typo'd slug the SAME way the SubclassSlug
-// union rejects it at compile time (M1, #1277); the cross-row duplicate-slug
-// check (M2) catches what no type can — two rows sharing one slug.
+// z.enum(SUBCLASS_SLUGS) rejects a typo'd slug the same way SubclassSlug does
+// at compile time; a separate cross-row check catches duplicate slugs, which
+// no type can.
 export const subclassSeedSchema = z
   .object({
     className: z.string().min(1),
@@ -51,16 +36,11 @@ export const subclassSeedSchema = z
     casterFraction: z.literal("third").optional(),
     spellcastingAbility: z.string().min(1).optional(),
   })
-  // #1531: casterFraction/spellcastingAbility are a pair — a row setting one
-  // without the other is malformed (a caster with no ability, or an ability
-  // orphaned from any fraction), so this fails the seed loudly rather than
-  // writing a half-set Subclass row.
   .refine((row) => Boolean(row.casterFraction) === Boolean(row.spellcastingAbility), {
     message: "casterFraction and spellcastingAbility must be set together, or not at all",
   });
 
 export const SUBCLASSES: SubclassSeed[] = [
-  // ── Fighter ────────────────────────────────────────────────────────────────
   {
     className: "Fighter",
     name: "Battle Master",
@@ -81,21 +61,14 @@ export const SUBCLASSES: SubclassSeed[] = [
     description:
       "A warrior who weaves abjuration and evocation magic into combat. You gain spellcasting using Intelligence, following the third-caster progression (slots start at level 3).",
     slug: "fighter-eldritch-knight",
-    // #1531: SRD 5.1 (Fighter → Martial Archetype: Eldritch Knight). This row
-    // is edition-NULL (shared), so one value pair serves both editions — no
-    // SRD 5.2 citation needed (see subclass-slug.ts's SUBCLASS_IDENTITY note
-    // on why no edition fork exists here).
+    // SRD 5.1 (Fighter → Martial Archetype: Eldritch Knight), #1531.
+    // Edition-NULL (shared) — one value pair serves both editions.
     casterFraction: "third",
     spellcastingAbility: "intelligence",
   },
-  // ── Wizard ────────────────────────────────────────────────────────────────
-  // Bladesinging (#1676): TCoE (Tasha's Cauldron of Everything) p. 76 is the
-  // settled printing, not SCAG — verified against the transcription the
-  // owner's group uses (proficiency-bonus Bladesong uses/long rest, no race
-  // restriction, the TCoE-only cantrip-substitution rider on Extra Attack).
-  // EDITION_2014 only, no 2024 successor: SRD 5.2/PHB'24 never reprinted
-  // Bladesinging content (out of scope, epic #1281), same "tagged row, zero
-  // 2024 rows" shape as Totem Warrior/The Archfey/The Great Old One above.
+  // TCoE (Tasha's Cauldron of Everything) p.76, not SCAG (#1676). EDITION_2014
+  // only — SRD 5.2/PHB'24 never reprinted Bladesinging (out of scope, epic
+  // #1281).
   {
     className: "Wizard",
     name: "Bladesinging",
@@ -125,15 +98,13 @@ export const SUBCLASSES: SubclassSeed[] = [
       "You study magic that dazzles the senses and tricks the mind. Improved Minor Illusion and Malleable Illusions let you push the boundaries of what can appear real.",
     slug: "wizard-school-of-illusion",
   },
-  // ── Rogue ─────────────────────────────────────────────────────────────────
   {
     className: "Rogue",
     name: "Arcane Trickster",
     description:
       "You combine roguish skill with arcane magic, learning enchantment and illusion spells using Intelligence following the third-caster progression. Mage Hand becomes an extension of your cunning.",
     slug: "rogue-arcane-trickster",
-    // #1531: SRD 5.1 (Rogue → Roguish Archetype: Arcane Trickster) — same
-    // edition-NULL shape as Eldritch Knight above.
+    // SRD 5.1 (Rogue → Roguish Archetype: Arcane Trickster), #1531.
     casterFraction: "third",
     spellcastingAbility: "intelligence",
   },
@@ -151,7 +122,6 @@ export const SUBCLASSES: SubclassSeed[] = [
       "A nimble expert at burglary and larceny. Fast Hands lets you use Cunning Action for Sleight of Hand, Thieves' Tools, or Use an Object; Second-Story Work eases climbing and jumps. At higher levels you become supremely stealthy, can use any magic item, and take two turns in the first round of combat.",
     slug: "rogue-thief",
   },
-  // ── Cleric ────────────────────────────────────────────────────────────────
   {
     className: "Cleric",
     name: "Life Domain",
@@ -166,7 +136,6 @@ export const SUBCLASSES: SubclassSeed[] = [
       "A champion of deception and infiltration. You gain access to domain spells like Charm Person and Disguise Self, and can grant allies the ability to attack with advantage using your Blessing of the Trickster.",
     slug: "cleric-trickery-domain",
   },
-  // ── Barbarian ─────────────────────────────────────────────────────────────
   {
     className: "Barbarian",
     name: "Totem Warrior",
@@ -182,14 +151,11 @@ export const SUBCLASSES: SubclassSeed[] = [
       "You channel a battle frenzy beyond normal rage. Frenzied Rage lets you make a bonus attack each turn, and Mindless Rage makes you immune to the charmed and frightened conditions while raging.",
     slug: "barbarian-berserker",
   },
-  // ── Bard ─────────────────────────────────────────────────────────────────
   {
     className: "Bard",
     name: "College of Lore",
-    // #1224: reworded edition-neutral — 2014 grants "bonus spells from any
-    // class"; 2024's Magical Discoveries scopes that to Cleric/Druid/Wizard.
-    // Subclass.description is un-editioned (Subclass rows are edition-shared),
-    // so this row can only state what's true under both, not fork.
+    // Subclass.description is un-editioned — must read true under both
+    // editions, not fork (#1224).
     description:
       "Devoted to knowledge and cunning. You gain proficiency in three additional skills, Cutting Words to impose penalties on enemy rolls, and bonus spells at level 6.",
     slug: "bard-college-of-lore",
@@ -197,14 +163,10 @@ export const SUBCLASSES: SubclassSeed[] = [
   {
     className: "Bard",
     name: "College of Valor",
-    // #1224: reworded edition-neutral — 2024's Martial Training adds Martial
-    // weapon proficiency (2014's Bonus Proficiencies grants only medium armor
-    // + shields), so "armor and weapon proficiencies" is true under both.
     description:
       "A bard who fights as well as they inspire. You gain armor and weapon proficiencies, Combat Inspiration (allies add your Bardic Inspiration die to damage rolls), and Extra Attack at level 6.",
     slug: "bard-college-of-valor",
   },
-  // ── Druid ─────────────────────────────────────────────────────────────────
   {
     className: "Druid",
     name: "Circle of the Land",
@@ -219,17 +181,15 @@ export const SUBCLASSES: SubclassSeed[] = [
       "You are at home in the wild, capable of transforming into more powerful beasts. Starting at level 2 you can Wild Shape into beasts with CR up to 1 (scaling to CR equal to a third of your druid level at level 6), and you can use Wild Shape as a bonus action. At higher levels you can transform into elementals.",
     slug: "druid-circle-of-the-moon",
   },
-  // ── Monk ─────────────────────────────────────────────────────────────────
   {
     className: "Monk",
     name: "Warrior of the Open Hand",
     description:
       "You master techniques to push and trip opponents, cover yourself in a shroud of focus, and enter a trance state that heals your wounds. Open Hand Technique allows you to impose special effects on creatures hit by your Flurry of Blows — knocking them prone, pushing them 15 ft, or denying their reactions.",
     slug: "monk-warrior-of-the-open-hand",
-    // #1501: SRD 5.2's own subclass — retagged (bound in the same commit as
-    // "Way of the Open Hand" below, its 2014 counterpart) so
-    // resolveSubclassId/assertEverySubclassEditionPopulated never see an
-    // untagged row whose 2014 partition is now empty.
+    // SRD 5.2's own subclass (#1501) — its 2014 counterpart is Way of the Open
+    // Hand below; both must stay tagged so resolveSubclassId/
+    // assertEverySubclassEditionPopulated never see an empty partition.
     edition: "EDITION_2024",
   },
   {
@@ -237,9 +197,9 @@ export const SUBCLASSES: SubclassSeed[] = [
     name: "Way of the Open Hand",
     description:
       "You master techniques to push and trip opponents, manipulate ki to heal your wounds, and practice a meditation that wards you with an aura of peace. Open Hand Technique lets you impose special effects on creatures hit by your Flurry of Blows — knocking them prone, pushing them 15 ft, or denying their reactions until the end of your next turn.",
-    // SRD 5.1's own monastic tradition (the only one present in the SRD) —
-    // a SEPARATE subclass from "Warrior of the Open Hand" above, not a retag
-    // of it (#1501; monk.ts's two SubclassDefinition entries are the same split).
+    // SRD 5.1's own monastic tradition — a separate subclass from Warrior of
+    // the Open Hand above, not a retag (#1501; monk.ts's SubclassDefinition
+    // split mirrors this).
     slug: "monk-way-of-the-open-hand",
     edition: "EDITION_2014",
   },
@@ -251,9 +211,9 @@ export const SUBCLASSES: SubclassSeed[] = [
     slug: "monk-warrior-of-shadow",
     edition: "EDITION_2024",
   },
-  // PHB'14 pp.79-80 — not in SRD 5.1, which ships only Way of the Open Hand
-  // for monk (#1502). A DISTINCT slug from Warrior of Shadow above, not a
-  // retag: the two lineages coexist per campaign (epic #1281).
+  // PHB'14 pp.79-80 — not in SRD 5.1 (#1502). Distinct slug from Warrior of
+  // Shadow above, not a retag — both lineages coexist per campaign (epic
+  // #1281).
   {
     className: "Monk",
     name: "Way of Shadow",
@@ -268,11 +228,6 @@ export const SUBCLASSES: SubclassSeed[] = [
     description:
       "You wield the elements of air, earth, fire, and water. Manipulate Elements grants the Elementalism cantrip, and Elemental Attunement lets you spend 1 Focus Point to imbue yourself for 10 minutes — extending your Unarmed Strike reach and letting your strikes deal elemental damage that shoves foes. Elemental Burst (level 6) unleashes a 20-ft sphere for three Martial Arts dice, Stride of the Elements (level 11) grants flight and swimming while attuned, and Elemental Epitome (level 17) adds elemental resistance, a destructive stride, and empowered strikes.",
     slug: "monk-warrior-of-the-elements",
-    // Retagged EDITION_2024 (#1503, alongside authoring the 2014 predecessor
-    // below) — a from-scratch PHB'24 rebuild (Elementalism cantrip + a
-    // Focus-fuelled buff toggle + Elemental Burst/Strike), not a retab of Way
-    // of the Four Elements' discipline menu. Was untagged/shared since #1246;
-    // this is the first PR to author the 2014 half, so the two must fork.
     edition: "EDITION_2024",
   },
   {
@@ -290,7 +245,6 @@ export const SUBCLASSES: SubclassSeed[] = [
       "You wield your focus to wound or heal with a touch. Hand of Harm channels necrotic energy into your unarmed strikes, while Hand of Healing lets you mend a creature as a Magic action or in place of a Flurry of Blows strike. Physician's Touch adds lingering harm or cures grievous conditions, Flurry of Healing and Harm lets a flurry of blows do both at once, and Hand of Ultimate Mercy can restore the recently dead to life.",
     slug: "monk-warrior-of-mercy",
   },
-  // ── Paladin ───────────────────────────────────────────────────────────────
   {
     className: "Paladin",
     name: "Oath of Devotion",
@@ -312,7 +266,6 @@ export const SUBCLASSES: SubclassSeed[] = [
       "You pursue the worst of the worst with righteous fury. Vow of Enmity grants advantage on attack rolls against one creature; Abjure Enemy holds a foe in fear. You gain spells such as Bane and Hold Person, and eventually can teleport to strike your quarry wherever they flee.",
     slug: "paladin-oath-of-vengeance",
   },
-  // ── Ranger ───────────────────────────────────────────────────────────────
   {
     className: "Ranger",
     name: "Hunter",
@@ -327,13 +280,6 @@ export const SUBCLASSES: SubclassSeed[] = [
       "You forge an unbreakable bond with an animal companion that fights alongside you. Your companion acts on your turn and grows more powerful as you level — sharing your proficiency bonus, gaining additional attacks, and becoming harder to kill. The bond lets you communicate with it telepathically.",
     slug: "ranger-beast-master",
   },
-  // ── Sorcerer ─────────────────────────────────────────────────────────────
-  // #1232: both descriptions below are edition-neutral — no armor class
-  // formula, feature name, or other numeric/mechanical detail that differs
-  // between PHB'14 and SRD 5.2/PHB'24 (2014's "13 + Dex modifier" AC, e.g., is
-  // NOT the 2024 value, #1232 §1.5) — a Subclass row is edition-SHARED
-  // (`edition` stays unset on both), served identically to 2014 and 2024
-  // creation dropdowns, so its prose can't privilege either edition's numbers.
   {
     className: "Sorcerer",
     name: "Draconic Bloodline",
@@ -348,7 +294,6 @@ export const SUBCLASSES: SubclassSeed[] = [
       "Your innate magic stems from an untamed, chaotic source. Casting spells risks triggering a Wild Magic Surge — a random magical effect — and Tides of Chaos lets you court that chaos deliberately for advantage on a roll. Your control over the chaos grows at higher levels.",
     slug: "sorcerer-wild-magic",
   },
-  // ── Warlock ───────────────────────────────────────────────────────────────
   {
     className: "Warlock",
     name: "The Fiend",

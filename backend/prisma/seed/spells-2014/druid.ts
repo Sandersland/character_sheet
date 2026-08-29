@@ -1,124 +1,7 @@
-// PHB'14 (2014) Druid spell list — content slice of epic #1517 (#1716).
-// Per the epic's row-ownership rule (tie-break Wizard > Cleric > Druid > Bard >
-// Sorcerer > Warlock > Paladin > Ranger), Druid is 3rd priority, so this file
-// authors every spell on 1-2 class lists where Druid is the highest-priority
-// class present (i.e. neither Wizard nor Cleric is on that spell's list). A
-// spell on 3+ lists is authored in shared.ts (#1713) instead; this file never
-// re-transcribes one, only relies on shared.ts already fanning "druid" into
-// its classes[] (verified at the time: every one of the 64 3+-list PHB'14
-// Druid spells already carried a druid membership row in shared.ts — no
-// gaps found, no membership edits needed there for this slice. #1742's own
-// non-SRD-3+-list audit later found one more — Feign Death, a
-// Bard/Cleric/Druid/Wizard 4-list spell missing from every slice entirely —
-// and added it to shared.ts with a druid tag, bumping this count from 64 to
-// 65).
-// Wizard-owned 2-list spells Druid also gets (Flaming Sphere, Conjure Minor
-// Elementals, Conjure Elemental, Antipathy/Sympathy, Shapechange) are already
-// tagged with druid membership in wizard.ts (#1714) — not re-authored here.
-// Cleric-owned 2-list spells Druid also gets (Guidance, Resistance, Create or
-// Destroy Water, Contagion, Heal, Heroes' Feast, True Resurrection) are
-// likewise already tagged with druid membership in cleric.ts (#1715) — not
-// re-authored here either. All 12 of those wizard/cleric-owned rows were
-// individually verified to already carry "druid" in classes[]; zero edits to
-// either file were needed for this slice.
-//
-// Source: dnd5eapi.co's 2014 spell set (/api/2014/classes/druid/spells,
-// which enumerates exactly 106 spells — 7 cantrips, 16 L1, 17 L2, 12 L3,
-// 16 L4, 14 L5, 9 L6, 5 L7, 6 L8, 4 L9). Cross-checked against a second
-// source (open5e's srd-2014 document, same 319-spell total the Wizard/Cleric
-// slices' own headers cite) and against each spell's own
-// /api/2014/spells/<slug> "classes" field for every ambiguous case. One
-// third-party list (5thsrd.org) disagreed on Meld into Stone — its own
-// dnd5eapi record tags "classes": [Cleric] only, with a "land" SUBCLASS tag
-// (Circle of the Land's bonus-spell list, not the base Druid class list)
-// explaining the third-party page's conflation; Meld into Stone is NOT
-// authored or membership-tagged here. Of the 106, 30 are Druid-owned
-// (authored below), 7 are Cleric-owned, 5 are Wizard-owned, and 64 are
-// shared — all cross-checked as described above.
-//
-// ADDENDUM (#1721, the Ranger slice): dnd5eapi's SRD-only dataset above
-// misses two more real PHB'14 Druid+Ranger 2-list spells entirely — Beast
-// Sense (L2) and Grasping Vine (L4) — found by #1721's authoritative-lookup
-// sweep (5etools' generated spell-source lookup) and added below per the
-// tie-break (Druid outranks Ranger), each cited PHB'14 p.NN individually and
-// cross-checked word-for-word against a second source (see their own
-// per-row comments). This file now owns 32 rows total (30 SRD + these 2
-// hand-transcribed), 109 total PHB'14 Druid spells (108 as of #1721, bumped
-// to 109 by #1742's Feign Death addition to shared.ts above).
-//
-// Every OTHER owned row below (the original 30) is verbatim SRD 5.1 text via
-// dnd5eapi, cited SRD 5.1 as a whole rather than per-row (this file's own
-// convention, matching cleric.ts/wizard.ts/shared.ts).
-// Structured effect fields (effectKind/dice/save/saveEffect/upcast) are
-// derived from that same API response's damage/dc JSON, then individually
-// audited against each row's own prose (dnd5eapi's dc/damage fields have
-// documented gaps — found on 9 rows in the Wizard slice, 2 in Cleric).
-//
-// This slice's own prose-vs-field audit found ONE such gap: Call Lightning's
-// dc field is null despite "Each creature ... must make a dexterity saving
-// throw. A creature takes 3d10 lightning damage on a failed save, or half as
-// much damage on a successful one" — hand-added attackType/saveAbility/
-// saveEffect from the row's own prose, same as the other slices' fixes.
-//
-// Scraping artifacts cleaned: dnd5eapi's "the GM" restored to this repo's
-// "the DM" (Conjure Animals, Conjure Woodland Beings, Divination x2, Giant
-// Insect x2, Awaken, Reincarnate x2, Conjure Fey — 10 occurrences across 7
-// rows); Druidcraft's stray literal quote marks around "range" removed
-// ("within 'range':" -> "within range:"); Druidcraft's "faint order of
-// skunk" corrected to the actual SRD text "faint odor of skunk" (verified
-// against a second source, 5esrd.com); Entangle's "starting form a point"
-// typo corrected to "starting from a point"; Conjure Animals' higher-level
-// clause restored a dropped trailing word ("three times as many with a
-// 7th-level" -> "...7th-level slot", matching Conjure Woodland Beings' own
-// complete phrasing for the identical mechanic one level up); Moonbeam's
-// "1dl0" OCR artifact corrected to "1d10"; Storm of Vengeance's markdown
-// "***Round N.***" sub-headings stripped of their asterisks
-// (SpellDetailCard has no markdown parser, matching Command's Approach/
-// Drop/Flee precedent in cleric.ts); Reincarnate's d100 race table
-// hand-converted from a literal markdown pipe table to prose, values
-// unchanged. "Pass without Trace" and "Commune with Nature" use this repo's
-// established lowercase-preposition title casing (dnd5eapi title-cases every
-// word) — matching "Pass without Trace"'s existing spelling everywhere else
-// in this codebase (spells.ts, subclass-granted-spells.ts, shadow-arts.ts).
-//
-// Structured-field calls worth flagging for the rules-accuracy pass:
-// - Heat Metal: the 2d8 fire damage triggers unconditionally when the object
-//   is touched (no attack roll, no save — matches Forbiddance's
-//   "unconditional hit" shape in cleric.ts); the constitution save only
-//   gates a SEPARATE consequence (dropping the object), not the damage
-//   itself, so attackType/saveAbility are left unset despite the save
-//   appearing in the prose — same "recurring save gates a side-effect, not
-//   the initial hit" shape as Contagion's melee-spell-attack precedent.
-// - Flame Blade: PHB'14's real upcast rate is "+1d6 for every TWO slot
-//   levels above 2nd" — upcastDicePerLevel is a per-1-level-only field, so
-//   it's left unset (same Spiritual Weapon precedent from cleric.ts); the
-//   description's own text is the only carrier of the actual rate.
-// - Barkskin: PHB'14's real mechanic is a 16 AC floor, REQUIRES
-//   concentration, and costs a full action to cast (dnd5eapi: concentration
-//   true, casting_time "1 action", "...can't be less than 16") — three
-//   separate, genuine differences from the 2024 SPELLS row (floor 17,
-//   non-concentration, "1 bonus action" — see that row's own comment).
-//   Reusing any of the 2024 row's values here would silently bleed the 2024
-//   revision into a 2014 row, the exact edition-mixing bug a prior slice's
-//   Chromatic Orb draft committed.
-// - Wall of Thorns: TWO separate damage instances (7d8 piercing when the
-//   wall appears, 7d8 slashing per turn spent moving through it) — no single
-//   effectKind/damageType captures both, matches Flame Strike/Ice Storm's
-//   multi-type precedent (utility row, numbers carried only in prose).
-// - Storm of Vengeance: five distinct rounds, each with its own save type
-//   (constitution round 1, dexterity round 3) and damage type (thunder,
-//   acid, lightning, bludgeoning, cold) — far past what one
-//   effectKind/dice/save triple can express, matches Meteor Swarm's "too
-//   complex, utility row" precedent even more strongly than Flame Strike's
-//   two-damage-type case.
-// - Goodberry: 1 hp per berry (up to 10) is a per-item flat amount, not a
-//   single dice/flat heal at cast time — utility row, matching Aid's
-//   "inexpressible as a dice heal" precedent shape (for a different
-//   structural reason here: per-consumed-item, not per-slot-level).
 import type { CatalogSpell } from "../spells.js";
 
+// SRD 5.1 (dnd5eapi.co) — verbatim text for every row below without its own citation.
 export const DRUID_SPELLS_2014: CatalogSpell[] = [
-  // ── Cantrips ──────────────────────────────────────────────────────────────
   {
     name: "Druidcraft",
     level: 0,
@@ -157,11 +40,7 @@ export const DRUID_SPELLS_2014: CatalogSpell[] = [
     description: "The wood of a club or a quarterstaff you are holding is imbued with nature's power. For the duration, you can use your spellcasting ability instead of Strength for the attack and damage rolls of melee attacks using that weapon, and the weapon's damage die becomes a d8. The weapon also becomes magical, if it isn't already. The spell ends if you cast it again or if you let go of the weapon.",
     classes: ["druid"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "mistletoe, a shamrock leaf, and a club or quarterstaff" },
-    // A weapon-die/attack-ability swap, not an AC buff — doesn't fit the
-    // ac/acFloor/acUnarmoredBase buff channel, matches Warding Bond's
-    // "too complex for the generic channel" precedent from cleric.ts.
   },
-  // ── Level 1 ───────────────────────────────────────────────────────────────
   {
     name: "Entangle",
     level: 1,
@@ -200,11 +79,7 @@ export const DRUID_SPELLS_2014: CatalogSpell[] = [
     description: "Up to ten berries appear in your hand and are infused with magic for the duration. A creature can use its action to eat one berry. Eating a berry restores 1 hit point, and the berry provides enough nourishment to sustain a creature for a day. The berries lose their potency if they have not been consumed within 24 hours of the casting of this spell.",
     classes: ["druid", "ranger"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "a sprig of mistletoe" },
-    // 1 hp per berry (up to 10, eaten one at a time over the duration) is a
-    // per-item flat amount, not a single dice/flat heal at cast time —
-    // utility row, matching Aid's "inexpressible as a dice heal" precedent.
   },
-  // ── Level 2 ───────────────────────────────────────────────────────────────
   {
     name: "Barkskin",
     level: 2,
@@ -216,23 +91,12 @@ export const DRUID_SPELLS_2014: CatalogSpell[] = [
     description: "You touch a willing creature. Until the spell ends, the target's skin has a rough, bark-like appearance, and the target's AC can't be less than 16, regardless of what kind of armor it is wearing.",
     classes: ["druid", "ranger"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "a handful of oak bark" },
-    // PHB'14: floor 16, concentration required, "1 action" to cast — the
-    // 2024 SPELLS row (floor 17, non-concentration, "1 bonus action") is a
-    // genuine three-part edition revision, not reused here (see this file's
-    // header).
+    // PHB'14: floor 16, concentration, cast as an action — the 2024 row (floor 17, non-concentration, bonus action) is a different edition's spell, not reused here.
     effectKind: "buff",
     buffTarget: "acFloor",
     buffModifier: 16,
   },
-  // PHB'14 p. 217. Not in dnd5eapi/open5e's SRD dataset. Found by #1721's
-  // (Ranger slice) authoritative-lookup sweep (5etools' generated
-  // spell-source lookup) — a genuine gap in this file's own SRD-only sweep,
-  // since Beast Sense isn't SRD content either. Cross-checked word-for-word
-  // against a second source (dnd5e.wikidot.com/spell:beast-sense), which
-  // corroborates 5etools' own PHB-sourced text exactly, including the
-  // ritual tag. Druid AND Ranger both carry base PHB'14 class access (no
-  // "(Optional)" tag on either in the lookup) — added here per the
-  // tie-break (Druid outranks Ranger), with a ranger membership tag.
+  // PHB'14 p. 217.
   {
     name: "Beast Sense",
     level: 2,
@@ -263,10 +127,7 @@ export const DRUID_SPELLS_2014: CatalogSpell[] = [
     effectDiceCount: 3,
     effectDiceFaces: 6,
     damageType: "fire",
-    // upcastDicePerLevel deliberately UNSET: PHB'14's real rate is "+1d6 for
-    // EVERY TWO slot levels above 2nd," not per-level — see this file's
-    // header (Spiritual Weapon precedent, cleric.ts). The description's own
-    // text is the only carrier of this row's actual upcast rule.
+    // upcastDicePerLevel deliberately unset: the real rate is +1d6 per TWO slot levels above 2nd, not per-level; the description carries the actual rule.
   },
   {
     name: "Heat Metal",
@@ -279,10 +140,7 @@ export const DRUID_SPELLS_2014: CatalogSpell[] = [
     description: "Choose a manufactured metal object, such as a metal weapon or a suit of heavy or medium metal armor, that you can see within range. You cause the object to glow red-hot. Any creature in physical contact with the object takes 2d8 fire damage when you cast the spell. Until the spell ends, you can use a bonus action on each of your subsequent turns to cause this damage again. If a creature is holding or wearing the object and takes the damage from it, the creature must succeed on a constitution saving throw or drop the object if it can. If it doesn't drop the object, it has disadvantage on attack rolls and ability checks until the start of your next turn. At Higher Levels. When you cast this spell using a spell slot of 3rd level or higher, the damage increases by 1d8 for each slot level above 2nd.",
     classes: ["druid", "bard"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "a piece of iron and a flame" },
-    // Damage is unconditional (no attack roll, no save gates it — see this
-    // file's header); attackType/saveAbility deliberately unset despite the
-    // constitution save appearing in the prose, since that save only decides
-    // whether the object is dropped, a separate consequence.
+    // Damage is unconditional; the constitution save only decides whether the object is dropped, a separate consequence.
     effectKind: "damage",
     effectDiceCount: 2,
     effectDiceFaces: 8,
@@ -320,8 +178,6 @@ export const DRUID_SPELLS_2014: CatalogSpell[] = [
     description: "A veil of shadows and silence radiates from you, masking you and your companions from detection. For the duration, each creature you choose within 30 feet of you (including you) has a +10 bonus to Dexterity (Stealth) checks and can't be tracked except by magical means. A creature that receives this bonus leaves behind no tracks or other traces of its passage.",
     classes: ["druid", "ranger"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "ashes from a burned leaf of mistletoe and a sprig of spruce" },
-    // A +10 Stealth-check bonus, not an AC buff — doesn't fit the buff
-    // channel (ac/acFloor/acUnarmoredBase only), utility row.
   },
   {
     name: "Spike Growth",
@@ -334,11 +190,7 @@ export const DRUID_SPELLS_2014: CatalogSpell[] = [
     description: "The ground in a 20-foot radius centered on a point within range twists and sprouts hard spikes and thorns. The area becomes difficult terrain for the duration. When a creature moves into or within the area, it takes 2d4 piercing damage for every 5 feet it travels. The transformation of the ground is camouflaged to look natural. Any creature that can't see the area at the time the spell is cast can make a Wisdom (Perception) check against your spell save DC to recognize the terrain as hazardous before entering it.",
     classes: ["druid", "ranger"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "seven sharp thorns or seven small twigs, each sharpened to a point" },
-    // Damage scales with distance MOVED (2d4 per 5 feet), not a single
-    // fixed-dice hit gated by an attack or save — no attackType/effectKind
-    // combination expresses a per-5-feet-traveled hazard, utility row.
   },
-  // ── Level 3 ───────────────────────────────────────────────────────────────
   {
     name: "Call Lightning",
     level: 3,
@@ -350,10 +202,6 @@ export const DRUID_SPELLS_2014: CatalogSpell[] = [
     description: "A storm cloud appears in the shape of a cylinder that is 10 feet tall with a 60-foot radius, centered on a point you can see 100 feet directly above you. The spell fails if you can't see a point in the air where the storm cloud could appear (for example, if you are in a room that can't accommodate the cloud). When you cast the spell, choose a point you can see within range. A bolt of lightning flashes down from the cloud to that point. Each creature within 5 feet of that point must make a dexterity saving throw. A creature takes 3d10 lightning damage on a failed save, or half as much damage on a successful one. On each of your turns until the spell ends, you can use your action to call down lightning in this way again, targeting the same point or a different one. If you are outdoors in stormy conditions when you cast this spell, the spell gives you control over the existing storm instead of creating a new one. Under such conditions, the spell's damage increases by 1d10. At Higher Levels. When you cast this spell using a spell slot of 4th level or higher, the damage increases by 1d10 for each slot level above 3rd.",
     classes: ["druid"],
     components: { verbal: true, somatic: true, material: false },
-    // dnd5eapi's own dc field is null despite the prose clearly gating on a
-    // dexterity save with half damage on success — same API-gap class as
-    // Flaming Sphere/Scorching Ray (#1714) and Sanctuary/Spirit Guardians
-    // (#1715). Hand-added from this row's own text, not a separate guess.
     attackType: "save",
     saveAbility: "dexterity",
     saveEffect: "half",
@@ -374,8 +222,6 @@ export const DRUID_SPELLS_2014: CatalogSpell[] = [
     description: "You summon fey spirits that take the form of beasts and appear in unoccupied spaces that you can see within range. Choose one of the following options for what appears: - One beast of challenge rating 2 or lower - Two beasts of challenge rating 1 or lower - Four beasts of challenge rating 1/2 or lower - Eight beasts of challenge rating 1/4 or lower. Each beast is also considered fey, and it disappears when it drops to 0 hit points or when the spell ends. The summoned creatures are friendly to you and your companions. Roll initiative for the summoned creatures as a group, which has its own turns. They obey any verbal commands that you issue to them (no action required by you). If you don't issue any commands to them, they defend themselves from hostile creatures, but otherwise take no actions. The DM has the creatures' statistics. At Higher Levels. When you cast this spell using certain higher-level spell slots, you choose one of the summoning options above, and more creatures appear: twice as many with a 5th-level slot, three times as many with a 7th-level slot.",
     classes: ["druid", "ranger"],
     components: { verbal: true, somatic: true, material: false },
-    // Summon spell — no single attack/save/damage/heal fits (matches Conjure
-    // Woodland Beings/Conjure Fey/Planar Ally's precedent), utility row.
   },
   {
     name: "Wind Wall",
@@ -395,10 +241,7 @@ export const DRUID_SPELLS_2014: CatalogSpell[] = [
     effectDiceCount: 3,
     effectDiceFaces: 8,
     damageType: "bludgeoning",
-    // No "At Higher Levels" text in PHB'14 — this spell doesn't upcast,
-    // upcastDicePerLevel deliberately absent.
   },
-  // ── Level 4 ───────────────────────────────────────────────────────────────
   {
     name: "Conjure Woodland Beings",
     level: 4,
@@ -410,7 +253,6 @@ export const DRUID_SPELLS_2014: CatalogSpell[] = [
     description: "You summon fey creatures that appear in unoccupied spaces that you can see within range. Choose one of the following options for what appears: - One fey creature of challenge rating 2 or lower - Two fey creatures of challenge rating 1 or lower - Four fey creatures of challenge rating 1/2 or lower - Eight fey creatures of challenge rating 1/4 or lower. A summoned creature disappears when it drops to 0 hit points or when the spell ends. The summoned creatures are friendly to you and your companions. Roll initiative for the summoned creatures as a group, which have their own turns. They obey any verbal commands that you issue to them (no action required by you). If you don't issue any commands to them, they defend themselves from hostile creatures, but otherwise take no actions. The DM has the creatures' statistics. At Higher Levels. When you cast this spell using certain higher-level spell slots, you choose one of the summoning options above, and more creatures appear: twice as many with a 6th-level slot and three times as many with an 8th-level slot.",
     classes: ["druid", "ranger"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "one holly berry per creature summoned" },
-    // Summon spell, utility row — see Conjure Animals.
   },
   {
     name: "Divination",
@@ -449,18 +291,8 @@ export const DRUID_SPELLS_2014: CatalogSpell[] = [
     description: "You transform up to ten centipedes, three spiders, five wasps, or one scorpion within range into giant versions of their natural forms for the duration. A centipede becomes a giant centipede, a spider becomes a giant spider, a wasp becomes a giant wasp, and a scorpion becomes a giant scorpion. Each creature obeys your verbal commands, and in combat, they act on your turn each round. The DM has the statistics for these creatures and resolves their actions and movement. A creature remains in its giant size for the duration, until it drops to 0 hit points, or until you use an action to dismiss the effect on it. The DM might allow you to choose different targets. For example, if you transform a bee, its giant version might have the same statistics as a giant wasp.",
     classes: ["druid"],
     components: { verbal: true, somatic: true, material: false },
-    // Any damage dealt comes from the transformed creatures' own stat
-    // blocks, not this spell directly — utility row.
   },
-  // PHB'14 p. 246. Not in dnd5eapi/open5e's SRD dataset. Found by #1721's
-  // (Ranger slice) authoritative-lookup sweep — the same class of gap as
-  // Beast Sense above. Cross-checked word-for-word against a second source
-  // (dnd5e.wikidot.com/spell:grasping-vine), which corroborates 5etools' own
-  // PHB-sourced text exactly; neither source carries an "At Higher Levels"
-  // clause. Druid AND Ranger both carry base PHB'14 class access (no
-  // "(Optional)" tag on either) — added here per the tie-break, with a
-  // ranger membership tag. Pure pull/control effect (no damage at all) — a
-  // clean attackType:"save" row, same shape as Entangle above.
+  // PHB'14 p. 246.
   {
     name: "Grasping Vine",
     level: 4,
@@ -476,7 +308,6 @@ export const DRUID_SPELLS_2014: CatalogSpell[] = [
     attackType: "save",
     saveAbility: "dexterity",
   },
-  // ── Level 5 ───────────────────────────────────────────────────────────────
   {
     name: "Antilife Shell",
     level: 5,
@@ -535,7 +366,6 @@ export const DRUID_SPELLS_2014: CatalogSpell[] = [
     classes: ["druid", "ranger"],
     components: { verbal: true, somatic: true, material: false },
   },
-  // ── Level 6 ───────────────────────────────────────────────────────────────
   {
     name: "Conjure Fey",
     level: 6,
@@ -547,7 +377,6 @@ export const DRUID_SPELLS_2014: CatalogSpell[] = [
     description: "You summon a fey creature of challenge rating 6 or lower, or a fey spirit that takes the form of a beast of challenge rating 6 or lower. It appears in an unoccupied space that you can see within range. The fey creature disappears when it drops to 0 hit points or when the spell ends. The fey creature is friendly to you and your companions for the duration. Roll initiative for the creature, which has its own turns. It obeys any verbal commands that you issue to it (no action required by you), as long as they don't violate its alignment. If you don't issue any commands to the fey creature, it defends itself from hostile creatures but otherwise takes no actions. If your concentration is broken, the fey creature doesn't disappear. Instead, you lose control of the fey creature, it becomes hostile toward you and your companions, and it might attack. An uncontrolled fey creature can't be dismissed by you, and it disappears 1 hour after you summoned it. The DM has the fey creature's statistics. At Higher Levels. When you cast this spell using a spell slot of 7th level or higher, the challenge rating increases by 1 for each slot level above 6th.",
     classes: ["druid", "warlock"],
     components: { verbal: true, somatic: true, material: false },
-    // Summon spell, utility row — see Conjure Animals.
   },
   {
     name: "Transport via Plants",
@@ -571,10 +400,6 @@ export const DRUID_SPELLS_2014: CatalogSpell[] = [
     description: "You create a wall of tough, pliable, tangled brush bristling with needle-sharp thorns. The wall appears within range on a solid surface and lasts for the duration. You choose to make the wall up to 60 feet long, 10 feet high, and 5 feet thick or a circle that has a 20-foot diameter and is up to 20 feet high and 5 feet thick. The wall blocks line of sight. When the wall appears, each creature within its area must make a dexterity saving throw. On a failed save, a creature takes 7d8 piercing damage, or half as much damage on a successful save. A creature can move through the wall, albeit slowly and painfully. For every 1 foot a creature moves through the wall, it must spend 4 feet of movement. Furthermore, the first time a creature enters the wall on a turn or ends its turn there, the creature must make a dexterity saving throw. It takes 7d8 slashing damage on a failed save, or half as much damage on a successful one. At Higher Levels. When you cast this spell using a spell slot of 7th level or higher, both types of damage increase by 1d8 for each slot level above 6th.",
     classes: ["druid"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "a handful of thorns" },
-    // TWO separate damage instances (piercing on appearance, slashing while
-    // moving through) — see this file's header, matches Flame Strike/Ice
-    // Storm's multi-type precedent; utility row, numbers carried only in
-    // prose.
   },
   {
     name: "Wind Walk",
@@ -587,7 +412,6 @@ export const DRUID_SPELLS_2014: CatalogSpell[] = [
     classes: ["druid"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "fire and holy water" },
   },
-  // ── Level 8 ───────────────────────────────────────────────────────────────
   {
     name: "Animal Shapes",
     level: 8,
@@ -600,7 +424,6 @@ export const DRUID_SPELLS_2014: CatalogSpell[] = [
     classes: ["druid"],
     components: { verbal: true, somatic: true, material: false },
   },
-  // ── Level 9 ───────────────────────────────────────────────────────────────
   {
     name: "Storm of Vengeance",
     level: 9,
@@ -612,8 +435,5 @@ export const DRUID_SPELLS_2014: CatalogSpell[] = [
     description: "A churning storm cloud forms, centered on a point you can see and spreading to a radius of 360 feet. Lightning flashes in the area, thunder booms, and strong winds roar. Each creature under the cloud (no more than 5,000 feet beneath the cloud) when it appears must make a constitution saving throw. On a failed save, a creature takes 2d6 thunder damage and becomes deafened for 5 minutes. Each round you maintain concentration on this spell, the storm produces additional effects on your turn. Round 2. Acidic rain falls from the cloud. Each creature and object under the cloud takes 1d6 acid damage. Round 3. You call six bolts of lightning from the cloud to strike six creatures or objects of your choice beneath the cloud. A given creature or object can't be struck by more than one bolt. A struck creature must make a dexterity saving throw. The creature takes 10d6 lightning damage on a failed save, or half as much damage on a successful one. Round 4. Hailstones rain down from the cloud. Each creature under the cloud takes 2d6 bludgeoning damage. Round 5-10. Gusts and freezing rain assail the area under the cloud. The area becomes difficult terrain and is heavily obscured. Each creature there takes 1d6 cold damage. Ranged weapon attacks in the area are impossible. The wind and rain count as a severe distraction for the purposes of maintaining concentration on spells. Finally, gusts of strong wind (ranging from 20 to 50 miles per hour) automatically disperse fog, mists, and similar phenomena in the area, whether mundane or magical.",
     classes: ["druid"],
     components: { verbal: true, somatic: true, material: false },
-    // Five distinct rounds, each its own save type and damage type — see
-    // this file's header (Meteor Swarm precedent); utility row, numbers
-    // carried only in prose.
   },
 ];

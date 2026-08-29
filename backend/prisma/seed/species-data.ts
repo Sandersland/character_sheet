@@ -1,31 +1,5 @@
-// Species catalog seed data (#1679, epic #1518) — pure data, no Prisma, no
-// side effects (same split as catalog-data.ts's CLASSES/BACKGROUNDS). Executable
-// upsert logic lives in seed-species.ts, mirroring subclasses.ts/seed-
-// subclasses.ts's split.
-//
-// Wave-1 rosters only (epic body "Owner decisions" 6 / review decision 9):
-// 2014 = the 9 PHB'14 races with the FULL PHB'14 subrace list (exceeds SRD
-// 5.1, which carries one subrace per race). Variant Human is EXCLUDED (wave 2,
-// after #1690). 2024 = the 10 PHB'24 species; no Half-Elf/Half-Orc, adds
-// Aasimar/Goliath/Orc. Every speed verified against SRD 5.1 / SRD 5.2 text
-// (2026-08-04 research pass) — PHB'14 Dwarf 25 ft vs PHB'24 Dwarf 30 ft is
-// the canary this epic names explicitly.
-//
-// Dragonborn's Draconic Ancestry is seeded as SpeciesVariant rows in BOTH
-// editions (epic review decision 7) — same 10 dragon types (five chromatic,
-// five metallic) in both PHB'14 and PHB'24; the breath-weapon/resistance
-// TRAIT content each type grants is authored later (#1682/#1683), so these
-// rows carry identity only (name + slug), no abilityIncreases (draconic
-// ancestry has never granted an ability score bonus in either edition) and no
-// speedOverride.
-//
-// #1683 (slice 6): the remaining 2024 lineage/legacy/ancestry variants — Elf
-// (Drow/High Elf/Wood Elf), Gnome (Forest/Rock), Tiefling (Abyssal/Chthonic/
-// Infernal), Goliath (the six Giant Ancestry benefits) — via the elfLineage
-// Variants/gnomishLineageVariants/fiendishLegacyVariants/giantAncestryVariants
-// helpers below. Every 2024 species row's `abilityIncreases` is `[]` (species
-// or variant): 2024 ability increases come from backgrounds only (#1572),
-// never species — pinned by a negative test in species-data.test.ts.
+// Pure data, no Prisma, no side effects — the upsert logic lives in seedSpecies (seed-species.ts).
+// 2014 species use the full PHB'14 subrace list (SRD 5.1 covers only one subrace per race).
 import { z } from "zod";
 
 import { abilityIncreasesSchema, type AbilityIncreaseSpec } from "../../src/lib/srd/species-ability-increases.js";
@@ -36,10 +10,7 @@ export interface SpeciesVariantSeed {
   slug: string;
   speedOverride?: number;
   abilityIncreases?: AbilityIncreaseSpec[];
-  // When true, abilityIncreases REPLACES the parent species' increases instead
-  // of stacking on them at creation (#1751 — Astral Elf; see the schema comment
-  // on SpeciesVariant.abilityIncreasesReplace). Omit (= additive) for every
-  // real subrace.
+  // When true, abilityIncreases REPLACES the parent species' increases instead of stacking on them at creation (#1751 — Astral Elf). Omit (= additive) for every real subrace.
   abilityIncreasesReplace?: boolean;
 }
 
@@ -52,12 +23,7 @@ export interface SpeciesSeed {
   variants?: SpeciesVariantSeed[];
 }
 
-// Validated at seed time (prisma/seed/validate.ts), same "fail the seed with a
-// row-indexed message" role as subclassSeedSchema. Unlike Subclass/Feat/
-// Background's optional `edition` (#1306's "NULL = shared" convention),
-// `edition` here is REQUIRED — a species row with no edition is a bug, never
-// "valid in both" (see Species's own schema comment). Not exported: nested
-// inside speciesSeedSchema below, no cross-file consumer of the bare shape.
+// Unlike Subclass/Feat/Background's optional `edition` (#1306's "NULL = shared" convention), `edition` here is REQUIRED — a species row with no edition is a bug, never "valid in both".
 const speciesVariantSeedSchema = z
   .object({
     name: z.string().min(1),
@@ -79,9 +45,7 @@ export const speciesSeedSchema = z
   })
   .strict();
 
-// The 10 PHB'14/PHB'24 Draconic Ancestry dragon types (SRD 5.1 p. 33 table /
-// SRD 5.2 p. 39 table) — identical type list in both editions; only the
-// damage type/breath-weapon shape per type (slice 4/6 content) ever forks.
+// The 10 Draconic Ancestry dragon types (SRD 5.1 p.33 table / SRD 5.2 p.39 table) — identical list in both editions; only the damage type/breath-weapon shape per type ever forks.
 const DRAGON_ANCESTRY_TYPES = [
   "Black",
   "Blue",
@@ -129,12 +93,7 @@ const SPECIES_2014: SpeciesSeed[] = [
         abilityIncreases: [{ ability: "wisdom", amount: 1 }],
       },
       { name: "Drow", slug: "drow", abilityIncreases: [{ ability: "charisma", amount: 1 }] },
-      // Astral Elf (Spelljammer: Astral Adventurer's Guide, non-SRD/non-PHB) —
-      // #1751. A standalone race modelled as an Elf variant so it nests in the
-      // species→variant picker, but its ability increase is the Tasha's-era
-      // floating "+2/+1 or +1/+1/+1" pool ({ floating: 3 }), which REPLACES the
-      // base Elf's +2 DEX rather than stacking (abilityIncreasesReplace) — an
-      // Astral Elf is not a PHB elf subrace and does not get +2 DEX.
+      // Astral Elf (Spelljammer, non-SRD/non-PHB, #1751): modelled as an Elf variant, but its ability increase is the floating Tasha's-era pool ({ floating: 3 }), which REPLACES the base Elf's +2 DEX via abilityIncreasesReplace since it is not a PHB elf subrace.
       {
         name: "Astral Elf",
         slug: "astral",
@@ -159,7 +118,7 @@ const SPECIES_2014: SpeciesSeed[] = [
     slug: "human",
     speed: 30, // SRD 5.1 p. 31
     edition: "EDITION_2014",
-    // Variant Human excluded from wave 1 (epic review decision 9).
+    // Variant Human is not yet seeded.
     abilityIncreases: [
       { ability: "strength", amount: 1 },
       { ability: "dexterity", amount: 1 },
@@ -229,16 +188,8 @@ const SPECIES_2014: SpeciesSeed[] = [
   },
 ];
 
-// #1683: the 2024 lineage/legacy/ancestry variants — identity rows only (name
-// + slug [+ speedOverride for Wood Elf]), never an abilityIncreases entry (no
-// 2024 species/variant ever grants one, #1572). The spell-granting rows'
-// actual SpeciesGrantedSpell content lives in species-granted-spells-data.ts;
-// their announce-text trait rows (resistances, Fiendish Legacy/Giant Ancestry
-// framing, Superior Darkvision) live in species-traits-data.ts. Aasimar's
-// Celestial Revelation is deliberately NOT here — verified against SRD 5.2 p.
-// 12/PHB'24 p. 16 (2026-08-04 research pass): it's a Bonus Action transformation
-// unlocked at character level 3 and re-chosen every time you use it, not a
-// creation-time lineage pick — see the PR description for the full ruling.
+// #1683: 2024 lineage/legacy/ancestry variants — SpeciesGrantedSpell content lives in SPECIES_GRANTED_SPELLS; announce-text trait rows (resistances, framing, Superior Darkvision) live in SPECIES_TRAITS.
+// Aasimar's Celestial Revelation is deliberately not modelled here (SRD 5.2 p.12/PHB'24 p.16): it's a Bonus Action transformation re-chosen every use, not a creation-time lineage pick.
 function elfLineageVariants(): SpeciesVariantSeed[] {
   return [
     { name: "Drow", slug: "drow" },
@@ -262,11 +213,7 @@ function fiendishLegacyVariants(): SpeciesVariantSeed[] {
   ];
 }
 
-// SRD 5.2 p. 32's Giant Ancestry table — six benefits, one chosen at creation
-// (re-selectable on a level up per the book, but the app bakes the creation
-// pick like every other species choice, #1681's "no reversible delta" shape).
-// No abilityIncreases (never one in 2024) and no SpeciesGrantedSpell rows
-// (none of the six benefits cast a spell) — pure trait content, #1682-shaped.
+// SRD 5.2 p.32's Giant Ancestry table — six benefits, one chosen at creation; the book allows re-selecting on level up, but the app bakes the creation pick (#1681's no-reversible-delta shape). No abilityIncreases and no SpeciesGrantedSpell rows — pure trait content.
 function giantAncestryVariants(): SpeciesVariantSeed[] {
   return [
     { name: "Cloud's Jaunt", slug: "cloud" },
@@ -278,9 +225,7 @@ function giantAncestryVariants(): SpeciesVariantSeed[] {
   ];
 }
 
-// PHB'24/SRD 5.2: no species carries an ability increase (backgrounds do,
-// #1572) — every row below has an empty (default) abilityIncreases. Every
-// speed is 30 ft except Goliath's 35 ft (SRD 5.2's own stated exception).
+// PHB'24/SRD 5.2: no species carries an ability increase (backgrounds do, #1572). Every speed is 30 ft except Goliath's 35 ft (SRD 5.2's own stated exception).
 const SPECIES_2024: SpeciesSeed[] = [
   { name: "Aasimar", slug: "aasimar", speed: 30, edition: "EDITION_2024" },
   {
